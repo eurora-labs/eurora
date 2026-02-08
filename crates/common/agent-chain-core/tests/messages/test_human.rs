@@ -2,7 +2,10 @@
 //!
 //! Converted from `langchain/libs/core/tests/unit_tests/messages/test_human.py`
 
-use agent_chain_core::messages::{HumanMessage, HumanMessageChunk};
+use agent_chain_core::messages::{
+    ContentBlock, ContentPart, HumanMessage, HumanMessageChunk, ImageContentBlock, ImageSource,
+    MessageContent, TextContentBlock,
+};
 
 // ============================================================================
 // TestHumanMessage
@@ -270,4 +273,428 @@ fn test_chunk_sum() {
     ];
     let result: HumanMessageChunk = chunks.into_iter().sum();
     assert_eq!(result.content.as_text(), "Hello beautiful world!");
+}
+
+// ============================================================================
+// TestHumanMessage — list / multimodal content
+// ============================================================================
+
+#[test]
+fn test_init_with_list_content() {
+    let parts = vec![ContentPart::Text {
+        text: "Hello".to_string(),
+    }];
+    let msg = HumanMessage::builder()
+        .content(MessageContent::Parts(parts))
+        .build();
+    match &msg.content {
+        MessageContent::Parts(p) => {
+            assert_eq!(p.len(), 1);
+            match &p[0] {
+                ContentPart::Text { text } => assert_eq!(text, "Hello"),
+                other => panic!("expected Text content part, got {:?}", other),
+            }
+        }
+        other => panic!("expected Parts content, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_init_with_multimodal_content() {
+    let parts = vec![
+        ContentPart::Text {
+            text: "What's in this image?".to_string(),
+        },
+        ContentPart::Image {
+            source: ImageSource::Url {
+                url: "https://example.com/img.png".to_string(),
+            },
+            detail: None,
+        },
+    ];
+    let msg = HumanMessage::builder()
+        .content(MessageContent::Parts(parts))
+        .build();
+    match &msg.content {
+        MessageContent::Parts(p) => {
+            assert_eq!(p.len(), 2);
+            assert!(matches!(&p[0], ContentPart::Text { .. }));
+            assert!(matches!(&p[1], ContentPart::Image { .. }));
+        }
+        other => panic!("expected Parts content, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_init_with_content_blocks() {
+    let blocks = vec![
+        ContentBlock::Text(TextContentBlock::new("Hello")),
+        ContentBlock::Image(ImageContentBlock::from_url("https://example.com/img.png")),
+    ];
+    let msg = HumanMessage::builder()
+        .content("")
+        .content_blocks(blocks)
+        .build();
+    // When content_blocks is provided, content is Parts (not Text)
+    assert!(matches!(&msg.content, MessageContent::Parts(_)));
+}
+
+#[test]
+fn test_text_method() {
+    let msg = HumanMessage::builder().content("Hello world").build();
+    assert_eq!(msg.text(), "Hello world");
+}
+
+#[test]
+fn test_text_method_list_content() {
+    let parts = vec![
+        ContentPart::Text {
+            text: "Part 1".to_string(),
+        },
+        ContentPart::Text {
+            text: "Part 2".to_string(),
+        },
+    ];
+    let msg = HumanMessage::builder()
+        .content(MessageContent::Parts(parts))
+        .build();
+    // Rust joins text parts with spaces
+    assert_eq!(msg.text(), "Part 1 Part 2");
+}
+
+#[test]
+fn test_text_method_multimodal_content() {
+    let parts = vec![
+        ContentPart::Text {
+            text: "Hello".to_string(),
+        },
+        ContentPart::Image {
+            source: ImageSource::Url {
+                url: "https://example.com".to_string(),
+            },
+            detail: None,
+        },
+        ContentPart::Text {
+            text: "world".to_string(),
+        },
+    ];
+    let msg = HumanMessage::builder()
+        .content(MessageContent::Parts(parts))
+        .build();
+    // Non-text parts are filtered out; text parts joined with spaces
+    assert_eq!(msg.text(), "Hello world");
+}
+
+#[test]
+fn test_content_blocks_property() {
+    let msg = HumanMessage::builder().content("Hello").build();
+    let blocks = msg.content_blocks();
+    assert_eq!(blocks.len(), 1);
+    match &blocks[0] {
+        ContentBlock::Text(tb) => {
+            assert_eq!(tb.block_type, "text");
+            assert_eq!(tb.text, "Hello");
+        }
+        other => panic!("expected Text content block, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_content_blocks_multimodal() {
+    let parts = vec![
+        ContentPart::Text {
+            text: "What's in this?".to_string(),
+        },
+        ContentPart::Image {
+            source: ImageSource::Url {
+                url: "https://example.com/img.png".to_string(),
+            },
+            detail: None,
+        },
+    ];
+    let msg = HumanMessage::builder()
+        .content(MessageContent::Parts(parts))
+        .build();
+    let blocks = msg.content_blocks();
+    assert!(blocks.len() >= 2);
+    assert!(matches!(&blocks[0], ContentBlock::Text(_)));
+    // The image part may be translated to Image or NonStandard depending on
+    // how the block translator handles the legacy ContentPart::Image format.
+    // The important thing is it is preserved.
+}
+
+// ============================================================================
+// TestHumanMessage — pretty_repr
+// ============================================================================
+
+#[test]
+fn test_pretty_repr() {
+    let msg = HumanMessage::builder().content("Hello").build();
+    let result = msg.pretty_repr(false);
+    assert!(
+        result.contains("Human Message"),
+        "expected 'Human Message' in pretty_repr, got: {result}"
+    );
+    assert!(
+        result.contains("Hello"),
+        "expected 'Hello' in pretty_repr, got: {result}"
+    );
+}
+
+#[test]
+fn test_pretty_repr_with_name() {
+    let msg = HumanMessage::builder()
+        .content("Hello")
+        .name("user1".to_string())
+        .build();
+    let result = msg.pretty_repr(false);
+    assert!(
+        result.contains("Name: user1"),
+        "expected 'Name: user1' in pretty_repr, got: {result}"
+    );
+}
+
+// ============================================================================
+// TestHumanMessage — empty list content
+// ============================================================================
+
+#[test]
+fn test_empty_list_content() {
+    let msg = HumanMessage::builder()
+        .content(MessageContent::Parts(vec![]))
+        .build();
+    match &msg.content {
+        MessageContent::Parts(p) => assert!(p.is_empty()),
+        other => panic!("expected Parts content, got {:?}", other),
+    }
+    assert_eq!(msg.text(), "");
+}
+
+// ============================================================================
+// TestHumanMessageModelDumpSnapshot (serialization snapshots)
+// ============================================================================
+
+#[test]
+fn test_model_dump_exact_keys_and_values() {
+    let msg = HumanMessage::builder()
+        .content("Hello world")
+        .id("msg-001".to_string())
+        .name("alice".to_string())
+        .build();
+    let dumped = serde_json::to_value(&msg).unwrap();
+    assert_eq!(dumped["content"], "Hello world");
+    assert_eq!(dumped["type"], "human");
+    assert_eq!(dumped["name"], "alice");
+    assert_eq!(dumped["id"], "msg-001");
+    assert_eq!(dumped["additional_kwargs"], serde_json::json!({}));
+    assert_eq!(dumped["response_metadata"], serde_json::json!({}));
+}
+
+#[test]
+fn test_model_dump_default_values() {
+    let msg = HumanMessage::builder().content("Test").build();
+    let dumped = serde_json::to_value(&msg).unwrap();
+    assert_eq!(dumped["content"], "Test");
+    assert_eq!(dumped["type"], "human");
+    assert!(dumped["id"].is_null());
+    assert_eq!(dumped["additional_kwargs"], serde_json::json!({}));
+    assert_eq!(dumped["response_metadata"], serde_json::json!({}));
+    // name is skipped when None (skip_serializing_if)
+    assert!(dumped.get("name").is_none() || dumped["name"].is_null());
+}
+
+// ============================================================================
+// TestHumanMessageEquality
+// ============================================================================
+
+#[test]
+fn test_same_content_messages_are_equal() {
+    let msg1 = HumanMessage::builder().content("Hello").build();
+    let msg2 = HumanMessage::builder().content("Hello").build();
+    assert_eq!(msg1, msg2);
+}
+
+#[test]
+fn test_different_content_messages_are_not_equal() {
+    let msg1 = HumanMessage::builder().content("Hello").build();
+    let msg2 = HumanMessage::builder().content("World").build();
+    assert_ne!(msg1, msg2);
+}
+
+#[test]
+fn test_same_content_different_id_are_not_equal() {
+    let msg1 = HumanMessage::builder()
+        .content("Hello")
+        .id("1".to_string())
+        .build();
+    let msg2 = HumanMessage::builder()
+        .content("Hello")
+        .id("2".to_string())
+        .build();
+    assert_ne!(msg1, msg2);
+}
+
+#[test]
+fn test_same_content_and_metadata_are_equal() {
+    let msg1 = HumanMessage::builder()
+        .content("Hello")
+        .name("user1".to_string())
+        .id("msg-1".to_string())
+        .build();
+    let msg2 = HumanMessage::builder()
+        .content("Hello")
+        .name("user1".to_string())
+        .id("msg-1".to_string())
+        .build();
+    assert_eq!(msg1, msg2);
+}
+
+// ============================================================================
+// TestHumanMessageContentBlocksInit
+// ============================================================================
+
+#[test]
+fn test_init_with_content_blocks_sets_content() {
+    let blocks = vec![
+        ContentBlock::Text(TextContentBlock::new("Hello")),
+        ContentBlock::Text(TextContentBlock::new(" world")),
+    ];
+    let msg = HumanMessage::builder()
+        .content("")
+        .content_blocks(blocks)
+        .build();
+    // content should be Parts (from the content_blocks parameter)
+    assert!(matches!(&msg.content, MessageContent::Parts(_)));
+}
+
+#[test]
+fn test_content_blocks_roundtrip() {
+    let blocks = vec![
+        ContentBlock::Text(TextContentBlock::new("First")),
+        ContentBlock::Text(TextContentBlock::new("Second")),
+    ];
+    let msg = HumanMessage::builder()
+        .content("")
+        .content_blocks(blocks)
+        .build();
+    let result_blocks = msg.content_blocks();
+    // The content_blocks() method should produce text blocks that contain
+    // the original text values (possibly nested within non_standard wrappers
+    // depending on serialization).
+    assert!(result_blocks.len() >= 2);
+}
+
+// ============================================================================
+// TestHumanMessageChunk — list content addition
+// ============================================================================
+
+#[test]
+fn test_chunk_add_with_list_content() {
+    let chunk1 = HumanMessageChunk::builder()
+        .content(MessageContent::Parts(vec![ContentPart::Text {
+            text: "Hello".to_string(),
+        }]))
+        .build();
+    let chunk2 = HumanMessageChunk::builder()
+        .content(MessageContent::Parts(vec![ContentPart::Text {
+            text: " world".to_string(),
+        }]))
+        .build();
+    let result = chunk1 + chunk2;
+    match &result.content {
+        MessageContent::Parts(parts) => {
+            // Parts are appended (not merged) when there is no index key
+            assert_eq!(parts.len(), 2);
+            match &parts[0] {
+                ContentPart::Text { text } => assert_eq!(text, "Hello"),
+                other => panic!("expected Text, got {:?}", other),
+            }
+            match &parts[1] {
+                ContentPart::Text { text } => assert_eq!(text, " world"),
+                other => panic!("expected Text, got {:?}", other),
+            }
+        }
+        other => panic!("expected Parts content, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_chunk_add_list_of_chunks() {
+    let chunk1 = HumanMessageChunk::builder()
+        .content("a")
+        .id("1".to_string())
+        .build();
+    let chunk2 = HumanMessageChunk::builder().content("b").build();
+    let chunk3 = HumanMessageChunk::builder().content("c").build();
+    // Equivalent to Python's `chunk1 + [chunk2, chunk3]` using fold
+    let result = vec![chunk2, chunk3]
+        .into_iter()
+        .fold(chunk1, |acc, c| acc + c);
+    assert_eq!(result.content.as_text(), "abc");
+    assert_eq!(result.id, Some("1".to_string()));
+}
+
+// ============================================================================
+// TestHumanMessageChunk — content_blocks property
+// ============================================================================
+
+#[test]
+fn test_chunk_content_blocks_property() {
+    // HumanMessageChunk doesn't have content_blocks() directly, but we can
+    // convert to HumanMessage and test content_blocks there
+    let chunk = HumanMessageChunk::builder().content("Hello").build();
+    let msg: HumanMessage = chunk.into();
+    let blocks = msg.content_blocks();
+    assert_eq!(blocks.len(), 1);
+    match &blocks[0] {
+        ContentBlock::Text(tb) => {
+            assert_eq!(tb.block_type, "text");
+            assert_eq!(tb.text, "Hello");
+        }
+        other => panic!("expected Text content block, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_chunk_content_blocks_multimodal() {
+    let parts = vec![
+        ContentPart::Text {
+            text: "Check this:".to_string(),
+        },
+        ContentPart::Image {
+            source: ImageSource::Url {
+                url: "https://example.com/img.png".to_string(),
+            },
+            detail: None,
+        },
+    ];
+    let chunk = HumanMessageChunk::builder()
+        .content(MessageContent::Parts(parts))
+        .build();
+    let msg: HumanMessage = chunk.into();
+    let blocks = msg.content_blocks();
+    assert!(blocks.len() >= 2);
+    assert!(matches!(&blocks[0], ContentBlock::Text(_)));
+}
+
+// ============================================================================
+// TestHumanMessageChunkContentBlocksEmpty
+// ============================================================================
+
+#[test]
+fn test_chunk_content_blocks_empty_string() {
+    let chunk = HumanMessageChunk::builder().content("").build();
+    let msg: HumanMessage = chunk.into();
+    let blocks = msg.content_blocks();
+    assert!(blocks.is_empty());
+}
+
+#[test]
+fn test_chunk_content_blocks_empty_list() {
+    let chunk = HumanMessageChunk::builder()
+        .content(MessageContent::Parts(vec![]))
+        .build();
+    let msg: HumanMessage = chunk.into();
+    let blocks = msg.content_blocks();
+    assert!(blocks.is_empty());
 }

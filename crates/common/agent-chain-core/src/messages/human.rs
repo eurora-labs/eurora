@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 use super::base::{get_msg_title_repr, is_interactive_env, merge_content};
 use super::content::{ContentBlock, ContentPart, KNOWN_BLOCK_TYPES, MessageContent};
-use crate::utils::merge::merge_dicts;
+use crate::utils::merge::{merge_dicts, merge_lists};
 
 /// A human message in the conversation.
 ///
@@ -439,9 +439,31 @@ impl HumanMessageChunk {
                 MessageContent::Text(merge_content(a, b))
             }
             (MessageContent::Parts(a), MessageContent::Parts(b)) => {
-                let mut parts = a.clone();
-                parts.extend(b.clone());
-                MessageContent::Parts(parts)
+                // Serialize parts to JSON Values for index-aware merging
+                let left: Vec<serde_json::Value> = a
+                    .iter()
+                    .filter_map(|p| serde_json::to_value(p).ok())
+                    .collect();
+                let right: Vec<serde_json::Value> = b
+                    .iter()
+                    .filter_map(|p| serde_json::to_value(p).ok())
+                    .collect();
+                // Use merge_lists for index-aware merging (matching Python behavior)
+                match merge_lists(Some(left.clone()), vec![Some(right.clone())]) {
+                    Ok(Some(merged)) => {
+                        let parts: Vec<ContentPart> = merged
+                            .into_iter()
+                            .filter_map(|v| serde_json::from_value(v).ok())
+                            .collect();
+                        MessageContent::Parts(parts)
+                    }
+                    _ => {
+                        // Fallback: simple extend
+                        let mut parts = a.clone();
+                        parts.extend(b.clone());
+                        MessageContent::Parts(parts)
+                    }
+                }
             }
             (MessageContent::Text(a), MessageContent::Parts(b)) => {
                 let mut parts = vec![ContentPart::Text { text: a.clone() }];
