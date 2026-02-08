@@ -56,6 +56,15 @@ use super::utils::{ConfigurableFieldSpec, get_unique_config_specs};
 /// assert_eq!(with_fallbacks.invoke(3, None).unwrap(), 6);
 /// assert_eq!(with_fallbacks.invoke(10, None).unwrap(), 10);
 /// ```
+/// Predicate for determining whether a fallback should be attempted for a given error.
+pub type FallbackErrorPredicate = Arc<dyn Fn(&Error) -> bool + Send + Sync>;
+
+/// Type alias for a function that inserts an exception into an input.
+///
+/// When `exception_key` is set, this function is called to create a modified
+/// input that includes the exception information under the specified key.
+pub type ExceptionInserter<I> = Arc<dyn Fn(&I, &str, &Error) -> I + Send + Sync>;
+
 pub struct RunnableWithFallbacks<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
@@ -65,10 +74,14 @@ where
     pub runnable: DynRunnable<I, O>,
     /// A sequence of fallbacks to try.
     pub fallbacks: Vec<DynRunnable<I, O>>,
-    /// Whether to handle all errors (true) or specific error types.
-    /// In Rust, we simplify the Python's `exceptions_to_handle` to a boolean flag
-    /// since we don't have the same exception hierarchy.
-    pub handle_all_errors: bool,
+    /// Predicate to determine which errors should trigger a fallback.
+    /// If None, all errors trigger fallback (equivalent to Python's default `(Exception,)`).
+    pub error_predicate: Option<FallbackErrorPredicate>,
+    /// If set, handled exceptions will be passed to fallbacks as part of the input
+    /// under the specified key. The input must be a dict-like type.
+    pub exception_key: Option<String>,
+    /// Function to insert an exception into the input when `exception_key` is set.
+    exception_inserter: Option<ExceptionInserter<I>>,
     /// Optional name for this runnable.
     name: Option<String>,
 }
@@ -82,7 +95,11 @@ where
         f.debug_struct("RunnableWithFallbacks")
             .field("runnable", &"<runnable>")
             .field("fallbacks_count", &self.fallbacks.len())
-            .field("handle_all_errors", &self.handle_all_errors)
+            .field(
+                "error_predicate",
+                &self.error_predicate.as_ref().map(|_| "..."),
+            )
+            .field("exception_key", &self.exception_key)
             .field("name", &self.name)
             .finish()
     }
@@ -105,7 +122,9 @@ where
         Self {
             runnable: Arc::new(runnable),
             fallbacks,
-            handle_all_errors: true,
+            error_predicate: None,
+            exception_key: None,
+            exception_inserter: None,
             name: None,
         }
     }
@@ -115,17 +134,35 @@ where
         Self {
             runnable,
             fallbacks,
-            handle_all_errors: true,
+            error_predicate: None,
+            exception_key: None,
+            exception_inserter: None,
             name: None,
         }
     }
 
-    /// Set whether to handle all errors.
+    /// Set a predicate to determine which errors should trigger fallback.
     ///
-    /// If true, any error will trigger fallback.
-    /// If false, only certain errors will trigger fallback (default: true).
-    pub fn with_handle_all_errors(mut self, handle_all_errors: bool) -> Self {
-        self.handle_all_errors = handle_all_errors;
+    /// If the predicate returns true for an error, fallback is attempted.
+    /// If it returns false, the error is raised immediately.
+    /// If no predicate is set, all errors trigger fallback.
+    pub fn with_error_predicate(mut self, predicate: FallbackErrorPredicate) -> Self {
+        self.error_predicate = Some(predicate);
+        self
+    }
+
+    /// Set the exception key with an inserter function.
+    ///
+    /// When set, handled exceptions are passed to fallback runnables as part of
+    /// the input under the specified key. The `inserter` function defines how
+    /// to create a new input with the exception value inserted.
+    pub fn with_exception_key(
+        mut self,
+        key: impl Into<String>,
+        inserter: ExceptionInserter<I>,
+    ) -> Self {
+        self.exception_key = Some(key.into());
+        self.exception_inserter = Some(inserter);
         self
     }
 
@@ -155,10 +192,11 @@ where
     }
 
     /// Check if an error should trigger a fallback.
-    fn should_fallback(&self, _error: &Error) -> bool {
-        // In the Python version, this checks if the error is an instance of
-        // exceptions_to_handle. In Rust, we simplify to a boolean flag.
-        self.handle_all_errors
+    fn should_fallback(&self, error: &Error) -> bool {
+        match &self.error_predicate {
+            Some(predicate) => predicate(error),
+            None => true,
+        }
     }
 }
 
@@ -187,8 +225,17 @@ where
         );
 
         let mut first_error: Option<Error> = None;
+        let mut last_error: Option<Error> = None;
+        let mut current_input = input;
 
         for runnable in self.runnables() {
+            // If exception_key is set, inject the last error into the input
+            if let (Some(key), Some(inserter), Some(err)) =
+                (&self.exception_key, &self.exception_inserter, &last_error)
+            {
+                current_input = inserter(&current_input, key, err);
+            }
+
             let child_config = patch_config(
                 Some(config.clone()),
                 Some(run_manager.get_child(None)),
@@ -198,7 +245,7 @@ where
                 None,
             );
 
-            match runnable.invoke(input.clone(), Some(child_config)) {
+            match runnable.invoke(current_input.clone(), Some(child_config)) {
                 Ok(output) => {
                     run_manager.on_chain_end(&std::collections::HashMap::new());
                     return Ok(output);
@@ -206,8 +253,9 @@ where
                 Err(e) => {
                     if self.should_fallback(&e) {
                         if first_error.is_none() {
-                            first_error = Some(e);
+                            first_error = Some(Error::other(e.to_string()));
                         }
+                        last_error = Some(e);
                     } else {
                         run_manager.on_chain_error(&e);
                         return Err(e);
@@ -233,17 +281,30 @@ where
         let config = ensure_config(config);
 
         let mut first_error: Option<Error> = None;
+        let mut last_error: Option<Error> = None;
+        let mut current_input = input;
 
         for runnable in self.runnables() {
-            match runnable.ainvoke(input.clone(), Some(config.clone())).await {
+            // If exception_key is set, inject the last error into the input
+            if let (Some(key), Some(inserter), Some(err)) =
+                (&self.exception_key, &self.exception_inserter, &last_error)
+            {
+                current_input = inserter(&current_input, key, err);
+            }
+
+            match runnable
+                .ainvoke(current_input.clone(), Some(config.clone()))
+                .await
+            {
                 Ok(output) => {
                     return Ok(output);
                 }
                 Err(e) => {
                     if self.should_fallback(&e) {
                         if first_error.is_none() {
-                            first_error = Some(e);
+                            first_error = Some(Error::other(e.to_string()));
                         }
+                        last_error = Some(e);
                     } else {
                         return Err(e);
                     }
@@ -306,9 +367,16 @@ where
                             if !handled_exception_indices.contains(i) {
                                 handled_exception_indices.push(*i);
                             }
-                            // Store the error for this index
+                            // If exception_key is set, inject exception into the input
+                            let next_input = if let (Some(key), Some(inserter)) =
+                                (&self.exception_key, &self.exception_inserter)
+                            {
+                                inserter(input, key, &e)
+                            } else {
+                                input.clone()
+                            };
                             to_return[*i] = Some(Err(e));
-                            next_run_again.push((*i, input.clone()));
+                            next_run_again.push((*i, next_input));
                         } else if return_exceptions {
                             to_return[*i] = Some(Err(e));
                         } else if first_to_raise.is_none() {
@@ -407,9 +475,16 @@ where
                             if !handled_exception_indices.contains(i) {
                                 handled_exception_indices.push(*i);
                             }
-                            // Store the error for this index
+                            // If exception_key is set, inject exception into the input
+                            let next_input = if let (Some(key), Some(inserter)) =
+                                (&self.exception_key, &self.exception_inserter)
+                            {
+                                inserter(input, key, &e)
+                            } else {
+                                input.clone()
+                            };
                             to_return[*i] = Some(Err(e));
-                            next_run_again.push((*i, input.clone()));
+                            next_run_again.push((*i, next_input));
                         } else if return_exceptions {
                             to_return[*i] = Some(Err(e));
                         } else if first_to_raise.is_none() {
@@ -463,10 +538,19 @@ where
 
         Box::pin(async_stream::stream! {
             let mut first_error: Option<Error> = None;
+            let mut last_error: Option<Error> = None;
+            let mut current_input = input;
 
             for runnable in self.runnables() {
+                // If exception_key is set, inject the last error into the input
+                if let (Some(key), Some(inserter), Some(err)) =
+                    (&self.exception_key, &self.exception_inserter, &last_error)
+                {
+                    current_input = inserter(&current_input, key, err);
+                }
+
                 // Try to get the first chunk from this runnable's stream
-                let mut stream = runnable.stream(input.clone(), Some(config.clone()));
+                let mut stream = runnable.stream(current_input.clone(), Some(config.clone()));
 
                 match stream.next().await {
                     Some(Ok(chunk)) => {
@@ -482,9 +566,9 @@ where
                     Some(Err(e)) => {
                         if self.should_fallback(&e) {
                             if first_error.is_none() {
-                                first_error = Some(e);
+                                first_error = Some(Error::other(e.to_string()));
                             }
-                            // Try next fallback
+                            last_error = Some(e);
                         } else {
                             yield Err(e);
                             return;
@@ -516,10 +600,19 @@ where
 
         Box::pin(async_stream::stream! {
             let mut first_error: Option<Error> = None;
+            let mut last_error: Option<Error> = None;
+            let mut current_input = input;
 
             for runnable in self.runnables() {
+                // If exception_key is set, inject the last error into the input
+                if let (Some(key), Some(inserter), Some(err)) =
+                    (&self.exception_key, &self.exception_inserter, &last_error)
+                {
+                    current_input = inserter(&current_input, key, err);
+                }
+
                 // Try to get the first chunk from this runnable's stream
-                let mut stream = runnable.astream(input.clone(), Some(config.clone()));
+                let mut stream = runnable.astream(current_input.clone(), Some(config.clone()));
 
                 match stream.next().await {
                     Some(Ok(chunk)) => {
@@ -535,9 +628,9 @@ where
                     Some(Err(e)) => {
                         if self.should_fallback(&e) {
                             if first_error.is_none() {
-                                first_error = Some(e);
+                                first_error = Some(Error::other(e.to_string()));
                             }
-                            // Try next fallback
+                            last_error = Some(e);
                         } else {
                             yield Err(e);
                             return;

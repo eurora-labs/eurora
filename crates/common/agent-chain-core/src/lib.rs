@@ -158,7 +158,7 @@ pub use output_parsers::{
     BaseCumulativeTransformOutputParser, BaseLLMOutputParser, BaseOutputParser,
     BaseTransformOutputParser, CommaSeparatedListOutputParser, JsonOutputParser, ListOutputParser,
     MarkdownListOutputParser, NumberedListOutputParser, OutputParserError, ParseMatch,
-    SimpleJsonOutputParser, StrOutputParser, XMLOutputParser, drop_last_n,
+    PydanticOutputParser, SimpleJsonOutputParser, StrOutputParser, XMLOutputParser, drop_last_n,
 };
 
 // Re-export output types

@@ -330,6 +330,69 @@ pub fn merge_configs(configs: Vec<Option<RunnableConfig>>) -> RunnableConfig {
     result
 }
 
+/// A callable that takes input and optionally a config.
+///
+/// This enum mirrors the Python `call_func_with_variable_args` pattern,
+/// where a function may or may not accept a `RunnableConfig` parameter.
+pub enum VariableArgsFn<I, O> {
+    /// A function that only takes input.
+    InputOnly(Box<dyn Fn(I) -> O + Send + Sync>),
+    /// A function that takes input and config.
+    WithConfig(Box<dyn Fn(I, &RunnableConfig) -> O + Send + Sync>),
+}
+
+/// Call a function that may optionally accept a config.
+///
+/// This mirrors Python's `call_func_with_variable_args`.
+pub fn call_func_with_variable_args<I, O>(
+    func: &VariableArgsFn<I, O>,
+    input: I,
+    config: &RunnableConfig,
+) -> O {
+    match func {
+        VariableArgsFn::InputOnly(f) => f(input),
+        VariableArgsFn::WithConfig(f) => f(input, config),
+    }
+}
+
+/// An async callable that takes input and optionally a config.
+pub enum AsyncVariableArgsFn<I, O> {
+    /// An async function that only takes input.
+    InputOnly(
+        Box<
+            dyn Fn(I) -> std::pin::Pin<Box<dyn std::future::Future<Output = O> + Send>>
+                + Send
+                + Sync,
+        >,
+    ),
+    /// An async function that takes input and config.
+    WithConfig(
+        Box<
+            dyn Fn(
+                    I,
+                    RunnableConfig,
+                )
+                    -> std::pin::Pin<Box<dyn std::future::Future<Output = O> + Send>>
+                + Send
+                + Sync,
+        >,
+    ),
+}
+
+/// Call an async function that may optionally accept a config.
+///
+/// This mirrors Python's `acall_func_with_variable_args`.
+pub async fn acall_func_with_variable_args<I, O>(
+    func: &AsyncVariableArgsFn<I, O>,
+    input: I,
+    config: &RunnableConfig,
+) -> O {
+    match func {
+        AsyncVariableArgsFn::InputOnly(f) => f(input).await,
+        AsyncVariableArgsFn::WithConfig(f) => f(input, config.clone()).await,
+    }
+}
+
 /// Get a callback manager configured from the given RunnableConfig.
 pub fn get_callback_manager_for_config(config: &RunnableConfig) -> CallbackManager {
     CallbackManager::configure(

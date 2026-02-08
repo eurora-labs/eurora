@@ -96,7 +96,7 @@ pub fn indent_lines_after_first(text: &str, prefix: &str) -> String {
 /// - Keys with null values in self are replaced
 /// - Values that support addition are added together
 /// - Otherwise the value from other replaces the value in self
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct AddableDict(pub HashMap<String, Value>);
 
 impl AddableDict {
@@ -218,7 +218,37 @@ pub trait Addable: Clone {
     fn add(self, other: Self) -> Self;
 }
 
-impl<T: Clone + std::ops::Add<Output = T>> Addable for T {
+impl Addable for String {
+    fn add(mut self, other: Self) -> Self {
+        self.push_str(&other);
+        self
+    }
+}
+
+impl<T: Clone> Addable for Vec<T> {
+    fn add(mut self, other: Self) -> Self {
+        self.extend(other);
+        self
+    }
+}
+
+macro_rules! impl_addable_for_numeric {
+    ($($t:ty),+) => {
+        $(
+            impl Addable for $t {
+                fn add(self, other: Self) -> Self {
+                    self + other
+                }
+            }
+        )+
+    };
+}
+
+impl_addable_for_numeric!(
+    i8, i16, i32, i64, i128, u8, u16, u32, u64, u128, f32, f64, isize, usize
+);
+
+impl Addable for AddableDict {
     fn add(self, other: Self) -> Self {
         self + other
     }

@@ -21,6 +21,26 @@ use super::utils::{
     get_unique_config_specs,
 };
 
+/// Trait for runnables that can produce a reconfigured copy of themselves.
+///
+/// This mirrors Python's pattern where `RunnableSerializable` subclasses can be
+/// re-instantiated with modified field values via `__class__(**{**init_params, **configurable})`.
+///
+/// In Rust, types that want to support `configurable_fields` should implement this
+/// trait to allow `RunnableConfigurableFields` to create modified instances at runtime.
+pub trait Reconfigurable: Runnable {
+    /// Create a new instance of this runnable with the given field overrides.
+    ///
+    /// The `fields` map contains field names to JSON values that should override
+    /// the corresponding fields in the new instance.
+    ///
+    /// Returns `None` if the reconfiguration is not possible (e.g., unknown fields).
+    fn reconfigure(
+        &self,
+        fields: &HashMap<String, Value>,
+    ) -> Option<Arc<dyn Runnable<Input = Self::Input, Output = Self::Output> + Send + Sync>>;
+}
+
 /// Prefix the id of a `ConfigurableFieldSpec`.
 ///
 /// This is useful when a `RunnableConfigurableAlternatives` is used as a
@@ -138,7 +158,6 @@ pub trait DynamicRunnable: Runnable {
 ///
 /// This struct wraps a default runnable and allows its fields to be configured
 /// at runtime through the `configurable` section of `RunnableConfig`.
-#[derive(Debug)]
 pub struct RunnableConfigurableFields<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
@@ -150,6 +169,36 @@ where
     pub fields: HashMap<String, AnyConfigurableField>,
     /// Optional configuration to merge with invocation config.
     pub config: Option<RunnableConfig>,
+    /// Optional reconfigure function for creating modified instances.
+    reconfigure_fn: Option<
+        Arc<
+            dyn Fn(
+                    &dyn Runnable<Input = I, Output = O>,
+                    &HashMap<String, Value>,
+                )
+                    -> Option<Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>>
+                + Send
+                + Sync,
+        >,
+    >,
+}
+
+impl<I, O> Debug for RunnableConfigurableFields<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RunnableConfigurableFields")
+            .field("default", &self.default)
+            .field("fields", &self.fields)
+            .field("config", &self.config)
+            .field(
+                "reconfigure_fn",
+                &self.reconfigure_fn.as_ref().map(|_| "..."),
+            )
+            .finish()
+    }
 }
 
 impl<I, O> Clone for RunnableConfigurableFields<I, O>
@@ -162,6 +211,7 @@ where
             default: Arc::clone(&self.default),
             fields: self.fields.clone(),
             config: self.config.clone(),
+            reconfigure_fn: self.reconfigure_fn.clone(),
         }
     }
 }
@@ -180,6 +230,29 @@ where
             default,
             fields,
             config: None,
+            reconfigure_fn: None,
+        }
+    }
+
+    /// Create a new `RunnableConfigurableFields` with a reconfigure function.
+    pub fn with_reconfigure_fn(
+        default: Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>,
+        fields: HashMap<String, AnyConfigurableField>,
+        reconfigure_fn: Arc<
+            dyn Fn(
+                    &dyn Runnable<Input = I, Output = O>,
+                    &HashMap<String, Value>,
+                )
+                    -> Option<Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>>
+                + Send
+                + Sync,
+        >,
+    ) -> Self {
+        Self {
+            default,
+            fields,
+            config: None,
+            reconfigure_fn: Some(reconfigure_fn),
         }
     }
 
@@ -288,9 +361,14 @@ where
             return (Arc::clone(&self.default), config);
         }
 
-        // For now, we cannot dynamically create a new instance with different fields
-        // in Rust without more infrastructure. Return the default with the config.
-        // In a real implementation, this would need a factory function or similar.
+        // Try to reconfigure the default runnable with the new field values
+        if let Some(reconfigure_fn) = &self.reconfigure_fn {
+            if let Some(reconfigured) = reconfigure_fn(self.default.as_ref(), &configurable_fields)
+            {
+                return (reconfigured, config);
+            }
+        }
+
         (Arc::clone(&self.default), config)
     }
 }
@@ -796,6 +874,30 @@ pub trait ConfigurableRunnable: Runnable + Sized {
         Self: Send + Sync + 'static,
     {
         RunnableConfigurableFields::new(Arc::new(self), fields)
+    }
+
+    /// Create a configurable version of this runnable that allows configuring specific fields,
+    /// with support for runtime reconfiguration via the `Reconfigurable` trait.
+    fn configurable_fields_reconfigurable(
+        self,
+        fields: HashMap<String, AnyConfigurableField>,
+    ) -> RunnableConfigurableFields<Self::Input, Self::Output>
+    where
+        Self: Reconfigurable + Send + Sync + Clone + 'static,
+    {
+        let reconfigure_fn: Arc<
+            dyn Fn(
+                    &dyn Runnable<Input = Self::Input, Output = Self::Output>,
+                    &HashMap<String, Value>,
+                ) -> Option<
+                    Arc<dyn Runnable<Input = Self::Input, Output = Self::Output> + Send + Sync>,
+                > + Send
+                + Sync,
+        > = {
+            let default_clone = self.clone();
+            Arc::new(move |_runnable, fields| default_clone.reconfigure(fields))
+        };
+        RunnableConfigurableFields::with_reconfigure_fn(Arc::new(self), fields, reconfigure_fn)
     }
 
     /// Create a configurable version of this runnable that allows selecting between alternatives.
