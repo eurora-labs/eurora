@@ -1,9 +1,8 @@
 <script lang="ts">
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
-	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
+	import { Button } from '@eurora/ui/components/button/index';
 	import * as Dialog from '@eurora/ui/components/dialog/index';
-	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import { platform } from '@tauri-apps/plugin-os';
 	import { onMount } from 'svelte';
@@ -12,6 +11,7 @@
 
 	let dialogOpen = $state(false);
 	let checking = $state(false);
+	let cancelled = false;
 
 	async function checkPermission(): Promise<boolean> {
 		try {
@@ -24,26 +24,32 @@
 
 	async function requestPermission() {
 		checking = true;
+		cancelled = false;
 		try {
 			await taurpcService.system.request_accessibility_permission();
 		} catch (error) {
 			console.error('Failed to request accessibility permission:', error);
 		}
-		// Poll for a bit to see if the user granted it
 		await pollForPermission();
 		checking = false;
 	}
 
 	async function pollForPermission() {
-		// Check a few times with a delay since the user needs to interact with System Settings
 		for (let i = 0; i < 30; i++) {
+			if (cancelled) return;
 			await new Promise((resolve) => setTimeout(resolve, 2000));
+			if (cancelled) return;
 			const granted = await checkPermission();
 			if (granted) {
 				dialogOpen = false;
 				return;
 			}
 		}
+	}
+
+	function dismiss() {
+		cancelled = true;
+		dialogOpen = false;
 	}
 
 	onMount(() => {
@@ -100,9 +106,7 @@
 					Open Settings
 				{/if}
 			</Button>
-			<Dialog.Close class={buttonVariants({ variant: 'ghost', class: 'w-full' })}>
-				Remind me later
-			</Dialog.Close>
+			<Button variant="ghost" onclick={dismiss} class="w-full">Remind me later</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
