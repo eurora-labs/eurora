@@ -111,7 +111,7 @@ pub use content::{
     create_plaintext_block,
     create_reasoning_block,
     create_text_block,
-    create_tool_call_block,
+    create_tool_call,
     create_video_block,
     // Helper functions
     is_data_content_block,

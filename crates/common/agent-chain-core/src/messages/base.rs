@@ -180,7 +180,7 @@ impl BaseMessage {
             BaseMessage::Tool(m) => m.name.clone(),
             BaseMessage::Chat(m) => m.name.clone(),
             BaseMessage::Function(m) => Some(m.name.clone()),
-            BaseMessage::Remove(_) => None,
+            BaseMessage::Remove(m) => m.name.clone(),
         }
     }
 
@@ -243,7 +243,7 @@ impl BaseMessage {
             BaseMessage::Tool(m) => Some(&m.additional_kwargs),
             BaseMessage::Chat(m) => Some(&m.additional_kwargs),
             BaseMessage::Function(m) => Some(&m.additional_kwargs),
-            BaseMessage::Remove(_) => None,
+            BaseMessage::Remove(m) => Some(&m.additional_kwargs),
         }
     }
 
@@ -256,7 +256,7 @@ impl BaseMessage {
             BaseMessage::Tool(m) => Some(&m.response_metadata),
             BaseMessage::Chat(m) => Some(&m.response_metadata),
             BaseMessage::Function(m) => Some(&m.response_metadata),
-            BaseMessage::Remove(_) => None,
+            BaseMessage::Remove(m) => Some(&m.response_metadata),
         }
     }
 
