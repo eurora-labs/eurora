@@ -1050,9 +1050,7 @@ fn test_convert_to_openai_messages_developer() {
 #[test]
 fn test_convert_to_openai_messages_empty_content() {
     // Message with empty content string should preserve empty string
-    let messages = vec![BaseMessage::AI(
-        AIMessage::builder().content("").build(),
-    )];
+    let messages = vec![BaseMessage::AI(AIMessage::builder().content("").build())];
     let result = convert_to_openai_messages(&messages, TextFormat::String);
     assert_eq!(result.len(), 1);
     assert_eq!(result[0]["role"], "assistant");
@@ -1156,9 +1154,7 @@ fn test_get_buffer_string_with_empty_content() {
 
 #[test]
 fn test_message_chunk_to_message_ai() {
-    let chunk = BaseMessageChunk::AI(
-        AIMessageChunk::builder().content("hello from ai").build(),
-    );
+    let chunk = BaseMessageChunk::AI(AIMessageChunk::builder().content("hello from ai").build());
     let msg = message_chunk_to_message(&chunk);
     assert!(matches!(msg, BaseMessage::AI(_)));
     assert_eq!(msg.content(), "hello from ai");
@@ -1171,7 +1167,9 @@ fn test_message_chunk_to_message_ai() {
 #[test]
 fn test_message_chunk_to_message_human() {
     let chunk = BaseMessageChunk::Human(
-        HumanMessageChunk::builder().content("hello from human").build(),
+        HumanMessageChunk::builder()
+            .content("hello from human")
+            .build(),
     );
     let msg = message_chunk_to_message(&chunk);
     assert!(matches!(msg, BaseMessage::Human(_)));
@@ -1185,7 +1183,9 @@ fn test_message_chunk_to_message_human() {
 #[test]
 fn test_message_chunk_to_message_system() {
     let chunk = BaseMessageChunk::System(
-        SystemMessageChunk::builder().content("system prompt").build(),
+        SystemMessageChunk::builder()
+            .content("system prompt")
+            .build(),
     );
     let msg = message_chunk_to_message(&chunk);
     assert!(matches!(msg, BaseMessage::System(_)));

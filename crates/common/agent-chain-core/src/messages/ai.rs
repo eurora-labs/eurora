@@ -983,53 +983,48 @@ impl AIMessageChunk {
                 .get("output_version")
                 .and_then(|v| v.as_str())
                 == Some("v1")
-        {
-            if let Ok(mut content_list) =
+            && let Ok(mut content_list) =
                 serde_json::from_str::<Vec<serde_json::Value>>(&self.content)
-            {
-                // Build a map of id -> tool_call for replacement
-                let id_to_tc: HashMap<String, serde_json::Value> = self
-                    .tool_calls
-                    .iter()
-                    .filter_map(|tc| {
-                        tc.id.as_ref().map(|id| {
-                            let mut tc_val = serde_json::json!({
-                                "type": "tool_call",
-                                "name": tc.name,
-                                "args": tc.args,
-                                "id": id,
-                            });
-                            tc_val
-                                .as_object_mut()
-                                .map(|m| (id.clone(), serde_json::Value::Object(m.clone())))
-                        })
+        {
+            // Build a map of id -> tool_call for replacement
+            let id_to_tc: HashMap<String, serde_json::Value> = self
+                .tool_calls
+                .iter()
+                .filter_map(|tc| {
+                    tc.id.as_ref().map(|id| {
+                        let mut tc_val = serde_json::json!({
+                            "type": "tool_call",
+                            "name": tc.name,
+                            "args": tc.args,
+                            "id": id,
+                        });
+                        tc_val
+                            .as_object_mut()
+                            .map(|m| (id.clone(), serde_json::Value::Object(m.clone())))
                     })
-                    .flatten()
-                    .collect();
+                })
+                .flatten()
+                .collect();
 
-                let mut changed = false;
-                for block in &mut content_list {
-                    if let Some(block_type) = block.get("type").and_then(|t| t.as_str()) {
-                        if block_type == "tool_call_chunk" {
-                            if let Some(call_id) = block.get("id").and_then(|i| i.as_str()) {
-                                if let Some(tc) = id_to_tc.get(call_id) {
-                                    let mut replacement = tc.clone();
-                                    // Preserve "extras" from the original block
-                                    if let Some(extras) = block.get("extras") {
-                                        replacement["extras"] = extras.clone();
-                                    }
-                                    *block = replacement;
-                                    changed = true;
-                                }
-                            }
-                        }
+            let mut changed = false;
+            for block in &mut content_list {
+                if let Some(block_type) = block.get("type").and_then(|t| t.as_str())
+                    && block_type == "tool_call_chunk"
+                    && let Some(call_id) = block.get("id").and_then(|i| i.as_str())
+                    && let Some(tc) = id_to_tc.get(call_id)
+                {
+                    let mut replacement = tc.clone();
+                    // Preserve "extras" from the original block
+                    if let Some(extras) = block.get("extras") {
+                        replacement["extras"] = extras.clone();
                     }
+                    *block = replacement;
+                    changed = true;
                 }
+            }
 
-                if changed {
-                    self.content =
-                        serde_json::to_string(&content_list).unwrap_or(self.content.clone());
-                }
+            if changed {
+                self.content = serde_json::to_string(&content_list).unwrap_or(self.content.clone());
             }
         }
     }
@@ -1059,19 +1054,15 @@ impl AIMessageChunk {
         {
             let mut changed = false;
             for block in &mut content_list {
-                if let Some(block_type) = block.get("type").and_then(|t| t.as_str()) {
-                    if block_type == "server_tool_call" || block_type == "server_tool_call_chunk" {
-                        if let Some(args_str) = block.get("args").and_then(|a| a.as_str()) {
-                            if let Ok(args) = serde_json::from_str::<serde_json::Value>(args_str) {
-                                if args.is_object() {
-                                    block["type"] =
-                                        serde_json::Value::String("server_tool_call".to_string());
-                                    block["args"] = args;
-                                    changed = true;
-                                }
-                            }
-                        }
-                    }
+                if let Some(block_type) = block.get("type").and_then(|t| t.as_str())
+                    && (block_type == "server_tool_call" || block_type == "server_tool_call_chunk")
+                    && let Some(args_str) = block.get("args").and_then(|a| a.as_str())
+                    && let Ok(args) = serde_json::from_str::<serde_json::Value>(args_str)
+                    && args.is_object()
+                {
+                    block["type"] = serde_json::Value::String("server_tool_call".to_string());
+                    block["args"] = args;
+                    changed = true;
                 }
             }
 
