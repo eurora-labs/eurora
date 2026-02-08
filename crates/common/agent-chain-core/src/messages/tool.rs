@@ -599,10 +599,16 @@ pub fn default_tool_parser(
             .map(|s| s.to_string());
 
         match serde_json::from_str::<serde_json::Value>(arguments_str) {
-            Ok(args) if args.is_object() => {
+            Ok(args) => {
+                // Matches Python: `function_args or {}` — falsy values become empty dict
+                let args = if args.is_object() {
+                    args
+                } else {
+                    serde_json::Value::Object(serde_json::Map::new())
+                };
                 tool_calls.push(tool_call(function_name, args, id));
             }
-            _ => {
+            Err(_) => {
                 invalid_tool_calls.push(invalid_tool_call(
                     Some(function_name),
                     Some(arguments_str.to_string()),
