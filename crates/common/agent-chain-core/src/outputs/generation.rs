@@ -103,13 +103,9 @@ pub struct GenerationChunk {
 
     /// Type is used exclusively for serialization purposes.
     ///
-    /// Set to "GenerationChunk" for this class.
-    #[serde(rename = "type", default = "default_generation_chunk_type")]
+    /// Set to "Generation" for this class (inherited from Generation in Python).
+    #[serde(rename = "type", default = "default_generation_type")]
     pub generation_type: String,
-}
-
-fn default_generation_chunk_type() -> String {
-    "GenerationChunk".to_string()
 }
 
 impl GenerationChunk {
@@ -118,7 +114,7 @@ impl GenerationChunk {
         Self {
             text: text.into(),
             generation_info: None,
-            generation_type: "GenerationChunk".to_string(),
+            generation_type: "Generation".to_string(),
         }
     }
 
@@ -127,7 +123,7 @@ impl GenerationChunk {
         Self {
             text: text.into(),
             generation_info: Some(generation_info),
-            generation_type: "GenerationChunk".to_string(),
+            generation_type: "Generation".to_string(),
         }
     }
 }
@@ -137,7 +133,7 @@ impl Default for GenerationChunk {
         Self {
             text: String::new(),
             generation_info: None,
-            generation_type: "GenerationChunk".to_string(),
+            generation_type: "Generation".to_string(),
         }
     }
 }
@@ -174,7 +170,7 @@ impl Add for GenerationChunk {
         GenerationChunk {
             text: self.text + &other.text,
             generation_info,
-            generation_type: "GenerationChunk".to_string(),
+            generation_type: "Generation".to_string(),
         }
     }
 }
@@ -184,7 +180,7 @@ impl From<Generation> for GenerationChunk {
         GenerationChunk {
             text: generation.text,
             generation_info: generation.generation_info,
-            generation_type: "GenerationChunk".to_string(),
+            generation_type: "Generation".to_string(),
         }
     }
 }
