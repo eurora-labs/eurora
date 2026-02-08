@@ -196,14 +196,28 @@ cat "$TMP_DIR/tauri.conf.json"
 export VERSION
 export CHANNEL
 
-# Build native messaging
-cargo build --package euro-native-messaging --release
+# Create binaries directory for externalBin
+BINARIES_DIR="$PWD/../crates/app/euro-tauri/binaries"
+mkdir -p "$BINARIES_DIR"
 
 # Build the app with release config
 if [ -n "$TARGET" ]; then
 	# Export TARGET for cargo to use
 	export CARGO_BUILD_TARGET="$TARGET"
 
+	# Build native messaging with the same target
+	info "Building native messaging for target: $TARGET"
+	cargo build --package euro-native-messaging --release --target "$TARGET"
+
+	# Copy the binary with the target-triple suffix for Tauri's externalBin
+	# Tauri expects binaries named like: binary-name-<target-triple>[.exe]
+	if [ "$OS" = "windows" ]; then
+		cp "$PWD/../target/$TARGET/release/euro-native-messaging.exe" "$BINARIES_DIR/euro-native-messaging-$TARGET.exe"
+	else
+		cp "$PWD/../target/$TARGET/release/euro-native-messaging" "$BINARIES_DIR/euro-native-messaging-$TARGET"
+	fi
+
+	info "Copied native messaging binary to: $BINARIES_DIR/euro-native-messaging-$TARGET"
 
 	# Build with specified target
 	# Note: passing --target is necessary to let tauri find the binaries,
@@ -214,8 +228,24 @@ if [ -n "$TARGET" ]; then
 		--config "$TMP_DIR/tauri.conf.json" \
 		--target "$TARGET"
 
-  BUNDLE_DIR=$(readlink -f "$PWD/../target/$TARGET/release/bundle")
+	BUNDLE_DIR=$(readlink -f "$PWD/../target/$TARGET/release/bundle")
 else
+	# Detect the default target triple
+	DEFAULT_TARGET=$(rustc -vV | grep host | cut -d' ' -f2)
+
+	# Build native messaging without target (default)
+	info "Building native messaging for default target: $DEFAULT_TARGET"
+	cargo build --package euro-native-messaging --release
+
+	# Copy the binary with the target-triple suffix for Tauri's externalBin
+	if [ "$OS" = "windows" ]; then
+		cp "$PWD/../target/release/euro-native-messaging.exe" "$BINARIES_DIR/euro-native-messaging-$DEFAULT_TARGET.exe"
+	else
+		cp "$PWD/../target/release/euro-native-messaging" "$BINARIES_DIR/euro-native-messaging-$DEFAULT_TARGET"
+	fi
+
+	info "Copied native messaging binary to: $BINARIES_DIR/euro-native-messaging-$DEFAULT_TARGET"
+
 	# Build with default target
 	tauri build \
 		--verbose \

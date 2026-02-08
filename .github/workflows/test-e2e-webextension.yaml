@@ -22,12 +22,12 @@ jobs:
         runs-on: ubuntu-latest
         timeout-minutes: 60
         steps:
-            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                   persist-credentials: false
                   lfs: true
               if: ${{ github.event_name != 'workflow_dispatch' }}
-            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               if: ${{ github.event_name == 'workflow_dispatch' }}
               with:
                   ref: ${{ github.event.inputs.sha }}
@@ -36,9 +36,9 @@ jobs:
               uses: ./.github/actions/init-env-node
 
             - id: get_playwright_version
-              uses: eviden-actions/get-playwright-version@5f9f0c1c02aa67d01d1bd3f46108ad3c1424190d # v1
+              uses: eviden-actions/get-playwright-version@4ab3bd9361d018d7931275b5106f2290fa54cfb6 # v1
             - name: Cache playwright binaries
-              uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
+              uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
               id: playwright-cache
               with:
                   path: |

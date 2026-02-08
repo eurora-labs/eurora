@@ -12,6 +12,7 @@ use super::proto::{
     browser_bridge_server::BrowserBridgeServer, frame::Kind as FrameKind,
 };
 use dashmap::DashMap;
+use log::{debug, error, info, warn};
 use std::collections::HashMap;
 use std::net::ToSocketAddrs;
 use std::pin::Pin;
@@ -21,7 +22,6 @@ use std::time::Duration;
 use tokio::sync::{OnceCell, RwLock, broadcast, mpsc, oneshot, watch};
 use tokio_stream::{Stream, wrappers::ReceiverStream};
 use tonic::{Request, Response, Status, transport::Server};
-use tracing::{debug, error, info, warn};
 
 /// The port for the browser bridge gRPC server
 pub const BROWSER_BRIDGE_PORT: &str = "1431";
@@ -476,6 +476,7 @@ impl BrowserBridge for BrowserBridgeService {
         &self,
         request: Request<tonic::Streaming<Frame>>,
     ) -> Result<Response<Self::OpenStream>, Status> {
+        info!("Received first browser open request");
         let mut inbound = request.into_inner();
 
         let first_frame = inbound.message().await.map_err(|e| {
@@ -512,7 +513,7 @@ impl BrowserBridge for BrowserBridgeService {
                     browser_pid,
                 },
             );
-            info!(
+            debug!(
                 "Registered browser with browser_pid: {} and host_pid: {}. Total registered browsers: {}",
                 browser_pid,
                 host_pid,
@@ -530,8 +531,8 @@ impl BrowserBridge for BrowserBridgeService {
                 match inbound.message().await {
                     Ok(Some(frame)) => {
                         info!(
-                            "Received frame from native messenger (browser_pid={}): {:?}",
-                            browser_pid, frame
+                            "Received frame from native messenger browser_pid={}",
+                            browser_pid
                         );
                         if let Err(e) = frames_tx.send((browser_pid, frame)) {
                             warn!(

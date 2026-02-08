@@ -28,6 +28,20 @@ async function listener(msg: any, sender: any, sendResponse: (response?: any) =>
 		}
 	}
 
+	async function runCommon() {
+		try {
+			if (msg.commonChunk) {
+				const common = await imp(msg.commonChunk);
+				common?.main?.();
+			}
+		} catch (error) {
+			console.error('Error loading common script:', error);
+		}
+	}
+
+	// Always run common script first
+	await runCommon();
+
 	try {
 		const mod = await imp(msg.chunk);
 		// For now this is unused but could be useful for some future websites

@@ -19,6 +19,7 @@
 		"build:browser": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:all",
 		"build:firefox": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:firefox",
 		"build:chrome": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:chrome",
+		"build:safari": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:safari",
 		"dev:web": "pnpm --filter @eurora/web dev",
 		"dev:web:watch": "pnpm --filter @eurora/ui package && concurrently \"pnpm --filter @eurora/ui dev:watch\" \"pnpm --filter @eurora/web dev\" --names \"ui,web\" --prefix-colors \"blue,green\"",
 		"build:web": "turbo run build --filter @eurora/web...",
@@ -31,6 +32,7 @@
 		"commit": "cz",
 		"proto:typescript": "buf generate && turbo run build --filter @eurora/shared --force",
 		"proto:rust": "cargo build -p proto-gen",
+		"proto:swift": "protoc --proto_path=proto --swift_out=apps/macos/Shared/Generated --grpc-swift_out=apps/macos/Shared/Generated proto/browser_bridge.proto",
 		"prettier": "prettier --check",
 		"fix": "eslint --fix .",
 		"format": "prettier --write .",
@@ -43,7 +45,7 @@
 		"test:e2e:webextension": "turbo run test:e2e:webextension"
 	},
 	"devDependencies": {
-		"@bufbuild/buf": "^1.64.0",
+		"@bufbuild/buf": "^1.65.0",
 		"@bufbuild/protobuf": "^2.11.0",
 		"@bufbuild/protoc-gen-es": "^2.11.0",
 		"@commitlint/cli": "^19.8.1",
@@ -53,7 +55,7 @@
 		"@connectrpc/connect-web": "^2.1.1",
 		"@eslint/js": "^9.39.2",
 		"@gitbutler/no-relative-imports": "^0.0.3",
-		"@tauri-apps/cli": "^2.9.6",
+		"@tauri-apps/cli": "^2.10.0",
 		"commitizen": "^4.3.1",
 		"concurrently": "^9.2.1",
 		"cz-conventional-changelog": "^3.3.0",
@@ -61,7 +63,7 @@
 		"eslint-import-resolver-next": "^0.6.0",
 		"eslint-import-resolver-typescript": "^4.4.4",
 		"eslint-plugin-import-x": "^4.16.1",
-		"eslint-plugin-storybook": "10.2.1",
+		"eslint-plugin-storybook": "10.2.6",
 		"eslint-plugin-svelte": "3.9.0",
 		"globals": "^16.5.0",
 		"husky": "^9.1.7",
@@ -73,12 +75,12 @@
 		"protolint": "^0.56.4",
 		"svelte-eslint-parser": "^1.4.1",
 		"tailwindcss": "catalog:",
-		"ts-proto": "^2.11.1",
-		"turbo": "^2.8.2",
+		"ts-proto": "^2.11.2",
+		"turbo": "^2.8.3",
 		"typescript-eslint": "^8.54.0",
 		"web-ext": "^8.10.0"
 	},
-	"packageManager": "pnpm@10.28.2",
+	"packageManager": "pnpm@10.29.1",
 	"engines": {
 		"node": ">=20.11"
 	},

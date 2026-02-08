@@ -44,7 +44,6 @@
 
 	function getExtensions(): SveltePMExtension[] {
 		return [
-			extensionFactory.getExtension('59b26f84-d10a-11f0-a0a4-17b6bfaafdde'),
 			extensionFactory.getExtension('7c7b59bb-d44d-431a-9f4d-64240172e092'),
 			extensionFactory.getExtension('309f0906-d48c-4439-9751-7bcf915cdfc5'),
 			extensionFactory.getExtension('2c434895-d32c-485f-8525-c4394863b83a'),
@@ -212,13 +211,18 @@
 			>
 				{#each messages as message}
 					{@const content = getMessageContent(message)}
-					{#if content.length > 0}
+					{@const isUser = isUserMessage(message)}
+					{#if content.length > 0 || !isUser}
 						<Chat.Message
-							variant={isUserMessage(message) ? 'default' : 'assistant'}
+							variant={isUser ? 'default' : 'assistant'}
 							finishRendering={() => {}}
 						>
 							<Chat.MessageContent>
-								<Katex math={content} finishRendering={() => {}} />
+								{#if content.length > 0}
+									<Katex math={content} finishRendering={() => {}} />
+								{:else}
+									<span class="text-primary/60 italic">Thinking...</span>
+								{/if}
 							</Chat.MessageContent>
 						</Chat.Message>
 					{/if}
