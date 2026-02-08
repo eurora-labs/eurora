@@ -24,7 +24,7 @@ impl ProcessFunctionality for Eurora {
         // So different names are used for debug and release builds.
         match cfg!(debug_assertions) {
             true => os_pick("euro-tauri.exe", "euro-tauri", "euro-tauri"),
-            false => os_pick("euro-tauri.exe", "euro-tauri", "Eurora"),
+            false => os_pick("eurora.exe", "eurora", "Eurora"),
         }
     }
 }

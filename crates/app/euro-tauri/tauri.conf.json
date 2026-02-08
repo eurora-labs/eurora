@@ -1,6 +1,7 @@
 {
 	"productName": "Eurora Dev",
 	"identifier": "com.eurora.app.dev",
+	"mainBinaryName": "eurora",
 	"build": {
 		"beforeDevCommand": "pnpm dev:internal-tauri",
 		"beforeBuildCommand": "[ \"$CI\" = \"true\" ] || pnpm build:desktop build:launcher-window  -- --mode development",
