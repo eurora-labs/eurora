@@ -75,6 +75,21 @@ impl ChatGeneration {
             generation_type: "ChatGeneration".to_string(),
         }
     }
+
+    /// Returns `true` as this class is serializable.
+    ///
+    /// Inherited from Generation in Python.
+    pub fn is_lc_serializable() -> bool {
+        true
+    }
+
+    /// Get the namespace of the LangChain object.
+    ///
+    /// Returns `["langchain", "schema", "output"]`.
+    /// Inherited from Generation in Python.
+    pub fn get_lc_namespace() -> Vec<&'static str> {
+        vec!["langchain", "schema", "output"]
+    }
 }
 
 /// Extract text from a message.
