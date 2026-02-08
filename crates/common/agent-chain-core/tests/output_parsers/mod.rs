@@ -12,4 +12,5 @@ mod test_list_parser;
 mod test_openai_functions;
 mod test_openai_functions_parser;
 mod test_openai_tools;
+mod test_openai_tools_parser;
 mod test_string_parser;
