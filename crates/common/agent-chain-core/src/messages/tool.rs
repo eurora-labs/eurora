@@ -8,6 +8,9 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
+use super::base::{get_msg_title_repr, is_interactive_env, merge_content};
+use crate::utils::merge::{merge_dicts, merge_obj};
+
 /// Mixin trait for objects that tools can return directly.
 ///
 /// If a custom Tool is invoked with a `ToolCall` and the output of custom code is
@@ -28,6 +31,9 @@ pub struct ToolCall {
     pub name: String,
     /// Arguments for the tool call as a JSON object
     pub args: serde_json::Value,
+    /// Type discriminant. Always "tool_call" when present.
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub call_type: Option<String>,
 }
 
 #[bon]
@@ -39,6 +45,7 @@ impl ToolCall {
             id,
             name: name.into(),
             args,
+            call_type: Some("tool_call".to_string()),
         }
     }
 }
@@ -62,6 +69,9 @@ pub struct ToolCallChunk {
     /// The index of the tool call in a sequence
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<i32>,
+    /// Type discriminant. Always "tool_call_chunk" when present.
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub chunk_type: Option<String>,
 }
 
 #[bon]
@@ -79,6 +89,7 @@ impl ToolCallChunk {
             args,
             id,
             index,
+            chunk_type: Some("tool_call_chunk".to_string()),
         }
     }
 }
@@ -102,6 +113,9 @@ pub struct InvalidToolCall {
     /// An error message associated with the tool call
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// Type discriminant. Always "invalid_tool_call" when present.
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub call_type: Option<String>,
 }
 
 #[bon]
@@ -119,6 +133,7 @@ impl InvalidToolCall {
             args,
             id,
             error,
+            call_type: Some("invalid_tool_call".to_string()),
         }
     }
 }
@@ -281,6 +296,26 @@ impl ToolMessage {
     pub fn text(&self) -> &str {
         &self.content
     }
+
+    /// Get a pretty representation of the message.
+    ///
+    /// Corresponds to `BaseMessage.pretty_repr` in LangChain Python.
+    pub fn pretty_repr(&self, html: bool) -> String {
+        let title = get_msg_title_repr("Tool Message", html);
+        let name_line = if let Some(name) = &self.name {
+            format!("\nName: {}", name)
+        } else {
+            String::new()
+        };
+        format!("{}{}\n\n{}", title, name_line, self.content)
+    }
+
+    /// Pretty print the message to stdout.
+    ///
+    /// Corresponds to `BaseMessage.pretty_print` in LangChain Python.
+    pub fn pretty_print(&self) {
+        println!("{}", self.pretty_repr(is_interactive_env()));
+    }
 }
 
 impl ToolOutputMixin for ToolMessage {}
@@ -381,41 +416,56 @@ impl ToolMessageChunk {
 
     /// Concatenate this chunk with another chunk.
     ///
+    /// Matches `ToolMessageChunk.__add__` in LangChain Python:
+    /// - Uses `merge_content` for content
+    /// - Uses `merge_obj` for artifact
+    /// - Uses `merge_dicts` for additional_kwargs and response_metadata
+    /// - Uses `_merge_status` for status
+    ///
     /// Panics if the tool_call_ids don't match.
     pub fn concat(&self, other: &ToolMessageChunk) -> ToolMessageChunk {
         if self.tool_call_id != other.tool_call_id {
-            panic!(
-                "Cannot concatenate ToolMessageChunks with different tool_call_ids: '{}' vs '{}'",
-                self.tool_call_id, other.tool_call_id
-            );
+            panic!("Cannot concatenate ToolMessageChunks with different names.");
         }
 
-        let mut content = self.content.clone();
-        content.push_str(&other.content);
+        let content = merge_content(&self.content, &other.content);
 
-        // Merge status (error takes precedence)
-        let status = if self.status == ToolStatus::Error || other.status == ToolStatus::Error {
-            ToolStatus::Error
-        } else {
-            ToolStatus::Success
+        // Merge artifact using merge_obj (matching Python)
+        let artifact = match (&self.artifact, &other.artifact) {
+            (Some(left), Some(right)) => merge_obj(left.clone(), right.clone()).ok(),
+            (Some(left), None) => Some(left.clone()),
+            (None, Some(right)) => Some(right.clone()),
+            (None, None) => None,
         };
 
-        // Merge response_metadata
-        let mut response_metadata = self.response_metadata.clone();
-        for (k, v) in &other.response_metadata {
-            response_metadata
-                .entry(k.clone())
-                .or_insert_with(|| v.clone());
-        }
+        // Merge additional_kwargs using merge_dicts (matching Python BaseMessageChunk.__add__)
+        let additional_kwargs = {
+            let left_val = serde_json::to_value(&self.additional_kwargs).unwrap_or_default();
+            let right_val = serde_json::to_value(&other.additional_kwargs).unwrap_or_default();
+            match merge_dicts(left_val, vec![right_val]) {
+                Ok(merged) => serde_json::from_value(merged).unwrap_or_default(),
+                Err(_) => self.additional_kwargs.clone(),
+            }
+        };
+
+        // Merge response_metadata using merge_dicts (matching Python BaseMessageChunk.__add__)
+        let response_metadata = {
+            let left_val = serde_json::to_value(&self.response_metadata).unwrap_or_default();
+            let right_val = serde_json::to_value(&other.response_metadata).unwrap_or_default();
+            match merge_dicts(left_val, vec![right_val]) {
+                Ok(merged) => serde_json::from_value(merged).unwrap_or_default(),
+                Err(_) => self.response_metadata.clone(),
+            }
+        };
 
         ToolMessageChunk {
             content,
             tool_call_id: self.tool_call_id.clone(),
-            id: self.id.clone().or_else(|| other.id.clone()),
+            id: self.id.clone(),
             name: self.name.clone().or_else(|| other.name.clone()),
-            status,
-            artifact: self.artifact.clone().or_else(|| other.artifact.clone()),
-            additional_kwargs: self.additional_kwargs.clone(),
+            status: merge_status(&self.status, &other.status),
+            artifact,
+            additional_kwargs,
             response_metadata,
         }
     }
@@ -440,6 +490,35 @@ impl std::ops::Add for ToolMessageChunk {
 
     fn add(self, other: ToolMessageChunk) -> ToolMessageChunk {
         self.concat(&other)
+    }
+}
+
+impl std::iter::Sum for ToolMessageChunk {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.reduce(|a, b| a + b).unwrap_or_else(|| {
+            ToolMessageChunk::builder()
+                .content("")
+                .tool_call_id("")
+                .build()
+        })
+    }
+}
+
+impl From<ToolMessageChunk> for ToolMessage {
+    fn from(chunk: ToolMessageChunk) -> Self {
+        chunk.to_message()
+    }
+}
+
+/// Merge two tool statuses.
+///
+/// Returns "error" if either status is "error", otherwise "success".
+/// This corresponds to `_merge_status` in LangChain Python.
+fn merge_status(left: &ToolStatus, right: &ToolStatus) -> ToolStatus {
+    if *left == ToolStatus::Error || *right == ToolStatus::Error {
+        ToolStatus::Error
+    } else {
+        ToolStatus::Success
     }
 }
 
