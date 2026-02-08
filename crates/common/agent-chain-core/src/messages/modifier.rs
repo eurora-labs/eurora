@@ -8,6 +8,8 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
+use super::base::{get_msg_title_repr, is_interactive_env};
+
 /// Message responsible for deleting other messages.
 ///
 /// This is used to remove messages from a conversation history by their ID.
@@ -50,15 +52,15 @@ impl Serialize for RemoveMessage {
     where
         S: Serializer,
     {
-        let mut field_count = 3;
+        let mut field_count = 4; // type, content, id, additional_kwargs, response_metadata
         if self.name.is_some() {
             field_count += 1;
         }
-        // Add 1 for additional type field
-        field_count += 1;
+        field_count += 1; // response_metadata
 
         let mut map = serializer.serialize_map(Some(field_count))?;
         map.serialize_entry("type", "remove")?;
+        map.serialize_entry("content", "")?;
         map.serialize_entry("id", &self.id)?;
         if self.name.is_some() {
             map.serialize_entry("name", &self.name)?;
@@ -127,5 +129,25 @@ impl RemoveMessage {
     /// RemoveMessage always returns an empty string.
     pub fn content(&self) -> &'static str {
         ""
+    }
+
+    /// Get a pretty representation of the message.
+    ///
+    /// # Arguments
+    ///
+    /// * `html` - Whether to format the message with bold text (using ANSI codes).
+    pub fn pretty_repr(&self, html: bool) -> String {
+        let title = get_msg_title_repr("Remove Message", html);
+        let name_line = if let Some(name) = &self.name {
+            format!("\nName: {}", name)
+        } else {
+            String::new()
+        };
+        format!("{}{}\n\n{}", title, name_line, self.content())
+    }
+
+    /// Pretty print the message to stdout.
+    pub fn pretty_print(&self) {
+        println!("{}", self.pretty_repr(is_interactive_env()));
     }
 }
