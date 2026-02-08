@@ -45,7 +45,7 @@ pub trait BaseTransformOutputParser: BaseOutputParser {
                     StringOrMessage::Text(text) => Generation::new(text),
                     StringOrMessage::Message(msg) => Generation::new((*msg).content()),
                 };
-                yield self.parse_generation(&generation);
+                yield self.parse_result(&[generation], false);
             }
         })
     }
