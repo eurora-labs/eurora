@@ -1125,6 +1125,13 @@ pub const KNOWN_BLOCK_TYPES: &[&str] = &[
 /// Data content block type literals.
 const DATA_CONTENT_BLOCK_TYPES: &[&str] = &["image", "video", "audio", "text-plain", "file"];
 
+/// Returns the tuple of data content block type literals.
+///
+/// Mirrors Python's `_get_data_content_block_types()`.
+pub fn get_data_content_block_types() -> &'static [&'static str] {
+    DATA_CONTENT_BLOCK_TYPES
+}
+
 // =============================================================================
 // Helper Functions
 // =============================================================================
