@@ -8,8 +8,9 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
-use super::base::merge_content;
-use super::content::{ContentBlock, ContentPart, MessageContent};
+use super::base::{get_msg_title_repr, is_interactive_env, merge_content};
+use super::content::{ContentBlock, ContentPart, KNOWN_BLOCK_TYPES, MessageContent};
+use crate::utils::merge::merge_dicts;
 
 /// A system message in the conversation.
 ///
@@ -103,13 +104,30 @@ impl SystemMessage {
     #[builder]
     pub fn new(
         content: impl Into<MessageContent>,
+        /// Optional typed standard content blocks. When provided, these are
+        /// serialized and used as the message content instead of `content`.
+        /// Corresponds to the `content_blocks` parameter in Python's
+        /// `SystemMessage.__init__`.
+        content_blocks: Option<Vec<ContentBlock>>,
         id: Option<String>,
         name: Option<String>,
         #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
         #[builder(default)] response_metadata: HashMap<String, serde_json::Value>,
     ) -> Self {
+        let resolved_content = if let Some(blocks) = content_blocks {
+            // Convert ContentBlock list to Parts, matching Python behavior
+            // where content_blocks is passed as content to BaseMessage.__init__
+            let parts: Vec<ContentPart> = blocks
+                .into_iter()
+                .filter_map(|block| serde_json::to_value(&block).ok().map(ContentPart::Other))
+                .collect();
+            MessageContent::Parts(parts)
+        } else {
+            content.into()
+        };
+
         Self {
-            content: content.into(),
+            content: resolved_content,
             id,
             name,
             additional_kwargs,
@@ -143,23 +161,100 @@ impl SystemMessage {
         }
     }
 
+    /// Get the text content of the message as a string.
+    ///
+    /// This extracts text from both simple string content and list content
+    /// (filtering for text blocks). Corresponds to the `text` property
+    /// on `BaseMessage` in LangChain Python.
+    pub fn text(&self) -> String {
+        self.content.as_text()
+    }
+
+    /// Get a pretty representation of the message.
+    ///
+    /// Corresponds to `BaseMessage.pretty_repr` in LangChain Python.
+    pub fn pretty_repr(&self, html: bool) -> String {
+        let title = get_msg_title_repr("System Message", html);
+        let name_line = if let Some(name) = &self.name {
+            format!("\nName: {}", name)
+        } else {
+            String::new()
+        };
+        format!("{}{}\n\n{}", title, name_line, self.content.as_text_ref())
+    }
+
+    /// Pretty print the message to stdout.
+    ///
+    /// Corresponds to `BaseMessage.pretty_print` in LangChain Python.
+    pub fn pretty_print(&self) {
+        println!("{}", self.pretty_repr(is_interactive_env()));
+    }
+
     /// Get the content blocks translated to the standard format.
     ///
-    /// This method translates provider-specific content blocks to the
-    /// standardized LangChain content block format.
+    /// Translates provider-specific content blocks to the standardized
+    /// LangChain content block format using a multi-pass approach:
     ///
-    /// This corresponds to `content_blocks` property in LangChain Python.
+    /// 1. First pass: classify each content item as a text block, known v1 block,
+    ///    or non-standard wrapper (guarding v0 blocks by `source_type` field).
+    /// 2. Second pass: sequentially apply input converters to unpack non-standard blocks.
+    ///
+    /// This corresponds to the `content_blocks` property on `BaseMessage`
+    /// in LangChain Python.
     pub fn content_blocks(&self) -> Vec<ContentBlock> {
         use super::content::{
             AudioContentBlock, FileContentBlock, ImageContentBlock, InvalidToolCallBlock,
-            NonStandardContentBlock, PlainTextContentBlock, ReasoningContentBlock,
-            TextContentBlock, ToolCallBlock, ToolCallChunkBlock, VideoContentBlock,
+            NonStandardContentBlock, PlainTextContentBlock, ReasoningContentBlock, ServerToolCall,
+            ServerToolCallChunk, ServerToolResult, TextContentBlock, ToolCallBlock,
+            ToolCallChunkBlock, VideoContentBlock,
+        };
+        use crate::messages::block_translators::anthropic::convert_input_to_standard_blocks as anthropic_convert;
+        use crate::messages::block_translators::openai::convert_to_v1_from_chat_completions_input;
+
+        // First pass: classify content items (mirrors Python BaseMessage.content_blocks)
+        let mut blocks: Vec<serde_json::Value> = Vec::new();
+
+        // Normalize content to a list of items
+        let items: Vec<serde_json::Value> = match &self.content {
+            MessageContent::Text(s) => {
+                if s.is_empty() {
+                    vec![]
+                } else {
+                    vec![serde_json::Value::String(s.clone())]
+                }
+            }
+            MessageContent::Parts(parts) => parts
+                .iter()
+                .filter_map(|p| serde_json::to_value(p).ok())
+                .collect(),
         };
 
-        let raw_content = self.content_list();
+        for item in items {
+            if let Some(s) = item.as_str() {
+                // Plain string content is treated as a text block
+                blocks.push(serde_json::json!({"type": "text", "text": s}));
+            } else if item.is_object() {
+                let item_type = item.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
-        // Deserialize JSON blocks into ContentBlock structs
-        raw_content
+                if !KNOWN_BLOCK_TYPES.contains(&item_type) {
+                    // Unknown type: wrap as non_standard
+                    blocks.push(serde_json::json!({"type": "non_standard", "value": item}));
+                } else if item.get("source_type").is_some() {
+                    // Guard against v0 blocks that share the same `type` keys
+                    blocks.push(serde_json::json!({"type": "non_standard", "value": item}));
+                } else {
+                    // Known v1 block type
+                    blocks.push(item);
+                }
+            }
+        }
+
+        // Second pass: sequentially apply input converters to unpack non_standard blocks
+        blocks = convert_to_v1_from_chat_completions_input(&blocks);
+        blocks = anthropic_convert(&blocks);
+
+        // Deserialize JSON blocks into ContentBlock enum variants
+        blocks
             .into_iter()
             .map(|v| {
                 let block_type = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
@@ -186,10 +281,17 @@ impl SystemMessage {
                         .map(ContentBlock::File),
                     "text-plain" => serde_json::from_value::<PlainTextContentBlock>(v.clone())
                         .map(ContentBlock::PlainText),
+                    "server_tool_call" => serde_json::from_value::<ServerToolCall>(v.clone())
+                        .map(ContentBlock::ServerToolCall),
+                    "server_tool_call_chunk" => {
+                        serde_json::from_value::<ServerToolCallChunk>(v.clone())
+                            .map(ContentBlock::ServerToolCallChunk)
+                    }
+                    "server_tool_result" => serde_json::from_value::<ServerToolResult>(v.clone())
+                        .map(ContentBlock::ServerToolResult),
                     "non_standard" => serde_json::from_value::<NonStandardContentBlock>(v.clone())
                         .map(ContentBlock::NonStandard),
                     _ => {
-                        // Unknown type, wrap as non_standard
                         tracing::warn!(
                             block_type = %block_type,
                             json = %v,
@@ -207,7 +309,6 @@ impl SystemMessage {
                         json = %v,
                         "Failed to deserialize ContentBlock in content_blocks, wrapping as non_standard"
                     );
-                    // Wrap the malformed block as NonStandardContentBlock with error info
                     let mut error_value = std::collections::HashMap::new();
                     error_value.insert("original_json".to_string(), v.clone());
                     error_value.insert(
@@ -222,9 +323,7 @@ impl SystemMessage {
                         block_type: "non_standard".to_string(),
                         id: None,
                         value: error_value,
-                        index: v
-                            .get("index")
-                            .and_then(|i| serde_json::from_value(i.clone()).ok()),
+                        index: v.get("index").and_then(|i| serde_json::from_value(i.clone()).ok()),
                     })
                 })
             })
@@ -322,6 +421,9 @@ impl SystemMessageChunk {
     }
 
     /// Concatenate this chunk with another chunk.
+    ///
+    /// Uses `merge_dicts` for `additional_kwargs` and `response_metadata`,
+    /// matching the behavior of `BaseMessageChunk.__add__` in LangChain Python.
     pub fn concat(&self, other: &SystemMessageChunk) -> SystemMessageChunk {
         let content = match (&self.content, &other.content) {
             (MessageContent::Text(a), MessageContent::Text(b)) => {
@@ -344,17 +446,25 @@ impl SystemMessageChunk {
             }
         };
 
-        // Merge additional_kwargs
-        let mut additional_kwargs = self.additional_kwargs.clone();
-        for (k, v) in &other.additional_kwargs {
-            additional_kwargs.insert(k.clone(), v.clone());
-        }
+        // Merge additional_kwargs using merge_dicts (recursive deep merge)
+        let additional_kwargs = {
+            let left_val = serde_json::to_value(&self.additional_kwargs).unwrap_or_default();
+            let right_val = serde_json::to_value(&other.additional_kwargs).unwrap_or_default();
+            match merge_dicts(left_val, vec![right_val]) {
+                Ok(merged) => serde_json::from_value(merged).unwrap_or_default(),
+                Err(_) => self.additional_kwargs.clone(),
+            }
+        };
 
-        // Merge response_metadata
-        let mut response_metadata = self.response_metadata.clone();
-        for (k, v) in &other.response_metadata {
-            response_metadata.insert(k.clone(), v.clone());
-        }
+        // Merge response_metadata using merge_dicts (recursive deep merge)
+        let response_metadata = {
+            let left_val = serde_json::to_value(&self.response_metadata).unwrap_or_default();
+            let right_val = serde_json::to_value(&other.response_metadata).unwrap_or_default();
+            match merge_dicts(left_val, vec![right_val]) {
+                Ok(merged) => serde_json::from_value(merged).unwrap_or_default(),
+                Err(_) => self.response_metadata.clone(),
+            }
+        };
 
         SystemMessageChunk {
             content,
