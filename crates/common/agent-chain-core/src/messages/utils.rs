@@ -623,7 +623,9 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
                                 }
                             }
                             BaseMessageChunk::Chat(c) => {
-                                c.content = format!("{}{}", chunk_separator, c.content);
+                                if let super::content::MessageContent::Text(ref mut s) = c.content {
+                                    *s = format!("{}{}", chunk_separator, s);
+                                }
                             }
                             BaseMessageChunk::Function(c) => {
                                 c.content = format!("{}{}", chunk_separator, c.content);

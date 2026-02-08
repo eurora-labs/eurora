@@ -152,7 +152,7 @@ impl BaseMessage {
             BaseMessage::System(m) => m.content.as_text_ref(),
             BaseMessage::AI(m) => &m.content,
             BaseMessage::Tool(m) => &m.content,
-            BaseMessage::Chat(m) => &m.content,
+            BaseMessage::Chat(m) => m.content.as_text_ref(),
             BaseMessage::Function(m) => &m.content,
             BaseMessage::Remove(_) => "",
         }
@@ -207,7 +207,7 @@ impl BaseMessage {
             BaseMessage::System(m) => m.content.as_text(),
             BaseMessage::AI(m) => m.content.to_string(),
             BaseMessage::Tool(m) => m.content.clone(),
-            BaseMessage::Chat(m) => m.content.to_string(),
+            BaseMessage::Chat(m) => m.content.as_text(),
             BaseMessage::Function(m) => m.content.clone(),
             BaseMessage::Remove(_) => String::new(),
         }
@@ -430,7 +430,7 @@ impl BaseMessageChunk {
             BaseMessageChunk::Human(m) => m.content.as_text_ref(),
             BaseMessageChunk::System(m) => m.content.as_text_ref(),
             BaseMessageChunk::Tool(m) => &m.content,
-            BaseMessageChunk::Chat(m) => &m.content,
+            BaseMessageChunk::Chat(m) => m.content.as_text_ref(),
             BaseMessageChunk::Function(m) => &m.content,
         }
     }
