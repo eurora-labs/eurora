@@ -12,6 +12,7 @@ use serde_json::Value;
 use super::base::OutputParserError;
 use crate::error::{Error, Result};
 use crate::outputs::ChatGeneration;
+use crate::utils::json::parse_partial_json;
 
 /// Parse an output that is one of sets of values.
 ///
@@ -97,8 +98,40 @@ impl JsonOutputFunctionsParser {
         self
     }
 
+    /// Return the output parser type for serialization.
+    pub fn parser_type(&self) -> &str {
+        "json_functions"
+    }
+
+    /// Parse the output of an LLM call to a JSON object.
+    ///
+    /// This method is not implemented because `JsonOutputFunctionsParser` works
+    /// directly with `ChatGeneration` results, not raw text strings.
+    pub fn parse(&self, _text: &str) -> Result<Value> {
+        Err(Error::NotImplemented(
+            "JsonOutputFunctionsParser.parse is not implemented".to_string(),
+        ))
+    }
+
+    /// Compute a JSON patch diff between two values.
+    ///
+    /// Returns a list of JSON patch operations that transform `prev` into `next`.
+    /// This mirrors the Python `_diff` method which uses `jsonpatch.make_patch`.
+    pub fn diff(&self, prev: &Value, next: &Value) -> Vec<Value> {
+        let mut ops = Vec::new();
+        compute_json_diff("", prev, next, &mut ops);
+        ops
+    }
+
     /// Parse the result of an LLM call to a JSON object.
-    pub fn parse_result(&self, result: &[ChatGeneration]) -> Result<Value> {
+    ///
+    /// When `partial` is true, attempts to parse partial JSON and returns
+    /// `Ok(None)` instead of erroring on missing or invalid data.
+    pub fn parse_result_with_partial(
+        &self,
+        result: &[ChatGeneration],
+        partial: bool,
+    ) -> Result<Option<Value>> {
         if result.len() != 1 {
             return Err(OutputParserError::new(format!(
                 "Expected exactly one result, but got {}",
@@ -115,6 +148,9 @@ impl JsonOutputFunctionsParser {
         let function_call = match additional_kwargs.get("function_call") {
             Some(fc) => fc,
             None => {
+                if partial {
+                    return Ok(None);
+                }
                 return Err(OutputParserError::new(
                     "Could not parse function call: 'function_call' key not found",
                 )
@@ -122,13 +158,17 @@ impl JsonOutputFunctionsParser {
             }
         };
 
-        let arguments_value = function_call.get("arguments").ok_or_else(|| {
-            OutputParserError::new("Could not parse function call data: missing 'arguments'")
-        })?;
+        let arguments_value = match function_call.get("arguments") {
+            Some(v) => v,
+            None => return Ok(None),
+        };
 
         let arguments_str = match arguments_value.as_str() {
             Some(s) => s,
             None => {
+                if partial {
+                    return Ok(None);
+                }
                 return Err(OutputParserError::new(
                     "Could not parse function call data: 'arguments' is not a string",
                 )
@@ -136,32 +176,54 @@ impl JsonOutputFunctionsParser {
             }
         };
 
-        let parsed_arguments = if self.strict {
-            serde_json::from_str::<Value>(arguments_str).map_err(|e| {
-                Error::from(OutputParserError::new(format!(
-                    "Could not parse function call data: {}",
-                    e
-                )))
-            })?
+        if partial {
+            let parsed = parse_partial_json(arguments_str, self.strict);
+            match parsed {
+                Ok(parsed_arguments) => {
+                    if self.args_only {
+                        Ok(Some(parsed_arguments))
+                    } else {
+                        let name = function_call.get("name").cloned().unwrap_or(Value::Null);
+                        Ok(Some(serde_json::json!({
+                            "arguments": parsed_arguments,
+                            "name": name,
+                        })))
+                    }
+                }
+                Err(_) => Ok(None),
+            }
         } else {
-            parse_json_lenient(arguments_str).map_err(|e| {
-                Error::from(OutputParserError::new(format!(
-                    "Could not parse function call data: {}",
-                    e
-                )))
-            })?
-        };
+            let parsed_arguments = if self.strict {
+                serde_json::from_str::<Value>(arguments_str).map_err(|e| {
+                    Error::from(OutputParserError::new(format!(
+                        "Could not parse function call data: {}",
+                        e
+                    )))
+                })?
+            } else {
+                parse_json_lenient(arguments_str).map_err(|e| {
+                    Error::from(OutputParserError::new(format!(
+                        "Could not parse function call data: {}",
+                        e
+                    )))
+                })?
+            };
 
-        if self.args_only {
-            Ok(parsed_arguments)
-        } else {
-            let name = function_call.get("name").cloned().unwrap_or(Value::Null);
-
-            Ok(serde_json::json!({
-                "arguments": parsed_arguments,
-                "name": name,
-            }))
+            if self.args_only {
+                Ok(Some(parsed_arguments))
+            } else {
+                let name = function_call.get("name").cloned().unwrap_or(Value::Null);
+                Ok(Some(serde_json::json!({
+                    "arguments": parsed_arguments,
+                    "name": name,
+                })))
+            }
         }
+    }
+
+    /// Parse the result of an LLM call to a JSON object (non-partial).
+    pub fn parse_result(&self, result: &[ChatGeneration]) -> Result<Option<Value>> {
+        self.parse_result_with_partial(result, false)
     }
 }
 
@@ -277,6 +339,191 @@ impl<T: Send + Sync + Clone + Debug + 'static> PydanticOutputFunctionsParser<T> 
                     .ok_or_else(|| OutputParserError::new("Missing arguments in function call"))?;
                 resolver(function_name, arguments)
             }
+        }
+    }
+}
+
+/// Parse an output as a specific key of the JSON object from OpenAI function calling.
+///
+/// Extracts a specific key from the parsed JSON arguments.
+/// Mirrors `langchain_core.output_parsers.openai_functions.JsonKeyOutputFunctionsParser`.
+#[derive(Debug, Clone)]
+pub struct JsonKeyOutputFunctionsParser {
+    /// The name of the key to extract from the parsed JSON.
+    pub key_name: String,
+
+    /// The underlying JSON parser.
+    inner: JsonOutputFunctionsParser,
+}
+
+impl JsonKeyOutputFunctionsParser {
+    pub fn new(key_name: impl Into<String>) -> Self {
+        Self {
+            key_name: key_name.into(),
+            inner: JsonOutputFunctionsParser::default(),
+        }
+    }
+
+    pub fn with_strict(mut self, strict: bool) -> Self {
+        self.inner.strict = strict;
+        self
+    }
+
+    /// Parse the result, extracting the value at `key_name` from the JSON.
+    ///
+    /// When `partial` is true, returns `Ok(None)` if the key is not present
+    /// instead of erroring.
+    pub fn parse_result_with_partial(
+        &self,
+        result: &[ChatGeneration],
+        partial: bool,
+    ) -> Result<Option<Value>> {
+        let res = self.inner.parse_result_with_partial(result, partial)?;
+        match res {
+            None => Ok(None),
+            Some(value) => {
+                if partial {
+                    Ok(value.get(&self.key_name).cloned())
+                } else {
+                    value
+                        .get(&self.key_name)
+                        .cloned()
+                        .ok_or_else(|| {
+                            Error::Other(format!(
+                                "Key '{}' not found in parsed output",
+                                self.key_name
+                            ))
+                        })
+                        .map(Some)
+                }
+            }
+        }
+    }
+
+    /// Parse the result (non-partial).
+    pub fn parse_result(&self, result: &[ChatGeneration]) -> Result<Option<Value>> {
+        self.parse_result_with_partial(result, false)
+    }
+}
+
+/// Parse an output as a Pydantic object and extract a specific attribute.
+///
+/// Mirrors `langchain_core.output_parsers.openai_functions.PydanticAttrOutputFunctionsParser`.
+#[derive(Debug, Clone)]
+pub struct PydanticAttrOutputFunctionsParser<T> {
+    /// The underlying pydantic parser.
+    inner: PydanticOutputFunctionsParser<T>,
+    /// The attribute name to extract from the parsed struct.
+    pub attr_name: String,
+}
+
+impl<T: DeserializeOwned + Send + Sync + Clone + Debug + 'static>
+    PydanticAttrOutputFunctionsParser<T>
+{
+    /// Create a new parser that extracts a specific attribute from the parsed struct.
+    pub fn new(attr_name: impl Into<String>) -> Self {
+        Self {
+            inner: PydanticOutputFunctionsParser::new(),
+            attr_name: attr_name.into(),
+        }
+    }
+
+    /// Parse the result and extract the named attribute as a `Value`.
+    ///
+    /// First parses the result into the typed struct `T` using serde, then
+    /// serializes it back to a `Value` and extracts the named field.
+    pub fn parse_result(&self, result: &[ChatGeneration]) -> Result<Value>
+    where
+        T: serde::Serialize,
+    {
+        let parsed = self.inner.parse_result(result)?;
+        let as_value = serde_json::to_value(&parsed)
+            .map_err(|e| Error::Other(format!("Failed to serialize parsed result: {}", e)))?;
+        as_value.get(&self.attr_name).cloned().ok_or_else(|| {
+            Error::Other(format!(
+                "Attribute '{}' not found on parsed object",
+                self.attr_name
+            ))
+        })
+    }
+}
+
+/// Compute a JSON patch-like diff between two values.
+///
+/// Produces a list of operations (add, remove, replace) that transform `prev` into `next`.
+fn compute_json_diff(path: &str, prev: &Value, next: &Value, ops: &mut Vec<Value>) {
+    if prev == next {
+        return;
+    }
+
+    match (prev, next) {
+        (Value::Object(prev_map), Value::Object(next_map)) => {
+            for (key, next_val) in next_map {
+                let child_path = if path.is_empty() {
+                    format!("/{}", key)
+                } else {
+                    format!("{}/{}", path, key)
+                };
+
+                match prev_map.get(key) {
+                    Some(prev_val) => {
+                        compute_json_diff(&child_path, prev_val, next_val, ops);
+                    }
+                    None => {
+                        ops.push(serde_json::json!({
+                            "op": "add",
+                            "path": child_path,
+                            "value": next_val,
+                        }));
+                    }
+                }
+            }
+
+            for key in prev_map.keys() {
+                if !next_map.contains_key(key) {
+                    let child_path = if path.is_empty() {
+                        format!("/{}", key)
+                    } else {
+                        format!("{}/{}", path, key)
+                    };
+                    ops.push(serde_json::json!({
+                        "op": "remove",
+                        "path": child_path,
+                    }));
+                }
+            }
+        }
+        (Value::Array(prev_arr), Value::Array(next_arr)) => {
+            let min_len = prev_arr.len().min(next_arr.len());
+            for i in 0..min_len {
+                let child_path = format!("{}/{}", path, i);
+                compute_json_diff(&child_path, &prev_arr[i], &next_arr[i], ops);
+            }
+
+            for i in min_len..next_arr.len() {
+                let child_path = format!("{}/{}", path, i);
+                ops.push(serde_json::json!({
+                    "op": "add",
+                    "path": child_path,
+                    "value": next_arr[i],
+                }));
+            }
+
+            for i in (min_len..prev_arr.len()).rev() {
+                let child_path = format!("{}/{}", path, i);
+                ops.push(serde_json::json!({
+                    "op": "remove",
+                    "path": child_path,
+                }));
+            }
+        }
+        _ => {
+            let op_path = if path.is_empty() { "/" } else { path };
+            ops.push(serde_json::json!({
+                "op": "replace",
+                "path": op_path,
+                "value": next,
+            }));
         }
     }
 }

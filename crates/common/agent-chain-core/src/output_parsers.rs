@@ -80,7 +80,8 @@ pub use xml::{XMLOutputParser, nested_element};
 
 // Re-export OpenAI functions parsers
 pub use openai_functions::{
-    JsonOutputFunctionsParser, OutputFunctionsParser, PydanticOutputFunctionsParser, PydanticSchema,
+    JsonKeyOutputFunctionsParser, JsonOutputFunctionsParser, OutputFunctionsParser,
+    PydanticAttrOutputFunctionsParser, PydanticOutputFunctionsParser, PydanticSchema,
 };
 
 #[cfg(test)]

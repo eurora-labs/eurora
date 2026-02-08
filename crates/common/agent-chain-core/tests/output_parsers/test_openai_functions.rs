@@ -40,13 +40,13 @@ fn test_json_output_function_parser() {
     let result = parser.parse_result(&[chat_generation.clone()]).unwrap();
     assert_eq!(
         result,
-        json!({"arguments": {"arg1": "code\ncode"}, "name": "function_name"})
+        Some(json!({"arguments": {"arg1": "code\ncode"}, "name": "function_name"}))
     );
 
     // Args only
     let parser = JsonOutputFunctionsParser::new(true);
     let result = parser.parse_result(&[chat_generation.clone()]).unwrap();
-    assert_eq!(result, json!({"arg1": "code\ncode"}));
+    assert_eq!(result, Some(json!({"arg1": "code\ncode"})));
 
     // Verify that the original message is not modified
     let additional_kwargs = chat_generation.message.additional_kwargs().unwrap();
@@ -71,7 +71,7 @@ fn test_json_output_function_parser_strictness_full_output() {
     let result = parser.parse_result(&[chat_generation]).unwrap();
     assert_eq!(
         result,
-        json!({"arguments": {"arg1": "value1"}, "name": "function_name"})
+        Some(json!({"arguments": {"arg1": "value1"}, "name": "function_name"}))
     );
 }
 
@@ -82,7 +82,7 @@ fn test_json_output_function_parser_strictness_args_only() {
 
     let parser = JsonOutputFunctionsParser::new(true).with_strict(false);
     let result = parser.parse_result(&[chat_generation]).unwrap();
-    assert_eq!(result, json!({"arg1": "value1"}));
+    assert_eq!(result, Some(json!({"arg1": "value1"})));
 }
 
 /// Test case: args_only=true, strict=false, args with literal newline (lenient parsing)
@@ -93,7 +93,7 @@ fn test_json_output_function_parser_strictness_newline_lenient() {
 
     let parser = JsonOutputFunctionsParser::new(true).with_strict(false);
     let result = parser.parse_result(&[chat_generation]).unwrap();
-    assert_eq!(result, json!({"code": "print(2+\n2)"}));
+    assert_eq!(result, Some(json!({"code": "print(2+\n2)"})));
 }
 
 /// Test case: args_only=true, strict=false, unicode characters
@@ -103,7 +103,7 @@ fn test_json_output_function_parser_strictness_unicode() {
 
     let parser = JsonOutputFunctionsParser::new(true).with_strict(false);
     let result = parser.parse_result(&[chat_generation]).unwrap();
-    assert_eq!(result, json!({"code": "你好)"}));
+    assert_eq!(result, Some(json!({"code": "你好)"})));
 }
 
 /// Test case: args_only=true, strict=true, args with literal newline (should fail)
