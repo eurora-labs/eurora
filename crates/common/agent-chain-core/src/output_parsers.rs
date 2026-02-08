@@ -87,8 +87,8 @@ pub use openai_functions::{
 
 // Re-export OpenAI tools parsers
 pub use openai_tools::{
-    JsonOutputKeyToolsParser, JsonOutputToolsParser, PydanticToolsParser, parse_tool_call,
-    parse_tool_calls,
+    JsonOutputKeyToolsParser, JsonOutputToolsParser, PydanticToolsParser, make_invalid_tool_call,
+    parse_tool_call, parse_tool_calls,
 };
 
 #[cfg(test)]

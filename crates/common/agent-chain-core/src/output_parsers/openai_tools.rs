@@ -12,6 +12,7 @@ use serde_json::Value;
 
 use super::base::OutputParserError;
 use crate::error::{Error, Result};
+use crate::messages::{InvalidToolCall, invalid_tool_call};
 use crate::outputs::ChatGeneration;
 use crate::utils::json::parse_partial_json;
 
@@ -51,12 +52,23 @@ pub fn parse_tool_call(
             .and_then(|a| a.as_str())
             .ok_or_else(|| OutputParserError::new("Tool call arguments is not a string"))?;
 
-        serde_json::from_str::<Value>(args_str).map_err(|e| {
-            Error::from(OutputParserError::new(format!(
-                "Function {} arguments:\n\n{}\n\nare not valid JSON. Received JSONDecodeError {}",
-                name, args_str, e
-            )))
-        })?
+        if strict {
+            serde_json::from_str::<Value>(args_str).map_err(|e| {
+                Error::from(OutputParserError::new(format!(
+                    "Function {} arguments:\n\n{}\n\nare not valid JSON. Received JSONDecodeError {}",
+                    name, args_str, e
+                )))
+            })?
+        } else {
+            // Non-strict mode: allow control characters (newlines, tabs, etc.)
+            // inside strings, matching Python's json.loads(s, strict=False).
+            parse_partial_json(args_str, false).map_err(|e| {
+                Error::from(OutputParserError::new(format!(
+                    "Function {} arguments:\n\n{}\n\nare not valid JSON. Received JSONDecodeError {:?}",
+                    name, args_str, e
+                )))
+            })?
+        }
     };
 
     let args = match function_args {
@@ -74,6 +86,30 @@ pub fn parse_tool_call(
     }
 
     Ok(Some(Value::Object(parsed)))
+}
+
+/// Create an `InvalidToolCall` from a raw tool call and an error message.
+///
+/// Mirrors `langchain_core.output_parsers.openai_tools.make_invalid_tool_call`.
+pub fn make_invalid_tool_call(raw_tool_call: &Value, error_msg: Option<&str>) -> InvalidToolCall {
+    let function = raw_tool_call.get("function");
+
+    let name = function
+        .and_then(|f| f.get("name"))
+        .and_then(|n| n.as_str())
+        .map(|s| s.to_string());
+
+    let args = function
+        .and_then(|f| f.get("arguments"))
+        .and_then(|a| a.as_str())
+        .map(|s| s.to_string());
+
+    let id = raw_tool_call
+        .get("id")
+        .and_then(|i| i.as_str())
+        .map(|s| s.to_string());
+
+    invalid_tool_call(name, args, id, error_msg.map(|s| s.to_string()))
 }
 
 /// Parse a list of raw tool calls.
