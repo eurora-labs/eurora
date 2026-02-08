@@ -95,9 +95,27 @@ impl ChatGeneration {
 /// Extract text from a message.
 ///
 /// This corresponds to the `set_text` model validator in Python which
-/// extracts the text content from the message.
+/// extracts the text content from the message. When the content is a JSON
+/// array (OpenAI-style content blocks), the first text block is used.
 fn extract_text_from_message(message: &BaseMessage) -> String {
-    message.content().to_string()
+    let content = message.content();
+
+    // Try parsing as a JSON array of content blocks (OpenAI format)
+    if let Ok(blocks) = serde_json::from_str::<Vec<Value>>(content) {
+        for block in &blocks {
+            if let Some(s) = block.as_str() {
+                return s.to_string();
+            }
+            if let Some(obj) = block.as_object() {
+                if let Some(Value::String(text)) = obj.get("text") {
+                    return text.clone();
+                }
+            }
+        }
+        return String::new();
+    }
+
+    content.to_string()
 }
 
 /// `ChatGeneration` chunk.
