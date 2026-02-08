@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
 use super::base::{get_msg_title_repr, is_interactive_env};
+use super::content::ContentBlock;
 
 /// Message responsible for deleting other messages.
 ///
@@ -129,6 +130,13 @@ impl RemoveMessage {
     /// RemoveMessage always returns an empty string.
     pub fn content(&self) -> &'static str {
         ""
+    }
+
+    /// Get the content blocks of the message.
+    ///
+    /// RemoveMessage always returns an empty list since it has no content.
+    pub fn content_blocks(&self) -> Vec<ContentBlock> {
+        vec![]
     }
 
     /// Get a pretty representation of the message.
