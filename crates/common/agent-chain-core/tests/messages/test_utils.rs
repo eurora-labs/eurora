@@ -258,7 +258,16 @@ fn test_filter_message_include_names() {
     ];
     let messages_copy = messages.clone();
     let expected = messages[1..2].to_vec();
-    let actual = filter_messages(&messages, Some(&["blur"]), None, None, None, None, None);
+    let actual = filter_messages(
+        &messages,
+        Some(&["blur"]),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    );
     assert_eq!(expected, actual);
     assert_eq!(messages, messages_copy);
 }
@@ -283,7 +292,16 @@ fn test_filter_message_exclude_names() {
     ];
     let messages_copy = messages.clone();
     let expected = messages[1..2].to_vec();
-    let actual = filter_messages(&messages, None, Some(&["blah"]), None, None, None, None);
+    let actual = filter_messages(
+        &messages,
+        None,
+        Some(&["blah"]),
+        None,
+        None,
+        None,
+        None,
+        None,
+    );
     assert_eq!(expected, actual);
     assert_eq!(messages, messages_copy);
 }
@@ -308,7 +326,7 @@ fn test_filter_message_include_ids() {
     ];
     let messages_copy = messages.clone();
     let expected = messages[1..2].to_vec();
-    let actual = filter_messages(&messages, None, None, None, None, Some(&["2"]), None);
+    let actual = filter_messages(&messages, None, None, None, None, Some(&["2"]), None, None);
     assert_eq!(expected, actual);
     assert_eq!(messages, messages_copy);
 }
@@ -333,7 +351,7 @@ fn test_filter_message_exclude_ids() {
     ];
     let messages_copy = messages.clone();
     let expected = messages[1..2].to_vec();
-    let actual = filter_messages(&messages, None, None, None, None, None, Some(&["1"]));
+    let actual = filter_messages(&messages, None, None, None, None, None, Some(&["1"]), None);
     assert_eq!(expected, actual);
     assert_eq!(messages, messages_copy);
 }
@@ -358,7 +376,16 @@ fn test_filter_message_include_types_str() {
     ];
     let messages_copy = messages.clone();
     let expected = messages[1..2].to_vec();
-    let actual = filter_messages(&messages, None, None, Some(&["human"]), None, None, None);
+    let actual = filter_messages(
+        &messages,
+        None,
+        None,
+        Some(&["human"]),
+        None,
+        None,
+        None,
+        None,
+    );
     assert_eq!(expected, actual);
     assert_eq!(messages, messages_copy);
 }
@@ -383,7 +410,16 @@ fn test_filter_message_exclude_types_str() {
     ];
     let messages_copy = messages.clone();
     let expected = messages[1..2].to_vec();
-    let actual = filter_messages(&messages, None, None, None, Some(&["system"]), None, None);
+    let actual = filter_messages(
+        &messages,
+        None,
+        None,
+        None,
+        Some(&["system"]),
+        None,
+        None,
+        None,
+    );
     assert_eq!(expected, actual);
     assert_eq!(messages, messages_copy);
 }
@@ -414,6 +450,7 @@ fn test_filter_message_combined() {
         None,
         None,
         Some(&["system"]),
+        None,
         None,
         None,
     );
@@ -761,7 +798,7 @@ fn test_convert_to_openai_messages_single_message() {
     let messages = vec![BaseMessage::Human(
         HumanMessage::builder().content("Hello").build(),
     )];
-    let result = convert_to_openai_messages(&messages, TextFormat::String);
+    let result = convert_to_openai_messages(&messages, TextFormat::String, false);
 
     assert_eq!(result.len(), 1);
     assert_eq!(result[0]["role"], "user");
@@ -775,7 +812,7 @@ fn test_convert_to_openai_messages_multiple_messages() {
         BaseMessage::Human(HumanMessage::builder().content("Human message").build()),
         BaseMessage::AI(AIMessage::builder().content("AI message").build()),
     ];
-    let result = convert_to_openai_messages(&messages, TextFormat::String);
+    let result = convert_to_openai_messages(&messages, TextFormat::String, false);
 
     let expected = [
         serde_json::json!({"role": "system", "content": "System message"}),
@@ -794,7 +831,7 @@ fn test_convert_to_openai_messages_block_format() {
     let messages = vec![BaseMessage::Human(
         HumanMessage::builder().content("Hello").build(),
     )];
-    let result = convert_to_openai_messages(&messages, TextFormat::Block);
+    let result = convert_to_openai_messages(&messages, TextFormat::Block, false);
 
     assert_eq!(result.len(), 1);
     assert_eq!(result[0]["role"], "user");
@@ -813,7 +850,7 @@ fn test_convert_to_openai_messages_tool_message() {
             .tool_call_id("123")
             .build(),
     )];
-    let result = convert_to_openai_messages(&messages, TextFormat::Block);
+    let result = convert_to_openai_messages(&messages, TextFormat::Block, false);
 
     assert_eq!(result.len(), 1);
     assert_eq!(result[0]["role"], "tool");
@@ -826,7 +863,7 @@ fn test_convert_to_openai_messages_tool_message() {
 #[test]
 fn test_convert_to_openai_messages_empty_list() {
     let messages: Vec<BaseMessage> = vec![];
-    let result = convert_to_openai_messages(&messages, TextFormat::String);
+    let result = convert_to_openai_messages(&messages, TextFormat::String, false);
     assert!(result.is_empty());
 }
 
@@ -994,9 +1031,10 @@ fn test_merge_message_runs_preserves_tool_calls() {
     assert_eq!(actual.len(), 1);
     // Content should be merged
     assert_eq!(actual[0].content(), "first\nsecond");
-    // Document current behavior: tool_calls are lost during merge because
-    // merge_message_runs creates a new AIMessage from merged content only.
-    assert!(actual[0].tool_calls().is_empty());
+    // With chunk-based merging, tool_calls are properly preserved
+    assert_eq!(actual[0].tool_calls().len(), 2);
+    assert_eq!(actual[0].tool_calls()[0].name, "tool_a");
+    assert_eq!(actual[0].tool_calls()[1].name, "tool_b");
 }
 
 // ============================================================================
@@ -1036,7 +1074,7 @@ fn test_convert_to_openai_messages_developer() {
             .additional_kwargs(additional_kwargs)
             .build(),
     )];
-    let result = convert_to_openai_messages(&messages, TextFormat::String);
+    let result = convert_to_openai_messages(&messages, TextFormat::String, false);
     assert_eq!(result.len(), 1);
     // The Rust impl always maps System -> "system" role
     assert_eq!(result[0]["role"], "system");
@@ -1051,7 +1089,7 @@ fn test_convert_to_openai_messages_developer() {
 fn test_convert_to_openai_messages_empty_content() {
     // Message with empty content string should preserve empty string
     let messages = vec![BaseMessage::AI(AIMessage::builder().content("").build())];
-    let result = convert_to_openai_messages(&messages, TextFormat::String);
+    let result = convert_to_openai_messages(&messages, TextFormat::String, false);
     assert_eq!(result.len(), 1);
     assert_eq!(result[0]["role"], "assistant");
     assert_eq!(result[0]["content"], "");
@@ -1075,7 +1113,7 @@ fn test_convert_to_openai_messages_ai_with_tool_calls() {
             .tool_calls(vec![tc])
             .build(),
     )];
-    let result = convert_to_openai_messages(&messages, TextFormat::String);
+    let result = convert_to_openai_messages(&messages, TextFormat::String, false);
     assert_eq!(result.len(), 1);
     assert_eq!(result[0]["role"], "assistant");
     assert_eq!(result[0]["content"], "Let me check the weather.");
@@ -1579,6 +1617,7 @@ fn test_filter_messages_include_types_and_include_names_combined() {
         Some(&["alice"]),
         None,
         Some(&["ai"]),
+        None,
         None,
         None,
         None,

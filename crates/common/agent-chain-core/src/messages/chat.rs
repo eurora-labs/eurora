@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
 use super::base::merge_content;
+use crate::utils::merge::merge_dicts;
 
 /// A chat message that can be assigned an arbitrary speaker (role).
 ///
@@ -270,23 +271,31 @@ impl ChatMessageChunk {
 
         let content = merge_content(&self.content, &other.content);
 
-        // Merge additional_kwargs
-        let mut additional_kwargs = self.additional_kwargs.clone();
-        for (k, v) in &other.additional_kwargs {
-            additional_kwargs.insert(k.clone(), v.clone());
-        }
+        // Merge additional_kwargs using merge_dicts (recursive deep merge)
+        let additional_kwargs = {
+            let left_val = serde_json::to_value(&self.additional_kwargs).unwrap_or_default();
+            let right_val = serde_json::to_value(&other.additional_kwargs).unwrap_or_default();
+            match merge_dicts(left_val, vec![right_val]) {
+                Ok(merged) => serde_json::from_value(merged).unwrap_or_default(),
+                Err(_) => self.additional_kwargs.clone(),
+            }
+        };
 
-        // Merge response_metadata
-        let mut response_metadata = self.response_metadata.clone();
-        for (k, v) in &other.response_metadata {
-            response_metadata.insert(k.clone(), v.clone());
-        }
+        // Merge response_metadata using merge_dicts (recursive deep merge)
+        let response_metadata = {
+            let left_val = serde_json::to_value(&self.response_metadata).unwrap_or_default();
+            let right_val = serde_json::to_value(&other.response_metadata).unwrap_or_default();
+            match merge_dicts(left_val, vec![right_val]) {
+                Ok(merged) => serde_json::from_value(merged).unwrap_or_default(),
+                Err(_) => self.response_metadata.clone(),
+            }
+        };
 
         ChatMessageChunk {
             content,
             role: self.role.clone(),
-            id: self.id.clone().or_else(|| other.id.clone()),
-            name: self.name.clone().or_else(|| other.name.clone()),
+            id: self.id.clone(),
+            name: self.name.clone(),
             additional_kwargs,
             response_metadata,
         }

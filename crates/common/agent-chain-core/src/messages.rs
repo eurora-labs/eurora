@@ -138,9 +138,9 @@ pub use tool::{
 
 // Re-export from utils
 pub use utils::{
-    AnyMessage, CountTokensConfig, MessageLikeRepresentation, TextFormat, TrimMessagesConfig,
-    TrimStrategy, convert_to_message, convert_to_messages, convert_to_openai_messages,
-    count_tokens_approximately, filter_messages, get_buffer_string, merge_message_runs,
-    message_chunk_to_message, message_from_dict, message_to_dict, messages_from_dict,
-    messages_to_dict, trim_messages,
+    AnyMessage, CountTokensConfig, ExcludeToolCalls, MessageLikeRepresentation, TextFormat,
+    TrimMessagesConfig, TrimStrategy, convert_to_message, convert_to_messages,
+    convert_to_openai_messages, count_tokens_approximately, filter_messages, get_buffer_string,
+    merge_message_runs, message_chunk_to_message, message_from_dict, message_to_dict,
+    messages_from_dict, messages_to_dict, trim_messages,
 };
