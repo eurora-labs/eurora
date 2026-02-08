@@ -3624,6 +3624,7 @@ dependencies = [
  "anyhow",
  "backtrace",
  "color-thief",
+ "core-foundation 0.10.1",
  "dotenv",
  "euro-activity",
  "euro-conversation",
