@@ -21,7 +21,8 @@ export const config = {
 	capabilities: [
 		{
 			'tauri:options': {
-				application: '../target/debug/euro-tauri',
+				application: '../target/debug/eurora',
+				// application: '../target/debug/euro-tauri',
 			},
 		},
 	],
