@@ -149,7 +149,7 @@ async fn test_comma_transform_single_chunk() {
         .collect()
         .await;
 
-    assert_eq!(results, vec![vec!["foo", "bar", "baz"]]);
+    assert_eq!(results, vec![vec!["foo"], vec!["bar"], vec!["baz"]]);
 }
 
 // --- CommaSeparatedListOutputParser async tests ---
@@ -255,7 +255,7 @@ async fn test_numbered_transform_single_chunk() {
         .collect()
         .await;
 
-    assert_eq!(results, vec![vec!["foo", "bar", "baz"]]);
+    assert_eq!(results, vec![vec!["foo"], vec!["bar"], vec!["baz"]]);
 }
 
 // --- NumberedListOutputParser async tests ---
@@ -356,7 +356,7 @@ async fn test_markdown_transform_single_chunk() {
         .collect()
         .await;
 
-    assert_eq!(results, vec![vec!["foo", "bar", "baz"]]);
+    assert_eq!(results, vec![vec!["foo"], vec!["bar"], vec!["baz"]]);
 }
 
 // --- MarkdownListOutputParser async tests ---
