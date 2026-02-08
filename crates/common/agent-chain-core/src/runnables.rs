@@ -8,6 +8,8 @@ pub mod branch;
 pub mod config;
 pub mod configurable;
 pub mod fallbacks;
+pub mod graph;
+pub mod graph_mermaid;
 pub mod passthrough;
 pub mod retry;
 pub mod router;
@@ -21,14 +23,20 @@ pub use base::{
 };
 pub use branch::{RunnableBranch, RunnableBranchBuilder};
 pub use config::{
-    ConfigOrList, RunnableConfig, ensure_config, get_config_list, merge_configs, patch_config,
+    AsyncVariableArgsFn, ConfigOrList, RunnableConfig, VariableArgsFn,
+    acall_func_with_variable_args, call_func_with_variable_args, ensure_config, get_config_list,
+    merge_configs, patch_config,
 };
 pub use configurable::{
-    Alternative, ConfigurableRunnable, DynamicRunnable, RunnableConfigurableAlternatives,
-    RunnableConfigurableFields, make_options_spec_multi, make_options_spec_single,
-    prefix_config_spec,
+    Alternative, ConfigurableRunnable, DynamicRunnable, Reconfigurable,
+    RunnableConfigurableAlternatives, RunnableConfigurableFields, make_options_spec_multi,
+    make_options_spec_single, prefix_config_spec,
 };
-pub use fallbacks::{RunnableWithFallbacks, RunnableWithFallbacksExt};
+pub use fallbacks::{
+    ExceptionInserter, FallbackErrorPredicate, RunnableWithFallbacks, RunnableWithFallbacksExt,
+};
+pub use graph::{CurveStyle, Edge, Graph, MermaidDrawMethod, MermaidOptions, Node, NodeStyles};
+pub use graph_mermaid::to_safe_id;
 pub use passthrough::{
     PickKeys, RunnableAssign, RunnableAssignBuilder, RunnablePassthrough, RunnablePick,
     graph_passthrough,

@@ -6,12 +6,14 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 use futures::StreamExt;
 use futures::stream::BoxStream;
 use serde::Serialize;
 use serde_json::Value;
+use tokio::sync::Semaphore;
 
 use crate::error::Result;
 use crate::load::{Serializable, Serialized};
@@ -106,12 +108,13 @@ pub trait Runnable: Send + Sync + Debug {
 
     /// Transform multiple inputs into outputs in parallel.
     ///
-    /// Default implementation runs invoke() in parallel for each input.
+    /// Default implementation runs invoke() in parallel using scoped threads,
+    /// respecting the `max_concurrency` setting from config.
     fn batch(
         &self,
         inputs: Vec<Self::Input>,
         config: Option<ConfigOrList>,
-        _return_exceptions: bool,
+        return_exceptions: bool,
     ) -> Vec<Result<Self::Output>>
     where
         Self: 'static,
@@ -124,23 +127,59 @@ pub trait Runnable: Send + Sync + Debug {
 
         // For single input, just invoke directly
         if inputs.len() == 1 {
-            return vec![self.invoke(
-                inputs.into_iter().next().unwrap(),
-                Some(configs.into_iter().next().unwrap()),
-            )];
+            let input = inputs.into_iter().next().unwrap();
+            let config = configs.into_iter().next().unwrap();
+            let result = self.invoke(input, Some(config));
+            if return_exceptions {
+                return vec![result];
+            }
+            return vec![result];
         }
 
-        // For multiple inputs, run sequentially (parallel implementation would require rayon)
-        inputs
-            .into_iter()
-            .zip(configs)
-            .map(|(input, config)| self.invoke(input, Some(config)))
-            .collect()
+        let max_concurrency = configs[0].max_concurrency;
+        let len = inputs.len();
+        let mut results: Vec<Option<Result<Self::Output>>> = (0..len).map(|_| None).collect();
+
+        std::thread::scope(|scope| {
+            let active_count = Arc::new(AtomicUsize::new(0));
+            let semaphore_like = max_concurrency;
+            let mut handles = Vec::with_capacity(len);
+
+            for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
+                // Simple concurrency limiting: wait until a slot is available
+                if let Some(max) = semaphore_like {
+                    while active_count.load(Ordering::SeqCst) >= max {
+                        std::thread::sleep(std::time::Duration::from_millis(1));
+                    }
+                }
+                let active = active_count.clone();
+                active.fetch_add(1, Ordering::SeqCst);
+
+                let handle = scope.spawn(move || {
+                    let result = if return_exceptions {
+                        self.invoke(input, Some(config))
+                    } else {
+                        self.invoke(input, Some(config))
+                    };
+                    active.fetch_sub(1, Ordering::SeqCst);
+                    (i, result)
+                });
+                handles.push(handle);
+            }
+
+            for handle in handles {
+                let (i, result) = handle.join().expect("thread should not panic");
+                results[i] = Some(result);
+            }
+        });
+
+        results.into_iter().map(|r| r.unwrap()).collect()
     }
 
     /// Transform multiple inputs into outputs asynchronously.
     ///
-    /// Default implementation runs ainvoke() in parallel for each input.
+    /// Default implementation runs ainvoke() concurrently, respecting the
+    /// `max_concurrency` setting from config using a semaphore.
     async fn abatch(
         &self,
         inputs: Vec<Self::Input>,
@@ -155,14 +194,129 @@ pub trait Runnable: Send + Sync + Debug {
         }
 
         let configs = get_config_list(config, inputs.len());
-        let mut results = Vec::with_capacity(inputs.len());
+        let max_concurrency = configs[0].max_concurrency;
 
-        for (input, config) in inputs.into_iter().zip(configs) {
-            let result = self.ainvoke(input, Some(config)).await;
-            results.push(result);
+        match max_concurrency {
+            Some(limit) if limit > 0 => {
+                let semaphore = Arc::new(Semaphore::new(limit));
+                let futures: Vec<_> = inputs
+                    .into_iter()
+                    .zip(configs)
+                    .map(|(input, config)| {
+                        let sem = semaphore.clone();
+                        async move {
+                            let _permit =
+                                sem.acquire().await.expect("semaphore should not be closed");
+                            self.ainvoke(input, Some(config)).await
+                        }
+                    })
+                    .collect();
+                futures::future::join_all(futures).await
+            }
+            _ => {
+                let futures: Vec<_> = inputs
+                    .into_iter()
+                    .zip(configs)
+                    .map(|(input, config)| self.ainvoke(input, Some(config)))
+                    .collect();
+                futures::future::join_all(futures).await
+            }
+        }
+    }
+
+    /// Run invoke in parallel on a list of inputs, yielding results as they
+    /// complete.
+    ///
+    /// Default implementation uses scoped threads with concurrency limiting.
+    fn batch_as_completed(
+        &self,
+        inputs: Vec<Self::Input>,
+        config: Option<ConfigOrList>,
+        _return_exceptions: bool,
+    ) -> Vec<(usize, Result<Self::Output>)>
+    where
+        Self: 'static,
+    {
+        if inputs.is_empty() {
+            return Vec::new();
         }
 
-        results
+        let configs = get_config_list(config, inputs.len());
+
+        if inputs.len() == 1 {
+            let input = inputs.into_iter().next().unwrap();
+            let config = configs.into_iter().next().unwrap();
+            return vec![(0, self.invoke(input, Some(config)))];
+        }
+
+        let max_concurrency = configs[0].max_concurrency;
+        let (sender, receiver) = std::sync::mpsc::channel();
+
+        std::thread::scope(|scope| {
+            let active_count = Arc::new(AtomicUsize::new(0));
+
+            for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
+                if let Some(max) = max_concurrency {
+                    while active_count.load(Ordering::SeqCst) >= max {
+                        std::thread::sleep(std::time::Duration::from_millis(1));
+                    }
+                }
+                let active = active_count.clone();
+                active.fetch_add(1, Ordering::SeqCst);
+                let tx = sender.clone();
+
+                scope.spawn(move || {
+                    let result = self.invoke(input, Some(config));
+                    active.fetch_sub(1, Ordering::SeqCst);
+                    tx.send((i, result))
+                        .expect("receiver should not be dropped");
+                });
+            }
+
+            // Drop the original sender so the receiver will terminate
+            drop(sender);
+        });
+
+        receiver.into_iter().collect()
+    }
+
+    /// Run ainvoke in parallel on a list of inputs, yielding results as they
+    /// complete.
+    ///
+    /// Default implementation uses FuturesUnordered with semaphore-based
+    /// concurrency limiting. Returns a stream of (index, result) tuples.
+    fn abatch_as_completed(
+        &self,
+        inputs: Vec<Self::Input>,
+        config: Option<ConfigOrList>,
+        _return_exceptions: bool,
+    ) -> BoxStream<'_, (usize, Result<Self::Output>)>
+    where
+        Self: 'static,
+    {
+        if inputs.is_empty() {
+            return Box::pin(futures::stream::empty());
+        }
+
+        let configs = get_config_list(config, inputs.len());
+        let max_concurrency = configs[0].max_concurrency;
+        let semaphore = max_concurrency.map(|n| Arc::new(Semaphore::new(n)));
+
+        let futures_unordered = futures::stream::FuturesUnordered::new();
+
+        for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
+            let sem = semaphore.clone();
+            futures_unordered.push(async move {
+                let _permit = match sem {
+                    Some(ref s) => Some(s.acquire().await.expect("semaphore should not be closed")),
+                    None => None,
+                };
+                let result = self.ainvoke(input, Some(config)).await;
+                (i, result)
+            });
+        }
+
+        Box::pin(futures_unordered)
     }
 
     /// Stream output from a single input.

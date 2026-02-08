@@ -45,6 +45,7 @@ mod json;
 mod list;
 mod openai_functions;
 mod openai_tools;
+mod pydantic;
 mod string;
 mod transform;
 mod xml;
@@ -75,6 +76,9 @@ pub use list::{
     CommaSeparatedListOutputParser, ListOutputParser, MarkdownListOutputParser,
     NumberedListOutputParser, ParseMatch, drop_last_n,
 };
+
+// Re-export Pydantic (struct) parser
+pub use pydantic::PydanticOutputParser;
 
 // Re-export XML parser
 pub use xml::{XMLOutputParser, nested_element};

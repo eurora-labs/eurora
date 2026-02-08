@@ -1,0 +1,165 @@
+//! Parser for Pydantic-style (struct) output.
+//!
+//! This module contains the `PydanticOutputParser` which parses LLM output
+//! as JSON and validates it against a Rust struct using `serde::Deserialize`.
+//! Mirrors `langchain_core.output_parsers.pydantic`.
+
+use std::fmt::Debug;
+use std::marker::PhantomData;
+
+use serde::de::DeserializeOwned;
+use serde_json::Value;
+
+use crate::error::{Error, Result};
+use crate::outputs::Generation;
+use crate::utils::json::parse_json_markdown;
+
+use super::base::{BaseOutputParser, OutputParserError};
+use super::format_instructions::format_pydantic_instructions;
+
+/// Parse an output using a Rust struct (Pydantic model equivalent).
+///
+/// This parser first extracts JSON from the LLM output (handling markdown code
+/// blocks), then deserializes the JSON into the target type `T` using serde.
+///
+/// This is the Rust equivalent of Python's `PydanticOutputParser`. Instead of
+/// Pydantic models, it uses `serde::Deserialize` for type validation.
+///
+/// # Type Parameters
+///
+/// * `T` - The target type to deserialize into. Must implement `DeserializeOwned`,
+///   `Send`, `Sync`, `Clone`, and `Debug`.
+///
+/// # Example
+///
+/// ```ignore
+/// use serde::Deserialize;
+/// use agent_chain_core::output_parsers::PydanticOutputParser;
+///
+/// #[derive(Debug, Clone, Deserialize)]
+/// struct Person {
+///     name: String,
+///     age: i64,
+/// }
+///
+/// let parser = PydanticOutputParser::<Person>::new(
+///     "Person",
+///     serde_json::json!({"properties": {"name": {"type": "string"}, "age": {"type": "integer"}}, "required": ["name", "age"]}),
+/// );
+/// let result = parser.parse(r#"{"name": "Alice", "age": 30}"#).unwrap();
+/// assert_eq!(result.name, "Alice");
+/// ```
+#[derive(Debug, Clone)]
+pub struct PydanticOutputParser<T> {
+    /// The name of the target type (used in error messages).
+    name: String,
+    /// The JSON schema of the target type (used for format instructions).
+    schema: Value,
+    _marker: PhantomData<T>,
+}
+
+impl<T: DeserializeOwned + Send + Sync + Clone + Debug> PydanticOutputParser<T> {
+    /// Create a new `PydanticOutputParser`.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the target type (used in error messages, equivalent
+    ///   to `pydantic_object.__name__` in Python).
+    /// * `schema` - The JSON schema of the target type (equivalent to
+    ///   `pydantic_object.model_json_schema()` in Python).
+    pub fn new(name: impl Into<String>, schema: Value) -> Self {
+        Self {
+            name: name.into(),
+            schema,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Parse a JSON object (as `Value`) into the target type.
+    ///
+    /// Mirrors Python's `PydanticOutputParser._parse_obj()`.
+    pub fn parse_obj(&self, obj: &Value) -> Result<T> {
+        serde_json::from_value::<T>(obj.clone()).map_err(|e| self.parser_exception(&e, obj))
+    }
+
+    /// Create an `OutputParserError` for a failed parse.
+    ///
+    /// Mirrors Python's `PydanticOutputParser._parser_exception()`.
+    pub fn parser_exception(&self, error: &dyn std::fmt::Display, json_object: &Value) -> Error {
+        let json_string = serde_json::to_string(json_object).unwrap_or_default();
+        let message = format!(
+            "Failed to parse {} from completion {}. Got: {}",
+            self.name, json_string, error
+        );
+        OutputParserError::parse_error(message, json_string).into()
+    }
+
+    /// Get the JSON schema for the target type.
+    pub fn get_schema(&self) -> &Value {
+        &self.schema
+    }
+
+    /// Get the name of the target type.
+    pub fn output_type_name(&self) -> &str {
+        &self.name
+    }
+}
+
+impl<T: DeserializeOwned + Send + Sync + Clone + Debug> BaseOutputParser
+    for PydanticOutputParser<T>
+{
+    type Output = T;
+
+    fn parse(&self, text: &str) -> Result<T> {
+        let text = text.trim();
+        let json_object = parse_json_markdown(text).map_err(|e| {
+            let message = format!("Invalid json output: {}. Error: {}", text, e);
+            Error::from(OutputParserError::parse_error(&message, text))
+        })?;
+        self.parse_obj(&json_object)
+    }
+
+    fn parse_result(&self, result: &[Generation], partial: bool) -> Result<T> {
+        if result.is_empty() {
+            return Err(Error::Other("No generations to parse".to_string()));
+        }
+
+        let text = result[0].text.trim();
+
+        let json_object = match parse_json_markdown(text) {
+            Ok(value) => value,
+            Err(e) => {
+                if partial {
+                    return Err(Error::Other(format!("Partial parse failed: {}", e)));
+                }
+                return Err(OutputParserError::parse_error(
+                    format!("Invalid json output: {}", e),
+                    text,
+                )
+                .into());
+            }
+        };
+
+        match self.parse_obj(&json_object) {
+            Ok(value) => Ok(value),
+            Err(_) if partial => Err(Error::Other("Partial parse: validation failed".to_string())),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn get_format_instructions(&self) -> Result<String> {
+        let mut schema_copy = self.schema.clone();
+
+        if let Value::Object(ref mut map) = schema_copy {
+            map.remove("title");
+            map.remove("type");
+        }
+
+        let schema_str = serde_json::to_string(&schema_copy).unwrap_or_else(|_| "{}".to_string());
+        Ok(format_pydantic_instructions(&schema_str))
+    }
+
+    fn parser_type(&self) -> &str {
+        "pydantic"
+    }
+}
