@@ -44,6 +44,7 @@ mod format_instructions;
 mod json;
 mod list;
 mod openai_functions;
+mod openai_tools;
 mod string;
 mod transform;
 mod xml;
@@ -82,6 +83,12 @@ pub use xml::{XMLOutputParser, nested_element};
 pub use openai_functions::{
     JsonKeyOutputFunctionsParser, JsonOutputFunctionsParser, OutputFunctionsParser,
     PydanticAttrOutputFunctionsParser, PydanticOutputFunctionsParser, PydanticSchema,
+};
+
+// Re-export OpenAI tools parsers
+pub use openai_tools::{
+    JsonOutputKeyToolsParser, JsonOutputToolsParser, PydanticToolsParser, parse_tool_call,
+    parse_tool_calls,
 };
 
 #[cfg(test)]
