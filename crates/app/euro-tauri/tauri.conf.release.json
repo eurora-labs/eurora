@@ -1,6 +1,7 @@
 {
 	"productName": "Eurora",
 	"identifier": "com.eurora.app",
+	"mainBinaryName": "eurora",
 	"build": {
 		"beforeBuildCommand": "[ \"$CI\" = \"true\" ] || pnpm build:desktop -- --mode production"
 	},
