@@ -750,7 +750,7 @@ pub fn messages_to_dict(messages: &[BaseMessage]) -> Vec<serde_json::Value> {
 /// The formatted title representation.
 pub fn get_msg_title_repr(title: &str, bold: bool) -> String {
     let padded = format!(" {} ", title);
-    let sep_len = (80 - padded.len()) / 2;
+    let sep_len = 80usize.saturating_sub(padded.len()) / 2;
     let sep: String = "=".repeat(sep_len);
     let second_sep = if padded.len() % 2 == 0 {
         sep.clone()
