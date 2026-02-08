@@ -9,12 +9,34 @@ use std::sync::OnceLock;
 static PARENT_PID: OnceLock<u32> = OnceLock::new();
 
 /// Capture and store the parent PID. Should be called once at startup.
+///
+/// On Safari/macOS, the Swift bridge passes the actual Safari PID via
+/// the EURORA_BROWSER_PID environment variable since the native messaging
+/// host's parent would be the Swift bridge app, not Safari.
 pub fn capture_parent_pid() {
-    let ppid = get_parent_pid_impl();
+    // Check for environment variable override (used by Safari bridge)
+    let ppid = if let Ok(env_pid) = std::env::var("EURORA_BROWSER_PID") {
+        if let Ok(pid) = env_pid.parse::<u32>() {
+            tracing::info!(
+                "Using browser PID from EURORA_BROWSER_PID environment variable: {}",
+                pid
+            );
+            pid
+        } else {
+            tracing::warn!(
+                "Invalid EURORA_BROWSER_PID value '{}', falling back to parent PID",
+                env_pid
+            );
+            get_parent_pid_impl()
+        }
+    } else {
+        get_parent_pid_impl()
+    };
+
     if PARENT_PID.set(ppid).is_err() {
         tracing::warn!("Parent PID was already captured");
     }
-    tracing::info!("Captured parent PID: {}", ppid);
+    tracing::info!("Captured browser PID: {}", ppid);
 }
 
 /// Get the previously captured parent PID.

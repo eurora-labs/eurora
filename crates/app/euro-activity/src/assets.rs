@@ -2,12 +2,10 @@
 
 pub mod article;
 pub mod default;
-pub mod pdf;
 pub mod twitter;
 pub mod youtube;
 
 pub use article::ArticleAsset;
 pub use default::DefaultAsset;
-pub use pdf::PdfAsset;
 pub use twitter::TwitterAsset;
 pub use youtube::YoutubeAsset;
