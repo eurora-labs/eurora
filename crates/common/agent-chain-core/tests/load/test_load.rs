@@ -1208,8 +1208,8 @@ fn test_load_empty_list() {
 
 #[test]
 fn test_load_float() {
-    let result = load(json!(3.14), None).unwrap();
-    assert_eq!(result.as_f64(), Some(3.14));
+    let result = load(json!(3.15), None).unwrap();
+    assert_eq!(result.as_f64(), Some(3.15));
 }
 
 #[test]

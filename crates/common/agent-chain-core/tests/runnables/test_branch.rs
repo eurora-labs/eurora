@@ -21,7 +21,7 @@ fn test_branch_initialization() {
     let branch = RunnableBranchBuilder::<i32, i32>::new()
         .branch(|x| Ok(x > 0), |x| Ok(x + 1))
         .branch(|x| Ok(x < 0), |x| Ok(x - 1))
-        .default(|x| Ok(x))
+        .default(Ok)
         .unwrap();
 
     assert_eq!(branch.name(), Some("RunnableBranch".to_string()));
@@ -280,7 +280,7 @@ fn test_branch_with_hashmap_input() {
 
     let branch = RunnableBranchBuilder::new()
         .branch(
-            |x: Input| Ok(x.get("type").map_or(false, |v| v == "add")),
+            |x: Input| Ok(x.get("type").is_some_and(|v| v == "add")),
             |x: Input| {
                 let a: i32 = x.get("a").unwrap().parse().unwrap();
                 let b: i32 = x.get("b").unwrap().parse().unwrap();
@@ -288,7 +288,7 @@ fn test_branch_with_hashmap_input() {
             },
         )
         .branch(
-            |x: Input| Ok(x.get("type").map_or(false, |v| v == "multiply")),
+            |x: Input| Ok(x.get("type").is_some_and(|v| v == "multiply")),
             |x: Input| {
                 let a: i32 = x.get("a").unwrap().parse().unwrap();
                 let b: i32 = x.get("b").unwrap().parse().unwrap();

@@ -37,7 +37,9 @@ fn test_json_output_function_parser() {
 
     // Full output (args_only=false) with non-strict mode
     let parser = JsonOutputFunctionsParser::new(false);
-    let result = parser.parse_result(&[chat_generation.clone()]).unwrap();
+    let result = parser
+        .parse_result(std::slice::from_ref(&chat_generation))
+        .unwrap();
     assert_eq!(
         result,
         Some(json!({"arguments": {"arg1": "code\ncode"}, "name": "function_name"}))
@@ -45,7 +47,9 @@ fn test_json_output_function_parser() {
 
     // Args only
     let parser = JsonOutputFunctionsParser::new(true);
-    let result = parser.parse_result(&[chat_generation.clone()]).unwrap();
+    let result = parser
+        .parse_result(std::slice::from_ref(&chat_generation))
+        .unwrap();
     assert_eq!(result, Some(json!({"arg1": "code\ncode"})));
 
     // Verify that the original message is not modified

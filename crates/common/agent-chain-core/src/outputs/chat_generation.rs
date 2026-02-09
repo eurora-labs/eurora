@@ -106,10 +106,10 @@ fn extract_text_from_message(message: &BaseMessage) -> String {
             if let Some(s) = block.as_str() {
                 return s.to_string();
             }
-            if let Some(obj) = block.as_object() {
-                if let Some(Value::String(text)) = obj.get("text") {
-                    return text.clone();
-                }
+            if let Some(obj) = block.as_object()
+                && let Some(Value::String(text)) = obj.get("text")
+            {
+                return text.clone();
             }
         }
         return String::new();

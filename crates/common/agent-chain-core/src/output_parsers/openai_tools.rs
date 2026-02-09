@@ -144,21 +144,11 @@ pub fn parse_tool_calls(
 /// Parse tools from OpenAI response.
 ///
 /// Mirrors `langchain_core.output_parsers.openai_tools.JsonOutputToolsParser`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct JsonOutputToolsParser {
     pub strict: bool,
     pub return_id: bool,
     pub first_tool_only: bool,
-}
-
-impl Default for JsonOutputToolsParser {
-    fn default() -> Self {
-        Self {
-            strict: false,
-            return_id: false,
-            first_tool_only: false,
-        }
-    }
 }
 
 impl JsonOutputToolsParser {
@@ -228,10 +218,10 @@ impl JsonOutputToolsParser {
         let tool_calls: Vec<Value> = tool_calls
             .into_iter()
             .map(|mut tc| {
-                if let Value::Object(ref mut map) = tc {
-                    if let Some(name) = map.remove("name") {
-                        map.insert("type".to_string(), name);
-                    }
+                if let Value::Object(ref mut map) = tc
+                    && let Some(name) = map.remove("name")
+                {
+                    map.insert("type".to_string(), name);
                 }
                 tc
             })
@@ -328,10 +318,10 @@ impl JsonOutputKeyToolsParser {
         let parsed_tool_calls: Vec<Value> = parsed_tool_calls
             .into_iter()
             .map(|mut tc| {
-                if let Value::Object(ref mut map) = tc {
-                    if let Some(name) = map.remove("name") {
-                        map.insert("type".to_string(), name);
-                    }
+                if let Value::Object(ref mut map) = tc
+                    && let Some(name) = map.remove("name")
+                {
+                    map.insert("type".to_string(), name);
                 }
                 tc
             })
@@ -451,7 +441,7 @@ impl PydanticToolsParser {
         let json_results = self.inner.parse_result(result, partial)?;
 
         if json_results.is_null()
-            || (json_results.is_array() && json_results.as_array().map_or(false, |a| a.is_empty()))
+            || (json_results.is_array() && json_results.as_array().is_some_and(|a| a.is_empty()))
         {
             if self.first_tool_only {
                 return Ok(Value::Null);

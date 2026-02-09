@@ -71,6 +71,7 @@ fn scalar_to_yaml(value: &Value) -> String {
 }
 
 /// Draw a Mermaid graph from nodes and edges.
+#[allow(clippy::too_many_arguments)]
 pub fn draw_mermaid(
     nodes: &HashMap<String, Node>,
     edges: &[Edge],
@@ -132,7 +133,7 @@ pub fn draw_mermaid(
 
     // Node formatting
     let render_node = |key: &str, node: &Node, indent: &str| -> String {
-        let node_name = node.name.split(':').last().unwrap_or(&node.name);
+        let node_name = node.name.split(':').next_back().unwrap_or(&node.name);
         let label = if node_name.starts_with(MARKDOWN_SPECIAL_CHARS)
             && node_name.ends_with(MARKDOWN_SPECIAL_CHARS)
         {
@@ -197,14 +198,15 @@ pub fn draw_mermaid(
     let mut seen_subgraphs: Vec<String> = Vec::new();
 
     // Recursive subgraph rendering
+    #[allow(clippy::too_many_arguments)]
     fn add_subgraph(
         mermaid_graph: &mut String,
         edge_groups: &HashMap<String, Vec<&Edge>>,
         subgraph_nodes: &HashMap<String, Vec<(&String, &Node)>>,
         edges: &[&Edge],
         prefix: &str,
-        first_node: Option<&str>,
-        last_node: Option<&str>,
+        _first_node: Option<&str>,
+        _last_node: Option<&str>,
         with_styles: bool,
         wrap_label_n_words: usize,
         seen_subgraphs: &mut Vec<String>,
@@ -217,13 +219,11 @@ pub fn draw_mermaid(
             mermaid_graph.push_str(&format!("\tsubgraph {}\n", subgraph));
 
             // Add nodes belonging to this subgraph
-            if with_styles {
-                if let Some(sub_nodes) = subgraph_nodes.get(prefix) {
-                    let mut sorted_nodes: Vec<_> = sub_nodes.clone();
-                    sorted_nodes.sort_by_key(|(key, _)| (*key).clone());
-                    for (key, node) in &sorted_nodes {
-                        mermaid_graph.push_str(&render_node(key, node, "\t"));
-                    }
+            if with_styles && let Some(sub_nodes) = subgraph_nodes.get(prefix) {
+                let mut sorted_nodes: Vec<_> = sub_nodes.clone();
+                sorted_nodes.sort_by_key(|(key, _)| (*key).clone());
+                for (key, node) in &sorted_nodes {
+                    mermaid_graph.push_str(&render_node(key, node, "\t"));
                 }
             }
         }
@@ -288,8 +288,8 @@ pub fn draw_mermaid(
                     subgraph_nodes,
                     nested_edges,
                     nested_prefix,
-                    first_node,
-                    last_node,
+                    _first_node,
+                    _last_node,
                     with_styles,
                     wrap_label_n_words,
                     seen_subgraphs,

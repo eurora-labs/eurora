@@ -127,6 +127,7 @@ async fn test_fallbacks_abatch() {
 
 /// Mirrors Python's _runnable function: behavior depends on input["text"]
 /// and whether input["exception"] is present.
+#[allow(clippy::type_complexity)]
 fn dict_runnable() -> RunnableLambda<
     impl Fn(HashMap<String, Value>) -> Result<String> + Send + Sync,
     HashMap<String, Value>,

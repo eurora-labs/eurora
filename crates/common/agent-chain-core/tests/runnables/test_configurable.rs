@@ -54,10 +54,10 @@ impl Reconfigurable for MyRunnable {
         fields: &HashMap<String, Value>,
     ) -> Option<Arc<dyn Runnable<Input = String, Output = String> + Send + Sync>> {
         let mut new = self.clone();
-        if let Some(val) = fields.get("my_property") {
-            if let Some(s) = val.as_str() {
-                new.my_property = s.to_string();
-            }
+        if let Some(val) = fields.get("my_property")
+            && let Some(s) = val.as_str()
+        {
+            new.my_property = s.to_string();
         }
         Some(Arc::new(new))
     }

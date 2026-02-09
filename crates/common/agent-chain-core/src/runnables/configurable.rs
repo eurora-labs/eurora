@@ -170,6 +170,7 @@ where
     /// Optional configuration to merge with invocation config.
     pub config: Option<RunnableConfig>,
     /// Optional reconfigure function for creating modified instances.
+    #[allow(clippy::type_complexity)]
     reconfigure_fn: Option<
         Arc<
             dyn Fn(
@@ -235,6 +236,7 @@ where
     }
 
     /// Create a new `RunnableConfigurableFields` with a reconfigure function.
+    #[allow(clippy::type_complexity)]
     pub fn with_reconfigure_fn(
         default: Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>,
         fields: HashMap<String, AnyConfigurableField>,
@@ -362,11 +364,10 @@ where
         }
 
         // Try to reconfigure the default runnable with the new field values
-        if let Some(reconfigure_fn) = &self.reconfigure_fn {
-            if let Some(reconfigured) = reconfigure_fn(self.default.as_ref(), &configurable_fields)
-            {
-                return (reconfigured, config);
-            }
+        if let Some(reconfigure_fn) = &self.reconfigure_fn
+            && let Some(reconfigured) = reconfigure_fn(self.default.as_ref(), &configurable_fields)
+        {
+            return (reconfigured, config);
         }
 
         (Arc::clone(&self.default), config)
@@ -885,6 +886,7 @@ pub trait ConfigurableRunnable: Runnable + Sized {
     where
         Self: Reconfigurable + Send + Sync + Clone + 'static,
     {
+        #[allow(clippy::type_complexity)]
         let reconfigure_fn: Arc<
             dyn Fn(
                     &dyn Runnable<Input = Self::Input, Output = Self::Output>,

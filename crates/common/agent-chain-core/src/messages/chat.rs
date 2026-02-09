@@ -223,9 +223,7 @@ impl ChatMessage {
             } else if item.is_object() {
                 let item_type = item.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
-                if !KNOWN_BLOCK_TYPES.contains(&item_type) {
-                    blocks.push(serde_json::json!({"type": "non_standard", "value": item}));
-                } else if item.get("source_type").is_some() {
+                if !KNOWN_BLOCK_TYPES.contains(&item_type) || item.get("source_type").is_some() {
                     blocks.push(serde_json::json!({"type": "non_standard", "value": item}));
                 } else {
                     blocks.push(item);
@@ -558,9 +556,7 @@ impl ChatMessageChunk {
             } else if item.is_object() {
                 let item_type = item.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
-                if !KNOWN_BLOCK_TYPES.contains(&item_type) {
-                    blocks.push(serde_json::json!({"type": "non_standard", "value": item}));
-                } else if item.get("source_type").is_some() {
+                if !KNOWN_BLOCK_TYPES.contains(&item_type) || item.get("source_type").is_some() {
                     blocks.push(serde_json::json!({"type": "non_standard", "value": item}));
                 } else {
                     blocks.push(item);
