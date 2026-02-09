@@ -43,6 +43,15 @@ pub fn is_openai_data_block(block: &serde_json::Value, filter: Option<DataBlockF
                 return false;
             }
 
+            // Only allow keys: "type", "image_url", "detail" (matching Python behavior)
+            if let Some(obj) = block.as_object()
+                && !obj
+                    .keys()
+                    .all(|k| k == "type" || k == "image_url" || k == "detail")
+            {
+                return false;
+            }
+
             // Check for valid image_url structure
             if let Some(image_url) = block.get("image_url")
                 && let Some(obj) = image_url.as_object()
