@@ -41,17 +41,17 @@ fn test_sync_handler_has_methods() {
     let mut handler = SnapshotHandler;
 
     // LLMManagerMixin
-    let _ = LLMManagerMixin::on_llm_new_token(&mut handler, "", uuid::Uuid::nil(), None, None);
-    let _ = LLMManagerMixin::on_llm_end(&mut handler, &Default::default(), uuid::Uuid::nil(), None);
-    let _ = LLMManagerMixin::on_llm_error(
+    LLMManagerMixin::on_llm_new_token(&mut handler, "", uuid::Uuid::nil(), None, None);
+    LLMManagerMixin::on_llm_end(&mut handler, &Default::default(), uuid::Uuid::nil(), None);
+    LLMManagerMixin::on_llm_error(
         &mut handler,
-        &std::io::Error::new(std::io::ErrorKind::Other, "e"),
+        &std::io::Error::other("e"),
         uuid::Uuid::nil(),
         None,
     );
 
     // CallbackManagerMixin
-    let _ = CallbackManagerMixin::on_llm_start(
+    CallbackManagerMixin::on_llm_start(
         &mut handler,
         &Default::default(),
         &[],
@@ -60,7 +60,7 @@ fn test_sync_handler_has_methods() {
         None,
         None,
     );
-    let _ = CallbackManagerMixin::on_chat_model_start(
+    CallbackManagerMixin::on_chat_model_start(
         &mut handler,
         &Default::default(),
         &[],
@@ -69,7 +69,7 @@ fn test_sync_handler_has_methods() {
         None,
         None,
     );
-    let _ = CallbackManagerMixin::on_chain_start(
+    CallbackManagerMixin::on_chain_start(
         &mut handler,
         &Default::default(),
         &Default::default(),
@@ -78,7 +78,7 @@ fn test_sync_handler_has_methods() {
         None,
         None,
     );
-    let _ = CallbackManagerMixin::on_tool_start(
+    CallbackManagerMixin::on_tool_start(
         &mut handler,
         &Default::default(),
         "",
@@ -88,7 +88,7 @@ fn test_sync_handler_has_methods() {
         None,
         None,
     );
-    let _ = CallbackManagerMixin::on_retriever_start(
+    CallbackManagerMixin::on_retriever_start(
         &mut handler,
         &Default::default(),
         "",
@@ -99,22 +99,21 @@ fn test_sync_handler_has_methods() {
     );
 
     // ChainManagerMixin
-    let _ =
-        ChainManagerMixin::on_chain_end(&mut handler, &Default::default(), uuid::Uuid::nil(), None);
-    let _ = ChainManagerMixin::on_chain_error(
+    ChainManagerMixin::on_chain_end(&mut handler, &Default::default(), uuid::Uuid::nil(), None);
+    ChainManagerMixin::on_chain_error(
         &mut handler,
-        &std::io::Error::new(std::io::ErrorKind::Other, "e"),
+        &std::io::Error::other("e"),
         uuid::Uuid::nil(),
         None,
     );
-    let _ = ChainManagerMixin::on_agent_action(
+    ChainManagerMixin::on_agent_action(
         &mut handler,
         &Default::default(),
         uuid::Uuid::nil(),
         None,
         None,
     );
-    let _ = ChainManagerMixin::on_agent_finish(
+    ChainManagerMixin::on_agent_finish(
         &mut handler,
         &Default::default(),
         uuid::Uuid::nil(),
@@ -123,33 +122,32 @@ fn test_sync_handler_has_methods() {
     );
 
     // ToolManagerMixin
-    let _ =
-        ToolManagerMixin::on_tool_end(&mut handler, "", uuid::Uuid::nil(), None, None, None, None);
-    let _ = ToolManagerMixin::on_tool_error(
+    ToolManagerMixin::on_tool_end(&mut handler, "", uuid::Uuid::nil(), None, None, None, None);
+    ToolManagerMixin::on_tool_error(
         &mut handler,
-        &std::io::Error::new(std::io::ErrorKind::Other, "e"),
+        &std::io::Error::other("e"),
         uuid::Uuid::nil(),
         None,
     );
 
     // RetrieverManagerMixin
-    let _ = RetrieverManagerMixin::on_retriever_end(&mut handler, &[], uuid::Uuid::nil(), None);
-    let _ = RetrieverManagerMixin::on_retriever_error(
+    RetrieverManagerMixin::on_retriever_end(&mut handler, &[], uuid::Uuid::nil(), None);
+    RetrieverManagerMixin::on_retriever_error(
         &mut handler,
-        &std::io::Error::new(std::io::ErrorKind::Other, "e"),
+        &std::io::Error::other("e"),
         uuid::Uuid::nil(),
         None,
     );
 
     // RunManagerMixin
-    let _ = RunManagerMixin::on_text(&mut handler, "", uuid::Uuid::nil(), None, None, "");
-    let _ = RunManagerMixin::on_retry(
+    RunManagerMixin::on_text(&mut handler, "", uuid::Uuid::nil(), None, None, "");
+    RunManagerMixin::on_retry(
         &mut handler,
         &() as &dyn std::any::Any,
         uuid::Uuid::nil(),
         None,
     );
-    let _ = RunManagerMixin::on_custom_event(
+    RunManagerMixin::on_custom_event(
         &mut handler,
         "",
         &() as &dyn std::any::Any,

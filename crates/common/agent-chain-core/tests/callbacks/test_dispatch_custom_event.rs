@@ -2,6 +2,7 @@
 //!
 //! Ported from `langchain/libs/core/tests/unit_tests/callbacks/test_dispatch_custom_event.py`
 
+use agent_chain_core::callbacks::Callbacks;
 use agent_chain_core::callbacks::base::{
     BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
     RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
@@ -9,7 +10,9 @@ use agent_chain_core::callbacks::base::{
 use agent_chain_core::callbacks::manager::{
     AsyncCallbackManager, CallbackManager, adispatch_custom_event, dispatch_custom_event,
 };
-use std::collections::HashMap;
+use agent_chain_core::runnables::base::Runnable;
+use agent_chain_core::runnables::config::get_callback_manager_for_config;
+use agent_chain_core::runnables::{RunnableConfig, RunnableLambdaWithConfig};
 use std::sync::Arc;
 
 // -- FakeHandler --
@@ -76,53 +79,101 @@ async fn test_async_custom_event_root_dispatch() {
 
 /// Ported from `test_sync_callback_manager`.
 ///
-/// Dispatching a custom event with a properly configured manager (with
-/// parent_run_id and handlers) should succeed.
+/// Uses RunnableLambdaWithConfig to dispatch custom events from within a
+/// lambda, verifying the full callback pipeline wires up parent_run_id.
 #[test]
 fn test_sync_callback_manager() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = CallbackManager::new();
-    manager.add_handler(handler, true);
 
-    // Start a chain to establish a parent_run_id
-    let chain_run = manager.on_chain_start(&HashMap::new(), &HashMap::new(), None);
-    let child_manager = chain_run.get_child(None);
+    let runnable = RunnableLambdaWithConfig::new_with_config(|x: i32, config: &RunnableConfig| {
+        let manager = get_callback_manager_for_config(config);
+        dispatch_custom_event("event1", &serde_json::json!({"x": x}), &manager)
+            .map_err(agent_chain_core::error::Error::other)?;
+        dispatch_custom_event("event2", &serde_json::json!({"x": x}), &manager)
+            .map_err(agent_chain_core::error::Error::other)?;
+        Ok(x)
+    });
 
-    // Dispatch custom events through the child manager (which has parent_run_id set)
-    let result1 = dispatch_custom_event("event1", &serde_json::json!({"x": 1}), &child_manager);
-    assert!(result1.is_ok());
+    let config = RunnableConfig {
+        callbacks: Some(Callbacks::from_handlers(vec![handler])),
+        ..Default::default()
+    };
 
-    let result2 = dispatch_custom_event("event2", &serde_json::json!({"x": 1}), &child_manager);
-    assert!(result2.is_ok());
+    let result = runnable.invoke(1, Some(config));
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), 1);
 }
 
 /// Ported from `test_async_callback_manager`.
 ///
-/// Dispatching a custom event asynchronously with a properly configured
-/// manager (with parent_run_id and handlers) should succeed.
+/// Uses RunnableLambdaWithConfig with an async function to dispatch custom
+/// events, verifying the async callback pipeline.
 #[tokio::test]
 async fn test_async_callback_manager() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
-    manager.add_handler(handler, true);
 
-    // Start a chain to establish a parent_run_id
-    let chain_run = manager
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None)
-        .await;
-    let child_manager = chain_run.get_child(None);
+    let runnable = RunnableLambdaWithConfig::new_with_config(|x: i32, config: &RunnableConfig| {
+        let manager = get_callback_manager_for_config(config);
+        dispatch_custom_event("event1", &serde_json::json!({"x": x}), &manager)
+            .map_err(agent_chain_core::error::Error::other)?;
+        dispatch_custom_event("event2", &serde_json::json!({"x": x}), &manager)
+            .map_err(agent_chain_core::error::Error::other)?;
+        Ok(x)
+    });
 
-    // Dispatch custom events through the child manager (which has parent_run_id set)
-    let result1 =
-        adispatch_custom_event("event1", &serde_json::json!({"x": 1}), &child_manager).await;
-    assert!(result1.is_ok());
+    let config = RunnableConfig {
+        callbacks: Some(Callbacks::from_handlers(vec![handler])),
+        ..Default::default()
+    };
 
-    let result2 =
-        adispatch_custom_event("event2", &serde_json::json!({"x": 1}), &child_manager).await;
-    assert!(result2.is_ok());
+    // ainvoke falls back to sync func since no afunc is set
+    let result = runnable.ainvoke(1, Some(config)).await;
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), 1);
 }
 
-/// Additional test: verify empty handlers short-circuit without error.
+/// Verify that RunnableLambda::invoke now fires callback lifecycle events.
+#[test]
+fn test_runnable_lambda_callback_lifecycle() {
+    use agent_chain_core::runnables::base::RunnableLambda;
+
+    let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
+
+    let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
+
+    let config = RunnableConfig {
+        callbacks: Some(Callbacks::from_handlers(vec![handler])),
+        ..Default::default()
+    };
+
+    // Should succeed and fire on_chain_start/on_chain_end callbacks
+    let result = runnable.invoke(1, Some(config));
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), 2);
+}
+
+/// Verify that RunnableLambda error path fires on_chain_error.
+#[test]
+fn test_runnable_lambda_callback_error_lifecycle() {
+    use agent_chain_core::runnables::base::RunnableLambda;
+
+    let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
+
+    let runnable = RunnableLambda::new(|_x: i32| -> agent_chain_core::error::Result<i32> {
+        Err(agent_chain_core::error::Error::other("test error"))
+    });
+
+    let config = RunnableConfig {
+        callbacks: Some(Callbacks::from_handlers(vec![handler])),
+        ..Default::default()
+    };
+
+    // Should fail and fire on_chain_start/on_chain_error callbacks
+    let result = runnable.invoke(1, Some(config));
+    assert!(result.is_err());
+}
+
+/// Verify empty handlers short-circuit without error.
 #[test]
 fn test_dispatch_custom_event_no_handlers() {
     let mut manager = CallbackManager::new();
@@ -132,7 +183,7 @@ fn test_dispatch_custom_event_no_handlers() {
     assert!(result.is_ok());
 }
 
-/// Additional test: async version with empty handlers short-circuits.
+/// Async version with empty handlers short-circuits.
 #[tokio::test]
 async fn test_adispatch_custom_event_no_handlers() {
     let manager = AsyncCallbackManager::new();

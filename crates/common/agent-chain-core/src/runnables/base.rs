@@ -15,11 +15,13 @@ use serde::Serialize;
 use serde_json::Value;
 use tokio::sync::Semaphore;
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::load::{Serializable, Serialized};
 
 use super::config::{
-    ConfigOrList, RunnableConfig, ensure_config, get_callback_manager_for_config, get_config_list,
+    AsyncVariableArgsFn, ConfigOrList, RunnableConfig, VariableArgsFn,
+    acall_func_with_variable_args, call_func_with_variable_args, ensure_config,
+    get_async_callback_manager_for_config, get_callback_manager_for_config, get_config_list,
     merge_configs, patch_config,
 };
 
@@ -564,8 +566,22 @@ where
         self.name.clone()
     }
 
-    fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
-        (self.func)(input)
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let config = ensure_config(config);
+        let callback_manager = get_callback_manager_for_config(&config);
+        let run_manager =
+            callback_manager.on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id);
+
+        match (self.func)(input) {
+            Ok(output) => {
+                run_manager.on_chain_end(&HashMap::new());
+                Ok(output)
+            }
+            Err(e) => {
+                run_manager.on_chain_error(&e);
+                Err(e)
+            }
+        }
     }
 }
 
@@ -577,6 +593,220 @@ where
     O: Send + Sync + Clone + Debug + 'static,
 {
     RunnableLambda::new(func)
+}
+
+// =============================================================================
+// RunnableLambdaWithConfig
+// =============================================================================
+
+/// A config-aware version of `RunnableLambda` that supports functions which
+/// receive `RunnableConfig`, as well as async functions.
+///
+/// Mirrors Python's `RunnableLambda` support for functions with optional
+/// `config` parameter. Uses `VariableArgsFn` / `AsyncVariableArgsFn` enums
+/// to dispatch to the correct function signature at runtime.
+///
+/// # Examples
+///
+///
+pub struct RunnableLambdaWithConfig<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    func: Option<VariableArgsFn<I, Result<O>>>,
+    afunc: Option<AsyncVariableArgsFn<I, Result<O>>>,
+    name: Option<String>,
+}
+
+impl<I, O> Debug for RunnableLambdaWithConfig<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RunnableLambdaWithConfig")
+            .field("name", &self.name)
+            .field("has_func", &self.func.is_some())
+            .field("has_afunc", &self.afunc.is_some())
+            .finish()
+    }
+}
+
+impl<I, O> RunnableLambdaWithConfig<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    /// Create from a sync function that only takes input.
+    pub fn new(func: impl Fn(I) -> Result<O> + Send + Sync + 'static) -> Self {
+        Self {
+            func: Some(VariableArgsFn::InputOnly(Box::new(func))),
+            afunc: None,
+            name: None,
+        }
+    }
+
+    /// Create from a sync function that takes input and config.
+    pub fn new_with_config(
+        func: impl Fn(I, &RunnableConfig) -> Result<O> + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            func: Some(VariableArgsFn::WithConfig(Box::new(func))),
+            afunc: None,
+            name: None,
+        }
+    }
+
+    /// Create from an async function that only takes input.
+    pub fn new_async<F, Fut>(afunc: F) -> Self
+    where
+        F: Fn(I) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = Result<O>> + Send + 'static,
+    {
+        Self {
+            func: None,
+            afunc: Some(AsyncVariableArgsFn::InputOnly(Box::new(move |input| {
+                Box::pin(afunc(input))
+            }))),
+            name: None,
+        }
+    }
+
+    /// Create from an async function that takes input and config.
+    pub fn new_async_with_config<F, Fut>(afunc: F) -> Self
+    where
+        F: Fn(I, RunnableConfig) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = Result<O>> + Send + 'static,
+    {
+        Self {
+            func: None,
+            afunc: Some(AsyncVariableArgsFn::WithConfig(Box::new(
+                move |input, config| Box::pin(afunc(input, config)),
+            ))),
+            name: None,
+        }
+    }
+
+    /// Set a name for this runnable.
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Add an async function to this runnable (for use with ainvoke).
+    pub fn with_afunc<F, Fut>(mut self, afunc: F) -> Self
+    where
+        F: Fn(I) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = Result<O>> + Send + 'static,
+    {
+        self.afunc = Some(AsyncVariableArgsFn::InputOnly(Box::new(move |input| {
+            Box::pin(afunc(input))
+        })));
+        self
+    }
+
+    /// Add a config-aware async function to this runnable.
+    pub fn with_afunc_config<F, Fut>(mut self, afunc: F) -> Self
+    where
+        F: Fn(I, RunnableConfig) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = Result<O>> + Send + 'static,
+    {
+        self.afunc = Some(AsyncVariableArgsFn::WithConfig(Box::new(
+            move |input, config| Box::pin(afunc(input, config)),
+        )));
+        self
+    }
+}
+
+#[async_trait]
+impl<I, O> Runnable for RunnableLambdaWithConfig<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    type Input = I;
+    type Output = O;
+
+    fn name(&self) -> Option<String> {
+        self.name.clone()
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let func = self.func.as_ref().ok_or_else(|| {
+            Error::other("Cannot invoke a coroutine function synchronously. Use ainvoke instead.")
+        })?;
+
+        let config = ensure_config(config);
+        let callback_manager = get_callback_manager_for_config(&config);
+        let run_manager =
+            callback_manager.on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id);
+
+        let child_config = patch_config(
+            Some(config),
+            Some(run_manager.get_child(None)),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        match call_func_with_variable_args(func, input, &child_config) {
+            Ok(output) => {
+                run_manager.on_chain_end(&HashMap::new());
+                Ok(output)
+            }
+            Err(e) => {
+                run_manager.on_chain_error(&e);
+                Err(e)
+            }
+        }
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output>
+    where
+        Self: 'static,
+    {
+        let config = ensure_config(config);
+        let async_callback_manager = get_async_callback_manager_for_config(&config);
+        let run_manager = async_callback_manager
+            .on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id)
+            .await;
+
+        let child_config = patch_config(
+            Some(config),
+            Some(run_manager.get_child(None).to_callback_manager()),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let result = if let Some(afunc) = &self.afunc {
+            acall_func_with_variable_args(afunc, input, &child_config).await
+        } else if let Some(func) = &self.func {
+            call_func_with_variable_args(func, input, &child_config)
+        } else {
+            Err(Error::other(
+                "RunnableLambdaWithConfig has no func or afunc",
+            ))
+        };
+
+        match result {
+            Ok(output) => {
+                run_manager.on_chain_end(&HashMap::new()).await;
+                Ok(output)
+            }
+            Err(e) => {
+                run_manager.get_sync().on_chain_error(&e);
+                Err(e)
+            }
+        }
+    }
 }
 
 // =============================================================================
