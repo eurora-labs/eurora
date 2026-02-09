@@ -1279,7 +1279,6 @@ impl CallbackManager {
         local_tags: Option<Vec<String>>,
         inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
         local_metadata: Option<HashMap<String, serde_json::Value>>,
-        _verbose: bool,
     ) -> Self {
         let mut callback_manager = Self::new();
 
@@ -1492,7 +1491,6 @@ impl AsyncCallbackManager {
         local_tags: Option<Vec<String>>,
         inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
         local_metadata: Option<HashMap<String, serde_json::Value>>,
-        verbose: bool,
     ) -> Self {
         Self {
             inner: CallbackManager::configure(
@@ -1502,7 +1500,6 @@ impl AsyncCallbackManager {
                 local_tags,
                 inheritable_metadata,
                 local_metadata,
-                verbose,
             ),
         }
     }
@@ -1763,7 +1760,6 @@ mod tests {
             Some(vec!["tag2".to_string()]),
             None,
             None,
-            false,
         );
 
         assert!(manager.tags.contains(&"tag1".to_string()));
@@ -2153,15 +2149,7 @@ where
     F: FnOnce(&mut CallbackManagerForChainGroup) -> R,
 {
     let cm = callback_manager.unwrap_or_else(|| {
-        CallbackManager::configure(
-            None,
-            None,
-            tags.clone(),
-            None,
-            metadata.clone(),
-            None,
-            false,
-        )
+        CallbackManager::configure(None, None, tags.clone(), None, metadata.clone(), None)
     });
 
     let mut serialized = HashMap::new();
@@ -2277,15 +2265,7 @@ where
     Fut: Future<Output = R>,
 {
     let cm = callback_manager.unwrap_or_else(|| {
-        AsyncCallbackManager::configure(
-            None,
-            None,
-            tags.clone(),
-            None,
-            metadata.clone(),
-            None,
-            false,
-        )
+        AsyncCallbackManager::configure(None, None, tags.clone(), None, metadata.clone(), None)
     });
 
     let mut serialized = HashMap::new();

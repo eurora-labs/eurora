@@ -14,7 +14,6 @@ use serde_json::Value;
 use crate::caches::BaseCache;
 use crate::callbacks::Callbacks;
 use crate::error::Result;
-use crate::globals::get_verbose;
 use crate::messages::{AIMessage, BaseMessage};
 use crate::outputs::LLMResult;
 
@@ -89,14 +88,6 @@ impl LangSmithParams {
         self.ls_stop = Some(stop);
         self
     }
-}
-
-/// Get the global verbosity setting.
-///
-/// This is a helper function that returns the global verbose setting.
-/// Python equivalent: `_get_verbosity()` in `langchain_core.language_models.base`
-pub fn get_verbosity() -> bool {
-    get_verbose()
 }
 
 use crate::prompt_values::{ChatPromptValue, ImagePromptValue, StringPromptValue};
@@ -256,12 +247,6 @@ pub struct LanguageModelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache: Option<bool>,
 
-    /// Whether to print verbose output.
-    ///
-    /// If `None` at initialization, will default to global verbose setting.
-    #[serde(default)]
-    pub verbose: bool,
-
     /// Tags to add to the run trace.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
@@ -286,12 +271,6 @@ impl LanguageModelConfig {
     /// Enable caching.
     pub fn with_cache(mut self, cache: bool) -> Self {
         self.cache = Some(cache);
-        self
-    }
-
-    /// Enable verbose mode.
-    pub fn with_verbose(mut self, verbose: bool) -> Self {
-        self.verbose = verbose;
         self
     }
 
@@ -508,11 +487,9 @@ mod tests {
     fn test_language_model_config_builder() {
         let config = LanguageModelConfig::new()
             .with_cache(true)
-            .with_verbose(true)
             .with_tags(vec!["test".to_string()]);
 
         assert_eq!(config.cache, Some(true));
-        assert!(config.verbose);
         assert_eq!(config.tags, Some(vec!["test".to_string()]));
     }
 }

@@ -4,14 +4,12 @@
 
 use std::collections::HashMap;
 
-use agent_chain_core::globals::{get_verbose, set_verbose};
 use agent_chain_core::language_models::{
     BaseLanguageModel, FakeListLLM, LangSmithParams, LanguageModelConfig, LanguageModelInput,
-    LanguageModelOutput, get_token_ids_default, get_verbosity,
+    LanguageModelOutput, get_token_ids_default,
 };
 use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
 use agent_chain_core::prompt_values::StringPromptValue;
-use serial_test::serial;
 
 #[cfg(test)]
 mod test_lang_smith_params {
@@ -164,47 +162,6 @@ mod test_get_token_ids_default_method {
 }
 
 #[cfg(test)]
-mod test_get_verbosity {
-    use super::*;
-
-    #[test]
-    #[serial]
-    fn test_get_verbosity_returns_global_verbose() {
-        // Test get_verbosity returns global verbose setting
-        // Python equivalent: test_get_verbosity_returns_global_verbose()
-
-        // Save original value
-        let original = get_verbose();
-
-        // Test with true
-        set_verbose(true);
-        assert!(get_verbosity());
-
-        // Test with false
-        set_verbose(false);
-        assert!(!get_verbosity());
-
-        // Restore original value
-        set_verbose(original);
-    }
-
-    #[test]
-    #[serial]
-    fn test_get_verbosity_matches_get_verbose() {
-        // Test that get_verbosity() matches get_verbose()
-        let original = get_verbose();
-
-        set_verbose(true);
-        assert_eq!(get_verbosity(), get_verbose());
-
-        set_verbose(false);
-        assert_eq!(get_verbosity(), get_verbose());
-
-        set_verbose(original);
-    }
-}
-
-#[cfg(test)]
 mod test_language_model_config {
     use super::*;
 
@@ -214,7 +171,6 @@ mod test_language_model_config {
         let config = LanguageModelConfig::default();
 
         assert_eq!(config.cache, None);
-        assert!(!config.verbose);
         assert_eq!(config.tags, None);
         assert_eq!(config.metadata, None);
     }
@@ -231,16 +187,6 @@ mod test_language_model_config {
         // Test LanguageModelConfig with cache=false
         let config = LanguageModelConfig::new().with_cache(false);
         assert_eq!(config.cache, Some(false));
-    }
-
-    #[test]
-    fn test_config_with_verbose() {
-        // Test LanguageModelConfig with verbose setting
-        let config = LanguageModelConfig::new().with_verbose(true);
-        assert!(config.verbose);
-
-        let config = LanguageModelConfig::new().with_verbose(false);
-        assert!(!config.verbose);
     }
 
     #[test]
@@ -269,24 +215,19 @@ mod test_language_model_config {
         // Test chaining builder methods
         let config = LanguageModelConfig::new()
             .with_cache(true)
-            .with_verbose(true)
             .with_tags(vec!["test".to_string()]);
 
         assert_eq!(config.cache, Some(true));
-        assert!(config.verbose);
         assert_eq!(config.tags, Some(vec!["test".to_string()]));
     }
 
     #[test]
     fn test_config_serialization() {
         // Test config serialization
-        let config = LanguageModelConfig::new()
-            .with_cache(true)
-            .with_verbose(true);
+        let config = LanguageModelConfig::new().with_cache(true);
 
         let json = serde_json::to_string(&config).unwrap();
         assert!(json.contains("cache"));
-        assert!(json.contains("verbose"));
     }
 }
 
@@ -430,16 +371,6 @@ mod test_language_model_config_serialization {
     }
 
     #[test]
-    fn test_verbose_serialization() {
-        // Test verbose field in serialization
-        let config = LanguageModelConfig::new().with_verbose(true);
-        let json = serde_json::to_string(&config).unwrap();
-
-        // Verbose is serialized (default value)
-        assert!(json.contains("verbose"));
-    }
-
-    #[test]
     fn test_tags_excluded_when_none() {
         // Test tags field excluded when None
         let config = LanguageModelConfig::new();
@@ -464,14 +395,12 @@ mod test_language_model_config_serialization {
         // Test serialization/deserialization roundtrip
         let config = LanguageModelConfig::new()
             .with_cache(true)
-            .with_verbose(true)
             .with_tags(vec!["test".to_string()]);
 
         let json = serde_json::to_string(&config).unwrap();
         let deserialized: LanguageModelConfig = serde_json::from_str(&json).unwrap();
 
         assert_eq!(deserialized.cache, config.cache);
-        assert_eq!(deserialized.verbose, config.verbose);
         assert_eq!(deserialized.tags, config.tags);
     }
 }
@@ -728,34 +657,5 @@ mod test_base_language_model_trait {
         assert!(params.ls_provider.is_some());
         assert!(params.ls_model_name.is_some());
         assert_eq!(params.ls_stop, None);
-    }
-}
-
-#[cfg(test)]
-mod test_verbose_validator {
-    use super::*;
-
-    #[test]
-    fn test_verbose_defaults_to_false() {
-        // Test that verbose defaults to false in LanguageModelConfig
-        // In Python, None gets converted to the global verbose setting
-        // In Rust, we default to false when not specified
-
-        let config = LanguageModelConfig::default();
-        assert!(!config.verbose);
-    }
-
-    #[test]
-    fn test_verbose_can_be_set_true() {
-        // Test that verbose can be explicitly set to true
-        let config = LanguageModelConfig::new().with_verbose(true);
-        assert!(config.verbose);
-    }
-
-    #[test]
-    fn test_verbose_can_be_set_false() {
-        // Test that verbose can be explicitly set to false
-        let config = LanguageModelConfig::new().with_verbose(false);
-        assert!(!config.verbose);
     }
 }

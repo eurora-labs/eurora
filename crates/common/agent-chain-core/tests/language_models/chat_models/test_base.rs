@@ -990,12 +990,10 @@ fn test_chat_model_config_builder() {
 
     let config = ChatModelConfig::new()
         .with_cache(true)
-        .with_verbose(true)
         .with_disable_streaming(true)
         .with_output_version("v1");
 
     assert_eq!(config.base.cache, Some(true));
-    assert!(config.base.verbose);
     assert_eq!(config.disable_streaming, DisableStreaming::Bool(true));
     assert_eq!(config.output_version, Some("v1".to_string()));
 
