@@ -137,9 +137,7 @@ pub use messages::{
 pub use tools::{BaseTool, Tool, ToolDefinition};
 
 // Re-export chat history types
-pub use chat_history::{
-    AIMessageInput, BaseChatMessageHistory, HumanMessageInput, InMemoryChatMessageHistory,
-};
+pub use chat_history::{BaseChatMessageHistory, InMemoryChatMessageHistory};
 
 // Re-export chat session types
 pub use chat_sessions::ChatSession;

@@ -44,8 +44,8 @@ use crate::messages::{AIMessage, BaseMessage, HumanMessage, get_buffer_string};
 /// let mut history = InMemoryChatMessageHistory::new();
 ///
 /// // Add messages
-/// history.add_user_message("Hello!".into());
-/// history.add_ai_message("Hi there!".into());
+/// history.add_user_message(HumanMessage::builder().content("Hello!").build());
+/// history.add_ai_message(AIMessage::builder().content("Hi there!").build());
 ///
 /// // Get all messages
 /// let messages = history.messages();
@@ -80,12 +80,8 @@ pub trait BaseChatMessageHistory: Send + Sync {
     /// interface instead to save on round-trips to the persistence layer.
     ///
     /// This method may be deprecated in a future release.
-    fn add_user_message(&mut self, message: HumanMessageInput) {
-        let human_message = match message {
-            HumanMessageInput::Message(m) => m,
-            HumanMessageInput::Text(text) => HumanMessage::builder().content(text).build(),
-        };
-        self.add_message(BaseMessage::Human(human_message));
+    fn add_user_message(&mut self, message: HumanMessage) {
+        self.add_message(BaseMessage::Human(message));
     }
 
     /// Convenience method for adding an AI message string to the store.
@@ -94,12 +90,8 @@ pub trait BaseChatMessageHistory: Send + Sync {
     /// interface instead to save on round-trips to the persistence layer.
     ///
     /// This method may be deprecated in a future release.
-    fn add_ai_message(&mut self, message: AIMessageInput) {
-        let ai_message = match message {
-            AIMessageInput::Message(m) => *m,
-            AIMessageInput::Text(text) => AIMessage::builder().content(&text).build(),
-        };
-        self.add_message(BaseMessage::AI(ai_message));
+    fn add_ai_message(&mut self, message: AIMessage) {
+        self.add_message(BaseMessage::AI(message));
     }
 
     /// Add a Message object to the store.
@@ -139,62 +131,6 @@ pub trait BaseChatMessageHistory: Send + Sync {
     /// Return a string representation of the chat history.
     fn to_buffer_string(&self) -> String {
         get_buffer_string(&self.messages(), "Human", "AI")
-    }
-}
-
-/// Input type for [`BaseChatMessageHistory::add_user_message`].
-///
-/// Can be either a [`HumanMessage`] or a string.
-pub enum HumanMessageInput {
-    /// A pre-constructed HumanMessage.
-    Message(HumanMessage),
-    /// A text string to be converted to a HumanMessage.
-    Text(String),
-}
-
-impl From<HumanMessage> for HumanMessageInput {
-    fn from(message: HumanMessage) -> Self {
-        HumanMessageInput::Message(message)
-    }
-}
-
-impl From<String> for HumanMessageInput {
-    fn from(text: String) -> Self {
-        HumanMessageInput::Text(text)
-    }
-}
-
-impl From<&str> for HumanMessageInput {
-    fn from(text: &str) -> Self {
-        HumanMessageInput::Text(text.to_string())
-    }
-}
-
-/// Input type for [`BaseChatMessageHistory::add_ai_message`].
-///
-/// Can be either an [`AIMessage`] or a string.
-pub enum AIMessageInput {
-    /// A pre-constructed AIMessage.
-    Message(Box<AIMessage>),
-    /// A text string to be converted to an AIMessage.
-    Text(String),
-}
-
-impl From<AIMessage> for AIMessageInput {
-    fn from(message: AIMessage) -> Self {
-        AIMessageInput::Message(Box::new(message))
-    }
-}
-
-impl From<String> for AIMessageInput {
-    fn from(text: String) -> Self {
-        AIMessageInput::Text(text)
-    }
-}
-
-impl From<&str> for AIMessageInput {
-    fn from(text: &str) -> Self {
-        AIMessageInput::Text(text.to_string())
     }
 }
 
@@ -277,7 +213,7 @@ mod tests {
     #[test]
     fn test_add_user_message_string() {
         let mut history = InMemoryChatMessageHistory::new();
-        history.add_user_message("Hello!".into());
+        history.add_user_message(HumanMessage::builder().content("Hello!").build());
 
         let messages = history.messages();
         assert_eq!(messages.len(), 1);
@@ -289,7 +225,7 @@ mod tests {
     fn test_add_user_message_human_message() {
         let mut history = InMemoryChatMessageHistory::new();
         let human_msg = HumanMessage::builder().content("Hello!").build();
-        history.add_user_message(human_msg.into());
+        history.add_user_message(human_msg);
 
         let messages = history.messages();
         assert_eq!(messages.len(), 1);
@@ -300,7 +236,7 @@ mod tests {
     #[test]
     fn test_add_ai_message_string() {
         let mut history = InMemoryChatMessageHistory::new();
-        history.add_ai_message("Hi there!".into());
+        history.add_ai_message(AIMessage::builder().content("Hi there!").build());
 
         let messages = history.messages();
         assert_eq!(messages.len(), 1);
@@ -312,7 +248,7 @@ mod tests {
     fn test_add_ai_message_ai_message() {
         let mut history = InMemoryChatMessageHistory::new();
         let ai_msg = AIMessage::builder().content("Hi there!").build();
-        history.add_ai_message(ai_msg.into());
+        history.add_ai_message(ai_msg);
 
         let messages = history.messages();
         assert_eq!(messages.len(), 1);
@@ -349,8 +285,8 @@ mod tests {
     #[test]
     fn test_clear() {
         let mut history = InMemoryChatMessageHistory::new();
-        history.add_user_message("Hello!".into());
-        history.add_ai_message("Hi!".into());
+        history.add_user_message(HumanMessage::builder().content("Hello!").build());
+        history.add_ai_message(AIMessage::builder().content("Hi!").build());
 
         assert_eq!(history.messages().len(), 2);
 
@@ -361,8 +297,8 @@ mod tests {
     #[test]
     fn test_to_buffer_string() {
         let mut history = InMemoryChatMessageHistory::new();
-        history.add_user_message("Hello!".into());
-        history.add_ai_message("Hi there!".into());
+        history.add_user_message(HumanMessage::builder().content("Hello!").build());
+        history.add_ai_message(AIMessage::builder().content("Hi there!").build());
 
         let buffer = history.to_buffer_string();
         assert!(buffer.contains("Human: Hello!"));
@@ -372,8 +308,8 @@ mod tests {
     #[test]
     fn test_display() {
         let mut history = InMemoryChatMessageHistory::new();
-        history.add_user_message("Hello!".into());
-        history.add_ai_message("Hi there!".into());
+        history.add_user_message(HumanMessage::builder().content("Hello!").build());
+        history.add_ai_message(AIMessage::builder().content("Hi there!").build());
 
         let display = format!("{}", history);
         assert!(display.contains("Human: Hello!"));
@@ -383,7 +319,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_messages_async() {
         let mut history = InMemoryChatMessageHistory::new();
-        history.add_user_message("Hello!".into());
+        history.add_user_message(HumanMessage::builder().content("Hello!").build());
 
         let messages = history.get_messages_async().await;
         assert_eq!(messages.len(), 1);
@@ -405,7 +341,7 @@ mod tests {
     #[tokio::test]
     async fn test_clear_async() {
         let mut history = InMemoryChatMessageHistory::new();
-        history.add_user_message("Hello!".into());
+        history.add_user_message(HumanMessage::builder().content("Hello!").build());
 
         assert_eq!(history.messages().len(), 1);
 

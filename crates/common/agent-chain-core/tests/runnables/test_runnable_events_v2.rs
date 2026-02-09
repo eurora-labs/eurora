@@ -171,7 +171,7 @@ fn test_standard_event_chain_lifecycle() {
 /// Mirrors the sequence event pattern: parent start, child events, parent end.
 #[test]
 fn test_standard_event_sequence_pattern() {
-    let events = vec![
+    let events = [
         StandardStreamEvent::new("on_chain_start", "run-seq", "RunnableSequence")
             .with_data(EventData::new().with_input(json!({}))),
         StandardStreamEvent::new("on_chain_start", "run-step1", "foo")
