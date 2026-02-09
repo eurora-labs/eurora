@@ -64,7 +64,10 @@ pub use chat_models::{
 pub use crate::messages::UsageMetadata;
 
 // Re-export LLM types
-pub use llms::{BaseLLM, LLM, LLMConfig, get_prompts_from_cache, update_cache};
+pub use llms::{
+    BaseLLM, CacheValue, LLM, LLMConfig, RunIdInput, create_base_retry, get_prompts_from_cache,
+    get_run_ids_list, resolve_cache, save_llm, update_cache,
+};
 
 // Re-export fake implementations for testing
 pub use fake::{FakeListLLM, FakeListLLMError, FakeStreamingListLLM};
