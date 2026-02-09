@@ -38,13 +38,13 @@ impl BaseCallbackHandler for SnapshotHandler {
 /// If a method is added, it should be added at the end of the list.
 #[test]
 fn test_sync_handler_has_methods() {
-    let mut handler = SnapshotHandler;
+    let handler = SnapshotHandler;
 
     // LLMManagerMixin
-    LLMManagerMixin::on_llm_new_token(&mut handler, "", uuid::Uuid::nil(), None, None);
-    LLMManagerMixin::on_llm_end(&mut handler, &Default::default(), uuid::Uuid::nil(), None);
+    LLMManagerMixin::on_llm_new_token(&handler, "", uuid::Uuid::nil(), None, None);
+    LLMManagerMixin::on_llm_end(&handler, &Default::default(), uuid::Uuid::nil(), None);
     LLMManagerMixin::on_llm_error(
-        &mut handler,
+        &handler,
         &std::io::Error::other("e"),
         uuid::Uuid::nil(),
         None,
@@ -52,7 +52,7 @@ fn test_sync_handler_has_methods() {
 
     // CallbackManagerMixin
     CallbackManagerMixin::on_llm_start(
-        &mut handler,
+        &handler,
         &Default::default(),
         &[],
         uuid::Uuid::nil(),
@@ -61,7 +61,7 @@ fn test_sync_handler_has_methods() {
         None,
     );
     CallbackManagerMixin::on_chat_model_start(
-        &mut handler,
+        &handler,
         &Default::default(),
         &[],
         uuid::Uuid::nil(),
@@ -70,7 +70,7 @@ fn test_sync_handler_has_methods() {
         None,
     );
     CallbackManagerMixin::on_chain_start(
-        &mut handler,
+        &handler,
         &Default::default(),
         &Default::default(),
         uuid::Uuid::nil(),
@@ -79,7 +79,7 @@ fn test_sync_handler_has_methods() {
         None,
     );
     CallbackManagerMixin::on_tool_start(
-        &mut handler,
+        &handler,
         &Default::default(),
         "",
         uuid::Uuid::nil(),
@@ -89,7 +89,7 @@ fn test_sync_handler_has_methods() {
         None,
     );
     CallbackManagerMixin::on_retriever_start(
-        &mut handler,
+        &handler,
         &Default::default(),
         "",
         uuid::Uuid::nil(),
@@ -99,22 +99,22 @@ fn test_sync_handler_has_methods() {
     );
 
     // ChainManagerMixin
-    ChainManagerMixin::on_chain_end(&mut handler, &Default::default(), uuid::Uuid::nil(), None);
+    ChainManagerMixin::on_chain_end(&handler, &Default::default(), uuid::Uuid::nil(), None);
     ChainManagerMixin::on_chain_error(
-        &mut handler,
+        &handler,
         &std::io::Error::other("e"),
         uuid::Uuid::nil(),
         None,
     );
     ChainManagerMixin::on_agent_action(
-        &mut handler,
+        &handler,
         &Default::default(),
         uuid::Uuid::nil(),
         None,
         None,
     );
     ChainManagerMixin::on_agent_finish(
-        &mut handler,
+        &handler,
         &Default::default(),
         uuid::Uuid::nil(),
         None,
@@ -122,33 +122,28 @@ fn test_sync_handler_has_methods() {
     );
 
     // ToolManagerMixin
-    ToolManagerMixin::on_tool_end(&mut handler, "", uuid::Uuid::nil(), None, None, None, None);
+    ToolManagerMixin::on_tool_end(&handler, "", uuid::Uuid::nil(), None, None, None, None);
     ToolManagerMixin::on_tool_error(
-        &mut handler,
+        &handler,
         &std::io::Error::other("e"),
         uuid::Uuid::nil(),
         None,
     );
 
     // RetrieverManagerMixin
-    RetrieverManagerMixin::on_retriever_end(&mut handler, &[], uuid::Uuid::nil(), None);
+    RetrieverManagerMixin::on_retriever_end(&handler, &[], uuid::Uuid::nil(), None);
     RetrieverManagerMixin::on_retriever_error(
-        &mut handler,
+        &handler,
         &std::io::Error::other("e"),
         uuid::Uuid::nil(),
         None,
     );
 
     // RunManagerMixin
-    RunManagerMixin::on_text(&mut handler, "", uuid::Uuid::nil(), None, None, "");
-    RunManagerMixin::on_retry(
-        &mut handler,
-        &() as &dyn std::any::Any,
-        uuid::Uuid::nil(),
-        None,
-    );
+    RunManagerMixin::on_text(&handler, "", uuid::Uuid::nil(), None, None, "");
+    RunManagerMixin::on_retry(&handler, &() as &dyn std::any::Any, uuid::Uuid::nil(), None);
     RunManagerMixin::on_custom_event(
-        &mut handler,
+        &handler,
         "",
         &() as &dyn std::any::Any,
         uuid::Uuid::nil(),

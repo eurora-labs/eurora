@@ -6,3 +6,5 @@ mod test_async_callback_manager;
 mod test_base;
 mod test_base_snapshot;
 mod test_dispatch_custom_event;
+mod test_manager;
+mod test_manager_snapshot;
