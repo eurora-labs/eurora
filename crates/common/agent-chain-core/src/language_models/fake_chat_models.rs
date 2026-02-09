@@ -352,6 +352,10 @@ impl BaseChatModel for FakeListChatModel {
         Ok(ChatResult::new(vec![generation]))
     }
 
+    fn has_stream_impl(&self) -> bool {
+        true
+    }
+
     fn _stream(
         &self,
         _messages: Vec<BaseMessage>,
@@ -635,6 +639,10 @@ impl BaseChatModel for GenericFakeChatModel {
 
         let generation = ChatGeneration::new(message.into());
         Ok(ChatResult::new(vec![generation]))
+    }
+
+    fn has_stream_impl(&self) -> bool {
+        true
     }
 
     fn _stream(
