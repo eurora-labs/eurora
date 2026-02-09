@@ -377,7 +377,7 @@ pub fn draw_mermaid(
 }
 
 /// Generate Mermaid graph styles for different node types.
-fn generate_mermaid_graph_styles(node_colors: &NodeStyles) -> String {
+pub fn generate_mermaid_graph_styles(node_colors: &NodeStyles) -> String {
     let mut styles = String::new();
     styles += &format!("\tclassDef default {}\n", node_colors.default);
     styles += &format!("\tclassDef first {}\n", node_colors.first);

@@ -10,6 +10,8 @@ pub mod configurable;
 pub mod fallbacks;
 pub mod graph;
 pub mod graph_mermaid;
+pub mod graph_png;
+pub mod history;
 pub mod passthrough;
 pub mod retry;
 pub mod router;
@@ -35,8 +37,14 @@ pub use configurable::{
 pub use fallbacks::{
     ExceptionInserter, FallbackErrorPredicate, RunnableWithFallbacks, RunnableWithFallbacksExt,
 };
-pub use graph::{CurveStyle, Edge, Graph, MermaidDrawMethod, MermaidOptions, Node, NodeStyles};
-pub use graph_mermaid::to_safe_id;
+pub use graph::{
+    CurveStyle, Edge, Graph, LabelsDict, MermaidDrawMethod, MermaidOptions, Node, NodeStyles,
+};
+pub use graph_mermaid::{generate_mermaid_graph_styles, to_safe_id};
+pub use graph_png::{PngDrawError, PngDrawer};
+pub use history::{
+    GetSessionHistoryFn, HistoryInput, HistoryOutput, HistoryRunnable, RunnableWithMessageHistory,
+};
 pub use passthrough::{
     PickKeys, RunnableAssign, RunnableAssignBuilder, RunnablePassthrough, RunnablePick,
     graph_passthrough,

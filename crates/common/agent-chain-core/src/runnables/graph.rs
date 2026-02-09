@@ -9,6 +9,17 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
+/// Dictionary of labels for nodes and edges in a graph.
+///
+/// Mirrors Python's `LabelsDict` `TypedDict` from `langchain_core.runnables.graph`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LabelsDict {
+    /// Labels for nodes, mapping node ID to display label.
+    pub nodes: HashMap<String, String>,
+    /// Labels for edges, mapping edge name to display label.
+    pub edges: HashMap<String, String>,
+}
+
 /// Edge in a graph.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Edge {
@@ -340,6 +351,46 @@ impl Graph {
         }
     }
 
+    /// Draw the graph as a PNG image.
+    ///
+    /// * `output_file_path` – path to save the PNG file. If `None`, PNG bytes
+    ///   are returned.
+    /// * `fontname` – font for labels (defaults to `"arial"`).
+    /// * `labels` – optional label overrides for nodes and edges.
+    ///
+    /// Mirrors `Graph.draw_png()` from `langchain_core.runnables.graph`.
+    pub fn draw_png(
+        &self,
+        output_file_path: Option<&std::path::Path>,
+        fontname: Option<&str>,
+        labels: Option<LabelsDict>,
+    ) -> Result<Option<Vec<u8>>, super::graph_png::PngDrawError> {
+        let default_node_labels: std::collections::HashMap<String, String> = self
+            .nodes
+            .values()
+            .map(|n| (n.id.clone(), n.name.clone()))
+            .collect();
+
+        let merged_labels = LabelsDict {
+            nodes: {
+                let mut merged = default_node_labels;
+                if let Some(ref user_labels) = labels {
+                    merged.extend(
+                        user_labels
+                            .nodes
+                            .iter()
+                            .map(|(k, v)| (k.clone(), v.clone())),
+                    );
+                }
+                merged
+            },
+            edges: labels.as_ref().map(|l| l.edges.clone()).unwrap_or_default(),
+        };
+
+        let drawer = super::graph_png::PngDrawer::new(fontname, Some(merged_labels));
+        drawer.draw(self, output_file_path)
+    }
+
     /// Draw the graph as a Mermaid syntax string.
     pub fn draw_mermaid(&self, options: Option<MermaidOptions>) -> String {
         let opts = options.unwrap_or_default();
@@ -400,6 +451,22 @@ pub enum CurveStyle {
 }
 
 impl CurveStyle {
+    /// All curve style variants.
+    pub const ALL: [CurveStyle; 12] = [
+        CurveStyle::Basis,
+        CurveStyle::BumpX,
+        CurveStyle::BumpY,
+        CurveStyle::Cardinal,
+        CurveStyle::CatmullRom,
+        CurveStyle::Linear,
+        CurveStyle::MonotoneX,
+        CurveStyle::MonotoneY,
+        CurveStyle::Natural,
+        CurveStyle::Step,
+        CurveStyle::StepAfter,
+        CurveStyle::StepBefore,
+    ];
+
     /// Get the Mermaid value string for this curve style.
     pub fn value(&self) -> &'static str {
         match self {
@@ -442,6 +509,16 @@ impl Default for NodeStyles {
 pub enum MermaidDrawMethod {
     Pyppeteer,
     Api,
+}
+
+impl MermaidDrawMethod {
+    /// Get the string value for this draw method.
+    pub fn value(&self) -> &'static str {
+        match self {
+            MermaidDrawMethod::Pyppeteer => "pyppeteer",
+            MermaidDrawMethod::Api => "api",
+        }
+    }
 }
 
 // ============================================================================
