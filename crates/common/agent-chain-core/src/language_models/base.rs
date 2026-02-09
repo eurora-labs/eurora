@@ -260,6 +260,10 @@ pub struct LanguageModelConfig {
     /// If provided, this function will be used instead of the default tokenizer.
     #[serde(skip)]
     pub custom_get_token_ids: Option<CustomGetTokenIds>,
+
+    /// Callbacks to invoke during model execution.
+    #[serde(skip)]
+    pub callbacks: Option<Callbacks>,
 }
 
 impl LanguageModelConfig {
@@ -292,6 +296,12 @@ impl LanguageModelConfig {
     /// when calling `get_token_ids` on a model using this configuration.
     pub fn with_custom_get_token_ids(mut self, tokenizer: CustomGetTokenIds) -> Self {
         self.custom_get_token_ids = Some(tokenizer);
+        self
+    }
+
+    /// Set callbacks for this model.
+    pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
+        self.callbacks = Some(callbacks);
         self
     }
 }

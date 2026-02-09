@@ -175,6 +175,29 @@ pub trait BaseLLM: BaseLanguageModel {
         Ok(String::new())
     }
 
+    /// Process multiple inputs and return results.
+    ///
+    /// Calls `generate_prompts` with all inputs at once and extracts text
+    /// from each generation.
+    async fn batch(&self, inputs: Vec<LanguageModelInput>) -> Result<Vec<String>> {
+        if inputs.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let prompts: Vec<String> = inputs.iter().map(|i| i.to_string()).collect();
+        let result = self.generate_prompts(prompts, None, None).await?;
+
+        let mut outputs = Vec::new();
+        for generations in &result.generations {
+            if let Some(generation) = generations.first() {
+                outputs.push(extract_text(generation));
+            } else {
+                outputs.push(String::new());
+            }
+        }
+        Ok(outputs)
+    }
+
     /// Get standard params for tracing.
     fn get_llm_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
         let mut params = self.get_ls_params(stop);

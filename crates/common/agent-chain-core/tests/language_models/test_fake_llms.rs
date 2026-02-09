@@ -742,3 +742,217 @@ async fn test_stream_with_sleep() {
     assert_eq!(chunks, vec!["a", "b"]);
     assert!(elapsed >= Duration::from_millis(20));
 }
+
+// ====================================================================
+// Previously skipped tests — now implemented
+// ====================================================================
+
+/// Ported from `test_batch_processing`.
+#[tokio::test]
+async fn test_batch_processing() {
+    let llm = FakeListLLM::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
+    let results = llm
+        .batch(vec![
+            LanguageModelInput::from("p1"),
+            LanguageModelInput::from("p2"),
+            LanguageModelInput::from("p3"),
+        ])
+        .await
+        .unwrap();
+    assert_eq!(results, vec!["r1", "r2", "r3"]);
+}
+
+/// Ported from `test_abatch_processing`.
+#[tokio::test]
+async fn test_abatch_processing() {
+    let llm = FakeListLLM::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
+    let results = llm
+        .batch(vec![
+            LanguageModelInput::from("p1"),
+            LanguageModelInput::from("p2"),
+            LanguageModelInput::from("p3"),
+        ])
+        .await
+        .unwrap();
+    assert_eq!(results, vec!["r1", "r2", "r3"]);
+}
+
+/// Ported from `test_batch_cycles_correctly_and_updates_counter`.
+#[tokio::test]
+async fn test_batch_cycles_correctly_and_updates_counter() {
+    let llm = FakeListLLM::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
+    let results = llm
+        .batch(vec![
+            LanguageModelInput::from("p1"),
+            LanguageModelInput::from("p2"),
+            LanguageModelInput::from("p3"),
+        ])
+        .await
+        .unwrap();
+    assert_eq!(results, vec!["r1", "r2", "r3"]);
+    assert_eq!(llm.current_index(), 0);
+}
+
+/// Ported from `test_batch_partial_cycle_updates_counter`.
+#[tokio::test]
+async fn test_batch_partial_cycle_updates_counter() {
+    let llm = FakeListLLM::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
+    let results = llm
+        .batch(vec![LanguageModelInput::from("p1")])
+        .await
+        .unwrap();
+    assert_eq!(results, vec!["r1"]);
+    assert_eq!(llm.current_index(), 1);
+}
+
+/// Ported from `test_call_resets_counter_at_end_multiple_responses`.
+#[tokio::test]
+async fn test_call_resets_counter_at_end_multiple_responses() {
+    let llm = FakeListLLM::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+    // Advance to last response
+    let _ = llm.call("p".to_string(), None, None).await;
+    let _ = llm.call("p".to_string(), None, None).await;
+    assert_eq!(llm.current_index(), 2);
+
+    let result = llm.call("p".to_string(), None, None).await.unwrap();
+    assert_eq!(result, "c");
+    assert_eq!(llm.current_index(), 0);
+}
+
+/// Ported from `test_identifying_params_with_extra_attributes`.
+#[test]
+fn test_identifying_params_with_extra_attributes() {
+    let llm = FakeStreamingListLLM::new(vec!["test".to_string()])
+        .with_error_on_chunk(5)
+        .with_sleep(Duration::from_millis(500));
+    let params = llm.identifying_params();
+    assert_eq!(
+        params.get("responses").unwrap(),
+        &serde_json::json!(["test"])
+    );
+    assert!(!params.contains_key("error_on_chunk_number"));
+    assert!(!params.contains_key("sleep"));
+}
+
+/// Ported from `test_multiple_sequential_streams_cycle` (4 sequential streams).
+#[tokio::test]
+async fn test_multiple_sequential_streams_cycle() {
+    let llm = FakeStreamingListLLM::new(vec!["AB".to_string(), "CD".to_string()]);
+
+    async fn collect(llm: &FakeStreamingListLLM, prompt: &str) -> Vec<String> {
+        use futures::StreamExt;
+        let mut stream = llm
+            .stream_prompt(prompt.to_string(), None, None)
+            .await
+            .unwrap();
+        let mut chunks = Vec::new();
+        while let Some(chunk) = stream.next().await {
+            chunks.push(chunk.unwrap().text);
+        }
+        chunks
+    }
+
+    assert_eq!(collect(&llm, "p1").await, vec!["A", "B"]);
+    assert_eq!(collect(&llm, "p2").await, vec!["C", "D"]);
+    assert_eq!(collect(&llm, "p3").await, vec!["A", "B"]);
+    assert_eq!(collect(&llm, "p4").await, vec!["C", "D"]);
+}
+
+/// Ported from `test_invoke_with_multiple_messages`.
+#[tokio::test]
+async fn test_invoke_with_multiple_messages() {
+    use agent_chain_core::messages::SystemMessage;
+
+    let llm = FakeListLLM::new(vec!["multi message response".to_string()]);
+    let messages = vec![
+        BaseMessage::System(
+            SystemMessage::builder()
+                .content("You are a helper.")
+                .build(),
+        ),
+        BaseMessage::Human(HumanMessage::builder().content("What is 2+2?").build()),
+    ];
+    let result = llm
+        .invoke(LanguageModelInput::from(messages))
+        .await
+        .unwrap();
+    assert_eq!(result, "multi message response");
+}
+
+/// Ported from `test_ainvoke_with_human_message_list`.
+#[tokio::test]
+async fn test_ainvoke_with_human_message_list() {
+    let llm = FakeListLLM::new(vec!["async message response".to_string()]);
+    let messages = vec![BaseMessage::Human(
+        HumanMessage::builder().content("Hello").build(),
+    )];
+    let result = llm
+        .invoke(LanguageModelInput::from(messages))
+        .await
+        .unwrap();
+    assert_eq!(result, "async message response");
+}
+
+/// Ported from `test_ainvoke_returns_full_response` (streaming LLM).
+#[tokio::test]
+async fn test_streaming_ainvoke_returns_full_response() {
+    let llm = FakeStreamingListLLM::new(vec!["hello world".to_string()]);
+    let result = llm.call("prompt".to_string(), None, None).await.unwrap();
+    assert_eq!(result, "hello world");
+}
+
+/// Ported from `test_stream_with_mixed_special_characters`.
+#[tokio::test]
+async fn test_stream_with_mixed_special_characters() {
+    let llm = FakeStreamingListLLM::new(vec!["\u{1f44d}\n\t".to_string()]);
+    let mut stream = llm
+        .stream_prompt("prompt".to_string(), None, None)
+        .await
+        .unwrap();
+    let mut chunks = Vec::new();
+    while let Some(chunk) = stream.next().await {
+        chunks.push(chunk.unwrap().text);
+    }
+    assert_eq!(chunks, vec!["\u{1f44d}", "\n", "\t"]);
+}
+
+/// Ported from `test_astream_sleep_delays_proportional_to_chunks`.
+#[tokio::test]
+async fn test_astream_sleep_delays_proportional_to_chunks() {
+    let llm =
+        FakeStreamingListLLM::new(vec!["abcde".to_string()]).with_sleep(Duration::from_millis(20));
+
+    let start = std::time::Instant::now();
+    let mut stream = llm
+        .stream_prompt("prompt".to_string(), None, None)
+        .await
+        .unwrap();
+    let mut chunks = Vec::new();
+    while let Some(chunk) = stream.next().await {
+        chunks.push(chunk.unwrap().text);
+    }
+    let elapsed = start.elapsed();
+
+    assert_eq!(chunks, vec!["a", "b", "c", "d", "e"]);
+    assert!(elapsed >= Duration::from_millis(100));
+}
+
+/// Ported from `test_astream_no_sleep_is_fast`.
+#[tokio::test]
+async fn test_astream_no_sleep_is_fast() {
+    let llm = FakeStreamingListLLM::new(vec!["abcde".to_string()]);
+
+    let start = std::time::Instant::now();
+    let mut stream = llm
+        .stream_prompt("prompt".to_string(), None, None)
+        .await
+        .unwrap();
+    let mut chunks = Vec::new();
+    while let Some(chunk) = stream.next().await {
+        chunks.push(chunk.unwrap().text);
+    }
+    let elapsed = start.elapsed();
+
+    assert_eq!(chunks, vec!["a", "b", "c", "d", "e"]);
+    assert!(elapsed < Duration::from_secs(1));
+}
