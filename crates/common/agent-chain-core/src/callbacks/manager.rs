@@ -1021,6 +1021,13 @@ impl CallbackManager {
         }
     }
 
+    /// Remove a handler from the callback manager.
+    pub fn remove_handler(&mut self, handler: &Arc<dyn BaseCallbackHandler>) {
+        self.handlers
+            .retain(|h| !std::ptr::eq(h.as_ref(), handler.as_ref()));
+        self.inheritable_handlers
+            .retain(|h| !std::ptr::eq(h.as_ref(), handler.as_ref()));
+    }
     /// Add tags.
     pub fn add_tags(&mut self, tags: Vec<String>, inherit: bool) {
         for tag in &tags {
@@ -1326,6 +1333,11 @@ impl AsyncCallbackManager {
     /// Add handler.
     pub fn add_handler(&mut self, handler: Arc<dyn BaseCallbackHandler>, inherit: bool) {
         self.inner.add_handler(handler, inherit);
+    }
+
+    /// Remove a handler from the callback manager.
+    pub fn remove_handler(&mut self, handler: &Arc<dyn BaseCallbackHandler>) {
+        self.inner.remove_handler(handler);
     }
 
     /// Add tags.
