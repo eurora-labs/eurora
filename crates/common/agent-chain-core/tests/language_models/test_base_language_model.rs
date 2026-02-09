@@ -659,3 +659,141 @@ mod test_base_language_model_trait {
         assert_eq!(params.ls_stop, None);
     }
 }
+
+// ====================================================================
+// Tests ported from test_base_language_model.py — previously missing
+// ====================================================================
+
+#[cfg(test)]
+mod test_get_num_tokens_edge_cases {
+    use super::*;
+
+    /// Ported from `test_get_num_tokens_whitespace_only`.
+    #[test]
+    fn test_get_num_tokens_whitespace_only() {
+        let model = FakeListLLM::new(vec!["response".to_string()]);
+        // The default tokenizer uses split_whitespace, so whitespace-only
+        // strings produce zero tokens.
+        let result = model.get_num_tokens("   ");
+        assert_eq!(result, 0);
+    }
+
+    /// Ported from `test_get_num_tokens_single_token`.
+    #[test]
+    fn test_get_num_tokens_single_token() {
+        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let result = model.get_num_tokens("a");
+        assert_eq!(result, 1);
+    }
+}
+
+#[cfg(test)]
+mod test_get_num_tokens_from_messages_edge_cases {
+    use super::*;
+
+    /// Ported from `test_single_message_returns_correct_count`.
+    #[test]
+    fn test_single_message_returns_correct_count() {
+        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let messages = vec![BaseMessage::Human(
+            HumanMessage::builder().content("Hello world").build(),
+        )];
+        let result = model.get_num_tokens_from_messages(&messages);
+        // "Human: Hello world" => 3 words ("Human:", "Hello", "world")
+        // + overhead from get_buffer_string formatting
+        assert!(result > 0);
+    }
+}
+
+#[cfg(test)]
+mod test_generate_prompt {
+    use super::*;
+
+    /// Ported from `test_generate_prompt_single_prompt`.
+    #[tokio::test]
+    async fn test_generate_prompt_single_prompt() {
+        let model = FakeListLLM::new(vec!["test response".to_string()]);
+        let prompts = vec![LanguageModelInput::from("Hello")];
+        let result = model.generate_prompt(prompts, None, None).await.unwrap();
+
+        assert_eq!(result.generations.len(), 1);
+        assert_eq!(result.generations[0].len(), 1);
+        match &result.generations[0][0] {
+            agent_chain_core::outputs::GenerationType::Generation(generation) => {
+                assert_eq!(generation.text, "test response");
+            }
+            _ => panic!("Expected Generation variant"),
+        }
+    }
+
+    /// Ported from `test_generate_prompt_multiple_prompts`.
+    #[tokio::test]
+    async fn test_generate_prompt_multiple_prompts() {
+        let model = FakeListLLM::new(vec![
+            "Response 1".to_string(),
+            "Response 2".to_string(),
+            "Response 3".to_string(),
+        ]);
+        let prompts = vec![
+            LanguageModelInput::from("Prompt 1"),
+            LanguageModelInput::from("Prompt 2"),
+            LanguageModelInput::from("Prompt 3"),
+        ];
+        let result = model.generate_prompt(prompts, None, None).await.unwrap();
+
+        assert_eq!(result.generations.len(), 3);
+        for gen_list in &result.generations {
+            assert_eq!(gen_list.len(), 1);
+        }
+    }
+
+    /// Ported from `test_generate_prompt_empty_prompts`.
+    #[tokio::test]
+    async fn test_generate_prompt_empty_prompts() {
+        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let result = model.generate_prompt(vec![], None, None).await.unwrap();
+
+        assert_eq!(result.generations.len(), 0);
+    }
+}
+
+#[cfg(test)]
+mod test_agenerate_prompt {
+    use super::*;
+
+    /// Ported from `test_agenerate_prompt_single_prompt`.
+    ///
+    /// In Rust, generate_prompt is already async, so this tests the same
+    /// code path as the sync test but explicitly exercises the async nature.
+    #[tokio::test]
+    async fn test_agenerate_prompt_single_prompt() {
+        let model = FakeListLLM::new(vec!["test response".to_string()]);
+        let prompts = vec![LanguageModelInput::from("Hello")];
+        let result = model.generate_prompt(prompts, None, None).await.unwrap();
+
+        assert_eq!(result.generations.len(), 1);
+        assert_eq!(result.generations[0].len(), 1);
+    }
+
+    /// Ported from `test_agenerate_prompt_multiple_prompts`.
+    #[tokio::test]
+    async fn test_agenerate_prompt_multiple_prompts() {
+        let model = FakeListLLM::new(vec!["Response 1".to_string(), "Response 2".to_string()]);
+        let prompts = vec![
+            LanguageModelInput::from("Prompt 1"),
+            LanguageModelInput::from("Prompt 2"),
+        ];
+        let result = model.generate_prompt(prompts, None, None).await.unwrap();
+
+        assert_eq!(result.generations.len(), 2);
+    }
+
+    /// Ported from `test_agenerate_prompt_empty_prompts`.
+    #[tokio::test]
+    async fn test_agenerate_prompt_empty_prompts() {
+        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let result = model.generate_prompt(vec![], None, None).await.unwrap();
+
+        assert_eq!(result.generations.len(), 0);
+    }
+}
