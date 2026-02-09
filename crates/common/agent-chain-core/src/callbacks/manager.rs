@@ -197,9 +197,9 @@ impl RunManager {
         }
         let run_id = self.inner.run_id;
         let parent_run_id = self.inner.parent_run_id;
-        let tags = self.inner.tags.clone();
-        handle_event(&self.inner.handlers, None, |_handler| {
-            let _ = (text, run_id, parent_run_id, &tags);
+        let _tags = self.inner.tags.clone();
+        handle_event(&self.inner.handlers, None, |handler| {
+            handler.on_text(text, run_id, parent_run_id, None, "");
         });
     }
 
@@ -210,12 +210,12 @@ impl RunManager {
         }
         let run_id = self.inner.run_id;
         let parent_run_id = self.inner.parent_run_id;
-        let tags = self.inner.tags.clone();
+        let _tags = self.inner.tags.clone();
         handle_event(
             &self.inner.handlers,
             Some(|h: &dyn BaseCallbackHandler| h.ignore_retry()),
-            |_handler| {
-                let _ = (retry_state, run_id, parent_run_id, &tags);
+            |handler| {
+                handler.on_retry(retry_state, run_id, parent_run_id);
             },
         );
     }
@@ -305,9 +305,9 @@ impl AsyncRunManager {
         }
         let run_id = self.inner.run_id;
         let parent_run_id = self.inner.parent_run_id;
-        let tags = self.inner.tags.clone();
-        ahandle_event(&self.inner.handlers, None, |_handler| {
-            let _ = (text, run_id, parent_run_id, &tags);
+        let _tags = self.inner.tags.clone();
+        ahandle_event(&self.inner.handlers, None, |handler| {
+            handler.on_text(text, run_id, parent_run_id, None, "");
             async {}
         })
         .await;
@@ -320,12 +320,12 @@ impl AsyncRunManager {
         }
         let run_id = self.inner.run_id;
         let parent_run_id = self.inner.parent_run_id;
-        let tags = self.inner.tags.clone();
+        let _tags = self.inner.tags.clone();
         ahandle_event(
             &self.inner.handlers,
             Some(|h: &dyn BaseCallbackHandler| h.ignore_retry()),
-            |_handler| {
-                let _ = (retry_state, run_id, parent_run_id, &tags);
+            |handler| {
+                handler.on_retry(retry_state, run_id, parent_run_id);
                 async {}
             },
         )
@@ -567,12 +567,12 @@ impl CallbackManagerForLLMRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
-        let tags = self.inner.tags().to_vec();
+        let _tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_llm()),
-            |_handler| {
-                let _ = (token, run_id, parent_run_id, chunk, &tags);
+            |handler| {
+                handler.on_llm_new_token(token, run_id, parent_run_id, chunk);
             },
         );
     }
@@ -584,12 +584,12 @@ impl CallbackManagerForLLMRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
-        let tags = self.inner.tags().to_vec();
+        let _tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_llm()),
-            |_handler| {
-                let _ = (response, run_id, parent_run_id, &tags);
+            |handler| {
+                handler.on_llm_end(response, run_id, parent_run_id);
             },
         );
     }
@@ -601,12 +601,12 @@ impl CallbackManagerForLLMRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
-        let tags = self.inner.tags().to_vec();
+        let _tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_llm()),
-            |_handler| {
-                let _ = (error, run_id, parent_run_id, &tags);
+            |handler| {
+                handler.on_llm_error(error, run_id, parent_run_id);
             },
         );
     }
@@ -685,12 +685,12 @@ impl CallbackManagerForChainRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
-        let tags = self.inner.tags().to_vec();
+        let _tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_chain()),
-            |_handler| {
-                let _ = (outputs, run_id, parent_run_id, &tags);
+            |handler| {
+                handler.on_chain_end(outputs, run_id, parent_run_id);
             },
         );
     }
@@ -702,12 +702,12 @@ impl CallbackManagerForChainRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
-        let tags = self.inner.tags().to_vec();
+        let _tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_chain()),
-            |_handler| {
-                let _ = (error, run_id, parent_run_id, &tags);
+            |handler| {
+                handler.on_chain_error(error, run_id, parent_run_id);
             },
         );
     }
@@ -719,12 +719,12 @@ impl CallbackManagerForChainRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
-        let tags = self.inner.tags().to_vec();
+        let _tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_agent()),
-            |_handler| {
-                let _ = (action, run_id, parent_run_id, &tags);
+            |handler| {
+                handler.on_agent_action(action, run_id, parent_run_id, None);
             },
         );
     }
@@ -736,12 +736,12 @@ impl CallbackManagerForChainRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
-        let tags = self.inner.tags().to_vec();
+        let _tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_agent()),
-            |_handler| {
-                let _ = (finish, run_id, parent_run_id, &tags);
+            |handler| {
+                handler.on_agent_finish(finish, run_id, parent_run_id, None);
             },
         );
     }
@@ -820,12 +820,12 @@ impl CallbackManagerForToolRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
-        let tags = self.inner.tags().to_vec();
+        let _tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_agent()),
-            |_handler| {
-                let _ = (output, run_id, parent_run_id, &tags);
+            |handler| {
+                handler.on_tool_end(output, run_id, parent_run_id, None, None, None);
             },
         );
     }
@@ -837,12 +837,12 @@ impl CallbackManagerForToolRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
-        let tags = self.inner.tags().to_vec();
+        let _tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_agent()),
-            |_handler| {
-                let _ = (error, run_id, parent_run_id, &tags);
+            |handler| {
+                handler.on_tool_error(error, run_id, parent_run_id);
             },
         );
     }
@@ -921,12 +921,12 @@ impl CallbackManagerForRetrieverRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
-        let tags = self.inner.tags().to_vec();
+        let _tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_retriever()),
-            |_handler| {
-                let _ = (documents, run_id, parent_run_id, &tags);
+            |handler| {
+                handler.on_retriever_end(documents, run_id, parent_run_id);
             },
         );
     }
@@ -938,12 +938,12 @@ impl CallbackManagerForRetrieverRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
-        let tags = self.inner.tags().to_vec();
+        let _tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_retriever()),
-            |_handler| {
-                let _ = (error, run_id, parent_run_id, &tags);
+            |handler| {
+                handler.on_retriever_error(error, run_id, parent_run_id);
             },
         );
     }
@@ -1021,6 +1021,13 @@ impl CallbackManager {
         }
     }
 
+    /// Remove a handler from the callback manager.
+    pub fn remove_handler(&mut self, handler: &Arc<dyn BaseCallbackHandler>) {
+        self.handlers
+            .retain(|h| !std::ptr::eq(h.as_ref(), handler.as_ref()));
+        self.inheritable_handlers
+            .retain(|h| !std::ptr::eq(h.as_ref(), handler.as_ref()));
+    }
     /// Add tags.
     pub fn add_tags(&mut self, tags: Vec<String>, inherit: bool) {
         for tag in &tags {
@@ -1066,8 +1073,15 @@ impl CallbackManager {
             handle_event(
                 &self.handlers,
                 Some(|h: &dyn BaseCallbackHandler| h.ignore_llm()),
-                |_handler| {
-                    let _ = (serialized, run_id);
+                |handler| {
+                    handler.on_llm_start(
+                        serialized,
+                        prompts,
+                        run_id,
+                        self.parent_run_id,
+                        Some(&self.tags),
+                        Some(&self.metadata),
+                    );
                 },
             );
 
@@ -1103,8 +1117,15 @@ impl CallbackManager {
             handle_event(
                 &self.handlers,
                 Some(|h: &dyn BaseCallbackHandler| h.ignore_chat_model()),
-                |_handler| {
-                    let _ = (serialized, run_id);
+                |handler| {
+                    handler.on_chat_model_start(
+                        serialized,
+                        messages,
+                        run_id,
+                        self.parent_run_id,
+                        Some(&self.tags),
+                        Some(&self.metadata),
+                    );
                 },
             );
 
@@ -1135,8 +1156,15 @@ impl CallbackManager {
         handle_event(
             &self.handlers,
             Some(|h: &dyn BaseCallbackHandler| h.ignore_chain()),
-            |_handler| {
-                let _ = (serialized, inputs, run_id);
+            |handler| {
+                handler.on_chain_start(
+                    serialized,
+                    inputs,
+                    run_id,
+                    self.parent_run_id,
+                    Some(&self.tags),
+                    Some(&self.metadata),
+                );
             },
         );
 
@@ -1165,8 +1193,16 @@ impl CallbackManager {
         handle_event(
             &self.handlers,
             Some(|h: &dyn BaseCallbackHandler| h.ignore_agent()),
-            |_handler| {
-                let _ = (serialized, input_str, run_id, inputs);
+            |handler| {
+                handler.on_tool_start(
+                    serialized,
+                    input_str,
+                    run_id,
+                    self.parent_run_id,
+                    Some(&self.tags),
+                    Some(&self.metadata),
+                    inputs,
+                );
             },
         );
 
@@ -1194,8 +1230,15 @@ impl CallbackManager {
         handle_event(
             &self.handlers,
             Some(|h: &dyn BaseCallbackHandler| h.ignore_retriever()),
-            |_handler| {
-                let _ = (serialized, query, run_id);
+            |handler| {
+                handler.on_retriever_start(
+                    serialized,
+                    query,
+                    run_id,
+                    self.parent_run_id,
+                    Some(&self.tags),
+                    Some(&self.metadata),
+                );
             },
         );
 
@@ -1222,8 +1265,8 @@ impl CallbackManager {
         handle_event(
             &self.handlers,
             Some(|h: &dyn BaseCallbackHandler| h.ignore_custom_event()),
-            |_handler| {
-                let _ = (name, data, run_id);
+            |handler| {
+                handler.on_custom_event(name, data, run_id, None, None);
             },
         );
     }
@@ -1236,7 +1279,6 @@ impl CallbackManager {
         local_tags: Option<Vec<String>>,
         inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
         local_metadata: Option<HashMap<String, serde_json::Value>>,
-        _verbose: bool,
     ) -> Self {
         let mut callback_manager = Self::new();
 
@@ -1326,6 +1368,16 @@ impl AsyncCallbackManager {
     /// Add handler.
     pub fn add_handler(&mut self, handler: Arc<dyn BaseCallbackHandler>, inherit: bool) {
         self.inner.add_handler(handler, inherit);
+    }
+
+    /// Remove a handler from the callback manager.
+    pub fn remove_handler(&mut self, handler: &Arc<dyn BaseCallbackHandler>) {
+        self.inner.remove_handler(handler);
+    }
+
+    /// Get the inner sync CallbackManager.
+    pub fn to_callback_manager(&self) -> CallbackManager {
+        self.inner.clone()
     }
 
     /// Add tags.
@@ -1425,8 +1477,8 @@ impl AsyncCallbackManager {
         handle_event(
             &self.inner.handlers,
             Some(|h: &dyn BaseCallbackHandler| h.ignore_custom_event()),
-            |_handler| {
-                let _ = (name, data, run_id);
+            |handler| {
+                handler.on_custom_event(name, data, run_id, None, None);
             },
         );
     }
@@ -1439,7 +1491,6 @@ impl AsyncCallbackManager {
         local_tags: Option<Vec<String>>,
         inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
         local_metadata: Option<HashMap<String, serde_json::Value>>,
-        verbose: bool,
     ) -> Self {
         Self {
             inner: CallbackManager::configure(
@@ -1449,7 +1500,6 @@ impl AsyncCallbackManager {
                 local_tags,
                 inheritable_metadata,
                 local_metadata,
-                verbose,
             ),
         }
     }
@@ -1710,7 +1760,6 @@ mod tests {
             Some(vec!["tag2".to_string()]),
             None,
             None,
-            false,
         );
 
         assert!(manager.tags.contains(&"tag1".to_string()));
@@ -2100,15 +2149,7 @@ where
     F: FnOnce(&mut CallbackManagerForChainGroup) -> R,
 {
     let cm = callback_manager.unwrap_or_else(|| {
-        CallbackManager::configure(
-            None,
-            None,
-            tags.clone(),
-            None,
-            metadata.clone(),
-            None,
-            false,
-        )
+        CallbackManager::configure(None, None, tags.clone(), None, metadata.clone(), None)
     });
 
     let mut serialized = HashMap::new();
@@ -2184,8 +2225,8 @@ pub fn dispatch_custom_event(
     handle_event(
         &callback_manager.handlers,
         Some(|h: &dyn BaseCallbackHandler| h.ignore_custom_event()),
-        |_handler| {
-            let _ = (name, data, run_id);
+        |handler| {
+            handler.on_custom_event(name, data, run_id, None, None);
         },
     );
 
@@ -2224,15 +2265,7 @@ where
     Fut: Future<Output = R>,
 {
     let cm = callback_manager.unwrap_or_else(|| {
-        AsyncCallbackManager::configure(
-            None,
-            None,
-            tags.clone(),
-            None,
-            metadata.clone(),
-            None,
-            false,
-        )
+        AsyncCallbackManager::configure(None, None, tags.clone(), None, metadata.clone(), None)
     });
 
     let mut serialized = HashMap::new();
@@ -2289,8 +2322,8 @@ pub async fn adispatch_custom_event(
     handle_event(
         callback_manager.handlers(),
         Some(|h: &dyn BaseCallbackHandler| h.ignore_custom_event()),
-        |_handler| {
-            let _ = (name, data, run_id);
+        |handler| {
+            handler.on_custom_event(name, data, run_id, None, None);
         },
     );
 

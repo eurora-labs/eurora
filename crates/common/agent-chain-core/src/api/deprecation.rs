@@ -7,7 +7,6 @@
 //! We may change the API at any time with no warning.
 
 use std::fmt;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::internal::is_caller_internal;
 
@@ -66,9 +65,6 @@ impl fmt::Display for AgentChainPendingDeprecationWarning {
 }
 
 impl std::error::Error for AgentChainPendingDeprecationWarning {}
-
-/// Global flag to suppress deprecation warnings.
-static SUPPRESS_DEPRECATION_WARNINGS: AtomicBool = AtomicBool::new(false);
 
 /// Parameters for configuring deprecation warnings.
 #[derive(Debug, Clone, Default)]
@@ -316,11 +312,6 @@ pub fn handle_renamed_parameter<T>(
 /// );
 /// ```
 pub fn warn_deprecated(params: DeprecationParams, caller_module: &str) {
-    // Skip if warnings are suppressed
-    if SUPPRESS_DEPRECATION_WARNINGS.load(Ordering::Relaxed) {
-        return;
-    }
-
     // Skip if caller is internal
     if is_caller_internal(caller_module) {
         return;
@@ -328,7 +319,7 @@ pub fn warn_deprecated(params: DeprecationParams, caller_module: &str) {
 
     // Validate parameters
     if let Err(err) = params.validate() {
-        eprintln!("Invalid deprecation parameters: {}", err);
+        tracing::error!(target: "agent_chain_core::deprecation", %err, "Invalid deprecation parameters");
         return;
     }
 
@@ -393,60 +384,11 @@ pub fn warn_deprecated(params: DeprecationParams, caller_module: &str) {
 
     if params.pending {
         let warning = AgentChainPendingDeprecationWarning::new(message);
-        eprintln!("AgentChainPendingDeprecationWarning: {}", warning);
+        tracing::warn!(target: "agent_chain_core::deprecation", %warning, "AgentChainPendingDeprecationWarning");
     } else {
         let warning = AgentChainDeprecationWarning::new(message);
-        eprintln!("AgentChainDeprecationWarning: {}", warning);
+        tracing::warn!(target: "agent_chain_core::deprecation", %warning, "AgentChainDeprecationWarning");
     }
-}
-
-/// Guard that suppresses deprecation warnings while it exists.
-pub struct SuppressDeprecationWarnings {
-    previous_state: bool,
-}
-
-impl SuppressDeprecationWarnings {
-    /// Create a new guard that suppresses deprecation warnings.
-    pub fn new() -> Self {
-        let previous_state = SUPPRESS_DEPRECATION_WARNINGS.swap(true, Ordering::Relaxed);
-        Self { previous_state }
-    }
-}
-
-impl Default for SuppressDeprecationWarnings {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Drop for SuppressDeprecationWarnings {
-    fn drop(&mut self) {
-        SUPPRESS_DEPRECATION_WARNINGS.store(self.previous_state, Ordering::Relaxed);
-    }
-}
-
-/// Suppress deprecation warnings within a scope.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::api::suppress_deprecation_warnings;
-///
-/// {
-///     let _guard = suppress_deprecation_warnings();
-///     // Deprecation warnings are suppressed here
-/// }
-/// // Deprecation warnings are restored here
-/// ```
-pub fn suppress_deprecation_warnings() -> SuppressDeprecationWarnings {
-    SuppressDeprecationWarnings::new()
-}
-
-/// Enable deprecation warnings (unmute them).
-///
-/// This function enables deprecation warnings that may have been suppressed.
-pub fn surface_deprecation_warnings() {
-    SUPPRESS_DEPRECATION_WARNINGS.store(false, Ordering::Relaxed);
 }
 
 /// Macro for handling renamed parameters with deprecation warnings.
@@ -621,20 +563,6 @@ mod tests {
     }
 
     #[test]
-    fn test_suppress_deprecation_warnings() {
-        // Ensure warnings are not suppressed initially
-        surface_deprecation_warnings();
-        assert!(!SUPPRESS_DEPRECATION_WARNINGS.load(Ordering::Relaxed));
-
-        {
-            let _guard = suppress_deprecation_warnings();
-            assert!(SUPPRESS_DEPRECATION_WARNINGS.load(Ordering::Relaxed));
-        }
-
-        assert!(!SUPPRESS_DEPRECATION_WARNINGS.load(Ordering::Relaxed));
-    }
-
-    #[test]
     fn test_rename_parameter_params() {
         let params = RenameParameterParams::new("0.1.0", "0.2.0", "old_name", "new_name");
         assert_eq!(params.since, "0.1.0");
@@ -645,7 +573,6 @@ mod tests {
 
     #[test]
     fn test_handle_renamed_parameter_new_only() {
-        surface_deprecation_warnings();
         let params = RenameParameterParams::new("0.1.0", "0.2.0", "old_param", "new_param");
 
         // Only new parameter provided - should return the new value
@@ -662,7 +589,6 @@ mod tests {
 
     #[test]
     fn test_handle_renamed_parameter_old_only() {
-        surface_deprecation_warnings();
         let params = RenameParameterParams::new("0.1.0", "0.2.0", "old_param", "new_param");
 
         // Only old parameter provided - should return the old value (with warning)
