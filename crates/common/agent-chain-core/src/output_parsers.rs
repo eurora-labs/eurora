@@ -43,6 +43,9 @@ mod base;
 mod format_instructions;
 mod json;
 mod list;
+mod openai_functions;
+mod openai_tools;
+mod pydantic;
 mod string;
 mod transform;
 mod xml;
@@ -63,9 +66,7 @@ pub use format_instructions::{
 pub use string::StrOutputParser;
 
 // Re-export transform types
-pub use transform::{
-    BaseCumulativeTransformOutputParser, BaseTransformOutputParser, StringOrMessage,
-};
+pub use transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
 
 // Re-export JSON parser
 pub use json::{JsonOutputParser, SimpleJsonOutputParser};
@@ -73,11 +74,26 @@ pub use json::{JsonOutputParser, SimpleJsonOutputParser};
 // Re-export list parsers
 pub use list::{
     CommaSeparatedListOutputParser, ListOutputParser, MarkdownListOutputParser,
-    NumberedListOutputParser, drop_last_n,
+    NumberedListOutputParser, ParseMatch, drop_last_n,
 };
+
+// Re-export Pydantic (struct) parser
+pub use pydantic::PydanticOutputParser;
 
 // Re-export XML parser
 pub use xml::{XMLOutputParser, nested_element};
+
+// Re-export OpenAI functions parsers
+pub use openai_functions::{
+    JsonKeyOutputFunctionsParser, JsonOutputFunctionsParser, OutputFunctionsParser,
+    PydanticAttrOutputFunctionsParser, PydanticOutputFunctionsParser, PydanticSchema,
+};
+
+// Re-export OpenAI tools parsers
+pub use openai_tools::{
+    JsonOutputKeyToolsParser, JsonOutputToolsParser, PydanticToolsParser, make_invalid_tool_call,
+    parse_tool_call, parse_tool_calls,
+};
 
 #[cfg(test)]
 mod tests {

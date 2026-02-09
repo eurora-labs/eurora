@@ -3,8 +3,8 @@
 //! Converted from `langchain/libs/core/tests/unit_tests/messages/test_tool.py`
 
 use agent_chain_core::messages::{
-    ToolMessage, ToolMessageChunk, ToolStatus, default_tool_chunk_parser, default_tool_parser,
-    invalid_tool_call, tool_call, tool_call_chunk,
+    ToolMessage, ToolMessageChunk, ToolOutputMixin, ToolStatus, default_tool_chunk_parser,
+    default_tool_parser, invalid_tool_call, tool_call, tool_call_chunk,
 };
 use serde_json::json;
 use uuid::Uuid;
@@ -589,4 +589,379 @@ fn test_chunk_parse_empty_list() {
     let raw_calls: Vec<serde_json::Value> = vec![];
     let chunks = default_tool_chunk_parser(&raw_calls);
     assert_eq!(chunks.len(), 0);
+}
+
+// ============================================================================
+// TestToolOutputMixin
+// ============================================================================
+
+#[test]
+fn test_tool_message_is_tool_output_mixin() {
+    let msg = ToolMessage::builder()
+        .content("Result")
+        .tool_call_id("call-123")
+        .build();
+    // In Rust, ToolMessage implements ToolOutputMixin trait.
+    fn assert_tool_output(_: &impl ToolOutputMixin) {}
+    assert_tool_output(&msg);
+}
+
+// ============================================================================
+// TestMergeStatus (tested indirectly via chunk addition)
+// ============================================================================
+
+#[test]
+fn test_merge_status_success_plus_success() {
+    let chunk1 = ToolMessageChunk::builder()
+        .content("")
+        .tool_call_id("call-1")
+        .status(ToolStatus::Success)
+        .build();
+    let chunk2 = ToolMessageChunk::builder()
+        .content("")
+        .tool_call_id("call-1")
+        .status(ToolStatus::Success)
+        .build();
+    let result = chunk1 + chunk2;
+    assert_eq!(result.status, ToolStatus::Success);
+}
+
+#[test]
+fn test_merge_status_error_plus_success() {
+    let chunk1 = ToolMessageChunk::builder()
+        .content("")
+        .tool_call_id("call-1")
+        .status(ToolStatus::Error)
+        .build();
+    let chunk2 = ToolMessageChunk::builder()
+        .content("")
+        .tool_call_id("call-1")
+        .status(ToolStatus::Success)
+        .build();
+    let result = chunk1 + chunk2;
+    assert_eq!(result.status, ToolStatus::Error);
+}
+
+#[test]
+fn test_merge_status_success_plus_error() {
+    let chunk1 = ToolMessageChunk::builder()
+        .content("")
+        .tool_call_id("call-1")
+        .status(ToolStatus::Success)
+        .build();
+    let chunk2 = ToolMessageChunk::builder()
+        .content("")
+        .tool_call_id("call-1")
+        .status(ToolStatus::Error)
+        .build();
+    let result = chunk1 + chunk2;
+    assert_eq!(result.status, ToolStatus::Error);
+}
+
+#[test]
+fn test_merge_status_error_plus_error() {
+    let chunk1 = ToolMessageChunk::builder()
+        .content("")
+        .tool_call_id("call-1")
+        .status(ToolStatus::Error)
+        .build();
+    let chunk2 = ToolMessageChunk::builder()
+        .content("")
+        .tool_call_id("call-1")
+        .status(ToolStatus::Error)
+        .build();
+    let result = chunk1 + chunk2;
+    assert_eq!(result.status, ToolStatus::Error);
+}
+
+// ============================================================================
+// TestToolMessageContentCoercion (Rust-adapted)
+// ============================================================================
+
+#[test]
+fn test_empty_string_content() {
+    let msg = ToolMessage::builder()
+        .content("")
+        .tool_call_id("call-400")
+        .build();
+    assert_eq!(msg.content, "");
+    assert_eq!(msg.tool_call_id, "call-400");
+    assert_eq!(msg.status, ToolStatus::Success);
+    assert_eq!(msg.message_type(), "tool");
+}
+
+// ============================================================================
+// TestToolMessageSerializationWithArtifactAndError
+// ============================================================================
+
+#[test]
+fn test_serialization_roundtrip_with_artifact_and_error_status() {
+    let artifact_data = json!({"raw_output": "traceback info", "exit_code": 1});
+    let msg = ToolMessage::builder()
+        .id("msg-600".to_string())
+        .content("Tool execution failed")
+        .tool_call_id("call-600")
+        .name("failing_tool".to_string())
+        .artifact(artifact_data.clone())
+        .status(ToolStatus::Error)
+        .build();
+
+    let serialized = serde_json::to_value(&msg).unwrap();
+    assert_eq!(serialized.get("type").unwrap().as_str().unwrap(), "tool");
+
+    let deserialized: ToolMessage = serde_json::from_value(serialized).unwrap();
+    assert_eq!(deserialized.content, "Tool execution failed");
+    assert_eq!(deserialized.tool_call_id, "call-600");
+    assert_eq!(deserialized.name, Some("failing_tool".to_string()));
+    assert_eq!(deserialized.artifact, Some(artifact_data));
+    assert_eq!(deserialized.status, ToolStatus::Error);
+    assert_eq!(deserialized.id, Some("msg-600".to_string()));
+}
+
+// ============================================================================
+// TestToolMessageChunkAddExtended
+// ============================================================================
+
+#[test]
+fn test_both_success_statuses_result_in_success() {
+    let chunk1 = ToolMessageChunk::builder()
+        .content("Part A")
+        .tool_call_id("call-700")
+        .status(ToolStatus::Success)
+        .build();
+    let chunk2 = ToolMessageChunk::builder()
+        .content(" Part B")
+        .tool_call_id("call-700")
+        .status(ToolStatus::Success)
+        .build();
+    let result = chunk1 + chunk2;
+    assert_eq!(result.status, ToolStatus::Success);
+    assert_eq!(result.content, "Part A Part B");
+}
+
+#[test]
+fn test_tool_call_id_preserved_from_first_chunk() {
+    let chunk1 = ToolMessageChunk::builder()
+        .id("chunk-first".to_string())
+        .content("Hello")
+        .tool_call_id("call-800")
+        .build();
+    let chunk2 = ToolMessageChunk::builder()
+        .id("chunk-second".to_string())
+        .content(" World")
+        .tool_call_id("call-800")
+        .build();
+    let result = chunk1 + chunk2;
+    assert_eq!(result.tool_call_id, "call-800");
+    assert_eq!(result.id, Some("chunk-first".to_string()));
+}
+
+// ============================================================================
+// TestDefaultToolParserExtended
+// ============================================================================
+
+#[test]
+fn test_tool_call_with_no_id_field() {
+    let raw_calls = vec![json!({
+        "function": {
+            "name": "lookup",
+            "arguments": r#"{"term": "python"}"#,
+        },
+    })];
+    let (tool_calls, invalid_calls) = default_tool_parser(&raw_calls);
+    assert_eq!(tool_calls.len(), 1);
+    assert_eq!(invalid_calls.len(), 0);
+    assert_eq!(tool_calls[0].name, "lookup");
+    assert_eq!(tool_calls[0].args, json!({"term": "python"}));
+    assert_eq!(tool_calls[0].id, None);
+}
+
+#[test]
+fn test_empty_function_args_string() {
+    let raw_calls = vec![json!({
+        "id": "call-a",
+        "function": {
+            "name": "no_args",
+            "arguments": "",
+        },
+    })];
+    let (tool_calls, invalid_calls) = default_tool_parser(&raw_calls);
+    // Empty string is not valid JSON, so it should be an invalid tool call
+    assert_eq!(tool_calls.len(), 0);
+    assert_eq!(invalid_calls.len(), 1);
+    assert_eq!(invalid_calls[0].name, Some("no_args".to_string()));
+    assert_eq!(invalid_calls[0].args, Some("".to_string()));
+    assert_eq!(invalid_calls[0].id, Some("call-a".to_string()));
+}
+
+#[test]
+fn test_null_function_args() {
+    let raw_calls = vec![json!({
+        "id": "call-b",
+        "function": {
+            "name": "null_args_tool",
+            "arguments": "null",
+        },
+    })];
+    let (tool_calls, invalid_calls) = default_tool_parser(&raw_calls);
+    // json.loads("null") returns None, then `function_args or {}` yields {}
+    assert_eq!(tool_calls.len(), 1);
+    assert_eq!(invalid_calls.len(), 0);
+    assert_eq!(tool_calls[0].name, "null_args_tool");
+    assert_eq!(tool_calls[0].args, json!({}));
+    assert_eq!(tool_calls[0].id, Some("call-b".to_string()));
+}
+
+// ============================================================================
+// TestDefaultToolChunkParserExtended
+// ============================================================================
+
+#[test]
+fn test_tool_calls_with_function_name_none() {
+    let raw_calls = vec![json!({
+        "id": null,
+        "index": 0,
+        "function": {
+            "name": null,
+            "arguments": r#""continued"}"#,
+        },
+    })];
+    let chunks = default_tool_chunk_parser(&raw_calls);
+    assert_eq!(chunks.len(), 1);
+    assert_eq!(chunks[0].name, None);
+    assert_eq!(chunks[0].args, Some(r#""continued"}"#.to_string()));
+    assert_eq!(chunks[0].id, None);
+    assert_eq!(chunks[0].index, Some(0));
+}
+
+// ============================================================================
+// TestToolMessageFieldDefaults
+// ============================================================================
+
+#[test]
+fn test_additional_kwargs_default_is_empty_dict() {
+    let msg = ToolMessage::builder()
+        .content("test")
+        .tool_call_id("call-1100")
+        .build();
+    assert!(msg.additional_kwargs.is_empty());
+}
+
+#[test]
+fn test_response_metadata_default_is_empty_dict() {
+    let msg = ToolMessage::builder()
+        .content("test")
+        .tool_call_id("call-1200")
+        .build();
+    assert!(msg.response_metadata.is_empty());
+}
+
+#[test]
+fn test_additional_kwargs_and_response_metadata_with_values() {
+    let mut additional = std::collections::HashMap::new();
+    additional.insert("custom".to_string(), json!("value"));
+    let mut response_meta = std::collections::HashMap::new();
+    response_meta.insert("meta".to_string(), json!("data"));
+
+    let msg = ToolMessage::builder()
+        .content("test")
+        .tool_call_id("call-1301")
+        .additional_kwargs(additional)
+        .response_metadata(response_meta)
+        .build();
+
+    assert_eq!(
+        msg.additional_kwargs.get("custom").unwrap(),
+        &json!("value")
+    );
+    assert_eq!(msg.response_metadata.get("meta").unwrap(), &json!("data"));
+}
+
+// ============================================================================
+// TestToolMessagePrettyReprExtended
+// ============================================================================
+
+#[test]
+fn test_pretty_repr_includes_tool_name() {
+    let msg = ToolMessage::builder()
+        .content("42")
+        .tool_call_id("call-1400")
+        .name("calculator".to_string())
+        .build();
+    let result = msg.pretty_repr(false);
+    assert!(result.contains("Tool Message"));
+    assert!(result.contains("Name: calculator"));
+    assert!(result.contains("42"));
+}
+
+#[test]
+fn test_pretty_repr_without_name() {
+    let msg = ToolMessage::builder()
+        .content("result data")
+        .tool_call_id("call-1500")
+        .build();
+    let result = msg.pretty_repr(false);
+    assert!(result.contains("Tool Message"));
+    assert!(!result.contains("Name:"));
+    assert!(result.contains("result data"));
+}
+
+#[test]
+fn test_pretty_repr_with_error_content() {
+    let msg = ToolMessage::builder()
+        .content("Error: division by zero")
+        .tool_call_id("call-1600")
+        .name("math_tool".to_string())
+        .status(ToolStatus::Error)
+        .build();
+    let result = msg.pretty_repr(false);
+    assert!(result.contains("Tool Message"));
+    assert!(result.contains("Name: math_tool"));
+    assert!(result.contains("Error: division by zero"));
+}
+
+// ============================================================================
+// TestToolCallTypedDict (structure tests)
+// ============================================================================
+
+#[test]
+fn test_tool_call_structure() {
+    let tc = tool_call(
+        "test_tool",
+        json!({"param": "value"}),
+        Some("call-123".to_string()),
+    );
+    assert_eq!(tc.name, "test_tool");
+    assert_eq!(tc.args["param"], "value");
+    assert_eq!(tc.id, Some("call-123".to_string()));
+}
+
+#[test]
+fn test_tool_call_with_type() {
+    let tc = tool_call("test_tool", json!({}), Some("call-123".to_string()));
+    assert_eq!(tc.call_type, Some("tool_call".to_string()));
+}
+
+// ============================================================================
+// TestToolCallChunkTypedDict (structure tests)
+// ============================================================================
+
+#[test]
+fn test_tool_call_chunk_structure() {
+    let tc = tool_call_chunk(
+        Some("test_tool".to_string()),
+        Some(r#"{"key": "value"}"#.to_string()),
+        Some("call-123".to_string()),
+        Some(0),
+    );
+    assert_eq!(tc.name, Some("test_tool".to_string()));
+    assert_eq!(tc.args, Some(r#"{"key": "value"}"#.to_string()));
+    assert_eq!(tc.id, Some("call-123".to_string()));
+    assert_eq!(tc.index, Some(0));
+}
+
+#[test]
+fn test_tool_call_chunk_with_type() {
+    let tc = tool_call_chunk(None, None, None, None);
+    assert_eq!(tc.chunk_type, Some("tool_call_chunk".to_string()));
 }

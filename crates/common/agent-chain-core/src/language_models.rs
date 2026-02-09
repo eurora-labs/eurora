@@ -50,7 +50,7 @@ mod utils;
 // Re-export base types
 pub use base::{
     BaseLanguageModel, CustomGetTokenIds, LangSmithParams, LanguageModelConfig, LanguageModelInput,
-    LanguageModelOutput, get_verbosity,
+    LanguageModelOutput,
 };
 
 // Re-export chat model types
@@ -64,7 +64,10 @@ pub use chat_models::{
 pub use crate::messages::UsageMetadata;
 
 // Re-export LLM types
-pub use llms::{BaseLLM, LLM, LLMConfig, get_prompts_from_cache, update_cache};
+pub use llms::{
+    BaseLLM, CacheValue, LLM, LLMConfig, RunIdInput, create_base_retry, get_prompts_from_cache,
+    get_run_ids_list, resolve_cache, save_llm, update_cache,
+};
 
 // Re-export fake implementations for testing
 pub use fake::{FakeListLLM, FakeListLLMError, FakeStreamingListLLM};
@@ -81,7 +84,7 @@ pub use model_profile::{ModelProfile, ModelProfileRegistry};
 pub use utils::{
     DataBlockFilter as OpenAiDataBlockFilter, ParsedDataUri, convert_legacy_v0_content_block_to_v1,
     convert_openai_format_to_data_block, estimate_token_count, get_token_ids_default,
-    is_openai_data_block, parse_data_uri,
+    is_openai_data_block, parse_data_uri, update_message_content_to_blocks,
 };
 
 /// Type alias for a boxed language model input.

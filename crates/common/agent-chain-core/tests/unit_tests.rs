@@ -2,8 +2,11 @@
 //!
 //! Test structure mirrors `langchain/libs/core/tests/unit_tests/`
 
+mod callbacks;
 mod language_models;
+mod load;
 mod messages;
 mod output_parsers;
 mod outputs;
+mod runnables;
 mod utils;

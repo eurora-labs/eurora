@@ -7,7 +7,6 @@
 //! We may change the API at any time with no warning.
 
 use std::fmt;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::internal::is_caller_internal;
 
@@ -38,9 +37,6 @@ impl fmt::Display for AgentChainBetaWarning {
 }
 
 impl std::error::Error for AgentChainBetaWarning {}
-
-/// Global flag to suppress beta warnings.
-static SUPPRESS_BETA_WARNINGS: AtomicBool = AtomicBool::new(false);
 
 /// Parameters for configuring beta warnings.
 #[derive(Debug, Clone, Default)]
@@ -107,11 +103,6 @@ impl BetaParams {
 /// );
 /// ```
 pub fn warn_beta(params: BetaParams, caller_module: &str) {
-    // Skip if warnings are suppressed
-    if SUPPRESS_BETA_WARNINGS.load(Ordering::Relaxed) {
-        return;
-    }
-
     // Skip if caller is internal
     if is_caller_internal(caller_module) {
         return;
@@ -138,59 +129,7 @@ pub fn warn_beta(params: BetaParams, caller_module: &str) {
     };
 
     let warning = AgentChainBetaWarning::new(message);
-
-    // In Rust, we use tracing or log for warnings
-    // For now, we use eprintln to match Python's warnings behavior
-    eprintln!("AgentChainBetaWarning: {}", warning);
-}
-
-/// Guard that suppresses beta warnings while it exists.
-pub struct SuppressBetaWarnings {
-    previous_state: bool,
-}
-
-impl SuppressBetaWarnings {
-    /// Create a new guard that suppresses beta warnings.
-    pub fn new() -> Self {
-        let previous_state = SUPPRESS_BETA_WARNINGS.swap(true, Ordering::Relaxed);
-        Self { previous_state }
-    }
-}
-
-impl Default for SuppressBetaWarnings {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Drop for SuppressBetaWarnings {
-    fn drop(&mut self) {
-        SUPPRESS_BETA_WARNINGS.store(self.previous_state, Ordering::Relaxed);
-    }
-}
-
-/// Suppress beta warnings within a scope.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::api::suppress_beta_warnings;
-///
-/// {
-///     let _guard = suppress_beta_warnings();
-///     // Beta warnings are suppressed here
-/// }
-/// // Beta warnings are restored here
-/// ```
-pub fn suppress_beta_warnings() -> SuppressBetaWarnings {
-    SuppressBetaWarnings::new()
-}
-
-/// Enable beta warnings (unmute them).
-///
-/// This function enables beta warnings that may have been suppressed.
-pub fn surface_beta_warnings() {
-    SUPPRESS_BETA_WARNINGS.store(false, Ordering::Relaxed);
+    tracing::warn!(target: "agent_chain_core::beta", %warning, "AgentChainBetaWarning");
 }
 
 /// Macro to mark a function or method as beta.
@@ -258,19 +197,5 @@ mod tests {
             params.addendum,
             Some("Consider using other_function.".to_string())
         );
-    }
-
-    #[test]
-    fn test_suppress_beta_warnings() {
-        // Ensure warnings are not suppressed initially
-        surface_beta_warnings();
-        assert!(!SUPPRESS_BETA_WARNINGS.load(Ordering::Relaxed));
-
-        {
-            let _guard = suppress_beta_warnings();
-            assert!(SUPPRESS_BETA_WARNINGS.load(Ordering::Relaxed));
-        }
-
-        assert!(!SUPPRESS_BETA_WARNINGS.load(Ordering::Relaxed));
     }
 }
