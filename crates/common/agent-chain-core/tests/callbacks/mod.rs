@@ -9,3 +9,7 @@ mod test_dispatch_custom_event;
 mod test_manager;
 mod test_manager_snapshot;
 mod test_stdout;
+mod test_stdout_snapshot;
+mod test_sync_callback_manager;
+mod test_usage_callback;
+mod test_usage_snapshot;
