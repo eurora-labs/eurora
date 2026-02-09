@@ -45,6 +45,10 @@ pub fn parse_partial_json(s: &str, strict: bool) -> Result<Value, JsonParseError
                 is_inside_string = false;
             } else if char == '\n' && !escaped {
                 new_char = "\\n".to_string();
+            } else if char == '\r' && !escaped {
+                new_char = "\\r".to_string();
+            } else if char == '\t' && !escaped {
+                new_char = "\\t".to_string();
             } else if char == '\\' {
                 escaped = !escaped;
             } else {

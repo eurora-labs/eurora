@@ -53,6 +53,9 @@ pub struct ChatChunk {
     /// Typically present on the final chunk.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub finish_reason: Option<String>,
+    /// Accumulated tool calls - typically present on the final chunk when finish_reason is "tool_calls".
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_calls: Vec<crate::messages::ToolCall>,
 }
 
 impl ChatChunk {
@@ -63,6 +66,7 @@ impl ChatChunk {
             is_final: false,
             usage_metadata: None,
             finish_reason: None,
+            tool_calls: Vec::new(),
         }
     }
 
@@ -76,6 +80,7 @@ impl ChatChunk {
             is_final: true,
             usage_metadata,
             finish_reason,
+            tool_calls: Vec::new(),
         }
     }
 
@@ -202,6 +207,10 @@ pub struct ChatModelConfig {
 
     /// Profile detailing model capabilities.
     pub profile: Option<ModelProfile>,
+
+    /// Optional local cache instance for this chat model.
+    /// When set, this cache is used instead of the global cache.
+    pub cache_instance: Option<Arc<dyn crate::caches::BaseCache>>,
 }
 
 impl std::fmt::Debug for ChatModelConfig {
@@ -215,6 +224,10 @@ impl std::fmt::Debug for ChatModelConfig {
             .field("disable_streaming", &self.disable_streaming)
             .field("output_version", &self.output_version)
             .field("profile", &self.profile)
+            .field(
+                "cache_instance",
+                &self.cache_instance.as_ref().map(|_| "..."),
+            )
             .finish()
     }
 }
@@ -228,6 +241,24 @@ impl ChatModelConfig {
     /// Set the rate limiter.
     pub fn with_rate_limiter(mut self, rate_limiter: Arc<dyn BaseRateLimiter>) -> Self {
         self.rate_limiter = Some(rate_limiter);
+        self
+    }
+
+    /// Set a local cache instance for this chat model.
+    pub fn with_cache_instance(mut self, cache: Arc<dyn crate::caches::BaseCache>) -> Self {
+        self.cache_instance = Some(cache);
+        self
+    }
+
+    /// Disable caching for this chat model.
+    pub fn with_cache_disabled(mut self) -> Self {
+        self.base.cache = Some(false);
+        self
+    }
+
+    /// Enable caching (use global cache).
+    pub fn with_cache_enabled(mut self) -> Self {
+        self.base.cache = Some(true);
         self
     }
 
@@ -252,12 +283,6 @@ impl ChatModelConfig {
     /// Enable caching.
     pub fn with_cache(mut self, cache: bool) -> Self {
         self.base.cache = Some(cache);
-        self
-    }
-
-    /// Enable verbose mode.
-    pub fn with_verbose(mut self, verbose: bool) -> Self {
-        self.base.verbose = verbose;
         self
     }
 
@@ -535,18 +560,14 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
 
         // Check if any streaming callback handlers are present
-        if let Some(handlers) = run_manager {
-            // In Python, this checks for `_StreamingCallbackHandler` instances
-            // For Rust, we can check if any handler implements StreamingCallbackHandler
-            // This is a simplified check - in practice, you'd want a more sophisticated check
-            if !handlers.is_empty() {
-                // If there are any handlers, we assume streaming might be wanted
-                return true;
-            }
+        if let Some(handlers) = run_manager
+            && !handlers.is_empty()
+        {
+            return true;
         }
 
-        // Default: streaming is available and not disabled
-        true
+        // Default: no streaming without explicit request or callback handlers
+        false
     }
 
     /// Generate from a batch of message lists.
@@ -619,7 +640,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             self.config().tags.clone(),
             Some(inheritable_metadata),
             self.config().metadata.clone(),
-            self.config().verbose,
         );
 
         // Start chat model runs
@@ -767,7 +787,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             self.config().tags.clone(),
             Some(inheritable_metadata),
             self.config().metadata.clone(),
-            self.config().verbose,
         );
 
         // Start chat model runs
@@ -865,9 +884,47 @@ pub trait BaseChatModel: BaseLanguageModel {
         stop: Option<Vec<String>>,
         run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<crate::outputs::ChatResult> {
-        // Check cache (if caching is enabled)
-        // Note: Full cache implementation would check self.cache() here
-        // For now, we skip cache check since it requires async cache lookup
+        // Resolve cache: local instance > global, respect cache=false
+        let cache_config = self.chat_config().base.cache;
+        let cache_instance = self.chat_config().cache_instance.clone();
+
+        let resolved_cache: Option<std::sync::Arc<dyn crate::caches::BaseCache>> =
+            if let Some(instance) = cache_instance {
+                Some(instance)
+            } else if cache_config == Some(false) {
+                None
+            } else if cache_config == Some(true) {
+                let global = crate::globals::get_llm_cache();
+                if global.is_none() {
+                    return Err(Error::Other(
+                        "Asked to cache, but no cache found at global cache.".to_string(),
+                    ));
+                }
+                global
+            } else {
+                // cache is None — use global if available
+                crate::globals::get_llm_cache()
+            };
+
+        // Check cache before rate limiting
+        if let Some(ref cache) = resolved_cache {
+            let llm_string = self._get_llm_string(stop.as_deref(), None);
+            let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
+            if let Some(cached) = cache.lookup(&prompt_key, &llm_string) {
+                // Convert cached Generation objects to ChatGeneration
+                let generations: Vec<crate::outputs::ChatGeneration> = cached
+                    .into_iter()
+                    .map(|generation| {
+                        crate::outputs::ChatGeneration::new(BaseMessage::AI(
+                            crate::messages::AIMessage::builder()
+                                .content(&generation.text)
+                                .build(),
+                        ))
+                    })
+                    .collect();
+                return Ok(crate::outputs::ChatResult::new(generations));
+            }
+        }
 
         // Apply rate limiter after cache check
         if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
@@ -892,7 +949,24 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
 
         // Non-streaming path
-        let result = self._generate(messages, stop, run_manager).await?;
+        let result = self
+            ._generate(messages.clone(), stop.clone(), run_manager)
+            .await?;
+
+        // Update cache with new result
+        if let Some(ref cache) = resolved_cache {
+            let llm_string = self._get_llm_string(stop.as_deref(), None);
+            let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
+            let generations: Vec<crate::outputs::Generation> = result
+                .generations
+                .iter()
+                .map(|generation| {
+                    crate::outputs::Generation::new(generation.message.content().to_string())
+                })
+                .collect();
+            cache.update(&prompt_key, &llm_string, generations);
+        }
+
         Ok(result)
     }
 
@@ -906,10 +980,45 @@ pub trait BaseChatModel: BaseLanguageModel {
         stop: Option<Vec<String>>,
         run_manager: Option<&AsyncCallbackManagerForLLMRun>,
     ) -> Result<crate::outputs::ChatResult> {
-        // Check cache (if caching is enabled)
-        // Note: Full cache implementation would check self.cache() here
-        // For now, we skip cache check since it requires async cache lookup
+        // Resolve cache (same logic as sync version)
+        let cache_config = self.chat_config().base.cache;
+        let cache_instance = self.chat_config().cache_instance.clone();
 
+        let resolved_cache: Option<std::sync::Arc<dyn crate::caches::BaseCache>> =
+            if let Some(instance) = cache_instance {
+                Some(instance)
+            } else if cache_config == Some(false) {
+                None
+            } else if cache_config == Some(true) {
+                let global = crate::globals::get_llm_cache();
+                if global.is_none() {
+                    return Err(Error::Other(
+                        "Asked to cache, but no cache found at global cache.".to_string(),
+                    ));
+                }
+                global
+            } else {
+                crate::globals::get_llm_cache()
+            };
+
+        // Check cache before rate limiting
+        if let Some(ref cache) = resolved_cache {
+            let llm_string = self._get_llm_string(stop.as_deref(), None);
+            let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
+            if let Some(cached) = cache.lookup(&prompt_key, &llm_string) {
+                let generations: Vec<crate::outputs::ChatGeneration> = cached
+                    .into_iter()
+                    .map(|generation| {
+                        crate::outputs::ChatGeneration::new(BaseMessage::AI(
+                            crate::messages::AIMessage::builder()
+                                .content(&generation.text)
+                                .build(),
+                        ))
+                    })
+                    .collect();
+                return Ok(crate::outputs::ChatResult::new(generations));
+            }
+        }
         // Apply rate limiter after cache check
         if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
             rate_limiter.aacquire(true).await;
@@ -935,7 +1044,24 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
 
         // Non-streaming path
-        let result = self._agenerate(messages, stop, run_manager).await?;
+        let result = self
+            ._agenerate(messages.clone(), stop.clone(), run_manager)
+            .await?;
+
+        // Update cache with new result
+        if let Some(ref cache) = resolved_cache {
+            let llm_string = self._get_llm_string(stop.as_deref(), None);
+            let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
+            let generations: Vec<crate::outputs::Generation> = result
+                .generations
+                .iter()
+                .map(|generation| {
+                    crate::outputs::Generation::new(generation.message.content().to_string())
+                })
+                .collect();
+            cache.update(&prompt_key, &llm_string, generations);
+        }
+
         Ok(result)
     }
 
@@ -1004,7 +1130,7 @@ pub trait BaseChatModel: BaseLanguageModel {
     /// Invoke the model with input.
     async fn invoke(&self, input: LanguageModelInput) -> Result<AIMessage> {
         let messages = self.convert_input(input)?;
-        let result = self._generate(messages, None, None).await?;
+        let result = self._generate_with_cache(messages, None, None).await?;
 
         if result.generations.is_empty() {
             return Err(Error::Other("No generations returned".into()));
@@ -1019,7 +1145,7 @@ pub trait BaseChatModel: BaseLanguageModel {
     /// Async invoke the model.
     async fn ainvoke(&self, input: LanguageModelInput) -> Result<AIMessage> {
         let messages = self.convert_input(input)?;
-        let result = self._agenerate(messages, None, None).await?;
+        let result = self._agenerate_with_cache(messages, None, None).await?;
 
         if result.generations.is_empty() {
             return Err(Error::Other("No generations returned".into()));
@@ -1456,12 +1582,10 @@ mod tests {
     fn test_chat_model_config_builder() {
         let config = ChatModelConfig::new()
             .with_cache(true)
-            .with_verbose(true)
             .with_disable_streaming(true)
             .with_output_version("v1");
 
         assert_eq!(config.base.cache, Some(true));
-        assert!(config.base.verbose);
         assert_eq!(config.disable_streaming, DisableStreaming::Bool(true));
         assert_eq!(config.output_version, Some("v1".to_string()));
     }
