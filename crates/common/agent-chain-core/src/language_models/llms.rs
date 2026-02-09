@@ -198,6 +198,18 @@ pub trait BaseLLM: BaseLanguageModel {
         Ok(outputs)
     }
 
+    /// Process multiple inputs, returning individual results or errors.
+    ///
+    /// Unlike `batch`, this method catches per-item errors and returns them
+    /// in-place rather than failing the entire batch.
+    async fn batch_with_exceptions(&self, inputs: Vec<LanguageModelInput>) -> Vec<Result<String>> {
+        let mut results = Vec::new();
+        for input in inputs {
+            results.push(self.invoke(input).await);
+        }
+        results
+    }
+
     /// Get standard params for tracing.
     fn get_llm_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
         let mut params = self.get_ls_params(stop);
@@ -314,6 +326,150 @@ pub fn update_cache(
     }
 
     new_results.llm_output.clone()
+}
+
+/// Cache resolution value. Can be a boolean flag or a cache instance.
+impl std::fmt::Debug for CacheValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CacheValue::Flag(b) => write!(f, "CacheValue::Flag({})", b),
+            CacheValue::Instance(_) => write!(f, "CacheValue::Instance(...)"),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum CacheValue {
+    /// Use/don't use the global cache.
+    Flag(bool),
+    /// Use a specific cache instance.
+    Instance(std::sync::Arc<dyn crate::caches::BaseCache>),
+}
+
+/// Resolve a cache value to an optional cache instance.
+///
+/// Mirrors Python's `_resolve_cache` function.
+///
+/// - `CacheValue::Instance(cache)` -> returns that cache
+/// - `CacheValue::Flag(false)` -> returns None (no caching)
+/// - `CacheValue::Flag(true)` -> returns the global cache, or errors if none set
+/// - `None` -> returns the global cache if set, otherwise None
+pub fn resolve_cache(
+    cache: Option<CacheValue>,
+) -> Result<Option<std::sync::Arc<dyn crate::caches::BaseCache>>> {
+    match cache {
+        Some(CacheValue::Instance(c)) => Ok(Some(c)),
+        Some(CacheValue::Flag(false)) => Ok(None),
+        Some(CacheValue::Flag(true)) => {
+            let global = crate::globals::get_llm_cache();
+            if global.is_some() {
+                Ok(global)
+            } else {
+                Err(crate::error::Error::Other(
+                    "No global cache was configured. Set the global cache via `set_llm_cache` or pass a cache instance directly.".to_string(),
+                ))
+            }
+        }
+        None => Ok(crate::globals::get_llm_cache()),
+    }
+}
+
+/// Run ID input for batch operations.
+///
+/// Allows passing a single UUID, a list of UUIDs, or None.
+#[derive(Debug, Clone)]
+pub enum RunIdInput {
+    /// No run IDs specified.
+    None,
+    /// A single UUID (used for the first prompt, rest are None).
+    Single(uuid::Uuid),
+    /// A list of UUIDs (must match batch length).
+    List(Vec<uuid::Uuid>),
+}
+
+/// Normalize run_id input into a list of `Option<Uuid>` matching the prompts length.
+///
+/// Mirrors Python's `BaseLLM._get_run_ids_list`.
+pub fn get_run_ids_list(run_id: RunIdInput, prompts_len: usize) -> Result<Vec<Option<uuid::Uuid>>> {
+    match run_id {
+        RunIdInput::None => Ok(vec![Option::None; prompts_len]),
+        RunIdInput::Single(uid) => {
+            let mut result = vec![Option::None; prompts_len];
+            if !result.is_empty() {
+                result[0] = Some(uid);
+            }
+            Ok(result)
+        }
+        RunIdInput::List(uids) => {
+            if uids.len() != prompts_len {
+                return Err(crate::error::Error::Other(format!(
+                    "run_id list length ({}) does not match batch length ({})",
+                    uids.len(),
+                    prompts_len
+                )));
+            }
+            Ok(uids.into_iter().map(Some).collect())
+        }
+    }
+}
+
+/// Create a retry wrapper that retries a function on specified errors.
+///
+/// Mirrors Python's `create_base_retry_decorator`.
+///
+/// The `error_predicate` function determines whether a given error should
+/// trigger a retry. The function is called up to `max_retries` times total.
+pub fn create_base_retry<F, T>(
+    error_predicate: impl Fn(&crate::error::Error) -> bool,
+    max_retries: usize,
+    mut function: F,
+) -> Result<T>
+where
+    F: FnMut() -> Result<T>,
+{
+    let mut last_error = None;
+    for _ in 0..max_retries {
+        match function() {
+            Ok(value) => return Ok(value),
+            Err(err) => {
+                if error_predicate(&err) {
+                    last_error = Some(err);
+                    continue;
+                }
+                return Err(err);
+            }
+        }
+    }
+    Err(last_error
+        .unwrap_or_else(|| crate::error::Error::Other("max retries exceeded".to_string())))
+}
+
+/// Save model parameters to a JSON file.
+///
+/// Writes the model's `identifying_params` to a file. Only `.json` extension
+/// is supported (YAML would require an additional dependency).
+///
+/// Mirrors Python's `BaseLLM.save()`.
+pub fn save_llm(
+    identifying_params: &std::collections::HashMap<String, serde_json::Value>,
+    path: &std::path::Path,
+) -> Result<()> {
+    let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+
+    match extension {
+        "json" => {
+            let json = serde_json::to_string_pretty(identifying_params).map_err(|e| {
+                crate::error::Error::Other(format!("JSON serialization failed: {}", e))
+            })?;
+            std::fs::write(path, json)
+                .map_err(|e| crate::error::Error::Other(format!("Failed to write file: {}", e)))?;
+            Ok(())
+        }
+        _ => Err(crate::error::Error::Other(format!(
+            "File extension must be json, got: {}",
+            extension
+        ))),
+    }
 }
 
 #[cfg(test)]

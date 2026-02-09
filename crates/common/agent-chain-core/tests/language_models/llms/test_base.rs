@@ -481,3 +481,283 @@ async fn test_call_method() {
     let result = llm.call("prompt".to_string(), None, None).await.unwrap();
     assert_eq!(result, "direct");
 }
+
+// ====================================================================
+// Previously skipped tests — now implemented
+// ====================================================================
+
+// ---- _get_run_ids_list ----
+
+/// Ported from `test_none_run_id`.
+#[test]
+fn test_get_run_ids_list_none() {
+    use agent_chain_core::language_models::RunIdInput;
+    use agent_chain_core::language_models::get_run_ids_list;
+
+    let result = get_run_ids_list(RunIdInput::None, 3).unwrap();
+    assert_eq!(result, vec![None, None, None]);
+}
+
+/// Ported from `test_single_uuid`.
+#[test]
+fn test_get_run_ids_list_single_uuid() {
+    use agent_chain_core::language_models::{RunIdInput, get_run_ids_list};
+
+    let uid = uuid::Uuid::new_v4();
+    let result = get_run_ids_list(RunIdInput::Single(uid), 3).unwrap();
+    assert_eq!(result[0], Some(uid));
+    assert_eq!(result[1], None);
+    assert_eq!(result[2], None);
+}
+
+/// Ported from `test_list_of_uuids`.
+#[test]
+fn test_get_run_ids_list_list_of_uuids() {
+    use agent_chain_core::language_models::{RunIdInput, get_run_ids_list};
+
+    let uid1 = uuid::Uuid::new_v4();
+    let uid2 = uuid::Uuid::new_v4();
+    let result = get_run_ids_list(RunIdInput::List(vec![uid1, uid2]), 2).unwrap();
+    assert_eq!(result, vec![Some(uid1), Some(uid2)]);
+}
+
+/// Ported from `test_mismatched_list_length_raises`.
+#[test]
+fn test_get_run_ids_list_mismatched_length() {
+    use agent_chain_core::language_models::{RunIdInput, get_run_ids_list};
+
+    let uid = uuid::Uuid::new_v4();
+    let result = get_run_ids_list(RunIdInput::List(vec![uid]), 3);
+    assert!(result.is_err());
+    let err_msg = format!("{}", result.unwrap_err());
+    assert!(err_msg.contains("does not match batch length"));
+}
+
+/// Ported from `test_single_prompt_with_uuid`.
+#[test]
+fn test_get_run_ids_list_single_prompt_with_uuid() {
+    use agent_chain_core::language_models::{RunIdInput, get_run_ids_list};
+
+    let uid = uuid::Uuid::new_v4();
+    let result = get_run_ids_list(RunIdInput::Single(uid), 1).unwrap();
+    assert_eq!(result, vec![Some(uid)]);
+}
+
+// ---- _resolve_cache ----
+
+/// Ported from `test_cache_is_base_cache_instance`.
+#[test]
+fn test_resolve_cache_instance() {
+    use agent_chain_core::language_models::{CacheValue, resolve_cache};
+    use std::sync::Arc;
+
+    let cache = Arc::new(InMemoryCache::unbounded());
+    let result = resolve_cache(Some(CacheValue::Instance(cache.clone()))).unwrap();
+    assert!(result.is_some());
+}
+
+/// Ported from `test_cache_is_none_returns_global_cache`.
+#[test]
+fn test_resolve_cache_none_returns_global() {
+    use agent_chain_core::language_models::resolve_cache;
+    use agent_chain_core::set_llm_cache;
+    use std::sync::Arc;
+
+    let cache = Arc::new(InMemoryCache::unbounded());
+    set_llm_cache(Some(cache));
+
+    let result = resolve_cache(None).unwrap();
+    assert!(result.is_some());
+
+    // Clean up global state
+    set_llm_cache(None);
+}
+
+/// Ported from `test_cache_is_none_no_global_returns_none`.
+#[test]
+fn test_resolve_cache_none_no_global_returns_none() {
+    use agent_chain_core::language_models::resolve_cache;
+    use agent_chain_core::set_llm_cache;
+
+    set_llm_cache(None);
+    let result = resolve_cache(None).unwrap();
+    assert!(result.is_none());
+}
+
+/// Ported from `test_cache_is_true_with_global_cache`.
+#[test]
+fn test_resolve_cache_true_with_global() {
+    use agent_chain_core::language_models::{CacheValue, resolve_cache};
+    use agent_chain_core::set_llm_cache;
+    use std::sync::Arc;
+
+    let cache = Arc::new(InMemoryCache::unbounded());
+    set_llm_cache(Some(cache));
+
+    let result = resolve_cache(Some(CacheValue::Flag(true))).unwrap();
+    assert!(result.is_some());
+
+    set_llm_cache(None);
+}
+
+/// Ported from `test_cache_is_true_without_global_cache_raises`.
+#[test]
+fn test_resolve_cache_true_without_global_raises() {
+    use agent_chain_core::language_models::{CacheValue, resolve_cache};
+    use agent_chain_core::set_llm_cache;
+
+    set_llm_cache(None);
+
+    let result = resolve_cache(Some(CacheValue::Flag(true)));
+    assert!(result.is_err());
+    if let Err(err) = result {
+        let err_msg = format!("{}", err);
+        assert!(err_msg.contains("No global cache was configured"));
+    }
+}
+
+/// Ported from `test_cache_is_false`.
+#[test]
+fn test_resolve_cache_false() {
+    use agent_chain_core::language_models::{CacheValue, resolve_cache};
+
+    let result = resolve_cache(Some(CacheValue::Flag(false))).unwrap();
+    assert!(result.is_none());
+}
+
+// ---- batch with return_exceptions ----
+
+/// Ported from `test_batch_return_exceptions_true`.
+#[tokio::test]
+async fn test_batch_with_exceptions() {
+    let llm = FakeListLLM::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
+    let results = llm
+        .batch_with_exceptions(vec![
+            LanguageModelInput::from("p1"),
+            LanguageModelInput::from("p2"),
+            LanguageModelInput::from("p3"),
+        ])
+        .await;
+
+    assert_eq!(results.len(), 3);
+    assert!(results.iter().all(|r| r.is_ok()));
+    assert_eq!(results[0].as_ref().unwrap(), "r1");
+    assert_eq!(results[1].as_ref().unwrap(), "r2");
+    assert_eq!(results[2].as_ref().unwrap(), "r3");
+}
+
+// ---- save_llm ----
+
+/// Ported from `test_save_json`.
+#[test]
+fn test_save_json() {
+    use agent_chain_core::language_models::save_llm;
+
+    let llm = FakeListLLM::new(vec!["a".to_string(), "b".to_string()]);
+    let params = llm.identifying_params();
+
+    let dir = std::env::temp_dir().join(format!("test_save_{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file_path = dir.join("llm.json");
+
+    save_llm(&params, &file_path).unwrap();
+
+    assert!(file_path.exists());
+    let content = std::fs::read_to_string(&file_path).unwrap();
+    let data: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert_eq!(data["_type"], "fake-list");
+    assert_eq!(data["responses"], json!(["a", "b"]));
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// Ported from `test_save_invalid_extension_raises`.
+#[test]
+fn test_save_invalid_extension_raises() {
+    use agent_chain_core::language_models::save_llm;
+
+    let llm = FakeListLLM::new(vec!["a".to_string()]);
+    let params = llm.identifying_params();
+
+    let dir = std::env::temp_dir().join(format!("test_save_{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file_path = dir.join("llm.txt");
+
+    let result = save_llm(&params, &file_path);
+    assert!(result.is_err());
+    let err_msg = format!("{}", result.unwrap_err());
+    assert!(err_msg.contains("must be json"));
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+// ---- create_base_retry ----
+
+/// Ported from `test_retries_on_specified_error`.
+#[test]
+fn test_retry_on_specified_error() {
+    use agent_chain_core::language_models::create_base_retry;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let call_count = AtomicUsize::new(0);
+
+    let result = create_base_retry(
+        |_err| true, // retry on all errors
+        3,
+        || {
+            let count = call_count.fetch_add(1, Ordering::SeqCst) + 1;
+            if count < 3 {
+                Err(agent_chain_core::error::Error::Other(
+                    "transient".to_string(),
+                ))
+            } else {
+                Ok("success".to_string())
+            }
+        },
+    );
+
+    assert_eq!(result.unwrap(), "success");
+    assert_eq!(call_count.load(Ordering::SeqCst), 3);
+}
+
+/// Ported from `test_does_not_retry_on_unspecified_error`.
+#[test]
+fn test_retry_does_not_retry_on_unspecified_error() {
+    use agent_chain_core::language_models::create_base_retry;
+
+    let result: Result<String, _> = create_base_retry(
+        |_err| false, // never retry
+        3,
+        || {
+            Err(agent_chain_core::error::Error::Other(
+                "unrecoverable".to_string(),
+            ))
+        },
+    );
+
+    assert!(result.is_err());
+    assert!(format!("{}", result.unwrap_err()).contains("unrecoverable"));
+}
+
+/// Ported from `test_max_retries_one_means_no_retry`.
+#[test]
+fn test_retry_max_retries_one_means_no_retry() {
+    use agent_chain_core::language_models::create_base_retry;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let call_count = AtomicUsize::new(0);
+
+    let result: Result<String, _> = create_base_retry(
+        |_err| true,
+        1,
+        || {
+            call_count.fetch_add(1, Ordering::SeqCst);
+            Err(agent_chain_core::error::Error::Other(
+                "always fails".to_string(),
+            ))
+        },
+    );
+
+    assert!(result.is_err());
+    assert_eq!(call_count.load(Ordering::SeqCst), 1);
+}
