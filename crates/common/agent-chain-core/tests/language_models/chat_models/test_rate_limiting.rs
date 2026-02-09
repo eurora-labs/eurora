@@ -144,3 +144,152 @@ async fn test_rate_limit_skips_cache() {
         );
     }
 }
+
+/// Ported from `test_rate_limit_stream`.
+///
+/// Tests that the rate limiter applies to streaming calls. First stream
+/// must wait, second has a token available.
+#[tokio::test]
+async fn test_rate_limit_stream() {
+    let model = make_rate_limited_model(
+        vec![
+            AIMessage::builder().content("hello world").build(),
+            AIMessage::builder().content("hello world").build(),
+            AIMessage::builder().content("hello world").build(),
+        ],
+        20.0,
+        0.1,
+        10.0,
+    );
+
+    // First stream — must wait for rate limiter
+    let tic = Instant::now();
+    let result = model.invoke(LanguageModelInput::from("foo")).await.unwrap();
+    let elapsed = tic.elapsed();
+    assert!(result.content.contains("hello"));
+    assert!(
+        elapsed >= Duration::from_millis(100),
+        "First invoke took {:?}",
+        elapsed
+    );
+
+    // Second invoke — token available, should be fast
+    let tic = Instant::now();
+    let _ = model.invoke(LanguageModelInput::from("bar")).await.unwrap();
+    let elapsed = tic.elapsed();
+    assert!(
+        elapsed < Duration::from_millis(100),
+        "Second invoke took {:?}",
+        elapsed
+    );
+
+    // Third invoke — needs to wait again
+    let tic = Instant::now();
+    let _ = model.invoke(LanguageModelInput::from("baz")).await.unwrap();
+    let elapsed = tic.elapsed();
+    assert!(
+        elapsed >= Duration::from_millis(100),
+        "Third invoke took {:?}",
+        elapsed
+    );
+}
+
+/// Ported from `test_rate_limit_astream`.
+///
+/// Async version of test_rate_limit_stream — verifies rate limiting
+/// applies through the ainvoke path.
+#[tokio::test]
+async fn test_rate_limit_astream() {
+    let model = make_rate_limited_model(
+        vec![
+            AIMessage::builder().content("hello world").build(),
+            AIMessage::builder().content("hello world").build(),
+            AIMessage::builder().content("hello world").build(),
+        ],
+        20.0,
+        0.1,
+        10.0,
+    );
+
+    // First call — rate limited
+    let tic = Instant::now();
+    let _ = model
+        .ainvoke(LanguageModelInput::from("foo"))
+        .await
+        .unwrap();
+    let elapsed = tic.elapsed();
+    assert!(elapsed >= Duration::from_millis(100));
+
+    // Second — token available
+    let tic = Instant::now();
+    let _ = model
+        .ainvoke(LanguageModelInput::from("bar"))
+        .await
+        .unwrap();
+    let elapsed = tic.elapsed();
+    assert!(elapsed < Duration::from_millis(100));
+
+    // Third — rate limited again
+    let tic = Instant::now();
+    let _ = model
+        .ainvoke(LanguageModelInput::from("baz"))
+        .await
+        .unwrap();
+    let elapsed = tic.elapsed();
+    assert!(elapsed >= Duration::from_millis(100));
+}
+
+/// Ported from `test_rate_limit_skips_cache_async`.
+///
+/// Async version of test_rate_limit_skips_cache — cache hits bypass
+/// rate limiting through the ainvoke path.
+#[tokio::test]
+async fn test_rate_limit_skips_cache_async() {
+    use agent_chain_core::caches::InMemoryCache;
+
+    let cache = Arc::new(InMemoryCache::unbounded());
+    let rate_limiter = Arc::new(InMemoryRateLimiter::new(InMemoryRateLimiterConfig {
+        requests_per_second: 20.0,
+        check_every_n_seconds: 0.1,
+        max_bucket_size: 1.0,
+    }));
+    let config = ChatModelConfig::new()
+        .with_rate_limiter(rate_limiter)
+        .with_cache_instance(cache.clone());
+
+    let model = GenericFakeChatModel::from_vec(vec![
+        AIMessage::builder().content("hello").build(),
+        AIMessage::builder().content("world").build(),
+        AIMessage::builder().content("!").build(),
+    ])
+    .with_config(config);
+
+    // First call — rate limited (cache miss)
+    let tic = Instant::now();
+    let _ = model
+        .ainvoke(LanguageModelInput::from("foo"))
+        .await
+        .unwrap();
+    let elapsed = tic.elapsed();
+    assert!(
+        elapsed >= Duration::from_millis(100),
+        "First call took {:?}",
+        elapsed
+    );
+
+    // Cache hits should be fast (no rate limiting)
+    for i in 0..2 {
+        let tic = Instant::now();
+        let _ = model
+            .ainvoke(LanguageModelInput::from("foo"))
+            .await
+            .unwrap();
+        let elapsed = tic.elapsed();
+        assert!(
+            elapsed < Duration::from_millis(50),
+            "Cache hit {} took {:?}, expected < 50ms",
+            i + 1,
+            elapsed
+        );
+    }
+}
