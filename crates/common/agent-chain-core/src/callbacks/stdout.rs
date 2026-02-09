@@ -5,6 +5,7 @@
 
 use std::collections::HashMap;
 use std::io::{self, Write};
+use std::sync::{Arc, Mutex};
 
 use uuid::Uuid;
 
@@ -26,21 +27,32 @@ pub mod colors {
     pub const WHITE: &str = "\x1b[37m";
 }
 
-/// Print text with optional color.
-fn print_text(text: &str, color: Option<&str>, end: &str) {
-    if let Some(c) = color {
-        print!("{}{}{}{}", c, text, colors::RESET, end);
-    } else {
-        print!("{}{}", text, end);
+/// Write text with optional color to a writer.
+fn write_text(writer: &Mutex<Box<dyn Write + Send>>, text: &str, color: Option<&str>, end: &str) {
+    if let Ok(mut w) = writer.lock() {
+        if let Some(c) = color {
+            let _ = write!(w, "{}{}{}{}", c, text, colors::RESET, end);
+        } else {
+            let _ = write!(w, "{}{}", text, end);
+        }
+        let _ = w.flush();
     }
-    let _ = io::stdout().flush();
 }
 
 /// Callback Handler that prints to stdout.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct StdOutCallbackHandler {
     /// The color to use for the text.
     pub color: Option<String>,
+    writer: Arc<Mutex<Box<dyn Write + Send>>>,
+}
+
+impl std::fmt::Debug for StdOutCallbackHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StdOutCallbackHandler")
+            .field("color", &self.color)
+            .finish()
+    }
 }
 
 impl Default for StdOutCallbackHandler {
@@ -52,13 +64,25 @@ impl Default for StdOutCallbackHandler {
 impl StdOutCallbackHandler {
     /// Create a new StdOutCallbackHandler.
     pub fn new() -> Self {
-        Self { color: None }
+        Self {
+            color: None,
+            writer: Arc::new(Mutex::new(Box::new(io::stdout()))),
+        }
     }
 
     /// Create a new StdOutCallbackHandler with a specific color.
     pub fn with_color(color: impl Into<String>) -> Self {
         Self {
             color: Some(color.into()),
+            writer: Arc::new(Mutex::new(Box::new(io::stdout()))),
+        }
+    }
+
+    /// Create a new StdOutCallbackHandler with a custom writer.
+    pub fn with_writer(writer: Arc<Mutex<Box<dyn Write + Send>>>) -> Self {
+        Self {
+            color: None,
+            writer,
         }
     }
 
@@ -80,16 +104,13 @@ impl ToolManagerMixin for StdOutCallbackHandler {
         observation_prefix: Option<&str>,
         llm_prefix: Option<&str>,
     ) {
-        // Print observation prefix if provided
         if let Some(prefix) = observation_prefix {
-            print_text(&format!("\n{}", prefix), None, "");
+            write_text(&self.writer, &format!("\n{}", prefix), None, "");
         }
-        // Print output with color override or handler's default color
         let effective_color = color.or(self.get_color());
-        print_text(output, effective_color, "");
-        // Print LLM prefix if provided
+        write_text(&self.writer, output, effective_color, "");
         if let Some(prefix) = llm_prefix {
-            print_text(&format!("\n{}", prefix), None, "");
+            write_text(&self.writer, &format!("\n{}", prefix), None, "");
         }
     }
 }
@@ -103,9 +124,8 @@ impl RunManagerMixin for StdOutCallbackHandler {
         color: Option<&str>,
         end: &str,
     ) {
-        // Use color parameter if provided, otherwise use handler's default color
         let effective_color = color.or(self.get_color());
-        print_text(text, effective_color, end);
+        write_text(&self.writer, text, effective_color, end);
     }
 }
 
@@ -139,12 +159,16 @@ impl CallbackManagerMixin for StdOutCallbackHandler {
             })
             .unwrap_or("<unknown>");
 
-        println!(
-            "\n\n{}> Entering new {} chain...{}",
-            colors::BOLD,
-            name,
-            colors::RESET
-        );
+        if let Ok(mut w) = self.writer.lock() {
+            let _ = writeln!(
+                w,
+                "\n\n{}> Entering new {} chain...{}",
+                colors::BOLD,
+                name,
+                colors::RESET
+            );
+            let _ = w.flush();
+        }
     }
 }
 
@@ -155,7 +179,10 @@ impl ChainManagerMixin for StdOutCallbackHandler {
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
     ) {
-        println!("\n{}> Finished chain.{}", colors::BOLD, colors::RESET);
+        if let Ok(mut w) = self.writer.lock() {
+            let _ = writeln!(w, "\n{}> Finished chain.{}", colors::BOLD, colors::RESET);
+            let _ = w.flush();
+        }
     }
 
     fn on_agent_action(
@@ -166,9 +193,8 @@ impl ChainManagerMixin for StdOutCallbackHandler {
         color: Option<&str>,
     ) {
         if let Some(log) = action.get("log").and_then(|v| v.as_str()) {
-            // Use color parameter if provided, otherwise use handler's default color
             let effective_color = color.or(self.get_color());
-            print_text(log, effective_color, "");
+            write_text(&self.writer, log, effective_color, "");
         }
     }
 
@@ -180,9 +206,8 @@ impl ChainManagerMixin for StdOutCallbackHandler {
         color: Option<&str>,
     ) {
         if let Some(log) = finish.get("log").and_then(|v| v.as_str()) {
-            // Use color parameter if provided, otherwise use handler's default color
             let effective_color = color.or(self.get_color());
-            print_text(log, effective_color, "\n");
+            write_text(&self.writer, log, effective_color, "\n");
         }
     }
 }
@@ -196,13 +221,34 @@ impl BaseCallbackHandler for StdOutCallbackHandler {
 /// Callback handler for streaming. Only works with LLMs that support streaming.
 ///
 /// This handler prints tokens to stdout as they are generated.
-#[derive(Debug, Clone, Default)]
-pub struct StreamingStdOutCallbackHandler;
+#[derive(Clone)]
+pub struct StreamingStdOutCallbackHandler {
+    writer: Arc<Mutex<Box<dyn Write + Send>>>,
+}
+
+impl std::fmt::Debug for StreamingStdOutCallbackHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StreamingStdOutCallbackHandler").finish()
+    }
+}
+
+impl Default for StreamingStdOutCallbackHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl StreamingStdOutCallbackHandler {
     /// Create a new StreamingStdOutCallbackHandler.
     pub fn new() -> Self {
-        Self
+        Self {
+            writer: Arc::new(Mutex::new(Box::new(io::stdout()))),
+        }
+    }
+
+    /// Create a new StreamingStdOutCallbackHandler with a custom writer.
+    pub fn with_writer(writer: Arc<Mutex<Box<dyn Write + Send>>>) -> Self {
+        Self { writer }
     }
 }
 
@@ -214,8 +260,10 @@ impl LLMManagerMixin for StreamingStdOutCallbackHandler {
         _parent_run_id: Option<Uuid>,
         _chunk: Option<&serde_json::Value>,
     ) {
-        print!("{}", token);
-        let _ = io::stdout().flush();
+        if let Ok(mut w) = self.writer.lock() {
+            let _ = write!(w, "{}", token);
+            let _ = w.flush();
+        }
     }
 }
 

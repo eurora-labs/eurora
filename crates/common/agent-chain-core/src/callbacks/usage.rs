@@ -108,7 +108,7 @@ impl LLMManagerMixin for UsageMetadataCallbackHandler {
                         generation
                             .message
                             .response_metadata()
-                            .and_then(|meta| meta.get("model"))
+                            .and_then(|meta| meta.get("model_name"))
                             .and_then(|v| v.as_str())
                             .map(|s| s.to_string())
                     });
