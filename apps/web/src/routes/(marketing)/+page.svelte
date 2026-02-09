@@ -6,11 +6,11 @@
 	<!-- Top section: Left-aligned title and button -->
 	<div class="flex flex-col items-start gap-4 mb-8">
 		<h1 class="text-2xl font-bold text-shadow-xl">
-			Never explain yourself again to an AI
+			Never explain yourself again,
 			<br />
-			Eurora is an 
+			Eurora is the easiest way to use AI.
 		</h1>
-		<DownloadButton />
+		<DownloadButton class="rounded-full" />
 	</div>
 
 	<!-- Video section: Full container width, slightly rounded, autoplay -->
