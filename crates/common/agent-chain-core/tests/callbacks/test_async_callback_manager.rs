@@ -129,7 +129,7 @@ async fn test_async_callback_manager_on_llm_error() {
 
     assert_eq!(run_managers.len(), 1);
 
-    let error = std::io::Error::new(std::io::ErrorKind::Other, "test");
+    let error = std::io::Error::other("test");
     run_managers[0].on_llm_error(&error).await;
 }
 
@@ -144,7 +144,7 @@ async fn test_async_callback_manager_on_chain_error() {
         .on_chain_start(&HashMap::new(), &HashMap::new(), None)
         .await;
 
-    let error = std::io::Error::new(std::io::ErrorKind::Other, "test");
+    let error = std::io::Error::other("test");
     run_manager.on_chain_error(&error).await;
 }
 
@@ -159,7 +159,7 @@ async fn test_async_callback_manager_on_tool_error() {
         .on_tool_start(&HashMap::new(), "test", None, None)
         .await;
 
-    let error = std::io::Error::new(std::io::ErrorKind::Other, "test");
+    let error = std::io::Error::other("test");
     run_manager.on_tool_error(&error).await;
 }
 
@@ -403,7 +403,7 @@ async fn test_async_callback_manager_retriever_error() {
         .on_retriever_start(&HashMap::new(), "test query", None)
         .await;
 
-    let error = std::io::Error::new(std::io::ErrorKind::Other, "test error");
+    let error = std::io::Error::other("test error");
     run_manager.on_retriever_error(&error).await;
 }
 

@@ -228,10 +228,10 @@ pub use runnables::{
     AddableDict, BaseStreamEvent, CUSTOM_EVENT_TYPE, ConfigOrList, CustomStreamEvent,
     DynRouterRunnable, DynRunnable, EventData, PickKeys, RouterInput, RouterRunnable, Runnable,
     RunnableAssign, RunnableAssignBuilder, RunnableBinding, RunnableConfig, RunnableEach,
-    RunnableLambda, RunnableParallel, RunnablePassthrough, RunnablePick, RunnableRetry,
-    RunnableSequence, RunnableSerializable, StandardStreamEvent, StreamEvent, coerce_to_runnable,
-    ensure_config, get_config_list, graph_passthrough, merge_configs, patch_config, pipe,
-    runnable_lambda, to_dyn,
+    RunnableLambda, RunnableLambdaWithConfig, RunnableParallel, RunnablePassthrough, RunnablePick,
+    RunnableRetry, RunnableSequence, RunnableSerializable, StandardStreamEvent, StreamEvent,
+    coerce_to_runnable, ensure_config, get_config_list, graph_passthrough, merge_configs,
+    patch_config, pipe, runnable_lambda, to_dyn,
 };
 
 // Re-export structured query types

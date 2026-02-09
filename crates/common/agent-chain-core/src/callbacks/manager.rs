@@ -1340,6 +1340,11 @@ impl AsyncCallbackManager {
         self.inner.remove_handler(handler);
     }
 
+    /// Get the inner sync CallbackManager.
+    pub fn to_callback_manager(&self) -> CallbackManager {
+        self.inner.clone()
+    }
+
     /// Add tags.
     pub fn add_tags(&mut self, tags: Vec<String>, inherit: bool) {
         self.inner.add_tags(tags, inherit);
