@@ -53,6 +53,9 @@ pub struct ChatChunk {
     /// Typically present on the final chunk.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub finish_reason: Option<String>,
+    /// Accumulated tool calls - typically present on the final chunk when finish_reason is "tool_calls".
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_calls: Vec<crate::messages::ToolCall>,
 }
 
 impl ChatChunk {
@@ -63,6 +66,7 @@ impl ChatChunk {
             is_final: false,
             usage_metadata: None,
             finish_reason: None,
+            tool_calls: Vec::new(),
         }
     }
 
@@ -76,6 +80,7 @@ impl ChatChunk {
             is_final: true,
             usage_metadata,
             finish_reason,
+            tool_calls: Vec::new(),
         }
     }
 
