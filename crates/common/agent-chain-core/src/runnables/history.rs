@@ -155,6 +155,64 @@ impl RunnableWithMessageHistory {
         &self.history_factory_config
     }
 
+    /// Get a JSON schema describing the expected input.
+    ///
+    /// Mirrors `RunnableWithMessageHistory.get_input_schema()` from Python.
+    ///
+    /// When `input_messages_key` and `history_messages_key` are both set,
+    /// the schema has a single required field for the input key.
+    /// Otherwise, the schema describes a sequence of messages.
+    pub fn get_input_schema(&self) -> Value {
+        if self.input_messages_key.is_some() && self.history_messages_key.is_some() {
+            let key = self.input_messages_key.as_deref().unwrap();
+            serde_json::json!({
+                "title": "RunnableWithChatHistoryInput",
+                "type": "object",
+                "properties": {
+                    key: {
+                        "title": key.chars().next().unwrap().to_uppercase().to_string() + &key[1..],
+                        "anyOf": [
+                            { "type": "string" },
+                            { "type": "object" },
+                            { "type": "array" }
+                        ]
+                    }
+                },
+                "required": [key]
+            })
+        } else if self.input_messages_key.is_some() {
+            let key = self.input_messages_key.as_deref().unwrap();
+            serde_json::json!({
+                "title": "RunnableWithChatHistoryInput",
+                "type": "object",
+                "properties": {
+                    key: {
+                        "title": key.chars().next().unwrap().to_uppercase().to_string() + &key[1..],
+                        "type": "array",
+                        "items": { "type": "object" }
+                    }
+                },
+                "required": [key]
+            })
+        } else {
+            serde_json::json!({
+                "title": "RunnableWithChatHistoryInput",
+                "type": "array",
+                "items": { "type": "object" }
+            })
+        }
+    }
+
+    /// Get a JSON schema describing the expected output.
+    ///
+    /// Mirrors `RunnableWithMessageHistory.get_output_schema()` from Python.
+    pub fn get_output_schema(&self) -> Value {
+        serde_json::json!({
+            "title": "RunnableWithChatHistoryOutput",
+            "type": "object"
+        })
+    }
+
     /// Invoke the wrapped runnable with history management.
     ///
     /// 1. Resolve the session from the config's `configurable` map.

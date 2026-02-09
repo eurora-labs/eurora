@@ -213,6 +213,14 @@ where
         self.name.clone()
     }
 
+    fn get_input_schema(&self, config: Option<&RunnableConfig>) -> serde_json::Value {
+        self.runnable.get_input_schema(config)
+    }
+
+    fn get_output_schema(&self, config: Option<&RunnableConfig>) -> serde_json::Value {
+        self.runnable.get_output_schema(config)
+    }
+
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         let config = ensure_config(config);
         let callback_manager = get_callback_manager_for_config(&config);

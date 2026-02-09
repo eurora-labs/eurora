@@ -874,3 +874,28 @@ fn test_retry_name_propagation() {
 
     assert_eq!(retry.name(), Some("my_step".to_string()));
 }
+
+// ===========================================================================
+// Schema preservation
+// ===========================================================================
+
+/// Mirrors `test_retry_preserves_schemas`.
+///
+/// Verifies that RunnableRetry delegates schema to the wrapped runnable.
+#[test]
+fn test_retry_preserves_schemas() {
+    // Create two identical runnables since RunnableLambda doesn't impl Clone
+    let runnable_for_schema = RunnableLambda::new(|x: i32| Ok(x.to_string()));
+    let runnable_for_retry = RunnableLambda::new(|x: i32| Ok(x.to_string()));
+
+    let retry_runnable = RunnableRetry::new(runnable_for_retry, RunnableRetryConfig::new());
+
+    assert_eq!(
+        retry_runnable.get_input_schema(None),
+        runnable_for_schema.get_input_schema(None),
+    );
+    assert_eq!(
+        retry_runnable.get_output_schema(None),
+        runnable_for_schema.get_output_schema(None),
+    );
+}

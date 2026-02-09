@@ -1162,3 +1162,81 @@ fn output_message_content(output: &HistoryOutput) -> &str {
         other => panic!("expected Message output, got {other:?}"),
     }
 }
+
+// ===========================================================================
+// Schema tests
+// ===========================================================================
+
+/// Mirrors `test_get_input_schema_input_dict`.
+///
+/// When `input_messages_key` and `history_messages_key` are both set,
+/// the input schema should have a single required field for the input key.
+#[test]
+fn test_get_input_schema_input_dict() {
+    let store: Arc<Mutex<HashMap<String, Arc<Mutex<InMemoryChatMessageHistory>>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
+    let factory = make_session_factory(store);
+
+    let with_history = RunnableWithMessageHistory::new(
+        Box::new(DictReturnsDictOutput),
+        factory,
+        Some("input".into()),
+        Some("output".into()),
+        Some("history".into()),
+        None,
+    );
+
+    let schema = with_history.get_input_schema();
+    assert_eq!(schema["title"], "RunnableWithChatHistoryInput");
+    assert_eq!(schema["type"], "object");
+    // Should have "input" as a required property
+    let required = schema["required"].as_array().unwrap();
+    assert!(required.contains(&serde_json::json!("input")));
+    let properties = schema["properties"].as_object().unwrap();
+    assert!(properties.contains_key("input"));
+}
+
+/// Mirrors `test_get_output_schema`.
+#[test]
+fn test_get_output_schema() {
+    let store: Arc<Mutex<HashMap<String, Arc<Mutex<InMemoryChatMessageHistory>>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
+    let factory = make_session_factory(store);
+
+    let with_history = RunnableWithMessageHistory::new(
+        Box::new(DictReturnsDictOutput),
+        factory,
+        Some("input".into()),
+        Some("output".into()),
+        Some("history".into()),
+        None,
+    );
+
+    let schema = with_history.get_output_schema();
+    assert_eq!(schema["title"], "RunnableWithChatHistoryOutput");
+    assert_eq!(schema["type"], "object");
+}
+
+/// Mirrors `test_get_input_schema_input_messages`.
+///
+/// When no `input_messages_key` is set, the input schema should describe
+/// a sequence (array) of messages.
+#[test]
+fn test_get_input_schema_input_messages() {
+    let store: Arc<Mutex<HashMap<String, Arc<Mutex<InMemoryChatMessageHistory>>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
+    let factory = make_session_factory(store);
+
+    let with_history = RunnableWithMessageHistory::new(
+        Box::new(ConcatHumanMessages),
+        factory,
+        None, // no input_messages_key → expects bare message list
+        None,
+        None,
+        None,
+    );
+
+    let schema = with_history.get_input_schema();
+    assert_eq!(schema["title"], "RunnableWithChatHistoryInput");
+    assert_eq!(schema["type"], "array");
+}

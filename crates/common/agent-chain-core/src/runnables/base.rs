@@ -79,6 +79,32 @@ pub trait Runnable: Send + Sync + Debug {
         std::any::type_name::<Self>()
     }
 
+    /// Get a JSON schema describing the input type of this Runnable.
+    ///
+    /// Mirrors `Runnable.get_input_schema()` from
+    /// `langchain_core.runnables.base`.
+    ///
+    /// The default implementation returns a generic object schema derived
+    /// from the Runnable's name. Wrapper runnables (retry, fallbacks, etc.)
+    /// override this to delegate to the wrapped runnable's schema.
+    fn get_input_schema(&self, _config: Option<&RunnableConfig>) -> Value {
+        serde_json::json!({
+            "title": self.get_name(Some("Input"), None),
+            "type": "object"
+        })
+    }
+
+    /// Get a JSON schema describing the output type of this Runnable.
+    ///
+    /// Mirrors `Runnable.get_output_schema()` from
+    /// `langchain_core.runnables.base`.
+    fn get_output_schema(&self, _config: Option<&RunnableConfig>) -> Value {
+        serde_json::json!({
+            "title": self.get_name(Some("Output"), None),
+            "type": "object"
+        })
+    }
+
     /// Transform a single input into an output.
     ///
     /// # Arguments
@@ -890,6 +916,14 @@ where
 
     fn name(&self) -> Option<String> {
         self.bound.name()
+    }
+
+    fn get_input_schema(&self, config: Option<&RunnableConfig>) -> Value {
+        self.bound.get_input_schema(config)
+    }
+
+    fn get_output_schema(&self, config: Option<&RunnableConfig>) -> Value {
+        self.bound.get_output_schema(config)
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
