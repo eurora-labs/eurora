@@ -22,10 +22,26 @@ use crate::prompt_values::PromptValue;
 pub type LLMStream = Pin<Box<dyn Stream<Item = Result<GenerationChunk>> + Send>>;
 
 /// Configuration specific to LLMs.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct LLMConfig {
     /// Base language model configuration.
     pub base: LanguageModelConfig,
+
+    /// Optional local cache instance for this LLM.
+    /// When set, this cache is used instead of the global cache.
+    pub cache_instance: Option<std::sync::Arc<dyn crate::caches::BaseCache>>,
+}
+
+impl std::fmt::Debug for LLMConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LLMConfig")
+            .field("base", &self.base)
+            .field(
+                "cache_instance",
+                &self.cache_instance.as_ref().map(|_| "..."),
+            )
+            .finish()
+    }
 }
 
 impl LLMConfig {
@@ -49,6 +65,15 @@ impl LLMConfig {
     /// Set metadata.
     pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
         self.base.metadata = Some(metadata);
+        self
+    }
+
+    /// Set a local cache instance for this LLM.
+    pub fn with_cache_instance(
+        mut self,
+        cache: std::sync::Arc<dyn crate::caches::BaseCache>,
+    ) -> Self {
+        self.cache_instance = Some(cache);
         self
     }
 }
@@ -175,6 +200,85 @@ pub trait BaseLLM: BaseLanguageModel {
         Ok(String::new())
     }
 
+    /// Generate with cache support.
+    ///
+    /// This method mirrors Python's `BaseLLM.generate()`:
+    /// 1. Resolve which cache to use (local instance, global, or none)
+    /// 2. Look up cached results for each prompt
+    /// 3. Call `generate_prompts` only for cache misses
+    /// 4. Update the cache with new results
+    /// 5. Return the combined result
+    async fn generate(&self, prompts: Vec<String>, stop: Option<Vec<String>>) -> Result<LLMResult> {
+        use crate::caches::BaseCache;
+
+        // Resolve which cache to use
+        let cache_config = self.llm_config().base.cache;
+        let cache_instance = self.llm_config().cache_instance.clone();
+
+        let resolved_cache: Option<std::sync::Arc<dyn BaseCache>> =
+            if let Some(instance) = cache_instance {
+                // Local cache instance takes priority
+                Some(instance)
+            } else if cache_config == Some(false) {
+                // Explicitly disabled
+                None
+            } else {
+                // Use global cache (may be None)
+                crate::globals::get_llm_cache()
+            };
+
+        if let Some(cache) = &resolved_cache {
+            // Cache is available — look up existing results
+            let params = self.identifying_params();
+            let (mut existing, llm_string, missing_idxs, missing_prompts) =
+                get_prompts_from_cache(&params, &prompts, Some(cache.as_ref()));
+
+            if missing_prompts.is_empty() {
+                // All prompts were cached
+                let generations = (0..prompts.len())
+                    .map(|i| {
+                        existing
+                            .remove(&i)
+                            .unwrap_or_default()
+                            .into_iter()
+                            .map(GenerationType::Generation)
+                            .collect()
+                    })
+                    .collect();
+                return Ok(LLMResult::new(generations));
+            }
+
+            // Generate only for misses
+            let new_results = self.generate_prompts(missing_prompts, stop, None).await?;
+
+            // Update cache
+            update_cache(
+                Some(cache.as_ref()),
+                &mut existing,
+                &llm_string,
+                &missing_idxs,
+                &new_results,
+                &prompts,
+            );
+
+            // Reconstruct full result in order
+            let generations = (0..prompts.len())
+                .map(|i| {
+                    existing
+                        .remove(&i)
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(GenerationType::Generation)
+                        .collect()
+                })
+                .collect();
+            Ok(LLMResult::new(generations))
+        } else {
+            // No cache — generate directly
+            self.generate_prompts(prompts, stop, None).await
+        }
+    }
+
     /// Process multiple inputs and return results.
     ///
     /// Calls `generate_prompts` with all inputs at once and extracts text
@@ -265,7 +369,9 @@ pub fn get_prompts_from_cache(
     Vec<usize>,
     Vec<String>,
 ) {
-    let llm_string = serde_json::to_string(&params).unwrap_or_default();
+    // Use BTreeMap for deterministic key ordering in the cache key
+    let sorted: std::collections::BTreeMap<_, _> = params.iter().collect();
+    let llm_string = serde_json::to_string(&sorted).unwrap_or_default();
     let mut existing_prompts = HashMap::new();
     let mut missing_prompt_idxs = Vec::new();
     let mut missing_prompts = Vec::new();

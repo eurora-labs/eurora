@@ -1,181 +1,146 @@
 //! Rate limiting tests for chat models.
 //!
-//! Mirrors `langchain/libs/core/tests/unit_tests/language_models/chat_models/test_rate_limiting.py`
-//!
-//! Tests the interaction between chat models and rate limiting:
-//! - invoke, ainvoke, batch, abatch, stream, astream with rate limiting
-//! - Rate limiting does not apply to cache hits
-//! - Serialization with rate limiters
+//! Ported from `langchain/libs/core/tests/unit_tests/language_models/chat_models/test_rate_limiting.py`
 
-// TODO: These tests require the following types to be implemented:
-// - GenericFakeChatModel
-// - InMemoryRateLimiter
-// - InMemoryCache
-// - Serialization utilities (dumps)
-// When implementing, add: use std::time::{Duration, Instant};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
-#[test]
-fn test_rate_limit_invoke() {
-    // Test rate limiting for invoke()
-    // Python equivalent: test_rate_limit_invoke()
-    //
-    // At 20 requests per second with check_every_n_seconds=0.1,
-    // first request should take >0.1s (bucket starts empty),
-    // second request should be faster (token available)
+use agent_chain_core::GenericFakeChatModel;
+use agent_chain_core::language_models::{BaseChatModel, ChatModelConfig, LanguageModelInput};
+use agent_chain_core::messages::AIMessage;
+use agent_chain_core::rate_limiters::{InMemoryRateLimiter, InMemoryRateLimiterConfig};
 
-    // TODO: Implement once rate limiter is available
-    // Expected behavior:
-    // let model = GenericFakeChatModel::new(vec!["hello", "world"])
-    //     .with_rate_limiter(InMemoryRateLimiter {
-    //         requests_per_second: 20.0,
-    //         check_every_n_seconds: 0.1,
-    //         max_bucket_size: 10,
-    //     });
-    //
-    // let start = Instant::now();
-    // model.invoke("foo");
-    // let duration = start.elapsed();
-    // assert!(duration.as_secs_f64() > 0.10 && duration.as_secs_f64() < 0.15);
-    //
-    // let start = Instant::now();
-    // model.invoke("foo");
-    // let duration = start.elapsed();
-    // assert!(duration.as_secs_f64() < 0.10);
+fn make_rate_limited_model(
+    messages: Vec<AIMessage>,
+    requests_per_second: f64,
+    check_every_n_seconds: f64,
+    max_bucket_size: f64,
+) -> GenericFakeChatModel {
+    let rate_limiter = Arc::new(InMemoryRateLimiter::new(InMemoryRateLimiterConfig {
+        requests_per_second,
+        check_every_n_seconds,
+        max_bucket_size,
+    }));
+    let config = ChatModelConfig::new().with_rate_limiter(rate_limiter);
+    GenericFakeChatModel::from_vec(messages).with_config(config)
 }
 
+/// Ported from `test_rate_limit_invoke`.
+#[tokio::test]
+async fn test_rate_limit_invoke() {
+    let model = make_rate_limited_model(
+        vec![
+            AIMessage::builder().content("hello").build(),
+            AIMessage::builder().content("world").build(),
+        ],
+        20.0,
+        0.1,
+        10.0,
+    );
+
+    // First call — token bucket starts empty, must wait
+    let tic = Instant::now();
+    let _ = model.invoke(LanguageModelInput::from("foo")).await.unwrap();
+    let elapsed = tic.elapsed();
+    assert!(
+        elapsed >= Duration::from_millis(100),
+        "First call took {:?}, expected >= 100ms",
+        elapsed
+    );
+
+    // Second call — should have a token available
+    let tic = Instant::now();
+    let _ = model.invoke(LanguageModelInput::from("foo")).await.unwrap();
+    let elapsed = tic.elapsed();
+    assert!(
+        elapsed < Duration::from_millis(100),
+        "Second call took {:?}, expected < 100ms",
+        elapsed
+    );
+}
+
+/// Ported from `test_rate_limit_ainvoke`.
 #[tokio::test]
 async fn test_rate_limit_ainvoke() {
-    // Test rate limiting for ainvoke()
-    // Python equivalent: test_rate_limit_ainvoke()
+    let model = make_rate_limited_model(
+        vec![
+            AIMessage::builder().content("hello").build(),
+            AIMessage::builder().content("world").build(),
+            AIMessage::builder().content("!").build(),
+        ],
+        20.0,
+        0.1,
+        10.0,
+    );
 
-    // TODO: Implement once async rate limiter is available
-    // Expected behavior similar to sync version, but three invocations:
-    // 1st: >0.1s (bucket starts empty)
-    // 2nd: <0.1s (token available)
-    // 3rd: >0.1s (need to wait for token)
+    let tic = Instant::now();
+    let _ = model
+        .ainvoke(LanguageModelInput::from("foo"))
+        .await
+        .unwrap();
+    let elapsed = tic.elapsed();
+    assert!(elapsed >= Duration::from_millis(100));
+
+    let tic = Instant::now();
+    let _ = model
+        .ainvoke(LanguageModelInput::from("foo"))
+        .await
+        .unwrap();
+    let elapsed = tic.elapsed();
+    assert!(elapsed < Duration::from_millis(100));
+
+    // Third call — needs to wait again
+    let tic = Instant::now();
+    let _ = model
+        .ainvoke(LanguageModelInput::from("foo"))
+        .await
+        .unwrap();
+    let elapsed = tic.elapsed();
+    assert!(elapsed >= Duration::from_millis(100));
 }
 
-#[test]
-fn test_rate_limit_batch() {
-    // Test rate limiting for batch()
-    // Python equivalent: test_rate_limit_batch()
-
-    // TODO: Implement once batch rate limiting is available
-    // Expected behavior:
-    // let model = GenericFakeChatModel::new(vec!["hello", "world", "!"])
-    //     .with_rate_limiter(InMemoryRateLimiter {
-    //         requests_per_second: 20.0,
-    //         check_every_n_seconds: 0.01,
-    //         max_bucket_size: 10,
-    //     });
-    //
-    // let start = Instant::now();
-    // model.batch(vec!["foo", "foo"]);
-    // let duration = start.elapsed();
-    // assert!(duration.as_secs_f64() > 0.1 && duration.as_secs_f64() < 0.2);
-}
-
+/// Ported from `test_rate_limit_skips_cache`.
 #[tokio::test]
-async fn test_rate_limit_abatch() {
-    // Test rate limiting for abatch()
-    // Python equivalent: test_rate_limit_abatch()
+async fn test_rate_limit_skips_cache() {
+    use agent_chain_core::caches::InMemoryCache;
 
-    // TODO: Implement once async batch rate limiting is available
-}
+    let cache = Arc::new(InMemoryCache::unbounded());
+    let rate_limiter = Arc::new(InMemoryRateLimiter::new(InMemoryRateLimiterConfig {
+        requests_per_second: 20.0,
+        check_every_n_seconds: 0.1,
+        max_bucket_size: 1.0,
+    }));
+    let config = ChatModelConfig::new()
+        .with_rate_limiter(rate_limiter)
+        .with_cache_instance(cache.clone());
 
-#[test]
-fn test_rate_limit_stream() {
-    // Test rate limiting for stream()
-    // Python equivalent: test_rate_limit_stream()
+    let model = GenericFakeChatModel::from_vec(vec![
+        AIMessage::builder().content("hello").build(),
+        AIMessage::builder().content("world").build(),
+        AIMessage::builder().content("!").build(),
+    ])
+    .with_config(config);
 
-    // TODO: Implement once stream rate limiting is available
-    // Expected behavior:
-    // let model = GenericFakeChatModel::new(vec![
-    //     "hello world", "hello world", "hello world"
-    // ]).with_rate_limiter(InMemoryRateLimiter {
-    //     requests_per_second: 20.0,
-    //     check_every_n_seconds: 0.1,
-    //     max_bucket_size: 10,
-    // });
-    //
-    // // First stream: >0.1s
-    // let start = Instant::now();
-    // let response: Vec<_> = model.stream("foo").collect();
-    // let duration = start.elapsed();
-    // assert_eq!(response.iter().map(|m| m.content).collect::<Vec<_>>(),
-    //            vec!["hello", " ", "world"]);
-    // assert!(duration.as_secs_f64() > 0.1 && duration.as_secs_f64() < 0.2);
-    //
-    // // Second stream: <0.1s (token available)
-    // // Third stream: >0.1s (need to wait)
-}
+    // First call — rate limited (cache miss)
+    let tic = Instant::now();
+    let _ = model.invoke(LanguageModelInput::from("foo")).await.unwrap();
+    let elapsed = tic.elapsed();
+    assert!(
+        elapsed >= Duration::from_millis(100),
+        "First call took {:?}",
+        elapsed
+    );
 
-#[tokio::test]
-async fn test_rate_limit_astream() {
-    // Test rate limiting for astream()
-    // Python equivalent: test_rate_limit_astream()
-
-    // TODO: Implement once async stream rate limiting is available
-}
-
-#[test]
-fn test_rate_limit_skips_cache() {
-    // Test that rate limiting does not rate limit cache lookups
-    // Python equivalent: test_rate_limit_skips_cache()
-
-    // TODO: Implement once cache + rate limiter interaction is available
-    // Expected behavior:
-    // let cache = InMemoryCache::new();
-    // let model = GenericFakeChatModel::new(vec!["hello", "world", "!"])
-    //     .with_rate_limiter(InMemoryRateLimiter {
-    //         requests_per_second: 20.0,
-    //         check_every_n_seconds: 0.1,
-    //         max_bucket_size: 1,
-    //     })
-    //     .with_cache(cache.clone());
-    //
-    // // First invoke: >0.1s (rate limited)
-    // let start = Instant::now();
-    // model.invoke("foo");
-    // let duration = start.elapsed();
-    // assert!(duration.as_secs_f64() > 0.1 && duration.as_secs_f64() < 0.2);
-    //
-    // // Cache hits: <0.05s (not rate limited)
-    // for _ in 0..2 {
-    //     let start = Instant::now();
-    //     model.invoke("foo");
-    //     let duration = start.elapsed();
-    //     assert!(duration.as_secs_f64() < 0.05);
-    // }
-    //
-    // // Verify rate_limiter info is not part of cache key
-    // assert_eq!(cache.len(), 1);
-}
-
-#[tokio::test]
-async fn test_rate_limit_skips_cache_async() {
-    // Test that async rate limiting does not rate limit cache lookups
-    // Python equivalent: test_rate_limit_skips_cache_async()
-
-    // TODO: Implement once async cache + rate limiter interaction is available
-    // Expected behavior similar to sync version
-}
-
-#[test]
-fn test_serialization_with_rate_limiter() {
-    // Test model serialization with rate limiter
-    // Python equivalent: test_serialization_with_rate_limiter()
-
-    // TODO: Implement once serialization with rate limiter is available
-    // Expected behavior:
-    // let model = SerializableModel::new(vec!["hello", "world", "!"])
-    //     .with_rate_limiter(InMemoryRateLimiter {
-    //         requests_per_second: 100.0,
-    //         check_every_n_seconds: 0.01,
-    //         max_bucket_size: 1,
-    //     });
-    //
-    // let serialized = dumps(&model);
-    // // Rate limiter should not be in serialization
-    // assert!(!serialized.contains("InMemoryRateLimiter"));
+    // Second and third calls — cache hits, no rate limiting
+    for i in 0..2 {
+        let tic = Instant::now();
+        let _ = model.invoke(LanguageModelInput::from("foo")).await.unwrap();
+        let elapsed = tic.elapsed();
+        assert!(
+            elapsed < Duration::from_millis(50),
+            "Cache hit {} took {:?}, expected < 50ms",
+            i + 1,
+            elapsed
+        );
+    }
 }
