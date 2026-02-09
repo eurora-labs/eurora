@@ -124,7 +124,7 @@ fn test_event_data_with_messages() {
     let human = BaseMessage::Human(HumanMessage::builder().content("hello").build());
     let ai = BaseMessage::AI(AIMessage::builder().content("hi there").build());
 
-    let input_val = serde_json::to_value(&[&human]).unwrap();
+    let input_val = serde_json::to_value([&human]).unwrap();
     let output_val = serde_json::to_value(&ai).unwrap();
     let chunk_val = serde_json::to_value(&ai).unwrap();
 
@@ -141,7 +141,7 @@ fn test_event_data_with_messages() {
 /// Mirrors `test_event_with_multiple_chunks`.
 #[test]
 fn test_event_with_multiple_chunks() {
-    let chunks = vec![
+    let chunks = [
         EventData::new().with_chunk(json!("Hello")),
         EventData::new().with_chunk(json!(" ")),
         EventData::new().with_chunk(json!("World")),

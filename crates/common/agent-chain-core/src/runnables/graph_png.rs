@@ -141,6 +141,7 @@ impl PngDrawer {
     ///
     /// Mirrors `add_subgraph` in the Python implementation. Returns a list of
     /// `(cluster_name, member_node_ids)` pairs for each subgraph detected.
+    #[allow(clippy::only_used_in_recursion)]
     pub fn collect_subgraphs(
         &self,
         nodes: &[Vec<String>],
@@ -243,11 +244,11 @@ mod itertools_substitute {
             let key = item[0].clone();
             let tail: Vec<String> = item[1..].to_vec();
 
-            if let Some(last) = result.last_mut() {
-                if last.0 == key {
-                    last.1.push(tail);
-                    continue;
-                }
+            if let Some(last) = result.last_mut()
+                && last.0 == key
+            {
+                last.1.push(tail);
+                continue;
             }
             result.push((key, vec![tail]));
         }

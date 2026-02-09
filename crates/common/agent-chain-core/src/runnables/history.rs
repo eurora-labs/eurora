@@ -7,14 +7,14 @@
 //! Mirrors `langchain_core.runnables.history`.
 
 use std::collections::HashMap;
-use std::fmt::Debug;
+use std::fmt;
 use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
 
 use crate::chat_history::BaseChatMessageHistory;
 use crate::error::{Error, Result};
-use crate::messages::{AIMessage, BaseMessage, HumanMessage};
+use crate::messages::BaseMessage;
 use crate::runnables::config::RunnableConfig;
 use crate::runnables::utils::ConfigurableFieldSpec;
 
@@ -29,47 +29,54 @@ use crate::runnables::utils::ConfigurableFieldSpec;
 pub type GetSessionHistoryFn =
     Arc<dyn Fn(&HashMap<String, String>) -> Arc<Mutex<dyn BaseChatMessageHistory>> + Send + Sync>;
 
-/// The output type of the inner runnable.
-///
-/// Mirrors Python's flexible output: str | BaseMessage | list[BaseMessage] | dict.
-#[derive(Debug, Clone)]
-pub enum HistoryOutput {
-    /// A plain string (will be wrapped as `AIMessage` when saving to history).
-    Text(String),
-    /// A single message.
-    Message(BaseMessage),
-    /// A list of messages.
-    Messages(Vec<BaseMessage>),
-    /// A dict-like structure containing messages under a key.
-    Dict(HashMap<String, HistoryOutput>),
-}
-
-/// The input type of the inner runnable.
-///
-/// Mirrors Python's flexible input: list[BaseMessage] | dict.
-#[derive(Debug, Clone)]
-pub enum HistoryInput {
-    /// A list of messages (the runnable takes messages directly).
-    Messages(Vec<BaseMessage>),
-    /// A dict with one or more keys; messages are in `input_messages_key`.
-    Dict(HashMap<String, Value>),
-}
+/// Function type for the inner runnable: takes messages and an optional config,
+/// returns messages.
+pub type HistoryInvokeFn = Arc<
+    dyn Fn(Vec<BaseMessage>, Option<&RunnableConfig>) -> Result<Vec<BaseMessage>> + Send + Sync,
+>;
 
 // ---------------------------------------------------------------------------
-// Inner runnable trait
+// HistoryRunnable
 // ---------------------------------------------------------------------------
 
-/// Trait for the inner runnable wrapped by `RunnableWithMessageHistory`.
+/// The inner runnable wrapped by `RunnableWithMessageHistory`.
 ///
-/// This is a simplified, object-safe variant of the `Runnable` trait
-/// specialised for the history use case.
-pub trait HistoryRunnable: Send + Sync + Debug {
-    /// Invoke the inner runnable with the given input.
-    fn invoke_history(
+/// Takes `Vec<BaseMessage>` as input and returns `Vec<BaseMessage>` as output.
+pub enum HistoryRunnable {
+    /// A lambda/closure-based runnable.
+    Lambda(HistoryInvokeFn),
+}
+
+impl HistoryRunnable {
+    /// Create a `HistoryRunnable` from a closure.
+    pub fn from_fn<F>(f: F) -> Self
+    where
+        F: Fn(Vec<BaseMessage>, Option<&RunnableConfig>) -> Result<Vec<BaseMessage>>
+            + Send
+            + Sync
+            + 'static,
+    {
+        HistoryRunnable::Lambda(Arc::new(f))
+    }
+
+    /// Invoke the runnable with the given messages.
+    pub fn invoke(
         &self,
-        input: HistoryInput,
+        input: Vec<BaseMessage>,
         config: Option<&RunnableConfig>,
-    ) -> Result<HistoryOutput>;
+    ) -> Result<Vec<BaseMessage>> {
+        match self {
+            HistoryRunnable::Lambda(f) => f(input, config),
+        }
+    }
+}
+
+impl fmt::Debug for HistoryRunnable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HistoryRunnable::Lambda(_) => write!(f, "HistoryRunnable::Lambda(...)"),
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -83,37 +90,31 @@ pub trait HistoryRunnable: Send + Sync + Debug {
 /// # Usage
 ///
 /// ```ignore
-/// use agent_chain_core::runnables::history::RunnableWithMessageHistory;
+/// use agent_chain_core::runnables::history::{HistoryRunnable, RunnableWithMessageHistory};
 ///
-/// let with_history = RunnableWithMessageHistory::builder()
-///     .runnable(my_runnable)
-///     .get_session_history(session_factory)
-///     .build();
+/// let runnable = HistoryRunnable::from_fn(|msgs, _cfg| Ok(msgs));
 ///
-/// let output = with_history.invoke(input, config)?;
+/// let with_history = RunnableWithMessageHistory::new(
+///     runnable,
+///     session_factory,
+///     None,
+/// );
+///
+/// let output = with_history.invoke(vec![human("hello")], Some(config))?;
 /// ```
 pub struct RunnableWithMessageHistory {
     /// The wrapped runnable.
-    runnable: Box<dyn HistoryRunnable>,
+    runnable: HistoryRunnable,
     /// Factory that returns a chat message history for a given session.
     get_session_history: GetSessionHistoryFn,
-    /// Key for input messages when the input is a dict.
-    input_messages_key: Option<String>,
-    /// Key for output messages when the output is a dict.
-    output_messages_key: Option<String>,
-    /// Key under which historical messages are injected into a dict input.
-    history_messages_key: Option<String>,
     /// Config specs describing the fields passed to the session factory.
     history_factory_config: Vec<ConfigurableFieldSpec>,
 }
 
-impl Debug for RunnableWithMessageHistory {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for RunnableWithMessageHistory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RunnableWithMessageHistory")
             .field("runnable", &self.runnable)
-            .field("input_messages_key", &self.input_messages_key)
-            .field("output_messages_key", &self.output_messages_key)
-            .field("history_messages_key", &self.history_messages_key)
             .finish()
     }
 }
@@ -121,11 +122,8 @@ impl Debug for RunnableWithMessageHistory {
 impl RunnableWithMessageHistory {
     /// Create a new `RunnableWithMessageHistory`.
     pub fn new(
-        runnable: Box<dyn HistoryRunnable>,
+        runnable: HistoryRunnable,
         get_session_history: GetSessionHistoryFn,
-        input_messages_key: Option<String>,
-        output_messages_key: Option<String>,
-        history_messages_key: Option<String>,
         history_factory_config: Option<Vec<ConfigurableFieldSpec>>,
     ) -> Self {
         let config = history_factory_config.unwrap_or_else(|| {
@@ -143,9 +141,6 @@ impl RunnableWithMessageHistory {
         Self {
             runnable,
             get_session_history,
-            input_messages_key,
-            output_messages_key,
-            history_messages_key,
             history_factory_config: config,
         }
     }
@@ -158,49 +153,12 @@ impl RunnableWithMessageHistory {
     /// Get a JSON schema describing the expected input.
     ///
     /// Mirrors `RunnableWithMessageHistory.get_input_schema()` from Python.
-    ///
-    /// When `input_messages_key` and `history_messages_key` are both set,
-    /// the schema has a single required field for the input key.
-    /// Otherwise, the schema describes a sequence of messages.
     pub fn get_input_schema(&self) -> Value {
-        if self.input_messages_key.is_some() && self.history_messages_key.is_some() {
-            let key = self.input_messages_key.as_deref().unwrap();
-            serde_json::json!({
-                "title": "RunnableWithChatHistoryInput",
-                "type": "object",
-                "properties": {
-                    key: {
-                        "title": key.chars().next().unwrap().to_uppercase().to_string() + &key[1..],
-                        "anyOf": [
-                            { "type": "string" },
-                            { "type": "object" },
-                            { "type": "array" }
-                        ]
-                    }
-                },
-                "required": [key]
-            })
-        } else if self.input_messages_key.is_some() {
-            let key = self.input_messages_key.as_deref().unwrap();
-            serde_json::json!({
-                "title": "RunnableWithChatHistoryInput",
-                "type": "object",
-                "properties": {
-                    key: {
-                        "title": key.chars().next().unwrap().to_uppercase().to_string() + &key[1..],
-                        "type": "array",
-                        "items": { "type": "object" }
-                    }
-                },
-                "required": [key]
-            })
-        } else {
-            serde_json::json!({
-                "title": "RunnableWithChatHistoryInput",
-                "type": "array",
-                "items": { "type": "object" }
-            })
-        }
+        serde_json::json!({
+            "title": "RunnableWithChatHistoryInput",
+            "type": "array",
+            "items": { "type": "object" }
+        })
     }
 
     /// Get a JSON schema describing the expected output.
@@ -209,7 +167,8 @@ impl RunnableWithMessageHistory {
     pub fn get_output_schema(&self) -> Value {
         serde_json::json!({
             "title": "RunnableWithChatHistoryOutput",
-            "type": "object"
+            "type": "array",
+            "items": { "type": "object" }
         })
     }
 
@@ -222,9 +181,9 @@ impl RunnableWithMessageHistory {
     /// 5. Save input + output messages to history.
     pub fn invoke(
         &self,
-        input: HistoryInput,
+        input: Vec<BaseMessage>,
         config: Option<RunnableConfig>,
-    ) -> Result<HistoryOutput> {
+    ) -> Result<Vec<BaseMessage>> {
         let config = config.unwrap_or_default();
         let history = self.resolve_history(&config)?;
 
@@ -236,37 +195,21 @@ impl RunnableWithMessageHistory {
             guard.messages()
         };
 
-        // --- build the augmented input ---
-        let augmented_input = self.build_input_with_history(&input, &historic_messages)?;
+        // --- build the augmented input: prepend history ---
+        let mut augmented_input = historic_messages.clone();
+        augmented_input.extend(input.iter().cloned());
 
         // --- invoke the inner runnable ---
-        let output = self
-            .runnable
-            .invoke_history(augmented_input, Some(&config))?;
+        let output = self.runnable.invoke(augmented_input, Some(&config))?;
 
         // --- exit history: save new messages ---
-        let input_messages = self.get_input_messages(&input)?;
-        // Remove historic messages that were prepended to avoid duplicates.
-        let new_input_messages = if self.history_messages_key.is_none() {
-            let skip = historic_messages.len();
-            if skip <= input_messages.len() {
-                input_messages[skip..].to_vec()
-            } else {
-                input_messages
-            }
-        } else {
-            input_messages
-        };
-
-        let output_messages = self.get_output_messages(&output)?;
-
         {
             let mut guard = history
                 .lock()
                 .map_err(|e| Error::Other(format!("history lock poisoned: {e}")))?;
-            let mut combined = new_input_messages;
-            combined.extend(output_messages);
-            guard.add_messages(&combined);
+            let mut to_save = input;
+            to_save.extend(output.clone());
+            guard.add_messages(&to_save);
         }
 
         Ok(output)
@@ -297,187 +240,6 @@ impl RunnableWithMessageHistory {
             }
         }
 
-        // Validate all expected keys are present (unless factory takes no args).
-        let missing: Vec<&&str> = expected_keys
-            .iter()
-            .filter(|k| !params.contains_key(**k))
-            .collect();
-
-        if !missing.is_empty() && !expected_keys.is_empty() {
-            // Allow invocation without config if the factory takes 0 args
-            // (tested by test_ignore_session_id) — the factory will be called
-            // with an empty map and it must handle that.
-        }
-
         Ok((self.get_session_history)(&params))
-    }
-
-    /// Build the augmented input by prepending history messages.
-    fn build_input_with_history(
-        &self,
-        input: &HistoryInput,
-        historic_messages: &[BaseMessage],
-    ) -> Result<HistoryInput> {
-        match input {
-            HistoryInput::Messages(msgs) => {
-                if self.history_messages_key.is_some() {
-                    // History goes into a separate key — not applicable for
-                    // bare-message inputs.
-                    Ok(HistoryInput::Messages(msgs.clone()))
-                } else {
-                    // Prepend history to the message list.
-                    let mut combined = historic_messages.to_vec();
-                    combined.extend(msgs.iter().cloned());
-                    Ok(HistoryInput::Messages(combined))
-                }
-            }
-            HistoryInput::Dict(map) => {
-                let mut new_map = map.clone();
-
-                if let Some(ref history_key) = self.history_messages_key {
-                    // Inject history under the dedicated key.
-                    let history_value = messages_to_json_value(historic_messages);
-                    new_map.insert(history_key.clone(), history_value);
-                } else if let Some(ref input_key) = self.input_messages_key {
-                    // Prepend history to the messages at `input_messages_key`.
-                    let existing = new_map
-                        .get(input_key)
-                        .cloned()
-                        .unwrap_or(Value::Array(vec![]));
-                    let existing_msgs = json_value_to_messages(&existing)?;
-                    let mut combined = historic_messages.to_vec();
-                    combined.extend(existing_msgs);
-                    new_map.insert(input_key.clone(), messages_to_json_value(&combined));
-                }
-                Ok(HistoryInput::Dict(new_map))
-            }
-        }
-    }
-
-    /// Extract input messages from the input value.
-    ///
-    /// Mirrors `_get_input_messages` in the Python implementation.
-    pub fn get_input_messages(&self, input: &HistoryInput) -> Result<Vec<BaseMessage>> {
-        match input {
-            HistoryInput::Messages(msgs) => Ok(msgs.clone()),
-            HistoryInput::Dict(map) => {
-                let key = self
-                    .input_messages_key
-                    .as_deref()
-                    .or_else(|| {
-                        if map.len() == 1 {
-                            map.keys().next().map(|s| s.as_str())
-                        } else {
-                            Some("input")
-                        }
-                    })
-                    .unwrap_or("input");
-
-                let val = map
-                    .get(key)
-                    .ok_or_else(|| Error::Other(format!("Missing key '{key}' in input dict")))?;
-
-                value_to_input_messages(val)
-            }
-        }
-    }
-
-    /// Extract output messages from the output value.
-    ///
-    /// Mirrors `_get_output_messages` in the Python implementation.
-    pub fn get_output_messages(&self, output: &HistoryOutput) -> Result<Vec<BaseMessage>> {
-        match output {
-            HistoryOutput::Text(s) => Ok(vec![BaseMessage::AI(
-                AIMessage::builder().content(s).build(),
-            )]),
-            HistoryOutput::Message(m) => Ok(vec![m.clone()]),
-            HistoryOutput::Messages(ms) => Ok(ms.clone()),
-            HistoryOutput::Dict(map) => {
-                let key = self
-                    .output_messages_key
-                    .as_deref()
-                    .or_else(|| {
-                        if map.len() == 1 {
-                            map.keys().next().map(|s| s.as_str())
-                        } else {
-                            Some("output")
-                        }
-                    })
-                    .unwrap_or("output");
-
-                let val = map
-                    .get(key)
-                    .ok_or_else(|| Error::Other(format!("Missing key '{key}' in output dict")))?;
-
-                match val {
-                    HistoryOutput::Text(s) => Ok(vec![BaseMessage::AI(
-                        AIMessage::builder().content(s).build(),
-                    )]),
-                    HistoryOutput::Message(m) => Ok(vec![m.clone()]),
-                    HistoryOutput::Messages(ms) => Ok(ms.clone()),
-                    other => Err(Error::Other(format!(
-                        "Expected str, BaseMessage, list[BaseMessage], or tuple[BaseMessage]. Got {other:?}."
-                    ))),
-                }
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Conversion helpers
-// ---------------------------------------------------------------------------
-
-/// Convert `BaseMessage` slice to a JSON `Value::Array` for injection into dict inputs.
-fn messages_to_json_value(messages: &[BaseMessage]) -> Value {
-    Value::Array(
-        messages
-            .iter()
-            .map(|m| serde_json::to_value(m).unwrap_or(Value::Null))
-            .collect(),
-    )
-}
-
-/// Parse a JSON value into a list of `BaseMessage`.
-fn json_value_to_messages(value: &Value) -> Result<Vec<BaseMessage>> {
-    match value {
-        Value::Array(arr) => {
-            let mut messages = Vec::with_capacity(arr.len());
-            for item in arr {
-                let msg: BaseMessage = serde_json::from_value(item.clone())
-                    .map_err(|e| Error::Other(format!("Failed to parse message: {e}")))?;
-                messages.push(msg);
-            }
-            Ok(messages)
-        }
-        Value::String(s) => Ok(vec![BaseMessage::Human(
-            HumanMessage::builder().content(s).build(),
-        )]),
-        _ => Err(Error::Other(format!(
-            "Expected array or string of messages, got: {value}"
-        ))),
-    }
-}
-
-/// Parse a `serde_json::Value` into input messages.
-///
-/// Mirrors the Python `_get_input_messages` inner logic for individual values.
-fn value_to_input_messages(val: &Value) -> Result<Vec<BaseMessage>> {
-    match val {
-        Value::String(s) => Ok(vec![BaseMessage::Human(
-            HumanMessage::builder().content(s).build(),
-        )]),
-        Value::Array(arr) => {
-            let mut messages = Vec::with_capacity(arr.len());
-            for item in arr {
-                let msg: BaseMessage = serde_json::from_value(item.clone())
-                    .map_err(|e| Error::Other(format!("Failed to parse message: {e}")))?;
-                messages.push(msg);
-            }
-            Ok(messages)
-        }
-        _ => Err(Error::Other(format!(
-            "Expected str, BaseMessage, list[BaseMessage], or tuple[BaseMessage]. Got {val}."
-        ))),
     }
 }
