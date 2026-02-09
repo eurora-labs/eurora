@@ -555,18 +555,14 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
 
         // Check if any streaming callback handlers are present
-        if let Some(handlers) = run_manager {
-            // In Python, this checks for `_StreamingCallbackHandler` instances
-            // For Rust, we can check if any handler implements StreamingCallbackHandler
-            // This is a simplified check - in practice, you'd want a more sophisticated check
-            if !handlers.is_empty() {
-                // If there are any handlers, we assume streaming might be wanted
-                return true;
-            }
+        if let Some(handlers) = run_manager
+            && !handlers.is_empty()
+        {
+            return true;
         }
 
-        // Default: streaming is available and not disabled
-        true
+        // Default: no streaming without explicit request or callback handlers
+        false
     }
 
     /// Generate from a batch of message lists.
