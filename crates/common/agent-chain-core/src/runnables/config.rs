@@ -334,6 +334,7 @@ pub fn merge_configs(configs: Vec<Option<RunnableConfig>>) -> RunnableConfig {
 ///
 /// This enum mirrors the Python `call_func_with_variable_args` pattern,
 /// where a function may or may not accept a `RunnableConfig` parameter.
+#[allow(clippy::type_complexity)]
 pub enum VariableArgsFn<I, O> {
     /// A function that only takes input.
     InputOnly(Box<dyn Fn(I) -> O + Send + Sync>),
@@ -356,6 +357,7 @@ pub fn call_func_with_variable_args<I, O>(
 }
 
 /// An async callable that takes input and optionally a config.
+#[allow(clippy::type_complexity)]
 pub enum AsyncVariableArgsFn<I, O> {
     /// An async function that only takes input.
     InputOnly(

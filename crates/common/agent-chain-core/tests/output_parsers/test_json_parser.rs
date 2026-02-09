@@ -107,9 +107,9 @@ fn test_parse_json_with_boolean_and_null() {
 fn test_parse_json_numeric_values() {
     let parser = JsonOutputParser::new();
     let result = parser
-        .parse(r#"{"int": 42, "float": 3.14, "negative": -1}"#)
+        .parse(r#"{"int": 42, "float": 3.15, "negative": -1}"#)
         .unwrap();
-    assert_eq!(result, json!({"int": 42, "float": 3.14, "negative": -1}));
+    assert_eq!(result, json!({"int": 42, "float": 3.15, "negative": -1}));
 }
 
 // --- JsonOutputParser.parse_result() tests ---

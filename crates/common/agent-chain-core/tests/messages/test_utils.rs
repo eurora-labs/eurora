@@ -2673,7 +2673,10 @@ fn test_count_tokens_approximately_tool_message_includes_tool_call_id_and_name()
     // role = "tool" -> 4 chars
     // total chars = 6 (content) + 6 (tool_call_id) + 4 (role) + 7 (name) = 23 chars
     // tokens = ceil(23 / 4) + 3 = 6 + 3 = 9
-    assert_eq!(count_tokens_approximately(&[msg.clone()], &config), 9);
+    assert_eq!(
+        count_tokens_approximately(std::slice::from_ref(&msg), &config),
+        9
+    );
 
     // Without name counting
     let config_no_name = CountTokensConfig {
@@ -2689,7 +2692,10 @@ fn test_count_tokens_approximately_tool_message_includes_tool_call_id_and_name()
     // role = "user" -> 4 chars
     // total chars = 6 (content) + 4 (role) = 10
     // tokens = ceil(10 / 4) + 3 = 3 + 3 = 6
-    assert_eq!(count_tokens_approximately(&[human_msg.clone()], &config), 6);
+    assert_eq!(
+        count_tokens_approximately(std::slice::from_ref(&human_msg), &config),
+        6
+    );
 
     // ToolMessage should have more tokens than HumanMessage with same content
     assert!(

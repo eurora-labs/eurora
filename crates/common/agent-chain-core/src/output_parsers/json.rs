@@ -206,11 +206,11 @@ fn compute_json_diff_recursive(prev: &Value, next: &Value, path: &str, patches: 
                 let child_path = format!("{}/{}", path, i);
                 compute_json_diff_recursive(&prev_arr[i], &next_arr[i], &child_path, patches);
             }
-            for i in common_len..next_arr.len() {
+            for (i, item) in next_arr.iter().enumerate().skip(common_len) {
                 patches.push(serde_json::json!({
                     "op": "add",
                     "path": format!("{}/{}", path, i),
-                    "value": next_arr[i],
+                    "value": item,
                 }));
             }
             for i in common_len..prev_arr.len() {

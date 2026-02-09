@@ -173,6 +173,7 @@ impl From<ProtoToolCallChunk> for ToolCallChunk {
             args: proto.args,
             id: proto.id,
             index: proto.index,
+            chunk_type: None,
         }
     }
 }
@@ -199,6 +200,7 @@ impl From<ProtoInvalidToolCall> for InvalidToolCall {
             args: proto.args,
             id: proto.id,
             error: proto.error,
+            call_type: None,
         }
     }
 }
@@ -829,7 +831,7 @@ impl From<ProtoToolMessageChunk> for ToolMessageChunk {
 impl From<ChatMessage> for ProtoChatMessage {
     fn from(msg: ChatMessage) -> Self {
         ProtoChatMessage {
-            content: msg.content,
+            content: msg.content.as_text(),
             role: msg.role,
             id: msg.id,
             name: msg.name,
@@ -859,7 +861,7 @@ impl From<ProtoChatMessage> for ChatMessage {
 impl From<ChatMessageChunk> for ProtoChatMessageChunk {
     fn from(chunk: ChatMessageChunk) -> Self {
         ProtoChatMessageChunk {
-            content: chunk.content.clone(),
+            content: chunk.content.as_text(),
             role: chunk.role.clone(),
             id: chunk.id.clone(),
             name: chunk.name.clone(),

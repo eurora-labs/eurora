@@ -230,6 +230,7 @@ impl JsonOutputFunctionsParser {
 /// Internal type-erased parser function for single-schema parsing.
 #[derive(Clone)]
 pub struct SingleSchemaParser<T>(
+    #[allow(clippy::type_complexity)]
     std::sync::Arc<dyn Fn(&[ChatGeneration]) -> Result<T> + Send + Sync>,
 );
 
@@ -249,7 +250,10 @@ pub enum PydanticSchema<T> {
     Single(SingleSchemaParser<T>),
     /// Multiple schemas keyed by function name.
     /// The caller provides a function that deserializes by name.
-    Multiple(std::sync::Arc<dyn Fn(&str, &str) -> Result<T> + Send + Sync>),
+    Multiple(
+        #[allow(clippy::type_complexity)]
+        std::sync::Arc<dyn Fn(&str, &str) -> Result<T> + Send + Sync>,
+    ),
 }
 
 impl<T> Debug for PydanticSchema<T> {
@@ -300,12 +304,20 @@ pub struct PydanticOutputFunctionsParser<T> {
     pub schema: PydanticSchema<T>,
 }
 
-impl<T: DeserializeOwned + Send + Sync + Clone + Debug + 'static> PydanticOutputFunctionsParser<T> {
-    /// Create a parser for a single schema type (args_only = true).
-    pub fn new() -> Self {
+impl<T: DeserializeOwned + Send + Sync + Clone + Debug + 'static> Default
+    for PydanticOutputFunctionsParser<T>
+{
+    fn default() -> Self {
         Self {
             schema: PydanticSchema::single::<T>(),
         }
+    }
+}
+
+impl<T: DeserializeOwned + Send + Sync + Clone + Debug + 'static> PydanticOutputFunctionsParser<T> {
+    /// Create a parser for a single schema type (args_only = true).
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
@@ -500,12 +512,12 @@ fn compute_json_diff(path: &str, prev: &Value, next: &Value, ops: &mut Vec<Value
                 compute_json_diff(&child_path, &prev_arr[i], &next_arr[i], ops);
             }
 
-            for i in min_len..next_arr.len() {
+            for (i, item) in next_arr.iter().enumerate().skip(min_len) {
                 let child_path = format!("{}/{}", path, i);
                 ops.push(serde_json::json!({
                     "op": "add",
                     "path": child_path,
-                    "value": next_arr[i],
+                    "value": item,
                 }));
             }
 

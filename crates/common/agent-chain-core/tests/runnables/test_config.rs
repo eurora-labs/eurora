@@ -406,7 +406,7 @@ fn test_merge_config_callbacks_handlers_with_manager() {
     match &merged.callbacks {
         Some(Callbacks::Manager(base_mgr)) => {
             // When merging handlers into a manager, the manager's handlers + the list handlers
-            assert!(base_mgr.handlers.len() >= 1);
+            assert!(!base_mgr.handlers.is_empty());
         }
         _ => panic!("Expected Callbacks::Manager"),
     }

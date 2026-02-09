@@ -1279,28 +1279,26 @@ where
         let excluded_content = messages[idx].content();
         if let Ok(mut content_blocks) =
             serde_json::from_str::<Vec<serde_json::Value>>(excluded_content)
+            && content_blocks.len() > 1
         {
-            if content_blocks.len() > 1 {
+            if reverse_partial {
+                content_blocks.reverse();
+            }
+            let num_blocks = content_blocks.len();
+            for remove_count in 1..num_blocks {
+                let mut partial_blocks = content_blocks[..num_blocks - remove_count].to_vec();
                 if reverse_partial {
-                    content_blocks.reverse();
+                    partial_blocks.reverse();
                 }
-                let num_blocks = content_blocks.len();
-                for remove_count in 1..num_blocks {
-                    let mut partial_blocks = content_blocks[..num_blocks - remove_count].to_vec();
-                    if reverse_partial {
-                        partial_blocks.reverse();
-                    }
-                    let partial_content =
-                        serde_json::to_string(&partial_blocks).unwrap_or_default();
-                    let partial_msg = create_message_with_content(&messages[idx], &partial_content);
-                    let mut test = messages[..idx].to_vec();
-                    test.push(partial_msg);
-                    if (config.token_counter)(&test) <= config.max_tokens {
-                        messages = test;
-                        idx += 1;
-                        included_partial = true;
-                        break;
-                    }
+                let partial_content = serde_json::to_string(&partial_blocks).unwrap_or_default();
+                let partial_msg = create_message_with_content(&messages[idx], &partial_content);
+                let mut test = messages[..idx].to_vec();
+                test.push(partial_msg);
+                if (config.token_counter)(&test) <= config.max_tokens {
+                    messages = test;
+                    idx += 1;
+                    included_partial = true;
+                    break;
                 }
             }
         }
@@ -1408,6 +1406,7 @@ where
     // Build a temporary config for first-strategy on reversed messages
     // Pass start_on as end_on (since we reversed)
     // Wrap the text_splitter reference in a closure so it fits the generic param
+    #[allow(clippy::type_complexity)]
     let splitter_wrapper: Option<Box<dyn Fn(&str) -> Vec<String> + '_>> = config
         .text_splitter
         .as_ref()

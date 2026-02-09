@@ -79,7 +79,7 @@ mod test_default {
                 assert!(
                     data.id
                         .last()
-                        .map_or(false, |s| s.contains("NonSerializableTest"))
+                        .is_some_and(|s| s.contains("NonSerializableTest"))
                 );
             }
             other => panic!("Expected NotImplemented, got {:?}", other),
@@ -274,7 +274,7 @@ mod test_dumpd {
         assert!(
             id.iter().any(|v| v
                 .as_str()
-                .map_or(false, |s| s.contains("NonSerializableTest"))),
+                .is_some_and(|s| s.contains("NonSerializableTest"))),
             "id should contain NonSerializableTest, got: {:?}",
             id
         );
@@ -288,7 +288,7 @@ mod test_dumpd {
     #[test]
     fn test_dumpd_with_nested_structures() {
         let serializable_obj = SerializableTest { value: 1 };
-        let serialized_value = serde_json::to_value(&serializable_obj.to_json()).unwrap();
+        let serialized_value = serde_json::to_value(serializable_obj.to_json()).unwrap();
 
         let data = json!({
             "serializable": serialized_value,
@@ -330,7 +330,7 @@ mod test_dumpd {
 
         // Serializable object in dict
         let obj = SerializableTest { value: 42 };
-        let serialized = serde_json::to_value(&obj.to_json()).unwrap();
+        let serialized = serde_json::to_value(obj.to_json()).unwrap();
         let data = json!({"obj": serialized});
         assert_eq!(data["obj"]["type"], "constructor");
     }
@@ -340,7 +340,7 @@ mod test_dumpd {
     /// Ported from `TestDumpd::test_dumpd_list_of_serializable`
     #[test]
     fn test_dumpd_list_of_serializable() {
-        let objs = vec![SerializableTest { value: 1 }, SerializableTest { value: 2 }];
+        let objs = [SerializableTest { value: 1 }, SerializableTest { value: 2 }];
 
         let result: Vec<Value> = objs.iter().map(|obj| dumpd(obj).unwrap()).collect();
 
@@ -390,8 +390,8 @@ mod test_dumpd {
     /// Ported from `TestDumpdSnapshot::test_dumpd_float`
     #[test]
     fn test_dumpd_float() {
-        let result = dumpd_value(&3.14).unwrap();
-        assert_eq!(result, json!(3.14));
+        let result = dumpd_value(&3.15).unwrap();
+        assert_eq!(result, json!(3.15));
     }
 
     /// Test dumpd() with Serializable inside a list inside a dict.
@@ -400,7 +400,7 @@ mod test_dumpd {
     #[test]
     fn test_dumpd_nested_serializable_in_list() {
         let obj = SerializableTest { value: 10 };
-        let serialized = serde_json::to_value(&obj.to_json()).unwrap();
+        let serialized = serde_json::to_value(obj.to_json()).unwrap();
 
         let data = json!({
             "items": [serialized, "plain", 42]
@@ -468,7 +468,7 @@ mod test_default_snapshot {
         assert!(
             id.iter().any(|v| v
                 .as_str()
-                .map_or(false, |s| s.contains("NonSerializableTest"))),
+                .is_some_and(|s| s.contains("NonSerializableTest"))),
             "id should contain NonSerializableTest, got: {:?}",
             id
         );
@@ -548,7 +548,7 @@ mod test_dumps_snapshot {
         assert!(
             id.iter().any(|v| v
                 .as_str()
-                .map_or(false, |s| s.contains("NonSerializableTest"))),
+                .is_some_and(|s| s.contains("NonSerializableTest"))),
             "id should contain NonSerializableTest, got: {:?}",
             id
         );

@@ -156,11 +156,9 @@ pub trait Runnable: Send + Sync + Debug {
                 active.fetch_add(1, Ordering::SeqCst);
 
                 let handle = scope.spawn(move || {
-                    let result = if return_exceptions {
-                        self.invoke(input, Some(config))
-                    } else {
-                        self.invoke(input, Some(config))
-                    };
+                    // TODO: when return_exceptions is true, catch panics and return them as errors
+                    let _ = return_exceptions;
+                    let result = self.invoke(input, Some(config));
                     active.fetch_sub(1, Ordering::SeqCst);
                     (i, result)
                 });
