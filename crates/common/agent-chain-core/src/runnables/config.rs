@@ -174,8 +174,9 @@ pub fn get_config_list(config: Option<ConfigOrList>, length: usize) -> Vec<Runna
             // Special case: if length > 1 and config has a run_id,
             // only use it for the first element
             if length > 1 && c.run_id.is_some() {
-                eprintln!(
-                    "Warning: Provided run_id will be used only for the first element of the batch."
+                tracing::warn!(
+                    target: "agent_chain_core::runnables",
+                    "Provided run_id will be used only for the first element of the batch."
                 );
                 let mut configs = Vec::with_capacity(length);
                 configs.push((*c).clone());
@@ -404,7 +405,6 @@ pub fn get_callback_manager_for_config(config: &RunnableConfig) -> CallbackManag
         None,
         Some(config.metadata.clone()),
         None,
-        false,
     )
 }
 
@@ -419,7 +419,6 @@ pub fn get_async_callback_manager_for_config(
         None,
         Some(config.metadata.clone()),
         None,
-        false,
     )
 }
 

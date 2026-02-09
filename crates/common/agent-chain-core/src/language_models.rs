@@ -50,7 +50,7 @@ mod utils;
 // Re-export base types
 pub use base::{
     BaseLanguageModel, CustomGetTokenIds, LangSmithParams, LanguageModelConfig, LanguageModelInput,
-    LanguageModelOutput, get_verbosity,
+    LanguageModelOutput,
 };
 
 // Re-export chat model types

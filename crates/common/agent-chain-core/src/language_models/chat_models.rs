@@ -255,12 +255,6 @@ impl ChatModelConfig {
         self
     }
 
-    /// Enable verbose mode.
-    pub fn with_verbose(mut self, verbose: bool) -> Self {
-        self.base.verbose = verbose;
-        self
-    }
-
     /// Set tags.
     pub fn with_tags(mut self, tags: Vec<String>) -> Self {
         self.base.tags = Some(tags);
@@ -619,7 +613,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             self.config().tags.clone(),
             Some(inheritable_metadata),
             self.config().metadata.clone(),
-            self.config().verbose,
         );
 
         // Start chat model runs
@@ -767,7 +760,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             self.config().tags.clone(),
             Some(inheritable_metadata),
             self.config().metadata.clone(),
-            self.config().verbose,
         );
 
         // Start chat model runs
@@ -1456,12 +1448,10 @@ mod tests {
     fn test_chat_model_config_builder() {
         let config = ChatModelConfig::new()
             .with_cache(true)
-            .with_verbose(true)
             .with_disable_streaming(true)
             .with_output_version("v1");
 
         assert_eq!(config.base.cache, Some(true));
-        assert!(config.base.verbose);
         assert_eq!(config.disable_streaming, DisableStreaming::Bool(true));
         assert_eq!(config.output_version, Some("v1".to_string()));
     }

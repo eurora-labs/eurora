@@ -40,12 +40,6 @@ impl LLMConfig {
         self
     }
 
-    /// Enable verbose mode.
-    pub fn with_verbose(mut self, verbose: bool) -> Self {
-        self.base.verbose = verbose;
-        self
-    }
-
     /// Set tags.
     pub fn with_tags(mut self, tags: Vec<String>) -> Self {
         self.base.tags = Some(tags);
@@ -307,11 +301,9 @@ mod tests {
     fn test_llm_config_builder() {
         let config = LLMConfig::new()
             .with_cache(true)
-            .with_verbose(true)
             .with_tags(vec!["test".to_string()]);
 
         assert_eq!(config.base.cache, Some(true));
-        assert!(config.base.verbose);
         assert_eq!(config.base.tags, Some(vec!["test".to_string()]));
     }
 
