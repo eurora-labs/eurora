@@ -43,6 +43,15 @@ pub fn is_openai_data_block(block: &serde_json::Value, filter: Option<DataBlockF
                 return false;
             }
 
+            // Only allow keys: "type", "image_url", "detail" (matching Python behavior)
+            if let Some(obj) = block.as_object()
+                && !obj
+                    .keys()
+                    .all(|k| k == "type" || k == "image_url" || k == "detail")
+            {
+                return false;
+            }
+
             // Check for valid image_url structure
             if let Some(image_url) = block.get("image_url")
                 && let Some(obj) = image_url.as_object()
@@ -326,6 +335,49 @@ pub fn convert_openai_format_to_data_block(
     }
 
     result
+}
+
+/// Update message content to use content blocks format.
+///
+/// Creates a copy of the AIMessage where `content` is replaced by the
+/// serialized `content_blocks()` result, and `response_metadata["output_version"]`
+/// is set to the given version string.
+///
+/// This mirrors Python's `_update_message_content_to_blocks`.
+pub fn update_message_content_to_blocks(
+    message: &crate::messages::AIMessage,
+    output_version: &str,
+) -> crate::messages::AIMessage {
+    let content_blocks = message.content_blocks();
+
+    // Serialize content blocks to a JSON array string (matching how AIMessage
+    // stores multimodal content as a JSON string).
+    let block_values: Vec<serde_json::Value> = content_blocks
+        .iter()
+        .filter_map(|block| serde_json::to_value(block).ok())
+        .collect();
+
+    let new_content = if block_values.is_empty() {
+        message.content.clone()
+    } else {
+        serde_json::to_string(&block_values).unwrap_or_else(|_| message.content.clone())
+    };
+
+    let mut new_metadata = message.response_metadata.clone();
+    new_metadata.insert(
+        "output_version".to_string(),
+        serde_json::Value::String(output_version.to_string()),
+    );
+
+    crate::messages::AIMessage::builder()
+        .content(new_content)
+        .response_metadata(new_metadata)
+        .tool_calls(message.tool_calls.clone())
+        .invalid_tool_calls(message.invalid_tool_calls.clone())
+        .maybe_id(message.id.clone())
+        .maybe_name(message.name.clone())
+        .maybe_usage_metadata(message.usage_metadata.clone())
+        .build()
 }
 
 #[cfg(test)]

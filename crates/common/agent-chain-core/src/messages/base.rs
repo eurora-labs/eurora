@@ -152,7 +152,7 @@ impl BaseMessage {
             BaseMessage::System(m) => m.content.as_text_ref(),
             BaseMessage::AI(m) => &m.content,
             BaseMessage::Tool(m) => &m.content,
-            BaseMessage::Chat(m) => &m.content,
+            BaseMessage::Chat(m) => m.content.as_text_ref(),
             BaseMessage::Function(m) => &m.content,
             BaseMessage::Remove(_) => "",
         }
@@ -180,7 +180,7 @@ impl BaseMessage {
             BaseMessage::Tool(m) => m.name.clone(),
             BaseMessage::Chat(m) => m.name.clone(),
             BaseMessage::Function(m) => Some(m.name.clone()),
-            BaseMessage::Remove(_) => None,
+            BaseMessage::Remove(m) => m.name.clone(),
         }
     }
 
@@ -207,7 +207,7 @@ impl BaseMessage {
             BaseMessage::System(m) => m.content.as_text(),
             BaseMessage::AI(m) => m.content.to_string(),
             BaseMessage::Tool(m) => m.content.clone(),
-            BaseMessage::Chat(m) => m.content.to_string(),
+            BaseMessage::Chat(m) => m.content.as_text(),
             BaseMessage::Function(m) => m.content.clone(),
             BaseMessage::Remove(_) => String::new(),
         }
@@ -243,79 +243,29 @@ impl BaseMessage {
             BaseMessage::Tool(m) => Some(&m.additional_kwargs),
             BaseMessage::Chat(m) => Some(&m.additional_kwargs),
             BaseMessage::Function(m) => Some(&m.additional_kwargs),
-            BaseMessage::Remove(_) => None,
+            BaseMessage::Remove(m) => Some(&m.additional_kwargs),
         }
     }
 
     /// Get response metadata if present.
     pub fn response_metadata(&self) -> Option<&HashMap<String, serde_json::Value>> {
         match self {
+            BaseMessage::Human(m) => Some(&m.response_metadata),
+            BaseMessage::System(m) => Some(&m.response_metadata),
             BaseMessage::AI(m) => Some(&m.response_metadata),
+            BaseMessage::Tool(m) => Some(&m.response_metadata),
             BaseMessage::Chat(m) => Some(&m.response_metadata),
             BaseMessage::Function(m) => Some(&m.response_metadata),
-            BaseMessage::Tool(m) => Some(&m.response_metadata),
-            _ => None,
+            BaseMessage::Remove(m) => Some(&m.response_metadata),
         }
     }
 
     /// Pretty print the message to stdout.
-    /// This mimics LangChain's pretty_print() method for messages.
+    ///
+    /// This corresponds to `pretty_print` in LangChain Python, which calls
+    /// `print(self.pretty_repr(html=is_interactive_env()))`.
     pub fn pretty_print(&self) {
-        let (role, content) = match self {
-            BaseMessage::Human(m) => ("Human", m.content.as_text_ref()),
-            BaseMessage::System(m) => ("System", m.content.as_text_ref()),
-            BaseMessage::AI(m) => {
-                let tool_calls = &m.tool_calls;
-                if tool_calls.is_empty() {
-                    ("AI", m.content())
-                } else {
-                    println!(
-                        "================================== AI Message =================================="
-                    );
-                    if !m.content().is_empty() {
-                        println!("{}", m.content());
-                    }
-                    for tc in tool_calls {
-                        println!("Tool Call: {} ({:?})", tc.name, tc.id);
-                        println!("  Args: {}", tc.args);
-                    }
-                    return;
-                }
-            }
-            BaseMessage::Tool(m) => {
-                println!(
-                    "================================= Tool Message ================================="
-                );
-                println!("[{}] {}", m.tool_call_id, m.content);
-                return;
-            }
-            BaseMessage::Chat(m) => (m.role.as_str(), m.content.as_str()),
-            BaseMessage::Function(m) => {
-                println!(
-                    "=============================== Function Message ==============================="
-                );
-                println!("[{}] {}", m.name, m.content);
-                return;
-            }
-            BaseMessage::Remove(m) => {
-                println!(
-                    "================================ Remove Message ================================"
-                );
-                println!("Remove message with id: {}", m.id);
-                return;
-            }
-        };
-
-        let header = format!("=== {} Message ===", role);
-        let padding = (80 - header.len()) / 2;
-        println!(
-            "{:=>padding$}{}{:=>padding$}",
-            "",
-            header,
-            "",
-            padding = padding
-        );
-        println!("{}", content);
+        println!("{}", self.pretty_repr(is_interactive_env()));
     }
 
     /// Get a pretty representation of the message.
@@ -480,7 +430,7 @@ impl BaseMessageChunk {
             BaseMessageChunk::Human(m) => m.content.as_text_ref(),
             BaseMessageChunk::System(m) => m.content.as_text_ref(),
             BaseMessageChunk::Tool(m) => &m.content,
-            BaseMessageChunk::Chat(m) => &m.content,
+            BaseMessageChunk::Chat(m) => m.content.as_text_ref(),
             BaseMessageChunk::Function(m) => &m.content,
         }
     }
@@ -558,6 +508,42 @@ impl From<FunctionMessageChunk> for BaseMessageChunk {
     }
 }
 
+/// Concatenation support for `BaseMessageChunk`.
+///
+/// This corresponds to `BaseMessageChunk.__add__` in LangChain Python.
+/// Both chunks must be of the same variant; panics on type mismatch
+/// (matching Python's `TypeError`).
+///
+/// Merges `content` via `merge_content`, `additional_kwargs` via `merge_dicts`,
+/// and `response_metadata` via `merge_dicts`.
+impl std::ops::Add for BaseMessageChunk {
+    type Output = BaseMessageChunk;
+
+    fn add(self, other: BaseMessageChunk) -> BaseMessageChunk {
+        match (self, other) {
+            (BaseMessageChunk::AI(a), BaseMessageChunk::AI(b)) => BaseMessageChunk::AI(a + b),
+            (BaseMessageChunk::Human(a), BaseMessageChunk::Human(b)) => {
+                BaseMessageChunk::Human(a + b)
+            }
+            (BaseMessageChunk::System(a), BaseMessageChunk::System(b)) => {
+                BaseMessageChunk::System(a + b)
+            }
+            (BaseMessageChunk::Tool(a), BaseMessageChunk::Tool(b)) => BaseMessageChunk::Tool(a + b),
+            (BaseMessageChunk::Chat(a), BaseMessageChunk::Chat(b)) => BaseMessageChunk::Chat(a + b),
+            (BaseMessageChunk::Function(a), BaseMessageChunk::Function(b)) => {
+                BaseMessageChunk::Function(a + b)
+            }
+            (left, right) => {
+                panic!(
+                    "unsupported operand type(s) for +: \"{}\" and \"{}\"",
+                    left.message_type(),
+                    right.message_type()
+                );
+            }
+        }
+    }
+}
+
 impl From<AIMessage> for BaseMessage {
     fn from(message: AIMessage) -> Self {
         BaseMessage::AI(message)
@@ -600,9 +586,22 @@ impl From<RemoveMessage> for BaseMessage {
     }
 }
 
+impl From<&str> for BaseMessage {
+    fn from(text: &str) -> Self {
+        BaseMessage::Human(HumanMessage::builder().content(text).build())
+    }
+}
+
+impl From<String> for BaseMessage {
+    fn from(text: String) -> Self {
+        BaseMessage::Human(HumanMessage::builder().content(text).build())
+    }
+}
+
 /// Content type for merge operations.
 ///
 /// Represents message content that can be either a string or a list of values.
+/// This corresponds to `str | list[str | dict]` in Python.
 #[derive(Debug, Clone, PartialEq)]
 pub enum MergeableContent {
     /// String content.
@@ -631,24 +630,25 @@ impl From<Vec<Value>> for MergeableContent {
 
 /// Merge multiple message contents (simple string version).
 ///
-/// Concatenates two strings together. This is the simple version
-/// that corresponds to the basic case of `merge_content` in LangChain Python.
-///
-/// For more complex merging with lists, use `merge_content_complex`.
+/// Concatenates two strings together. This is a convenience wrapper for the
+/// common case where both contents are known to be strings.
 pub fn merge_content(first: &str, second: &str) -> String {
     let mut result = first.to_string();
     result.push_str(second);
     result
 }
 
-/// Merge multiple message contents with support for both strings and lists.
+/// Merge multiple message contents.
 ///
-/// This function handles merging string contents and list contents together.
-/// If both contents are strings, they are concatenated.
-/// If one is a string and one is a list, the string is prepended/appended.
-/// If both are lists, the lists are concatenated with smart merging.
+/// Handles merging string and list contents together, matching the behavior of
+/// `merge_content` in LangChain Python (`langchain_core.messages.base`).
 ///
-/// This corresponds to the full `merge_content` function in LangChain Python.
+/// The merge rules are:
+/// - String + String → String (concatenation)
+/// - String + List → List (string is prepended as first element)
+/// - List + List → List (merged via `merge_lists` for index-aware merging)
+/// - List + String → List (string is appended to last element if it's a string,
+///   empty strings are no-ops, otherwise appended as new element)
 ///
 /// # Arguments
 ///
@@ -659,39 +659,51 @@ pub fn merge_content(first: &str, second: &str) -> String {
 ///
 /// The merged content.
 pub fn merge_content_complex(
-    first_content: Option<MergeableContent>,
+    first_content: MergeableContent,
     contents: Vec<MergeableContent>,
 ) -> MergeableContent {
-    let mut merged = first_content.unwrap_or(MergeableContent::Text(String::new()));
+    let mut merged = first_content;
 
     for content in contents {
         merged = match (merged, content) {
+            // String + String → concatenation
             (MergeableContent::Text(mut left), MergeableContent::Text(right)) => {
                 left.push_str(&right);
                 MergeableContent::Text(left)
             }
+            // String + List → prepend string to list
             (MergeableContent::Text(left), MergeableContent::List(right)) => {
                 let mut new_list = vec![Value::String(left)];
                 new_list.extend(right);
                 MergeableContent::List(new_list)
             }
-            (MergeableContent::List(mut left), MergeableContent::List(right)) => {
-                if let Ok(Some(merged_list)) =
-                    merge_lists(Some(left.clone()), vec![Some(right.clone())])
-                {
-                    MergeableContent::List(merged_list)
-                } else {
-                    left.extend(right);
-                    MergeableContent::List(left)
+            // List + List → merge_lists
+            (MergeableContent::List(left), MergeableContent::List(right)) => {
+                match merge_lists(Some(left.clone()), vec![Some(right.clone())]) {
+                    Ok(Some(merged_list)) => MergeableContent::List(merged_list),
+                    _ => {
+                        let mut result = left;
+                        result.extend(right);
+                        MergeableContent::List(result)
+                    }
                 }
             }
+            // List + String → append to last string element or add new
             (MergeableContent::List(mut left), MergeableContent::Text(right)) => {
-                if !right.is_empty() {
-                    if let Some(Value::String(last)) = left.last_mut() {
-                        last.push_str(&right);
-                    } else if !left.is_empty() {
-                        left.push(Value::String(right));
+                if right.is_empty() {
+                    // Empty string is a no-op
+                } else if left.is_empty() {
+                    // Empty list, do nothing (matches Python: `elif merged:`)
+                } else if let Some(last) = left.last_mut()
+                    && last.is_string()
+                {
+                    // Last element is a string, append to it
+                    if let Value::String(s) = last {
+                        s.push_str(&right);
                     }
+                } else {
+                    // Last element is not a string, add as new element
+                    left.push(Value::String(right));
                 }
                 MergeableContent::List(left)
             }
@@ -750,7 +762,7 @@ pub fn messages_to_dict(messages: &[BaseMessage]) -> Vec<serde_json::Value> {
 /// The formatted title representation.
 pub fn get_msg_title_repr(title: &str, bold: bool) -> String {
     let padded = format!(" {} ", title);
-    let sep_len = (80 - padded.len()) / 2;
+    let sep_len = 80usize.saturating_sub(padded.len()) / 2;
     let sep: String = "=".repeat(sep_len);
     let second_sep = if padded.len() % 2 == 0 {
         sep.clone()

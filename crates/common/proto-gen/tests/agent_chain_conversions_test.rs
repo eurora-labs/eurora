@@ -151,6 +151,7 @@ mod tests {
             args: Some("{\"query\":".to_string()),
             id: Some("call_123".to_string()),
             index: Some(0),
+            chunk_type: None,
         };
 
         let original = AIMessageChunk::builder()

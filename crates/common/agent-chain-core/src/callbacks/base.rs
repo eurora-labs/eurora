@@ -18,7 +18,7 @@ use crate::outputs::ChatResult;
 pub trait RetrieverManagerMixin {
     /// Run when Retriever errors.
     fn on_retriever_error(
-        &mut self,
+        &self,
         error: &dyn std::error::Error,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -28,7 +28,7 @@ pub trait RetrieverManagerMixin {
 
     /// Run when Retriever ends running.
     fn on_retriever_end(
-        &mut self,
+        &self,
         documents: &[serde_json::Value],
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -41,7 +41,7 @@ pub trait RetrieverManagerMixin {
 pub trait LLMManagerMixin {
     /// Run on new output token. Only available when streaming is enabled.
     fn on_llm_new_token(
-        &mut self,
+        &self,
         token: &str,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -51,13 +51,13 @@ pub trait LLMManagerMixin {
     }
 
     /// Run when LLM ends running.
-    fn on_llm_end(&mut self, response: &ChatResult, run_id: Uuid, parent_run_id: Option<Uuid>) {
+    fn on_llm_end(&self, response: &ChatResult, run_id: Uuid, parent_run_id: Option<Uuid>) {
         let _ = (response, run_id, parent_run_id);
     }
 
     /// Run when LLM errors.
     fn on_llm_error(
-        &mut self,
+        &self,
         error: &dyn std::error::Error,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -70,7 +70,7 @@ pub trait LLMManagerMixin {
 pub trait ChainManagerMixin {
     /// Run when chain ends running.
     fn on_chain_end(
-        &mut self,
+        &self,
         outputs: &HashMap<String, serde_json::Value>,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -80,7 +80,7 @@ pub trait ChainManagerMixin {
 
     /// Run when chain errors.
     fn on_chain_error(
-        &mut self,
+        &self,
         error: &dyn std::error::Error,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -90,7 +90,7 @@ pub trait ChainManagerMixin {
 
     /// Run on agent action.
     fn on_agent_action(
-        &mut self,
+        &self,
         action: &serde_json::Value,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -101,7 +101,7 @@ pub trait ChainManagerMixin {
 
     /// Run on the agent end.
     fn on_agent_finish(
-        &mut self,
+        &self,
         finish: &serde_json::Value,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -115,7 +115,7 @@ pub trait ChainManagerMixin {
 pub trait ToolManagerMixin {
     /// Run when the tool ends running.
     fn on_tool_end(
-        &mut self,
+        &self,
         output: &str,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -135,7 +135,7 @@ pub trait ToolManagerMixin {
 
     /// Run when tool errors.
     fn on_tool_error(
-        &mut self,
+        &self,
         error: &dyn std::error::Error,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -149,7 +149,7 @@ pub trait CallbackManagerMixin {
     /// Run when LLM starts running.
     #[allow(clippy::too_many_arguments)]
     fn on_llm_start(
-        &mut self,
+        &self,
         serialized: &HashMap<String, serde_json::Value>,
         prompts: &[String],
         run_id: Uuid,
@@ -163,7 +163,7 @@ pub trait CallbackManagerMixin {
     /// Run when a chat model starts running.
     #[allow(clippy::too_many_arguments)]
     fn on_chat_model_start(
-        &mut self,
+        &self,
         serialized: &HashMap<String, serde_json::Value>,
         messages: &[Vec<BaseMessage>],
         run_id: Uuid,
@@ -177,7 +177,7 @@ pub trait CallbackManagerMixin {
     /// Run when the Retriever starts running.
     #[allow(clippy::too_many_arguments)]
     fn on_retriever_start(
-        &mut self,
+        &self,
         serialized: &HashMap<String, serde_json::Value>,
         query: &str,
         run_id: Uuid,
@@ -191,7 +191,7 @@ pub trait CallbackManagerMixin {
     /// Run when a chain starts running.
     #[allow(clippy::too_many_arguments)]
     fn on_chain_start(
-        &mut self,
+        &self,
         serialized: &HashMap<String, serde_json::Value>,
         inputs: &HashMap<String, serde_json::Value>,
         run_id: Uuid,
@@ -205,7 +205,7 @@ pub trait CallbackManagerMixin {
     /// Run when the tool starts running.
     #[allow(clippy::too_many_arguments)]
     fn on_tool_start(
-        &mut self,
+        &self,
         serialized: &HashMap<String, serde_json::Value>,
         input_str: &str,
         run_id: Uuid,
@@ -230,7 +230,7 @@ pub trait CallbackManagerMixin {
 pub trait RunManagerMixin {
     /// Run on an arbitrary text.
     fn on_text(
-        &mut self,
+        &self,
         text: &str,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -241,13 +241,13 @@ pub trait RunManagerMixin {
     }
 
     /// Run on a retry event.
-    fn on_retry(&mut self, retry_state: &dyn Any, run_id: Uuid, parent_run_id: Option<Uuid>) {
+    fn on_retry(&self, retry_state: &dyn Any, run_id: Uuid, parent_run_id: Option<Uuid>) {
         let _ = (retry_state, run_id, parent_run_id);
     }
 
     /// Override to define a handler for a custom event.
     fn on_custom_event(
-        &mut self,
+        &self,
         name: &str,
         data: &dyn Any,
         run_id: Uuid,
@@ -333,7 +333,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
     /// Run when LLM starts running (async).
     #[allow(clippy::too_many_arguments)]
     async fn on_llm_start_async(
-        &mut self,
+        &self,
         serialized: &HashMap<String, serde_json::Value>,
         prompts: &[String],
         run_id: Uuid,
@@ -347,7 +347,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
     /// Run when a chat model starts running (async).
     #[allow(clippy::too_many_arguments)]
     async fn on_chat_model_start_async(
-        &mut self,
+        &self,
         serialized: &HashMap<String, serde_json::Value>,
         messages: &[Vec<BaseMessage>],
         run_id: Uuid,
@@ -360,7 +360,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
 
     /// Run on new output token (async).
     async fn on_llm_new_token_async(
-        &mut self,
+        &self,
         token: &str,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -372,7 +372,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
 
     /// Run when LLM ends running (async).
     async fn on_llm_end_async(
-        &mut self,
+        &self,
         response: &ChatResult,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -383,7 +383,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
 
     /// Run when LLM errors (async).
     async fn on_llm_error_async(
-        &mut self,
+        &self,
         error: &str,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -395,7 +395,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
     /// Run when chain starts running (async).
     #[allow(clippy::too_many_arguments)]
     async fn on_chain_start_async(
-        &mut self,
+        &self,
         serialized: &HashMap<String, serde_json::Value>,
         inputs: &HashMap<String, serde_json::Value>,
         run_id: Uuid,
@@ -408,7 +408,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
 
     /// Run when chain ends running (async).
     async fn on_chain_end_async(
-        &mut self,
+        &self,
         outputs: &HashMap<String, serde_json::Value>,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -419,7 +419,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
 
     /// Run when chain errors (async).
     async fn on_chain_error_async(
-        &mut self,
+        &self,
         error: &str,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -431,7 +431,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
     /// Run when tool starts running (async).
     #[allow(clippy::too_many_arguments)]
     async fn on_tool_start_async(
-        &mut self,
+        &self,
         serialized: &HashMap<String, serde_json::Value>,
         input_str: &str,
         run_id: Uuid,
@@ -453,7 +453,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
 
     /// Run when tool ends running (async).
     async fn on_tool_end_async(
-        &mut self,
+        &self,
         output: &str,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -464,7 +464,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
 
     /// Run when tool errors (async).
     async fn on_tool_error_async(
-        &mut self,
+        &self,
         error: &str,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -475,7 +475,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
 
     /// Run on an arbitrary text (async).
     async fn on_text_async(
-        &mut self,
+        &self,
         text: &str,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -486,7 +486,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
 
     /// Run on a retry event (async).
     async fn on_retry_async(
-        &mut self,
+        &self,
         retry_state: &serde_json::Value,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -496,7 +496,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
 
     /// Run on agent action (async).
     async fn on_agent_action_async(
-        &mut self,
+        &self,
         action: &serde_json::Value,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -507,7 +507,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
 
     /// Run on the agent end (async).
     async fn on_agent_finish_async(
-        &mut self,
+        &self,
         finish: &serde_json::Value,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -519,7 +519,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
     /// Run on the retriever start (async).
     #[allow(clippy::too_many_arguments)]
     async fn on_retriever_start_async(
-        &mut self,
+        &self,
         serialized: &HashMap<String, serde_json::Value>,
         query: &str,
         run_id: Uuid,
@@ -532,7 +532,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
 
     /// Run on the retriever end (async).
     async fn on_retriever_end_async(
-        &mut self,
+        &self,
         documents: &[serde_json::Value],
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -543,7 +543,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
 
     /// Run on retriever error (async).
     async fn on_retriever_error_async(
-        &mut self,
+        &self,
         error: &str,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
@@ -554,7 +554,7 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
 
     /// Override to define a handler for custom events (async).
     async fn on_custom_event_async(
-        &mut self,
+        &self,
         name: &str,
         data: &serde_json::Value,
         run_id: Uuid,

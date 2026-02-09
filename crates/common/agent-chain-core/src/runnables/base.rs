@@ -6,18 +6,22 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 use futures::StreamExt;
 use futures::stream::BoxStream;
 use serde::Serialize;
 use serde_json::Value;
+use tokio::sync::Semaphore;
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::load::{Serializable, Serialized};
 
 use super::config::{
-    ConfigOrList, RunnableConfig, ensure_config, get_callback_manager_for_config, get_config_list,
+    AsyncVariableArgsFn, ConfigOrList, RunnableConfig, VariableArgsFn,
+    acall_func_with_variable_args, call_func_with_variable_args, ensure_config,
+    get_async_callback_manager_for_config, get_callback_manager_for_config, get_config_list,
     merge_configs, patch_config,
 };
 
@@ -77,6 +81,32 @@ pub trait Runnable: Send + Sync + Debug {
         std::any::type_name::<Self>()
     }
 
+    /// Get a JSON schema describing the input type of this Runnable.
+    ///
+    /// Mirrors `Runnable.get_input_schema()` from
+    /// `langchain_core.runnables.base`.
+    ///
+    /// The default implementation returns a generic object schema derived
+    /// from the Runnable's name. Wrapper runnables (retry, fallbacks, etc.)
+    /// override this to delegate to the wrapped runnable's schema.
+    fn get_input_schema(&self, _config: Option<&RunnableConfig>) -> Value {
+        serde_json::json!({
+            "title": self.get_name(Some("Input"), None),
+            "type": "object"
+        })
+    }
+
+    /// Get a JSON schema describing the output type of this Runnable.
+    ///
+    /// Mirrors `Runnable.get_output_schema()` from
+    /// `langchain_core.runnables.base`.
+    fn get_output_schema(&self, _config: Option<&RunnableConfig>) -> Value {
+        serde_json::json!({
+            "title": self.get_name(Some("Output"), None),
+            "type": "object"
+        })
+    }
+
     /// Transform a single input into an output.
     ///
     /// # Arguments
@@ -106,12 +136,13 @@ pub trait Runnable: Send + Sync + Debug {
 
     /// Transform multiple inputs into outputs in parallel.
     ///
-    /// Default implementation runs invoke() in parallel for each input.
+    /// Default implementation runs invoke() in parallel using scoped threads,
+    /// respecting the `max_concurrency` setting from config.
     fn batch(
         &self,
         inputs: Vec<Self::Input>,
         config: Option<ConfigOrList>,
-        _return_exceptions: bool,
+        return_exceptions: bool,
     ) -> Vec<Result<Self::Output>>
     where
         Self: 'static,
@@ -124,23 +155,57 @@ pub trait Runnable: Send + Sync + Debug {
 
         // For single input, just invoke directly
         if inputs.len() == 1 {
-            return vec![self.invoke(
-                inputs.into_iter().next().unwrap(),
-                Some(configs.into_iter().next().unwrap()),
-            )];
+            let input = inputs.into_iter().next().unwrap();
+            let config = configs.into_iter().next().unwrap();
+            let result = self.invoke(input, Some(config));
+            if return_exceptions {
+                return vec![result];
+            }
+            return vec![result];
         }
 
-        // For multiple inputs, run sequentially (parallel implementation would require rayon)
-        inputs
-            .into_iter()
-            .zip(configs)
-            .map(|(input, config)| self.invoke(input, Some(config)))
-            .collect()
+        let max_concurrency = configs[0].max_concurrency;
+        let len = inputs.len();
+        let mut results: Vec<Option<Result<Self::Output>>> = (0..len).map(|_| None).collect();
+
+        std::thread::scope(|scope| {
+            let active_count = Arc::new(AtomicUsize::new(0));
+            let semaphore_like = max_concurrency;
+            let mut handles = Vec::with_capacity(len);
+
+            for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
+                // Simple concurrency limiting: wait until a slot is available
+                if let Some(max) = semaphore_like {
+                    while active_count.load(Ordering::SeqCst) >= max {
+                        std::thread::sleep(std::time::Duration::from_millis(1));
+                    }
+                }
+                let active = active_count.clone();
+                active.fetch_add(1, Ordering::SeqCst);
+
+                let handle = scope.spawn(move || {
+                    // TODO: when return_exceptions is true, catch panics and return them as errors
+                    let _ = return_exceptions;
+                    let result = self.invoke(input, Some(config));
+                    active.fetch_sub(1, Ordering::SeqCst);
+                    (i, result)
+                });
+                handles.push(handle);
+            }
+
+            for handle in handles {
+                let (i, result) = handle.join().expect("thread should not panic");
+                results[i] = Some(result);
+            }
+        });
+
+        results.into_iter().map(|r| r.unwrap()).collect()
     }
 
     /// Transform multiple inputs into outputs asynchronously.
     ///
-    /// Default implementation runs ainvoke() in parallel for each input.
+    /// Default implementation runs ainvoke() concurrently, respecting the
+    /// `max_concurrency` setting from config using a semaphore.
     async fn abatch(
         &self,
         inputs: Vec<Self::Input>,
@@ -155,14 +220,129 @@ pub trait Runnable: Send + Sync + Debug {
         }
 
         let configs = get_config_list(config, inputs.len());
-        let mut results = Vec::with_capacity(inputs.len());
+        let max_concurrency = configs[0].max_concurrency;
 
-        for (input, config) in inputs.into_iter().zip(configs) {
-            let result = self.ainvoke(input, Some(config)).await;
-            results.push(result);
+        match max_concurrency {
+            Some(limit) if limit > 0 => {
+                let semaphore = Arc::new(Semaphore::new(limit));
+                let futures: Vec<_> = inputs
+                    .into_iter()
+                    .zip(configs)
+                    .map(|(input, config)| {
+                        let sem = semaphore.clone();
+                        async move {
+                            let _permit =
+                                sem.acquire().await.expect("semaphore should not be closed");
+                            self.ainvoke(input, Some(config)).await
+                        }
+                    })
+                    .collect();
+                futures::future::join_all(futures).await
+            }
+            _ => {
+                let futures: Vec<_> = inputs
+                    .into_iter()
+                    .zip(configs)
+                    .map(|(input, config)| self.ainvoke(input, Some(config)))
+                    .collect();
+                futures::future::join_all(futures).await
+            }
+        }
+    }
+
+    /// Run invoke in parallel on a list of inputs, yielding results as they
+    /// complete.
+    ///
+    /// Default implementation uses scoped threads with concurrency limiting.
+    fn batch_as_completed(
+        &self,
+        inputs: Vec<Self::Input>,
+        config: Option<ConfigOrList>,
+        _return_exceptions: bool,
+    ) -> Vec<(usize, Result<Self::Output>)>
+    where
+        Self: 'static,
+    {
+        if inputs.is_empty() {
+            return Vec::new();
         }
 
-        results
+        let configs = get_config_list(config, inputs.len());
+
+        if inputs.len() == 1 {
+            let input = inputs.into_iter().next().unwrap();
+            let config = configs.into_iter().next().unwrap();
+            return vec![(0, self.invoke(input, Some(config)))];
+        }
+
+        let max_concurrency = configs[0].max_concurrency;
+        let (sender, receiver) = std::sync::mpsc::channel();
+
+        std::thread::scope(|scope| {
+            let active_count = Arc::new(AtomicUsize::new(0));
+
+            for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
+                if let Some(max) = max_concurrency {
+                    while active_count.load(Ordering::SeqCst) >= max {
+                        std::thread::sleep(std::time::Duration::from_millis(1));
+                    }
+                }
+                let active = active_count.clone();
+                active.fetch_add(1, Ordering::SeqCst);
+                let tx = sender.clone();
+
+                scope.spawn(move || {
+                    let result = self.invoke(input, Some(config));
+                    active.fetch_sub(1, Ordering::SeqCst);
+                    tx.send((i, result))
+                        .expect("receiver should not be dropped");
+                });
+            }
+
+            // Drop the original sender so the receiver will terminate
+            drop(sender);
+        });
+
+        receiver.into_iter().collect()
+    }
+
+    /// Run ainvoke in parallel on a list of inputs, yielding results as they
+    /// complete.
+    ///
+    /// Default implementation uses FuturesUnordered with semaphore-based
+    /// concurrency limiting. Returns a stream of (index, result) tuples.
+    fn abatch_as_completed(
+        &self,
+        inputs: Vec<Self::Input>,
+        config: Option<ConfigOrList>,
+        _return_exceptions: bool,
+    ) -> BoxStream<'_, (usize, Result<Self::Output>)>
+    where
+        Self: 'static,
+    {
+        if inputs.is_empty() {
+            return Box::pin(futures::stream::empty());
+        }
+
+        let configs = get_config_list(config, inputs.len());
+        let max_concurrency = configs[0].max_concurrency;
+        let semaphore = max_concurrency.map(|n| Arc::new(Semaphore::new(n)));
+
+        let futures_unordered = futures::stream::FuturesUnordered::new();
+
+        for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
+            let sem = semaphore.clone();
+            futures_unordered.push(async move {
+                let _permit = match sem {
+                    Some(ref s) => Some(s.acquire().await.expect("semaphore should not be closed")),
+                    None => None,
+                };
+                let result = self.ainvoke(input, Some(config)).await;
+                (i, result)
+            });
+        }
+
+        Box::pin(futures_unordered)
     }
 
     /// Stream output from a single input.
@@ -386,8 +566,22 @@ where
         self.name.clone()
     }
 
-    fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
-        (self.func)(input)
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let config = ensure_config(config);
+        let callback_manager = get_callback_manager_for_config(&config);
+        let run_manager =
+            callback_manager.on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id);
+
+        match (self.func)(input) {
+            Ok(output) => {
+                run_manager.on_chain_end(&HashMap::new());
+                Ok(output)
+            }
+            Err(e) => {
+                run_manager.on_chain_error(&e);
+                Err(e)
+            }
+        }
     }
 }
 
@@ -399,6 +593,220 @@ where
     O: Send + Sync + Clone + Debug + 'static,
 {
     RunnableLambda::new(func)
+}
+
+// =============================================================================
+// RunnableLambdaWithConfig
+// =============================================================================
+
+/// A config-aware version of `RunnableLambda` that supports functions which
+/// receive `RunnableConfig`, as well as async functions.
+///
+/// Mirrors Python's `RunnableLambda` support for functions with optional
+/// `config` parameter. Uses `VariableArgsFn` / `AsyncVariableArgsFn` enums
+/// to dispatch to the correct function signature at runtime.
+///
+/// # Examples
+///
+///
+pub struct RunnableLambdaWithConfig<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    func: Option<VariableArgsFn<I, Result<O>>>,
+    afunc: Option<AsyncVariableArgsFn<I, Result<O>>>,
+    name: Option<String>,
+}
+
+impl<I, O> Debug for RunnableLambdaWithConfig<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RunnableLambdaWithConfig")
+            .field("name", &self.name)
+            .field("has_func", &self.func.is_some())
+            .field("has_afunc", &self.afunc.is_some())
+            .finish()
+    }
+}
+
+impl<I, O> RunnableLambdaWithConfig<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    /// Create from a sync function that only takes input.
+    pub fn new(func: impl Fn(I) -> Result<O> + Send + Sync + 'static) -> Self {
+        Self {
+            func: Some(VariableArgsFn::InputOnly(Box::new(func))),
+            afunc: None,
+            name: None,
+        }
+    }
+
+    /// Create from a sync function that takes input and config.
+    pub fn new_with_config(
+        func: impl Fn(I, &RunnableConfig) -> Result<O> + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            func: Some(VariableArgsFn::WithConfig(Box::new(func))),
+            afunc: None,
+            name: None,
+        }
+    }
+
+    /// Create from an async function that only takes input.
+    pub fn new_async<F, Fut>(afunc: F) -> Self
+    where
+        F: Fn(I) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = Result<O>> + Send + 'static,
+    {
+        Self {
+            func: None,
+            afunc: Some(AsyncVariableArgsFn::InputOnly(Box::new(move |input| {
+                Box::pin(afunc(input))
+            }))),
+            name: None,
+        }
+    }
+
+    /// Create from an async function that takes input and config.
+    pub fn new_async_with_config<F, Fut>(afunc: F) -> Self
+    where
+        F: Fn(I, RunnableConfig) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = Result<O>> + Send + 'static,
+    {
+        Self {
+            func: None,
+            afunc: Some(AsyncVariableArgsFn::WithConfig(Box::new(
+                move |input, config| Box::pin(afunc(input, config)),
+            ))),
+            name: None,
+        }
+    }
+
+    /// Set a name for this runnable.
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Add an async function to this runnable (for use with ainvoke).
+    pub fn with_afunc<F, Fut>(mut self, afunc: F) -> Self
+    where
+        F: Fn(I) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = Result<O>> + Send + 'static,
+    {
+        self.afunc = Some(AsyncVariableArgsFn::InputOnly(Box::new(move |input| {
+            Box::pin(afunc(input))
+        })));
+        self
+    }
+
+    /// Add a config-aware async function to this runnable.
+    pub fn with_afunc_config<F, Fut>(mut self, afunc: F) -> Self
+    where
+        F: Fn(I, RunnableConfig) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = Result<O>> + Send + 'static,
+    {
+        self.afunc = Some(AsyncVariableArgsFn::WithConfig(Box::new(
+            move |input, config| Box::pin(afunc(input, config)),
+        )));
+        self
+    }
+}
+
+#[async_trait]
+impl<I, O> Runnable for RunnableLambdaWithConfig<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    type Input = I;
+    type Output = O;
+
+    fn name(&self) -> Option<String> {
+        self.name.clone()
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let func = self.func.as_ref().ok_or_else(|| {
+            Error::other("Cannot invoke a coroutine function synchronously. Use ainvoke instead.")
+        })?;
+
+        let config = ensure_config(config);
+        let callback_manager = get_callback_manager_for_config(&config);
+        let run_manager =
+            callback_manager.on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id);
+
+        let child_config = patch_config(
+            Some(config),
+            Some(run_manager.get_child(None)),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        match call_func_with_variable_args(func, input, &child_config) {
+            Ok(output) => {
+                run_manager.on_chain_end(&HashMap::new());
+                Ok(output)
+            }
+            Err(e) => {
+                run_manager.on_chain_error(&e);
+                Err(e)
+            }
+        }
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output>
+    where
+        Self: 'static,
+    {
+        let config = ensure_config(config);
+        let async_callback_manager = get_async_callback_manager_for_config(&config);
+        let run_manager = async_callback_manager
+            .on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id)
+            .await;
+
+        let child_config = patch_config(
+            Some(config),
+            Some(run_manager.get_child(None).to_callback_manager()),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let result = if let Some(afunc) = &self.afunc {
+            acall_func_with_variable_args(afunc, input, &child_config).await
+        } else if let Some(func) = &self.func {
+            call_func_with_variable_args(func, input, &child_config)
+        } else {
+            Err(Error::other(
+                "RunnableLambdaWithConfig has no func or afunc",
+            ))
+        };
+
+        match result {
+            Ok(output) => {
+                run_manager.on_chain_end(&HashMap::new()).await;
+                Ok(output)
+            }
+            Err(e) => {
+                run_manager.get_sync().on_chain_error(&e);
+                Err(e)
+            }
+        }
+    }
 }
 
 // =============================================================================
@@ -738,6 +1146,14 @@ where
 
     fn name(&self) -> Option<String> {
         self.bound.name()
+    }
+
+    fn get_input_schema(&self, config: Option<&RunnableConfig>) -> Value {
+        self.bound.get_input_schema(config)
+    }
+
+    fn get_output_schema(&self, config: Option<&RunnableConfig>) -> Value {
+        self.bound.get_output_schema(config)
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {

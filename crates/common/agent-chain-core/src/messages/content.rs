@@ -1125,6 +1125,13 @@ pub const KNOWN_BLOCK_TYPES: &[&str] = &[
 /// Data content block type literals.
 const DATA_CONTENT_BLOCK_TYPES: &[&str] = &["image", "video", "audio", "text-plain", "file"];
 
+/// Returns the tuple of data content block type literals.
+///
+/// Mirrors Python's `_get_data_content_block_types()`.
+pub fn get_data_content_block_types() -> &'static [&'static str] {
+    DATA_CONTENT_BLOCK_TYPES
+}
+
 // =============================================================================
 // Helper Functions
 // =============================================================================
@@ -1429,7 +1436,7 @@ pub fn create_plaintext_block(config: PlainTextBlockConfig) -> PlainTextContentB
 /// * `id` - An identifier for the tool call. Generated automatically if not provided.
 /// * `index` - Index of block in aggregate response.
 /// * `extras` - Provider-specific metadata.
-pub fn create_tool_call_block(
+pub fn create_tool_call(
     name: impl Into<String>,
     args: HashMap<String, serde_json::Value>,
     id: Option<String>,
@@ -1462,7 +1469,7 @@ pub fn create_reasoning_block(
 ) -> ReasoningContentBlock {
     ReasoningContentBlock {
         block_type: "reasoning".to_string(),
-        reasoning,
+        reasoning: Some(reasoning.unwrap_or_default()),
         id: Some(ensure_id(id)),
         index,
         extras,

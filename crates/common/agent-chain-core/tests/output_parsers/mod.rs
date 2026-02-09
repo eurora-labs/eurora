@@ -2,4 +2,16 @@
 //!
 //! This module contains tests ported from langchain/libs/core/tests/unit_tests/output_parsers/
 
+mod test_base;
+mod test_base_parsers;
+mod test_format_instructions;
+mod test_json;
+mod test_json_parser;
+mod test_list;
+mod test_list_parser;
+mod test_openai_functions;
+mod test_openai_functions_parser;
+mod test_openai_tools;
+mod test_openai_tools_parser;
+mod test_pydantic;
 mod test_string_parser;

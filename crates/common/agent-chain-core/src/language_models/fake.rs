@@ -68,6 +68,21 @@ impl FakeListLLM {
         self
     }
 
+    /// Set a local cache instance for this LLM.
+    pub fn with_cache_instance(
+        mut self,
+        cache: std::sync::Arc<dyn crate::caches::BaseCache>,
+    ) -> Self {
+        self.config.cache_instance = Some(cache);
+        self
+    }
+
+    /// Disable caching for this LLM.
+    pub fn with_cache_disabled(mut self) -> Self {
+        self.config.base.cache = Some(false);
+        self
+    }
+
     /// Get the current index.
     pub fn current_index(&self) -> usize {
         self.index.load(Ordering::SeqCst)

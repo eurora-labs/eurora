@@ -1046,6 +1046,15 @@ fn test_convert_to_openai_data_block() {
     let result = convert_to_openai_data_block(&block, OpenAiApi::Responses).unwrap();
     assert_eq!(result, expected);
 
+    // Responses API - File / url
+    let block = json!({
+        "type": "file",
+        "url": "https://example.com/test.pdf"
+    });
+    let expected = json!({"type": "input_file", "file_url": "https://example.com/test.pdf"});
+    let result = convert_to_openai_data_block(&block, OpenAiApi::Responses).unwrap();
+    assert_eq!(result, expected);
+
     // Responses API - File / base64
     let block = json!({
         "type": "file",

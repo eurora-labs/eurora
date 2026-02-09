@@ -149,7 +149,7 @@ pub fn validate_jinja2(template: &str, input_variables: &[String]) -> Result<()>
         if !extra.is_empty() {
             warning.push_str(&format!("Extra variables: {:?}", extra));
         }
-        eprintln!("Warning: {}", warning.trim());
+        tracing::warn!(target: "agent_chain_core::prompts", "{}", warning.trim());
     }
 
     Ok(())

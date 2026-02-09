@@ -16,7 +16,7 @@ use uuid::Uuid;
 /// Users can acquire the run_id information from callbacks or via run_id
 /// information present in the astream_event API (depending on the use case).
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RunInfo {
     /// A unique identifier for the model or chain run.
     pub run_id: Uuid,

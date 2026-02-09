@@ -137,9 +137,7 @@ pub use messages::{
 pub use tools::{BaseTool, Tool, ToolDefinition};
 
 // Re-export chat history types
-pub use chat_history::{
-    AIMessageInput, BaseChatMessageHistory, HumanMessageInput, InMemoryChatMessageHistory,
-};
+pub use chat_history::{BaseChatMessageHistory, InMemoryChatMessageHistory};
 
 // Re-export chat session types
 pub use chat_sessions::ChatSession;
@@ -151,14 +149,14 @@ pub use chat_loaders::BaseChatLoader;
 pub use caches::{BaseCache, CacheReturnValue, InMemoryCache};
 
 // Re-export global functions
-pub use globals::{get_debug, get_llm_cache, get_verbose, set_debug, set_llm_cache, set_verbose};
+pub use globals::{get_llm_cache, set_llm_cache};
 
 // Re-export output parser types
 pub use output_parsers::{
     BaseCumulativeTransformOutputParser, BaseLLMOutputParser, BaseOutputParser,
     BaseTransformOutputParser, CommaSeparatedListOutputParser, JsonOutputParser, ListOutputParser,
-    MarkdownListOutputParser, NumberedListOutputParser, OutputParserError, SimpleJsonOutputParser,
-    StrOutputParser, XMLOutputParser,
+    MarkdownListOutputParser, NumberedListOutputParser, OutputParserError, ParseMatch,
+    PydanticOutputParser, SimpleJsonOutputParser, StrOutputParser, XMLOutputParser, drop_last_n,
 };
 
 // Re-export output types
@@ -230,10 +228,10 @@ pub use runnables::{
     AddableDict, BaseStreamEvent, CUSTOM_EVENT_TYPE, ConfigOrList, CustomStreamEvent,
     DynRouterRunnable, DynRunnable, EventData, PickKeys, RouterInput, RouterRunnable, Runnable,
     RunnableAssign, RunnableAssignBuilder, RunnableBinding, RunnableConfig, RunnableEach,
-    RunnableLambda, RunnableParallel, RunnablePassthrough, RunnablePick, RunnableRetry,
-    RunnableSequence, RunnableSerializable, StandardStreamEvent, StreamEvent, coerce_to_runnable,
-    ensure_config, get_config_list, graph_passthrough, merge_configs, patch_config, pipe,
-    runnable_lambda, to_dyn,
+    RunnableLambda, RunnableLambdaWithConfig, RunnableParallel, RunnablePassthrough, RunnablePick,
+    RunnableRetry, RunnableSequence, RunnableSerializable, StandardStreamEvent, StreamEvent,
+    coerce_to_runnable, ensure_config, get_config_list, graph_passthrough, merge_configs,
+    patch_config, pipe, runnable_lambda, to_dyn,
 };
 
 // Re-export structured query types

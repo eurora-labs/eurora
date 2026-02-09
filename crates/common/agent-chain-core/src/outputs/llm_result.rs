@@ -59,7 +59,7 @@ impl From<ChatGenerationChunk> for GenerationType {
 /// generated outputs and any additional information that the model provider wants to
 /// return.
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LLMResult {
     /// Generated outputs.
     ///
@@ -163,6 +163,14 @@ impl LLMResult {
         }
 
         llm_results
+    }
+}
+
+impl PartialEq for LLMResult {
+    fn eq(&self, other: &Self) -> bool {
+        self.generations == other.generations
+            && self.llm_output == other.llm_output
+            && self.result_type == other.result_type
     }
 }
 

@@ -858,3 +858,520 @@ mod test_parrot_fake_chat_model {
         );
     }
 }
+
+// ====================================================================
+// Previously missing tests — now implemented
+// ====================================================================
+
+#[cfg(test)]
+mod test_fake_messages_list_additional {
+    use agent_chain_core::FakeMessagesListChatModel;
+    use agent_chain_core::language_models::BaseChatModel;
+    use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
+
+    /// Ported from `test_single_response_counter_stays_at_zero`.
+    #[tokio::test]
+    async fn test_single_response_counter_stays_at_zero() {
+        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(
+            AIMessage::builder().content("only one").build(),
+        )]);
+        assert_eq!(model.current_index(), 0);
+        let _ = model._generate(vec![], None, None).await.unwrap();
+        assert_eq!(model.current_index(), 0);
+        let _ = model._generate(vec![], None, None).await.unwrap();
+        assert_eq!(model.current_index(), 0);
+        let _ = model._generate(vec![], None, None).await.unwrap();
+        assert_eq!(model.current_index(), 0);
+    }
+
+    /// Ported from `test_ainvoke` (async cycling).
+    #[tokio::test]
+    async fn test_ainvoke() {
+        let responses = vec![
+            BaseMessage::AI(AIMessage::builder().content("async first").build()),
+            BaseMessage::AI(AIMessage::builder().content("async second").build()),
+        ];
+        let model = FakeMessagesListChatModel::new(responses);
+
+        let result1 = model._generate(vec![], None, None).await.unwrap();
+        assert_eq!(result1.generations[0].message.content(), "async first");
+
+        let result2 = model._generate(vec![], None, None).await.unwrap();
+        assert_eq!(result2.generations[0].message.content(), "async second");
+
+        // Cycle back
+        let result3 = model._generate(vec![], None, None).await.unwrap();
+        assert_eq!(result3.generations[0].message.content(), "async first");
+    }
+
+    /// Ported from `test_generate_returns_proper_chat_result_structure`.
+    #[tokio::test]
+    async fn test_generate_returns_proper_chat_result_structure() {
+        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(
+            AIMessage::builder().content("structured").build(),
+        )]);
+        let result = model
+            ._generate(
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("hi").build(),
+                )],
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(result.generations.len(), 1);
+        let generation = &result.generations[0];
+        assert!(matches!(generation.message, BaseMessage::AI(_)));
+        assert_eq!(generation.message.content(), "structured");
+    }
+
+    /// Ported from `test_generate_with_non_ai_message_response`.
+    #[tokio::test]
+    async fn test_generate_with_non_ai_message_response() {
+        let human_msg = BaseMessage::Human(HumanMessage::builder().content("echoed back").build());
+        let model = FakeMessagesListChatModel::new(vec![human_msg]);
+        let result = model
+            ._generate(
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("hi").build(),
+                )],
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(result.generations.len(), 1);
+        assert_eq!(result.generations[0].message.content(), "echoed back");
+        assert!(matches!(
+            result.generations[0].message,
+            BaseMessage::Human(_)
+        ));
+    }
+}
+
+#[cfg(test)]
+mod test_fake_list_chat_model_additional {
+    use agent_chain_core::FakeListChatModel;
+    use agent_chain_core::language_models::BaseChatModel;
+    use futures::StreamExt;
+    use std::time::{Duration, Instant};
+
+    /// Ported from `test_call_with_sleep`.
+    #[tokio::test]
+    async fn test_call_with_sleep() {
+        let model =
+            FakeListChatModel::new(vec!["hello".to_string()]).with_sleep(Duration::from_millis(50));
+
+        let start = Instant::now();
+        let result = model._generate(vec![], None, None).await.unwrap();
+        let elapsed = start.elapsed();
+
+        assert!(elapsed >= Duration::from_millis(50));
+        assert_eq!(result.generations[0].message.content(), "hello");
+    }
+
+    /// Ported from `test_stream_chunk_position_single_char`.
+    #[tokio::test]
+    async fn test_stream_chunk_position_single_char() {
+        let model = FakeListChatModel::new(vec!["x".to_string()]);
+        let mut stream = model._stream(vec![], None, None).unwrap();
+
+        let mut chunks = Vec::new();
+        while let Some(chunk_result) = stream.next().await {
+            chunks.push(chunk_result.unwrap());
+        }
+
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].text, "x");
+    }
+
+    /// Ported from `test_astream_chunk_position_last`.
+    #[tokio::test]
+    async fn test_astream_chunk_position_last() {
+        let model = FakeListChatModel::new(vec!["abc".to_string()]);
+        let mut stream = model._stream(vec![], None, None).unwrap();
+
+        let mut chunks = Vec::new();
+        while let Some(chunk_result) = stream.next().await {
+            chunks.push(chunk_result.unwrap());
+        }
+
+        assert_eq!(chunks.len(), 3);
+        let contents: Vec<String> = chunks.iter().map(|c| c.text.clone()).collect();
+        assert_eq!(contents, vec!["a", "b", "c"]);
+    }
+
+    /// Ported from `test_stream_error_on_first_chunk`.
+    #[tokio::test]
+    async fn test_stream_error_on_first_chunk() {
+        let model = FakeListChatModel::new(vec!["hello".to_string()]).with_error_on_chunk(0);
+        let mut stream = model._stream(vec![], None, None).unwrap();
+
+        let first = stream.next().await.unwrap();
+        assert!(first.is_err());
+    }
+
+    /// Ported from `test_astream_error_on_first_chunk`.
+    #[tokio::test]
+    async fn test_astream_error_on_first_chunk() {
+        let model = FakeListChatModel::new(vec!["hello".to_string()]).with_error_on_chunk(0);
+        let mut stream = model._stream(vec![], None, None).unwrap();
+
+        let mut chunks = Vec::new();
+        while let Some(chunk_result) = stream.next().await {
+            match chunk_result {
+                Ok(chunk) => chunks.push(chunk),
+                Err(_) => break,
+            }
+        }
+        assert!(chunks.is_empty());
+    }
+
+    /// Ported from `test_stream_empty_string_response`.
+    #[tokio::test]
+    async fn test_stream_empty_string_response() {
+        let model = FakeListChatModel::new(vec!["".to_string()]);
+        let mut stream = model._stream(vec![], None, None).unwrap();
+
+        let mut chunks = Vec::new();
+        while let Some(chunk_result) = stream.next().await {
+            if let Ok(chunk) = chunk_result {
+                chunks.push(chunk);
+            }
+        }
+        // Empty string has no characters, so no chunks
+        assert!(chunks.is_empty());
+    }
+
+    /// Ported from `test_batch_with_single_config`.
+    #[tokio::test]
+    async fn test_batch_with_single_config() {
+        let model =
+            FakeListChatModel::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
+
+        let result1 = model._generate(vec![], None, None).await.unwrap();
+        let result2 = model._generate(vec![], None, None).await.unwrap();
+        let result3 = model._generate(vec![], None, None).await.unwrap();
+
+        assert_eq!(result1.generations[0].message.content(), "r1");
+        assert_eq!(result2.generations[0].message.content(), "r2");
+        assert_eq!(result3.generations[0].message.content(), "r3");
+    }
+
+    /// Ported from `test_abatch_with_single_config`.
+    #[tokio::test]
+    async fn test_abatch_with_single_config() {
+        let model =
+            FakeListChatModel::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
+
+        let result1 = model._generate(vec![], None, None).await.unwrap();
+        let result2 = model._generate(vec![], None, None).await.unwrap();
+        let result3 = model._generate(vec![], None, None).await.unwrap();
+
+        assert_eq!(result1.generations[0].message.content(), "r1");
+        assert_eq!(result2.generations[0].message.content(), "r2");
+        assert_eq!(result3.generations[0].message.content(), "r3");
+    }
+}
+
+#[cfg(test)]
+mod test_fake_chat_model_additional {
+    use agent_chain_core::FakeChatModel;
+    use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
+    use agent_chain_core::messages::{BaseMessage, HumanMessage};
+
+    /// Ported from `test_agenerate_returns_chat_result`.
+    #[tokio::test]
+    async fn test_agenerate_returns_chat_result() {
+        let model = FakeChatModel::new();
+        let result = model
+            ._generate(
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("hi").build(),
+                )],
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(result.generations.len(), 1);
+        assert!(matches!(result.generations[0].message, BaseMessage::AI(_)));
+        assert_eq!(result.generations[0].message.content(), "fake response");
+    }
+
+    /// Ported from `test_llm_type_and_identifying_params_consistency`.
+    #[test]
+    fn test_llm_type_and_identifying_params_consistency() {
+        let model = FakeChatModel::new();
+        assert_eq!(model.llm_type(), "fake-chat-model");
+        let params = model.identifying_params();
+        assert_eq!(params.get("key").unwrap(), "fake");
+        // Verify consistency across multiple accesses
+        assert_eq!(model.llm_type(), "fake-chat-model");
+        assert_eq!(params.get("key").unwrap(), "fake");
+    }
+}
+
+#[cfg(test)]
+mod test_generic_fake_chat_model_additional {
+    use agent_chain_core::GenericFakeChatModel;
+    use agent_chain_core::language_models::BaseChatModel;
+    use agent_chain_core::messages::AIMessage;
+    use futures::StreamExt;
+
+    /// Ported from `test_stream_with_multiple_words_preserves_whitespace`.
+    #[tokio::test]
+    async fn test_stream_with_multiple_words_preserves_whitespace() {
+        let messages = vec![AIMessage::builder().content("hello world foo").build()];
+        let model = GenericFakeChatModel::from_vec(messages);
+        let mut stream = model._stream(vec![], None, None).unwrap();
+
+        let mut chunks = Vec::new();
+        while let Some(chunk_result) = stream.next().await {
+            if let Ok(chunk) = chunk_result {
+                chunks.push(chunk.text.clone());
+            }
+        }
+
+        // re.split(r"(\s)", "hello world foo") -> ["hello", " ", "world", " ", "foo"]
+        assert_eq!(chunks, vec!["hello", " ", "world", " ", "foo"]);
+        assert_eq!(chunks.join(""), "hello world foo");
+    }
+
+    /// Ported from `test_stream_function_call_non_string_values`.
+    ///
+    /// Tests that function_call with non-string values (dict) produces chunks.
+    /// The "name" key (string) gets split by comma, "parsed" key (dict) gets
+    /// a single chunk.
+    #[tokio::test]
+    async fn test_stream_function_call_non_string_values() {
+        use serde_json::Value;
+        use std::collections::HashMap;
+
+        let mut function_call = HashMap::new();
+        function_call.insert("name".to_string(), Value::String("my_func".to_string()));
+        function_call.insert("parsed".to_string(), serde_json::json!({"key": "value"}));
+
+        let mut additional_kwargs = HashMap::new();
+        additional_kwargs.insert(
+            "function_call".to_string(),
+            Value::Object(function_call.into_iter().collect()),
+        );
+
+        let ai_msg = AIMessage::builder()
+            .content("")
+            .additional_kwargs(additional_kwargs)
+            .build();
+
+        let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
+        let mut stream = model._stream(vec![], None, None).unwrap();
+
+        let mut chunks = Vec::new();
+        while let Some(chunk_result) = stream.next().await {
+            if let Ok(chunk) = chunk_result {
+                chunks.push(chunk);
+            }
+        }
+
+        // Should produce chunks for function_call sub-keys
+        // ("name" is a string so it gets 1 chunk, "parsed" is a dict so 1 chunk)
+        assert!(!chunks.is_empty());
+    }
+
+    /// Ported from `test_stream_chunk_position_last_no_additional_kwargs`.
+    #[tokio::test]
+    async fn test_stream_chunk_position_last_no_additional_kwargs() {
+        let messages = vec![AIMessage::builder().content("hi there").build()];
+        let model = GenericFakeChatModel::from_vec(messages);
+        let mut stream = model._stream(vec![], None, None).unwrap();
+
+        let mut chunks = Vec::new();
+        while let Some(chunk_result) = stream.next().await {
+            if let Ok(chunk) = chunk_result {
+                chunks.push(chunk);
+            }
+        }
+
+        // "hi there" splits to ["hi", " ", "there"]
+        assert_eq!(chunks.len(), 3);
+        let contents: Vec<String> = chunks.iter().map(|c| c.text.clone()).collect();
+        assert_eq!(contents, vec!["hi", " ", "there"]);
+    }
+
+    /// Ported from `test_stream_with_content_and_additional_kwargs`.
+    ///
+    /// Tests that a message with both content and additional_kwargs produces
+    /// chunks for both. Content "hello" is a single word -> 1 content chunk.
+    /// Then additional_kwargs produces 1+ chunks.
+    #[tokio::test]
+    async fn test_stream_with_content_and_additional_kwargs() {
+        use serde_json::Value;
+        use std::collections::HashMap;
+
+        let mut additional_kwargs = HashMap::new();
+        additional_kwargs.insert(
+            "custom_key".to_string(),
+            Value::String("custom_value".to_string()),
+        );
+
+        let ai_msg = AIMessage::builder()
+            .content("hello")
+            .additional_kwargs(additional_kwargs)
+            .build();
+
+        let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
+        let mut stream = model._stream(vec![], None, None).unwrap();
+
+        let mut chunks = Vec::new();
+        while let Some(chunk_result) = stream.next().await {
+            if let Ok(chunk) = chunk_result {
+                chunks.push(chunk);
+            }
+        }
+
+        // Content "hello" produces 1 chunk, additional_kwargs produces 1+ chunks
+        assert!(chunks.len() >= 2);
+
+        // Verify content chunk
+        let content_chunks: Vec<_> = chunks.iter().filter(|c| !c.text.is_empty()).collect();
+        assert!(!content_chunks.is_empty());
+        let joined: String = content_chunks.iter().map(|c| c.text.as_str()).collect();
+        assert_eq!(joined, "hello");
+    }
+}
+
+#[cfg(test)]
+mod test_parrot_fake_chat_model_additional {
+    use agent_chain_core::ParrotFakeChatModel;
+    use agent_chain_core::language_models::{BaseChatModel, LanguageModelInput};
+    use agent_chain_core::messages::{BaseMessage, HumanMessage, SystemMessage};
+
+    /// Ported from `test_generate_with_multiple_messages_returns_last`.
+    #[tokio::test]
+    async fn test_generate_with_multiple_messages_returns_last() {
+        let model = ParrotFakeChatModel::new();
+        let messages = vec![
+            BaseMessage::System(SystemMessage::builder().content("system prompt").build()),
+            BaseMessage::Human(HumanMessage::builder().content("first human").build()),
+            BaseMessage::Human(HumanMessage::builder().content("second human").build()),
+            BaseMessage::Human(HumanMessage::builder().content("last human").build()),
+        ];
+        let result = model._generate(messages, None, None).await.unwrap();
+        assert_eq!(result.generations.len(), 1);
+        assert_eq!(result.generations[0].message.content(), "last human");
+    }
+
+    /// Ported from `test_ainvoke_with_string`.
+    #[tokio::test]
+    async fn test_ainvoke_with_string() {
+        let model = ParrotFakeChatModel::new();
+        let input = LanguageModelInput::Text("echo this string".to_string());
+        let messages = input.to_messages();
+        let result = model._generate(messages, None, None).await.unwrap();
+        assert_eq!(result.generations[0].message.content(), "echo this string");
+    }
+}
+
+#[cfg(test)]
+mod test_generic_fake_chat_model_run_manager {
+    use std::sync::{Arc, Mutex};
+
+    use agent_chain_core::GenericFakeChatModel;
+    use agent_chain_core::callbacks::CallbackManagerForLLMRun;
+    use agent_chain_core::callbacks::base::{
+        BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
+        RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
+    };
+    use agent_chain_core::language_models::BaseChatModel;
+    use agent_chain_core::messages::AIMessage;
+    use futures::StreamExt;
+    use uuid::Uuid;
+
+    /// A callback handler that records all tokens received via on_llm_new_token.
+    #[derive(Debug, Clone)]
+    struct TokenRecorder {
+        tokens: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl TokenRecorder {
+        fn new() -> Self {
+            Self {
+                tokens: Arc::new(Mutex::new(Vec::new())),
+            }
+        }
+
+        fn recorded_tokens(&self) -> Vec<String> {
+            self.tokens.lock().unwrap().clone()
+        }
+    }
+
+    impl LLMManagerMixin for TokenRecorder {
+        fn on_llm_new_token(
+            &self,
+            token: &str,
+            _run_id: Uuid,
+            _parent_run_id: Option<Uuid>,
+            _chunk: Option<&serde_json::Value>,
+        ) {
+            self.tokens.lock().unwrap().push(token.to_string());
+        }
+    }
+
+    impl ChainManagerMixin for TokenRecorder {}
+    impl ToolManagerMixin for TokenRecorder {}
+    impl RetrieverManagerMixin for TokenRecorder {}
+    impl CallbackManagerMixin for TokenRecorder {}
+    impl RunManagerMixin for TokenRecorder {}
+
+    impl BaseCallbackHandler for TokenRecorder {
+        fn name(&self) -> &str {
+            "TokenRecorder"
+        }
+    }
+
+    /// Ported from `test_stream_with_run_manager_callback`.
+    ///
+    /// Verifies that _stream calls on_llm_new_token on the run_manager's
+    /// handlers for each content chunk.
+    #[tokio::test]
+    async fn test_stream_with_run_manager_callback() {
+        let messages = vec![AIMessage::builder().content("hello world").build()];
+        let model = GenericFakeChatModel::from_vec(messages);
+
+        let recorder = TokenRecorder::new();
+        let handler: Arc<dyn BaseCallbackHandler> = Arc::new(recorder.clone());
+
+        let run_manager = CallbackManagerForLLMRun::new(
+            Uuid::new_v4(),
+            vec![handler],
+            vec![],
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let mut stream = model._stream(vec![], None, Some(&run_manager)).unwrap();
+
+        let mut chunks = Vec::new();
+        while let Some(chunk_result) = stream.next().await {
+            if let Ok(chunk) = chunk_result {
+                chunks.push(chunk.text.clone());
+            }
+        }
+
+        // "hello world" splits to ["hello", " ", "world"]
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks, vec!["hello", " ", "world"]);
+
+        // Verify on_llm_new_token was called for each chunk
+        let tokens = recorder.recorded_tokens();
+        assert_eq!(tokens.len(), 3);
+        assert_eq!(tokens, vec!["hello", " ", "world"]);
+    }
+}

@@ -489,10 +489,26 @@ pub fn convert_to_standard_blocks_with_context(
 }
 
 /// Convert Anthropic input content blocks (for HumanMessage) to standard format.
+///
+/// During the `content_blocks` parsing process, blocks not recognized as v1 are
+/// wrapped as `non_standard` with the original block in the `value` field. This
+/// function unpacks those blocks before attempting Anthropic-specific conversion.
 pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
     let mut result = Vec::new();
 
-    for block in content {
+    // Unpack non_standard blocks to get at the original provider-specific block
+    let unpacked_blocks: Vec<Value> = content
+        .iter()
+        .map(|block| {
+            if block.get("type").and_then(|v| v.as_str()) == Some("non_standard") {
+                block.get("value").cloned().unwrap_or_else(|| block.clone())
+            } else {
+                block.clone()
+            }
+        })
+        .collect();
+
+    for block in &unpacked_blocks {
         if !block.is_object() {
             if let Some(s) = block.as_str() {
                 result.push(json!({"type": "text", "text": s}));

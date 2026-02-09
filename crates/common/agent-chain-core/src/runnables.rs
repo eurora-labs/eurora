@@ -8,6 +8,10 @@ pub mod branch;
 pub mod config;
 pub mod configurable;
 pub mod fallbacks;
+pub mod graph;
+pub mod graph_mermaid;
+pub mod graph_png;
+pub mod history;
 pub mod passthrough;
 pub mod retry;
 pub mod router;
@@ -16,19 +20,32 @@ pub mod utils;
 
 // Re-export commonly used types
 pub use base::{
-    DynRunnable, Runnable, RunnableBinding, RunnableEach, RunnableLambda, RunnableParallel,
-    RunnableSequence, RunnableSerializable, coerce_to_runnable, pipe, runnable_lambda, to_dyn,
+    DynRunnable, Runnable, RunnableBinding, RunnableEach, RunnableLambda, RunnableLambdaWithConfig,
+    RunnableParallel, RunnableSequence, RunnableSerializable, coerce_to_runnable, pipe,
+    runnable_lambda, to_dyn,
 };
 pub use branch::{RunnableBranch, RunnableBranchBuilder};
 pub use config::{
-    ConfigOrList, RunnableConfig, ensure_config, get_config_list, merge_configs, patch_config,
+    AsyncVariableArgsFn, ConfigOrList, RunnableConfig, VariableArgsFn,
+    acall_func_with_variable_args, call_func_with_variable_args, ensure_config, get_config_list,
+    merge_configs, patch_config,
 };
 pub use configurable::{
-    Alternative, ConfigurableRunnable, DynamicRunnable, RunnableConfigurableAlternatives,
-    RunnableConfigurableFields, make_options_spec_multi, make_options_spec_single,
-    prefix_config_spec,
+    Alternative, ConfigurableRunnable, DynamicRunnable, Reconfigurable,
+    RunnableConfigurableAlternatives, RunnableConfigurableFields, make_options_spec_multi,
+    make_options_spec_single, prefix_config_spec,
 };
-pub use fallbacks::{RunnableWithFallbacks, RunnableWithFallbacksExt};
+pub use fallbacks::{
+    ExceptionInserter, FallbackErrorPredicate, RunnableWithFallbacks, RunnableWithFallbacksExt,
+};
+pub use graph::{
+    CurveStyle, Edge, Graph, LabelsDict, MermaidDrawMethod, MermaidOptions, Node, NodeStyles,
+};
+pub use graph_mermaid::{generate_mermaid_graph_styles, to_safe_id};
+pub use graph_png::{PngDrawError, PngDrawer};
+pub use history::{
+    GetSessionHistoryFn, HistoryInvokeFn, HistoryRunnable, RunnableWithMessageHistory,
+};
 pub use passthrough::{
     PickKeys, RunnableAssign, RunnableAssignBuilder, RunnablePassthrough, RunnablePick,
     graph_passthrough,

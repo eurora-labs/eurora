@@ -137,9 +137,10 @@ fn insert_input_variables(
                     && let serde_json::Value::Object(inner) = value
                     && inner.contains_key("path")
                 {
-                    eprintln!(
-                        "Warning: Specifying image inputs via file path in environments \
-                                 with user-input paths is a security vulnerability."
+                    tracing::warn!(
+                        target: "agent_chain_core::prompts",
+                        "Specifying image inputs via file path in environments \
+                         with user-input paths is a security vulnerability."
                     );
                 }
 

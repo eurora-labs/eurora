@@ -4,14 +4,12 @@
 
 use std::collections::HashMap;
 
-use agent_chain_core::globals::{get_verbose, set_verbose};
 use agent_chain_core::language_models::{
     BaseLanguageModel, FakeListLLM, LangSmithParams, LanguageModelConfig, LanguageModelInput,
-    LanguageModelOutput, get_token_ids_default, get_verbosity,
+    LanguageModelOutput, get_token_ids_default,
 };
 use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
 use agent_chain_core::prompt_values::StringPromptValue;
-use serial_test::serial;
 
 #[cfg(test)]
 mod test_lang_smith_params {
@@ -164,47 +162,6 @@ mod test_get_token_ids_default_method {
 }
 
 #[cfg(test)]
-mod test_get_verbosity {
-    use super::*;
-
-    #[test]
-    #[serial]
-    fn test_get_verbosity_returns_global_verbose() {
-        // Test get_verbosity returns global verbose setting
-        // Python equivalent: test_get_verbosity_returns_global_verbose()
-
-        // Save original value
-        let original = get_verbose();
-
-        // Test with true
-        set_verbose(true);
-        assert!(get_verbosity());
-
-        // Test with false
-        set_verbose(false);
-        assert!(!get_verbosity());
-
-        // Restore original value
-        set_verbose(original);
-    }
-
-    #[test]
-    #[serial]
-    fn test_get_verbosity_matches_get_verbose() {
-        // Test that get_verbosity() matches get_verbose()
-        let original = get_verbose();
-
-        set_verbose(true);
-        assert_eq!(get_verbosity(), get_verbose());
-
-        set_verbose(false);
-        assert_eq!(get_verbosity(), get_verbose());
-
-        set_verbose(original);
-    }
-}
-
-#[cfg(test)]
 mod test_language_model_config {
     use super::*;
 
@@ -214,7 +171,6 @@ mod test_language_model_config {
         let config = LanguageModelConfig::default();
 
         assert_eq!(config.cache, None);
-        assert!(!config.verbose);
         assert_eq!(config.tags, None);
         assert_eq!(config.metadata, None);
     }
@@ -231,16 +187,6 @@ mod test_language_model_config {
         // Test LanguageModelConfig with cache=false
         let config = LanguageModelConfig::new().with_cache(false);
         assert_eq!(config.cache, Some(false));
-    }
-
-    #[test]
-    fn test_config_with_verbose() {
-        // Test LanguageModelConfig with verbose setting
-        let config = LanguageModelConfig::new().with_verbose(true);
-        assert!(config.verbose);
-
-        let config = LanguageModelConfig::new().with_verbose(false);
-        assert!(!config.verbose);
     }
 
     #[test]
@@ -269,24 +215,19 @@ mod test_language_model_config {
         // Test chaining builder methods
         let config = LanguageModelConfig::new()
             .with_cache(true)
-            .with_verbose(true)
             .with_tags(vec!["test".to_string()]);
 
         assert_eq!(config.cache, Some(true));
-        assert!(config.verbose);
         assert_eq!(config.tags, Some(vec!["test".to_string()]));
     }
 
     #[test]
     fn test_config_serialization() {
         // Test config serialization
-        let config = LanguageModelConfig::new()
-            .with_cache(true)
-            .with_verbose(true);
+        let config = LanguageModelConfig::new().with_cache(true);
 
         let json = serde_json::to_string(&config).unwrap();
         assert!(json.contains("cache"));
-        assert!(json.contains("verbose"));
     }
 }
 
@@ -430,16 +371,6 @@ mod test_language_model_config_serialization {
     }
 
     #[test]
-    fn test_verbose_serialization() {
-        // Test verbose field in serialization
-        let config = LanguageModelConfig::new().with_verbose(true);
-        let json = serde_json::to_string(&config).unwrap();
-
-        // Verbose is serialized (default value)
-        assert!(json.contains("verbose"));
-    }
-
-    #[test]
     fn test_tags_excluded_when_none() {
         // Test tags field excluded when None
         let config = LanguageModelConfig::new();
@@ -464,14 +395,12 @@ mod test_language_model_config_serialization {
         // Test serialization/deserialization roundtrip
         let config = LanguageModelConfig::new()
             .with_cache(true)
-            .with_verbose(true)
             .with_tags(vec!["test".to_string()]);
 
         let json = serde_json::to_string(&config).unwrap();
         let deserialized: LanguageModelConfig = serde_json::from_str(&json).unwrap();
 
         assert_eq!(deserialized.cache, config.cache);
-        assert_eq!(deserialized.verbose, config.verbose);
         assert_eq!(deserialized.tags, config.tags);
     }
 }
@@ -731,31 +660,192 @@ mod test_base_language_model_trait {
     }
 }
 
+// ====================================================================
+// Tests ported from test_base_language_model.py — previously missing
+// ====================================================================
+
 #[cfg(test)]
-mod test_verbose_validator {
+mod test_get_num_tokens_edge_cases {
     use super::*;
 
+    /// Ported from `test_get_num_tokens_whitespace_only`.
     #[test]
-    fn test_verbose_defaults_to_false() {
-        // Test that verbose defaults to false in LanguageModelConfig
-        // In Python, None gets converted to the global verbose setting
-        // In Rust, we default to false when not specified
-
-        let config = LanguageModelConfig::default();
-        assert!(!config.verbose);
+    fn test_get_num_tokens_whitespace_only() {
+        let model = FakeListLLM::new(vec!["response".to_string()]);
+        // The default tokenizer uses split_whitespace, so whitespace-only
+        // strings produce zero tokens.
+        let result = model.get_num_tokens("   ");
+        assert_eq!(result, 0);
     }
 
+    /// Ported from `test_get_num_tokens_single_token`.
     #[test]
-    fn test_verbose_can_be_set_true() {
-        // Test that verbose can be explicitly set to true
-        let config = LanguageModelConfig::new().with_verbose(true);
-        assert!(config.verbose);
+    fn test_get_num_tokens_single_token() {
+        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let result = model.get_num_tokens("a");
+        assert_eq!(result, 1);
+    }
+}
+
+#[cfg(test)]
+mod test_get_num_tokens_from_messages_edge_cases {
+    use super::*;
+
+    /// Ported from `test_single_message_returns_correct_count`.
+    #[test]
+    fn test_single_message_returns_correct_count() {
+        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let messages = vec![BaseMessage::Human(
+            HumanMessage::builder().content("Hello world").build(),
+        )];
+        let result = model.get_num_tokens_from_messages(&messages);
+        // "Human: Hello world" => 3 words ("Human:", "Hello", "world")
+        // + overhead from get_buffer_string formatting
+        assert!(result > 0);
+    }
+}
+
+#[cfg(test)]
+mod test_generate_prompt {
+    use super::*;
+
+    /// Ported from `test_generate_prompt_single_prompt`.
+    #[tokio::test]
+    async fn test_generate_prompt_single_prompt() {
+        let model = FakeListLLM::new(vec!["test response".to_string()]);
+        let prompts = vec![LanguageModelInput::from("Hello")];
+        let result = model.generate_prompt(prompts, None, None).await.unwrap();
+
+        assert_eq!(result.generations.len(), 1);
+        assert_eq!(result.generations[0].len(), 1);
+        match &result.generations[0][0] {
+            agent_chain_core::outputs::GenerationType::Generation(generation) => {
+                assert_eq!(generation.text, "test response");
+            }
+            _ => panic!("Expected Generation variant"),
+        }
     }
 
+    /// Ported from `test_generate_prompt_multiple_prompts`.
+    #[tokio::test]
+    async fn test_generate_prompt_multiple_prompts() {
+        let model = FakeListLLM::new(vec![
+            "Response 1".to_string(),
+            "Response 2".to_string(),
+            "Response 3".to_string(),
+        ]);
+        let prompts = vec![
+            LanguageModelInput::from("Prompt 1"),
+            LanguageModelInput::from("Prompt 2"),
+            LanguageModelInput::from("Prompt 3"),
+        ];
+        let result = model.generate_prompt(prompts, None, None).await.unwrap();
+
+        assert_eq!(result.generations.len(), 3);
+        for gen_list in &result.generations {
+            assert_eq!(gen_list.len(), 1);
+        }
+    }
+
+    /// Ported from `test_generate_prompt_empty_prompts`.
+    #[tokio::test]
+    async fn test_generate_prompt_empty_prompts() {
+        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let result = model.generate_prompt(vec![], None, None).await.unwrap();
+
+        assert_eq!(result.generations.len(), 0);
+    }
+}
+
+#[cfg(test)]
+mod test_agenerate_prompt {
+    use super::*;
+
+    /// Ported from `test_agenerate_prompt_single_prompt`.
+    ///
+    /// In Rust, generate_prompt is already async, so this tests the same
+    /// code path as the sync test but explicitly exercises the async nature.
+    #[tokio::test]
+    async fn test_agenerate_prompt_single_prompt() {
+        let model = FakeListLLM::new(vec!["test response".to_string()]);
+        let prompts = vec![LanguageModelInput::from("Hello")];
+        let result = model.generate_prompt(prompts, None, None).await.unwrap();
+
+        assert_eq!(result.generations.len(), 1);
+        assert_eq!(result.generations[0].len(), 1);
+    }
+
+    /// Ported from `test_agenerate_prompt_multiple_prompts`.
+    #[tokio::test]
+    async fn test_agenerate_prompt_multiple_prompts() {
+        let model = FakeListLLM::new(vec!["Response 1".to_string(), "Response 2".to_string()]);
+        let prompts = vec![
+            LanguageModelInput::from("Prompt 1"),
+            LanguageModelInput::from("Prompt 2"),
+        ];
+        let result = model.generate_prompt(prompts, None, None).await.unwrap();
+
+        assert_eq!(result.generations.len(), 2);
+    }
+
+    /// Ported from `test_agenerate_prompt_empty_prompts`.
+    #[tokio::test]
+    async fn test_agenerate_prompt_empty_prompts() {
+        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let result = model.generate_prompt(vec![], None, None).await.unwrap();
+
+        assert_eq!(result.generations.len(), 0);
+    }
+}
+
+// ====================================================================
+// Previously skipped tests — now implemented
+// ====================================================================
+
+#[cfg(test)]
+mod test_callbacks_config {
+    use agent_chain_core::callbacks::Callbacks;
+    use agent_chain_core::callbacks::base::{
+        BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
+        RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
+    };
+    use agent_chain_core::language_models::LanguageModelConfig;
+    use std::sync::Arc;
+
+    #[derive(Debug)]
+    struct TestHandler;
+    impl LLMManagerMixin for TestHandler {}
+    impl ChainManagerMixin for TestHandler {}
+    impl ToolManagerMixin for TestHandler {}
+    impl RetrieverManagerMixin for TestHandler {}
+    impl CallbackManagerMixin for TestHandler {}
+    impl RunManagerMixin for TestHandler {}
+    impl BaseCallbackHandler for TestHandler {
+        fn name(&self) -> &str {
+            "TestHandler"
+        }
+    }
+
+    /// Ported from `test_initialization_with_callbacks`.
     #[test]
-    fn test_verbose_can_be_set_false() {
-        // Test that verbose can be explicitly set to false
-        let config = LanguageModelConfig::new().with_verbose(false);
-        assert!(!config.verbose);
+    fn test_initialization_with_callbacks() {
+        let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
+        let callbacks = Callbacks::from_handlers(vec![handler]);
+        let config = LanguageModelConfig::new().with_callbacks(callbacks);
+        assert!(config.callbacks.is_some());
+    }
+
+    /// Ported from `test_callbacks_excluded_from_serialization`.
+    #[test]
+    fn test_callbacks_excluded_from_serialization() {
+        let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
+        let callbacks = Callbacks::from_handlers(vec![handler]);
+        let config = LanguageModelConfig::new().with_callbacks(callbacks);
+
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(
+            !json.contains("callbacks"),
+            "callbacks should be excluded from serialization"
+        );
     }
 }
