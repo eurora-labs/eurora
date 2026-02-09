@@ -168,6 +168,20 @@ where
         self.name.clone()
     }
 
+    fn get_input_schema(&self, _config: Option<&RunnableConfig>) -> serde_json::Value {
+        serde_json::json!({
+            "title": self.get_name(Some("Input"), None),
+            "type": "object"
+        })
+    }
+
+    fn get_output_schema(&self, _config: Option<&RunnableConfig>) -> serde_json::Value {
+        serde_json::json!({
+            "title": self.get_name(Some("Output"), None),
+            "type": "object"
+        })
+    }
+
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         let config = ensure_config(config);
 
@@ -385,6 +399,31 @@ impl Runnable for RunnableAssign {
             .or_else(|| Some("RunnableAssign".to_string()))
     }
 
+    fn get_input_schema(&self, config: Option<&RunnableConfig>) -> serde_json::Value {
+        self.mapper.get_input_schema(config)
+    }
+
+    fn get_output_schema(&self, config: Option<&RunnableConfig>) -> serde_json::Value {
+        let input_schema = self.mapper.get_input_schema(config);
+        let output_schema = self.mapper.get_output_schema(config);
+        // Merge input and output properties into a combined schema
+        let mut properties = serde_json::Map::new();
+        if let Some(props) = input_schema.get("properties").and_then(|v| v.as_object()) {
+            for (k, v) in props {
+                properties.insert(k.clone(), v.clone());
+            }
+        }
+        if let Some(props) = output_schema.get("properties").and_then(|v| v.as_object()) {
+            for (k, v) in props {
+                properties.insert(k.clone(), v.clone());
+            }
+        }
+        serde_json::json!({
+            "title": "RunnableAssignOutput",
+            "type": "object",
+            "properties": properties
+        })
+    }
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         let config = ensure_config(config);
         let callback_manager = get_callback_manager_for_config(&config);
@@ -660,6 +699,28 @@ impl Runnable for RunnablePick {
         })
     }
 
+    fn get_output_schema(&self, _config: Option<&RunnableConfig>) -> serde_json::Value {
+        match &self.keys {
+            PickKeys::Single(key) => serde_json::json!({
+                "title": format!("RunnablePick<{}>Output", key),
+                "type": "object",
+                "properties": {
+                    key: { "title": key }
+                }
+            }),
+            PickKeys::Multiple(keys) => {
+                let mut properties = serde_json::Map::new();
+                for key in keys {
+                    properties.insert(key.clone(), serde_json::json!({ "title": key }));
+                }
+                serde_json::json!({
+                    "title": self.get_name(Some("Output"), None),
+                    "type": "object",
+                    "properties": properties
+                })
+            }
+        }
+    }
     fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
         self.pick(&input)
             .ok_or_else(|| Error::Other("No matching keys found in input".to_string()))

@@ -174,4 +174,92 @@ fn test_remove_message_does_not_modify_content() {
 
     // Content should always be empty string
     assert_eq!(msg.content(), "");
+
+    // content_blocks should be empty
+    assert!(msg.content_blocks().is_empty());
+}
+
+// ============================================================================
+// TestRemoveMessage – text, content_blocks, pretty_repr
+// ============================================================================
+
+#[test]
+fn test_text_property_is_empty() {
+    let msg = RemoveMessage::builder().id("msg-123").build();
+    assert_eq!(msg.text(), "");
+}
+
+#[test]
+fn test_content_blocks_property_is_empty() {
+    let msg = RemoveMessage::builder().id("msg-123").build();
+    let blocks = msg.content_blocks();
+    assert!(blocks.is_empty());
+}
+
+#[test]
+fn test_pretty_repr() {
+    let msg = RemoveMessage::builder().id("msg-123").build();
+    let result = msg.pretty_repr(false);
+    assert!(result.contains("Remove Message"));
+}
+
+#[test]
+fn test_pretty_repr_html() {
+    let msg = RemoveMessage::builder().id("html-test").build();
+    let result = msg.pretty_repr(true);
+    // Should contain the message role header
+    assert!(result.contains("Remove Message"));
+    // HTML mode wraps in ANSI bold codes
+    assert!(result.contains("\x1b[1m"));
+}
+
+// ============================================================================
+// TestRemoveMessageModelDump (serialization snapshot)
+// ============================================================================
+
+#[test]
+fn test_model_dump_snapshot() {
+    let msg = RemoveMessage::builder().id("msg-dump-1").build();
+    let dumped = serde_json::to_value(&msg).unwrap();
+    let obj = dumped.as_object().unwrap();
+
+    // Verify expected keys are present
+    assert!(obj.contains_key("content"));
+    assert!(obj.contains_key("id"));
+    assert!(obj.contains_key("type"));
+    assert!(obj.contains_key("additional_kwargs"));
+    assert!(obj.contains_key("response_metadata"));
+
+    assert_eq!(obj["content"].as_str().unwrap(), "");
+    assert_eq!(obj["id"].as_str().unwrap(), "msg-dump-1");
+    assert_eq!(obj["type"].as_str().unwrap(), "remove");
+}
+
+#[test]
+fn test_model_dump_with_name() {
+    let msg = RemoveMessage::builder()
+        .id("msg-dump-2")
+        .name("marker".to_string())
+        .build();
+    let dumped = serde_json::to_value(&msg).unwrap();
+    let obj = dumped.as_object().unwrap();
+    assert_eq!(obj["name"].as_str().unwrap(), "marker");
+}
+
+// ============================================================================
+// TestRemoveMessageEquality
+// ============================================================================
+
+#[test]
+fn test_same_id_equal() {
+    let msg1 = RemoveMessage::builder().id("same-id").build();
+    let msg2 = RemoveMessage::builder().id("same-id").build();
+    assert_eq!(msg1, msg2);
+}
+
+#[test]
+fn test_different_id_not_equal() {
+    let msg1 = RemoveMessage::builder().id("id-a").build();
+    let msg2 = RemoveMessage::builder().id("id-b").build();
+    assert_ne!(msg1, msg2);
 }

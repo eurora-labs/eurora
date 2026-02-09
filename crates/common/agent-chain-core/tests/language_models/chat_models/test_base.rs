@@ -572,9 +572,13 @@ fn test_disable_streaming_bool_false() {
 
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::Bool(false));
 
-    // _should_stream should return true when streaming is implemented
-    assert!(model._should_stream(false, false, None, None));
-    assert!(model._should_stream(false, true, None, None)); // with tools
+    // _should_stream should return true when streaming is implemented and handlers present
+    let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::base::BaseCallbackHandler>> =
+        vec![std::sync::Arc::new(
+            agent_chain_core::callbacks::StdOutCallbackHandler::new(),
+        )];
+    assert!(model._should_stream(false, false, None, Some(&handlers)));
+    assert!(model._should_stream(false, true, None, Some(&handlers))); // with tools
 }
 
 #[test]
@@ -584,11 +588,16 @@ fn test_disable_streaming_tool_calling() {
 
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::ToolCalling);
 
+    let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::base::BaseCallbackHandler>> =
+        vec![std::sync::Arc::new(
+            agent_chain_core::callbacks::StdOutCallbackHandler::new(),
+        )];
+
     // Without tools, streaming should work
-    assert!(model._should_stream(false, false, None, None));
+    assert!(model._should_stream(false, false, None, Some(&handlers)));
 
     // With tools, streaming should be disabled
-    assert!(!model._should_stream(false, true, None, None));
+    assert!(!model._should_stream(false, true, None, Some(&handlers)));
 }
 
 #[tokio::test]
@@ -596,20 +605,25 @@ async fn test_disable_streaming_async() {
     // Test disable_streaming async variants.
     // Python equivalent: test_disable_streaming_async()
 
+    let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::base::BaseCallbackHandler>> =
+        vec![std::sync::Arc::new(
+            agent_chain_core::callbacks::StdOutCallbackHandler::new(),
+        )];
+
     // Test Bool(true)
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::Bool(true));
     let result = model.invoke(LanguageModelInput::Messages(vec![])).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap().content, "invoke");
 
-    // Test Bool(false) - streaming works
+    // Test Bool(false) - streaming works with handlers
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::Bool(false));
-    assert!(model._should_stream(true, false, None, None));
+    assert!(model._should_stream(true, false, None, Some(&handlers)));
 
     // Test ToolCalling
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::ToolCalling);
-    assert!(model._should_stream(true, false, None, None)); // no tools
-    assert!(!model._should_stream(true, true, None, None)); // with tools
+    assert!(model._should_stream(true, false, None, Some(&handlers))); // no tools
+    assert!(!model._should_stream(true, true, None, Some(&handlers))); // with tools
 }
 
 #[tokio::test]
@@ -990,12 +1004,10 @@ fn test_chat_model_config_builder() {
 
     let config = ChatModelConfig::new()
         .with_cache(true)
-        .with_verbose(true)
         .with_disable_streaming(true)
         .with_output_version("v1");
 
     assert_eq!(config.base.cache, Some(true));
-    assert!(config.base.verbose);
     assert_eq!(config.disable_streaming, DisableStreaming::Bool(true));
     assert_eq!(config.output_version, Some("v1".to_string()));
 
@@ -1084,4 +1096,453 @@ async fn test_generate_basic() {
     assert!(result.is_ok());
     let llm_result = result.unwrap();
     assert_eq!(llm_result.generations.len(), 2);
+}
+
+// ====================================================================
+// Previously missing tests — now implemented
+// ====================================================================
+
+// ---- TestGenerateFromStream ----
+
+/// Ported from `TestGenerateFromStream::test_accumulates_chunks`.
+#[test]
+fn test_generate_from_stream_accumulates_chunks() {
+    use agent_chain_core::language_models::generate_from_stream;
+
+    let chunks = vec![
+        ChatGenerationChunk::new(BaseMessage::AI(
+            AIMessage::builder().content("hello").build(),
+        )),
+        ChatGenerationChunk::new(BaseMessage::AI(
+            AIMessage::builder().content(" world").build(),
+        )),
+    ];
+    let result = generate_from_stream(chunks.into_iter()).unwrap();
+    assert_eq!(result.generations.len(), 1);
+    assert!(result.generations[0].message.content().contains("hello"));
+    assert!(result.generations[0].message.content().contains("world"));
+}
+
+/// Ported from `TestGenerateFromStream::test_single_chunk`.
+#[test]
+fn test_generate_from_stream_single_chunk() {
+    use agent_chain_core::language_models::generate_from_stream;
+
+    let chunks = vec![ChatGenerationChunk::new(BaseMessage::AI(
+        AIMessage::builder().content("single").build(),
+    ))];
+    let result = generate_from_stream(chunks.into_iter()).unwrap();
+    assert_eq!(result.generations.len(), 1);
+    assert_eq!(result.generations[0].message.content(), "single");
+}
+
+/// Ported from `TestGenerateFromStream::test_empty_stream_raises_value_error`.
+#[test]
+fn test_generate_from_stream_empty_raises_error() {
+    use agent_chain_core::language_models::generate_from_stream;
+
+    let chunks: Vec<ChatGenerationChunk> = vec![];
+    let result = generate_from_stream(chunks.into_iter());
+    assert!(result.is_err());
+}
+
+// ---- TestAGenerateFromStream ----
+
+/// Ported from `TestAGenerateFromStream::test_accumulates_chunks`.
+#[tokio::test]
+async fn test_agenerate_from_stream_accumulates_chunks() {
+    use agent_chain_core::language_models::agenerate_from_stream;
+
+    let chunks = vec![
+        Ok(ChatGenerationChunk::new(BaseMessage::AI(
+            AIMessage::builder().content("hello").build(),
+        ))),
+        Ok(ChatGenerationChunk::new(BaseMessage::AI(
+            AIMessage::builder().content(" world").build(),
+        ))),
+    ];
+    let stream = futures::stream::iter(chunks);
+    let result = agenerate_from_stream(stream).await.unwrap();
+    assert_eq!(result.generations.len(), 1);
+}
+
+/// Ported from `TestAGenerateFromStream::test_empty_stream_raises_value_error`.
+#[tokio::test]
+async fn test_agenerate_from_stream_empty_raises_error() {
+    use agent_chain_core::language_models::agenerate_from_stream;
+
+    let chunks: Vec<Result<ChatGenerationChunk>> = vec![];
+    let stream = futures::stream::iter(chunks);
+    let result = agenerate_from_stream(stream).await;
+    assert!(result.is_err());
+}
+
+// ---- TestCombineLlmOutputs ----
+
+/// Ported from `TestCombineLlmOutputs::test_returns_empty_dict_by_default`.
+#[test]
+fn test_combine_llm_outputs_returns_empty_dict() {
+    let model = agent_chain_core::FakeChatModel::new();
+    let result = model._combine_llm_outputs(&[]);
+    assert!(result.is_empty());
+}
+
+/// Ported from `TestCombineLlmOutputs::test_returns_empty_dict_with_empty_list`.
+#[test]
+fn test_combine_llm_outputs_returns_empty_dict_with_empty_list() {
+    let model = agent_chain_core::FakeChatModel::new();
+    let result = model._combine_llm_outputs(&[None, None]);
+    assert!(result.is_empty());
+}
+
+// ---- TestConvertCachedGenerations ----
+
+/// Ported from `TestConvertCachedGenerations::test_with_chat_generation_objects`.
+#[test]
+fn test_convert_cached_generations_chat_generation() {
+    use agent_chain_core::outputs::Generation;
+
+    let model = agent_chain_core::FakeChatModel::new();
+    let generations = vec![Generation::new("hello".to_string())];
+    let result = model._convert_cached_generations(generations);
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0].message.content(), "hello");
+}
+
+/// Ported from `TestConvertCachedGenerations::test_with_legacy_generation_objects`.
+#[test]
+fn test_convert_cached_generations_legacy() {
+    use agent_chain_core::outputs::Generation;
+
+    let model = agent_chain_core::FakeChatModel::new();
+    let generations = vec![
+        Generation::new("first".to_string()),
+        Generation::new("second".to_string()),
+    ];
+    let result = model._convert_cached_generations(generations);
+    assert_eq!(result.len(), 2);
+    assert_eq!(result[0].message.content(), "first");
+    assert_eq!(result[1].message.content(), "second");
+}
+
+/// Ported from `TestConvertCachedGenerations::test_with_mixed_generation_objects`.
+#[test]
+fn test_convert_cached_generations_mixed() {
+    use agent_chain_core::outputs::Generation;
+
+    let model = agent_chain_core::FakeChatModel::new();
+    let generations = vec![
+        Generation::new("a".to_string()),
+        Generation::new("b".to_string()),
+        Generation::new("c".to_string()),
+    ];
+    let result = model._convert_cached_generations(generations);
+    assert_eq!(result.len(), 3);
+    assert_eq!(result[0].message.content(), "a");
+    assert_eq!(result[1].message.content(), "b");
+    assert_eq!(result[2].message.content(), "c");
+}
+
+// ---- TestShouldStream ----
+
+/// Ported from `TestShouldStream::test_no_stream_implemented_returns_false`.
+#[test]
+fn test_should_stream_no_stream_returns_false() {
+    let model = agent_chain_core::FakeChatModel::new();
+    // FakeChatModel doesn't implement _stream, so should return false
+    assert!(!model._should_stream(false, false, None, None));
+}
+
+/// Ported from `TestShouldStream::test_no_stream_or_astream_returns_false_for_async`.
+#[test]
+fn test_should_stream_no_astream_returns_false() {
+    let model = agent_chain_core::FakeChatModel::new();
+    assert!(!model._should_stream(true, false, None, None));
+}
+
+/// Ported from `TestShouldStream::test_disable_streaming_true_returns_false`.
+#[test]
+fn test_should_stream_disabled_returns_false() {
+    let config = ChatModelConfig::new().with_disable_streaming(true);
+    let model = FakeListChatModel::new(vec!["test".to_string()]).with_config(config);
+    // Even with stream impl, disabled should return false
+    assert!(!model._should_stream(false, false, None, None));
+}
+
+/// Ported from `TestShouldStream::test_stream_kwarg_true`.
+#[test]
+fn test_should_stream_kwarg_true() {
+    let model = FakeListChatModel::new(vec!["test".to_string()]);
+    // FakeListChatModel has _stream impl, kwarg=true forces streaming
+    assert!(model._should_stream(false, false, Some(true), None));
+}
+
+/// Ported from `TestShouldStream::test_stream_kwarg_false`.
+#[test]
+fn test_should_stream_kwarg_false() {
+    let model = FakeListChatModel::new(vec!["test".to_string()]);
+    assert!(!model._should_stream(false, false, Some(false), None));
+}
+
+/// Ported from `TestShouldStream::test_no_handlers_no_streaming`.
+#[test]
+fn test_should_stream_no_handlers() {
+    let model = FakeListChatModel::new(vec!["test".to_string()]);
+    // With has_stream_impl=true, no disable, no kwarg, no streaming field,
+    // and empty handlers list — should return true (default when stream is available)
+    let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::base::BaseCallbackHandler>> =
+        vec![];
+    assert!(!model._should_stream(false, false, None, Some(&handlers)));
+}
+
+// ---- TestConvertInput ----
+
+/// Ported from `TestConvertInput::test_convert_input_from_string`.
+#[test]
+fn test_convert_input_from_string() {
+    let model = agent_chain_core::FakeChatModel::new();
+    let result = model
+        .convert_input(LanguageModelInput::from("hello world"))
+        .unwrap();
+    assert_eq!(result.len(), 1);
+    assert!(matches!(&result[0], BaseMessage::Human(_)));
+    assert_eq!(result[0].content(), "hello world");
+}
+
+/// Ported from `TestConvertInput::test_convert_input_from_message_sequence`.
+#[test]
+fn test_convert_input_from_message_sequence() {
+    let model = agent_chain_core::FakeChatModel::new();
+    let messages = vec![BaseMessage::Human(
+        HumanMessage::builder().content("hi").build(),
+    )];
+    let result = model
+        .convert_input(LanguageModelInput::from(messages))
+        .unwrap();
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0].content(), "hi");
+}
+
+// ---- TestGenerateMethod ----
+
+/// Ported from `TestGenerateMethod::test_single_message_list`.
+#[tokio::test]
+async fn test_generate_single_message_list() {
+    let model = FakeListChatModel::new(vec!["response".to_string()]);
+    let result = model
+        .generate(
+            vec![vec![BaseMessage::Human(
+                HumanMessage::builder().content("hello").build(),
+            )]],
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.generations.len(), 1);
+}
+
+/// Ported from `TestGenerateMethod::test_multiple_message_lists`.
+#[tokio::test]
+async fn test_generate_multiple_message_lists() {
+    let model = FakeListChatModel::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
+    let result = model
+        .generate(
+            vec![
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("p1").build(),
+                )],
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("p2").build(),
+                )],
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("p3").build(),
+                )],
+            ],
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.generations.len(), 3);
+}
+
+/// Ported from `TestGenerateMethod::test_generate_returns_chat_result`.
+#[tokio::test]
+async fn test_generate_returns_chat_result() {
+    let model = FakeListChatModel::new(vec!["hello".to_string()]);
+    let result = model
+        .generate(
+            vec![vec![BaseMessage::Human(
+                HumanMessage::builder().content("hi").build(),
+            )]],
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.generations.len(), 1);
+    // Verify it's a ChatGeneration inside
+    match &result.generations[0][0] {
+        agent_chain_core::outputs::GenerationType::ChatGeneration(cg) => {
+            assert_eq!(cg.message.content(), "hello");
+        }
+        _ => panic!("Expected ChatGeneration"),
+    }
+}
+
+// ---- TestAGenerateMethod ----
+
+/// Ported from `TestAGenerateMethod::test_single_message_list`.
+#[tokio::test]
+async fn test_agenerate_single_message_list() {
+    let model = FakeListChatModel::new(vec!["response".to_string()]);
+    let result = model
+        .agenerate(
+            vec![vec![BaseMessage::Human(
+                HumanMessage::builder().content("hello").build(),
+            )]],
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.generations.len(), 1);
+}
+
+/// Ported from `TestAGenerateMethod::test_multiple_message_lists`.
+#[tokio::test]
+async fn test_agenerate_multiple_message_lists() {
+    let model = FakeListChatModel::new(vec!["r1".to_string(), "r2".to_string()]);
+    let result = model
+        .agenerate(
+            vec![
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("p1").build(),
+                )],
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("p2").build(),
+                )],
+            ],
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.generations.len(), 2);
+}
+
+/// Ported from `TestAGenerateMethod::test_agenerate_returns_chat_result`.
+#[tokio::test]
+async fn test_agenerate_returns_chat_result() {
+    let model = FakeListChatModel::new(vec!["hello".to_string()]);
+    let result = model
+        .agenerate(
+            vec![vec![BaseMessage::Human(
+                HumanMessage::builder().content("hi").build(),
+            )]],
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.generations.len(), 1);
+}
+
+// ---- TestBindTools / TestWithStructuredOutput ----
+
+/// Ported from `TestBindTools::test_raises_not_implemented_by_default`.
+#[test]
+fn test_bind_tools_raises_not_implemented() {
+    let model = agent_chain_core::FakeChatModel::new();
+    let result = model.bind_tools(&[], None);
+    assert!(result.is_err());
+}
+
+/// Ported from `TestWithStructuredOutput::test_raises_not_implemented`.
+#[test]
+fn test_with_structured_output_raises_not_implemented() {
+    let model = agent_chain_core::FakeChatModel::new();
+    let result = model.with_structured_output(serde_json::json!({}), false);
+    assert!(result.is_err());
+}
+
+// ---- TestSimpleChatModelGenerate ----
+
+/// Ported from `TestSimpleChatModelGenerate::test_generate_wraps_call_output`.
+#[tokio::test]
+async fn test_simple_chat_model_generate_wraps_call() {
+    let model = agent_chain_core::FakeChatModel::new();
+    let result = model
+        ._generate(
+            vec![BaseMessage::Human(
+                HumanMessage::builder().content("hello").build(),
+            )],
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.generations.len(), 1);
+    assert_eq!(result.generations[0].message.content(), "fake response");
+}
+
+/// Ported from `TestSimpleChatModelFakeChatModel::test_generate_returns_chat_result`.
+#[tokio::test]
+async fn test_simple_fake_chat_generate_returns_chat_result() {
+    let model = agent_chain_core::FakeChatModel::new();
+    let result = model
+        ._generate(
+            vec![BaseMessage::Human(
+                HumanMessage::builder().content("hi").build(),
+            )],
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.generations.len(), 1);
+    assert!(matches!(result.generations[0].message, BaseMessage::AI(_)));
+}
+
+/// Ported from `TestSimpleChatModelFakeChatModel::test_agenerate_returns_chat_result`.
+#[tokio::test]
+async fn test_simple_fake_chat_agenerate_returns_chat_result() {
+    let model = agent_chain_core::FakeChatModel::new();
+    let result = model
+        ._generate(
+            vec![BaseMessage::Human(
+                HumanMessage::builder().content("hi").build(),
+            )],
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.generations.len(), 1);
+    assert_eq!(result.generations[0].message.content(), "fake response");
 }

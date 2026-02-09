@@ -14,7 +14,6 @@ use serde_json::Value;
 use crate::caches::BaseCache;
 use crate::callbacks::Callbacks;
 use crate::error::Result;
-use crate::globals::get_verbose;
 use crate::messages::{AIMessage, BaseMessage};
 use crate::outputs::LLMResult;
 
@@ -89,14 +88,6 @@ impl LangSmithParams {
         self.ls_stop = Some(stop);
         self
     }
-}
-
-/// Get the global verbosity setting.
-///
-/// This is a helper function that returns the global verbose setting.
-/// Python equivalent: `_get_verbosity()` in `langchain_core.language_models.base`
-pub fn get_verbosity() -> bool {
-    get_verbose()
 }
 
 use crate::prompt_values::{ChatPromptValue, ImagePromptValue, StringPromptValue};
@@ -256,12 +247,6 @@ pub struct LanguageModelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache: Option<bool>,
 
-    /// Whether to print verbose output.
-    ///
-    /// If `None` at initialization, will default to global verbose setting.
-    #[serde(default)]
-    pub verbose: bool,
-
     /// Tags to add to the run trace.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
@@ -275,6 +260,10 @@ pub struct LanguageModelConfig {
     /// If provided, this function will be used instead of the default tokenizer.
     #[serde(skip)]
     pub custom_get_token_ids: Option<CustomGetTokenIds>,
+
+    /// Callbacks to invoke during model execution.
+    #[serde(skip)]
+    pub callbacks: Option<Callbacks>,
 }
 
 impl LanguageModelConfig {
@@ -286,12 +275,6 @@ impl LanguageModelConfig {
     /// Enable caching.
     pub fn with_cache(mut self, cache: bool) -> Self {
         self.cache = Some(cache);
-        self
-    }
-
-    /// Enable verbose mode.
-    pub fn with_verbose(mut self, verbose: bool) -> Self {
-        self.verbose = verbose;
         self
     }
 
@@ -313,6 +296,12 @@ impl LanguageModelConfig {
     /// when calling `get_token_ids` on a model using this configuration.
     pub fn with_custom_get_token_ids(mut self, tokenizer: CustomGetTokenIds) -> Self {
         self.custom_get_token_ids = Some(tokenizer);
+        self
+    }
+
+    /// Set callbacks for this model.
+    pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
+        self.callbacks = Some(callbacks);
         self
     }
 }
@@ -508,11 +497,9 @@ mod tests {
     fn test_language_model_config_builder() {
         let config = LanguageModelConfig::new()
             .with_cache(true)
-            .with_verbose(true)
             .with_tags(vec!["test".to_string()]);
 
         assert_eq!(config.cache, Some(true));
-        assert!(config.verbose);
         assert_eq!(config.tags, Some(vec!["test".to_string()]));
     }
 }

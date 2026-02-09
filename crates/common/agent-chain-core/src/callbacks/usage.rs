@@ -85,7 +85,7 @@ impl fmt::Display for UsageMetadataCallbackHandler {
 }
 
 impl LLMManagerMixin for UsageMetadataCallbackHandler {
-    fn on_llm_end(&mut self, response: &ChatResult, _run_id: Uuid, _parent_run_id: Option<Uuid>) {
+    fn on_llm_end(&self, response: &ChatResult, _run_id: Uuid, _parent_run_id: Option<Uuid>) {
         // Extract usage metadata from the first generation's message
         let first_generation = response.generations.first();
 
@@ -108,7 +108,7 @@ impl LLMManagerMixin for UsageMetadataCallbackHandler {
                         generation
                             .message
                             .response_metadata()
-                            .and_then(|meta| meta.get("model"))
+                            .and_then(|meta| meta.get("model_name"))
                             .and_then(|v| v.as_str())
                             .map(|s| s.to_string())
                     });
@@ -297,7 +297,7 @@ mod tests {
 
     #[test]
     fn test_on_llm_end_collects_usage() {
-        let mut handler = UsageMetadataCallbackHandler::new();
+        let handler = UsageMetadataCallbackHandler::new();
 
         let result = create_chat_result_with_usage("Hello", "gpt-4", 10, 20);
 
@@ -314,7 +314,7 @@ mod tests {
 
     #[test]
     fn test_on_llm_end_accumulates_usage() {
-        let mut handler = UsageMetadataCallbackHandler::new();
+        let handler = UsageMetadataCallbackHandler::new();
 
         let result1 = create_chat_result_with_usage("Hello", "gpt-4", 10, 20);
         let result2 = create_chat_result_with_usage("World", "gpt-4", 5, 15);
@@ -333,7 +333,7 @@ mod tests {
 
     #[test]
     fn test_on_llm_end_multiple_models() {
-        let mut handler = UsageMetadataCallbackHandler::new();
+        let handler = UsageMetadataCallbackHandler::new();
 
         let result1 = create_chat_result_with_usage("Hello", "gpt-4", 10, 20);
         let result2 = create_chat_result_with_usage("Hello", "claude-3", 8, 25);
@@ -353,7 +353,7 @@ mod tests {
 
     #[test]
     fn test_clone_shares_state() {
-        let mut handler1 = UsageMetadataCallbackHandler::new();
+        let handler1 = UsageMetadataCallbackHandler::new();
         let handler2 = handler1.clone();
 
         let result = create_chat_result_with_usage("Hello", "gpt-4", 10, 20);

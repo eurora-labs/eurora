@@ -6,23 +6,52 @@
 use std::collections::VecDeque;
 use std::fmt::Debug;
 
+use futures::stream::BoxStream;
 use regex::Regex;
 
 use crate::error::Result;
+use crate::messages::BaseMessage;
 
 use super::base::BaseOutputParser;
 use super::transform::BaseTransformOutputParser;
+
+/// A single match from `parse_iter`, carrying the captured group text
+/// and the byte offset where the overall match ends in the input.
+///
+/// Mirrors the `re.Match` objects returned by Python's
+/// `ListOutputParser.parse_iter`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseMatch {
+    /// The text captured by the first group (equivalent to `m.group(1)`).
+    pub group: String,
+    /// The byte offset where the overall regex match ends in the input
+    /// (equivalent to `m.end()`).
+    pub end: usize,
+}
 
 /// Parse the output of a model to a list.
 ///
 /// This is a base trait for list output parsers.
 pub trait ListOutputParser: BaseOutputParser<Output = Vec<String>> {
-    /// Parse the output iteratively, yielding strings.
+    /// Parse the output iteratively, yielding match results.
     ///
-    /// Returns a vector of matched strings. Used for streaming parsing.
+    /// Returns a vector of [`ParseMatch`] values carrying the captured text
+    /// and the end position of each match. Used for streaming parsing where
+    /// the caller needs to know how much of the input has been consumed.
+    ///
     /// The default implementation returns an empty vector.
-    fn parse_iter(&self, _text: &str) -> Vec<String> {
+    fn parse_iter(&self, _text: &str) -> Vec<ParseMatch> {
         Vec::new()
+    }
+
+    /// Parse the output without filtering empty strings.
+    ///
+    /// Used internally by the streaming transform fallback path.
+    /// Python's CSV reader preserves empty fields from trailing commas
+    /// (e.g., `"foo,"` → `["foo", ""]`), which the streaming logic relies on
+    /// to detect complete items. The default delegates to `parse()`.
+    fn parse_with_empties(&self, text: &str) -> Result<Vec<String>> {
+        self.parse(text)
     }
 }
 
@@ -114,9 +143,47 @@ impl BaseOutputParser for CommaSeparatedListOutputParser {
     }
 }
 
-impl BaseTransformOutputParser for CommaSeparatedListOutputParser {}
+impl BaseTransformOutputParser for CommaSeparatedListOutputParser {
+    fn transform<'a>(
+        &'a self,
+        input: BoxStream<'a, BaseMessage>,
+    ) -> BoxStream<'a, Result<Self::Output>>
+    where
+        Self::Output: 'a,
+    {
+        list_transform(self, input)
+    }
+}
 
-impl ListOutputParser for CommaSeparatedListOutputParser {}
+impl ListOutputParser for CommaSeparatedListOutputParser {
+    fn parse_with_empties(&self, text: &str) -> Result<Vec<String>> {
+        let mut reader = csv::ReaderBuilder::new()
+            .has_headers(false)
+            .flexible(true)
+            .trim(csv::Trim::All)
+            .from_reader(text.as_bytes());
+
+        let mut result = Vec::new();
+        for record in reader.records() {
+            match record {
+                Ok(rec) => {
+                    for field in rec.iter() {
+                        result.push(field.to_string());
+                    }
+                }
+                Err(_) => {
+                    return Ok(text.split(',').map(|s| s.trim().to_string()).collect());
+                }
+            }
+        }
+
+        if result.is_empty() {
+            Ok(text.split(',').map(|s| s.trim().to_string()).collect())
+        } else {
+            Ok(result)
+        }
+    }
+}
 
 /// Parse a numbered list.
 ///
@@ -185,13 +252,30 @@ impl BaseOutputParser for NumberedListOutputParser {
     }
 }
 
-impl BaseTransformOutputParser for NumberedListOutputParser {}
+impl BaseTransformOutputParser for NumberedListOutputParser {
+    fn transform<'a>(
+        &'a self,
+        input: BoxStream<'a, BaseMessage>,
+    ) -> BoxStream<'a, Result<Self::Output>>
+    where
+        Self::Output: 'a,
+    {
+        list_transform(self, input)
+    }
+}
 
 impl ListOutputParser for NumberedListOutputParser {
-    fn parse_iter(&self, text: &str) -> Vec<String> {
+    fn parse_iter(&self, text: &str) -> Vec<ParseMatch> {
         let re = self.get_regex();
         re.captures_iter(text)
-            .filter_map(|cap| cap.get(1).map(|m| m.as_str().trim().to_string()))
+            .filter_map(|cap| {
+                let overall = cap.get(0)?;
+                let group = cap.get(1)?;
+                Some(ParseMatch {
+                    group: group.as_str().trim().to_string(),
+                    end: overall.end(),
+                })
+            })
             .collect()
     }
 }
@@ -262,18 +346,101 @@ impl BaseOutputParser for MarkdownListOutputParser {
     }
 }
 
-impl BaseTransformOutputParser for MarkdownListOutputParser {}
+impl BaseTransformOutputParser for MarkdownListOutputParser {
+    fn transform<'a>(
+        &'a self,
+        input: BoxStream<'a, BaseMessage>,
+    ) -> BoxStream<'a, Result<Self::Output>>
+    where
+        Self::Output: 'a,
+    {
+        list_transform(self, input)
+    }
+}
 
 impl ListOutputParser for MarkdownListOutputParser {
-    fn parse_iter(&self, text: &str) -> Vec<String> {
+    fn parse_iter(&self, text: &str) -> Vec<ParseMatch> {
         let re = self.get_regex();
+        let mut offset = 0;
         text.lines()
             .filter_map(|line| {
-                re.captures(line)
-                    .and_then(|cap| cap.get(1).map(|m| m.as_str().trim().to_string()))
+                let line_start = offset;
+                // +1 accounts for the newline character (or 0 at end of text)
+                offset += line.len() + 1;
+                re.captures(line).and_then(|cap| {
+                    let group = cap.get(1)?;
+                    let overall = cap.get(0)?;
+                    Some(ParseMatch {
+                        group: group.as_str().trim().to_string(),
+                        end: line_start + overall.end(),
+                    })
+                })
             })
             .collect()
     }
+}
+
+/// Streaming transform implementation for list parsers.
+///
+/// Mirrors the `_transform` method of Python's `ListOutputParser`. Accumulates
+/// text from incoming message chunks and yields individual list items as they
+/// become complete. For parsers that implement `parse_iter` (returning non-empty
+/// results), it uses `drop_last_n` to avoid yielding the last (potentially
+/// incomplete) item until the stream ends. For parsers without `parse_iter`
+/// (like `CommaSeparatedListOutputParser`), it falls back to `parse()` and holds
+/// back the last item.
+fn list_transform<'a, P: ListOutputParser + 'a>(
+    parser: &'a P,
+    input: BoxStream<'a, BaseMessage>,
+) -> BoxStream<'a, Result<Vec<String>>> {
+    use futures::StreamExt;
+
+    Box::pin(async_stream::stream! {
+        let mut buffer = String::new();
+        let mut stream = input;
+
+        while let Some(message) = stream.next().await {
+            let chunk_content = message.content();
+            buffer.push_str(chunk_content);
+
+            let iter_results = parser.parse_iter(&buffer);
+            if !iter_results.is_empty() {
+                let mut done_idx = 0;
+                for m in drop_last_n(iter_results.into_iter(), 1) {
+                    done_idx = m.end;
+                    yield Ok(vec![m.group]);
+                }
+                buffer = buffer[done_idx..].to_string();
+            } else {
+                match parser.parse_with_empties(&buffer) {
+                    Ok(parts) => {
+                        if parts.len() > 1 {
+                            for part in &parts[..parts.len() - 1] {
+                                if !part.is_empty() {
+                                    yield Ok(vec![part.clone()]);
+                                }
+                            }
+                            buffer = parts[parts.len() - 1].clone();
+                        }
+                    }
+                    Err(err) => {
+                        yield Err(err);
+                    }
+                }
+            }
+        }
+
+        match parser.parse(&buffer) {
+            Ok(parts) => {
+                for part in parts {
+                    yield Ok(vec![part]);
+                }
+            }
+            Err(err) => {
+                yield Err(err);
+            }
+        }
+    })
 }
 
 /// Drop the last n elements of an iterator.

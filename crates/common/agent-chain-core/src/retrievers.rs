@@ -290,7 +290,6 @@ pub trait BaseRetriever: Send + Sync + Debug {
             self.tags().map(|t| t.to_vec()),
             Some(inheritable_metadata),
             self.metadata().cloned(),
-            false,
         );
 
         // Start retriever run
@@ -345,7 +344,6 @@ pub trait BaseRetriever: Send + Sync + Debug {
             self.tags().map(|t| t.to_vec()),
             Some(inheritable_metadata),
             self.metadata().cloned(),
-            false,
         );
 
         // Start retriever run

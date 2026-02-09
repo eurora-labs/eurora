@@ -1,0 +1,15 @@
+//! Unit tests for agent-chain-core callbacks module.
+//!
+//! Test structure mirrors `langchain/libs/core/tests/unit_tests/callbacks/`
+
+mod test_async_callback_manager;
+mod test_base;
+mod test_base_snapshot;
+mod test_dispatch_custom_event;
+mod test_manager;
+mod test_manager_snapshot;
+mod test_stdout;
+mod test_stdout_snapshot;
+mod test_sync_callback_manager;
+mod test_usage_callback;
+mod test_usage_snapshot;
