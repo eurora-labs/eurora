@@ -599,7 +599,7 @@ impl BaseChatModel for GenericFakeChatModel {
         &self,
         _messages: Vec<BaseMessage>,
         _stop: Option<Vec<String>>,
-        _run_manager: Option<&CallbackManagerForLLMRun>,
+        run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
         // Get the message via _generate
         let message = {
@@ -612,6 +612,17 @@ impl BaseChatModel for GenericFakeChatModel {
         let content = message.content().to_string();
         let message_id = message.id;
         let additional_kwargs = message.additional_kwargs.clone();
+
+        // Extract callback data from run_manager so we can call on_llm_new_token
+        // inside the stream. We clone the Arc handlers (cheap) so the stream
+        // can own them without borrowing run_manager.
+        let callback_handlers: Vec<
+            std::sync::Arc<dyn crate::callbacks::base::BaseCallbackHandler>,
+        > = run_manager
+            .map(|rm| rm.handlers().to_vec())
+            .unwrap_or_default();
+        let callback_run_id = run_manager.map(|rm| rm.run_id());
+        let callback_parent_run_id = run_manager.and_then(|rm| rm.parent_run_id());
 
         let stream = async_stream::stream! {
             if !content.is_empty() {
@@ -653,7 +664,12 @@ impl BaseChatModel for GenericFakeChatModel {
 
                     let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
 
-                    // TODO: call run_manager.on_llm_new_token(token, chunk=chunk) if run_manager is provided
+                    // Invoke on_llm_new_token on each handler
+                    if let Some(run_id) = callback_run_id {
+                        for handler in &callback_handlers {
+                            handler.on_llm_new_token(&token, run_id, callback_parent_run_id, None);
+                        }
+                    }
 
                     yield Ok(chunk);
                 }
