@@ -422,3 +422,112 @@ fn test_empty_string() {
     let uri = "";
     assert!(parse_data_uri(uri).is_none());
 }
+
+// ====================================================================
+// TestUpdateMessageContentToBlocks
+// ====================================================================
+
+use agent_chain_core::language_models::update_message_content_to_blocks;
+use agent_chain_core::messages::AIMessage;
+use std::collections::HashMap;
+
+/// Ported from `test_updates_content_to_content_blocks`.
+#[test]
+fn test_updates_content_to_content_blocks() {
+    let message = AIMessage::builder().content("Hello world").build();
+    let result = update_message_content_to_blocks(&message, "v1");
+
+    assert_eq!(
+        result
+            .response_metadata
+            .get("output_version")
+            .and_then(|v| v.as_str()),
+        Some("v1")
+    );
+}
+
+/// Ported from `test_preserves_original_message`.
+#[test]
+fn test_preserves_original_message() {
+    let message = AIMessage::builder().content("Hello world").build();
+    let original_content = message.content.clone();
+
+    let result = update_message_content_to_blocks(&message, "v1");
+
+    // Original message should be unchanged
+    assert_eq!(message.content, original_content);
+    // Result should be a different instance (verified by metadata difference)
+    assert!(result.response_metadata.contains_key("output_version"));
+    assert!(!message.response_metadata.contains_key("output_version"));
+}
+
+/// Ported from `test_with_complex_content`.
+#[test]
+fn test_with_complex_content() {
+    let content_list = serde_json::json!([
+        {"type": "text", "text": "Hello"},
+        {"type": "tool_use", "id": "123", "name": "test", "input": {}}
+    ]);
+    let message = AIMessage::builder()
+        .content(serde_json::to_string(&content_list).unwrap())
+        .build();
+
+    let result = update_message_content_to_blocks(&message, "v1");
+
+    assert_eq!(
+        result
+            .response_metadata
+            .get("output_version")
+            .and_then(|v| v.as_str()),
+        Some("v1")
+    );
+}
+
+/// Ported from `test_with_different_output_version`.
+#[test]
+fn test_with_different_output_version() {
+    let message = AIMessage::builder().content("Test").build();
+    let result = update_message_content_to_blocks(&message, "v2");
+
+    assert_eq!(
+        result
+            .response_metadata
+            .get("output_version")
+            .and_then(|v| v.as_str()),
+        Some("v2")
+    );
+}
+
+/// Ported from `test_preserves_existing_response_metadata`.
+#[test]
+fn test_preserves_existing_response_metadata() {
+    let mut response_metadata = HashMap::new();
+    response_metadata.insert("model".to_string(), serde_json::json!("test-model"));
+    response_metadata.insert("usage".to_string(), serde_json::json!({"tokens": 10}));
+
+    let message = AIMessage::builder()
+        .content("Hello")
+        .response_metadata(response_metadata)
+        .build();
+
+    let result = update_message_content_to_blocks(&message, "v1");
+
+    assert_eq!(
+        result
+            .response_metadata
+            .get("model")
+            .and_then(|v| v.as_str()),
+        Some("test-model")
+    );
+    assert_eq!(
+        result.response_metadata.get("usage"),
+        Some(&serde_json::json!({"tokens": 10}))
+    );
+    assert_eq!(
+        result
+            .response_metadata
+            .get("output_version")
+            .and_then(|v| v.as_str()),
+        Some("v1")
+    );
+}

@@ -81,7 +81,7 @@ pub use model_profile::{ModelProfile, ModelProfileRegistry};
 pub use utils::{
     DataBlockFilter as OpenAiDataBlockFilter, ParsedDataUri, convert_legacy_v0_content_block_to_v1,
     convert_openai_format_to_data_block, estimate_token_count, get_token_ids_default,
-    is_openai_data_block, parse_data_uri,
+    is_openai_data_block, parse_data_uri, update_message_content_to_blocks,
 };
 
 /// Type alias for a boxed language model input.

@@ -797,3 +797,55 @@ mod test_agenerate_prompt {
         assert_eq!(result.generations.len(), 0);
     }
 }
+
+// ====================================================================
+// Previously skipped tests — now implemented
+// ====================================================================
+
+#[cfg(test)]
+mod test_callbacks_config {
+    use agent_chain_core::callbacks::Callbacks;
+    use agent_chain_core::callbacks::base::{
+        BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
+        RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
+    };
+    use agent_chain_core::language_models::LanguageModelConfig;
+    use std::sync::Arc;
+
+    #[derive(Debug)]
+    struct TestHandler;
+    impl LLMManagerMixin for TestHandler {}
+    impl ChainManagerMixin for TestHandler {}
+    impl ToolManagerMixin for TestHandler {}
+    impl RetrieverManagerMixin for TestHandler {}
+    impl CallbackManagerMixin for TestHandler {}
+    impl RunManagerMixin for TestHandler {}
+    impl BaseCallbackHandler for TestHandler {
+        fn name(&self) -> &str {
+            "TestHandler"
+        }
+    }
+
+    /// Ported from `test_initialization_with_callbacks`.
+    #[test]
+    fn test_initialization_with_callbacks() {
+        let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
+        let callbacks = Callbacks::from_handlers(vec![handler]);
+        let config = LanguageModelConfig::new().with_callbacks(callbacks);
+        assert!(config.callbacks.is_some());
+    }
+
+    /// Ported from `test_callbacks_excluded_from_serialization`.
+    #[test]
+    fn test_callbacks_excluded_from_serialization() {
+        let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
+        let callbacks = Callbacks::from_handlers(vec![handler]);
+        let config = LanguageModelConfig::new().with_callbacks(callbacks);
+
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(
+            !json.contains("callbacks"),
+            "callbacks should be excluded from serialization"
+        );
+    }
+}
