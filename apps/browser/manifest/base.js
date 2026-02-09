@@ -4,11 +4,12 @@ export const base = {
 	version: '0.0.0',
 	minimum_chrome_version: '102.0',
 	action: { default_popup: 'popup.html' },
-	description: 'A browser extension for Eurora',
+	description:
+		'A browser extension that allows the Eurora desktop app to communicate with the browser.',
 	content_security_policy: {
 		extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
 	},
-	permissions: ['nativeMessaging', 'tabs', 'storage', 'scripting', 'webRequest', 'webNavigation'],
+	permissions: ['nativeMessaging', 'tabs', 'scripting', 'webNavigation'],
 	icons: {
 		16: 'icon-16x16.png',
 		32: 'icon-32x32.png',
