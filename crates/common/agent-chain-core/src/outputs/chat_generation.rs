@@ -75,14 +75,47 @@ impl ChatGeneration {
             generation_type: "ChatGeneration".to_string(),
         }
     }
+
+    /// Returns `true` as this class is serializable.
+    ///
+    /// Inherited from Generation in Python.
+    pub fn is_lc_serializable() -> bool {
+        true
+    }
+
+    /// Get the namespace of the LangChain object.
+    ///
+    /// Returns `["langchain", "schema", "output"]`.
+    /// Inherited from Generation in Python.
+    pub fn get_lc_namespace() -> Vec<&'static str> {
+        vec!["langchain", "schema", "output"]
+    }
 }
 
 /// Extract text from a message.
 ///
 /// This corresponds to the `set_text` model validator in Python which
-/// extracts the text content from the message.
+/// extracts the text content from the message. When the content is a JSON
+/// array (OpenAI-style content blocks), the first text block is used.
 fn extract_text_from_message(message: &BaseMessage) -> String {
-    message.content().to_string()
+    let content = message.content();
+
+    // Try parsing as a JSON array of content blocks (OpenAI format)
+    if let Ok(blocks) = serde_json::from_str::<Vec<Value>>(content) {
+        for block in &blocks {
+            if let Some(s) = block.as_str() {
+                return s.to_string();
+            }
+            if let Some(obj) = block.as_object()
+                && let Some(Value::String(text)) = obj.get("text")
+            {
+                return text.clone();
+            }
+        }
+        return String::new();
+    }
+
+    content.to_string()
 }
 
 /// `ChatGeneration` chunk.

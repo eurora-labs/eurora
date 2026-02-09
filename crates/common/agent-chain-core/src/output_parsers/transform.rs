@@ -33,19 +33,16 @@ pub trait BaseTransformOutputParser: BaseOutputParser {
     /// Default implementation yields a parsed result for each chunk.
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, StringOrMessage>,
+        input: BoxStream<'a, BaseMessage>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
     {
         Box::pin(async_stream::stream! {
             let mut stream = input;
-            while let Some(chunk) = stream.next().await {
-                let generation = match chunk {
-                    StringOrMessage::Text(text) => Generation::new(text),
-                    StringOrMessage::Message(msg) => Generation::new((*msg).content()),
-                };
-                yield self.parse_generation(&generation);
+            while let Some(message) = stream.next().await {
+                let generation = Generation::new(message.content());
+                yield self.parse_result(&[generation], false);
             }
         })
     }
@@ -53,7 +50,7 @@ pub trait BaseTransformOutputParser: BaseOutputParser {
     /// Async transform an input stream into an output stream.
     fn atransform<'a>(
         &'a self,
-        input: BoxStream<'a, StringOrMessage>,
+        input: BoxStream<'a, BaseMessage>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
@@ -89,7 +86,7 @@ pub trait BaseCumulativeTransformOutputParser: BaseOutputParser {
     /// yielding intermediate results as they change.
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, StringOrMessage>,
+        input: BoxStream<'a, BaseMessage>,
         _config: Option<RunnableConfig>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
@@ -102,13 +99,8 @@ pub trait BaseCumulativeTransformOutputParser: BaseOutputParser {
             let mut acc_gen: Option<AccumulatedGeneration> = None;
             let mut stream = input;
 
-            while let Some(chunk) = stream.next().await {
-                let chunk_gen = match chunk {
-                    StringOrMessage::Text(text) => AccumulatedGeneration::Text(text),
-                    StringOrMessage::Message(msg) => {
-                        AccumulatedGeneration::Text((*msg).content().to_string())
-                    }
-                };
+            while let Some(message) = stream.next().await {
+                let chunk_gen = AccumulatedGeneration::Text(message.content().to_string());
 
                 acc_gen = Some(match acc_gen {
                     None => chunk_gen,
@@ -140,40 +132,13 @@ pub trait BaseCumulativeTransformOutputParser: BaseOutputParser {
     /// Async transform an input stream into an output stream.
     fn atransform<'a>(
         &'a self,
-        input: BoxStream<'a, StringOrMessage>,
+        input: BoxStream<'a, BaseMessage>,
         config: Option<RunnableConfig>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: PartialEq + 'a,
     {
         self.transform(input, config)
-    }
-}
-
-/// Input type that can be either a string or a message.
-#[derive(Debug, Clone)]
-pub enum StringOrMessage {
-    /// Raw text input.
-    Text(String),
-    /// Message input.
-    Message(Box<BaseMessage>),
-}
-
-impl From<String> for StringOrMessage {
-    fn from(text: String) -> Self {
-        StringOrMessage::Text(text)
-    }
-}
-
-impl From<&str> for StringOrMessage {
-    fn from(text: &str) -> Self {
-        StringOrMessage::Text(text.to_string())
-    }
-}
-
-impl From<BaseMessage> for StringOrMessage {
-    fn from(msg: BaseMessage) -> Self {
-        StringOrMessage::Message(Box::new(msg))
     }
 }
 
@@ -268,15 +233,6 @@ mod tests {
         let generation = Generation::new("world");
         let result = parser.parse_generation(&generation).unwrap();
         assert_eq!(result, "WORLD");
-    }
-
-    #[test]
-    fn test_string_or_message_from_string() {
-        let input: StringOrMessage = "test".into();
-        match input {
-            StringOrMessage::Text(t) => assert_eq!(t, "test"),
-            _ => panic!("Expected Text variant"),
-        }
     }
 
     #[test]

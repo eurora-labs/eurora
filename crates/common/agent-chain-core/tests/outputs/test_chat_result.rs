@@ -2,8 +2,8 @@
 //!
 //! Ported from `langchain/libs/core/tests/unit_tests/outputs/test_chat_result.py`
 
-use agent_chain_core::messages::AIMessage;
-use agent_chain_core::outputs::{ChatGeneration, ChatResult};
+use agent_chain_core::messages::{AIMessage, AIMessageChunk};
+use agent_chain_core::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult};
 use serde_json::json;
 use std::collections::HashMap;
 
@@ -178,5 +178,188 @@ mod chat_result_tests {
         for (i, chat_gen) in result.generations.iter().enumerate() {
             assert_eq!(chat_gen.text, format!("Candidate {}", i + 1));
         }
+    }
+}
+
+/// Test suite for ChatResult serialization roundtrips.
+mod chat_result_serialization_tests {
+    use super::*;
+
+    /// Test serialization for ChatResult.
+    #[test]
+    fn test_model_dump_basic() {
+        let chat_gen = ChatGeneration::new(AIMessage::builder().content("Hello").build().into());
+        let result = ChatResult::new(vec![chat_gen]);
+        let data = serde_json::to_value(&result).expect("serialization should succeed");
+        assert!(data.get("generations").is_some());
+        assert_eq!(
+            data.get("generations").unwrap().as_array().unwrap().len(),
+            1
+        );
+        assert!(data.get("llm_output").is_none());
+    }
+
+    /// Test serialization includes llm_output.
+    #[test]
+    fn test_model_dump_with_llm_output() {
+        let chat_gen = ChatGeneration::new(AIMessage::builder().content("Hello").build().into());
+        let mut llm_output = HashMap::new();
+        llm_output.insert("model".to_string(), json!("gpt-4"));
+        llm_output.insert("token_usage".to_string(), json!({"total": 50}));
+        let result = ChatResult::with_llm_output(vec![chat_gen], llm_output);
+        let data = serde_json::to_value(&result).expect("serialization should succeed");
+        assert_eq!(data["llm_output"]["model"], json!("gpt-4"));
+        assert_eq!(data["llm_output"]["token_usage"]["total"], json!(50));
+    }
+
+    /// Test JSON serialization roundtrip.
+    #[test]
+    fn test_json_roundtrip() {
+        let mut generation_info = HashMap::new();
+        generation_info.insert("finish_reason".to_string(), json!("stop"));
+        let chat_gen = ChatGeneration::with_info(
+            AIMessage::builder().content("test").build().into(),
+            generation_info,
+        );
+        let mut llm_output = HashMap::new();
+        llm_output.insert("model".to_string(), json!("gpt-4"));
+        let result = ChatResult::with_llm_output(vec![chat_gen], llm_output);
+
+        let json_str = serde_json::to_string(&result).expect("serialization should succeed");
+        let restored: ChatResult =
+            serde_json::from_str(&json_str).expect("deserialization should succeed");
+        assert_eq!(restored.generations.len(), 1);
+        assert_eq!(restored.generations[0].text, "test");
+        let mut expected_output = HashMap::new();
+        expected_output.insert("model".to_string(), json!("gpt-4"));
+        assert_eq!(restored.llm_output, Some(expected_output));
+    }
+
+    /// Test deserialization from a Value (dict equivalent).
+    #[test]
+    fn test_model_validate_from_dict() {
+        let chat_gen = ChatGeneration::new(AIMessage::builder().content("test").build().into());
+        let mut llm_output = HashMap::new();
+        llm_output.insert("key".to_string(), json!("val"));
+        let result = ChatResult::with_llm_output(vec![chat_gen], llm_output);
+
+        let data = serde_json::to_value(&result).expect("serialization should succeed");
+        let restored: ChatResult =
+            serde_json::from_value(data).expect("deserialization should succeed");
+        assert_eq!(restored.generations.len(), result.generations.len());
+        assert_eq!(restored.llm_output, result.llm_output);
+    }
+}
+
+/// Test suite for ChatResult equality semantics.
+mod chat_result_equality_tests {
+    use super::*;
+
+    /// Test equality for ChatResults with same content.
+    #[test]
+    fn test_equality_same_content() {
+        let chat_gen = ChatGeneration::new(AIMessage::builder().content("Hello").build().into());
+        let mut llm_output = HashMap::new();
+        llm_output.insert("model".to_string(), json!("gpt-4"));
+        let result1 = ChatResult::with_llm_output(vec![chat_gen.clone()], llm_output.clone());
+        let result2 = ChatResult::with_llm_output(vec![chat_gen], llm_output);
+        assert_eq!(result1, result2);
+    }
+
+    /// Test inequality for ChatResults with different generations.
+    #[test]
+    fn test_inequality_different_generations() {
+        let chat_gen1 = ChatGeneration::new(AIMessage::builder().content("Hello").build().into());
+        let chat_gen2 = ChatGeneration::new(AIMessage::builder().content("Goodbye").build().into());
+        let result1 = ChatResult::new(vec![chat_gen1]);
+        let result2 = ChatResult::new(vec![chat_gen2]);
+        assert_ne!(result1, result2);
+    }
+
+    /// Test inequality for ChatResults with different llm_output.
+    #[test]
+    fn test_inequality_different_llm_output() {
+        let chat_gen = ChatGeneration::new(AIMessage::builder().content("Hello").build().into());
+        let mut output1 = HashMap::new();
+        output1.insert("model".to_string(), json!("gpt-4"));
+        let mut output2 = HashMap::new();
+        output2.insert("model".to_string(), json!("gpt-3.5"));
+        let result1 = ChatResult::with_llm_output(vec![chat_gen.clone()], output1);
+        let result2 = ChatResult::with_llm_output(vec![chat_gen], output2);
+        assert_ne!(result1, result2);
+    }
+
+    /// Test equality when both have None llm_output.
+    #[test]
+    fn test_equality_both_none_llm_output() {
+        let chat_gen = ChatGeneration::new(AIMessage::builder().content("Hello").build().into());
+        let result1 = ChatResult::new(vec![chat_gen.clone()]);
+        let result2 = ChatResult::new(vec![chat_gen]);
+        assert_eq!(result1, result2);
+    }
+}
+
+/// Test suite for ChatResult model behavior.
+mod chat_result_model_behavior_tests {
+    use super::*;
+
+    /// Test ChatResult with ChatGenerationChunk objects.
+    ///
+    /// In Python, ChatGenerationChunk is a subclass of ChatGeneration, so it
+    /// can be stored directly. In Rust, we convert via From<ChatGenerationChunk>.
+    #[test]
+    fn test_with_chat_generation_chunk() {
+        let chunk = ChatGenerationChunk::new(
+            AIMessageChunk::builder()
+                .content("chunk")
+                .build()
+                .to_message()
+                .into(),
+        );
+        let chat_gen: ChatGeneration = chunk.into();
+        let result = ChatResult::new(vec![chat_gen]);
+        assert_eq!(result.generations.len(), 1);
+        assert_eq!(result.generations[0].text, "chunk");
+    }
+
+    /// Test that generation ordering is preserved.
+    #[test]
+    fn test_generations_ordering_preserved() {
+        let generations: Vec<ChatGeneration> = (0..5)
+            .map(|i| {
+                ChatGeneration::new(
+                    AIMessage::builder()
+                        .content(format!("Response {i}"))
+                        .build()
+                        .into(),
+                )
+            })
+            .collect();
+        let result = ChatResult::new(generations);
+        for (i, generation) in result.generations.iter().enumerate() {
+            assert_eq!(generation.text, format!("Response {i}"));
+        }
+    }
+
+    /// Test ChatResult with generations having different content types.
+    ///
+    /// In Python, AIMessage content can be a string or a list of content blocks.
+    /// In Rust, list content is stored as a JSON string via `with_content_list`,
+    /// and text extraction follows the same logic as Python's `set_text` validator.
+    #[test]
+    fn test_generations_with_mixed_content_types() {
+        let gen_str = ChatGeneration::new(
+            AIMessage::builder()
+                .content("string content")
+                .build()
+                .into(),
+        );
+        let gen_list = ChatGeneration::new(
+            AIMessage::with_content_list(vec![json!({"text": "list content", "type": "text"})])
+                .into(),
+        );
+        let result = ChatResult::new(vec![gen_str, gen_list]);
+        assert_eq!(result.generations[0].text, "string content");
+        assert_eq!(result.generations[1].text, "list content");
     }
 }
