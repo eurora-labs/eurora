@@ -72,7 +72,7 @@ impl RetrieverManagerMixin for StdOutCallbackHandler {}
 
 impl ToolManagerMixin for StdOutCallbackHandler {
     fn on_tool_end(
-        &mut self,
+        &self,
         output: &str,
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
@@ -96,7 +96,7 @@ impl ToolManagerMixin for StdOutCallbackHandler {
 
 impl RunManagerMixin for StdOutCallbackHandler {
     fn on_text(
-        &mut self,
+        &self,
         text: &str,
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
@@ -111,7 +111,7 @@ impl RunManagerMixin for StdOutCallbackHandler {
 
 impl CallbackManagerMixin for StdOutCallbackHandler {
     fn on_chain_start(
-        &mut self,
+        &self,
         serialized: &HashMap<String, serde_json::Value>,
         _inputs: &HashMap<String, serde_json::Value>,
         _run_id: Uuid,
@@ -150,7 +150,7 @@ impl CallbackManagerMixin for StdOutCallbackHandler {
 
 impl ChainManagerMixin for StdOutCallbackHandler {
     fn on_chain_end(
-        &mut self,
+        &self,
         _outputs: &HashMap<String, serde_json::Value>,
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
@@ -159,7 +159,7 @@ impl ChainManagerMixin for StdOutCallbackHandler {
     }
 
     fn on_agent_action(
-        &mut self,
+        &self,
         action: &serde_json::Value,
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
@@ -173,7 +173,7 @@ impl ChainManagerMixin for StdOutCallbackHandler {
     }
 
     fn on_agent_finish(
-        &mut self,
+        &self,
         finish: &serde_json::Value,
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
@@ -208,7 +208,7 @@ impl StreamingStdOutCallbackHandler {
 
 impl LLMManagerMixin for StreamingStdOutCallbackHandler {
     fn on_llm_new_token(
-        &mut self,
+        &self,
         token: &str,
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,

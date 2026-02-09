@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
+use std::sync::Mutex;
 
 use uuid::Uuid;
 
@@ -41,7 +42,7 @@ pub struct FileCallbackHandler {
     pub color: Option<String>,
     /// The buffered writer wrapping the file.
     /// This is an Option to support the close() method.
-    file: Option<BufWriter<File>>,
+    file: Mutex<Option<BufWriter<File>>>,
 }
 
 impl FileCallbackHandler {
@@ -95,7 +96,7 @@ impl FileCallbackHandler {
             filename: filename.as_ref().to_string_lossy().to_string(),
             mode: mode.to_string(),
             color: None,
-            file: Some(BufWriter::new(file)),
+            file: Mutex::new(Some(BufWriter::new(file))),
         })
     }
 
@@ -130,10 +131,9 @@ impl FileCallbackHandler {
     ///
     /// This method is safe to call multiple times and will only close
     /// the file if it's currently open.
-    pub fn close(&mut self) {
-        if let Some(mut writer) = self.file.take() {
+    pub fn close(&self) {
+        if let Some(mut writer) = self.file.lock().unwrap().take() {
             let _ = writer.flush();
-            // File will be closed when writer is dropped
         }
     }
 
@@ -143,16 +143,16 @@ impl FileCallbackHandler {
     ///
     /// * `text` - The text to write to the file.
     /// * `end` - String appended after the text.
-    fn write(&mut self, text: &str, end: &str) {
-        if let Some(ref mut writer) = self.file {
+    fn write(&self, text: &str, end: &str) {
+        if let Some(ref mut writer) = *self.file.lock().unwrap() {
             let _ = write!(writer, "{}{}", text, end);
             let _ = writer.flush();
         }
     }
 
     /// Flush the writer.
-    pub fn flush(&mut self) -> io::Result<()> {
-        if let Some(ref mut writer) = self.file {
+    pub fn flush(&self) -> io::Result<()> {
+        if let Some(ref mut writer) = *self.file.lock().unwrap() {
             writer.flush()
         } else {
             Ok(())
@@ -162,7 +162,9 @@ impl FileCallbackHandler {
 
 impl Drop for FileCallbackHandler {
     fn drop(&mut self) {
-        self.close();
+        if let Some(mut writer) = self.file.lock().unwrap().take() {
+            let _ = writer.flush();
+        }
     }
 }
 
@@ -172,7 +174,7 @@ impl RetrieverManagerMixin for FileCallbackHandler {}
 impl ToolManagerMixin for FileCallbackHandler {
     /// Handle tool end by writing the output.
     fn on_tool_end(
-        &mut self,
+        &self,
         output: &str,
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
@@ -195,7 +197,7 @@ impl ToolManagerMixin for FileCallbackHandler {
 impl RunManagerMixin for FileCallbackHandler {
     /// Handle text output.
     fn on_text(
-        &mut self,
+        &self,
         text: &str,
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
@@ -208,7 +210,7 @@ impl RunManagerMixin for FileCallbackHandler {
 
 impl CallbackManagerMixin for FileCallbackHandler {
     fn on_chain_start(
-        &mut self,
+        &self,
         serialized: &HashMap<String, serde_json::Value>,
         _inputs: &HashMap<String, serde_json::Value>,
         _run_id: Uuid,
@@ -242,7 +244,7 @@ impl CallbackManagerMixin for FileCallbackHandler {
 
 impl ChainManagerMixin for FileCallbackHandler {
     fn on_chain_end(
-        &mut self,
+        &self,
         _outputs: &HashMap<String, serde_json::Value>,
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
@@ -252,7 +254,7 @@ impl ChainManagerMixin for FileCallbackHandler {
 
     /// Handle agent action by writing the action log.
     fn on_agent_action(
-        &mut self,
+        &self,
         action: &serde_json::Value,
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
@@ -265,7 +267,7 @@ impl ChainManagerMixin for FileCallbackHandler {
 
     /// Handle agent finish by writing the finish log.
     fn on_agent_finish(
-        &mut self,
+        &self,
         finish: &serde_json::Value,
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
@@ -347,7 +349,7 @@ mod tests {
         let file_path = dir.path().join("test_write.txt");
 
         {
-            let mut handler = FileCallbackHandler::new(&file_path, false).unwrap();
+            let handler = FileCallbackHandler::new(&file_path, false).unwrap();
             handler.write("Hello, World!", "\n");
             handler.flush().unwrap();
         }
@@ -362,13 +364,13 @@ mod tests {
         let file_path = dir.path().join("test_append.txt");
 
         {
-            let mut handler = FileCallbackHandler::new(&file_path, false).unwrap();
+            let handler = FileCallbackHandler::new(&file_path, false).unwrap();
             handler.write("First line", "\n");
             handler.flush().unwrap();
         }
 
         {
-            let mut handler = FileCallbackHandler::new(&file_path, true).unwrap();
+            let handler = FileCallbackHandler::new(&file_path, true).unwrap();
             handler.write("Second line", "\n");
             handler.flush().unwrap();
         }
@@ -382,7 +384,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let file_path = dir.path().join("test_close.txt");
 
-        let mut handler = FileCallbackHandler::new(&file_path, false).unwrap();
+        let handler = FileCallbackHandler::new(&file_path, false).unwrap();
         handler.write("Before close", "\n");
 
         // Close explicitly
@@ -404,7 +406,7 @@ mod tests {
         let file_path = dir.path().join("test_chain.txt");
 
         {
-            let mut handler = FileCallbackHandler::new(&file_path, false).unwrap();
+            let handler = FileCallbackHandler::new(&file_path, false).unwrap();
 
             let mut serialized = HashMap::new();
             serialized.insert(
@@ -429,7 +431,7 @@ mod tests {
         let file_path = dir.path().join("test_agent.txt");
 
         {
-            let mut handler = FileCallbackHandler::new(&file_path, false).unwrap();
+            let handler = FileCallbackHandler::new(&file_path, false).unwrap();
             let run_id = Uuid::new_v4();
 
             // Test on_agent_action
@@ -461,7 +463,7 @@ mod tests {
         let file_path = dir.path().join("test_tool_text.txt");
 
         {
-            let mut handler = FileCallbackHandler::new(&file_path, false).unwrap();
+            let handler = FileCallbackHandler::new(&file_path, false).unwrap();
             let run_id = Uuid::new_v4();
 
             // Test on_tool_end

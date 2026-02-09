@@ -23,7 +23,7 @@ impl CallbackManagerMixin for LlmEndHandler {}
 impl RunManagerMixin for LlmEndHandler {}
 
 impl LLMManagerMixin for LlmEndHandler {
-    fn on_llm_end(&mut self, _response: &ChatResult, _run_id: Uuid, _parent_run_id: Option<Uuid>) {}
+    fn on_llm_end(&self, _response: &ChatResult, _run_id: Uuid, _parent_run_id: Option<Uuid>) {}
 }
 
 impl BaseCallbackHandler for LlmEndHandler {
@@ -45,7 +45,7 @@ impl RunManagerMixin for ChatModelStartHandler {}
 
 impl CallbackManagerMixin for ChatModelStartHandler {
     fn on_chat_model_start(
-        &mut self,
+        &self,
         _serialized: &HashMap<String, serde_json::Value>,
         _messages: &[Vec<agent_chain_core::messages::BaseMessage>],
         _run_id: Uuid,
@@ -83,7 +83,7 @@ impl BaseCallbackHandler for AsyncLlmEndHandler {
 #[async_trait]
 impl AsyncCallbackHandler for AsyncLlmEndHandler {
     async fn on_llm_end_async(
-        &mut self,
+        &self,
         _response: &ChatResult,
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
@@ -113,7 +113,7 @@ impl BaseCallbackHandler for AsyncChatModelStartHandler {
 #[async_trait]
 impl AsyncCallbackHandler for AsyncChatModelStartHandler {
     async fn on_chat_model_start_async(
-        &mut self,
+        &self,
         _serialized: &HashMap<String, serde_json::Value>,
         _messages: &[Vec<agent_chain_core::messages::BaseMessage>],
         _run_id: Uuid,
