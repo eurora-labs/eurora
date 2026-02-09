@@ -13,4 +13,8 @@ mod test_graph_png;
 mod test_history;
 mod test_passthrough;
 mod test_retry;
+mod test_router;
+mod test_runnable;
+mod test_runnable_events_v2;
+mod test_schema;
 mod test_utils;
