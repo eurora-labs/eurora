@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Version of cargo-about you expect. Change as you upgrade.
-CARGO_ABOUT_VERSION="${CARGO_ABOUT_VERSION:-0.7}"
+CARGO_ABOUT_VERSION="${CARGO_ABOUT_VERSION:-0.8}"
 
 # Resolve repo root as the parent of this script directory.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

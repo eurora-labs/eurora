@@ -3,6 +3,7 @@ env:
     RUST_BACKTRACE: full
     RUSTUP_TOOLCHAIN: stable
     PUBLIC_STRIPE_KEY: ${{ secrets.PUBLIC_STRIPE_KEY }}
+
 on:
     push:
         branches:
@@ -11,6 +12,7 @@ on:
         branches: [main]
         paths-ignore:
             - 'apps/web/**'
+            - 'apps/browser/**'
     workflow_dispatch:
         inputs:
             sha:
@@ -50,6 +52,7 @@ jobs:
                   save-if: ${{ github.ref == 'refs/heads/main' }}
             - name: Setup node environment
               uses: ./.github/actions/init-env-node
+
             - name: Build SvelteKit
               run: pnpm build:desktop -- --mode development
             - name: Install Protoc
@@ -62,6 +65,7 @@ jobs:
 
             - name: Build Tauri
               run: pnpm build:test
+
             - name: Install tauri-driver
               if: ${{ github.ref != 'refs/heads/main' }}
               run: |

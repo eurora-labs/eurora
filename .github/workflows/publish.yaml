@@ -217,7 +217,7 @@ jobs:
 
             - name: Generate third-party license bundle
               shell: bash
-              run: ./scripts/generate-licenses ./LICENSES-THIRD-PARTY.md
+              run: ./scripts/generate-licenses ./crates/app/euro-tauri/LICENSES-THIRD-PARTY.md
 
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
