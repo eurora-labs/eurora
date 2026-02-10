@@ -13,7 +13,7 @@
 	}
 
 	function handleSettings() {
-		goto('/settings/profile');
+		goto('/settings');
 	}
 
 	function getInitials(name?: string, email?: string): string {
@@ -47,25 +47,13 @@
 				</Avatar.Root>
 			</Button>
 		</DropdownMenu.Trigger>
-		<DropdownMenu.Content class="w-56" align="end">
-			<DropdownMenu.Label class="font-normal">
-				<div class="flex flex-col space-y-1">
-					<p class="text-sm font-medium leading-none">
-						{$currentUser.name || 'User'}
-					</p>
-					<p class="text-xs leading-none text-muted-foreground">
-						{$currentUser.email}
-					</p>
-				</div>
-			</DropdownMenu.Label>
-			<DropdownMenu.Separator />
+		<DropdownMenu.Content class="w-32 border-none" align="end">
 			<DropdownMenu.Group>
 				<DropdownMenu.Item onclick={handleSettings}>
 					<UserIcon class="mr-2 h-4 w-4" />
-					<span>Profile Settings</span>
+					<span>Settings</span>
 				</DropdownMenu.Item>
 			</DropdownMenu.Group>
-			<DropdownMenu.Separator />
 			<DropdownMenu.Item onclick={handleLogout}>
 				<LogOutIcon class="mr-2 h-4 w-4" />
 				<span>Log out</span>

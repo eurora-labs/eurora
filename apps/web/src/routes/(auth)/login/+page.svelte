@@ -17,7 +17,7 @@
 	import { superForm } from 'sveltekit-superforms';
 	import { zodClient, type ZodObjectType } from 'sveltekit-superforms/adapters';
 	import { z } from 'zod';
-	// import { auth } from '$lib/stores/auth.js';
+	import { auth } from '$lib/stores/auth.js';
 
 	onMount(() => {
 		try {
@@ -75,16 +75,12 @@
 				},
 			});
 
-			// Call the auth service to login the user
-			await authService.login(loginData);
-
-			// Store tokens in auth store
-			// auth.login(tokens);
+			const tokens = await authService.login(loginData);
+			auth.login(tokens);
 			success = true;
 
-			// Redirect to home page after a short delay
 			setTimeout(() => {
-				goto('/');
+				goto('/settings');
 			}, 1500);
 		} catch (err) {
 			console.error('Login error:', err);
