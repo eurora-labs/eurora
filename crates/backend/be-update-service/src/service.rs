@@ -45,12 +45,13 @@ impl AppState {
     }
 
     /// Check if a newer version exists in S3 for the given platform
-    #[instrument(skip(self), fields(bucket = %self.bucket_name, channel, target_arch, current_version))]
+    #[instrument(skip(self), fields(bucket = %self.bucket_name, channel, target_arch, current_version, ?bundle_type))]
     pub async fn check_for_update(
         &self,
         channel: &str,
         target_arch: &str,
         current_version: &str,
+        bundle_type: Option<&str>,
     ) -> Result<Option<UpdateResponse>> {
         debug!(
             "Starting update check for {}/{}/{}",
@@ -167,7 +168,7 @@ impl AppState {
             );
             // Construct the update response
             let update_response = self
-                .build_update_response(channel, &target, &arch, &latest_ver_str)
+                .build_update_response(channel, &target, &arch, &latest_ver_str, bundle_type)
                 .await?;
             debug!("Update response built successfully");
             Ok(Some(update_response))
@@ -181,13 +182,14 @@ impl AppState {
     }
 
     /// Build the update response with platform-specific information
-    #[instrument(skip(self), fields(bucket = %self.bucket_name, channel, target, arch, version))]
+    #[instrument(skip(self), fields(bucket = %self.bucket_name, channel, target, arch, version, ?bundle_type))]
     async fn build_update_response(
         &self,
         channel: &str,
         target: &str,
         arch: &str,
         version: &str,
+        bundle_type: Option<&str>,
     ) -> Result<UpdateResponse> {
         debug!(
             "Building update response for {}/{}/{}/{}",
@@ -200,7 +202,9 @@ impl AppState {
             "Looking for download file in directory: {}",
             directory_prefix
         );
-        let (file_key, last_modified) = self.find_download_file(&directory_prefix, target).await?;
+        let (file_key, last_modified) = self
+            .find_download_file(&directory_prefix, target, bundle_type)
+            .await?;
         debug!("Found download file: {}", file_key);
 
         // Get signature file content based on the actual release file name
@@ -301,11 +305,12 @@ impl AppState {
 
     /// Find the actual download file in the S3 directory
     /// Returns the file key and the last_modified timestamp
-    #[instrument(skip(self), fields(bucket = %self.bucket_name, directory_prefix, target))]
+    #[instrument(skip(self), fields(bucket = %self.bucket_name, directory_prefix, target, ?bundle_type))]
     async fn find_download_file(
         &self,
         directory_prefix: &str,
         target: &str,
+        bundle_type: Option<&str>,
     ) -> Result<(String, DateTime<Utc>)> {
         debug!(
             "Searching for download file in directory: {}",
@@ -331,16 +336,29 @@ impl AppState {
             file_count, directory_prefix
         );
 
-        // Define expected file extensions based on target platform
-        let expected_extensions = match target {
-            "linux" => vec![".AppImage.tar.gz", ".tar.gz"],
-            "darwin" => vec![".app.tar.gz", ".dmg", ".tar.gz"],
-            "windows" => vec![".msi.zip"],
-            _ => vec![".tar.gz", ".zip"],
+        // Define expected file extensions based on bundle type (if provided) or target platform.
+        // With createUpdaterArtifacts: true, native bundles are served directly:
+        //   - Linux AppImage: .AppImage (no tar.gz wrapper)
+        //   - Linux deb/rpm: .deb / .rpm (fall back to .AppImage if not available)
+        //   - Windows MSI: .msi (no zip wrapper)
+        //   - macOS: .app.tar.gz
+        let expected_extensions = match bundle_type {
+            Some("deb") => vec![".deb", ".AppImage"],
+            Some("rpm") => vec![".rpm", ".AppImage"],
+            Some("appimage") => vec![".AppImage"],
+            Some("msi") => vec![".msi"],
+            Some("nsis") => vec![".exe"],
+            Some("app") => vec![".app.tar.gz", ".tar.gz"],
+            _ => match target {
+                "linux" => vec![".AppImage"],
+                "darwin" | "macos" => vec![".app.tar.gz", ".dmg", ".tar.gz"],
+                "windows" => vec![".msi"],
+                _ => vec![".tar.gz", ".zip"],
+            },
         };
         debug!(
-            "Expected extensions for {}: {:?}",
-            target, expected_extensions
+            "Expected extensions for target={}, bundle_type={:?}: {:?}",
+            target, bundle_type, expected_extensions
         );
 
         // Find the first file that matches expected extensions and is not "signature" or "notes.txt"
@@ -591,7 +609,10 @@ impl AppState {
                         let directory_prefix =
                             format!("releases/{}/{}/{}/{}/", channel, version, target, arch);
 
-                        match self.find_download_file(&directory_prefix, &target).await {
+                        match self
+                            .find_download_file(&directory_prefix, &target, None)
+                            .await
+                        {
                             Ok((file_key, last_modified)) => {
                                 // Track the maximum last_modified date
                                 match &max_last_modified {

@@ -10,9 +10,12 @@
 	},
 	"bundle": {
 		"active": false,
+		"resources": [
+			"LICENSES-THIRD-PARTY.md"
+		],
 		"category": "DeveloperTool",
 		"copyright": "Copyright © 2024-2026 Eurora Labs. All rights reserved.",
-		"createUpdaterArtifacts": "v1Compatible",
+		"createUpdaterArtifacts": true,
 		"targets": [
 			"app",
 			"dmg",
@@ -54,7 +57,7 @@
 	"plugins": {
 		"updater": {
 			"endpoints": [
-				"https://api.eurora-labs.com/releases/nightly/{{target}}-{{arch}}/{{current_version}}"
+				"https://api.eurora-labs.com/releases/nightly/{{target}}-{{arch}}/{{current_version}}/{{bundle_type}}"
 			],
 			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU3NzQzMEU5RDE5MDk4OTMKUldTVG1KRFI2VEIwNTFCdlhJbkI5NExkOFpNVVpoQy9hZE1jQnlWR2FPZXYwR09rS1RLZ2dnc00K"
 		}

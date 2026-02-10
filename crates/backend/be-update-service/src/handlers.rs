@@ -12,7 +12,7 @@ use tracing::{debug, instrument, warn};
 use crate::{
     error::error_to_http_response,
     service::AppState,
-    types::{ExtensionReleaseParams, ReleaseParams, UpdateParams},
+    types::{ExtensionReleaseParams, ReleaseParams, UpdateParams, UpdateWithBundleTypeParams},
 };
 
 /// Handler for the update endpoint
@@ -39,6 +39,7 @@ pub async fn check_update_handler(
             &params.channel,
             &params.target_arch,
             &params.current_version,
+            None,
         )
         .await
     {
@@ -93,6 +94,65 @@ pub async fn get_release_handler(
         }
         Err(e) => {
             warn!("Release info request failed: {}", e);
+            let (status, error_response) = error_to_http_response(&e);
+            (status, error_response).into_response()
+        }
+    }
+}
+
+/// Handler for the update endpoint with bundle type
+/// This allows serving the correct artifact format (e.g. .deb for deb installs,
+/// .AppImage.tar.gz for appimage installs) based on the Tauri {{bundle_type}} variable.
+#[instrument(skip(state), fields(
+    channel = %params.channel,
+    target_arch = %params.target_arch,
+    current_version = %params.current_version,
+    bundle_type = %params.bundle_type
+))]
+pub async fn check_update_with_bundle_type_handler(
+    State(state): State<Arc<AppState>>,
+    Path(params): Path<UpdateWithBundleTypeParams>,
+) -> Response {
+    debug!(
+        "Processing update request: channel={}, target_arch={}, current_version={}, bundle_type={}",
+        params.channel, params.target_arch, params.current_version, params.bundle_type
+    );
+
+    if &params.current_version == "0.0.0" {
+        return StatusCode::NO_CONTENT.into_response();
+    }
+
+    let bundle_type = if params.bundle_type.is_empty() || params.bundle_type == "unknown" {
+        None
+    } else {
+        Some(params.bundle_type.as_str())
+    };
+
+    match state
+        .check_for_update(
+            &params.channel,
+            &params.target_arch,
+            &params.current_version,
+            bundle_type,
+        )
+        .await
+    {
+        Ok(Some(update)) => {
+            debug!("Update available: version {}", update.version);
+            debug!(
+                "Update response: signature_length={}, notes_length={}, url_length={}",
+                update.signature.len(),
+                update.notes.len(),
+                update.url.len()
+            );
+            (StatusCode::OK, Json(update)).into_response()
+        }
+        Ok(None) => {
+            debug!("No update available");
+            StatusCode::NO_CONTENT.into_response()
+        }
+        Err(e) => {
+            warn!("Update check failed: {}", e);
             let (status, error_response) = error_to_http_response(&e);
             (status, error_response).into_response()
         }

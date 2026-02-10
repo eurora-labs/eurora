@@ -31,6 +31,10 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             "/releases/{channel}/{target_arch}/{current_version}",
             get(handlers::check_update_handler),
         )
+        .route(
+            "/releases/{channel}/{target_arch}/{current_version}/{bundle_type}",
+            get(handlers::check_update_with_bundle_type_handler),
+        )
         // Browser extension routes
         // GET /extensions/{channel} - returns all browsers for a channel
         .route(
@@ -65,7 +69,7 @@ pub use error::{ErrorResponse, NoUpdateResponse, UpdateServiceError};
 pub use types::{
     BrowserExtensionInfo, BrowserType, ExtensionChannel, ExtensionReleaseParams,
     ExtensionReleaseResponse, PlatformInfo, ReleaseInfoResponse, ReleaseParams, UpdateParams,
-    UpdateResponse,
+    UpdateResponse, UpdateWithBundleTypeParams,
 };
 
 // Re-export handler for direct use
