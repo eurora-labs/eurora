@@ -185,8 +185,11 @@ impl AppState {
         String::from_utf8(body.to_vec()).context("Failed to convert body to string")
     }
 
-    /// Find the actual download file in the S3 directory.
-    /// Returns the file key and the last_modified timestamp.
+    /// Find download file candidates in the S3 directory, ordered by priority.
+    ///
+    /// Returns candidates in priority order based on bundle_type. For example,
+    /// `bundle_type = "deb"` returns `.deb` files first, then `.AppImage` as fallback.
+    /// Only files that have a corresponding `.sig` signature are included.
     #[instrument(skip(self), fields(directory_prefix, target, ?bundle_type))]
     async fn find_download_file(
         &self,
@@ -225,32 +228,47 @@ impl AppState {
 
         let is_metadata = |filename: &str| filename.ends_with(".sig") || filename == "notes.txt";
 
-        // Find the first file matching expected extensions
-        for object in resp.contents() {
-            let Some(key) = object.key() else { continue };
-            let filename = key.strip_prefix(directory_prefix).unwrap_or(key);
+        // Collect all S3 keys for quick `.sig` existence checks
+        let all_keys: std::collections::HashSet<&str> =
+            resp.contents().iter().filter_map(|o| o.key()).collect();
 
-            if is_metadata(filename) {
-                continue;
-            }
+        // Find the first file matching expected extensions, respecting priority order.
+        // Extensions are listed in priority order (e.g. [".deb", ".AppImage"] prefers .deb),
+        // so we iterate extensions first to avoid S3's lexicographic ordering from
+        // returning a lower-priority match (e.g. .AppImage before .deb).
+        // Only return files that have a corresponding .sig signature file,
+        // since Tauri's updater requires a valid signature.
+        for ext in &expected_extensions {
+            for object in resp.contents() {
+                let Some(key) = object.key() else { continue };
+                let filename = key.strip_prefix(directory_prefix).unwrap_or(key);
 
-            if expected_extensions
-                .iter()
-                .any(|ext| filename.ends_with(ext))
-            {
-                let last_modified = extract_last_modified(object)?;
-                return Ok((key.to_owned(), last_modified));
+                if is_metadata(filename) {
+                    continue;
+                }
+
+                if filename.ends_with(ext) {
+                    let sig_key = format!("{}.sig", key);
+                    if all_keys.contains(sig_key.as_str()) {
+                        let last_modified = extract_last_modified(object)?;
+                        return Ok((key.to_owned(), last_modified));
+                    }
+                    debug!("Skipping {} (no signature file {})", key, sig_key);
+                }
             }
         }
 
-        // Fallback: return the first non-metadata file
+        // Fallback: return the first non-metadata file that has a signature
         for object in resp.contents() {
             let Some(key) = object.key() else { continue };
             let filename = key.strip_prefix(directory_prefix).unwrap_or(key);
 
             if !is_metadata(filename) && !filename.is_empty() {
-                let last_modified = extract_last_modified(object)?;
-                return Ok((key.to_owned(), last_modified));
+                let sig_key = format!("{}.sig", key);
+                if all_keys.contains(sig_key.as_str()) {
+                    let last_modified = extract_last_modified(object)?;
+                    return Ok((key.to_owned(), last_modified));
+                }
             }
         }
 

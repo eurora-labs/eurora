@@ -286,16 +286,31 @@ elif [ "$OS" = "linux" ]; then
 	DEB="$(find "$BUNDLE_DIR/deb" -name '*.deb')"
 	RPM="$(find "$BUNDLE_DIR/rpm" -name '*.rpm')"
 
+	# Sign .deb and .rpm so the updater can serve them to deb/rpm-installed clients.
+	# Tauri only generates .AppImage.sig by default; without these signatures the
+	# update service would have to fall back to serving AppImage to all Linux users.
+	info "Signing .deb package..."
+	tauri signer sign "$DEB"
+	DEB_SIG="${DEB}.sig"
+
+	info "Signing .rpm package..."
+	tauri signer sign "$RPM"
+	RPM_SIG="${RPM}.sig"
+
 	cp "$APPIMAGE" "$RELEASE_DIR"
 	cp "$APPIMAGE_SIG" "$RELEASE_DIR"
 	cp "$DEB" "$RELEASE_DIR"
+	cp "$DEB_SIG" "$RELEASE_DIR"
 	cp "$RPM" "$RELEASE_DIR"
+	cp "$RPM_SIG" "$RELEASE_DIR"
 
 	info "built:"
 	info "	- $RELEASE_DIR/$(basename "$APPIMAGE")"
 	info "	- $RELEASE_DIR/$(basename "$APPIMAGE_SIG")"
 	info "	- $RELEASE_DIR/$(basename "$DEB")"
+	info "	- $RELEASE_DIR/$(basename "$DEB_SIG")"
 	info "	- $RELEASE_DIR/$(basename "$RPM")"
+	info "	- $RELEASE_DIR/$(basename "$RPM_SIG")"
 elif [ "$OS" = "windows" ]; then
 	# With createUpdaterArtifacts: true, the MSI installer itself is the
 	# updater artifact (no .zip wrapper). Signature is .msi.sig.
