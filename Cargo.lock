@@ -1490,6 +1490,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "be-payment-service"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "aws-config",
+ "aws-sdk-s3",
+ "axum",
+ "chrono",
+ "semver",
+ "serde",
+ "thiserror 2.0.18",
+ "tower",
+ "tower-http",
+ "tracing",
+]
+
+[[package]]
 name = "be-remote-db"
 version = "0.0.0"
 dependencies = [
