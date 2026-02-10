@@ -186,6 +186,13 @@ fi
 
 # Note: OS values are: darwin, linux, windows
 
+# Ensure license file exists for bundling (CI generates it via generate-licenses)
+LICENSES_FILE="$PWD/../crates/app/euro-tauri/LICENSES-THIRD-PARTY.md"
+if [ ! -f "$LICENSES_FILE" ]; then
+	info "LICENSES-THIRD-PARTY.md not found, creating placeholder"
+	echo "# Third-Party Licenses" > "$LICENSES_FILE"
+fi
+
 # update the version in the tauri release config
 jq '.version="'"$VERSION"'"' "$CONFIG_PATH" >"$TMP_DIR/tauri.conf.json"
 
@@ -272,37 +279,50 @@ if [ "$OS" = "darwin" ]; then
 	info "	- $RELEASE_DIR/$(basename "$MACOS_UPDATER")"
 	info "	- $RELEASE_DIR/$(basename "$MACOS_UPDATER_SIG")"
 elif [ "$OS" = "linux" ]; then
-	APPIMAGE="$(find "$BUNDLE_DIR/appimage" -name \*.AppImage)"
-	APPIMAGE_UPDATER="$(find "$BUNDLE_DIR/appimage" -name \*.AppImage.tar.gz)"
-	APPIMAGE_UPDATER_SIG="$(find "$BUNDLE_DIR/appimage" -name \*.AppImage.tar.gz.sig)"
-	DEB="$(find "$BUNDLE_DIR/deb" -name \*.deb)"
-	RPM="$(find "$BUNDLE_DIR/rpm" -name \*.rpm)"
+	# With createUpdaterArtifacts: true, the AppImage itself is the updater
+	# artifact (no .tar.gz wrapper). Signature is .AppImage.sig.
+	APPIMAGE="$(find "$BUNDLE_DIR/appimage" -name '*.AppImage' -not -name '*.sig')"
+	APPIMAGE_SIG="$(find "$BUNDLE_DIR/appimage" -name '*.AppImage.sig')"
+	DEB="$(find "$BUNDLE_DIR/deb" -name '*.deb')"
+	RPM="$(find "$BUNDLE_DIR/rpm" -name '*.rpm')"
+
+	# Sign .deb and .rpm so the updater can serve them to deb/rpm-installed clients.
+	# Tauri only generates .AppImage.sig by default; without these signatures the
+	# update service would have to fall back to serving AppImage to all Linux users.
+	info "Signing .deb package..."
+	tauri signer sign "$DEB"
+	DEB_SIG="${DEB}.sig"
+
+	info "Signing .rpm package..."
+	tauri signer sign "$RPM"
+	RPM_SIG="${RPM}.sig"
 
 	cp "$APPIMAGE" "$RELEASE_DIR"
-	cp "$APPIMAGE_UPDATER" "$RELEASE_DIR"
-	cp "$APPIMAGE_UPDATER_SIG" "$RELEASE_DIR"
+	cp "$APPIMAGE_SIG" "$RELEASE_DIR"
 	cp "$DEB" "$RELEASE_DIR"
+	cp "$DEB_SIG" "$RELEASE_DIR"
 	cp "$RPM" "$RELEASE_DIR"
+	cp "$RPM_SIG" "$RELEASE_DIR"
 
 	info "built:"
 	info "	- $RELEASE_DIR/$(basename "$APPIMAGE")"
-	info "	- $RELEASE_DIR/$(basename "$APPIMAGE_UPDATER")"
-	info "	- $RELEASE_DIR/$(basename "$APPIMAGE_UPDATER_SIG")"
+	info "	- $RELEASE_DIR/$(basename "$APPIMAGE_SIG")"
 	info "	- $RELEASE_DIR/$(basename "$DEB")"
+	info "	- $RELEASE_DIR/$(basename "$DEB_SIG")"
 	info "	- $RELEASE_DIR/$(basename "$RPM")"
+	info "	- $RELEASE_DIR/$(basename "$RPM_SIG")"
 elif [ "$OS" = "windows" ]; then
-	WINDOWS_INSTALLER="$(find "$BUNDLE_DIR/msi" -name \*.msi)"
-	WINDOWS_UPDATER="$(find "$BUNDLE_DIR/msi" -name \*.msi.zip)"
-	WINDOWS_UPDATER_SIG="$(find "$BUNDLE_DIR/msi" -name \*.msi.zip.sig)"
+	# With createUpdaterArtifacts: true, the MSI installer itself is the
+	# updater artifact (no .zip wrapper). Signature is .msi.sig.
+	WINDOWS_MSI="$(find "$BUNDLE_DIR/msi" -name '*.msi' -not -name '*.sig')"
+	WINDOWS_MSI_SIG="$(find "$BUNDLE_DIR/msi" -name '*.msi.sig')"
 
-	cp "$WINDOWS_INSTALLER" "$RELEASE_DIR"
-	cp "$WINDOWS_UPDATER" "$RELEASE_DIR"
-	cp "$WINDOWS_UPDATER_SIG" "$RELEASE_DIR"
+	cp "$WINDOWS_MSI" "$RELEASE_DIR"
+	cp "$WINDOWS_MSI_SIG" "$RELEASE_DIR"
 
 	info "built:"
-	info "	- $RELEASE_DIR/$(basename "$WINDOWS_INSTALLER")"
-	info "	- $RELEASE_DIR/$(basename "$WINDOWS_UPDATER")"
-	info "	- $RELEASE_DIR/$(basename "$WINDOWS_UPDATER_SIG")"
+	info "	- $RELEASE_DIR/$(basename "$WINDOWS_MSI")"
+	info "	- $RELEASE_DIR/$(basename "$WINDOWS_MSI_SIG")"
 else
 	error "unsupported os: $OS"
 fi
