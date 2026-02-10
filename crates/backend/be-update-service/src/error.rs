@@ -1,209 +1,172 @@
-//! Error types and handling for the update service
-
-use axum::{http::StatusCode, response::Json};
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Json, Response},
+};
 use serde::Serialize;
-use tracing::error;
+use tracing::{error, warn};
 
-/// Detailed error response with error type
 #[derive(Serialize)]
 pub struct ErrorResponse {
     pub error: String,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub details: Option<String>,
 }
 
-/// Error response for when no update is available
-#[derive(Serialize)]
-pub struct NoUpdateResponse {
-    pub message: String,
-}
-
-/// Custom error types for better error handling
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum UpdateServiceError {
+    #[error("Invalid version format: {0}")]
     InvalidVersion(String),
+
+    #[error("Invalid target architecture: {0}")]
     InvalidTargetArch(String),
+
+    #[error("Invalid channel: {0}")]
     InvalidChannel(String),
+
+    #[error("Invalid browser type: {0}")]
     InvalidBrowserType(String),
+
+    #[error("Invalid extension channel: {0}")]
     InvalidExtensionChannel(String),
+
+    #[error("Extension not found for browser '{browser}' channel '{channel}'")]
     ExtensionNotFound { browser: String, channel: String },
+
+    #[error("S3 operation failed: {0}")]
     S3Error(String),
+
+    #[error("Signature file not found: {0}")]
     SignatureNotFound(String),
+
+    #[error("Download file not found in: {0}")]
     DownloadFileNotFound(String),
+
+    #[error("Failed to generate presigned URL: {0}")]
     PresignedUrlError(String),
-    ListObjectsError(String),
 }
 
-impl std::fmt::Display for UpdateServiceError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            UpdateServiceError::InvalidVersion(v) => write!(f, "Invalid version format: {}", v),
-            UpdateServiceError::InvalidTargetArch(t) => {
-                write!(f, "Invalid target architecture: {}", t)
-            }
-            UpdateServiceError::InvalidChannel(c) => write!(f, "Invalid channel: {}", c),
-            UpdateServiceError::InvalidBrowserType(b) => {
-                write!(f, "Invalid browser type: {}", b)
-            }
-            UpdateServiceError::InvalidExtensionChannel(c) => {
-                write!(f, "Invalid extension channel: {}", c)
-            }
-            UpdateServiceError::ExtensionNotFound { browser, channel } => {
-                write!(
-                    f,
-                    "Extension not found for browser '{}' channel '{}'",
-                    browser, channel
+impl IntoResponse for UpdateServiceError {
+    fn into_response(self) -> Response {
+        let (status, error_code, message, details) = match &self {
+            UpdateServiceError::InvalidVersion(v) => {
+                warn!("Invalid version provided: {}", v);
+                (
+                    StatusCode::BAD_REQUEST,
+                    "invalid_version",
+                    "Invalid version format",
+                    Some(format!("Version '{}' is not a valid semantic version", v)),
                 )
             }
-            UpdateServiceError::S3Error(e) => write!(f, "S3 operation failed: {}", e),
-            UpdateServiceError::SignatureNotFound(k) => {
-                write!(f, "Signature file not found: {}", k)
-            }
-            UpdateServiceError::DownloadFileNotFound(d) => {
-                write!(f, "Download file not found in: {}", d)
-            }
-            UpdateServiceError::PresignedUrlError(e) => {
-                write!(f, "Failed to generate presigned URL: {}", e)
-            }
-            UpdateServiceError::ListObjectsError(e) => {
-                write!(f, "Failed to list S3 objects: {}", e)
-            }
-        }
-    }
-}
-
-impl std::error::Error for UpdateServiceError {}
-
-/// Convert UpdateServiceError to HTTP error response
-pub fn error_to_http_response(e: &anyhow::Error) -> (StatusCode, Json<ErrorResponse>) {
-    match e.downcast_ref::<UpdateServiceError>() {
-        Some(UpdateServiceError::InvalidVersion(v)) => {
-            error!("Invalid version provided: {}", v);
-            (
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse {
-                    error: "invalid_version".to_string(),
-                    message: "Invalid version format".to_string(),
-                    details: Some(format!("Version '{}' is not a valid semantic version", v)),
-                }),
-            )
-        }
-        Some(UpdateServiceError::InvalidTargetArch(t)) => {
-            error!("Invalid target architecture: {}", t);
-            (
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse {
-                    error: "invalid_target_arch".to_string(),
-                    message: "Invalid target architecture format".to_string(),
-                    details: Some(format!(
+            UpdateServiceError::InvalidTargetArch(t) => {
+                warn!("Invalid target architecture: {}", t);
+                (
+                    StatusCode::BAD_REQUEST,
+                    "invalid_target_arch",
+                    "Invalid target architecture format",
+                    Some(format!(
                         "Target architecture '{}' should be in format 'os-arch'",
                         t
                     )),
-                }),
-            )
-        }
-        Some(UpdateServiceError::InvalidChannel(c)) => {
-            error!("Invalid channel: {}", c);
-            (
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse {
-                    error: "invalid_channel".to_string(),
-                    message: "Invalid channel".to_string(),
-                    details: Some(format!(
+                )
+            }
+            UpdateServiceError::InvalidChannel(c) => {
+                warn!("Invalid channel: {}", c);
+                (
+                    StatusCode::BAD_REQUEST,
+                    "invalid_channel",
+                    "Invalid channel",
+                    Some(format!(
                         "Channel '{}' is not supported. Use 'nightly', 'release', or 'beta'",
                         c
                     )),
-                }),
-            )
-        }
-        Some(UpdateServiceError::S3Error(s3_err)) => {
-            error!("S3 operation failed: {}", s3_err);
-            (
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(ErrorResponse {
-                    error: "service_unavailable".to_string(),
-                    message: "Update service temporarily unavailable".to_string(),
-                    details: None, // Don't expose internal S3 errors
-                }),
-            )
-        }
-        Some(UpdateServiceError::DownloadFileNotFound(dir)) => {
-            error!("Download file not found in directory: {}", dir);
-            (
-                StatusCode::NOT_FOUND,
-                Json(ErrorResponse {
-                    error: "download_not_found".to_string(),
-                    message: "Update package not found".to_string(),
-                    details: None,
-                }),
-            )
-        }
-        Some(UpdateServiceError::PresignedUrlError(url_err)) => {
-            error!("Failed to generate presigned URL: {}", url_err);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    error: "url_generation_failed".to_string(),
-                    message: "Failed to generate download URL".to_string(),
-                    details: None,
-                }),
-            )
-        }
-        Some(UpdateServiceError::InvalidBrowserType(browser)) => {
-            error!("Invalid browser type: {}", browser);
-            (
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse {
-                    error: "invalid_browser_type".to_string(),
-                    message: "Invalid browser type".to_string(),
-                    details: Some(format!(
+                )
+            }
+            UpdateServiceError::InvalidBrowserType(b) => {
+                warn!("Invalid browser type: {}", b);
+                (
+                    StatusCode::BAD_REQUEST,
+                    "invalid_browser_type",
+                    "Invalid browser type",
+                    Some(format!(
                         "Browser '{}' is not supported. Use 'firefox', 'chrome', or 'safari'",
-                        browser
+                        b
                     )),
-                }),
-            )
-        }
-        Some(UpdateServiceError::InvalidExtensionChannel(channel)) => {
-            error!("Invalid extension channel: {}", channel);
-            (
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse {
-                    error: "invalid_extension_channel".to_string(),
-                    message: "Invalid extension channel".to_string(),
-                    details: Some(format!(
+                )
+            }
+            UpdateServiceError::InvalidExtensionChannel(c) => {
+                warn!("Invalid extension channel: {}", c);
+                (
+                    StatusCode::BAD_REQUEST,
+                    "invalid_extension_channel",
+                    "Invalid extension channel",
+                    Some(format!(
                         "Channel '{}' is not supported. Use 'release' or 'nightly'",
-                        channel
+                        c
                     )),
-                }),
-            )
-        }
-        Some(UpdateServiceError::ExtensionNotFound { browser, channel }) => {
-            error!(
-                "Extension not found for browser '{}' channel '{}'",
-                browser, channel
-            );
-            (
-                StatusCode::NOT_FOUND,
-                Json(ErrorResponse {
-                    error: "extension_not_found".to_string(),
-                    message: "Extension version not found".to_string(),
-                    details: Some(format!(
+                )
+            }
+            UpdateServiceError::ExtensionNotFound { browser, channel } => {
+                warn!(
+                    "Extension not found for browser '{}' channel '{}'",
+                    browser, channel
+                );
+                (
+                    StatusCode::NOT_FOUND,
+                    "extension_not_found",
+                    "Extension version not found",
+                    Some(format!(
                         "No extension found for browser '{}' in channel '{}'",
                         browser, channel
                     )),
-                }),
-            )
-        }
-        _ => {
-            error!("Unexpected error: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    error: "internal_error".to_string(),
-                    message: "Internal server error".to_string(),
-                    details: None,
-                }),
-            )
-        }
+                )
+            }
+            UpdateServiceError::S3Error(e) => {
+                error!("S3 operation failed: {}", e);
+                (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "service_unavailable",
+                    "Update service temporarily unavailable",
+                    None,
+                )
+            }
+            UpdateServiceError::SignatureNotFound(k) => {
+                error!("Signature file not found: {}", k);
+                (
+                    StatusCode::NOT_FOUND,
+                    "signature_not_found",
+                    "Signature file not found",
+                    None,
+                )
+            }
+            UpdateServiceError::DownloadFileNotFound(dir) => {
+                error!("Download file not found in directory: {}", dir);
+                (
+                    StatusCode::NOT_FOUND,
+                    "download_not_found",
+                    "Update package not found",
+                    None,
+                )
+            }
+            UpdateServiceError::PresignedUrlError(e) => {
+                error!("Failed to generate presigned URL: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "url_generation_failed",
+                    "Failed to generate download URL",
+                    None,
+                )
+            }
+        };
+
+        (
+            status,
+            Json(ErrorResponse {
+                error: error_code.to_owned(),
+                message: message.to_owned(),
+                details,
+            }),
+        )
+            .into_response()
     }
 }
