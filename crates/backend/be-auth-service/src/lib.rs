@@ -420,10 +420,10 @@ impl AuthService {
             None => None,
         };
 
-        // Consume the state to prevent replay attacks
+        // Consume the state to prevent replay attacks — this MUST succeed
         if let Err(e) = self.db.consume_oauth_state(state).await {
             error!("Failed to consume OAuth state: {}", e);
-            // Continue anyway, as the state was valid
+            return Err(Status::internal("Failed to process OAuth state"));
         }
 
         // Exchange authorization code for tokens and extract user info via OIDC
@@ -538,30 +538,51 @@ impl AuthService {
                             .unwrap_or(&user_info.name)
                             .to_string();
 
-                        // Ensure username is unique by appending numbers if needed
-                        let mut final_username = username.clone();
-                        let mut counter = 1;
-                        while self
-                            .db
-                            .user_exists_by_username(&final_username)
-                            .await
-                            .unwrap_or(false)
-                        {
-                            final_username = format!("{}_{}", username, counter);
-                            counter += 1;
-                        }
+                        // Create user with unique username, retrying on constraint violations
+                        // to handle concurrent signups with the same email prefix.
+                        let new_user = {
+                            let mut final_username = username.clone();
+                            let mut counter = 0u32;
+                            const MAX_RETRIES: u32 = 5;
 
-                        let create_request = be_remote_db::NewUser {
-                            username: final_username,
-                            email: user_info.email.clone(),
-                            display_name: Some(user_info.name.clone()),
-                            password_hash: None, // OAuth-only users have no password credentials
+                            loop {
+                                let create_request = be_remote_db::NewUser {
+                                    username: final_username.clone(),
+                                    email: user_info.email.clone(),
+                                    display_name: Some(user_info.name.clone()),
+                                    password_hash: None,
+                                };
+
+                                match self.db.create_user(create_request).await {
+                                    Ok(user) => break user,
+                                    Err(be_remote_db::DbError::Duplicate { field, value })
+                                        if value.contains("username") =>
+                                    {
+                                        counter += 1;
+                                        if counter >= MAX_RETRIES {
+                                            error!(
+                                                "Failed to create unique username after {} attempts",
+                                                MAX_RETRIES
+                                            );
+                                            return Err(Status::internal(
+                                                "Failed to create user account",
+                                            ));
+                                        }
+                                        final_username = format!("{}_{}", username, counter);
+                                        info!(
+                                            "Username conflict on '{}' ({}), retrying with '{}'",
+                                            field, value, final_username
+                                        );
+                                    }
+                                    Err(e) => {
+                                        error!("Failed to create user from Google OAuth: {}", e);
+                                        return Err(Status::internal(
+                                            "Failed to create user account",
+                                        ));
+                                    }
+                                }
+                            }
                         };
-
-                        let new_user = self.db.create_user(create_request).await.map_err(|e| {
-                            error!("Failed to create user from Google OAuth: {}", e);
-                            Status::internal("Failed to create user account")
-                        })?;
 
                         // Create OAuth credentials for the new user
                         let oauth_request = CreateOAuthCredentials {
@@ -721,7 +742,10 @@ impl ProtoAuthService for AuthService {
                 let google_client = self.google_oauth_client().await?;
 
                 // Generate random state and PKCE verifier (RFC 7636 compliant)
-                let state = self.generate_random_string(32).unwrap();
+                let state = self.generate_random_string(32).map_err(|e| {
+                    error!("Failed to generate OAuth state: {}", e);
+                    Status::internal("Failed to generate OAuth state")
+                })?;
                 let (_, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
                 let pkce_verifier_secret = pkce_verifier.secret().to_string();
                 let nonce = Nonce::new_random();
