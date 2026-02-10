@@ -86,7 +86,7 @@ pub struct NewUser {
     pub username: String,
     pub email: String,
     pub display_name: Option<String>,
-    pub password_hash: String,
+    pub password_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -190,6 +190,9 @@ pub struct OAuthState {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
+    /// Encrypted OIDC nonce for ID token replay protection
+    #[serde(skip_serializing)]
+    pub nonce: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -200,6 +203,8 @@ pub struct CreateOAuthState {
     pub redirect_uri: String,
     pub ip_address: Option<ipnet::IpNet>,
     pub expires_at: DateTime<Utc>,
+    /// Encrypted OIDC nonce (application must encrypt before storing)
+    pub nonce: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
