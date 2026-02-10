@@ -220,7 +220,7 @@ impl AppState {
             Some("app") => vec![".app.tar.gz", ".tar.gz"],
             _ => match target {
                 "linux" => vec![".AppImage"],
-                "darwin" | "macos" => vec![".app.tar.gz", ".dmg", ".tar.gz"],
+                "darwin" => vec![".app.tar.gz", ".dmg", ".tar.gz"],
                 "windows" => vec![".msi"],
                 _ => vec![".tar.gz", ".zip"],
             },
@@ -424,9 +424,7 @@ impl AppState {
                     }
                 };
 
-                // Normalize macos -> darwin to match Tauri's platform naming
-                let normalized_target = if target == "macos" { "darwin" } else { target };
-                let platform_key = format!("{}-{}", normalized_target, arch);
+                let platform_key = format!("{}-{}", target, arch);
                 platforms.insert(platform_key, PlatformInfo { url, signature });
             }
         }
