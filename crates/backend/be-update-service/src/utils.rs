@@ -2,9 +2,7 @@ use crate::error::UpdateServiceError;
 
 /// Parse target_arch into (target, arch) components.
 /// e.g., "linux-x86_64" -> ("linux", "x86_64")
-///
-/// Normalizes "darwin" to "macos" to match our S3 directory structure
-/// (Tauri uses "darwin" but our release script stores files under "macos").
+///       "darwin-aarch64" -> ("darwin", "aarch64")
 pub fn parse_target_arch(target_arch: &str) -> Result<(String, String), UpdateServiceError> {
     let Some((target, arch)) = target_arch.split_once('-') else {
         return Err(UpdateServiceError::InvalidTargetArch(
@@ -12,13 +10,7 @@ pub fn parse_target_arch(target_arch: &str) -> Result<(String, String), UpdateSe
         ));
     };
 
-    let target = if target == "darwin" {
-        "macos".to_owned()
-    } else {
-        target.to_owned()
-    };
-
-    Ok((target, arch.to_owned()))
+    Ok((target.to_owned(), arch.to_owned()))
 }
 
 #[cfg(test)]
@@ -33,11 +25,11 @@ mod tests {
         );
         assert_eq!(
             parse_target_arch("darwin-aarch64").unwrap(),
-            ("macos".to_owned(), "aarch64".to_owned())
+            ("darwin".to_owned(), "aarch64".to_owned())
         );
         assert_eq!(
             parse_target_arch("darwin-x86_64").unwrap(),
-            ("macos".to_owned(), "x86_64".to_owned())
+            ("darwin".to_owned(), "x86_64".to_owned())
         );
         assert_eq!(
             parse_target_arch("windows-x86_64").unwrap(),
