@@ -55,8 +55,8 @@
 	);
 </script>
 
-<Sidebar.Root class="border-none">
-	<Sidebar.Content class="overflow-x-hidden">
+<Sidebar.Root>
+	<Sidebar.Header>
 		<div class="flex items-center pt-2">
 			<Button
 				variant="link"
@@ -67,6 +67,8 @@
 				Eurora Labs
 			</Button>
 		</div>
+	</Sidebar.Header>
+	<Sidebar.Content>
 		<Sidebar.Group>
 			<Sidebar.GroupContent>
 				<Sidebar.Menu>

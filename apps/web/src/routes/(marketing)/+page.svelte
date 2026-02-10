@@ -1,6 +1,6 @@
 <script lang="ts">
-	import StaticLauncher from '$components/marketing/static-launcher.svelte';
-	import VideoSection from '$components/marketing/video-section.svelte';
+	import StaticLauncher from '$lib/components/marketing/static-launcher.svelte';
+	import VideoSection from '$lib/components/marketing/video-section.svelte';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { type Icon as IconType } from '@lucide/svelte';
