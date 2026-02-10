@@ -1,16 +1,13 @@
-import Close from '$lib/components/dialog/dialog-close.svelte';
-import Content from '$lib/components/dialog/dialog-content.svelte';
-import Description from '$lib/components/dialog/dialog-description.svelte';
-import Footer from '$lib/components/dialog/dialog-footer.svelte';
-
-import Header from '$lib/components/dialog/dialog-header.svelte';
-import Overlay from '$lib/components/dialog/dialog-overlay.svelte';
-import Title from '$lib/components/dialog/dialog-title.svelte';
-import Trigger from '$lib/components/dialog/dialog-trigger.svelte';
-import { Dialog as DialogPrimitive } from 'bits-ui';
-
-const Root = DialogPrimitive.Root;
-const Portal = DialogPrimitive.Portal;
+import Root from "./dialog.svelte";
+import Portal from "./dialog-portal.svelte";
+import Title from "./dialog-title.svelte";
+import Footer from "./dialog-footer.svelte";
+import Header from "./dialog-header.svelte";
+import Overlay from "./dialog-overlay.svelte";
+import Content from "./dialog-content.svelte";
+import Description from "./dialog-description.svelte";
+import Trigger from "./dialog-trigger.svelte";
+import Close from "./dialog-close.svelte";
 
 export {
 	Root,
