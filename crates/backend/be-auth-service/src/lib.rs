@@ -1,10 +1,13 @@
 //! The Eurora authentication service that provides gRPC endpoints for user authentication.
 
 use anyhow::{Result, anyhow};
-use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use bcrypt::{DEFAULT_COST, hash, verify};
+use argon2::{
+    Argon2,
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
+};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{Algorithm, Header, encode};
+use openidconnect::{PkceCodeChallenge, PkceCodeVerifier};
 use std::sync::Arc;
 // Re-export shared types for convenience
 pub use auth_core::Claims;
@@ -13,14 +16,13 @@ use be_remote_db::{
     CreateLoginToken, CreateOAuthCredentials, CreateOAuthState, CreateRefreshToken,
     DatabaseManager, NewUser, OAuthProvider,
 };
-use oauth2::TokenResponse as OAuth2TokenResponse;
 use proto_gen::auth::{
     EmailPasswordCredentials, GetLoginTokenResponse, LoginByLoginTokenRequest, LoginRequest,
     Provider, RefreshTokenRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
     ThirdPartyAuthUrlResponse, ThirdPartyCredentials, TokenResponse, login_request::Credential,
     proto_auth_service_server::ProtoAuthService,
 };
-use rand::{TryRngCore, rngs::OsRng};
+use rand::TryRngCore;
 use sha2::{Digest, Sha256};
 use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};
@@ -108,16 +110,22 @@ impl AuthService {
         Ok((claims, token.to_string()))
     }
 
-    /// Hash a password using bcrypt
+    /// Hash a password using Argon2id
     fn hash_password(&self, password: &str) -> Result<String> {
-        let hashed =
-            hash(password, DEFAULT_COST).map_err(|e| anyhow!("Failed to hash password: {}", e))?;
-        Ok(hashed)
+        let salt = SaltString::generate(&mut OsRng);
+        let hash = Argon2::default()
+            .hash_password(password.as_bytes(), &salt)
+            .map_err(|e| anyhow!("Failed to hash password: {}", e))?;
+        Ok(hash.to_string())
     }
 
-    /// Verify a password against a hash
+    /// Verify a password against an Argon2id hash
     fn verify_password(&self, password: &str, hash: &str) -> Result<bool> {
-        verify(password, hash).map_err(|e| anyhow!("Failed to verify password: {}", e))
+        let parsed_hash =
+            PasswordHash::new(hash).map_err(|e| anyhow!("Invalid password hash format: {}", e))?;
+        Ok(Argon2::default()
+            .verify_password(password.as_bytes(), &parsed_hash)
+            .is_ok())
     }
 
     /// Hash a refresh token for secure storage (returns raw 32-byte hash)
@@ -196,7 +204,7 @@ impl AuthService {
     fn generate_random_string(&self, length: usize) -> Result<String> {
         let byte_len = length.div_ceil(2); // round up for odd lengths
         let mut bytes = vec![0u8; byte_len];
-        OsRng.try_fill_bytes(&mut bytes).map_err(|e| {
+        rand::rngs::OsRng.try_fill_bytes(&mut bytes).map_err(|e| {
             error!("Failed to generate random bytes: {}", e);
             Status::internal("Failed to generate random bytes")
         })?;
@@ -250,12 +258,10 @@ impl AuthService {
     }
 
     /// Convert a code_verifier to code_challenge using PKCE S256 method
-    /// This computes: base64url_no_pad(sha256(code_verifier))
     fn code_verifier_to_challenge(&self, code_verifier: &str) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(code_verifier.as_bytes());
-        let hash = hasher.finalize();
-        URL_SAFE_NO_PAD.encode(hash)
+        let verifier = PkceCodeVerifier::new(code_verifier.to_string());
+        let challenge = PkceCodeChallenge::from_code_verifier_sha256(&verifier);
+        challenge.as_str().to_string()
     }
 
     /// Register a new user (not in proto yet, but implementing for completeness)
@@ -351,7 +357,6 @@ impl AuthService {
         &self,
         creds: ThirdPartyCredentials,
     ) -> Result<Response<TokenResponse>, Status> {
-        // Extract code and state from credentials
         let code = &creds.code;
         let state = &creds.state;
 
@@ -388,67 +393,40 @@ impl AuthService {
             // Continue anyway, as the state was valid
         }
 
-        // Create OAuth client for token exchange
-        let google_config = oauth::google::GoogleOAuthConfig::from_env().map_err(|e| {
-            error!("Failed to load Google OAuth config: {}", e);
-            Status::internal("OAuth configuration error")
-        })?;
-
-        let google_client_id = oauth2::ClientId::new(google_config.client_id.clone());
-        let google_client_secret = oauth2::ClientSecret::new(google_config.client_secret.clone());
-
-        let auth_url =
-            oauth2::AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())
-                .map_err(|e| {
-                    error!("Invalid authorization endpoint URL: {}", e);
-                    Status::internal("OAuth configuration error")
-                })?;
-
-        let token_url =
-            oauth2::TokenUrl::new("https://www.googleapis.com/oauth2/v3/token".to_string())
-                .map_err(|e| {
-                    error!("Invalid token endpoint URL: {}", e);
-                    Status::internal("OAuth configuration error")
-                })?;
-
-        let redirect_url =
-            oauth2::RedirectUrl::new(google_config.redirect_uri.clone()).map_err(|e| {
-                error!("Invalid redirect URL: {}", e);
+        // Exchange authorization code for tokens and extract user info via OIDC
+        let google_client = oauth::google::create_google_oauth_client()
+            .await
+            .map_err(|e| {
+                error!("Failed to create Google OAuth client: {}", e);
                 Status::internal("OAuth configuration error")
             })?;
 
-        let client = oauth2::basic::BasicClient::new(google_client_id)
-            .set_client_secret(google_client_secret)
-            .set_auth_uri(auth_url)
-            .set_token_uri(token_url)
-            .set_redirect_uri(redirect_url);
-
-        // Exchange authorization code for access token
-        let http_client = reqwest::ClientBuilder::new()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|e| {
-                error!("Failed to build HTTP client: {}", e);
-                Status::internal("HTTP client error")
-            })?;
-
-        let token_result = client
-            .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
-            .set_pkce_verifier(oauth2::PkceCodeVerifier::new(pkce_verifier))
-            .request_async(&http_client)
+        let user_info = google_client
+            .exchange_code(code, pkce_verifier)
             .await
             .map_err(|e| {
                 error!("Failed to exchange authorization code: {}", e);
                 Status::unauthenticated("Invalid authorization code")
             })?;
 
-        let access_token = token_result.access_token().secret();
+        // Reject unverified emails
+        if !user_info.verified_email {
+            warn!(
+                "Google login rejected: email {} not verified",
+                user_info.email
+            );
+            return Err(Status::unauthenticated("Email address is not verified"));
+        }
 
-        // Get user info from Google
-        let user_info = self.get_google_user_info(access_token).await.map_err(|e| {
-            error!("Failed to get user info from Google: {}", e);
-            Status::internal("Failed to retrieve user information")
-        })?;
+        // Build OAuth credential values from the token response
+        let oauth_access_token = user_info.access_token.as_bytes().to_vec();
+        let oauth_refresh_token = user_info
+            .refresh_token
+            .as_ref()
+            .map(|t| t.as_bytes().to_vec());
+        let oauth_token_expiry = user_info.expires_in.map(|duration| {
+            chrono::Utc::now() + chrono::Duration::seconds(duration.as_secs() as i64)
+        });
 
         // Check if user exists by OAuth provider first
         let existing_user_by_oauth = self
@@ -465,14 +443,9 @@ impl AuthService {
                     .await
                 {
                     let update_request = be_remote_db::UpdateOAuthCredentials {
-                        access_token: Some(access_token.as_bytes().to_vec()),
-                        refresh_token: token_result
-                            .refresh_token()
-                            .map(|t| t.secret().as_bytes().to_vec()),
-                        access_token_expiry: token_result.expires_in().map(|duration| {
-                            chrono::Utc::now()
-                                + chrono::Duration::seconds(duration.as_secs() as i64)
-                        }),
+                        access_token: Some(oauth_access_token.clone()),
+                        refresh_token: oauth_refresh_token.clone(),
+                        access_token_expiry: oauth_token_expiry,
                         scope: Some("openid email profile".to_string()),
                     };
 
@@ -498,14 +471,9 @@ impl AuthService {
                             user_id: user.id,
                             provider: OAuthProvider::Google,
                             provider_user_id: user_info.id.clone(),
-                            access_token: Some(access_token.as_bytes().to_vec()),
-                            refresh_token: token_result
-                                .refresh_token()
-                                .map(|t| t.secret().as_bytes().to_vec()),
-                            access_token_expiry: token_result.expires_in().map(|duration| {
-                                chrono::Utc::now()
-                                    + chrono::Duration::seconds(duration.as_secs() as i64)
-                            }),
+                            access_token: Some(oauth_access_token.clone()),
+                            refresh_token: oauth_refresh_token.clone(),
+                            access_token_expiry: oauth_token_expiry,
                             scope: Some("openid email profile".to_string()),
                         };
 
@@ -568,14 +536,9 @@ impl AuthService {
                             user_id: new_user.id,
                             provider: OAuthProvider::Google,
                             provider_user_id: user_info.id.clone(),
-                            access_token: Some(access_token.as_bytes().to_vec()),
-                            refresh_token: token_result
-                                .refresh_token()
-                                .map(|t| t.secret().as_bytes().to_vec()),
-                            access_token_expiry: token_result.expires_in().map(|duration| {
-                                chrono::Utc::now()
-                                    + chrono::Duration::seconds(duration.as_secs() as i64)
-                            }),
+                            access_token: Some(oauth_access_token.clone()),
+                            refresh_token: oauth_refresh_token.clone(),
+                            access_token_expiry: oauth_token_expiry,
                             scope: Some("openid email profile".to_string()),
                         };
 
@@ -611,34 +574,6 @@ impl AuthService {
         };
 
         Ok(Response::new(response))
-    }
-
-    /// Get user info from Google using access token
-    async fn get_google_user_info(
-        &self,
-        access_token: &str,
-    ) -> Result<oauth::google::GoogleUserInfo> {
-        info!("Fetching user info from Google");
-
-        let client = reqwest::Client::new();
-        let response = client
-            .get("https://www.googleapis.com/oauth2/v2/userinfo")
-            .bearer_auth(access_token)
-            .send()
-            .await
-            .map_err(|e| anyhow!("Failed to fetch user info: {}", e))?;
-
-        if !response.status().is_success() {
-            error!("Google API returned error: {}", response.status());
-            return Err(anyhow!("Failed to fetch user info from Google"));
-        }
-
-        let user_info: oauth::google::GoogleUserInfo = response
-            .json()
-            .await
-            .map_err(|e| anyhow!("Failed to parse user info response: {}", e))?;
-
-        Ok(user_info)
     }
 
     async fn handle_github_login(
@@ -751,14 +686,15 @@ impl ProtoAuthService for AuthService {
             Provider::Google => {
                 info!("Generating Google OAuth URL");
 
-                let google_client = create_google_oauth_client().map_err(|e| {
+                let google_client = create_google_oauth_client().await.map_err(|e| {
                     error!("Failed to create Google OAuth client: {}", e);
                     Status::internal("Failed to initialize OAuth client")
                 })?;
 
-                // Generate random state and PKCE verifier
+                // Generate random state and PKCE verifier (RFC 7636 compliant)
                 let state = self.generate_random_string(32).unwrap();
-                let pkce_verifier = self.generate_random_string(64).unwrap();
+                let (_, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
+                let pkce_verifier_secret = pkce_verifier.secret().to_string();
 
                 // Get redirect URI from Google client config
                 let google_config = oauth::google::GoogleOAuthConfig::from_env().map_err(|e| {
@@ -767,11 +703,10 @@ impl ProtoAuthService for AuthService {
                 })?;
 
                 // Store OAuth state in database with encrypted PKCE verifier
-                let expires_at = Utc::now() + Duration::minutes(10); // 10 minute expiration
+                let expires_at = Utc::now() + Duration::minutes(10);
 
-                // Encrypt the PKCE verifier before storing
-                let encrypted_pkce_verifier =
-                    encrypt_pkce_verifier(&pkce_verifier).map_err(|e| {
+                let encrypted_pkce_verifier = encrypt_pkce_verifier(&pkce_verifier_secret)
+                    .map_err(|e| {
                         error!("Failed to encrypt PKCE verifier: {}", e);
                         Status::internal("Failed to secure OAuth state")
                     })?;
@@ -780,7 +715,7 @@ impl ProtoAuthService for AuthService {
                     state: state.clone(),
                     pkce_verifier: encrypted_pkce_verifier,
                     redirect_uri: google_config.redirect_uri.clone(),
-                    ip_address: None, // Could be extracted from request metadata if needed
+                    ip_address: None,
                     expires_at,
                 };
 
@@ -793,7 +728,7 @@ impl ProtoAuthService for AuthService {
                     })?;
 
                 google_client
-                    .get_authorization_url_with_state_and_pkce(&state, &pkce_verifier)
+                    .get_authorization_url_with_state_and_pkce(&state, &pkce_verifier_secret)
                     .map_err(|e| {
                         error!("Failed to generate Google OAuth URL: {}", e);
                         Status::internal("Failed to generate OAuth URL")
