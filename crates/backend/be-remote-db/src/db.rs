@@ -55,7 +55,6 @@ impl DatabaseManager {
     // User management methods
     pub async fn create_user(&self, request: NewUser) -> DbResult<User> {
         let user_id = Uuid::now_v7();
-        let password_id = Uuid::now_v7();
         let now = Utc::now();
 
         // Start a transaction to ensure both user and password_credentials are created atomically
@@ -79,20 +78,24 @@ impl DatabaseManager {
         .fetch_one(&mut *tx)
         .await?;
 
-        // Insert password credentials
-        sqlx::query(
-            r#"
-            INSERT INTO password_credentials (id, user_id, password_hash, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5)
-            "#,
-        )
-        .bind(password_id)
-        .bind(user_id)
-        .bind(&request.password_hash)
-        .bind(now) // created_at
-        .bind(now) // updated_at is NOT NULL, set to now initially
-        .execute(&mut *tx)
-        .await?;
+        // Only insert password credentials if a password hash is provided
+        // OAuth-only users don't have password credentials
+        if let Some(ref password_hash) = request.password_hash {
+            let password_id = Uuid::now_v7();
+            sqlx::query(
+                r#"
+                INSERT INTO password_credentials (id, user_id, password_hash, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5)
+                "#,
+            )
+            .bind(password_id)
+            .bind(user_id)
+            .bind(password_hash)
+            .bind(now) // created_at
+            .bind(now) // updated_at is NOT NULL, set to now initially
+            .execute(&mut *tx)
+            .await?;
+        }
 
         // Commit the transaction
         tx.commit().await?;
@@ -368,9 +371,9 @@ impl DatabaseManager {
 
         let oauth_state = sqlx::query_as::<_, OAuthState>(
             r#"
-            INSERT INTO oauth_state (id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at
+            INSERT INTO oauth_state (id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce
             "#,
         )
         .bind(id)
@@ -382,6 +385,7 @@ impl DatabaseManager {
         .bind(now)
         .bind(now)
         .bind(request.expires_at)
+        .bind(&request.nonce)
         .fetch_one(&self.pool)
         .await?;
 
@@ -391,7 +395,7 @@ impl DatabaseManager {
     pub async fn get_oauth_state_by_state(&self, state: &str) -> DbResult<OAuthState> {
         let oauth_state = sqlx::query_as::<_, OAuthState>(
             r#"
-            SELECT id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at
+            SELECT id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce
             FROM oauth_state
             WHERE state = $1 AND consumed = false AND expires_at > now()
             "#,
@@ -411,7 +415,7 @@ impl DatabaseManager {
             UPDATE oauth_state
             SET consumed = true, updated_at = $2
             WHERE state = $1 AND consumed = false AND expires_at > now()
-            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at
+            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce
             "#,
         )
         .bind(state)
