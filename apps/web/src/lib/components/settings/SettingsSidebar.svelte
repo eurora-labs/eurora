@@ -55,7 +55,7 @@
 	);
 </script>
 
-<Sidebar.Root>
+<Sidebar.Root class="border-none">
 	<Sidebar.Header>
 		<div class="flex items-center pt-2">
 			<Button
