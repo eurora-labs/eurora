@@ -7,8 +7,9 @@ use argon2::{
 };
 use chrono::{Duration, Utc};
 use jsonwebtoken::{Algorithm, Header, encode};
-use openidconnect::{PkceCodeChallenge, PkceCodeVerifier};
+use openidconnect::{Nonce, PkceCodeChallenge, PkceCodeVerifier};
 use std::sync::Arc;
+use tokio::sync::OnceCell;
 // Re-export shared types for convenience
 pub use auth_core::Claims;
 use be_auth_grpc::JwtConfig;
@@ -31,8 +32,8 @@ use uuid::Uuid;
 pub mod crypto;
 pub mod oauth;
 
-use crypto::{decrypt_pkce_verifier, encrypt_pkce_verifier};
-use oauth::google::create_google_oauth_client;
+use crypto::{decrypt_sensitive_string, encrypt_sensitive_string};
+use oauth::google::GoogleOAuthClient;
 
 /// The main authentication service
 pub struct AuthService {
@@ -40,6 +41,8 @@ pub struct AuthService {
     jwt_config: JwtConfig,
     #[allow(dead_code)]
     desktop_login_url: String,
+    /// Cached Google OAuth client (lazily initialized on first use)
+    google_oauth_client: OnceCell<GoogleOAuthClient>,
 }
 
 impl AuthService {
@@ -54,7 +57,25 @@ impl AuthService {
             db,
             jwt_config,
             desktop_login_url,
+            google_oauth_client: OnceCell::new(),
         }
+    }
+
+    /// Get or initialize the cached Google OAuth client.
+    /// OIDC discovery is performed only on the first call; subsequent calls reuse the cached client.
+    async fn google_oauth_client(&self) -> Result<&GoogleOAuthClient, Status> {
+        self.google_oauth_client
+            .get_or_try_init(|| async {
+                let config = oauth::google::GoogleOAuthConfig::from_env().map_err(|e| {
+                    error!("Failed to load Google OAuth config: {}", e);
+                    Status::internal("OAuth configuration error")
+                })?;
+                GoogleOAuthClient::discover(config).await.map_err(|e| {
+                    error!("Failed to create Google OAuth client: {}", e);
+                    Status::internal("Failed to initialize OAuth client")
+                })
+            })
+            .await
     }
 
     /// Extract and validate JWT token from request metadata
@@ -294,7 +315,7 @@ impl AuthService {
             username: username.to_string(),
             email: email.to_string(),
             display_name,
-            password_hash,
+            password_hash: Some(password_hash),
         };
 
         // Create user in database
@@ -382,10 +403,22 @@ impl AuthService {
         };
 
         // Decrypt the PKCE verifier from the stored OAuth state
-        let pkce_verifier = decrypt_pkce_verifier(&oauth_state.pkce_verifier).map_err(|e| {
+        let pkce_verifier = decrypt_sensitive_string(&oauth_state.pkce_verifier).map_err(|e| {
             error!("Failed to decrypt PKCE verifier: {}", e);
             Status::internal("Failed to process OAuth state")
         })?;
+
+        // Decrypt the nonce for ID token verification
+        let nonce = match &oauth_state.nonce {
+            Some(encrypted_nonce) => {
+                let nonce_str = decrypt_sensitive_string(encrypted_nonce).map_err(|e| {
+                    error!("Failed to decrypt nonce: {}", e);
+                    Status::internal("Failed to process OAuth state")
+                })?;
+                Some(Nonce::new(nonce_str))
+            }
+            None => None,
+        };
 
         // Consume the state to prevent replay attacks
         if let Err(e) = self.db.consume_oauth_state(state).await {
@@ -394,15 +427,10 @@ impl AuthService {
         }
 
         // Exchange authorization code for tokens and extract user info via OIDC
-        let google_client = oauth::google::create_google_oauth_client()
-            .await
-            .map_err(|e| {
-                error!("Failed to create Google OAuth client: {}", e);
-                Status::internal("OAuth configuration error")
-            })?;
+        let google_client = self.google_oauth_client().await?;
 
         let user_info = google_client
-            .exchange_code(code, pkce_verifier)
+            .exchange_code(code, pkce_verifier, nonce.as_ref())
             .await
             .map_err(|e| {
                 error!("Failed to exchange authorization code: {}", e);
@@ -418,12 +446,21 @@ impl AuthService {
             return Err(Status::unauthenticated("Email address is not verified"));
         }
 
-        // Build OAuth credential values from the token response
-        let oauth_access_token = user_info.access_token.as_bytes().to_vec();
+        // Build OAuth credential values from the token response (encrypted at rest)
+        let oauth_access_token =
+            encrypt_sensitive_string(&user_info.access_token).map_err(|e| {
+                error!("Failed to encrypt OAuth access token: {}", e);
+                Status::internal("Failed to secure OAuth credentials")
+            })?;
         let oauth_refresh_token = user_info
             .refresh_token
             .as_ref()
-            .map(|t| t.as_bytes().to_vec());
+            .map(|t| encrypt_sensitive_string(t))
+            .transpose()
+            .map_err(|e| {
+                error!("Failed to encrypt OAuth refresh token: {}", e);
+                Status::internal("Failed to secure OAuth credentials")
+            })?;
         let oauth_token_expiry = user_info.expires_in.map(|duration| {
             chrono::Utc::now() + chrono::Duration::seconds(duration.as_secs() as i64)
         });
@@ -485,17 +522,12 @@ impl AuthService {
                         user
                     }
                     Err(_) => {
-                        // If token is not present throw error
-                        let login_token = creds.login_token.clone();
-                        let challenge_method = creds.challenge_method.clone();
-
-                        if login_token.is_none() {
-                            error!("Login token is missing");
-                            return Err(Status::unauthenticated("Login token is missing"));
-                        }
-                        if challenge_method.is_none() {
-                            error!("Challenge method is missing");
-                            return Err(Status::unauthenticated("Challenge method is missing"));
+                        // New users must come from the desktop app flow, which provides a login token
+                        if creds.login_token.is_none() {
+                            error!("Login token is missing for new user registration via OAuth");
+                            return Err(Status::unauthenticated(
+                                "Login token is required for new account registration",
+                            ));
                         }
 
                         // Generate username from email (before @ symbol) or use name
@@ -523,7 +555,7 @@ impl AuthService {
                             username: final_username,
                             email: user_info.email.clone(),
                             display_name: Some(user_info.name.clone()),
-                            password_hash: String::new(), // No password for OAuth users
+                            password_hash: None, // OAuth-only users have no password credentials
                         };
 
                         let new_user = self.db.create_user(create_request).await.map_err(|e| {
@@ -686,15 +718,14 @@ impl ProtoAuthService for AuthService {
             Provider::Google => {
                 info!("Generating Google OAuth URL");
 
-                let google_client = create_google_oauth_client().await.map_err(|e| {
-                    error!("Failed to create Google OAuth client: {}", e);
-                    Status::internal("Failed to initialize OAuth client")
-                })?;
+                let google_client = self.google_oauth_client().await?;
 
                 // Generate random state and PKCE verifier (RFC 7636 compliant)
                 let state = self.generate_random_string(32).unwrap();
                 let (_, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
                 let pkce_verifier_secret = pkce_verifier.secret().to_string();
+                let nonce = Nonce::new_random();
+                let nonce_secret = nonce.secret().to_string();
 
                 // Get redirect URI from Google client config
                 let google_config = oauth::google::GoogleOAuthConfig::from_env().map_err(|e| {
@@ -702,14 +733,19 @@ impl ProtoAuthService for AuthService {
                     Status::internal("OAuth configuration error")
                 })?;
 
-                // Store OAuth state in database with encrypted PKCE verifier
+                // Store OAuth state in database with encrypted PKCE verifier and nonce
                 let expires_at = Utc::now() + Duration::minutes(10);
 
-                let encrypted_pkce_verifier = encrypt_pkce_verifier(&pkce_verifier_secret)
+                let encrypted_pkce_verifier = encrypt_sensitive_string(&pkce_verifier_secret)
                     .map_err(|e| {
                         error!("Failed to encrypt PKCE verifier: {}", e);
                         Status::internal("Failed to secure OAuth state")
                     })?;
+
+                let encrypted_nonce = encrypt_sensitive_string(&nonce_secret).map_err(|e| {
+                    error!("Failed to encrypt nonce: {}", e);
+                    Status::internal("Failed to secure OAuth state")
+                })?;
 
                 let oauth_state_request = CreateOAuthState {
                     state: state.clone(),
@@ -717,6 +753,7 @@ impl ProtoAuthService for AuthService {
                     redirect_uri: google_config.redirect_uri.clone(),
                     ip_address: None,
                     expires_at,
+                    nonce: encrypted_nonce,
                 };
 
                 self.db
@@ -728,7 +765,11 @@ impl ProtoAuthService for AuthService {
                     })?;
 
                 google_client
-                    .get_authorization_url_with_state_and_pkce(&state, &pkce_verifier_secret)
+                    .get_authorization_url_with_state_and_pkce(
+                        &state,
+                        &pkce_verifier_secret,
+                        &nonce,
+                    )
                     .map_err(|e| {
                         error!("Failed to generate Google OAuth URL: {}", e);
                         Status::internal("Failed to generate OAuth URL")
@@ -858,12 +899,12 @@ impl AuthService {
             }
         };
 
-        // Get password credentials
+        // Get password credentials (OAuth-only users won't have any)
         let password_creds = match self.db.get_password_credentials(user.id).await {
             Ok(creds) => creds,
-            Err(e) => {
-                error!("Failed to get password credentials: {}", e);
-                return Err(Status::internal("Authentication error"));
+            Err(_) => {
+                warn!("Login failed: no password credentials for {}", login);
+                return Err(Status::unauthenticated("Invalid credentials"));
             }
         };
 

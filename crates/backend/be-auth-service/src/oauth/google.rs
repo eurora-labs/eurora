@@ -82,11 +82,12 @@ impl GoogleOAuthClient {
         Ok(Self { client })
     }
 
-    /// Generate the authorization URL with a custom state and PKCE verifier.
+    /// Generate the authorization URL with a custom state, PKCE verifier, and nonce.
     pub fn get_authorization_url_with_state_and_pkce(
         &self,
         state: &str,
         pkce_verifier: &str,
+        nonce: &Nonce,
     ) -> Result<String> {
         info!("Generating Google OAuth authorization URL with custom state and PKCE");
 
@@ -94,12 +95,13 @@ impl GoogleOAuthClient {
         let pkce_challenge = PkceCodeChallenge::from_code_verifier_sha256(&pkce_code_verifier);
 
         let state_str = state.to_string();
+        let nonce_clone = nonce.clone();
         let (authorize_url, _, _) = self
             .client
             .authorize_url(
                 AuthenticationFlow::<CoreResponseType>::AuthorizationCode,
                 || CsrfToken::new(state_str),
-                Nonce::new_random,
+                move || nonce_clone,
             )
             .add_scope(Scope::new("email".to_string()))
             .add_scope(Scope::new("profile".to_string()))
@@ -110,7 +112,15 @@ impl GoogleOAuthClient {
     }
 
     /// Exchange an authorization code for tokens and extract user info from the ID token.
-    pub async fn exchange_code(&self, code: &str, pkce_verifier: String) -> Result<GoogleUserInfo> {
+    ///
+    /// The `nonce` parameter is used to verify the ID token's nonce claim, protecting
+    /// against ID token replay attacks per the OpenID Connect Core spec.
+    pub async fn exchange_code(
+        &self,
+        code: &str,
+        pkce_verifier: String,
+        nonce: Option<&Nonce>,
+    ) -> Result<GoogleUserInfo> {
         let http_client = build_http_client()?;
 
         let token_response = self
@@ -126,11 +136,16 @@ impl GoogleOAuthClient {
             .id_token()
             .ok_or_else(|| anyhow!("Google did not return an ID token"))?;
 
-        // We skip nonce verification since we don't persist the nonce across the flow.
-        // The PKCE verifier provides equivalent replay protection.
-        let claims: &CoreIdTokenClaims = id_token
-            .claims(&self.client.id_token_verifier(), |_: Option<&Nonce>| Ok(()))
-            .map_err(|e| anyhow!("Failed to verify ID token: {}", e))?;
+        // Verify the ID token claims, including nonce verification to prevent replay attacks
+        let verifier = self.client.id_token_verifier();
+        let claims: &CoreIdTokenClaims = match nonce {
+            Some(expected_nonce) => id_token
+                .claims(&verifier, expected_nonce)
+                .map_err(|e| anyhow!("Failed to verify ID token: {}", e))?,
+            None => id_token
+                .claims(&verifier, |_: Option<&Nonce>| Ok(()))
+                .map_err(|e| anyhow!("Failed to verify ID token: {}", e))?,
+        };
 
         let subject = claims.subject().to_string();
         let email = claims
