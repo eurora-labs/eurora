@@ -14,11 +14,6 @@
 		"lint": "eslint .",
 		"test:unit": "vitest"
 	},
-	"dependencies": {
-		"@stripe/stripe-js": "^7.9.0",
-		"stripe": "^18.5.0",
-		"svelte-stripe": "^1.4.0"
-	},
 	"devDependencies": {
 		"@eurora/prosemirror-core": "workspace:*",
 		"@eurora/prosemirror-view": "workspace:*",

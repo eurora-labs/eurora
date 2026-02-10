@@ -1,4 +1,4 @@
-<script lang="ts">
+<!-- <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { loadStripe } from '@stripe/stripe-js';
 	import { onMount } from 'svelte';
@@ -123,4 +123,4 @@
 		color: white;
 		font-size: 1.2rem;
 	}
-</style>
+</style> -->
