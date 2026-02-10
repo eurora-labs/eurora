@@ -50,6 +50,18 @@ jobs:
                   save-if: ${{ github.ref == 'refs/heads/main' }}
             - name: Setup node environment
               uses: ./.github/actions/init-env-node
+
+            - name: Install cargo-about
+              shell: bash
+              run: |
+                  if ! command -v cargo-about >/dev/null 2>&1; then
+                  cargo install --locked "cargo-about@^0.8"
+                  fi
+
+            - name: Generate third-party license bundle
+              shell: bash
+              run: ./scripts/generate-licenses ./crates/app/euro-tauri/LICENSES-THIRD-PARTY.md
+
             - name: Build SvelteKit
               run: pnpm build:desktop -- --mode development
             - name: Install Protoc
