@@ -10,9 +10,6 @@
 	},
 	"bundle": {
 		"active": false,
-		"resources": [
-			"LICENSES-THIRD-PARTY.md"
-		],
 		"category": "DeveloperTool",
 		"copyright": "Copyright © 2024-2026 Eurora Labs. All rights reserved.",
 		"createUpdaterArtifacts": true,

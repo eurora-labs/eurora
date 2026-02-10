@@ -6,6 +6,9 @@
 	},
 	"bundle": {
 		"active": true,
+		"resources": [
+			"LICENSES-THIRD-PARTY.md"
+		],
 		"externalBin": [
 			"binaries/euro-native-messaging"
 		],
