@@ -1,8 +1,5 @@
 <script lang="ts">
 	import '../app.css';
-	// import * as Alert from '@eurora/ui/components/alert/index';
-	// import { Button } from '@eurora/ui/components/button/index';
-	// import XIcon from '@lucide/svelte/icons/x';
 	import { ModeWatcher, setMode } from 'mode-watcher';
 	import { onMount } from 'svelte';
 
@@ -11,7 +8,6 @@
 	});
 
 	let { children } = $props();
-	// let showAlert = $state(true);
 </script>
 
 <ModeWatcher defaultMode="dark" track={false} />

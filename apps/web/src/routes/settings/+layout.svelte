@@ -7,8 +7,7 @@
 
 <Sidebar.Provider open={true}>
 	<SettingsSidebar />
-	<Sidebar.Inset>
-		<Sidebar.Trigger class="fixed bottom-0 left-0 m-2" />
+	<main>
 		{@render children?.()}
-	</Sidebar.Inset>
+	</main>
 </Sidebar.Provider>
