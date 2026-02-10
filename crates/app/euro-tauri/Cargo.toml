@@ -51,8 +51,10 @@ serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }
 specta-typescript = { version = "0.0.9" }
 tauri = { version = "2.10.2", features = ["tray-icon", "unstable"] }
+tauri-plugin-autostart = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
+tauri-plugin-global-shortcut = "2"
 tauri-plugin-http = "2"
 tauri-plugin-log = { version = "2", features = ["colored"] }
 tauri-plugin-opener = "2"
@@ -64,22 +66,14 @@ tauri-plugin-store = "2"
 tauri-plugin-stronghold = "2"
 tauri-plugin-updater = "2.10"
 tauri-plugin-window-state = "2"
-taurpc = { version = "0.6.0" }
+taurpc = "0.6.0"
 # The features here optimize for performance.
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
 tracing = { workspace = true }
 url = { workspace = true }
 
 [build-dependencies]
-tauri-build = { version = "2.5.1", features = [] }
-
-[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
-tauri-plugin-autostart = "2"
-tauri-plugin-updater = "2.10"
-
-[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-global-shortcut = "2"
-tauri-plugin-updater = "2.10"
+tauri-build = { version = "2", features = [] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "0.10.1"
