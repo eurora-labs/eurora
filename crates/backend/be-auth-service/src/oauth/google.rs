@@ -1,4 +1,5 @@
 use std::env;
+use std::time::Duration;
 
 use anyhow::{Result, anyhow};
 use openidconnect::{
@@ -54,6 +55,7 @@ pub struct GoogleOAuthClient {
 fn build_http_client() -> Result<reqwest::Client> {
     reqwest::ClientBuilder::new()
         .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(30))
         .build()
         .map_err(|e| anyhow!("Failed to build HTTP client: {}", e))
 }
