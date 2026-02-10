@@ -4,9 +4,6 @@ env:
     RUSTUP_TOOLCHAIN: stable
     PUBLIC_STRIPE_KEY: ${{ secrets.PUBLIC_STRIPE_KEY }}
 
-permissions:
-    contents: read # Required for checkout
-    actions: read # Required for downloading artifacts
 on:
     push:
         branches:

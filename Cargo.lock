@@ -1528,6 +1528,7 @@ dependencies = [
  "chrono",
  "semver",
  "serde",
+ "thiserror 2.0.18",
  "tower",
  "tower-http",
  "tracing",
