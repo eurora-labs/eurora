@@ -22,6 +22,15 @@ pub struct UpdateParams {
     pub current_version: String,
 }
 
+/// Path parameters for the update endpoint with bundle type
+#[derive(Deserialize, Debug)]
+pub struct UpdateWithBundleTypeParams {
+    pub channel: String,     // "nightly" or "release"
+    pub target_arch: String, // e.g., "linux-x86_64", "darwin-aarch64"
+    pub current_version: String,
+    pub bundle_type: String, // e.g., "appimage", "deb", "rpm", "msi", "nsis", "app"
+}
+
 /// Path parameters for the release info endpoint
 #[derive(Deserialize, Debug)]
 pub struct ReleaseParams {
