@@ -1,4 +1,4 @@
-import Root from '$lib/components/skeleton/skeleton.svelte';
+import Root from "./skeleton.svelte";
 
 export {
 	Root,
