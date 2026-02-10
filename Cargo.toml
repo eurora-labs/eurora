@@ -27,6 +27,7 @@ agent-chain-macros = { path = "crates/common/agent-chain-macros" }
 agent-graph = { path = "crates/common/agent-graph" }
 agent-graph-macros = { path = "crates/common/agent-graph-macros" }
 anyhow = "1.0.99"
+argon2 = "0.5"
 async_from = "0.2.0"
 async-stream = "0.3.6"
 async-trait = "0.1.89"
@@ -77,6 +78,7 @@ jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
 keyring = "3.6.3"
 log = "0.4"
 once_cell = "1.21"
+openidconnect = "4"
 parking_lot = "0.12.5"
 posthog-rs = "0.3.7"
 # prompt-kit = { path = "crates/common/prompt-kit" }
