@@ -3,6 +3,10 @@ env:
     RUST_BACKTRACE: full
     RUSTUP_TOOLCHAIN: stable
     PUBLIC_STRIPE_KEY: ${{ secrets.PUBLIC_STRIPE_KEY }}
+
+permissions:
+    contents: read # Required for checkout
+    actions: read # Required for downloading artifacts
 on:
     push:
         branches:
@@ -11,6 +15,7 @@ on:
         branches: [main]
         paths-ignore:
             - 'apps/web/**'
+            - 'apps/browser/**'
     workflow_dispatch:
         inputs:
             sha:
@@ -74,6 +79,7 @@ jobs:
 
             - name: Build Tauri
               run: pnpm build:test
+
             - name: Install tauri-driver
               if: ${{ github.ref != 'refs/heads/main' }}
               run: |
