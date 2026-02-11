@@ -144,7 +144,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let http_router = update_router.merge(payment_router);
 
     let http_listener = tokio::net::TcpListener::bind(http_addr).await?;
-    let http_server = axum::serve(http_listener, http_router).with_graceful_shutdown(async {
+    let http_server = axum::serve(
+        http_listener,
+        http_router.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(async {
         tokio::signal::ctrl_c()
             .await
             .expect("Failed to install CTRL+C signal handler");
