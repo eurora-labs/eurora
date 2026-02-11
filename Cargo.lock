@@ -714,55 +714,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-stripe-connect"
-version = "1.0.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72642dc2394e22008daf1adda501e7e6759afea27db04a741a93737ae19a578e"
-dependencies = [
- "async-stripe-client-core",
- "async-stripe-shared",
- "async-stripe-types",
- "miniserde",
- "serde",
- "smol_str 0.3.2",
- "tracing",
-]
-
-[[package]]
 name = "async-stripe-core"
 version = "1.0.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24f6eef09c1b78f7b0fc339ac26eff57acbe8f5ee42c8800efb0eae4f9707c44"
-dependencies = [
- "async-stripe-client-core",
- "async-stripe-shared",
- "async-stripe-types",
- "miniserde",
- "serde",
- "smol_str 0.3.2",
- "tracing",
-]
-
-[[package]]
-name = "async-stripe-payment"
-version = "1.0.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4225f470aefe8b4d72e0571640cd7b1136c00a642764ad10aed7510c3ae4556"
-dependencies = [
- "async-stripe-client-core",
- "async-stripe-shared",
- "async-stripe-types",
- "miniserde",
- "serde",
- "smol_str 0.3.2",
- "tracing",
-]
-
-[[package]]
-name = "async-stripe-product"
-version = "1.0.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5184d0d8827768662d8757a0e8e3bc69445e5d3c752381fda04010efe0c070d1"
 dependencies = [
  "async-stripe-client-core",
  "async-stripe-shared",
@@ -1670,19 +1625,9 @@ dependencies = [
  "async-stripe",
  "async-stripe-billing",
  "async-stripe-checkout",
- "async-stripe-connect",
  "async-stripe-core",
- "async-stripe-payment",
- "async-stripe-product",
- "async-stripe-types",
  "async-stripe-webhook",
- "aws-config",
- "aws-sdk-s3",
  "axum",
- "chrono",
- "futures",
- "futures-util",
- "semver",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -1690,7 +1635,6 @@ dependencies = [
  "tower",
  "tower-http",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
