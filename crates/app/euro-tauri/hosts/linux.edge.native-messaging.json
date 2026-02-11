@@ -1,0 +1,7 @@
+{
+	"allowed_origins": ["chrome-extension://jldnbebjeaegfgpboohhoipokpbpncke/"],
+	"description": "Eurora Native Messaging Host",
+	"name": "com.eurora.app",
+	"path": "/home/andre/Projects/eurora/svelte-app/target/debug/euro-native-messaging",
+	"type": "stdio"
+}

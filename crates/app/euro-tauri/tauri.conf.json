@@ -34,7 +34,7 @@
 	               "fragmentPaths": [
 	                   "fragment.wxs"
 	               ],
-	               "componentRefs": ["ChromeRegistryEntries", "FirefoxRegistryEntries", "FirefoxNativeMessagingHostJson", "FirefoxNativeMessaging", "ChromeNativeMessagingHostJson", "ChromeNativeMessaging"]
+	               "componentRefs": ["ChromeRegistryEntries", "EdgeRegistryEntries", "FirefoxRegistryEntries", "ChromeNativeMessagingHostJson", "ChromeNativeMessaging", "EdgeNativeMessagingHostJson", "EdgeNativeMessaging", "FirefoxNativeMessagingHostJson", "FirefoxNativeMessaging"]
 	           }
 		},
 		"linux": {

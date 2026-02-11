@@ -26,7 +26,7 @@ use euro_tauri::{
     shared_types::SharedConversationManager,
 };
 use euro_timeline::TimelineManager;
-use log::{debug, error};
+use log::{debug, error, info, warn};
 use tauri::{
     Manager, generate_context,
     menu::{Menu, MenuItem},
@@ -35,6 +35,143 @@ use tauri::{
 use tauri_plugin_log::fern::colors::ColoredLevelConfig;
 use taurpc::Router;
 use tokio::sync::Mutex;
+
+/// Installs native messaging host manifests so browsers can discover the
+/// `euro-native-messaging` sidecar binary. On macOS the manifests are written
+/// into each browser's `NativeMessagingHosts` directory under
+/// `~/Library/Application Support/`. On Linux they go under `~/.config/`.
+/// Windows is handled by the WiX MSI installer, so this is a no-op there.
+fn install_native_messaging_manifests(app: &tauri::App) {
+    #[cfg(target_os = "windows")]
+    {
+        let _ = app;
+        return;
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        use std::path::PathBuf;
+
+        let resource_dir = match app.path().resource_dir() {
+            Ok(dir) => dir,
+            Err(e) => {
+                warn!(
+                    "Could not resolve resource dir, skipping native messaging manifest install: {e}"
+                );
+                return;
+            }
+        };
+
+        // Resolve the actual sidecar binary path (next to the main executable)
+        let binary_path = match std::env::current_exe() {
+            Ok(exe) => exe
+                .parent()
+                .map(|dir| dir.join("euro-native-messaging"))
+                .unwrap_or_default(),
+            Err(e) => {
+                warn!("Could not resolve current exe path: {e}");
+                return;
+            }
+        };
+        let binary_path_str = binary_path.to_string_lossy();
+
+        // (template resource file, target browser directories)
+        #[cfg(target_os = "macos")]
+        let manifest_configs: Vec<(&str, Vec<PathBuf>)> = {
+            let home = dirs::home_dir().unwrap_or_default();
+            vec![
+                (
+                    "hosts/mac.chromium.native-messaging.json",
+                    vec![
+                        home.join("Library/Application Support/Google/Chrome/NativeMessagingHosts"),
+                        home.join("Library/Application Support/Chromium/NativeMessagingHosts"),
+                        home.join("Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts"),
+                    ],
+                ),
+                (
+                    "hosts/mac.edge.native-messaging.json",
+                    vec![
+                        home.join("Library/Application Support/Microsoft Edge/NativeMessagingHosts"),
+                    ],
+                ),
+                (
+                    "hosts/mac.firefox.native-messaging.json",
+                    vec![
+                        home.join("Library/Application Support/Mozilla/NativeMessagingHosts"),
+                    ],
+                ),
+            ]
+        };
+
+        #[cfg(target_os = "linux")]
+        let manifest_configs: Vec<(&str, Vec<PathBuf>)> = {
+            let home = dirs::home_dir().unwrap_or_default();
+            vec![
+                (
+                    "hosts/linux.chromium.native-messaging.json",
+                    vec![
+                        home.join(".config/google-chrome/NativeMessagingHosts"),
+                        home.join(".config/chromium/NativeMessagingHosts"),
+                        home.join(".config/BraveSoftware/Brave-Browser/NativeMessagingHosts"),
+                    ],
+                ),
+                (
+                    "hosts/linux.edge.native-messaging.json",
+                    vec![home.join(".config/microsoft-edge/NativeMessagingHosts")],
+                ),
+            ]
+        };
+
+        for (template_name, browser_dirs) in &manifest_configs {
+            let template_path = resource_dir.join(template_name);
+            let content = match std::fs::read_to_string(&template_path) {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!("Could not read native messaging template {template_name}: {e}");
+                    continue;
+                }
+            };
+
+            // Parse and override the "path" field with the resolved binary location
+            let mut manifest: serde_json::Value = match serde_json::from_str(&content) {
+                Ok(v) => v,
+                Err(e) => {
+                    warn!("Could not parse native messaging template {template_name}: {e}");
+                    continue;
+                }
+            };
+            if let Some(obj) = manifest.as_object_mut() {
+                obj.insert(
+                    "path".to_string(),
+                    serde_json::Value::String(binary_path_str.to_string()),
+                );
+            }
+
+            let manifest_json = match serde_json::to_string_pretty(&manifest) {
+                Ok(s) => s,
+                Err(e) => {
+                    warn!("Could not serialize native messaging manifest: {e}");
+                    continue;
+                }
+            };
+
+            for dir in browser_dirs {
+                if let Err(e) = std::fs::create_dir_all(dir) {
+                    warn!("Could not create directory {}: {e}", dir.display());
+                    continue;
+                }
+                let dest = dir.join("com.eurora.app.json");
+                match std::fs::write(&dest, &manifest_json) {
+                    Ok(()) => info!("Installed native messaging manifest to {}", dest.display()),
+                    Err(e) => warn!(
+                        "Failed to write native messaging manifest to {}: {e}",
+                        dest.display()
+                    ),
+                }
+            }
+        }
+    }
+}
 
 async fn initialize_posthog() -> Result<(), posthog_rs::Error> {
     let posthog_key = option_env!("POSTHOG_API_KEY");
@@ -92,6 +229,8 @@ fn main() {
                 .plugin(tauri_plugin_os::init())
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .setup(move |tauri_app| {
+                    install_native_messaging_manifests(tauri_app);
+
                     let started_by_autostart = std::env::args().any(|arg| arg == "--startup-launch");
                     if started_by_autostart {
                         let event = posthog_rs::Event::new_anon("start_app_by_autostart");
