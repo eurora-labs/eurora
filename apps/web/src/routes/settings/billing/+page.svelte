@@ -2,6 +2,12 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { auth, accessToken, isAuthenticated } from '$lib/stores/auth.js';
+	import {
+		subscriptionStore,
+		subscription,
+		subscriptionLoading,
+		subscriptionError,
+	} from '$lib/stores/subscription.js';
 	import { Badge } from '@eurora/ui/components/badge/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
@@ -12,40 +18,30 @@
 	const PAYMENT_API_URL = import.meta.env.VITE_PAYMENT_API_URL;
 	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID;
 
-	interface SubscriptionStatus {
-		subscription_id: string | null;
-		status: string | null;
-		price_id: string | null;
-		cancel_at: number | null;
-		cancel_at_period_end: boolean | null;
-	}
-
-	let loading = $state(true);
 	let portalLoading = $state(false);
-	let error = $state<string | null>(null);
-	let subscription = $state<SubscriptionStatus | null>(null);
+	let portalError = $state<string | null>(null);
 
 	const planName = $derived.by(() => {
-		if (!subscription?.price_id) return 'Free';
-		if (subscription.price_id === STRIPE_PRO_PRICE_ID) return 'Pro';
+		if (!$subscription?.price_id) return 'Free';
+		if ($subscription.price_id === STRIPE_PRO_PRICE_ID) return 'Pro';
 		return 'Pro'; // Any paid price is treated as a paid plan
 	});
 
 	const planPrice = $derived.by(() => {
-		if (!subscription?.price_id) return '$0.00 / month';
-		if (subscription.price_id === STRIPE_PRO_PRICE_ID) return '$20.00 / month';
+		if (!$subscription?.price_id) return '$0.00 / month';
+		if ($subscription.price_id === STRIPE_PRO_PRICE_ID) return '$20.00 / month';
 		return 'Paid plan';
 	});
 
 	const hasPaidPlan = $derived(
-		!!subscription?.subscription_id && subscription?.status === 'active',
+		!!$subscription?.subscription_id && $subscription?.status === 'active',
 	);
 
-	const isCanceling = $derived(subscription?.cancel_at_period_end === true);
+	const isCanceling = $derived($subscription?.cancel_at_period_end === true);
 
 	const cancelAtFormatted = $derived.by(() => {
-		if (!subscription?.cancel_at) return null;
-		return new Date(subscription.cancel_at * 1000).toLocaleDateString('en-US', {
+		if (!$subscription?.cancel_at) return null;
+		return new Date($subscription.cancel_at * 1000).toLocaleDateString('en-US', {
 			month: 'long',
 			day: 'numeric',
 			year: 'numeric',
@@ -53,7 +49,7 @@
 	});
 
 	const statusVariant = $derived.by<'default' | 'secondary' | 'destructive' | 'outline'>(() => {
-		switch (subscription?.status) {
+		switch ($subscription?.status) {
 			case 'active':
 				return 'default';
 			case 'past_due':
@@ -66,41 +62,11 @@
 		}
 	});
 
-	async function fetchSubscription() {
-		loading = true;
-		error = null;
-
-		try {
-			await auth.ensureValidToken();
-
-			const res = await fetch(`${PAYMENT_API_URL}/payment/subscription`, {
-				headers: {
-					Authorization: `Bearer ${$accessToken}`,
-				},
-			});
-
-			if (!res.ok) {
-				// 400 with "no Stripe customer" means user is on free plan
-				if (res.status === 400) {
-					subscription = null;
-					return;
-				}
-				const body = await res.json().catch(() => null);
-				throw new Error(body?.error ?? `Failed to load subscription (${res.status})`);
-			}
-
-			const data: SubscriptionStatus = await res.json();
-			subscription = data.subscription_id ? data : null;
-		} catch (err) {
-			console.error('Failed to fetch subscription:', err);
-			error = err instanceof Error ? err.message : 'Failed to load billing information.';
-		} finally {
-			loading = false;
-		}
-	}
+	const error = $derived(portalError ?? $subscriptionError);
 
 	async function handleManageBilling() {
 		portalLoading = true;
+		portalError = null;
 
 		try {
 			await auth.ensureValidToken();
@@ -122,7 +88,7 @@
 			window.location.href = url;
 		} catch (err) {
 			console.error('Portal error:', err);
-			error = err instanceof Error ? err.message : 'Failed to open billing portal.';
+			portalError = err instanceof Error ? err.message : 'Failed to open billing portal.';
 			portalLoading = false;
 		}
 	}
@@ -132,7 +98,9 @@
 			goto('/login?redirect=/settings/billing');
 			return;
 		}
-		fetchSubscription();
+		// The layout already fetches; this is a no-op if already fetched,
+		// or picks up the in-flight request's result.
+		subscriptionStore.fetch();
 	});
 </script>
 
@@ -141,7 +109,7 @@
 </svelte:head>
 
 <div class="space-y-8">
-	{#if loading}
+	{#if $subscriptionLoading}
 		<div class="flex items-center justify-center py-16">
 			<Loader2Icon class="h-6 w-6 animate-spin text-muted-foreground" />
 		</div>
@@ -155,8 +123,11 @@
 							Failed to load billing information
 						</p>
 						<p class="mt-1 text-sm text-muted-foreground">{error}</p>
-						<Button variant="outline" size="sm" class="mt-3" onclick={fetchSubscription}
-							>Retry</Button
+						<Button
+							variant="outline"
+							size="sm"
+							class="mt-3"
+							onclick={() => subscriptionStore.refresh()}>Retry</Button
 						>
 					</div>
 				</div>
@@ -168,9 +139,9 @@
 				<div>
 					<div class="flex items-center gap-2">
 						<h3 class="text-2xl font-bold tracking-tight">{planName}</h3>
-						{#if hasPaidPlan && subscription?.status}
+						{#if hasPaidPlan && $subscription?.status}
 							<Badge variant={statusVariant} class="capitalize">
-								{isCanceling ? 'Canceling' : subscription.status}
+								{isCanceling ? 'Canceling' : $subscription.status}
 							</Badge>
 						{/if}
 					</div>

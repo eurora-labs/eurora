@@ -152,7 +152,14 @@ pub async fn get_subscription_status<H: WebhookEventHandler>(
     State(state): State<Arc<AppState<H>>>,
     AuthUser(claims): AuthUser,
 ) -> Result<Json<SubscriptionStatus>, PaymentError> {
-    let customer_id = resolve_customer_id(&state, &claims.email).await?;
+    // If no Stripe customer exists for this email, the user is on the free
+    // plan — return an empty (default) status instead of an error so the
+    // frontend doesn't have to guess based on HTTP status codes.
+    let customer_id = match resolve_customer_id(&state, &claims.email).await {
+        Ok(id) => id,
+        Err(PaymentError::InvalidField(_)) => return Ok(Json(SubscriptionStatus::default())),
+        Err(e) => return Err(e),
+    };
 
     let page = stripe_billing::subscription::ListSubscription::new()
         .customer(&customer_id)
