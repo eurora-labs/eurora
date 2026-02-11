@@ -28,7 +28,7 @@ struct ErrorBody {
 impl IntoResponse for PaymentError {
     fn into_response(self) -> Response {
         let (status, message) = match &self {
-            PaymentError::Stripe(stripe::StripeError::Stripe(_, code)) => {
+            PaymentError::Stripe(stripe::StripeError::Stripe(api_error, code)) => {
                 let status = match code {
                     400 => StatusCode::BAD_REQUEST,
                     401 => StatusCode::UNAUTHORIZED,
@@ -37,9 +37,16 @@ impl IntoResponse for PaymentError {
                     429 => StatusCode::TOO_MANY_REQUESTS,
                     _ => StatusCode::INTERNAL_SERVER_ERROR,
                 };
-                (status, self.to_string())
+                let message = api_error
+                    .message
+                    .clone()
+                    .unwrap_or_else(|| "Payment processing error".to_string());
+                (status, message)
             }
-            PaymentError::Stripe(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            PaymentError::Stripe(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal server error".to_string(),
+            ),
             PaymentError::WebhookSignatureInvalid => (StatusCode::BAD_REQUEST, self.to_string()),
             PaymentError::MissingField(_) => (StatusCode::BAD_REQUEST, self.to_string()),
             PaymentError::Config(_) => (

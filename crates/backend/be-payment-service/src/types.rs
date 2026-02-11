@@ -35,7 +35,7 @@ pub struct CreatePortalResponse {
 }
 
 /// Lightweight subscription status returned to the frontend.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 pub struct SubscriptionStatus {
     pub subscription_id: Option<String>,
     pub status: Option<String>,
