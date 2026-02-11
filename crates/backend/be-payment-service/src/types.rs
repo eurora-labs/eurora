@@ -1,14 +1,13 @@
 use serde::{Deserialize, Serialize};
 
 /// Request body for creating a checkout session.
+///
+/// The customer email is derived from the authenticated user's JWT claims,
+/// and the Stripe customer ID is resolved server-side to prevent duplicates.
 #[derive(Debug, Deserialize)]
 pub struct CreateCheckoutRequest {
     /// Stripe price ID to check out.
     pub price_id: String,
-    /// Existing Stripe customer ID (optional).
-    pub customer_id: Option<String>,
-    /// Customer email used when no customer_id is provided.
-    pub customer_email: Option<String>,
 }
 
 /// Response returned after creating a checkout session.
@@ -42,4 +41,13 @@ pub struct SubscriptionStatus {
     pub price_id: Option<String>,
     pub cancel_at: Option<i64>,
     pub cancel_at_period_end: Option<bool>,
+}
+
+/// Response for verifying a checkout session's payment status.
+#[derive(Debug, Serialize)]
+pub struct CheckoutStatusResponse {
+    /// The session status: "complete", "open", or "expired".
+    pub status: String,
+    /// The customer email associated with the session.
+    pub customer_email: Option<String>,
 }

@@ -8,17 +8,21 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use axum::{
-    Router,
+    Extension, Router,
     extract::DefaultBodyLimit,
     routing::{get, post},
 };
 use tower::ServiceBuilder;
+use tower_governor::{
+    GovernorLayer, governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor,
+};
 use tower_http::{
     cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer},
     trace::TraceLayer,
 };
-use tracing::{debug, warn};
+use tracing::debug;
 
+pub mod auth;
 pub mod config;
 pub mod error;
 pub mod handlers;
@@ -32,30 +36,22 @@ use service::AppState;
 ///
 /// # Security
 ///
-/// The returned router does **not** include authentication or authorization
-/// middleware. All endpoints (checkout, portal, subscription status, customer
-/// listing) assume the caller is already authenticated. You **must** mount
-/// this router behind your own auth layer — for example an API-gateway or an
-/// Axum middleware that validates JWTs / session tokens — before exposing it
-/// to the network.
+/// All endpoints except `POST /payment/webhook` require a valid JWT access
+/// token in the `Authorization: Bearer <token>` header. The token is validated
+/// using the [`be_auth_core::JwtConfig`] that is injected as an axum extension.
 ///
-/// The only endpoint that performs its own verification is
-/// `POST /payment/webhook`, which validates the Stripe webhook signature.
+/// `POST /payment/webhook` uses Stripe webhook signature verification instead.
+///
+/// `POST /payment/checkout` is additionally rate-limited to 10 requests per
+/// minute per IP to prevent abuse.
 pub fn create_router<H: webhook::WebhookEventHandler>(state: Arc<AppState<H>>) -> Router {
-    let origin = match state.config.frontend_url.parse() {
-        Ok(origin) => origin,
-        Err(e) => {
-            warn!(
-                frontend_url = %state.config.frontend_url,
-                error = %e,
-                "Invalid FRONTEND_URL, falling back to http://localhost:5173 — \
-                 CORS will reject requests from the real frontend"
-            );
-            "http://localhost:5173"
-                .parse()
-                .expect("valid default origin")
-        }
-    };
+    // FRONTEND_URL is validated during PaymentConfig::from_env(), so this
+    // parse cannot fail at runtime.
+    let origin = state
+        .config
+        .frontend_url
+        .parse()
+        .expect("FRONTEND_URL was validated during config loading");
 
     let cors = CorsLayer::new()
         .allow_origin(AllowOrigin::exact(origin))
@@ -63,15 +59,43 @@ pub fn create_router<H: webhook::WebhookEventHandler>(state: Arc<AppState<H>>) -
         .allow_headers(AllowHeaders::mirror_request())
         .allow_credentials(true);
 
-    Router::new()
+    // Rate limit: 10 requests per 60 seconds per client IP on checkout.
+    // SmartIpKeyExtractor checks X-Forwarded-For / X-Real-IP headers first,
+    // falling back to peer IP — works correctly behind a reverse proxy.
+    let checkout_governor = GovernorConfigBuilder::default()
+        .per_second(6)
+        .burst_size(10)
+        .key_extractor(SmartIpKeyExtractor)
+        .finish()
+        .expect("valid governor config");
+
+    let jwt_config = state.jwt_config.clone();
+
+    // Checkout route with rate limiting
+    let checkout_route = Router::new()
         .route("/payment/checkout", post(handlers::create_checkout_session))
+        .layer(GovernorLayer::new(Arc::new(checkout_governor)));
+
+    // Other authenticated routes (no extra rate limiting)
+    let authed_routes = Router::new()
         .route("/payment/portal", post(handlers::create_portal_session))
         .route(
             "/payment/subscription",
             get(handlers::get_subscription_status),
         )
-        .route("/payment/customers", get(handlers::list_customers))
-        .route("/payment/webhook", post(handlers::handle_webhook))
+        .route(
+            "/payment/checkout-status",
+            get(handlers::get_checkout_status),
+        )
+        .route("/payment/customers", get(handlers::list_customers));
+
+    // Webhook route — no JWT auth, uses Stripe signature verification
+    let webhook_route = Router::new().route("/payment/webhook", post(handlers::handle_webhook));
+
+    checkout_route
+        .merge(authed_routes)
+        .merge(webhook_route)
+        .layer(Extension(jwt_config))
         .layer(DefaultBodyLimit::max(1024 * 1024)) // 1 MB
         .layer(
             ServiceBuilder::new()
@@ -112,7 +136,7 @@ pub fn init_payment_service_with_handler<H: webhook::WebhookEventHandler>(
 pub use config::PaymentConfig;
 pub use error::PaymentError;
 pub use types::{
-    CreateCheckoutRequest, CreateCheckoutResponse, CreatePortalRequest, CreatePortalResponse,
-    SubscriptionStatus,
+    CheckoutStatusResponse, CreateCheckoutRequest, CreateCheckoutResponse, CreatePortalRequest,
+    CreatePortalResponse, SubscriptionStatus,
 };
 pub use webhook::{LoggingWebhookHandler, WebhookEventHandler};

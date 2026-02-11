@@ -5,16 +5,19 @@ use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
 use stripe_checkout::CheckoutSessionMode;
-use stripe_checkout::checkout_session::{CreateCheckoutSession, CreateCheckoutSessionLineItems};
+use stripe_checkout::checkout_session::{
+    CreateCheckoutSession, CreateCheckoutSessionLineItems, RetrieveCheckoutSession,
+};
 use stripe_core::customer::ListCustomer;
 use stripe_webhook::{Event, EventObject, Webhook};
 use tracing::{error, info, warn};
 
+use crate::auth::AuthUser;
 use crate::error::PaymentError;
 use crate::service::AppState;
 use crate::types::{
-    CreateCheckoutRequest, CreateCheckoutResponse, CreatePortalRequest, CreatePortalResponse,
-    SubscriptionStatus,
+    CheckoutStatusResponse, CreateCheckoutRequest, CreateCheckoutResponse, CreatePortalRequest,
+    CreatePortalResponse, SubscriptionStatus,
 };
 use crate::webhook::WebhookEventHandler;
 
@@ -23,8 +26,13 @@ use crate::webhook::WebhookEventHandler;
 // ---------------------------------------------------------------------------
 
 /// Creates a Stripe Checkout Session for a subscription and returns the URL.
+///
+/// The customer email is taken from the authenticated user's JWT claims.
+/// If a Stripe customer already exists for that email, the existing customer
+/// is reused to prevent duplicates.
 pub async fn create_checkout_session<H: WebhookEventHandler>(
     State(state): State<Arc<AppState<H>>>,
+    AuthUser(claims): AuthUser,
     Json(body): Json<CreateCheckoutRequest>,
 ) -> Result<Json<CreateCheckoutResponse>, PaymentError> {
     if !state
@@ -36,6 +44,8 @@ pub async fn create_checkout_session<H: WebhookEventHandler>(
             "price_id is not a recognised plan",
         ));
     }
+
+    let email = &claims.email;
 
     let line_items = vec![CreateCheckoutSessionLineItems {
         quantity: Some(1),
@@ -57,9 +67,17 @@ pub async fn create_checkout_session<H: WebhookEventHandler>(
         .success_url(&success_url)
         .cancel_url(&cancel_url);
 
-    if let Some(ref customer_id) = body.customer_id {
-        req = req.customer(customer_id);
-    } else if let Some(ref email) = body.customer_email {
+    // Look up an existing Stripe customer by email to prevent duplicates.
+    let existing = ListCustomer::new()
+        .email(email)
+        .limit(1)
+        .send(&state.client)
+        .await?;
+
+    if let Some(customer) = existing.data.first() {
+        info!(customer_id = %customer.id, %email, "Reusing existing Stripe customer");
+        req = req.customer(&customer.id);
+    } else {
         req = req.customer_email(email);
     }
 
@@ -82,6 +100,7 @@ pub async fn create_checkout_session<H: WebhookEventHandler>(
 /// Creates a Stripe Billing Portal session so customers can manage their subscription.
 pub async fn create_portal_session<H: WebhookEventHandler>(
     State(state): State<Arc<AppState<H>>>,
+    AuthUser(_claims): AuthUser,
     Json(body): Json<CreatePortalRequest>,
 ) -> Result<Json<CreatePortalResponse>, PaymentError> {
     let return_url = format!("{}/settings/billing", state.config.frontend_url);
@@ -102,6 +121,7 @@ pub async fn create_portal_session<H: WebhookEventHandler>(
 /// Returns the subscription status for a given customer.
 pub async fn get_subscription_status<H: WebhookEventHandler>(
     State(state): State<Arc<AppState<H>>>,
+    AuthUser(_claims): AuthUser,
     axum::extract::Query(params): axum::extract::Query<CustomerQuery>,
 ) -> Result<Json<SubscriptionStatus>, PaymentError> {
     let page = stripe_billing::subscription::ListSubscription::new()
@@ -135,6 +155,7 @@ const DEFAULT_CUSTOMER_PAGE_SIZE: i64 = 20;
 /// Lists Stripe customers with pagination (admin/debug endpoint).
 pub async fn list_customers<H: WebhookEventHandler>(
     State(state): State<Arc<AppState<H>>>,
+    AuthUser(_claims): AuthUser,
     axum::extract::Query(params): axum::extract::Query<CustomerListQuery>,
 ) -> Result<impl IntoResponse, PaymentError> {
     let limit = params.limit.unwrap_or(DEFAULT_CUSTOMER_PAGE_SIZE).min(100);
@@ -168,6 +189,37 @@ pub async fn list_customers<H: WebhookEventHandler>(
 pub struct CustomerListQuery {
     pub limit: Option<i64>,
     pub starting_after: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// GET /payment/checkout-status?session_id=cs_xxx
+// ---------------------------------------------------------------------------
+
+/// Verifies a checkout session's payment status so the frontend can confirm
+/// that the payment actually went through before showing a success message.
+pub async fn get_checkout_status<H: WebhookEventHandler>(
+    State(state): State<Arc<AppState<H>>>,
+    AuthUser(_claims): AuthUser,
+    axum::extract::Query(params): axum::extract::Query<CheckoutStatusQuery>,
+) -> Result<Json<CheckoutStatusResponse>, PaymentError> {
+    let session = RetrieveCheckoutSession::new(params.session_id.as_str())
+        .send(&state.client)
+        .await?;
+
+    let status = session
+        .status
+        .map(|s| s.as_str().to_owned())
+        .unwrap_or_else(|| "unknown".to_owned());
+
+    Ok(Json(CheckoutStatusResponse {
+        status,
+        customer_email: session.customer_email,
+    }))
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct CheckoutStatusQuery {
+    pub session_id: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -258,12 +310,25 @@ pub async fn handle_webhook<H: WebhookEventHandler>(
 mod tests {
     use axum::body::Body;
     use axum::http::Request;
+    use be_auth_core::JwtConfig;
     use tower::ServiceExt;
 
     use super::*;
     use crate::config::PaymentConfig;
 
     fn test_state() -> Arc<AppState> {
+        // These env vars are required by JwtConfig::default().
+        // Set them if not already present so tests can run standalone.
+        // SAFETY: Tests run sequentially within this module; no concurrent reads.
+        unsafe {
+            if std::env::var("JWT_ACCESS_SECRET").is_err() {
+                std::env::set_var("JWT_ACCESS_SECRET", "test_access_secret");
+            }
+            if std::env::var("JWT_REFRESH_SECRET").is_err() {
+                std::env::set_var("JWT_REFRESH_SECRET", "test_refresh_secret");
+            }
+        }
+
         let config = PaymentConfig {
             stripe_secret_key: "sk_test_fake".to_string(),
             stripe_webhook_secret: "whsec_test_secret".to_string(),
@@ -272,11 +337,36 @@ mod tests {
             enterprise_price_id: "price_enterprise".to_string(),
         };
         let client = stripe::Client::new(&config.stripe_secret_key);
+        let jwt_config = Arc::new(JwtConfig::default());
         Arc::new(AppState {
             client,
             config,
             webhook_handler: Arc::new(crate::webhook::LoggingWebhookHandler),
+            jwt_config,
         })
+    }
+
+    /// Helper: create a valid JWT access token for tests.
+    fn test_access_token(_state: &Arc<AppState>) -> String {
+        use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
+
+        let secret =
+            std::env::var("JWT_ACCESS_SECRET").unwrap_or_else(|_| "test_access_secret".into());
+        let now = chrono::Utc::now().timestamp();
+        let claims = auth_core::Claims {
+            sub: "user_123".to_string(),
+            username: "testuser".to_string(),
+            email: "test@example.com".to_string(),
+            exp: now + 3600,
+            iat: now,
+            token_type: "access".to_string(),
+        };
+        encode(
+            &Header::new(Algorithm::HS256),
+            &claims,
+            &EncodingKey::from_secret(secret.as_bytes()),
+        )
+        .expect("failed to encode test JWT")
     }
 
     #[tokio::test]
@@ -366,8 +456,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn checkout_rejects_unauthenticated() {
+        let state = test_state();
+        let app = crate::create_router(state);
+
+        let body = serde_json::json!({
+            "price_id": "price_pro",
+        });
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/payment/checkout")
+                    .header("content-type", "application/json")
+                    .header("x-forwarded-for", "127.0.0.1")
+                    .body(Body::from(body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
     async fn checkout_rejects_unknown_price_id() {
         let state = test_state();
+        let token = test_access_token(&state);
         let app = crate::create_router(state);
 
         let body = serde_json::json!({
@@ -380,6 +496,8 @@ mod tests {
                     .method("POST")
                     .uri("/payment/checkout")
                     .header("content-type", "application/json")
+                    .header("authorization", format!("Bearer {token}"))
+                    .header("x-forwarded-for", "127.0.0.1")
                     .body(Body::from(body.to_string()))
                     .unwrap(),
             )

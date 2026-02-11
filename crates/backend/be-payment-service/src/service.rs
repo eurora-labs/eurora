@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use be_auth_core::JwtConfig;
 use stripe::{ClientBuilder, RequestStrategy};
 
 use crate::config::PaymentConfig;
@@ -13,6 +14,8 @@ pub struct AppState<H: WebhookEventHandler = crate::webhook::LoggingWebhookHandl
     pub config: PaymentConfig,
     /// Webhook event handler for provisioning / revoking access.
     pub webhook_handler: Arc<H>,
+    /// JWT configuration for validating access tokens on authenticated endpoints.
+    pub jwt_config: Arc<JwtConfig>,
 }
 
 impl AppState {
@@ -34,10 +37,12 @@ impl<H: WebhookEventHandler> AppState<H> {
             .map_err(|e| {
                 crate::error::PaymentError::Config(format!("Failed to build Stripe client: {e}"))
             })?;
+        let jwt_config = Arc::new(JwtConfig::default());
         Ok(Self {
             client,
             config,
             webhook_handler,
+            jwt_config,
         })
     }
 }

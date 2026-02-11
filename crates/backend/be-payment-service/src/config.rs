@@ -1,3 +1,5 @@
+use axum::http::HeaderValue;
+
 /// Payment service configuration loaded from environment variables.
 #[derive(Debug, Clone)]
 pub struct PaymentConfig {
@@ -6,6 +8,7 @@ pub struct PaymentConfig {
     /// Stripe webhook signing secret (whsec_...).
     pub stripe_webhook_secret: String,
     /// Frontend URL used for checkout session redirect URLs.
+    /// Validated to be a valid `HeaderValue` at construction time so CORS never silently degrades.
     pub frontend_url: String,
     /// Stripe price ID for the Pro plan.
     pub pro_price_id: String,
@@ -39,6 +42,14 @@ impl PaymentConfig {
 
         let frontend_url =
             std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
+
+        // Validate that the frontend URL is a valid HTTP header value so CORS
+        // configuration never silently falls back to a wrong origin.
+        HeaderValue::from_str(&frontend_url).map_err(|e| {
+            crate::error::PaymentError::Config(format!(
+                "FRONTEND_URL '{frontend_url}' is not a valid header value: {e}"
+            ))
+        })?;
 
         let pro_price_id = std::env::var("STRIPE_PRO_PRICE_ID").map_err(|_| {
             crate::error::PaymentError::Config(

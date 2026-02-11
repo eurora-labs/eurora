@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { auth, isAuthenticated, currentUser } from '$lib/stores/auth.js';
+	import { auth, isAuthenticated, currentUser, accessToken } from '$lib/stores/auth.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import CheckIcon from '@lucide/svelte/icons/check';
@@ -24,12 +24,16 @@
 		error = null;
 
 		try {
+			await auth.ensureValidToken();
+
 			const res = await fetch(`${PAYMENT_API_URL}/payment/checkout`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${$accessToken}`,
+				},
 				body: JSON.stringify({
 					price_id: STRIPE_PRO_PRICE_ID,
-					customer_email: $currentUser?.email,
 				}),
 			});
 

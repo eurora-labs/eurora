@@ -7,6 +7,9 @@ pub enum PaymentError {
     #[error("Stripe error: {0}")]
     Stripe(#[from] stripe::StripeError),
 
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+
     #[error("Webhook signature verification failed")]
     WebhookSignatureInvalid,
 
@@ -50,6 +53,7 @@ impl IntoResponse for PaymentError {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Internal server error".to_string(),
             ),
+            PaymentError::Unauthorized(_) => (StatusCode::UNAUTHORIZED, self.to_string()),
             PaymentError::WebhookSignatureInvalid => (StatusCode::BAD_REQUEST, self.to_string()),
             PaymentError::MissingField(_) | PaymentError::InvalidField(_) => {
                 (StatusCode::BAD_REQUEST, self.to_string())
