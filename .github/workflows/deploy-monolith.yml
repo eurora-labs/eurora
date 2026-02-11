@@ -4,9 +4,7 @@ on:
     push:
         branches: ['main']
         paths:
-            - 'crates/backend/be-monolith/**'
-            - 'crates/backend/be-auth-service/**'
-            - 'crates/backend/be-remote-db/**'
+            - 'crates/backend/**'
             - 'crates/common/**'
             - 'proto/**'
             - '.github/workflows/deploy-monolith.yml'
