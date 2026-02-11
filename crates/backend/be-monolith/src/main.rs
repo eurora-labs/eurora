@@ -8,6 +8,7 @@ use dotenv::dotenv;
 use proto_gen::auth::proto_auth_service_server::ProtoAuthServiceServer;
 // use euro_proto::proto_prompt_service::proto_prompt_service_server::ProtoPromptServiceServer;
 use be_auth_grpc::JwtInterceptor;
+use be_payment_service::init_payment_service;
 use be_remote_db::DatabaseManager;
 use be_update_service::init_update_service;
 use tonic::transport::Server;
@@ -102,6 +103,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
+    // Initialize payment service
+    let payment_router = match init_payment_service() {
+        Ok(router) => router,
+        Err(e) => {
+            error!("Failed to initialize payment service: {}", e);
+            return Err(e.into());
+        }
+    };
+
     // Create shutdown signal
     let shutdown_signal = async {
         tokio::signal::ctrl_c()
@@ -131,8 +141,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ))
         .serve_with_shutdown(grpc_addr, shutdown_signal);
 
+    let http_router = update_router.merge(payment_router);
+
     let http_listener = tokio::net::TcpListener::bind(http_addr).await?;
-    let http_server = axum::serve(http_listener, update_router).with_graceful_shutdown(async {
+    let http_server = axum::serve(http_listener, http_router).with_graceful_shutdown(async {
         tokio::signal::ctrl_c()
             .await
             .expect("Failed to install CTRL+C signal handler");

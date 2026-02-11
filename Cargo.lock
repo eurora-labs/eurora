@@ -803,6 +803,7 @@ version = "1.0.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3daef54fbcc3446320b0443606193f564142e40103d9c478c30ffaeb84a418a6"
 dependencies = [
+ "async-stripe-billing",
  "async-stripe-checkout",
  "async-stripe-shared",
  "async-stripe-types",
@@ -1644,6 +1645,7 @@ dependencies = [
  "be-auth-grpc",
  "be-auth-service",
  "be-conversation-service",
+ "be-payment-service",
  "be-remote-db",
  "be-update-service",
  "dotenv",
@@ -1682,6 +1684,7 @@ dependencies = [
  "futures-util",
  "semver",
  "serde",
+ "serde_json",
  "thiserror 2.0.18",
  "tokio",
  "tower",
