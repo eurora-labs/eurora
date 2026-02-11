@@ -6,6 +6,15 @@ description = "Eurora Payment Service"
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 publish = false
 
+[package.metadata.cargo-machete]
+ignored = [
+  "async-stripe",
+  "async-stripe-core",
+  "async-stripe-webhook",
+  "async-stripe-billing",
+  "async-stripe-checkout"
+]
+
 [dependencies]
 anyhow = { workspace = true }
 async-stripe = { version = "1.0.0-rc.1", features = [
@@ -20,31 +29,25 @@ async-stripe-billing = { version = "1.0.0-rc.1", features = [
 async-stripe-checkout = { version = "1.0.0-rc.1", features = [
   "checkout_session"
 ] }
-async-stripe-connect = { version = "1.0.0-rc.1", features = [
-  "account",
-  "account_link"
-] }
+# async-stripe-connect = { version = "1.0.0-rc.1", features = [
+#   "account",
+#   "account_link"
+# ] }
 async-stripe-core = { version = "1.0.0-rc.1", features = [
   "customer",
   "payment_intent"
 ] }
-async-stripe-payment = { version = "1.0.0-rc.1", features = [
-  "payment_link",
-  "payment_method"
-] }
-async-stripe-product = { version = "1.0.0-rc.1", features = ["price", "product"] }
-async-stripe-types = "1.0.0-rc.1"
+# async-stripe-payment = { version = "1.0.0-rc.1", features = [
+#   "payment_link",
+#   "payment_method"
+# ] }
+# async-stripe-product = { version = "1.0.0-rc.1", features = ["price", "product"] }
+# async-stripe-types = "1.0.0-rc.1"
 async-stripe-webhook = { version = "1.0.0-rc.1", features = [
   "async-stripe-billing",
   "async-stripe-checkout"
 ] }
-aws-config = { version = "1.8.12", features = ["behavior-version-latest"] }
-aws-sdk-s3 = "1.121.0"
 axum = { version = "0.8.8", features = ["macros"] }
-chrono = { workspace = true, features = ["serde"] }
-futures = { workspace = true }
-futures-util = { workspace = true }
-semver = "1.0"
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -52,4 +55,3 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tower = { workspace = true }
 tower-http = { version = "0.6.8", features = ["cors", "trace"] }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
