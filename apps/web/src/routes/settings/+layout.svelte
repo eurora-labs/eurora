@@ -1,6 +1,7 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import { currentUser } from '$lib/stores/auth.js';
+	import { auth, currentUser, accessToken, isAuthenticated } from '$lib/stores/auth.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Dialog from '@eurora/ui/components/dialog/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
@@ -10,7 +11,11 @@
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import PenLineIcon from '@lucide/svelte/icons/pen-line';
 
+	const PAYMENT_API_URL = import.meta.env.VITE_PAYMENT_API_URL;
+	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID;
+
 	let { children } = $props();
+	let planLabel = $state('Free');
 
 	const navItems = [
 		{ title: 'General', url: '/settings', icon: BoltIcon },
@@ -21,6 +26,24 @@
 	let items = $derived(
 		navItems.map((item) => ({ ...item, isActive: item.url === page.url.pathname })),
 	);
+
+	onMount(async () => {
+		if (!$isAuthenticated) return;
+		try {
+			await auth.ensureValidToken();
+			const res = await fetch(`${PAYMENT_API_URL}/payment/subscription`, {
+				headers: { Authorization: `Bearer ${$accessToken}` },
+			});
+			if (res.ok) {
+				const data = await res.json();
+				if (data.subscription_id && data.status === 'active') {
+					planLabel = data.price_id === STRIPE_PRO_PRICE_ID ? 'Pro' : 'Pro';
+				}
+			}
+		} catch {
+			// Silently fall back to "Free"
+		}
+	});
 </script>
 
 <div class="flex min-h-screen flex-col">
@@ -53,7 +76,7 @@
 							</a>
 						</span>
 						<span class="truncate text-xs leading-tight text-muted-foreground">
-							Free - {$currentUser.email}
+							{planLabel} - {$currentUser.email}
 						</span>
 					</div>
 				{/if}

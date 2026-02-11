@@ -1,16 +1,139 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { auth, accessToken, isAuthenticated } from '$lib/stores/auth.js';
 	import { Badge } from '@eurora/ui/components/badge/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
-	import * as Table from '@eurora/ui/components/table/index';
-	// Placeholder — replace with real subscription state
-	const hasPaidPlan = false;
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
+	import AlertCircleIcon from '@lucide/svelte/icons/alert-circle';
 
-	const invoices = [
-		{ id: 'INV-001', date: 'Jan 10, 2026', amount: '$0.00', status: 'Paid', plan: 'Free' },
-		{ id: 'INV-002', date: 'Dec 10, 2025', amount: '$0.00', status: 'Paid', plan: 'Free' },
-		{ id: 'INV-003', date: 'Nov 10, 2025', amount: '$0.00', status: 'Paid', plan: 'Free' },
-	];
+	const PAYMENT_API_URL = import.meta.env.VITE_PAYMENT_API_URL;
+	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID;
+
+	interface SubscriptionStatus {
+		subscription_id: string | null;
+		status: string | null;
+		price_id: string | null;
+		cancel_at: number | null;
+		cancel_at_period_end: boolean | null;
+	}
+
+	let loading = $state(true);
+	let portalLoading = $state(false);
+	let error = $state<string | null>(null);
+	let subscription = $state<SubscriptionStatus | null>(null);
+
+	const planName = $derived.by(() => {
+		if (!subscription?.price_id) return 'Free';
+		if (subscription.price_id === STRIPE_PRO_PRICE_ID) return 'Pro';
+		return 'Pro'; // Any paid price is treated as a paid plan
+	});
+
+	const planPrice = $derived.by(() => {
+		if (!subscription?.price_id) return '$0.00 / month';
+		if (subscription.price_id === STRIPE_PRO_PRICE_ID) return '$20.00 / month';
+		return 'Paid plan';
+	});
+
+	const hasPaidPlan = $derived(
+		!!subscription?.subscription_id && subscription?.status === 'active',
+	);
+
+	const isCanceling = $derived(subscription?.cancel_at_period_end === true);
+
+	const cancelAtFormatted = $derived.by(() => {
+		if (!subscription?.cancel_at) return null;
+		return new Date(subscription.cancel_at * 1000).toLocaleDateString('en-US', {
+			month: 'long',
+			day: 'numeric',
+			year: 'numeric',
+		});
+	});
+
+	const statusVariant = $derived.by<'default' | 'secondary' | 'destructive' | 'outline'>(() => {
+		switch (subscription?.status) {
+			case 'active':
+				return 'default';
+			case 'past_due':
+			case 'unpaid':
+				return 'destructive';
+			case 'canceled':
+				return 'outline';
+			default:
+				return 'secondary';
+		}
+	});
+
+	async function fetchSubscription() {
+		loading = true;
+		error = null;
+
+		try {
+			await auth.ensureValidToken();
+
+			const res = await fetch(`${PAYMENT_API_URL}/payment/subscription`, {
+				headers: {
+					Authorization: `Bearer ${$accessToken}`,
+				},
+			});
+
+			if (!res.ok) {
+				// 400 with "no Stripe customer" means user is on free plan
+				if (res.status === 400) {
+					subscription = null;
+					return;
+				}
+				const body = await res.json().catch(() => null);
+				throw new Error(body?.error ?? `Failed to load subscription (${res.status})`);
+			}
+
+			const data: SubscriptionStatus = await res.json();
+			subscription = data.subscription_id ? data : null;
+		} catch (err) {
+			console.error('Failed to fetch subscription:', err);
+			error = err instanceof Error ? err.message : 'Failed to load billing information.';
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function handleManageBilling() {
+		portalLoading = true;
+
+		try {
+			await auth.ensureValidToken();
+
+			const res = await fetch(`${PAYMENT_API_URL}/payment/portal`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${$accessToken}`,
+				},
+			});
+
+			if (!res.ok) {
+				const body = await res.json().catch(() => null);
+				throw new Error(body?.error ?? `Failed to open billing portal (${res.status})`);
+			}
+
+			const { url } = await res.json();
+			window.location.href = url;
+		} catch (err) {
+			console.error('Portal error:', err);
+			error = err instanceof Error ? err.message : 'Failed to open billing portal.';
+			portalLoading = false;
+		}
+	}
+
+	onMount(() => {
+		if (!$isAuthenticated) {
+			goto('/login?redirect=/settings/billing');
+			return;
+		}
+		fetchSubscription();
+	});
 </script>
 
 <svelte:head>
@@ -18,45 +141,101 @@
 </svelte:head>
 
 <div class="space-y-8">
-	<div class="flex items-center justify-between py-2">
-		<div>
-			<h3 class="text-2xl font-bold tracking-tight">Free</h3>
-			<p class="mt-0.5 text-sm text-muted-foreground">$0.00 / month</p>
+	{#if loading}
+		<div class="flex items-center justify-center py-16">
+			<Loader2Icon class="h-6 w-6 animate-spin text-muted-foreground" />
 		</div>
-		{#if hasPaidPlan}
-			<Button variant="outline" size="sm">Update payment method</Button>
-		{:else}
-			<Button size="sm">Upgrade</Button>
+	{:else}
+		{#if error}
+			<Card.Root class="border-destructive/50 bg-destructive/5 p-4">
+				<div class="flex items-start gap-3">
+					<AlertCircleIcon class="mt-0.5 h-4 w-4 text-destructive" />
+					<div>
+						<p class="text-sm font-medium text-destructive">
+							Failed to load billing information
+						</p>
+						<p class="mt-1 text-sm text-muted-foreground">{error}</p>
+						<Button variant="outline" size="sm" class="mt-3" onclick={fetchSubscription}
+							>Retry</Button
+						>
+					</div>
+				</div>
+			</Card.Root>
 		{/if}
-	</div>
 
-	<div>
-		<h3 class="mb-4 text-base font-semibold">Invoice History</h3>
-		<Card.Root class="p-2 border-none">
-			<Table.Root>
-				<Table.Header>
-					<Table.Row class="border-none">
-						<Table.Head>Invoice</Table.Head>
-						<Table.Head>Date</Table.Head>
-						<Table.Head>Plan</Table.Head>
-						<Table.Head>Amount</Table.Head>
-						<Table.Head class="text-right">Status</Table.Head>
-					</Table.Row>
-				</Table.Header>
-				<Table.Body>
-					{#each invoices as invoice (invoice.id)}
-						<Table.Row class="border-none">
-							<Table.Cell class="font-medium">{invoice.id}</Table.Cell>
-							<Table.Cell>{invoice.date}</Table.Cell>
-							<Table.Cell>{invoice.plan}</Table.Cell>
-							<Table.Cell>{invoice.amount}</Table.Cell>
-							<Table.Cell class="text-right">
-								<Badge variant="secondary">{invoice.status}</Badge>
-							</Table.Cell>
-						</Table.Row>
-					{/each}
-				</Table.Body>
-			</Table.Root>
-		</Card.Root>
-	</div>
+		<div class="flex items-center justify-between py-2">
+			<div class="flex items-center gap-3">
+				<div>
+					<div class="flex items-center gap-2">
+						<h3 class="text-2xl font-bold tracking-tight">{planName}</h3>
+						{#if hasPaidPlan && subscription?.status}
+							<Badge variant={statusVariant} class="capitalize">
+								{isCanceling ? 'Canceling' : subscription.status}
+							</Badge>
+						{/if}
+					</div>
+					<p class="mt-0.5 text-sm text-muted-foreground">{planPrice}</p>
+					{#if isCanceling && cancelAtFormatted}
+						<p class="mt-1 text-sm text-amber-600">
+							Your plan will be canceled on {cancelAtFormatted}
+						</p>
+					{/if}
+				</div>
+			</div>
+			{#if hasPaidPlan}
+				<Button
+					variant="outline"
+					size="sm"
+					onclick={handleManageBilling}
+					disabled={portalLoading}
+				>
+					{#if portalLoading}
+						<Loader2Icon class="mr-2 h-4 w-4 animate-spin" />
+						Loading...
+					{:else}
+						Manage Subscription
+						<ExternalLinkIcon class="ml-1.5 h-3.5 w-3.5" />
+					{/if}
+				</Button>
+			{:else}
+				<Button size="sm" href="/pricing">Upgrade</Button>
+			{/if}
+		</div>
+
+		{#if hasPaidPlan}
+			<div>
+				<h3 class="mb-3 text-base font-semibold">Payment & Invoices</h3>
+				<p class="mb-4 text-sm text-muted-foreground">
+					View invoices, update your payment method, or cancel your subscription through
+					the billing portal.
+				</p>
+				<Button
+					variant="outline"
+					size="sm"
+					onclick={handleManageBilling}
+					disabled={portalLoading}
+				>
+					{#if portalLoading}
+						<Loader2Icon class="mr-2 h-4 w-4 animate-spin" />
+						Loading...
+					{:else}
+						Open Billing Portal
+						<ExternalLinkIcon class="ml-1.5 h-3.5 w-3.5" />
+					{/if}
+				</Button>
+			</div>
+		{:else}
+			<div>
+				<h3 class="mb-3 text-base font-semibold">Upgrade to Pro</h3>
+				<Card.Root class="p-5">
+					<p class="mb-1 text-sm font-medium">Get more out of Eurora</p>
+					<p class="mb-4 text-sm text-muted-foreground">
+						Unlock unlimited queries, premium AI models, faster response times, and
+						priority support.
+					</p>
+					<Button size="sm" href="/pricing">View Plans</Button>
+				</Card.Root>
+			</div>
+		{/if}
+	{/if}
 </div>
