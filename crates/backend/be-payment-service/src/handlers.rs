@@ -32,7 +32,7 @@ pub async fn create_checkout_session<H: WebhookEventHandler>(
         .allowed_price_ids()
         .contains(&body.price_id.as_str())
     {
-        return Err(PaymentError::MissingField(
+        return Err(PaymentError::InvalidField(
             "price_id is not a recognised plan",
         ));
     }
