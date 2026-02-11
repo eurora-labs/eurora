@@ -9,6 +9,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use axum::{
     Router,
+    extract::DefaultBodyLimit,
     routing::{get, post},
 };
 use tower::ServiceBuilder;
@@ -16,7 +17,7 @@ use tower_http::{
     cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer},
     trace::TraceLayer,
 };
-use tracing::debug;
+use tracing::{debug, warn};
 
 pub mod config;
 pub mod error;
@@ -27,15 +28,37 @@ pub mod webhook;
 
 use service::AppState;
 
+/// Creates the payment service [`Router`].
+///
+/// # Security
+///
+/// The returned router does **not** include authentication or authorization
+/// middleware. All endpoints (checkout, portal, subscription status, customer
+/// listing) assume the caller is already authenticated. You **must** mount
+/// this router behind your own auth layer — for example an API-gateway or an
+/// Axum middleware that validates JWTs / session tokens — before exposing it
+/// to the network.
+///
+/// The only endpoint that performs its own verification is
+/// `POST /payment/webhook`, which validates the Stripe webhook signature.
 pub fn create_router<H: webhook::WebhookEventHandler>(state: Arc<AppState<H>>) -> Router {
+    let origin = match state.config.frontend_url.parse() {
+        Ok(origin) => origin,
+        Err(e) => {
+            warn!(
+                frontend_url = %state.config.frontend_url,
+                error = %e,
+                "Invalid FRONTEND_URL, falling back to http://localhost:5173 — \
+                 CORS will reject requests from the real frontend"
+            );
+            "http://localhost:5173"
+                .parse()
+                .expect("valid default origin")
+        }
+    };
+
     let cors = CorsLayer::new()
-        .allow_origin(AllowOrigin::exact(
-            state.config.frontend_url.parse().unwrap_or(
-                "http://localhost:5173"
-                    .parse()
-                    .expect("valid default origin"),
-            ),
-        ))
+        .allow_origin(AllowOrigin::exact(origin))
         .allow_methods(AllowMethods::mirror_request())
         .allow_headers(AllowHeaders::mirror_request())
         .allow_credentials(true);
@@ -49,6 +72,7 @@ pub fn create_router<H: webhook::WebhookEventHandler>(state: Arc<AppState<H>>) -
         )
         .route("/payment/customers", get(handlers::list_customers))
         .route("/payment/webhook", post(handlers::handle_webhook))
+        .layer(DefaultBodyLimit::max(1024 * 1024)) // 1 MB
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())

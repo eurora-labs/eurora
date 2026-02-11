@@ -13,6 +13,9 @@ pub enum PaymentError {
     #[error("Missing required field: {0}")]
     MissingField(&'static str),
 
+    #[error("Invalid value for field: {0}")]
+    InvalidField(&'static str),
+
     #[error("Configuration error: {0}")]
     Config(String),
 
@@ -48,7 +51,9 @@ impl IntoResponse for PaymentError {
                 "Internal server error".to_string(),
             ),
             PaymentError::WebhookSignatureInvalid => (StatusCode::BAD_REQUEST, self.to_string()),
-            PaymentError::MissingField(_) => (StatusCode::BAD_REQUEST, self.to_string()),
+            PaymentError::MissingField(_) | PaymentError::InvalidField(_) => {
+                (StatusCode::BAD_REQUEST, self.to_string())
+            }
             PaymentError::Config(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Internal server error".to_string(),

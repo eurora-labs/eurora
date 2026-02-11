@@ -36,9 +36,52 @@ pub trait WebhookEventHandler: Send + Sync + 'static {
     }
 }
 
-/// Default no-op handler that just logs events.
+/// Default handler that logs webhook events without taking any action.
 ///
-/// Used when no custom handler is provided — preserves the previous logging-only behavior.
+/// Used when no custom handler is provided.
 pub struct LoggingWebhookHandler;
 
-impl WebhookEventHandler for LoggingWebhookHandler {}
+impl WebhookEventHandler for LoggingWebhookHandler {
+    async fn on_checkout_completed(
+        &self,
+        customer_id: Option<String>,
+        subscription_id: Option<String>,
+        customer_email: Option<String>,
+    ) -> Result<(), crate::error::PaymentError> {
+        tracing::info!(
+            ?customer_id,
+            ?subscription_id,
+            ?customer_email,
+            "Checkout completed (no-op handler)"
+        );
+        Ok(())
+    }
+
+    async fn on_subscription_updated(
+        &self,
+        subscription_id: String,
+        customer_id: Option<String>,
+        status: String,
+    ) -> Result<(), crate::error::PaymentError> {
+        tracing::info!(
+            %subscription_id,
+            ?customer_id,
+            %status,
+            "Subscription updated (no-op handler)"
+        );
+        Ok(())
+    }
+
+    async fn on_subscription_deleted(
+        &self,
+        subscription_id: String,
+        customer_id: Option<String>,
+    ) -> Result<(), crate::error::PaymentError> {
+        tracing::info!(
+            %subscription_id,
+            ?customer_id,
+            "Subscription deleted (no-op handler)"
+        );
+        Ok(())
+    }
+}
