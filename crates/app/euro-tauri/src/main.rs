@@ -66,10 +66,14 @@ fn install_native_messaging_manifests(app: &tauri::App) {
 
         // Resolve the actual sidecar binary path (next to the main executable)
         let binary_path = match std::env::current_exe() {
-            Ok(exe) => exe
-                .parent()
-                .map(|dir| dir.join("euro-native-messaging"))
-                .unwrap_or_default(),
+            Ok(exe) => match exe.parent() {
+                Some(dir) => dir.join("euro-native-messaging"),
+                None => {
+                    warn!("Could not resolve parent directory of current exe");
+                    return;
+                }
+            },
+
             Err(e) => {
                 warn!("Could not resolve current exe path: {e}");
                 return;
