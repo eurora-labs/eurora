@@ -86,8 +86,7 @@ pub fn create_router<H: webhook::WebhookEventHandler>(state: Arc<AppState<H>>) -
         .route(
             "/payment/checkout-status",
             get(handlers::get_checkout_status),
-        )
-        .route("/payment/customers", get(handlers::list_customers));
+        );
 
     // Webhook route — no JWT auth, uses Stripe signature verification
     let webhook_route = Router::new().route("/payment/webhook", post(handlers::handle_webhook));
@@ -136,7 +135,7 @@ pub fn init_payment_service_with_handler<H: webhook::WebhookEventHandler>(
 pub use config::PaymentConfig;
 pub use error::PaymentError;
 pub use types::{
-    CheckoutStatusResponse, CreateCheckoutRequest, CreateCheckoutResponse, CreatePortalRequest,
-    CreatePortalResponse, SubscriptionStatus,
+    CheckoutStatusResponse, CreateCheckoutRequest, CreateCheckoutResponse, CreatePortalResponse,
+    SubscriptionStatus,
 };
 pub use webhook::{LoggingWebhookHandler, WebhookEventHandler};

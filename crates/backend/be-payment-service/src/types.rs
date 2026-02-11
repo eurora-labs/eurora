@@ -19,13 +19,6 @@ pub struct CreateCheckoutResponse {
     pub url: String,
 }
 
-/// Request body for creating a billing portal session.
-#[derive(Debug, Deserialize)]
-pub struct CreatePortalRequest {
-    /// The Stripe customer ID.
-    pub customer_id: String,
-}
-
 /// Response returned after creating a billing portal session.
 #[derive(Debug, Serialize)]
 pub struct CreatePortalResponse {
@@ -48,6 +41,4 @@ pub struct SubscriptionStatus {
 pub struct CheckoutStatusResponse {
     /// The session status: "complete", "open", or "expired".
     pub status: String,
-    /// The customer email associated with the session.
-    pub customer_email: Option<String>,
 }

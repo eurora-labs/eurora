@@ -3,7 +3,6 @@ use std::sync::Arc;
 use axum::Json;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
-use axum::response::IntoResponse;
 use stripe_checkout::CheckoutSessionMode;
 use stripe_checkout::checkout_session::{
     CreateCheckoutSession, CreateCheckoutSessionLineItems, RetrieveCheckoutSession,
@@ -16,10 +15,34 @@ use crate::auth::AuthUser;
 use crate::error::PaymentError;
 use crate::service::AppState;
 use crate::types::{
-    CheckoutStatusResponse, CreateCheckoutRequest, CreateCheckoutResponse, CreatePortalRequest,
-    CreatePortalResponse, SubscriptionStatus,
+    CheckoutStatusResponse, CreateCheckoutRequest, CreateCheckoutResponse, CreatePortalResponse,
+    SubscriptionStatus,
 };
 use crate::webhook::WebhookEventHandler;
+
+// ---------------------------------------------------------------------------
+// Helper: resolve the authenticated user's Stripe customer by email
+// ---------------------------------------------------------------------------
+
+/// Looks up the Stripe customer that matches the authenticated user's email.
+///
+/// Returns the customer ID, or `Err(Unauthorized)` if no Stripe customer
+/// exists yet for this email.
+async fn resolve_customer_id<H: WebhookEventHandler>(
+    state: &AppState<H>,
+    email: &str,
+) -> Result<String, PaymentError> {
+    let page = ListCustomer::new()
+        .email(email)
+        .limit(1)
+        .send(&state.client)
+        .await?;
+
+    page.data
+        .first()
+        .map(|c| c.id.to_string())
+        .ok_or_else(|| PaymentError::InvalidField("no Stripe customer found for this account"))
+}
 
 // ---------------------------------------------------------------------------
 // POST /payment/checkout
@@ -98,15 +121,18 @@ pub async fn create_checkout_session<H: WebhookEventHandler>(
 // ---------------------------------------------------------------------------
 
 /// Creates a Stripe Billing Portal session so customers can manage their subscription.
+///
+/// The Stripe customer is resolved from the authenticated user's email — the
+/// client never supplies a customer ID directly.
 pub async fn create_portal_session<H: WebhookEventHandler>(
     State(state): State<Arc<AppState<H>>>,
-    AuthUser(_claims): AuthUser,
-    Json(body): Json<CreatePortalRequest>,
+    AuthUser(claims): AuthUser,
 ) -> Result<Json<CreatePortalResponse>, PaymentError> {
+    let customer_id = resolve_customer_id(&state, &claims.email).await?;
     let return_url = format!("{}/settings/billing", state.config.frontend_url);
 
     let session = stripe_billing::billing_portal_session::CreateBillingPortalSession::new()
-        .customer(&body.customer_id)
+        .customer(&customer_id)
         .return_url(&return_url)
         .send(&state.client)
         .await?;
@@ -118,14 +144,18 @@ pub async fn create_portal_session<H: WebhookEventHandler>(
 // GET /payment/subscription?customer_id=cus_xxx
 // ---------------------------------------------------------------------------
 
-/// Returns the subscription status for a given customer.
+/// Returns the subscription status for the authenticated user.
+///
+/// The Stripe customer is resolved from the authenticated user's email — the
+/// client never supplies a customer ID directly.
 pub async fn get_subscription_status<H: WebhookEventHandler>(
     State(state): State<Arc<AppState<H>>>,
-    AuthUser(_claims): AuthUser,
-    axum::extract::Query(params): axum::extract::Query<CustomerQuery>,
+    AuthUser(claims): AuthUser,
 ) -> Result<Json<SubscriptionStatus>, PaymentError> {
+    let customer_id = resolve_customer_id(&state, &claims.email).await?;
+
     let page = stripe_billing::subscription::ListSubscription::new()
-        .customer(&params.customer_id)
+        .customer(&customer_id)
         .limit(1)
         .send(&state.client)
         .await?;
@@ -141,80 +171,38 @@ pub async fn get_subscription_status<H: WebhookEventHandler>(
     Ok(Json(status.unwrap_or_default()))
 }
 
-#[derive(Debug, serde::Deserialize)]
-pub struct CustomerQuery {
-    pub customer_id: String,
-}
-
-// ---------------------------------------------------------------------------
-// GET /payment/customers?limit=20&starting_after=cus_xxx
-// ---------------------------------------------------------------------------
-
-const DEFAULT_CUSTOMER_PAGE_SIZE: i64 = 20;
-
-/// Lists Stripe customers with pagination (admin/debug endpoint).
-pub async fn list_customers<H: WebhookEventHandler>(
-    State(state): State<Arc<AppState<H>>>,
-    AuthUser(_claims): AuthUser,
-    axum::extract::Query(params): axum::extract::Query<CustomerListQuery>,
-) -> Result<impl IntoResponse, PaymentError> {
-    let limit = params.limit.unwrap_or(DEFAULT_CUSTOMER_PAGE_SIZE).min(100);
-
-    let mut req = ListCustomer::new().limit(limit);
-    if let Some(ref cursor) = params.starting_after {
-        req = req.starting_after(cursor);
-    }
-
-    let page = req.send(&state.client).await?;
-
-    let summary: Vec<serde_json::Value> = page
-        .data
-        .iter()
-        .map(|c| {
-            serde_json::json!({
-                "id": c.id,
-                "email": c.email,
-                "name": c.name,
-            })
-        })
-        .collect();
-
-    Ok(Json(serde_json::json!({
-        "data": summary,
-        "has_more": page.has_more,
-    })))
-}
-
-#[derive(Debug, serde::Deserialize)]
-pub struct CustomerListQuery {
-    pub limit: Option<i64>,
-    pub starting_after: Option<String>,
-}
-
 // ---------------------------------------------------------------------------
 // GET /payment/checkout-status?session_id=cs_xxx
 // ---------------------------------------------------------------------------
 
 /// Verifies a checkout session's payment status so the frontend can confirm
 /// that the payment actually went through before showing a success message.
+///
+/// The session's `customer_email` must match the authenticated user's email,
+/// preventing users from probing arbitrary session IDs.
 pub async fn get_checkout_status<H: WebhookEventHandler>(
     State(state): State<Arc<AppState<H>>>,
-    AuthUser(_claims): AuthUser,
+    AuthUser(claims): AuthUser,
     axum::extract::Query(params): axum::extract::Query<CheckoutStatusQuery>,
 ) -> Result<Json<CheckoutStatusResponse>, PaymentError> {
     let session = RetrieveCheckoutSession::new(params.session_id.as_str())
         .send(&state.client)
         .await?;
 
+    // Ensure the checkout session belongs to the authenticated user.
+    let session_email = session.customer_email.as_deref().unwrap_or_default();
+    if !session_email.eq_ignore_ascii_case(&claims.email) {
+        return Err(PaymentError::Unauthorized(
+            "Session does not belong to this user".to_string(),
+        ));
+    }
+
     let status = session
         .status
         .map(|s| s.as_str().to_owned())
         .unwrap_or_else(|| "unknown".to_owned());
 
-    Ok(Json(CheckoutStatusResponse {
-        status,
-        customer_email: session.customer_email,
-    }))
+    Ok(Json(CheckoutStatusResponse { status }))
 }
 
 #[derive(Debug, serde::Deserialize)]
