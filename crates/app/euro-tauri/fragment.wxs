@@ -11,11 +11,26 @@
                             <Component Id="ChromeNativeMessagingHostJson" Guid="8c7ca6a7-77b0-4738-aaa5-9ba9b4a509fe">
                                 <File Id="ChromeNativeMessagingHostJsonFile"
                                     Name="com.eurora.app.json"
-                                    Source="D:\a\eurora\eurora\crates\app\euro-tauri\hosts\windows.native-messaging.json"
+                                    Source="D:\a\eurora\eurora\crates\app\euro-tauri\hosts\windows.chromium.native-messaging.json"
                                 KeyPath="yes" />
                             </Component>
                             <Component Id="ChromeNativeMessaging" Guid="6adc0a23-d076-44c8-8a93-e22934856bac">
                                 <File Id="ChromeNativeMessagingFile"
+                                    Name="euro-native-messaging.exe"
+                                    Source="D:\a\eurora\eurora\target\release\euro-native-messaging.exe"
+                                    KeyPath="yes" />
+                            </Component>
+                        </Directory>
+
+                        <Directory Id="EdgeFolder" Name="edge">
+                            <Component Id="EdgeNativeMessagingHostJson" Guid="a1f3b2c4-5d6e-7f80-9a1b-2c3d4e5f6a7b">
+                                <File Id="EdgeNativeMessagingHostJsonFile"
+                                    Name="com.eurora.app.json"
+                                    Source="D:\a\eurora\eurora\crates\app\euro-tauri\hosts\windows.edge.native-messaging.json"
+                                    KeyPath="yes" />
+                            </Component>
+                            <Component Id="EdgeNativeMessaging" Guid="b2c3d4e5-6f7a-8b9c-0d1e-2f3a4b5c6d7e">
+                                <File Id="EdgeNativeMessagingFile"
                                     Name="euro-native-messaging.exe"
                                     Source="D:\a\eurora\eurora\target\release\euro-native-messaging.exe"
                                     KeyPath="yes" />
@@ -51,6 +66,19 @@
                     <RegistryValue
                         Type="string"
                         Value="C:\\Eurora Labs\\Eurora\\chrome\\com.eurora.app.json"
+                        KeyPath="yes"
+                    />
+                </RegistryKey>
+            </Component>
+            <Component Id="EdgeRegistryEntries" Guid="*">
+                <RegistryKey
+                Root="HKCU"
+                Key="Software\Microsoft\Edge\NativeMessagingHosts\com.eurora.app"
+                Action="createAndRemoveOnUninstall"
+                >
+                    <RegistryValue
+                        Type="string"
+                        Value="C:\\Eurora Labs\\Eurora\\edge\\com.eurora.app.json"
                         KeyPath="yes"
                     />
                 </RegistryKey>

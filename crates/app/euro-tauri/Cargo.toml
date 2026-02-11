@@ -31,6 +31,7 @@ agent-chain-core = { workspace = true }
 anyhow = { workspace = true }
 backtrace = { version = "0.3.76", optional = true }
 color-thief = "0.2.2"
+dirs = { workspace = true }
 dotenv = { workspace = true }
 euro-activity = { workspace = true }
 euro-conversation = { workspace = true }
