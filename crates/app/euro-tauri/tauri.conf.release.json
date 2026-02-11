@@ -8,7 +8,13 @@
 	"bundle": {
 		"active": true,
 		"resources": [
-			"LICENSES-THIRD-PARTY.md"
+			"LICENSES-THIRD-PARTY.md",
+			"hosts/mac.chromium.native-messaging.json",
+			"hosts/mac.edge.native-messaging.json",
+			"hosts/mac.firefox.native-messaging.json",
+			"hosts/linux.chromium.native-messaging.json",
+			"hosts/linux.edge.native-messaging.json",
+			"hosts/linux.firefox.native-messaging.json"
 		],
 		"externalBin": [
 			"binaries/euro-native-messaging"
