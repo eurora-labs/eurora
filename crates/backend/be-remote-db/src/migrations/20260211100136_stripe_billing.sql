@@ -17,6 +17,7 @@ CREATE TABLE stripe.customers (
     app_user_id UUID,                             -- Application user reference
     email TEXT,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     raw_data JSONB NOT NULL,                      -- Full Stripe customer object
 
     CONSTRAINT fk_stripe_customers_app_user_id
@@ -36,6 +37,7 @@ CREATE TABLE stripe.products (
     active BOOLEAN NOT NULL,
     metadata JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     raw_data JSONB NOT NULL
 );
 
@@ -54,17 +56,19 @@ CREATE TABLE stripe.prices (
     active BOOLEAN NOT NULL,
     metadata JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     raw_data JSONB NOT NULL,
 
     CONSTRAINT fk_stripe_prices_product_id
         FOREIGN KEY (product_id)
         REFERENCES stripe.products(id)
+        ON DELETE CASCADE
 );
 
 ----------------------------------------------------------------
 -- Create ENUM type for Stripe subscription status
 ----------------------------------------------------------------
-CREATE TYPE stripe_subscription_status AS ENUM (
+CREATE TYPE stripe.subscription_status AS ENUM (
     'incomplete',
     'incomplete_expired',
     'trialing',
@@ -82,7 +86,7 @@ CREATE TYPE stripe_subscription_status AS ENUM (
 CREATE TABLE stripe.subscriptions (
     id TEXT PRIMARY KEY,                          -- Stripe subscription ID: sub_xxx
     customer_id TEXT NOT NULL,
-    status stripe_subscription_status NOT NULL,
+    status stripe.subscription_status NOT NULL,
     cancel_at_period_end BOOLEAN NOT NULL,
     canceled_at TIMESTAMP WITH TIME ZONE,
     current_period_start TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -90,6 +94,7 @@ CREATE TABLE stripe.subscriptions (
     trial_start TIMESTAMP WITH TIME ZONE,
     trial_end TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     collection_method TEXT,                       -- charge_automatically / send_invoice
     default_payment_method TEXT,
     raw_data JSONB NOT NULL,
@@ -97,6 +102,7 @@ CREATE TABLE stripe.subscriptions (
     CONSTRAINT fk_stripe_subscriptions_customer_id
         FOREIGN KEY (customer_id)
         REFERENCES stripe.customers(id)
+        ON DELETE CASCADE
 );
 
 ----------------------------------------------------------------
@@ -118,6 +124,7 @@ CREATE TABLE stripe.subscription_items (
     CONSTRAINT fk_stripe_subscription_items_price_id
         FOREIGN KEY (price_id)
         REFERENCES stripe.prices(id)
+        ON DELETE CASCADE
 );
 
 ----------------------------------------------------------------
@@ -176,6 +183,7 @@ CREATE TABLE plan_prices (
     CONSTRAINT fk_plan_prices_stripe_price_id
         FOREIGN KEY (stripe_price_id)
         REFERENCES stripe.prices(id)
+        ON DELETE CASCADE
 );
 
 ----------------------------------------------------------------
@@ -192,7 +200,7 @@ CREATE INDEX idx_stripe_prices_active ON stripe.prices(active);
 CREATE INDEX idx_stripe_prices_recurring_interval ON stripe.prices(recurring_interval);
 
 -- Stripe subscriptions indexes
-CREATE INDEX idx_stripe_subscriptions_customer_id ON stripe.subscriptions(customer_id);
+CREATE INDEX idx_stripe_subscriptions_customer_id_created_at ON stripe.subscriptions(customer_id, created_at DESC);
 CREATE INDEX idx_stripe_subscriptions_status ON stripe.subscriptions(status);
 CREATE INDEX idx_stripe_subscriptions_current_period_end ON stripe.subscriptions(current_period_end);
 
@@ -210,6 +218,26 @@ CREATE INDEX idx_plan_prices_stripe_price_id ON plan_prices(stripe_price_id);
 -- Add triggers for automatic updated_at timestamp updates
 -- Uses existing update_updated_at_column() function from initial migration
 ----------------------------------------------------------------
+CREATE TRIGGER update_stripe_customers_updated_at
+    BEFORE UPDATE ON stripe.customers
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_stripe_products_updated_at
+    BEFORE UPDATE ON stripe.products
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_stripe_prices_updated_at
+    BEFORE UPDATE ON stripe.prices
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_stripe_subscriptions_updated_at
+    BEFORE UPDATE ON stripe.subscriptions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 CREATE TRIGGER update_accounts_updated_at
     BEFORE UPDATE ON accounts
     FOR EACH ROW
@@ -225,7 +253,7 @@ CREATE TRIGGER update_plans_updated_at
 -- Provides a convenient summary of each account's current billing state
 ----------------------------------------------------------------
 CREATE VIEW account_billing_state AS
-SELECT
+SELECT DISTINCT ON (a.id)
     a.id AS account_id,
     s.id AS stripe_subscription_id,
     s.status,
@@ -240,7 +268,14 @@ FROM accounts a
 LEFT JOIN stripe.customers c
     ON c.id = a.stripe_customer_id
 LEFT JOIN LATERAL (
-    SELECT *
+    SELECT
+        sub.id,
+        sub.customer_id,
+        sub.status,
+        sub.current_period_start,
+        sub.current_period_end,
+        sub.cancel_at_period_end,
+        sub.created_at
     FROM stripe.subscriptions sub
     WHERE sub.customer_id = c.id
     ORDER BY sub.created_at DESC
@@ -253,7 +288,8 @@ LEFT JOIN stripe.prices sp
 LEFT JOIN plan_prices pp
     ON pp.stripe_price_id = sp.id
 LEFT JOIN plans p
-    ON p.id = pp.plan_id;
+    ON p.id = pp.plan_id
+ORDER BY a.id;
 
 ----------------------------------------------------------------
 -- Add comments for documentation
@@ -267,6 +303,7 @@ COMMENT ON TABLE stripe.customers IS 'Stripe customer records linked to applicat
 COMMENT ON COLUMN stripe.customers.id IS 'Stripe customer ID (cus_xxx)';
 COMMENT ON COLUMN stripe.customers.app_user_id IS 'Foreign key to users table';
 COMMENT ON COLUMN stripe.customers.email IS 'Customer email from Stripe';
+COMMENT ON COLUMN stripe.customers.updated_at IS 'Last time this record was updated locally';
 COMMENT ON COLUMN stripe.customers.raw_data IS 'Full Stripe customer JSON object';
 
 -- Stripe products
@@ -275,6 +312,7 @@ COMMENT ON COLUMN stripe.products.id IS 'Stripe product ID (prod_xxx)';
 COMMENT ON COLUMN stripe.products.name IS 'Product display name';
 COMMENT ON COLUMN stripe.products.active IS 'Whether the product is currently available';
 COMMENT ON COLUMN stripe.products.metadata IS 'Stripe product metadata key-value pairs';
+COMMENT ON COLUMN stripe.products.updated_at IS 'Last time this record was updated locally';
 COMMENT ON COLUMN stripe.products.raw_data IS 'Full Stripe product JSON object';
 
 -- Stripe prices
@@ -283,6 +321,7 @@ COMMENT ON COLUMN stripe.prices.id IS 'Stripe price ID (price_xxx)';
 COMMENT ON COLUMN stripe.prices.product_id IS 'Foreign key to stripe.products';
 COMMENT ON COLUMN stripe.prices.unit_amount IS 'Price in smallest currency unit (e.g. cents)';
 COMMENT ON COLUMN stripe.prices.recurring_interval IS 'Billing interval: month, year, etc.';
+COMMENT ON COLUMN stripe.prices.updated_at IS 'Last time this record was updated locally';
 COMMENT ON COLUMN stripe.prices.raw_data IS 'Full Stripe price JSON object';
 
 -- Stripe subscriptions
@@ -293,6 +332,7 @@ COMMENT ON COLUMN stripe.subscriptions.status IS 'Current subscription status';
 COMMENT ON COLUMN stripe.subscriptions.cancel_at_period_end IS 'Whether subscription cancels at period end';
 COMMENT ON COLUMN stripe.subscriptions.current_period_start IS 'Start of current billing period';
 COMMENT ON COLUMN stripe.subscriptions.current_period_end IS 'End of current billing period';
+COMMENT ON COLUMN stripe.subscriptions.updated_at IS 'Last time this record was updated locally';
 COMMENT ON COLUMN stripe.subscriptions.raw_data IS 'Full Stripe subscription JSON object';
 
 -- Stripe subscription items
@@ -327,4 +367,4 @@ COMMENT ON COLUMN plan_prices.stripe_price_id IS 'Foreign key to stripe.prices';
 COMMENT ON VIEW account_billing_state IS 'Summarizes each account''s current subscription and plan state';
 
 -- Enum type
-COMMENT ON TYPE stripe_subscription_status IS 'Stripe subscription lifecycle states';
+COMMENT ON TYPE stripe.subscription_status IS 'Stripe subscription lifecycle states';
