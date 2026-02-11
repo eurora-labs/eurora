@@ -79,8 +79,9 @@
 			auth.login(tokens);
 			success = true;
 
+			const redirectTo = page.url.searchParams.get('redirect') || '/settings';
 			setTimeout(() => {
-				goto('/settings');
+				goto(redirectTo);
 			}, 1500);
 		} catch (err) {
 			console.error('Login error:', err);
