@@ -1,9 +1,51 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { auth, isAuthenticated, currentUser } from '$lib/stores/auth.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import XIcon from '@lucide/svelte/icons/x';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+
+	const PAYMENT_API_URL = import.meta.env.VITE_PAYMENT_API_URL;
+	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID;
+
+	let loading = $state(false);
+	let error = $state<string | null>(null);
+
+	async function handleGetPro() {
+		if (!$isAuthenticated) {
+			goto('/login?redirect=/pricing');
+			return;
+		}
+
+		loading = true;
+		error = null;
+
+		try {
+			const res = await fetch(`${PAYMENT_API_URL}/payment/checkout`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					price_id: STRIPE_PRO_PRICE_ID,
+					customer_email: $currentUser?.email,
+				}),
+			});
+
+			if (!res.ok) {
+				const body = await res.json().catch(() => null);
+				throw new Error(body?.error ?? `Checkout failed (${res.status})`);
+			}
+
+			const { url } = await res.json();
+			window.location.href = url;
+		} catch (err) {
+			console.error('Checkout error:', err);
+			error = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+			loading = false;
+		}
+	}
 </script>
 
 <div class="container mx-auto max-w-5xl px-4 py-16">
@@ -14,6 +56,12 @@
 			usage limits.
 		</p>
 	</div>
+
+	{#if error}
+		<div class="mx-auto mb-8 max-w-md rounded-md bg-red-50 p-4">
+			<p class="text-sm text-red-800">{error}</p>
+		</div>
+	{/if}
 
 	<div class="mb-16 grid grid-cols-1 gap-8 md:grid-cols-3">
 		<!-- Free Plan -->
@@ -57,7 +105,7 @@
 						<span class="text-gray-500">Custom integrations</span>
 					</li>
 				</ul>
-				<Button variant="outline" class="w-full">Get Started</Button>
+				<Button variant="outline" class="w-full" href="/register">Get Started</Button>
 			</Card.Content>
 		</Card.Root>
 
@@ -107,9 +155,14 @@
 						<span class="text-gray-500">Custom integrations</span>
 					</li>
 				</ul>
-				<Button class="w-full" href="https://buy.stripe.com/test_6oU00j5JH71f8571Tq7wA00"
-					>Subscribe Now</Button
-				>
+				<Button class="w-full" onclick={handleGetPro} disabled={loading}>
+					{#if loading}
+						<Loader2Icon class="mr-2 h-4 w-4 animate-spin" />
+						Redirecting...
+					{:else}
+						Get
+					{/if}
+				</Button>
 			</Card.Content>
 		</Card.Root>
 
