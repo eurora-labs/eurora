@@ -50,6 +50,8 @@ fn install_native_messaging_manifests(app: &tauri::App) {
 
     #[cfg(not(target_os = "windows"))]
     {
+        #[cfg(target_os = "linux")]
+        use std::os::unix::fs::PermissionsExt;
         use std::path::PathBuf;
 
         let resource_dir = match app.path().resource_dir() {
@@ -73,7 +75,19 @@ fn install_native_messaging_manifests(app: &tauri::App) {
                 return;
             }
         };
-        let binary_path_str = binary_path.to_string_lossy();
+        // On macOS the sidecar lives next to the main executable inside the .app
+        // bundle. On Linux we copy it to a stable well-known path so that
+        // manifests survive package-manager upgrades that change the install prefix.
+        #[cfg(target_os = "macos")]
+        let manifest_binary_path = binary_path.to_string_lossy().to_string();
+
+        #[cfg(target_os = "linux")]
+        let manifest_binary_path = {
+            let home = dirs::home_dir().unwrap_or_default();
+            home.join(".eurora/native-messaging/euro-native-messaging")
+                .to_string_lossy()
+                .to_string()
+        };
 
         // (template resource file, target browser directories)
         #[cfg(target_os = "macos")]
@@ -106,6 +120,38 @@ fn install_native_messaging_manifests(app: &tauri::App) {
         #[cfg(target_os = "linux")]
         let manifest_configs: Vec<(&str, Vec<PathBuf>)> = {
             let home = dirs::home_dir().unwrap_or_default();
+
+            // On Linux, copy the sidecar binary to ~/.eurora/native-messaging/
+            // so that browser manifests can reference a stable, well-known path.
+            let native_messaging_dir = home.join(".eurora/native-messaging");
+            if let Err(e) = std::fs::create_dir_all(&native_messaging_dir) {
+                warn!(
+                    "Could not create native messaging directory {}: {e}",
+                    native_messaging_dir.display()
+                );
+            } else {
+                let dest = native_messaging_dir.join("euro-native-messaging");
+                match std::fs::copy(&binary_path, &dest) {
+                    Ok(_) => {
+                        // Ensure the copied binary is executable
+                        if let Err(e) = std::fs::set_permissions(
+                            &dest,
+                            <std::fs::Permissions as PermissionsExt>::from_mode(0o755),
+                        ) {
+                            warn!(
+                                "Could not set executable permission on {}: {e}",
+                                dest.display()
+                            );
+                        }
+                        info!("Copied native messaging binary to {}", dest.display());
+                    }
+                    Err(e) => warn!(
+                        "Could not copy native messaging binary to {}: {e}",
+                        dest.display()
+                    ),
+                }
+            }
+
             vec![
                 (
                     "hosts/linux.chromium.native-messaging.json",
@@ -118,6 +164,10 @@ fn install_native_messaging_manifests(app: &tauri::App) {
                 (
                     "hosts/linux.edge.native-messaging.json",
                     vec![home.join(".config/microsoft-edge/NativeMessagingHosts")],
+                ),
+                (
+                    "hosts/linux.firefox.native-messaging.json",
+                    vec![home.join(".mozilla/native-messaging-hosts")],
                 ),
             ]
         };
@@ -143,7 +193,7 @@ fn install_native_messaging_manifests(app: &tauri::App) {
             if let Some(obj) = manifest.as_object_mut() {
                 obj.insert(
                     "path".to_string(),
-                    serde_json::Value::String(binary_path_str.to_string()),
+                    serde_json::Value::String(manifest_binary_path.clone()),
                 );
             }
 
