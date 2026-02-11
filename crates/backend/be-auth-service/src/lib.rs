@@ -522,14 +522,6 @@ impl AuthService {
                         user
                     }
                     Err(_) => {
-                        // New users must come from the desktop app flow, which provides a login token
-                        if creds.login_token.is_none() {
-                            error!("Login token is missing for new user registration via OAuth");
-                            return Err(Status::unauthenticated(
-                                "Login token is required for new account registration",
-                            ));
-                        }
-
                         // Generate username from email (before @ symbol) or use name
                         let username = user_info
                             .email
