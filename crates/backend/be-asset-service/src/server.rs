@@ -1,5 +1,3 @@
-//! Server-side implementation for the Assets Service.
-
 use std::sync::Arc;
 
 use be_asset::AssetService as CoreAssetService;
@@ -16,24 +14,16 @@ pub use proto_gen::asset::proto_asset_service_server::{
     ProtoAssetService, ProtoAssetServiceServer,
 };
 
-/// The main assets service
 #[derive(Debug)]
 pub struct AssetService(CoreAssetService);
 
 impl AssetService {
-    /// Create a new AssetsService instance
     pub fn new(db: Arc<DatabaseManager>, storage: Arc<StorageService>) -> Self {
         let core_service = CoreAssetService::new(db, storage);
         info!("Creating new AssetsService instance");
         Self(core_service)
     }
 
-    /// Create a new AssetsService with storage configured from environment
-    ///
-    /// # Errors
-    ///
-    /// Returns [`AssetServiceError::StorageConfig`] if the storage service
-    /// cannot be configured from environment variables.
     pub fn from_env(db: Arc<DatabaseManager>) -> Result<Self> {
         let core_service = CoreAssetService::from_env(db).map_err(AssetServiceError::Asset)?;
         Ok(Self(core_service))

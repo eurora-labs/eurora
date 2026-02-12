@@ -26,12 +26,11 @@ use sha2::{Digest, Sha256};
 use tracing::{debug, info};
 use uuid::Uuid;
 
-/// Storage backend configuration
 #[derive(Debug, Clone)]
 pub enum StorageConfig {
-    /// Local filesystem storage
-    FS { root: String },
-    /// S3 storage
+    FS {
+        root: String,
+    },
     S3 {
         bucket: String,
         region: String,
@@ -88,7 +87,6 @@ impl StorageConfig {
     }
 }
 
-/// Storage service for managing file assets
 #[derive(Debug, Clone)]
 pub struct StorageService {
     operator: Operator,
@@ -117,13 +115,11 @@ impl StorageService {
         Self::new(config)
     }
 
-    /// Create an OpenDAL operator based on the configuration
     fn create_operator(config: &StorageConfig) -> StorageResult<Operator> {
         match config {
             StorageConfig::FS { root } => {
                 debug!("Creating filesystem storage operator with root: {}", root);
 
-                // Ensure the directory exists
                 std::fs::create_dir_all(root)?;
 
                 let builder = services::Fs::default().root(root);
@@ -158,27 +154,17 @@ impl StorageService {
         }
     }
 
-    /// Calculate SHA256 hash of content
     pub fn calculate_sha256(content: &[u8]) -> Vec<u8> {
         let mut hasher = Sha256::new();
         hasher.update(content);
         hasher.finalize().to_vec()
     }
 
-    /// Generate a storage path for an asset
-    ///
-    /// Path format: `{user_id}/{asset_id}/{filename}`
-    ///
-    /// This structure allows for:
-    /// - Efficient user-based lookups
-    /// - Unique asset identification
-    /// - Human-readable filenames
     pub fn generate_path(user_id: &Uuid, asset_id: &Uuid, extension: Option<&str>) -> String {
         let ext = extension.unwrap_or("bin");
         format!("{}/{}.{}", user_id, asset_id, ext)
     }
 
-    /// Get file extension from MIME type
     pub fn extension_from_mime(mime_type: &str) -> &'static str {
         match mime_type {
             "image/png" => "png",
@@ -294,17 +280,14 @@ impl StorageService {
         }
     }
 
-    /// Get the storage configuration
     pub fn config(&self) -> &StorageConfig {
         &self.config
     }
 
-    /// Get the operator for advanced operations
     pub fn operator(&self) -> &Operator {
         &self.operator
     }
 
-    /// Get the string representation of the storage backend
     pub fn get_backend_name(&self) -> &str {
         match self.config {
             StorageConfig::S3 { .. } => "s3",
@@ -322,7 +305,6 @@ mod tests {
         let content = b"Hello, World!";
         let hash = StorageService::calculate_sha256(content);
 
-        // Known SHA256 hash for "Hello, World!"
         let expected =
             hex::decode("dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f")
                 .unwrap();

@@ -21,7 +21,6 @@ type DiscoveredClient = CoreClient<
     EndpointMaybeSet, // HasUserInfoUrl
 >;
 
-/// Google OAuth configuration
 #[derive(Debug, Clone)]
 pub struct GoogleOAuthConfig {
     pub client_id: String,
@@ -30,7 +29,6 @@ pub struct GoogleOAuthConfig {
 }
 
 impl GoogleOAuthConfig {
-    /// Create a new GoogleOAuthConfig from environment variables
     pub fn from_env() -> Result<Self> {
         let client_id = env::var("GOOGLE_CLIENT_ID")
             .map_err(|_| anyhow!("GOOGLE_CLIENT_ID environment variable not set"))?;
@@ -47,7 +45,6 @@ impl GoogleOAuthConfig {
     }
 }
 
-/// Google OAuth client wrapper using OpenID Connect discovery
 pub struct GoogleOAuthClient {
     client: DiscoveredClient,
 }
@@ -61,7 +58,6 @@ fn build_http_client() -> Result<reqwest::Client> {
 }
 
 impl GoogleOAuthClient {
-    /// Create a new Google OAuth client using OIDC discovery
     pub async fn discover(config: GoogleOAuthConfig) -> Result<Self> {
         let issuer_url = IssuerUrl::new("https://accounts.google.com".to_string())
             .map_err(|e| anyhow!("Invalid issuer URL: {}", e))?;
@@ -84,7 +80,6 @@ impl GoogleOAuthClient {
         Ok(Self { client })
     }
 
-    /// Generate the authorization URL with a custom state, PKCE verifier, and nonce.
     pub fn get_authorization_url_with_state_and_pkce(
         &self,
         state: &str,
@@ -113,10 +108,7 @@ impl GoogleOAuthClient {
         Ok(authorize_url.to_string())
     }
 
-    /// Exchange an authorization code for tokens and extract user info from the ID token.
-    ///
-    /// The `nonce` parameter is used to verify the ID token's nonce claim, protecting
-    /// against ID token replay attacks per the OpenID Connect Core spec.
+    /// The `nonce` verifies the ID token's nonce claim (OIDC replay protection).
     pub async fn exchange_code(
         &self,
         code: &str,
@@ -133,12 +125,10 @@ impl GoogleOAuthClient {
             .await
             .map_err(|e| anyhow!("Failed to exchange authorization code: {}", e))?;
 
-        // Extract user info from ID token claims
         let id_token = token_response
             .id_token()
             .ok_or_else(|| anyhow!("Google did not return an ID token"))?;
 
-        // Verify the ID token claims, including nonce verification to prevent replay attacks
         let verifier = self.client.id_token_verifier();
         let claims: &CoreIdTokenClaims = match nonce {
             Some(expected_nonce) => id_token
@@ -156,7 +146,6 @@ impl GoogleOAuthClient {
             .to_string();
         let email_verified = claims.email_verified().unwrap_or(false);
 
-        // Extract localized claim values
         let name = match claims.name() {
             Some(localized) => localized
                 .get(None)
@@ -174,7 +163,6 @@ impl GoogleOAuthClient {
             .picture()
             .and_then(|localized| localized.get(None).map(|v| v.to_string()));
 
-        // Extract OAuth tokens for storage
         let access_token = token_response.access_token().secret().to_string();
         let refresh_token = token_response
             .refresh_token()
@@ -197,7 +185,6 @@ impl GoogleOAuthClient {
     }
 }
 
-/// Google user info extracted from OIDC ID token claims + OAuth tokens
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GoogleUserInfo {
     pub id: String,
@@ -208,18 +195,14 @@ pub struct GoogleUserInfo {
     pub family_name: Option<String>,
     pub picture: Option<String>,
     pub locale: Option<String>,
-    /// The OAuth access token (for storage, not serialized to clients)
     #[serde(skip)]
     pub access_token: String,
-    /// The OAuth refresh token (for storage, not serialized to clients)
     #[serde(skip)]
     pub refresh_token: Option<String>,
-    /// Token expiry duration
     #[serde(skip)]
     pub expires_in: Option<std::time::Duration>,
 }
 
-/// Create a Google OAuth client from environment variables using OIDC discovery
 pub async fn create_google_oauth_client() -> Result<GoogleOAuthClient> {
     let config = GoogleOAuthConfig::from_env()?;
     GoogleOAuthClient::discover(config).await

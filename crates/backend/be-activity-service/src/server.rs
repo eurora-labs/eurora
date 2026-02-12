@@ -1,5 +1,3 @@
-//! Server-side implementation for the Activity Service.
-
 use std::sync::Arc;
 
 use be_asset::AssetService;
@@ -25,7 +23,6 @@ pub use proto_gen::activity::proto_activity_service_server::{
     ProtoActivityService, ProtoActivityServiceServer,
 };
 
-/// The main activity service
 #[derive(Debug)]
 pub struct ActivityService {
     db: Arc<DatabaseManager>,
@@ -33,7 +30,6 @@ pub struct ActivityService {
 }
 
 impl ActivityService {
-    /// Create a new ActivityService instance
     pub fn new(db: Arc<DatabaseManager>, asset: Arc<AssetService>) -> Self {
         info!("Creating new ActivityService instance");
         Self {
@@ -42,19 +38,12 @@ impl ActivityService {
         }
     }
 
-    /// Create a new ActivityService from environment variables.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ActivityServiceError::Storage`] if the storage service
-    /// cannot be initialized from environment variables.
     pub fn from_env(db: Arc<DatabaseManager>) -> ActivityResult<Self> {
         let asset = AssetService::from_env(db.clone()).map_err(ActivityServiceError::Asset)?;
 
         Ok(Self::new(db, Arc::new(asset)))
     }
 
-    /// Convert a database Activity to a proto Activity
     fn db_activity_to_proto(activity: &be_remote_db::Activity) -> Activity {
         Activity {
             id: activity.id.to_string(),
@@ -70,7 +59,6 @@ impl ActivityService {
     }
 }
 
-/// Convert DateTime<Utc> to prost_types::Timestamp
 fn datetime_to_timestamp(dt: DateTime<Utc>) -> Timestamp {
     Timestamp {
         seconds: dt.timestamp(),
@@ -78,12 +66,10 @@ fn datetime_to_timestamp(dt: DateTime<Utc>) -> Timestamp {
     }
 }
 
-/// Convert prost_types::Timestamp to DateTime<Utc>
 fn timestamp_to_datetime(ts: &Timestamp) -> Option<DateTime<Utc>> {
     DateTime::from_timestamp(ts.seconds, ts.nanos as u32)
 }
 
-/// Parse an optional UUID from a string.
 fn parse_optional_uuid(
     value: Option<&String>,
     field: &'static str,
@@ -167,7 +153,6 @@ impl ProtoActivityService for ActivityService {
             .await
             .map_err(ActivityServiceError::from)?;
         info!("Created activity at: {:?}", activity.created_at);
-        // Upload icon to storage if provided
         let icon_id = match req.icon {
             Some(icon) => {
                 let icon_response = self
@@ -178,7 +163,7 @@ impl ProtoActivityService for ActivityService {
                             content: icon,
                             mime_type: "image/png".to_string(),
                             metadata: None,
-                            activity_id: None, // Prevent this icon from being treated as a regular activity asset
+                            activity_id: None,
                         },
                         user_id,
                     )

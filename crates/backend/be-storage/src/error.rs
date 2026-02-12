@@ -2,94 +2,74 @@
 
 use thiserror::Error;
 
-/// Errors that can occur in the storage service
 #[derive(Error, Debug)]
 pub enum StorageError {
-    /// Configuration error - missing or invalid configuration
     #[error("Configuration error: {0}")]
     Configuration(String),
 
-    /// Missing required environment variable
     #[error("Missing required environment variable: {0}")]
     MissingEnvVar(String),
 
-    /// IO error when accessing filesystem
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    /// OpenDAL storage operation error
     #[error("Storage operation failed: {0}")]
     OpenDal(#[from] opendal::Error),
 
-    /// Asset not found at the specified path
     #[error("Asset not found: {0}")]
     NotFound(String),
 
-    /// Invalid path format
     #[error("Invalid path: {0}")]
     InvalidPath(String),
 
-    /// Upload operation failed
     #[error("Upload failed: {0}")]
     UploadFailed(String),
 
-    /// Download operation failed
     #[error("Download failed: {0}")]
     DownloadFailed(String),
 
-    /// Delete operation failed
     #[error("Delete failed: {0}")]
     DeleteFailed(String),
 }
 
 impl StorageError {
-    /// Create a new configuration error
     pub fn configuration(msg: impl Into<String>) -> Self {
         Self::Configuration(msg.into())
     }
 
-    /// Create a missing environment variable error
     pub fn missing_env_var(var_name: impl Into<String>) -> Self {
         Self::MissingEnvVar(var_name.into())
     }
 
-    /// Create a not found error
     pub fn not_found(path: impl Into<String>) -> Self {
         Self::NotFound(path.into())
     }
 
-    /// Create an invalid path error
     pub fn invalid_path(msg: impl Into<String>) -> Self {
         Self::InvalidPath(msg.into())
     }
 
-    /// Create an upload failed error
     pub fn upload_failed(msg: impl Into<String>) -> Self {
         Self::UploadFailed(msg.into())
     }
 
-    /// Create a download failed error
     pub fn download_failed(msg: impl Into<String>) -> Self {
         Self::DownloadFailed(msg.into())
     }
 
-    /// Create a delete failed error
     pub fn delete_failed(msg: impl Into<String>) -> Self {
         Self::DeleteFailed(msg.into())
     }
 
-    /// Check if this error represents a "not found" condition
     pub fn is_not_found(&self) -> bool {
         matches!(self, Self::NotFound(_))
     }
 
-    /// Check if this error is a configuration error
     pub fn is_configuration(&self) -> bool {
         matches!(self, Self::Configuration(_) | Self::MissingEnvVar(_))
     }
 }
 
-/// Result type alias for storage operations
 pub type StorageResult<T> = std::result::Result<T, StorageError>;
 
 #[cfg(test)]
