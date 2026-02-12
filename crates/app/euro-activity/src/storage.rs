@@ -1,4 +1,3 @@
-//! Asset storage functionality for saving activity assets to disk and remote service
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use euro_auth::AuthedChannel;
@@ -15,22 +14,15 @@ use tonic::Status;
 
 use crate::{Activity, ActivityAsset, ActivityError, error::ActivityResult};
 
-/// Information about a saved asset
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SavedAssetInfo {
-    /// Relative path to the saved file
     pub file_path: PathBuf,
-    /// Absolute path to the saved file
     pub absolute_path: PathBuf,
-    /// Content hash (if enabled)
     pub content_hash: Option<String>,
-    /// File size in bytes
     pub file_size: u64,
-    /// Timestamp when the asset was saved
     pub saved_at: chrono::DateTime<chrono::Utc>,
 }
 
-/// Trait for assets that can be saved to disk
 #[async_trait]
 #[enum_dispatch]
 pub trait SaveableAsset {
@@ -40,27 +32,21 @@ pub trait SaveableAsset {
     // {
     // }
 
-    /// Get the asset type for organizing files
     fn get_asset_type(&self) -> &'static str;
 
-    /// Serialize the asset content for saving
     async fn serialize_content(&self) -> ActivityResult<Vec<u8>>;
 
-    /// Get a unique identifier for the asset (used for filename)
     fn get_unique_id(&self) -> String;
 
-    /// Get a human-readable name for the asset
     fn get_display_name(&self) -> String;
 }
 
-/// Asset storage manager
 pub struct ActivityStorage {
     activity_client: ProtoActivityServiceClient<AuthedChannel>,
     asset_client: ProtoAssetServiceClient<AuthedChannel>,
 }
 
 impl ActivityStorage {
-    /// Create a new asset storage manager
     pub async fn new() -> Self {
         let channel = euro_auth::get_authed_channel().await;
         let asset_client = ProtoAssetServiceClient::new(channel);
@@ -74,7 +60,6 @@ impl ActivityStorage {
         }
     }
 
-    /// Save all assets of an activity to service by ids
     pub async fn save_activity_to_service(
         &self,
         activity: &Activity,
@@ -118,7 +103,6 @@ impl ActivityStorage {
         Ok(response.into_inner())
     }
 
-    /// Save all assets of an activity to service by ids
     pub async fn save_assets_to_service_by_ids(
         &self,
         activity: &Activity,
@@ -136,7 +120,6 @@ impl ActivityStorage {
         Ok(saved_assets)
     }
 
-    /// Save an asset to remote service via gRPC
     pub async fn save_asset_to_service(
         &self,
         asset: &ActivityAsset,
@@ -145,29 +128,25 @@ impl ActivityStorage {
         //     ActivityError::Configuration("service_endpoint not configured".to_string())
         // })?;
 
-        // Serialize the entire ActivityAsset enum to JSON (no encryption as requested)
         let bytes = serde_json::to_vec(asset)?;
         let file_size = bytes.len() as u64;
 
         let mut client = self.asset_client.clone();
 
-        // Prepare metadata as JSON containing asset type info
         let metadata = serde_json::json!({
             "asset_type": asset.get_asset_type(),
             "unique_id": asset.get_unique_id(),
             "display_name": asset.get_display_name(),
         });
 
-        // Create the request
         let request = tonic::Request::new(CreateAssetRequest {
             name: asset.get_display_name(),
             content: bytes,
             mime_type: "application/json".to_string(),
             metadata: Some(metadata.to_string()),
-            activity_id: None, // Could be linked later if needed
+            activity_id: None,
         });
 
-        // Call the service
         let response = client
             .create_asset(request)
             .await

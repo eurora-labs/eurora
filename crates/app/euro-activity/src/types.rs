@@ -1,8 +1,3 @@
-//! Core type definitions for the refactored activity system
-//!
-//! This module contains the enum-based replacements for the previous trait object system,
-//! providing better performance, type safety, and cloneable activities.
-
 use std::collections::HashMap;
 
 use agent_chain_core::BaseMessage;
@@ -19,7 +14,6 @@ use crate::{
     storage::SaveableAsset,
 };
 
-/// Context chip for UI integration
 #[taurpc::ipc_type]
 pub struct ContextChip {
     pub id: String,
@@ -30,7 +24,6 @@ pub struct ContextChip {
     pub position: Option<u32>,
 }
 
-/// Display asset for UI rendering
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DisplayAsset {
     pub name: String,
@@ -43,7 +36,6 @@ impl DisplayAsset {
     }
 }
 
-/// Enum containing all possible activity assets
 #[enum_dispatch(SaveableAsset, AssetFunctionality)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ActivityAsset {
@@ -105,7 +97,6 @@ pub trait SnapshotFunctionality {
     fn get_created_at(&self) -> u64;
 }
 
-/// Enum containing all possible activity snapshots
 #[enum_dispatch(SnapshotFunctionality)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ActivitySnapshot {
@@ -134,30 +125,20 @@ impl TryFrom<NativeMessage> for ActivitySnapshot {
     }
 }
 
-/// Main activity structure - now fully cloneable and serializable
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Activity {
-    /// ID of the activity
     pub id: String,
-    /// Name of the activity
     pub name: String,
-    /// Icon representing the activity
     #[serde(skip)]
     pub icon: Option<image::RgbaImage>,
-    /// Process name of the activity
     pub process_name: String,
-    /// Start time
     pub start: DateTime<Utc>,
-    /// End time
     pub end: Option<DateTime<Utc>>,
-    /// Assets associated with the activity
     pub assets: Vec<ActivityAsset>,
-    /// Snapshots of the activity
     pub snapshots: Vec<ActivitySnapshot>,
 }
 
 impl Activity {
-    /// Create a new activity
     pub fn new(
         name: String,
         icon: Option<image::RgbaImage>,
@@ -176,7 +157,6 @@ impl Activity {
         }
     }
 
-    /// Get display assets for UI rendering
     pub fn get_display_assets(&self) -> Vec<DisplayAsset> {
         self.assets
             .iter()
@@ -190,7 +170,6 @@ impl Activity {
             .collect()
     }
 
-    /// Get context chips for UI integration
     pub fn get_context_chips(&self) -> Vec<ContextChip> {
         self.assets
             .iter()
@@ -198,17 +177,14 @@ impl Activity {
             .collect()
     }
 
-    /// Add an asset to the activity
     pub fn add_asset(&mut self, asset: ActivityAsset) {
         self.assets.push(asset);
     }
 
-    /// Add a snapshot to the activity
     pub fn add_snapshot(&mut self, snapshot: ActivitySnapshot) {
         self.snapshots.push(snapshot);
     }
 
-    /// Mark the activity as ended
     pub fn end_activity(&mut self) {
         self.end = Some(Utc::now());
     }
