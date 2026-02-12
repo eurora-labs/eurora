@@ -23,6 +23,7 @@ services:
             postgres:
                 condition: service_healthy
         network_mode: host
+        user: '${EURORA_UID:-1000}:${EURORA_GID:-1000}'
         environment:
             REMOTE_DATABASE_URL: postgresql://postgres:postgres@localhost:${EURORA_POSTGRES_PORT:-39432}/eurora
             MONOLITH_ADDR: 0.0.0.0:${EURORA_GRPC_PORT:-39051}
@@ -36,8 +37,7 @@ services:
             ASSET_STORAGE_FS_ROOT: /data/assets
             APPROVED_EMAILS: '*'
         volumes:
-            - eurora-assets:/data/assets
+            - ${EURORA_ASSET_DIR:?EURORA_ASSET_DIR must be set}:/data/assets
 
 volumes:
     eurora-pgdata:
-    eurora-assets:

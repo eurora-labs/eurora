@@ -103,6 +103,27 @@ fn find_available_port(preferred: u16) -> Result<u16, String> {
     Ok(port)
 }
 
+fn host_ids() -> (String, String) {
+    #[cfg(unix)]
+    {
+        let uid = std::process::Command::new("id")
+            .arg("-u")
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .unwrap_or_else(|_| "1000".to_string());
+        let gid = std::process::Command::new("id")
+            .arg("-g")
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .unwrap_or_else(|_| "1000".to_string());
+        (uid, gid)
+    }
+    #[cfg(not(unix))]
+    {
+        ("0".to_string(), "0".to_string())
+    }
+}
+
 #[derive(Clone)]
 pub struct SystemApiImpl;
 
@@ -336,13 +357,25 @@ impl SystemApi for SystemApiImpl {
             ollama_model
         };
 
+        let asset_dir = dirs::data_dir()
+            .ok_or_else(|| "Failed to resolve platform data directory".to_string())?
+            .join("eurora")
+            .join("assets");
+        std::fs::create_dir_all(&asset_dir)
+            .map_err(|e| format!("Failed to create asset directory: {}", e))?;
+
+        let (uid, gid) = host_ids();
+
         info!(
-            "Starting local backend via docker compose: {} (grpc={}, http={}, postgres={}, ollama_model={})",
+            "Starting local backend via docker compose: {} (grpc={}, http={}, postgres={}, ollama_model={}, asset_dir={}, uid={}, gid={})",
             compose_path.display(),
             grpc_port,
             http_port,
             postgres_port,
-            model
+            model,
+            asset_dir.display(),
+            uid,
+            gid,
         );
 
         let output = tokio::process::Command::new("docker")
@@ -351,6 +384,9 @@ impl SystemApi for SystemApiImpl {
             .env("EURORA_HTTP_PORT", http_port.to_string())
             .env("EURORA_POSTGRES_PORT", postgres_port.to_string())
             .env("OLLAMA_MODEL", &model)
+            .env("EURORA_ASSET_DIR", asset_dir.to_string_lossy().as_ref())
+            .env("EURORA_UID", &uid)
+            .env("EURORA_GID", &gid)
             .output()
             .await
             .map_err(|e| format!("Failed to run docker compose: {}", e))?;
