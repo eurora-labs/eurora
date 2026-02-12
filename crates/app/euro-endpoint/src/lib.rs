@@ -4,9 +4,9 @@ pub use error::{EndpointError, Result};
 
 use std::sync::RwLock;
 
+use log::info;
 use tokio::sync::watch;
 use tonic::transport::{Channel, ClientTlsConfig};
-use tracing::info;
 
 const DEFAULT_API_URL: &str = "https://api.eurora-labs.com";
 

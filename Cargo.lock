@@ -3612,6 +3612,7 @@ dependencies = [
  "euro-secret",
  "humantime-serde",
  "jsonwebtoken",
+ "log",
  "prost",
  "prost-types",
  "proto-gen",
@@ -3624,7 +3625,6 @@ dependencies = [
  "tonic-prost",
  "tonic-prost-build",
  "tower",
- "tracing",
  "tracing-subscriber",
 ]
 
@@ -3689,10 +3689,10 @@ dependencies = [
 name = "euro-endpoint"
 version = "0.0.0"
 dependencies = [
+ "log",
  "thiserror 2.0.18",
  "tokio",
  "tonic",
- "tracing",
 ]
 
 [[package]]
@@ -3758,13 +3758,13 @@ dependencies = [
  "anyhow",
  "dirs 6.0.0",
  "euro-fs",
+ "log",
  "notify",
  "serde",
  "serde_json",
  "serde_json_lenient",
  "specta",
  "tokio",
- "tracing",
 ]
 
 [[package]]

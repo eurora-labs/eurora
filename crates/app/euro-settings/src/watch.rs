@@ -1,13 +1,12 @@
+use anyhow::Result;
+use log::{debug, error};
+use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher, event::ModifyKind};
 use std::{
     ops::{Deref, DerefMut},
     path::{Path, PathBuf},
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, mpsc},
     time::Duration,
 };
-
-use anyhow::Result;
-use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher, event::ModifyKind};
-use tracing::debug;
 
 use crate::AppSettings;
 
@@ -127,7 +126,7 @@ impl SettingsWithDiskSync {
                     }
 
                     Err(_) => {
-                        tracing::error!(
+                        error!(
                             "Error watching config file {:?} - watcher terminated",
                             config_path
                         );
