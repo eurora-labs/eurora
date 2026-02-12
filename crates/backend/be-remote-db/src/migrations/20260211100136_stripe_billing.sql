@@ -133,7 +133,7 @@ CREATE TABLE stripe.subscription_items (
 ----------------------------------------------------------------
 CREATE TABLE accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner_user_id UUID NOT NULL,
+    owner_user_id UUID NOT NULL UNIQUE,
     name TEXT NOT NULL,
     stripe_customer_id TEXT UNIQUE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -368,3 +368,22 @@ COMMENT ON VIEW account_billing_state IS 'Summarizes each account''s current sub
 
 -- Enum type
 COMMENT ON TYPE stripe.subscription_status IS 'Stripe subscription lifecycle states';
+
+----------------------------------------------------------------
+-- Create stripe.webhook_events table
+-- Tracks processed webhook event IDs for idempotency
+----------------------------------------------------------------
+CREATE TABLE stripe.webhook_events (
+    event_id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    processed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+-- Auto-expire old events after 30 days to prevent unbounded growth.
+-- A cron or pg_cron job should periodically run:
+--   DELETE FROM stripe.webhook_events WHERE processed_at < now() - interval '30 days';
+
+COMMENT ON TABLE stripe.webhook_events IS 'Tracks processed Stripe webhook event IDs for idempotency';
+COMMENT ON COLUMN stripe.webhook_events.event_id IS 'Stripe event ID (evt_xxx)';
+COMMENT ON COLUMN stripe.webhook_events.event_type IS 'Event type string (e.g. checkout.session.completed)';
+COMMENT ON COLUMN stripe.webhook_events.processed_at IS 'Timestamp when the event was successfully processed';

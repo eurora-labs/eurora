@@ -179,13 +179,32 @@ pub async fn handle_webhook(
         Webhook::construct_event(&body, signature, &state.config.stripe_webhook_secret)
             .map_err(|_| PaymentError::WebhookSignatureInvalid)?;
 
+    // Idempotency: skip events we have already processed
+    let event_id = event.id.as_str();
+    let event_type = event.type_.as_str();
+    if state
+        .db
+        .is_webhook_event_processed(event_id)
+        .await
+        .unwrap_or(false)
+    {
+        info!(%event_id, %event_type, "Webhook event already processed — skipping");
+        return Ok(StatusCode::OK);
+    }
+
+    let raw_data: serde_json::Value = serde_json::from_str(&body).unwrap_or_default();
+
     match event.data.object {
         EventObject::CheckoutSessionCompleted(session) => {
             let customer_id = session.customer.as_ref().map(|c| c.id().to_string());
             let subscription_id = session.subscription.as_ref().map(|s| s.id().to_string());
             let customer_email = session.customer_email.clone();
 
+            // Try to get the expanded subscription object for period/item data
+            let subscription_obj = session.subscription.as_ref().and_then(|s| s.as_object());
+
             info!(
+                %event_id,
                 session_id = %session.id,
                 customer = ?customer_id,
                 "Checkout session completed"
@@ -196,49 +215,72 @@ pub async fn handle_webhook(
                 customer_id,
                 subscription_id,
                 customer_email,
+                subscription_obj,
+                &raw_data,
             )
             .await
             {
-                error!(error = %e, "Failed to provision access after checkout");
+                error!(%event_id, error = %e, "Failed to provision access after checkout");
                 return Err(e);
             }
         }
         EventObject::CustomerSubscriptionUpdated(sub) => {
-            let customer_id = Some(sub.customer.id().to_string());
-            let status = sub.status.to_string();
-
             info!(
+                %event_id,
                 subscription_id = %sub.id,
-                status = %status,
+                status = %sub.status,
                 "Subscription updated"
             );
 
-            if let Err(e) =
-                webhook::on_subscription_updated(&state.db, sub.id.to_string(), customer_id, status)
-                    .await
-            {
-                error!(error = %e, "Failed to handle subscription update");
+            if let Err(e) = webhook::on_subscription_updated(&state.db, &sub, &raw_data).await {
+                error!(%event_id, error = %e, "Failed to handle subscription update");
                 return Err(e);
             }
         }
         EventObject::CustomerSubscriptionDeleted(sub) => {
-            let customer_id = Some(sub.customer.id().to_string());
-
             info!(
+                %event_id,
                 subscription_id = %sub.id,
                 "Subscription deleted"
             );
 
-            if let Err(e) =
-                webhook::on_subscription_deleted(&state.db, sub.id.to_string(), customer_id).await
-            {
-                error!(error = %e, "Failed to revoke access after subscription deletion");
+            if let Err(e) = webhook::on_subscription_deleted(&state.db, &sub, &raw_data).await {
+                error!(%event_id, error = %e, "Failed to revoke access after subscription deletion");
+                return Err(e);
+            }
+        }
+        EventObject::InvoicePaid(invoice) => {
+            info!(
+                %event_id,
+                invoice_id = ?invoice.id,
+                "Invoice paid"
+            );
+
+            if let Err(e) = webhook::on_invoice_paid(&state.db, &invoice).await {
+                error!(%event_id, error = %e, "Failed to handle invoice paid event");
+                return Err(e);
+            }
+        }
+        EventObject::InvoicePaymentFailed(invoice) => {
+            info!(
+                %event_id,
+                invoice_id = ?invoice.id,
+                "Invoice payment failed"
+            );
+
+            if let Err(e) = webhook::on_invoice_payment_failed(&state.db, &invoice).await {
+                error!(%event_id, error = %e, "Failed to handle invoice payment failure");
                 return Err(e);
             }
         }
         _ => {
-            warn!(event_type = %event.type_, "Unhandled webhook event");
+            warn!(%event_id, %event_type, "Unhandled webhook event");
         }
+    }
+
+    // Record successful processing for idempotency
+    if let Err(e) = state.db.record_webhook_event(event_id, event_type).await {
+        error!(%event_id, error = %e, "Failed to record webhook event — event may be reprocessed");
     }
 
     Ok(StatusCode::OK)
