@@ -312,10 +312,10 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         self.active_browser = None;
         self.active_browser_pid = None;
 
-        if let Some(handle) = self.event_subscription_handle.take() {
-            if let Ok(handle) = Arc::try_unwrap(handle) {
-                handle.abort();
-            }
+        if let Some(handle) = self.event_subscription_handle.take()
+            && let Ok(handle) = Arc::try_unwrap(handle)
+        {
+            handle.abort();
         }
 
         if let Some(handle) = self.snapshot_collection_handle.take()
