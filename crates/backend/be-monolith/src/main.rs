@@ -13,7 +13,7 @@ use proto_gen::auth::proto_auth_service_server::ProtoAuthServiceServer;
 use tonic::transport::Server;
 use tonic_web::GrpcWebLayer;
 use tower_http::cors::CorsLayer;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 use tracing_subscriber::Layer;
 use tracing_subscriber::filter::{EnvFilter, LevelFilter};
 use tracing_subscriber::layer::SubscriberExt;
@@ -23,21 +23,26 @@ use tracing_subscriber::util::SubscriberInitExt;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
 
-    if cfg!(not(debug_assertions)) {
-        let sentry_dsn =
-            std::env::var("SENTRY_MONOLITH_DSN").expect("SENTRY_MONOLITH_DSN must be set");
-        let _guard = sentry::init((
-            sentry_dsn,
-            sentry::ClientOptions {
-                release: sentry::release_name!(),
-                traces_sample_rate: 0.0,
-                enable_logs: true,
-                send_default_pii: true, // during closed beta all metrics are non-anonymous
-                debug: true,
-                ..Default::default()
-            },
-        ));
-    }
+    let _sentry_guard = if cfg!(not(debug_assertions)) {
+        std::env::var("SENTRY_MONOLITH_DSN")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .map(|sentry_dsn| {
+                sentry::init((
+                    sentry_dsn,
+                    sentry::ClientOptions {
+                        release: sentry::release_name!(),
+                        traces_sample_rate: 0.0,
+                        enable_logs: true,
+                        send_default_pii: true, // during closed beta all metrics are non-anonymous
+                        debug: true,
+                        ..Default::default()
+                    },
+                ))
+            })
+    } else {
+        None
+    };
 
     let (health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter
@@ -83,11 +88,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cors = CorsLayer::permissive();
 
+    let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
+        .map(|v| v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
     let bucket_name =
         std::env::var("S3_BUCKET_NAME").unwrap_or_else(|_| "eurora-releases".to_string());
 
     let update_router = match init_update_service(bucket_name).await {
         Ok(router) => router,
+        Err(e) if local_mode => {
+            warn!("Update service disabled in local mode: {}", e);
+            axum::Router::new()
+        }
         Err(e) => {
             error!("Failed to initialize update service: {}", e);
             return Err(e.into());
@@ -96,6 +109,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let payment_router = match init_payment_service(db_manager.clone()) {
         Ok(router) => router,
+        Err(e) if local_mode => {
+            warn!("Payment service disabled in local mode: {}", e);
+            axum::Router::new()
+        }
         Err(e) => {
             error!("Failed to initialize payment service: {}", e);
             return Err(e.into());
