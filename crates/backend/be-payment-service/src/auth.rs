@@ -6,10 +6,6 @@ use be_auth_core::JwtConfig;
 
 use crate::error::PaymentError;
 
-/// Authenticated user extracted from a JWT `Authorization: Bearer <token>` header.
-///
-/// Add this as a handler parameter to enforce authentication.
-/// The JWT is validated using the shared [`JwtConfig`] stored in an axum extension.
 pub struct AuthUser(pub auth_core::Claims);
 
 impl<S> FromRequestParts<S> for AuthUser

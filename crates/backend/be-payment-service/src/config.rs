@@ -1,32 +1,15 @@
 use axum::http::HeaderValue;
 
-/// Payment service configuration loaded from environment variables.
 #[derive(Debug, Clone)]
 pub struct PaymentConfig {
-    /// Stripe secret key (sk_test_... or sk_live_...).
     pub stripe_secret_key: String,
-    /// Stripe webhook signing secret (whsec_...).
     pub stripe_webhook_secret: String,
-    /// Frontend URL used for checkout session redirect URLs.
-    /// Validated to be a valid `HeaderValue` at construction time so CORS never silently degrades.
     pub frontend_url: String,
-    /// Stripe price ID for the Pro plan.
     pub pro_price_id: String,
-    /// Stripe price ID for the Enterprise plan.
     pub enterprise_price_id: String,
 }
 
 impl PaymentConfig {
-    /// Loads configuration from environment variables.
-    ///
-    /// Required env vars:
-    /// - `STRIPE_SECRET_KEY`
-    /// - `STRIPE_WEBHOOK_SECRET`
-    /// - `STRIPE_PRO_PRICE_ID`
-    /// - `STRIPE_ENTERPRISE_PRICE_ID`
-    ///
-    /// Optional env vars (with defaults):
-    /// - `FRONTEND_URL` (default: `http://localhost:5173`)
     pub fn from_env() -> Result<Self, crate::error::PaymentError> {
         let stripe_secret_key = std::env::var("STRIPE_SECRET_KEY").map_err(|_| {
             crate::error::PaymentError::Config(
@@ -43,8 +26,6 @@ impl PaymentConfig {
         let frontend_url =
             std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
 
-        // Validate that the frontend URL is a valid HTTP header value so CORS
-        // configuration never silently falls back to a wrong origin.
         HeaderValue::from_str(&frontend_url).map_err(|e| {
             crate::error::PaymentError::Config(format!(
                 "FRONTEND_URL '{frontend_url}' is not a valid header value: {e}"
@@ -72,7 +53,6 @@ impl PaymentConfig {
         })
     }
 
-    /// Returns the set of price IDs that the checkout endpoint accepts.
     pub fn allowed_price_ids(&self) -> Vec<&str> {
         vec![&self.pro_price_id, &self.enterprise_price_id]
     }

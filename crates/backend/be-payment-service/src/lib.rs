@@ -1,9 +1,3 @@
-//! Eurora Payment Service
-//!
-//! Stripe-based payment service providing checkout sessions, billing portal,
-//! subscription management, and webhook handling. Deployed as HTTP routes
-//! within the monolith.
-
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -12,6 +6,7 @@ use axum::{
     extract::DefaultBodyLimit,
     routing::{get, post},
 };
+use be_remote_db::DatabaseManager;
 use tower::ServiceBuilder;
 use tower_governor::{
     GovernorLayer, governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor,
@@ -32,19 +27,7 @@ pub mod webhook;
 
 use service::AppState;
 
-/// Creates the payment service [`Router`].
-///
-/// # Security
-///
-/// All endpoints except `POST /payment/webhook` require a valid JWT access
-/// token in the `Authorization: Bearer <token>` header. The token is validated
-/// using the [`be_auth_core::JwtConfig`] that is injected as an axum extension.
-///
-/// `POST /payment/webhook` uses Stripe webhook signature verification instead.
-///
-/// `POST /payment/checkout` is additionally rate-limited to 10 requests per
-/// minute per IP to prevent abuse.
-pub fn create_router<H: webhook::WebhookEventHandler>(state: Arc<AppState<H>>) -> Router {
+pub fn create_router(state: Arc<AppState>) -> Router {
     // FRONTEND_URL is validated during PaymentConfig::from_env(), so this
     // parse cannot fail at runtime.
     let origin = state
@@ -59,9 +42,6 @@ pub fn create_router<H: webhook::WebhookEventHandler>(state: Arc<AppState<H>>) -
         .allow_headers(AllowHeaders::mirror_request())
         .allow_credentials(true);
 
-    // Rate limit: 10 requests per 60 seconds per client IP on checkout.
-    // SmartIpKeyExtractor checks X-Forwarded-For / X-Real-IP headers first,
-    // falling back to peer IP — works correctly behind a reverse proxy.
     let checkout_governor = GovernorConfigBuilder::default()
         .per_second(6)
         .burst_size(10)
@@ -71,12 +51,10 @@ pub fn create_router<H: webhook::WebhookEventHandler>(state: Arc<AppState<H>>) -
 
     let jwt_config = state.jwt_config.clone();
 
-    // Checkout route with rate limiting
     let checkout_route = Router::new()
         .route("/payment/checkout", post(handlers::create_checkout_session))
         .layer(GovernorLayer::new(Arc::new(checkout_governor)));
 
-    // Other authenticated routes (no extra rate limiting)
     let authed_routes = Router::new()
         .route("/payment/portal", post(handlers::create_portal_session))
         .route(
@@ -88,14 +66,13 @@ pub fn create_router<H: webhook::WebhookEventHandler>(state: Arc<AppState<H>>) -
             get(handlers::get_checkout_status),
         );
 
-    // Webhook route — no JWT auth, uses Stripe signature verification
     let webhook_route = Router::new().route("/payment/webhook", post(handlers::handle_webhook));
 
     checkout_route
         .merge(authed_routes)
         .merge(webhook_route)
         .layer(Extension(jwt_config))
-        .layer(DefaultBodyLimit::max(1024 * 1024)) // 1 MB
+        .layer(DefaultBodyLimit::max(1024 * 1024))
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
@@ -104,30 +81,10 @@ pub fn create_router<H: webhook::WebhookEventHandler>(state: Arc<AppState<H>>) -
         .with_state(state)
 }
 
-/// Initializes the payment service with the default logging-only webhook handler.
-///
-/// Reads configuration from environment variables (`STRIPE_SECRET_KEY`,
-/// `STRIPE_WEBHOOK_SECRET`, etc).
-pub fn init_payment_service() -> Result<Router> {
+pub fn init_payment_service(db: Arc<DatabaseManager>) -> Result<Router> {
     debug!("Initializing payment service");
 
-    let state = Arc::new(AppState::from_env().context("Failed to create payment service state")?);
-
-    Ok(create_router(state))
-}
-
-/// Initializes the payment service with a custom webhook event handler.
-///
-/// Use this to provide your own provisioning/revocation logic.
-pub fn init_payment_service_with_handler<H: webhook::WebhookEventHandler>(
-    webhook_handler: Arc<H>,
-) -> Result<Router> {
-    debug!("Initializing payment service with custom webhook handler");
-
-    let state = Arc::new(
-        AppState::from_env_with_handler(webhook_handler)
-            .context("Failed to create payment service state")?,
-    );
+    let state = Arc::new(AppState::from_env(db).context("Failed to create payment service state")?);
 
     Ok(create_router(state))
 }
@@ -138,4 +95,3 @@ pub use types::{
     CheckoutStatusResponse, CreateCheckoutRequest, CreateCheckoutResponse, CreatePortalResponse,
     SubscriptionStatus,
 };
-pub use webhook::{LoggingWebhookHandler, WebhookEventHandler};
