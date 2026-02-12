@@ -98,7 +98,7 @@ impl AuthApi for AuthApiImpl {
                     Ok(true)
                 }
                 Err(e) => {
-                    error!("Failed to initialize prompt kit service: {}", e);
+                    error!("Login by login token failed: {}", e);
 
                     Ok(false)
                 }
