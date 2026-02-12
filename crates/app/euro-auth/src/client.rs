@@ -1,4 +1,5 @@
 use anyhow::{Ok, Result, anyhow};
+use log::error;
 use proto_gen::auth::{
     EmailPasswordCredentials, GetLoginTokenResponse, LoginByLoginTokenRequest, LoginRequest,
     RefreshTokenRequest, RegisterRequest, TokenResponse, login_request::Credential,
@@ -6,7 +7,6 @@ use proto_gen::auth::{
 };
 use tokio::sync::watch;
 use tonic::transport::Channel;
-use tracing::error;
 
 #[derive(Debug, Clone)]
 pub struct AuthClient {

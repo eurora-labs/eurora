@@ -521,7 +521,7 @@ fn main() {
                                 let is_warning_or_above = metadata.level() <= log::Level::Warn;
                                 is_euro_crate || is_common_crate || is_webview || is_warning_or_above
                             })
-                            .level(log::LevelFilter::Trace)
+                            .level(log::LevelFilter::Debug)
                             // .target(Target::new(TargetKind::Stdout))
                             .with_colors(ColoredLevelConfig::default())
                             .build()
