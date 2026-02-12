@@ -13,4 +13,16 @@
 			<Card.Description>Access everything Eurora has to offer.</Card.Description>
 		</Card.Header>
 	</Card.Root>
+
+	<Card.Root
+		class="flex group cursor-pointer w-full"
+		onclick={() => goto('/onboarding/no-access/run-locally')}
+	>
+		<Card.Header class="pb-6 text-left">
+			<Card.Title class="mb-2 text-2xl font-semibold">Run Locally</Card.Title>
+			<Card.Description>
+				Use Eurora with your own local models without a subscription.
+			</Card.Description>
+		</Card.Header>
+	</Card.Root>
 </div>
