@@ -4,15 +4,7 @@ import { createTauRPCProxy as createProxy, type InferCommandOutput } from 'taurp
 type TAURI_CHANNEL<T> = (response: T) => void
 
 
-export type AppSettings = { 
-/**
- * General settings
- */
-general: GeneralSettings; 
-/**
- * Telemetry settings
- */
-telemetry: TelemetrySettings }
+export type AppSettings = { general: GeneralSettings; telemetry: TelemetrySettings; thirdParty: ThirdPartySettings }
 
 /**
  * Context chip for UI integration
@@ -21,11 +13,7 @@ export type ContextChip = { id: string; extension_id: string; name: string; attr
 
 export type ConversationView = { id: string | null; title: string }
 
-export type GeneralSettings = { 
-/**
- * Whether to start the app on autostart
- */
-autostart: boolean }
+export type GeneralSettings = { autostart: boolean }
 
 export type LoginToken = { code_challenge: string; expires_in: bigint; url: string }
 
@@ -35,40 +23,15 @@ export type Query = { text: string; assets: string[] }
 
 export type ResponseChunk = { chunk: string }
 
-export type TelemetrySettings = { considered: boolean; 
-/**
- * Anonymous metrics
- */
-anonymousMetrics: boolean; 
-/**
- * Anonymous error reporting
- */
-anonymousErrors: boolean; 
-/**
- * Non-anonymous metrics
- */
-nonAnonymousMetrics: boolean; 
-/**
- * Distinct ID, if non-anonymous metrics are enabled
- */
-distinctId: string | null }
+export type TelemetrySettings = { considered: boolean; anonymousMetrics: boolean; anonymousErrors: boolean; nonAnonymousMetrics: boolean; distinctId: string | null }
+
+export type ThirdPartySettings = { endpoint: string }
 
 export type TimelineAppEvent = { name: string; color: string | null; icon_base64: string | null }
 
-/**
- * Information about an available update
- */
-export type UpdateInfo = { 
-/**
- * The version string of the available update
- */
-version: string; 
-/**
- * Release notes or changelog for the update (if available)
- */
-body: string | null }
+export type UpdateInfo = { version: string; body: string | null }
 
-const ARGS_MAP = { 'auth':'{"get_login_token":[],"get_role":[],"is_authenticated":[],"poll_for_login":[]}', 'chat':'{"send_query":["conversation_id","channel","query"]}', 'context_chip':'{"get":[]}', 'conversation':'{"conversation_title_changed":["conversation"],"create":[],"create_empty_conversation":[],"current_conversation_changed":["conversation"],"get_messages":["conversation_id","limit","offset"],"list":["limit","offset"],"new_conversation_added":["conversation"],"switch_conversation":["conversation_id"]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"install_update":[],"list_activities":[],"quit":[],"request_accessibility_permission":[]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
+const ARGS_MAP = { 'auth':'{"get_login_token":[],"get_role":[],"is_authenticated":[],"poll_for_login":[]}', 'chat':'{"send_query":["conversation_id","channel","query"]}', 'context_chip':'{"get":[]}', 'conversation':'{"conversation_title_changed":["conversation"],"create":[],"create_empty_conversation":[],"current_conversation_changed":["conversation"],"get_messages":["conversation_id","limit","offset"],"list":["limit","offset"],"new_conversation_added":["conversation"],"switch_conversation":["conversation_id"]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"get_third_party_settings":[],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"],"set_third_party_settings":["third_party_settings"]}', 'system':'{"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"install_update":[],"list_activities":[],"quit":[],"request_accessibility_permission":[]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
 export type Router = { "auth": {get_login_token: () => Promise<LoginToken>, 
 get_role: () => Promise<string>, 
 is_authenticated: () => Promise<boolean>, 
@@ -93,8 +56,10 @@ switch_to_remote: (provider: string, apiKey: string, model: string) => Promise<n
 "settings": {get_all_settings: () => Promise<AppSettings>, 
 get_general_settings: () => Promise<GeneralSettings>, 
 get_telemetry_settings: () => Promise<TelemetrySettings>, 
+get_third_party_settings: () => Promise<ThirdPartySettings>, 
 set_general_settings: (generalSettings: GeneralSettings) => Promise<GeneralSettings>, 
-set_telemetry_settings: (telemetrySettings: TelemetrySettings) => Promise<TelemetrySettings>},
+set_telemetry_settings: (telemetrySettings: TelemetrySettings) => Promise<TelemetrySettings>, 
+set_third_party_settings: (thirdPartySettings: ThirdPartySettings) => Promise<ThirdPartySettings>},
 "system": {check_accessibility_permission: () => Promise<boolean>, 
 check_for_update: () => Promise<UpdateInfo | null>, 
 check_grpc_server_connection: (serverAddress: string | null) => Promise<string>, 

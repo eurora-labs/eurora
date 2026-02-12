@@ -11,18 +11,13 @@ use tracing::debug;
 
 use crate::AppSettings;
 
-/// A monitor for [`Settings`] on disk which will keep its internal state in sync with
-/// what's on disk.
-///
-/// It will also distribute the latest version of the application settings.
 #[derive(Clone)]
 pub struct SettingsWithDiskSync {
     config_path: PathBuf,
-    /// The source of truth for the application settings, as previously read from disk.
     snapshot: Arc<RwLock<AppSettings>>,
 }
 
-/// Allow changes to the most recent [`Settings`] and force them to be saved.
+/// Wrapper that asserts mutations are saved to disk before being dropped.
 pub(crate) struct SettingsEnforceSaveToDisk<'a> {
     config_path: &'a Path,
     snapshot: RwLockWriteGuard<'a, AppSettings>,
@@ -32,7 +27,7 @@ pub(crate) struct SettingsEnforceSaveToDisk<'a> {
 impl SettingsEnforceSaveToDisk<'_> {
     #[allow(dead_code)]
     pub fn save(&mut self) -> Result<()> {
-        // Mark as completed first so failure to save will not make us complain about not saving.
+        // Mark before save so a save failure doesn't trigger the Drop assertion
         self.saved = true;
         self.snapshot.save(self.config_path)?;
         Ok(())
@@ -65,10 +60,6 @@ impl Drop for SettingsEnforceSaveToDisk<'_> {
 pub(crate) const SETTINGS_FILE: &str = "settings.json";
 
 impl SettingsWithDiskSync {
-    /// Create a new instance without actually starting to [watch in the background](Self::watch_in_background()).
-    ///
-    /// * `config_dir` contains the application settings file.
-    /// * `subscriber` receives any change to it.
     #[allow(dead_code)]
     pub fn new(config_dir: impl AsRef<Path>) -> Result<Self> {
         let config_path = config_dir.as_ref().join(SETTINGS_FILE);
@@ -81,7 +72,6 @@ impl SettingsWithDiskSync {
         })
     }
 
-    /// Return a reference to the most recently loaded [`Settings`].
     #[allow(dead_code)]
     pub fn get(&self) -> Result<RwLockReadGuard<'_, AppSettings>> {
         self.snapshot
@@ -89,7 +79,6 @@ impl SettingsWithDiskSync {
             .map_err(|e| anyhow::anyhow!("Could not read settings: {:?}", e))
     }
 
-    /// Allow changes only from within this crate to implement all possible settings updates [here](crate::api).
     #[allow(dead_code)]
     pub(crate) fn get_mut_enforce_save(&self) -> Result<SettingsEnforceSaveToDisk<'_>> {
         self.snapshot
@@ -102,13 +91,11 @@ impl SettingsWithDiskSync {
             .map_err(|e| anyhow::anyhow!("Could not write settings: {:?}", e))
     }
 
-    /// The path from which application settings will be read from disk.
     #[allow(dead_code)]
     pub fn config_path(&self) -> &Path {
         &self.config_path
     }
 
-    /// Start watching [`Self::config_path()`] for changes and inform
     #[allow(dead_code)]
     pub fn watch_in_background(
         &mut self,

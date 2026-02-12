@@ -7,12 +7,9 @@ use tauri_plugin_updater::UpdaterExt;
 use tokio::sync::Mutex;
 use tracing::{debug, error};
 
-/// Information about an available update
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 pub struct UpdateInfo {
-    /// The version string of the available update
     pub version: String,
-    /// Release notes or changelog for the update (if available)
     pub body: Option<String>,
 }
 
@@ -51,7 +48,6 @@ impl SystemApi for SystemApiImpl {
 
         debug!("Checking connection to gRPC server: {}", address);
 
-        // Try to establish a basic TCP connection to check if the server is listening
         match tokio::net::TcpStream::connect(address.replace("http://", "").replace("https://", ""))
             .await
         {
@@ -73,11 +69,7 @@ impl SystemApi for SystemApiImpl {
     ) -> Result<Vec<ContextChip>, String> {
         let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle.state();
         let timeline = timeline_state.lock().await;
-
-        // Get all activities from the timeline
         let activities = timeline.get_context_chips().await;
-
-        // Limit to the 5 most recent activities to avoid cluttering the UI
         let limited_activities = activities.into_iter().take(5).collect::<Vec<ContextChip>>();
 
         Ok(limited_activities)
