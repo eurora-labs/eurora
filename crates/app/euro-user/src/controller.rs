@@ -12,9 +12,7 @@ pub struct Controller {
 
 impl Controller {
     pub async fn from_path(path: impl Into<PathBuf>) -> Result<Controller> {
-        let auth_manager = AuthManager::new()
-            .await
-            .context("Failed to create auth manager")?;
+        let auth_manager = AuthManager::new().await;
         Ok(Controller {
             auth_manager,
             storage: Storage::from_path(path),
@@ -42,7 +40,7 @@ impl Controller {
         self.storage.set(user).context("failed to set user")
     }
 
-    pub fn delete_user(&self) -> Result<()> {
+    pub fn delete_user(&mut self) -> Result<()> {
         self.storage.delete().context("failed to delete user")?;
         let namespace = secret::Namespace::Global;
         secret::delete(crate::ACCESS_TOKEN_HANDLE, namespace).ok();
@@ -51,35 +49,35 @@ impl Controller {
     }
 
     pub async fn login(
-        &self,
+        &mut self,
         login: impl Into<String>,
         password: impl Into<String>,
     ) -> Result<Sensitive<String>> {
         self.auth_manager.login(login, password).await
     }
 
-    pub async fn get_or_refresh_access_token(&self) -> Result<Sensitive<String>> {
+    pub async fn get_or_refresh_access_token(&mut self) -> Result<Sensitive<String>> {
         self.auth_manager.get_or_refresh_access_token().await
     }
 
-    pub fn get_access_token_payload(&self) -> Result<Claims> {
+    pub fn get_access_token_payload(&mut self) -> Result<Claims> {
         self.auth_manager.get_access_token_payload()
     }
 
-    pub fn get_refresh_token_payload(&self) -> Result<Claims> {
+    pub fn get_refresh_token_payload(&mut self) -> Result<Claims> {
         self.auth_manager.get_refresh_token_payload()
     }
 
-    pub async fn refresh_tokens(&self) -> Result<Sensitive<String>> {
+    pub async fn refresh_tokens(&mut self) -> Result<Sensitive<String>> {
         self.auth_manager.refresh_tokens().await
     }
 
-    pub async fn get_login_tokens(&self) -> Result<(String, String)> {
+    pub async fn get_login_tokens(&mut self) -> Result<(String, String)> {
         self.auth_manager.get_login_tokens().await
     }
 
     pub async fn login_by_login_token(
-        &self,
+        &mut self,
         login_token: impl Into<String>,
     ) -> Result<Sensitive<String>> {
         self.auth_manager

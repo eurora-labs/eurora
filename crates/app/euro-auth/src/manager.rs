@@ -25,20 +25,19 @@ pub const ACCESS_TOKEN_HANDLE: &str = "AUTH_ACCESS_TOKEN";
 pub const REFRESH_TOKEN_HANDLE: &str = "AUTH_REFRESH_TOKEN";
 
 impl AuthManager {
-    pub async fn new() -> Result<Self> {
-        let refresh_offset = std::env::var("JWT_REFRESH_OFFSET").unwrap_or("15".to_string());
-        Ok(Self {
-            auth_client: AuthClient::new().await?,
-            jwt_config: JwtConfig {
-                refresh_offset: refresh_offset
-                    .parse()
-                    .map_err(|_| anyhow!("Invalid JWT_REFRESH_OFFSET format"))?,
-            },
-        })
+    pub async fn new() -> Self {
+        let refresh_offset: i64 = std::env::var("JWT_REFRESH_OFFSET")
+            .unwrap_or("15".to_string())
+            .parse()
+            .unwrap_or(15);
+        Self {
+            auth_client: AuthClient::new().await,
+            jwt_config: JwtConfig { refresh_offset },
+        }
     }
 
     pub async fn login(
-        &self,
+        &mut self,
         login: impl Into<String>,
         password: impl Into<String>,
     ) -> Result<Sensitive<String>> {
@@ -73,7 +72,7 @@ impl AuthManager {
         Ok(token.claims)
     }
 
-    pub async fn get_or_refresh_access_token(&self) -> Result<Sensitive<String>> {
+    pub async fn get_or_refresh_access_token(&mut self) -> Result<Sensitive<String>> {
         // Check if token has expired or is close to expiration
         match self.get_access_token_payload() {
             Ok(claims) => {
@@ -102,7 +101,7 @@ impl AuthManager {
         }
     }
 
-    pub async fn refresh_tokens(&self) -> Result<Sensitive<String>> {
+    pub async fn refresh_tokens(&mut self) -> Result<Sensitive<String>> {
         let refresh_token = self.get_refresh_token()?;
 
         let response = self.auth_client.refresh_token(&refresh_token.0).await?;
@@ -129,7 +128,7 @@ impl AuthManager {
 
         Ok((code_verifier, code_challenge))
     }
-    pub async fn login_by_login_token(&self, login_token: String) -> Result<Sensitive<String>> {
+    pub async fn login_by_login_token(&mut self, login_token: String) -> Result<Sensitive<String>> {
         let response = self.auth_client.login_by_login_token(login_token).await?;
 
         // Store tokens securely

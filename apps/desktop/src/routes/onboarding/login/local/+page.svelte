@@ -9,7 +9,7 @@
   --name eurora-backend \\
   -p 8080:8080 \\
   ghcr.io/eurora-labs/eurora/be-monolith:latest \\
-  --LOCAL \\
+  --RUNNING_EURORA_FULLY_LOCAL=true
   --OLLAMA_MODEL=your_model \\
   --POSTGRESQL_URL=your_local_postgresql`;
 

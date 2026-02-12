@@ -35,7 +35,7 @@ impl AsyncInterceptor for AuthInterceptor {
         Pin<Box<dyn std::future::Future<Output = Result<Request<()>, Status>> + Send + 'static>>;
 
     fn call(&mut self, mut request: Request<()>) -> Self::Future {
-        let auth_manager = self.auth_manager.clone();
+        let mut auth_manager = self.auth_manager.clone();
 
         Box::pin(async move {
             // Get or refresh the access token
@@ -70,9 +70,7 @@ async fn build_authed_channel() -> AuthedChannel {
         .await
         .expect("Failed to build secure channel");
 
-    let auth_manager = AuthManager::new()
-        .await
-        .expect("Failed to create AuthManager");
+    let auth_manager = AuthManager::new().await;
 
     let interceptor = AuthInterceptor::new(auth_manager);
 

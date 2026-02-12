@@ -36,9 +36,8 @@ impl AuthApi for AuthApiImpl {
         self,
         app_handle: AppHandle<R>,
     ) -> Result<LoginToken, String> {
-        // Try to get auth manager from app state
         if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
-            let controller = user_state.lock().await;
+            let mut controller = user_state.lock().await;
             let (code_verifier, code_challenge) = controller
                 .get_login_tokens()
                 .await
@@ -71,7 +70,7 @@ impl AuthApi for AuthApiImpl {
 
     async fn poll_for_login<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
         if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
-            let controller = user_state.lock().await;
+            let mut controller = user_state.lock().await;
             let login_token = secret::retrieve(LOGIN_CODE_VERIFIER, secret::Namespace::Global)
                 .map_err(|e| format!("Failed to retrieve login token: {}", e))?
                 .ok_or_else(|| "Login token not found".to_string())?;
@@ -118,7 +117,7 @@ impl AuthApi for AuthApiImpl {
 
         for _ in 0..MAX_RETRIES {
             if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
-                let controller = user_state.lock().await;
+                let mut controller = user_state.lock().await;
                 return match controller.get_or_refresh_access_token().await {
                     Ok(token) => Ok(!token.is_empty()),
                     Err(e) => Err(format!("Failed to get or refresh access token: {}", e)),
@@ -132,7 +131,7 @@ impl AuthApi for AuthApiImpl {
 
     async fn get_role<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<String, String> {
         if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
-            let controller = user_state.lock().await;
+            let mut controller = user_state.lock().await;
             let claims = controller
                 .get_access_token_payload()
                 .map_err(|e| format!("Failed to get access token payload: {}", e))?;
