@@ -1,87 +1,87 @@
-/// Events dispatched by the webhook handler when Stripe notifies us of payment lifecycle changes.
-///
-/// Implement this trait to wire up provisioning (grant/revoke access, update DB records, etc).
-#[allow(unused_variables)]
-pub trait WebhookEventHandler: Send + Sync + 'static {
-    /// A checkout session was completed — the customer has paid.
-    ///
-    /// Use `customer_id` and `subscription_id` to link the Stripe subscription to
-    /// your internal user record and provision access.
-    fn on_checkout_completed(
-        &self,
-        customer_id: Option<String>,
-        subscription_id: Option<String>,
-        customer_email: Option<String>,
-    ) -> impl std::future::Future<Output = Result<(), crate::error::PaymentError>> + Send {
-        async { Ok(()) }
+use std::sync::Arc;
+
+use be_remote_db::DatabaseManager;
+use tracing::info;
+
+use crate::error::PaymentError;
+
+pub async fn on_checkout_completed(
+    db: &Arc<DatabaseManager>,
+    customer_id: Option<String>,
+    subscription_id: Option<String>,
+    customer_email: Option<String>,
+) -> Result<(), PaymentError> {
+    let customer_id =
+        customer_id.ok_or_else(|| PaymentError::MissingField("customer_id in checkout session"))?;
+
+    info!(
+        %customer_id,
+        ?subscription_id,
+        ?customer_email,
+        "Checkout completed — provisioning"
+    );
+
+    db.upsert_stripe_customer(&customer_id, customer_email.as_deref())
+        .await
+        .map_err(|e| anyhow::anyhow!("upsert stripe customer: {e}"))?;
+
+    if let Some(ref email) = customer_email
+        && let Ok(user) = db.get_user_by_email(email).await
+    {
+        db.ensure_account_for_user(user.id, &customer_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("ensure account: {e}"))?;
     }
 
-    /// A subscription was updated (e.g. plan change, renewal, payment failure recovery).
-    fn on_subscription_updated(
-        &self,
-        subscription_id: String,
-        customer_id: Option<String>,
-        status: String,
-    ) -> impl std::future::Future<Output = Result<(), crate::error::PaymentError>> + Send {
-        async { Ok(()) }
+    if let Some(ref sub_id) = subscription_id {
+        db.upsert_stripe_subscription(sub_id, &customer_id, "active")
+            .await
+            .map_err(|e| anyhow::anyhow!("upsert subscription: {e}"))?;
     }
 
-    /// A subscription was deleted/cancelled — revoke the customer's access.
-    fn on_subscription_deleted(
-        &self,
-        subscription_id: String,
-        customer_id: Option<String>,
-    ) -> impl std::future::Future<Output = Result<(), crate::error::PaymentError>> + Send {
-        async { Ok(()) }
-    }
+    Ok(())
 }
 
-/// Default handler that logs webhook events without taking any action.
-///
-/// Used when no custom handler is provided.
-pub struct LoggingWebhookHandler;
+pub async fn on_subscription_updated(
+    db: &Arc<DatabaseManager>,
+    subscription_id: String,
+    customer_id: Option<String>,
+    status: String,
+) -> Result<(), PaymentError> {
+    info!(
+        %subscription_id,
+        ?customer_id,
+        %status,
+        "Subscription updated — syncing status"
+    );
 
-impl WebhookEventHandler for LoggingWebhookHandler {
-    async fn on_checkout_completed(
-        &self,
-        customer_id: Option<String>,
-        subscription_id: Option<String>,
-        customer_email: Option<String>,
-    ) -> Result<(), crate::error::PaymentError> {
-        tracing::info!(
-            ?customer_id,
-            ?subscription_id,
-            ?customer_email,
-            "Checkout completed (no-op handler)"
-        );
-        Ok(())
+    if let Some(ref cust_id) = customer_id {
+        db.upsert_stripe_subscription(&subscription_id, cust_id, &status)
+            .await
+            .map_err(|e| anyhow::anyhow!("upsert subscription: {e}"))?;
+    } else {
+        db.update_stripe_subscription_status(&subscription_id, &status)
+            .await
+            .map_err(|e| anyhow::anyhow!("update subscription status: {e}"))?;
     }
 
-    async fn on_subscription_updated(
-        &self,
-        subscription_id: String,
-        customer_id: Option<String>,
-        status: String,
-    ) -> Result<(), crate::error::PaymentError> {
-        tracing::info!(
-            %subscription_id,
-            ?customer_id,
-            %status,
-            "Subscription updated (no-op handler)"
-        );
-        Ok(())
-    }
+    Ok(())
+}
 
-    async fn on_subscription_deleted(
-        &self,
-        subscription_id: String,
-        customer_id: Option<String>,
-    ) -> Result<(), crate::error::PaymentError> {
-        tracing::info!(
-            %subscription_id,
-            ?customer_id,
-            "Subscription deleted (no-op handler)"
-        );
-        Ok(())
-    }
+pub async fn on_subscription_deleted(
+    db: &Arc<DatabaseManager>,
+    subscription_id: String,
+    customer_id: Option<String>,
+) -> Result<(), PaymentError> {
+    info!(
+        %subscription_id,
+        ?customer_id,
+        "Subscription deleted — revoking"
+    );
+
+    db.update_stripe_subscription_status(&subscription_id, "canceled")
+        .await
+        .map_err(|e| anyhow::anyhow!("update subscription status: {e}"))?;
+
+    Ok(())
 }

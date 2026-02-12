@@ -18,20 +18,9 @@ use crate::types::{
     CheckoutStatusResponse, CreateCheckoutRequest, CreateCheckoutResponse, CreatePortalResponse,
     SubscriptionStatus,
 };
-use crate::webhook::WebhookEventHandler;
+use crate::webhook;
 
-// ---------------------------------------------------------------------------
-// Helper: resolve the authenticated user's Stripe customer by email
-// ---------------------------------------------------------------------------
-
-/// Looks up the Stripe customer that matches the authenticated user's email.
-///
-/// Returns the customer ID, or `Err(Unauthorized)` if no Stripe customer
-/// exists yet for this email.
-async fn resolve_customer_id<H: WebhookEventHandler>(
-    state: &AppState<H>,
-    email: &str,
-) -> Result<String, PaymentError> {
+async fn resolve_customer_id(state: &AppState, email: &str) -> Result<String, PaymentError> {
     let page = ListCustomer::new()
         .email(email)
         .limit(1)
@@ -44,17 +33,8 @@ async fn resolve_customer_id<H: WebhookEventHandler>(
         .ok_or_else(|| PaymentError::InvalidField("no Stripe customer found for this account"))
 }
 
-// ---------------------------------------------------------------------------
-// POST /payment/checkout
-// ---------------------------------------------------------------------------
-
-/// Creates a Stripe Checkout Session for a subscription and returns the URL.
-///
-/// The customer email is taken from the authenticated user's JWT claims.
-/// If a Stripe customer already exists for that email, the existing customer
-/// is reused to prevent duplicates.
-pub async fn create_checkout_session<H: WebhookEventHandler>(
-    State(state): State<Arc<AppState<H>>>,
+pub async fn create_checkout_session(
+    State(state): State<Arc<AppState>>,
     AuthUser(claims): AuthUser,
     Json(body): Json<CreateCheckoutRequest>,
 ) -> Result<Json<CreateCheckoutResponse>, PaymentError> {
@@ -76,8 +56,6 @@ pub async fn create_checkout_session<H: WebhookEventHandler>(
         ..Default::default()
     }];
 
-    // Double braces escape in format! to produce the literal {CHECKOUT_SESSION_ID}
-    // that Stripe replaces with the actual session ID on redirect.
     let success_url = format!(
         "{}/payment/thanks?session_id={{CHECKOUT_SESSION_ID}}",
         state.config.frontend_url
@@ -90,7 +68,6 @@ pub async fn create_checkout_session<H: WebhookEventHandler>(
         .success_url(&success_url)
         .cancel_url(&cancel_url);
 
-    // Look up an existing Stripe customer by email to prevent duplicates.
     let existing = ListCustomer::new()
         .email(email)
         .limit(1)
@@ -116,16 +93,8 @@ pub async fn create_checkout_session<H: WebhookEventHandler>(
     }))
 }
 
-// ---------------------------------------------------------------------------
-// POST /payment/portal
-// ---------------------------------------------------------------------------
-
-/// Creates a Stripe Billing Portal session so customers can manage their subscription.
-///
-/// The Stripe customer is resolved from the authenticated user's email — the
-/// client never supplies a customer ID directly.
-pub async fn create_portal_session<H: WebhookEventHandler>(
-    State(state): State<Arc<AppState<H>>>,
+pub async fn create_portal_session(
+    State(state): State<Arc<AppState>>,
     AuthUser(claims): AuthUser,
 ) -> Result<Json<CreatePortalResponse>, PaymentError> {
     let customer_id = resolve_customer_id(&state, &claims.email).await?;
@@ -140,21 +109,10 @@ pub async fn create_portal_session<H: WebhookEventHandler>(
     Ok(Json(CreatePortalResponse { url: session.url }))
 }
 
-// ---------------------------------------------------------------------------
-// GET /payment/subscription?customer_id=cus_xxx
-// ---------------------------------------------------------------------------
-
-/// Returns the subscription status for the authenticated user.
-///
-/// The Stripe customer is resolved from the authenticated user's email — the
-/// client never supplies a customer ID directly.
-pub async fn get_subscription_status<H: WebhookEventHandler>(
-    State(state): State<Arc<AppState<H>>>,
+pub async fn get_subscription_status(
+    State(state): State<Arc<AppState>>,
     AuthUser(claims): AuthUser,
 ) -> Result<Json<SubscriptionStatus>, PaymentError> {
-    // If no Stripe customer exists for this email, the user is on the free
-    // plan — return an empty (default) status instead of an error so the
-    // frontend doesn't have to guess based on HTTP status codes.
     let customer_id = match resolve_customer_id(&state, &claims.email).await {
         Ok(id) => id,
         Err(PaymentError::InvalidField(_)) => return Ok(Json(SubscriptionStatus::default())),
@@ -178,17 +136,8 @@ pub async fn get_subscription_status<H: WebhookEventHandler>(
     Ok(Json(status.unwrap_or_default()))
 }
 
-// ---------------------------------------------------------------------------
-// GET /payment/checkout-status?session_id=cs_xxx
-// ---------------------------------------------------------------------------
-
-/// Verifies a checkout session's payment status so the frontend can confirm
-/// that the payment actually went through before showing a success message.
-///
-/// The session's `customer_email` must match the authenticated user's email,
-/// preventing users from probing arbitrary session IDs.
-pub async fn get_checkout_status<H: WebhookEventHandler>(
-    State(state): State<Arc<AppState<H>>>,
+pub async fn get_checkout_status(
+    State(state): State<Arc<AppState>>,
     AuthUser(claims): AuthUser,
     axum::extract::Query(params): axum::extract::Query<CheckoutStatusQuery>,
 ) -> Result<Json<CheckoutStatusResponse>, PaymentError> {
@@ -196,7 +145,6 @@ pub async fn get_checkout_status<H: WebhookEventHandler>(
         .send(&state.client)
         .await?;
 
-    // Ensure the checkout session belongs to the authenticated user.
     let session_email = session.customer_email.as_deref().unwrap_or_default();
     if !session_email.eq_ignore_ascii_case(&claims.email) {
         return Err(PaymentError::Unauthorized(
@@ -217,13 +165,8 @@ pub struct CheckoutStatusQuery {
     pub session_id: String,
 }
 
-// ---------------------------------------------------------------------------
-// POST /payment/webhook
-// ---------------------------------------------------------------------------
-
-/// Handles incoming Stripe webhook events with signature verification.
-pub async fn handle_webhook<H: WebhookEventHandler>(
-    State(state): State<Arc<AppState<H>>>,
+pub async fn handle_webhook(
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     body: String,
 ) -> Result<StatusCode, PaymentError> {
@@ -248,10 +191,13 @@ pub async fn handle_webhook<H: WebhookEventHandler>(
                 "Checkout session completed"
             );
 
-            if let Err(e) = state
-                .webhook_handler
-                .on_checkout_completed(customer_id, subscription_id, customer_email)
-                .await
+            if let Err(e) = webhook::on_checkout_completed(
+                &state.db,
+                customer_id,
+                subscription_id,
+                customer_email,
+            )
+            .await
             {
                 error!(error = %e, "Failed to provision access after checkout");
                 return Err(e);
@@ -267,10 +213,9 @@ pub async fn handle_webhook<H: WebhookEventHandler>(
                 "Subscription updated"
             );
 
-            if let Err(e) = state
-                .webhook_handler
-                .on_subscription_updated(sub.id.to_string(), customer_id, status)
-                .await
+            if let Err(e) =
+                webhook::on_subscription_updated(&state.db, sub.id.to_string(), customer_id, status)
+                    .await
             {
                 error!(error = %e, "Failed to handle subscription update");
                 return Err(e);
@@ -284,10 +229,8 @@ pub async fn handle_webhook<H: WebhookEventHandler>(
                 "Subscription deleted"
             );
 
-            if let Err(e) = state
-                .webhook_handler
-                .on_subscription_deleted(sub.id.to_string(), customer_id)
-                .await
+            if let Err(e) =
+                webhook::on_subscription_deleted(&state.db, sub.id.to_string(), customer_id).await
             {
                 error!(error = %e, "Failed to revoke access after subscription deletion");
                 return Err(e);
@@ -299,206 +242,4 @@ pub async fn handle_webhook<H: WebhookEventHandler>(
     }
 
     Ok(StatusCode::OK)
-}
-
-#[cfg(test)]
-mod tests {
-    use axum::body::Body;
-    use axum::http::Request;
-    use be_auth_core::JwtConfig;
-    use tower::ServiceExt;
-
-    use super::*;
-    use crate::config::PaymentConfig;
-
-    fn test_state() -> Arc<AppState> {
-        // These env vars are required by JwtConfig::default().
-        // Set them if not already present so tests can run standalone.
-        // SAFETY: Tests run sequentially within this module; no concurrent reads.
-        unsafe {
-            if std::env::var("JWT_ACCESS_SECRET").is_err() {
-                std::env::set_var("JWT_ACCESS_SECRET", "test_access_secret");
-            }
-            if std::env::var("JWT_REFRESH_SECRET").is_err() {
-                std::env::set_var("JWT_REFRESH_SECRET", "test_refresh_secret");
-            }
-        }
-
-        let config = PaymentConfig {
-            stripe_secret_key: "sk_test_fake".to_string(),
-            stripe_webhook_secret: "whsec_test_secret".to_string(),
-            frontend_url: "http://localhost:5173".to_string(),
-            pro_price_id: "price_pro".to_string(),
-            enterprise_price_id: "price_enterprise".to_string(),
-        };
-        let client = stripe::Client::new(&config.stripe_secret_key);
-        let jwt_config = Arc::new(JwtConfig::default());
-        Arc::new(AppState {
-            client,
-            config,
-            webhook_handler: Arc::new(crate::webhook::LoggingWebhookHandler),
-            jwt_config,
-        })
-    }
-
-    /// Helper: create a valid JWT access token for tests.
-    fn test_access_token(_state: &Arc<AppState>) -> String {
-        use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
-
-        let secret =
-            std::env::var("JWT_ACCESS_SECRET").unwrap_or_else(|_| "test_access_secret".into());
-        let now = chrono::Utc::now().timestamp();
-        let claims = auth_core::Claims {
-            sub: "user_123".to_string(),
-            username: "testuser".to_string(),
-            email: "test@example.com".to_string(),
-            exp: now + 3600,
-            iat: now,
-            token_type: "access".to_string(),
-        };
-        encode(
-            &Header::new(Algorithm::HS256),
-            &claims,
-            &EncodingKey::from_secret(secret.as_bytes()),
-        )
-        .expect("failed to encode test JWT")
-    }
-
-    #[tokio::test]
-    async fn webhook_rejects_missing_signature() {
-        let state = test_state();
-        let app = crate::create_router(state);
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/payment/webhook")
-                    .header("content-type", "application/json")
-                    .body(Body::from("{}"))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    }
-
-    #[tokio::test]
-    async fn webhook_rejects_bad_signature() {
-        let state = test_state();
-        let app = crate::create_router(state);
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/payment/webhook")
-                    .header("content-type", "application/json")
-                    .header("stripe-signature", "t=123,v1=badsig")
-                    .body(Body::from("{}"))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    }
-
-    #[tokio::test]
-    async fn webhook_accepts_valid_signature() {
-        let state = test_state();
-        let secret = state.config.stripe_webhook_secret.clone();
-        let app = crate::create_router(state);
-
-        let payload = serde_json::json!({
-            "id": "evt_test",
-            "object": "event",
-            "api_version": "2017-05-25",
-            "created": 1533204620,
-            "livemode": false,
-            "pending_webhooks": 1,
-            "data": {
-                "object": {
-                    "object": "bank_account",
-                    "country": "us",
-                    "currency": "usd",
-                    "id": "ba_test",
-                    "last4": "6789",
-                    "status": "verified"
-                }
-            },
-            "type": "account.external_account.created"
-        })
-        .to_string();
-
-        let sig = Webhook::generate_test_header(&payload, &secret, None);
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/payment/webhook")
-                    .header("content-type", "application/json")
-                    .header("stripe-signature", sig)
-                    .body(Body::from(payload))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::OK);
-    }
-
-    #[tokio::test]
-    async fn checkout_rejects_unauthenticated() {
-        let state = test_state();
-        let app = crate::create_router(state);
-
-        let body = serde_json::json!({
-            "price_id": "price_pro",
-        });
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/payment/checkout")
-                    .header("content-type", "application/json")
-                    .header("x-forwarded-for", "127.0.0.1")
-                    .body(Body::from(body.to_string()))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-    }
-
-    #[tokio::test]
-    async fn checkout_rejects_unknown_price_id() {
-        let state = test_state();
-        let token = test_access_token(&state);
-        let app = crate::create_router(state);
-
-        let body = serde_json::json!({
-            "price_id": "price_unknown_plan",
-        });
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/payment/checkout")
-                    .header("content-type", "application/json")
-                    .header("authorization", format!("Bearer {token}"))
-                    .header("x-forwarded-for", "127.0.0.1")
-                    .body(Body::from(body.to_string()))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    }
 }

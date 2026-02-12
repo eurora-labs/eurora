@@ -104,7 +104,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Initialize payment service
-    let payment_router = match init_payment_service() {
+    let payment_router = match init_payment_service(db_manager.clone()) {
         Ok(router) => router,
         Err(e) => {
             error!("Failed to initialize payment service: {}", e);

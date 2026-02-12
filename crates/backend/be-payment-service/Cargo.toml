@@ -50,10 +50,9 @@ async-stripe-webhook = { version = "1.0.0-rc.1", features = [
 auth-core = { workspace = true }
 axum = { version = "0.8.8", features = ["macros"] }
 be-auth-core = { workspace = true }
+be-remote-db = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tower = { workspace = true }
 tower_governor = "0.8"
 tower-http = { version = "0.6.8", features = ["cors", "trace"] }

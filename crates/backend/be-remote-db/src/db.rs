@@ -1,6 +1,6 @@
 use crate::{
     GetConversation, MessageType, PaginationParams,
-    error::DbResult,
+    error::{DbError, DbResult},
     types::{
         Activity, ActivityAsset, Asset, AssetStatus, Conversation, CreateLoginToken,
         CreateOAuthCredentials, CreateOAuthState, CreateRefreshToken, GetActivitiesByTimeRange,
@@ -975,5 +975,146 @@ impl DatabaseManager {
         };
 
         Ok(messages)
+    }
+
+    // =========================================================================
+    // Stripe Billing Methods
+    // =========================================================================
+
+    /// Upsert a Stripe customer record, optionally linking it to an app user by email.
+    ///
+    /// If `email` is provided and a matching user exists, `app_user_id` is set.
+    /// On conflict (existing customer_id), email and app_user_id are updated.
+    pub async fn upsert_stripe_customer(
+        &self,
+        customer_id: &str,
+        email: Option<&str>,
+    ) -> DbResult<()> {
+        let now = Utc::now();
+
+        // Resolve app_user_id from email if possible
+        let app_user_id: Option<Uuid> = if let Some(email) = email {
+            sqlx::query_scalar("SELECT id FROM users WHERE email = $1")
+                .bind(email)
+                .fetch_optional(&self.pool)
+                .await?
+        } else {
+            None
+        };
+
+        sqlx::query(
+            r#"
+            INSERT INTO stripe.customers (id, app_user_id, email, created_at, updated_at, raw_data)
+            VALUES ($1, $2, $3, $4, $5, '{}'::jsonb)
+            ON CONFLICT (id) DO UPDATE
+            SET email = COALESCE(EXCLUDED.email, stripe.customers.email),
+                app_user_id = COALESCE(EXCLUDED.app_user_id, stripe.customers.app_user_id),
+                updated_at = EXCLUDED.updated_at
+            "#,
+        )
+        .bind(customer_id)
+        .bind(app_user_id)
+        .bind(email)
+        .bind(now)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Ensure an application account exists for the given user, linked to a Stripe customer.
+    ///
+    /// If an account already exists for this user, the Stripe customer link is updated.
+    /// Returns the account ID.
+    pub async fn ensure_account_for_user(
+        &self,
+        user_id: Uuid,
+        stripe_customer_id: &str,
+    ) -> DbResult<Uuid> {
+        let now = Utc::now();
+
+        let account_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO accounts (owner_user_id, name, stripe_customer_id, created_at, updated_at)
+            SELECT $1, u.username, $2, $3, $4
+            FROM users u WHERE u.id = $1
+            ON CONFLICT (stripe_customer_id) DO UPDATE
+            SET updated_at = EXCLUDED.updated_at
+            RETURNING id
+            "#,
+        )
+        .bind(user_id)
+        .bind(stripe_customer_id)
+        .bind(now)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(account_id)
+    }
+
+    /// Upsert a Stripe subscription record.
+    ///
+    /// Inserts a minimal subscription row on checkout completion. On conflict,
+    /// updates the status and customer linkage.
+    pub async fn upsert_stripe_subscription(
+        &self,
+        subscription_id: &str,
+        customer_id: &str,
+        status: &str,
+    ) -> DbResult<()> {
+        let now = Utc::now();
+
+        sqlx::query(
+            r#"
+            INSERT INTO stripe.subscriptions (
+                id, customer_id, status,
+                cancel_at_period_end,
+                current_period_start, current_period_end,
+                created_at, updated_at, raw_data
+            )
+            VALUES ($1, $2, $3::stripe.subscription_status, false, $4, $4, $5, $6, '{}'::jsonb)
+            ON CONFLICT (id) DO UPDATE
+            SET status = $3::stripe.subscription_status,
+                customer_id = EXCLUDED.customer_id,
+                updated_at = EXCLUDED.updated_at
+            "#,
+        )
+        .bind(subscription_id)
+        .bind(customer_id)
+        .bind(status)
+        .bind(now)
+        .bind(now)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Update the status of an existing Stripe subscription.
+    pub async fn update_stripe_subscription_status(
+        &self,
+        subscription_id: &str,
+        status: &str,
+    ) -> DbResult<()> {
+        let result = sqlx::query(
+            r#"
+            UPDATE stripe.subscriptions
+            SET status = $2::stripe.subscription_status
+            WHERE id = $1
+            "#,
+        )
+        .bind(subscription_id)
+        .bind(status)
+        .execute(&self.pool)
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(DbError::not_found_with_id("subscription", subscription_id));
+        }
+
+        Ok(())
     }
 }
