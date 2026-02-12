@@ -3,7 +3,7 @@
 use agent_chain::SystemMessage;
 use agent_chain::openai::BuiltinTool;
 use agent_chain::{BaseChatModel, BaseMessage, HumanMessage, openai::ChatOpenAI};
-use be_auth_grpc::{extract_claims, parse_user_id};
+use be_auth_grpc::{Role, extract_claims, parse_user_id, require_role};
 use be_remote_db::{
     DatabaseManager, GetConversation, ListConversations, MessageType, NewConversation,
     PaginationParams,
@@ -97,6 +97,7 @@ impl ProtoConversationService for ConversationService {
         info!("CreateConversation request received");
 
         let claims = extract_claims(&request)?;
+        require_role(claims, Role::Tier1)?;
         let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
@@ -168,6 +169,7 @@ impl ProtoConversationService for ConversationService {
         info!("AddHumanMessage request received");
 
         let claims = extract_claims(&request)?;
+        require_role(claims, Role::Tier1)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
@@ -223,6 +225,7 @@ impl ProtoConversationService for ConversationService {
         info!("AddHiddenHumanMessage request received");
 
         let claims = extract_claims(&request)?;
+        require_role(claims, Role::Tier1)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
@@ -279,6 +282,7 @@ impl ProtoConversationService for ConversationService {
         info!("AddSystemMessage request received");
 
         let claims = extract_claims(&request)?;
+        require_role(claims, Role::Tier1)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
@@ -334,6 +338,7 @@ impl ProtoConversationService for ConversationService {
         info!("ChatStream request received");
 
         let claims = extract_claims(&request)?;
+        require_role(claims, Role::Tier1)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
@@ -512,6 +517,7 @@ impl ProtoConversationService for ConversationService {
     ) -> Result<Response<GenerateConversationTitleResponse>, Status> {
         info!("Generate conversation title request received");
         let claims = extract_claims(&request)?;
+        require_role(claims, Role::Tier1)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 

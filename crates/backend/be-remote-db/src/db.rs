@@ -1009,6 +1009,22 @@ impl DatabaseManager {
         Ok(())
     }
 
+    pub async fn get_billing_state_for_user(
+        &self,
+        user_id: Uuid,
+    ) -> DbResult<Option<crate::AccountBillingState>> {
+        let result = sqlx::query_as::<_, crate::AccountBillingState>(
+            "SELECT abs.*
+             FROM account_billing_state abs
+             JOIN accounts a ON a.id = abs.account_id
+             WHERE a.owner_user_id = $1",
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(result)
+    }
+
     /// Upsert a Stripe customer record, linking it to an app user by email.
     ///
     /// If `email` is provided and a matching user exists, `app_user_id` is set.

@@ -11,7 +11,7 @@ use openidconnect::{Nonce, PkceCodeChallenge, PkceCodeVerifier};
 use std::sync::Arc;
 use tokio::sync::OnceCell;
 // Re-export shared types for convenience
-pub use auth_core::Claims;
+pub use auth_core::{Claims, Role};
 use be_auth_grpc::JwtConfig;
 use be_remote_db::{
     CreateLoginToken, CreateOAuthCredentials, CreateOAuthState, CreateRefreshToken,
@@ -156,12 +156,24 @@ impl AuthService {
         hasher.finalize().to_vec()
     }
 
-    /// Generate JWT tokens (access and refresh)
+    async fn resolve_role(&self, user_id: Uuid) -> Role {
+        match self.db.get_billing_state_for_user(user_id).await {
+            Ok(Some(state)) if matches!(state.status.as_deref(), Some("active" | "trialing")) => {
+                match state.plan_id.as_deref() {
+                    Some("enterprise") => Role::Enterprise,
+                    _ => Role::Tier1,
+                }
+            }
+            _ => Role::Free,
+        }
+    }
+
     async fn generate_tokens(
         &self,
         user_id: &str,
         username: &str,
         email: &str,
+        role: Role,
     ) -> Result<(String, String)> {
         let now = Utc::now();
         let access_exp = now + Duration::hours(self.jwt_config.access_token_expiry_hours);
@@ -175,6 +187,7 @@ impl AuthService {
             exp: access_exp.timestamp(),
             iat: now.timestamp(),
             token_type: "access".to_string(),
+            role: role.clone(),
         };
 
         // Refresh token claims
@@ -185,6 +198,7 @@ impl AuthService {
             exp: refresh_exp.timestamp(),
             iat: now.timestamp(),
             token_type: "refresh".to_string(),
+            role,
         };
 
         let header = Header::new(Algorithm::HS256);
@@ -325,9 +339,13 @@ impl AuthService {
             .await
             .map_err(|e| anyhow!("Failed to create user: {}", e))?;
 
-        // Generate tokens
         let (access_token, refresh_token) = self
-            .generate_tokens(&user.id.to_string(), &user.username, &user.email)
+            .generate_tokens(
+                &user.id.to_string(),
+                &user.username,
+                &user.email,
+                Role::Free,
+            )
             .await?;
 
         Ok(TokenResponse {
@@ -362,9 +380,9 @@ impl AuthService {
             .await
             .map_err(|e| anyhow!("Failed to revoke old refresh token: {}", e))?;
 
-        // Generate new tokens
+        let role = self.resolve_role(user.id).await;
         let (access_token, new_refresh_token) = self
-            .generate_tokens(&user.id.to_string(), &user.username, &user.email)
+            .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
             .await?;
 
         Ok(TokenResponse {
@@ -603,9 +621,9 @@ impl AuthService {
                 .await;
         }
 
-        // Generate JWT tokens
+        let role = self.resolve_role(user.id).await;
         let (access_token, refresh_token) = self
-            .generate_tokens(&user.id.to_string(), &user.username, &user.email)
+            .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
             .await
             .map_err(|e| {
                 error!("Failed to generate tokens: {}", e);
@@ -862,9 +880,9 @@ impl ProtoAuthService for AuthService {
             return Err(Status::internal("Failed to process login token"));
         }
 
-        // Generate JWT tokens for the user
+        let role = self.resolve_role(user.id).await;
         let (access_token, refresh_token) = match self
-            .generate_tokens(&user.id.to_string(), &user.username, &user.email)
+            .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
             .await
         {
             Ok(tokens) => tokens,
@@ -938,9 +956,9 @@ impl AuthService {
             return Err(Status::unauthenticated("Invalid credentials"));
         }
 
-        // Generate tokens
+        let role = self.resolve_role(user.id).await;
         let (access_token, refresh_token) = match self
-            .generate_tokens(&user.id.to_string(), &user.username, &user.email)
+            .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
             .await
         {
             Ok(tokens) => tokens,

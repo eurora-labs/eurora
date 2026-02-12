@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use be_asset::AssetService as CoreAssetService;
-use be_auth_grpc::{extract_claims, parse_user_id};
+use be_auth_grpc::{Role, extract_claims, parse_user_id, require_role};
 use be_remote_db::DatabaseManager;
 use be_storage::StorageService;
 use tonic::{Request, Response, Status};
@@ -49,6 +49,7 @@ impl ProtoAssetService for AssetService {
         info!("CreateAsset request received");
 
         let claims = extract_claims(&request)?;
+        require_role(claims, Role::Tier1)?;
         let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();

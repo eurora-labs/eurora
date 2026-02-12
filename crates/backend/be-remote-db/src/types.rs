@@ -499,3 +499,21 @@ pub struct ActivityConversation {
     pub conversation_id: Uuid,
     pub created_at: DateTime<Utc>,
 }
+
+// =============================================================================
+// Billing Types
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct AccountBillingState {
+    pub account_id: Uuid,
+    pub stripe_subscription_id: Option<String>,
+    pub status: Option<String>,
+    pub current_period_start: Option<DateTime<Utc>>,
+    pub current_period_end: Option<DateTime<Utc>>,
+    pub cancel_at_period_end: Option<bool>,
+    pub plan_id: Option<String>,
+    pub plan_name: Option<String>,
+    pub max_users: Option<i32>,
+    pub max_projects: Option<i32>,
+}
