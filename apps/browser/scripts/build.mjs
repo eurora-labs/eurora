@@ -1,4 +1,4 @@
-/* eslint-disable no-console, @typescript-eslint/no-unused-vars, @typescript-eslint/ban-ts-comment */
+/* eslint-disable no-console, @typescript-eslint/ban-ts-comment */
 import { writeManifest } from '../manifest/targets.js';
 import { backgroundConfig } from '../vite/presets/background.js';
 import { contentConfig } from '../vite/presets/content.js';

@@ -1,5 +1,5 @@
+import { auth, accessToken } from '$lib/stores/auth.js';
 import { writable, derived, get } from 'svelte/store';
-import { auth, accessToken } from './auth.js';
 
 const PAYMENT_API_URL = import.meta.env.VITE_PAYMENT_API_URL;
 
@@ -69,7 +69,7 @@ export const subscriptionStore = {
 
 	/** Force a re-fetch (e.g. after returning from Stripe portal). */
 	async refresh() {
-		return this.fetch(true);
+		return await this.fetch(true);
 	},
 
 	/** Reset the store (e.g. on logout). */

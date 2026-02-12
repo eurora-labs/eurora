@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { auth, isAuthenticated, currentUser, accessToken } from '$lib/stores/auth.js';
+	import { auth, isAuthenticated, accessToken } from '$lib/stores/auth.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import CheckIcon from '@lucide/svelte/icons/check';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import XIcon from '@lucide/svelte/icons/x';
-	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 
 	const PAYMENT_API_URL = import.meta.env.VITE_PAYMENT_API_URL;
 	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID;

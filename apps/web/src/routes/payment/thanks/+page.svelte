@@ -1,13 +1,12 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
 	import { auth, accessToken } from '$lib/stores/auth.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import CheckIcon from '@lucide/svelte/icons/circle-check';
 	import XCircleIcon from '@lucide/svelte/icons/circle-x';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import { onMount } from 'svelte';
 
 	const PAYMENT_API_URL = import.meta.env.VITE_PAYMENT_API_URL;
 

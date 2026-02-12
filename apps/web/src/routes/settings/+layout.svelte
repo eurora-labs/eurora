@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { currentUser, isAuthenticated } from '$lib/stores/auth.js';
 	import { subscriptionStore, subscription } from '$lib/stores/subscription.js';
@@ -11,6 +10,7 @@
 	import CreditCardIcon from '@lucide/svelte/icons/credit-card';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import PenLineIcon from '@lucide/svelte/icons/pen-line';
+	import { onMount } from 'svelte';
 
 	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID;
 

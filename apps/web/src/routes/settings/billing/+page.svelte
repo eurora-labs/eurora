@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { auth, accessToken, isAuthenticated } from '$lib/stores/auth.js';
 	import {
@@ -11,9 +10,10 @@
 	import { Badge } from '@eurora/ui/components/badge/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
-	import Loader2Icon from '@lucide/svelte/icons/loader-2';
-	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import AlertCircleIcon from '@lucide/svelte/icons/alert-circle';
+	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import { onMount } from 'svelte';
 
 	const PAYMENT_API_URL = import.meta.env.VITE_PAYMENT_API_URL;
 	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID;
