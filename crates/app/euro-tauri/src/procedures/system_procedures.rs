@@ -1,3 +1,6 @@
+use std::net::TcpListener;
+use std::path::PathBuf;
+
 use euro_activity::ContextChip;
 use euro_timeline::TimelineManager;
 use serde::{Deserialize, Serialize};
@@ -5,12 +8,19 @@ use specta::Type;
 use tauri::{Manager, Runtime};
 use tauri_plugin_updater::UpdaterExt;
 use tokio::sync::Mutex;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 pub struct UpdateInfo {
     pub version: String,
     pub body: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct LocalBackendInfo {
+    pub grpc_port: u16,
+    pub http_port: u16,
+    pub postgres_port: u16,
 }
 
 #[taurpc::procedures(path = "system")]
@@ -33,6 +43,61 @@ pub trait SystemApi {
     async fn check_accessibility_permission() -> Result<bool, String>;
 
     async fn request_accessibility_permission() -> Result<(), String>;
+
+    async fn get_docker_compose_path<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<String, String>;
+
+    async fn start_local_backend<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<LocalBackendInfo, String>;
+}
+
+fn resolve_docker_compose_path<R: Runtime>(
+    app_handle: &tauri::AppHandle<R>,
+) -> Result<PathBuf, String> {
+    if cfg!(debug_assertions) {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("docker-compose.yml");
+        if path.exists() {
+            return Ok(path);
+        }
+        return Err(format!(
+            "docker-compose.yml not found at {}",
+            path.display()
+        ));
+    }
+
+    let resource_dir = app_handle
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("Failed to resolve resource directory: {}", e))?;
+
+    let path = resource_dir.join("docker-compose.yml");
+    if path.exists() {
+        Ok(path)
+    } else {
+        Err(format!(
+            "docker-compose.yml not found at {}",
+            path.display()
+        ))
+    }
+}
+
+const DEFAULT_PORTS: [u16; 3] = [39051, 39080, 39432];
+
+fn find_available_port(preferred: u16) -> Result<u16, String> {
+    // Try the preferred port first
+    if TcpListener::bind(("127.0.0.1", preferred)).is_ok() {
+        return Ok(preferred);
+    }
+    // Bind to :0 to let the OS pick a free port
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .map_err(|e| format!("Failed to find available port: {}", e))?;
+    let port = listener
+        .local_addr()
+        .map_err(|e| format!("Failed to get local address: {}", e))?
+        .port();
+    Ok(port)
 }
 
 #[derive(Clone)]
@@ -215,5 +280,57 @@ impl SystemApi for SystemApiImpl {
         {
             Ok(())
         }
+    }
+
+    async fn get_docker_compose_path<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<String, String> {
+        let path = resolve_docker_compose_path(&app_handle)?;
+        debug!("Docker compose path: {}", path.display());
+        Ok(path.to_string_lossy().to_string())
+    }
+
+    async fn start_local_backend<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<LocalBackendInfo, String> {
+        let compose_path = resolve_docker_compose_path(&app_handle)?;
+
+        let grpc_port = find_available_port(DEFAULT_PORTS[0])?;
+        let http_port = find_available_port(DEFAULT_PORTS[1])?;
+        let postgres_port = find_available_port(DEFAULT_PORTS[2])?;
+
+        info!(
+            "Starting local backend via docker compose: {} (grpc={}, http={}, postgres={})",
+            compose_path.display(),
+            grpc_port,
+            http_port,
+            postgres_port
+        );
+
+        let output = tokio::process::Command::new("docker")
+            .args(["compose", "-f", &compose_path.to_string_lossy(), "up", "-d"])
+            .env("EURORA_GRPC_PORT", grpc_port.to_string())
+            .env("EURORA_HTTP_PORT", http_port.to_string())
+            .env("EURORA_POSTGRES_PORT", postgres_port.to_string())
+            .output()
+            .await
+            .map_err(|e| format!("Failed to run docker compose: {}", e))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            error!("docker compose failed: {}", stderr);
+            return Err(format!("docker compose failed: {}", stderr));
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        info!("docker compose started: {}", stdout);
+
+        Ok(LocalBackendInfo {
+            grpc_port,
+            http_port,
+            postgres_port,
+        })
     }
 }
