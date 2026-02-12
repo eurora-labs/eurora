@@ -1,4 +1,4 @@
-use euro_settings::{AppSettings, GeneralSettings, TelemetrySettings, ThirdPartySettings};
+use euro_settings::{ApiSettings, AppSettings, GeneralSettings, TelemetrySettings};
 use tauri::{Manager, Runtime};
 
 use crate::shared_types::SharedAppSettings;
@@ -27,14 +27,14 @@ pub trait SettingsApi {
         telemetry_settings: TelemetrySettings,
     ) -> Result<TelemetrySettings, String>;
 
-    async fn get_third_party_settings<R: Runtime>(
+    async fn get_api_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
-    ) -> Result<ThirdPartySettings, String>;
+    ) -> Result<ApiSettings, String>;
 
-    async fn set_third_party_settings<R: Runtime>(
+    async fn set_api_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
-        third_party_settings: ThirdPartySettings,
-    ) -> Result<ThirdPartySettings, String>;
+        api_settings: ApiSettings,
+    ) -> Result<ApiSettings, String>;
 }
 #[derive(Clone)]
 pub struct SettingsApiImpl;
@@ -103,29 +103,29 @@ impl SettingsApi for SettingsApiImpl {
         Ok(settings.telemetry.clone())
     }
 
-    async fn get_third_party_settings<R: Runtime>(
+    async fn get_api_settings<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
-    ) -> Result<ThirdPartySettings, String> {
+    ) -> Result<ApiSettings, String> {
         let state = app_handle.state::<SharedAppSettings>();
         let settings = state.lock().await;
 
-        Ok(settings.third_party.clone())
+        Ok(settings.api.clone())
     }
 
-    async fn set_third_party_settings<R: Runtime>(
+    async fn set_api_settings<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
-        third_party_settings: ThirdPartySettings,
-    ) -> Result<ThirdPartySettings, String> {
+        api_settings: ApiSettings,
+    ) -> Result<ApiSettings, String> {
         let state = app_handle.state::<SharedAppSettings>();
         let mut settings = state.lock().await;
 
-        settings.third_party = third_party_settings;
+        settings.api = api_settings;
         settings
             .save_to_default_path()
-            .map_err(|e| format!("Failed to persist third party settings: {e}"))?;
+            .map_err(|e| format!("Failed to persist api settings: {e}"))?;
 
-        Ok(settings.third_party.clone())
+        Ok(settings.api.clone())
     }
 }

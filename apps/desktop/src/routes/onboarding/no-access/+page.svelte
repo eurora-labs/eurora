@@ -27,7 +27,7 @@
 
 	<Card.Root
 		class="flex group cursor-pointer w-full"
-		onclick={() => goto('/no-access/run-locally')}
+		onclick={() => goto('/onboarding/login/local')}
 	>
 		<Card.Header class="pb-6 text-left">
 			<Card.Title class="mb-2 text-2xl font-semibold">Run Locally</Card.Title>
