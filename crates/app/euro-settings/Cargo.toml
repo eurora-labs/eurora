@@ -11,7 +11,7 @@ dirs = { workspace = true }
 euro-fs = { workspace = true }
 notify = { version = "8.2.0" }
 # prompt-kit = { workspace = true }
-serde = { workspace = true, features = ["std"] }
+serde = { workspace = true, features = ["derive", "std"] }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 serde_json_lenient = { workspace = true }
 specta = { workspace = true, features = ["derive", "function"] }

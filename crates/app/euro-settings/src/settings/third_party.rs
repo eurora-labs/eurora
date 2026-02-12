@@ -3,6 +3,6 @@ use specta::Type;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct GeneralSettings {
-    pub autostart: bool,
+pub struct ThirdPartySettings {
+    pub endpoint: String,
 }
