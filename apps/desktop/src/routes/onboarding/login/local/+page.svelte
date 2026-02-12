@@ -6,8 +6,8 @@
 	import { Input } from '@eurora/ui/components/input/index';
 	import * as Item from '@eurora/ui/components/item/index';
 	import CheckIcon from '@lucide/svelte/icons/check';
-	import PlayIcon from '@lucide/svelte/icons/play';
 	import LoaderIcon from '@lucide/svelte/icons/loader';
+	import PlayIcon from '@lucide/svelte/icons/play';
 	import { toast } from 'svelte-sonner';
 
 	let taurpc = inject(TAURPC_SERVICE);
@@ -40,8 +40,16 @@
 		try {
 			try {
 				await taurpc.auth.register(username, email, password);
-			} catch {
-				await taurpc.auth.login(email, password);
+			} catch (registerError) {
+				const regMsg = String(registerError);
+				if (!regMsg.includes('already exists')) {
+					throw registerError;
+				}
+				try {
+					await taurpc.auth.login(email, password);
+				} catch (loginError) {
+					throw new Error(`Registration failed: ${regMsg}\nLogin failed: ${loginError}`);
+				}
 			}
 			toast.success('Logged in to local backend');
 			goto('/');

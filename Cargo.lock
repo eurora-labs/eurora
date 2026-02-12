@@ -1543,7 +1543,6 @@ dependencies = [
 name = "be-auth-service"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "argon2",
  "auth-core",
  "be-auth-grpc",

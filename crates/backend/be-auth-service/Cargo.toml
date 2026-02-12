@@ -6,7 +6,6 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 publish = false
 
 [dependencies]
-anyhow = { workspace = true }
 argon2 = { workspace = true }
 auth-core = { workspace = true }
 be-auth-grpc = { workspace = true }

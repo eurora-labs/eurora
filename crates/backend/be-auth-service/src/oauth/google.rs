@@ -1,7 +1,6 @@
 use std::env;
 use std::time::Duration;
 
-use anyhow::{Result, anyhow};
 use openidconnect::{
     AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointMaybeSet,
     EndpointNotSet, EndpointSet, IssuerUrl, Nonce, OAuth2TokenResponse, PkceCodeChallenge,
@@ -9,7 +8,28 @@ use openidconnect::{
     core::{CoreClient, CoreIdTokenClaims, CoreProviderMetadata, CoreResponseType},
 };
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tracing::info;
+
+#[derive(Debug, Error)]
+pub enum OAuthError {
+    #[error("Missing environment variable: {0}")]
+    MissingEnvVar(&'static str),
+    #[error("OAuth discovery failed: {0}")]
+    Discovery(String),
+    #[error("Invalid URL: {0}")]
+    InvalidUrl(String),
+    #[error("Code exchange failed: {0}")]
+    CodeExchange(String),
+    #[error("Missing ID token")]
+    MissingIdToken,
+    #[error("Token verification failed: {0}")]
+    TokenVerification(String),
+    #[error("Missing email in claims")]
+    MissingEmail,
+    #[error("HTTP client error: {0}")]
+    HttpClient(String),
+}
 
 /// The concrete client type returned by `from_provider_metadata` + `set_redirect_uri`
 type DiscoveredClient = CoreClient<
@@ -29,11 +49,11 @@ pub struct GoogleOAuthConfig {
 }
 
 impl GoogleOAuthConfig {
-    pub fn from_env() -> Result<Self> {
+    pub fn from_env() -> Result<Self, OAuthError> {
         let client_id = env::var("GOOGLE_CLIENT_ID")
-            .map_err(|_| anyhow!("GOOGLE_CLIENT_ID environment variable not set"))?;
+            .map_err(|_| OAuthError::MissingEnvVar("GOOGLE_CLIENT_ID"))?;
         let client_secret = env::var("GOOGLE_CLIENT_SECRET")
-            .map_err(|_| anyhow!("GOOGLE_CLIENT_SECRET environment variable not set"))?;
+            .map_err(|_| OAuthError::MissingEnvVar("GOOGLE_CLIENT_SECRET"))?;
         let redirect_uri = env::var("GOOGLE_REDIRECT_URI")
             .unwrap_or_else(|_| "http://localhost:5173/auth/google/callback".to_string());
 
@@ -49,29 +69,30 @@ pub struct GoogleOAuthClient {
     client: DiscoveredClient,
 }
 
-fn build_http_client() -> Result<reqwest::Client> {
+fn build_http_client() -> Result<reqwest::Client, OAuthError> {
     reqwest::ClientBuilder::new()
         .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_secs(30))
         .build()
-        .map_err(|e| anyhow!("Failed to build HTTP client: {}", e))
+        .map_err(|e| OAuthError::HttpClient(e.to_string()))
 }
 
 impl GoogleOAuthClient {
-    pub async fn discover(config: GoogleOAuthConfig) -> Result<Self> {
+    pub async fn discover(config: GoogleOAuthConfig) -> Result<Self, OAuthError> {
         let issuer_url = IssuerUrl::new("https://accounts.google.com".to_string())
-            .map_err(|e| anyhow!("Invalid issuer URL: {}", e))?;
+            .map_err(|e| OAuthError::InvalidUrl(e.to_string()))?;
 
         let http_client = build_http_client()?;
 
+        info!("Discovering OpenID Connect provider metadata");
         let provider_metadata = CoreProviderMetadata::discover_async(issuer_url, &http_client)
             .await
-            .map_err(|e| anyhow!("Failed to discover OpenID Connect provider: {}", e))?;
+            .map_err(|e| OAuthError::Discovery(e.to_string()))?;
 
         let client_id = ClientId::new(config.client_id);
         let client_secret = Some(ClientSecret::new(config.client_secret));
         let redirect_url = RedirectUrl::new(config.redirect_uri)
-            .map_err(|e| anyhow!("Invalid redirect URL: {}", e))?;
+            .map_err(|e| OAuthError::InvalidUrl(e.to_string()))?;
 
         let client =
             CoreClient::from_provider_metadata(provider_metadata, client_id, client_secret)
@@ -85,7 +106,7 @@ impl GoogleOAuthClient {
         state: &str,
         pkce_verifier: &str,
         nonce: &Nonce,
-    ) -> Result<String> {
+    ) -> String {
         info!("Generating Google OAuth authorization URL with custom state and PKCE");
 
         let pkce_code_verifier = PkceCodeVerifier::new(pkce_verifier.to_string());
@@ -105,7 +126,7 @@ impl GoogleOAuthClient {
             .set_pkce_challenge(pkce_challenge)
             .url();
 
-        Ok(authorize_url.to_string())
+        authorize_url.to_string()
     }
 
     /// The `nonce` verifies the ID token's nonce claim (OIDC replay protection).
@@ -114,36 +135,34 @@ impl GoogleOAuthClient {
         code: &str,
         pkce_verifier: String,
         nonce: Option<&Nonce>,
-    ) -> Result<GoogleUserInfo> {
+    ) -> Result<GoogleUserInfo, OAuthError> {
         let http_client = build_http_client()?;
 
         let token_response = self
             .client
-            .exchange_code(AuthorizationCode::new(code.to_string()))?
+            .exchange_code(AuthorizationCode::new(code.to_string()))
+            .map_err(|e| OAuthError::CodeExchange(e.to_string()))?
             .set_pkce_verifier(PkceCodeVerifier::new(pkce_verifier))
             .request_async(&http_client)
             .await
-            .map_err(|e| anyhow!("Failed to exchange authorization code: {}", e))?;
+            .map_err(|e| OAuthError::CodeExchange(e.to_string()))?;
 
         let id_token = token_response
             .id_token()
-            .ok_or_else(|| anyhow!("Google did not return an ID token"))?;
+            .ok_or(OAuthError::MissingIdToken)?;
 
         let verifier = self.client.id_token_verifier();
         let claims: &CoreIdTokenClaims = match nonce {
             Some(expected_nonce) => id_token
                 .claims(&verifier, expected_nonce)
-                .map_err(|e| anyhow!("Failed to verify ID token: {}", e))?,
+                .map_err(|e| OAuthError::TokenVerification(e.to_string()))?,
             None => id_token
                 .claims(&verifier, |_: Option<&Nonce>| Ok(()))
-                .map_err(|e| anyhow!("Failed to verify ID token: {}", e))?,
+                .map_err(|e| OAuthError::TokenVerification(e.to_string()))?,
         };
 
         let subject = claims.subject().to_string();
-        let email = claims
-            .email()
-            .ok_or_else(|| anyhow!("Email not present in ID token claims"))?
-            .to_string();
+        let email = claims.email().ok_or(OAuthError::MissingEmail)?.to_string();
         let email_verified = claims.email_verified().unwrap_or(false);
 
         let name = match claims.name() {
@@ -203,7 +222,7 @@ pub struct GoogleUserInfo {
     pub expires_in: Option<std::time::Duration>,
 }
 
-pub async fn create_google_oauth_client() -> Result<GoogleOAuthClient> {
+pub async fn create_google_oauth_client() -> Result<GoogleOAuthClient, OAuthError> {
     let config = GoogleOAuthConfig::from_env()?;
     GoogleOAuthClient::discover(config).await
 }
