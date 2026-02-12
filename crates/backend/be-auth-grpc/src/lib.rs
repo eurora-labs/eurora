@@ -1,18 +1,7 @@
-use std::sync::OnceLock;
-
 use tonic::{Request, Status, service::Interceptor};
 use uuid::Uuid;
 
 pub use be_auth_core::*;
-
-fn is_local_mode() -> bool {
-    static LOCAL_MODE: OnceLock<bool> = OnceLock::new();
-    *LOCAL_MODE.get_or_init(|| {
-        std::env::var("RUNNING_EURORA_FULLY_LOCAL")
-            .map(|v| v.eq_ignore_ascii_case("true"))
-            .unwrap_or(false)
-    })
-}
 
 #[derive(Clone, Default)]
 pub struct JwtInterceptor {
@@ -21,19 +10,6 @@ pub struct JwtInterceptor {
 
 impl Interceptor for JwtInterceptor {
     fn call(&mut self, mut request: Request<()>) -> Result<Request<()>, Status> {
-        if is_local_mode() {
-            request.extensions_mut().insert(Claims {
-                sub: "local".to_string(),
-                username: "local".to_string(),
-                email: "local@localhost".to_string(),
-                exp: i64::MAX,
-                iat: 0,
-                token_type: "access".to_string(),
-                role: Role::Enterprise,
-            });
-            return Ok(request);
-        }
-
         let auth_header = request
             .metadata()
             .get("authorization")
