@@ -23,6 +23,7 @@ euro-native-messaging = { workspace = true }
 focus-tracker = { workspace = true, features = ["async"] }
 humantime-serde = { workspace = true }
 image = { workspace = true }
+log = { workspace = true }
 prost = { workspace = true }
 prost-types = { workspace = true }
 proto-gen = { workspace = true }
@@ -38,9 +39,9 @@ tokio = { workspace = true, features = [
   "fs",
   "macros",
   "rt-multi-thread",
+  "sync",
 ] }
 tonic = { workspace = true }
-log = { workspace = true }
 url = { workspace = true }
 usvg = { version = "0.45" }
 uuid = { workspace = true }

@@ -4,6 +4,7 @@
 )]
 
 use dotenv::dotenv;
+use euro_endpoint::EndpointManager;
 use euro_settings::AppSettings;
 use euro_tauri::procedures::timeline_procedures::TimelineAppEvent;
 use euro_tauri::shared_types::SharedUserController;
@@ -297,6 +298,15 @@ fn main() {
                     }
 
                     let app_settings = AppSettings::load_from_default_path_creating().unwrap();
+                    let endpoint_url = &app_settings.api.endpoint;
+                    let endpoint_manager = if endpoint_url.is_empty() {
+                        EndpointManager::from_env()
+                    } else {
+                        EndpointManager::new(endpoint_url)
+                    }
+                    .expect("Failed to initialize API endpoint");
+                    let endpoint_manager = std::sync::Arc::new(endpoint_manager);
+                    tauri_app.manage(endpoint_manager.clone());
                     tauri_app.manage(Mutex::new(app_settings.clone()));
 
                     tauri::async_runtime::spawn(async move {
@@ -377,27 +387,18 @@ fn main() {
                         .expect("Failed to create tray icon");
 
                     let conversation_handle = app_handle.clone();
+                    let conversation_channel_rx = endpoint_manager.subscribe();
                     tauri::async_runtime::spawn(async move {
-                        let conversation_manager = euro_conversation::ConversationManager::new().await;
+                        let conversation_manager = euro_conversation::ConversationManager::new(conversation_channel_rx);
                         conversation_handle.manage(SharedConversationManager::new(conversation_manager));
                     });
 
 
                     let timeline_handle = app_handle.clone();
                     let db_app_handle = app_handle.clone();
+                    let timeline_channel_rx = endpoint_manager.subscribe();
                     tauri::async_runtime::spawn(async move {
-                        // let db_manager = match create_shared_database_manager(&db_app_handle).await {
-                        //     Ok(db) => {
-                        //         Some(db)
-                        //     }
-                        //     Err(e) => {
-                        //         error!("Failed to initialize personal database manager: {}", e);
-                        //         None
-                        //     }
-                        // };
-                        // if let Some(db_manager) = db_manager {
-                        //     db_app_handle.manage(db_manager);
-                        let timeline = euro_timeline::TimelineManager::builder().build().await.expect("Failed to create timeline");
+                        let timeline = euro_timeline::TimelineManager::builder().channel_rx(timeline_channel_rx).build().expect("Failed to create timeline");
                         timeline_handle.manage(Mutex::new(timeline));
                             let timeline_mutex = db_app_handle.state::<Mutex<TimelineManager>>();
 
@@ -486,16 +487,15 @@ fn main() {
 
                     let app_handle_user = app_handle.clone();
                     let path = tauri_app.path().app_data_dir().unwrap();
+                    let user_channel_rx = endpoint_manager.subscribe();
                     tauri::async_runtime::spawn(async move {
-                        let user_controller = euro_user::Controller::from_path(path)
-                            .await
+                        let user_controller = euro_user::Controller::new(path, user_channel_rx)
                             .map_err(|e| {
                                 error!("Failed to create user controller: {}", e);
                                 e
                             })
                             .unwrap();
                         app_handle_user.manage(SharedUserController::new(user_controller));
-                        // app_handle_user.manage(user_controller);
                     });
 
 

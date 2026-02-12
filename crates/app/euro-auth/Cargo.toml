@@ -26,6 +26,7 @@ tokio = { workspace = true, features = [
   "fs",
   "macros",
   "rt-multi-thread",
+  "sync",
 ] }
 tonic = { workspace = true, features = ["channel", "tls-native-roots"] }
 tonic-async-interceptor = "0.14.1"

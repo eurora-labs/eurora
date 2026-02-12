@@ -35,6 +35,7 @@ dirs = { workspace = true }
 dotenv = { workspace = true }
 euro-activity = { workspace = true }
 euro-conversation = { workspace = true }
+euro-endpoint = { workspace = true }
 euro-secret = { workspace = true }
 euro-settings = { workspace = true }
 euro-timeline = { workspace = true }

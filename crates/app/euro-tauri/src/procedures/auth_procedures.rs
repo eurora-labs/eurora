@@ -21,6 +21,19 @@ pub trait AuthApi {
     async fn poll_for_login<R: Runtime>(app_handle: AppHandle<R>) -> Result<bool, String>;
     async fn get_login_token<R: Runtime>(app_handle: AppHandle<R>) -> Result<LoginToken, String>;
 
+    async fn register<R: Runtime>(
+        app_handle: AppHandle<R>,
+        username: String,
+        email: String,
+        password: String,
+    ) -> Result<(), String>;
+
+    async fn login<R: Runtime>(
+        app_handle: AppHandle<R>,
+        login: String,
+        password: String,
+    ) -> Result<(), String>;
+
     async fn is_authenticated<R: Runtime>(app_handle: AppHandle<R>) -> Result<bool, String>;
     async fn get_role<R: Runtime>(app_handle: AppHandle<R>) -> Result<String, String>;
 }
@@ -108,6 +121,57 @@ impl AuthApi for AuthApiImpl {
 
             Ok(false)
         }
+    }
+
+    async fn register<R: Runtime>(
+        self,
+        app_handle: AppHandle<R>,
+        username: String,
+        email: String,
+        password: String,
+    ) -> Result<(), String> {
+        let user_state = app_handle
+            .try_state::<SharedUserController>()
+            .ok_or_else(|| "User controller not available".to_string())?;
+        let mut controller = user_state.lock().await;
+
+        controller
+            .register(&username, &email, &password)
+            .await
+            .map_err(|e| format!("Registration failed: {}", e))?;
+
+        let state = app_handle.state::<SharedAppSettings>();
+        let settings = state.lock().await;
+        settings
+            .save_to_default_path()
+            .map_err(|e| format!("Failed to save settings: {}", e))?;
+
+        Ok(())
+    }
+
+    async fn login<R: Runtime>(
+        self,
+        app_handle: AppHandle<R>,
+        login: String,
+        password: String,
+    ) -> Result<(), String> {
+        let user_state = app_handle
+            .try_state::<SharedUserController>()
+            .ok_or_else(|| "User controller not available".to_string())?;
+        let mut controller = user_state.lock().await;
+
+        controller
+            .login(&login, &password)
+            .await
+            .map_err(|e| format!("Login failed: {}", e))?;
+
+        let state = app_handle.state::<SharedAppSettings>();
+        let settings = state.lock().await;
+        settings
+            .save_to_default_path()
+            .map_err(|e| format!("Failed to save settings: {}", e))?;
+
+        Ok(())
     }
 
     async fn is_authenticated<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {

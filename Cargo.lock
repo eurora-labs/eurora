@@ -3686,6 +3686,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "euro-endpoint"
+version = "0.0.0"
+dependencies = [
+ "thiserror 2.0.18",
+ "tokio",
+ "tonic",
+ "tracing",
+]
+
+[[package]]
 name = "euro-fs"
 version = "0.0.0"
 dependencies = [
@@ -3774,6 +3784,7 @@ dependencies = [
  "dotenv",
  "euro-activity",
  "euro-conversation",
+ "euro-endpoint",
  "euro-secret",
  "euro-settings",
  "euro-timeline",
@@ -3829,6 +3840,7 @@ dependencies = [
  "serde",
  "thiserror 2.0.18",
  "tokio",
+ "tonic",
  "windows-sys 0.61.2",
 ]
 
@@ -3843,6 +3855,8 @@ dependencies = [
  "euro-storage",
  "serde",
  "serde_json",
+ "tokio",
+ "tonic",
  "uuid",
 ]
 

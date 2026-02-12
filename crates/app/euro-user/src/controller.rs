@@ -3,6 +3,8 @@ use anyhow::{Context, Result};
 use euro_auth::{AuthManager, Claims};
 use euro_secret::{Sensitive, secret};
 use std::path::PathBuf;
+use tokio::sync::watch;
+use tonic::transport::Channel;
 
 #[derive(Clone)]
 pub struct Controller {
@@ -11,8 +13,11 @@ pub struct Controller {
 }
 
 impl Controller {
-    pub async fn from_path(path: impl Into<PathBuf>) -> Result<Controller> {
-        let auth_manager = AuthManager::new().await;
+    pub fn new(
+        path: impl Into<PathBuf>,
+        channel_rx: watch::Receiver<Channel>,
+    ) -> Result<Controller> {
+        let auth_manager = AuthManager::new(channel_rx);
         Ok(Controller {
             auth_manager,
             storage: Storage::from_path(path),
@@ -44,6 +49,15 @@ impl Controller {
         secret::delete(crate::ACCESS_TOKEN_HANDLE, namespace).ok();
         secret::delete(crate::REFRESH_TOKEN_HANDLE, namespace).ok();
         Ok(())
+    }
+
+    pub async fn register(
+        &mut self,
+        username: impl Into<String>,
+        email: impl Into<String>,
+        password: impl Into<String>,
+    ) -> Result<Sensitive<String>> {
+        self.auth_manager.register(username, email, password).await
     }
 
     pub async fn login(

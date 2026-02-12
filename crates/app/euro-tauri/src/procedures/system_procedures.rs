@@ -8,6 +8,8 @@ use specta::Type;
 use tauri::{Manager, Runtime};
 use tauri_plugin_updater::UpdaterExt;
 use tokio::sync::Mutex;
+
+use crate::shared_types::SharedEndpointManager;
 use tracing::{debug, error, info};
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
@@ -50,6 +52,7 @@ pub trait SystemApi {
 
     async fn start_local_backend<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
+        ollama_model: String,
     ) -> Result<LocalBackendInfo, String>;
 }
 
@@ -294,26 +297,60 @@ impl SystemApi for SystemApiImpl {
     async fn start_local_backend<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
+        ollama_model: String,
     ) -> Result<LocalBackendInfo, String> {
         let compose_path = resolve_docker_compose_path(&app_handle)?;
+        let compose_file = compose_path.to_string_lossy();
+
+        info!("Stopping any existing eurora docker compose instances");
+        let _ = tokio::process::Command::new("docker")
+            .args(["compose", "-f", &compose_file, "down", "--remove-orphans"])
+            .output()
+            .await;
+
+        let ps = tokio::process::Command::new("docker")
+            .args(["ps", "-aq", "--filter", "name=eurora"])
+            .output()
+            .await;
+        if let Ok(ps) = ps {
+            let ids = String::from_utf8_lossy(&ps.stdout);
+            let ids: Vec<&str> = ids.split_whitespace().collect();
+            if !ids.is_empty() {
+                info!("Stopping {} stray eurora container(s)", ids.len());
+                let _ = tokio::process::Command::new("docker")
+                    .arg("rm")
+                    .arg("-f")
+                    .args(&ids)
+                    .output()
+                    .await;
+            }
+        }
 
         let grpc_port = find_available_port(DEFAULT_PORTS[0])?;
         let http_port = find_available_port(DEFAULT_PORTS[1])?;
         let postgres_port = find_available_port(DEFAULT_PORTS[2])?;
 
+        let model = if ollama_model.is_empty() {
+            "llama3.2".to_string()
+        } else {
+            ollama_model
+        };
+
         info!(
-            "Starting local backend via docker compose: {} (grpc={}, http={}, postgres={})",
+            "Starting local backend via docker compose: {} (grpc={}, http={}, postgres={}, ollama_model={})",
             compose_path.display(),
             grpc_port,
             http_port,
-            postgres_port
+            postgres_port,
+            model
         );
 
         let output = tokio::process::Command::new("docker")
-            .args(["compose", "-f", &compose_path.to_string_lossy(), "up", "-d"])
+            .args(["compose", "-f", &compose_file, "up", "-d"])
             .env("EURORA_GRPC_PORT", grpc_port.to_string())
             .env("EURORA_HTTP_PORT", http_port.to_string())
             .env("EURORA_POSTGRES_PORT", postgres_port.to_string())
+            .env("OLLAMA_MODEL", &model)
             .output()
             .await
             .map_err(|e| format!("Failed to run docker compose: {}", e))?;
@@ -326,6 +363,12 @@ impl SystemApi for SystemApiImpl {
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         info!("docker compose started: {}", stdout);
+
+        let local_url = format!("http://127.0.0.1:{}", grpc_port);
+        let endpoint_manager = app_handle.state::<SharedEndpointManager>();
+        endpoint_manager
+            .set_global_backend_url(&local_url)
+            .map_err(|e| format!("Failed to switch API endpoint: {e}"))?;
 
         Ok(LocalBackendInfo {
             grpc_port,
