@@ -34,5 +34,5 @@
 		</Item.Root>
 	</div>
 
-	<Button variant="outline" onclick={() => goto('/onboarding/no-access')}>Back</Button>
+	<Button variant="outline" onclick={() => goto('/no-access')}>Back</Button>
 </div>

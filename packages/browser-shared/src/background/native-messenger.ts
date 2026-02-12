@@ -1,8 +1,8 @@
 import { onUpdated, onActivated } from './focus-tracker.js';
 import { handleMessage } from './messaging.js';
 import { getCurrentTabIcon } from './tabs.js';
-import browser from 'webextension-polyfill';
 import { isSafari } from './util.js';
+import browser from 'webextension-polyfill';
 import type { Frame, RequestFrame, ResponseFrame } from '../content/bindings.js';
 
 const host = 'com.eurora.app';
@@ -55,7 +55,6 @@ async function onNativePortMessage(message: unknown, sender: browser.Runtime.Por
 
 	if (safariMessage.name === 'NativeRequest' && safariMessage.userInfo?.frame) {
 		// Safari dispatch message format - extract the frame from userInfo
-		console.log('Received Safari dispatch message:', safariMessage.name);
 		frame = safariMessage.userInfo.frame;
 	} else {
 		// Standard native messaging format (Chrome/Firefox or Safari sendNativeMessage)
