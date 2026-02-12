@@ -10,6 +10,7 @@ publish = false
 ignored = [
   "async-stripe",
   "async-stripe-core",
+  "async-stripe-shared",
   "async-stripe-webhook",
   "async-stripe-billing",
   "async-stripe-checkout"
@@ -42,6 +43,7 @@ async-stripe-core = { version = "1.0.0-rc.1", features = [
 #   "payment_method"
 # ] }
 # async-stripe-product = { version = "1.0.0-rc.1", features = ["price", "product"] }
+async-stripe-shared = { version = "1.0.0-rc.1", features = ["serialize"] }
 # async-stripe-types = "1.0.0-rc.1"
 async-stripe-webhook = { version = "1.0.0-rc.1", features = [
   "async-stripe-billing",
@@ -52,6 +54,7 @@ axum = { version = "0.8.8", features = ["macros"] }
 be-auth-core = { workspace = true }
 be-remote-db = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 tower = { workspace = true }
 tower_governor = "0.8"

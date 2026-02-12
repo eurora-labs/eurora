@@ -981,15 +981,50 @@ impl DatabaseManager {
     // Stripe Billing Methods
     // =========================================================================
 
-    /// Upsert a Stripe customer record, optionally linking it to an app user by email.
+    /// Check whether a Stripe webhook event has already been processed.
+    pub async fn is_webhook_event_processed(&self, event_id: &str) -> DbResult<bool> {
+        let count: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM stripe.webhook_events WHERE event_id = $1")
+                .bind(event_id)
+                .fetch_one(&self.pool)
+                .await?;
+
+        Ok(count.0 > 0)
+    }
+
+    /// Record a Stripe webhook event as processed.
+    pub async fn record_webhook_event(&self, event_id: &str, event_type: &str) -> DbResult<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO stripe.webhook_events (event_id, event_type)
+            VALUES ($1, $2)
+            ON CONFLICT (event_id) DO NOTHING
+            "#,
+        )
+        .bind(event_id)
+        .bind(event_type)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Upsert a Stripe customer record, linking it to an app user by email.
     ///
     /// If `email` is provided and a matching user exists, `app_user_id` is set.
     /// On conflict (existing customer_id), email and app_user_id are updated.
-    pub async fn upsert_stripe_customer(
+    ///
+    /// Accepts an optional transaction executor; falls back to the pool.
+    pub async fn upsert_stripe_customer<'e, E>(
         &self,
+        executor: E,
         customer_id: &str,
         email: Option<&str>,
-    ) -> DbResult<()> {
+        raw_data: &serde_json::Value,
+    ) -> DbResult<()>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
         let now = Utc::now();
 
         // Resolve app_user_id from email if possible
@@ -1005,10 +1040,11 @@ impl DatabaseManager {
         sqlx::query(
             r#"
             INSERT INTO stripe.customers (id, app_user_id, email, created_at, updated_at, raw_data)
-            VALUES ($1, $2, $3, $4, $5, '{}'::jsonb)
+            VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (id) DO UPDATE
             SET email = COALESCE(EXCLUDED.email, stripe.customers.email),
                 app_user_id = COALESCE(EXCLUDED.app_user_id, stripe.customers.app_user_id),
+                raw_data = EXCLUDED.raw_data,
                 updated_at = EXCLUDED.updated_at
             "#,
         )
@@ -1017,7 +1053,8 @@ impl DatabaseManager {
         .bind(email)
         .bind(now)
         .bind(now)
-        .execute(&self.pool)
+        .bind(raw_data)
+        .execute(executor)
         .await?;
 
         Ok(())
@@ -1027,11 +1064,15 @@ impl DatabaseManager {
     ///
     /// If an account already exists for this user, the Stripe customer link is updated.
     /// Returns the account ID.
-    pub async fn ensure_account_for_user(
+    pub async fn ensure_account_for_user<'e, E>(
         &self,
+        executor: E,
         user_id: Uuid,
         stripe_customer_id: &str,
-    ) -> DbResult<Uuid> {
+    ) -> DbResult<Uuid>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
         let now = Utc::now();
 
         let account_id: Uuid = sqlx::query_scalar(
@@ -1039,8 +1080,9 @@ impl DatabaseManager {
             INSERT INTO accounts (owner_user_id, name, stripe_customer_id, created_at, updated_at)
             SELECT $1, u.username, $2, $3, $4
             FROM users u WHERE u.id = $1
-            ON CONFLICT (stripe_customer_id) DO UPDATE
-            SET updated_at = EXCLUDED.updated_at
+            ON CONFLICT (owner_user_id) DO UPDATE
+            SET stripe_customer_id = EXCLUDED.stripe_customer_id,
+                updated_at = EXCLUDED.updated_at
             RETURNING id
             "#,
         )
@@ -1048,7 +1090,7 @@ impl DatabaseManager {
         .bind(stripe_customer_id)
         .bind(now)
         .bind(now)
-        .fetch_one(&self.pool)
+        .fetch_one(executor)
         .await?;
 
         Ok(account_id)
@@ -1056,39 +1098,123 @@ impl DatabaseManager {
 
     /// Upsert a Stripe subscription record.
     ///
-    /// Inserts a minimal subscription row on checkout completion. On conflict,
-    /// updates the status and customer linkage.
-    pub async fn upsert_stripe_subscription(
+    /// Inserts a subscription row on checkout completion. On conflict,
+    /// updates the status, customer linkage, period, cancellation, and raw data.
+    #[builder]
+    pub async fn upsert_stripe_subscription<'e, E>(
         &self,
+        executor: E,
         subscription_id: &str,
         customer_id: &str,
         status: &str,
-    ) -> DbResult<()> {
+        cancel_at_period_end: bool,
+        canceled_at: Option<i64>,
+        current_period_start: i64,
+        current_period_end: i64,
+        raw_data: &serde_json::Value,
+    ) -> DbResult<()>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
         let now = Utc::now();
+        let canceled_at_ts = canceled_at.and_then(|ts| chrono::DateTime::from_timestamp(ts, 0));
+        let period_start = chrono::DateTime::from_timestamp(current_period_start, 0).unwrap_or(now);
+        let period_end = chrono::DateTime::from_timestamp(current_period_end, 0).unwrap_or(now);
 
         sqlx::query(
             r#"
             INSERT INTO stripe.subscriptions (
                 id, customer_id, status,
-                cancel_at_period_end,
+                cancel_at_period_end, canceled_at,
                 current_period_start, current_period_end,
                 created_at, updated_at, raw_data
             )
-            VALUES ($1, $2, $3::stripe.subscription_status, false, $4, $4, $5, $6, '{}'::jsonb)
+            VALUES ($1, $2, $3::stripe.subscription_status, $4, $5, $6, $7, $8, $9, $10)
             ON CONFLICT (id) DO UPDATE
             SET status = $3::stripe.subscription_status,
                 customer_id = EXCLUDED.customer_id,
+                cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+                canceled_at = EXCLUDED.canceled_at,
+                current_period_start = EXCLUDED.current_period_start,
+                current_period_end = EXCLUDED.current_period_end,
+                raw_data = EXCLUDED.raw_data,
                 updated_at = EXCLUDED.updated_at
             "#,
         )
         .bind(subscription_id)
         .bind(customer_id)
         .bind(status)
+        .bind(cancel_at_period_end)
+        .bind(canceled_at_ts)
+        .bind(period_start)
+        .bind(period_end)
         .bind(now)
         .bind(now)
-        .bind(now)
-        .execute(&self.pool)
+        .bind(raw_data)
+        .execute(executor)
         .await?;
+
+        Ok(())
+    }
+
+    /// Upsert Stripe subscription items for a given subscription.
+    ///
+    /// Replaces all existing items for the subscription with the provided set.
+    pub async fn sync_stripe_subscription_items<'e, E>(
+        &self,
+        executor: E,
+        subscription_id: &str,
+        items: &[(String, String, Option<i64>, serde_json::Value)], // (item_id, price_id, quantity, raw_data)
+    ) -> DbResult<()>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        // Build a single query that deletes old items and inserts new ones.
+        // For simplicity, we use a CTE approach.
+        if items.is_empty() {
+            sqlx::query("DELETE FROM stripe.subscription_items WHERE subscription_id = $1")
+                .bind(subscription_id)
+                .execute(executor)
+                .await?;
+            return Ok(());
+        }
+
+        // We need a transaction-like executor, but since this is already called
+        // within a transaction from webhook handlers, we use multiple queries on
+        // the same executor. However, sqlx Executor is consumed after one use,
+        // so we'll build a single batch query.
+        //
+        // Use a CTE to delete then insert in one round-trip.
+        let mut query = String::from(
+            "WITH deleted AS (DELETE FROM stripe.subscription_items WHERE subscription_id = $1) INSERT INTO stripe.subscription_items (id, subscription_id, price_id, quantity, raw_data) VALUES ",
+        );
+
+        let mut param_idx = 2u32;
+        for (i, _) in items.iter().enumerate() {
+            if i > 0 {
+                query.push_str(", ");
+            }
+            query.push_str(&format!(
+                "(${}, $1, ${}, ${}, ${})",
+                param_idx,
+                param_idx + 1,
+                param_idx + 2,
+                param_idx + 3,
+            ));
+            param_idx += 4;
+        }
+        query.push_str(" ON CONFLICT (id) DO UPDATE SET price_id = EXCLUDED.price_id, quantity = EXCLUDED.quantity, raw_data = EXCLUDED.raw_data");
+
+        let mut q = sqlx::query(&query).bind(subscription_id);
+        for (item_id, price_id, quantity, raw_data) in items {
+            q = q
+                .bind(item_id)
+                .bind(price_id)
+                .bind(quantity.map(|v| v as i32))
+                .bind(raw_data);
+        }
+
+        q.execute(executor).await?;
 
         Ok(())
     }
@@ -1098,16 +1224,30 @@ impl DatabaseManager {
         &self,
         subscription_id: &str,
         status: &str,
+        cancel_at_period_end: bool,
+        canceled_at: Option<i64>,
+        raw_data: &serde_json::Value,
     ) -> DbResult<()> {
+        let now = Utc::now();
+        let canceled_at_ts = canceled_at.and_then(|ts| chrono::DateTime::from_timestamp(ts, 0));
+
         let result = sqlx::query(
             r#"
             UPDATE stripe.subscriptions
-            SET status = $2::stripe.subscription_status
+            SET status = $2::stripe.subscription_status,
+                cancel_at_period_end = $3,
+                canceled_at = $4,
+                raw_data = $5,
+                updated_at = $6
             WHERE id = $1
             "#,
         )
         .bind(subscription_id)
         .bind(status)
+        .bind(cancel_at_period_end)
+        .bind(canceled_at_ts)
+        .bind(raw_data)
+        .bind(now)
         .execute(&self.pool)
         .await?;
 
