@@ -850,22 +850,30 @@ impl ProtoAuthService for AuthService {
         let code_challenge = self.code_verifier_to_challenge(&code_verifier);
         let token_hash = self.hash_login_token(&code_challenge);
 
-        // Get the login token from database
-        let login_token = match self.db.get_login_token_by_hash(&token_hash).await {
+        // Try to atomically consume the login token (only succeeds if not yet consumed).
+        // Using consume directly avoids a TOCTOU race between get + check + consume.
+        let login_token = match self.db.consume_login_token(&token_hash).await {
             Ok(login_token) => login_token,
             Err(_) => {
-                warn!("Login token not found or expired");
-                return Err(Status::unauthenticated("Invalid or expired login token"));
+                // Token not found as unconsumed. Check if it was already consumed
+                // (e.g. previous response lost in transit) — if so, re-issue tokens
+                // since the caller proved identity via PKCE code_verifier.
+                match self.db.get_login_token_by_hash_any(&token_hash).await {
+                    Ok(login_token) if login_token.consumed => {
+                        info!(
+                            "Login token already consumed, re-issuing tokens for idempotent retry"
+                        );
+                        login_token
+                    }
+                    _ => {
+                        warn!("Login token not found or expired");
+                        return Err(Status::unauthenticated("Invalid or expired login token"));
+                    }
+                }
             }
         };
 
-        // Check if token is already consumed
-        if login_token.consumed {
-            warn!("Login token already consumed");
-            return Err(Status::unauthenticated("Invalid login token"));
-        }
-
-        // Get the user associated with the token (user_id is now required, not optional)
+        // Get the user associated with the token
         let user = match self.db.get_user_by_id(login_token.user_id).await {
             Ok(user) => user,
             Err(_) => {
@@ -873,12 +881,6 @@ impl ProtoAuthService for AuthService {
                 return Err(Status::internal("User not found"));
             }
         };
-
-        // Mark the token as consumed
-        if let Err(e) = self.db.consume_login_token(&token_hash).await {
-            error!("Failed to consume login token: {}", e);
-            return Err(Status::internal("Failed to process login token"));
-        }
 
         let role = self.resolve_role(user.id).await;
         let (access_token, refresh_token) = match self

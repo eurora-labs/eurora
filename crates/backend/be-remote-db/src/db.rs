@@ -466,6 +466,23 @@ impl DatabaseManager {
         Ok(login_token)
     }
 
+    /// Look up a login token by hash regardless of consumed status (still checks expiry).
+    /// Used to detect already-consumed tokens for idempotent retry handling.
+    pub async fn get_login_token_by_hash_any(&self, token_hash: &[u8]) -> DbResult<LoginToken> {
+        let login_token = sqlx::query_as::<_, LoginToken>(
+            r#"
+            SELECT id, token_hash, consumed, expires_at, user_id, created_at, updated_at
+            FROM login_tokens
+            WHERE token_hash = $1 AND expires_at > now()
+            "#,
+        )
+        .bind(token_hash)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(login_token)
+    }
+
     pub async fn consume_login_token(&self, token_hash: &[u8]) -> DbResult<LoginToken> {
         let now = Utc::now();
 
