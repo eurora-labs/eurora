@@ -18,8 +18,6 @@ use crate::{
     types::{ActivityAsset, ActivitySnapshot},
 };
 
-/// No-op strategy that returns empty results efficiently
-/// Used when no snapshot tracking is needed (e.g., when Eurora is focused)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct NoStrategy;
 
@@ -33,7 +31,6 @@ impl StrategySupport for NoStrategy {
 #[async_trait]
 impl ActivityStrategyFunctionality for NoStrategy {
     fn can_handle_process(&self, focus_window: &FocusedWindow) -> bool {
-        // Check if the process is in the supported processes list
         NoStrategy::get_supported_processes().contains(&focus_window.process_name.as_str())
     }
 
@@ -46,7 +43,6 @@ impl ActivityStrategyFunctionality for NoStrategy {
             "NoStrategy: not starting tracking for {:?}",
             focus_window.process_name
         );
-        // Intentionally do nothing - this strategy is for processes we want to ignore
         Ok(())
     }
 
@@ -58,7 +54,6 @@ impl ActivityStrategyFunctionality for NoStrategy {
             "NoStrategy: handling process change to: {}",
             focus_window.process_name
         );
-        // Only continue if the new process is one we can handle (Eurora)
         Ok(self.can_handle_process(focus_window))
     }
 

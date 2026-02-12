@@ -1,5 +1,3 @@
-//! Default strategy implementation for unsupported applications
-
 use async_trait::async_trait;
 use focus_tracker::FocusedWindow;
 use log::debug;
@@ -14,15 +12,13 @@ use crate::{
     types::{Activity, ActivityAsset, ActivitySnapshot},
 };
 
-/// Default strategy for applications that don't have specific implementations
+/// Fallback for applications that don't have specific strategy implementations.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DefaultStrategy;
 
 #[async_trait]
 impl StrategySupport for DefaultStrategy {
     fn get_supported_processes() -> Vec<&'static str> {
-        // Default strategy doesn't explicitly support any processes
-        // It will be used as fallback for any unsupported process
         vec![]
     }
 }
@@ -30,7 +26,6 @@ impl StrategySupport for DefaultStrategy {
 #[async_trait]
 impl ActivityStrategyFunctionality for DefaultStrategy {
     fn can_handle_process(&self, _focus_window: &FocusedWindow) -> bool {
-        // DefaultStrategy is a fallback that doesn't actively handle processes
         false
     }
 
@@ -44,7 +39,6 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
             focus_window.process_name
         );
 
-        // Create a simple activity with no assets
         let activity = Activity::new(
             focus_window.window_title.clone().unwrap_or_default(),
             focus_window.icon.clone(),
@@ -52,7 +46,6 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
             vec![],
         );
 
-        // Send the new activity
         let _ = sender.send(ActivityReport::NewActivity(activity));
 
         Ok(())
@@ -66,7 +59,6 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
             "Default strategy handling process change to: {}",
             focus_window.process_name
         );
-        // DefaultStrategy cannot handle process changes, request strategy switch
         Ok(false)
     }
 
@@ -97,7 +89,6 @@ mod tests {
     #[test]
     fn test_supported_processes() {
         let processes = DefaultStrategy::get_supported_processes();
-        // Default strategy doesn't explicitly support any processes
         assert!(processes.is_empty());
     }
 }

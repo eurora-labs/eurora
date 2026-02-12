@@ -1,17 +1,14 @@
-//! YouTube snapshot implementation
-
 use agent_chain_core::{BaseMessage, ContentPart, HumanMessage, ImageSource};
 use euro_native_messaging::types::NativeYoutubeSnapshot;
 use serde::{Deserialize, Serialize};
 
 use crate::{error::ActivityError, types::SnapshotFunctionality};
 
-/// YouTube video snapshot with frame capture
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct YoutubeSnapshot {
     pub id: String,
     pub current_time: f32,
-    pub video_frame: Option<String>, // Runtime image, not serialized
+    pub video_frame: Option<String>,
     pub video_duration: Option<f32>,
     pub video_title: Option<String>,
     pub video_url: Option<String>,
@@ -20,7 +17,6 @@ pub struct YoutubeSnapshot {
 }
 
 impl YoutubeSnapshot {
-    /// Create a new YouTube snapshot
     pub fn new(
         id: Option<String>,
         video_frame: Option<String>,
@@ -44,7 +40,6 @@ impl YoutubeSnapshot {
         }
     }
 
-    /// Try to create from protocol buffer snapshot
     pub fn try_from(snapshot: NativeYoutubeSnapshot) -> Result<Self, ActivityError> {
         // let video_frame_image = if let Some(proto_image) = snapshot.video_frame {
         //     Some(load_image_from_proto(proto_image)?)
@@ -66,7 +61,6 @@ impl YoutubeSnapshot {
         })
     }
 
-    /// Get progress percentage (0.0 to 1.0)
     pub fn get_progress_percentage(&self) -> Option<f32> {
         self.video_duration.map(|duration| {
             if duration > 0.0 {
@@ -77,14 +71,12 @@ impl YoutubeSnapshot {
         })
     }
 
-    /// Format current time as MM:SS
     pub fn format_current_time(&self) -> String {
         let minutes = (self.current_time / 60.0) as u32;
         let seconds = (self.current_time % 60.0) as u32;
         format!("{:02}:{:02}", minutes, seconds)
     }
 
-    /// Format duration as MM:SS
     pub fn format_duration(&self) -> Option<String> {
         self.video_duration.map(|duration| {
             let minutes = (duration / 60.0) as u32;
@@ -93,7 +85,6 @@ impl YoutubeSnapshot {
         })
     }
 
-    /// Check if video is near the end (within last 10% or 30 seconds)
     pub fn is_near_end(&self) -> bool {
         if let Some(duration) = self.video_duration {
             let remaining = duration - self.current_time;
@@ -103,18 +94,15 @@ impl YoutubeSnapshot {
         }
     }
 
-    /// Update the timestamp
     pub fn touch(&mut self) {
         self.updated_at = chrono::Utc::now().timestamp() as u64;
     }
 }
 
 impl SnapshotFunctionality for YoutubeSnapshot {
-    /// Construct a message for LLM interaction
     fn construct_messages(&self) -> Vec<BaseMessage> {
         let mut content_parts = vec![];
 
-        // Add image if available
         if let Some(image) = &self.video_frame
             && !image.is_empty()
         {

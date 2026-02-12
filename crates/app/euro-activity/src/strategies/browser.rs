@@ -33,18 +33,11 @@ pub use euro_browser::{
     ResponseFrame,
 };
 
-/// Browser strategy for collecting web browser activity data
-///
-/// The gRPC server is managed as a global singleton that persists independently
-/// of the strategy lifecycle. This allows connections from native messengers to
-/// be maintained even when tracking stops.
 #[derive(Clone, Serialize, Deserialize, Default)]
 pub struct BrowserStrategy {
     #[serde(skip)]
     sender: Option<mpsc::UnboundedSender<ActivityReport>>,
 
-    /// Reference to the global singleton bridge service
-    /// Note: The actual service is stored globally and accessed via BrowserBridgeService::get_or_init()
     #[serde(skip)]
     bridge_service: Option<&'static BrowserBridgeService>,
 
@@ -57,18 +50,12 @@ pub struct BrowserStrategy {
     #[serde(skip)]
     active_browser: Option<String>,
 
-    /// The currently active browser PID for routing requests
     #[serde(skip)]
     active_browser_pid: Option<u32>,
 }
 
 impl BrowserStrategy {
-    /// Initializes the browser strategy by connecting to the singleton service
-    ///
-    /// The gRPC server is managed by the TimelineManager. This method only connects
-    /// to the singleton service. The server should already be running when this is called.
     async fn initialize_service(&mut self) -> ActivityResult<()> {
-        // Get the global singleton service instance (server is started by TimelineManager)
         let service = BrowserBridgeService::get_or_init().await;
 
         self.bridge_service = Some(service);
@@ -77,7 +64,6 @@ impl BrowserStrategy {
     }
 
     async fn init_collection(&mut self, focus_window: &FocusedWindow) -> ActivityResult<()> {
-        // Initialize tracking logic here
         let Some(sender) = self.sender.clone() else {
             return Err(ActivityError::Strategy(
                 "Sender not initialized".to_string(),
@@ -89,7 +75,6 @@ impl BrowserStrategy {
             .as_ref()
             .ok_or_else(|| ActivityError::Strategy("Bridge service not initialized".to_string()))?;
 
-        // Subscribe to event frames from the bridge service
         let mut events_rx = service.subscribe_to_events();
         let _default_icon = focus_window.icon.clone();
         let mut strategy = self.clone();
@@ -117,7 +102,6 @@ impl BrowserStrategy {
                     }
                 };
 
-                // Only handle NativeMetadata events to create new activities
                 let metadata = match native_message {
                     NativeMessage::NativeMetadata(data) => StrategyMetadata::from(data),
                     _ => {
@@ -170,15 +154,10 @@ impl BrowserStrategy {
 
         self.event_subscription_handle = Some(Arc::new(handle));
 
-        // Start snapshot collection
         self.collect_assets_and_snapshots();
         Ok(())
     }
 
-    /// Create a new browser strategy and connect to the singleton service
-    ///
-    /// Note: The gRPC server must be started by the TimelineManager before creating
-    /// a BrowserStrategy. This method only connects to the existing singleton service.
     pub async fn new() -> ActivityResult<Self> {
         let mut strategy = BrowserStrategy::default();
         strategy.initialize_service().await?;
@@ -259,7 +238,6 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             focus_window.process_name
         );
 
-        // Check if this strategy can handle the new process
         if self.can_handle_process(focus_window) {
             debug!(
                 "Browser strategy can continue handling: {}",
@@ -324,7 +302,6 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                 "Browser strategy cannot handle: {}, stopping tracking",
                 focus_window.process_name
             );
-            // Properly stop tracking to abort the listener task
             self.stop_tracking().await?;
             Ok(false)
         }
@@ -335,28 +312,21 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         self.active_browser = None;
         self.active_browser_pid = None;
 
-        // Clean up event subscription task
         if let Some(handle) = self.event_subscription_handle.take() {
-            // Try to unwrap Arc, if we're the only owner, abort the task
             if let Ok(handle) = Arc::try_unwrap(handle) {
                 handle.abort();
             }
         }
 
-        // Clean up snapshot collection task
         if let Some(handle) = self.snapshot_collection_handle.take()
             && let Ok(handle) = Arc::try_unwrap(handle)
         {
             handle.abort();
         }
 
-        // Note: We don't stop the gRPC server here as it should keep running
-        // to accept new connections from native messengers
-
         Ok(())
     }
 
-    /// Retrieve assets from the browser
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
         debug!("Retrieving assets for browser strategy");
 
@@ -388,7 +358,6 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         Ok(vec![asset])
     }
 
-    /// Retrieve snapshots from the browser
     async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
         let service = self
             .bridge_service
@@ -444,7 +413,6 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
         let metadata = match native_metadata {
             NativeMessage::NativeMetadata(metadata) => {
-                // Validate URL if present
                 if let Some(ref url) = metadata.url
                     && !url.starts_with("http")
                     // TODO: Add the actual extension ID after we're accepted to chrome
@@ -485,10 +453,8 @@ impl BrowserStrategy {
             loop {
                 interval.tick().await;
 
-                // Collect assets
-                // TODO: This shouldn't happen every tick
-                // ideally this would be driven by the browser's extension itself
-                // so the watchers need to be rewritten
+                // TODO: This shouldn't happen every tick —
+                // ideally this would be driven by the browser extension itself
                 match strategy_clone.retrieve_assets().await {
                     Ok(assets) if !assets.is_empty() => {
                         debug!("Collected {} asset(s)", assets.len());
@@ -505,7 +471,6 @@ impl BrowserStrategy {
                     }
                 }
 
-                // Collect snapshots
                 match strategy_clone.retrieve_snapshots().await {
                     Ok(snapshots) if !snapshots.is_empty() => {
                         debug!("Collected {} snapshot(s)", snapshots.len());
