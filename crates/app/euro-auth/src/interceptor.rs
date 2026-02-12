@@ -1,13 +1,10 @@
-use crate::{AuthManager, get_secure_channel};
+use crate::AuthManager;
 use std::pin::Pin;
-use tokio::sync::OnceCell;
 use tonic::{Request, Status, transport::Channel};
 use tonic_async_interceptor::{AsyncInterceptor, async_interceptor};
 use tower::ServiceBuilder;
 
 pub type AuthedChannel = tonic_async_interceptor::AsyncInterceptedService<Channel, AuthInterceptor>;
-
-pub static AUTHED_CHANNEL: OnceCell<AuthedChannel> = OnceCell::const_new();
 
 #[derive(Debug, Clone)]
 pub struct AuthInterceptor {
@@ -51,23 +48,10 @@ impl AsyncInterceptor for AuthInterceptor {
     }
 }
 
-async fn build_authed_channel() -> AuthedChannel {
-    let channel = get_secure_channel()
-        .await
-        .expect("Failed to build secure channel");
-
-    let auth_manager = AuthManager::new().await;
-
+pub fn build_authed_channel(channel: Channel, auth_manager: AuthManager) -> AuthedChannel {
     let interceptor = AuthInterceptor::new(auth_manager);
 
     ServiceBuilder::new()
         .layer(async_interceptor(interceptor))
         .service(channel)
-}
-
-pub async fn get_authed_channel() -> AuthedChannel {
-    AUTHED_CHANNEL
-        .get_or_init(|| async { build_authed_channel().await })
-        .await
-        .clone()
 }

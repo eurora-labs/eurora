@@ -2,7 +2,9 @@
 
 use agent_chain::SystemMessage;
 use agent_chain::openai::BuiltinTool;
-use agent_chain::{BaseChatModel, BaseMessage, HumanMessage, openai::ChatOpenAI};
+use agent_chain::{
+    BaseChatModel, BaseMessage, HumanMessage, ollama::ChatOllama, openai::ChatOpenAI,
+};
 use be_auth_grpc::{Role, extract_claims, parse_user_id, require_role};
 use be_remote_db::{
     DatabaseManager, GetConversation, ListConversations, MessageType, NewConversation,
@@ -31,10 +33,9 @@ pub use proto_gen::conversation::proto_conversation_service_server::{
     ProtoConversationService, ProtoConversationServiceServer,
 };
 
-#[derive(Debug)]
 pub struct ConversationService {
-    chat_provider: ChatOpenAI,
-    title_provider: ChatOpenAI,
+    chat_provider: Box<dyn BaseChatModel + Send + Sync>,
+    title_provider: Box<dyn BaseChatModel + Send + Sync>,
     db: Arc<DatabaseManager>,
 }
 
@@ -42,23 +43,48 @@ impl ConversationService {
     pub fn from_env(db: Arc<DatabaseManager>) -> ConversationServiceResult<Self> {
         info!("Creating new ConversationService instance");
 
-        let api_key = std::env::var("OPENAI_API_KEY").unwrap_or_else(|_| {
-            error!("OPENAI_API_KEY environment variable is not set");
-            String::new()
-        });
-        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-5.1".to_string());
+        let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
+            .map(|v| v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
 
-        let chat_provider = ChatOpenAI::new(&model)
-            .with_builtin_tools(vec![BuiltinTool::WebSearch])
-            .api_key(api_key.clone());
+        if local_mode {
+            let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "llama3.2".to_string());
+            let host = std::env::var("OLLAMA_HOST")
+                .unwrap_or_else(|_| "http://host.docker.internal:11434".to_string());
 
-        let _title_provider = ChatOpenAI::new("gpt-4.1-mini").api_key(api_key.clone());
+            info!(
+                "Local mode: using Ollama provider (model={}, host={})",
+                model, host
+            );
 
-        Ok(Self {
-            chat_provider,
-            title_provider: _title_provider,
-            db,
-        })
+            let chat_provider = ChatOllama::new(&model).base_url(&host);
+            let title_provider = ChatOllama::new(&model).base_url(&host);
+
+            Ok(Self {
+                chat_provider: Box::new(chat_provider),
+                title_provider: Box::new(title_provider),
+                db,
+            })
+        } else {
+            let api_key = std::env::var("OPENAI_API_KEY").unwrap_or_else(|_| {
+                error!("OPENAI_API_KEY environment variable is not set");
+                String::new()
+            });
+            let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-5.1".to_string());
+
+            info!("Cloud mode: using OpenAI provider (model={})", model);
+
+            let chat_provider = ChatOpenAI::new(&model)
+                .with_builtin_tools(vec![BuiltinTool::WebSearch])
+                .api_key(api_key.clone());
+            let title_provider = ChatOpenAI::new("gpt-4.1-mini").api_key(api_key.clone());
+
+            Ok(Self {
+                chat_provider: Box::new(chat_provider),
+                title_provider: Box::new(title_provider),
+                db,
+            })
+        }
     }
 
     fn db_conversation_to_proto(conversation: be_remote_db::Conversation) -> Conversation {

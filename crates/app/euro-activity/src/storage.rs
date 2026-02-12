@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
-use euro_auth::AuthedChannel;
+use euro_auth::{AuthManager, AuthedChannel, build_authed_channel};
 use log::{debug, error};
 use prost_types::Timestamp;
 use proto_gen::activity::{
@@ -10,7 +10,9 @@ use proto_gen::activity::{
 use proto_gen::asset::{CreateAssetRequest, proto_asset_service_client::ProtoAssetServiceClient};
 use serde::{Deserialize, Serialize};
 use std::{io::Cursor, path::PathBuf};
+use tokio::sync::watch;
 use tonic::Status;
+use tonic::transport::Channel;
 
 use crate::{Activity, ActivityAsset, ActivityError, error::ActivityResult};
 
@@ -26,12 +28,6 @@ pub struct SavedAssetInfo {
 #[async_trait]
 #[enum_dispatch]
 pub trait SaveableAsset {
-    // async fn load(bytes: &[u8]) -> ActivityResult<Self>
-    // where
-    //     Self: Sized,
-    // {
-    // }
-
     fn get_asset_type(&self) -> &'static str;
 
     async fn serialize_content(&self) -> ActivityResult<Vec<u8>>;
@@ -42,29 +38,36 @@ pub trait SaveableAsset {
 }
 
 pub struct ActivityStorage {
-    activity_client: ProtoActivityServiceClient<AuthedChannel>,
-    asset_client: ProtoAssetServiceClient<AuthedChannel>,
+    channel_rx: watch::Receiver<Channel>,
+    auth_manager: AuthManager,
 }
 
 impl ActivityStorage {
-    pub async fn new() -> Self {
-        let channel = euro_auth::get_authed_channel().await;
-        let asset_client = ProtoAssetServiceClient::new(channel);
-
-        let channel = euro_auth::get_authed_channel().await;
-        let activity_client = ProtoActivityServiceClient::new(channel);
-
+    pub fn new(channel_rx: watch::Receiver<Channel>) -> Self {
+        let auth_manager = AuthManager::new(channel_rx.clone());
         Self {
-            activity_client,
-            asset_client,
+            channel_rx,
+            auth_manager,
         }
+    }
+
+    fn activity_client(&self) -> ProtoActivityServiceClient<AuthedChannel> {
+        let channel = self.channel_rx.borrow().clone();
+        let authed = build_authed_channel(channel, self.auth_manager.clone());
+        ProtoActivityServiceClient::new(authed)
+    }
+
+    fn asset_client(&self) -> ProtoAssetServiceClient<AuthedChannel> {
+        let channel = self.channel_rx.borrow().clone();
+        let authed = build_authed_channel(channel, self.auth_manager.clone());
+        ProtoAssetServiceClient::new(authed)
     }
 
     pub async fn save_activity_to_service(
         &self,
         activity: &Activity,
     ) -> ActivityResult<ActivityResponse> {
-        let mut client = self.activity_client.clone();
+        let mut client = self.activity_client();
         let icon = match &activity.icon {
             Some(icon) => {
                 let mut bytes: Vec<u8> = Vec::new();
@@ -74,12 +77,6 @@ impl ActivityStorage {
             }
             None => None,
         };
-        // let icon = activity.icon.as_ref().map(|icon| {
-        //     let mut bytes: Vec<u8> = Vec::new();
-        //     icon.write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Png)
-        //         .map_err(|e| ActivityError::Image(e)).;
-        //     bytes
-        // });
         let response = client
             .insert_activity(InsertActivityRequest {
                 id: None,
@@ -111,10 +108,8 @@ impl ActivityStorage {
         let mut saved_assets = Vec::new();
 
         for asset in &activity.assets {
-            // if ids.contains(&asset.get_id().to_string()) {
             let saved_info = self.save_asset_to_service(asset).await?;
             saved_assets.push(saved_info);
-            // }
         }
 
         Ok(saved_assets)
@@ -124,14 +119,10 @@ impl ActivityStorage {
         &self,
         asset: &ActivityAsset,
     ) -> ActivityResult<SavedAssetInfo> {
-        // let service_endpoint = self.config.service_endpoint.as_ref().ok_or_else(|| {
-        //     ActivityError::Configuration("service_endpoint not configured".to_string())
-        // })?;
+        let mut client = self.asset_client();
 
         let bytes = serde_json::to_vec(asset)?;
         let file_size = bytes.len() as u64;
-
-        let mut client = self.asset_client.clone();
 
         let metadata = serde_json::json!({
             "asset_type": asset.get_asset_type(),

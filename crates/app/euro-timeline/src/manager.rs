@@ -3,7 +3,8 @@ use bon::bon;
 use euro_activity::{SavedAssetInfo, types::SnapshotFunctionality};
 use log::{debug, info};
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, watch};
+use tonic::transport::Channel;
 
 use crate::{
     ActivityStorage, AssetFunctionality, ContextChip, TimelineError, collector::CollectorService,
@@ -19,7 +20,7 @@ pub struct TimelineManager {
 #[bon]
 impl TimelineManager {
     #[builder]
-    pub async fn new() -> TimelineResult<Self> {
+    pub fn new(channel_rx: watch::Receiver<Channel>) -> TimelineResult<Self> {
         let timeline_config = TimelineConfig::default();
         timeline_config.validate()?;
         let storage = Arc::new(Mutex::new(TimelineStorage::new(
@@ -28,7 +29,7 @@ impl TimelineManager {
 
         let collector =
             CollectorService::new_with_timeline_config(Arc::clone(&storage), timeline_config);
-        let activity_storage = Arc::new(Mutex::new(ActivityStorage::new().await));
+        let activity_storage = Arc::new(Mutex::new(ActivityStorage::new(channel_rx)));
 
         Ok(TimelineManager {
             storage,

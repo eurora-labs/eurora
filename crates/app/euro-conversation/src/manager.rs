@@ -4,7 +4,7 @@ use crate::{
     types::ConversationEvent,
 };
 use agent_chain::{BaseMessage, HumanMessage, SystemMessage};
-use euro_auth::{AuthedChannel, get_authed_channel};
+use euro_auth::{AuthManager, AuthedChannel, build_authed_channel};
 use proto_gen::agent_chain::{ProtoHumanMessage, ProtoSystemMessage};
 use proto_gen::conversation::{
     AddHiddenHumanMessageRequest, AddHumanMessageRequest, AddSystemMessageRequest,
@@ -13,41 +13,44 @@ use proto_gen::conversation::{
     proto_conversation_service_client::ProtoConversationServiceClient,
 };
 use std::pin::Pin;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, watch};
 use tokio_stream::{Stream, StreamExt};
+use tonic::transport::Channel;
 
 pub struct ConversationManager {
+    channel_rx: watch::Receiver<Channel>,
+    auth_manager: AuthManager,
     current_conversation: Conversation,
-    conversation_client: ProtoConversationServiceClient<AuthedChannel>,
     conversation_event_tx: broadcast::Sender<ConversationEvent>,
 }
 
 impl ConversationManager {
-    pub async fn new() -> Self {
-        let channel = get_authed_channel().await;
-        let conversation_client = ProtoConversationServiceClient::new(channel.clone());
+    pub fn new(channel_rx: watch::Receiver<Channel>) -> Self {
+        let auth_manager = AuthManager::new(channel_rx.clone());
         let (conversation_event_tx, _) = broadcast::channel(100);
 
         Self {
+            channel_rx,
+            auth_manager,
             current_conversation: Conversation::default(),
-            conversation_client,
             conversation_event_tx,
         }
     }
 
+    /// Build a client from the latest channel with auth interceptor.
+    fn client(&self) -> ProtoConversationServiceClient<AuthedChannel> {
+        let channel = self.channel_rx.borrow().clone();
+        let authed = build_authed_channel(channel, self.auth_manager.clone());
+        ProtoConversationServiceClient::new(authed)
+    }
+
     pub async fn create_empty_conversation(&mut self) -> Result<&Conversation> {
         self.current_conversation = Conversation::default();
-        // self.conversation_event_tx
-        //     .send(ConversationEvent::NewConversation {
-        //         id: None,
-        //         title: self.current_conversation.title().to_string(),
-        //     })?;
-
         Ok(&self.current_conversation)
     }
 
     pub async fn switch_conversation(&mut self, conversation_id: String) -> Result<&Conversation> {
-        let mut client = self.conversation_client.clone();
+        let mut client = self.client();
         let conversation = client
             .get_conversation(GetConversationRequest { conversation_id })
             .await?
@@ -56,12 +59,6 @@ impl ConversationManager {
             .ok_or(Error::ConversationNotFound)?;
 
         self.current_conversation = conversation.into();
-
-        // self.conversation_event_tx
-        //     .send(ConversationEvent::NewConversation {
-        //         id: self.current_conversation.id(),
-        //         title: self.current_conversation.title().to_string(),
-        //     })?;
 
         Ok(&self.current_conversation)
     }
@@ -86,7 +83,7 @@ impl ConversationManager {
         &mut self,
         request: CreateConversationRequest,
     ) -> Result<Conversation> {
-        let mut client = self.conversation_client.clone();
+        let mut client = self.client();
         let response = client.create_conversation(request).await?.into_inner();
         if let Some(conversation) = response.conversation {
             if self.current_conversation.id().is_none() {
@@ -115,7 +112,7 @@ impl ConversationManager {
         &self,
         request: ListConversationsRequest,
     ) -> Result<Vec<Conversation>> {
-        let mut client = self.conversation_client.clone();
+        let mut client = self.client();
         let response = client.list_conversations(request).await?.into_inner();
 
         Ok(response
@@ -126,7 +123,7 @@ impl ConversationManager {
     }
 
     pub async fn get_current_messages(&self, limit: u32, offset: u32) -> Result<Vec<BaseMessage>> {
-        let mut client = self.conversation_client.clone();
+        let mut client = self.client();
         let id = self
             .current_conversation
             .id()
@@ -149,7 +146,7 @@ impl ConversationManager {
     }
 
     pub async fn get_conversation(&self, conversation_id: String) -> Result<Conversation> {
-        let mut client = self.conversation_client.clone();
+        let mut client = self.client();
         let response = client
             .get_conversation(GetConversationRequest { conversation_id })
             .await?
@@ -168,7 +165,7 @@ impl ConversationManager {
         limit: u32,
         offset: u32,
     ) -> Result<Vec<BaseMessage>> {
-        let mut client = self.conversation_client.clone();
+        let mut client = self.client();
         let response = client
             .get_messages(GetMessagesRequest {
                 conversation_id,
@@ -190,7 +187,7 @@ impl ConversationManager {
         conversation_id: String,
         content: String,
     ) -> Result<Conversation> {
-        let mut client = self.conversation_client.clone();
+        let mut client = self.client();
         let response = client
             .generate_conversation_title(GenerateConversationTitleRequest {
                 conversation_id,
@@ -210,7 +207,7 @@ impl ConversationManager {
 
 impl ConversationManager {
     pub async fn add_human_message(&mut self, message: &HumanMessage) -> Result<()> {
-        let mut client = self.conversation_client.clone();
+        let mut client = self.client();
         let proto_message: ProtoHumanMessage = message.clone().into();
         let conversation_id = self
             .current_conversation
@@ -227,7 +224,7 @@ impl ConversationManager {
     }
 
     pub async fn add_hidden_human_message(&mut self, message: &HumanMessage) -> Result<()> {
-        let mut client = self.conversation_client.clone();
+        let mut client = self.client();
         let proto_message: ProtoHumanMessage = message.clone().into();
         client
             .add_hidden_human_message(AddHiddenHumanMessageRequest {
@@ -239,7 +236,7 @@ impl ConversationManager {
     }
 
     pub async fn add_system_message(&mut self, message: &SystemMessage) -> Result<()> {
-        let mut client = self.conversation_client.clone();
+        let mut client = self.client();
         let proto_message: ProtoSystemMessage = message.clone().into();
         client
             .add_system_message(AddSystemMessageRequest {
@@ -256,7 +253,7 @@ impl ConversationManager {
         &mut self,
         content: String,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<String>> + Send>>> {
-        let mut client = self.conversation_client.clone();
+        let mut client = self.client();
         let stream = client
             .chat_stream(ChatStreamRequest {
                 conversation_id: self.current_conversation.id().unwrap().to_string(),

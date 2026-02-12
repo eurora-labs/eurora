@@ -57,6 +57,7 @@ euro-auth = { path = "crates/app/euro-auth" }
 euro-browser = { path = "crates/app/euro-browser" }
 euro-conversation = { path = "crates/app/euro-conversation" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
+euro-endpoint = { path = "crates/app/euro-endpoint" }
 euro-fs = { path = "crates/app/euro-fs" }
 euro-native-messaging = { path = "crates/app/euro-native-messaging" }
 euro-screen-position = { path = "crates/app/euro-screen-position" }
