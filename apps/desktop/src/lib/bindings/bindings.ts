@@ -14,6 +14,8 @@ export type ConversationView = { id: string | null; title: string }
 
 export type GeneralSettings = { autostart: boolean }
 
+export type LocalBackendInfo = { grpc_port: number; http_port: number; postgres_port: number }
+
 export type LoginToken = { code_challenge: string; expires_in: bigint; url: string }
 
 export type MessageView = { id: string | null; role: string; content: string }
@@ -28,7 +30,7 @@ export type TimelineAppEvent = { name: string; color: string | null; icon_base64
 
 export type UpdateInfo = { version: string; body: string | null }
 
-const ARGS_MAP = { 'auth':'{"get_login_token":[],"get_role":[],"is_authenticated":[],"poll_for_login":[]}', 'chat':'{"send_query":["conversation_id","channel","query"]}', 'context_chip':'{"get":[]}', 'conversation':'{"conversation_title_changed":["conversation"],"create":[],"create_empty_conversation":[],"current_conversation_changed":["conversation"],"get_messages":["conversation_id","limit","offset"],"list":["limit","offset"],"new_conversation_added":["conversation"],"switch_conversation":["conversation_id"]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"install_update":[],"list_activities":[],"quit":[],"request_accessibility_permission":[]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
+const ARGS_MAP = { 'auth':'{"get_login_token":[],"get_role":[],"is_authenticated":[],"poll_for_login":[]}', 'chat':'{"send_query":["conversation_id","channel","query"]}', 'context_chip':'{"get":[]}', 'conversation':'{"conversation_title_changed":["conversation"],"create":[],"create_empty_conversation":[],"current_conversation_changed":["conversation"],"get_messages":["conversation_id","limit","offset"],"list":["limit","offset"],"new_conversation_added":["conversation"],"switch_conversation":["conversation_id"]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"get_docker_compose_path":[],"install_update":[],"list_activities":[],"quit":[],"request_accessibility_permission":[],"start_local_backend":[]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
 export type Router = { "auth": {get_login_token: () => Promise<LoginToken>, 
 get_role: () => Promise<string>, 
 is_authenticated: () => Promise<boolean>, 
@@ -60,10 +62,12 @@ set_telemetry_settings: (telemetrySettings: TelemetrySettings) => Promise<Teleme
 "system": {check_accessibility_permission: () => Promise<boolean>, 
 check_for_update: () => Promise<UpdateInfo | null>, 
 check_grpc_server_connection: (serverAddress: string | null) => Promise<string>, 
+get_docker_compose_path: () => Promise<string>, 
 install_update: () => Promise<null>, 
 list_activities: () => Promise<ContextChip[]>, 
 quit: () => Promise<null>, 
-request_accessibility_permission: () => Promise<null>},
+request_accessibility_permission: () => Promise<null>, 
+start_local_backend: () => Promise<LocalBackendInfo>},
 "third_party": {check_api_key_exists: () => Promise<boolean>, 
 save_api_key: (apiKey: string) => Promise<null>},
 "timeline": {list: () => Promise<string[]>, 

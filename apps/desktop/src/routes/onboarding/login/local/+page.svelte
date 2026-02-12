@@ -1,20 +1,31 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Item from '@eurora/ui/components/item/index';
-	import CopyIcon from '@lucide/svelte/icons/copy';
 	import CheckIcon from '@lucide/svelte/icons/check';
+	import PlayIcon from '@lucide/svelte/icons/play';
+	import LoaderIcon from '@lucide/svelte/icons/loader';
+	import { toast } from 'svelte-sonner';
 
-	const dockerRun = `docker run -d \\
-  --name eurora-backend \\
-  -p 8080:8080 \\
-  ghcr.io/eurora-labs/eurora/be-monolith:latest \\
-  --RUNNING_EURORA_FULLY_LOCAL=true
-  --OLLAMA_MODEL=your_model \\
-  --POSTGRESQL_URL=your_local_postgresql`;
+	let taurpc = inject(TAURPC_SERVICE);
 
-	function copy(text: string) {
-		navigator.clipboard.writeText(text);
+	let starting = $state(false);
+	let backendInfo: { grpc_port: number; http_port: number; postgres_port: number } | null =
+		$state(null);
+
+	async function startBackend() {
+		starting = true;
+		try {
+			const info = await taurpc.system.start_local_backend();
+			backendInfo = info;
+			toast.success(`Backend started on gRPC :${info.grpc_port}, HTTP :${info.http_port}`);
+		} catch (error) {
+			toast.error(`Failed to start backend: ${error}`);
+		} finally {
+			starting = false;
+		}
 	}
 </script>
 
@@ -27,7 +38,7 @@
 	<div class="w-full flex-1 overflow-y-auto pb-8">
 		<Item.Root variant="default">
 			<Item.Content>
-				<Item.Title>1. Make sure Docker is installed</Item.Title>
+				<Item.Title>1. Make sure Docker is installed and running</Item.Title>
 				<Item.Description>
 					You can download Docker from the
 					<a href="https://docs.docker.com/get-docker/" target="_blank"
@@ -39,46 +50,31 @@
 
 		<Item.Root variant="default">
 			<Item.Content>
-				<Item.Title>2. Pull the official Eurora backend image</Item.Title>
+				<Item.Title>2. Start the backend</Item.Title>
 				<Item.Description>
-					<Button
-						variant="ghost"
-						class="font-mono text-xs"
-						onclick={() =>
-							copy('docker pull ghcr.io/eurora-labs/eurora/be-monolith:latest')}
-					>
-						docker pull ghcr.io/eurora-labs/eurora/be-monolith:latest
-						<CopyIcon class="size-3.5 shrink-0" />
-					</Button>
+					This will start the Eurora backend and a PostgreSQL database using Docker
+					Compose.
 				</Item.Description>
 			</Item.Content>
+			<Item.Actions>
+				<Button onclick={startBackend} disabled={starting || !!backendInfo}>
+					{#if starting}
+						<LoaderIcon class="size-4 animate-spin" />
+						Starting...
+					{:else if backendInfo}
+						<CheckIcon class="size-4" />
+						Started
+					{:else}
+						<PlayIcon class="size-4" />
+						Start
+					{/if}
+				</Button>
+			</Item.Actions>
 		</Item.Root>
 
 		<Item.Root variant="default">
 			<Item.Content>
-				<Item.Title>3. Start the backend</Item.Title>
-				<Item.Description class="line-clamp-none">
-					<span>
-						Run the container with the required flags. Replace <code>your_model</code>
-						with your Ollama model name and <code>your_local_postgresql</code> with your PostgreSQL
-						connection string.
-					</span>
-					<br />
-					<Button
-						variant="ghost"
-						class="font-mono text-xs whitespace-pre-wrap text-left h-auto py-2"
-						onclick={() => copy(dockerRun)}
-					>
-						{dockerRun}
-						<CopyIcon class="size-3.5 shrink-0 self-start mt-0.5" />
-					</Button>
-				</Item.Description>
-			</Item.Content>
-		</Item.Root>
-
-		<Item.Root variant="default">
-			<Item.Content>
-				<Item.Title>4. Configure Eurora</Item.Title>
+				<Item.Title>3. Configure Eurora</Item.Title>
 				<Item.Description>
 					Once the backend is running, you can change the backend URL later in Settings
 					&rarr; API.
@@ -88,7 +84,7 @@
 
 		<Item.Root variant="outline">
 			<Item.Content>
-				<Item.Title>5. Check the connection</Item.Title>
+				<Item.Title>4. Check the connection</Item.Title>
 				<Item.Description>
 					Verify that the backend is reachable and enter the app.
 				</Item.Description>
