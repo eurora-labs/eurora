@@ -26,21 +26,19 @@ pub struct DatabaseManager {
 #[bon]
 impl DatabaseManager {
     pub async fn new(database_url: &str) -> DbResult<Self> {
-        // Create the database if it doesn't exist
         if !sqlx::Postgres::database_exists(database_url).await? {
             sqlx::Postgres::create_database(database_url).await?;
         }
 
         let pool = PgPoolOptions::new()
             .max_connections(50)
-            .min_connections(3) // Minimum number of idle connections
+            .min_connections(3)
             .acquire_timeout(Duration::from_secs(10))
             .connect(database_url)
             .await?;
 
         let db_manager = DatabaseManager { pool };
 
-        // Run migrations after establishing the connection
         Self::run_migrations(&db_manager.pool).await?;
 
         Ok(db_manager)
@@ -52,15 +50,12 @@ impl DatabaseManager {
         Ok(())
     }
 
-    // User management methods
     pub async fn create_user(&self, request: NewUser) -> DbResult<User> {
         let user_id = Uuid::now_v7();
         let now = Utc::now();
 
-        // Start a transaction to ensure both user and password_credentials are created atomically
         let mut tx = self.pool.begin().await?;
 
-        // Insert user
         let user = sqlx::query_as::<_, User>(
             r#"
             INSERT INTO users (id, username, email, display_name, email_verified, created_at, updated_at)
@@ -78,7 +73,6 @@ impl DatabaseManager {
         .fetch_one(&mut *tx)
         .await?;
 
-        // Only insert password credentials if a password hash is provided
         // OAuth-only users don't have password credentials
         if let Some(ref password_hash) = request.password_hash {
             let password_id = Uuid::now_v7();
@@ -97,7 +91,6 @@ impl DatabaseManager {
             .await?;
         }
 
-        // Commit the transaction
         tx.commit().await?;
 
         Ok(user)
@@ -148,7 +141,6 @@ impl DatabaseManager {
         Ok(user)
     }
 
-    // Password credentials management methods
     pub async fn get_password_credentials(&self, user_id: Uuid) -> DbResult<PasswordCredentials> {
         let credentials = sqlx::query_as::<_, PasswordCredentials>(
             r#"
@@ -164,7 +156,6 @@ impl DatabaseManager {
         Ok(credentials)
     }
 
-    // Utility methods
     pub async fn user_exists_by_username(&self, username: &str) -> DbResult<bool> {
         let count: (i64,) = sqlx::query_as(
             r#"
@@ -191,7 +182,6 @@ impl DatabaseManager {
         Ok(count.0 > 0)
     }
 
-    // OAuth credentials management methods
     pub async fn create_oauth_credentials(
         &self,
         request: CreateOAuthCredentials,
@@ -301,7 +291,6 @@ impl DatabaseManager {
         Ok(user)
     }
 
-    // Refresh token management methods
     pub async fn create_refresh_token(
         &self,
         request: CreateRefreshToken,
@@ -364,7 +353,6 @@ impl DatabaseManager {
         Ok(refresh_token)
     }
 
-    // OAuth state management methods
     pub async fn create_oauth_state(&self, request: CreateOAuthState) -> DbResult<OAuthState> {
         let id = Uuid::now_v7();
         let now = Utc::now();
@@ -426,7 +414,6 @@ impl DatabaseManager {
         Ok(oauth_state)
     }
 
-    // Login token management methods
     pub async fn create_login_token(&self, request: CreateLoginToken) -> DbResult<LoginToken> {
         let id = Uuid::now_v7();
         let now = Utc::now();
@@ -506,7 +493,6 @@ impl DatabaseManager {
     // Activity Management Methods
     // =========================================================================
 
-    /// Create a new activity
     pub async fn create_activity(&self, request: NewActivity) -> DbResult<Activity> {
         let id = request.id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
@@ -534,7 +520,6 @@ impl DatabaseManager {
         Ok(activity)
     }
 
-    /// Get an activity by ID for a specific user
     pub async fn get_activity_for_user(
         &self,
         activity_id: Uuid,
@@ -555,7 +540,6 @@ impl DatabaseManager {
         Ok(activity)
     }
 
-    /// List activities for a user with pagination
     pub async fn list_activities(
         &self,
         request: ListActivities,
@@ -582,7 +566,6 @@ impl DatabaseManager {
         Ok(activities)
     }
 
-    /// Update an existing activity
     pub async fn update_activity(&self, request: UpdateActivity) -> DbResult<Activity> {
         let now = Utc::now();
 
@@ -615,7 +598,6 @@ impl DatabaseManager {
         Ok(activity)
     }
 
-    /// Update activity end time
     pub async fn update_activity_end_time(&self, request: UpdateActivityEndTime) -> DbResult<()> {
         let now = Utc::now();
 
@@ -636,7 +618,6 @@ impl DatabaseManager {
         Ok(())
     }
 
-    /// Get the last active (not ended) activity for a user
     pub async fn get_last_active_activity(&self, user_id: Uuid) -> DbResult<Option<Activity>> {
         let activity = sqlx::query_as::<_, Activity>(
             r#"
@@ -654,7 +635,6 @@ impl DatabaseManager {
         Ok(activity)
     }
 
-    /// Delete an activity
     pub async fn delete_activity(&self, activity_id: Uuid, user_id: Uuid) -> DbResult<Activity> {
         let activity = sqlx::query_as::<_, Activity>(
             r#"
@@ -671,7 +651,6 @@ impl DatabaseManager {
         Ok(activity)
     }
 
-    /// Get activities by time range for a user
     pub async fn get_activities_by_time_range(
         &self,
         request: GetActivitiesByTimeRange,
@@ -706,7 +685,6 @@ impl DatabaseManager {
     // Asset Management Methods
     // =========================================================================
 
-    /// Create a new asset
     pub async fn create_asset(&self, request: NewAsset) -> DbResult<Asset> {
         let id = request.id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
@@ -738,8 +716,6 @@ impl DatabaseManager {
         Ok(asset)
     }
 
-    /// Link an asset to an activity
-    /// Verifies that both the activity and asset belong to the specified user
     pub async fn link_asset_to_activity(
         &self,
         activity_id: Uuid,
@@ -748,7 +724,6 @@ impl DatabaseManager {
     ) -> DbResult<ActivityAsset> {
         let now = Utc::now();
 
-        // Use CTE to verify ownership of both activity and asset before linking
         let activity_asset = sqlx::query_as::<_, ActivityAsset>(
             r#"
             WITH verified_activity AS (
@@ -777,7 +752,6 @@ impl DatabaseManager {
     // Conversation Management Methods
     // =========================================================================
 
-    /// Create a new conversation
     pub async fn create_conversation(&self, request: NewConversation) -> DbResult<Conversation> {
         let id = request.id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
@@ -800,7 +774,6 @@ impl DatabaseManager {
         Ok(conversation)
     }
 
-    /// Get a conversation by ID
     pub async fn get_conversation(&self, request: GetConversation) -> DbResult<Conversation> {
         let conversation = sqlx::query_as::<_, Conversation>(
             r#"
@@ -817,7 +790,6 @@ impl DatabaseManager {
         Ok(conversation)
     }
 
-    /// Update a conversation
     #[builder]
     pub async fn update_conversation(
         &self,
@@ -845,7 +817,6 @@ impl DatabaseManager {
         Ok(conversation)
     }
 
-    /// List conversations for a user with pagination
     pub async fn list_conversations(
         &self,
         request: ListConversations,
@@ -876,7 +847,6 @@ impl DatabaseManager {
     // Message Management Methods
     // =========================================================================
 
-    /// Create a new message
     #[builder]
     pub async fn create_message(
         &self,
@@ -934,11 +904,7 @@ impl DatabaseManager {
     }
 
     #[builder]
-    /// List messages for a conversation with pagination
-    ///
-    /// By default, retrieves all messages regardless of `hidden_from_ui` status.
-    /// If `only_visible` is `Some(true)`, only retrieves messages where `hidden_from_ui = false` (visible messages).
-    /// If `only_visible` is `Some(false)`, only retrieves messages where `hidden_from_ui = true` (hidden messages).
+    /// `only_visible`: `None` = all, `Some(true)` = visible only, `Some(false)` = hidden only.
     pub async fn list_messages(
         &self,
         conversation_id: Uuid,
@@ -998,7 +964,6 @@ impl DatabaseManager {
     // Stripe Billing Methods
     // =========================================================================
 
-    /// Check whether a Stripe webhook event has already been processed.
     pub async fn is_webhook_event_processed(&self, event_id: &str) -> DbResult<bool> {
         let count: (i64,) =
             sqlx::query_as("SELECT COUNT(*) FROM stripe.webhook_events WHERE event_id = $1")
@@ -1009,7 +974,6 @@ impl DatabaseManager {
         Ok(count.0 > 0)
     }
 
-    /// Record a Stripe webhook event as processed.
     pub async fn record_webhook_event(&self, event_id: &str, event_type: &str) -> DbResult<()> {
         sqlx::query(
             r#"
@@ -1042,12 +1006,7 @@ impl DatabaseManager {
         Ok(result)
     }
 
-    /// Upsert a Stripe customer record, linking it to an app user by email.
-    ///
-    /// If `email` is provided and a matching user exists, `app_user_id` is set.
-    /// On conflict (existing customer_id), email and app_user_id are updated.
-    ///
-    /// Accepts an optional transaction executor; falls back to the pool.
+    /// If `email` matches an existing user, `app_user_id` is set automatically.
     pub async fn upsert_stripe_customer<'e, E>(
         &self,
         executor: E,
@@ -1060,7 +1019,6 @@ impl DatabaseManager {
     {
         let now = Utc::now();
 
-        // Resolve app_user_id from email if possible
         let app_user_id: Option<Uuid> = if let Some(email) = email {
             sqlx::query_scalar("SELECT id FROM users WHERE email = $1")
                 .bind(email)
@@ -1093,10 +1051,7 @@ impl DatabaseManager {
         Ok(())
     }
 
-    /// Ensure an application account exists for the given user, linked to a Stripe customer.
-    ///
-    /// If an account already exists for this user, the Stripe customer link is updated.
-    /// Returns the account ID.
+    /// Upserts an account for the user, linking to a Stripe customer. Returns the account ID.
     pub async fn ensure_account_for_user<'e, E>(
         &self,
         executor: E,
@@ -1129,10 +1084,6 @@ impl DatabaseManager {
         Ok(account_id)
     }
 
-    /// Upsert a Stripe subscription record.
-    ///
-    /// Inserts a subscription row on checkout completion. On conflict,
-    /// updates the status, customer linkage, period, cancellation, and raw data.
     #[builder]
     pub async fn upsert_stripe_subscription<'e, E>(
         &self,
@@ -1190,8 +1141,6 @@ impl DatabaseManager {
         Ok(())
     }
 
-    /// Upsert Stripe subscription items for a given subscription.
-    ///
     /// Replaces all existing items for the subscription with the provided set.
     pub async fn sync_stripe_subscription_items<'e, E>(
         &self,
@@ -1202,8 +1151,6 @@ impl DatabaseManager {
     where
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
-        // Build a single query that deletes old items and inserts new ones.
-        // For simplicity, we use a CTE approach.
         if items.is_empty() {
             sqlx::query("DELETE FROM stripe.subscription_items WHERE subscription_id = $1")
                 .bind(subscription_id)
@@ -1212,12 +1159,7 @@ impl DatabaseManager {
             return Ok(());
         }
 
-        // We need a transaction-like executor, but since this is already called
-        // within a transaction from webhook handlers, we use multiple queries on
-        // the same executor. However, sqlx Executor is consumed after one use,
-        // so we'll build a single batch query.
-        //
-        // Use a CTE to delete then insert in one round-trip.
+        // Single CTE to delete + insert in one round-trip (executor is consumed after one use)
         let mut query = String::from(
             "WITH deleted AS (DELETE FROM stripe.subscription_items WHERE subscription_id = $1) INSERT INTO stripe.subscription_items (id, subscription_id, price_id, quantity, raw_data) VALUES ",
         );
@@ -1252,7 +1194,6 @@ impl DatabaseManager {
         Ok(())
     }
 
-    /// Update the status of an existing Stripe subscription.
     pub async fn update_stripe_subscription_status(
         &self,
         subscription_id: &str,

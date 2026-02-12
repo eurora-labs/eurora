@@ -3,7 +3,6 @@ use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Validation, decode};
 
 pub use auth_core::{Claims, Role};
 
-/// Configuration for JWT tokens
 #[derive(Clone)]
 pub struct JwtConfig {
     pub access_token_encoding_key: EncodingKey,
@@ -52,7 +51,6 @@ impl JwtConfig {
         let token_data = decode::<Claims>(token, &self.access_token_decoding_key, &self.validation)
             .map_err(|e| anyhow!("Invalid token: {}", e))?;
 
-        // Ensure it's an access token
         if token_data.claims.token_type != "access" {
             return Err(anyhow!("Invalid token type: expected access token"));
         }
@@ -65,7 +63,6 @@ impl JwtConfig {
             decode::<Claims>(token, &self.refresh_token_decoding_key, &self.validation)
                 .map_err(|e| anyhow!("Invalid token: {}", e))?;
 
-        // Ensure it's a refresh token
         if token_data.claims.token_type != "refresh" {
             return Err(anyhow!("Invalid token type: expected refresh token"));
         }

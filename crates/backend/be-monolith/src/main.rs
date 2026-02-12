@@ -2,15 +2,14 @@ use std::{net::SocketAddr, sync::Arc};
 
 use be_activity_service::{ActivityService, ProtoActivityServiceServer};
 use be_asset_service::{AssetService, ProtoAssetServiceServer};
+use be_auth_grpc::JwtInterceptor;
 use be_auth_service::AuthService;
 use be_conversation_service::{ConversationService, ProtoConversationServiceServer};
-use dotenv::dotenv;
-use proto_gen::auth::proto_auth_service_server::ProtoAuthServiceServer;
-// use euro_proto::proto_prompt_service::proto_prompt_service_server::ProtoPromptServiceServer;
-use be_auth_grpc::JwtInterceptor;
 use be_payment_service::init_payment_service;
 use be_remote_db::DatabaseManager;
 use be_update_service::init_update_service;
+use dotenv::dotenv;
+use proto_gen::auth::proto_auth_service_server::ProtoAuthServiceServer;
 use tonic::transport::Server;
 use tonic_web::GrpcWebLayer;
 use tower_http::cors::CorsLayer;
@@ -22,9 +21,8 @@ use tracing_subscriber::util::SubscriberInitExt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Load environment variables
     dotenv().ok();
-    // Initialize sentry if running in production
+
     if cfg!(not(debug_assertions)) {
         let sentry_dsn =
             std::env::var("SENTRY_MONOLITH_DSN").expect("SENTRY_MONOLITH_DSN must be set");
@@ -47,20 +45,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await;
 
     let filter = EnvFilter::builder()
-        .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
-        .parse_lossy("be_=debug,hyper=off,tokio=off"); // keep yours, silence deps
+        .with_default_directive(LevelFilter::WARN.into())
+        .parse_lossy("be_=debug,hyper=off,tokio=off");
 
-    // Initialize tracing
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_filter(filter.clone()))
         .with(sentry::integrations::tracing::layer().with_filter(filter))
         .try_init()
         .unwrap();
-
-    // let subscriber = FmtSubscriber::builder()
-    //     .with_max_level(Level::INFO)
-    //     .finish();
-    // tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
 
     let database_url = std::env::var("REMOTE_DATABASE_URL")
         .expect("REMOTE_DATABASE_URL environment variable must be set");
@@ -91,7 +83,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cors = CorsLayer::permissive();
 
-    // Initialize update service
     let bucket_name =
         std::env::var("S3_BUCKET_NAME").unwrap_or_else(|_| "eurora-releases".to_string());
 
@@ -103,7 +94,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    // Initialize payment service
     let payment_router = match init_payment_service(db_manager.clone()) {
         Ok(router) => router,
         Err(e) => {
@@ -112,7 +102,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    // Create shutdown signal
     let shutdown_signal = async {
         tokio::signal::ctrl_c()
             .await
@@ -120,7 +109,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         debug!("Shutting down gracefully...");
     };
 
-    // Start both servers concurrently
     let grpc_server = Server::builder()
         .accept_http1(true)
         .layer(cors)
@@ -154,7 +142,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .expect("Failed to install CTRL+C signal handler");
     });
 
-    // Run both servers concurrently
     tokio::select! {
         result = grpc_server => {
             if let Err(e) = result {
