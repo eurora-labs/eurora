@@ -1,5 +1,3 @@
-//! High-level timeline manager implementation
-
 use agent_chain_core::BaseMessage;
 use bon::bon;
 use euro_activity::{SavedAssetInfo, types::SnapshotFunctionality};
@@ -12,13 +10,9 @@ use crate::{
     config::TimelineConfig, error::TimelineResult, storage::TimelineStorage, types::ActivityEvent,
 };
 
-/// High-level timeline manager that provides a simple API for timeline operations
 pub struct TimelineManager {
-    /// Shared storage for timeline data
     pub storage: Arc<Mutex<TimelineStorage>>,
-    /// Shared disk storage for saving activities
     pub activity_storage: Arc<Mutex<ActivityStorage>>,
-    /// Collection service
     pub collector: CollectorService,
 }
 
@@ -43,40 +37,26 @@ impl TimelineManager {
         })
     }
 
-    /// Start the timeline manager (begins activity collection)
-    ///
-    /// This also starts the browser bridge gRPC server which accepts connections
-    /// from native messaging hosts. The server will run as long as the timeline
-    /// manager is alive.
     pub async fn start(&mut self) -> TimelineResult<()> {
         debug!("Starting timeline manager");
 
-        // Start the browser bridge server for native messenger communication
         info!("Starting browser bridge gRPC server");
         euro_browser::start_browser_bridge_server().await;
 
         self.collector.start().await
     }
 
-    /// Stop the timeline manager
-    ///
-    /// This stops activity collection and gracefully shuts down the browser bridge
-    /// gRPC server, disconnecting all native messengers.
     pub async fn stop(&mut self) -> TimelineResult<()> {
         debug!("Stopping timeline manager");
 
-        // Stop the browser bridge server
         info!("Stopping browser bridge gRPC server");
         euro_browser::stop_browser_bridge_server().await;
 
-        // Stop the collector if it has a stop method
-        // For now, just log that we're stopping
         info!("Timeline manager stopped");
 
         Ok(())
     }
 
-    /// Get context chips from the current activity
     pub async fn get_context_chips(&self) -> Vec<ContextChip> {
         let storage = self.storage.lock().await;
         if let Some(activity) = storage.get_current_activity() {
@@ -86,7 +66,6 @@ impl TimelineManager {
         }
     }
 
-    /// Save the assets via the be-asset-service
     pub async fn save_assets_to_service_by_ids(
         &self,
         ids: &[String],
@@ -109,7 +88,6 @@ impl TimelineManager {
         }
     }
 
-    /// Save current activity to disk
     pub async fn save_current_activity_to_service(&self) -> TimelineResult<()> {
         let activity = {
             let storage = self.storage.lock().await;
@@ -154,7 +132,6 @@ impl TimelineManager {
         }
     }
 
-    /// Construct messages from current activity by ids
     pub async fn construct_asset_messages_by_ids(&self, ids: &[String]) -> Vec<BaseMessage> {
         let storage = self.storage.lock().await;
         if let Some(activity) = storage.get_current_activity() {
@@ -169,7 +146,6 @@ impl TimelineManager {
         }
     }
 
-    /// Construct messages from current activity snapshots by ids
     pub async fn construct_snapshot_messages_by_ids(&self, _ids: &[String]) -> Vec<BaseMessage> {
         let storage = self.storage.lock().await;
         if let Some(activity) = storage.get_current_activity() {
@@ -183,12 +159,10 @@ impl TimelineManager {
         }
     }
 
-    /// Subscribe to activity events
     pub fn subscribe_to_activity_events(&self) -> tokio::sync::broadcast::Receiver<ActivityEvent> {
         self.collector.subscribe_to_activity_events()
     }
 
-    /// Subscribe to new assets events
     pub fn subscribe_to_assets_events(&self) -> tokio::sync::broadcast::Receiver<Vec<ContextChip>> {
         self.collector.subscribe_to_assets_events()
     }

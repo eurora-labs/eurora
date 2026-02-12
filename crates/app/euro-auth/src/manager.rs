@@ -1,4 +1,3 @@
-// use crate::client::AuthClient;
 use crate::client::AuthClient;
 use anyhow::{Result, anyhow};
 use auth_core::Claims;
@@ -11,7 +10,6 @@ use tracing::error;
 
 #[derive(Debug, Clone)]
 pub struct JwtConfig {
-    /// Minutes offset
     refresh_offset: i64,
 }
 
@@ -43,7 +41,6 @@ impl AuthManager {
     ) -> Result<Sensitive<String>> {
         let response = self.auth_client.login_by_password(login, password).await?;
 
-        // Store tokens securely
         store_access_token(response.access_token.clone())?;
         store_refresh_token(response.refresh_token.clone())?;
 
@@ -73,14 +70,12 @@ impl AuthManager {
     }
 
     pub async fn get_or_refresh_access_token(&mut self) -> Result<Sensitive<String>> {
-        // Check if token has expired or is close to expiration
         match self.get_access_token_payload() {
             Ok(claims) => {
                 let now = chrono::Utc::now().timestamp();
                 let expiry_with_offset = claims.exp - self.jwt_config.refresh_offset * 60;
 
                 if now < expiry_with_offset {
-                    // Token is still valid
                     self.get_access_token()
                 } else {
                     self.refresh_tokens().await.map_err(|err| {
@@ -106,7 +101,6 @@ impl AuthManager {
 
         let response = self.auth_client.refresh_token(&refresh_token.0).await?;
 
-        // Store tokens securely
         store_access_token(response.access_token.clone())?;
         store_refresh_token(response.refresh_token.clone())?;
 
@@ -131,7 +125,6 @@ impl AuthManager {
     pub async fn login_by_login_token(&mut self, login_token: String) -> Result<Sensitive<String>> {
         let response = self.auth_client.login_by_login_token(login_token).await?;
 
-        // Store tokens securely
         store_access_token(response.access_token.clone())?;
         store_refresh_token(response.refresh_token.clone())?;
 

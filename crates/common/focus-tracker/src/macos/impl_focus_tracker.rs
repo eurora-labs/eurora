@@ -16,8 +16,6 @@ impl ImplFocusTracker {
     }
 }
 
-/// Tracks the previous focus state for change detection.
-/// Uses references to avoid cloning strings on every poll.
 #[derive(Default)]
 struct FocusState {
     process_name: String,
@@ -25,22 +23,17 @@ struct FocusState {
 }
 
 impl FocusState {
-    /// Check if the window has changed compared to the current state.
-    /// Returns true if process_name or window_title differs.
     fn has_changed(&self, window: &FocusedWindow) -> bool {
         self.process_name != window.process_name
             || self.window_title.as_deref() != window.window_title.as_deref()
     }
 
-    /// Update the state from the given window.
-    /// Only clones when necessary (when focus actually changed).
     fn update_from(&mut self, window: &FocusedWindow) {
         self.process_name = window.process_name.clone();
         self.window_title = window.window_title.clone();
     }
 }
 
-/// Check if the stop signal is set.
 #[inline]
 fn should_stop(stop_signal: Option<&AtomicBool>) -> bool {
     stop_signal.is_some_and(|stop| stop.load(Ordering::Relaxed))
@@ -107,18 +100,14 @@ impl ImplFocusTracker {
         let mut prev_state = FocusState::default();
 
         loop {
-            // Check stop signal before processing
             if should_stop(stop_signal) {
                 debug!("Stop signal received, exiting focus tracking loop");
                 break;
             }
 
-            // Get basic window info first (without icon - fast)
             match utils::get_frontmost_window_basic_info() {
                 Ok(mut window) => {
-                    // Only fetch icon and report when focus actually changed
                     if prev_state.has_changed(&window) {
-                        // Fetch icon only when focus changed (expensive operation)
                         match utils::fetch_icon_for_pid(window.process_id as i32, &config.icon) {
                             Ok(icon) => window.icon = icon,
                             Err(e) => debug!("Error fetching icon: {}", e),
@@ -150,18 +139,14 @@ impl ImplFocusTracker {
         let mut prev_state = FocusState::default();
 
         loop {
-            // Check stop signal before processing
             if should_stop(stop_signal) {
                 debug!("Stop signal received, exiting focus tracking loop");
                 break;
             }
 
-            // Get basic window info first (without icon - fast)
             match utils::get_frontmost_window_basic_info() {
                 Ok(mut window) => {
-                    // Only fetch icon and report when focus actually changed
                     if prev_state.has_changed(&window) {
-                        // Fetch icon only when focus changed (expensive operation)
                         match utils::fetch_icon_for_pid(window.process_id as i32, &config.icon) {
                             Ok(icon) => window.icon = icon,
                             Err(e) => debug!("Error fetching icon: {}", e),

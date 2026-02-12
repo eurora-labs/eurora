@@ -89,7 +89,6 @@ impl ConversationManager {
         let mut client = self.conversation_client.clone();
         let response = client.create_conversation(request).await?.into_inner();
         if let Some(conversation) = response.conversation {
-            // Assign the id if it's not already set
             if self.current_conversation.id().is_none() {
                 self.current_conversation
                     .set_id(uuid::Uuid::parse_str(&conversation.id).unwrap())?;
@@ -212,7 +211,6 @@ impl ConversationManager {
 impl ConversationManager {
     pub async fn add_human_message(&mut self, message: &HumanMessage) -> Result<()> {
         let mut client = self.conversation_client.clone();
-        // Convert HumanMessage to ProtoHumanMessage using the From trait implementation
         let proto_message: ProtoHumanMessage = message.clone().into();
         let conversation_id = self
             .current_conversation
@@ -230,7 +228,6 @@ impl ConversationManager {
 
     pub async fn add_hidden_human_message(&mut self, message: &HumanMessage) -> Result<()> {
         let mut client = self.conversation_client.clone();
-        // Convert HumanMessage to ProtoHumanMessage using the From trait implementation
         let proto_message: ProtoHumanMessage = message.clone().into();
         client
             .add_hidden_human_message(AddHiddenHumanMessageRequest {
@@ -243,7 +240,6 @@ impl ConversationManager {
 
     pub async fn add_system_message(&mut self, message: &SystemMessage) -> Result<()> {
         let mut client = self.conversation_client.clone();
-        // Convert SystemMessage to ProtoSystemMessage using the From trait implementation
         let proto_message: ProtoSystemMessage = message.clone().into();
         client
             .add_system_message(AddSystemMessageRequest {

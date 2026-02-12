@@ -12,7 +12,6 @@ use windows_sys::Win32::{
     },
 };
 
-/// Get the handle of the currently focused window
 pub fn get_foreground_window() -> Option<HWND> {
     let hwnd = unsafe { GetForegroundWindow() };
     if hwnd.is_null() || unsafe { IsWindow(hwnd) } == 0 {
@@ -22,18 +21,10 @@ pub fn get_foreground_window() -> Option<HWND> {
     }
 }
 
-/// Check if we're running in an interactive session
 pub fn is_interactive_session() -> FocusTrackerResult<bool> {
-    // Check if we can get the foreground window
-    // In a service context, this will typically fail
     Ok(unsafe { !GetForegroundWindow().is_null() })
 }
 
-/// Get the title of a window
-///
-/// # Safety
-/// This function is unsafe because it dereferences a raw pointer (HWND).
-/// The caller must ensure that the HWND is valid.
 pub unsafe fn get_window_title(hwnd: HWND) -> FocusTrackerResult<String> {
     let mut buffer = [0u16; 512];
     let len = unsafe { GetWindowTextW(hwnd, buffer.as_mut_ptr(), buffer.len() as i32) };
@@ -49,11 +40,6 @@ pub unsafe fn get_window_title(hwnd: HWND) -> FocusTrackerResult<String> {
     Ok(title)
 }
 
-/// Get the process ID of a window
-///
-/// # Safety
-/// This function is unsafe because it dereferences a raw pointer (HWND).
-/// The caller must ensure that the HWND is valid.
 pub unsafe fn get_window_process_id(hwnd: HWND) -> FocusTrackerResult<u32> {
     let mut process_id = 0u32;
     unsafe {
@@ -69,7 +55,6 @@ pub unsafe fn get_window_process_id(hwnd: HWND) -> FocusTrackerResult<u32> {
     Ok(process_id)
 }
 
-/// Get the process name from a process ID
 pub fn get_process_name(process_id: u32) -> FocusTrackerResult<String> {
     let process_handle =
         unsafe { OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, process_id) };
@@ -90,7 +75,6 @@ pub fn get_process_name(process_id: u32) -> FocusTrackerResult<String> {
         )
     };
 
-    // Close the process handle
     unsafe {
         CloseHandle(process_handle);
     }
@@ -108,11 +92,6 @@ pub fn get_process_name(process_id: u32) -> FocusTrackerResult<String> {
     Ok(name)
 }
 
-/// Get window information (title and process name) for a given window handle
-///
-/// # Safety
-/// This function is unsafe because it calls unsafe functions that dereference raw pointers.
-/// The caller must ensure that the HWND is valid.
 pub unsafe fn get_window_info(hwnd: HWND) -> FocusTrackerResult<(String, String)> {
     let title = unsafe { get_window_title(hwnd) }.unwrap_or_else(|_| String::new());
     let process_id = unsafe { get_window_process_id(hwnd) }?;
@@ -122,11 +101,6 @@ pub unsafe fn get_window_info(hwnd: HWND) -> FocusTrackerResult<(String, String)
     Ok((title, process_name))
 }
 
-/// Check if a window handle is valid
-///
-/// # Safety
-/// This function is unsafe because it dereferences a raw pointer (HWND).
-/// The caller must ensure that the HWND is not dangling.
 pub unsafe fn is_valid_window(hwnd: HWND) -> bool {
     !hwnd.is_null() && unsafe { IsWindow(hwnd) } != 0
 }
