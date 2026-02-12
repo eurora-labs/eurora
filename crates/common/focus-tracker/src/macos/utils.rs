@@ -50,7 +50,6 @@ const K_CG_WINDOW_LIST_OPTION_ON_SCREEN_ONLY: u32 = 1;
 const K_CG_WINDOW_LIST_EXCLUDE_DESKTOP_ELEMENTS: u32 = 1 << 4;
 const K_CG_NULL_WINDOW_ID: u32 = 0;
 
-/// Get basic window info without icon (for change detection)
 pub fn get_frontmost_window_basic_info() -> FocusTrackerResult<FocusedWindow> {
     autoreleasepool(|_pool| {
         let pid = get_frontmost_window_pid()?;
@@ -79,7 +78,6 @@ pub fn get_frontmost_window_basic_info() -> FocusTrackerResult<FocusedWindow> {
     })
 }
 
-/// Fetch icon for the given process ID
 pub fn fetch_icon_for_pid(
     pid: i32,
     icon_config: &IconConfig,
@@ -96,7 +94,6 @@ pub fn fetch_icon_for_pid(
 
 fn get_frontmost_window_pid() -> FocusTrackerResult<i32> {
     unsafe {
-        // Get list of all on-screen windows, ordered by front-to-back
         let options =
             K_CG_WINDOW_LIST_OPTION_ON_SCREEN_ONLY | K_CG_WINDOW_LIST_EXCLUDE_DESKTOP_ELEMENTS;
         let window_list_ref = CGWindowListCopyWindowInfo(options, K_CG_NULL_WINDOW_ID);
@@ -116,26 +113,22 @@ fn get_frontmost_window_pid() -> FocusTrackerResult<i32> {
         let layer_key = CFString::from_static_string("kCGWindowLayer");
         let pid_key = CFString::from_static_string("kCGWindowOwnerPID");
 
-        // Find the first window at layer 0 (normal application windows)
         for i in 0..window_list.len() {
             let window_info = window_list.get(i).ok_or_else(|| {
                 FocusTrackerError::Platform(format!("Failed to get window {}", i))
             })?;
 
-            // Check window layer
             if let Some(layer_ptr) = window_info.find(layer_key.as_CFTypeRef() as *const _) {
                 let layer_cftype = CFType::wrap_under_get_rule(layer_ptr.cast());
                 if let Some(layer_number) = layer_cftype.downcast::<CFNumber>()
                     && let Some(layer) = layer_number.to_i32()
                 {
-                    // Skip non-zero layers (these are overlays, menus, etc.)
                     if layer != 0 {
                         continue;
                     }
                 }
             }
 
-            // Get the PID for this window
             let pid_value_ptr = window_info
                 .find(pid_key.as_CFTypeRef() as *const _)
                 .ok_or_else(|| {
@@ -175,7 +168,6 @@ fn get_window_title_via_accessibility(pid: i32) -> FocusTrackerResult<Option<Str
         )
     };
 
-    // Release app_element - it follows the Create Rule
     unsafe { CFRelease(app_element as *const c_void) };
 
     if result == K_AX_ERROR_APIDISABLED {
@@ -196,27 +188,18 @@ fn get_window_title_via_accessibility(pid: i32) -> FocusTrackerResult<Option<Str
         )
     };
 
-    // Release focused_window - it follows the Create Rule
     unsafe { CFRelease(focused_window as *const c_void) };
 
     if result != K_AX_ERROR_SUCCESS || title.is_null() {
         return Ok(None);
     }
 
-    // Extract string from CFString and then release it
-    // The title follows the Create Rule from AXUIElementCopyAttributeValue
     let title_str = unsafe { cfstring_to_string(title as *const c_void) };
-
-    // Release title - it follows the Create Rule
     unsafe { CFRelease(title as *const c_void) };
 
     Ok(title_str)
 }
 
-/// Convert a CFString to a Rust String
-///
-/// # Safety
-/// The caller must ensure the pointer is a valid CFString
 unsafe fn cfstring_to_string(cf_string: *const c_void) -> Option<String> {
     if cf_string.is_null() {
         return None;
@@ -227,7 +210,6 @@ unsafe fn cfstring_to_string(cf_string: *const c_void) -> Option<String> {
         return Some(String::new());
     }
 
-    // UTF-8 can use up to 4 bytes per character, plus null terminator
     let buffer_size = (length * 4 + 1) as usize;
     let mut buffer: Vec<i8> = vec![0; buffer_size];
 
@@ -241,7 +223,6 @@ unsafe fn cfstring_to_string(cf_string: *const c_void) -> Option<String> {
     };
 
     if success {
-        // Find the null terminator and convert to String
         let c_str = unsafe { std::ffi::CStr::from_ptr(buffer.as_ptr()) };
         c_str.to_str().ok().map(|s| s.to_string())
     } else {

@@ -52,7 +52,6 @@ impl FocusTracker {
             .track_focus_with_stop(on_focus, stop_signal, &self.config)
     }
 
-    /// Async version of track_focus - requires the "async" feature
     #[cfg(feature = "async")]
     pub async fn track_focus_async<F, Fut>(&self, on_focus: F) -> FocusTrackerResult<()>
     where
@@ -64,7 +63,6 @@ impl FocusTracker {
             .await
     }
 
-    /// Async version of track_focus_with_stop - requires the "async" feature
     #[cfg(feature = "async")]
     pub async fn track_focus_async_with_stop<F, Fut>(
         &self,
@@ -80,20 +78,16 @@ impl FocusTracker {
             .await
     }
 
-    /// Subscribe to focus changes and receive them via a channel
     pub fn subscribe_focus_changes(&self) -> FocusTrackerResult<mpsc::Receiver<FocusedWindow>> {
         let (sender, receiver) = mpsc::channel();
         let stop_signal = AtomicBool::new(false);
 
-        // Clone the tracker for the background thread
         let tracker = self.clone();
 
-        // Spawn a background thread to track focus changes
         std::thread::spawn(move || {
             let _ = tracker.track_focus_with_stop(
                 move |window: FocusedWindow| -> FocusTrackerResult<()> {
                     if sender.send(window).is_err() {
-                        // Receiver has been dropped, stop tracking
                         return Err(crate::FocusTrackerError::Error(
                             "Receiver dropped".to_string(),
                         ));

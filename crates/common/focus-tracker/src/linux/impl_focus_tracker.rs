@@ -20,7 +20,6 @@ impl ImplFocusTracker {
         F: FnMut(FocusedWindow) -> FocusTrackerResult<()>,
     {
         if wayland_detect() {
-            // Wayland is not supported for the time being
             Err(FocusTrackerError::Unsupported)
         } else {
             xorg_focus_tracker::track_focus(on_focus, config)
@@ -37,7 +36,6 @@ impl ImplFocusTracker {
         F: FnMut(FocusedWindow) -> FocusTrackerResult<()>,
     {
         if wayland_detect() {
-            // Wayland is not supported for the time being
             Err(FocusTrackerError::Unsupported)
         } else {
             xorg_focus_tracker::track_focus_with_stop(on_focus, stop_signal, config)
@@ -55,7 +53,6 @@ impl ImplFocusTracker {
         Fut: Future<Output = FocusTrackerResult<()>>,
     {
         if wayland_detect() {
-            // Wayland is not supported for the time being
             Err(FocusTrackerError::Unsupported)
         } else {
             xorg_focus_tracker::track_focus_async(on_focus, config).await
@@ -74,7 +71,6 @@ impl ImplFocusTracker {
         Fut: Future<Output = FocusTrackerResult<()>>,
     {
         if wayland_detect() {
-            // Wayland is not supported for the time being
             Err(FocusTrackerError::Unsupported)
         } else {
             xorg_focus_tracker::track_focus_async_with_stop(on_focus, stop_signal, config).await

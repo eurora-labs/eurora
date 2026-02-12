@@ -29,13 +29,11 @@ impl Controller {
         Ok(user)
     }
 
-    /// Return the current login, or `None` if there is none yet.
     pub fn get_user(&self) -> Result<Option<User>> {
         let user = self.storage.get().context("failed to get user")?;
         Ok(user)
     }
 
-    /// Persist the user to storage.
     pub fn set_user(&self, user: &User) -> Result<()> {
         self.storage.set(user).context("failed to set user")
     }

@@ -8,14 +8,12 @@ use proto_gen::auth::{
 use tonic::transport::Channel;
 use tracing::error;
 
-/// gRPC client for authentication service
 #[derive(Debug, Clone)]
 pub struct AuthClient {
     client: Option<ProtoAuthServiceClient<Channel>>,
 }
 
 impl AuthClient {
-    /// Create a new gRPC client connected to the auth service
     pub async fn new() -> Self {
         let mut auth_client = Self { client: None };
         auth_client.get_or_init_client().await.ok();
@@ -36,7 +34,6 @@ impl AuthClient {
         Ok(self.login(req).await?)
     }
 
-    /// Login with email/username and password
     async fn login(&mut self, data: LoginRequest) -> Result<TokenResponse> {
         let mut client = self.get_or_init_client().await?;
         let response = client.login(data).await.map_err(|e| {
@@ -47,7 +44,6 @@ impl AuthClient {
         Ok(response.into_inner())
     }
 
-    /// Register a new user
     pub async fn register(
         &mut self,
         username: impl Into<String>,
@@ -72,7 +68,6 @@ impl AuthClient {
         Ok(response.into_inner())
     }
 
-    /// Refresh access token using refresh token
     pub async fn refresh_token(
         &mut self,
         refresh_token: impl Into<String>,
