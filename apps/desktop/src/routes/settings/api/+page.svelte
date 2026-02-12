@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { type ThirdPartySettings } from '$lib/bindings/bindings.js';
+	import { type ApiSettings } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
 	import { Checkbox } from '@eurora/ui/components/checkbox/index';
@@ -9,21 +9,21 @@
 
 	const taurpc = inject(TAURPC_SERVICE);
 
-	let thirdPartySettings = $state<ThirdPartySettings | null>(null);
+	let apiSettings = $state<ApiSettings | null>(null);
 	let customEndpoint = $state(false);
 	let endpointValue = $state('');
 
 	async function saveSettings() {
-		if (!thirdPartySettings) return;
-		await taurpc.settings.set_third_party_settings({
-			...thirdPartySettings,
-			endpoint: customEndpoint ? endpointValue : thirdPartySettings.endpoint,
+		if (!apiSettings) return;
+		await taurpc.settings.set_api_settings({
+			...apiSettings,
+			endpoint: customEndpoint ? endpointValue : apiSettings.endpoint,
 		});
 	}
 
 	function onCustomEndpointChange(checked: boolean) {
 		customEndpoint = checked;
-		if (!checked && thirdPartySettings) {
+		if (!checked && apiSettings) {
 			// Reset to current endpoint when unchecking
 			endpointValue = '';
 			saveSettings();
@@ -31,14 +31,14 @@
 	}
 
 	onMount(() => {
-		taurpc.settings.get_third_party_settings().then((settings) => {
-			thirdPartySettings = settings;
+		taurpc.settings.get_api_settings().then((settings) => {
+			apiSettings = settings;
 		});
 	});
 </script>
 
 <div class="flex flex-col p-4 gap-4">
-	<h1 class="text-2xl font-semibold">Third Party</h1>
+	<h1 class="text-2xl font-semibold">Api Settings</h1>
 
 	<div class="flex flex-col gap-4">
 		<div class="flex items-center gap-2">
@@ -55,7 +55,7 @@
 				<Label for="endpoint">Endpoint</Label>
 				<Input
 					id="endpoint"
-					placeholder={thirdPartySettings?.endpoint ?? ''}
+					placeholder={apiSettings?.endpoint ?? ''}
 					bind:value={endpointValue}
 					onblur={saveSettings}
 				/>

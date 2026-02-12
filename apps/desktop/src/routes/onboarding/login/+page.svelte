@@ -3,7 +3,7 @@
 	import * as Card from '@eurora/ui/components/card/index';
 </script>
 
-<div class="flex flex-col justify-center items-center h-full p-8">
+<div class="flex flex-col justify-center items-center h-full p-8 gap-8">
 	<Card.Root
 		class="flex group cursor-pointer w-full"
 		onclick={() => goto('/onboarding/login/first-party')}
@@ -16,7 +16,7 @@
 
 	<Card.Root
 		class="flex group cursor-pointer w-full"
-		onclick={() => goto('/no-access/run-locally')}
+		onclick={() => goto('/onboarding/login/local')}
 	>
 		<Card.Header class="pb-6 text-left">
 			<Card.Title class="mb-2 text-2xl font-semibold">Run Locally</Card.Title>

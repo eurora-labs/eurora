@@ -27,7 +27,7 @@ impl AppSettings {
         let mut app_settings: AppSettings = serde_json::from_value(settings)?;
 
         if let Ok(api_base_url) = std::env::var("API_BASE_URL") {
-            app_settings.third_party.endpoint = api_base_url;
+            app_settings.api.endpoint = api_base_url;
         }
 
         Ok(app_settings)

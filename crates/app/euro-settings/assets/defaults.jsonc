@@ -9,7 +9,7 @@
         "nonAnonymousMetrics": false,
         "distinctId": null
     },
-    "thirdParty": {
+    "api": {
         "endpoint": "https://api.eurora-labs.com"
     },
     "launcher": {}
