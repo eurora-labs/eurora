@@ -135,6 +135,14 @@ impl AuthService {
     }
 
     async fn resolve_role(&self, user_id: Uuid) -> Role {
+        let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
+            .map(|v| v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+
+        if local_mode {
+            return Role::Enterprise;
+        }
+
         match self.db.get_billing_state_for_user(user_id).await {
             Ok(Some(state)) if matches!(state.status.as_deref(), Some("active" | "trialing")) => {
                 match state.plan_id.as_deref() {
