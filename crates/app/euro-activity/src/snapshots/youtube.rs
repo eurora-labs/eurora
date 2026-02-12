@@ -115,21 +115,25 @@ impl SnapshotFunctionality for YoutubeSnapshot {
         let mut content_parts = vec![];
 
         // Add image if available
-        if let Some(image) = &self.video_frame {
+        if let Some(image) = &self.video_frame
+            && !image.is_empty()
+        {
             content_parts.push(ContentPart::Image {
                 source: ImageSource::Url {
                     url: format!("data:image/png;base64,{}", image.clone()),
                 },
                 detail: None,
             });
-        }
 
-        vec![
-            HumanMessage::builder()
-                .content(content_parts)
-                .build()
-                .into(),
-        ]
+            vec![
+                HumanMessage::builder()
+                    .content(content_parts)
+                    .build()
+                    .into(),
+            ]
+        } else {
+            vec![]
+        }
     }
 
     fn get_updated_at(&self) -> u64 {
