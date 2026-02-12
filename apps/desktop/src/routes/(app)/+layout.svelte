@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { type TimelineAppEvent } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import MainSidebar from '$lib/components/MainSidebar.svelte';
@@ -18,6 +19,17 @@
 		if (document) {
 			document.body.classList.add(`${platform()}-app`);
 		}
+
+		taurpcService.auth
+			.get_role()
+			.then((role) => {
+				if (role === 'Free') {
+					goto('/onboarding/no-access');
+				}
+			})
+			.catch((error) => {
+				console.error('Failed to check user role:', error);
+			});
 
 		taurpcService.timeline.new_app_event.on((e) => {
 			// Limit the items to 5

@@ -22,6 +22,7 @@ pub trait AuthApi {
     async fn get_login_token<R: Runtime>(app_handle: AppHandle<R>) -> Result<LoginToken, String>;
 
     async fn is_authenticated<R: Runtime>(app_handle: AppHandle<R>) -> Result<bool, String>;
+    async fn get_role<R: Runtime>(app_handle: AppHandle<R>) -> Result<String, String>;
 }
 
 const LOGIN_CODE_VERIFIER: &str = "LOGIN_CODE_VERIFIER";
@@ -127,5 +128,17 @@ impl AuthApi for AuthApiImpl {
         }
 
         Ok(false)
+    }
+
+    async fn get_role<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<String, String> {
+        if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
+            let controller = user_state.lock().await;
+            let claims = controller
+                .get_access_token_payload()
+                .map_err(|e| format!("Failed to get access token payload: {}", e))?;
+            Ok(format!("{:?}", claims.role))
+        } else {
+            Err("User controller not available".to_string())
+        }
     }
 }
