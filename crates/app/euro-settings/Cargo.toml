@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 anyhow = { workspace = true }
 dirs = { workspace = true }
+euro-debug = { workspace = true }
 euro-fs = { workspace = true }
 log = { workspace = true }
 notify = { version = "8.2.0" }

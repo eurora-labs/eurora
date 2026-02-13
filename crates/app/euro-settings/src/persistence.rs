@@ -30,6 +30,14 @@ impl AppSettings {
         // if you have the variable set in the .env file
         if let Ok(api_base_url) = std::env::var("API_BASE_URL") {
             app_settings.api.endpoint = api_base_url;
+        } else if cfg!(debug_assertions) {
+            // This is handy for development so that
+            // the Tauri app connects after running
+            // pnpm docker:monolith
+            if let Some(endpoint) = euro_debug::detect_local_backend_endpoint() {
+                log::debug!("Detected local backend at {}", endpoint);
+                app_settings.api.endpoint = endpoint;
+            }
         }
 
         Ok(app_settings)

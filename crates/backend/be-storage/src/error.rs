@@ -30,6 +30,9 @@ pub enum StorageError {
 
     #[error("Delete failed: {0}")]
     DeleteFailed(String),
+
+    #[error("Encryption error: {0}")]
+    Encryption(String),
 }
 
 impl StorageError {

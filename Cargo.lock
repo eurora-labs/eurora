@@ -1581,17 +1581,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "be-encrypt"
+version = "0.0.0"
+dependencies = [
+ "base64 0.22.1",
+ "chacha20poly1305",
+ "hkdf",
+ "rand 0.9.2",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.18",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
 name = "be-monolith"
 version = "0.0.1"
 dependencies = [
  "axum",
  "be-activity-service",
+ "be-asset",
  "be-asset-service",
  "be-auth-grpc",
  "be-auth-service",
  "be-conversation-service",
+ "be-encrypt",
  "be-payment-service",
  "be-remote-db",
+ "be-storage",
  "be-update-service",
  "dotenv",
  "prost",
@@ -1653,6 +1671,8 @@ dependencies = [
 name = "be-storage"
 version = "0.0.0"
 dependencies = [
+ "be-encrypt",
+ "bon",
  "hex",
  "opendal",
  "sha2",
@@ -3622,6 +3642,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "euro-debug"
+version = "0.0.0"
+dependencies = [
+ "log",
+]
+
+[[package]]
 name = "euro-encrypt"
 version = "0.0.0"
 dependencies = [
@@ -3712,6 +3739,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "dirs 6.0.0",
+ "euro-debug",
  "euro-fs",
  "log",
  "notify",

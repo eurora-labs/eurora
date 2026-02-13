@@ -11,6 +11,7 @@
 		"check-types": "turbo run check-types",
 		"dev:monolith": "cargo run -p be-monolith -- --mode development",
 		"prod:monolith": "cargo run -p be-monolith -- --mode production",
+		"docker:monolith": "./scripts/build-monolith-image.sh --restart",
 		"dev:desktop": "pnpm tauri dev",
 		"dev:ui": "pnpm --filter @eurora/ui storybook",
 		"check": "turbo run check --no-daemon",

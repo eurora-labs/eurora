@@ -37,7 +37,7 @@ services:
             ASSET_STORAGE_FS_ROOT: /data/assets
             APPROVED_EMAILS: '*'
         volumes:
-            - ${EURORA_ASSET_DIR:?EURORA_ASSET_DIR must be set}:/data/assets
+            - ${EURORA_ASSET_DIR:-~/.local/share/eurora/assets}:/data/assets
 
 volumes:
     eurora-pgdata:
