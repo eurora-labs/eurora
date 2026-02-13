@@ -24,7 +24,10 @@
 		error = null;
 
 		try {
-			await auth.ensureValidToken();
+			if (!(await auth.ensureValidToken())) {
+				goto('/login?redirect=/pricing');
+				return;
+			}
 
 			const res = await fetch(`${PAYMENT_API_URL}/payment/checkout`, {
 				method: 'POST',

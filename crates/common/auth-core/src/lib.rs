@@ -21,6 +21,16 @@ impl Role {
     }
 }
 
+impl std::fmt::Display for Role {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Role::Free => write!(f, "Free"),
+            Role::Tier1 => write!(f, "Tier1"),
+            Role::Enterprise => write!(f, "Enterprise"),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct Claims {

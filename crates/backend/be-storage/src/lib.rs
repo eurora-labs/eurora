@@ -311,6 +311,11 @@ impl StorageService {
                     );
                     decrypted
                 }
+                None if be_encrypt::is_encrypted(&bytes) => {
+                    return Err(StorageError::Encryption(
+                        "asset is encrypted but no encryption key is configured".into(),
+                    ));
+                }
                 _ => bytes,
             }
         };

@@ -25,7 +25,7 @@ pub fn detect_local_backend_endpoint() -> Option<String> {
     for line in env_output.lines() {
         if let Some(addr) = line.strip_prefix("MONOLITH_ADDR=") {
             let port = addr.rsplit(':').next()?;
-            return Some(format!("http://0.0.0.0:{}", port));
+            return Some(format!("http://localhost:{}", port));
         }
     }
 

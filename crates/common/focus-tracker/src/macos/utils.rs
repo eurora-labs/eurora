@@ -91,13 +91,13 @@ pub fn get_frontmost_window_basic_info() -> FocusTrackerResult<FocusedWindow> {
 /// image.
 ///
 /// The icon is extracted via [`NSWorkspace::iconForFile`] using the app's
-/// bundle path, then converted through a thread-safe TIFF pipeline (no
-/// `NSGraphicsContext` required) and resized with the [`image`] crate.
+/// bundle path, then rendered at the target size through
+/// [`NSGraphicsContext`] into an [`NSBitmapImageRep`] and encoded as PNG.
 ///
 /// # Errors
 ///
-/// Returns an error if the TIFF representation cannot be obtained or if the
-/// image data cannot be decoded.
+/// Returns an error if the icon cannot be rendered or if the PNG data
+/// cannot be decoded.
 pub fn fetch_icon_for_pid(
     pid: i32,
     icon_config: &IconConfig,

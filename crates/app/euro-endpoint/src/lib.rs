@@ -49,10 +49,10 @@ impl EndpointManager {
 
     pub fn set_global_backend_url(&self, url: &str) -> Result<()> {
         let channel = build_channel(url)?;
-        *self.current_url.write().unwrap() = url.to_owned();
         self.tx
             .send(channel)
             .map_err(|_| EndpointError::NoSubscribers)?;
+        *self.current_url.write().unwrap() = url.to_owned();
         info!("Switched API endpoint to {}", url);
         Ok(())
     }

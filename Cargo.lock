@@ -1649,7 +1649,6 @@ dependencies = [
  "async-stripe-core",
  "async-stripe-shared",
  "async-stripe-webhook",
- "auth-core",
  "axum",
  "be-auth-core",
  "be-remote-db",
@@ -1677,6 +1676,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "thiserror 2.0.18",
+ "tracing",
  "uuid",
 ]
 

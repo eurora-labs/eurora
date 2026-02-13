@@ -196,10 +196,14 @@ impl AuthApi for AuthApiImpl {
     async fn get_role<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<String, String> {
         if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
             let mut controller = user_state.lock().await;
+            controller
+                .get_or_refresh_access_token()
+                .await
+                .map_err(|e| format!("Failed to get access token: {}", e))?;
             let claims = controller
                 .get_access_token_payload()
                 .map_err(|e| format!("Failed to get access token payload: {}", e))?;
-            Ok(format!("{:?}", claims.role))
+            Ok(claims.role.to_string())
         } else {
             Err("User controller not available".to_string())
         }

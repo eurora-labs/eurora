@@ -11,6 +11,5 @@
     },
     "api": {
         "endpoint": "https://api.eurora-labs.com"
-    },
-    "launcher": {}
+    }
 }

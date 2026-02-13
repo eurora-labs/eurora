@@ -29,7 +29,8 @@ impl AuthManager {
         let refresh_offset: i64 = std::env::var("JWT_REFRESH_OFFSET")
             .unwrap_or("15".to_string())
             .parse()
-            .unwrap_or(15);
+            .unwrap_or(15)
+            .max(0);
         Self {
             auth_client: AuthClient::new(channel_rx),
             jwt_config: JwtConfig { refresh_offset },

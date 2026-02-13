@@ -33,9 +33,7 @@
 		return 'Paid plan';
 	});
 
-	const hasPaidPlan = $derived(
-		!!$subscription?.subscription_id && $subscription?.status === 'active',
-	);
+	const hasPaidPlan = $derived($subscription?.subscription_id != null);
 
 	const isCanceling = $derived($subscription?.cancel_at_period_end === true);
 
