@@ -21,6 +21,8 @@ mod error;
 
 pub use error::{StorageError, StorageResult};
 
+use std::sync::Arc;
+
 use bon::bon;
 use opendal::{Operator, services};
 use sha2::{Digest, Sha256};
@@ -93,7 +95,7 @@ pub struct StorageService {
     operator: Operator,
     config: StorageConfig,
     #[cfg(feature = "encryption")]
-    encryption_key: Option<be_encrypt::MainKey>,
+    encryption_key: Arc<std::sync::RwLock<Option<be_encrypt::MainKey>>>,
 }
 
 #[bon]
@@ -113,8 +115,18 @@ impl StorageService {
             operator,
             config,
             #[cfg(feature = "encryption")]
-            encryption_key,
+            encryption_key: Arc::new(std::sync::RwLock::new(encryption_key)),
         })
+    }
+
+    /// Set the encryption key at runtime. Subsequent uploads will be encrypted
+    /// and downloads of encrypted assets will be decrypted.
+    #[cfg(feature = "encryption")]
+    pub fn set_encryption_key(&self, key: be_encrypt::MainKey) {
+        *self
+            .encryption_key
+            .write()
+            .expect("encryption key lock poisoned") = Some(key);
     }
 
     /// Create a new storage service using environment variables for configuration
@@ -230,20 +242,26 @@ impl StorageService {
         );
 
         #[cfg(feature = "encryption")]
-        let content = match &self.encryption_key {
-            Some(key) => {
-                let encrypted = be_encrypt::encrypt(key, content, "asset").map_err(|e| {
-                    StorageError::Encryption(format!("Failed to encrypt asset: {}", e))
-                })?;
-                debug!(
-                    "Encrypted asset {} ({} -> {} bytes)",
-                    asset_id,
-                    content.len(),
-                    encrypted.len()
-                );
-                encrypted
+        let content = {
+            let key_guard = self
+                .encryption_key
+                .read()
+                .expect("encryption key lock poisoned");
+            match key_guard.as_ref() {
+                Some(key) => {
+                    let encrypted = be_encrypt::encrypt(key, content, "asset").map_err(|e| {
+                        StorageError::Encryption(format!("Failed to encrypt asset: {}", e))
+                    })?;
+                    debug!(
+                        "Encrypted asset {} ({} -> {} bytes)",
+                        asset_id,
+                        content.len(),
+                        encrypted.len()
+                    );
+                    encrypted
+                }
+                None => content.to_vec(),
             }
-            None => content.to_vec(),
         };
 
         #[cfg(not(feature = "encryption"))]
@@ -275,20 +293,26 @@ impl StorageService {
         let bytes = content.to_vec();
 
         #[cfg(feature = "encryption")]
-        let bytes = match &self.encryption_key {
-            Some(key) if be_encrypt::is_encrypted(&bytes) => {
-                let decrypted = be_encrypt::decrypt(key, &bytes).map_err(|e| {
-                    StorageError::Encryption(format!("Failed to decrypt asset: {}", e))
-                })?;
-                debug!(
-                    "Decrypted asset from {} ({} -> {} bytes)",
-                    path,
-                    bytes.len(),
-                    decrypted.len()
-                );
-                decrypted
+        let bytes = {
+            let key_guard = self
+                .encryption_key
+                .read()
+                .expect("encryption key lock poisoned");
+            match key_guard.as_ref() {
+                Some(key) if be_encrypt::is_encrypted(&bytes) => {
+                    let decrypted = be_encrypt::decrypt(key, &bytes).map_err(|e| {
+                        StorageError::Encryption(format!("Failed to decrypt asset: {}", e))
+                    })?;
+                    debug!(
+                        "Decrypted asset from {} ({} -> {} bytes)",
+                        path,
+                        bytes.len(),
+                        decrypted.len()
+                    );
+                    decrypted
+                }
+                _ => bytes,
             }
-            _ => bytes,
         };
 
         debug!(

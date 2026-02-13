@@ -21,7 +21,7 @@ use chacha20poly1305::{
 use hkdf::Hkdf;
 use rand::RngCore;
 use sha2::Sha256;
-use tracing::{error, info, warn};
+use tracing::error;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Magic bytes identifying encrypted files (shared with `euro-encrypt`).
@@ -196,65 +196,6 @@ pub fn decrypt(mk: &MainKey, data: &[u8]) -> EncryptResult<Vec<u8>> {
 /// Check whether a byte slice starts with the encrypted file magic bytes.
 pub fn is_encrypted(bytes: &[u8]) -> bool {
     bytes.len() >= MAGIC.len() && bytes[..MAGIC.len()] == *MAGIC
-}
-
-/// Load an encryption key from env vars, or generate and persist one.
-///
-/// Resolution order:
-/// 1. `EURORA_ENCRYPTION_KEY` env var (base64-encoded 32 bytes)
-/// 2. `EURORA_ENCRYPTION_KEY_FILE` env var → read file contents
-/// 3. Auto-generate and save to `{ASSET_STORAGE_FS_ROOT}/.encryption_key`
-pub fn load_or_generate_key() -> EncryptResult<MainKey> {
-    // 1. Check env var
-    if let Ok(key_b64) = std::env::var("EURORA_ENCRYPTION_KEY") {
-        info!("Loading encryption key from EURORA_ENCRYPTION_KEY env var");
-        return MainKey::from_base64(&key_b64);
-    }
-
-    // 2. Check key file env var
-    if let Ok(path) = std::env::var("EURORA_ENCRYPTION_KEY_FILE") {
-        info!("Loading encryption key from file: {}", path);
-        let contents = std::fs::read_to_string(&path).map_err(EncryptError::Io)?;
-        return MainKey::from_base64(&contents);
-    }
-
-    // 3. Auto-generate and persist
-    let fs_root = std::env::var("ASSET_STORAGE_FS_ROOT").unwrap_or_else(|_| "./assets".to_string());
-    std::fs::create_dir_all(&fs_root).map_err(EncryptError::Io)?;
-
-    let key_path = std::path::Path::new(&fs_root).join(".encryption_key");
-
-    // Check if a key file already exists at the default location
-    if key_path.exists() {
-        info!(
-            "Loading existing encryption key from {}",
-            key_path.display()
-        );
-        let contents = std::fs::read_to_string(&key_path).map_err(EncryptError::Io)?;
-        return MainKey::from_base64(&contents);
-    }
-
-    warn!(
-        "No encryption key configured. Generating a new key and saving to {}",
-        key_path.display()
-    );
-    warn!("Back up this file to avoid data loss!");
-
-    let key = MainKey::generate()?;
-    let encoded = key.to_base64();
-
-    std::fs::write(&key_path, &encoded).map_err(EncryptError::Io)?;
-
-    // Set restrictive permissions (Unix only)
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&key_path, std::fs::Permissions::from_mode(0o600))
-            .map_err(EncryptError::Io)?;
-    }
-
-    info!("Encryption key saved to {}", key_path.display());
-    Ok(key)
 }
 
 fn build_header(tag: &str, salt: &[u8; 32], nonce: &[u8; 24]) -> EncryptResult<Vec<u8>> {

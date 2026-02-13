@@ -82,31 +82,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|v| v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
 
-    // Build shared storage service, with encryption in local mode
-    let encryption_key = if local_mode {
-        match be_encrypt::load_or_generate_key() {
-            Ok(key) => {
-                info!("Local mode: asset encryption enabled");
-                Some(key)
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to load encryption key, assets will be stored unencrypted: {}",
-                    e
-                );
-                None
-            }
-        }
-    } else {
-        None
-    };
-
     let storage_config =
         be_storage::StorageConfig::from_env().expect("Failed to load storage config");
     let storage = Arc::new(
         StorageService::builder()
             .config(storage_config)
-            .maybe_encryption_key(encryption_key)
             .build()
             .expect("Failed to initialize storage service"),
     );
@@ -159,7 +139,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         debug!("Shutting down gracefully...");
     };
 
-    let grpc_server = Server::builder()
+    let mut grpc_router = Server::builder()
         .accept_http1(true)
         .layer(cors)
         .layer(GrpcWebLayer::new())
@@ -176,8 +156,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_service(ProtoConversationServiceServer::with_interceptor(
             conversation_service,
             jwt_interceptor.clone(),
-        ))
-        .serve_with_shutdown(grpc_addr, shutdown_signal);
+        ));
+
+    if local_mode {
+        let local_config = be_local_config_service::LocalConfigService::new(storage.clone());
+        grpc_router = grpc_router.add_service(local_config.into_server());
+        info!("Local mode: registered LocalConfigService (encryption key will be set by client)");
+    }
+
+    let grpc_server = grpc_router.serve_with_shutdown(grpc_addr, shutdown_signal);
 
     let http_router = update_router.merge(payment_router);
 

@@ -31,6 +31,11 @@ mod proto {
         pub use super::*;
     }
 
+    pub mod local_config {
+        tonic::include_proto!("local_config_service");
+        pub use super::*;
+    }
+
     pub mod shared {
         tonic::include_proto!("shared");
         pub use super::*;
