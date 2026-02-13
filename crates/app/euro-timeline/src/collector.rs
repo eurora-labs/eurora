@@ -8,7 +8,6 @@ use euro_activity::DefaultStrategy;
 use euro_activity::strategies::ActivityReport;
 use euro_activity::{ContextChip, strategies::ActivityStrategyFunctionality};
 use focus_tracker::{FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig};
-use log::{debug, error};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -17,6 +16,7 @@ use tokio::{
     sync::{Mutex, RwLock, broadcast, mpsc},
     task::JoinHandle,
 };
+use tracing::{debug, error};
 
 pub struct CollectorService {
     storage: Arc<Mutex<TimelineStorage>>,

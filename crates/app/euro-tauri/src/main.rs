@@ -27,15 +27,15 @@ use euro_tauri::{
     shared_types::SharedConversationManager,
 };
 use euro_timeline::TimelineManager;
-use log::{debug, error, info, warn};
 use tauri::{
     Manager, generate_context,
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
 };
-use tauri_plugin_log::fern::colors::ColoredLevelConfig;
+
 use taurpc::Router;
 use tokio::sync::Mutex;
+use tracing::{debug, error, info, warn};
 
 /// Installs native messaging host manifests so browsers can discover the
 /// `euro-native-messaging` sidecar binary. On macOS the manifests are written
@@ -262,9 +262,6 @@ fn main() {
             },
         ));
     }
-
-    let _sentry_logger = sentry::integrations::log::SentryLogger::new()
-        .filter(|_md| sentry::integrations::log::LogFilter::Log);
 
     // Regular application startup
     let tauri_context = generate_context!();
@@ -503,7 +500,7 @@ fn main() {
                 .plugin(tauri_plugin_http::init())
                 .plugin(tauri_plugin_opener::init())
                 .plugin(
-                    tauri_plugin_log::Builder::new()
+                    tauri_plugin_tracing::Builder::new()
                             .filter(|metadata| {
                                 let target = metadata.target();
                                 // Allow all logs from euro-* crates (Rust converts hyphens to underscores in module paths)
@@ -517,12 +514,12 @@ fn main() {
                                 // Allow webview logs
                                 let is_webview = target.starts_with("webview");
                                 // For third-party crates, only allow warnings and above
-                                let is_warning_or_above = metadata.level() <= log::Level::Warn;
+                                let is_warning_or_above = *metadata.level() <= tracing::Level::WARN;
                                 is_euro_crate || is_common_crate || is_webview || is_warning_or_above
                             })
-                            .level(log::LevelFilter::Debug)
-                            // .target(Target::new(TargetKind::Stdout))
-                            .with_colors(ColoredLevelConfig::default())
+                            .with_max_level(tauri_plugin_tracing::LevelFilter::DEBUG)
+                            .with_colors()
+                            .with_default_subscriber()
                             .build()
                 )
                 .plugin(tauri_plugin_shell::init())

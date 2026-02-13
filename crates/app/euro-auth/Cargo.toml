@@ -16,7 +16,6 @@ chrono = { workspace = true, features = ["serde"] }
 euro-secret = { workspace = true }
 humantime-serde = { workspace = true }
 jsonwebtoken = { workspace = true }
-log = { workspace = true }
 prost = { workspace = true }
 prost-types = { workspace = true }
 proto-gen = { workspace = true }
@@ -33,6 +32,7 @@ tonic = { workspace = true, features = ["channel", "tls-native-roots"] }
 tonic-async-interceptor = "0.14.1"
 tonic-prost = { workspace = true }
 tower = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 tracing-subscriber = { workspace = true }

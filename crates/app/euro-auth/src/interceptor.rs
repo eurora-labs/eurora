@@ -1,9 +1,9 @@
 use crate::AuthManager;
-use log::error;
 use std::pin::Pin;
 use tonic::{Request, Status, transport::Channel};
 use tonic_async_interceptor::{AsyncInterceptor, async_interceptor};
 use tower::ServiceBuilder;
+use tracing::error;
 
 pub type AuthedChannel = tonic_async_interceptor::AsyncInterceptedService<Channel, AuthInterceptor>;
 

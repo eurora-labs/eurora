@@ -5,6 +5,3 @@ edition.workspace = true
 description = "Development-time helpers"
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 publish = false
-
-[dependencies]
-log = { workspace = true }

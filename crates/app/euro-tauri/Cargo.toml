@@ -46,7 +46,6 @@ euro-vision = { workspace = true }
 futures = { workspace = true }
 image = { workspace = true }
 keyring = { workspace = true }
-log = { workspace = true }
 parking_lot = { workspace = true }
 posthog-rs = { workspace = true }
 proto-gen = { workspace = true }
@@ -61,9 +60,6 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-http = "2"
-tauri-plugin-log = { version = "2", features = [
-  "colored",
-] }
 tauri-plugin-opener = "2"
 tauri-plugin-os = "2"
 tauri-plugin-process = "2"
@@ -71,12 +67,12 @@ tauri-plugin-shell = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-store = "2"
 tauri-plugin-stronghold = "2"
+tauri-plugin-tracing = { version = "0.3.2", features = ["colored"] }
 tauri-plugin-updater = "2.10"
 tauri-plugin-window-state = "2"
 taurpc = "0.6.0"
 # The features here optimize for performance.
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
-tonic = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
 
