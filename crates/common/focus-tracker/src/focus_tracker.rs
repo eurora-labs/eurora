@@ -19,10 +19,12 @@ pub struct FocusTracker {
 }
 
 impl FocusTracker {
+    #[must_use]
     pub fn new() -> Self {
         Self::with_config(FocusTrackerConfig::default())
     }
 
+    #[must_use]
     pub fn with_config(config: FocusTrackerConfig) -> Self {
         Self {
             impl_focus_tracker: ImplFocusTracker::new(),
@@ -38,6 +40,13 @@ impl Default for FocusTracker {
 }
 
 impl FocusTracker {
+    /// Tracks focus changes, calling `on_focus` each time the focused window changes.
+    ///
+    /// This method blocks the calling thread indefinitely.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the platform API fails or the callback returns an error.
     pub fn track_focus<F>(&self, on_focus: F) -> FocusTrackerResult<()>
     where
         F: FnMut(FocusedWindow) -> FocusTrackerResult<()>,
@@ -45,6 +54,11 @@ impl FocusTracker {
         self.impl_focus_tracker.track_focus(on_focus, &self.config)
     }
 
+    /// Tracks focus changes with an external stop signal.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the platform API fails or the callback returns an error.
     pub fn track_focus_with_stop<F>(
         &self,
         on_focus: F,
@@ -57,6 +71,11 @@ impl FocusTracker {
             .track_focus_with_stop(on_focus, stop_signal, &self.config)
     }
 
+    /// Async variant of [`track_focus`](Self::track_focus).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the platform API fails or the callback returns an error.
     #[cfg(feature = "async")]
     pub async fn track_focus_async<F, Fut>(&self, on_focus: F) -> FocusTrackerResult<()>
     where
@@ -68,6 +87,11 @@ impl FocusTracker {
             .await
     }
 
+    /// Async variant of [`track_focus_with_stop`](Self::track_focus_with_stop).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the platform API fails or the callback returns an error.
     #[cfg(feature = "async")]
     pub async fn track_focus_async_with_stop<F, Fut>(
         &self,
@@ -83,6 +107,12 @@ impl FocusTracker {
             .await
     }
 
+    /// Spawns a background thread that tracks focus changes and sends them
+    /// through a channel.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the background thread cannot be spawned.
     pub fn subscribe_focus_changes(&self) -> FocusTrackerResult<FocusSubscription> {
         let (sender, receiver) = mpsc::channel();
         let stop_signal = Arc::new(AtomicBool::new(false));
@@ -130,6 +160,7 @@ pub struct FocusSubscription {
 }
 
 impl FocusSubscription {
+    #[must_use]
     pub fn receiver(&self) -> &mpsc::Receiver<FocusedWindow> {
         &self.receiver
     }
@@ -137,11 +168,10 @@ impl FocusSubscription {
     /// Consumes the subscription, returning the receiver.
     ///
     /// The stop signal is set so the background thread will exit after its
-    /// current poll cycle. The thread handle is detached — it will clean
-    /// itself up without blocking.
+    #[must_use]
     pub fn into_receiver(mut self) -> mpsc::Receiver<FocusedWindow> {
         self.stop_signal.store(true, Ordering::Release);
-        self.handle.take(); // Detach: thread will exit on its own.
+        self.handle.take();
         std::mem::replace(&mut self.receiver, mpsc::channel().1)
     }
 
@@ -167,6 +197,6 @@ impl std::fmt::Debug for FocusSubscription {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("FocusSubscription")
             .field("stopped", &self.stop_signal.load(Ordering::Relaxed))
-            .finish()
+            .finish_non_exhaustive()
     }
 }
