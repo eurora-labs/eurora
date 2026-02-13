@@ -168,6 +168,7 @@ impl FocusSubscription {
     /// Consumes the subscription, returning the receiver.
     ///
     /// The stop signal is set so the background thread will exit after its
+    /// next polling iteration.
     #[must_use]
     pub fn into_receiver(mut self) -> mpsc::Receiver<FocusedWindow> {
         self.stop_signal.store(true, Ordering::Release);
