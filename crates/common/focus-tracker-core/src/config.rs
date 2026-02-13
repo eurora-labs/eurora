@@ -1,14 +1,9 @@
 use crate::{FocusTrackerError, FocusTrackerResult};
 use std::time::Duration;
 
-/// Configuration for icon processing behavior
 #[derive(Debug, Clone)]
 pub struct IconConfig {
-    /// Target size for icons (width and height will be equal)
-    /// Default: None (use platform default size)
     pub size: Option<u32>,
-
-    /// The algorithm to use for icon scaling, supports Windows and Linux x11
     pub filter_type: image::imageops::FilterType,
 }
 
@@ -22,15 +17,10 @@ impl Default for IconConfig {
 }
 
 impl IconConfig {
-    /// Create a new icon configuration with default settings
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set the icon size (width and height will be equal)
-    ///
-    /// # Arguments
-    /// * `size` - The icon size in pixels (1..=512)
     pub fn with_size(mut self, size: u32) -> FocusTrackerResult<Self> {
         if size == 0 {
             return Err(FocusTrackerError::InvalidConfig {
@@ -46,20 +36,14 @@ impl IconConfig {
         Ok(self)
     }
 
-    /// Get the icon size, using a default if none is configured
     pub fn get_size_or_default(&self) -> u32 {
-        self.size.unwrap_or(128) // Default to 128x128
+        self.size.unwrap_or(128)
     }
 }
 
-/// Configuration for focus tracking behavior
 #[derive(Debug, Clone)]
 pub struct FocusTrackerConfig {
-    /// Polling interval for focus change detection
-    /// Default: 100ms
     pub poll_interval: Duration,
-    /// Icon processing configuration
-    /// Default: IconConfig::default()
     pub icon: IconConfig,
 }
 
@@ -73,33 +57,20 @@ impl Default for FocusTrackerConfig {
 }
 
 impl FocusTrackerConfig {
-    /// Create a new configuration with default settings
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set the icon configuration
-    ///
-    /// # Arguments
-    /// * `icon` - The icon configuration
     pub fn with_icon_config(mut self, icon: IconConfig) -> Self {
         self.icon = icon;
         self
     }
 
-    /// Set the icon size (convenience method)
-    ///
-    /// # Arguments
-    /// * `size` - The icon size in pixels (1..=512)
     pub fn with_icon_size(mut self, size: u32) -> FocusTrackerResult<Self> {
         self.icon = self.icon.with_size(size)?;
         Ok(self)
     }
 
-    /// Set the polling interval for focus change detection
-    ///
-    /// # Arguments
-    /// * `interval` - The polling interval duration (1ms..=10s)
     pub fn with_poll_interval(mut self, interval: Duration) -> FocusTrackerResult<Self> {
         if interval.is_zero() {
             return Err(FocusTrackerError::InvalidConfig {
@@ -115,10 +86,6 @@ impl FocusTrackerConfig {
         Ok(self)
     }
 
-    /// Set the polling interval in milliseconds
-    ///
-    /// # Arguments
-    /// * `ms` - The polling interval in milliseconds (1..=10000)
     pub fn with_poll_interval_ms(self, ms: u64) -> FocusTrackerResult<Self> {
         self.with_poll_interval(Duration::from_millis(ms))
     }
