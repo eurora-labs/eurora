@@ -17,8 +17,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create the focus tracker with custom configuration
     let config = FocusTrackerConfig::new()
-        .with_icon_config(IconConfig::new().with_size(64))
-        .with_poll_interval(std::time::Duration::from_millis(500));
+        .with_icon_config(IconConfig::new().with_size(64)?)
+        .with_poll_interval(std::time::Duration::from_millis(500))?;
 
     let tracker = FocusTracker::with_config(config);
 
