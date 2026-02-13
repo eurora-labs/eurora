@@ -21,10 +21,10 @@ use crate::{
 use async_trait::async_trait;
 use euro_native_messaging::NativeMessage;
 use focus_tracker::FocusedWindow;
-use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::mpsc;
+use tracing::{debug, info, warn};
 use url::Url;
 
 // Re-export the singleton service and types from euro_browser crate

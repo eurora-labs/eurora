@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use focus_tracker::FocusedWindow;
-use log::debug;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
+use tracing::debug;
 
 use crate::{
     error::ActivityResult,

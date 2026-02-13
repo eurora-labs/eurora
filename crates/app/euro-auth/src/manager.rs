@@ -4,11 +4,11 @@ use auth_core::Claims;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use euro_secret::{Sensitive, secret};
 use jsonwebtoken::dangerous::insecure_decode;
-use log::error;
 use rand::{TryRngCore, rngs::OsRng};
 use sha2::{Digest, Sha256};
 use tokio::sync::watch;
 use tonic::transport::Channel;
+use tracing::error;
 
 #[derive(Debug, Clone)]
 pub struct JwtConfig {

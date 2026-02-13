@@ -14,7 +14,6 @@ euro-activity = { workspace = true }
 euro-browser = { workspace = true }
 focus-tracker = { workspace = true, features = ["async"] }
 image = { workspace = true }
-log = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = [
@@ -24,6 +23,7 @@ tokio = { workspace = true, features = [
   "time",
 ] }
 tonic = { workspace = true, features = ["channel"] }
+tracing = { workspace = true }
 
 [dev-dependencies]
 rustls = { workspace = true, default-features = false, features = [

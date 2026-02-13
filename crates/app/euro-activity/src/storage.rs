@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use euro_auth::{AuthManager, AuthedChannel, build_authed_channel};
-use log::{debug, error};
 use prost_types::Timestamp;
 use proto_gen::activity::{
     ActivityResponse, InsertActivityRequest,
@@ -13,6 +12,7 @@ use std::{io::Cursor, path::PathBuf};
 use tokio::sync::watch;
 use tonic::Status;
 use tonic::transport::Channel;
+use tracing::{debug, error};
 
 use crate::{Activity, ActivityAsset, ActivityError, error::ActivityResult};
 

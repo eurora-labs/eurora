@@ -1,9 +1,9 @@
-use std::path::Path;
-
 use anyhow::Result;
 use euro_fs::create_dirs_then_write;
 use serde_json::json;
 use serde_json_lenient::to_string_pretty;
+use std::path::Path;
+use tracing::debug;
 
 use crate::{
     AppSettings,
@@ -35,7 +35,7 @@ impl AppSettings {
             // the Tauri app connects after running
             // pnpm docker:monolith
             if let Some(endpoint) = euro_debug::detect_local_backend_endpoint() {
-                log::debug!("Detected local backend at {}", endpoint);
+                debug!("Detected local backend at {}", endpoint);
                 app_settings.api.endpoint = endpoint;
             }
         }

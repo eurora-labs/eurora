@@ -1,5 +1,4 @@
 use anyhow::Result;
-use log::{debug, error};
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher, event::ModifyKind};
 use std::{
     ops::{Deref, DerefMut},
@@ -7,6 +6,7 @@ use std::{
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, mpsc},
     time::Duration,
 };
+use tracing::{debug, error};
 
 use crate::AppSettings;
 

@@ -3,7 +3,6 @@ use super::proto::{
     browser_bridge_server::BrowserBridgeServer, frame::Kind as FrameKind,
 };
 use dashmap::DashMap;
-use log::{debug, error, info, warn};
 use std::collections::HashMap;
 use std::net::ToSocketAddrs;
 use std::pin::Pin;
@@ -13,6 +12,7 @@ use std::time::Duration;
 use tokio::sync::{OnceCell, RwLock, broadcast, mpsc, oneshot, watch};
 use tokio_stream::{Stream, wrappers::ReceiverStream};
 use tonic::{Request, Response, Status, transport::Server};
+use tracing::{debug, error, info, warn};
 
 pub const BROWSER_BRIDGE_PORT: &str = "1431";
 
