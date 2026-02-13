@@ -109,7 +109,7 @@ impl ImplFocusTracker {
                 Ok(mut window) => {
                     if prev_state.has_changed(&window) {
                         match utils::fetch_icon_for_pid(window.process_id as i32, &config.icon) {
-                            Ok(icon) => window.icon = icon,
+                            Ok(icon) => window.icon = icon.map(std::sync::Arc::new),
                             Err(e) => debug!("Error fetching icon: {}", e),
                         }
                         prev_state.update_from(&window);
@@ -148,7 +148,7 @@ impl ImplFocusTracker {
                 Ok(mut window) => {
                     if prev_state.has_changed(&window) {
                         match utils::fetch_icon_for_pid(window.process_id as i32, &config.icon) {
-                            Ok(icon) => window.icon = icon,
+                            Ok(icon) => window.icon = icon.map(std::sync::Arc::new),
                             Err(e) => debug!("Error fetching icon: {}", e),
                         }
                         prev_state.update_from(&window);
