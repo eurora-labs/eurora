@@ -130,23 +130,21 @@ pub struct FocusSubscription {
 }
 
 impl FocusSubscription {
-    /// Returns a reference to the receiver for consuming focus events.
     pub fn receiver(&self) -> &mpsc::Receiver<FocusedWindow> {
         &self.receiver
     }
 
     /// Consumes the subscription, returning the receiver.
     ///
-    /// The background thread will continue running until the receiver is dropped
-    /// and the channel closes, at which point it exits on its own.
-    /// To stop the thread promptly, prefer dropping the entire `FocusSubscription`.
+    /// The stop signal is set so the background thread will exit after its
+    /// current poll cycle. The thread handle is detached — it will clean
+    /// itself up without blocking.
     pub fn into_receiver(mut self) -> mpsc::Receiver<FocusedWindow> {
-        // Detach: don't signal stop or join on drop.
-        self.handle.take();
+        self.stop_signal.store(true, Ordering::Release);
+        self.handle.take(); // Detach: thread will exit on its own.
         std::mem::replace(&mut self.receiver, mpsc::channel().1)
     }
 
-    /// Signals the background thread to stop and waits for it to exit.
     pub fn stop(mut self) {
         self.shutdown();
     }

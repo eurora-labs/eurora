@@ -90,6 +90,7 @@ where
 
         let mut current_focused_window: Option<u32> = None;
         let mut cached_icon: Option<Arc<image::RgbaImage>> = None;
+        let mut consecutive_errors: u32 = 0;
 
         if let Ok(Some(window)) = get_active_window(&conn, root, atoms.net_active_window) {
             match get_window_info(&conn, window, &atoms) {
@@ -134,75 +135,78 @@ where
                     continue;
                 }
                 Err(e) => {
-                    info!("X11 error: {e}");
+                    consecutive_errors += 1;
+                    info!("X11 error ({consecutive_errors}/{MAX_CONSECUTIVE_X11_ERRORS}): {e}");
+                    if consecutive_errors >= MAX_CONSECUTIVE_X11_ERRORS {
+                        return Err(FocusTrackerError::platform_with_source(
+                            "X11 connection failed repeatedly",
+                            e,
+                        ));
+                    }
                     std::thread::sleep(std::time::Duration::from_secs(1));
                     continue;
                 }
             };
 
-            if let Event::PropertyNotify(PropertyNotifyEvent { atom, window, .. }) = event {
-                let mut should_emit_focus_event = false;
-                let mut new_window: Option<u32> = None;
-                let mut is_focus_change = false;
+            let Event::PropertyNotify(PropertyNotifyEvent { atom, window, .. }) = event else {
+                continue;
+            };
 
-                if atom == atoms.net_active_window && window == root {
-                    match get_active_window(&conn, root, atoms.net_active_window) {
-                        Ok(win) => {
-                            new_window = win;
-                            should_emit_focus_event = true;
-                            is_focus_change = true;
+            let mut should_emit_focus_event = false;
+            let mut new_window: Option<u32> = None;
+            let mut is_focus_change = false;
 
-                            update_window_monitoring(
-                                &conn,
-                                &mut current_focused_window,
-                                new_window,
-                            );
-                        }
-                        Err(e) => {
-                            info!("Failed to get active window: {}", e);
-                            continue;
+            if atom == atoms.net_active_window && window == root {
+                match get_active_window(&conn, root, atoms.net_active_window) {
+                    Ok(win) => {
+                        new_window = win;
+                        should_emit_focus_event = true;
+                        is_focus_change = true;
+
+                        update_window_monitoring(&conn, &mut current_focused_window, new_window);
+                        if let Err(e) = flush_connection(&conn) {
+                            info!("Failed to flush connection: {e}");
                         }
                     }
-                } else if (atom == atoms.net_wm_name || atom == atoms.wm_name)
-                    && Some(window) == current_focused_window
-                {
-                    new_window = current_focused_window;
-                    should_emit_focus_event = true;
-                    is_focus_change = false;
-                }
-
-                if should_emit_focus_event && let Some(window) = new_window {
-                    match get_window_info(&conn, window, &atoms) {
-                        Ok(mut focused_window) => {
-                            if is_focus_change {
-                                let icon = get_icon_data(
-                                    &conn,
-                                    window,
-                                    atoms.net_wm_icon,
-                                    &config_clone.icon,
-                                )
-                                .ok()
-                                .map(Arc::new);
-                                cached_icon = icon.clone();
-                                focused_window.icon = icon;
-                            } else {
-                                focused_window.icon = cached_icon.clone();
-                            }
-
-                            if tx.send(focused_window).is_err() {
-                                info!("Async task dropped, stopping X11 event loop");
-                                break;
-                            }
-                        }
-                        Err(e) => {
-                            info!("Failed to get window info for window {}: {}", window, e);
-                        }
+                    Err(e) => {
+                        info!("Failed to get active window: {}", e);
+                        continue;
                     }
                 }
+            } else if (atom == atoms.net_wm_name || atom == atoms.wm_name)
+                && Some(window) == current_focused_window
+            {
+                new_window = current_focused_window;
+                should_emit_focus_event = true;
+                is_focus_change = false;
             }
 
-            if let Err(e) = flush_connection(&conn) {
-                info!("Failed to flush connection: {}", e);
+            if should_emit_focus_event && let Some(window) = new_window {
+                match get_window_info(&conn, window, &atoms) {
+                    Ok(mut focused_window) => {
+                        if is_focus_change {
+                            let icon =
+                                get_icon_data(&conn, window, atoms.net_wm_icon, &config_clone.icon)
+                                    .ok()
+                                    .map(Arc::new);
+                            cached_icon = icon.clone();
+                            focused_window.icon = icon;
+                        } else {
+                            focused_window.icon = cached_icon.clone();
+                        }
+
+                        if tx.send(focused_window).is_err() {
+                            info!("Async task dropped, stopping X11 event loop");
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        info!("Failed to get window info for window {}: {}", window, e);
+                        if is_focus_change {
+                            current_focused_window = None;
+                        }
+                    }
+                }
             }
         }
 
@@ -305,9 +309,7 @@ where
                     info!("Failed to flush after initial monitoring: {e}");
                 }
 
-                if let Err(e) = on_focus(focused_window) {
-                    info!("Initial focus event handler failed: {}", e);
-                }
+                on_focus(focused_window)?;
             }
             Err(e) => {
                 info!("Failed to get initial window info: {}", e);
@@ -321,59 +323,60 @@ where
             None => break,
         };
 
-        if let Event::PropertyNotify(PropertyNotifyEvent { atom, window, .. }) = event {
-            let mut should_emit_focus_event = false;
-            let mut new_window: Option<u32> = None;
-            let mut is_focus_change = false;
+        let Event::PropertyNotify(PropertyNotifyEvent { atom, window, .. }) = event else {
+            continue;
+        };
 
-            if atom == atoms.net_active_window && window == root {
-                match get_active_window(&conn, root, atoms.net_active_window) {
-                    Ok(win) => {
-                        new_window = win;
-                        should_emit_focus_event = true;
-                        is_focus_change = true;
+        let mut should_emit_focus_event = false;
+        let mut new_window: Option<u32> = None;
+        let mut is_focus_change = false;
 
-                        update_window_monitoring(&conn, &mut current_focused_window, new_window);
-                    }
-                    Err(e) => {
-                        info!("Failed to get active window: {}", e);
-                        continue;
-                    }
+        if atom == atoms.net_active_window && window == root {
+            match get_active_window(&conn, root, atoms.net_active_window) {
+                Ok(win) => {
+                    new_window = win;
+                    should_emit_focus_event = true;
+                    is_focus_change = true;
+
+                    update_window_monitoring(&conn, &mut current_focused_window, new_window);
+                    flush_connection(&conn)?;
                 }
-            } else if (atom == atoms.net_wm_name || atom == atoms.wm_name)
-                && Some(window) == current_focused_window
-            {
-                new_window = current_focused_window;
-                should_emit_focus_event = true;
-                is_focus_change = false;
+                Err(e) => {
+                    info!("Failed to get active window: {}", e);
+                    continue;
+                }
             }
+        } else if (atom == atoms.net_wm_name || atom == atoms.wm_name)
+            && Some(window) == current_focused_window
+        {
+            new_window = current_focused_window;
+            should_emit_focus_event = true;
+            is_focus_change = false;
+        }
 
-            if should_emit_focus_event && let Some(window) = new_window {
-                match get_window_info(&conn, window, &atoms) {
-                    Ok(mut focused_window) => {
-                        if is_focus_change {
-                            let icon =
-                                get_icon_data(&conn, window, atoms.net_wm_icon, &config.icon)
-                                    .ok()
-                                    .map(Arc::new);
-                            cached_icon = icon.clone();
-                            focused_window.icon = icon;
-                        } else {
-                            focused_window.icon = cached_icon.clone();
-                        }
-
-                        if let Err(e) = on_focus(focused_window) {
-                            info!("Focus event handler failed: {}", e);
-                        }
+        if should_emit_focus_event && let Some(window) = new_window {
+            match get_window_info(&conn, window, &atoms) {
+                Ok(mut focused_window) => {
+                    if is_focus_change {
+                        let icon = get_icon_data(&conn, window, atoms.net_wm_icon, &config.icon)
+                            .ok()
+                            .map(Arc::new);
+                        cached_icon = icon.clone();
+                        focused_window.icon = icon;
+                    } else {
+                        focused_window.icon = cached_icon.clone();
                     }
-                    Err(e) => {
-                        info!("Failed to get window info for window {}: {}", window, e);
+
+                    on_focus(focused_window)?;
+                }
+                Err(e) => {
+                    info!("Failed to get window info for window {}: {}", window, e);
+                    if is_focus_change {
+                        current_focused_window = None;
                     }
                 }
             }
         }
-
-        flush_connection(&conn)?;
     }
 
     Ok(())
@@ -428,6 +431,8 @@ fn setup_root_window_monitoring<C: Connection>(conn: &C, root: u32) -> FocusTrac
     Ok(())
 }
 
+const MAX_CONSECUTIVE_X11_ERRORS: u32 = 10;
+
 /// Returns `Ok(None)` when the stop signal fires, `Ok(Some(event))` on an
 /// event, or `Err` on unrecoverable failure.
 fn get_next_event<C: Connection>(
@@ -435,6 +440,8 @@ fn get_next_event<C: Connection>(
     stop_signal: Option<&AtomicBool>,
     config: &FocusTrackerConfig,
 ) -> FocusTrackerResult<Option<Event>> {
+    let mut consecutive_errors: u32 = 0;
+
     match stop_signal {
         Some(stop) => loop {
             if stop.load(Ordering::Acquire) {
@@ -446,7 +453,14 @@ fn get_next_event<C: Connection>(
                     std::thread::sleep(config.poll_interval);
                 }
                 Err(e) => {
-                    info!("X11 error: {e}");
+                    consecutive_errors += 1;
+                    info!("X11 error ({consecutive_errors}/{MAX_CONSECUTIVE_X11_ERRORS}): {e}");
+                    if consecutive_errors >= MAX_CONSECUTIVE_X11_ERRORS {
+                        return Err(FocusTrackerError::platform_with_source(
+                            "X11 connection failed repeatedly",
+                            e,
+                        ));
+                    }
                     std::thread::sleep(std::time::Duration::from_secs(1));
                 }
             }
@@ -455,7 +469,14 @@ fn get_next_event<C: Connection>(
             match conn.wait_for_event() {
                 Ok(e) => return Ok(Some(e)),
                 Err(e) => {
-                    info!("X11 error: {e}");
+                    consecutive_errors += 1;
+                    info!("X11 error ({consecutive_errors}/{MAX_CONSECUTIVE_X11_ERRORS}): {e}");
+                    if consecutive_errors >= MAX_CONSECUTIVE_X11_ERRORS {
+                        return Err(FocusTrackerError::platform_with_source(
+                            "X11 connection failed repeatedly",
+                            e,
+                        ));
+                    }
                     std::thread::sleep(std::time::Duration::from_secs(1));
                 }
             }
@@ -542,7 +563,10 @@ fn get_active_window<C: Connection>(
         FocusTrackerError::platform_with_source("failed to get active window reply", e)
     })?;
 
-    Ok(reply.value32().and_then(|mut v| v.next()))
+    Ok(reply
+        .value32()
+        .and_then(|mut v| v.next())
+        .filter(|&id| id != 0))
 }
 
 fn get_window_name<C: Connection>(
@@ -562,6 +586,8 @@ fn get_window_name<C: Connection>(
     }
 }
 
+const MAX_STRING_PROPERTY_LEN: u32 = 4096;
+
 fn try_get_property_string<C: Connection>(
     conn: &C,
     window: u32,
@@ -569,7 +595,14 @@ fn try_get_property_string<C: Connection>(
     property_type: u32,
 ) -> FocusTrackerResult<Option<String>> {
     let cookie = conn
-        .get_property(false, window, property, property_type, 0, u32::MAX)
+        .get_property(
+            false,
+            window,
+            property,
+            property_type,
+            0,
+            MAX_STRING_PROPERTY_LEN,
+        )
         .map_err(|e| FocusTrackerError::platform_with_source("failed to get window property", e))?;
 
     let reply = cookie.reply().map_err(|e| {
@@ -630,6 +663,104 @@ fn resize_icon(
     image::imageops::resize(&image, target_size, target_size, filter_type)
 }
 
+struct IconEntry {
+    width: u32,
+    height: u32,
+    pixel_offset: usize,
+}
+
+fn parse_icon_entries(values: &[u32]) -> Vec<IconEntry> {
+    const MAX_ICON_DIMENSION: u32 = 1024;
+    let mut entries = Vec::new();
+    let mut offset = 0;
+
+    while offset + 2 <= values.len() {
+        let width = values[offset];
+        let height = values[offset + 1];
+        let pixel_offset = offset + 2;
+
+        if width == 0 || height == 0 || width > MAX_ICON_DIMENSION || height > MAX_ICON_DIMENSION {
+            break;
+        }
+
+        let pixel_count = match (width as usize).checked_mul(height as usize) {
+            Some(n) => n,
+            None => break,
+        };
+
+        if pixel_offset + pixel_count > values.len() {
+            break;
+        }
+
+        entries.push(IconEntry {
+            width,
+            height,
+            pixel_offset,
+        });
+
+        offset = pixel_offset + pixel_count;
+    }
+
+    entries
+}
+
+/// Select the best icon for the target size. Preference order:
+/// 1. Exact match (returned immediately)
+/// 2. Smallest icon larger than the target
+/// 3. Largest icon overall
+fn select_closest_size_icon(entries: &[IconEntry], target: u32) -> Option<&IconEntry> {
+    let mut best_larger: Option<&IconEntry> = None;
+    let mut largest: Option<&IconEntry> = None;
+
+    for entry in entries {
+        let max_dim = entry.width.max(entry.height);
+
+        if entry.width == target && entry.height == target {
+            return Some(entry);
+        }
+
+        if entry.width > target
+            && entry.height > target
+            && best_larger.is_none_or(|b| max_dim < b.width.max(b.height))
+        {
+            best_larger = Some(entry);
+        }
+
+        if largest.is_none_or(|b| max_dim > b.width.max(b.height)) {
+            largest = Some(entry);
+        }
+    }
+
+    best_larger.or(largest)
+}
+
+fn decode_icon_entry(values: &[u32], entry: &IconEntry) -> FocusTrackerResult<image::RgbaImage> {
+    let pixel_count = (entry.width as usize)
+        .checked_mul(entry.height as usize)
+        .ok_or_else(|| FocusTrackerError::platform("icon dimensions overflow"))?;
+
+    let mut pixels = Vec::with_capacity(
+        pixel_count
+            .checked_mul(4)
+            .ok_or_else(|| FocusTrackerError::platform("icon buffer size overflow"))?,
+    );
+
+    for &argb in &values[entry.pixel_offset..entry.pixel_offset + pixel_count] {
+        let a = ((argb >> 24) & 0xFF) as u8;
+        let r = ((argb >> 16) & 0xFF) as u8;
+        let g = ((argb >> 8) & 0xFF) as u8;
+        let b = (argb & 0xFF) as u8;
+
+        pixels.push(r);
+        pixels.push(g);
+        pixels.push(b);
+        pixels.push(a);
+    }
+
+    image::RgbaImage::from_raw(entry.width, entry.height, pixels)
+        .ok_or_else(|| FocusTrackerError::platform("failed to create RgbaImage from pixel data"))
+}
+
 fn get_icon_data<C: Connection>(
     conn: &C,
     window: u32,
@@ -662,58 +793,18 @@ fn get_icon_data<C: Connection>(
         .ok_or_else(|| FocusTrackerError::platform("failed to parse icon data as 32-bit values"))?
         .collect();
 
-    if values.len() < 2 {
+    let entries = parse_icon_entries(&values);
+    if entries.is_empty() {
         return Err(FocusTrackerError::platform(
-            "invalid icon data: missing width/height",
+            "no valid icon entries in _NET_WM_ICON data",
         ));
     }
 
-    let width = values[0];
-    let height = values[1];
+    let target = icon_config.get_size_or_default();
+    let best = select_closest_size_icon(&entries, target)
+        .ok_or_else(|| FocusTrackerError::platform("no suitable icon found"))?;
 
-    const MAX_ICON_DIMENSION: u32 = 1024;
-
-    if width == 0 || height == 0 {
-        return Err(FocusTrackerError::platform("invalid icon dimensions"));
-    }
-
-    if width > MAX_ICON_DIMENSION || height > MAX_ICON_DIMENSION {
-        return Err(FocusTrackerError::platform(format!(
-            "icon dimensions {width}x{height} exceed maximum {MAX_ICON_DIMENSION}",
-        )));
-    }
-
-    let expected_pixels = (width as usize)
-        .checked_mul(height as usize)
-        .ok_or_else(|| FocusTrackerError::platform("icon dimensions overflow"))?;
-    let available_pixels = values.len() - 2;
-
-    if available_pixels < expected_pixels {
-        return Err(FocusTrackerError::platform(format!(
-            "insufficient pixel data: expected {expected_pixels}, got {available_pixels}",
-        )));
-    }
-
-    let mut pixels = Vec::with_capacity(
-        expected_pixels
-            .checked_mul(4)
-            .ok_or_else(|| FocusTrackerError::platform("icon buffer size overflow"))?,
-    );
-
-    for &argb in &values[2..2 + expected_pixels] {
-        let a = ((argb >> 24) & 0xFF) as u8;
-        let r = ((argb >> 16) & 0xFF) as u8;
-        let g = ((argb >> 8) & 0xFF) as u8;
-        let b = (argb & 0xFF) as u8;
-
-        pixels.push(r);
-        pixels.push(g);
-        pixels.push(b);
-        pixels.push(a);
-    }
-
-    let mut image = image::RgbaImage::from_raw(width, height, pixels)
-        .ok_or_else(|| FocusTrackerError::platform("failed to create RgbaImage from pixel data"))?;
+    let mut image = decode_icon_entry(&values, best)?;
 
     if let Some(target_size) = icon_config.size {
         image = resize_icon(image, target_size, icon_config.filter_type);
