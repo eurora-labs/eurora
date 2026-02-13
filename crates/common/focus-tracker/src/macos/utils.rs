@@ -64,7 +64,9 @@ pub fn get_frontmost_window_basic_info() -> FocusTrackerResult<FocusedWindow> {
         };
 
         let Some(process_name) = process_name else {
-            return Err(FocusTrackerError::Platform(pid.to_string()));
+            return Err(FocusTrackerError::platform(format!(
+                "failed to get process name for pid {pid}"
+            )));
         };
 
         let window_title = get_window_title_via_accessibility(pid)?;
@@ -99,15 +101,13 @@ fn get_frontmost_window_pid() -> FocusTrackerResult<i32> {
         let window_list_ref = CGWindowListCopyWindowInfo(options, K_CG_NULL_WINDOW_ID);
 
         if window_list_ref.is_null() {
-            return Err(FocusTrackerError::Platform(
-                "Failed to get window list".to_string(),
-            ));
+            return Err(FocusTrackerError::platform("failed to get window list"));
         }
 
         let window_list: CFArray<CFDictionary> = CFArray::wrap_under_create_rule(window_list_ref);
 
         if window_list.is_empty() {
-            return Err(FocusTrackerError::Platform("No windows found".to_string()));
+            return Err(FocusTrackerError::platform("no windows found"));
         }
 
         let layer_key = CFString::from_static_string("kCGWindowLayer");
@@ -115,39 +115,36 @@ fn get_frontmost_window_pid() -> FocusTrackerResult<i32> {
 
         for i in 0..window_list.len() {
             let window_info = window_list.get(i).ok_or_else(|| {
-                FocusTrackerError::Platform(format!("Failed to get window {}", i))
+                FocusTrackerError::platform(format!("failed to get window {}", i))
             })?;
 
             if let Some(layer_ptr) = window_info.find(layer_key.as_CFTypeRef() as *const _) {
                 let layer_cftype = CFType::wrap_under_get_rule(layer_ptr.cast());
                 if let Some(layer_number) = layer_cftype.downcast::<CFNumber>()
                     && let Some(layer) = layer_number.to_i32()
+                    && layer != 0
                 {
-                    if layer != 0 {
-                        continue;
-                    }
+                    continue;
                 }
             }
 
             let pid_value_ptr = window_info
                 .find(pid_key.as_CFTypeRef() as *const _)
-                .ok_or_else(|| {
-                    FocusTrackerError::Platform("Failed to get window owner PID".to_string())
-                })?;
+                .ok_or_else(|| FocusTrackerError::platform("failed to get window owner PID"))?;
 
             let pid_cftype = CFType::wrap_under_get_rule(pid_value_ptr.cast());
-            let pid_number: CFNumber = pid_cftype.downcast().ok_or_else(|| {
-                FocusTrackerError::Platform("Failed to downcast PID to CFNumber".to_string())
-            })?;
-            let pid: i32 = pid_number.to_i32().ok_or_else(|| {
-                FocusTrackerError::Platform("Failed to convert PID to i32".to_string())
-            })?;
+            let pid_number: CFNumber = pid_cftype
+                .downcast()
+                .ok_or_else(|| FocusTrackerError::platform("failed to downcast PID to CFNumber"))?;
+            let pid: i32 = pid_number
+                .to_i32()
+                .ok_or_else(|| FocusTrackerError::platform("failed to convert PID to i32"))?;
 
             return Ok(pid);
         }
 
-        Err(FocusTrackerError::Platform(
-            "No normal application window found".to_string(),
+        Err(FocusTrackerError::platform(
+            "no normal application window found",
         ))
     }
 }
@@ -171,7 +168,9 @@ fn get_window_title_via_accessibility(pid: i32) -> FocusTrackerResult<Option<Str
     unsafe { CFRelease(app_element as *const c_void) };
 
     if result == K_AX_ERROR_APIDISABLED {
-        return Err(FocusTrackerError::PermissionDenied);
+        return Err(FocusTrackerError::PermissionDenied {
+            context: "macOS accessibility API denied (AXUIElement)".into(),
+        });
     }
 
     if result != K_AX_ERROR_SUCCESS || focused_window.is_null() {
@@ -286,8 +285,8 @@ fn nsimage_to_rgba(
     };
 
     if bitmap_rep.is_none() {
-        return Err(FocusTrackerError::Platform(
-            "Failed to create bitmap representation".to_string(),
+        return Err(FocusTrackerError::platform(
+            "failed to create bitmap representation",
         ));
     }
     let bitmap_rep = bitmap_rep.unwrap();
@@ -329,8 +328,8 @@ fn nsimage_to_rgba(
     };
 
     if png_data.is_none() {
-        return Err(FocusTrackerError::Platform(
-            "Failed to get PNG data from bitmap".to_string(),
+        return Err(FocusTrackerError::platform(
+            "failed to get PNG data from bitmap",
         ));
     }
     let png_data = png_data.unwrap();
@@ -342,7 +341,7 @@ fn nsimage_to_rgba(
 
     let rgba_image = image::load_from_memory(bytes)
         .map_err(|e| {
-            FocusTrackerError::Platform(format!("Failed to load image from PNG data: {}", e))
+            FocusTrackerError::platform_with_source("failed to load image from PNG data", e)
         })?
         .to_rgba8();
 
