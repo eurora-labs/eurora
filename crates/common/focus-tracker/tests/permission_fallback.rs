@@ -67,7 +67,7 @@ fn test_macos_accessibility_permission() {
                 info!("Some windows had no title - possible permission issue");
             }
         }
-        Err(FocusTrackerError::PermissionDenied) => {
+        Err(FocusTrackerError::PermissionDenied { .. }) => {
             info!("Expected PermissionDenied error received");
         }
         Err(e) => {
@@ -333,14 +333,22 @@ fn test_error_handling_robustness() {
 fn test_error_types() {
     info!("Testing all error types");
 
-    let errors = vec![
-        FocusTrackerError::Error("Test error".to_string()),
-        FocusTrackerError::StdSyncPoisonError("Test poison".to_string()),
+    let errors: Vec<FocusTrackerError> = vec![
         FocusTrackerError::Unsupported,
-        FocusTrackerError::PermissionDenied,
+        FocusTrackerError::PermissionDenied {
+            context: "test permission denied".into(),
+        },
         FocusTrackerError::NoDisplay,
         FocusTrackerError::NotInteractiveSession,
-        FocusTrackerError::Platform("Test platform error".to_string()),
+        FocusTrackerError::ChannelClosed,
+        FocusTrackerError::InvalidConfig {
+            reason: "test invalid config".into(),
+        },
+        FocusTrackerError::platform("test platform error"),
+        FocusTrackerError::platform_with_source(
+            "test platform with source",
+            std::io::Error::new(std::io::ErrorKind::Other, "inner error"),
+        ),
     ];
 
     for error in errors {

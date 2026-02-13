@@ -88,9 +88,7 @@ impl FocusTracker {
             let _ = tracker.track_focus_with_stop(
                 move |window: FocusedWindow| -> FocusTrackerResult<()> {
                     if sender.send(window).is_err() {
-                        return Err(crate::FocusTrackerError::Error(
-                            "Receiver dropped".to_string(),
-                        ));
+                        return Err(crate::FocusTrackerError::ChannelClosed);
                     }
                     Ok(())
                 },

@@ -40,10 +40,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create advanced configuration with all options
     let config = FocusTrackerConfig::new()
         // Custom polling interval - faster than default for demo
-        .with_poll_interval_ms(50)
+        .with_poll_interval_ms(50)?
         // Custom icon configuration
         .with_icon_config(
-            IconConfig::new().with_size(64), // Larger icons for better quality
+            IconConfig::new().with_size(64)?, // Larger icons for better quality
         );
 
     println!("⚙️  Configuration:");

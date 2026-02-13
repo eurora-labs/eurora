@@ -132,8 +132,8 @@ impl CollectorService {
         });
 
         self.focus_thread_handle = Some(tokio::spawn(async move {
-            let config =
-                FocusTrackerConfig::new().with_icon_config(IconConfig::new().with_size(64));
+            let config = FocusTrackerConfig::new()
+                .with_icon_config(IconConfig::new().with_size(64).expect("valid icon size"));
             let tracker = FocusTracker::with_config(config);
             let prev_focus = Arc::new(Mutex::new(String::new()));
 

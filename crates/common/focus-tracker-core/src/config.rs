@@ -1,3 +1,4 @@
+use crate::{FocusTrackerError, FocusTrackerResult};
 use std::time::Duration;
 
 /// Configuration for icon processing behavior
@@ -29,29 +30,25 @@ impl IconConfig {
     /// Set the icon size (width and height will be equal)
     ///
     /// # Arguments
-    /// * `size` - The icon size in pixels
-    ///
-    /// # Panics
-    /// Panics if the size is zero or too large (> 512)
-    pub fn with_size(mut self, size: u32) -> Self {
-        self.validate_size(size);
+    /// * `size` - The icon size in pixels (1..=512)
+    pub fn with_size(mut self, size: u32) -> FocusTrackerResult<Self> {
+        if size == 0 {
+            return Err(FocusTrackerError::InvalidConfig {
+                reason: "icon size cannot be zero".into(),
+            });
+        }
+        if size > 512 {
+            return Err(FocusTrackerError::InvalidConfig {
+                reason: "icon size cannot be greater than 512 pixels".into(),
+            });
+        }
         self.size = Some(size);
-        self
+        Ok(self)
     }
 
     /// Get the icon size, using a default if none is configured
     pub fn get_size_or_default(&self) -> u32 {
         self.size.unwrap_or(128) // Default to 128x128
-    }
-
-    /// Validate the icon size
-    fn validate_size(&self, size: u32) {
-        if size == 0 {
-            panic!("Icon size cannot be zero");
-        }
-        if size > 512 {
-            panic!("Icon size cannot be greater than 512 pixels");
-        }
     }
 }
 
@@ -93,47 +90,37 @@ impl FocusTrackerConfig {
     /// Set the icon size (convenience method)
     ///
     /// # Arguments
-    /// * `size` - The icon size in pixels
-    ///
-    /// # Panics
-    /// Panics if the size is zero or too large (> 512)
-    pub fn with_icon_size(mut self, size: u32) -> Self {
-        self.icon = self.icon.with_size(size);
-        self
+    /// * `size` - The icon size in pixels (1..=512)
+    pub fn with_icon_size(mut self, size: u32) -> FocusTrackerResult<Self> {
+        self.icon = self.icon.with_size(size)?;
+        Ok(self)
     }
 
     /// Set the polling interval for focus change detection
     ///
     /// # Arguments
-    /// * `interval` - The polling interval duration
-    ///
-    /// # Panics
-    /// Panics if the interval is zero or too large (> 10 seconds)
-    pub fn with_poll_interval(mut self, interval: Duration) -> Self {
-        self.validate_poll_interval(interval);
+    /// * `interval` - The polling interval duration (1ms..=10s)
+    pub fn with_poll_interval(mut self, interval: Duration) -> FocusTrackerResult<Self> {
+        if interval.is_zero() {
+            return Err(FocusTrackerError::InvalidConfig {
+                reason: "poll interval cannot be zero".into(),
+            });
+        }
+        if interval > Duration::from_secs(10) {
+            return Err(FocusTrackerError::InvalidConfig {
+                reason: "poll interval cannot be greater than 10 seconds".into(),
+            });
+        }
         self.poll_interval = interval;
-        self
+        Ok(self)
     }
 
     /// Set the polling interval in milliseconds
     ///
     /// # Arguments
-    /// * `ms` - The polling interval in milliseconds
-    ///
-    /// # Panics
-    /// Panics if the interval is zero or too large (> 10000ms)
-    pub fn with_poll_interval_ms(self, ms: u64) -> Self {
+    /// * `ms` - The polling interval in milliseconds (1..=10000)
+    pub fn with_poll_interval_ms(self, ms: u64) -> FocusTrackerResult<Self> {
         self.with_poll_interval(Duration::from_millis(ms))
-    }
-
-    /// Validate the polling interval
-    fn validate_poll_interval(&self, interval: Duration) {
-        if interval.is_zero() {
-            panic!("Poll interval cannot be zero");
-        }
-        if interval > Duration::from_secs(10) {
-            panic!("Poll interval cannot be greater than 10 seconds");
-        }
     }
 }
 
@@ -155,13 +142,15 @@ mod tests {
 
     #[test]
     fn test_builder_pattern() {
-        let config = FocusTrackerConfig::new().with_poll_interval_ms(250);
+        let config = FocusTrackerConfig::new()
+            .with_poll_interval_ms(250)
+            .unwrap();
         assert_eq!(config.poll_interval, Duration::from_millis(250));
     }
 
     #[test]
     fn test_icon_config_builder() {
-        let config = FocusTrackerConfig::new().with_icon_size(64);
+        let config = FocusTrackerConfig::new().with_icon_size(64).unwrap();
         assert_eq!(config.icon.size, Some(64));
     }
 
@@ -173,38 +162,40 @@ mod tests {
 
     #[test]
     fn test_icon_config_with_size() {
-        let icon_config = IconConfig::new().with_size(256);
+        let icon_config = IconConfig::new().with_size(256).unwrap();
         assert_eq!(icon_config.size, Some(256));
         assert_eq!(icon_config.get_size_or_default(), 256);
     }
 
     #[test]
-    #[should_panic(expected = "Icon size cannot be zero")]
-    fn test_zero_icon_size_panics() {
-        IconConfig::new().with_size(0);
+    fn test_zero_icon_size_errors() {
+        let result = IconConfig::new().with_size(0);
+        assert!(result.is_err());
     }
 
     #[test]
-    #[should_panic(expected = "Icon size cannot be greater than 512 pixels")]
-    fn test_large_icon_size_panics() {
-        IconConfig::new().with_size(1024);
+    fn test_large_icon_size_errors() {
+        let result = IconConfig::new().with_size(1024);
+        assert!(result.is_err());
     }
 
     #[test]
     fn test_with_poll_interval() {
-        let config = FocusTrackerConfig::new().with_poll_interval(Duration::from_millis(500));
+        let config = FocusTrackerConfig::new()
+            .with_poll_interval(Duration::from_millis(500))
+            .unwrap();
         assert_eq!(config.poll_interval, Duration::from_millis(500));
     }
 
     #[test]
-    #[should_panic(expected = "Poll interval cannot be zero")]
-    fn test_zero_interval_panics() {
-        FocusTrackerConfig::new().with_poll_interval(Duration::from_millis(0));
+    fn test_zero_interval_errors() {
+        let result = FocusTrackerConfig::new().with_poll_interval(Duration::from_millis(0));
+        assert!(result.is_err());
     }
 
     #[test]
-    #[should_panic(expected = "Poll interval cannot be greater than 10 seconds")]
-    fn test_large_interval_panics() {
-        FocusTrackerConfig::new().with_poll_interval(Duration::from_secs(11));
+    fn test_large_interval_errors() {
+        let result = FocusTrackerConfig::new().with_poll_interval(Duration::from_secs(11));
+        assert!(result.is_err());
     }
 }

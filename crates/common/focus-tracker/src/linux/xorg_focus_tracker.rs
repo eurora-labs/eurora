@@ -103,11 +103,15 @@ where
                         return Ok(());
                     }
                     current_focused_window = Some(window);
-                    let _ = conn.change_window_attributes(
+                    if let Err(e) = conn.change_window_attributes(
                         window,
                         &ChangeWindowAttributesAux::new().event_mask(EventMask::PROPERTY_CHANGE),
-                    );
-                    let _ = flush_connection(&conn);
+                    ) {
+                        info!("Failed to monitor initial window {window}: {e}");
+                    }
+                    if let Err(e) = flush_connection(&conn) {
+                        info!("Failed to flush after initial monitoring: {e}");
+                    }
                 }
                 Err(e) => {
                     info!("Failed to get initial window info: {}", e);
@@ -243,9 +247,9 @@ where
             Err(e)
         }
         Err(e) => {
-            let err_msg = format!("X11 blocking task failed: {}", e);
+            let err_msg = format!("X11 blocking task failed: {e}");
             info!("{}", err_msg);
-            Err(FocusTrackerError::Platform(err_msg))
+            Err(FocusTrackerError::platform(err_msg))
         }
     }
 }
@@ -279,11 +283,15 @@ where
                     info!("Initial focus event handler failed: {}", e);
                 }
                 current_focused_window = Some(window);
-                let _ = conn.change_window_attributes(
+                if let Err(e) = conn.change_window_attributes(
                     window,
                     &ChangeWindowAttributesAux::new().event_mask(EventMask::PROPERTY_CHANGE),
-                );
-                let _ = flush_connection(&conn);
+                ) {
+                    info!("Failed to monitor initial window {window}: {e}");
+                }
+                if let Err(e) = flush_connection(&conn) {
+                    info!("Failed to flush after initial monitoring: {e}");
+                }
             }
             Err(e) => {
                 info!("Failed to get initial window info: {}", e);
@@ -374,7 +382,7 @@ fn connect_to_x11() -> FocusTrackerResult<(RustConnection, usize)> {
         {
             FocusTrackerError::NoDisplay
         } else {
-            FocusTrackerError::Platform(error_str)
+            FocusTrackerError::platform_with_source("failed to connect to X11", e)
         }
     })
 }
@@ -394,10 +402,11 @@ fn setup_root_window_monitoring<C: Connection>(conn: &C, root: u32) -> FocusTrac
         root,
         &ChangeWindowAttributesAux::new().event_mask(EventMask::PROPERTY_CHANGE),
     )
-    .map_err(|e| FocusTrackerError::Platform(e.to_string()))?;
+    .map_err(|e| FocusTrackerError::platform_with_source("failed to monitor root window", e))?;
 
-    conn.flush()
-        .map_err(|e| FocusTrackerError::Platform(e.to_string()))?;
+    conn.flush().map_err(|e| {
+        FocusTrackerError::platform_with_source("failed to flush after root window monitoring", e)
+    })?;
 
     Ok(())
 }
@@ -441,17 +450,21 @@ fn update_window_monitoring<C: Connection>(
     new_window: Option<u32>,
 ) {
     if let Some(old_win) = *current_focused_window {
-        let _ = conn.change_window_attributes(
+        if let Err(e) = conn.change_window_attributes(
             old_win,
             &ChangeWindowAttributesAux::new().event_mask(EventMask::NO_EVENT),
-        );
+        ) {
+            info!("Failed to remove monitoring from window {old_win}: {e}");
+        }
     }
 
     if let Some(new_win) = new_window {
-        let _ = conn.change_window_attributes(
+        if let Err(e) = conn.change_window_attributes(
             new_win,
             &ChangeWindowAttributesAux::new().event_mask(EventMask::PROPERTY_CHANGE),
-        );
+        ) {
+            info!("Failed to add monitoring to window {new_win}: {e}");
+        }
         *current_focused_window = Some(new_win);
     } else {
         *current_focused_window = None;
@@ -460,7 +473,7 @@ fn update_window_monitoring<C: Connection>(
 
 fn flush_connection<C: Connection>(conn: &C) -> FocusTrackerResult<()> {
     conn.flush()
-        .map_err(|e| FocusTrackerError::Platform(format!("Failed to flush connection: {e}")))
+        .map_err(|e| FocusTrackerError::platform_with_source("failed to flush X11 connection", e))
 }
 
 fn get_window_info<C: Connection>(
@@ -486,11 +499,11 @@ fn get_window_info<C: Connection>(
 fn get_atom<C: Connection>(conn: &C, name: &[u8]) -> FocusTrackerResult<u32> {
     let cookie = conn
         .intern_atom(false, name)
-        .map_err(|e| FocusTrackerError::Platform(e.to_string()))?;
+        .map_err(|e| FocusTrackerError::platform_with_source("failed to intern atom", e))?;
 
     let reply = cookie
         .reply()
-        .map_err(|e| FocusTrackerError::Platform(e.to_string()))?;
+        .map_err(|e| FocusTrackerError::platform_with_source("failed to get atom reply", e))?;
 
     Ok(reply.atom)
 }
@@ -502,11 +515,13 @@ fn get_active_window<C: Connection>(
 ) -> FocusTrackerResult<Option<u32>> {
     let cookie = conn
         .get_property(false, root, net_active_window, AtomEnum::WINDOW, 0, 1)
-        .map_err(|e| FocusTrackerError::Platform(format!("Failed to get active window: {e}")))?;
+        .map_err(|e| {
+            FocusTrackerError::platform_with_source("failed to get active window property", e)
+        })?;
 
-    let reply = cookie
-        .reply()
-        .map_err(|e| FocusTrackerError::Platform(format!("Failed to get active window: {e}")))?;
+    let reply = cookie.reply().map_err(|e| {
+        FocusTrackerError::platform_with_source("failed to get active window reply", e)
+    })?;
 
     Ok(reply.value32().and_then(|mut v| v.next()))
 }
@@ -524,9 +539,7 @@ fn get_window_name<C: Connection>(
             AtomEnum::WM_NAME.into(),
             AtomEnum::STRING.into(),
         )
-        .and_then(|opt| {
-            opt.ok_or_else(|| FocusTrackerError::Platform("No window name found".to_string()))
-        }),
+        .and_then(|opt| opt.ok_or_else(|| FocusTrackerError::platform("no window name found"))),
     }
 }
 
@@ -538,11 +551,11 @@ fn try_get_property_string<C: Connection>(
 ) -> FocusTrackerResult<Option<String>> {
     let cookie = conn
         .get_property(false, window, property, property_type, 0, u32::MAX)
-        .map_err(|e| FocusTrackerError::Platform(format!("Failed to get property: {e}")))?;
+        .map_err(|e| FocusTrackerError::platform_with_source("failed to get window property", e))?;
 
-    let reply = cookie
-        .reply()
-        .map_err(|e| FocusTrackerError::Platform(format!("Failed to get property: {e}")))?;
+    let reply = cookie.reply().map_err(|e| {
+        FocusTrackerError::platform_with_source("failed to get window property reply", e)
+    })?;
 
     if reply.value_len > 0 {
         Ok(Some(String::from_utf8_lossy(&reply.value).into_owned()))
@@ -558,23 +571,30 @@ fn get_process_info<C: Connection>(
 ) -> FocusTrackerResult<(u32, String)> {
     let cookie = conn
         .get_property(false, window, net_wm_pid, AtomEnum::CARDINAL, 0, 1)
-        .map_err(|e| FocusTrackerError::Platform(format!("Failed to get PID: {e}")))?;
+        .map_err(|e| {
+            FocusTrackerError::platform_with_source("failed to get window PID property", e)
+        })?;
 
-    let reply = cookie
-        .reply()
-        .map_err(|e| FocusTrackerError::Platform(format!("Failed to get PID: {e}")))?;
+    let reply = cookie.reply().map_err(|e| {
+        FocusTrackerError::platform_with_source("failed to get window PID reply", e)
+    })?;
 
     let pid = reply
         .value32()
         .and_then(|mut v| v.next())
-        .ok_or_else(|| FocusTrackerError::Platform("No PID found for window".to_string()))?;
+        .ok_or_else(|| FocusTrackerError::platform("no PID found for window"))?;
 
     let process_name = std::fs::read_to_string(format!("/proc/{pid}/comm"))
         .or_else(|_| {
             std::fs::read_link(format!("/proc/{pid}/exe")).map(|p| p.to_string_lossy().into())
         })
         .map(|name| name.trim_end_matches('\n').to_owned())
-        .map_err(|e| FocusTrackerError::Platform(format!("Failed to get process name: {e}")))?;
+        .map_err(|e| {
+            FocusTrackerError::platform_with_source(
+                format!("failed to get process name for pid {pid}"),
+                e,
+            )
+        })?;
 
     Ok((pid, process_name))
 }
@@ -607,12 +627,12 @@ fn get_icon_data<C: Connection>(
             u32::MAX / 4,
         )
         .map_err(|e| {
-            FocusTrackerError::Platform(format!("Failed to request icon property: {e}"))
+            FocusTrackerError::platform_with_source("failed to request icon property", e)
         })?;
 
-    let reply = cookie
-        .reply()
-        .map_err(|e| FocusTrackerError::Platform(format!("Failed to get icon property: {e}")))?;
+    let reply = cookie.reply().map_err(|e| {
+        FocusTrackerError::platform_with_source("failed to get icon property reply", e)
+    })?;
 
     if reply.value_len == 0 {
         return Err(FocusTrackerError::Unsupported);
@@ -620,14 +640,12 @@ fn get_icon_data<C: Connection>(
 
     let values: Vec<u32> = reply
         .value32()
-        .ok_or_else(|| {
-            FocusTrackerError::Platform("Failed to parse icon data as 32-bit values".to_string())
-        })?
+        .ok_or_else(|| FocusTrackerError::platform("failed to parse icon data as 32-bit values"))?
         .collect();
 
     if values.len() < 2 {
-        return Err(FocusTrackerError::Platform(
-            "Invalid icon data: missing width/height".to_string(),
+        return Err(FocusTrackerError::platform(
+            "invalid icon data: missing width/height",
         ));
     }
 
@@ -635,26 +653,24 @@ fn get_icon_data<C: Connection>(
     let height = values[1];
 
     if width == 0 || height == 0 {
-        return Err(FocusTrackerError::Platform(
-            "Invalid icon dimensions".to_string(),
-        ));
+        return Err(FocusTrackerError::platform("invalid icon dimensions"));
     }
 
     let expected_pixels = (width as usize)
         .checked_mul(height as usize)
-        .ok_or_else(|| FocusTrackerError::Platform("Icon dimensions overflow".into()))?;
+        .ok_or_else(|| FocusTrackerError::platform("icon dimensions overflow"))?;
     let available_pixels = values.len() - 2;
 
     if available_pixels < expected_pixels {
-        return Err(FocusTrackerError::Platform(format!(
-            "Insufficient pixel data: expected {expected_pixels}, got {available_pixels}",
+        return Err(FocusTrackerError::platform(format!(
+            "insufficient pixel data: expected {expected_pixels}, got {available_pixels}",
         )));
     }
 
     let mut pixels = Vec::with_capacity(
         expected_pixels
             .checked_mul(4)
-            .ok_or_else(|| FocusTrackerError::Platform("Icon dimensions overflow".into()))?,
+            .ok_or_else(|| FocusTrackerError::platform("icon buffer size overflow"))?,
     );
 
     for &argb in &values[2..2 + expected_pixels] {
@@ -669,9 +685,8 @@ fn get_icon_data<C: Connection>(
         pixels.push(a);
     }
 
-    let mut image = image::RgbaImage::from_raw(width, height, pixels).ok_or_else(|| {
-        FocusTrackerError::Platform("Failed to create RgbaImage from pixel data".to_string())
-    })?;
+    let mut image = image::RgbaImage::from_raw(width, height, pixels)
+        .ok_or_else(|| FocusTrackerError::platform("failed to create RgbaImage from pixel data"))?;
 
     if let Some(target_size) = icon_config.size {
         image = resize_icon(image, target_size, icon_config.filter_type);
