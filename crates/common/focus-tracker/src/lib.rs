@@ -18,7 +18,13 @@ mod platform;
 
 pub use platform::utils;
 
-pub fn subscribe_focus_changes() -> FocusTrackerResult<std::sync::mpsc::Receiver<FocusedWindow>> {
+/// Convenience function that creates a [`FocusTracker`] with default settings
+/// and immediately subscribes to focus changes.
+///
+/// # Errors
+///
+/// Returns an error if the background tracking thread cannot be spawned.
+pub fn subscribe_focus_changes() -> FocusTrackerResult<FocusSubscription> {
     let tracker = FocusTracker::new();
     tracker.subscribe_focus_changes()
 }

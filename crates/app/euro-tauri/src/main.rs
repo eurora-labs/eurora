@@ -46,7 +46,6 @@ fn install_native_messaging_manifests(app: &tauri::App) {
     #[cfg(target_os = "windows")]
     {
         let _ = app;
-        return;
     }
 
     #[cfg(not(target_os = "windows"))]
