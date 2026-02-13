@@ -148,6 +148,7 @@ where
                     continue;
                 }
             };
+            consecutive_errors = 0;
 
             let Event::PropertyNotify(PropertyNotifyEvent { atom, window, .. }) = event else {
                 continue;
