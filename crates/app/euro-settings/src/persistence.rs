@@ -26,6 +26,8 @@ impl AppSettings {
 
         let mut app_settings: AppSettings = serde_json::from_value(settings)?;
 
+        // Normal user login flows won't work during development
+        // if you have the variable set in the .env file
         if let Ok(api_base_url) = std::env::var("API_BASE_URL") {
             app_settings.api.endpoint = api_base_url;
         }
