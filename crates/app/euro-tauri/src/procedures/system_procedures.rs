@@ -90,11 +90,11 @@ const DEFAULT_PORTS: [u16; 3] = [39051, 39080, 39432];
 
 fn find_available_port(preferred: u16) -> Result<u16, String> {
     // Try the preferred port first
-    if TcpListener::bind(("0.0.0.0", preferred)).is_ok() {
+    if TcpListener::bind(("localhost", preferred)).is_ok() {
         return Ok(preferred);
     }
     // Bind to :0 to let the OS pick a free port
-    let listener = TcpListener::bind("0.0.0.0:0")
+    let listener = TcpListener::bind("localhost:0")
         .map_err(|e| format!("Failed to find available port: {}", e))?;
     let port = listener
         .local_addr()
@@ -133,7 +133,7 @@ impl SystemApi for SystemApiImpl {
         self,
         server_address: Option<String>,
     ) -> Result<String, String> {
-        let address = server_address.unwrap_or_else(|| "0.0.0.0:50051".to_string());
+        let address = server_address.unwrap_or_else(|| "localhost:50051".to_string());
 
         debug!("Checking connection to gRPC server: {}", address);
 
@@ -400,7 +400,7 @@ impl SystemApi for SystemApiImpl {
         let stdout = String::from_utf8_lossy(&output.stdout);
         info!("docker compose started: {}", stdout);
 
-        let local_url = format!("http://0.0.0.0:{}", grpc_port);
+        let local_url = format!("http://localhost:{}", grpc_port);
         let endpoint_manager = app_handle.state::<SharedEndpointManager>();
         endpoint_manager
             .set_global_backend_url(&local_url)

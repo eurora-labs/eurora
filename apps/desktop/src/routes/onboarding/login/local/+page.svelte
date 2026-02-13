@@ -54,14 +54,13 @@
 
 			try {
 				const apiSettings = await taurpc.settings.get_api_settings();
-				apiSettings.endpoint = `http://0.0.0.0:${backendInfo?.grpc_port}`;
+				apiSettings.endpoint = `http://localhost:${backendInfo?.grpc_port}`;
 				await taurpc.settings.set_api_settings(apiSettings);
+				toast.success('Logged in to local backend');
+				goto('/');
 			} catch (error) {
-				console.error('Failed to set API settings:', error);
+				toast.error(`Failed to set API settings: ${error}`);
 			}
-
-			toast.success('Logged in to local backend');
-			goto('/');
 		} catch (error) {
 			toast.error(`Authentication failed: ${error}`);
 		} finally {

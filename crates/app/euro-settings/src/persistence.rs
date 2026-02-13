@@ -51,7 +51,7 @@ impl AppSettings {
         AppSettings::load(config_dir.join(SETTINGS_FILE).as_path())
     }
 
-    /// Save only values that differ from defaults to the config file.
+    /// Save only values that differ from the current config file.
     pub fn save(&self, config_path: &Path) -> Result<()> {
         let current = serde_json::to_value(AppSettings::load(config_path)?)?;
         let update = serde_json::to_value(self)?;

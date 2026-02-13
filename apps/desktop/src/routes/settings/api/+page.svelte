@@ -12,10 +12,11 @@
 	let apiSettings = $state<ApiSettings | null>(null);
 	let customEndpoint = $state(false);
 	let endpointValue = $state('');
+	let initialEndpoint = $state('https://api.eurora-labs.com');
 
 	async function saveSettings() {
 		if (!apiSettings) return;
-		await taurpc.settings.set_api_settings({
+		apiSettings = await taurpc.settings.set_api_settings({
 			...apiSettings,
 			endpoint: customEndpoint ? endpointValue : apiSettings.endpoint,
 		});
@@ -25,7 +26,7 @@
 		customEndpoint = checked;
 		if (!checked && apiSettings) {
 			// Reset to current endpoint when unchecking
-			endpointValue = '';
+			endpointValue = initialEndpoint;
 			saveSettings();
 		}
 	}
@@ -33,12 +34,13 @@
 	onMount(() => {
 		taurpc.settings.get_api_settings().then((settings) => {
 			apiSettings = settings;
+			initialEndpoint = settings.endpoint;
 		});
 	});
 </script>
 
 <div class="flex flex-col p-4 gap-4">
-	<h1 class="text-2xl font-semibold">Api Settings</h1>
+	<h1 class="text-2xl font-semibold">API Settings</h1>
 
 	<div class="flex flex-col gap-4">
 		<div class="flex items-center gap-2">

@@ -29,7 +29,7 @@
 			icon: ChevronsLeftRightEllipsis,
 		},
 		{
-			title: 'Api',
+			title: 'API',
 			url: '/settings/api',
 			icon: ServerIcon,
 		},

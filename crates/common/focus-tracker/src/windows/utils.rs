@@ -136,7 +136,7 @@ pub(crate) fn get_process_exe_path(process_id: u32) -> FocusTrackerResult<Vec<u1
     }
     let _guard = HandleGuard(process_handle);
 
-    let mut buffer = [0u16; 1024];
+    let mut buffer = vec![0u16; 32768];
     let mut len = buffer.len() as u32;
     let ok = unsafe {
         QueryFullProcessImageNameW(
@@ -153,7 +153,8 @@ pub(crate) fn get_process_exe_path(process_id: u32) -> FocusTrackerResult<Vec<u1
         ));
     }
 
-    Ok(buffer[..len as usize].to_vec())
+    buffer.truncate(len as usize);
+    Ok(buffer)
 }
 
 pub(crate) fn get_window_info(hwnd: HWND) -> FocusTrackerResult<(Option<String>, String)> {

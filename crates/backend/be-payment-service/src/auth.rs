@@ -6,7 +6,7 @@ use be_auth_core::JwtConfig;
 
 use crate::error::PaymentError;
 
-pub struct AuthUser(pub auth_core::Claims);
+pub struct AuthUser(pub be_auth_core::Claims);
 
 impl<S> FromRequestParts<S> for AuthUser
 where

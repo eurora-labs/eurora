@@ -300,12 +300,12 @@ impl Drop for IconBitmapGuard {
 fn acquire_icon_handle(hwnd: HWND) -> Result<(isize, bool), FocusTrackerError> {
     let hicon = unsafe { SendMessageW(hwnd, WM_GETICON, ICON_BIG as WPARAM, 0) } as isize;
     if hicon != 0 {
-        return Ok((hicon, true));
+        return Ok((hicon, false));
     }
 
     let hicon = unsafe { SendMessageW(hwnd, WM_GETICON, ICON_SMALL as WPARAM, 0) } as isize;
     if hicon != 0 {
-        return Ok((hicon, true));
+        return Ok((hicon, false));
     }
 
     let hicon = unsafe { GetClassLongPtrW(hwnd, GCLP_HICON) } as isize;

@@ -2,6 +2,17 @@
 	import { goto } from '$app/navigation';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { open } from '@tauri-apps/plugin-shell';
+	import { toast } from 'svelte-sonner';
+
+	const pricingUrl = 'https://www.eurora-labs.com/pricing';
+
+	async function openPricing() {
+		try {
+			await open(pricingUrl);
+		} catch {
+			toast.error(`Could not open browser. Please visit: ${pricingUrl}`);
+		}
+	}
 </script>
 
 <div class="flex flex-col justify-center items-center h-full p-8 gap-4">
@@ -13,10 +24,7 @@
 		</p>
 	</div>
 
-	<Card.Root
-		class="flex group cursor-pointer w-full"
-		onclick={() => open('https://www.eurora-labs.com/pricing')}
-	>
+	<Card.Root class="flex group cursor-pointer w-full" onclick={openPricing}>
 		<Card.Header class="pb-6 text-left">
 			<Card.Title class="mb-2 text-2xl font-semibold">Upgrade Plan</Card.Title>
 			<Card.Description>
