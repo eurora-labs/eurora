@@ -28,33 +28,6 @@ pub fn spawn_test_window(title: &str) -> Result<Child, Box<dyn std::error::Error
     Ok(child)
 }
 
-// /// Spawn a test window with an icon
-// ///
-// /// # Arguments
-// /// * `title` - The window title to set
-// /// * `icon_path` - Path to the icon file
-// ///
-// /// # Returns
-// /// A `Child` process handle for the spawned window
-// pub fn spawn_test_window_with_icon(
-//     title: &str,
-//     icon_path: &str,
-// ) -> Result<Child, Box<dyn std::error::Error>> {
-//     let mut cmd = Command::new("cargo");
-//     cmd.args(&["run", "--example", "spawn_window", "--"])
-//         .args(&["--title", title, "--icon", icon_path])
-//         .stdin(Stdio::null())
-//         .stdout(Stdio::piped())
-//         .stderr(Stdio::piped());
-
-//     let child = cmd.spawn()?;
-
-//     // Give the window time to appear
-//     std::thread::sleep(Duration::from_millis(500));
-
-//     Ok(child)
-// }
-
 /// Focus a window (platform-specific implementation)
 ///
 /// # Arguments
@@ -139,10 +112,24 @@ fn focus_window_windows(_child: &mut Child) -> Result<(), Box<dyn std::error::Er
 }
 
 #[cfg(target_os = "macos")]
-fn focus_window_macos(_child: &mut Child) -> Result<(), Box<dyn std::error::Error>> {
-    // macOS-specific window focusing implementation
-    // This would use AppleScript or Cocoa APIs to focus the window
-    // For now, we'll implement a basic version
+fn focus_window_macos(child: &mut Child) -> Result<(), Box<dyn std::error::Error>> {
+    let pid = child.id();
+
+    let script = format!(
+        "tell application \"System Events\" to set frontmost of the first process whose unix id is {} to true",
+        pid
+    );
+
+    let output = Command::new("osascript").args(["-e", &script]).output()?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("osascript failed to focus window (pid {pid}): {stderr}").into());
+    }
+
+    // Give the system a moment to complete the focus switch
+    std::thread::sleep(Duration::from_millis(200));
+
     Ok(())
 }
 
@@ -175,24 +162,36 @@ pub fn wait_for_focus(expected_title: &str, timeout: Duration) -> bool {
 /// Get the currently focused window (for testing purposes)
 fn get_current_focused_window() -> Result<focus_tracker::FocusedWindow, Box<dyn std::error::Error>>
 {
-    // This is a simplified version for testing
-    // In a real implementation, this would use the actual focus tracking logic
-
     #[cfg(target_os = "linux")]
     {
         get_focused_window_linux()
     }
 
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "macos")]
     {
-        // Placeholder for other platforms
+        get_focused_window_macos()
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        get_focused_window_windows()
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+    {
         Ok(focus_tracker::FocusedWindow {
-            process_id: 123,
-            process_name: "some process".to_string(),
+            process_id: 0,
+            process_name: "unknown".to_string(),
             window_title: Some("unknown".to_string()),
             icon: None,
         })
     }
+}
+
+#[cfg(target_os = "macos")]
+fn get_focused_window_macos() -> Result<focus_tracker::FocusedWindow, Box<dyn std::error::Error>> {
+    focus_tracker::utils::get_frontmost_window_basic_info()
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
 }
 
 #[cfg(target_os = "linux")]
@@ -206,7 +205,7 @@ fn get_focused_window_linux() -> Result<focus_tracker::FocusedWindow, Box<dyn st
     {
         let title = String::from_utf8_lossy(&output.stdout).trim().to_string();
         return Ok(focus_tracker::FocusedWindow {
-            process_id: 123,
+            process_id: 0,
             process_name: "unknown".to_string(),
             window_title: Some(title),
             icon: None,
@@ -215,7 +214,20 @@ fn get_focused_window_linux() -> Result<focus_tracker::FocusedWindow, Box<dyn st
 
     // Fallback
     Ok(focus_tracker::FocusedWindow {
-        process_id: 123,
+        process_id: 0,
+        process_name: "unknown".to_string(),
+        window_title: Some("unknown".to_string()),
+        icon: None,
+    })
+}
+
+#[cfg(target_os = "windows")]
+fn get_focused_window_windows() -> Result<focus_tracker::FocusedWindow, Box<dyn std::error::Error>>
+{
+    // Placeholder – a full implementation would use the Windows API to query
+    // the foreground window title.
+    Ok(focus_tracker::FocusedWindow {
+        process_id: 0,
         process_name: "unknown".to_string(),
         window_title: Some("unknown".to_string()),
         icon: None,
@@ -291,7 +303,7 @@ pub fn spawn_window(title: &str) -> Result<Child, Box<dyn std::error::Error>> {
 #[allow(dead_code)]
 pub fn get_focused_window() -> focus_tracker::FocusedWindow {
     get_current_focused_window().unwrap_or_else(|_| focus_tracker::FocusedWindow {
-        process_id: 123,
+        process_id: 0,
         process_name: "unknown".to_string(),
         window_title: Some("unknown".to_string()),
         icon: None,
