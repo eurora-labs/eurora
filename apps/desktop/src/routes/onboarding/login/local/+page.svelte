@@ -51,6 +51,15 @@
 					throw new Error(`Registration failed: ${regMsg}\nLogin failed: ${loginError}`);
 				}
 			}
+
+			try {
+				const apiSettings = await taurpc.settings.get_api_settings();
+				apiSettings.endpoint = `http://0.0.0.0:${backendInfo?.grpc_port}`;
+				await taurpc.settings.set_api_settings(apiSettings);
+			} catch (error) {
+				console.error('Failed to set API settings:', error);
+			}
+
 			toast.success('Logged in to local backend');
 			goto('/');
 		} catch (error) {
