@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use agent_chain_core::BaseMessage;
 use chrono::{DateTime, Utc};
@@ -130,7 +131,7 @@ pub struct Activity {
     pub id: String,
     pub name: String,
     #[serde(skip)]
-    pub icon: Option<image::RgbaImage>,
+    pub icon: Option<Arc<image::RgbaImage>>,
     pub process_name: String,
     pub start: DateTime<Utc>,
     pub end: Option<DateTime<Utc>>,
@@ -141,7 +142,7 @@ pub struct Activity {
 impl Activity {
     pub fn new(
         name: String,
-        icon: Option<image::RgbaImage>,
+        icon: Option<Arc<image::RgbaImage>>,
         process_name: String,
         assets: Vec<ActivityAsset>,
     ) -> Self {

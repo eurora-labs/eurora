@@ -94,11 +94,11 @@ Customize behavior with `FocusTrackerConfig`:
 ```rust
 use focus_tracker::{FocusTracker, FocusTrackerConfig, IconConfig};
 
-let config = FocusTrackerConfig::new()
-    .with_poll_interval_ms(50)           // Faster polling (default: 100ms)
-    .with_icon_config(
-        IconConfig::new().with_size(128) // Custom icon size
-    );
+let config = FocusTrackerConfig::builder()
+    .poll_interval(std::time::Duration::from_millis(50))  // Faster polling (default: 100ms)
+    .unwrap()
+    .icon(IconConfig::builder().size(128).unwrap().build()) // Custom icon size
+    .build();
 
 let tracker = FocusTracker::with_config(config);
 ```

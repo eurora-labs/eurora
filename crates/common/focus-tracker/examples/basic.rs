@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!();
 
     // This is the simplest way to get focus changes - just one function call!
-    let receiver = subscribe_focus_changes()?;
+    let subscription = subscribe_focus_changes()?;
 
     // Set up Ctrl+C handler for graceful shutdown
     let running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
@@ -31,7 +31,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Listen for focus changes in a simple loop
     let mut event_count = 0;
     while running.load(std::sync::atomic::Ordering::SeqCst) {
-        match receiver.recv_timeout(Duration::from_millis(100)) {
+        match subscription
+            .receiver()
+            .recv_timeout(Duration::from_millis(100))
+        {
             Ok(focused_window) => {
                 event_count += 1;
                 println!(
