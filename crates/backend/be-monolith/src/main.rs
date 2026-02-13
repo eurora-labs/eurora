@@ -7,6 +7,7 @@ use be_auth_service::AuthService;
 use be_conversation_service::{ConversationService, ProtoConversationServiceServer};
 use be_payment_service::init_payment_service;
 use be_remote_db::DatabaseManager;
+use be_storage::StorageService;
 use be_update_service::init_update_service;
 use dotenv::dotenv;
 use proto_gen::auth::proto_auth_service_server::ProtoAuthServiceServer;
@@ -76,10 +77,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let jwt_interceptor = JwtInterceptor::default();
 
     let auth_service = AuthService::new(db_manager.clone(), jwt_interceptor.get_config().clone());
-    let activity_service = ActivityService::from_env(db_manager.clone())
-        .expect("Failed to initialize activity service");
-    let assets_service =
-        AssetService::from_env(db_manager.clone()).expect("Failed to initialize assets service");
+
+    let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
+        .map(|v| v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
+    // Build shared storage service, with encryption in local mode
+    let encryption_key = if local_mode {
+        match be_encrypt::load_or_generate_key() {
+            Ok(key) => {
+                info!("Local mode: asset encryption enabled");
+                Some(key)
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to load encryption key, assets will be stored unencrypted: {}",
+                    e
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    let storage_config =
+        be_storage::StorageConfig::from_env().expect("Failed to load storage config");
+    let storage = Arc::new(
+        StorageService::builder()
+            .config(storage_config)
+            .maybe_encryption_key(encryption_key)
+            .build()
+            .expect("Failed to initialize storage service"),
+    );
+
+    let core_asset = Arc::new(be_asset::AssetService::new(
+        db_manager.clone(),
+        storage.clone(),
+    ));
+    let activity_service = ActivityService::new(db_manager.clone(), core_asset.clone());
+    let assets_service = AssetService::new(db_manager.clone(), storage.clone());
     let conversation_service = ConversationService::from_env(db_manager.clone())
         .expect("Failed to initialize conversation service");
 
@@ -87,10 +124,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Starting HTTP server at {}", http_addr);
 
     let cors = CorsLayer::permissive();
-
-    let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
-        .map(|v| v.eq_ignore_ascii_case("true"))
-        .unwrap_or(false);
 
     let bucket_name =
         std::env::var("S3_BUCKET_NAME").unwrap_or_else(|_| "eurora-releases".to_string());

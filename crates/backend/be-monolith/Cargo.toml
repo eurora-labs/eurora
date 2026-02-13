@@ -8,12 +8,15 @@ publish = false
 [dependencies]
 axum = "0.8.8"
 be-activity-service = { workspace = true }
+be-asset = { workspace = true }
 be-asset-service = { workspace = true }
 be-auth-grpc = { workspace = true }
 be-auth-service = { workspace = true }
 be-conversation-service = { workspace = true }
+be-encrypt = { workspace = true }
 be-payment-service = { workspace = true }
 be-remote-db = { workspace = true }
+be-storage = { workspace = true, features = ["encryption"] }
 be-update-service = { workspace = true }
 dotenv = { workspace = true }
 prost = { workspace = true }

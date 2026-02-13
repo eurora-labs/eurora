@@ -21,6 +21,7 @@ mod error;
 
 pub use error::{StorageError, StorageResult};
 
+use bon::bon;
 use opendal::{Operator, services};
 use sha2::{Digest, Sha256};
 use tracing::{debug, info};
@@ -91,17 +92,29 @@ impl StorageConfig {
 pub struct StorageService {
     operator: Operator,
     config: StorageConfig,
+    #[cfg(feature = "encryption")]
+    encryption_key: Option<be_encrypt::MainKey>,
 }
 
+#[bon]
 impl StorageService {
-    /// Create a new storage service with the given configuration
+    /// Create a new storage service with the given configuration.
     ///
     /// # Errors
     ///
     /// Returns an error if the storage operator cannot be created.
-    pub fn new(config: StorageConfig) -> StorageResult<Self> {
+    #[builder]
+    pub fn new(
+        config: StorageConfig,
+        #[cfg(feature = "encryption")] encryption_key: Option<be_encrypt::MainKey>,
+    ) -> StorageResult<Self> {
         let operator = Self::create_operator(&config)?;
-        Ok(Self { operator, config })
+        Ok(Self {
+            operator,
+            config,
+            #[cfg(feature = "encryption")]
+            encryption_key,
+        })
     }
 
     /// Create a new storage service using environment variables for configuration
@@ -112,7 +125,7 @@ impl StorageService {
     pub fn from_env() -> StorageResult<Self> {
         let config = StorageConfig::from_env()?;
         info!("Initializing storage service with config: {:?}", config);
-        Self::new(config)
+        Self::builder().config(config).build()
     }
 
     fn create_operator(config: &StorageConfig) -> StorageResult<Operator> {
@@ -216,13 +229,29 @@ impl StorageService {
             content.len()
         );
 
-        self.operator.write(&path, content.to_vec()).await?;
+        #[cfg(feature = "encryption")]
+        let content = match &self.encryption_key {
+            Some(key) => {
+                let encrypted = be_encrypt::encrypt(key, content, "asset").map_err(|e| {
+                    StorageError::Encryption(format!("Failed to encrypt asset: {}", e))
+                })?;
+                debug!(
+                    "Encrypted asset {} ({} -> {} bytes)",
+                    asset_id,
+                    content.len(),
+                    encrypted.len()
+                );
+                encrypted
+            }
+            None => content.to_vec(),
+        };
 
-        info!(
-            "Successfully uploaded asset {} ({} bytes)",
-            asset_id,
-            content.len()
-        );
+        #[cfg(not(feature = "encryption"))]
+        let content = content.to_vec();
+
+        self.operator.write(&path, content).await?;
+
+        info!("Successfully uploaded asset {}", asset_id);
 
         Ok(path)
     }
@@ -243,13 +272,32 @@ impl StorageService {
             }
         })?;
 
+        let bytes = content.to_vec();
+
+        #[cfg(feature = "encryption")]
+        let bytes = match &self.encryption_key {
+            Some(key) if be_encrypt::is_encrypted(&bytes) => {
+                let decrypted = be_encrypt::decrypt(key, &bytes).map_err(|e| {
+                    StorageError::Encryption(format!("Failed to decrypt asset: {}", e))
+                })?;
+                debug!(
+                    "Decrypted asset from {} ({} -> {} bytes)",
+                    path,
+                    bytes.len(),
+                    decrypted.len()
+                );
+                decrypted
+            }
+            _ => bytes,
+        };
+
         debug!(
             "Successfully downloaded {} bytes from {}",
-            content.len(),
+            bytes.len(),
             path
         );
 
-        Ok(content.to_vec())
+        Ok(bytes)
     }
 
     /// Delete content from storage
