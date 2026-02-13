@@ -27,7 +27,7 @@ use euro_tauri::{
     shared_types::SharedConversationManager,
 };
 use euro_timeline::TimelineManager;
-use log::{debug, error};
+use log::{debug, error, info, warn};
 use tauri::{
     Manager, generate_context,
     menu::{Menu, MenuItem},
