@@ -406,10 +406,40 @@ impl SystemApi for SystemApiImpl {
             .set_global_backend_url(&local_url)
             .map_err(|e| format!("Failed to switch API endpoint: {e}"))?;
 
+        // Send the encryption key from the system keyring to the local backend
+        send_encryption_key(&local_url).await?;
+
         Ok(LocalBackendInfo {
             grpc_port,
             http_port,
             postgres_port,
         })
     }
+}
+
+/// Retrieve (or generate) the encryption key from the system keyring and send
+/// it to the local backend via the `LocalConfigService` gRPC endpoint.
+async fn send_encryption_key(backend_url: &str) -> Result<(), String> {
+    use base64::prelude::*;
+    use proto_gen::local_config::SetEncryptionKeyRequest;
+    use proto_gen::local_config::proto_local_config_service_client::ProtoLocalConfigServiceClient;
+
+    let main_key = euro_encrypt::MainKey::new()
+        .map_err(|e| format!("Failed to retrieve encryption key from keyring: {e}"))?;
+
+    let encoded = BASE64_STANDARD.encode(main_key.0);
+
+    let mut client = ProtoLocalConfigServiceClient::connect(backend_url.to_string())
+        .await
+        .map_err(|e| format!("Failed to connect to local config service: {e}"))?;
+
+    client
+        .set_encryption_key(SetEncryptionKeyRequest {
+            encryption_key: encoded,
+        })
+        .await
+        .map_err(|e| format!("Failed to send encryption key to backend: {e}"))?;
+
+    info!("Encryption key sent to local backend");
+    Ok(())
 }

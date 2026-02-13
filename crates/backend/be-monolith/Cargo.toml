@@ -13,7 +13,7 @@ be-asset-service = { workspace = true }
 be-auth-grpc = { workspace = true }
 be-auth-service = { workspace = true }
 be-conversation-service = { workspace = true }
-be-encrypt = { workspace = true }
+be-local-config-service = { workspace = true }
 be-payment-service = { workspace = true }
 be-remote-db = { workspace = true }
 be-storage = { workspace = true, features = ["encryption"] }

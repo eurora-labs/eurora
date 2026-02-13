@@ -41,6 +41,7 @@ be-auth-grpc = { path = "crates/backend/be-auth-grpc" }
 be-auth-service = { path = "crates/backend/be-auth-service" }
 be-conversation-service = { path = "crates/backend/be-conversation-service" }
 be-encrypt = { path = "crates/backend/be-encrypt" }
+be-local-config-service = { path = "crates/backend/be-local-config-service" }
 be-monolith = { path = "crates/backend/be-monolith" }
 be-payment-service = { path = "crates/backend/be-payment-service" }
 be-remote-db = { path = "crates/backend/be-remote-db" }

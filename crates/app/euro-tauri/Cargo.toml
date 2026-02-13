@@ -30,11 +30,13 @@ test = false
 agent-chain-core = { workspace = true }
 anyhow = { workspace = true }
 backtrace = { version = "0.3.76", optional = true }
+base64 = { workspace = true }
 color-thief = "0.2.2"
 dirs = { workspace = true }
 dotenv = { workspace = true }
 euro-activity = { workspace = true }
 euro-conversation = { workspace = true }
+euro-encrypt = { workspace = true }
 euro-endpoint = { workspace = true }
 euro-secret = { workspace = true }
 euro-settings = { workspace = true }
@@ -47,6 +49,7 @@ keyring = { workspace = true }
 log = { workspace = true }
 parking_lot = { workspace = true }
 posthog-rs = { workspace = true }
+proto-gen = { workspace = true }
 sentry = { workspace = true, features = ["log", "logs", "tracing"] }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
@@ -73,6 +76,7 @@ tauri-plugin-window-state = "2"
 taurpc = "0.6.0"
 # The features here optimize for performance.
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
+tonic = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
 

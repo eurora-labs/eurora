@@ -16,9 +16,6 @@ pub enum EncryptError {
 
     #[error("encryption error: {0}")]
     Encryption(#[from] chacha20poly1305::Error),
-
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
 }
 
 pub type EncryptResult<T> = std::result::Result<T, EncryptError>;

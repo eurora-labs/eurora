@@ -1596,6 +1596,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "be-local-config-service"
+version = "0.0.0"
+dependencies = [
+ "be-encrypt",
+ "be-storage",
+ "proto-gen",
+ "thiserror 2.0.18",
+ "tonic",
+ "tonic-prost-build",
+ "tracing",
+]
+
+[[package]]
 name = "be-monolith"
 version = "0.0.1"
 dependencies = [
@@ -1606,7 +1619,7 @@ dependencies = [
  "be-auth-grpc",
  "be-auth-service",
  "be-conversation-service",
- "be-encrypt",
+ "be-local-config-service",
  "be-payment-service",
  "be-remote-db",
  "be-storage",
@@ -3761,12 +3774,14 @@ dependencies = [
  "agent-chain-core",
  "anyhow",
  "backtrace",
+ "base64 0.22.1",
  "color-thief",
  "core-foundation 0.10.1",
  "dirs 6.0.0",
  "dotenv",
  "euro-activity",
  "euro-conversation",
+ "euro-encrypt",
  "euro-endpoint",
  "euro-secret",
  "euro-settings",
@@ -3779,6 +3794,7 @@ dependencies = [
  "log",
  "parking_lot",
  "posthog-rs",
+ "proto-gen",
  "sentry",
  "serde",
  "serde_json",
@@ -3803,6 +3819,7 @@ dependencies = [
  "tauri-plugin-window-state",
  "taurpc",
  "tokio",
+ "tonic",
  "tracing",
  "url",
 ]
