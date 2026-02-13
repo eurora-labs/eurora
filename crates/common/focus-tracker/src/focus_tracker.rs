@@ -2,7 +2,12 @@ use crate::{
     FocusTrackerConfig, FocusTrackerResult, FocusedWindow,
     platform::impl_focus_tracker::ImplFocusTracker,
 };
-use std::sync::{atomic::AtomicBool, mpsc};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+    mpsc,
+};
+use std::thread::JoinHandle;
 
 #[cfg(feature = "async")]
 use std::future::Future;
@@ -78,24 +83,92 @@ impl FocusTracker {
             .await
     }
 
-    pub fn subscribe_focus_changes(&self) -> FocusTrackerResult<mpsc::Receiver<FocusedWindow>> {
+    pub fn subscribe_focus_changes(&self) -> FocusTrackerResult<FocusSubscription> {
         let (sender, receiver) = mpsc::channel();
-        let stop_signal = AtomicBool::new(false);
+        let stop_signal = Arc::new(AtomicBool::new(false));
+        let thread_stop = Arc::clone(&stop_signal);
 
         let tracker = self.clone();
 
-        std::thread::spawn(move || {
-            let _ = tracker.track_focus_with_stop(
-                move |window: FocusedWindow| -> FocusTrackerResult<()> {
-                    if sender.send(window).is_err() {
-                        return Err(crate::FocusTrackerError::ChannelClosed);
-                    }
-                    Ok(())
-                },
-                &stop_signal,
-            );
-        });
+        let handle = std::thread::Builder::new()
+            .name("focus-tracker".into())
+            .spawn(move || {
+                let _ = tracker.track_focus_with_stop(
+                    move |window: FocusedWindow| -> FocusTrackerResult<()> {
+                        if sender.send(window).is_err() {
+                            return Err(crate::FocusTrackerError::ChannelClosed);
+                        }
+                        Ok(())
+                    },
+                    &thread_stop,
+                );
+            })
+            .map_err(|e| {
+                crate::FocusTrackerError::platform_with_source(
+                    "failed to spawn focus tracking thread",
+                    e,
+                )
+            })?;
 
-        Ok(receiver)
+        Ok(FocusSubscription {
+            receiver,
+            stop_signal,
+            handle: Some(handle),
+        })
+    }
+}
+
+/// A handle to an active focus-change subscription.
+///
+/// Provides a [`mpsc::Receiver`] for consuming focus events and manages the
+/// lifecycle of the background tracking thread. The thread is signaled to stop
+/// and joined when the subscription is dropped.
+pub struct FocusSubscription {
+    receiver: mpsc::Receiver<FocusedWindow>,
+    stop_signal: Arc<AtomicBool>,
+    handle: Option<JoinHandle<()>>,
+}
+
+impl FocusSubscription {
+    /// Returns a reference to the receiver for consuming focus events.
+    pub fn receiver(&self) -> &mpsc::Receiver<FocusedWindow> {
+        &self.receiver
+    }
+
+    /// Consumes the subscription, returning the receiver.
+    ///
+    /// The background thread will continue running until the receiver is dropped
+    /// and the channel closes, at which point it exits on its own.
+    /// To stop the thread promptly, prefer dropping the entire `FocusSubscription`.
+    pub fn into_receiver(mut self) -> mpsc::Receiver<FocusedWindow> {
+        // Detach: don't signal stop or join on drop.
+        self.handle.take();
+        std::mem::replace(&mut self.receiver, mpsc::channel().1)
+    }
+
+    /// Signals the background thread to stop and waits for it to exit.
+    pub fn stop(mut self) {
+        self.shutdown();
+    }
+
+    fn shutdown(&mut self) {
+        self.stop_signal.store(true, Ordering::Release);
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
+        }
+    }
+}
+
+impl Drop for FocusSubscription {
+    fn drop(&mut self) {
+        self.shutdown();
+    }
+}
+
+impl std::fmt::Debug for FocusSubscription {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FocusSubscription")
+            .field("stopped", &self.stop_signal.load(Ordering::Relaxed))
+            .finish()
     }
 }
