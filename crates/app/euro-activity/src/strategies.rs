@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use enum_dispatch::enum_dispatch;
 use focus_tracker::FocusedWindow;
+use std::sync::Arc;
 use tokio::sync::mpsc;
 
 pub mod browser;
@@ -23,7 +24,7 @@ use crate::{
 #[derive(Debug, Clone, Default)]
 pub struct StrategyMetadata {
     pub url: Option<String>,
-    pub icon: Option<image::RgbaImage>,
+    pub icon: Option<Arc<image::RgbaImage>>,
 }
 
 #[derive(Debug, Clone)]
@@ -38,14 +39,14 @@ impl From<NativeMetadata> for StrategyMetadata {
     fn from(metadata: NativeMetadata) -> Self {
         let icon = match metadata.icon_base64 {
             Some(icon) => match icon.starts_with("data:image/svg+xml;base64") {
-                true => convert_svg_to_rgba(&icon).ok(),
+                true => convert_svg_to_rgba(&icon).ok().map(Arc::new),
                 false => {
                     let icon = icon.split(',').nth(1).unwrap_or(&icon);
                     let icon_data = BASE64_STANDARD.decode(icon.trim()).ok();
 
                     image::load_from_memory(&icon_data.unwrap_or_default())
                         .ok()
-                        .map(|icon_image| icon_image.to_rgba8())
+                        .map(|icon_image| Arc::new(icon_image.to_rgba8()))
                 }
             },
             None => None,

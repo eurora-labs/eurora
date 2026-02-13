@@ -18,7 +18,7 @@ mod platform;
 
 pub use platform::utils;
 
-pub fn subscribe_focus_changes() -> FocusTrackerResult<std::sync::mpsc::Receiver<FocusedWindow>> {
+pub fn subscribe_focus_changes() -> FocusTrackerResult<FocusSubscription> {
     let tracker = FocusTracker::new();
     tracker.subscribe_focus_changes()
 }

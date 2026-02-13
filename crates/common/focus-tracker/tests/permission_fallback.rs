@@ -347,7 +347,7 @@ fn test_error_types() {
         FocusTrackerError::platform("test platform error"),
         FocusTrackerError::platform_with_source(
             "test platform with source",
-            std::io::Error::new(std::io::ErrorKind::Other, "inner error"),
+            std::io::Error::other("inner error"),
         ),
     ];
 
