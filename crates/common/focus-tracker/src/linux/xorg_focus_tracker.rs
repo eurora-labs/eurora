@@ -1,5 +1,6 @@
 use crate::{FocusTrackerConfig, FocusTrackerError, FocusTrackerResult, FocusedWindow};
 use focus_tracker_core::IconConfig;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tracing::info;
@@ -767,6 +768,36 @@ fn get_icon_data<C: Connection>(
     net_wm_icon: u32,
     icon_config: &IconConfig,
 ) -> FocusTrackerResult<image::RgbaImage> {
+    match get_icon_from_x11_property(conn, window, net_wm_icon, icon_config) {
+        Ok(image) => return Ok(image),
+        Err(e) => {
+            if !matches!(e, FocusTrackerError::Unsupported) {
+                info!("_NET_WM_ICON failed: {e}, trying desktop file fallback");
+            }
+        }
+    }
+
+    let (wm_instance, wm_class) =
+        get_wm_class(conn, window).ok_or(FocusTrackerError::Unsupported)?;
+
+    let icon_value =
+        find_desktop_icon(&wm_instance, &wm_class).ok_or(FocusTrackerError::Unsupported)?;
+
+    let icon_path = resolve_icon_path(&icon_value).ok_or(FocusTrackerError::Unsupported)?;
+
+    info!(
+        "Loading icon from desktop file fallback: {}",
+        icon_path.display()
+    );
+    load_icon_from_file(&icon_path, icon_config)
+}
+
+fn get_icon_from_x11_property<C: Connection>(
+    conn: &C,
+    window: u32,
+    net_wm_icon: u32,
+    icon_config: &IconConfig,
+) -> FocusTrackerResult<image::RgbaImage> {
     let cookie = conn
         .get_property(
             false,
@@ -806,6 +837,219 @@ fn get_icon_data<C: Connection>(
 
     let mut image = decode_icon_entry(&values, best)?;
 
+    if let Some(target_size) = icon_config.size {
+        image = resize_icon(image, target_size, icon_config.filter_type);
+    }
+
+    Ok(image)
+}
+
+fn get_wm_class<C: Connection>(conn: &C, window: u32) -> Option<(String, String)> {
+    let cookie = conn
+        .get_property(
+            false,
+            window,
+            u32::from(AtomEnum::WM_CLASS),
+            u32::from(AtomEnum::STRING),
+            0,
+            MAX_STRING_PROPERTY_LEN,
+        )
+        .ok()?;
+
+    let reply = cookie.reply().ok()?;
+    if reply.value_len == 0 {
+        return None;
+    }
+
+    // WM_CLASS is two null-terminated strings: "instance\0class\0"
+    let raw = &reply.value;
+    let parts: Vec<&str> = std::str::from_utf8(raw)
+        .ok()?
+        .trim_end_matches('\0')
+        .splitn(2, '\0')
+        .collect();
+
+    if parts.len() == 2 {
+        Some((parts[0].to_owned(), parts[1].to_owned()))
+    } else if parts.len() == 1 && !parts[0].is_empty() {
+        Some((parts[0].to_owned(), parts[0].to_owned()))
+    } else {
+        None
+    }
+}
+
+fn xdg_application_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+
+    if let Some(data_home) = std::env::var_os("XDG_DATA_HOME") {
+        dirs.push(PathBuf::from(data_home).join("applications"));
+    } else if let Some(home) = std::env::var_os("HOME") {
+        dirs.push(PathBuf::from(home).join(".local/share/applications"));
+    }
+
+    let data_dirs =
+        std::env::var("XDG_DATA_DIRS").unwrap_or_else(|_| "/usr/local/share:/usr/share".to_owned());
+    for dir in data_dirs.split(':') {
+        if !dir.is_empty() {
+            dirs.push(PathBuf::from(dir).join("applications"));
+        }
+    }
+
+    dirs
+}
+
+struct DesktopEntry {
+    icon: Option<String>,
+    startup_wm_class: Option<String>,
+}
+
+fn parse_desktop_file(path: &Path) -> Option<DesktopEntry> {
+    let content = std::fs::read_to_string(path).ok()?;
+    let mut in_desktop_entry = false;
+    let mut icon = None;
+    let mut startup_wm_class = None;
+
+    for line in content.lines() {
+        let line = line.trim();
+
+        if line.starts_with('[') {
+            in_desktop_entry = line == "[Desktop Entry]";
+            if !in_desktop_entry && icon.is_some() {
+                break;
+            }
+            continue;
+        }
+
+        if !in_desktop_entry {
+            continue;
+        }
+
+        if let Some(value) = line.strip_prefix("Icon=") {
+            icon = Some(value.trim().to_owned());
+        } else if let Some(value) = line.strip_prefix("StartupWMClass=") {
+            startup_wm_class = Some(value.trim().to_owned());
+        }
+
+        if icon.is_some() && startup_wm_class.is_some() {
+            break;
+        }
+    }
+
+    Some(DesktopEntry {
+        icon,
+        startup_wm_class,
+    })
+}
+
+fn find_desktop_icon(wm_instance: &str, wm_class: &str) -> Option<String> {
+    let dirs = xdg_application_dirs();
+
+    let mut desktop_files: Vec<PathBuf> = Vec::new();
+    for dir in &dirs {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().is_some_and(|e| e == "desktop") {
+                    desktop_files.push(path);
+                }
+            }
+        }
+    }
+
+    for path in &desktop_files {
+        if let Some(entry) = parse_desktop_file(path)
+            && let Some(ref swc) = entry.startup_wm_class
+            && (swc.eq_ignore_ascii_case(wm_instance) || swc.eq_ignore_ascii_case(wm_class))
+            && let Some(icon) = entry.icon
+        {
+            return Some(icon);
+        }
+    }
+
+    for path in &desktop_files {
+        if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+            && (stem.eq_ignore_ascii_case(wm_instance) || stem.eq_ignore_ascii_case(wm_class))
+            && let Some(entry) = parse_desktop_file(path)
+            && let Some(icon) = entry.icon
+        {
+            return Some(icon);
+        }
+    }
+
+    None
+}
+
+fn xdg_icon_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+
+    if let Some(data_home) = std::env::var_os("XDG_DATA_HOME") {
+        dirs.push(PathBuf::from(data_home).join("icons"));
+    } else if let Some(home) = std::env::var_os("HOME") {
+        dirs.push(PathBuf::from(home).join(".local/share/icons"));
+    }
+
+    let data_dirs =
+        std::env::var("XDG_DATA_DIRS").unwrap_or_else(|_| "/usr/local/share:/usr/share".to_owned());
+    for dir in data_dirs.split(':') {
+        if !dir.is_empty() {
+            dirs.push(PathBuf::from(dir).join("icons"));
+        }
+    }
+
+    dirs
+}
+
+fn resolve_icon_path(icon: &str) -> Option<PathBuf> {
+    let path = Path::new(icon);
+
+    if path.is_absolute() {
+        return path.exists().then(|| path.to_owned());
+    }
+
+    let sizes = [
+        "512x512", "256x256", "128x128", "96x96", "64x64", "48x48", "32x32",
+    ];
+    let extensions = ["png", "xpm"];
+
+    for base_dir in xdg_icon_dirs() {
+        for size in &sizes {
+            for ext in &extensions {
+                let candidate = base_dir
+                    .join("hicolor")
+                    .join(size)
+                    .join("apps")
+                    .join(format!("{icon}.{ext}"));
+                if candidate.exists() {
+                    return Some(candidate);
+                }
+            }
+        }
+    }
+
+    for ext in &extensions {
+        let candidate = PathBuf::from(format!("/usr/share/pixmaps/{icon}.{ext}"));
+        if candidate.exists() {
+            return Some(candidate);
+        }
+    }
+
+    None
+}
+
+fn load_icon_from_file(
+    path: &Path,
+    icon_config: &IconConfig,
+) -> FocusTrackerResult<image::RgbaImage> {
+    let img = image::open(path)
+        .map_err(|e| {
+            FocusTrackerError::platform_with_source(
+                format!("failed to load icon from {}", path.display()),
+                e,
+            )
+        })?
+        .into_rgba8();
+
+    let mut image = img;
     if let Some(target_size) = icon_config.size {
         image = resize_icon(image, target_size, icon_config.filter_type);
     }
