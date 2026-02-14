@@ -548,6 +548,9 @@ jobs:
                   persist-credentials: false
                   lfs: true
 
+            - name: Init Node Environment
+              uses: ./.github/actions/init-env-node
+
             - name: Consume input variables
               shell: bash
               if: ${{ !github.event.workflow_run }}
@@ -665,6 +668,39 @@ jobs:
                   fi
 
                   echo "$APP_VERSION" > release/version
+
+            - name: Create updater tar.gz from notarized app
+              shell: bash
+              env:
+                  MATRIX_ARCH: ${{ matrix.arch }}
+                  APP_VERSION: ${{ env.version }}
+                  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+                  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+              run: |
+                  if [ "$MATRIX_ARCH" = "arm64" ]; then
+                    ARCH_DIR="aarch64"
+                  else
+                    ARCH_DIR="x86_64"
+                  fi
+
+                  RELEASE_DIR="release/darwin/${ARCH_DIR}"
+
+                  # Find the original Tauri tar.gz filename so the update API
+                  # keeps serving the same key on S3 (e.g. EuroraDesktop.app.tar.gz)
+                  ORIG_TARGZ=$(find "tauri-release/darwin/${ARCH_DIR}" -maxdepth 1 -name '*.tar.gz' -not -name '*.sig' | head -1)
+                  TARGZ_NAME=$(basename "$ORIG_TARGZ")
+
+                  echo "Creating updater tar.gz: $TARGZ_NAME (full assembled Eurora.app)"
+
+                  # Package the notarized Eurora.app into a tar.gz with the
+                  # same filename the Tauri updater expects.
+                  tar czf "$RELEASE_DIR/$TARGZ_NAME" -C assembled Eurora.app
+
+                  # Sign with the Tauri updater key so the client can verify
+                  pnpm tauri signer sign "$RELEASE_DIR/$TARGZ_NAME"
+
+                  echo "Updater tar.gz created and signed:"
+                  ls -la "$RELEASE_DIR/$TARGZ_NAME" "$RELEASE_DIR/${TARGZ_NAME}.sig"
 
             - name: Upload assembled artifacts
               uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
