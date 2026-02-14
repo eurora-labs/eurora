@@ -103,7 +103,7 @@ trap 'rm -rf "$ENTITLEMENTS_DIR"' EXIT
 
 # Extract entitlements from the embedded Tauri app's main executable
 TAURI_MAIN_BIN="$RESOURCES_DIR/$TAURI_APP_NAME/Contents/MacOS/$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$RESOURCES_DIR/$TAURI_APP_NAME/Contents/Info.plist")"
-if codesign -d --entitlements - "$TAURI_MAIN_BIN" > "$ENTITLEMENTS_DIR/tauri.plist" 2>/dev/null && [ -s "$ENTITLEMENTS_DIR/tauri.plist" ]; then
+if codesign -d --entitlements :- "$TAURI_MAIN_BIN" > "$ENTITLEMENTS_DIR/tauri.plist" 2>/dev/null && [ -s "$ENTITLEMENTS_DIR/tauri.plist" ]; then
     echo "  Extracted Tauri app entitlements"
 else
     echo "  No entitlements found on Tauri app (will re-sign without)"
@@ -114,7 +114,7 @@ fi
 APPEX=$(find "assembled/Eurora.app/Contents/PlugIns" -name '*.appex' -type d 2>/dev/null | head -1)
 if [ -n "$APPEX" ]; then
     APPEX_BIN="$APPEX/Contents/MacOS/$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APPEX/Contents/Info.plist")"
-    if codesign -d --entitlements - "$APPEX_BIN" > "$ENTITLEMENTS_DIR/appex.plist" 2>/dev/null && [ -s "$ENTITLEMENTS_DIR/appex.plist" ]; then
+    if codesign -d --entitlements :- "$APPEX_BIN" > "$ENTITLEMENTS_DIR/appex.plist" 2>/dev/null && [ -s "$ENTITLEMENTS_DIR/appex.plist" ]; then
         echo "  Extracted appex entitlements"
     else
         echo "  No entitlements found on appex (will re-sign without)"
@@ -124,7 +124,7 @@ fi
 
 # Extract entitlements from the outer launcher app
 LAUNCHER_BIN="assembled/Eurora.app/Contents/MacOS/$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "assembled/Eurora.app/Contents/Info.plist")"
-if codesign -d --entitlements - "$LAUNCHER_BIN" > "$ENTITLEMENTS_DIR/launcher.plist" 2>/dev/null && [ -s "$ENTITLEMENTS_DIR/launcher.plist" ]; then
+if codesign -d --entitlements :- "$LAUNCHER_BIN" > "$ENTITLEMENTS_DIR/launcher.plist" 2>/dev/null && [ -s "$ENTITLEMENTS_DIR/launcher.plist" ]; then
     echo "  Extracted launcher entitlements"
 else
     echo "  No entitlements found on launcher (will re-sign without)"
