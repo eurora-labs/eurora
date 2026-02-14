@@ -137,12 +137,14 @@ fi
 echo "--- Code signing ---"
 
 # Sign all nested frameworks/dylibs inside the Tauri app (no entitlements needed for these)
-find "$RESOURCES_DIR/$TAURI_APP_NAME/Contents/Frameworks" \
-    \( -name '*.dylib' -o -name '*.framework' \) 2>/dev/null | while read -r item; do
-    codesign --force --options runtime --timestamp \
-        --sign "$SIGN_IDENTITY" \
-        "$item"
-done
+if [ -d "$RESOURCES_DIR/$TAURI_APP_NAME/Contents/Frameworks" ]; then
+    find "$RESOURCES_DIR/$TAURI_APP_NAME/Contents/Frameworks" \
+        \( -name '*.dylib' -o -name '*.framework' \) | while read -r item; do
+        codesign --force --options runtime --timestamp \
+            --sign "$SIGN_IDENTITY" \
+            "$item"
+    done
+fi
 
 # Sign the embedded Tauri app's main executable with its entitlements
 TAURI_SIGN_ARGS=(--force --options runtime --timestamp --sign "$SIGN_IDENTITY")
@@ -163,12 +165,14 @@ if [ -n "$APPEX" ]; then
 fi
 
 # Sign any frameworks/dylibs in the outer launcher
-find "assembled/Eurora.app/Contents/Frameworks" \
-    \( -name '*.dylib' -o -name '*.framework' \) 2>/dev/null | while read -r item; do
-    codesign --force --options runtime --timestamp \
-        --sign "$SIGN_IDENTITY" \
-        "$item"
-done
+if [ -d "assembled/Eurora.app/Contents/Frameworks" ]; then
+    find "assembled/Eurora.app/Contents/Frameworks" \
+        \( -name '*.dylib' -o -name '*.framework' \) | while read -r item; do
+        codesign --force --options runtime --timestamp \
+            --sign "$SIGN_IDENTITY" \
+            "$item"
+    done
+fi
 
 # Sign the outer launcher app with its entitlements (covers the launcher binary)
 LAUNCHER_SIGN_ARGS=(--force --options runtime --timestamp --sign "$SIGN_IDENTITY")
