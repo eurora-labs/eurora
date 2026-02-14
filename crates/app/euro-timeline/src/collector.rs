@@ -122,6 +122,8 @@ impl CollectorService {
                         {
                             current_activity.assets.clear();
                             current_activity.assets.extend(assets);
+                            let context_chips = current_activity.get_context_chips();
+                            let _ = assets_event_tx_for_reports.send(context_chips);
                         }
                     }
                     ActivityReport::Stopping => {
