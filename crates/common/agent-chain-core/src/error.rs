@@ -89,4 +89,20 @@ impl Error {
     pub fn other(message: impl Into<String>) -> Self {
         Self::Other(message.into())
     }
+
+    /// Whether this error is worth retrying.
+    ///
+    /// Returns `false` for client errors (4xx) except 429 (rate limit),
+    /// and for parse/config errors that won't resolve on retry.
+    /// Returns `true` for transient network/server errors.
+    pub fn is_retryable(&self) -> bool {
+        match self {
+            // Network / transport errors are retryable
+            Self::Http(_) => true,
+            // Server errors (5xx) and 429 rate-limit are retryable
+            Self::Api { status, .. } => *status == 429 || *status >= 500,
+            // Everything else (parse, config, etc.) is not
+            _ => false,
+        }
+    }
 }
