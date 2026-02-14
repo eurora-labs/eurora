@@ -36,7 +36,6 @@
 		65C9D4CC2F3494AF00FAED22 /* manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 65C9D4C12F3494AF00FAED22 /* manifest.json */; };
 		65C9D4CD2F3494AF00FAED22 /* popup.html in Resources */ = {isa = PBXBuildFile; fileRef = 65C9D4C22F3494AF00FAED22 /* popup.html */; };
 		65C9D4CE2F3494AF00FAED22 /* icon-32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = 65C9D4C32F3494AF00FAED22 /* icon-32x32.png */; };
-		65C9D4CF2F3494AF00FAED22 /* preferences_schema.json in Resources */ = {isa = PBXBuildFile; fileRef = 65C9D4C42F3494AF00FAED22 /* preferences_schema.json */; };
 		65C9D4D02F3494AF00FAED22 /* icon-16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = 65C9D4C52F3494AF00FAED22 /* icon-16x16.png */; };
 		65C9D4D12F3494AF00FAED22 /* app in Resources */ = {isa = PBXBuildFile; fileRef = 65C9D4C62F3494AF00FAED22 /* app */; };
 		65C9D4D22F3494AF00FAED22 /* scripts in Resources */ = {isa = PBXBuildFile; fileRef = 65C9D4C72F3494AF00FAED22 /* scripts */; };
@@ -93,7 +92,6 @@
 		65C9D4C12F3494AF00FAED22 /* manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = manifest.json; path = ../../browser/dist/safari/manifest.json; sourceTree = "<group>"; };
 		65C9D4C22F3494AF00FAED22 /* popup.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = popup.html; path = ../../browser/dist/safari/popup.html; sourceTree = "<group>"; };
 		65C9D4C32F3494AF00FAED22 /* icon-32x32.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "icon-32x32.png"; path = "../../browser/dist/safari/icon-32x32.png"; sourceTree = "<group>"; };
-		65C9D4C42F3494AF00FAED22 /* preferences_schema.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = preferences_schema.json; path = ../../browser/dist/safari/preferences_schema.json; sourceTree = "<group>"; };
 		65C9D4C52F3494AF00FAED22 /* icon-16x16.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "icon-16x16.png"; path = "../../browser/dist/safari/icon-16x16.png"; sourceTree = "<group>"; };
 		65C9D4C62F3494AF00FAED22 /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; name = app; path = ../../browser/dist/safari/app; sourceTree = "<group>"; };
 		65C9D4C72F3494AF00FAED22 /* scripts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = scripts; path = ../../browser/dist/safari/scripts; sourceTree = "<group>"; };
@@ -196,7 +194,6 @@
 				65C9D4BE2F3494AF00FAED22 /* icon-128x128.png */,
 				65C9D4C12F3494AF00FAED22 /* manifest.json */,
 				65C9D4C22F3494AF00FAED22 /* popup.html */,
-				65C9D4C42F3494AF00FAED22 /* preferences_schema.json */,
 				65C9D4C72F3494AF00FAED22 /* scripts */,
 			);
 			name = Resources;
@@ -328,7 +325,6 @@
 				65C9D4CC2F3494AF00FAED22 /* manifest.json in Resources */,
 				65C9D4CD2F3494AF00FAED22 /* popup.html in Resources */,
 				65C9D4CE2F3494AF00FAED22 /* icon-32x32.png in Resources */,
-				65C9D4CF2F3494AF00FAED22 /* preferences_schema.json in Resources */,
 				65C9D4D02F3494AF00FAED22 /* icon-16x16.png in Resources */,
 				65C9D4D12F3494AF00FAED22 /* app in Resources */,
 				65C9D4D22F3494AF00FAED22 /* scripts in Resources */,
@@ -620,11 +616,14 @@
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
 				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
 				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
 				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = macos/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Eurora for Safari";
@@ -679,11 +678,14 @@
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
 				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
 				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
 				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = macos/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Eurora for Safari";
