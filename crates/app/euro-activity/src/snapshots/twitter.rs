@@ -1,5 +1,3 @@
-//! Twitter snapshot implementation
-
 use agent_chain_core::{BaseMessage, HumanMessage};
 use euro_native_messaging::types::NativeTwitterSnapshot;
 use serde::{Deserialize, Serialize};
@@ -7,7 +5,6 @@ use uuid::Uuid;
 
 use crate::{ActivityResult, assets::twitter::TwitterTweet, types::SnapshotFunctionality};
 
-/// Type of Twitter interaction captured in the snapshot
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum TwitterInteractionType {
     View,
@@ -19,7 +16,6 @@ pub enum TwitterInteractionType {
     Bookmark,
 }
 
-/// Twitter snapshot with real-time tweet updates and interactions
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TwitterSnapshot {
     pub id: String,
@@ -33,7 +29,6 @@ pub struct TwitterSnapshot {
 }
 
 impl TwitterSnapshot {
-    /// Create a new Twitter snapshot
     pub fn new(
         id: Option<String>,
         tweets: Vec<TwitterTweet>,
@@ -76,22 +71,18 @@ impl TwitterSnapshot {
         })
     }
 
-    /// Update the timestamp
     pub fn touch(&mut self) {
         self.updated_at = chrono::Utc::now().timestamp() as u64;
     }
 
-    /// Get tweet count
     pub fn get_tweet_count(&self) -> usize {
         self.tweets.len()
     }
 
-    /// Check if snapshot has any tweets
     pub fn has_tweets(&self) -> bool {
         !self.tweets.is_empty()
     }
 
-    /// Get all unique hashtags from tweets
     pub fn get_hashtags(&self) -> Vec<String> {
         let mut hashtags = Vec::new();
         for tweet in &self.tweets {
@@ -102,7 +93,6 @@ impl TwitterSnapshot {
         hashtags
     }
 
-    /// Get all unique mentions from tweets
     pub fn get_mentions(&self) -> Vec<String> {
         let mut mentions = Vec::new();
         for tweet in &self.tweets {
@@ -113,7 +103,6 @@ impl TwitterSnapshot {
         mentions
     }
 
-    /// Search tweets containing specific text
     pub fn search_tweets(&self, query: &str) -> Vec<&TwitterTweet> {
         let query_lower = query.to_lowercase();
         self.tweets
@@ -122,7 +111,6 @@ impl TwitterSnapshot {
             .collect()
     }
 
-    /// Filter tweets by author
     pub fn get_tweets_by_author(&self, author: &str) -> Vec<&TwitterTweet> {
         self.tweets
             .iter()
@@ -135,12 +123,10 @@ impl TwitterSnapshot {
             .collect()
     }
 
-    /// Check if snapshot represents a specific interaction
     pub fn is_interaction(&self, interaction_type: &TwitterInteractionType) -> bool {
         self.interaction_type.as_ref() == Some(interaction_type)
     }
 
-    /// Get interaction description
     pub fn get_interaction_description(&self) -> Option<String> {
         self.interaction_type.as_ref().map(|interaction| {
             let base_desc = match interaction {
@@ -163,18 +149,14 @@ impl TwitterSnapshot {
 }
 
 impl SnapshotFunctionality for TwitterSnapshot {
-    /// Construct a message for LLM interaction
     fn construct_messages(&self) -> Vec<BaseMessage> {
         let mut content = String::new();
-
-        // Add context about the page/interaction
         if let Some(context) = &self.page_context {
             content.push_str(&format!("User is viewing Twitter {} ", context));
         } else {
             content.push_str("User is viewing Twitter ");
         }
 
-        // Add interaction context
         if let Some(interaction) = &self.interaction_type {
             let interaction_desc = match interaction {
                 TwitterInteractionType::View => "viewing",
@@ -195,7 +177,6 @@ impl SnapshotFunctionality for TwitterSnapshot {
         content
             .push_str("and has a question about it. Here are the tweets the user is seeing:\n\n");
 
-        // Add tweet content
         let tweet_texts: Vec<String> = self
             .tweets
             .iter()

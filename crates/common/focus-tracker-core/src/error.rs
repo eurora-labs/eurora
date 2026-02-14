@@ -3,31 +3,48 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum FocusTrackerError {
-    #[error("{0}")]
-    Error(String),
-
-    #[error("StdSyncPoisonError {0}")]
-    StdSyncPoisonError(String),
-
-    #[error("Unsupported")]
+    #[error("unsupported platform or environment")]
     Unsupported,
 
-    #[error("Permission denied")]
-    PermissionDenied,
+    #[error("permission denied: {context}")]
+    PermissionDenied { context: String },
 
-    #[error("No display available")]
+    #[error("no display available")]
     NoDisplay,
 
-    #[error("Not running in interactive session")]
+    #[error("not running in interactive session")]
     NotInteractiveSession,
 
-    #[error("Platform error: {0}")]
-    Platform(String),
+    #[error("channel closed")]
+    ChannelClosed,
+
+    #[error("invalid config: {reason}")]
+    InvalidConfig { reason: String },
+
+    #[error("{context}")]
+    Platform {
+        context: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
 }
 
 impl FocusTrackerError {
-    pub fn new<S: ToString>(err: S) -> Self {
-        FocusTrackerError::Error(err.to_string())
+    pub fn platform(context: impl Into<String>) -> Self {
+        Self::Platform {
+            context: context.into(),
+            source: None,
+        }
+    }
+
+    pub fn platform_with_source(
+        context: impl Into<String>,
+        source: impl std::error::Error + Send + Sync + 'static,
+    ) -> Self {
+        Self::Platform {
+            context: context.into(),
+            source: Some(Box::new(source)),
+        }
     }
 }
 
@@ -35,6 +52,6 @@ pub type FocusTrackerResult<T> = Result<T, FocusTrackerError>;
 
 impl<T> From<PoisonError<T>> for FocusTrackerError {
     fn from(value: PoisonError<T>) -> Self {
-        FocusTrackerError::StdSyncPoisonError(value.to_string())
+        FocusTrackerError::platform(format!("mutex poisoned: {value}"))
     }
 }

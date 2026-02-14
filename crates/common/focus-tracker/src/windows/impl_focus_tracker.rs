@@ -1,9 +1,15 @@
 use crate::{FocusTrackerConfig, FocusTrackerError, FocusTrackerResult, FocusedWindow};
 use focus_tracker_core::IconConfig;
+use std::collections::HashMap;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use tracing::debug;
 
 #[cfg(feature = "async")]
 use std::future::Future;
+
+use super::utils;
+
 use windows_sys::Win32::{
     Foundation::{HWND, WPARAM},
     Graphics::Gdi::{
@@ -11,12 +17,10 @@ use windows_sys::Win32::{
         DeleteObject, GetDIBits, SelectObject,
     },
     UI::WindowsAndMessaging::{
-        GCLP_HICON, GCLP_HICONSM, GetClassLongPtrW, ICON_BIG, ICON_SMALL, SendMessageW, WM_GETICON,
+        DestroyIcon, GCLP_HICON, GCLP_HICONSM, GetClassLongPtrW, GetIconInfo, ICON_BIG, ICON_SMALL,
+        ICONINFO, SendMessageW, WM_GETICON,
     },
 };
-
-use super::utils;
-use tracing::info;
 
 #[derive(Debug, Clone)]
 pub(crate) struct ImplFocusTracker {}
@@ -25,6 +29,91 @@ impl ImplFocusTracker {
     pub(crate) fn new() -> Self {
         Self {}
     }
+}
+
+#[derive(Default)]
+struct FocusState {
+    hwnd: isize,
+    process_id: u32,
+    process_name: String,
+    window_title: Option<String>,
+}
+
+impl FocusState {
+    fn has_changed(&self, hwnd: HWND, process_id: u32, title: &Option<String>) -> bool {
+        let hwnd_value = hwnd as isize;
+        hwnd_value != self.hwnd
+            || process_id != self.process_id
+            || self.window_title.as_deref() != title.as_deref()
+    }
+
+    fn focus_changed(&self, hwnd: HWND) -> bool {
+        hwnd as isize != self.hwnd
+    }
+
+    fn update(&mut self, hwnd: HWND, process_id: u32, process_name: String, title: Option<String>) {
+        self.hwnd = hwnd as isize;
+        self.process_id = process_id;
+        self.process_name = process_name;
+        self.window_title = title;
+    }
+
+    fn clear(&mut self) {
+        self.hwnd = 0;
+        self.process_id = 0;
+        self.process_name.clear();
+        self.window_title = None;
+    }
+}
+
+#[inline]
+fn should_stop(stop_signal: Option<&AtomicBool>) -> bool {
+    stop_signal.is_some_and(|stop| stop.load(Ordering::Relaxed))
+}
+
+fn poll_focus_change(
+    prev_state: &mut FocusState,
+    icon_cache: &mut HashMap<String, Arc<image::RgbaImage>>,
+    icon_config: &IconConfig,
+) -> Option<FocusedWindow> {
+    let Some(hwnd) = utils::get_foreground_window() else {
+        if prev_state.hwnd != 0 {
+            prev_state.clear();
+            icon_cache.clear();
+        }
+        return None;
+    };
+
+    let (title, process_name) = match utils::get_window_info(hwnd) {
+        Ok(info) => info,
+        Err(e) => {
+            debug!("Failed to get window info: {e}");
+            return None;
+        }
+    };
+
+    let process_id = utils::get_window_process_id(hwnd).unwrap_or_default();
+
+    if !prev_state.has_changed(hwnd, process_id, &title) {
+        return None;
+    }
+
+    let icon = if prev_state.focus_changed(hwnd) {
+        resolve_icon(icon_cache, hwnd, process_id, &process_name, icon_config)
+    } else {
+        icon_cache.get(&process_name).map(Arc::clone)
+    };
+
+    let focused = FocusedWindow {
+        process_id,
+        process_name: process_name.clone(),
+        window_title: title.clone(),
+        icon,
+    };
+
+    prev_state.update(hwnd, process_id, process_name, title);
+
+    Some(focused)
 }
 
 impl ImplFocusTracker {
@@ -85,104 +174,32 @@ impl ImplFocusTracker {
         F: FnMut(FocusedWindow) -> Fut,
         Fut: Future<Output = FocusTrackerResult<()>>,
     {
-        // Check if we're in an interactive session
         if !utils::is_interactive_session()? {
             return Err(FocusTrackerError::NotInteractiveSession);
         }
 
-        // Track the previously focused window to avoid duplicate events
-        // Store HWND as isize to ensure Send trait is satisfied for async contexts
-        let mut prev_hwnd: Option<isize> = None;
-        let mut prev_title: Option<String> = None;
-        // Cache the icon for the currently focused window (only fetch on app change)
-        let mut cached_icon: Option<image::RgbaImage> = None;
+        let mut prev_state = FocusState::default();
+        let mut icon_cache: HashMap<String, Arc<image::RgbaImage>> = HashMap::new();
 
-        // Get initial focused window - use helper function to avoid non-Send types
-        if let Some(window_info) = get_window_info_without_icon() {
-            // Initial window - fetch icon
-            let icon = get_window_icon_by_hwnd(window_info.hwnd_value, &config.icon);
-            cached_icon = icon.clone();
-
-            let focused_window = FocusedWindow {
-                process_id: window_info.process_id,
-                process_name: window_info.process_name,
-                window_title: window_info.window_title.clone(),
-                icon,
-            };
-
-            if let Err(e) = on_focus(focused_window).await {
-                info!("Focus event handler failed: {}", e);
-            }
-
-            prev_hwnd = Some(window_info.hwnd_value);
-            prev_title = window_info.window_title;
-        }
-
-        // Main event loop - we'll use polling since Windows event hooks are complex to integrate
-        // with Rust's async runtime in a cross-platform way
         loop {
-            // Check stop signal before processing
-            if let Some(stop) = stop_signal
-                && stop.load(Ordering::Relaxed)
-            {
+            if should_stop(stop_signal) {
+                debug!("Stop signal received, exiting focus tracking loop");
                 break;
             }
 
-            // Check current foreground window - use helper function to avoid non-Send types
-            if let Some(window_info) = get_window_info_without_icon() {
-                let current_hwnd_value = window_info.hwnd_value;
-                let focus_changed = match prev_hwnd {
-                    Some(prev) => prev != current_hwnd_value,
-                    None => true,
-                };
+            let pending = poll_focus_change(&mut prev_state, &mut icon_cache, &config.icon);
 
-                // Also check if title changed for the same window
-                let title_changed = match &prev_title {
-                    Some(prev_t) => Some(prev_t) != window_info.window_title.as_ref(),
-                    None => true,
-                };
-
-                // Trigger handler if either window focus or title has changed
-                if focus_changed || title_changed {
-                    // Only fetch icon when the focused app changes, not on title changes
-                    let icon = if focus_changed {
-                        let new_icon = get_window_icon_by_hwnd(current_hwnd_value, &config.icon);
-                        cached_icon = new_icon.clone();
-                        new_icon
-                    } else {
-                        cached_icon.clone()
-                    };
-
-                    let focused_window = FocusedWindow {
-                        process_id: window_info.process_id,
-                        process_name: window_info.process_name,
-                        window_title: window_info.window_title.clone(),
-                        icon,
-                    };
-
-                    if let Err(e) = on_focus(focused_window).await {
-                        info!("Focus event handler failed: {}", e);
-                    }
-
-                    prev_hwnd = Some(current_hwnd_value);
-                    prev_title = window_info.window_title;
-                }
-            } else {
-                // No foreground window
-                if prev_hwnd.is_some() {
-                    prev_hwnd = None;
-                    prev_title = None;
-                    cached_icon = None;
-                }
+            if let Some(focused) = pending {
+                on_focus(focused).await?;
             }
 
-            // Sleep to avoid high CPU usage (async version)
             tokio::time::sleep(config.poll_interval).await;
         }
 
         Ok(())
     }
 
+    #[allow(clippy::unused_self)] // &self required for cross-platform API consistency
     fn run<F>(
         &self,
         mut on_focus: F,
@@ -192,106 +209,24 @@ impl ImplFocusTracker {
     where
         F: FnMut(FocusedWindow) -> FocusTrackerResult<()>,
     {
-        // Check if we're in an interactive session
         if !utils::is_interactive_session()? {
             return Err(FocusTrackerError::NotInteractiveSession);
         }
 
-        // Track the previously focused window to avoid duplicate events
-        // Store HWND as isize for consistency with async path
-        let mut prev_hwnd: Option<isize> = None;
-        let mut prev_title: Option<String> = None;
-        // Cache the icon for the currently focused window (only fetch on app change)
-        let mut cached_icon: Option<image::RgbaImage> = None;
+        let mut prev_state = FocusState::default();
+        let mut icon_cache: HashMap<String, Arc<image::RgbaImage>> = HashMap::new();
 
-        // Get initial focused window
-        if let Some(hwnd) = utils::get_foreground_window()
-            && let Ok((title, process)) = unsafe { utils::get_window_info(hwnd) }
-        {
-            // Initial window - fetch icon
-            let icon = get_window_icon(hwnd, &config.icon);
-            cached_icon = icon.clone();
-
-            let process_id = unsafe { utils::get_window_process_id(hwnd) }.unwrap_or_default();
-            if let Err(e) = on_focus(FocusedWindow {
-                process_id,
-                process_name: process.clone(),
-                window_title: Some(title.clone()),
-                icon,
-            }) {
-                info!("Focus event handler failed: {}", e);
-            }
-
-            prev_hwnd = Some(hwnd as isize);
-            prev_title = Some(title);
-        }
-
-        // Main event loop - we'll use polling since Windows event hooks are complex to integrate
-        // with Rust's async runtime in a cross-platform way
         loop {
-            // Check stop signal before processing
-            if let Some(stop) = stop_signal
-                && stop.load(Ordering::Relaxed)
-            {
+            if should_stop(stop_signal) {
+                debug!("Stop signal received, exiting focus tracking loop");
                 break;
             }
 
-            // Check current foreground window
-            if let Some(current_hwnd) = utils::get_foreground_window() {
-                let current_hwnd_value = current_hwnd as isize;
-                let focus_changed = match prev_hwnd {
-                    Some(prev) => prev != current_hwnd_value,
-                    None => true,
-                };
-
-                match unsafe { utils::get_window_info(current_hwnd) } {
-                    Ok((title, process)) => {
-                        // Also check if title changed for the same window
-                        let title_changed = match &prev_title {
-                            Some(prev_t) => prev_t != &title,
-                            None => true,
-                        };
-
-                        // Trigger handler if either window focus or title has changed
-                        if focus_changed || title_changed {
-                            // Only fetch icon when the focused app changes, not on title changes
-                            let icon = if focus_changed {
-                                let new_icon = get_window_icon(current_hwnd, &config.icon);
-                                cached_icon = new_icon.clone();
-                                new_icon
-                            } else {
-                                cached_icon.clone()
-                            };
-
-                            let process_id = unsafe { utils::get_window_process_id(current_hwnd) }
-                                .unwrap_or_default();
-                            if let Err(e) = on_focus(FocusedWindow {
-                                process_id,
-                                process_name: process.clone(),
-                                window_title: Some(title.clone()),
-                                icon,
-                            }) {
-                                info!("Focus event handler failed: {}", e);
-                            }
-
-                            prev_hwnd = Some(current_hwnd_value);
-                            prev_title = Some(title);
-                        }
-                    }
-                    Err(e) => {
-                        info!("Failed to get window info: {}", e);
-                    }
-                }
-            } else {
-                // No foreground window
-                if prev_hwnd.is_some() {
-                    prev_hwnd = None;
-                    prev_title = None;
-                    cached_icon = None;
-                }
+            if let Some(focused) = poll_focus_change(&mut prev_state, &mut icon_cache, &config.icon)
+            {
+                on_focus(focused)?;
             }
 
-            // Sleep to avoid high CPU usage
             std::thread::sleep(config.poll_interval);
         }
 
@@ -299,119 +234,157 @@ impl ImplFocusTracker {
     }
 }
 
-/* ------------------------------------------------------------ */
-/* Helper functions                                              */
-/* ------------------------------------------------------------ */
-
-/// Helper struct to hold window information with Send-safe types (without icon)
-struct WindowInfo {
-    hwnd_value: isize,
+fn resolve_icon(
+    cache: &mut HashMap<String, Arc<image::RgbaImage>>,
+    hwnd: HWND,
     process_id: u32,
-    process_name: String,
-    window_title: Option<String>,
-}
-
-/// Get current focused window info without icon, returning only Send-safe types
-/// This helper ensures no HWND pointers leak into async contexts
-/// The icon should be fetched separately using `get_window_icon_by_hwnd` only when the focused app changes.
-fn get_window_info_without_icon() -> Option<WindowInfo> {
-    let hwnd = utils::get_foreground_window()?;
-    let hwnd_value = hwnd as isize;
-
-    let (title, process) = unsafe { utils::get_window_info(hwnd) }.ok()?;
-    let process_id = unsafe { utils::get_window_process_id(hwnd) }.unwrap_or_default();
-
-    Some(WindowInfo {
-        hwnd_value,
-        process_id,
-        process_name: process,
-        window_title: Some(title),
-    })
-}
-
-/// Get the icon for a window by HWND value (isize)
-fn get_window_icon_by_hwnd(
-    hwnd_value: isize,
+    process_name: &str,
     icon_config: &IconConfig,
-) -> Option<image::RgbaImage> {
-    get_window_icon(hwnd_value as HWND, icon_config)
-}
-
-/// Resize an image to the specified dimensions using Lanczos3 filtering
-fn resize_icon(
-    image: image::RgbaImage,
-    target_size: u32,
-    filter_type: image::imageops::FilterType,
-) -> image::RgbaImage {
-    // Only resize if the image is not already the target size
-    if image.width() == target_size && image.height() == target_size {
-        return image;
+) -> Option<Arc<image::RgbaImage>> {
+    if let Some(cached) = cache.get(process_name) {
+        return Some(Arc::clone(cached));
     }
 
-    image::imageops::resize(&image, target_size, target_size, filter_type)
-}
-
-/// Get the icon for a window
-fn get_window_icon(hwnd: HWND, icon_config: &IconConfig) -> Option<image::RgbaImage> {
-    unsafe { extract_window_icon(hwnd, icon_config).ok() }
-}
-
-/// Extract the icon bitmap from a window handle
-///
-/// # Safety
-/// This function uses unsafe Win32 API calls and assumes the HWND is valid
-unsafe fn extract_window_icon(
-    hwnd: HWND,
-    icon_config: &IconConfig,
-) -> FocusTrackerResult<image::RgbaImage> {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, ICONINFO};
-
-    // Try to get the icon from the window in order of preference:
-    // 1. Try WM_GETICON with ICON_BIG
-    // 2. Try WM_GETICON with ICON_SMALL
-    // 3. Try GetClassLongPtrW with GCLP_HICON
-    // 4. Try GetClassLongPtrW with GCLP_HICONSM
-
-    let hicon = unsafe { SendMessageW(hwnd, WM_GETICON, ICON_BIG as WPARAM, 0) };
-    let hicon = if hicon != 0 {
-        hicon as isize
-    } else {
-        let hicon = unsafe { SendMessageW(hwnd, WM_GETICON, ICON_SMALL as WPARAM, 0) };
-        if hicon != 0 {
-            hicon as isize
-        } else {
-            let hicon = unsafe { GetClassLongPtrW(hwnd, GCLP_HICON) } as isize;
-            if hicon != 0 {
-                hicon
-            } else {
-                let hicon = unsafe { GetClassLongPtrW(hwnd, GCLP_HICONSM) } as isize;
-                if hicon != 0 {
-                    hicon
-                } else {
-                    return Err(FocusTrackerError::Platform(
-                        "No icon found for window".to_string(),
-                    ));
+    let image = match extract_window_icon(hwnd, icon_config) {
+        Ok(img) => img,
+        Err(e) => {
+            debug!("Failed to extract window icon: {e}, trying exe fallback");
+            match extract_exe_icon(process_id, icon_config) {
+                Ok(img) => img,
+                Err(e2) => {
+                    debug!("Failed to extract exe icon: {e2}");
+                    return None;
                 }
             }
         }
     };
 
-    // Get icon information
-    let mut icon_info: ICONINFO = unsafe { std::mem::zeroed() };
-    if unsafe { GetIconInfo(hicon as _, &mut icon_info) } == 0 {
-        return Err(FocusTrackerError::Platform(
-            "Failed to get icon info".to_string(),
+    let icon = Arc::new(image);
+    cache.insert(process_name.to_owned(), Arc::clone(&icon));
+    Some(icon)
+}
+
+struct DcGuard(windows_sys::Win32::Graphics::Gdi::HDC);
+
+impl Drop for DcGuard {
+    fn drop(&mut self) {
+        if !self.0.is_null() {
+            unsafe { DeleteDC(self.0) };
+        }
+    }
+}
+
+struct IconBitmapGuard {
+    hdc: windows_sys::Win32::Graphics::Gdi::HDC,
+    old_bitmap: windows_sys::Win32::Graphics::Gdi::HGDIOBJ,
+    hbm_color: windows_sys::Win32::Graphics::Gdi::HBITMAP,
+    hbm_mask: windows_sys::Win32::Graphics::Gdi::HBITMAP,
+}
+
+impl Drop for IconBitmapGuard {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.hdc.is_null() {
+                SelectObject(self.hdc, self.old_bitmap);
+            }
+            if !self.hbm_color.is_null() {
+                DeleteObject(self.hbm_color);
+            }
+            if !self.hbm_mask.is_null() {
+                DeleteObject(self.hbm_mask);
+            }
+        }
+    }
+}
+
+fn acquire_icon_handle(hwnd: HWND) -> Result<(isize, bool), FocusTrackerError> {
+    let hicon = unsafe { SendMessageW(hwnd, WM_GETICON, ICON_BIG as WPARAM, 0) } as isize;
+    if hicon != 0 {
+        return Ok((hicon, false));
+    }
+
+    let hicon = unsafe { SendMessageW(hwnd, WM_GETICON, ICON_SMALL as WPARAM, 0) } as isize;
+    if hicon != 0 {
+        return Ok((hicon, false));
+    }
+
+    let hicon = unsafe { GetClassLongPtrW(hwnd, GCLP_HICON) } as isize;
+    if hicon != 0 {
+        return Ok((hicon, false));
+    }
+
+    let hicon = unsafe { GetClassLongPtrW(hwnd, GCLP_HICONSM) } as isize;
+    if hicon != 0 {
+        return Ok((hicon, false));
+    }
+
+    Err(FocusTrackerError::platform("no icon found for window"))
+}
+
+fn extract_window_icon(
+    hwnd: HWND,
+    icon_config: &IconConfig,
+) -> FocusTrackerResult<image::RgbaImage> {
+    let (hicon, owned) = acquire_icon_handle(hwnd)?;
+    let result = icon_handle_to_image(hicon, icon_config);
+
+    if owned {
+        unsafe { DestroyIcon(hicon as _) };
+    }
+
+    result
+}
+
+fn extract_exe_icon(
+    process_id: u32,
+    icon_config: &IconConfig,
+) -> FocusTrackerResult<image::RgbaImage> {
+    use windows_sys::Win32::UI::Shell::ExtractIconExW;
+
+    let exe_path = utils::get_process_exe_path(process_id)?;
+
+    let mut path_z = exe_path;
+    path_z.push(0);
+
+    let mut hicon_large = std::ptr::null_mut();
+    let count = unsafe {
+        ExtractIconExW(
+            path_z.as_ptr(),
+            0,
+            &mut hicon_large,
+            std::ptr::null_mut(),
+            1,
+        )
+    };
+
+    if count == 0 || hicon_large.is_null() {
+        return Err(FocusTrackerError::platform(
+            "no icon found in process executable",
         ));
     }
 
-    // Extract the color bitmap (hbmColor) or mask bitmap (hbmMask) if color is not available
+    let result = icon_handle_to_image(hicon_large as isize, icon_config);
+
+    unsafe { DestroyIcon(hicon_large as _) };
+
+    result
+}
+
+fn icon_handle_to_image(
+    hicon: isize,
+    icon_config: &IconConfig,
+) -> FocusTrackerResult<image::RgbaImage> {
+    let mut icon_info: ICONINFO = unsafe { std::mem::zeroed() };
+    if unsafe { GetIconInfo(hicon as _, &mut icon_info) } == 0 {
+        return Err(FocusTrackerError::platform("failed to get icon info"));
+    }
+
     let bitmap = if !icon_info.hbmColor.is_null() {
         icon_info.hbmColor
     } else {
         icon_info.hbmMask
     };
 
-    // Get bitmap dimensions
     let hdc = unsafe { CreateCompatibleDC(std::ptr::null_mut()) };
     if hdc.is_null() {
         unsafe {
@@ -422,19 +395,21 @@ unsafe fn extract_window_icon(
                 DeleteObject(icon_info.hbmMask);
             }
         }
-        return Err(FocusTrackerError::Platform(
-            "Failed to create DC".to_string(),
-        ));
+        return Err(FocusTrackerError::platform("failed to create DC"));
     }
 
-    // Select the bitmap into the DC
+    let _dc_guard = DcGuard(hdc);
     let old_bitmap = unsafe { SelectObject(hdc, bitmap) };
+    let _bmp_guard = IconBitmapGuard {
+        hdc,
+        old_bitmap,
+        hbm_color: icon_info.hbmColor,
+        hbm_mask: icon_info.hbmMask,
+    };
 
-    // Setup BITMAPINFO to get the bitmap data
     let mut bmi: BITMAPINFO = unsafe { std::mem::zeroed() };
     bmi.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
 
-    // Get bitmap info
     if unsafe {
         GetDIBits(
             hdc,
@@ -447,50 +422,23 @@ unsafe fn extract_window_icon(
         )
     } == 0
     {
-        unsafe {
-            SelectObject(hdc, old_bitmap);
-            DeleteDC(hdc);
-            if !icon_info.hbmColor.is_null() {
-                DeleteObject(icon_info.hbmColor);
-            }
-            if !icon_info.hbmMask.is_null() {
-                DeleteObject(icon_info.hbmMask);
-            }
-        }
-        return Err(FocusTrackerError::Platform(
-            "Failed to get bitmap info".to_string(),
-        ));
+        return Err(FocusTrackerError::platform("failed to get bitmap info"));
     }
 
     let width = bmi.bmiHeader.biWidth as u32;
     let height = bmi.bmiHeader.biHeight.unsigned_abs();
 
     if width == 0 || height == 0 {
-        unsafe {
-            SelectObject(hdc, old_bitmap);
-            DeleteDC(hdc);
-            if !icon_info.hbmColor.is_null() {
-                DeleteObject(icon_info.hbmColor);
-            }
-            if !icon_info.hbmMask.is_null() {
-                DeleteObject(icon_info.hbmMask);
-            }
-        }
-        return Err(FocusTrackerError::Platform(
-            "Invalid icon dimensions".to_string(),
-        ));
+        return Err(FocusTrackerError::platform("invalid icon dimensions"));
     }
 
-    // Setup for 32-bit RGBA
     bmi.bmiHeader.biBitCount = 32;
     bmi.bmiHeader.biCompression = BI_RGB;
-    bmi.bmiHeader.biHeight = -(height as i32); // Negative for top-down bitmap
+    bmi.bmiHeader.biHeight = -(height as i32);
 
-    // Allocate buffer for pixel data
     let pixel_count = (width * height) as usize;
     let mut pixels: Vec<u8> = vec![0; pixel_count * 4];
 
-    // Get the actual bitmap bits
     if unsafe {
         GetDIBits(
             hdc,
@@ -503,53 +451,21 @@ unsafe fn extract_window_icon(
         )
     } == 0
     {
-        unsafe {
-            SelectObject(hdc, old_bitmap);
-            DeleteDC(hdc);
-            if !icon_info.hbmColor.is_null() {
-                DeleteObject(icon_info.hbmColor);
-            }
-            if !icon_info.hbmMask.is_null() {
-                DeleteObject(icon_info.hbmMask);
-            }
-        }
-        return Err(FocusTrackerError::Platform(
-            "Failed to get bitmap bits".to_string(),
-        ));
+        return Err(FocusTrackerError::platform("failed to get bitmap bits"));
     }
 
-    // Convert BGRA to RGBA
+    // Convert BGRA → RGBA in-place
     for i in (0..pixels.len()).step_by(4) {
-        pixels.swap(i, i + 2); // Swap B and R
+        pixels.swap(i, i + 2);
     }
 
-    // Cleanup
-    unsafe {
-        SelectObject(hdc, old_bitmap);
-        DeleteDC(hdc);
-        if !icon_info.hbmColor.is_null() {
-            DeleteObject(icon_info.hbmColor);
-        }
-        if !icon_info.hbmMask.is_null() {
-            DeleteObject(icon_info.hbmMask);
-        }
-        // Note: Don't destroy the icon if it came from GetClassLongPtrW as it's owned by the class
-        // Only destroy if it came from WM_GETICON
-        let from_wm_geticon = SendMessageW(hwnd, WM_GETICON, ICON_BIG as WPARAM, 0) != 0
-            || SendMessageW(hwnd, WM_GETICON, ICON_SMALL as WPARAM, 0) != 0;
-        if from_wm_geticon {
-            DestroyIcon(hicon as _);
-        }
-    }
+    let mut image = image::RgbaImage::from_raw(width, height, pixels)
+        .ok_or_else(|| FocusTrackerError::platform("failed to create RgbaImage from pixel data"))?;
 
-    // Create RgbaImage from pixel data
-    let mut image = image::RgbaImage::from_raw(width, height, pixels).ok_or_else(|| {
-        FocusTrackerError::Platform("Failed to create RgbaImage from pixel data".to_string())
-    })?;
-
-    // Resize the icon if needed
-    if let Some(target_size) = icon_config.size {
-        image = resize_icon(image, target_size, icon_config.filter_type);
+    if let Some(target_size) = icon_config.size
+        && (image.width() != target_size || image.height() != target_size)
+    {
+        image = image::imageops::resize(&image, target_size, target_size, icon_config.filter_type);
     }
 
     Ok(image)

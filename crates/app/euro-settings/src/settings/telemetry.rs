@@ -5,13 +5,9 @@ use specta::Type;
 #[serde(rename_all = "camelCase")]
 pub struct TelemetrySettings {
     pub considered: bool,
-    /// Anonymous metrics
     pub anonymous_metrics: bool,
-    /// Anonymous error reporting
     pub anonymous_errors: bool,
-    /// Non-anonymous metrics
     pub non_anonymous_metrics: bool,
-    /// Distinct ID, if non-anonymous metrics are enabled
     pub distinct_id: Option<String>,
 }
 

@@ -15,7 +15,7 @@
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronsLeftRightEllipsis from '@lucide/svelte/icons/chevrons-left-right-ellipsis';
 	import MailIcon from '@lucide/svelte/icons/mail';
-	import WebhookIcon from '@lucide/svelte/icons/webhook';
+	import ServerIcon from '@lucide/svelte/icons/server';
 
 	let items: MenuItem[] = [
 		{
@@ -24,14 +24,14 @@
 			icon: BoltIcon,
 		},
 		{
-			title: 'Third party',
-			url: '/settings/third-party',
-			icon: WebhookIcon,
-		},
-		{
 			title: 'Telemetry',
 			url: '/settings/telemetry',
 			icon: ChevronsLeftRightEllipsis,
+		},
+		{
+			title: 'API',
+			url: '/settings/api',
+			icon: ServerIcon,
 		},
 	];
 

@@ -1,8 +1,5 @@
-//! Error types for the activity system
-
 use thiserror::Error;
 
-/// Errors that can occur in the activity system
 #[derive(Error, Debug)]
 pub enum ActivityError {
     #[error("Protocol buffer error: {0}")]
@@ -43,38 +40,31 @@ pub enum ActivityError {
 }
 
 impl ActivityError {
-    /// Create a new protocol buffer error
     pub fn protocol_buffer(msg: impl Into<String>) -> Self {
         Self::ProtocolBuffer(msg.into())
     }
 
-    /// Create a new invalid data error
     pub fn invalid_data(msg: impl Into<String>) -> Self {
         Self::InvalidData(msg.into())
     }
 
-    /// Create a new network error
     pub fn network(msg: impl Into<String>) -> Self {
         Self::Network(msg.into())
     }
 
-    /// Create a new strategy error
     pub fn strategy(msg: impl Into<String>) -> Self {
         Self::Strategy(msg.into())
     }
 
-    /// Create a new configuration error
     pub fn configuration(msg: impl Into<String>) -> Self {
         Self::Configuration(msg.into())
     }
 
-    /// Create a new unknown error
     pub fn unknown(msg: impl Into<String>) -> Self {
         Self::Unknown(msg.into())
     }
 }
 
-/// Result type alias for activity operations
 pub type ActivityResult<T> = std::result::Result<T, ActivityError>;
 
 #[cfg(test)]

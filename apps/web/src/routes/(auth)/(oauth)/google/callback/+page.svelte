@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { auth } from '$lib/stores/auth.js';
 	import { create } from '@bufbuild/protobuf';
 	import { LoginRequestSchema, Provider } from '@eurora/shared/proto/auth_service_pb.js';
 	import { authService } from '@eurora/shared/services/auth-service';
@@ -46,13 +47,10 @@
 				},
 			});
 
-			await authService.login(loginData);
+			const tokens = await authService.login(loginData);
+			auth.login(tokens);
 
-			// Store tokens in auth store
-			// auth.login(tokens);
-
-			// Redirect to home page
-			goto('/');
+			goto('/settings');
 		} catch (error) {
 			console.error('Token exchange failed:', error);
 			goto('/login?error=token_exchange_failed');

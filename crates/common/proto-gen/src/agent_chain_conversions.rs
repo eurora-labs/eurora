@@ -1,12 +1,3 @@
-//! Agent Chain Protocol Buffer conversions.
-//!
-//! This module implements `From` trait conversions between the proto types
-//! and the native Rust message types from `agent_chain_core`.
-
-// ============================================================================
-// Conversions between proto types and agent_chain_core types
-// ============================================================================
-
 use crate::agent_chain::*;
 use agent_chain_core::messages::{
     AIMessage, AIMessageChunk, Annotation, AudioContentBlock, BaseMessage, BaseMessageChunk,
@@ -20,10 +11,6 @@ use agent_chain_core::messages::{
     ToolMessageChunk, ToolStatus, UsageMetadata, VideoContentBlock,
 };
 use std::collections::HashMap;
-
-// ========================================================================
-// Helper functions for JSON serialization/deserialization
-// ========================================================================
 
 fn hashmap_to_json_string(map: &HashMap<String, serde_json::Value>) -> Option<String> {
     if map.is_empty() {
@@ -47,10 +34,6 @@ fn json_string_to_value(s: &Option<String>) -> Option<serde_json::Value> {
     s.as_ref().and_then(|json| serde_json::from_str(json).ok())
 }
 
-// ========================================================================
-// InputTokenDetails conversions
-// ========================================================================
-
 impl From<InputTokenDetails> for ProtoInputTokenDetails {
     fn from(details: InputTokenDetails) -> Self {
         ProtoInputTokenDetails {
@@ -71,10 +54,6 @@ impl From<ProtoInputTokenDetails> for InputTokenDetails {
     }
 }
 
-// ========================================================================
-// OutputTokenDetails conversions
-// ========================================================================
-
 impl From<OutputTokenDetails> for ProtoOutputTokenDetails {
     fn from(details: OutputTokenDetails) -> Self {
         ProtoOutputTokenDetails {
@@ -92,10 +71,6 @@ impl From<ProtoOutputTokenDetails> for OutputTokenDetails {
         }
     }
 }
-
-// ========================================================================
-// UsageMetadata conversions
-// ========================================================================
 
 impl From<UsageMetadata> for ProtoUsageMetadata {
     fn from(usage: UsageMetadata) -> Self {
@@ -120,10 +95,6 @@ impl From<ProtoUsageMetadata> for UsageMetadata {
         }
     }
 }
-
-// ========================================================================
-// ToolCall conversions
-// ========================================================================
 
 impl From<ToolCall> for ProtoToolCall {
     fn from(tc: ToolCall) -> Self {
@@ -151,10 +122,6 @@ impl From<ProtoToolCall> for ToolCall {
     }
 }
 
-// ========================================================================
-// ToolCallChunk conversions
-// ========================================================================
-
 impl From<ToolCallChunk> for ProtoToolCallChunk {
     fn from(chunk: ToolCallChunk) -> Self {
         ProtoToolCallChunk {
@@ -177,10 +144,6 @@ impl From<ProtoToolCallChunk> for ToolCallChunk {
         }
     }
 }
-
-// ========================================================================
-// InvalidToolCall conversions
-// ========================================================================
 
 impl From<InvalidToolCall> for ProtoInvalidToolCall {
     fn from(itc: InvalidToolCall) -> Self {
@@ -205,10 +168,6 @@ impl From<ProtoInvalidToolCall> for InvalidToolCall {
     }
 }
 
-// ========================================================================
-// ToolStatus conversions
-// ========================================================================
-
 impl From<ToolStatus> for ProtoToolStatus {
     fn from(status: ToolStatus) -> Self {
         match status {
@@ -229,17 +188,12 @@ impl From<ProtoToolStatus> for ToolStatus {
     }
 }
 
-/// Helper function to convert i32 to ToolStatus
 pub fn i32_to_tool_status(val: i32) -> ToolStatus {
     match ProtoToolStatus::try_from(val) {
         Ok(ProtoToolStatus::ToolStatusError) => ToolStatus::Error,
         _ => ToolStatus::Success,
     }
 }
-
-// ========================================================================
-// ChunkPosition conversions
-// ========================================================================
 
 impl From<ChunkPosition> for ProtoChunkPosition {
     fn from(pos: ChunkPosition) -> Self {
@@ -257,10 +211,6 @@ impl From<ProtoChunkPosition> for Option<ChunkPosition> {
         }
     }
 }
-
-// ========================================================================
-// ImageDetail conversions
-// ========================================================================
 
 impl From<ImageDetail> for ProtoImageDetail {
     fn from(detail: ImageDetail) -> Self {
@@ -284,10 +234,6 @@ impl From<ProtoImageDetail> for ImageDetail {
     }
 }
 
-// ========================================================================
-// ImageSource conversions
-// ========================================================================
-
 impl From<ImageSource> for ProtoImageSource {
     fn from(source: ImageSource) -> Self {
         match source {
@@ -301,7 +247,6 @@ impl From<ImageSource> for ProtoImageSource {
                 })),
             },
             ImageSource::FileId { file_id } => ProtoImageSource {
-                // File ID doesn't have a direct proto representation, use URL as fallback
                 source: Some(proto_image_source::Source::Url(format!(
                     "file://{}",
                     file_id
@@ -332,10 +277,6 @@ impl From<ProtoImageSource> for ImageSource {
     }
 }
 
-// ========================================================================
-// ContentPart conversions
-// ========================================================================
-
 impl From<ContentPart> for ProtoContentPart {
     fn from(part: ContentPart) -> Self {
         match part {
@@ -349,7 +290,6 @@ impl From<ContentPart> for ProtoContentPart {
                 })),
             },
             ContentPart::Other(value) => {
-                // Serialize to text representation
                 let text = serde_json::to_string(&value).unwrap_or_default();
                 ProtoContentPart {
                     part: Some(proto_content_part::Part::Text(ProtoTextPart { text })),
@@ -383,10 +323,6 @@ impl From<ProtoContentPart> for ContentPart {
     }
 }
 
-// ========================================================================
-// MessageContent conversions
-// ========================================================================
-
 impl From<MessageContent> for ProtoMessageContent {
     fn from(content: MessageContent) -> Self {
         match content {
@@ -414,10 +350,6 @@ impl From<ProtoMessageContent> for MessageContent {
     }
 }
 
-// ========================================================================
-// BlockIndex conversions
-// ========================================================================
-
 impl From<BlockIndex> for ProtoBlockIndex {
     fn from(index: BlockIndex) -> Self {
         match index {
@@ -440,10 +372,6 @@ impl From<ProtoBlockIndex> for BlockIndex {
         }
     }
 }
-
-// ========================================================================
-// Annotation conversions
-// ========================================================================
 
 impl From<Annotation> for ProtoAnnotation {
     fn from(ann: Annotation) -> Self {
@@ -513,10 +441,6 @@ impl From<ProtoAnnotation> for Annotation {
     }
 }
 
-// ========================================================================
-// HumanMessage conversions
-// ========================================================================
-
 impl From<HumanMessage> for ProtoHumanMessage {
     fn from(msg: HumanMessage) -> Self {
         ProtoHumanMessage {
@@ -543,10 +467,6 @@ impl From<ProtoHumanMessage> for HumanMessage {
             .build()
     }
 }
-
-// ========================================================================
-// HumanMessageChunk conversions
-// ========================================================================
 
 impl From<HumanMessageChunk> for ProtoHumanMessageChunk {
     fn from(chunk: HumanMessageChunk) -> Self {
@@ -577,10 +497,6 @@ impl From<ProtoHumanMessageChunk> for HumanMessageChunk {
     }
 }
 
-// ========================================================================
-// SystemMessage conversions
-// ========================================================================
-
 impl From<SystemMessage> for ProtoSystemMessage {
     fn from(msg: SystemMessage) -> Self {
         ProtoSystemMessage {
@@ -607,10 +523,6 @@ impl From<ProtoSystemMessage> for SystemMessage {
             .build()
     }
 }
-
-// ========================================================================
-// SystemMessageChunk conversions
-// ========================================================================
 
 impl From<SystemMessageChunk> for ProtoSystemMessageChunk {
     fn from(chunk: SystemMessageChunk) -> Self {
@@ -640,10 +552,6 @@ impl From<ProtoSystemMessageChunk> for SystemMessageChunk {
             .build()
     }
 }
-
-// ========================================================================
-// AIMessage conversions
-// ========================================================================
 
 impl From<AIMessage> for ProtoAiMessage {
     fn from(msg: AIMessage) -> Self {
@@ -685,10 +593,6 @@ impl From<ProtoAiMessage> for AIMessage {
         msg
     }
 }
-
-// ========================================================================
-// AIMessageChunk conversions
-// ========================================================================
 
 impl From<AIMessageChunk> for ProtoAiMessageChunk {
     fn from(chunk: AIMessageChunk) -> Self {
@@ -754,10 +658,6 @@ impl From<ProtoAiMessageChunk> for AIMessageChunk {
     }
 }
 
-// ========================================================================
-// ToolMessage conversions
-// ========================================================================
-
 impl From<ToolMessage> for ProtoToolMessage {
     fn from(msg: ToolMessage) -> Self {
         ProtoToolMessage {
@@ -790,10 +690,6 @@ impl From<ProtoToolMessage> for ToolMessage {
     }
 }
 
-// ========================================================================
-// ToolMessageChunk conversions
-// ========================================================================
-
 impl From<ToolMessageChunk> for ProtoToolMessageChunk {
     fn from(chunk: ToolMessageChunk) -> Self {
         ProtoToolMessageChunk {
@@ -824,10 +720,6 @@ impl From<ProtoToolMessageChunk> for ToolMessageChunk {
     }
 }
 
-// ========================================================================
-// ChatMessage conversions
-// ========================================================================
-
 impl From<ChatMessage> for ProtoChatMessage {
     fn from(msg: ChatMessage) -> Self {
         ProtoChatMessage {
@@ -853,10 +745,6 @@ impl From<ProtoChatMessage> for ChatMessage {
             .build()
     }
 }
-
-// ========================================================================
-// ChatMessageChunk conversions
-// ========================================================================
 
 impl From<ChatMessageChunk> for ProtoChatMessageChunk {
     fn from(chunk: ChatMessageChunk) -> Self {
@@ -884,10 +772,6 @@ impl From<ProtoChatMessageChunk> for ChatMessageChunk {
     }
 }
 
-// ========================================================================
-// FunctionMessage conversions
-// ========================================================================
-
 impl From<FunctionMessage> for ProtoFunctionMessage {
     fn from(msg: FunctionMessage) -> Self {
         ProtoFunctionMessage {
@@ -911,10 +795,6 @@ impl From<ProtoFunctionMessage> for FunctionMessage {
             .build()
     }
 }
-
-// ========================================================================
-// FunctionMessageChunk conversions
-// ========================================================================
 
 impl From<FunctionMessageChunk> for ProtoFunctionMessageChunk {
     fn from(chunk: FunctionMessageChunk) -> Self {
@@ -940,10 +820,6 @@ impl From<ProtoFunctionMessageChunk> for FunctionMessageChunk {
     }
 }
 
-// ========================================================================
-// RemoveMessage conversions
-// ========================================================================
-
 impl From<RemoveMessage> for ProtoRemoveMessage {
     fn from(msg: RemoveMessage) -> Self {
         ProtoRemoveMessage { id: msg.id }
@@ -955,10 +831,6 @@ impl From<ProtoRemoveMessage> for RemoveMessage {
         RemoveMessage::builder().id(proto.id).build()
     }
 }
-
-// ========================================================================
-// BaseMessage conversions
-// ========================================================================
 
 impl From<BaseMessage> for ProtoBaseMessage {
     fn from(msg: BaseMessage) -> Self {
@@ -1003,10 +875,6 @@ impl From<ProtoBaseMessage> for BaseMessage {
     }
 }
 
-// ========================================================================
-// BaseMessageChunk conversions
-// ========================================================================
-
 impl From<BaseMessageChunk> for ProtoBaseMessageChunk {
     fn from(chunk: BaseMessageChunk) -> Self {
         match chunk {
@@ -1047,10 +915,6 @@ impl From<ProtoBaseMessageChunk> for BaseMessageChunk {
         }
     }
 }
-
-// ========================================================================
-// Content Block conversions
-// ========================================================================
 
 impl From<TextContentBlock> for ProtoTextContentBlock {
     fn from(block: TextContentBlock) -> Self {
@@ -1531,10 +1395,6 @@ impl From<ProtoServerToolResult> for ServerToolResult {
         }
     }
 }
-
-// ========================================================================
-// ContentBlock union conversions
-// ========================================================================
 
 impl From<ContentBlock> for ProtoContentBlock {
     fn from(block: ContentBlock) -> Self {

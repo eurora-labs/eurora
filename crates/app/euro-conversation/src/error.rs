@@ -40,5 +40,4 @@ impl From<Status> for Error {
     }
 }
 
-/// Result type alias for conversation operations.
 pub type Result<T> = std::result::Result<T, Error>;

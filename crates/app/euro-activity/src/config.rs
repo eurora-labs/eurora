@@ -1,22 +1,14 @@
-//! Configuration system for the refactored activity system
-
 use std::{collections::HashMap, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
-/// Global configuration for the activity system
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GlobalConfig {
-    /// Whether activity collection is enabled
     pub enabled: bool,
-    /// Default interval for collecting activity data
     #[serde(with = "humantime_serde")]
     pub default_collection_interval: Duration,
-    /// Maximum number of assets to collect per activity
     pub max_assets_per_activity: usize,
-    /// Maximum number of snapshots to collect per activity
     pub max_snapshots_per_activity: usize,
-    /// Privacy configuration
     pub privacy: PrivacyConfig,
 }
 
@@ -32,16 +24,11 @@ impl Default for GlobalConfig {
     }
 }
 
-/// Privacy configuration for data collection
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrivacyConfig {
-    /// Whether to collect full content or just metadata
     pub collect_content: bool,
-    /// Whether to anonymize collected data
     pub anonymize_data: bool,
-    /// Regex patterns to exclude from collection
     pub exclude_patterns: Vec<String>,
-    /// Applications to completely ignore
     pub ignored_applications: Vec<String>,
 }
 
@@ -61,21 +48,14 @@ impl Default for PrivacyConfig {
     }
 }
 
-/// Configuration for a specific strategy
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StrategyConfig {
-    /// Whether this strategy is enabled
     pub enabled: bool,
-    /// Priority of this strategy (higher = more preferred)
     pub priority: u32,
-    /// Collection interval for this strategy
     #[serde(with = "humantime_serde")]
     pub collection_interval: Duration,
-    /// Types of assets this strategy should collect
     pub asset_types: Vec<String>,
-    /// Frequency of snapshot collection
     pub snapshot_frequency: SnapshotFrequency,
-    /// Strategy-specific settings
     pub settings: HashMap<String, String>,
 }
 
@@ -92,32 +72,21 @@ impl Default for StrategyConfig {
     }
 }
 
-/// Frequency configuration for snapshot collection
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SnapshotFrequency {
-    /// Never collect snapshots
     Never,
-    /// Collect snapshots at regular intervals
     Interval(#[serde(with = "humantime_serde")] Duration),
-    /// Collect snapshots on specific events
     OnEvent(Vec<String>),
-    /// Collect snapshots when content changes
     OnChange,
 }
 
-/// Configuration for a specific application
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApplicationConfig {
-    /// Whether collection is enabled for this application
     pub enabled: bool,
-    /// Strategy to use for this application (overrides automatic selection)
     pub force_strategy: Option<String>,
-    /// Application-specific privacy settings
     pub privacy_override: Option<PrivacyConfig>,
-    /// Custom collection interval for this application
     #[serde(with = "humantime_serde")]
     pub collection_interval_override: Option<Duration>,
-    /// Application-specific settings
     pub settings: HashMap<String, String>,
 }
 
@@ -133,119 +102,97 @@ impl Default for ApplicationConfig {
     }
 }
 
-/// Main configuration structure for the activity system
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ActivityConfig {
-    /// Global configuration
     pub global: GlobalConfig,
-    /// Strategy-specific configurations
     pub strategies: HashMap<String, StrategyConfig>,
-    /// Application-specific configurations
     pub applications: HashMap<String, ApplicationConfig>,
 }
 
-/// Builder for creating activity configurations
 #[derive(Debug, Default)]
 pub struct ActivityConfigBuilder {
     config: ActivityConfig,
 }
 
 impl ActivityConfigBuilder {
-    /// Create a new configuration builder
     pub fn new() -> Self {
         Self {
             config: ActivityConfig::default(),
         }
     }
 
-    /// Enable or disable activity collection
     pub fn enable_collection(mut self, enabled: bool) -> Self {
         self.config.global.enabled = enabled;
         self
     }
 
-    /// Set the default collection interval
     pub fn default_collection_interval(mut self, interval: Duration) -> Self {
         self.config.global.default_collection_interval = interval;
         self
     }
 
-    /// Set the maximum number of assets per activity
     pub fn max_assets_per_activity(mut self, max: usize) -> Self {
         self.config.global.max_assets_per_activity = max;
         self
     }
 
-    /// Set the maximum number of snapshots per activity
     pub fn max_snapshots_per_activity(mut self, max: usize) -> Self {
         self.config.global.max_snapshots_per_activity = max;
         self
     }
 
-    /// Enable or disable content collection
     pub fn collect_content(mut self, collect: bool) -> Self {
         self.config.global.privacy.collect_content = collect;
         self
     }
 
-    /// Enable or disable data anonymization
     pub fn anonymize_data(mut self, anonymize: bool) -> Self {
         self.config.global.privacy.anonymize_data = anonymize;
         self
     }
 
-    /// Add an exclusion pattern
     pub fn add_exclusion_pattern(mut self, pattern: String) -> Self {
         self.config.global.privacy.exclude_patterns.push(pattern);
         self
     }
 
-    /// Add an ignored application
     pub fn ignore_application(mut self, app: String) -> Self {
         self.config.global.privacy.ignored_applications.push(app);
         self
     }
 
-    /// Configure a strategy
     pub fn configure_strategy(mut self, strategy_id: String, config: StrategyConfig) -> Self {
         self.config.strategies.insert(strategy_id, config);
         self
     }
 
-    /// Configure an application
     pub fn configure_application(mut self, app_name: String, config: ApplicationConfig) -> Self {
         self.config.applications.insert(app_name, config);
         self
     }
 
-    /// Build the final configuration
     pub fn build(self) -> ActivityConfig {
         self.config
     }
 }
 
 impl ActivityConfig {
-    /// Create a new configuration builder
     pub fn builder() -> ActivityConfigBuilder {
         ActivityConfigBuilder::new()
     }
 
-    /// Get strategy configuration by ID
     pub fn get_strategy_config(&self, strategy_id: &str) -> Option<&StrategyConfig> {
         self.strategies.get(strategy_id)
     }
 
-    /// Get application configuration by name
     pub fn get_application_config(&self, app_name: &str) -> Option<&ApplicationConfig> {
         self.applications.get(app_name)
     }
 
-    /// Check if collection is enabled globally
     pub fn is_collection_enabled(&self) -> bool {
         self.global.enabled
     }
 
-    /// Check if collection is enabled for a specific application
     pub fn is_application_enabled(&self, app_name: &str) -> bool {
         if !self.global.enabled {
             return false;
@@ -264,7 +211,6 @@ impl ActivityConfig {
             .is_none_or(|config| config.enabled)
     }
 
-    /// Get effective collection interval for an application
     pub fn get_collection_interval(&self, app_name: &str, strategy_id: &str) -> Duration {
         // Check application-specific override first
         if let Some(app_config) = self.get_application_config(app_name)
@@ -282,19 +228,16 @@ impl ActivityConfig {
         self.global.default_collection_interval
     }
 
-    /// Get effective privacy configuration for an application
     pub fn get_privacy_config(&self, app_name: &str) -> &PrivacyConfig {
         self.get_application_config(app_name)
             .and_then(|config| config.privacy_override.as_ref())
             .unwrap_or(&self.global.privacy)
     }
 
-    /// Check if content should be collected for an application
     pub fn should_collect_content(&self, app_name: &str) -> bool {
         self.get_privacy_config(app_name).collect_content
     }
 
-    /// Validate the configuration
     pub fn validate(&self) -> Result<(), String> {
         if self.global.max_assets_per_activity == 0 {
             return Err("max_assets_per_activity must be greater than 0".to_string());
@@ -308,14 +251,12 @@ impl ActivityConfig {
             return Err("default_collection_interval must be greater than 0".to_string());
         }
 
-        // Validate regex patterns
         for pattern in &self.global.privacy.exclude_patterns {
             if let Err(e) = regex::Regex::new(pattern) {
                 return Err(format!("Invalid regex pattern '{}': {}", pattern, e));
             }
         }
 
-        // Validate strategy intervals
         for (id, sc) in &self.strategies {
             if sc.collection_interval.is_zero() {
                 return Err(format!(
@@ -324,7 +265,6 @@ impl ActivityConfig {
                 ));
             }
         }
-        // Validate application overrides
         for (name, app) in &self.applications {
             if let Some(d) = app.collection_interval_override
                 && d.is_zero()
@@ -506,7 +446,6 @@ mod tests {
     fn test_snapshot_frequency() {
         let interval = SnapshotFrequency::Interval(Duration::from_secs(10));
 
-        // Just test that they can be created and serialized
         let serialized = serde_json::to_string(&interval).unwrap();
         assert!(!serialized.is_empty());
     }

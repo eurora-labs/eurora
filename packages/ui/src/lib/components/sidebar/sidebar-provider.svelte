@@ -1,14 +1,14 @@
 <script lang="ts">
+	import * as Tooltip from '$lib/components/tooltip/index.js';
+	import { cn, type WithElementRef } from '$lib/utils.js';
+	import type { HTMLAttributes } from 'svelte/elements';
 	import {
 		SIDEBAR_COOKIE_MAX_AGE,
 		SIDEBAR_COOKIE_NAME,
 		SIDEBAR_WIDTH,
 		SIDEBAR_WIDTH_ICON,
-	} from '$lib/components/sidebar/constants.js';
-	import { setSidebar } from '$lib/components/sidebar/context.svelte.js';
-	import * as Tooltip from '$lib/components/tooltip/index.js';
-	import { cn, type WithElementRef } from '$lib/utils.js';
-	import type { HTMLAttributes } from 'svelte/elements';
+	} from './constants.js';
+	import { setSidebar } from './context.svelte.js';
 
 	let {
 		ref = $bindable(null),
@@ -42,7 +42,7 @@
 		data-slot="sidebar-wrapper"
 		style="--sidebar-width: {SIDEBAR_WIDTH}; --sidebar-width-icon: {SIDEBAR_WIDTH_ICON}; {style}"
 		class={cn(
-			'group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex w-full',
+			'group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full',
 			className,
 		)}
 		bind:this={ref}

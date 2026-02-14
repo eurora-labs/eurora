@@ -1,12 +1,9 @@
-//! Article snapshot implementation
-
 use agent_chain_core::{BaseMessage, HumanMessage};
 use euro_native_messaging::types::NativeArticleSnapshot;
 use serde::{Deserialize, Serialize};
 
 use crate::{ActivityResult, types::SnapshotFunctionality};
 
-/// Article snapshot with highlighted content
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArticleSnapshot {
     pub id: String,
@@ -19,7 +16,6 @@ pub struct ArticleSnapshot {
 }
 
 impl ArticleSnapshot {
-    /// Create a new article snapshot
     pub fn new(
         id: Option<String>,
         highlight: Option<String>,
@@ -55,7 +51,6 @@ impl ArticleSnapshot {
 }
 
 impl SnapshotFunctionality for ArticleSnapshot {
-    /// Construct a message for LLM interaction
     fn construct_messages(&self) -> Vec<BaseMessage> {
         if let Some(highlight) = &self.highlight
             && highlight.is_empty()

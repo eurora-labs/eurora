@@ -65,7 +65,6 @@ impl ProcessFunctionality for Safari {
     }
 }
 
-// Implement a test
 #[cfg(test)]
 mod tests {
     use super::*;

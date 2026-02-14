@@ -1,4 +1,3 @@
-// use std::fs::File;
 use anyhow::Result;
 use euro_native_messaging::PORT;
 use euro_native_messaging::{
@@ -11,18 +10,11 @@ use tokio::io::{self};
 use tokio::sync::{broadcast, mpsc};
 use tonic::transport::Channel;
 use tracing::{error, info, warn};
-// Need this import to succeed in prod builds
 #[allow(unused_imports)]
 use tracing_subscriber::prelude::*;
-// use tracing_subscriber::{
-//     filter::{EnvFilter, LevelFilter},
-//     fmt,
-// };
 
-/// Retry interval for connecting to the server
 const RETRY_INTERVAL_SECS: u64 = 2;
 
-/// Connect to the gRPC server with retry logic
 async fn connect_with_retry(server_addr: &str) -> BrowserBridgeClient<Channel> {
     loop {
         info!(
@@ -48,24 +40,10 @@ async fn connect_with_retry(server_addr: &str) -> BrowserBridgeClient<Channel> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Capture parent PID immediately at startup, before any other processing.
-    // This records the PID of the browser process that started this native messaging host.
     parent_pid::capture_parent_pid();
 
-    // let filter = EnvFilter::builder()
-    //     .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
-    //     .parse_lossy("euro_=trace,hyper=off,tokio=off"); // keep yours, silence deps
-
-    // // Write only to file
-    // fmt()
-    //     .with_env_filter(filter.clone())
-    //     .with_writer(File::create("euro-native-messaging.log")?)
-    //     .init();
-
-    // Check for command line arguments
     let args: Vec<String> = env::args().collect();
 
-    // Handle the generate_specta argument
     if args.len() > 1 && args[1] == "--generate_specta" {
         return generate_typescript_definitions();
     }
@@ -80,13 +58,9 @@ async fn main() -> Result<()> {
 
     let server_addr = format!("http://[::1]:{}", PORT);
 
-    // Channel for frames coming from the gRPC server (will be forwarded to Chrome)
     let (from_server_tx, mut from_server_rx) = mpsc::channel::<Frame>(1024);
-
-    // Broadcast channel for frames going to the gRPC server (allows resubscribing on reconnect)
     let (to_server_tx, _) = broadcast::channel::<Frame>(1024);
 
-    // Task: write frames to Chrome (stdout)
     let chrome_writer_handle = tokio::spawn(async move {
         let mut stdout = io::stdout();
         info!("Chrome writer task started");
@@ -100,7 +74,6 @@ async fn main() -> Result<()> {
         info!("Chrome writer task stopped");
     });
 
-    // Task: read frames from Chrome (stdin) and forward to server
     let chrome_reader_handle = {
         let to_server_tx = to_server_tx.clone();
         tokio::spawn(async move {
@@ -110,8 +83,6 @@ async fn main() -> Result<()> {
                 match read_framed(&mut stdin).await {
                     Ok(Some(frame)) => {
                         info!("Read frame from Chrome: {:?}", frame.kind);
-                        // Broadcast to any active server connection
-                        // It's okay if there are no receivers (server disconnected)
                         let _ = to_server_tx.send(frame);
                     }
                     Ok(None) => {
@@ -128,18 +99,13 @@ async fn main() -> Result<()> {
         })
     };
 
-    // Main connection loop with retry logic
     let server_connection_handle = {
         let to_server_tx = to_server_tx.clone();
         tokio::spawn(async move {
             loop {
-                // Connect to the server (with retry)
                 let mut client = connect_with_retry(&server_addr).await;
-
-                // Subscribe to frames from Chrome for this connection
                 let mut to_server_rx = to_server_tx.subscribe();
 
-                // Send registration frame first
                 let register_frame = Frame {
                     kind: Some(FrameKind::Register(RegisterFrame {
                         host_pid,
@@ -147,13 +113,10 @@ async fn main() -> Result<()> {
                     })),
                 };
 
-                // Create a stream that starts with the register frame followed by forwarded frames
                 let outbound_stream = async_stream::stream! {
-                    // Send registration frame first
                     info!("Sending registration frame: host_pid={}, browser_pid={}", host_pid, browser_pid);
                     yield register_frame;
 
-                    // Then forward all frames from Chrome to the server
                     loop {
                         match to_server_rx.recv().await {
                             Ok(frame) => {
@@ -172,7 +135,6 @@ async fn main() -> Result<()> {
                     }
                 };
 
-                // Open bidirectional stream with the server
                 let response = match client.open(outbound_stream).await {
                     Ok(response) => {
                         info!("Bidirectional stream opened successfully");
@@ -191,7 +153,6 @@ async fn main() -> Result<()> {
 
                 let mut inbound_stream = response.into_inner();
 
-                // Receive frames from the server and forward to Chrome
                 loop {
                     match inbound_stream.message().await {
                         Ok(Some(frame)) => {

@@ -56,14 +56,14 @@ fn get_encryption_key() -> Result<Key, CryptoError> {
     Ok(Key::from(key_array))
 }
 
-/// Encrypt a PKCE verifier for secure storage.
+/// Encrypt a sensitive string for secure storage.
 ///
 /// Uses XChaCha20-Poly1305 authenticated encryption with a random nonce.
 /// The nonce is prepended to the ciphertext for storage.
 ///
 /// # Arguments
 ///
-/// * `verifier` - The plaintext PKCE verifier string
+/// * `verifier` - The plaintext string to encrypt
 ///
 /// # Returns
 ///
@@ -74,7 +74,7 @@ fn get_encryption_key() -> Result<Key, CryptoError> {
 /// Returns a `CryptoError` if:
 /// - The encryption key is not set or invalid
 /// - Encryption fails
-pub fn encrypt_pkce_verifier(verifier: &str) -> Result<Vec<u8>, CryptoError> {
+pub fn encrypt_sensitive_string(verifier: &str) -> Result<Vec<u8>, CryptoError> {
     let key = get_encryption_key()?;
     let cipher = XChaCha20Poly1305::new(&key);
 
@@ -97,7 +97,7 @@ pub fn encrypt_pkce_verifier(verifier: &str) -> Result<Vec<u8>, CryptoError> {
     Ok(encrypted)
 }
 
-/// Decrypt a PKCE verifier from encrypted storage.
+/// Decrypt a sensitive string from encrypted storage.
 ///
 /// # Arguments
 ///
@@ -105,7 +105,7 @@ pub fn encrypt_pkce_verifier(verifier: &str) -> Result<Vec<u8>, CryptoError> {
 ///
 /// # Returns
 ///
-/// Returns the decrypted PKCE verifier string
+/// Returns the decrypted plaintext string
 ///
 /// # Errors
 ///
@@ -113,7 +113,7 @@ pub fn encrypt_pkce_verifier(verifier: &str) -> Result<Vec<u8>, CryptoError> {
 /// - The encryption key is not set or invalid
 /// - The encrypted data format is invalid
 /// - Decryption fails (e.g., tampered data)
-pub fn decrypt_pkce_verifier(encrypted: &[u8]) -> Result<String, CryptoError> {
+pub fn decrypt_sensitive_string(encrypted: &[u8]) -> Result<String, CryptoError> {
     if encrypted.len() < NONCE_SIZE {
         return Err(CryptoError::InvalidFormat);
     }
@@ -158,13 +158,13 @@ mod tests {
         let verifier = "test_pkce_verifier_12345";
 
         // Encrypt
-        let encrypted = encrypt_pkce_verifier(verifier).expect("Encryption should succeed");
+        let encrypted = encrypt_sensitive_string(verifier).expect("Encryption should succeed");
 
         // Verify encrypted data has correct format (nonce + ciphertext)
         assert!(encrypted.len() > NONCE_SIZE);
 
         // Decrypt
-        let decrypted = decrypt_pkce_verifier(&encrypted).expect("Decryption should succeed");
+        let decrypted = decrypt_sensitive_string(&encrypted).expect("Decryption should succeed");
 
         assert_eq!(verifier, decrypted);
 
@@ -185,7 +185,7 @@ mod tests {
         }
 
         let verifier = "test_pkce_verifier";
-        let mut encrypted = encrypt_pkce_verifier(verifier).expect("Encryption should succeed");
+        let mut encrypted = encrypt_sensitive_string(verifier).expect("Encryption should succeed");
 
         // Tamper with the ciphertext
         if let Some(byte) = encrypted.last_mut() {
@@ -193,7 +193,7 @@ mod tests {
         }
 
         // Decryption should fail
-        let result = decrypt_pkce_verifier(&encrypted);
+        let result = decrypt_sensitive_string(&encrypted);
         assert!(result.is_err());
 
         // SAFETY: This is a test-only operation protected by mutex
@@ -211,7 +211,7 @@ mod tests {
             std::env::remove_var("PKCE_ENCRYPTION_KEY");
         }
 
-        let result = encrypt_pkce_verifier("test");
+        let result = encrypt_sensitive_string("test");
         assert!(matches!(result, Err(CryptoError::MissingEncryptionKey)));
     }
 
@@ -224,7 +224,7 @@ mod tests {
             std::env::set_var("PKCE_ENCRYPTION_KEY", "0123456789abcdef"); // Too short
         }
 
-        let result = encrypt_pkce_verifier("test");
+        let result = encrypt_sensitive_string("test");
         assert!(matches!(result, Err(CryptoError::InvalidKeyLength(_))));
 
         // SAFETY: This is a test-only operation protected by mutex

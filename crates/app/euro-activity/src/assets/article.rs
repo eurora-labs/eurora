@@ -1,5 +1,3 @@
-//! Article asset implementation
-
 use std::collections::HashMap;
 
 use agent_chain_core::{BaseMessage, HumanMessage};
@@ -14,7 +12,6 @@ use crate::{
     types::{AssetFunctionality, ContextChip},
 };
 
-/// Article asset with content and metadata
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ArticleAsset {
     pub id: String,
@@ -24,7 +21,6 @@ pub struct ArticleAsset {
 }
 
 impl ArticleAsset {
-    /// Create a new article asset
     pub fn new(id: String, url: String, title: String, content: String) -> Self {
         Self {
             id,
@@ -34,7 +30,6 @@ impl ArticleAsset {
         }
     }
 
-    /// Try to create from protocol buffer state
     pub fn try_from(asset: NativeArticleAsset) -> Result<Self, ActivityError> {
         Ok(ArticleAsset {
             id: uuid::Uuid::new_v4().to_string(),
@@ -58,7 +53,6 @@ impl AssetFunctionality for ArticleAsset {
         Some("article")
     }
 
-    /// Construct a message for LLM interaction
     fn construct_messages(&self) -> Vec<BaseMessage> {
         let mut content = format!(
             "The user is on a website titled '{}' and has a question about it.",

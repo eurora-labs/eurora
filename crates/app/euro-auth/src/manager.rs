@@ -1,4 +1,3 @@
-// use crate::client::AuthClient;
 use crate::client::AuthClient;
 use anyhow::{Result, anyhow};
 use auth_core::Claims;
@@ -7,11 +6,12 @@ use euro_secret::{Sensitive, secret};
 use jsonwebtoken::dangerous::insecure_decode;
 use rand::{TryRngCore, rngs::OsRng};
 use sha2::{Digest, Sha256};
+use tokio::sync::watch;
+use tonic::transport::Channel;
 use tracing::error;
 
 #[derive(Debug, Clone)]
 pub struct JwtConfig {
-    /// Minutes offset
     refresh_offset: i64,
 }
 
@@ -25,26 +25,42 @@ pub const ACCESS_TOKEN_HANDLE: &str = "AUTH_ACCESS_TOKEN";
 pub const REFRESH_TOKEN_HANDLE: &str = "AUTH_REFRESH_TOKEN";
 
 impl AuthManager {
-    pub async fn new() -> Result<Self> {
-        let refresh_offset = std::env::var("JWT_REFRESH_OFFSET").unwrap_or("15".to_string());
-        Ok(Self {
-            auth_client: AuthClient::new().await?,
-            jwt_config: JwtConfig {
-                refresh_offset: refresh_offset
-                    .parse()
-                    .map_err(|_| anyhow!("Invalid JWT_REFRESH_OFFSET format"))?,
-            },
-        })
+    pub fn new(channel_rx: watch::Receiver<Channel>) -> Self {
+        let refresh_offset: i64 = std::env::var("JWT_REFRESH_OFFSET")
+            .unwrap_or("15".to_string())
+            .parse()
+            .unwrap_or(15)
+            .max(0);
+        Self {
+            auth_client: AuthClient::new(channel_rx),
+            jwt_config: JwtConfig { refresh_offset },
+        }
     }
 
     pub async fn login(
-        &self,
+        &mut self,
         login: impl Into<String>,
         password: impl Into<String>,
     ) -> Result<Sensitive<String>> {
         let response = self.auth_client.login_by_password(login, password).await?;
 
-        // Store tokens securely
+        store_access_token(response.access_token.clone())?;
+        store_refresh_token(response.refresh_token.clone())?;
+
+        Ok(Sensitive(response.access_token))
+    }
+
+    pub async fn register(
+        &mut self,
+        username: impl Into<String>,
+        email: impl Into<String>,
+        password: impl Into<String>,
+    ) -> Result<Sensitive<String>> {
+        let response = self
+            .auth_client
+            .register(username, email, password, None)
+            .await?;
+
         store_access_token(response.access_token.clone())?;
         store_refresh_token(response.refresh_token.clone())?;
 
@@ -73,15 +89,13 @@ impl AuthManager {
         Ok(token.claims)
     }
 
-    pub async fn get_or_refresh_access_token(&self) -> Result<Sensitive<String>> {
-        // Check if token has expired or is close to expiration
+    pub async fn get_or_refresh_access_token(&mut self) -> Result<Sensitive<String>> {
         match self.get_access_token_payload() {
             Ok(claims) => {
                 let now = chrono::Utc::now().timestamp();
                 let expiry_with_offset = claims.exp - self.jwt_config.refresh_offset * 60;
 
                 if now < expiry_with_offset {
-                    // Token is still valid
                     self.get_access_token()
                 } else {
                     self.refresh_tokens().await.map_err(|err| {
@@ -102,12 +116,11 @@ impl AuthManager {
         }
     }
 
-    pub async fn refresh_tokens(&self) -> Result<Sensitive<String>> {
+    pub async fn refresh_tokens(&mut self) -> Result<Sensitive<String>> {
         let refresh_token = self.get_refresh_token()?;
 
         let response = self.auth_client.refresh_token(&refresh_token.0).await?;
 
-        // Store tokens securely
         store_access_token(response.access_token.clone())?;
         store_refresh_token(response.refresh_token.clone())?;
 
@@ -129,10 +142,10 @@ impl AuthManager {
 
         Ok((code_verifier, code_challenge))
     }
-    pub async fn login_by_login_token(&self, login_token: String) -> Result<Sensitive<String>> {
+
+    pub async fn login_by_login_token(&mut self, login_token: String) -> Result<Sensitive<String>> {
         let response = self.auth_client.login_by_login_token(login_token).await?;
 
-        // Store tokens securely
         store_access_token(response.access_token.clone())?;
         store_refresh_token(response.refresh_token.clone())?;
 

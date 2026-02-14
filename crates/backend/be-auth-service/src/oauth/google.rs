@@ -1,14 +1,46 @@
 use std::env;
+use std::time::Duration;
 
-use anyhow::{Result, anyhow};
-use oauth2::{
-    AuthUrl, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge, RedirectUrl, RevocationUrl,
-    Scope, TokenUrl, basic::BasicClient,
+use openidconnect::{
+    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointMaybeSet,
+    EndpointNotSet, EndpointSet, IssuerUrl, Nonce, OAuth2TokenResponse, PkceCodeChallenge,
+    PkceCodeVerifier, RedirectUrl, Scope, TokenResponse,
+    core::{CoreClient, CoreIdTokenClaims, CoreProviderMetadata, CoreResponseType},
 };
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info};
+use thiserror::Error;
+use tracing::info;
 
-/// Google OAuth configuration
+#[derive(Debug, Error)]
+pub enum OAuthError {
+    #[error("Missing environment variable: {0}")]
+    MissingEnvVar(&'static str),
+    #[error("OAuth discovery failed: {0}")]
+    Discovery(String),
+    #[error("Invalid URL: {0}")]
+    InvalidUrl(String),
+    #[error("Code exchange failed: {0}")]
+    CodeExchange(String),
+    #[error("Missing ID token")]
+    MissingIdToken,
+    #[error("Token verification failed: {0}")]
+    TokenVerification(String),
+    #[error("Missing email in claims")]
+    MissingEmail,
+    #[error("HTTP client error: {0}")]
+    HttpClient(String),
+}
+
+/// The concrete client type returned by `from_provider_metadata` + `set_redirect_uri`
+type DiscoveredClient = CoreClient<
+    EndpointSet,      // HasAuthUrl
+    EndpointNotSet,   // HasDeviceAuthUrl
+    EndpointNotSet,   // HasIntrospectionUrl
+    EndpointNotSet,   // HasRevocationUrl
+    EndpointMaybeSet, // HasTokenUrl
+    EndpointMaybeSet, // HasUserInfoUrl
+>;
+
 #[derive(Debug, Clone)]
 pub struct GoogleOAuthConfig {
     pub client_id: String,
@@ -17,12 +49,11 @@ pub struct GoogleOAuthConfig {
 }
 
 impl GoogleOAuthConfig {
-    /// Create a new GoogleOAuthConfig from environment variables
-    pub fn from_env() -> Result<Self> {
+    pub fn from_env() -> Result<Self, OAuthError> {
         let client_id = env::var("GOOGLE_CLIENT_ID")
-            .map_err(|_| anyhow!("GOOGLE_CLIENT_ID environment variable not set"))?;
+            .map_err(|_| OAuthError::MissingEnvVar("GOOGLE_CLIENT_ID"))?;
         let client_secret = env::var("GOOGLE_CLIENT_SECRET")
-            .map_err(|_| anyhow!("GOOGLE_CLIENT_SECRET environment variable not set"))?;
+            .map_err(|_| OAuthError::MissingEnvVar("GOOGLE_CLIENT_SECRET"))?;
         let redirect_uri = env::var("GOOGLE_REDIRECT_URI")
             .unwrap_or_else(|_| "http://localhost:5173/auth/google/callback".to_string());
 
@@ -34,112 +65,145 @@ impl GoogleOAuthConfig {
     }
 }
 
-/// Google OAuth client wrapper for URL generation
 pub struct GoogleOAuthClient {
-    config: GoogleOAuthConfig,
+    client: DiscoveredClient,
+}
+
+fn build_http_client() -> Result<reqwest::Client, OAuthError> {
+    reqwest::ClientBuilder::new()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|e| OAuthError::HttpClient(e.to_string()))
 }
 
 impl GoogleOAuthClient {
-    /// Create a new Google OAuth client
-    pub fn new(config: GoogleOAuthConfig) -> Result<Self> {
-        Ok(Self { config })
+    pub async fn discover(config: GoogleOAuthConfig) -> Result<Self, OAuthError> {
+        let issuer_url = IssuerUrl::new("https://accounts.google.com".to_string())
+            .map_err(|e| OAuthError::InvalidUrl(e.to_string()))?;
+
+        let http_client = build_http_client()?;
+
+        info!("Discovering OpenID Connect provider metadata");
+        let provider_metadata = CoreProviderMetadata::discover_async(issuer_url, &http_client)
+            .await
+            .map_err(|e| OAuthError::Discovery(e.to_string()))?;
+
+        let client_id = ClientId::new(config.client_id);
+        let client_secret = Some(ClientSecret::new(config.client_secret));
+        let redirect_url = RedirectUrl::new(config.redirect_uri)
+            .map_err(|e| OAuthError::InvalidUrl(e.to_string()))?;
+
+        let client =
+            CoreClient::from_provider_metadata(provider_metadata, client_id, client_secret)
+                .set_redirect_uri(redirect_url);
+
+        Ok(Self { client })
     }
 
-    /// Generate the authorization URL for Google OAuth
-    /// Returns (authorization_url, csrf_state)
-    pub fn get_authorization_url(&self) -> Result<(String, String)> {
-        debug!("Generating Google OAuth authorization URL");
-
-        let google_client_id = ClientId::new(self.config.client_id.clone());
-        let google_client_secret = ClientSecret::new(self.config.client_secret.clone());
-
-        let auth_url = AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())
-            .map_err(|e| anyhow!("Invalid authorization endpoint URL: {}", e))?;
-
-        let token_url = TokenUrl::new("https://www.googleapis.com/oauth2/v3/token".to_string())
-            .map_err(|e| anyhow!("Invalid token endpoint URL: {}", e))?;
-
-        let redirect_url = RedirectUrl::new(self.config.redirect_uri.clone())
-            .map_err(|e| anyhow!("Invalid redirect URL: {}", e))?;
-
-        // Set up the config for the Google OAuth2 process
-        let client = BasicClient::new(google_client_id)
-            .set_client_secret(google_client_secret)
-            .set_auth_uri(auth_url)
-            .set_token_uri(token_url)
-            .set_revocation_url(
-                RevocationUrl::new("https://accounts.google.com/o/oauth2/revoke".to_string())
-                    .map_err(|e| anyhow!("Invalid revocation endpoint URL: {}", e))?,
-            )
-            .set_redirect_uri(redirect_url);
-
-        // Generate the authorization URL to which we'll redirect the user
-        let (authorize_url, csrf_state) = client
-            .authorize_url(CsrfToken::new_random)
-            // Request access to OpenID Connect scopes for user authentication
-            .add_scope(Scope::new("openid".to_string()))
-            .add_scope(Scope::new("email".to_string()))
-            .add_scope(Scope::new("profile".to_string()))
-            .url();
-
-        info!("Generated Google OAuth authorization URL");
-
-        Ok((authorize_url.to_string(), csrf_state.secret().clone()))
-    }
-
-    /// Generate the authorization URL for Google OAuth with a custom state and PKCE verifier
-    /// Returns the authorization_url
     pub fn get_authorization_url_with_state_and_pkce(
         &self,
         state: &str,
         pkce_verifier: &str,
-    ) -> Result<String> {
+        nonce: &Nonce,
+    ) -> String {
         info!("Generating Google OAuth authorization URL with custom state and PKCE");
 
-        let google_client_id = ClientId::new(self.config.client_id.clone());
-        let google_client_secret = ClientSecret::new(self.config.client_secret.clone());
-
-        let auth_url = AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())
-            .map_err(|e| anyhow!("Invalid authorization endpoint URL: {}", e))?;
-
-        let token_url = TokenUrl::new("https://www.googleapis.com/oauth2/v3/token".to_string())
-            .map_err(|e| anyhow!("Invalid token endpoint URL: {}", e))?;
-
-        let redirect_url = RedirectUrl::new(self.config.redirect_uri.clone())
-            .map_err(|e| anyhow!("Invalid redirect URL: {}", e))?;
-
-        // Set up the config for the Google OAuth2 process
-        let client = BasicClient::new(google_client_id)
-            .set_client_secret(google_client_secret)
-            .set_auth_uri(auth_url)
-            .set_token_uri(token_url)
-            .set_revocation_url(
-                RevocationUrl::new("https://accounts.google.com/o/oauth2/revoke".to_string())
-                    .map_err(|e| anyhow!("Invalid revocation endpoint URL: {}", e))?,
-            )
-            .set_redirect_uri(redirect_url);
-
-        // Generate PKCE challenge from the verifier
-        let pkce_code_verifier = oauth2::PkceCodeVerifier::new(pkce_verifier.to_string());
+        let pkce_code_verifier = PkceCodeVerifier::new(pkce_verifier.to_string());
         let pkce_challenge = PkceCodeChallenge::from_code_verifier_sha256(&pkce_code_verifier);
 
-        // Generate the authorization URL with custom state and PKCE challenge
-        let (authorize_url, _) = client
-            .authorize_url(|| CsrfToken::new(state.to_string()))
-            // Request access to OpenID Connect scopes for user authentication
-            .add_scope(Scope::new("openid".to_string()))
+        let state_str = state.to_string();
+        let nonce_clone = nonce.clone();
+        let (authorize_url, _, _) = self
+            .client
+            .authorize_url(
+                AuthenticationFlow::<CoreResponseType>::AuthorizationCode,
+                || CsrfToken::new(state_str),
+                move || nonce_clone,
+            )
             .add_scope(Scope::new("email".to_string()))
             .add_scope(Scope::new("profile".to_string()))
             .set_pkce_challenge(pkce_challenge)
             .url();
 
-        info!("Generated authorization URL with custom state and PKCE");
+        authorize_url.to_string()
+    }
 
-        Ok(authorize_url.to_string())
+    /// The `nonce` verifies the ID token's nonce claim (OIDC replay protection).
+    pub async fn exchange_code(
+        &self,
+        code: &str,
+        pkce_verifier: String,
+        nonce: Option<&Nonce>,
+    ) -> Result<GoogleUserInfo, OAuthError> {
+        let http_client = build_http_client()?;
+
+        let token_response = self
+            .client
+            .exchange_code(AuthorizationCode::new(code.to_string()))
+            .map_err(|e| OAuthError::CodeExchange(e.to_string()))?
+            .set_pkce_verifier(PkceCodeVerifier::new(pkce_verifier))
+            .request_async(&http_client)
+            .await
+            .map_err(|e| OAuthError::CodeExchange(e.to_string()))?;
+
+        let id_token = token_response
+            .id_token()
+            .ok_or(OAuthError::MissingIdToken)?;
+
+        let verifier = self.client.id_token_verifier();
+        let claims: &CoreIdTokenClaims = match nonce {
+            Some(expected_nonce) => id_token
+                .claims(&verifier, expected_nonce)
+                .map_err(|e| OAuthError::TokenVerification(e.to_string()))?,
+            None => id_token
+                .claims(&verifier, |_: Option<&Nonce>| Ok(()))
+                .map_err(|e| OAuthError::TokenVerification(e.to_string()))?,
+        };
+
+        let subject = claims.subject().to_string();
+        let email = claims.email().ok_or(OAuthError::MissingEmail)?.to_string();
+        let email_verified = claims.email_verified().unwrap_or(false);
+
+        let name = match claims.name() {
+            Some(localized) => localized
+                .get(None)
+                .map(|v| v.to_string())
+                .unwrap_or_default(),
+            None => String::new(),
+        };
+        let given_name = claims
+            .given_name()
+            .and_then(|localized| localized.get(None).map(|v| v.to_string()));
+        let family_name = claims
+            .family_name()
+            .and_then(|localized| localized.get(None).map(|v| v.to_string()));
+        let picture = claims
+            .picture()
+            .and_then(|localized| localized.get(None).map(|v| v.to_string()));
+
+        let access_token = token_response.access_token().secret().to_string();
+        let refresh_token = token_response
+            .refresh_token()
+            .map(|t| t.secret().to_string());
+        let expires_in = token_response.expires_in();
+
+        Ok(GoogleUserInfo {
+            id: subject,
+            email,
+            verified_email: email_verified,
+            name,
+            given_name,
+            family_name,
+            picture,
+            locale: None,
+            access_token,
+            refresh_token,
+            expires_in,
+        })
     }
 }
 
-/// Google user info response from userinfo endpoint
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GoogleUserInfo {
     pub id: String,
@@ -150,10 +214,15 @@ pub struct GoogleUserInfo {
     pub family_name: Option<String>,
     pub picture: Option<String>,
     pub locale: Option<String>,
+    #[serde(skip)]
+    pub access_token: String,
+    #[serde(skip)]
+    pub refresh_token: Option<String>,
+    #[serde(skip)]
+    pub expires_in: Option<std::time::Duration>,
 }
 
-/// Create a Google OAuth client from environment variables
-pub fn create_google_oauth_client() -> Result<GoogleOAuthClient> {
+pub async fn create_google_oauth_client() -> Result<GoogleOAuthClient, OAuthError> {
     let config = GoogleOAuthConfig::from_env()?;
-    GoogleOAuthClient::new(config)
+    GoogleOAuthClient::discover(config).await
 }

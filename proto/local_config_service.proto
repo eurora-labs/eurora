@@ -1,0 +1,14 @@
+syntax = "proto3";
+package local_config_service;
+
+service ProtoLocalConfigService {
+  rpc SetEncryptionKey(SetEncryptionKeyRequest) returns (SetEncryptionKeyResponse);
+}
+
+message SetEncryptionKeyRequest {
+  string encryption_key = 1;
+}
+
+message SetEncryptionKeyResponse {
+  bool success = 1;
+}
