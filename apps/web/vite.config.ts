@@ -23,8 +23,8 @@ export default defineConfig(({ mode }) => {
 		// 		ignored: ['!**/node_modules/@eurora/ui/dist/**'],
 		// 	},
 		// },
-		// optimizeDeps: {
-		// 	exclude: ['@eurora/ui'],
-		// },
+		optimizeDeps: {
+			exclude: ['@eurora/ui'],
+		},
 	};
 });

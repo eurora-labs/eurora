@@ -1,13 +1,8 @@
-//! Generated Protocol Buffer code for Eurora services
-//!
-//! This crate contains auto-generated code from proto files
-//! and makes them available to other Rust crates in the workspace.
 #![allow(clippy::all)]
 
 #[cfg(feature = "agent-chain")]
 mod agent_chain_conversions;
 
-// Include the generated code
 mod proto {
     pub mod activity {
         tonic::include_proto!("activity_service");
@@ -36,11 +31,15 @@ mod proto {
         pub use super::*;
     }
 
+    pub mod local_config {
+        tonic::include_proto!("local_config_service");
+        pub use super::*;
+    }
+
     pub mod shared {
         tonic::include_proto!("shared");
         pub use super::*;
     }
 }
 
-// Convenience re-exports of the most commonly used types
 pub use proto::*;

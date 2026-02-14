@@ -120,14 +120,14 @@ fn event_mode_focus_switch() {
 
     info!("Starting event mode focus switch test");
 
-    // Subscribe to focus changes
-    let receiver = match subscribe_focus_changes() {
-        Ok(rx) => rx,
+    let subscription = match subscribe_focus_changes() {
+        Ok(sub) => sub,
         Err(e) => {
             info!("Failed to subscribe to focus changes: {}", e);
             return;
         }
     };
+    let receiver = subscription.receiver();
 
     // Give the subscription time to start
     std::thread::sleep(Duration::from_millis(500));

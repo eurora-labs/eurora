@@ -8,14 +8,14 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 ignored = ["tonic-prost"]
 
 [dependencies]
-agent-chain = { workspace = true, features = ["openai"] }
+agent-chain = { workspace = true, features = ["ollama", "openai"] }
 async-stream = { workspace = true }
 be-auth-grpc = { workspace = true }
 be-remote-db = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 prost = { workspace = true }
 prost-types = { workspace = true }
-proto-gen = { workspace = true, features = ["server", "agent-chain"] }
+proto-gen = { workspace = true, features = ["agent-chain", "server"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
