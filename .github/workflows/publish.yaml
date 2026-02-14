@@ -429,7 +429,9 @@ jobs:
                   repo-token: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Install Swift protoc plugins
-              run: brew install swift-protobuf protoc-gen-grpc-swift
+              run: |
+                  brew install swift-protobuf protoc-gen-grpc-swift
+                  echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
 
             - name: Compile Protobuf
               run: pnpm proto:typescript && pnpm proto:swift
