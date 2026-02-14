@@ -143,12 +143,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
             logger.error("Could not locate app Resources directory")
             return
         }
-        let desktopAppURL = resourceURL.appendingPathComponent("EuroraDesktop.app")
 
-        guard FileManager.default.fileExists(atPath: desktopAppURL.path) else {
-            logger.error("EuroraDesktop.app not found at \(desktopAppURL.path)")
+        // Discover the embedded Tauri app dynamically — the product name
+        // differs between release ("EuroraDesktop.app") and nightly
+        // ("EuroraDesktop Nightly.app"), so we scan Resources for any .app
+        // whose bundle identifier matches a known desktop build.
+        let desktopAppURL: URL? = {
+            guard
+                let contents = try? FileManager.default.contentsOfDirectory(
+                    at: resourceURL, includingPropertiesForKeys: nil)
+            else { return nil }
+            return contents.first { url in
+                guard url.pathExtension == "app" else { return false }
+                guard let bundle = Bundle(url: url),
+                    let bundleId = bundle.bundleIdentifier
+                else { return false }
+                return desktopBundleIdentifiers.contains(bundleId)
+            }
+        }()
+
+        guard let desktopAppURL else {
+            logger.error(
+                "No embedded desktop app found in Resources matching \(desktopBundleIdentifiers)")
             return
         }
+        logger.info("Found embedded desktop app: \(desktopAppURL.lastPathComponent)")
 
         let config = NSWorkspace.OpenConfiguration()
         config.activates = true

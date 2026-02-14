@@ -631,15 +631,19 @@ jobs:
                     ARCH_DIR="x86_64"
                   fi
 
-                  # Recreate DMG with the now-notarized app
+                  # Recreate DMG with the now-notarized app + Applications symlink
                   DMG_NAME="Eurora_${{ env.version }}_${{ matrix.arch }}.dmg"
                   rm -f "release/darwin/${ARCH_DIR}/$DMG_NAME"
+                  DMG_STAGING="$(mktemp -d)"
+                  ditto "assembled/Eurora.app" "$DMG_STAGING/Eurora.app"
+                  ln -s /Applications "$DMG_STAGING/Applications"
                   hdiutil create \
                     -volname "Eurora" \
-                    -srcfolder "assembled/Eurora.app" \
+                    -srcfolder "$DMG_STAGING" \
                     -ov \
                     -format UDZO \
                     "release/darwin/${ARCH_DIR}/$DMG_NAME"
+                  rm -rf "$DMG_STAGING"
 
                   # Sign the DMG itself (Apple recommends signing disk images for distribution)
                   SIGN_IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | grep "$APPLE_TEAM_ID" | head -1 | sed 's/.*"\(.*\)"/\1/')
