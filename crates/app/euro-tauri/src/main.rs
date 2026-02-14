@@ -282,7 +282,8 @@ fn main() {
                 .setup(move |tauri_app| {
                     install_native_messaging_manifests(tauri_app);
 
-                    let started_by_autostart = std::env::args().any(|arg| arg == "--startup-launch");
+                    let started_by_autostart =
+                        std::env::args().any(|arg| arg == "--startup-launch");
                     if started_by_autostart {
                         let event = posthog_rs::Event::new_anon("start_app_by_autostart");
 
@@ -311,12 +312,31 @@ fn main() {
                         });
                     });
 
-                    // #[cfg(all(desktop, not(debug_assertions)))]
-                    if app_settings.general.autostart && !started_by_autostart {
+                    // Autostart is never registered in debug builds — during
+                    // development you launch from your IDE or terminal and
+                    // don't want a launch agent or registry entry lingering.
+                    //
+                    // In release builds:
+                    //   • macOS — the Swift launcher (Eurora.app) registers
+                    //     itself as a login item via SMAppService.  The
+                    //     embedded EuroraDesktop.app must not create its own
+                    //     launch agent (unstable path, bypasses Safari bridge).
+                    //   • Windows / Linux — the Tauri app is the top-level
+                    //     binary so it registers itself directly.
+                    let should_register_autostart =
+                        !cfg!(debug_assertions) && !cfg!(target_os = "macos");
+
+                    if should_register_autostart
+                        && app_settings.general.autostart
+                        && !started_by_autostart
+                    {
                         use tauri_plugin_autostart::MacosLauncher;
                         use tauri_plugin_autostart::ManagerExt;
 
-                        let _ = tauri_app.handle().plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--startup-launch"]) /* arbitrary number of args to pass to your app */));
+                        let _ = tauri_app.handle().plugin(tauri_plugin_autostart::init(
+                            MacosLauncher::LaunchAgent,
+                            Some(vec!["--startup-launch"]),
+                        ));
 
                         // Get the autostart manager
                         let autostart_manager = tauri_app.autolaunch();
@@ -341,19 +361,24 @@ fn main() {
                     let main_window_handle = app_handle.clone();
                     main_window.on_window_event(move |event| {
                         if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                            let main_window = main_window_handle.get_window("main").expect("Failed to get main window");
+                            let main_window = main_window_handle
+                                .get_window("main")
+                                .expect("Failed to get main window");
                             main_window.hide().expect("Failed to hide main window");
                             api.prevent_close();
                         }
                         if let tauri::WindowEvent::Focused(focused) = event {
-                            let main_window = main_window_handle.get_window("main").expect("Failed to get main window");
-                            let minimized = main_window.is_minimized().expect("Failed to get window state");
+                            let main_window = main_window_handle
+                                .get_window("main")
+                                .expect("Failed to get main window");
+                            let minimized = main_window
+                                .is_minimized()
+                                .expect("Failed to get window state");
                             if !*focused && minimized {
                                 main_window.hide().expect("Failed to hide main window");
                             }
                         }
                     });
-
 
                     #[cfg(debug_assertions)]
                     {
@@ -374,9 +399,17 @@ fn main() {
                                 app.exit(0);
                             }
                             if event.id == "open" {
-                                let main_window = tray_icon_handle.get_window("main").expect("Failed to get main window");
-                                main_window.unminimize().map_err(|e| error!("Failed to set window state: {}", e)).ok();
-                                main_window.show().map_err(|e| error!("Failed to show main window: {}", e)).ok();
+                                let main_window = tray_icon_handle
+                                    .get_window("main")
+                                    .expect("Failed to get main window");
+                                main_window
+                                    .unminimize()
+                                    .map_err(|e| error!("Failed to set window state: {}", e))
+                                    .ok();
+                                main_window
+                                    .show()
+                                    .map_err(|e| error!("Failed to show main window: {}", e))
+                                    .ok();
                             }
                         })
                         .build(tauri_app)
@@ -385,101 +418,117 @@ fn main() {
                     let conversation_handle = app_handle.clone();
                     let conversation_channel_rx = endpoint_manager.subscribe();
                     tauri::async_runtime::spawn(async move {
-                        let conversation_manager = euro_conversation::ConversationManager::new(conversation_channel_rx);
-                        conversation_handle.manage(SharedConversationManager::new(conversation_manager));
+                        let conversation_manager =
+                            euro_conversation::ConversationManager::new(conversation_channel_rx);
+                        conversation_handle
+                            .manage(SharedConversationManager::new(conversation_manager));
                     });
-
 
                     let timeline_handle = app_handle.clone();
                     let db_app_handle = app_handle.clone();
                     let timeline_channel_rx = endpoint_manager.subscribe();
                     tauri::async_runtime::spawn(async move {
-                        let timeline = euro_timeline::TimelineManager::builder().channel_rx(timeline_channel_rx).build().expect("Failed to create timeline");
+                        let timeline = euro_timeline::TimelineManager::builder()
+                            .channel_rx(timeline_channel_rx)
+                            .build()
+                            .expect("Failed to create timeline");
                         timeline_handle.manage(Mutex::new(timeline));
-                            let timeline_mutex = db_app_handle.state::<Mutex<TimelineManager>>();
+                        let timeline_mutex = db_app_handle.state::<Mutex<TimelineManager>>();
 
-                            let mut asset_receiver = {
-                                let timeline = timeline_mutex.lock().await;
-                                timeline.subscribe_to_assets_events()
-                            };
-                            let assets_timeline_handle = db_app_handle.clone();
-                            tauri::async_runtime::spawn(async move {
-                                while let Ok(assets_event) = asset_receiver.recv().await {
-                                   let _ = TauRpcTimelineApiEventTrigger::new(assets_timeline_handle.clone())
-                                    .new_assets_event(assets_event);
-                                }
-                            });
-
-                            // Subscribe to activity change events before starting timeline
-                            let mut activity_receiver = {
-                                let timeline = timeline_mutex.lock().await;
-                                timeline.subscribe_to_activity_events()
-                            };
-
-
-
-                            let activity_timeline_handle = db_app_handle.clone();
-                            tauri::async_runtime::spawn(async move {
-                                // let db_manager = activity_timeline_handle.state::<PersonalDatabaseManager>().inner();
-                                while let Ok(activity_event) = activity_receiver.recv().await {
-                                    debug!("Activity changed to: {}",
-                                        activity_event.name.clone(),
-                                    );
-
-                                    let mut primary_icon_color = None;
-                                    let mut icon_base64 = None;
-
-                                    if let Some(icon) = activity_event.icon.as_ref() {
-                                        primary_icon_color = color_thief::get_palette(icon, color_thief::ColorFormat::Rgba, 10, 10).ok().map(|c| format!("#{r:02X}{g:02X}{b:02X}", r = c[0].r, g = c[0].g, b = c[0].b));
-                                        icon_base64 = euro_vision::rgba_to_base64(icon).ok();
-                                    }
-
-                                    let _ = TauRpcTimelineApiEventTrigger::new(activity_timeline_handle.clone())
-                                        .new_app_event( TimelineAppEvent {
-                                            name: activity_event.name.clone(),
-                                            color: primary_icon_color,
-                                            icon_base64
-                                        });
-
-
-                                    // // Close previous active activity if exists
-                                    // if let Ok(Some(last_activity)) = db_manager.get_last_active_activity().await {
-                                    //     let _ = db_manager.update_activity_end_time(&last_activity.id, focus_event.timestamp).await;
-                                    //     debug!("Closed previous activity: {}", last_activity.name);
-                                    // }
-
-                                    // // Create new activity for the focus change
-                                    // let activity = Activity {
-                                    //     id: Uuid::new_v4().to_string(),
-                                    //     name: focus_event.window_title.clone(),
-                                    //     icon_path: None,
-                                    //     process_name: focus_event.process_name.clone(),
-                                    //     started_at: focus_event.timestamp.to_rfc3339(),
-                                    //     ended_at: None,
-                                    // };
-
-                                    // match db_manager.insert_activity(&activity).await {
-                                    //     Ok(_) => {
-                                    //         debug!("Inserted activity: {} ({})", activity.name, activity.process_name);
-                                    //         debug!("Activity inserted with ID: {}", activity.id);
-                                    //     }
-                                    //     Err(e) => {
-                                    //         error!("Failed to insert activity: {}", e);
-                                    //     }
-                                    // }
-                                }
-                            });
-
-                            let mut timeline = timeline_mutex.lock().await;
-                            if let Err(e) = timeline.start().await {
-                                error!("Failed to start timeline collection: {}", e);
-                            } else {
-                                debug!("Timeline collection started successfully");
+                        let mut asset_receiver = {
+                            let timeline = timeline_mutex.lock().await;
+                            timeline.subscribe_to_assets_events()
+                        };
+                        let assets_timeline_handle = db_app_handle.clone();
+                        tauri::async_runtime::spawn(async move {
+                            while let Ok(assets_event) = asset_receiver.recv().await {
+                                let _ = TauRpcTimelineApiEventTrigger::new(
+                                    assets_timeline_handle.clone(),
+                                )
+                                .new_assets_event(assets_event);
                             }
+                        });
 
-                            // }
+                        // Subscribe to activity change events before starting timeline
+                        let mut activity_receiver = {
+                            let timeline = timeline_mutex.lock().await;
+                            timeline.subscribe_to_activity_events()
+                        };
+
+                        let activity_timeline_handle = db_app_handle.clone();
+                        tauri::async_runtime::spawn(async move {
+                            // let db_manager = activity_timeline_handle.state::<PersonalDatabaseManager>().inner();
+                            while let Ok(activity_event) = activity_receiver.recv().await {
+                                debug!("Activity changed to: {}", activity_event.name.clone(),);
+
+                                let mut primary_icon_color = None;
+                                let mut icon_base64 = None;
+
+                                if let Some(icon) = activity_event.icon.as_ref() {
+                                    primary_icon_color = color_thief::get_palette(
+                                        icon,
+                                        color_thief::ColorFormat::Rgba,
+                                        10,
+                                        10,
+                                    )
+                                    .ok()
+                                    .map(|c| {
+                                        format!(
+                                            "#{r:02X}{g:02X}{b:02X}",
+                                            r = c[0].r,
+                                            g = c[0].g,
+                                            b = c[0].b
+                                        )
+                                    });
+                                    icon_base64 = euro_vision::rgba_to_base64(icon).ok();
+                                }
+
+                                let _ = TauRpcTimelineApiEventTrigger::new(
+                                    activity_timeline_handle.clone(),
+                                )
+                                .new_app_event(TimelineAppEvent {
+                                    name: activity_event.name.clone(),
+                                    color: primary_icon_color,
+                                    icon_base64,
+                                });
+
+                                // // Close previous active activity if exists
+                                // if let Ok(Some(last_activity)) = db_manager.get_last_active_activity().await {
+                                //     let _ = db_manager.update_activity_end_time(&last_activity.id, focus_event.timestamp).await;
+                                //     debug!("Closed previous activity: {}", last_activity.name);
+                                // }
+
+                                // // Create new activity for the focus change
+                                // let activity = Activity {
+                                //     id: Uuid::new_v4().to_string(),
+                                //     name: focus_event.window_title.clone(),
+                                //     icon_path: None,
+                                //     process_name: focus_event.process_name.clone(),
+                                //     started_at: focus_event.timestamp.to_rfc3339(),
+                                //     ended_at: None,
+                                // };
+
+                                // match db_manager.insert_activity(&activity).await {
+                                //     Ok(_) => {
+                                //         debug!("Inserted activity: {} ({})", activity.name, activity.process_name);
+                                //         debug!("Activity inserted with ID: {}", activity.id);
+                                //     }
+                                //     Err(e) => {
+                                //         error!("Failed to insert activity: {}", e);
+                                //     }
+                                // }
+                            }
+                        });
+
+                        let mut timeline = timeline_mutex.lock().await;
+                        if let Err(e) = timeline.start().await {
+                            error!("Failed to start timeline collection: {}", e);
+                        } else {
+                            debug!("Timeline collection started successfully");
+                        }
+
+                        // }
                     });
-
 
                     let app_handle_user = app_handle.clone();
                     let path = tauri_app.path().app_data_dir().unwrap();
@@ -494,33 +543,32 @@ fn main() {
                         app_handle_user.manage(SharedUserController::new(user_controller));
                     });
 
-
                     Ok(())
                 })
                 .plugin(tauri_plugin_http::init())
                 .plugin(tauri_plugin_opener::init())
                 .plugin(
                     tauri_plugin_tracing::Builder::new()
-                            .filter(|metadata| {
-                                let target = metadata.target();
-                                // Allow all logs from euro-* crates (Rust converts hyphens to underscores in module paths)
-                                let is_euro_crate = target.starts_with("euro_");
-                                // Allow all logs from common folder crates
-                                let is_common_crate = target.starts_with("agent_chain")
-                                    || target.starts_with("agent_graph")
-                                    || target.starts_with("auth_core")
-                                    || target.starts_with("focus_tracker")
-                                    || target.starts_with("proto_gen");
-                                // Allow webview logs
-                                let is_webview = target.starts_with("webview");
-                                // For third-party crates, only allow warnings and above
-                                let is_warning_or_above = *metadata.level() <= tracing::Level::WARN;
-                                is_euro_crate || is_common_crate || is_webview || is_warning_or_above
-                            })
-                            .with_max_level(tauri_plugin_tracing::LevelFilter::DEBUG)
-                            .with_colors()
-                            .with_default_subscriber()
-                            .build()
+                        .filter(|metadata| {
+                            let target = metadata.target();
+                            // Allow all logs from euro-* crates (Rust converts hyphens to underscores in module paths)
+                            let is_euro_crate = target.starts_with("euro_");
+                            // Allow all logs from common folder crates
+                            let is_common_crate = target.starts_with("agent_chain")
+                                || target.starts_with("agent_graph")
+                                || target.starts_with("auth_core")
+                                || target.starts_with("focus_tracker")
+                                || target.starts_with("proto_gen");
+                            // Allow webview logs
+                            let is_webview = target.starts_with("webview");
+                            // For third-party crates, only allow warnings and above
+                            let is_warning_or_above = *metadata.level() <= tracing::Level::WARN;
+                            is_euro_crate || is_common_crate || is_webview || is_warning_or_above
+                        })
+                        .with_max_level(tauri_plugin_tracing::LevelFilter::DEBUG)
+                        .with_colors()
+                        .with_default_subscriber()
+                        .build(),
                 )
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_single_instance::init(|app, _, _| {
