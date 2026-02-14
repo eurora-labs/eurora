@@ -462,25 +462,30 @@ jobs:
               working-directory: apps/macos
               env:
                   APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
+                  XCODE_ARCH: ${{ matrix.xcode_arch }}
+                  APP_VERSION: ${{ env.version }}
+                  RUN_NUMBER: ${{ github.run_number }}
               run: |
                   xcodebuild archive \
                     -project macos.xcodeproj \
                     -scheme macos \
                     -configuration Release \
                     -archivePath "$RUNNER_TEMP/EuroraLauncher.xcarchive" \
-                    -arch "${{ matrix.xcode_arch }}" \
+                    -arch "$XCODE_ARCH" \
                     ONLY_ACTIVE_ARCH=NO \
                     CODE_SIGN_STYLE=Manual \
                     CODE_SIGN_IDENTITY="Developer ID Application" \
                     DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-                    MARKETING_VERSION="${{ env.version }}" \
-                    CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+                    MARKETING_VERSION="$APP_VERSION" \
+                    CURRENT_PROJECT_VERSION="$RUN_NUMBER" \
                     OTHER_CODE_SIGN_FLAGS="--timestamp"
 
             - name: Export archive
               shell: bash
+              env:
+                  APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
               run: |
-                  cat > "$RUNNER_TEMP/ExportOptions.plist" << 'PLIST'
+                  cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
                   <?xml version="1.0" encoding="UTF-8"?>
                   <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
                   <plist version="1.0">
@@ -488,7 +493,7 @@ jobs:
                       <key>method</key>
                       <string>developer-id</string>
                       <key>teamID</key>
-                      <string>${{ secrets.APPLE_PROVIDER_SHORT_NAME }}</string>
+                      <string>${APPLE_TEAM_ID}</string>
                   </dict>
                   </plist>
                   PLIST
@@ -500,8 +505,11 @@ jobs:
 
             - name: Prepare release artifacts
               shell: bash
+              env:
+                  MATRIX_ARCH: ${{ matrix.arch }}
+                  APP_VERSION: ${{ env.version }}
               run: |
-                  if [ "${{ matrix.arch }}" = "arm64" ]; then
+                  if [ "$MATRIX_ARCH" = "arm64" ]; then
                     ARCH_DIR="aarch64"
                   else
                     ARCH_DIR="x86_64"
@@ -513,7 +521,7 @@ jobs:
                   # Zip the exported launcher app (Eurora.app with Safari extension, without Tauri yet)
                   ditto -c -k --keepParent "$RUNNER_TEMP/export/Eurora.app" "$RELEASE_DIR/EuroraLauncher.app.zip"
 
-                  echo "${{ env.version }}" > release/version
+                  echo "$APP_VERSION" > release/version
 
             - name: Upload launcher artifacts
               uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -624,15 +632,17 @@ jobs:
               shell: bash
               env:
                   APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
+                  MATRIX_ARCH: ${{ matrix.arch }}
+                  APP_VERSION: ${{ env.version }}
               run: |
-                  if [ "${{ matrix.arch }}" = "arm64" ]; then
+                  if [ "$MATRIX_ARCH" = "arm64" ]; then
                     ARCH_DIR="aarch64"
                   else
                     ARCH_DIR="x86_64"
                   fi
 
                   # Recreate DMG with the now-notarized app + Applications symlink
-                  DMG_NAME="Eurora_${{ env.version }}_${{ matrix.arch }}.dmg"
+                  DMG_NAME="Eurora_${APP_VERSION}_${MATRIX_ARCH}.dmg"
                   rm -f "release/darwin/${ARCH_DIR}/$DMG_NAME"
                   DMG_STAGING="$(mktemp -d)"
                   ditto "assembled/Eurora.app" "$DMG_STAGING/Eurora.app"
@@ -654,7 +664,7 @@ jobs:
                     echo "WARNING: No signing identity found — DMG will be unsigned"
                   fi
 
-                  echo "${{ env.version }}" > release/version
+                  echo "$APP_VERSION" > release/version
 
             - name: Upload assembled artifacts
               uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
