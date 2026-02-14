@@ -1,4 +1,5 @@
 use anyhow::Result;
+use backon::{ConstantBuilder, Retryable};
 use euro_native_messaging::PORT;
 use euro_native_messaging::{
     parent_pid,
@@ -16,26 +17,23 @@ use tracing_subscriber::prelude::*;
 const RETRY_INTERVAL_SECS: u64 = 2;
 
 async fn connect_with_retry(server_addr: &str) -> BrowserBridgeClient<Channel> {
-    loop {
-        info!(
-            "Attempting to connect to euro-activity server at {}",
-            server_addr
-        );
-
-        match BrowserBridgeClient::connect(server_addr.to_string()).await {
-            Ok(client) => {
-                info!("Connected to euro-activity server");
-                return client;
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to connect to euro-activity server: {}. Retrying in {} seconds...",
-                    e, RETRY_INTERVAL_SECS
-                );
-                tokio::time::sleep(Duration::from_secs(RETRY_INTERVAL_SECS)).await;
-            }
+    let addr = server_addr.to_string();
+    (|| {
+        let addr = addr.clone();
+        async move {
+            info!("Attempting to connect to euro-activity server at {}", addr);
+            BrowserBridgeClient::connect(addr)
+                .await
+                .map_err(|e| e.to_string())
         }
-    }
+    })
+    .retry(ConstantBuilder::default().with_delay(Duration::from_secs(RETRY_INTERVAL_SECS)))
+    .sleep(tokio::time::sleep)
+    .notify(|err, dur| {
+        warn!("Failed to connect to euro-activity server: {err}. Retrying in {dur:?}...");
+    })
+    .await
+    .expect("infinite retry should never return Err")
 }
 
 #[tokio::main]

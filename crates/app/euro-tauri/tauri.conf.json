@@ -1,6 +1,6 @@
 {
 	"productName": "Eurora Dev",
-	"identifier": "com.eurora.app.dev",
+	"identifier": "com.eurora-labs.eurora.dev",
 	"mainBinaryName": "eurora",
 	"build": {
 		"beforeDevCommand": "pnpm dev:internal-tauri",

@@ -32,6 +32,7 @@ async_from = "0.2.0"
 async-stream = "0.3.6"
 async-trait = "0.1.89"
 auth-core = { path = "crates/common/auth-core" }
+backon = "1.6"
 base64 = "0.22.1"
 be-activity-service = { path = "crates/backend/be-activity-service" }
 be-asset = { path = "crates/backend/be-asset" }

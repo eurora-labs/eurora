@@ -22,15 +22,19 @@ services:
         depends_on:
             postgres:
                 condition: service_healthy
-        network_mode: host
+        ports:
+            - '${EURORA_GRPC_PORT:-39051}:${EURORA_GRPC_PORT:-39051}'
+            - '${EURORA_HTTP_PORT:-39080}:${EURORA_HTTP_PORT:-39080}'
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
         user: '${EURORA_UID:-1000}:${EURORA_GID:-1000}'
         environment:
-            REMOTE_DATABASE_URL: postgresql://postgres:postgres@localhost:${EURORA_POSTGRES_PORT:-39432}/eurora
+            REMOTE_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/eurora
             MONOLITH_ADDR: 0.0.0.0:${EURORA_GRPC_PORT:-39051}
             HTTP_ADDR: 0.0.0.0:${EURORA_HTTP_PORT:-39080}
             RUNNING_EURORA_FULLY_LOCAL: 'true'
             OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
-            OLLAMA_HOST: http://localhost:11434
+            OLLAMA_HOST: http://host.docker.internal:11434
             JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-access_secret}
             JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-refresh_secret}
             ASSET_STORAGE_BACKEND: fs
