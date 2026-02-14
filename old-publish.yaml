@@ -370,7 +370,7 @@ jobs:
                   path: release/
                   if-no-files-found: error
 
-    build-safari-launcher:
+    build-safari-extension:
         needs: build-sveltekit
         runs-on: macos-15
         strategy:
@@ -423,6 +423,11 @@ jobs:
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
 
+            # - name: Install Protoc
+            #   uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+            #   with:
+            #       repo-token: ${{ secrets.GITHUB_TOKEN }}
+
             - name: Install Swift protoc plugins
               run: |
                   brew install protobuf swift-protobuf protoc-gen-grpc-swift
@@ -457,7 +462,7 @@ jobs:
               working-directory: apps/macos
               run: xcodebuild -resolvePackageDependencies -project macos.xcodeproj -scheme macos
 
-            - name: Build and archive launcher
+            - name: Build and archive Safari extension
               shell: bash
               working-directory: apps/macos
               env:
@@ -467,7 +472,7 @@ jobs:
                     -project macos.xcodeproj \
                     -scheme macos \
                     -configuration Release \
-                    -archivePath "$RUNNER_TEMP/EuroraLauncher.xcarchive" \
+                    -archivePath "$RUNNER_TEMP/EuroraForSafari.xcarchive" \
                     -arch "${{ matrix.xcode_arch }}" \
                     ONLY_ACTIVE_ARCH=NO \
                     CODE_SIGN_STYLE=Manual \
@@ -494,9 +499,30 @@ jobs:
                   PLIST
 
                   xcodebuild -exportArchive \
-                    -archivePath "$RUNNER_TEMP/EuroraLauncher.xcarchive" \
+                    -archivePath "$RUNNER_TEMP/EuroraForSafari.xcarchive" \
                     -exportPath "$RUNNER_TEMP/export" \
                     -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
+
+            - name: Notarize app
+              shell: bash
+              env:
+                  APPLE_ID: ${{ secrets.APPLE_ID }}
+                  APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
+                  APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+              run: |
+                  APP_PATH="$RUNNER_TEMP/export/macos.app"
+
+                  # Create a zip for notarization
+                  ditto -c -k --keepParent "$APP_PATH" "$RUNNER_TEMP/macos-notarize.zip"
+
+                  xcrun notarytool submit "$RUNNER_TEMP/macos-notarize.zip" \
+                    --apple-id "$APPLE_ID" \
+                    --team-id "$APPLE_TEAM_ID" \
+                    --password "$APPLE_PASSWORD" \
+                    --wait
+
+                  # Staple the notarization ticket
+                  xcrun stapler staple "$APP_PATH"
 
             - name: Prepare release artifacts
               shell: bash
@@ -510,183 +536,38 @@ jobs:
                   RELEASE_DIR="release/darwin/$ARCH_DIR"
                   mkdir -p "$RELEASE_DIR"
 
-                  # Zip the exported launcher app (Eurora.app with Safari extension, without Tauri yet)
-                  ditto -c -k --keepParent "$RUNNER_TEMP/export/Eurora.app" "$RELEASE_DIR/EuroraLauncher.app.zip"
+                  # Create a zip of the signed+notarized app
+                  ditto -c -k --keepParent "$RUNNER_TEMP/export/macos.app" "$RELEASE_DIR/EuroraForSafari.app.zip"
 
                   echo "${{ env.version }}" > release/version
 
-            - name: Upload launcher artifacts
+            - name: Upload Safari extension artifacts
               uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
               with:
-                  name: 'launcher-${{ matrix.arch }}-${{ github.run_number }}'
-                  path: release/
-                  if-no-files-found: error
-
-    assemble-macos-dmg:
-        needs: [build-tauri, build-safari-launcher]
-        runs-on: macos-15
-        strategy:
-            fail-fast: false
-            matrix:
-                include:
-                    - arch: arm64
-                      tauri_suffix: ''
-                    - arch: x86_64
-                      tauri_suffix: '-x86_64'
-        steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-              with:
-                  token: ${{ secrets.GITHUB_TOKEN }}
-                  persist-credentials: false
-                  lfs: true
-
-            - name: Consume input variables
-              shell: bash
-              if: ${{ !github.event.workflow_run }}
-              env:
-                  INPUT_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
-              run: |
-                  {
-                    echo 'channel<<EOF'
-                    echo "$INPUT_CHANNEL"
-                    echo 'EOF'
-                  } >> "$GITHUB_ENV"
-
-            - name: Download Tauri artifacts
-              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
-              with:
-                  name: '${{ needs.build-tauri.outputs.channel }}-macos-15${{ matrix.tauri_suffix }}-${{ github.run_number }}'
-                  path: tauri-release
-
-            - name: Download launcher artifacts
-              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
-              with:
-                  name: 'launcher-${{ matrix.arch }}-${{ github.run_number }}'
-                  path: launcher-release
-
-            - name: Extract version
-              shell: bash
-              run: |
-                  VERSION="$(cat tauri-release/version)"
-                  {
-                    echo 'version<<EOF'
-                    echo "$VERSION"
-                    echo 'EOF'
-                  } >> "$GITHUB_ENV"
-
-            - name: Import Apple certificate
-              shell: bash
-              env:
-                  APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-                  APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-              run: |
-                  CERTIFICATE_PATH="$RUNNER_TEMP/build_certificate.p12"
-                  KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
-                  KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
-
-                  echo -n "$APPLE_CERTIFICATE" | base64 --decode -o "$CERTIFICATE_PATH"
-
-                  security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-                  security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-                  security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-                  security import "$CERTIFICATE_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
-                  security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-                  security list-keychain -d user -s "$KEYCHAIN_PATH" "$(security list-keychains -d user | tr -d '"' | tr '\n' ' ')"
-
-            - name: Assemble unified app and create DMG
-              shell: bash
-              env:
-                  ARCH: ${{ matrix.arch }}
-                  APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
-                  VERSION: ${{ env.version }}
-              run: ./scripts/assemble-macos-dmg.sh
-
-            - name: Notarize assembled app
-              shell: bash
-              env:
-                  APPLE_ID: ${{ secrets.APPLE_ID }}
-                  APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
-                  APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-              run: |
-                  # Notarize the final assembled Eurora.app
-                  ditto -c -k --keepParent "assembled/Eurora.app" "$RUNNER_TEMP/eurora-notarize.zip"
-
-                  xcrun notarytool submit "$RUNNER_TEMP/eurora-notarize.zip" \
-                    --apple-id "$APPLE_ID" \
-                    --team-id "$APPLE_TEAM_ID" \
-                    --password "$APPLE_PASSWORD" \
-                    --wait
-
-                  # Staple the notarization ticket
-                  xcrun stapler staple "assembled/Eurora.app"
-
-            - name: Recreate DMG with notarized app
-              shell: bash
-              env:
-                  APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
-              run: |
-                  if [ "${{ matrix.arch }}" = "arm64" ]; then
-                    ARCH_DIR="aarch64"
-                  else
-                    ARCH_DIR="x86_64"
-                  fi
-
-                  # Recreate DMG with the now-notarized app
-                  DMG_NAME="Eurora_${{ env.version }}_${{ matrix.arch }}.dmg"
-                  rm -f "release/darwin/${ARCH_DIR}/$DMG_NAME"
-                  hdiutil create \
-                    -volname "Eurora" \
-                    -srcfolder "assembled/Eurora.app" \
-                    -ov \
-                    -format UDZO \
-                    "release/darwin/${ARCH_DIR}/$DMG_NAME"
-
-                  # Sign the DMG itself (Apple recommends signing disk images for distribution)
-                  SIGN_IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | grep "$APPLE_TEAM_ID" | head -1 | sed 's/.*"\(.*\)"/\1/')
-                  if [ -n "$SIGN_IDENTITY" ]; then
-                    codesign --force --sign "$SIGN_IDENTITY" "release/darwin/${ARCH_DIR}/$DMG_NAME"
-                    echo "DMG signed with: $SIGN_IDENTITY"
-                  else
-                    echo "WARNING: No signing identity found — DMG will be unsigned"
-                  fi
-
-                  echo "${{ env.version }}" > release/version
-
-            - name: Upload assembled artifacts
-              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-              with:
-                  name: 'assembled-macos-${{ matrix.arch }}-${{ github.run_number }}'
+                  name: 'safari-${{ matrix.arch }}-${{ github.run_number }}'
                   path: release/
                   if-no-files-found: error
 
     publish-tauri:
-        needs: [build-tauri, assemble-macos-dmg]
+        needs: [build-tauri, build-safari-extension]
         runs-on: ubuntu-latest
         outputs:
             version: ${{ env.version }}
         strategy:
             fail-fast: false
             matrix:
+                # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#standard-github-hosted-runners-for-private-repositories
                 include:
-                    # macOS: use assembled DMG artifacts (unified app)
-                    - platform: macos-15
+                    - platform: macos-15 # [macOs, ARM64] - default target
                       target: ''
-                      source: assembled
-                      assembled_arch: arm64
-                    - platform: macos-15
+                    - platform: macos-15 # [macOs, x64] - cross-compile
                       target: x86_64-apple-darwin
-                      source: assembled
-                      assembled_arch: x86_64
-                    # Linux/Windows: use Tauri artifacts directly
-                    - platform: ubuntu-24.04
+                    - platform: ubuntu-24.04 # [linux, x64]
                       target: ''
-                      source: tauri
-                    - platform: ubuntu-24.04-arm
+                    - platform: ubuntu-24.04-arm # [linux, ARM64]
                       target: ''
-                      source: tauri
-                    - platform: windows-latest
+                    - platform: windows-latest # [windows, x64]
                       target: ''
-                      source: tauri
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
@@ -712,18 +593,25 @@ jobs:
                       echo 'EOF'
                     } >> "$GITHUB_ENV"
                   fi
-            - name: Download Tauri artifacts (Linux/Windows)
-              if: matrix.source == 'tauri'
+            - name: Download artifacts
               uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
               with:
                   name: '${{ needs.build-tauri.outputs.channel }}-${{ matrix.platform }}${{ env.artifact_suffix }}-${{ github.run_number }}'
                   path: release
-            - name: Download assembled macOS artifacts
-              if: matrix.source == 'assembled'
+            - name: Download Safari extension artifacts (ARM64)
+              if: matrix.platform == 'macos-15' && matrix.target == ''
               uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
               with:
-                  name: 'assembled-macos-${{ matrix.assembled_arch }}-${{ github.run_number }}'
+                  name: 'safari-arm64-${{ github.run_number }}'
                   path: release
+                  merge-multiple: true
+            - name: Download Safari extension artifacts (x86_64)
+              if: matrix.platform == 'macos-15' && matrix.target == 'x86_64-apple-darwin'
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: 'safari-x86_64-${{ github.run_number }}'
+                  path: release
+                  merge-multiple: true
             - name: Extract version
               shell: bash
               run: |

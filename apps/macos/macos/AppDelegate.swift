@@ -4,6 +4,7 @@
 
 import Cocoa
 import SafariServices
+import ServiceManagement
 import os.log
 
 @main
@@ -16,6 +17,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     private let desktopBundleIdentifiers = [
         "com.eurora-labs.eurora", "com.eurora-labs.eurora.nightly",
     ]
+    private let safariBundleIdentifiers = [
+        "com.apple.Safari", "com.apple.SafariTechnologyPreview",
+    ]
     private var grpcClient: BrowserBridgeClient?
     private var localBridgeServer: LocalBridgeServer?
     private var pendingExtensionRequests: [String: ([String: Any]?) -> Void] = [:]
@@ -26,11 +30,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("Eurora launcher starting")
 
+        // Register as a login item so the launcher (not the embedded Tauri
+        // app) starts on system boot.  SMAppService.mainApp is idempotent —
+        // calling register() when already enabled is a no-op.
+        #if !DEBUG
+            registerAsLoginItem()
+        #endif
+
         // Launch the embedded Tauri desktop app
         launchEuroraDesktop()
 
-        // Observe Tauri app termination so we can shut down with it
-        observeDesktopAppTermination()
+        // Observe Tauri app termination so we can shut down with it,
+        // and Safari launch/quit so we keep the browser PID current.
+        observeWorkspaceAppLifecycle()
 
         // Start the local bridge server for Safari extension communication
         let server = LocalBridgeServer()
@@ -56,6 +68,73 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    // MARK: - Login Item Registration
+
+    #if !DEBUG
+        private func registerAsLoginItem() {
+            let service = SMAppService.mainApp
+            switch service.status {
+            case .enabled:
+                logger.debug("Already registered as login item")
+            case .notRegistered, .notFound:
+                do {
+                    try service.register()
+                    logger.info("Registered as login item")
+                } catch {
+                    logger.error("Failed to register as login item: \(error.localizedDescription)")
+                }
+            case .requiresApproval:
+                logger.info("Login item requires user approval in System Settings")
+            @unknown default:
+                logger.warning("Unknown login item status: \(String(describing: service.status))")
+            }
+        }
+    #endif
+
+    // MARK: - App Lifecycle Observation
+
+    private func observeWorkspaceAppLifecycle() {
+        let center = NSWorkspace.shared.notificationCenter
+        center.addObserver(
+            self, selector: #selector(workspaceAppDidTerminate(_:)),
+            name: NSWorkspace.didTerminateApplicationNotification, object: nil
+        )
+        center.addObserver(
+            self, selector: #selector(workspaceAppDidLaunch(_:)),
+            name: NSWorkspace.didLaunchApplicationNotification, object: nil
+        )
+    }
+
+    @objc private func workspaceAppDidTerminate(_ notification: Notification) {
+        guard
+            let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
+                as? NSRunningApplication,
+            let bundleId = app.bundleIdentifier
+        else { return }
+
+        if desktopBundleIdentifiers.contains(bundleId) {
+            logger.info("EuroraDesktop terminated, shutting down launcher")
+            NSApplication.shared.terminate(nil)
+        } else if safariBundleIdentifiers.contains(bundleId) {
+            logger.info(
+                "Safari terminated (was PID \(app.processIdentifier)), clearing browser PID")
+            grpcClient?.updateBrowserPid(0)
+        }
+    }
+
+    @objc private func workspaceAppDidLaunch(_ notification: Notification) {
+        guard
+            let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
+                as? NSRunningApplication,
+            let bundleId = app.bundleIdentifier,
+            safariBundleIdentifiers.contains(bundleId)
+        else { return }
+
+        let pid = UInt32(app.processIdentifier)
+        logger.info("Safari launched (PID: \(pid)), updating browser PID")
+        grpcClient?.updateBrowserPid(pid)
+    }
 
     // MARK: - Tauri Desktop App Lifecycle
 
@@ -85,30 +164,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         }
     }
 
-    private func observeDesktopAppTermination() {
-        NSWorkspace.shared.notificationCenter.addObserver(
-            self, selector: #selector(appDidTerminate(_:)),
-            name: NSWorkspace.didTerminateApplicationNotification, object: nil
-        )
-    }
-
-    @objc private func appDidTerminate(_ notification: Notification) {
-        guard
-            let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
-                as? NSRunningApplication,
-            let bundleId = app.bundleIdentifier,
-            desktopBundleIdentifiers.contains(bundleId)
-        else { return }
-        logger.info("EuroraDesktop terminated, shutting down launcher")
-        NSApplication.shared.terminate(nil)
-    }
-
     // MARK: - Safari PID Detection
 
     private func findSafariPid() -> pid_t? {
-        let safariIds = ["com.apple.Safari", "com.apple.SafariTechnologyPreview"]
         return NSWorkspace.shared.runningApplications.first {
-            safariIds.contains($0.bundleIdentifier ?? "")
+            safariBundleIdentifiers.contains($0.bundleIdentifier ?? "")
         }?.processIdentifier
     }
 

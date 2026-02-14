@@ -220,6 +220,8 @@ if [ -n "$TARGET" ]; then
 	# Tauri expects binaries named like: binary-name-<target-triple>[.exe]
 	if [ "$OS" = "windows" ]; then
 		cp "$PWD/../target/$TARGET/release/euro-native-messaging.exe" "$BINARIES_DIR/euro-native-messaging-$TARGET.exe"
+	elif [ "$OS" = "darwin" ]; then
+		ditto "$PWD/../target/$TARGET/release/euro-native-messaging" "$BINARIES_DIR/euro-native-messaging-$TARGET"
 	else
 		cp "$PWD/../target/$TARGET/release/euro-native-messaging" "$BINARIES_DIR/euro-native-messaging-$TARGET"
 	fi
@@ -247,6 +249,8 @@ else
 	# Copy the binary with the target-triple suffix for Tauri's externalBin
 	if [ "$OS" = "windows" ]; then
 		cp "$PWD/../target/release/euro-native-messaging.exe" "$BINARIES_DIR/euro-native-messaging-$DEFAULT_TARGET.exe"
+	elif [ "$OS" = "darwin" ]; then
+		ditto "$PWD/../target/release/euro-native-messaging" "$BINARIES_DIR/euro-native-messaging-$DEFAULT_TARGET"
 	else
 		cp "$PWD/../target/release/euro-native-messaging" "$BINARIES_DIR/euro-native-messaging-$DEFAULT_TARGET"
 	fi
@@ -272,8 +276,8 @@ if [ "$OS" = "darwin" ]; then
 	MACOS_UPDATER="$(find "$BUNDLE_DIR/macos" -depth 1 -type f -name "*.tar.gz")"
 	MACOS_UPDATER_SIG="$(find "$BUNDLE_DIR/macos" -depth 1 -type f -name "*.tar.gz.sig")"
 
-	cp "$MACOS_UPDATER" "$RELEASE_DIR"
-	cp "$MACOS_UPDATER_SIG" "$RELEASE_DIR"
+	ditto "$MACOS_UPDATER" "$RELEASE_DIR/$(basename "$MACOS_UPDATER")"
+	ditto "$MACOS_UPDATER_SIG" "$RELEASE_DIR/$(basename "$MACOS_UPDATER_SIG")"
 
 	info "built:"
 	info "	- $RELEASE_DIR/$(basename "$MACOS_UPDATER")"

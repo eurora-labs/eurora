@@ -89,40 +89,102 @@ RESOURCES_DIR="assembled/Eurora.app/Contents/Resources"
 mkdir -p "$RESOURCES_DIR"
 # Use the basename from the tarball (preserves the exact product name)
 TAURI_APP_NAME=$(basename "$TAURI_APP")
-cp -R "$TAURI_APP" "$RESOURCES_DIR/$TAURI_APP_NAME"
+ditto "$TAURI_APP" "$RESOURCES_DIR/$TAURI_APP_NAME"
 echo "  Embedded as: $RESOURCES_DIR/$TAURI_APP_NAME"
 
-# 4. Re-sign the entire bundle recursively
-# Sign inner components first (most deeply nested first), then the outer app.
-echo "--- Code signing ---"
+# 4. Extract entitlements from original binaries before re-signing
+# codesign --force without --entitlements strips the embedded entitlements that
+# Xcode and Tauri injected at build time (sandbox, network, JIT, etc.).
+# We extract them first, then re-apply during re-signing.
+echo "--- Extracting entitlements from original binaries ---"
 
-# Sign the embedded Tauri app and its contents
-codesign --deep --force --options runtime --timestamp \
-    --sign "$SIGN_IDENTITY" \
-    "$RESOURCES_DIR/$TAURI_APP_NAME"
+ENTITLEMENTS_DIR=$(mktemp -d)
+trap 'rm -rf "$ENTITLEMENTS_DIR"' EXIT
 
-# Sign the Safari extension appex if present
+# Extract entitlements from the embedded Tauri app's main executable
+TAURI_MAIN_BIN="$RESOURCES_DIR/$TAURI_APP_NAME/Contents/MacOS/$(defaults read "$RESOURCES_DIR/$TAURI_APP_NAME/Contents/Info" CFBundleExecutable)"
+if codesign -d --entitlements - "$TAURI_MAIN_BIN" > "$ENTITLEMENTS_DIR/tauri.plist" 2>/dev/null && [ -s "$ENTITLEMENTS_DIR/tauri.plist" ]; then
+    echo "  Extracted Tauri app entitlements"
+else
+    echo "  No entitlements found on Tauri app (will re-sign without)"
+    rm -f "$ENTITLEMENTS_DIR/tauri.plist"
+fi
+
+# Extract entitlements from the Safari extension appex
 APPEX=$(find "assembled/Eurora.app/Contents/PlugIns" -name '*.appex' -type d 2>/dev/null | head -1)
 if [ -n "$APPEX" ]; then
-    codesign --deep --force --options runtime --timestamp \
+    APPEX_BIN="$APPEX/Contents/MacOS/$(defaults read "$APPEX/Contents/Info" CFBundleExecutable)"
+    if codesign -d --entitlements - "$APPEX_BIN" > "$ENTITLEMENTS_DIR/appex.plist" 2>/dev/null && [ -s "$ENTITLEMENTS_DIR/appex.plist" ]; then
+        echo "  Extracted appex entitlements"
+    else
+        echo "  No entitlements found on appex (will re-sign without)"
+        rm -f "$ENTITLEMENTS_DIR/appex.plist"
+    fi
+fi
+
+# Extract entitlements from the outer launcher app
+LAUNCHER_BIN="assembled/Eurora.app/Contents/MacOS/$(defaults read "assembled/Eurora.app/Contents/Info" CFBundleExecutable)"
+if codesign -d --entitlements - "$LAUNCHER_BIN" > "$ENTITLEMENTS_DIR/launcher.plist" 2>/dev/null && [ -s "$ENTITLEMENTS_DIR/launcher.plist" ]; then
+    echo "  Extracted launcher entitlements"
+else
+    echo "  No entitlements found on launcher (will re-sign without)"
+    rm -f "$ENTITLEMENTS_DIR/launcher.plist"
+fi
+
+# 5. Re-sign each component individually with its original entitlements
+# Apple discourages --deep for production signing because it cannot apply
+# per-component entitlements. We sign innermost components first, then outer.
+echo "--- Code signing ---"
+
+# Sign all nested frameworks/dylibs inside the Tauri app (no entitlements needed for these)
+find "$RESOURCES_DIR/$TAURI_APP_NAME/Contents/Frameworks" \
+    \( -name '*.dylib' -o -name '*.framework' \) 2>/dev/null | while read -r item; do
+    codesign --force --options runtime --timestamp \
         --sign "$SIGN_IDENTITY" \
-        "$APPEX"
+        "$item"
+done
+
+# Sign the embedded Tauri app's main executable with its entitlements
+TAURI_SIGN_ARGS=(--force --options runtime --timestamp --sign "$SIGN_IDENTITY")
+if [ -f "$ENTITLEMENTS_DIR/tauri.plist" ]; then
+    TAURI_SIGN_ARGS+=(--entitlements "$ENTITLEMENTS_DIR/tauri.plist")
+fi
+codesign "${TAURI_SIGN_ARGS[@]}" "$RESOURCES_DIR/$TAURI_APP_NAME"
+echo "  Signed Tauri app: $RESOURCES_DIR/$TAURI_APP_NAME"
+
+# Sign the Safari extension appex if present
+if [ -n "$APPEX" ]; then
+    APPEX_SIGN_ARGS=(--force --options runtime --timestamp --sign "$SIGN_IDENTITY")
+    if [ -f "$ENTITLEMENTS_DIR/appex.plist" ]; then
+        APPEX_SIGN_ARGS+=(--entitlements "$ENTITLEMENTS_DIR/appex.plist")
+    fi
+    codesign "${APPEX_SIGN_ARGS[@]}" "$APPEX"
     echo "  Signed extension: $APPEX"
 fi
 
-# Sign the outer app (covers launcher binary, frameworks, etc.)
-codesign --deep --force --options runtime --timestamp \
-    --sign "$SIGN_IDENTITY" \
-    "assembled/Eurora.app"
+# Sign any frameworks/dylibs in the outer launcher
+find "assembled/Eurora.app/Contents/Frameworks" \
+    \( -name '*.dylib' -o -name '*.framework' \) 2>/dev/null | while read -r item; do
+    codesign --force --options runtime --timestamp \
+        --sign "$SIGN_IDENTITY" \
+        "$item"
+done
+
+# Sign the outer launcher app with its entitlements (covers the launcher binary)
+LAUNCHER_SIGN_ARGS=(--force --options runtime --timestamp --sign "$SIGN_IDENTITY")
+if [ -f "$ENTITLEMENTS_DIR/launcher.plist" ]; then
+    LAUNCHER_SIGN_ARGS+=(--entitlements "$ENTITLEMENTS_DIR/launcher.plist")
+fi
+codesign "${LAUNCHER_SIGN_ARGS[@]}" "assembled/Eurora.app"
 
 echo "  Signing complete"
 
-# 5. Verify the signature
+# 6. Verify the signature
 echo "--- Verifying signature ---"
 codesign --verify --deep --strict "assembled/Eurora.app"
 echo "  Signature verified"
 
-# 6. Prepare release directory with DMG and updater artifacts
+# 7. Prepare release directory with DMG and updater artifacts
 echo "--- Preparing release artifacts ---"
 RELEASE_DIR="release/darwin/${ARCH_DIR}"
 mkdir -p "$RELEASE_DIR"
@@ -137,9 +199,13 @@ hdiutil create \
     "$RELEASE_DIR/$DMG_NAME"
 echo "  DMG created: $RELEASE_DIR/$DMG_NAME"
 
+# Sign the DMG itself (Apple recommends signing disk images for distribution)
+codesign --force --sign "$SIGN_IDENTITY" "$RELEASE_DIR/$DMG_NAME"
+echo "  DMG signed: $RELEASE_DIR/$DMG_NAME"
+
 # Copy Tauri updater artifacts (tar.gz + signature) for the update service
-cp "tauri-release/darwin/${ARCH_DIR}/"*.tar.gz "$RELEASE_DIR/" 2>/dev/null || true
-cp "tauri-release/darwin/${ARCH_DIR}/"*.tar.gz.sig "$RELEASE_DIR/" 2>/dev/null || true
+find "tauri-release/darwin/${ARCH_DIR}" -maxdepth 1 -name '*.tar.gz' -not -name '*.sig' -exec sh -c 'ditto "$1" "'"$RELEASE_DIR"'/$(basename "$1")"' _ {} \; 2>/dev/null || true
+find "tauri-release/darwin/${ARCH_DIR}" -maxdepth 1 -name '*.tar.gz.sig' -exec sh -c 'ditto "$1" "'"$RELEASE_DIR"'/$(basename "$1")"' _ {} \; 2>/dev/null || true
 echo "  Updater artifacts copied"
 
 echo "=== Assembly complete ==="
