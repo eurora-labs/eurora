@@ -28,7 +28,19 @@ else
     ARCH_DIR="x86_64"
 fi
 
-SIGN_IDENTITY="Developer ID Application: Eurora Labs (${APPLE_TEAM_ID})"
+# Discover the signing identity dynamically from the keychain
+# instead of hardcoding the org name, which may not match exactly.
+echo "=== Available codesigning identities ==="
+security find-identity -v -p codesigning
+
+SIGN_IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | grep "$APPLE_TEAM_ID" | head -1 | sed 's/.*"\(.*\)"/\1/')
+
+if [ -z "$SIGN_IDENTITY" ]; then
+    echo "ERROR: No 'Developer ID Application' identity found for team $APPLE_TEAM_ID"
+    echo "Available identities:"
+    security find-identity -v -p codesigning
+    exit 1
+fi
 
 echo "=== Assembling unified macOS app ==="
 echo "  arch:     $ARCH ($ARCH_DIR)"
