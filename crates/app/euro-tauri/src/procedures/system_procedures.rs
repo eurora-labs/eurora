@@ -429,17 +429,42 @@ async fn send_encryption_key(backend_url: &str) -> Result<(), String> {
 
     let encoded = BASE64_STANDARD.encode(main_key.0);
 
-    let mut client = ProtoLocalConfigServiceClient::connect(backend_url.to_string())
-        .await
-        .map_err(|e| format!("Failed to connect to local config service: {e}"))?;
+    // The backend container needs time to start (postgres health check + boot).
+    // Retry the gRPC connection with back-off before giving up.
+    const MAX_ATTEMPTS: u32 = 30;
+    const RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_secs(2);
 
-    client
-        .set_encryption_key(SetEncryptionKeyRequest {
-            encryption_key: encoded,
-        })
-        .await
-        .map_err(|e| format!("Failed to send encryption key to backend: {e}"))?;
+    let mut last_err = String::new();
+    for attempt in 1..=MAX_ATTEMPTS {
+        let result = async {
+            let mut client =
+                ProtoLocalConfigServiceClient::connect(backend_url.to_string()).await?;
+            client
+                .set_encryption_key(SetEncryptionKeyRequest {
+                    encryption_key: encoded.clone(),
+                })
+                .await?;
+            Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+        }
+        .await;
 
-    info!("Encryption key sent to local backend");
-    Ok(())
+        match result {
+            Ok(()) => {
+                info!("Encryption key sent to local backend");
+                return Ok(());
+            }
+            Err(e) => {
+                last_err = e.to_string();
+                info!(
+                    "Waiting for backend to be ready (attempt {}/{}): {}",
+                    attempt, MAX_ATTEMPTS, last_err
+                );
+                tokio::time::sleep(RETRY_INTERVAL).await;
+            }
+        }
+    }
+
+    Err(format!(
+        "Backend did not become ready after {MAX_ATTEMPTS} attempts: {last_err}"
+    ))
 }
