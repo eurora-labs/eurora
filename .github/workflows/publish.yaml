@@ -426,7 +426,7 @@ jobs:
             - name: Install protoc + swift plugin
               run: |
                   brew update
-                  brew install protobuf swift-protobuf
+                  brew install protobuf protoc-gen-grpc-swift
 
             - name: Compile Protobuf
               run: pnpm proto:typescript && pnpm proto:swift
