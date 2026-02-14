@@ -553,7 +553,6 @@ jobs:
 
             - name: Consume input variables
               shell: bash
-              if: ${{ !github.event.workflow_run }}
               env:
                   INPUT_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
               run: |
