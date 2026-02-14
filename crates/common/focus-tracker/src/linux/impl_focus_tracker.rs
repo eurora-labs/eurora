@@ -14,17 +14,20 @@ impl ImplFocusTracker {
     }
 }
 
+fn qualify_x11_error(err: FocusTrackerError) -> FocusTrackerError {
+    if matches!(err, FocusTrackerError::NoDisplay) && wayland_detect() {
+        FocusTrackerError::Unsupported
+    } else {
+        err
+    }
+}
+
 impl ImplFocusTracker {
     pub fn track_focus<F>(&self, on_focus: F, config: &FocusTrackerConfig) -> FocusTrackerResult<()>
     where
         F: FnMut(FocusedWindow) -> FocusTrackerResult<()>,
     {
-        if wayland_detect() {
-            // Wayland is not supported for the time being
-            Err(FocusTrackerError::Unsupported)
-        } else {
-            xorg_focus_tracker::track_focus(on_focus, config)
-        }
+        xorg_focus_tracker::track_focus(on_focus, config).map_err(qualify_x11_error)
     }
 
     pub fn track_focus_with_stop<F>(
@@ -36,12 +39,8 @@ impl ImplFocusTracker {
     where
         F: FnMut(FocusedWindow) -> FocusTrackerResult<()>,
     {
-        if wayland_detect() {
-            // Wayland is not supported for the time being
-            Err(FocusTrackerError::Unsupported)
-        } else {
-            xorg_focus_tracker::track_focus_with_stop(on_focus, stop_signal, config)
-        }
+        xorg_focus_tracker::track_focus_with_stop(on_focus, stop_signal, config)
+            .map_err(qualify_x11_error)
     }
 
     #[cfg(feature = "async")]
@@ -54,12 +53,9 @@ impl ImplFocusTracker {
         F: FnMut(FocusedWindow) -> Fut,
         Fut: Future<Output = FocusTrackerResult<()>>,
     {
-        if wayland_detect() {
-            // Wayland is not supported for the time being
-            Err(FocusTrackerError::Unsupported)
-        } else {
-            xorg_focus_tracker::track_focus_async(on_focus, config).await
-        }
+        xorg_focus_tracker::track_focus_async(on_focus, config)
+            .await
+            .map_err(qualify_x11_error)
     }
 
     #[cfg(feature = "async")]
@@ -73,11 +69,8 @@ impl ImplFocusTracker {
         F: FnMut(FocusedWindow) -> Fut,
         Fut: Future<Output = FocusTrackerResult<()>>,
     {
-        if wayland_detect() {
-            // Wayland is not supported for the time being
-            Err(FocusTrackerError::Unsupported)
-        } else {
-            xorg_focus_tracker::track_focus_async_with_stop(on_focus, stop_signal, config).await
-        }
+        xorg_focus_tracker::track_focus_async_with_stop(on_focus, stop_signal, config)
+            .await
+            .map_err(qualify_x11_error)
     }
 }

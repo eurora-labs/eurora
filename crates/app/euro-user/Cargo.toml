@@ -12,4 +12,6 @@ euro-secret = { workspace = true }
 euro-storage = { workspace = true }
 serde = { workspace = true, features = ["std"] }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
+tokio = { workspace = true, features = ["sync"] }
+tonic = { workspace = true, features = ["channel"] }
 uuid = { workspace = true, features = ["serde"] }

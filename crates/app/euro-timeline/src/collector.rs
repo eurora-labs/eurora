@@ -1,4 +1,3 @@
-//! Timeline collector service implementation
 use crate::{
     ActivityStrategy,
     error::{TimelineError, TimelineResult},
@@ -9,7 +8,6 @@ use euro_activity::DefaultStrategy;
 use euro_activity::strategies::ActivityReport;
 use euro_activity::{ContextChip, strategies::ActivityStrategyFunctionality};
 use focus_tracker::{FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig};
-use log::{debug, error};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -18,25 +16,18 @@ use tokio::{
     sync::{Mutex, RwLock, broadcast, mpsc},
     task::JoinHandle,
 };
+use tracing::{debug, error};
 
-/// Service responsible for collecting activities and managing the collection lifecycle
 pub struct CollectorService {
-    /// Shared storage for timeline data
     storage: Arc<Mutex<TimelineStorage>>,
-    /// Current collection task handle
     current_task: Option<JoinHandle<()>>,
-    /// Focus tracking task handle
     focus_thread_handle: Option<JoinHandle<()>>,
-    /// Shutdown signal for focus thread
     focus_shutdown_signal: Option<Arc<AtomicBool>>,
-    /// Broadcast channel for focus change events
     activity_event_tx: broadcast::Sender<ActivityEvent>,
-    /// Broadcast channel for new assets event
     assets_event_tx: broadcast::Sender<Vec<ContextChip>>,
 }
 
 impl CollectorService {
-    /// Create a new collector service with full timeline config
     pub fn new_with_timeline_config(
         storage: Arc<Mutex<TimelineStorage>>,
         timeline_config: crate::config::TimelineConfig,
@@ -59,7 +50,6 @@ impl CollectorService {
         }
     }
 
-    /// Start the collection service
     pub async fn start(&mut self) -> TimelineResult<()> {
         if self.is_running() {
             return Err(TimelineError::AlreadyRunning);
@@ -72,24 +62,20 @@ impl CollectorService {
         Ok(())
     }
 
-    /// Check if the collector is currently running
     pub fn is_running(&self) -> bool {
         self.current_task
             .as_ref()
             .is_some_and(|task| !task.is_finished())
     }
 
-    /// Subscribe to activity events
     pub fn subscribe_to_activity_events(&self) -> broadcast::Receiver<ActivityEvent> {
         self.activity_event_tx.subscribe()
     }
 
-    /// Subscribe to assets change events
     pub fn subscribe_to_assets_events(&self) -> broadcast::Receiver<Vec<ContextChip>> {
         self.assets_event_tx.subscribe()
     }
 
-    /// Start focus tracking with new strategy-driven architecture
     async fn start_focus_tracking(&mut self) -> TimelineResult<()> {
         let strategy = Arc::new(RwLock::new(ActivityStrategy::DefaultStrategy(
             DefaultStrategy,
@@ -98,10 +84,8 @@ impl CollectorService {
         let activity_event_tx = self.activity_event_tx.clone();
         let assets_event_tx = self.assets_event_tx.clone();
 
-        // Create channel for activity reports from strategies
         let (activity_tx, mut activity_rx) = mpsc::unbounded_channel::<ActivityReport>();
 
-        // Spawn task to handle activity reports from strategies
         let storage_for_reports = Arc::clone(&self.storage);
         let assets_event_tx_for_reports = assets_event_tx.clone();
         tokio::spawn(async move {
@@ -147,10 +131,15 @@ impl CollectorService {
             }
         });
 
-        // Spawn focus tracking task
         self.focus_thread_handle = Some(tokio::spawn(async move {
-            let config =
-                FocusTrackerConfig::new().with_icon_config(IconConfig::new().with_size(64));
+            let config = FocusTrackerConfig::builder()
+                .icon(
+                    IconConfig::builder()
+                        .size(64)
+                        .expect("valid icon size")
+                        .build(),
+                )
+                .build();
             let tracker = FocusTracker::with_config(config);
             let prev_focus = Arc::new(Mutex::new(String::new()));
 
@@ -178,7 +167,6 @@ impl CollectorService {
                                     debug!("Strategy can no longer handle: {}", process_name);
                                     match ActivityStrategy::new(&process_name).await {
                                         Ok(mut new_strategy) => {
-                                            // Start tracking with new strategy
                                             let _ = new_strategy
                                                 .start_tracking(&window, activity_tx_inner.clone())
                                                 .await
@@ -215,12 +203,10 @@ impl Drop for CollectorService {
             task.abort();
         }
 
-        // Signal focus thread to shutdown
         if let Some(shutdown_signal) = &self.focus_shutdown_signal {
             shutdown_signal.store(true, Ordering::Relaxed);
         }
 
-        // Cancel focus task if it exists (non-blocking in Drop)
         if let Some(thread_handle) = self.focus_thread_handle.take() {
             thread_handle.abort();
         }

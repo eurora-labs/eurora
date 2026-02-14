@@ -1,22 +1,16 @@
-//! Timeline storage implementation
-
 use std::collections::VecDeque;
 
 use chrono::Utc;
-use log::debug;
+use tracing::debug;
 
 use crate::{Activity, config::StorageConfig};
 
-/// Timeline storage that manages activities with configurable retention
 pub struct TimelineStorage {
-    /// Activities stored in chronological order (oldest first)
     activities: VecDeque<Activity>,
-    /// Storage configuration
     config: StorageConfig,
 }
 
 impl TimelineStorage {
-    /// Create a new timeline storage with the given configuration
     pub fn new(config: StorageConfig) -> Self {
         debug!(
             "Creating timeline storage with max_activities: {}, max_age: {:?}",
@@ -29,17 +23,14 @@ impl TimelineStorage {
         }
     }
 
-    /// Add a new activity to the timeline
     pub fn add_activity(&mut self, activity: Activity) {
         debug!(
             "Adding activity: {} (process: {})",
             activity.name, activity.process_name
         );
 
-        // Add the new activity
         self.activities.push_back(activity);
 
-        // Enforce capacity limit
         while self.activities.len() > self.config.max_activities {
             if let Some(removed) = self.activities.pop_front() {
                 debug!(
@@ -49,23 +40,19 @@ impl TimelineStorage {
             }
         }
 
-        // Auto cleanup if enabled
         if self.config.auto_cleanup {
             self.cleanup_old_activities();
         }
     }
 
-    /// Get the current (most recent) activity
     pub fn get_current_activity(&self) -> Option<&Activity> {
         self.activities.back()
     }
 
-    /// Get all activities mutably (oldest first)
     pub fn get_all_activities_mut(&mut self) -> &mut VecDeque<Activity> {
         &mut self.activities
     }
 
-    /// Cleanup old activities based on max_age configuration
     fn cleanup_old_activities(&mut self) {
         let now = Utc::now();
         let cutoff_time = now
@@ -74,7 +61,6 @@ impl TimelineStorage {
 
         let initial_count = self.activities.len();
 
-        // Remove activities older than cutoff_time
         while let Some(activity) = self.activities.front() {
             if activity.start < cutoff_time {
                 if let Some(removed) = self.activities.pop_front() {
@@ -85,7 +71,7 @@ impl TimelineStorage {
                     );
                 }
             } else {
-                break; // Activities are in chronological order
+                break;
             }
         }
 

@@ -27,6 +27,7 @@ agent-chain-macros = { path = "crates/common/agent-chain-macros" }
 agent-graph = { path = "crates/common/agent-graph" }
 agent-graph-macros = { path = "crates/common/agent-graph-macros" }
 anyhow = "1.0.99"
+argon2 = "0.5"
 async_from = "0.2.0"
 async-stream = "0.3.6"
 async-trait = "0.1.89"
@@ -39,7 +40,10 @@ be-auth-core = { path = "crates/backend/be-auth-core" }
 be-auth-grpc = { path = "crates/backend/be-auth-grpc" }
 be-auth-service = { path = "crates/backend/be-auth-service" }
 be-conversation-service = { path = "crates/backend/be-conversation-service" }
+be-encrypt = { path = "crates/backend/be-encrypt" }
+be-local-config-service = { path = "crates/backend/be-local-config-service" }
 be-monolith = { path = "crates/backend/be-monolith" }
+be-payment-service = { path = "crates/backend/be-payment-service" }
 be-remote-db = { path = "crates/backend/be-remote-db" }
 be-storage = { path = "crates/backend/be-storage" }
 be-update-service = { path = "crates/backend/be-update-service" }
@@ -54,7 +58,9 @@ euro-activity = { path = "crates/app/euro-activity" }
 euro-auth = { path = "crates/app/euro-auth" }
 euro-browser = { path = "crates/app/euro-browser" }
 euro-conversation = { path = "crates/app/euro-conversation" }
+euro-debug = { path = "crates/app/euro-debug" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
+euro-endpoint = { path = "crates/app/euro-endpoint" }
 euro-fs = { path = "crates/app/euro-fs" }
 euro-native-messaging = { path = "crates/app/euro-native-messaging" }
 euro-screen-position = { path = "crates/app/euro-screen-position" }
@@ -68,6 +74,7 @@ euro-vision = { path = "crates/app/euro-vision" }
 focus-tracker = { path = "crates/common/focus-tracker" }
 focus-tracker-core = { path = "crates/common/focus-tracker-core", version = "0.0.2" }
 futures = "0.3.31"
+futures-util = "0.3"
 hex = "0.4.3"
 humantime-serde = "1.1.1"
 image = "0.25.9"
@@ -75,8 +82,8 @@ indexmap = "2.13"  # collapse 2.10, 1.9
 insta = "1.41.1"
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
 keyring = "3.6.3"
-log = "0.4"
 once_cell = "1.21"
+openidconnect = "4"
 parking_lot = "0.12.5"
 posthog-rs = "0.3.7"
 # prompt-kit = { path = "crates/common/prompt-kit" }

@@ -11,6 +11,7 @@
 		"check-types": "turbo run check-types",
 		"dev:monolith": "cargo run -p be-monolith -- --mode development",
 		"prod:monolith": "cargo run -p be-monolith -- --mode production",
+		"docker:monolith": "./scripts/build-monolith-image.sh --restart",
 		"dev:desktop": "pnpm tauri dev",
 		"dev:ui": "pnpm --filter @eurora/ui storybook",
 		"check": "turbo run check --no-daemon",
@@ -76,11 +77,11 @@
 		"svelte-eslint-parser": "^1.4.1",
 		"tailwindcss": "catalog:",
 		"ts-proto": "^2.11.2",
-		"turbo": "^2.8.3",
+		"turbo": "^2.8.7",
 		"typescript-eslint": "^8.54.0",
 		"web-ext": "^8.10.0"
 	},
-	"packageManager": "pnpm@10.28.2",
+	"packageManager": "pnpm@10.29.2",
 	"engines": {
 		"node": ">=20.11"
 	},

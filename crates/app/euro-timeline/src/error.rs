@@ -1,8 +1,5 @@
-//! Error types for the timeline module
-
 use thiserror::Error;
 
-/// Main error type for timeline operations
 #[derive(Debug, Error)]
 pub enum TimelineError {
     #[error("Storage error: {0}")]
@@ -36,5 +33,4 @@ pub enum TimelineError {
     AlreadyRunning,
 }
 
-/// Result type alias for timeline operations
 pub type TimelineResult<T> = std::result::Result<T, TimelineError>;

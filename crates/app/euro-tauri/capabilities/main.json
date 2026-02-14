@@ -15,7 +15,7 @@
 		"dialog:allow-open",
 		"fs:allow-read-file",
 		"fs:allow-cache-read-recursive",
-		"log:default",
+		"tracing:default",
 		"process:default",
 		"shell:allow-open",
 		"store:default",
