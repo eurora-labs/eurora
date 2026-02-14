@@ -377,8 +377,11 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             return Ok(vec![]);
         };
 
-        let native_message = serde_json::from_str::<NativeMessage>(&payload)
-            .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
+        let native_message =
+            serde_json::from_str::<NativeMessage>(&payload).map_err(|e| -> ActivityError {
+                warn!("Received payload: {:?}", payload);
+                return ActivityError::from(e);
+            })?;
 
         let snapshot = ActivitySnapshot::try_from(native_message)
             .map_err(|e| -> ActivityError { ActivityError::InvalidSnapshotType(e.to_string()) })?;
