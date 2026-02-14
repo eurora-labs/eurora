@@ -429,7 +429,7 @@ jobs:
                   repo-token: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Compile Protobuf
-              run: pnpm proto:typescript
+              run: pnpm proto:typescript && pnpm proto:swift
 
             - name: Build Safari browser extension
               run: pnpm build:safari
