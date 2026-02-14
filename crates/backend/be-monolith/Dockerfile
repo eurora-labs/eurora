@@ -1,8 +1,7 @@
 FROM ubuntu:24.04
-ARG TARGETARCH
 RUN apt-get update && apt-get install -y ca-certificates libssl3 && rm -rf /var/lib/apt/lists/*
 RUN useradd -r -s /bin/false eurora
-COPY binaries/${TARGETARCH}/be-monolith /usr/local/bin/be-monolith
+COPY target/release/be-monolith /usr/local/bin/be-monolith
 RUN chown eurora:eurora /usr/local/bin/be-monolith
 USER eurora
 EXPOSE 50051
