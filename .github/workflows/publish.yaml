@@ -604,12 +604,28 @@ jobs:
                   security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
                   security list-keychain -d user -s "$KEYCHAIN_PATH" "$(security list-keychains -d user | tr -d '"' | tr '\n' ' ')"
 
+            - name: Compute app name from channel
+              shell: bash
+              run: |
+                  CHANNEL="${channel:-release}"
+                  if [ "$CHANNEL" = "nightly" ]; then
+                    APP_NAME="Eurora Nightly.app"
+                  else
+                    APP_NAME="Eurora.app"
+                  fi
+                  {
+                    echo 'app_name<<EOF'
+                    echo "$APP_NAME"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
+
             - name: Assemble unified app and create DMG
               shell: bash
               env:
                   ARCH: ${{ matrix.arch }}
                   APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
                   VERSION: ${{ env.version }}
+                  CHANNEL: ${{ env.channel }}
               run: ./scripts/assemble-macos-dmg.sh
 
             - name: Notarize assembled app
@@ -618,9 +634,10 @@ jobs:
                   APPLE_ID: ${{ secrets.APPLE_ID }}
                   APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
                   APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+                  APP_NAME: ${{ env.app_name }}
               run: |
-                  # Notarize the final assembled Eurora.app
-                  ditto -c -k --keepParent "assembled/Eurora.app" "$RUNNER_TEMP/eurora-notarize.zip"
+                  # Notarize the final assembled app
+                  ditto -c -k --keepParent "assembled/$APP_NAME" "$RUNNER_TEMP/eurora-notarize.zip"
 
                   xcrun notarytool submit "$RUNNER_TEMP/eurora-notarize.zip" \
                     --apple-id "$APPLE_ID" \
@@ -629,7 +646,7 @@ jobs:
                     --wait
 
                   # Staple the notarization ticket
-                  xcrun stapler staple "assembled/Eurora.app"
+                  xcrun stapler staple "assembled/$APP_NAME"
 
             - name: Recreate DMG with notarized app
               shell: bash
@@ -637,6 +654,8 @@ jobs:
                   APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
                   MATRIX_ARCH: ${{ matrix.arch }}
                   APP_VERSION: ${{ env.version }}
+                  APP_NAME: ${{ env.app_name }}
+                  CHANNEL: ${{ env.channel }}
               run: |
                   if [ "$MATRIX_ARCH" = "arm64" ]; then
                     ARCH_DIR="aarch64"
@@ -644,14 +663,21 @@ jobs:
                     ARCH_DIR="x86_64"
                   fi
 
+                  if [ "${CHANNEL:-release}" = "nightly" ]; then
+                    DISPLAY_NAME="Eurora Nightly"
+                  else
+                    DISPLAY_NAME="Eurora"
+                  fi
+                  DMG_LABEL="${DISPLAY_NAME// /_}"
+
                   # Recreate DMG with the now-notarized app + Applications symlink
-                  DMG_NAME="Eurora_${APP_VERSION}_${MATRIX_ARCH}.dmg"
+                  DMG_NAME="${DMG_LABEL}_${APP_VERSION}_${MATRIX_ARCH}.dmg"
                   rm -f "release/darwin/${ARCH_DIR}/$DMG_NAME"
                   DMG_STAGING="$(mktemp -d)"
-                  ditto "assembled/Eurora.app" "$DMG_STAGING/Eurora.app"
+                  ditto "assembled/$APP_NAME" "$DMG_STAGING/$APP_NAME"
                   ln -s /Applications "$DMG_STAGING/Applications"
                   hdiutil create \
-                    -volname "Eurora" \
+                    -volname "$DISPLAY_NAME" \
                     -srcfolder "$DMG_STAGING" \
                     -ov \
                     -format UDZO \
@@ -664,7 +690,8 @@ jobs:
                     codesign --force --sign "$SIGN_IDENTITY" "release/darwin/${ARCH_DIR}/$DMG_NAME"
                     echo "DMG signed with: $SIGN_IDENTITY"
                   else
-                    echo "WARNING: No signing identity found — DMG will be unsigned"
+                    echo "ERROR: No 'Developer ID Application' signing identity found for team $APPLE_TEAM_ID — refusing to upload unsigned DMG ($DMG_NAME)"
+                    exit 1
                   fi
 
                   echo "$APP_VERSION" > release/version
@@ -674,6 +701,7 @@ jobs:
               env:
                   MATRIX_ARCH: ${{ matrix.arch }}
                   APP_VERSION: ${{ env.version }}
+                  APP_NAME: ${{ env.app_name }}
                   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
                   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
               run: |
@@ -690,11 +718,11 @@ jobs:
                   ORIG_TARGZ=$(find "tauri-release/darwin/${ARCH_DIR}" -maxdepth 1 -name '*.tar.gz' -not -name '*.sig' | head -1)
                   TARGZ_NAME=$(basename "$ORIG_TARGZ")
 
-                  echo "Creating updater tar.gz: $TARGZ_NAME (full assembled Eurora.app)"
+                  echo "Creating updater tar.gz: $TARGZ_NAME (full assembled $APP_NAME)"
 
-                  # Package the notarized Eurora.app into a tar.gz with the
+                  # Package the notarized app into a tar.gz with the
                   # same filename the Tauri updater expects.
-                  tar czf "$RELEASE_DIR/$TARGZ_NAME" -C assembled Eurora.app
+                  tar czf "$RELEASE_DIR/$TARGZ_NAME" -C assembled "$APP_NAME"
 
                   # Sign with the Tauri updater key so the client can verify
                   pnpm tauri signer sign "$RELEASE_DIR/$TARGZ_NAME"
