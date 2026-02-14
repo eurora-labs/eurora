@@ -293,13 +293,9 @@ impl AuthService {
 
         let user = self.db.create_user(create_request).await?;
 
+        let role = self.resolve_role(user.id).await;
         let (access_token, refresh_token) = self
-            .generate_tokens(
-                &user.id.to_string(),
-                &user.username,
-                &user.email,
-                Role::Free,
-            )
+            .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
             .await?;
 
         Ok(TokenResponse {
