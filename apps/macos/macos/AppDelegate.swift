@@ -1,14 +1,27 @@
-// AppDelegate.swift - Container app for the Eurora Safari extension
+// AppDelegate.swift - Background launcher for the Eurora unified macOS app.
+// Launches the embedded Tauri desktop app (EuroraDesktop.app) and bridges
+// Safari extension traffic to the Tauri gRPC backend.
 
 import Cocoa
 import SafariServices
+import ServiceManagement
 import os.log
 
 @main
 @available(macOS 15.0, *)
-class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate, LocalBridgeServerDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
+    LocalBridgeServerDelegate
+{
     private let logger = Logger(subsystem: "com.eurora.macos", category: "AppDelegate")
-    private let extensionBundleIdentifier = "com.eurora.macos.Extension"
+    /// Timeout for extension requests awaiting a gRPC response (seconds).
+    private let requestTimeoutSeconds: TimeInterval = 30
+    private let extensionBundleIdentifier = "com.eurora-labs.eurora.macos.extension"
+    private let desktopBundleIdentifiers = [
+        "com.eurora-labs.eurora", "com.eurora-labs.eurora.nightly",
+    ]
+    private let safariBundleIdentifiers = [
+        "com.apple.Safari", "com.apple.SafariTechnologyPreview",
+    ]
     private var grpcClient: BrowserBridgeClient?
     private var localBridgeServer: LocalBridgeServer?
     private var pendingExtensionRequests: [String: ([String: Any]?) -> Void] = [:]
@@ -17,11 +30,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     private let pendingServerRequestsLock = NSLock()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        logger.info("Eurora container app starting")
+        logger.info("Eurora launcher starting")
+
+        // Register as a login item so the launcher (not the embedded Tauri
+        // app) starts on system boot.  SMAppService.mainApp is idempotent —
+        // calling register() when already enabled is a no-op.
+        #if !DEBUG
+            registerAsLoginItem()
+        #endif
+
+        // Launch the embedded Tauri desktop app
+        launchEuroraDesktop()
+
+        // Observe Tauri app termination so we can shut down with it,
+        // and Safari launch/quit so we keep the browser PID current.
+        observeWorkspaceAppLifecycle()
+
+        // Start the local bridge server for Safari extension communication
         let server = LocalBridgeServer()
         server.delegate = self
         server.start()
         self.localBridgeServer = server
+
+        // Connect gRPC client to the Tauri backend
         let hostPid = UInt32(getpid())
         let browserPid = findSafariPid().map { UInt32($0) } ?? 0
         logger.info("Starting gRPC client: host=\(hostPid), browser=\(browserPid)")
@@ -32,49 +63,233 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        grpcClient?.disconnect(); grpcClient = nil
-        localBridgeServer?.stop(); localBridgeServer = nil
+        grpcClient?.disconnect()
+        grpcClient = nil
+        localBridgeServer?.stop()
+        localBridgeServer = nil
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    // MARK: - Login Item Registration
+
+    #if !DEBUG
+        private func registerAsLoginItem() {
+            let service = SMAppService.mainApp
+            switch service.status {
+            case .enabled:
+                logger.debug("Already registered as login item")
+            case .notRegistered, .notFound:
+                do {
+                    try service.register()
+                    logger.info("Registered as login item")
+                } catch {
+                    logger.error("Failed to register as login item: \(error.localizedDescription)")
+                }
+            case .requiresApproval:
+                logger.info("Login item requires user approval in System Settings")
+            @unknown default:
+                logger.warning("Unknown login item status: \(String(describing: service.status))")
+            }
+        }
+    #endif
+
+    // MARK: - App Lifecycle Observation
+
+    private func observeWorkspaceAppLifecycle() {
+        let center = NSWorkspace.shared.notificationCenter
+        center.addObserver(
+            self, selector: #selector(workspaceAppDidTerminate(_:)),
+            name: NSWorkspace.didTerminateApplicationNotification, object: nil
+        )
+        center.addObserver(
+            self, selector: #selector(workspaceAppDidLaunch(_:)),
+            name: NSWorkspace.didLaunchApplicationNotification, object: nil
+        )
+    }
+
+    @objc private func workspaceAppDidTerminate(_ notification: Notification) {
+        guard
+            let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
+                as? NSRunningApplication,
+            let bundleId = app.bundleIdentifier
+        else { return }
+
+        if desktopBundleIdentifiers.contains(bundleId) {
+            logger.info("EuroraDesktop terminated, shutting down launcher")
+            NSApplication.shared.terminate(nil)
+        } else if safariBundleIdentifiers.contains(bundleId) {
+            logger.info(
+                "Safari terminated (was PID \(app.processIdentifier)), clearing browser PID")
+            grpcClient?.updateBrowserPid(0)
+        }
+    }
+
+    @objc private func workspaceAppDidLaunch(_ notification: Notification) {
+        guard
+            let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
+                as? NSRunningApplication,
+            let bundleId = app.bundleIdentifier,
+            safariBundleIdentifiers.contains(bundleId)
+        else { return }
+
+        let pid = UInt32(app.processIdentifier)
+        logger.info("Safari launched (PID: \(pid)), updating browser PID")
+        grpcClient?.updateBrowserPid(pid)
+    }
+
+    // MARK: - Tauri Desktop App Lifecycle
+
+    private func launchEuroraDesktop() {
+        guard let resourceURL = Bundle.main.resourceURL else {
+            logger.error("Could not locate app Resources directory")
+            return
+        }
+
+        // Discover the embedded Tauri app dynamically — the product name
+        // differs between release ("EuroraDesktop.app") and nightly
+        // ("EuroraDesktop Nightly.app"), so we scan Resources for any .app
+        // whose bundle identifier matches a known desktop build.
+        let desktopAppURL: URL? = {
+            guard
+                let contents = try? FileManager.default.contentsOfDirectory(
+                    at: resourceURL, includingPropertiesForKeys: nil)
+            else { return nil }
+            return contents.first { url in
+                guard url.pathExtension == "app" else { return false }
+                guard let bundle = Bundle(url: url),
+                    let bundleId = bundle.bundleIdentifier
+                else { return false }
+                return self.desktopBundleIdentifiers.contains(bundleId)
+            }
+        }()
+
+        guard let desktopAppURL else {
+            logger.error(
+                "No embedded desktop app found in Resources matching \(self.desktopBundleIdentifiers)"
+            )
+            return
+        }
+        logger.info("Found embedded desktop app: \(desktopAppURL.lastPathComponent)")
+
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = true
+
+        NSWorkspace.shared.openApplication(at: desktopAppURL, configuration: config) {
+            [weak self] app, error in
+            if let error = error {
+                self?.logger.error("Failed to launch EuroraDesktop: \(error.localizedDescription)")
+            } else {
+                self?.logger.info(
+                    "EuroraDesktop launched successfully (PID: \(app?.processIdentifier ?? 0))")
+            }
+        }
+    }
+
+    // MARK: - Safari PID Detection
 
     private func findSafariPid() -> pid_t? {
-        let safariIds = ["com.apple.Safari", "com.apple.SafariTechnologyPreview"]
-        return NSWorkspace.shared.runningApplications.first { safariIds.contains($0.bundleIdentifier ?? "") }?.processIdentifier
+        return NSWorkspace.shared.runningApplications.first {
+            safariBundleIdentifiers.contains($0.bundleIdentifier ?? "")
+        }?.processIdentifier
     }
 
-    func browserBridgeClientDidConnect(_ client: BrowserBridgeClient) { logger.info("Connected to gRPC server") }
-    func browserBridgeClientDidDisconnect(_ client: BrowserBridgeClient, error: Error?) {
-        if let error { logger.warning("Disconnected: \(error.localizedDescription)") }
-        else { logger.info("Disconnected from gRPC server") }
+    // MARK: - BrowserBridgeClientDelegate
+
+    func browserBridgeClientDidConnect(_ client: BrowserBridgeClient) {
+        logger.info("Connected to gRPC server")
     }
-    func browserBridgeClient(_ client: BrowserBridgeClient, didReceiveFrame frame: BrowserBridge_Frame) {
+    func browserBridgeClientDidDisconnect(_ client: BrowserBridgeClient, error: Error?) {
+        if let error {
+            logger.warning("Disconnected: \(error.localizedDescription)")
+        } else {
+            logger.info("Disconnected from gRPC server")
+        }
+
+        // Drain pending extension requests — the server can no longer respond,
+        // so complete them all with an error to avoid hanging the Safari extension.
+        pendingExtensionRequestsLock.lock()
+        let pending = pendingExtensionRequests
+        pendingExtensionRequests.removeAll()
+        pendingExtensionRequestsLock.unlock()
+
+        if !pending.isEmpty {
+            logger.info("Draining \(pending.count) pending extension request(s) due to disconnect")
+            let errDict: [String: Any] = [
+                "kind": ["Error": ["message": "gRPC client disconnected"]]
+            ]
+            for (_, completion) in pending {
+                completion(errDict)
+            }
+        }
+    }
+    func browserBridgeClient(
+        _ client: BrowserBridgeClient, didReceiveFrame frame: BrowserBridge_Frame
+    ) {
         handleFrameFromServer(frame)
     }
 
-    func localBridgeServer(_ server: LocalBridgeServer, didReceiveMessage message: [String: Any],
-                           completion: @escaping ([String: Any]?) -> Void) {
-        if let kind = message["kind"] as? [String: Any], let resp = kind["Response"] as? [String: Any], let rid = resp["id"] {
-            let idStr = "\(rid)"
-            pendingServerRequestsLock.lock()
-            let had = pendingServerRequests.removeValue(forKey: idStr) != nil
-            pendingServerRequestsLock.unlock()
-            if had { sendDictToServer(message); completion(["status": "forwarded"]); return }
+    // MARK: - LocalBridgeServerDelegate
+
+    func localBridgeServer(
+        _ server: LocalBridgeServer, didReceiveMessage message: [String: Any],
+        completion: @escaping ([String: Any]?) -> Void
+    ) {
+        // The delegate is called on LocalBridgeServer's background queue.
+        // Dispatch to main so all grpcClient access is serialized.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if let kind = message["kind"] as? [String: Any],
+                let resp = kind["Response"] as? [String: Any], let rid = resp["id"]
+            {
+                let idStr = "\(rid)"
+                self.pendingServerRequestsLock.lock()
+                let had = self.pendingServerRequests.removeValue(forKey: idStr) != nil
+                self.pendingServerRequestsLock.unlock()
+                if had {
+                    self.sendDictToServer(message)
+                    completion(["status": "forwarded"])
+                    return
+                }
+            }
+            self.forwardExtRequest(message, completion: completion)
         }
-        forwardExtRequest(message, completion: completion)
     }
 
-    private func forwardExtRequest(_ message: [String: Any], completion: @escaping ([String: Any]?) -> Void) {
+    private func forwardExtRequest(
+        _ message: [String: Any], completion: @escaping ([String: Any]?) -> Void
+    ) {
         guard let client = grpcClient, client.isConnected else {
-            completion(["kind": ["Error": ["message": "gRPC client not connected"]]]); return
+            completion(["kind": ["Error": ["message": "gRPC client not connected"]]])
+            return
         }
         var reqId: String?
-        if let kind = message["kind"] as? [String: Any], let req = kind["Request"] as? [String: Any], let id = req["id"] {
+        if let kind = message["kind"] as? [String: Any],
+            let req = kind["Request"] as? [String: Any], let id = req["id"]
+        {
             reqId = "\(id)"
         }
-        if let reqId { pendingExtensionRequestsLock.lock(); pendingExtensionRequests[reqId] = completion; pendingExtensionRequestsLock.unlock() }
+        if let reqId {
+            pendingExtensionRequestsLock.lock()
+            pendingExtensionRequests[reqId] = completion
+            pendingExtensionRequestsLock.unlock()
+
+            // Schedule a timeout so the Safari extension is not left hanging
+            // if the gRPC server never responds.
+            let timeout = requestTimeoutSeconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in
+                guard let self else { return }
+                self.pendingExtensionRequestsLock.lock()
+                let timedOut = self.pendingExtensionRequests.removeValue(forKey: reqId)
+                self.pendingExtensionRequestsLock.unlock()
+                if let timedOut {
+                    self.logger.warning("Request \(reqId) timed out after \(timeout)s")
+                    timedOut(["kind": ["Error": ["message": "Request timed out"]]])
+                }
+            }
+        }
         sendDictToServer(message)
-        if reqId == nil { completion(nil) }
+        if reqId == nil { completion(["status": "ok"]) }
     }
 
     private func sendDictToServer(_ dict: [String: Any]) {
@@ -88,7 +303,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         case .response(let r): deliverResponse(id: r.id, frame: frame)
         case .error(let e): deliverResponse(id: e.id, frame: frame)
         case .request(let r): forwardServerReq(request: r, frame: frame)
-        case .event, .cancel: if let d = Self.dictionaryFromFrame(frame) { localBridgeServer?.broadcast(message: d) }
+        case .event, .cancel:
+            if let d = Self.dictionaryFromFrame(frame) { localBridgeServer?.broadcast(message: d) }
         case .register: break
         }
     }
@@ -100,36 +316,59 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         pendingExtensionRequestsLock.unlock()
         guard let completion else { return }
         guard let dict = Self.dictionaryFromFrame(frame) else {
-            completion(["kind": ["Error": ["message": "Convert failed"]]]); return
+            completion(["kind": ["Error": ["message": "Convert failed"]]])
+            return
         }
         completion(dict)
     }
 
     private func forwardServerReq(request: BrowserBridge_RequestFrame, frame: BrowserBridge_Frame) {
-        let reqIdStr = "\(request.id)", action = request.action
+        let reqIdStr = "\(request.id)"
+        let action = request.action
         pendingServerRequestsLock.lock()
         pendingServerRequests[reqIdStr] = ["id": Int(request.id), "action": action]
         pendingServerRequestsLock.unlock()
         guard let dict = Self.dictionaryFromFrame(frame) else {
-            sendErrResp(requestId: reqIdStr, action: action, error: "Frame conversion failed"); return
+            sendErrResp(requestId: reqIdStr, action: action, error: "Frame conversion failed")
+            return
         }
         do {
             let jsonData = try JSONSerialization.data(withJSONObject: dict, options: [])
             guard let jsonStr = String(data: jsonData, encoding: .utf8) else {
-                sendErrResp(requestId: reqIdStr, action: action, error: "JSON encoding failed"); return
+                sendErrResp(requestId: reqIdStr, action: action, error: "JSON encoding failed")
+                return
             }
-            let userInfo: [String: Any] = ["frame": dict, "frameJson": jsonStr, "action": action, "requestId": reqIdStr]
-            SFSafariApplication.dispatchMessage(withName: "NativeRequest", toExtensionWithIdentifier: extensionBundleIdentifier, userInfo: userInfo) { [weak self] err in
-                if let err { self?.sendErrResp(requestId: reqIdStr, action: action, error: err.localizedDescription) }
+            let userInfo: [String: Any] = [
+                "frame": dict, "frameJson": jsonStr, "action": action, "requestId": reqIdStr,
+            ]
+            SFSafariApplication.dispatchMessage(
+                withName: "NativeRequest", toExtensionWithIdentifier: extensionBundleIdentifier,
+                userInfo: userInfo
+            ) { [weak self] err in
+                if let err {
+                    // The completion handler runs on an arbitrary thread;
+                    // dispatch to main to synchronize with grpcClient access.
+                    DispatchQueue.main.async {
+                        self?.sendErrResp(
+                            requestId: reqIdStr, action: action, error: err.localizedDescription)
+                    }
+                }
             }
-        } catch { sendErrResp(requestId: reqIdStr, action: action, error: error.localizedDescription) }
+        } catch {
+            sendErrResp(requestId: reqIdStr, action: action, error: error.localizedDescription)
+        }
     }
 
     private func sendErrResp(requestId: String, action: String, error: String) {
-        pendingServerRequestsLock.lock(); pendingServerRequests.removeValue(forKey: requestId); pendingServerRequestsLock.unlock()
+        pendingServerRequestsLock.lock()
+        pendingServerRequests.removeValue(forKey: requestId)
+        pendingServerRequestsLock.unlock()
         let idVal: UInt32 = UInt32(requestId) ?? 0
-        var ef = BrowserBridge_ErrorFrame(); ef.id = idVal; ef.message = error
-        var f = BrowserBridge_Frame(); f.error = ef
+        var ef = BrowserBridge_ErrorFrame()
+        ef.id = idVal
+        ef.message = error
+        var f = BrowserBridge_Frame()
+        f.error = ef
         grpcClient?.send(frame: f)
     }
 }
@@ -155,7 +394,9 @@ extension AppDelegate {
             frame.cancel = makeCancelFrame(from: cancel)
         } else if let register = kind["Register"] as? [String: Any] {
             frame.register = makeRegisterFrame(from: register)
-        } else { return nil }
+        } else {
+            return nil
+        }
 
         return frame
     }
@@ -212,7 +453,9 @@ extension AppDelegate {
         return ["kind": kind]
     }
 
-    private static func kindDictFromFrameKind(_ frameKind: BrowserBridge_Frame.OneOf_Kind) -> [String: Any]? {
+    private static func kindDictFromFrameKind(_ frameKind: BrowserBridge_Frame.OneOf_Kind)
+        -> [String: Any]?
+    {
         switch frameKind {
         case .request(let req): return ["Request": requestDict(from: req)]
         case .response(let resp): return ["Response": responseDict(from: resp)]
@@ -242,7 +485,9 @@ extension AppDelegate {
     }
 
     private static func errorDict(from err: BrowserBridge_ErrorFrame) -> [String: Any] {
-        var dict: [String: Any] = ["id": Int(err.id), "code": Int(err.code), "message": err.message]
+        var dict: [String: Any] = [
+            "id": Int(err.id), "code": Int(err.code), "message": err.message,
+        ]
         if err.hasDetails { dict["details"] = err.details }
         return dict
     }
