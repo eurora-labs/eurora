@@ -1,4 +1,6 @@
-// AppDelegate.swift - Container app for the Eurora Safari extension
+// AppDelegate.swift - Background launcher for the Eurora unified macOS app.
+// Launches the embedded Tauri desktop app (EuroraDesktop.app) and bridges
+// Safari extension traffic to the Tauri gRPC backend.
 
 import Cocoa
 import SafariServices
@@ -8,7 +10,8 @@ import os.log
 @available(macOS 15.0, *)
 class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate, LocalBridgeServerDelegate {
     private let logger = Logger(subsystem: "com.eurora.macos", category: "AppDelegate")
-    private let extensionBundleIdentifier = "com.eurora.macos.Extension"
+    private let extensionBundleIdentifier = "com.eurora-labs.eurora.macos.extension"
+    private let desktopBundleIdentifiers = ["com.eurora-labs.eurora", "com.eurora-labs.eurora.nightly"]
     private var grpcClient: BrowserBridgeClient?
     private var localBridgeServer: LocalBridgeServer?
     private var pendingExtensionRequests: [String: ([String: Any]?) -> Void] = [:]
@@ -17,11 +20,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     private let pendingServerRequestsLock = NSLock()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        logger.info("Eurora container app starting")
+        logger.info("Eurora launcher starting")
+
+        // Launch the embedded Tauri desktop app
+        launchEuroraDesktop()
+
+        // Observe Tauri app termination so we can shut down with it
+        observeDesktopAppTermination()
+
+        // Start the local bridge server for Safari extension communication
         let server = LocalBridgeServer()
         server.delegate = self
         server.start()
         self.localBridgeServer = server
+
+        // Connect gRPC client to the Tauri backend
         let hostPid = UInt32(getpid())
         let browserPid = findSafariPid().map { UInt32($0) } ?? 0
         logger.info("Starting gRPC client: host=\(hostPid), browser=\(browserPid)")
@@ -36,12 +49,58 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         localBridgeServer?.stop(); localBridgeServer = nil
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    // MARK: - Tauri Desktop App Lifecycle
+
+    private func launchEuroraDesktop() {
+        guard let resourceURL = Bundle.main.resourceURL else {
+            logger.error("Could not locate app Resources directory")
+            return
+        }
+        let desktopAppURL = resourceURL.appendingPathComponent("EuroraDesktop.app")
+
+        guard FileManager.default.fileExists(atPath: desktopAppURL.path) else {
+            logger.error("EuroraDesktop.app not found at \(desktopAppURL.path)")
+            return
+        }
+
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = true
+
+        NSWorkspace.shared.openApplication(at: desktopAppURL, configuration: config) { [weak self] app, error in
+            if let error = error {
+                self?.logger.error("Failed to launch EuroraDesktop: \(error.localizedDescription)")
+            } else {
+                self?.logger.info("EuroraDesktop launched successfully (PID: \(app?.processIdentifier ?? 0))")
+            }
+        }
+    }
+
+    private func observeDesktopAppTermination() {
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(appDidTerminate(_:)),
+            name: NSWorkspace.didTerminateApplicationNotification, object: nil
+        )
+    }
+
+    @objc private func appDidTerminate(_ notification: Notification) {
+        guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+              let bundleId = app.bundleIdentifier,
+              desktopBundleIdentifiers.contains(bundleId)
+        else { return }
+        logger.info("EuroraDesktop terminated, shutting down launcher")
+        NSApplication.shared.terminate(nil)
+    }
+
+    // MARK: - Safari PID Detection
 
     private func findSafariPid() -> pid_t? {
         let safariIds = ["com.apple.Safari", "com.apple.SafariTechnologyPreview"]
         return NSWorkspace.shared.runningApplications.first { safariIds.contains($0.bundleIdentifier ?? "") }?.processIdentifier
     }
+
+    // MARK: - BrowserBridgeClientDelegate
 
     func browserBridgeClientDidConnect(_ client: BrowserBridgeClient) { logger.info("Connected to gRPC server") }
     func browserBridgeClientDidDisconnect(_ client: BrowserBridgeClient, error: Error?) {
@@ -51,6 +110,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     func browserBridgeClient(_ client: BrowserBridgeClient, didReceiveFrame frame: BrowserBridge_Frame) {
         handleFrameFromServer(frame)
     }
+
+    // MARK: - LocalBridgeServerDelegate
 
     func localBridgeServer(_ server: LocalBridgeServer, didReceiveMessage message: [String: Any],
                            completion: @escaping ([String: Any]?) -> Void) {
