@@ -423,14 +423,14 @@ jobs:
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
 
-            - name: Install Protoc
-              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
-              with:
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+            # - name: Install Protoc
+            #   uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+            #   with:
+            #       repo-token: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Install Swift protoc plugins
               run: |
-                  brew install swift-protobuf protoc-gen-grpc-swift protoc-gen-grpc-swift-2
+                  brew install protoc swift-protobuf protoc-gen-grpc-swift
 
             - name: Compile Protobuf
               run: pnpm proto:typescript && pnpm proto:swift
