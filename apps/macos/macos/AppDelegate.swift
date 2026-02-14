@@ -8,10 +8,14 @@ import os.log
 
 @main
 @available(macOS 15.0, *)
-class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate, LocalBridgeServerDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
+    LocalBridgeServerDelegate
+{
     private let logger = Logger(subsystem: "com.eurora.macos", category: "AppDelegate")
     private let extensionBundleIdentifier = "com.eurora-labs.eurora.macos.extension"
-    private let desktopBundleIdentifiers = ["com.eurora-labs.eurora", "com.eurora-labs.eurora.nightly"]
+    private let desktopBundleIdentifiers = [
+        "com.eurora-labs.eurora", "com.eurora-labs.eurora.nightly",
+    ]
     private var grpcClient: BrowserBridgeClient?
     private var localBridgeServer: LocalBridgeServer?
     private var pendingExtensionRequests: [String: ([String: Any]?) -> Void] = [:]
@@ -45,8 +49,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        grpcClient?.disconnect(); grpcClient = nil
-        localBridgeServer?.stop(); localBridgeServer = nil
+        grpcClient?.disconnect()
+        grpcClient = nil
+        localBridgeServer?.stop()
+        localBridgeServer = nil
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -68,11 +74,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         let config = NSWorkspace.OpenConfiguration()
         config.activates = true
 
-        NSWorkspace.shared.openApplication(at: desktopAppURL, configuration: config) { [weak self] app, error in
+        NSWorkspace.shared.openApplication(at: desktopAppURL, configuration: config) {
+            [weak self] app, error in
             if let error = error {
                 self?.logger.error("Failed to launch EuroraDesktop: \(error.localizedDescription)")
             } else {
-                self?.logger.info("EuroraDesktop launched successfully (PID: \(app?.processIdentifier ?? 0))")
+                self?.logger.info(
+                    "EuroraDesktop launched successfully (PID: \(app?.processIdentifier ?? 0))")
             }
         }
     }
@@ -85,9 +93,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     }
 
     @objc private func appDidTerminate(_ notification: Notification) {
-        guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-              let bundleId = app.bundleIdentifier,
-              desktopBundleIdentifiers.contains(bundleId)
+        guard
+            let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
+                as? NSRunningApplication,
+            let bundleId = app.bundleIdentifier,
+            desktopBundleIdentifiers.contains(bundleId)
         else { return }
         logger.info("EuroraDesktop terminated, shutting down launcher")
         NSApplication.shared.terminate(nil)
@@ -97,45 +107,71 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
 
     private func findSafariPid() -> pid_t? {
         let safariIds = ["com.apple.Safari", "com.apple.SafariTechnologyPreview"]
-        return NSWorkspace.shared.runningApplications.first { safariIds.contains($0.bundleIdentifier ?? "") }?.processIdentifier
+        return NSWorkspace.shared.runningApplications.first {
+            safariIds.contains($0.bundleIdentifier ?? "")
+        }?.processIdentifier
     }
 
     // MARK: - BrowserBridgeClientDelegate
 
-    func browserBridgeClientDidConnect(_ client: BrowserBridgeClient) { logger.info("Connected to gRPC server") }
-    func browserBridgeClientDidDisconnect(_ client: BrowserBridgeClient, error: Error?) {
-        if let error { logger.warning("Disconnected: \(error.localizedDescription)") }
-        else { logger.info("Disconnected from gRPC server") }
+    func browserBridgeClientDidConnect(_ client: BrowserBridgeClient) {
+        logger.info("Connected to gRPC server")
     }
-    func browserBridgeClient(_ client: BrowserBridgeClient, didReceiveFrame frame: BrowserBridge_Frame) {
+    func browserBridgeClientDidDisconnect(_ client: BrowserBridgeClient, error: Error?) {
+        if let error {
+            logger.warning("Disconnected: \(error.localizedDescription)")
+        } else {
+            logger.info("Disconnected from gRPC server")
+        }
+    }
+    func browserBridgeClient(
+        _ client: BrowserBridgeClient, didReceiveFrame frame: BrowserBridge_Frame
+    ) {
         handleFrameFromServer(frame)
     }
 
     // MARK: - LocalBridgeServerDelegate
 
-    func localBridgeServer(_ server: LocalBridgeServer, didReceiveMessage message: [String: Any],
-                           completion: @escaping ([String: Any]?) -> Void) {
-        if let kind = message["kind"] as? [String: Any], let resp = kind["Response"] as? [String: Any], let rid = resp["id"] {
+    func localBridgeServer(
+        _ server: LocalBridgeServer, didReceiveMessage message: [String: Any],
+        completion: @escaping ([String: Any]?) -> Void
+    ) {
+        if let kind = message["kind"] as? [String: Any],
+            let resp = kind["Response"] as? [String: Any], let rid = resp["id"]
+        {
             let idStr = "\(rid)"
             pendingServerRequestsLock.lock()
             let had = pendingServerRequests.removeValue(forKey: idStr) != nil
             pendingServerRequestsLock.unlock()
-            if had { sendDictToServer(message); completion(["status": "forwarded"]); return }
+            if had {
+                sendDictToServer(message)
+                completion(["status": "forwarded"])
+                return
+            }
         }
         forwardExtRequest(message, completion: completion)
     }
 
-    private func forwardExtRequest(_ message: [String: Any], completion: @escaping ([String: Any]?) -> Void) {
+    private func forwardExtRequest(
+        _ message: [String: Any], completion: @escaping ([String: Any]?) -> Void
+    ) {
         guard let client = grpcClient, client.isConnected else {
-            completion(["kind": ["Error": ["message": "gRPC client not connected"]]]); return
+            completion(["kind": ["Error": ["message": "gRPC client not connected"]]])
+            return
         }
         var reqId: String?
-        if let kind = message["kind"] as? [String: Any], let req = kind["Request"] as? [String: Any], let id = req["id"] {
+        if let kind = message["kind"] as? [String: Any],
+            let req = kind["Request"] as? [String: Any], let id = req["id"]
+        {
             reqId = "\(id)"
         }
-        if let reqId { pendingExtensionRequestsLock.lock(); pendingExtensionRequests[reqId] = completion; pendingExtensionRequestsLock.unlock() }
+        if let reqId {
+            pendingExtensionRequestsLock.lock()
+            pendingExtensionRequests[reqId] = completion
+            pendingExtensionRequestsLock.unlock()
+        }
         sendDictToServer(message)
-        if reqId == nil { completion(nil) }
+        if reqId == nil { completion(["status": "ok"]) }
     }
 
     private func sendDictToServer(_ dict: [String: Any]) {
@@ -149,7 +185,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         case .response(let r): deliverResponse(id: r.id, frame: frame)
         case .error(let e): deliverResponse(id: e.id, frame: frame)
         case .request(let r): forwardServerReq(request: r, frame: frame)
-        case .event, .cancel: if let d = Self.dictionaryFromFrame(frame) { localBridgeServer?.broadcast(message: d) }
+        case .event, .cancel:
+            if let d = Self.dictionaryFromFrame(frame) { localBridgeServer?.broadcast(message: d) }
         case .register: break
         }
     }
@@ -161,36 +198,55 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         pendingExtensionRequestsLock.unlock()
         guard let completion else { return }
         guard let dict = Self.dictionaryFromFrame(frame) else {
-            completion(["kind": ["Error": ["message": "Convert failed"]]]); return
+            completion(["kind": ["Error": ["message": "Convert failed"]]])
+            return
         }
         completion(dict)
     }
 
     private func forwardServerReq(request: BrowserBridge_RequestFrame, frame: BrowserBridge_Frame) {
-        let reqIdStr = "\(request.id)", action = request.action
+        let reqIdStr = "\(request.id)"
+        let action = request.action
         pendingServerRequestsLock.lock()
         pendingServerRequests[reqIdStr] = ["id": Int(request.id), "action": action]
         pendingServerRequestsLock.unlock()
         guard let dict = Self.dictionaryFromFrame(frame) else {
-            sendErrResp(requestId: reqIdStr, action: action, error: "Frame conversion failed"); return
+            sendErrResp(requestId: reqIdStr, action: action, error: "Frame conversion failed")
+            return
         }
         do {
             let jsonData = try JSONSerialization.data(withJSONObject: dict, options: [])
             guard let jsonStr = String(data: jsonData, encoding: .utf8) else {
-                sendErrResp(requestId: reqIdStr, action: action, error: "JSON encoding failed"); return
+                sendErrResp(requestId: reqIdStr, action: action, error: "JSON encoding failed")
+                return
             }
-            let userInfo: [String: Any] = ["frame": dict, "frameJson": jsonStr, "action": action, "requestId": reqIdStr]
-            SFSafariApplication.dispatchMessage(withName: "NativeRequest", toExtensionWithIdentifier: extensionBundleIdentifier, userInfo: userInfo) { [weak self] err in
-                if let err { self?.sendErrResp(requestId: reqIdStr, action: action, error: err.localizedDescription) }
+            let userInfo: [String: Any] = [
+                "frame": dict, "frameJson": jsonStr, "action": action, "requestId": reqIdStr,
+            ]
+            SFSafariApplication.dispatchMessage(
+                withName: "NativeRequest", toExtensionWithIdentifier: extensionBundleIdentifier,
+                userInfo: userInfo
+            ) { [weak self] err in
+                if let err {
+                    self?.sendErrResp(
+                        requestId: reqIdStr, action: action, error: err.localizedDescription)
+                }
             }
-        } catch { sendErrResp(requestId: reqIdStr, action: action, error: error.localizedDescription) }
+        } catch {
+            sendErrResp(requestId: reqIdStr, action: action, error: error.localizedDescription)
+        }
     }
 
     private func sendErrResp(requestId: String, action: String, error: String) {
-        pendingServerRequestsLock.lock(); pendingServerRequests.removeValue(forKey: requestId); pendingServerRequestsLock.unlock()
+        pendingServerRequestsLock.lock()
+        pendingServerRequests.removeValue(forKey: requestId)
+        pendingServerRequestsLock.unlock()
         let idVal: UInt32 = UInt32(requestId) ?? 0
-        var ef = BrowserBridge_ErrorFrame(); ef.id = idVal; ef.message = error
-        var f = BrowserBridge_Frame(); f.error = ef
+        var ef = BrowserBridge_ErrorFrame()
+        ef.id = idVal
+        ef.message = error
+        var f = BrowserBridge_Frame()
+        f.error = ef
         grpcClient?.send(frame: f)
     }
 }
@@ -216,7 +272,9 @@ extension AppDelegate {
             frame.cancel = makeCancelFrame(from: cancel)
         } else if let register = kind["Register"] as? [String: Any] {
             frame.register = makeRegisterFrame(from: register)
-        } else { return nil }
+        } else {
+            return nil
+        }
 
         return frame
     }
@@ -273,7 +331,9 @@ extension AppDelegate {
         return ["kind": kind]
     }
 
-    private static func kindDictFromFrameKind(_ frameKind: BrowserBridge_Frame.OneOf_Kind) -> [String: Any]? {
+    private static func kindDictFromFrameKind(_ frameKind: BrowserBridge_Frame.OneOf_Kind)
+        -> [String: Any]?
+    {
         switch frameKind {
         case .request(let req): return ["Request": requestDict(from: req)]
         case .response(let resp): return ["Response": responseDict(from: resp)]
@@ -303,7 +363,9 @@ extension AppDelegate {
     }
 
     private static func errorDict(from err: BrowserBridge_ErrorFrame) -> [String: Any] {
-        var dict: [String: Any] = ["id": Int(err.id), "code": Int(err.code), "message": err.message]
+        var dict: [String: Any] = [
+            "id": Int(err.id), "code": Int(err.code), "message": err.message,
+        ]
         if err.hasDetails { dict["details"] = err.details }
         return dict
     }
