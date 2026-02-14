@@ -92,10 +92,11 @@ jobs:
                   cache-to: type=gha,scope=${{ matrix.arch }},mode=max
 
             - name: Export digest
+              env:
+                  DIGEST: ${{ steps.docker-build.outputs.digest }}
               run: |
                   mkdir -p /tmp/digests
-                  digest="${{ steps.docker-build.outputs.digest }}"
-                  touch "/tmp/digests/${digest#sha256:}"
+                  touch "/tmp/digests/${DIGEST#sha256:}"
 
             - name: Upload digest
               uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -132,10 +133,13 @@ jobs:
 
             - name: Create and push GHCR manifest
               working-directory: /tmp/digests
+              env:
+                  IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+                  SHA: ${{ github.sha }}
               run: |
-                  TAGS="-t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+                  TAGS="-t ${IMAGE_REF}:${SHA} -t ${IMAGE_REF}:latest"
                   docker buildx imagetools create $TAGS \
-                    $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+                    $(printf "${IMAGE_REF}@sha256:%s " *)
 
             - name: Configure AWS credentials
               uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
@@ -149,7 +153,11 @@ jobs:
 
             - name: Push to ECR
               working-directory: /tmp/digests
+              env:
+                  ECR_REPO: ${{ secrets.ECR_REPOSITORY }}
+                  IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+                  SHA: ${{ github.sha }}
               run: |
-                  TAGS="-t ${{ secrets.ECR_REPOSITORY }}:${{ github.sha }} -t ${{ secrets.ECR_REPOSITORY }}:latest"
+                  TAGS="-t ${ECR_REPO}:${SHA} -t ${ECR_REPO}:latest"
                   docker buildx imagetools create $TAGS \
-                    $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+                    $(printf "${IMAGE_REF}@sha256:%s " *)
