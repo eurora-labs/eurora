@@ -380,7 +380,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         let native_message =
             serde_json::from_str::<NativeMessage>(&payload).map_err(|e| -> ActivityError {
                 warn!("Received payload: {:?}", payload);
-                return ActivityError::from(e);
+                ActivityError::from(e)
             })?;
 
         let snapshot = ActivitySnapshot::try_from(native_message)
