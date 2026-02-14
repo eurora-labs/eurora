@@ -266,16 +266,16 @@ RELEASE_DIR="$DIST/$OS/$ARCH"
 mkdir -p "$RELEASE_DIR"
 
 if [ "$OS" = "darwin" ]; then
-	MACOS_DMG="$(find "$BUNDLE_DIR/dmg" -depth 1 -type f -name "*.dmg")"
+	# The final DMG is produced by the assemble-macos-dmg step in CI,
+	# which embeds this Tauri .app inside the unified Eurora.app wrapper.
+	# Here we only copy the updater artifacts (tar.gz + signature).
 	MACOS_UPDATER="$(find "$BUNDLE_DIR/macos" -depth 1 -type f -name "*.tar.gz")"
 	MACOS_UPDATER_SIG="$(find "$BUNDLE_DIR/macos" -depth 1 -type f -name "*.tar.gz.sig")"
 
-	cp "$MACOS_DMG" "$RELEASE_DIR"
 	cp "$MACOS_UPDATER" "$RELEASE_DIR"
 	cp "$MACOS_UPDATER_SIG" "$RELEASE_DIR"
 
 	info "built:"
-	info "	- $RELEASE_DIR/$(basename "$MACOS_DMG")"
 	info "	- $RELEASE_DIR/$(basename "$MACOS_UPDATER")"
 	info "	- $RELEASE_DIR/$(basename "$MACOS_UPDATER_SIG")"
 elif [ "$OS" = "linux" ]; then
