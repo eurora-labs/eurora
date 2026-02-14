@@ -9,6 +9,29 @@ use tauri::{Manager, Runtime};
 use tauri_plugin_updater::UpdaterExt;
 use tokio::sync::Mutex;
 
+/// Walk up from the current executable and return the outermost `.app` bundle.
+///
+/// When the Tauri binary lives at
+///   `Eurora.app/Contents/Resources/EuroraDesktop.app/Contents/MacOS/eurora`
+/// this returns `Some("/Applications/Eurora.app")`.
+///
+/// If there is only a single `.app` in the path (i.e. no wrapper), returns `None`
+/// so the caller can fall back to the default updater behaviour.
+#[cfg(target_os = "macos")]
+fn find_outermost_app_bundle() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let mut outermost: Option<PathBuf> = None;
+    let mut count = 0u32;
+    for ancestor in exe.ancestors() {
+        if ancestor.extension().is_some_and(|ext| ext == "app") {
+            outermost = Some(ancestor.to_path_buf());
+            count += 1;
+        }
+    }
+    // Only return the outer bundle when we are truly nested (≥ 2 .app levels).
+    if count >= 2 { outermost } else { None }
+}
+
 use crate::shared_types::SharedEndpointManager;
 use tracing::{debug, error, info};
 
@@ -200,9 +223,32 @@ impl SystemApi for SystemApiImpl {
     ) -> Result<(), String> {
         debug!("Installing update...");
 
-        let updater = app_handle.updater().map_err(|e| {
-            error!("Failed to get updater: {}", e);
-            format!("Failed to get updater: {}", e)
+        // On macOS, when running inside a nested bundle (Eurora.app wraps
+        // EuroraDesktop.app), we must tell the updater to target the
+        // *outermost* .app so it replaces the whole bundle — keeping the
+        // Safari extension and its code signature intact.
+        #[cfg(target_os = "macos")]
+        let outer_app: Option<PathBuf> = find_outermost_app_bundle();
+        #[cfg(not(target_os = "macos"))]
+        let outer_app: Option<PathBuf> = None;
+
+        let mut builder = app_handle.updater_builder();
+
+        if let Some(ref outer) = outer_app {
+            // Point the updater at a path inside the outer bundle so it
+            // resolves Eurora.app (not EuroraDesktop.app) as the bundle
+            // to replace.
+            let exe_inside_outer = outer.join("Contents").join("MacOS").join("Eurora");
+            debug!(
+                "Using outer app executable path for updater: {}",
+                exe_inside_outer.display()
+            );
+            builder = builder.executable_path(&exe_inside_outer);
+        }
+
+        let updater = builder.build().map_err(|e| {
+            error!("Failed to build updater: {}", e);
+            format!("Failed to build updater: {}", e)
         })?;
 
         let update = updater.check().await.map_err(|e| {
@@ -232,6 +278,31 @@ impl SystemApi for SystemApiImpl {
                 })?;
 
             debug!("Update installed, restarting application");
+
+            // On macOS with the nested wrapper bundle we must restart the
+            // *outer* Eurora.app (which hosts the launcher, bridge server
+            // and Safari extension).  A plain `app_handle.restart()` would
+            // only relaunch the inner Tauri binary — the launcher and its
+            // TCP bridge would stay dead.
+            //
+            // Strategy: spawn a background shell that waits for the old
+            // processes to exit, then `open`s the new outer app.  We then
+            // exit the current process; the launcher will observe the
+            // termination and shut itself down cleanly.
+            if let Some(ref outer) = outer_app {
+                let outer_path = outer.to_string_lossy().to_string();
+                info!("Scheduling restart of outer app bundle: {}", outer_path);
+                let _ = std::process::Command::new("sh")
+                    .arg("-c")
+                    .arg(format!("sleep 2 && open {:?}", outer_path))
+                    .stdin(std::process::Stdio::null())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .spawn();
+                // Exit immediately so the old launcher can terminate too.
+                std::process::exit(0);
+            }
+
             app_handle.restart();
             #[allow(unreachable_code)]
             Ok(())

@@ -10,11 +10,7 @@
 		653D3CD72F3336DA008D09DC /* NativeMessagingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 653D3CD62F3336DA008D09DC /* NativeMessagingBridge.swift */; };
 		653D3CD82F3336DA008D09DC /* NativeMessagingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 653D3CD62F3336DA008D09DC /* NativeMessagingBridge.swift */; };
 		654B71E62F332FE600A08DFD /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 654B71E52F332FE600A08DFD /* AppDelegate.swift */; };
-		654B71EA2F332FE600A08DFD /* Main.html in Resources */ = {isa = PBXBuildFile; fileRef = 654B71E82F332FE600A08DFD /* Main.html */; };
-		654B71EC2F332FE600A08DFD /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 654B71EB2F332FE600A08DFD /* Icon.png */; };
-		654B71EE2F332FE600A08DFD /* Style.css in Resources */ = {isa = PBXBuildFile; fileRef = 654B71ED2F332FE600A08DFD /* Style.css */; };
-		654B71F02F332FE600A08DFD /* Script.js in Resources */ = {isa = PBXBuildFile; fileRef = 654B71EF2F332FE600A08DFD /* Script.js */; };
-		654B71F22F332FE600A08DFD /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 654B71F12F332FE600A08DFD /* ViewController.swift */; };
+
 		654B71F52F332FE600A08DFD /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 654B71F32F332FE600A08DFD /* Main.storyboard */; };
 		654B71F72F332FE600A08DFD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 654B71F62F332FE600A08DFD /* Assets.xcassets */; };
 		654B71FE2F332FE600A08DFD /* macos Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 654B71FD2F332FE600A08DFD /* macos Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -71,11 +67,7 @@
 		653D3CD92F335387008D09DC /* macos.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = macos.entitlements; sourceTree = "<group>"; };
 		654B71E22F332FE600A08DFD /* macos.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = macos.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		654B71E52F332FE600A08DFD /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		654B71E92F332FE600A08DFD /* Base */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = Base; path = Base.lproj/Main.html; sourceTree = "<group>"; };
-		654B71EB2F332FE600A08DFD /* Icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Icon.png; sourceTree = "<group>"; };
-		654B71ED2F332FE600A08DFD /* Style.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = Style.css; sourceTree = "<group>"; };
-		654B71EF2F332FE600A08DFD /* Script.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = Script.js; sourceTree = "<group>"; };
-		654B71F12F332FE600A08DFD /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+
 		654B71F42F332FE600A08DFD /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		654B71F62F332FE600A08DFD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		654B71F82F332FE600A08DFD /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -151,7 +143,6 @@
 				6557CFC82F3514F700ACCFF3 /* BrowserBridgeClient.swift */,
 				653D3CD92F335387008D09DC /* macos.entitlements */,
 				654B71E52F332FE600A08DFD /* AppDelegate.swift */,
-				654B71F12F332FE600A08DFD /* ViewController.swift */,
 				654B71F32F332FE600A08DFD /* Main.storyboard */,
 				654B71F62F332FE600A08DFD /* Assets.xcassets */,
 				654B71F82F332FE600A08DFD /* Info.plist */,
@@ -163,10 +154,6 @@
 		654B71E72F332FE600A08DFD /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				654B71E82F332FE600A08DFD /* Main.html */,
-				654B71EB2F332FE600A08DFD /* Icon.png */,
-				654B71ED2F332FE600A08DFD /* Style.css */,
-				654B71EF2F332FE600A08DFD /* Script.js */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -306,12 +293,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				654B71EC2F332FE600A08DFD /* Icon.png in Resources */,
 				654B71F52F332FE600A08DFD /* Main.storyboard in Resources */,
-				654B71F02F332FE600A08DFD /* Script.js in Resources */,
-				654B71EA2F332FE600A08DFD /* Main.html in Resources */,
 				654B71F72F332FE600A08DFD /* Assets.xcassets in Resources */,
-				654B71EE2F332FE600A08DFD /* Style.css in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -342,7 +325,6 @@
 				6557CFC92F3514FD00ACCFF3 /* BrowserBridgeClient.swift in Sources */,
 				6557CFCB2F35151E00ACCFF3 /* LocalBridgeServer.swift in Sources */,
 				6557CFF92F3522A300ACCFF3 /* browser_bridge.grpc.swift in Sources */,
-				654B71F22F332FE600A08DFD /* ViewController.swift in Sources */,
 				654B71E62F332FE600A08DFD /* AppDelegate.swift in Sources */,
 				653D3CD72F3336DA008D09DC /* NativeMessagingBridge.swift in Sources */,
 				6557CFFB2F3522BA00ACCFF3 /* browser_bridge.pb.swift in Sources */,
@@ -369,14 +351,6 @@
 /* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
-		654B71E82F332FE600A08DFD /* Main.html */ = {
-			isa = PBXVariantGroup;
-			children = (
-				654B71E92F332FE600A08DFD /* Base */,
-			);
-			name = Main.html;
-			sourceTree = "<group>";
-		};
 		654B71F32F332FE600A08DFD /* Main.storyboard */ = {
 			isa = PBXVariantGroup;
 			children = (
@@ -626,7 +600,7 @@
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = macos/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Eurora for Safari";
+				INFOPLIST_KEY_CFBundleDisplayName = Eurora;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2024-2026 Eurora Labs. All rights reserved.";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
@@ -638,11 +612,9 @@
 				OTHER_LDFLAGS = (
 					"-framework",
 					SafariServices,
-					"-framework",
-					WebKit,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.eurora-labs.eurora.macos";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = Eurora;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = YES;
@@ -688,7 +660,7 @@
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = macos/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Eurora for Safari";
+				INFOPLIST_KEY_CFBundleDisplayName = Eurora;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2024-2026 Eurora Labs. All rights reserved.";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
@@ -700,11 +672,9 @@
 				OTHER_LDFLAGS = (
 					"-framework",
 					SafariServices,
-					"-framework",
-					WebKit,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.eurora-labs.eurora.macos";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = Eurora;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = YES;
