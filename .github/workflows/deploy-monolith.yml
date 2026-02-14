@@ -132,10 +132,7 @@ jobs:
             - name: Create and push GHCR manifest
               working-directory: /tmp/digests
               run: |
-                  TAGS="-t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
-                  if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-                    TAGS="$TAGS -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-                  fi
+                  TAGS="-t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
                   docker buildx imagetools create $TAGS \
                     $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
 
@@ -152,9 +149,6 @@ jobs:
             - name: Push to ECR
               working-directory: /tmp/digests
               run: |
-                  TAGS="-t ${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}"
-                  if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-                    TAGS="$TAGS -t ${{ secrets.ECR_REPOSITORY }}:latest"
-                  fi
+                  TAGS="-t ${{ secrets.ECR_REPOSITORY }}:${{ github.sha }} -t ${{ secrets.ECR_REPOSITORY }}:latest"
                   docker buildx imagetools create $TAGS \
                     $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
