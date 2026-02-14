@@ -24,7 +24,14 @@ env:
 
 jobs:
     build:
-        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                include:
+                    - runner: ubuntu-latest
+                      arch: amd64
+                    - runner: ubuntu-24.04-arm
+                      arch: arm64
+        runs-on: ${{ matrix.runner }}
         permissions:
             contents: read
         steps:
@@ -49,7 +56,7 @@ jobs:
 
             - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
               with:
-                  name: be-monolith-binary
+                  name: be-monolith-binary-${{ matrix.arch }}
                   path: target/release/be-monolith
                   retention-days: 7
 
@@ -66,14 +73,27 @@ jobs:
               with:
                   persist-credentials: false
 
-            - name: Download build artifact
+            - name: Download amd64 artifact
               uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
               with:
-                  name: be-monolith-binary
-                  path: ./target/release/
+                  name: be-monolith-binary-amd64
+                  path: ./binaries/amd64/
 
-            - name: Make binary executable
-              run: chmod +x ./target/release/be-monolith
+            - name: Download arm64 artifact
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: be-monolith-binary-arm64
+                  path: ./binaries/arm64/
+
+            - name: Make binaries executable
+              run: |
+                  chmod +x ./binaries/amd64/be-monolith
+                  chmod +x ./binaries/arm64/be-monolith
+
+            - name: Set up QEMU
+              uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+              with:
+                  platforms: arm64
 
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -85,29 +105,6 @@ jobs:
                   username: ${{ github.actor }}
                   password: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Extract metadata
-              id: meta
-              uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
-              with:
-                  images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-                  tags: |
-                      type=raw,value=${{ github.sha }}
-                      type=raw,value=latest,enable={{is_default_branch}}
-
-            - name: Build and push Docker image to GHCR
-              uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
-              with:
-                  context: .
-                  file: crates/backend/be-monolith/Dockerfile
-                  push: true
-                  load: true
-                  tags: |
-                      ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-                      ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-                  labels: ${{ steps.meta.outputs.labels }}
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
-
             - name: Configure AWS credentials
               uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
               with:
@@ -117,13 +114,28 @@ jobs:
             - name: Login to Amazon ECR
               id: ecr-login
               uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2
-            - name: Tag and push image to ECR
-              env:
-                  IMAGE_SHA: ${{ github.sha }}
-                  SRC_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-                  ECR_REPO: ${{ secrets.ECR_REPOSITORY }}
-              run: |
-                  docker tag "$SRC_IMAGE" "$ECR_REPO:$IMAGE_SHA"
-                  docker tag "$SRC_IMAGE" "$ECR_REPO:latest"
-                  docker push "$ECR_REPO:$IMAGE_SHA"
-                  docker push "$ECR_REPO:latest"
+
+            - name: Extract metadata
+              id: meta
+              uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+              with:
+                  images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+                  tags: |
+                      type=raw,value=${{ github.sha }}
+                      type=raw,value=latest,enable={{is_default_branch}}
+
+            - name: Build and push multi-arch Docker image
+              uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+              with:
+                  context: .
+                  file: crates/backend/be-monolith/Dockerfile
+                  platforms: linux/amd64,linux/arm64
+                  push: true
+                  tags: |
+                      ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+                      ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+                      ${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+                      ${{ secrets.ECR_REPOSITORY }}:latest
+                  labels: ${{ steps.meta.outputs.labels }}
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
