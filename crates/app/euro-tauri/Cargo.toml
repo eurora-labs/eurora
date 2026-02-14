@@ -29,6 +29,7 @@ test = false
 [dependencies]
 agent-chain-core = { workspace = true }
 anyhow = { workspace = true }
+backon = { workspace = true }
 backtrace = { version = "0.3.76", optional = true }
 base64 = { workspace = true }
 color-thief = "0.2.2"

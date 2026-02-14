@@ -1,6 +1,6 @@
 {
 	"productName": "Eurora Test",
-	"identifier": "com.eurora.app.test",
+	"identifier": "com.eurora-labs.eurora.test",
 	"build": {
 		"beforeBuildCommand": "[ \"$CI\" = \"true\" ] || pnpm build:desktop -- --mode development && cargo build -p euro-tauri "
 	}
