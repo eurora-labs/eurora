@@ -158,13 +158,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
                 guard let bundle = Bundle(url: url),
                     let bundleId = bundle.bundleIdentifier
                 else { return false }
-                return desktopBundleIdentifiers.contains(bundleId)
+                return self.desktopBundleIdentifiers.contains(bundleId)
             }
         }()
 
         guard let desktopAppURL else {
             logger.error(
-                "No embedded desktop app found in Resources matching \(desktopBundleIdentifiers)")
+                "No embedded desktop app found in Resources matching \(self.desktopBundleIdentifiers)"
+            )
             return
         }
         logger.info("Found embedded desktop app: \(desktopAppURL.lastPathComponent)")
