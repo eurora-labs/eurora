@@ -102,7 +102,7 @@ ENTITLEMENTS_DIR=$(mktemp -d)
 trap 'rm -rf "$ENTITLEMENTS_DIR"' EXIT
 
 # Extract entitlements from the embedded Tauri app's main executable
-TAURI_MAIN_BIN="$RESOURCES_DIR/$TAURI_APP_NAME/Contents/MacOS/$(defaults read "$RESOURCES_DIR/$TAURI_APP_NAME/Contents/Info" CFBundleExecutable)"
+TAURI_MAIN_BIN="$RESOURCES_DIR/$TAURI_APP_NAME/Contents/MacOS/$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$RESOURCES_DIR/$TAURI_APP_NAME/Contents/Info.plist")"
 if codesign -d --entitlements - "$TAURI_MAIN_BIN" > "$ENTITLEMENTS_DIR/tauri.plist" 2>/dev/null && [ -s "$ENTITLEMENTS_DIR/tauri.plist" ]; then
     echo "  Extracted Tauri app entitlements"
 else
@@ -113,7 +113,7 @@ fi
 # Extract entitlements from the Safari extension appex
 APPEX=$(find "assembled/Eurora.app/Contents/PlugIns" -name '*.appex' -type d 2>/dev/null | head -1)
 if [ -n "$APPEX" ]; then
-    APPEX_BIN="$APPEX/Contents/MacOS/$(defaults read "$APPEX/Contents/Info" CFBundleExecutable)"
+    APPEX_BIN="$APPEX/Contents/MacOS/$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APPEX/Contents/Info.plist")"
     if codesign -d --entitlements - "$APPEX_BIN" > "$ENTITLEMENTS_DIR/appex.plist" 2>/dev/null && [ -s "$ENTITLEMENTS_DIR/appex.plist" ]; then
         echo "  Extracted appex entitlements"
     else
@@ -123,7 +123,7 @@ if [ -n "$APPEX" ]; then
 fi
 
 # Extract entitlements from the outer launcher app
-LAUNCHER_BIN="assembled/Eurora.app/Contents/MacOS/$(defaults read "assembled/Eurora.app/Contents/Info" CFBundleExecutable)"
+LAUNCHER_BIN="assembled/Eurora.app/Contents/MacOS/$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "assembled/Eurora.app/Contents/Info.plist")"
 if codesign -d --entitlements - "$LAUNCHER_BIN" > "$ENTITLEMENTS_DIR/launcher.plist" 2>/dev/null && [ -s "$ENTITLEMENTS_DIR/launcher.plist" ]; then
     echo "  Extracted launcher entitlements"
 else
