@@ -420,6 +420,7 @@ impl SystemApi for SystemApiImpl {
 /// Retrieve (or generate) the encryption key from the system keyring and send
 /// it to the local backend via the `LocalConfigService` gRPC endpoint.
 async fn send_encryption_key(backend_url: &str) -> Result<(), String> {
+    use backon::{ConstantBuilder, Retryable};
     use base64::prelude::*;
     use proto_gen::local_config::SetEncryptionKeyRequest;
     use proto_gen::local_config::proto_local_config_service_client::ProtoLocalConfigServiceClient;
@@ -428,17 +429,33 @@ async fn send_encryption_key(backend_url: &str) -> Result<(), String> {
         .map_err(|e| format!("Failed to retrieve encryption key from keyring: {e}"))?;
 
     let encoded = BASE64_STANDARD.encode(main_key.0);
+    let url = backend_url.to_string();
 
-    let mut client = ProtoLocalConfigServiceClient::connect(backend_url.to_string())
-        .await
-        .map_err(|e| format!("Failed to connect to local config service: {e}"))?;
-
-    client
-        .set_encryption_key(SetEncryptionKeyRequest {
-            encryption_key: encoded,
-        })
-        .await
-        .map_err(|e| format!("Failed to send encryption key to backend: {e}"))?;
+    // The backend container needs time to start (postgres health check + boot).
+    (|| {
+        let encoded = encoded.clone();
+        let url = url.clone();
+        async move {
+            let mut client = ProtoLocalConfigServiceClient::connect(url).await?;
+            client
+                .set_encryption_key(SetEncryptionKeyRequest {
+                    encryption_key: encoded,
+                })
+                .await?;
+            Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+        }
+    })
+    .retry(
+        ConstantBuilder::default()
+            .with_delay(std::time::Duration::from_secs(2))
+            .with_max_times(30),
+    )
+    .sleep(tokio::time::sleep)
+    .notify(|err, dur| {
+        info!("Waiting for backend to be ready (retrying in {dur:?}): {err}");
+    })
+    .await
+    .map_err(|e| format!("Backend did not become ready: {e}"))?;
 
     info!("Encryption key sent to local backend");
     Ok(())

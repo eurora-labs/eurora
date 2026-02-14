@@ -236,6 +236,7 @@ dependencies = [
  "agent-chain-macros",
  "async-stream",
  "async-trait",
+ "backon",
  "futures",
  "reqwest 0.12.28",
  "serde",
@@ -3604,6 +3605,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-stream",
+ "backon",
  "base64 0.22.1",
  "enum_dispatch",
  "image",
@@ -3671,6 +3673,7 @@ version = "0.0.0"
 dependencies = [
  "agent-chain-core",
  "anyhow",
+ "backon",
  "backtrace",
  "base64 0.22.1",
  "color-thief",

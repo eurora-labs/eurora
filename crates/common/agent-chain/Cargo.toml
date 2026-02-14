@@ -10,6 +10,7 @@ agent-chain-core = { workspace = true }
 agent-chain-macros = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
+backon = { workspace = true }
 futures = { workspace = true }
 reqwest = { version = "0.12", features = ["json", "stream"] }
 serde = { workspace = true, features = ["derive"] }

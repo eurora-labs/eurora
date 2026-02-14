@@ -128,10 +128,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     private func sendErrResp(requestId: String, action: String, error: String) {
         pendingServerRequestsLock.lock(); pendingServerRequests.removeValue(forKey: requestId); pendingServerRequestsLock.unlock()
         let idVal: UInt32 = UInt32(requestId) ?? 0
-        guard let pData = try? JSONSerialization.data(withJSONObject: ["kind": "Error", "data": error]),
-              let payload = String(data: pData, encoding: .utf8) else { return }
-        var rf = BrowserBridge_ResponseFrame(); rf.id = idVal; rf.action = action; rf.payload = payload
-        var f = BrowserBridge_Frame(); f.response = rf
+        var ef = BrowserBridge_ErrorFrame(); ef.id = idVal; ef.message = error
+        var f = BrowserBridge_Frame(); f.error = ef
         grpcClient?.send(frame: f)
     }
 }
