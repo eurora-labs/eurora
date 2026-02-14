@@ -193,14 +193,18 @@ echo "--- Preparing release artifacts ---"
 RELEASE_DIR="release/darwin/${ARCH_DIR}"
 mkdir -p "$RELEASE_DIR"
 
-# Create DMG
+# Create DMG with an Applications symlink for the standard drag-to-install UX
 DMG_NAME="Eurora_${VERSION}_${ARCH}.dmg"
+DMG_STAGING="$(mktemp -d)"
+ditto "assembled/Eurora.app" "$DMG_STAGING/Eurora.app"
+ln -s /Applications "$DMG_STAGING/Applications"
 hdiutil create \
     -volname "Eurora" \
-    -srcfolder "assembled/Eurora.app" \
+    -srcfolder "$DMG_STAGING" \
     -ov \
     -format UDZO \
     "$RELEASE_DIR/$DMG_NAME"
+rm -rf "$DMG_STAGING"
 echo "  DMG created: $RELEASE_DIR/$DMG_NAME"
 
 # Sign the DMG itself (Apple recommends signing disk images for distribution)
