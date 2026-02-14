@@ -1,6 +1,6 @@
 {
 	"productName": "Eurora Nightly",
-	"identifier": "com.eurora.app.nightly",
+	"identifier": "com.eurora-labs.eurora.nightly",
 	"build": {
 		"beforeBuildCommand": "[ \"$CI\" = \"true\" ] || pnpm build:desktop -- --mode nightly"
 	},
