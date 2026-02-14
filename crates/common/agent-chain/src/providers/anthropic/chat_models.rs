@@ -8,6 +8,7 @@ use std::env;
 use std::pin::Pin;
 
 use async_trait::async_trait;
+use backon::{ConstantBuilder, Retryable};
 use futures::Stream;
 use serde::Deserialize;
 
@@ -426,6 +427,49 @@ impl BaseChatModel for ChatAnthropic {
 }
 
 impl ChatAnthropic {
+    /// Send an HTTP request and deserialize the JSON response.
+    ///
+    /// Returns an `Error::Api` for non-success status codes and
+    /// `Error::Http` for transport failures. The caller can use
+    /// `Error::is_retryable()` to decide whether to retry.
+    async fn send_json_request<T: serde::de::DeserializeOwned>(
+        &self,
+        payload: &serde_json::Value,
+    ) -> Result<T> {
+        let api_key = self.get_api_key()?;
+        let client = self.build_client();
+
+        let resp = client
+            .post(format!("{}/messages", self.api_base))
+            .header("x-api-key", &api_key)
+            .header("anthropic-version", &self.api_version)
+            .header("content-type", "application/json")
+            .json(payload)
+            .send()
+            .await
+            .map_err(Error::Http)?;
+
+        if resp.status().is_success() {
+            resp.json::<T>().await.map_err(|e| {
+                Error::Json(serde_json::Error::io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    e.to_string(),
+                )))
+            })
+        } else {
+            let status = resp.status().as_u16();
+            let error_text = resp.text().await.unwrap_or_default();
+            Err(Error::api(status, error_text))
+        }
+    }
+
+    /// Build a `backon` retry strategy from `self.max_retries`.
+    fn retry_strategy(&self) -> ConstantBuilder {
+        ConstantBuilder::default()
+            .with_delay(std::time::Duration::from_millis(0))
+            .with_max_times(self.max_retries as usize)
+    }
+
     /// Internal generate implementation.
     async fn _generate_internal(
         &self,
@@ -433,55 +477,14 @@ impl ChatAnthropic {
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
-        let api_key = self.get_api_key()?;
-        let client = self.build_client();
         let payload = self.build_request_payload(&messages, stop, None);
 
-        let mut last_error = None;
-        for _ in 0..=self.max_retries {
-            let response = client
-                .post(format!("{}/messages", self.api_base))
-                .header("x-api-key", &api_key)
-                .header("anthropic-version", &self.api_version)
-                .header("content-type", "application/json")
-                .json(&payload)
-                .send()
-                .await;
+        let resp: AnthropicResponse = (|| self.send_json_request(&payload))
+            .retry(self.retry_strategy())
+            .when(|e| e.is_retryable())
+            .await?;
 
-            match response {
-                Ok(resp) => {
-                    if resp.status().is_success() {
-                        match resp.json::<AnthropicResponse>().await {
-                            Ok(anthropic_resp) => {
-                                return Ok(self.parse_response(anthropic_resp));
-                            }
-                            Err(e) => {
-                                return Err(Error::Json(serde_json::Error::io(
-                                    std::io::Error::new(
-                                        std::io::ErrorKind::InvalidData,
-                                        e.to_string(),
-                                    ),
-                                )));
-                            }
-                        }
-                    } else {
-                        let status = resp.status().as_u16();
-                        let error_text = resp.text().await.unwrap_or_default();
-                        last_error = Some(Error::api(status, error_text));
-
-                        // Don't retry 4xx errors (client errors)
-                        if (400..500).contains(&status) {
-                            break;
-                        }
-                    }
-                }
-                Err(e) => {
-                    last_error = Some(Error::Http(e));
-                }
-            }
-        }
-
-        Err(last_error.unwrap_or_else(|| Error::other("Unknown error")))
+        Ok(self.parse_response(resp))
     }
 
     /// Internal generate with tools implementation.
@@ -492,9 +495,6 @@ impl ChatAnthropic {
         tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,
     ) -> Result<AIMessage> {
-        let api_key = self.get_api_key()?;
-        let client = self.build_client();
-
         // Convert tool definitions to Anthropic format
         let anthropic_tools: Vec<serde_json::Value> = tools
             .iter()
@@ -538,55 +538,13 @@ impl ChatAnthropic {
             }
         }
 
-        let mut last_error = None;
-        for _ in 0..=self.max_retries {
-            let response = client
-                .post(format!("{}/messages", self.api_base))
-                .header("x-api-key", &api_key)
-                .header("anthropic-version", &self.api_version)
-                .header("content-type", "application/json")
-                .json(&payload)
-                .send()
-                .await;
+        let resp: AnthropicResponse = (|| self.send_json_request(&payload))
+            .retry(self.retry_strategy())
+            .when(|e| e.is_retryable())
+            .await?;
 
-            match response {
-                Ok(resp) => {
-                    if resp.status().is_success() {
-                        match resp.json::<AnthropicResponse>().await {
-                            Ok(anthropic_resp) => {
-                                let result = self.parse_response(anthropic_resp);
-                                return Self::extract_ai_message(result);
-                            }
-                            Err(e) => {
-                                return Err(Error::Json(serde_json::Error::io(
-                                    std::io::Error::new(
-                                        std::io::ErrorKind::InvalidData,
-                                        e.to_string(),
-                                    ),
-                                )));
-                            }
-                        }
-                    } else {
-                        let status = resp.status().as_u16();
-                        let error_text = resp.text().await.unwrap_or_default();
-                        last_error = Some(Error::api(status, error_text));
-
-                        // Don't retry 4xx errors (client errors)
-                        if (400..500).contains(&status) {
-                            break;
-                        }
-                    }
-                }
-                Err(e) => {
-                    last_error = Some(Error::Http(e));
-                }
-            }
-        }
-
-        match last_error {
-            Some(e) => Err(e),
-            None => Err(Error::other("Unknown error")),
-        }
+        let result = self.parse_response(resp);
+        Self::extract_ai_message(result)
     }
 
     /// Internal stream implementation.

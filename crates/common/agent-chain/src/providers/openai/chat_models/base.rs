@@ -48,6 +48,7 @@ use std::env;
 use std::pin::Pin;
 
 use async_trait::async_trait;
+use backon::{ConstantBuilder, Retryable};
 use futures::Stream;
 use serde::{Deserialize, Serialize};
 
@@ -1357,63 +1358,66 @@ impl ChatOpenAI {
         ChatResult::new(vec![generation])
     }
 
+    /// Send an HTTP request and deserialize the JSON response.
+    ///
+    /// Returns an `Error::Api` for non-success status codes and
+    /// `Error::Http` for transport failures. The caller can use
+    /// `Error::is_retryable()` to decide whether to retry.
+    async fn send_json_request<T: serde::de::DeserializeOwned>(
+        &self,
+        url: &str,
+        payload: &serde_json::Value,
+    ) -> Result<T> {
+        let api_key = self.get_api_key()?;
+        let client = self.build_client();
+
+        let mut request = client
+            .post(url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Content-Type", "application/json");
+
+        if let Some(ref org) = self.organization {
+            request = request.header("OpenAI-Organization", org);
+        }
+
+        let resp = request.json(payload).send().await.map_err(Error::Http)?;
+
+        if resp.status().is_success() {
+            resp.json::<T>().await.map_err(|e| {
+                Error::Json(serde_json::Error::io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    e.to_string(),
+                )))
+            })
+        } else {
+            let status = resp.status().as_u16();
+            let error_text = resp.text().await.unwrap_or_default();
+            Err(Error::api(status, error_text))
+        }
+    }
+
+    /// Build a `backon` retry strategy from `self.max_retries`.
+    fn retry_strategy(&self) -> ConstantBuilder {
+        ConstantBuilder::default()
+            .with_delay(std::time::Duration::from_millis(0))
+            .with_max_times(self.max_retries as usize)
+    }
+
     /// Generate using the Responses API.
     async fn generate_responses_api(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
     ) -> Result<ChatResult> {
-        let api_key = self.get_api_key()?;
-        let client = self.build_client();
+        let url = format!("{}/responses", self.api_base);
         let payload = self.build_responses_api_payload(&messages, stop, None, false);
 
-        let mut last_error = None;
-        for _ in 0..=self.max_retries {
-            let mut request = client
-                .post(format!("{}/responses", self.api_base))
-                .header("Authorization", format!("Bearer {}", api_key))
-                .header("Content-Type", "application/json");
+        let resp: ResponsesApiResponse = (|| self.send_json_request(&url, &payload))
+            .retry(self.retry_strategy())
+            .when(|e| e.is_retryable())
+            .await?;
 
-            if let Some(ref org) = self.organization {
-                request = request.header("OpenAI-Organization", org);
-            }
-
-            let response = request.json(&payload).send().await;
-
-            match response {
-                Ok(resp) => {
-                    if resp.status().is_success() {
-                        match resp.json::<ResponsesApiResponse>().await {
-                            Ok(responses_resp) => {
-                                return Ok(self.parse_responses_api_response(responses_resp));
-                            }
-                            Err(e) => {
-                                return Err(Error::Json(serde_json::Error::io(
-                                    std::io::Error::new(
-                                        std::io::ErrorKind::InvalidData,
-                                        e.to_string(),
-                                    ),
-                                )));
-                            }
-                        }
-                    } else {
-                        let status = resp.status().as_u16();
-                        let error_text = resp.text().await.unwrap_or_default();
-                        last_error = Some(Error::api(status, error_text));
-
-                        // Don't retry 4xx errors (client errors), except 429 (rate limit)
-                        if (400..500).contains(&status) && status != 429 {
-                            break;
-                        }
-                    }
-                }
-                Err(e) => {
-                    last_error = Some(Error::Http(e));
-                }
-            }
-        }
-
-        Err(last_error.unwrap_or_else(|| Error::other("Unknown error")))
+        Ok(self.parse_responses_api_response(resp))
     }
 }
 
@@ -1618,57 +1622,15 @@ impl ChatOpenAI {
             return self.generate_responses_api(messages, stop).await;
         }
 
-        let api_key = self.get_api_key()?;
-        let client = self.build_client();
+        let url = format!("{}/chat/completions", self.api_base);
         let payload = self.build_request_payload(&messages, stop, None, false);
 
-        let mut last_error = None;
-        for _ in 0..=self.max_retries {
-            let mut request = client
-                .post(format!("{}/chat/completions", self.api_base))
-                .header("Authorization", format!("Bearer {}", api_key))
-                .header("Content-Type", "application/json");
+        let resp: OpenAIResponse = (|| self.send_json_request(&url, &payload))
+            .retry(self.retry_strategy())
+            .when(|e| e.is_retryable())
+            .await?;
 
-            if let Some(ref org) = self.organization {
-                request = request.header("OpenAI-Organization", org);
-            }
-
-            let response = request.json(&payload).send().await;
-
-            match response {
-                Ok(resp) => {
-                    if resp.status().is_success() {
-                        match resp.json::<OpenAIResponse>().await {
-                            Ok(openai_resp) => {
-                                return Ok(self.parse_response(openai_resp));
-                            }
-                            Err(e) => {
-                                return Err(Error::Json(serde_json::Error::io(
-                                    std::io::Error::new(
-                                        std::io::ErrorKind::InvalidData,
-                                        e.to_string(),
-                                    ),
-                                )));
-                            }
-                        }
-                    } else {
-                        let status = resp.status().as_u16();
-                        let error_text = resp.text().await.unwrap_or_default();
-                        last_error = Some(Error::api(status, error_text));
-
-                        // Don't retry 4xx errors (client errors), except 429 (rate limit)
-                        if (400..500).contains(&status) && status != 429 {
-                            break;
-                        }
-                    }
-                }
-                Err(e) => {
-                    last_error = Some(Error::Http(e));
-                }
-            }
-        }
-
-        Err(last_error.unwrap_or_else(|| Error::other("Unknown error")))
+        Ok(self.parse_response(resp))
     }
 
     /// Internal generate with tools implementation.
@@ -1696,63 +1658,21 @@ impl ChatOpenAI {
 
         // Use Responses API if enabled or if using built-in tools
         if self.should_use_responses_api(!self.builtin_tools.is_empty()) {
-            let api_key = self.get_api_key()?;
-            let client = self.build_client();
+            let url = format!("{}/responses", self.api_base);
             let payload =
                 self.build_responses_api_payload(&messages, stop, Some(&openai_tools), false);
 
-            let mut last_error = None;
-            for _ in 0..=self.max_retries {
-                let mut request = client
-                    .post(format!("{}/responses", self.api_base))
-                    .header("Authorization", format!("Bearer {}", api_key))
-                    .header("Content-Type", "application/json");
+            let resp: ResponsesApiResponse = (|| self.send_json_request(&url, &payload))
+                .retry(self.retry_strategy())
+                .when(|e| e.is_retryable())
+                .await?;
 
-                if let Some(ref org) = self.organization {
-                    request = request.header("OpenAI-Organization", org);
-                }
-
-                let response = request.json(&payload).send().await;
-
-                match response {
-                    Ok(resp) => {
-                        if resp.status().is_success() {
-                            match resp.json::<ResponsesApiResponse>().await {
-                                Ok(responses_resp) => {
-                                    let result = self.parse_responses_api_response(responses_resp);
-                                    return Self::extract_ai_message(result);
-                                }
-                                Err(e) => {
-                                    return Err(Error::Json(serde_json::Error::io(
-                                        std::io::Error::new(
-                                            std::io::ErrorKind::InvalidData,
-                                            e.to_string(),
-                                        ),
-                                    )));
-                                }
-                            }
-                        } else {
-                            let status = resp.status().as_u16();
-                            let error_text = resp.text().await.unwrap_or_default();
-                            last_error = Some(Error::api(status, error_text));
-
-                            if (400..500).contains(&status) && status != 429 {
-                                break;
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        last_error = Some(Error::Http(e));
-                    }
-                }
-            }
-
-            return Err(last_error.unwrap_or_else(|| Error::other("Unknown error")));
+            let result = self.parse_responses_api_response(resp);
+            return Self::extract_ai_message(result);
         }
 
         // Use Chat Completions API
-        let api_key = self.get_api_key()?;
-        let client = self.build_client();
+        let url = format!("{}/chat/completions", self.api_base);
         let mut payload = self.build_request_payload(&messages, stop, Some(&openai_tools), false);
 
         // Add tool_choice if specified
@@ -1773,53 +1693,13 @@ impl ChatOpenAI {
             payload["tool_choice"] = choice_json;
         }
 
-        let mut last_error = None;
-        for _ in 0..=self.max_retries {
-            let mut request = client
-                .post(format!("{}/chat/completions", self.api_base))
-                .header("Authorization", format!("Bearer {}", api_key))
-                .header("Content-Type", "application/json");
+        let resp: OpenAIResponse = (|| self.send_json_request(&url, &payload))
+            .retry(self.retry_strategy())
+            .when(|e| e.is_retryable())
+            .await?;
 
-            if let Some(ref org) = self.organization {
-                request = request.header("OpenAI-Organization", org);
-            }
-
-            let response = request.json(&payload).send().await;
-
-            match response {
-                Ok(resp) => {
-                    if resp.status().is_success() {
-                        match resp.json::<OpenAIResponse>().await {
-                            Ok(openai_resp) => {
-                                let result = self.parse_response(openai_resp);
-                                return Self::extract_ai_message(result);
-                            }
-                            Err(e) => {
-                                return Err(Error::Json(serde_json::Error::io(
-                                    std::io::Error::new(
-                                        std::io::ErrorKind::InvalidData,
-                                        e.to_string(),
-                                    ),
-                                )));
-                            }
-                        }
-                    } else {
-                        let status = resp.status().as_u16();
-                        let error_text = resp.text().await.unwrap_or_default();
-                        last_error = Some(Error::api(status, error_text));
-
-                        if (400..500).contains(&status) && status < 500 && status != 429 {
-                            break;
-                        }
-                    }
-                }
-                Err(e) => {
-                    last_error = Some(Error::Http(e));
-                }
-            }
-        }
-
-        Err(last_error.unwrap_or_else(|| Error::other("Unknown error")))
+        let result = self.parse_response(resp);
+        Self::extract_ai_message(result)
     }
 
     /// Create usage metadata from OpenAI usage response, including token details.

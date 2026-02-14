@@ -10,6 +10,7 @@ ignored = ["tonic-prost"]
 [dependencies]
 anyhow = { workspace = true }
 async-stream = "0.3"
+backon = { workspace = true }
 base64 = { workspace = true }
 enum_dispatch = { workspace = true }
 image = { workspace = true, features = ["default"] }
