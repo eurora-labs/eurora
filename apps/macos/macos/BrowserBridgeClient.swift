@@ -141,7 +141,7 @@ final class BrowserBridgeClient: @unchecked Sendable {
 
         // Re-register on the existing stream so the server sees the new PID
         if let continuation {
-            let regFrame = buildRegistrationFrame()
+            let regFrame = buildRegistrationFrame(browserPid: newPid)
             continuation.yield(regFrame)
         }
     }
@@ -201,11 +201,13 @@ final class BrowserBridgeClient: @unchecked Sendable {
         }
     }
 
-    /// Build the registration frame to send on connect
-    private func buildRegistrationFrame() -> BrowserBridge_Frame {
+    /// Build the registration frame to send on connect.
+    /// The caller must pass the current `browserPid` captured under `lock`
+    /// so the frame is constructed without a data race.
+    private func buildRegistrationFrame(browserPid: UInt32) -> BrowserBridge_Frame {
         var registerFrame = BrowserBridge_RegisterFrame()
         registerFrame.hostPid = self.hostPid
-        registerFrame.browserPid = self.browserPid
+        registerFrame.browserPid = browserPid
         var frame = BrowserBridge_Frame()
         frame.register = registerFrame
         return frame
@@ -257,9 +259,14 @@ final class BrowserBridgeClient: @unchecked Sendable {
 
         try await withGRPCClient(transport: transport) { grpcClient in
             let bridgeClient = BrowserBridge_BrowserBridge.Client(wrapping: grpcClient)
-            let regFrame = self.buildRegistrationFrame()
+
+            self.lock.lock()
+            let currentBrowserPid = self.browserPid
+            self.lock.unlock()
+
+            let regFrame = self.buildRegistrationFrame(browserPid: currentBrowserPid)
             self.logger.info(
-                "Sending registration: host=\(self.hostPid), browser=\(self.browserPid)")
+                "Sending registration: host=\(self.hostPid), browser=\(currentBrowserPid)")
 
             let (outboundStream, continuation) = AsyncStream.makeStream(
                 of: BrowserBridge_Frame.self)
