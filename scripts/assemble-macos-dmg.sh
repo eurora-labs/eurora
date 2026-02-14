@@ -236,10 +236,10 @@ echo "  DMG created: $RELEASE_DIR/$DMG_NAME"
 codesign --force --sign "$SIGN_IDENTITY" "$RELEASE_DIR/$DMG_NAME"
 echo "  DMG signed: $RELEASE_DIR/$DMG_NAME"
 
-# Copy Tauri updater artifacts (tar.gz + signature) for the update service
-find "tauri-release/darwin/${ARCH_DIR}" -maxdepth 1 -name '*.tar.gz' -not -name '*.sig' -exec sh -c 'ditto "$1" "'"$RELEASE_DIR"'/$(basename "$1")"' _ {} \; 2>/dev/null || true
-find "tauri-release/darwin/${ARCH_DIR}" -maxdepth 1 -name '*.tar.gz.sig' -exec sh -c 'ditto "$1" "'"$RELEASE_DIR"'/$(basename "$1")"' _ {} \; 2>/dev/null || true
-echo "  Updater artifacts copied"
+# NOTE: The updater tar.gz is NO LONGER copied from the raw Tauri build here.
+# The CI workflow creates it from the fully assembled + notarized Eurora.app
+# (see the "Create updater tar.gz" step in publish.yaml) so that auto-updates
+# replace the entire bundle — preserving the Safari extension and code signature.
 
 echo "=== Assembly complete ==="
 echo "  DMG: $RELEASE_DIR/$DMG_NAME"
