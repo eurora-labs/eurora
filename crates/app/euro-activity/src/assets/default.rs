@@ -1,5 +1,3 @@
-//! Default asset implementation for unsupported activity types
-
 use agent_chain_core::{BaseMessage, HumanMessage};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -10,7 +8,6 @@ use crate::{
     types::{AssetFunctionality, ContextChip},
 };
 
-/// Default asset for activities that don't have specific implementations
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DefaultAsset {
     pub id: String,
@@ -21,7 +18,6 @@ pub struct DefaultAsset {
 }
 
 impl DefaultAsset {
-    /// Create a new default asset
     pub fn new(
         id: String,
         name: String,
@@ -37,7 +33,6 @@ impl DefaultAsset {
         }
     }
 
-    /// Create a simple default asset with just a name
     pub fn simple(name: String) -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
@@ -58,7 +53,6 @@ impl AssetFunctionality for DefaultAsset {
         Some("default")
     }
 
-    /// Construct a message for LLM interaction
     fn construct_messages(&self) -> Vec<BaseMessage> {
         let mut content = format!(
             "The user is working with an application called '{}'",
@@ -81,7 +75,6 @@ impl AssetFunctionality for DefaultAsset {
         vec![HumanMessage::builder().content(content).build().into()]
     }
 
-    /// Get context chip for UI integration (returns None for default assets)
     fn get_context_chip(&self) -> Option<ContextChip> {
         None
     }

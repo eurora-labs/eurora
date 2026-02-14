@@ -25,6 +25,7 @@
 	import { inject } from '@eurora/shared/context';
 	import { ScrollArea } from '@eurora/ui/components/scroll-area/index';
 	import * as Chat from '@eurora/ui/custom-components/chat/index';
+	import { Thinking } from '@eurora/ui/custom-components/thinking/index';
 	import { onMount } from 'svelte';
 
 	let conversation = $state<ConversationView | null>(null);
@@ -221,7 +222,7 @@
 								{#if content.length > 0}
 									<Katex math={content} finishRendering={() => {}} />
 								{:else}
-									<span class="text-primary/60 italic">Thinking...</span>
+									<Thinking class="text-primary/60" />
 								{/if}
 							</Chat.MessageContent>
 						</Chat.Message>

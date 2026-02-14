@@ -22,7 +22,8 @@ tokio = { workspace = true, features = [
   "sync",
   "time",
 ] }
-log = { workspace = true }
+tonic = { workspace = true, features = ["channel"] }
+tracing = { workspace = true }
 
 [dev-dependencies]
 rustls = { workspace = true, default-features = false, features = [

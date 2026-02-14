@@ -1,5 +1,3 @@
-//! Snapshot implementations for different activity types
-
 pub mod article;
 pub mod default;
 pub mod twitter;

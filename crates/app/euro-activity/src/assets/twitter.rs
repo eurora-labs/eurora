@@ -1,5 +1,3 @@
-//! Twitter asset implementation
-
 use std::collections::HashMap;
 
 use agent_chain_core::{BaseMessage, HumanMessage};
@@ -14,7 +12,6 @@ use crate::{
     types::{AssetFunctionality, ContextChip},
 };
 
-/// Individual tweet data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TwitterTweet {
     pub text: String,
@@ -26,7 +23,6 @@ pub struct TwitterTweet {
 }
 
 impl TwitterTweet {
-    /// Create a new tweet
     pub fn new(text: String, author: Option<String>, timestamp: Option<String>) -> Self {
         Self {
             text,
@@ -38,7 +34,6 @@ impl TwitterTweet {
         }
     }
 
-    /// Get formatted tweet text with author
     pub fn get_formatted_text(&self) -> String {
         if let Some(author) = &self.author {
             format!("@{}: {}", author, self.text)
@@ -47,7 +42,6 @@ impl TwitterTweet {
         }
     }
 
-    /// Check if tweet contains a hashtag
     pub fn contains_hashtag(&self, hashtag: &str) -> bool {
         let hashtag_with_hash = if hashtag.starts_with('#') {
             hashtag.to_string()
@@ -59,7 +53,6 @@ impl TwitterTweet {
             .contains(&hashtag_with_hash.to_lowercase())
     }
 
-    /// Extract hashtags from the tweet
     pub fn extract_hashtags(&self) -> Vec<String> {
         self.text
             .split_whitespace()
@@ -68,7 +61,6 @@ impl TwitterTweet {
             .collect()
     }
 
-    /// Extract mentions from the tweet
     pub fn extract_mentions(&self) -> Vec<String> {
         self.text
             .split_whitespace()
@@ -87,7 +79,6 @@ impl AssetFunctionality for TwitterAsset {
         Some("twitter")
     }
 
-    /// Construct a message for LLM interaction
     fn construct_messages(&self) -> Vec<BaseMessage> {
         let max_tweets = 20usize;
         let tweet_texts: Vec<String> = self
@@ -123,7 +114,6 @@ impl AssetFunctionality for TwitterAsset {
         vec![HumanMessage::builder().content(text).build().into()]
     }
 
-    /// Get context chip for UI integration
     fn get_context_chip(&self) -> Option<ContextChip> {
         Some(ContextChip {
             id: self.id.clone(),
@@ -153,7 +143,6 @@ impl From<NativeTwitterTweet> for TwitterTweet {
     }
 }
 
-/// Twitter asset containing multiple tweets and metadata
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TwitterAsset {
     pub id: String,
@@ -164,7 +153,6 @@ pub struct TwitterAsset {
     pub context_type: TwitterContextType,
 }
 
-/// Type of Twitter context being captured
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum TwitterContextType {
     Timeline,
@@ -177,7 +165,6 @@ pub enum TwitterContextType {
 }
 
 impl TwitterAsset {
-    /// Create a new Twitter asset
     pub fn new(
         id: String,
         url: String,
@@ -195,7 +182,6 @@ impl TwitterAsset {
         }
     }
 
-    /// Try to create from protocol buffer state
     pub fn try_from(asset: NativeTwitterAsset) -> Result<Self, ActivityError> {
         let tweets: Vec<TwitterTweet> = asset.tweets.into_iter().map(TwitterTweet::from).collect();
 
@@ -205,11 +191,10 @@ impl TwitterAsset {
             title: asset.title,
             tweets,
             timestamp: asset.timestamp,
-            context_type: TwitterContextType::Timeline, // Default assumption
+            context_type: TwitterContextType::Timeline,
         })
     }
 
-    /// Get all unique hashtags from all tweets
     pub fn get_all_hashtags(&self) -> Vec<String> {
         let mut hashtags = Vec::new();
         for tweet in &self.tweets {
@@ -220,7 +205,6 @@ impl TwitterAsset {
         hashtags
     }
 
-    /// Get all unique mentions from all tweets
     pub fn get_all_mentions(&self) -> Vec<String> {
         let mut mentions = Vec::new();
         for tweet in &self.tweets {
@@ -231,7 +215,6 @@ impl TwitterAsset {
         mentions
     }
 
-    /// Filter tweets by author
     pub fn get_tweets_by_author(&self, author: &str) -> Vec<&TwitterTweet> {
         self.tweets
             .iter()
@@ -244,7 +227,6 @@ impl TwitterAsset {
             .collect()
     }
 
-    /// Search tweets containing specific text
     pub fn search_tweets(&self, query: &str) -> Vec<&TwitterTweet> {
         let query_lower = query.to_lowercase();
         self.tweets
@@ -253,7 +235,6 @@ impl TwitterAsset {
             .collect()
     }
 
-    /// Get tweet count
     pub fn get_tweet_count(&self) -> usize {
         self.tweets.len()
     }
