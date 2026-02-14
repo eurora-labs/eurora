@@ -13,6 +13,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     LocalBridgeServerDelegate
 {
     private let logger = Logger(subsystem: "com.eurora.macos", category: "AppDelegate")
+    /// Timeout for extension requests awaiting a gRPC response (seconds).
+    private let requestTimeoutSeconds: TimeInterval = 30
     private let extensionBundleIdentifier = "com.eurora-labs.eurora.macos.extension"
     private let desktopBundleIdentifiers = [
         "com.eurora-labs.eurora", "com.eurora-labs.eurora.nightly",
@@ -203,6 +205,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         } else {
             logger.info("Disconnected from gRPC server")
         }
+
+        // Drain pending extension requests — the server can no longer respond,
+        // so complete them all with an error to avoid hanging the Safari extension.
+        pendingExtensionRequestsLock.lock()
+        let pending = pendingExtensionRequests
+        pendingExtensionRequests.removeAll()
+        pendingExtensionRequestsLock.unlock()
+
+        if !pending.isEmpty {
+            logger.info("Draining \(pending.count) pending extension request(s) due to disconnect")
+            let errDict: [String: Any] = [
+                "kind": ["Error": ["message": "gRPC client disconnected"]]
+            ]
+            for (_, completion) in pending {
+                completion(errDict)
+            }
+        }
     }
     func browserBridgeClient(
         _ client: BrowserBridgeClient, didReceiveFrame frame: BrowserBridge_Frame
@@ -216,20 +235,25 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         _ server: LocalBridgeServer, didReceiveMessage message: [String: Any],
         completion: @escaping ([String: Any]?) -> Void
     ) {
-        if let kind = message["kind"] as? [String: Any],
-            let resp = kind["Response"] as? [String: Any], let rid = resp["id"]
-        {
-            let idStr = "\(rid)"
-            pendingServerRequestsLock.lock()
-            let had = pendingServerRequests.removeValue(forKey: idStr) != nil
-            pendingServerRequestsLock.unlock()
-            if had {
-                sendDictToServer(message)
-                completion(["status": "forwarded"])
-                return
+        // The delegate is called on LocalBridgeServer's background queue.
+        // Dispatch to main so all grpcClient access is serialized.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if let kind = message["kind"] as? [String: Any],
+                let resp = kind["Response"] as? [String: Any], let rid = resp["id"]
+            {
+                let idStr = "\(rid)"
+                self.pendingServerRequestsLock.lock()
+                let had = self.pendingServerRequests.removeValue(forKey: idStr) != nil
+                self.pendingServerRequestsLock.unlock()
+                if had {
+                    self.sendDictToServer(message)
+                    completion(["status": "forwarded"])
+                    return
+                }
             }
+            self.forwardExtRequest(message, completion: completion)
         }
-        forwardExtRequest(message, completion: completion)
     }
 
     private func forwardExtRequest(
@@ -249,6 +273,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
             pendingExtensionRequestsLock.lock()
             pendingExtensionRequests[reqId] = completion
             pendingExtensionRequestsLock.unlock()
+
+            // Schedule a timeout so the Safari extension is not left hanging
+            // if the gRPC server never responds.
+            let timeout = requestTimeoutSeconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in
+                guard let self else { return }
+                self.pendingExtensionRequestsLock.lock()
+                let timedOut = self.pendingExtensionRequests.removeValue(forKey: reqId)
+                self.pendingExtensionRequestsLock.unlock()
+                if let timedOut {
+                    self.logger.warning("Request \(reqId) timed out after \(timeout)s")
+                    timedOut(["kind": ["Error": ["message": "Request timed out"]]])
+                }
+            }
         }
         sendDictToServer(message)
         if reqId == nil { completion(["status": "ok"]) }
@@ -308,8 +346,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
                 userInfo: userInfo
             ) { [weak self] err in
                 if let err {
-                    self?.sendErrResp(
-                        requestId: reqIdStr, action: action, error: err.localizedDescription)
+                    // The completion handler runs on an arbitrary thread;
+                    // dispatch to main to synchronize with grpcClient access.
+                    DispatchQueue.main.async {
+                        self?.sendErrResp(
+                            requestId: reqIdStr, action: action, error: err.localizedDescription)
+                    }
                 }
             }
         } catch {

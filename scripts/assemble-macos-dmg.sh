@@ -146,6 +146,19 @@ if [ -d "$RESOURCES_DIR/$TAURI_APP_NAME/Contents/Frameworks" ]; then
     done
 fi
 
+# Sign helper executables in the Tauri app's MacOS directory (e.g., euro-native-messaging).
+# The main binary is signed when the .app bundle is signed below, so we skip it here.
+TAURI_MACOS_DIR="$RESOURCES_DIR/$TAURI_APP_NAME/Contents/MacOS"
+TAURI_MAIN_NAME=$(basename "$TAURI_MAIN_BIN")
+if [ -d "$TAURI_MACOS_DIR" ]; then
+    find "$TAURI_MACOS_DIR" -type f -perm +0111 ! -name "$TAURI_MAIN_NAME" | while read -r item; do
+        echo "  Signing helper executable: $(basename "$item")"
+        codesign --force --options runtime --timestamp \
+            --sign "$SIGN_IDENTITY" \
+            "$item"
+    done
+fi
+
 # Sign the embedded Tauri app's main executable with its entitlements
 TAURI_SIGN_ARGS=(--force --options runtime --timestamp --sign "$SIGN_IDENTITY")
 if [ -f "$ENTITLEMENTS_DIR/tauri.plist" ]; then
@@ -168,6 +181,18 @@ fi
 if [ -d "assembled/Eurora.app/Contents/Frameworks" ]; then
     find "assembled/Eurora.app/Contents/Frameworks" \
         \( -name '*.dylib' -o -name '*.framework' \) | while read -r item; do
+        codesign --force --options runtime --timestamp \
+            --sign "$SIGN_IDENTITY" \
+            "$item"
+    done
+fi
+
+# Sign helper executables in the launcher's MacOS directory (excluding main binary)
+LAUNCHER_MACOS_DIR="assembled/Eurora.app/Contents/MacOS"
+LAUNCHER_MAIN_NAME=$(basename "$LAUNCHER_BIN")
+if [ -d "$LAUNCHER_MACOS_DIR" ]; then
+    find "$LAUNCHER_MACOS_DIR" -type f -perm +0111 ! -name "$LAUNCHER_MAIN_NAME" | while read -r item; do
+        echo "  Signing helper executable: $(basename "$item")"
         codesign --force --options runtime --timestamp \
             --sign "$SIGN_IDENTITY" \
             "$item"
