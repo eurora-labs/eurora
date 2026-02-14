@@ -39,7 +39,8 @@ protocol BrowserBridgeClientDelegate: AnyObject {
     func browserBridgeClientDidDisconnect(_ client: BrowserBridgeClient, error: Error?)
 
     /// Called when a frame is received from the gRPC server
-    func browserBridgeClient(_ client: BrowserBridgeClient, didReceiveFrame frame: BrowserBridge_Frame)
+    func browserBridgeClient(
+        _ client: BrowserBridgeClient, didReceiveFrame frame: BrowserBridge_Frame)
 }
 
 /// gRPC client for the BrowserBridge service.
@@ -63,7 +64,7 @@ final class BrowserBridgeClient: @unchecked Sendable {
     private let logger = Logger(subsystem: "com.eurora.macos", category: "BrowserBridgeClient")
 
     private let hostPid: UInt32
-    private let browserPid: UInt32
+    private var browserPid: UInt32
 
     /// Task running the connect-with-retry loop
     private var connectionTask: Task<Void, Never>?
@@ -123,6 +124,26 @@ final class BrowserBridgeClient: @unchecked Sendable {
 
         connectionTask?.cancel()
         connectionTask = nil
+    }
+
+    /// Update the browser PID at runtime (e.g. when Safari launches or quits).
+    ///
+    /// If the client is currently connected, a fresh registration frame is sent
+    /// immediately so the gRPC server picks up the new PID without waiting for
+    /// the next reconnection cycle.
+    func updateBrowserPid(_ newPid: UInt32) {
+        lock.lock()
+        browserPid = newPid
+        let continuation = outboundContinuation
+        lock.unlock()
+
+        logger.info("Browser PID updated to \(newPid)")
+
+        // Re-register on the existing stream so the server sees the new PID
+        if let continuation {
+            let regFrame = buildRegistrationFrame()
+            continuation.yield(regFrame)
+        }
     }
 
     /// Send a frame to the gRPC server.
@@ -237,9 +258,11 @@ final class BrowserBridgeClient: @unchecked Sendable {
         try await withGRPCClient(transport: transport) { grpcClient in
             let bridgeClient = BrowserBridge_BrowserBridge.Client(wrapping: grpcClient)
             let regFrame = self.buildRegistrationFrame()
-            self.logger.info("Sending registration: host=\(self.hostPid), browser=\(self.browserPid)")
+            self.logger.info(
+                "Sending registration: host=\(self.hostPid), browser=\(self.browserPid)")
 
-            let (outboundStream, continuation) = AsyncStream.makeStream(of: BrowserBridge_Frame.self)
+            let (outboundStream, continuation) = AsyncStream.makeStream(
+                of: BrowserBridge_Frame.self)
             self.lock.lock()
             self.outboundContinuation = continuation
             self.lock.unlock()
