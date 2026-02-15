@@ -32,8 +32,10 @@ pub mod chat_loaders;
 pub mod chat_sessions;
 pub mod document_loaders;
 pub mod documents;
+pub mod embeddings;
 pub mod env;
 pub mod error;
+pub mod example_selectors;
 pub mod globals;
 pub mod language_models;
 pub mod load;
@@ -51,6 +53,7 @@ pub mod sys_info;
 pub mod tools;
 pub mod tracers;
 pub mod utils;
+pub mod vectorstores;
 
 // Keep chat_models as a backward-compatible re-export
 pub mod chat_models {
@@ -255,3 +258,18 @@ pub use sys_info::{PackageInfo, SystemInfo, get_sys_info, get_sys_info_map, prin
 
 // Re-export async_trait for use in generated code
 pub use async_trait::async_trait;
+
+// Re-export embedding types
+pub use embeddings::{DeterministicFakeEmbedding, Embeddings, FakeEmbeddings};
+
+// Re-export vector store types
+pub use vectorstores::{
+    InMemoryVectorStore, SearchType, VectorStore, VectorStoreRetrieverConfig, cosine_similarity,
+    maximal_marginal_relevance,
+};
+
+// Re-export example selector types
+pub use example_selectors::{
+    BaseExampleSelector, LengthBasedExampleSelector, MaxMarginalRelevanceExampleSelector,
+    SemanticSimilarityExampleSelector, sorted_values,
+};
