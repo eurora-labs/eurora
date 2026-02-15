@@ -6,6 +6,7 @@
 //! This corresponds to `langchain_core/messages/block_translators/` in Python.
 
 pub mod anthropic;
+pub mod langchain_v0;
 pub mod openai;
 
 use serde_json::Value;
