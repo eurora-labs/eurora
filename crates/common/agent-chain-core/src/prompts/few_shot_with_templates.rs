@@ -85,21 +85,20 @@ impl FewShotPromptWithTemplates {
     ) -> Result<Self> {
         let mut input_variables = std::collections::HashSet::new();
 
-        // Add suffix input variables (use field directly to avoid ambiguity)
         for var in &suffix.input_variables {
             input_variables.insert(var.clone());
         }
 
-        // Add prefix input variables
         if let Some(ref p) = prefix {
             for var in &p.input_variables {
                 input_variables.insert(var.clone());
             }
         }
 
-        let input_variables: Vec<_> = input_variables.into_iter().collect();
+        let mut input_variables: Vec<_> = input_variables.into_iter().collect();
+        input_variables.sort();
 
-        Ok(Self {
+        let mut result = Self {
             examples: Some(examples),
             example_selector: None,
             example_prompt,
@@ -110,7 +109,9 @@ impl FewShotPromptWithTemplates {
             input_variables,
             partial_variables: HashMap::new(),
             validate_template: false,
-        })
+        };
+        result.validate_template_variables()?;
+        Ok(result)
     }
 
     /// Create a new FewShotPromptWithTemplates with an example selector.
@@ -122,21 +123,20 @@ impl FewShotPromptWithTemplates {
     ) -> Result<Self> {
         let mut input_variables = std::collections::HashSet::new();
 
-        // Add suffix input variables (use field directly to avoid ambiguity)
         for var in &suffix.input_variables {
             input_variables.insert(var.clone());
         }
 
-        // Add prefix input variables
         if let Some(ref p) = prefix {
             for var in &p.input_variables {
                 input_variables.insert(var.clone());
             }
         }
 
-        let input_variables: Vec<_> = input_variables.into_iter().collect();
+        let mut input_variables: Vec<_> = input_variables.into_iter().collect();
+        input_variables.sort();
 
-        Ok(Self {
+        let mut result = Self {
             examples: None,
             example_selector: Some(Box::new(selector)),
             example_prompt,
@@ -147,7 +147,9 @@ impl FewShotPromptWithTemplates {
             input_variables,
             partial_variables: HashMap::new(),
             validate_template: false,
-        })
+        };
+        result.validate_template_variables()?;
+        Ok(result)
     }
 
     /// Set the example separator.
@@ -195,7 +197,39 @@ impl FewShotPromptWithTemplates {
         }
     }
 
-    /// Merge partial and user variables.
+    fn validate_template_variables(&mut self) -> Result<()> {
+        if self.validate_template {
+            let input_set: std::collections::HashSet<_> =
+                self.input_variables.iter().cloned().collect();
+            let mut expected: std::collections::HashSet<_> =
+                self.suffix.input_variables.iter().cloned().collect();
+            expected.extend(self.partial_variables.keys().cloned());
+            if let Some(ref p) = self.prefix {
+                expected.extend(p.input_variables.iter().cloned());
+            }
+            let missing: Vec<_> = expected.difference(&input_set).cloned().collect();
+            if !missing.is_empty() {
+                return Err(Error::InvalidConfig(format!(
+                    "Got input_variables={:?}, but based on prefix/suffix expected {:?}",
+                    self.input_variables, expected
+                )));
+            }
+        } else {
+            let mut vars: std::collections::HashSet<_> =
+                self.suffix.input_variables.iter().cloned().collect();
+            if let Some(ref p) = self.prefix {
+                vars.extend(p.input_variables.iter().cloned());
+            }
+            for k in self.partial_variables.keys() {
+                vars.remove(k);
+            }
+            let mut sorted: Vec<_> = vars.into_iter().collect();
+            sorted.sort();
+            self.input_variables = sorted;
+        }
+        Ok(())
+    }
+
     fn merge_partial_and_user_variables(
         &self,
         kwargs: &HashMap<String, String>,
@@ -218,17 +252,14 @@ impl BasePromptTemplate for FewShotPromptWithTemplates {
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<FormatOutputType> {
         let mut kwargs = self.merge_partial_and_user_variables(kwargs);
 
-        // Get examples
         let examples = self.get_examples(&kwargs)?;
 
-        // Format examples
         let example_strings: Result<Vec<_>> = examples
             .iter()
             .map(|example| StringPromptTemplate::format(&self.example_prompt, example))
             .collect();
         let example_strings = example_strings?;
 
-        // Format prefix if present
         let prefix = if let Some(ref prefix_template) = self.prefix {
             let prefix_vars: HashMap<_, _> = kwargs
                 .iter()
@@ -236,8 +267,7 @@ impl BasePromptTemplate for FewShotPromptWithTemplates {
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect();
 
-            // Remove prefix vars from kwargs (use field directly to avoid ambiguity)
-            for k in &prefix_template.input_variables {
+            for k in prefix_vars.keys() {
                 kwargs.remove(k);
             }
 
@@ -246,25 +276,19 @@ impl BasePromptTemplate for FewShotPromptWithTemplates {
             String::new()
         };
 
-        // Format suffix
         let suffix_vars: HashMap<_, _> = kwargs
             .iter()
             .filter(|(k, _)| self.suffix.input_variables.contains(k))
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
 
-        // Remove suffix vars from kwargs (use field directly to avoid ambiguity)
-        for k in &self.suffix.input_variables {
+        for k in suffix_vars.keys() {
             kwargs.remove(k);
         }
 
         let suffix = StringPromptTemplate::format(&self.suffix, &suffix_vars)?;
 
-        // Create the overall template
-        let mut pieces = Vec::new();
-        if !prefix.is_empty() {
-            pieces.push(prefix);
-        }
+        let mut pieces = vec![prefix];
         pieces.extend(example_strings);
         pieces.push(suffix);
 
@@ -274,7 +298,6 @@ impl BasePromptTemplate for FewShotPromptWithTemplates {
             .collect::<Vec<_>>()
             .join(&self.example_separator);
 
-        // Format any remaining variables
         format_template(&template, self.template_format, &kwargs)
     }
 
