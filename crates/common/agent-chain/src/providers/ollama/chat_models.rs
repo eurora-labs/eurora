@@ -427,29 +427,23 @@ impl ChatOllama {
             .filter_map(|msg| match msg {
                 BaseMessage::System(m) => Some(serde_json::json!({
                     "role": "system",
-                    "content": m.content.as_text()
+                    "content": m.content.as_text(),
+                    "images": [],
                 })),
                 BaseMessage::Human(m) => {
                     let (content, images) = extract_content_and_images(&m.content);
-                    let mut message = serde_json::json!({
+                    Some(serde_json::json!({
                         "role": "user",
-                        "content": content
-                    });
-                    if !images.is_empty() {
-                        message["images"] = serde_json::Value::Array(
-                            images.into_iter().map(serde_json::Value::String).collect(),
-                        );
-                    }
-                    Some(message)
+                        "content": content,
+                        "images": images,
+                    }))
                 }
                 BaseMessage::AI(m) => {
                     let mut message = serde_json::json!({
                         "role": "assistant",
+                        "content": m.content(),
+                        "images": [],
                     });
-
-                    if !m.content().is_empty() {
-                        message["content"] = serde_json::json!(m.content());
-                    }
 
                     if !m.tool_calls.is_empty() {
                         let tool_calls: Vec<serde_json::Value> = m
@@ -464,13 +458,15 @@ impl ChatOllama {
                 }
                 BaseMessage::Tool(m) => Some(serde_json::json!({
                     "role": "tool",
+                    "content": m.content,
+                    "images": [],
                     "tool_call_id": m.tool_call_id,
-                    "content": m.content
                 })),
                 BaseMessage::Remove(_) => None,
                 BaseMessage::Chat(m) => Some(serde_json::json!({
                     "role": m.role,
-                    "content": m.content
+                    "content": m.content,
+                    "images": [],
                 })),
                 BaseMessage::Function(m) => Some(serde_json::json!({
                     "role": "function",
@@ -766,11 +762,25 @@ impl BaseChatModel for ChatOllama {
                                 );
                             }
 
+                        let mut response_metadata = HashMap::new();
+                        if let Some(ref info) = chat_chunk.generation_info {
+                            if let Some(model) = info.get("model_name") {
+                                response_metadata.insert("model_name".to_string(), model.clone());
+                            }
+                            if let Some(provider) = info.get("model_provider") {
+                                response_metadata.insert("model_provider".to_string(), provider.clone());
+                            }
+                            if let Some(reason) = info.get("done_reason") {
+                                response_metadata.insert("done_reason".to_string(), reason.clone());
+                            }
+                        }
+
                         let message = AIMessage::builder()
                             .content(&chat_chunk.chunk.content)
                             .tool_calls(chat_chunk.chunk.tool_calls.clone())
                             .maybe_usage_metadata(chat_chunk.chunk.usage_metadata.clone())
                             .additional_kwargs(additional_kwargs)
+                            .response_metadata(response_metadata)
                             .build();
 
                         let chunk = if let Some(info) = chat_chunk.generation_info {
@@ -845,42 +855,72 @@ impl BaseChatModel for ChatOllama {
 
 impl ChatOllama {
     /// Internal generate implementation.
+    ///
+    /// Aggregates the streaming response into a single result, matching
+    /// Python's `_generate` which calls `_chat_stream_with_aggregation`.
     async fn _generate_internal(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
-        self.ensure_model_validated().await?;
+        let stream = self.stream_internal(messages, stop).await?;
+        futures::pin_mut!(stream);
 
-        let client = self.build_client();
-        let payload = self.build_request_payload(&messages, stop, None, false)?;
-        let base_url = self.get_base_url();
+        let mut full_content = String::new();
+        let mut all_tool_calls = Vec::new();
+        let mut final_usage: Option<UsageMetadata> = None;
+        let mut final_generation_info: Option<HashMap<String, serde_json::Value>> = None;
+        let mut additional_kwargs = HashMap::new();
 
-        let response = client
-            .post(format!("{}/api/chat", base_url))
-            .header("Content-Type", "application/json")
-            .json(&payload)
-            .send()
-            .await
-            .map_err(Error::Http)?;
+        while let Some(result) = stream.next().await {
+            let chunk = result?;
 
-        if !response.status().is_success() {
-            let status = response.status().as_u16();
-            let error_text = response.text().await.unwrap_or_default();
-            return Err(Error::api(status, error_text));
+            full_content.push_str(&chunk.chunk.content);
+
+            if !chunk.chunk.tool_calls.is_empty() {
+                all_tool_calls.extend(chunk.chunk.tool_calls);
+            }
+
+            if let Some(reasoning) = &chunk.reasoning_content {
+                additional_kwargs
+                    .entry("reasoning_content".to_string())
+                    .and_modify(|v| {
+                        if let serde_json::Value::String(existing) = v {
+                            existing.push_str(reasoning);
+                        }
+                    })
+                    .or_insert_with(|| serde_json::Value::String(reasoning.clone()));
+            }
+
+            if let Some(usage) = chunk.chunk.usage_metadata {
+                final_usage = Some(usage);
+            }
+
+            if let Some(info) = chunk.generation_info {
+                final_generation_info = Some(info);
+            }
         }
 
-        let ollama_resp: OllamaResponse = response.json().await.map_err(|e| {
-            Error::Json(serde_json::Error::io(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                e.to_string(),
-            )))
-        })?;
+        if full_content.is_empty() && all_tool_calls.is_empty() && final_generation_info.is_none() {
+            return Err(Error::Other(
+                "No data received from Ollama stream.".to_string(),
+            ));
+        }
 
-        let generation_info = Self::build_generation_info(&ollama_resp);
-        let ai_message = self.parse_response_to_ai_message(&ollama_resp);
-        let generation = ChatGeneration::with_info(ai_message.into(), generation_info);
+        let ai_message = AIMessage::builder()
+            .content(full_content)
+            .tool_calls(all_tool_calls)
+            .additional_kwargs(additional_kwargs)
+            .maybe_usage_metadata(final_usage)
+            .build();
+
+        let generation = if let Some(info) = final_generation_info {
+            ChatGeneration::with_info(ai_message.into(), info)
+        } else {
+            ChatGeneration::new(ai_message.into())
+        };
+
         Ok(ChatResult::new(vec![generation]))
     }
 
@@ -959,36 +999,33 @@ impl ChatOllama {
                     None
                 };
 
-                if is_done {
-                    let usage = if let (Some(prompt_eval_count), Some(eval_count)) =
-                        (stream_resp.prompt_eval_count, stream_resp.eval_count)
-                    {
-                        Some(UsageMetadata::new(prompt_eval_count as i64, eval_count as i64))
-                    } else {
-                        None
-                    };
-                    let finish_reason = stream_resp.done_reason.clone();
-
-                    let generation_info = Self::build_generation_info(&stream_resp);
-
-                    let mut chunk = ChatChunk::final_chunk(usage, finish_reason);
-                    chunk.tool_calls = tool_calls;
-
-                    yield OllamaStreamChunk {
-                        chunk,
-                        reasoning_content,
-                        generation_info: Some(generation_info),
-                    };
+                let usage = if let (Some(prompt_eval_count), Some(eval_count)) =
+                    (stream_resp.prompt_eval_count, stream_resp.eval_count)
+                {
+                    Some(UsageMetadata::new(prompt_eval_count as i64, eval_count as i64))
                 } else {
-                    let mut chunk = ChatChunk::new(content);
-                    chunk.tool_calls = tool_calls;
+                    None
+                };
 
-                    yield OllamaStreamChunk {
-                        chunk,
-                        reasoning_content,
-                        generation_info: None,
-                    };
+                let generation_info = if is_done {
+                    Some(Self::build_generation_info(&stream_resp))
+                } else {
+                    None
+                };
+
+                let mut chunk = ChatChunk::new(content);
+                chunk.tool_calls = tool_calls;
+                chunk.usage_metadata = usage;
+                if is_done {
+                    chunk.is_final = true;
+                    chunk.finish_reason = stream_resp.done_reason.clone();
                 }
+
+                yield OllamaStreamChunk {
+                    chunk,
+                    reasoning_content,
+                    generation_info,
+                };
             }
         };
 
@@ -1073,9 +1110,9 @@ fn get_tool_calls_from_response(response: &OllamaResponse) -> Vec<ToolCall> {
         .map(|tcs| {
             tcs.iter()
                 .filter_map(|tc| {
-                    tc.function.as_ref().map(|f| {
-                        let args = parse_tool_call_arguments(f.arguments.as_ref(), &f.name);
-                        ToolCall::builder().name(&f.name).args(args).build()
+                    tc.function.as_ref().and_then(|f| {
+                        let args = parse_tool_call_arguments(f.arguments.as_ref(), &f.name).ok()?;
+                        Some(ToolCall::builder().name(&f.name).args(args).build())
                     })
                 })
                 .collect()
@@ -1090,15 +1127,19 @@ fn get_tool_calls_from_response(response: &OllamaResponse) -> Vec<ToolCall> {
 fn parse_tool_call_arguments(
     raw_args: Option<&serde_json::Value>,
     function_name: &str,
-) -> serde_json::Value {
+) -> Result<serde_json::Value> {
     let Some(args) = raw_args else {
-        return serde_json::json!({});
+        return Ok(serde_json::json!({}));
     };
 
     match args {
-        serde_json::Value::String(s) => {
-            serde_json::from_str(s).unwrap_or_else(|_| serde_json::json!({}))
-        }
+        serde_json::Value::String(s) => match serde_json::from_str::<serde_json::Value>(s) {
+            Ok(v) => Ok(v),
+            Err(e) => Err(Error::Other(format!(
+                "Function {} arguments:\n\n{}\n\nare not valid JSON. Received error: {}",
+                function_name, s, e
+            ))),
+        },
         serde_json::Value::Object(map) => {
             let mut parsed = serde_json::Map::new();
             for (key, value) in map {
@@ -1125,9 +1166,9 @@ fn parse_tool_call_arguments(
                     }
                 }
             }
-            serde_json::Value::Object(parsed)
+            Ok(serde_json::Value::Object(parsed))
         }
-        other => other.clone(),
+        other => Ok(other.clone()),
     }
 }
 
@@ -1173,7 +1214,17 @@ fn extract_content_and_images(content: &MessageContent) -> (String, Vec<String>)
                 }
             }
 
-            let combined_content = text_parts.join("\n");
+            let combined_content = if text_parts.is_empty() {
+                String::new()
+            } else {
+                // Match Python's `content += f"\n{part}"` which prepends newline to each part
+                let mut result = String::new();
+                for part in &text_parts {
+                    result.push('\n');
+                    result.push_str(part);
+                }
+                result
+            };
             (combined_content, images)
         }
     }
@@ -1357,28 +1408,28 @@ mod tests {
     #[test]
     fn test_parse_tool_call_arguments_string() {
         let args = serde_json::json!(r#"{"a": 1, "b": 2}"#);
-        let parsed = parse_tool_call_arguments(Some(&args), "test");
+        let parsed = parse_tool_call_arguments(Some(&args), "test").unwrap();
         assert_eq!(parsed, serde_json::json!({"a": 1, "b": 2}));
     }
 
     #[test]
     fn test_parse_tool_call_arguments_dict() {
         let args = serde_json::json!({"a": 1, "b": "hello"});
-        let parsed = parse_tool_call_arguments(Some(&args), "test");
+        let parsed = parse_tool_call_arguments(Some(&args), "test").unwrap();
         assert_eq!(parsed, serde_json::json!({"a": 1, "b": "hello"}));
     }
 
     #[test]
     fn test_parse_tool_call_arguments_filters_function_name() {
         let args = serde_json::json!({"a": 1, "functionName": "test"});
-        let parsed = parse_tool_call_arguments(Some(&args), "test");
+        let parsed = parse_tool_call_arguments(Some(&args), "test").unwrap();
         assert_eq!(parsed, serde_json::json!({"a": 1}));
     }
 
     #[test]
     fn test_parse_tool_call_arguments_nested_json_string() {
         let args = serde_json::json!({"a": r#"{"nested": true}"#});
-        let parsed = parse_tool_call_arguments(Some(&args), "test");
+        let parsed = parse_tool_call_arguments(Some(&args), "test").unwrap();
         assert_eq!(parsed, serde_json::json!({"a": {"nested": true}}));
     }
 
@@ -1426,7 +1477,7 @@ mod tests {
             },
         ]);
         let (text, images) = extract_content_and_images(&content);
-        assert_eq!(text, "What's in this image?");
+        assert_eq!(text, "\nWhat's in this image?");
         assert_eq!(images, vec!["abc123"]);
     }
 
@@ -1460,7 +1511,7 @@ mod tests {
         let formatted = model.format_messages(&messages);
         assert_eq!(formatted.len(), 1);
         assert_eq!(formatted[0]["role"], "user");
-        assert_eq!(formatted[0]["content"], "Describe this");
+        assert_eq!(formatted[0]["content"], "\nDescribe this");
         assert_eq!(formatted[0]["images"][0], "base64data");
     }
 }
