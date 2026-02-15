@@ -46,6 +46,7 @@
 use std::collections::HashMap;
 use std::env;
 use std::pin::Pin;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use backon::{ConstantBuilder, Retryable};
@@ -68,8 +69,7 @@ use crate::messages::{
 };
 use crate::outputs::ChatGenerationChunk;
 use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
-use crate::runnables::config::RunnableConfig;
-use crate::tools::ToolDefinition;
+use crate::tools::{BaseTool, ToolDefinition};
 
 /// Default API base URL for OpenAI.
 const DEFAULT_API_BASE: &str = "https://api.openai.com/v1";
@@ -224,6 +224,10 @@ pub struct ChatOpenAI {
     extra_body: Option<HashMap<String, serde_json::Value>>,
     chat_model_config: ChatModelConfig,
     language_model_config: LanguageModelConfig,
+    /// Tools bound to this model via `bind_tools()`.
+    bound_tools: Vec<ToolDefinition>,
+    /// Tool choice for bound tools.
+    bound_tool_choice: Option<ToolChoice>,
 }
 
 impl ChatOpenAI {
@@ -293,6 +297,8 @@ impl ChatOpenAI {
             extra_body: None,
             chat_model_config: ChatModelConfig::new(),
             language_model_config: LanguageModelConfig::new(),
+            bound_tools: Vec::new(),
+            bound_tool_choice: None,
         }
     }
 
@@ -1735,6 +1741,18 @@ impl BaseChatModel for ChatOpenAI {
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
+        if !self.bound_tools.is_empty() {
+            let ai_message = self
+                .generate_with_tools_internal(
+                    messages,
+                    &self.bound_tools,
+                    self.bound_tool_choice.as_ref(),
+                    stop,
+                )
+                .await?;
+            let generation = ChatGeneration::new(ai_message.into());
+            return Ok(ChatResult::new(vec![generation]));
+        }
         self._generate_internal(messages, stop, None).await
     }
 
@@ -1744,6 +1762,21 @@ impl BaseChatModel for ChatOpenAI {
         stop: Option<Vec<String>>,
         _run_manager: Option<&AsyncCallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
+        // When tools are bound, fall back to non-streaming generation
+        // since stream_internal doesn't support tool parameters yet.
+        if !self.bound_tools.is_empty() {
+            let ai_message = self
+                .generate_with_tools_internal(
+                    messages,
+                    &self.bound_tools,
+                    self.bound_tool_choice.as_ref(),
+                    stop,
+                )
+                .await?;
+            let chunk = ChatGenerationChunk::new(ai_message.into());
+            return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })) as ChatGenerationStream);
+        }
+
         let chat_stream = self.stream_internal(messages, stop).await?;
 
         let generation_stream = async_stream::stream! {
@@ -1781,13 +1814,36 @@ impl BaseChatModel for ChatOpenAI {
             .await
     }
 
-    async fn invoke(
+
+    fn bind_tools(
         &self,
-        input: LanguageModelInput,
-        _config: Option<&RunnableConfig>,
-    ) -> Result<AIMessage> {
-        self.invoke_with_stop(input, None).await
+        tools: &[Arc<dyn BaseTool>],
+        tool_choice: Option<ToolChoice>,
+    ) -> Result<Box<dyn BaseChatModel>> {
+        let mut bound = self.clone();
+        bound.bound_tools = tools.iter().map(|t| t.definition()).collect();
+        bound.bound_tool_choice = tool_choice;
+        Ok(Box::new(bound))
     }
+
+    fn with_structured_output(
+        &self,
+        schema: serde_json::Value,
+        _include_raw: bool,
+    ) -> Result<Box<dyn BaseChatModel>> {
+        let name = schema.get("title").and_then(|t| t.as_str()).unwrap_or("structured_output").to_string();
+        let description = schema.get("description").and_then(|d| d.as_str()).unwrap_or("").to_string();
+        let tool_def = ToolDefinition {
+            name,
+            description,
+            parameters: schema,
+        };
+        let mut bound = self.clone();
+        bound.bound_tools = vec![tool_def];
+        bound.bound_tool_choice = Some(ToolChoice::String("required".to_string()));
+        Ok(Box::new(bound))
+    }
+
 }
 
 impl ChatOpenAI {
