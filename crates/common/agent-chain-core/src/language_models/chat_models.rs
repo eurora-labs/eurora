@@ -559,7 +559,11 @@ pub trait BaseChatModel: BaseLanguageModel {
             return streaming;
         }
 
-        // Check if any streaming callback handlers are present
+        // TODO: Python checks for `_StreamingCallbackHandler` marker trait here,
+        // but we can't easily check for a marker trait in Rust. This returns true
+        // if ANY handlers are present, which is more permissive than the Python
+        // implementation. Consider adding a `is_streaming_handler()` method to
+        // `BaseCallbackHandler` to allow filtering.
         if let Some(handlers) = run_manager
             && !handlers.is_empty()
         {
@@ -600,11 +604,14 @@ pub trait BaseChatModel: BaseLanguageModel {
         callbacks: Option<Callbacks>,
         tags: Option<Vec<String>>,
         metadata: Option<HashMap<String, Value>>,
-        _run_name: Option<String>,
+        run_name: Option<String>,
         run_id: Option<uuid::Uuid>,
     ) -> Result<LLMResult> {
         use crate::callbacks::CallbackManager;
         use crate::outputs::RunInfo;
+
+        // TODO: Pass run_name to callback manager on_chat_model_start once it accepts a name parameter
+        let _run_name = run_name;
 
         // Get invocation params and options
         let params = self._get_invocation_params(stop.as_deref(), None);
@@ -747,11 +754,14 @@ pub trait BaseChatModel: BaseLanguageModel {
         callbacks: Option<Callbacks>,
         tags: Option<Vec<String>>,
         metadata: Option<HashMap<String, Value>>,
-        _run_name: Option<String>,
+        run_name: Option<String>,
         run_id: Option<uuid::Uuid>,
     ) -> Result<LLMResult> {
         use crate::callbacks::AsyncCallbackManager;
         use crate::outputs::RunInfo;
+
+        // TODO: Pass run_name to callback manager on_chat_model_start once it accepts a name parameter
+        let _run_name = run_name;
 
         // Get invocation params and options
         let params = self._get_invocation_params(stop.as_deref(), None);
@@ -794,23 +804,33 @@ pub trait BaseChatModel: BaseLanguageModel {
             .on_chat_model_start(&params, &messages, run_id)
             .await;
 
-        // Process each message list sequentially
-        let mut results = Vec::new();
-        for (i, message_list) in messages.iter().enumerate() {
-            let run_manager = run_managers.get(i);
+        // Process each message list concurrently (matches Python's asyncio.gather)
+        let futures: Vec<_> = messages
+            .iter()
+            .enumerate()
+            .map(|(i, message_list)| {
+                let message_list = message_list.clone();
+                let stop = stop.clone();
+                let run_manager = run_managers.get(i);
+                async move {
+                    let result = self
+                        ._agenerate_with_cache(message_list, stop, run_manager)
+                        .await;
+                    (i, result)
+                }
+            })
+            .collect();
 
-            match self
-                ._agenerate_with_cache(message_list.clone(), stop.clone(), run_manager)
-                .await
-            {
-                Ok(result) => {
-                    results.push(result);
+        let settled = futures::future::join_all(futures).await;
+
+        let mut results = Vec::with_capacity(settled.len());
+        for (i, result) in settled {
+            match result {
+                Ok(chat_result) => {
+                    results.push(chat_result);
                 }
                 Err(e) => {
-                    // Report error to run manager
-                    // Note: We use get_sync() because on_llm_error takes &dyn Error which is not Sync,
-                    // and we can't hold a non-Sync reference across an await point.
-                    if let Some(rm) = run_manager {
+                    if let Some(rm) = run_managers.get(i) {
                         rm.get_sync().on_llm_error(&e);
                     }
                     return Err(e);
@@ -911,17 +931,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             let llm_string = self._get_llm_string(stop.as_deref(), None);
             let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
             if let Some(cached) = cache.lookup(&prompt_key, &llm_string) {
-                // Convert cached Generation objects to ChatGeneration
-                let generations: Vec<crate::outputs::ChatGeneration> = cached
-                    .into_iter()
-                    .map(|generation| {
-                        crate::outputs::ChatGeneration::new(BaseMessage::AI(
-                            crate::messages::AIMessage::builder()
-                                .content(&generation.text)
-                                .build(),
-                        ))
-                    })
-                    .collect();
+                let generations = self._convert_cached_generations(cached);
                 return Ok(crate::outputs::ChatResult::new(generations));
             }
         }
@@ -1005,17 +1015,8 @@ pub trait BaseChatModel: BaseLanguageModel {
         if let Some(ref cache) = resolved_cache {
             let llm_string = self._get_llm_string(stop.as_deref(), None);
             let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
-            if let Some(cached) = cache.lookup(&prompt_key, &llm_string) {
-                let generations: Vec<crate::outputs::ChatGeneration> = cached
-                    .into_iter()
-                    .map(|generation| {
-                        crate::outputs::ChatGeneration::new(BaseMessage::AI(
-                            crate::messages::AIMessage::builder()
-                                .content(&generation.text)
-                                .build(),
-                        ))
-                    })
-                    .collect();
+            if let Some(cached) = cache.alookup(&prompt_key, &llm_string).await {
+                let generations = self._convert_cached_generations(cached);
                 return Ok(crate::outputs::ChatResult::new(generations));
             }
         }
@@ -1059,7 +1060,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                     crate::outputs::Generation::new(generation.message.content().to_string())
                 })
                 .collect();
-            cache.update(&prompt_key, &llm_string, generations);
+            cache.aupdate(&prompt_key, &llm_string, generations).await;
         }
 
         Ok(result)
@@ -1535,10 +1536,11 @@ pub async fn agenerate_from_stream(
 ) -> Result<ChatResult> {
     use futures::StreamExt;
 
-    let chunks: Vec<ChatGenerationChunk> = stream
-        .filter_map(|result| async { result.ok() })
-        .collect()
-        .await;
+    let mut chunks = Vec::new();
+    futures::pin_mut!(stream);
+    while let Some(result) = stream.next().await {
+        chunks.push(result?);
+    }
 
     if chunks.is_empty() {
         return Err(Error::Other("No generations found in stream.".into()));

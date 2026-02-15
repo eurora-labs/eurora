@@ -3,9 +3,11 @@
 //! This module provides functions for rendering graphs as Mermaid syntax,
 //! mirroring `langchain_core.runnables.graph_mermaid`.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde_json::Value;
+
+use crate::error::{Error, Result};
 
 use super::graph::{Edge, Node, NodeStyles};
 
@@ -82,7 +84,7 @@ pub fn draw_mermaid(
     node_styles: &NodeStyles,
     wrap_label_n_words: usize,
     frontmatter_config: Option<&HashMap<String, Value>>,
-) -> String {
+) -> Result<String> {
     // Build frontmatter config with curve style
     let original_config = frontmatter_config.cloned().unwrap_or_default();
 
@@ -105,10 +107,7 @@ pub fn draw_mermaid(
         let mut full_config = original_config.clone();
         full_config.insert("config".to_string(), Value::Object(config_obj));
 
-        let yaml_str = value_to_yaml(
-            &serde_json::to_value(&full_config).unwrap_or(Value::Null),
-            0,
-        );
+        let yaml_str = value_to_yaml(&serde_json::to_value(&full_config)?, 0);
         format!("---\n{}\n---\ngraph TD;\n", yaml_str)
     } else {
         "graph TD;\n".to_string()
@@ -195,7 +194,7 @@ pub fn draw_mermaid(
         edge_groups.entry(common_prefix).or_default().push(edge);
     }
 
-    let mut seen_subgraphs: Vec<String> = Vec::new();
+    let mut seen_subgraphs: HashSet<String> = HashSet::new();
 
     // Recursive subgraph rendering
     #[allow(clippy::too_many_arguments)]
@@ -209,13 +208,19 @@ pub fn draw_mermaid(
         _last_node: Option<&str>,
         with_styles: bool,
         wrap_label_n_words: usize,
-        seen_subgraphs: &mut Vec<String>,
+        seen_subgraphs: &mut HashSet<String>,
         render_node: &dyn Fn(&str, &Node, &str) -> String,
-    ) {
+    ) -> Result<()> {
         let self_loop = edges.len() == 1 && edges[0].source == edges[0].target;
         if !prefix.is_empty() && !self_loop {
             let subgraph = prefix.rsplit(':').next().unwrap_or(prefix);
-            seen_subgraphs.push(subgraph.to_string());
+            if seen_subgraphs.contains(subgraph) {
+                return Err(Error::Other(format!(
+                    "Found duplicate subgraph '{}' -- this likely means that                      you're reusing a subgraph node with the same name.                      Please adjust your graph to have subgraph nodes with unique names.",
+                    subgraph
+                )));
+            }
+            seen_subgraphs.insert(subgraph.to_string());
             mermaid_graph.push_str(&format!("\tsubgraph {}\n", subgraph));
 
             // Add nodes belonging to this subgraph
@@ -294,13 +299,15 @@ pub fn draw_mermaid(
                     wrap_label_n_words,
                     seen_subgraphs,
                     render_node,
-                );
+                )?;
             }
         }
 
         if !prefix.is_empty() && !self_loop {
             mermaid_graph.push_str("\tend\n");
         }
+
+        Ok(())
     }
 
     // Start with top-level edges
@@ -317,7 +324,7 @@ pub fn draw_mermaid(
             wrap_label_n_words,
             &mut seen_subgraphs,
             &render_node,
-        );
+        )?;
     }
 
     // Add remaining top-level subgraphs
@@ -341,7 +348,7 @@ pub fn draw_mermaid(
                 wrap_label_n_words,
                 &mut seen_subgraphs,
                 &render_node,
-            );
+            )?;
         }
     }
 
@@ -355,6 +362,12 @@ pub fn draw_mermaid(
 
         for prefix in empty_prefixes {
             let subgraph = prefix.rsplit(':').next().unwrap_or(prefix);
+            if seen_subgraphs.contains(subgraph) {
+                return Err(Error::Other(format!(
+                    "Found duplicate subgraph '{}' -- this likely means that                      you're reusing a subgraph node with the same name.                      Please adjust your graph to have subgraph nodes with unique names.",
+                    subgraph
+                )));
+            }
             mermaid_graph.push_str(&format!("\tsubgraph {}\n", subgraph));
             if let Some(sub_nodes) = subgraph_nodes.get(prefix.as_str()) {
                 let mut sorted = sub_nodes.clone();
@@ -364,7 +377,7 @@ pub fn draw_mermaid(
                 }
             }
             mermaid_graph.push_str("\tend\n");
-            seen_subgraphs.push(subgraph.to_string());
+            seen_subgraphs.insert(subgraph.to_string());
         }
     }
 
@@ -373,7 +386,7 @@ pub fn draw_mermaid(
         mermaid_graph += &generate_mermaid_graph_styles(node_styles);
     }
 
-    mermaid_graph
+    Ok(mermaid_graph)
 }
 
 /// Generate Mermaid graph styles for different node types.
