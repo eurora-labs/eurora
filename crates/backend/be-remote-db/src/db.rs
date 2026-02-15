@@ -1,16 +1,13 @@
 use crate::{
-    GetConversation, MessageType, PaginationParams,
+    MessageType, PaginationParams,
     error::{DbError, DbResult},
     types::{
-        Activity, ActivityAsset, Asset, AssetStatus, Conversation, CreateLoginToken,
-        CreateOAuthCredentials, CreateOAuthState, CreateRefreshToken, GetActivitiesByTimeRange,
-        ListActivities, ListConversations, LoginToken, Message, NewActivity, NewAsset,
-        NewConversation, NewUser, OAuthCredentials, OAuthProvider, OAuthState, PasswordCredentials,
-        RefreshToken, UpdateActivity, UpdateActivityEndTime, UpdateOAuthCredentials, User,
+        Activity, ActivityAsset, Asset, AssetStatus, Conversation, LoginToken, Message,
+        OAuthCredentials, OAuthProvider, OAuthState, PasswordCredentials, RefreshToken, User,
     },
 };
 use bon::bon;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use sqlx::{
     migrate::MigrateDatabase,
     postgres::{PgPool, PgPoolOptions},
@@ -51,7 +48,14 @@ impl DatabaseManager {
         Ok(())
     }
 
-    pub async fn create_user(&self, request: NewUser) -> DbResult<User> {
+    #[builder]
+    pub async fn create_user(
+        &self,
+        username: String,
+        email: String,
+        display_name: Option<String>,
+        password_hash: Option<String>,
+    ) -> DbResult<User> {
         let user_id = Uuid::now_v7();
         let now = Utc::now();
 
@@ -65,9 +69,9 @@ impl DatabaseManager {
             "#,
         )
         .bind(user_id)
-        .bind(&request.username)
-        .bind(&request.email)
-        .bind(&request.display_name)
+        .bind(&username)
+        .bind(&email)
+        .bind(&display_name)
         .bind(false) // email_verified defaults to false
         .bind(now)
         .bind(now) // updated_at is NOT NULL, set to now initially
@@ -75,7 +79,7 @@ impl DatabaseManager {
         .await?;
 
         // OAuth-only users don't have password credentials
-        if let Some(ref password_hash) = request.password_hash {
+        if let Some(ref password_hash) = password_hash {
             let password_id = Uuid::now_v7();
             sqlx::query(
                 r#"
@@ -183,9 +187,16 @@ impl DatabaseManager {
         Ok(count.0 > 0)
     }
 
+    #[builder]
     pub async fn create_oauth_credentials(
         &self,
-        request: CreateOAuthCredentials,
+        user_id: Uuid,
+        provider: OAuthProvider,
+        provider_user_id: String,
+        access_token: Option<Vec<u8>>,
+        refresh_token: Option<Vec<u8>>,
+        access_token_expiry: Option<DateTime<Utc>>,
+        scope: Option<String>,
     ) -> DbResult<OAuthCredentials> {
         let id = Uuid::now_v7();
         let now = Utc::now();
@@ -202,13 +213,13 @@ impl DatabaseManager {
             "#,
         )
         .bind(id)
-        .bind(request.user_id)
-        .bind(request.provider)
-        .bind(&request.provider_user_id)
-        .bind(&request.access_token)
-        .bind(&request.refresh_token)
-        .bind(request.access_token_expiry)
-        .bind(&request.scope)
+        .bind(user_id)
+        .bind(provider)
+        .bind(&provider_user_id)
+        .bind(&access_token)
+        .bind(&refresh_token)
+        .bind(access_token_expiry)
+        .bind(&scope)
         .bind(now)
         .bind(now)
         .bind(now)
@@ -239,10 +250,14 @@ impl DatabaseManager {
         Ok(oauth_creds)
     }
 
+    #[builder]
     pub async fn update_oauth_credentials(
         &self,
         id: Uuid,
-        request: UpdateOAuthCredentials,
+        access_token: Option<Vec<u8>>,
+        refresh_token: Option<Vec<u8>>,
+        access_token_expiry: Option<DateTime<Utc>>,
+        scope: Option<String>,
     ) -> DbResult<OAuthCredentials> {
         let now = Utc::now();
 
@@ -260,10 +275,10 @@ impl DatabaseManager {
             "#,
         )
         .bind(id)
-        .bind(&request.access_token)
-        .bind(&request.refresh_token)
-        .bind(request.access_token_expiry)
-        .bind(&request.scope)
+        .bind(&access_token)
+        .bind(&refresh_token)
+        .bind(access_token_expiry)
+        .bind(&scope)
         .bind(now)
         .fetch_one(&self.pool)
         .await?;
@@ -292,9 +307,12 @@ impl DatabaseManager {
         Ok(user)
     }
 
+    #[builder]
     pub async fn create_refresh_token(
         &self,
-        request: CreateRefreshToken,
+        user_id: Uuid,
+        token_hash: Vec<u8>,
+        expires_at: DateTime<Utc>,
     ) -> DbResult<RefreshToken> {
         let id = Uuid::now_v7();
         let now = Utc::now();
@@ -307,10 +325,10 @@ impl DatabaseManager {
             "#,
         )
         .bind(id)
-        .bind(request.user_id)
-        .bind(&request.token_hash)
+        .bind(user_id)
+        .bind(&token_hash)
         .bind(now)
-        .bind(request.expires_at)
+        .bind(expires_at)
         .bind(false)
         .bind(now)
         .bind(now)
@@ -354,7 +372,16 @@ impl DatabaseManager {
         Ok(refresh_token)
     }
 
-    pub async fn create_oauth_state(&self, request: CreateOAuthState) -> DbResult<OAuthState> {
+    #[builder]
+    pub async fn create_oauth_state(
+        &self,
+        state: String,
+        pkce_verifier: Vec<u8>,
+        redirect_uri: String,
+        ip_address: Option<ipnet::IpNet>,
+        expires_at: DateTime<Utc>,
+        nonce: Vec<u8>,
+    ) -> DbResult<OAuthState> {
         let id = Uuid::now_v7();
         let now = Utc::now();
 
@@ -366,15 +393,15 @@ impl DatabaseManager {
             "#,
         )
         .bind(id)
-        .bind(&request.state)
-        .bind(&request.pkce_verifier)
-        .bind(&request.redirect_uri)
-        .bind(request.ip_address)
+        .bind(&state)
+        .bind(&pkce_verifier)
+        .bind(&redirect_uri)
+        .bind(ip_address)
         .bind(false) // consumed defaults to false
         .bind(now)
         .bind(now)
-        .bind(request.expires_at)
-        .bind(&request.nonce)
+        .bind(expires_at)
+        .bind(&nonce)
         .fetch_one(&self.pool)
         .await?;
 
@@ -415,7 +442,13 @@ impl DatabaseManager {
         Ok(oauth_state)
     }
 
-    pub async fn create_login_token(&self, request: CreateLoginToken) -> DbResult<LoginToken> {
+    #[builder]
+    pub async fn create_login_token(
+        &self,
+        token_hash: Vec<u8>,
+        user_id: Uuid,
+        expires_at: DateTime<Utc>,
+    ) -> DbResult<LoginToken> {
         let id = Uuid::now_v7();
         let now = Utc::now();
 
@@ -427,9 +460,9 @@ impl DatabaseManager {
             "#,
         )
         .bind(id)
-        .bind(&request.token_hash)
-        .bind(request.expires_at)
-        .bind(request.user_id)
+        .bind(&token_hash)
+        .bind(expires_at)
+        .bind(user_id)
         .bind(false) // consumed starts as false
         .bind(now)
         .bind(now)
@@ -494,8 +527,19 @@ impl DatabaseManager {
     // Activity Management Methods
     // =========================================================================
 
-    pub async fn create_activity(&self, request: NewActivity) -> DbResult<Activity> {
-        let id = request.id.unwrap_or_else(Uuid::now_v7);
+    #[builder]
+    pub async fn create_activity(
+        &self,
+        id: Option<Uuid>,
+        user_id: Uuid,
+        name: String,
+        icon_asset_id: Option<Uuid>,
+        process_name: String,
+        window_title: String,
+        started_at: DateTime<Utc>,
+        ended_at: Option<DateTime<Utc>>,
+    ) -> DbResult<Activity> {
+        let id = id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
 
         let activity = sqlx::query_as::<_, Activity>(
@@ -506,13 +550,13 @@ impl DatabaseManager {
             "#,
         )
         .bind(id)
-        .bind(request.user_id)
-        .bind(&request.name)
-        .bind(request.icon_asset_id)
-        .bind(&request.process_name)
-        .bind(&request.window_title)
-        .bind(request.started_at)
-        .bind(request.ended_at)
+        .bind(user_id)
+        .bind(&name)
+        .bind(icon_asset_id)
+        .bind(&process_name)
+        .bind(&window_title)
+        .bind(started_at)
+        .bind(ended_at)
         .bind(now)
         .bind(now)
         .fetch_one(&self.pool)
@@ -541,9 +585,10 @@ impl DatabaseManager {
         Ok(activity)
     }
 
+    #[builder]
     pub async fn list_activities(
         &self,
-        request: ListActivities,
+        user_id: Uuid,
         params: PaginationParams,
     ) -> DbResult<Vec<Activity>> {
         let query = format!(
@@ -558,7 +603,7 @@ impl DatabaseManager {
         );
 
         let activities = sqlx::query_as::<_, Activity>(&query)
-            .bind(request.user_id)
+            .bind(user_id)
             .bind(params.limit())
             .bind(params.offset())
             .fetch_all(&self.pool)
@@ -567,7 +612,18 @@ impl DatabaseManager {
         Ok(activities)
     }
 
-    pub async fn update_activity(&self, request: UpdateActivity) -> DbResult<Activity> {
+    #[builder]
+    pub async fn update_activity(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+        name: Option<String>,
+        icon_asset_id: Option<Uuid>,
+        process_name: Option<String>,
+        window_title: Option<String>,
+        started_at: Option<DateTime<Utc>>,
+        ended_at: Option<DateTime<Utc>>,
+    ) -> DbResult<Activity> {
         let now = Utc::now();
 
         let activity = sqlx::query_as::<_, Activity>(
@@ -584,14 +640,14 @@ impl DatabaseManager {
             RETURNING id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             "#,
         )
-        .bind(request.id)
-        .bind(request.user_id)
-        .bind(&request.name)
-        .bind(request.icon_asset_id)
-        .bind(&request.process_name)
-        .bind(&request.window_title)
-        .bind(request.started_at)
-        .bind(request.ended_at)
+        .bind(id)
+        .bind(user_id)
+        .bind(&name)
+        .bind(icon_asset_id)
+        .bind(&process_name)
+        .bind(&window_title)
+        .bind(started_at)
+        .bind(ended_at)
         .bind(now)
         .fetch_one(&self.pool)
         .await?;
@@ -599,7 +655,13 @@ impl DatabaseManager {
         Ok(activity)
     }
 
-    pub async fn update_activity_end_time(&self, request: UpdateActivityEndTime) -> DbResult<()> {
+    #[builder]
+    pub async fn update_activity_end_time(
+        &self,
+        activity_id: Uuid,
+        user_id: Uuid,
+        ended_at: DateTime<Utc>,
+    ) -> DbResult<()> {
         let now = Utc::now();
 
         sqlx::query(
@@ -609,9 +671,9 @@ impl DatabaseManager {
             WHERE id = $1 AND user_id = $2
             "#,
         )
-        .bind(request.activity_id)
-        .bind(request.user_id)
-        .bind(request.ended_at)
+        .bind(activity_id)
+        .bind(user_id)
+        .bind(ended_at)
         .bind(now)
         .execute(&self.pool)
         .await?;
@@ -652,9 +714,12 @@ impl DatabaseManager {
         Ok(activity)
     }
 
+    #[builder]
     pub async fn get_activities_by_time_range(
         &self,
-        request: GetActivitiesByTimeRange,
+        user_id: Uuid,
+        start_time: DateTime<Utc>,
+        end_time: DateTime<Utc>,
         params: PaginationParams,
     ) -> DbResult<Vec<Activity>> {
         let query = format!(
@@ -671,9 +736,9 @@ impl DatabaseManager {
         );
 
         let activities = sqlx::query_as::<_, Activity>(&query)
-            .bind(request.user_id)
-            .bind(request.start_time)
-            .bind(request.end_time)
+            .bind(user_id)
+            .bind(start_time)
+            .bind(end_time)
             .bind(params.limit())
             .bind(params.offset())
             .fetch_all(&self.pool)
@@ -686,11 +751,24 @@ impl DatabaseManager {
     // Asset Management Methods
     // =========================================================================
 
-    pub async fn create_asset(&self, request: NewAsset) -> DbResult<Asset> {
-        let id = request.id.unwrap_or_else(Uuid::now_v7);
+    #[builder]
+    pub async fn create_asset(
+        &self,
+        id: Option<Uuid>,
+        user_id: Uuid,
+        name: String,
+        mime_type: String,
+        size_bytes: Option<i64>,
+        checksum_sha256: Option<Vec<u8>>,
+        storage_backend: String,
+        storage_uri: String,
+        status: Option<AssetStatus>,
+        metadata: Option<serde_json::Value>,
+    ) -> DbResult<Asset> {
+        let id = id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
-        let metadata = request.metadata.unwrap_or_else(|| serde_json::json!({}));
-        let status = request.status.unwrap_or(AssetStatus::Uploaded);
+        let metadata = metadata.unwrap_or_else(|| serde_json::json!({}));
+        let status = status.unwrap_or(AssetStatus::Uploaded);
 
         let asset = sqlx::query_as::<_, Asset>(
             r#"
@@ -700,13 +778,13 @@ impl DatabaseManager {
             "#,
         )
         .bind(id)
-        .bind(request.user_id)
-        .bind(&request.name)
-        .bind(&request.mime_type)
-        .bind(request.size_bytes)
-        .bind(&request.checksum_sha256)
-        .bind(&request.storage_backend)
-        .bind(&request.storage_uri)
+        .bind(user_id)
+        .bind(&name)
+        .bind(&mime_type)
+        .bind(size_bytes)
+        .bind(&checksum_sha256)
+        .bind(&storage_backend)
+        .bind(&storage_uri)
         .bind(status)
         .bind(&metadata)
         .bind(now)
@@ -753,8 +831,14 @@ impl DatabaseManager {
     // Conversation Management Methods
     // =========================================================================
 
-    pub async fn create_conversation(&self, request: NewConversation) -> DbResult<Conversation> {
-        let id = request.id.unwrap_or_else(Uuid::now_v7);
+    #[builder]
+    pub async fn create_conversation(
+        &self,
+        id: Option<Uuid>,
+        user_id: Uuid,
+        title: String,
+    ) -> DbResult<Conversation> {
+        let id = id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
 
         let conversation = sqlx::query_as::<_, Conversation>(
@@ -765,8 +849,8 @@ impl DatabaseManager {
             "#,
         )
         .bind(id)
-        .bind(request.user_id)
-        .bind(&request.title)
+        .bind(user_id)
+        .bind(&title)
         .bind(now)
         .bind(now)
         .fetch_one(&self.pool)
@@ -775,7 +859,8 @@ impl DatabaseManager {
         Ok(conversation)
     }
 
-    pub async fn get_conversation(&self, request: GetConversation) -> DbResult<Conversation> {
+    #[builder]
+    pub async fn get_conversation(&self, id: Uuid, user_id: Uuid) -> DbResult<Conversation> {
         let conversation = sqlx::query_as::<_, Conversation>(
             r#"
             SELECT id, user_id, title, created_at, updated_at
@@ -783,8 +868,8 @@ impl DatabaseManager {
             WHERE id = $1 AND user_id = $2
             "#,
         )
-        .bind(request.id)
-        .bind(request.user_id)
+        .bind(id)
+        .bind(user_id)
         .fetch_one(&self.pool)
         .await?;
 
@@ -818,9 +903,10 @@ impl DatabaseManager {
         Ok(conversation)
     }
 
+    #[builder]
     pub async fn list_conversations(
         &self,
-        request: ListConversations,
+        user_id: Uuid,
         params: PaginationParams,
     ) -> DbResult<Vec<Conversation>> {
         let query = format!(
@@ -835,7 +921,7 @@ impl DatabaseManager {
         );
 
         let conversations = sqlx::query_as::<_, Conversation>(&query)
-            .bind(request.user_id)
+            .bind(user_id)
             .bind(params.limit())
             .bind(params.offset())
             .fetch_all(&self.pool)

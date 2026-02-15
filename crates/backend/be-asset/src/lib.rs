@@ -4,7 +4,7 @@ pub use error::{AssetError, AssetResult};
 
 use std::sync::Arc;
 
-use be_remote_db::{DatabaseManager, NewAsset};
+use be_remote_db::DatabaseManager;
 use be_storage::StorageService;
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
@@ -96,30 +96,31 @@ impl AssetService {
                 AssetError::StorageUpload(e)
             })?;
 
-        let metadata = req
+        let metadata: Option<serde_json::Value> = req
             .metadata
             .as_ref()
             .map(|m| serde_json::from_str(m))
             .transpose()
             .map_err(AssetError::InvalidMetadata)?;
 
-        let db_request = NewAsset {
-            id: Some(asset_id),
-            user_id,
-            name: req.name,
-            checksum_sha256: Some(checksum_sha256),
-            size_bytes: Some(size_bytes),
-            storage_uri,
-            storage_backend: self.storage.get_backend_name().to_string(),
-            mime_type: req.mime_type,
-            status: None,
-            metadata,
-        };
-
-        let asset = self.db.create_asset(db_request).await.map_err(|e| {
-            error!("Failed to create asset in database: {}", e);
-            AssetError::DatabaseCreate(e)
-        })?;
+        let asset = self
+            .db
+            .create_asset()
+            .id(asset_id)
+            .user_id(user_id)
+            .name(req.name)
+            .checksum_sha256(checksum_sha256)
+            .size_bytes(size_bytes)
+            .storage_uri(storage_uri)
+            .storage_backend(self.storage.get_backend_name().to_string())
+            .mime_type(req.mime_type)
+            .maybe_metadata(metadata)
+            .call()
+            .await
+            .map_err(|e| {
+                error!("Failed to create asset in database: {}", e);
+                AssetError::DatabaseCreate(e)
+            })?;
 
         if let Some(activity_id_str) = &req.activity_id {
             let activity_id =

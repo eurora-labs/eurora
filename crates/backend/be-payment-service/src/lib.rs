@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use axum::{
-    Extension, Router,
+    Router,
     extract::DefaultBodyLimit,
     routing::{get, post},
 };
@@ -49,8 +49,6 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .finish()
         .expect("valid governor config");
 
-    let jwt_config = state.jwt_config.clone();
-
     let checkout_route = Router::new()
         .route("/payment/checkout", post(handlers::create_checkout_session))
         .layer(GovernorLayer::new(Arc::new(checkout_governor)));
@@ -71,7 +69,6 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     checkout_route
         .merge(authed_routes)
         .merge(webhook_route)
-        .layer(Extension(jwt_config))
         .layer(DefaultBodyLimit::max(1024 * 1024))
         .layer(
             ServiceBuilder::new()

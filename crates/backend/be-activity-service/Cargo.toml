@@ -9,7 +9,7 @@ ignored = ["tonic-prost"]
 
 [dependencies]
 be-asset = { workspace = true }
-be-auth-grpc = { workspace = true }
+be-authz = { workspace = true }
 be-remote-db = { workspace = true }
 be-storage = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }

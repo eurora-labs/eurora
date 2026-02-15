@@ -1,10 +1,8 @@
 use std::sync::Arc;
 
 use be_asset::AssetService;
-use be_auth_grpc::{Role, extract_claims, parse_user_id, require_role};
-use be_remote_db::{
-    DatabaseManager, ListActivities, NewActivity, PaginationParams, UpdateActivity,
-};
+use be_authz::{extract_claims, parse_user_id};
+use be_remote_db::{DatabaseManager, PaginationParams};
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
 use proto_gen::asset::CreateAssetRequest;
@@ -94,10 +92,14 @@ impl ProtoActivityService for ActivityService {
 
         let activities = self
             .db
-            .list_activities(
-                ListActivities { user_id },
-                PaginationParams::new(req.offset, req.limit, "DESC".to_string()),
-            )
+            .list_activities()
+            .user_id(user_id)
+            .params(PaginationParams::new(
+                req.offset,
+                req.limit,
+                "DESC".to_string(),
+            ))
+            .call()
             .await
             .map_err(ActivityServiceError::from)?;
 
@@ -122,7 +124,6 @@ impl ProtoActivityService for ActivityService {
         info!("InsertActivity request received");
 
         let claims = extract_claims(&request)?;
-        require_role(claims, Role::Tier1)?;
         let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
@@ -140,16 +141,15 @@ impl ProtoActivityService for ActivityService {
 
         let activity = self
             .db
-            .create_activity(NewActivity {
-                id,
-                user_id,
-                name: req.name.clone(),
-                icon_asset_id: None,
-                process_name: req.process_name.clone(),
-                window_title: req.window_title.clone(),
-                started_at,
-                ended_at,
-            })
+            .create_activity()
+            .maybe_id(id)
+            .user_id(user_id)
+            .name(req.name.clone())
+            .process_name(req.process_name.clone())
+            .window_title(req.window_title.clone())
+            .started_at(started_at)
+            .maybe_ended_at(ended_at)
+            .call()
             .await
             .map_err(ActivityServiceError::from)?;
         info!("Created activity at: {:?}", activity.created_at);
@@ -179,12 +179,11 @@ impl ProtoActivityService for ActivityService {
         };
 
         self.db
-            .update_activity(UpdateActivity {
-                id: activity.id,
-                user_id,
-                icon_asset_id: icon_id,
-                ..Default::default()
-            })
+            .update_activity()
+            .id(activity.id)
+            .user_id(user_id)
+            .maybe_icon_asset_id(icon_id)
+            .call()
             .await
             .map_err(ActivityServiceError::Database)?;
 
