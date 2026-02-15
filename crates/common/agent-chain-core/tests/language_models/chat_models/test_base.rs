@@ -612,7 +612,9 @@ async fn test_disable_streaming_async() {
 
     // Test Bool(true)
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::Bool(true));
-    let result = model.invoke(LanguageModelInput::Messages(vec![])).await;
+    let result = model
+        .invoke(LanguageModelInput::Messages(vec![]), None)
+        .await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap().content, "invoke");
 
@@ -632,7 +634,9 @@ async fn test_disable_streaming_no_streaming_model() {
     // Python equivalent: test_disable_streaming_no_streaming_model()
 
     let model = NoStreamingModel::new().with_disable_streaming(DisableStreaming::Bool(true));
-    let result = model.invoke(LanguageModelInput::Messages(vec![])).await;
+    let result = model
+        .invoke(LanguageModelInput::Messages(vec![]), None)
+        .await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap().content, "invoke");
 
@@ -652,7 +656,9 @@ async fn test_disable_streaming_no_streaming_model_async() {
         DisableStreaming::ToolCalling,
     ] {
         let model = NoStreamingModel::new().with_disable_streaming(disable);
-        let result = model.ainvoke(LanguageModelInput::Messages(vec![])).await;
+        let result = model
+            .ainvoke(LanguageModelInput::Messages(vec![]), None)
+            .await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().content, "invoke");
     }
@@ -820,7 +826,7 @@ async fn test_async_batch_size() {
 
     // Test basic async operation works
     let llm = FakeListChatModel::new(vec!["test".to_string()]);
-    let result = llm.invoke(LanguageModelInput::Messages(vec![])).await;
+    let result = llm.invoke(LanguageModelInput::Messages(vec![]), None).await;
     assert!(result.is_ok());
 }
 
@@ -1033,7 +1039,7 @@ async fn test_invoke_basic() {
 
     let model = FakeListChatModel::new(vec!["hello world".to_string()]);
     let result = model
-        .invoke(LanguageModelInput::Text("test".to_string()))
+        .invoke(LanguageModelInput::Text("test".to_string()), None)
         .await;
 
     assert!(result.is_ok());
@@ -1046,7 +1052,7 @@ async fn test_ainvoke_basic() {
 
     let model = FakeListChatModel::new(vec!["async hello".to_string()]);
     let result = model
-        .ainvoke(LanguageModelInput::Text("test".to_string()))
+        .ainvoke(LanguageModelInput::Text("test".to_string()), None)
         .await;
 
     assert!(result.is_ok());

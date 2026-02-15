@@ -191,11 +191,9 @@ impl JsonOutputFunctionsParser {
                     if self.args_only {
                         Ok(Some(parsed_arguments))
                     } else {
-                        let name = function_call.get("name").cloned().unwrap_or(Value::Null);
-                        Ok(Some(serde_json::json!({
-                            "arguments": parsed_arguments,
-                            "name": name,
-                        })))
+                        let mut result_obj = function_call.clone();
+                        result_obj["arguments"] = parsed_arguments;
+                        Ok(Some(result_obj))
                     }
                 }
                 Err(_) => Ok(None),
@@ -220,11 +218,9 @@ impl JsonOutputFunctionsParser {
             if self.args_only {
                 Ok(Some(parsed_arguments))
             } else {
-                let name = function_call.get("name").cloned().unwrap_or(Value::Null);
-                Ok(Some(serde_json::json!({
-                    "arguments": parsed_arguments,
-                    "name": name,
-                })))
+                let mut result_obj = function_call.clone();
+                result_obj["arguments"] = parsed_arguments;
+                Ok(Some(result_obj))
             }
         }
     }
@@ -585,18 +581,16 @@ fn parse_json_lenient(input: &str) -> std::result::Result<Value, String> {
             continue;
         }
 
-        if in_string && character == '\n' {
-            result.push_str("\\n");
-            continue;
-        }
-
-        if in_string && character == '\r' {
-            result.push_str("\\r");
-            continue;
-        }
-
-        if in_string && character == '\t' {
-            result.push_str("\\t");
+        if in_string && character.is_control() {
+            match character {
+                '\n' => result.push_str("\\n"),
+                '\r' => result.push_str("\\r"),
+                '\t' => result.push_str("\\t"),
+                c => {
+                    // Escape other control characters as \uXXXX
+                    result.push_str(&format!("\\u{:04x}", c as u32));
+                }
+            }
             continue;
         }
 

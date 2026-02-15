@@ -216,7 +216,7 @@ pub fn draw_mermaid(
             let subgraph = prefix.rsplit(':').next().unwrap_or(prefix);
             if seen_subgraphs.contains(subgraph) {
                 return Err(Error::Other(format!(
-                    "Found duplicate subgraph '{}' -- this likely means that                      you're reusing a subgraph node with the same name.                      Please adjust your graph to have subgraph nodes with unique names.",
+                    "Found duplicate subgraph '{}' -- this likely means that you're reusing a subgraph node with the same name. Please adjust your graph to have subgraph nodes with unique names.",
                     subgraph
                 )));
             }
@@ -364,7 +364,7 @@ pub fn draw_mermaid(
             let subgraph = prefix.rsplit(':').next().unwrap_or(prefix);
             if seen_subgraphs.contains(subgraph) {
                 return Err(Error::Other(format!(
-                    "Found duplicate subgraph '{}' -- this likely means that                      you're reusing a subgraph node with the same name.                      Please adjust your graph to have subgraph nodes with unique names.",
+                    "Found duplicate subgraph '{}' -- this likely means that you're reusing a subgraph node with the same name. Please adjust your graph to have subgraph nodes with unique names.",
                     subgraph
                 )));
             }

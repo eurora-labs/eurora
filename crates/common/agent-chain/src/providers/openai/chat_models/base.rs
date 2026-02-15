@@ -68,6 +68,7 @@ use crate::messages::{
 };
 use crate::outputs::ChatGenerationChunk;
 use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
+use crate::runnables::config::RunnableConfig;
 use crate::tools::ToolDefinition;
 
 /// Default API base URL for OpenAI.
@@ -1780,7 +1781,11 @@ impl BaseChatModel for ChatOpenAI {
             .await
     }
 
-    async fn invoke(&self, input: LanguageModelInput) -> Result<AIMessage> {
+    async fn invoke(
+        &self,
+        input: LanguageModelInput,
+        _config: Option<&RunnableConfig>,
+    ) -> Result<AIMessage> {
         self.invoke_with_stop(input, None).await
     }
 }
