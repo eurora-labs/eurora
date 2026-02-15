@@ -5,6 +5,7 @@
 //! This file contains tests for the BaseChatModel trait and related functionality.
 
 use agent_chain_core::error::{Error, Result};
+use agent_chain_core::language_models::GenerateConfig;
 use agent_chain_core::language_models::{
     BaseChatModel, BaseLanguageModel, ChatGenerationStream, ChatModelConfig, DisableStreaming,
     FakeListChatModel, GenericFakeChatModel, LangSmithParams, LanguageModelConfig,
@@ -1094,15 +1095,7 @@ async fn test_generate_basic() {
     )];
 
     let result = model
-        .generate(
-            vec![messages1, messages2],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
+        .generate(vec![messages1, messages2], GenerateConfig::default())
         .await;
 
     assert!(result.is_ok());
@@ -1346,12 +1339,7 @@ async fn test_generate_single_message_list() {
             vec![vec![BaseMessage::Human(
                 HumanMessage::builder().content("hello").build(),
             )]],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            GenerateConfig::default(),
         )
         .await
         .unwrap();
@@ -1375,12 +1363,7 @@ async fn test_generate_multiple_message_lists() {
                     HumanMessage::builder().content("p3").build(),
                 )],
             ],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            GenerateConfig::default(),
         )
         .await
         .unwrap();
@@ -1396,12 +1379,7 @@ async fn test_generate_returns_chat_result() {
             vec![vec![BaseMessage::Human(
                 HumanMessage::builder().content("hi").build(),
             )]],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            GenerateConfig::default(),
         )
         .await
         .unwrap();
@@ -1426,12 +1404,7 @@ async fn test_agenerate_single_message_list() {
             vec![vec![BaseMessage::Human(
                 HumanMessage::builder().content("hello").build(),
             )]],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            GenerateConfig::default(),
         )
         .await
         .unwrap();
@@ -1452,12 +1425,7 @@ async fn test_agenerate_multiple_message_lists() {
                     HumanMessage::builder().content("p2").build(),
                 )],
             ],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            GenerateConfig::default(),
         )
         .await
         .unwrap();
@@ -1473,12 +1441,7 @@ async fn test_agenerate_returns_chat_result() {
             vec![vec![BaseMessage::Human(
                 HumanMessage::builder().content("hi").build(),
             )]],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            GenerateConfig::default(),
         )
         .await
         .unwrap();

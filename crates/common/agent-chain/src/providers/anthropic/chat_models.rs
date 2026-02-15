@@ -47,7 +47,7 @@ const DEFAULT_MAX_TOKENS: u32 = 4096;
 ///     .max_tokens(1024);
 ///
 /// let messages = vec![HumanMessage::builder().content("Hello!").build().into()];
-/// let response = model.generate(messages, None).await?;
+/// let response = model.generate(messages, GenerateConfig::default()).await?;
 /// ```
 #[derive(Debug, Clone)]
 pub struct ChatAnthropic {

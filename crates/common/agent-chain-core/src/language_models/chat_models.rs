@@ -37,6 +37,52 @@ pub type ChatGenerationStream = Pin<Box<dyn Stream<Item = Result<ChatGenerationC
 /// Type alias for streaming AIMessageChunk output.
 pub type AIMessageChunkStream = Pin<Box<dyn Stream<Item = Result<AIMessageChunk>> + Send>>;
 
+/// Configuration for `generate()` and `agenerate()` calls.
+///
+/// Wraps the optional parameters that Python passes as keyword arguments.
+/// Use the builder pattern for clean construction:
+///
+/// ```ignore
+/// let config = GenerateConfig::builder()
+///     .callbacks(my_callbacks)
+///     .tags(vec!["tag1".into()])
+///     .build();
+/// model.generate(messages, config).await?;
+/// ```
+#[derive(Debug, Clone, Default, bon::Builder)]
+pub struct GenerateConfig {
+    /// Stop words to use when generating.
+    #[builder(into)]
+    pub stop: Option<Vec<String>>,
+    /// Callbacks to pass through.
+    pub callbacks: Option<Callbacks>,
+    /// Tags to apply to the run.
+    #[builder(into)]
+    pub tags: Option<Vec<String>>,
+    /// Metadata to apply to the run.
+    #[builder(into)]
+    pub metadata: Option<HashMap<String, Value>>,
+    /// Name for the run (used in tracing).
+    #[builder(into)]
+    pub run_name: Option<String>,
+    /// ID for the run (used in tracing).
+    pub run_id: Option<uuid::Uuid>,
+}
+
+impl GenerateConfig {
+    /// Create a GenerateConfig from a RunnableConfig.
+    pub fn from_runnable_config(config: &RunnableConfig) -> Self {
+        Self {
+            stop: None,
+            callbacks: config.callbacks.clone(),
+            tags: Some(config.tags.clone()).filter(|t| !t.is_empty()),
+            metadata: Some(config.metadata.clone()).filter(|m| !m.is_empty()),
+            run_name: config.run_name.clone(),
+            run_id: config.run_id,
+        }
+    }
+}
+
 /// A chunk of output from streaming.
 ///
 /// This struct carries content deltas during streaming, along with optional
@@ -599,22 +645,22 @@ pub trait BaseChatModel: BaseLanguageModel {
     /// # Returns
     ///
     /// An `LLMResult` containing a list of candidate `ChatGeneration` objects.
-    #[allow(clippy::too_many_arguments)]
     async fn generate(
         &self,
         messages: Vec<Vec<BaseMessage>>,
-        stop: Option<Vec<String>>,
-        callbacks: Option<Callbacks>,
-        tags: Option<Vec<String>>,
-        metadata: Option<HashMap<String, Value>>,
-        run_name: Option<String>,
-        run_id: Option<uuid::Uuid>,
+        config: GenerateConfig,
     ) -> Result<LLMResult> {
         use crate::callbacks::CallbackManager;
         use crate::outputs::RunInfo;
 
-        // TODO: Pass run_name to callback manager on_chat_model_start once it accepts a name parameter
-        let _run_name = run_name;
+        let GenerateConfig {
+            stop,
+            callbacks,
+            tags,
+            metadata,
+            run_name: _run_name,
+            run_id,
+        } = config;
 
         // Get invocation params and options
         let params = self._get_invocation_params(stop.as_deref(), None);
@@ -739,32 +785,27 @@ pub trait BaseChatModel: BaseLanguageModel {
     /// # Arguments
     ///
     /// * `messages` - List of message lists.
-    /// * `stop` - Stop words to use when generating.
-    /// * `callbacks` - Callbacks to pass through.
-    /// * `tags` - Tags to apply.
-    /// * `metadata` - Metadata to apply.
-    /// * `run_name` - Name of the run.
-    /// * `run_id` - ID of the run.
+    /// * `config` - Generation configuration (stop, callbacks, tags, metadata, etc.).
     ///
     /// # Returns
     ///
     /// An `LLMResult` containing a list of candidate `ChatGeneration` objects.
-    #[allow(clippy::too_many_arguments)]
     async fn agenerate(
         &self,
         messages: Vec<Vec<BaseMessage>>,
-        stop: Option<Vec<String>>,
-        callbacks: Option<Callbacks>,
-        tags: Option<Vec<String>>,
-        metadata: Option<HashMap<String, Value>>,
-        run_name: Option<String>,
-        run_id: Option<uuid::Uuid>,
+        config: GenerateConfig,
     ) -> Result<LLMResult> {
         use crate::callbacks::AsyncCallbackManager;
         use crate::outputs::RunInfo;
 
-        // TODO: Pass run_name to callback manager on_chat_model_start once it accepts a name parameter
-        let _run_name = run_name;
+        let GenerateConfig {
+            stop,
+            callbacks,
+            tags,
+            metadata,
+            run_name: _run_name,
+            run_id,
+        } = config;
 
         // Get invocation params and options
         let params = self._get_invocation_params(stop.as_deref(), None);
@@ -1079,7 +1120,13 @@ pub trait BaseChatModel: BaseLanguageModel {
         callbacks: Option<Callbacks>,
     ) -> Result<BaseMessage> {
         let result = self
-            .agenerate(vec![messages], stop, callbacks, None, None, None, None)
+            .agenerate(
+                vec![messages],
+                GenerateConfig::builder()
+                    .maybe_stop(stop)
+                    .maybe_callbacks(callbacks)
+                    .build(),
+            )
             .await?;
 
         if result.generations.is_empty() || result.generations[0].is_empty() {
@@ -1157,12 +1204,13 @@ pub trait BaseChatModel: BaseLanguageModel {
         let result = self
             .generate(
                 vec![messages],
-                None,
-                callbacks,
-                tags,
-                metadata,
-                run_name,
-                run_id,
+                GenerateConfig::builder()
+                    .maybe_callbacks(callbacks)
+                    .maybe_tags(tags)
+                    .maybe_metadata(metadata)
+                    .maybe_run_name(run_name)
+                    .maybe_run_id(run_id)
+                    .build(),
             )
             .await?;
 
@@ -1205,12 +1253,13 @@ pub trait BaseChatModel: BaseLanguageModel {
         let result = self
             .agenerate(
                 vec![messages],
-                None,
-                callbacks,
-                tags,
-                metadata,
-                run_name,
-                run_id,
+                GenerateConfig::builder()
+                    .maybe_callbacks(callbacks)
+                    .maybe_tags(tags)
+                    .maybe_metadata(metadata)
+                    .maybe_run_name(run_name)
+                    .maybe_run_id(run_id)
+                    .build(),
             )
             .await?;
 

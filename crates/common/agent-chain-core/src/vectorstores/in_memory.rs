@@ -292,7 +292,6 @@ impl VectorStore for InMemoryVectorStore {
     }
 }
 
-
 impl VectorStoreFactory for InMemoryVectorStore {
     fn from_texts(
         texts: &[&str],

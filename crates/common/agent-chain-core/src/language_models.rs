@@ -35,7 +35,7 @@
 //!     let messages = vec![
 //!         BaseMessage::Human(HumanMessage::builder().content("Hello, how are you?").build()),
 //!     ];
-//!     model.generate(messages, None, None).await
+//!     model.generate(messages, GenerateConfig::default()).await
 //! }
 //! ```
 
@@ -56,8 +56,8 @@ pub use base::{
 // Re-export chat model types
 pub use chat_models::{
     AIMessageChunkStream, BaseChatModel, ChatChunk, ChatGenerationStream, ChatModelConfig,
-    ChatStream, DisableStreaming, SimpleChatModel, ToolChoice, agenerate_from_stream,
-    collect_and_merge_stream, generate_from_stream,
+    ChatStream, DisableStreaming, GenerateConfig, SimpleChatModel, ToolChoice,
+    agenerate_from_stream, collect_and_merge_stream, generate_from_stream,
 };
 
 // Re-export UsageMetadata from messages (where it's canonically defined)
