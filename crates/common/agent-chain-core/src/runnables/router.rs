@@ -223,13 +223,15 @@ where
 
         let configs = get_config_list(config, keys.len());
 
-        let _ = return_exceptions; // Used for API compatibility, not yet implemented
+        let _ = return_exceptions; // Vec<Result<O>> already captures exceptions per-item
         let results: Vec<Result<O>> = keys
             .into_iter()
             .zip(actual_inputs)
             .zip(configs)
             .map(|((key, input), config)| {
-                let runnable = self.runnables.get(&key).unwrap();
+                let runnable = self.runnables.get(&key).ok_or_else(|| {
+                    Error::Other(format!("No runnable associated with key '{}'", key))
+                })?;
                 runnable.invoke(input, Some(config))
             })
             .collect();
@@ -265,15 +267,20 @@ where
         let configs = get_config_list(config, keys.len());
         let max_concurrency = configs.first().and_then(|c| c.max_concurrency);
 
-        let _ = return_exceptions; // Used for API compatibility, not yet implemented
+        let _ = return_exceptions; // Vec<Result<O>> already captures exceptions per-item
         // Create futures for each invocation
         let futures: Vec<_> = keys
             .into_iter()
             .zip(actual_inputs)
             .zip(configs)
             .map(|((key, input), config)| {
-                let runnable = self.runnables.get(&key).unwrap().clone();
-                Box::pin(async move { runnable.ainvoke(input, Some(config)).await })
+                let runnable = self.runnables.get(&key).cloned().ok_or_else(|| {
+                    Error::Other(format!("No runnable associated with key '{}'", key))
+                });
+                Box::pin(async move {
+                    let runnable = runnable?;
+                    runnable.ainvoke(input, Some(config)).await
+                })
                     as std::pin::Pin<Box<dyn std::future::Future<Output = Result<O>> + Send>>
             })
             .collect();

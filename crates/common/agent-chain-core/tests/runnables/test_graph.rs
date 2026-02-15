@@ -192,7 +192,7 @@ fn test_parallel_subgraph_mermaid() {
     ];
 
     let graph = Graph::from_parts(nodes, edges);
-    let mermaid = graph.draw_mermaid(None);
+    let mermaid = graph.draw_mermaid(None).unwrap();
 
     // Verify key structural elements
     assert!(mermaid.contains("graph TD;"));
@@ -243,7 +243,7 @@ fn test_double_nested_subgraph_mermaid() {
     ];
 
     let graph = Graph::from_parts(nodes, edges);
-    let mermaid = graph.draw_mermaid(None);
+    let mermaid = graph.draw_mermaid(None).unwrap();
 
     assert!(mermaid.contains("graph TD;"));
     assert!(mermaid.contains("subgraph child_1"));
@@ -307,7 +307,7 @@ fn test_triple_nested_subgraph_mermaid() {
     ];
 
     let graph = Graph::from_parts(nodes, edges);
-    let mermaid = graph.draw_mermaid(None);
+    let mermaid = graph.draw_mermaid(None).unwrap();
 
     assert!(mermaid.contains("graph TD;"));
     assert!(mermaid.contains("subgraph grandchild_1"));
@@ -331,7 +331,7 @@ fn test_single_node_subgraph_mermaid() {
     ];
 
     let graph = Graph::from_parts(nodes, edges);
-    let mermaid = graph.draw_mermaid(None);
+    let mermaid = graph.draw_mermaid(None).unwrap();
 
     assert!(mermaid.contains("graph TD;"));
     assert!(mermaid.contains("subgraph sub"));
@@ -367,10 +367,12 @@ fn test_graph_mermaid_frontmatter_config() {
     let mut frontmatter = HashMap::new();
     frontmatter.insert("config".to_string(), Value::Object(config_inner));
 
-    let mermaid = graph.draw_mermaid(Some(MermaidOptions {
-        frontmatter_config: Some(frontmatter),
-        ..Default::default()
-    }));
+    let mermaid = graph
+        .draw_mermaid(Some(MermaidOptions {
+            frontmatter_config: Some(frontmatter),
+            ..Default::default()
+        }))
+        .unwrap();
 
     // Verify frontmatter is present
     assert!(mermaid.starts_with("---\n"));
@@ -400,7 +402,7 @@ fn test_graph_mermaid_special_chars() {
     ];
 
     let graph = Graph::from_parts(nodes, edges);
-    let mermaid = graph.draw_mermaid(None);
+    let mermaid = graph.draw_mermaid(None).unwrap();
 
     assert!(mermaid.contains("graph TD;"));
     // Chinese characters should be escaped to safe ids
@@ -427,10 +429,12 @@ fn test_draw_mermaid_without_styles() {
     ];
 
     let graph = Graph::from_parts(nodes, edges);
-    let mermaid = graph.draw_mermaid(Some(MermaidOptions {
-        with_styles: false,
-        ..Default::default()
-    }));
+    let mermaid = graph
+        .draw_mermaid(Some(MermaidOptions {
+            with_styles: false,
+            ..Default::default()
+        }))
+        .unwrap();
 
     // Without styles: no frontmatter, no classDef
     assert!(mermaid.starts_with("graph TD;\n"));
@@ -537,7 +541,7 @@ fn test_graph_conditional_edge() {
     let b = graph.add_node("b", Some("b"));
     graph.add_edge(&a, &b, None, true);
 
-    let mermaid = graph.draw_mermaid(None);
+    let mermaid = graph.draw_mermaid(None).unwrap();
     assert!(
         mermaid.contains("-.->"),
         "Conditional edge should use dashed arrow"
@@ -551,7 +555,7 @@ fn test_graph_edge_with_data() {
     let b = graph.add_node("b", Some("b"));
     graph.add_edge(&a, &b, Some("my label".to_string()), false);
 
-    let mermaid = graph.draw_mermaid(None);
+    let mermaid = graph.draw_mermaid(None).unwrap();
     assert!(
         mermaid.contains("my label"),
         "Edge data should appear as label"
@@ -575,7 +579,7 @@ fn test_node_with_metadata_renders_in_mermaid() {
     let edges = vec![Edge::new("other", "my_node")];
 
     let graph = Graph::from_parts(nodes, edges);
-    let mermaid = graph.draw_mermaid(None);
+    let mermaid = graph.draw_mermaid(None).unwrap();
 
     assert!(mermaid.contains("__interrupt"));
     assert!(mermaid.contains("before"));

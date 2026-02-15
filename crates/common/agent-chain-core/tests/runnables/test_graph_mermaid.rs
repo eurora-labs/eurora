@@ -124,7 +124,7 @@ fn test_draw_mermaid_simple_graph() {
 
     let edges = vec![Edge::new("1", "2")];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(result.contains("graph TD;"));
     assert!(result.contains("Start"));
@@ -140,10 +140,12 @@ fn test_draw_mermaid_without_styles() {
 
     let edges = vec![Edge::new("1", "2")];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(Some(MermaidOptions {
-        with_styles: false,
-        ..Default::default()
-    }));
+    let result = graph
+        .draw_mermaid(Some(MermaidOptions {
+            with_styles: false,
+            ..Default::default()
+        }))
+        .unwrap();
 
     assert!(result.contains("graph TD;"));
     assert!(!result.contains("classDef"));
@@ -167,7 +169,7 @@ fn test_draw_mermaid_with_conditional_edge() {
         Edge::new("1", "3"),
     ];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(result.contains("-."));
     assert!(result.contains(".->"));
@@ -187,7 +189,7 @@ fn test_draw_mermaid_with_edge_labels() {
         conditional: false,
     }];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(result.contains("label text") || result.contains("label&nbsp"));
 }
@@ -209,10 +211,12 @@ fn test_draw_mermaid_with_long_edge_label() {
         conditional: false,
     }];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(Some(MermaidOptions {
-        wrap_label_n_words: 9,
-        ..Default::default()
-    }));
+    let result = graph
+        .draw_mermaid(Some(MermaidOptions {
+            wrap_label_n_words: 9,
+            ..Default::default()
+        }))
+        .unwrap();
 
     assert!(result.contains("<br>") || result.contains("&nbsp"));
 }
@@ -227,10 +231,12 @@ fn test_draw_mermaid_curve_styles() {
 
     for curve_style in &CurveStyle::ALL {
         let graph = Graph::from_parts(nodes.clone(), edges.clone());
-        let result = graph.draw_mermaid(Some(MermaidOptions {
-            curve_style: curve_style.clone(),
-            ..Default::default()
-        }));
+        let result = graph
+            .draw_mermaid(Some(MermaidOptions {
+                curve_style: curve_style.clone(),
+                ..Default::default()
+            }))
+            .unwrap();
         assert!(
             result.contains(curve_style.value()),
             "Missing curve style '{}' in output",
@@ -248,7 +254,7 @@ fn test_draw_mermaid_first_last_nodes() {
 
     let edges = vec![Edge::new("start", "middle"), Edge::new("middle", "end")];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(result.contains(":::first"));
     assert!(result.contains(":::last"));
@@ -262,7 +268,7 @@ fn test_draw_mermaid_subgraph() {
 
     let edges = vec![Edge::new("parent", "sub:child")];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(result.contains("subgraph sub"));
     assert!(result.contains("end"));
@@ -276,7 +282,7 @@ fn test_draw_mermaid_nested_subgraphs() {
 
     let edges = vec![Edge::new("root", "a:b:c")];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(
         result.contains("\\3a") || result.contains("subgraph"),
@@ -294,7 +300,7 @@ fn test_draw_mermaid_node_metadata() {
     nodes.insert("1".to_string(), make_node_with_metadata("1", "Node1", meta));
 
     let graph = Graph::from_parts(nodes, vec![]);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(result.contains("key1") || result.contains("value1"));
 }
@@ -321,10 +327,12 @@ fn test_draw_mermaid_frontmatter_config() {
     frontmatter.insert("config".to_string(), Value::Object(config_inner));
 
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(Some(MermaidOptions {
-        frontmatter_config: Some(frontmatter),
-        ..Default::default()
-    }));
+    let result = graph
+        .draw_mermaid(Some(MermaidOptions {
+            frontmatter_config: Some(frontmatter),
+            ..Default::default()
+        }))
+        .unwrap();
 
     assert!(result.contains("---"));
     assert!(result.contains("theme: dark"));
@@ -338,7 +346,7 @@ fn test_draw_mermaid_markdown_special_chars() {
 
     let edges = vec![Edge::new("1", "2")];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(
         result.contains("<p>*bold*</p>") || result.contains("*bold*"),
@@ -357,7 +365,7 @@ fn test_graph_draw_mermaid_method() {
     let node2 = graph.add_node("node2", Some("node2"));
     graph.add_edge(&node1, &node2, None, false);
 
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(result.contains("graph TD;"));
 }
@@ -369,10 +377,12 @@ fn test_graph_draw_mermaid_without_styles() {
     let node2 = graph.add_node("node2", Some("node2"));
     graph.add_edge(&node1, &node2, None, false);
 
-    let result = graph.draw_mermaid(Some(MermaidOptions {
-        with_styles: false,
-        ..Default::default()
-    }));
+    let result = graph
+        .draw_mermaid(Some(MermaidOptions {
+            with_styles: false,
+            ..Default::default()
+        }))
+        .unwrap();
 
     assert!(!result.contains("classDef"));
 }
@@ -383,10 +393,12 @@ fn test_mermaid_curve_style_linear() {
     nodes.insert("1".to_string(), make_node("1", "A"));
 
     let graph = Graph::from_parts(nodes, vec![]);
-    let result = graph.draw_mermaid(Some(MermaidOptions {
-        curve_style: CurveStyle::Linear,
-        ..Default::default()
-    }));
+    let result = graph
+        .draw_mermaid(Some(MermaidOptions {
+            curve_style: CurveStyle::Linear,
+            ..Default::default()
+        }))
+        .unwrap();
 
     assert!(result.contains("curve: linear"));
 }
@@ -397,10 +409,12 @@ fn test_mermaid_curve_style_basis() {
     nodes.insert("1".to_string(), make_node("1", "A"));
 
     let graph = Graph::from_parts(nodes, vec![]);
-    let result = graph.draw_mermaid(Some(MermaidOptions {
-        curve_style: CurveStyle::Basis,
-        ..Default::default()
-    }));
+    let result = graph
+        .draw_mermaid(Some(MermaidOptions {
+            curve_style: CurveStyle::Basis,
+            ..Default::default()
+        }))
+        .unwrap();
 
     assert!(result.contains("curve: basis"));
 }
@@ -408,7 +422,7 @@ fn test_mermaid_curve_style_basis() {
 #[test]
 fn test_mermaid_empty_graph() {
     let graph = Graph::from_parts(HashMap::new(), vec![]);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(result.contains("graph TD;"));
 }
@@ -419,10 +433,12 @@ fn test_mermaid_single_node() {
     nodes.insert("1".to_string(), make_node("1", "OnlyNode"));
 
     let graph = Graph::from_parts(nodes, vec![]);
-    let result = graph.draw_mermaid(Some(MermaidOptions {
-        with_styles: false,
-        ..Default::default()
-    }));
+    let result = graph
+        .draw_mermaid(Some(MermaidOptions {
+            with_styles: false,
+            ..Default::default()
+        }))
+        .unwrap();
 
     assert!(result.contains("graph TD;"));
 }
@@ -436,7 +452,7 @@ fn test_mermaid_parallel_edges() {
 
     let edges = vec![Edge::new("1", "2"), Edge::new("1", "3")];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(
         result.matches("-->").count() >= 2,
@@ -451,7 +467,7 @@ fn test_mermaid_self_loop() {
 
     let edges = vec![Edge::new("1", "1")];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(result.contains("graph TD;"));
 }
@@ -473,7 +489,7 @@ fn test_mermaid_duplicate_subgraph_name_error() {
     let graph = Graph::from_parts(nodes, edges);
 
     // Should not crash — may or may not raise depending on structure
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
     assert!(result.contains("subgraph"));
 }
 
@@ -490,7 +506,7 @@ fn test_mermaid_node_with_metadata() {
     );
 
     let graph = Graph::from_parts(nodes, vec![]);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(
         result.contains("version = 1.0") || result.contains("version"),
@@ -519,10 +535,12 @@ fn test_mermaid_wrap_label_custom_words() {
         conditional: false,
     }];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(Some(MermaidOptions {
-        wrap_label_n_words: 5,
-        ..Default::default()
-    }));
+    let result = graph
+        .draw_mermaid(Some(MermaidOptions {
+            wrap_label_n_words: 5,
+            ..Default::default()
+        }))
+        .unwrap();
 
     assert!(
         result.matches("<br>").count() > 2,
@@ -546,11 +564,13 @@ fn test_mermaid_frontmatter_preserves_existing_config() {
     frontmatter.insert("config".to_string(), Value::Object(config_inner));
 
     let graph = Graph::from_parts(nodes, vec![]);
-    let result = graph.draw_mermaid(Some(MermaidOptions {
-        frontmatter_config: Some(frontmatter),
-        curve_style: CurveStyle::Basis,
-        ..Default::default()
-    }));
+    let result = graph
+        .draw_mermaid(Some(MermaidOptions {
+            frontmatter_config: Some(frontmatter),
+            curve_style: CurveStyle::Basis,
+            ..Default::default()
+        }))
+        .unwrap();
 
     assert!(result.contains("theme: forest"));
     assert!(result.contains("curve: basis"));
@@ -565,7 +585,7 @@ fn test_mermaid_empty_subgraph() {
 
     let edges = vec![Edge::new("regular", "sub:node1")];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(result.contains("subgraph sub"));
 }
@@ -578,10 +598,12 @@ fn test_graph_draw_mermaid_with_curve_styles() {
     graph.add_edge(&node1, &node2, None, false);
 
     for curve_style in &CurveStyle::ALL {
-        let result = graph.draw_mermaid(Some(MermaidOptions {
-            curve_style: curve_style.clone(),
-            ..Default::default()
-        }));
+        let result = graph
+            .draw_mermaid(Some(MermaidOptions {
+                curve_style: curve_style.clone(),
+                ..Default::default()
+            }))
+            .unwrap();
         assert!(
             result.contains(&format!("curve: {}", curve_style.value())),
             "Should contain curve: {}",
@@ -603,10 +625,12 @@ fn test_graph_draw_mermaid_custom_node_colors() {
         last: "fill:#fedcba".to_string(),
     };
 
-    let result = graph.draw_mermaid(Some(MermaidOptions {
-        node_styles: Some(custom_colors),
-        ..Default::default()
-    }));
+    let result = graph
+        .draw_mermaid(Some(MermaidOptions {
+            node_styles: Some(custom_colors),
+            ..Default::default()
+        }))
+        .unwrap();
 
     assert!(result.contains("fill:#abcdef"));
     assert!(result.contains("fill:#123456"));
@@ -647,7 +671,7 @@ fn test_draw_mermaid_special_node_names() {
 
     let edges = vec![Edge::new("__start__", "__end__")];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(
         result.contains("__start__") || result.contains("start"),
@@ -667,7 +691,7 @@ fn test_draw_mermaid_numeric_node_ids() {
 
     let edges = vec![Edge::new("1", "2")];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(result.contains("graph TD;"));
 }
@@ -683,7 +707,7 @@ fn test_draw_mermaid_complex_metadata() {
     nodes.insert("1".to_string(), make_node_with_metadata("1", "Node", meta));
 
     let graph = Graph::from_parts(nodes, vec![]);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(result.contains("nested") || result.contains("key"));
 }
@@ -698,7 +722,7 @@ fn test_mermaid_multiple_disconnected_subgraphs() {
 
     let edges = vec![Edge::new("sub1:a", "sub1:b"), Edge::new("sub2:c", "sub2:d")];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(result.contains("subgraph sub1"));
     assert!(result.contains("subgraph sub2"));
@@ -712,7 +736,7 @@ fn test_mermaid_edge_with_none_data() {
 
     let edges = vec![Edge::new("1", "2")];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(result.contains("-->"));
 }
@@ -730,7 +754,7 @@ fn test_mermaid_conditional_edge_with_label() {
         conditional: true,
     }];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(result.contains("-.") && result.contains(".->"));
 }
@@ -789,13 +813,15 @@ fn test_mermaid_with_all_features() {
     };
 
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(Some(MermaidOptions {
-        with_styles: true,
-        curve_style: CurveStyle::Cardinal,
-        node_styles: Some(custom_styles),
-        wrap_label_n_words: 5,
-        frontmatter_config: Some(frontmatter),
-    }));
+    let result = graph
+        .draw_mermaid(Some(MermaidOptions {
+            with_styles: true,
+            curve_style: CurveStyle::Cardinal,
+            node_styles: Some(custom_styles),
+            wrap_label_n_words: 5,
+            frontmatter_config: Some(frontmatter),
+        }))
+        .unwrap();
 
     assert!(result.contains("graph TD;"));
     assert!(result.contains("theme: neutral"));
@@ -842,7 +868,7 @@ fn test_mermaid_subgraph_single_node() {
 
     let edges = vec![Edge::new("outer", "sub:inner")];
     let graph = Graph::from_parts(nodes, edges);
-    let result = graph.draw_mermaid(None);
+    let result = graph.draw_mermaid(None).unwrap();
 
     assert!(result.contains("subgraph sub"));
     assert!(result.contains("end"));

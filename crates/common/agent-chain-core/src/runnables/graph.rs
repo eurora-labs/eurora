@@ -392,7 +392,7 @@ impl Graph {
     }
 
     /// Draw the graph as a Mermaid syntax string.
-    pub fn draw_mermaid(&self, options: Option<MermaidOptions>) -> String {
+    pub fn draw_mermaid(&self, options: Option<MermaidOptions>) -> crate::error::Result<String> {
         let opts = options.unwrap_or_default();
         let graph = self.reid();
         let first_node = graph.first_node().map(|n| n.id.clone());
