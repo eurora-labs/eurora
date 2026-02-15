@@ -1,9 +1,6 @@
 pub use auth_core::{Claims, Role};
 use be_auth_core::JwtConfig;
-use be_remote_db::{
-    CreateLoginToken, CreateOAuthCredentials, CreateOAuthState, CreateRefreshToken,
-    DatabaseManager, NewUser, OAuthProvider,
-};
+use be_remote_db::{DatabaseManager, OAuthProvider};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{Algorithm, Header, encode};
 use openidconnect::{Nonce, PkceCodeChallenge, PkceCodeVerifier};
@@ -196,13 +193,14 @@ impl AuthService {
             .map_err(|e| AuthError::Internal(format!("Invalid user ID format: {e}")))?;
 
         let token_hash = self.hash_refresh_token(&refresh_token);
-        let refresh_request = CreateRefreshToken {
-            user_id: user_uuid,
-            token_hash,
-            expires_at: refresh_exp,
-        };
 
-        self.db.create_refresh_token(refresh_request).await?;
+        self.db
+            .create_refresh_token()
+            .user_id(user_uuid)
+            .token_hash(token_hash)
+            .expires_at(refresh_exp)
+            .call()
+            .await?;
 
         Ok((access_token, refresh_token))
     }
@@ -231,13 +229,16 @@ impl AuthService {
         code_challenge: &str,
     ) {
         let token_hash = self.hash_login_token(code_challenge);
-        let create_request = CreateLoginToken {
-            token_hash,
-            expires_at: Utc::now() + Duration::minutes(20),
-            user_id: user.id,
-        };
 
-        match self.db.create_login_token(create_request).await {
+        match self
+            .db
+            .create_login_token()
+            .token_hash(token_hash)
+            .user_id(user.id)
+            .expires_at(Utc::now() + Duration::minutes(20))
+            .call()
+            .await
+        {
             Ok(_) => {
                 info!(
                     "Successfully associated login token with user: {}",
@@ -284,14 +285,15 @@ impl AuthService {
 
         let password_hash = self.hash_password(password)?;
 
-        let create_request = NewUser {
-            username: username.to_string(),
-            email: email.to_string(),
-            display_name,
-            password_hash: Some(password_hash),
-        };
-
-        let user = self.db.create_user(create_request).await?;
+        let user = self
+            .db
+            .create_user()
+            .username(username.to_string())
+            .email(email.to_string())
+            .maybe_display_name(display_name)
+            .password_hash(password_hash)
+            .call()
+            .await?;
 
         let role = self.resolve_role(user.id).await;
         let (access_token, refresh_token) = self
@@ -409,21 +411,18 @@ impl AuthService {
                     .db
                     .get_oauth_credentials_by_provider_and_user(OAuthProvider::Google, user.id)
                     .await
-                {
-                    let update_request = be_remote_db::UpdateOAuthCredentials {
-                        access_token: Some(oauth_access_token.clone()),
-                        refresh_token: oauth_refresh_token.clone(),
-                        access_token_expiry: oauth_token_expiry,
-                        scope: Some("openid email profile".to_string()),
-                    };
-
-                    if let Err(e) = self
+                    && let Err(e) = self
                         .db
-                        .update_oauth_credentials(oauth_creds.id, update_request)
+                        .update_oauth_credentials()
+                        .id(oauth_creds.id)
+                        .access_token(oauth_access_token.clone())
+                        .maybe_refresh_token(oauth_refresh_token.clone())
+                        .maybe_access_token_expiry(oauth_token_expiry)
+                        .scope("openid email profile".to_string())
+                        .call()
                         .await
-                    {
-                        warn!("Failed to update OAuth credentials: {}", e);
-                    }
+                {
+                    warn!("Failed to update OAuth credentials: {}", e);
                 }
 
                 user
@@ -433,17 +432,17 @@ impl AuthService {
 
                 match existing_user_by_email {
                     Ok(user) => {
-                        let oauth_request = CreateOAuthCredentials {
-                            user_id: user.id,
-                            provider: OAuthProvider::Google,
-                            provider_user_id: user_info.id.clone(),
-                            access_token: Some(oauth_access_token.clone()),
-                            refresh_token: oauth_refresh_token.clone(),
-                            access_token_expiry: oauth_token_expiry,
-                            scope: Some("openid email profile".to_string()),
-                        };
-
-                        self.db.create_oauth_credentials(oauth_request).await?;
+                        self.db
+                            .create_oauth_credentials()
+                            .user_id(user.id)
+                            .provider(OAuthProvider::Google)
+                            .provider_user_id(user_info.id.clone())
+                            .access_token(oauth_access_token.clone())
+                            .maybe_refresh_token(oauth_refresh_token.clone())
+                            .maybe_access_token_expiry(oauth_token_expiry)
+                            .scope("openid email profile".to_string())
+                            .call()
+                            .await?;
 
                         user
                     }
@@ -462,14 +461,15 @@ impl AuthService {
                             const MAX_RETRIES: u32 = 5;
 
                             loop {
-                                let create_request = be_remote_db::NewUser {
-                                    username: final_username.clone(),
-                                    email: user_info.email.clone(),
-                                    display_name: Some(user_info.name.clone()),
-                                    password_hash: None,
-                                };
-
-                                match self.db.create_user(create_request).await {
+                                match self
+                                    .db
+                                    .create_user()
+                                    .username(final_username.clone())
+                                    .email(user_info.email.clone())
+                                    .display_name(user_info.name.clone())
+                                    .call()
+                                    .await
+                                {
                                     Ok(user) => break user,
                                     Err(be_remote_db::DbError::Duplicate { field, value })
                                         if value.contains("username") =>
@@ -495,17 +495,17 @@ impl AuthService {
                             }
                         };
 
-                        let oauth_request = CreateOAuthCredentials {
-                            user_id: new_user.id,
-                            provider: OAuthProvider::Google,
-                            provider_user_id: user_info.id.clone(),
-                            access_token: Some(oauth_access_token.clone()),
-                            refresh_token: oauth_refresh_token.clone(),
-                            access_token_expiry: oauth_token_expiry,
-                            scope: Some("openid email profile".to_string()),
-                        };
-
-                        self.db.create_oauth_credentials(oauth_request).await?;
+                        self.db
+                            .create_oauth_credentials()
+                            .user_id(new_user.id)
+                            .provider(OAuthProvider::Google)
+                            .provider_user_id(user_info.id.clone())
+                            .access_token(oauth_access_token.clone())
+                            .maybe_refresh_token(oauth_refresh_token.clone())
+                            .maybe_access_token_expiry(oauth_token_expiry)
+                            .scope("openid email profile".to_string())
+                            .call()
+                            .await?;
 
                         new_user
                     }
@@ -637,17 +637,14 @@ impl ProtoAuthService for AuthService {
                 let encrypted_nonce = encrypt_sensitive_string(&nonce_secret)
                     .map_err(|e| Status::from(AuthError::from(e)))?;
 
-                let oauth_state_request = CreateOAuthState {
-                    state: state.clone(),
-                    pkce_verifier: encrypted_pkce_verifier,
-                    redirect_uri: google_config.redirect_uri.clone(),
-                    ip_address: None,
-                    expires_at,
-                    nonce: encrypted_nonce,
-                };
-
                 self.db
-                    .create_oauth_state(oauth_state_request)
+                    .create_oauth_state()
+                    .state(state.clone())
+                    .pkce_verifier(encrypted_pkce_verifier)
+                    .redirect_uri(google_config.redirect_uri.clone())
+                    .expires_at(expires_at)
+                    .nonce(encrypted_nonce)
+                    .call()
                     .await
                     .map_err(|e| Status::from(AuthError::from(e)))?;
 

@@ -6,10 +6,7 @@ use agent_chain::{
     BaseChatModel, BaseMessage, HumanMessage, ollama::ChatOllama, openai::ChatOpenAI,
 };
 use be_authz::{extract_claims, parse_user_id};
-use be_remote_db::{
-    DatabaseManager, GetConversation, ListConversations, MessageType, NewConversation,
-    PaginationParams,
-};
+use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
 use std::{pin::Pin, sync::Arc};
@@ -131,11 +128,10 @@ impl ProtoConversationService for ConversationService {
 
         let conversation = self
             .db
-            .create_conversation(NewConversation {
-                id: None,
-                user_id,
-                title,
-            })
+            .create_conversation()
+            .user_id(user_id)
+            .title(title)
+            .call()
             .await
             .map_err(ConversationServiceError::from)?;
 
@@ -162,10 +158,14 @@ impl ProtoConversationService for ConversationService {
 
         let conversations = self
             .db
-            .list_conversations(
-                ListConversations { user_id },
-                PaginationParams::new(req.offset, req.limit, "DESC".to_string()),
-            )
+            .list_conversations()
+            .user_id(user_id)
+            .params(PaginationParams::new(
+                req.offset,
+                req.limit,
+                "DESC".to_string(),
+            ))
+            .call()
             .await
             .map_err(ConversationServiceError::from)?;
 
@@ -500,10 +500,10 @@ impl ProtoConversationService for ConversationService {
 
         let conversation = self
             .db
-            .get_conversation(GetConversation {
-                id: conversation_id,
-                user_id,
-            })
+            .get_conversation()
+            .id(conversation_id)
+            .user_id(user_id)
+            .call()
             .await
             .map_err(ConversationServiceError::from)?;
 
