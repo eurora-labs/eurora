@@ -577,17 +577,10 @@ impl ProtoConversationService for ConversationService {
         };
 
         // Capitalize the first letter of the title
-        title = title
-            .chars()
-            .enumerate()
-            .map(|(i, c)| {
-                if i == 0 {
-                    c.to_uppercase().next().unwrap()
-                } else {
-                    c
-                }
-            })
-            .collect();
+        if let Some(first) = title.chars().next() {
+            let rest = &title[first.len_utf8()..];
+            title = first.to_uppercase().collect::<String>() + rest;
+        }
 
         let conversation = self
             .db
