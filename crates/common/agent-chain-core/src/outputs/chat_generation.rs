@@ -173,22 +173,20 @@ impl Add for ChatGenerationChunk {
 
     /// Concatenate two `ChatGenerationChunk`s.
     ///
-    /// Returns a new `ChatGenerationChunk` concatenated from self and other.
+    /// Uses proper message chunk merging to preserve metadata, tool calls,
+    /// and other message attributes.
     fn add(self, other: ChatGenerationChunk) -> Self::Output {
         let generation_info = merge_generation_info(self.generation_info, other.generation_info);
 
-        // For message merging, we concatenate the text content
-        // In a more complete implementation, this would use proper message chunk merging
-        let merged_text = self.text + &other.text;
-
-        // Create a new AI message with the merged content
-        let merged_message = crate::messages::AIMessage::builder()
-            .content(&merged_text)
-            .build();
+        let self_chunk = crate::messages::utils::msg_to_chunk(&self.message);
+        let other_chunk = crate::messages::utils::msg_to_chunk(&other.message);
+        let merged_chunk = self_chunk + other_chunk;
+        let merged_message = crate::messages::utils::chunk_to_msg(&merged_chunk);
+        let text = extract_text_from_message(&merged_message);
 
         ChatGenerationChunk {
-            text: merged_text,
-            message: merged_message.into(),
+            text,
+            message: merged_message,
             generation_info,
             generation_type: "ChatGenerationChunk".to_string(),
         }

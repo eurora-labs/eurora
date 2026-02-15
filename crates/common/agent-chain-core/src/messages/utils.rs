@@ -28,7 +28,7 @@ pub type MessageLikeRepresentation = serde_json::Value;
 /// Convert a `BaseMessage` to the corresponding `BaseMessageChunk`.
 ///
 /// This corresponds to `_msg_to_chunk` in LangChain Python.
-fn msg_to_chunk(message: &BaseMessage) -> BaseMessageChunk {
+pub(crate) fn msg_to_chunk(message: &BaseMessage) -> BaseMessageChunk {
     match message {
         BaseMessage::Human(m) => BaseMessageChunk::Human(
             HumanMessageChunk::builder()
@@ -103,7 +103,7 @@ fn msg_to_chunk(message: &BaseMessage) -> BaseMessageChunk {
 /// Convert a `BaseMessageChunk` to the corresponding `BaseMessage`.
 ///
 /// This corresponds to `_chunk_to_msg` in LangChain Python.
-fn chunk_to_msg(chunk: &BaseMessageChunk) -> BaseMessage {
+pub(crate) fn chunk_to_msg(chunk: &BaseMessageChunk) -> BaseMessage {
     chunk.to_message()
 }
 

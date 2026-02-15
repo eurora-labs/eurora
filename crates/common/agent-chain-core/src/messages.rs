@@ -50,7 +50,7 @@ mod human;
 mod modifier;
 mod system;
 mod tool;
-mod utils;
+pub(crate) mod utils;
 
 // Re-export from ai
 pub use ai::{
