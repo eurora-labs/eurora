@@ -1359,14 +1359,14 @@ mod tests {
     #[test]
     fn test_addable_dict() {
         let mut dict1 = AddableDict::new();
-        dict1.insert("a", serde_json::json!(1));
+        dict1.0.insert("a".to_string(), serde_json::json!(1));
 
         let mut dict2 = AddableDict::new();
-        dict2.insert("b", serde_json::json!(2));
+        dict2.0.insert("b".to_string(), serde_json::json!(2));
 
         let combined = dict1 + dict2;
-        assert_eq!(combined.get("a"), Some(&serde_json::json!(1)));
-        assert_eq!(combined.get("b"), Some(&serde_json::json!(2)));
+        assert_eq!(combined.0.get("a"), Some(&serde_json::json!(1)));
+        assert_eq!(combined.0.get("b"), Some(&serde_json::json!(2)));
     }
 
     #[test]

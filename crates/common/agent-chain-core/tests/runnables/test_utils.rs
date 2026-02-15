@@ -18,7 +18,7 @@ use serde_json::{Value, json};
 
 use agent_chain_core::runnables::utils::{
     AddableDict, ConfigurableField, ConfigurableFieldMultiOption, ConfigurableFieldSingleOption,
-    ConfigurableFieldSpec, RootEventFilter, add, gather_with_concurrency, get_unique_config_specs,
+    ConfigurableFieldSpec, RootEventFilter, gather_with_concurrency, get_unique_config_specs,
     indent_lines_after_first,
 };
 
@@ -74,62 +74,62 @@ fn test_indent_lines_after_first_empty_prefix() {
 #[test]
 fn test_addable_dict_add_basic() {
     let mut a = AddableDict::new();
-    a.insert("x", json!(1));
-    a.insert("y", json!("hello"));
+    a.0.insert("x".to_string(), json!(1));
+    a.0.insert("y".to_string(), json!("hello"));
 
     let mut b = AddableDict::new();
-    b.insert("x", json!(2));
-    b.insert("y", json!(" world"));
+    b.0.insert("x".to_string(), json!(2));
+    b.0.insert("y".to_string(), json!(" world"));
 
     let result = a + b;
-    assert_eq!(result.get("x"), Some(&json!(3)));
-    assert_eq!(result.get("y"), Some(&json!("hello world")));
+    assert_eq!(result.0.get("x"), Some(&json!(3)));
+    assert_eq!(result.0.get("y"), Some(&json!("hello world")));
 }
 
 #[test]
 fn test_addable_dict_add_new_keys() {
     let mut a = AddableDict::new();
-    a.insert("x", json!(1));
+    a.0.insert("x".to_string(), json!(1));
 
     let mut b = AddableDict::new();
-    b.insert("y", json!(2));
+    b.0.insert("y".to_string(), json!(2));
 
     let result = a + b;
-    assert_eq!(result.get("x"), Some(&json!(1)));
-    assert_eq!(result.get("y"), Some(&json!(2)));
+    assert_eq!(result.0.get("x"), Some(&json!(1)));
+    assert_eq!(result.0.get("y"), Some(&json!(2)));
 }
 
 #[test]
 fn test_addable_dict_add_none_values() {
     let mut a = AddableDict::new();
-    a.insert("x", Value::Null);
+    a.0.insert("x".to_string(), Value::Null);
 
     let mut b = AddableDict::new();
-    b.insert("x", json!(5));
+    b.0.insert("x".to_string(), json!(5));
 
     let result = a + b;
-    assert_eq!(result.get("x"), Some(&json!(5)));
+    assert_eq!(result.0.get("x"), Some(&json!(5)));
 
     let mut a2 = AddableDict::new();
-    a2.insert("x", json!(5));
+    a2.0.insert("x".to_string(), json!(5));
 
     let mut b2 = AddableDict::new();
-    b2.insert("x", Value::Null);
+    b2.0.insert("x".to_string(), Value::Null);
 
     let result2 = a2 + b2;
-    assert_eq!(result2.get("x"), Some(&json!(5)));
+    assert_eq!(result2.0.get("x"), Some(&json!(5)));
 }
 
 #[test]
 fn test_addable_dict_add_type_error_fallback() {
     let mut a = AddableDict::new();
-    a.insert("x", json!(1));
+    a.0.insert("x".to_string(), json!(1));
 
     let mut b = AddableDict::new();
-    b.insert("x", json!("string"));
+    b.0.insert("x".to_string(), json!("string"));
 
     let result = a + b;
-    assert_eq!(result.get("x"), Some(&json!("string")));
+    assert_eq!(result.0.get("x"), Some(&json!("string")));
 }
 
 #[test]
@@ -137,12 +137,12 @@ fn test_addable_dict_radd() {
     let a: HashMap<String, Value> = [("x".to_string(), json!(1))].into_iter().collect();
 
     let mut b = AddableDict::new();
-    b.insert("x", json!(2));
-    b.insert("y", json!(3));
+    b.0.insert("x".to_string(), json!(2));
+    b.0.insert("y".to_string(), json!(3));
 
     let result = AddableDict::from_map(a) + b;
-    assert_eq!(result.get("x"), Some(&json!(3)));
-    assert_eq!(result.get("y"), Some(&json!(3)));
+    assert_eq!(result.0.get("x"), Some(&json!(3)));
+    assert_eq!(result.0.get("y"), Some(&json!(3)));
 }
 
 #[test]
@@ -150,77 +150,27 @@ fn test_addable_dict_radd_new_keys() {
     let a: HashMap<String, Value> = [("a".to_string(), json!(1))].into_iter().collect();
 
     let mut b = AddableDict::new();
-    b.insert("b", json!(2));
+    b.0.insert("b".to_string(), json!(2));
 
     let result = AddableDict::from_map(a) + b;
-    assert_eq!(result.get("a"), Some(&json!(1)));
-    assert_eq!(result.get("b"), Some(&json!(2)));
+    assert_eq!(result.0.get("a"), Some(&json!(1)));
+    assert_eq!(result.0.get("b"), Some(&json!(2)));
 }
 
 #[test]
 fn test_addable_dict_preserves_dict_behavior() {
     let mut d = AddableDict::new();
-    d.insert("key", json!("value"));
+    d.0.insert("key".to_string(), json!("value"));
 
-    assert_eq!(d.get("key"), Some(&json!("value")));
-    let keys: Vec<&String> = d.iter().map(|(k, _)| k).collect();
+    assert_eq!(d.0.get("key"), Some(&json!("value")));
+    let keys: Vec<&String> = d.0.iter().map(|(k, _)| k).collect();
     assert_eq!(keys, vec!["key"]);
-    assert_eq!(d.len(), 1);
+    assert_eq!(d.0.len(), 1);
 }
 
 // ============================================================================
 // Tests for add()
 // ============================================================================
-
-#[test]
-fn test_add_strings() {
-    let result = add(vec![
-        "hello".to_string(),
-        " ".to_string(),
-        "world".to_string(),
-    ]);
-    assert_eq!(result, Some("hello world".to_string()));
-}
-
-#[test]
-fn test_add_lists() {
-    let result = add(vec![vec![1, 2], vec![3, 4], vec![5]]);
-    assert_eq!(result, Some(vec![1, 2, 3, 4, 5]));
-}
-
-#[test]
-fn test_add_integers() {
-    let result = add(vec![1, 2, 3]);
-    assert_eq!(result, Some(6));
-}
-
-#[test]
-fn test_add_empty_iterable() {
-    let result = add(Vec::<i32>::new());
-    assert_eq!(result, None);
-}
-
-#[test]
-fn test_add_single_element() {
-    let result = add(vec!["only".to_string()]);
-    assert_eq!(result, Some("only".to_string()));
-}
-
-#[test]
-fn test_add_addable_dicts() {
-    let mut d1 = AddableDict::new();
-    d1.insert("a", json!(1));
-
-    let mut d2 = AddableDict::new();
-    d2.insert("a", json!(2));
-    d2.insert("b", json!(3));
-
-    let result = add(vec![d1, d2]);
-    assert!(result.is_some());
-    let result = result.unwrap();
-    assert_eq!(result.get("a"), Some(&json!(3)));
-    assert_eq!(result.get("b"), Some(&json!(3)));
-}
 
 // ============================================================================
 // Tests for gather_with_concurrency
