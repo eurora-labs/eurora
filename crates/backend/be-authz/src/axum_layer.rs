@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::extract::Request;
+use axum::extract::{MatchedPath, Request};
 use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
@@ -8,10 +8,7 @@ use be_auth_core::JwtConfig;
 use tracing::{debug, warn};
 
 use crate::CasbinAuthz;
-
-/// Path prefixes that bypass authorization entirely (public/webhook routes).
-const BYPASS_PREFIXES: &[&str] = &["/releases/", "/extensions/"];
-const BYPASS_EXACT: &[&str] = &["/payment/webhook"];
+use crate::bypass::is_rest_bypass;
 
 /// Shared state for the axum authz middleware.
 pub struct AuthzState {
@@ -31,17 +28,22 @@ pub async fn authz_middleware(
     mut req: Request,
     next: Next,
 ) -> Response {
-    let path = req.uri().path().to_string();
+    let raw_path = req.uri().path().to_string();
     let method = req.method().to_string();
 
-    if BYPASS_PREFIXES
-        .iter()
-        .any(|prefix| path.starts_with(prefix))
-        || BYPASS_EXACT.iter().any(|exact| path == *exact)
-    {
-        debug!(path = %path, "Bypassing authorization for public route");
+    if is_rest_bypass(&raw_path) {
+        debug!(path = %raw_path, "Bypassing authorization for public route");
         return next.run(req).await;
     }
+
+    // Use the route template (e.g. "/payment/checkout") for policy matching instead
+    // of the concrete path (e.g. "/payment/subscription/sub_123"). This ensures
+    // routes with path parameters match their policy entries correctly.
+    let policy_path = req
+        .extensions()
+        .get::<MatchedPath>()
+        .map(|m| m.as_str().to_string())
+        .unwrap_or_else(|| raw_path.clone());
 
     let auth_header = match req
         .headers()
@@ -74,9 +76,10 @@ pub async fn authz_middleware(
     let claims = match state.jwt_config.validate_access_token(token) {
         Ok(c) => c,
         Err(e) => {
+            warn!(error = %e, "JWT validation failed");
             return (
                 StatusCode::UNAUTHORIZED,
-                axum::Json(serde_json::json!({"error": e.to_string()})),
+                axum::Json(serde_json::json!({"error": "Invalid or expired token"})),
             )
                 .into_response();
         }
@@ -84,14 +87,14 @@ pub async fn authz_middleware(
 
     let role = claims.role.to_string();
 
-    match state.authz.enforce(&role, &path, &method).await {
+    match state.authz.enforce(&role, &policy_path, &method) {
         Ok(true) => {
-            debug!(role = %role, path = %path, method = %method, "REST authorized");
+            debug!(role = %role, path = %raw_path, method = %method, "REST authorized");
             req.extensions_mut().insert(claims);
             next.run(req).await
         }
         Ok(false) => {
-            warn!(role = %role, path = %path, method = %method, "REST authorization denied");
+            warn!(role = %role, path = %raw_path, method = %method, "REST authorization denied");
             (
                 StatusCode::FORBIDDEN,
                 axum::Json(

@@ -1,7 +1,5 @@
-use std::collections::HashSet;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::LazyLock;
 use std::task::{Context, Poll};
 
 use auth_core::Claims;
@@ -13,15 +11,7 @@ use tower::{Layer, Service};
 use tracing::{debug, warn};
 
 use crate::CasbinAuthz;
-
-/// gRPC service paths that bypass authorization entirely (public/unauthenticated).
-static BYPASS_SERVICES: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
-    HashSet::from([
-        "auth_service.ProtoAuthService",
-        "grpc.health.v1.Health",
-        "local_config_service.ProtoLocalConfigService",
-    ])
-});
+use crate::bypass::is_grpc_bypass;
 
 /// Tower layer that combines JWT authentication and casbin authorization for gRPC.
 #[derive(Clone)]
@@ -84,7 +74,7 @@ where
                 None => return inner.call(req).await,
             };
 
-            if BYPASS_SERVICES.contains(service_full.as_str()) {
+            if is_grpc_bypass(&service_full) {
                 debug!(path = %path, "Bypassing authorization for public service");
                 return inner.call(req).await;
             }
@@ -97,7 +87,7 @@ where
             let service_name = extract_service_name(&service_full);
             let role = claims.role.to_string();
 
-            match authz.enforce(&role, &service_name, &method).await {
+            match authz.enforce(&role, &service_name, &method) {
                 Ok(true) => {
                     debug!(role = %role, service = %service_name, method = %method, "gRPC authorized");
                     req.extensions_mut().insert(claims);
@@ -132,9 +122,10 @@ fn extract_jwt_claims<B>(req: &Request<B>, jwt_config: &JwtConfig) -> Result<Cla
         .strip_prefix("Bearer ")
         .ok_or_else(|| Status::unauthenticated("Authorization header must start with 'Bearer '"))?;
 
-    jwt_config
-        .validate_access_token(token)
-        .map_err(|e| Status::unauthenticated(e.to_string()))
+    jwt_config.validate_access_token(token).map_err(|e| {
+        warn!(error = %e, "JWT validation failed");
+        Status::unauthenticated("Invalid or expired token")
+    })
 }
 
 /// Parse a gRPC path `/package.ServiceName/MethodName` into `(full_service, method)`.
@@ -154,4 +145,73 @@ fn parse_grpc_path(path: &str) -> Option<(String, String)> {
 fn extract_service_name(full_service: &str) -> String {
     let name = full_service.rsplit('.').next().unwrap_or(full_service);
     name.strip_prefix("Proto").unwrap_or(name).to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_grpc_path_valid() {
+        let result = parse_grpc_path("/conversation_service.ProtoConversationService/ChatStream");
+        assert_eq!(
+            result,
+            Some((
+                "conversation_service.ProtoConversationService".to_string(),
+                "ChatStream".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn parse_grpc_path_health() {
+        let result = parse_grpc_path("/grpc.health.v1.Health/Check");
+        assert_eq!(
+            result,
+            Some(("grpc.health.v1.Health".to_string(), "Check".to_string()))
+        );
+    }
+
+    #[test]
+    fn parse_grpc_path_no_leading_slash() {
+        assert_eq!(parse_grpc_path("no_slash/Method"), None);
+    }
+
+    #[test]
+    fn parse_grpc_path_empty_method() {
+        assert_eq!(parse_grpc_path("/service.Name/"), None);
+    }
+
+    #[test]
+    fn parse_grpc_path_no_method_slash() {
+        assert_eq!(parse_grpc_path("/service.Name"), None);
+    }
+
+    #[test]
+    fn parse_grpc_path_root() {
+        assert_eq!(parse_grpc_path("/"), None);
+    }
+
+    #[test]
+    fn extract_service_name_strips_proto_prefix() {
+        assert_eq!(
+            extract_service_name("conversation_service.ProtoConversationService"),
+            "ConversationService"
+        );
+    }
+
+    #[test]
+    fn extract_service_name_no_proto_prefix() {
+        assert_eq!(extract_service_name("grpc.health.v1.Health"), "Health");
+    }
+
+    #[test]
+    fn extract_service_name_no_package() {
+        assert_eq!(extract_service_name("ProtoFoo"), "Foo");
+    }
+
+    #[test]
+    fn extract_service_name_plain() {
+        assert_eq!(extract_service_name("MyService"), "MyService");
+    }
 }

@@ -1,4 +1,5 @@
 mod axum_layer;
+mod bypass;
 mod enforcer;
 mod error;
 mod grpc_layer;

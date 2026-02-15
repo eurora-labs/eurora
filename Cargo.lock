@@ -1540,7 +1540,6 @@ dependencies = [
  "be-auth-core",
  "casbin",
  "http 1.4.0",
- "pin-project-lite",
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
