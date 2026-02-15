@@ -51,6 +51,7 @@ pub mod runnables;
 pub mod stores;
 pub mod structured_query;
 pub mod sys_info;
+pub mod text_splitters;
 pub mod tools;
 pub mod tracers;
 pub mod utils;
@@ -225,6 +226,9 @@ pub use documents::{
     BaseDocumentCompressor, BaseDocumentTransformer, BaseMedia, Blob, BlobBuilder, BlobData,
     Document,
 };
+
+// Re-export text splitter types
+pub use text_splitters::TextSplitter;
 
 // Re-export retriever types
 pub use retrievers::{BaseRetriever, LangSmithRetrieverParams, RetrieverInput, RetrieverOutput};
