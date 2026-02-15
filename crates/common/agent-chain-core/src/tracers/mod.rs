@@ -66,6 +66,7 @@
 pub mod base;
 pub mod context;
 pub mod core;
+pub mod event_stream;
 pub mod log_stream;
 pub mod memory_stream;
 pub mod root_listeners;
@@ -105,6 +106,9 @@ pub use log_stream::{
 pub use root_listeners::{AsyncListener, AsyncRootListenersTracer, Listener, RootListenersTracer};
 pub use run_collector::RunCollectorCallbackHandler;
 pub use stdout::{ConsoleCallbackHandler, FunctionCallbackHandler, elapsed, try_json_stringify};
+
+// Re-export event stream types
+pub use event_stream::{AstreamEventsCallbackHandler, RunInfo};
 
 #[cfg(test)]
 mod tests {
