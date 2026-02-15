@@ -15,7 +15,7 @@
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { onMount } from 'svelte';
 
-	const PAYMENT_API_URL = import.meta.env.VITE_PAYMENT_API_URL;
+	const REST_API_URL = import.meta.env.VITE_REST_API_URL;
 	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID;
 
 	let portalLoading = $state(false);
@@ -69,7 +69,7 @@
 		try {
 			await auth.ensureValidToken();
 
-			const res = await fetch(`${PAYMENT_API_URL}/payment/portal`, {
+			const res = await fetch(`${REST_API_URL}/payment/portal`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',

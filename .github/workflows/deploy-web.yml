@@ -62,7 +62,7 @@ jobs:
             # - name: Build web app
             #   run: pnpm turbo run build --filter @eurora/web...
             #   env:
-            #       VITE_API_BASE_URL: 'https://api.eurora-labs.com'
+            #       VITE_GRPC_API_URL: 'https://api.eurora-labs.com'
 
             # - name: Create CNAME file
             #   run: echo "eurora-labs.com" > apps/web/dist/CNAME

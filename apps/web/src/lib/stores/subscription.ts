@@ -1,7 +1,7 @@
 import { auth, accessToken } from '$lib/stores/auth.js';
 import { writable, derived, get } from 'svelte/store';
 
-const PAYMENT_API_URL = import.meta.env.VITE_PAYMENT_API_URL;
+const REST_API_URL = import.meta.env.VITE_REST_API_URL;
 
 export interface SubscriptionStatus {
 	subscription_id: string | null;
@@ -40,7 +40,7 @@ export const subscriptionStore = {
 			await auth.ensureValidToken();
 			const token = get(accessToken);
 
-			const res = await fetch(`${PAYMENT_API_URL}/payment/subscription`, {
+			const res = await fetch(`${REST_API_URL}/payment/subscription`, {
 				headers: { Authorization: `Bearer ${token}` },
 			});
 
