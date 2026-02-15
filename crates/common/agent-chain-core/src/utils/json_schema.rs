@@ -213,50 +213,6 @@ fn retrieve_ref(path: &str, schema: &Value) -> Value {
     current.clone()
 }
 
-/// Recursively removes "title" fields from a JSON schema dictionary.
-///
-/// Remove "title" fields from the input JSON schema dictionary,
-/// except when a "title" appears within a property definition under "properties".
-///
-/// # Arguments
-///
-/// * `schema` - The input JSON schema as a reference to a serde_json Value.
-///
-/// # Returns
-///
-/// A new value with appropriate "title" fields removed.
-pub fn remove_titles(schema: &Value) -> Value {
-    remove_titles_helper(schema, "")
-}
-
-fn remove_titles_helper(kv: &Value, prev_key: &str) -> Value {
-    match kv {
-        Value::Object(map) => {
-            let mut new_map = Map::new();
-            for (k, v) in map {
-                if k == "title" {
-                    // If the value is a nested dict and part of a property under "properties",
-                    // preserve the title but continue recursion
-                    if v.is_object() && prev_key == "properties" {
-                        new_map.insert(k.clone(), remove_titles_helper(v, k));
-                    }
-                    // Otherwise, remove this "title" key (don't add to new_map)
-                } else {
-                    // Recurse into nested values
-                    new_map.insert(k.clone(), remove_titles_helper(v, k));
-                }
-            }
-            Value::Object(new_map)
-        }
-        Value::Array(arr) => Value::Array(
-            arr.iter()
-                .map(|item| remove_titles_helper(item, prev_key))
-                .collect(),
-        ),
-        _ => kv.clone(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -333,22 +289,5 @@ mod tests {
 
         let result = retrieve_ref("#/$defs/Person", &schema);
         assert_eq!(result["type"], json!("object"));
-    }
-
-    #[test]
-    fn test_remove_titles() {
-        let schema = json!({
-            "title": "MySchema",
-            "type": "object",
-            "properties": {
-                "name": {
-                    "title": "Name",
-                    "type": "string"
-                }
-            }
-        });
-
-        let result = remove_titles(&schema);
-        assert!(!result.as_object().unwrap().contains_key("title"));
     }
 }

@@ -13,8 +13,24 @@ use crate::outputs::Generation;
 use crate::runnables::AddableDict;
 
 use super::base::BaseOutputParser;
-use super::format_instructions::format_xml_instructions;
 use super::transform::BaseTransformOutputParser;
+
+/// XML format instructions template, defined locally matching
+/// `XML_FORMAT_INSTRUCTIONS` in `langchain_core.output_parsers.xml`.
+const XML_FORMAT_INSTRUCTIONS: &str = r#"The output should be formatted as a XML file.
+1. Output should conform to the tags below.
+2. If tags are not given, make them on your own.
+3. Remember to always open and close all the tags.
+
+As an example, for the tags ["foo", "bar", "baz"]:
+1. String "<foo>\n   <bar>\n      <baz></baz>\n   </bar>\n</foo>" is a well-formatted instance of the schema.
+2. String "<foo>\n   <bar>\n   </foo>" is a badly-formatted instance.
+3. String "<foo>\n   <tag>\n   </tag>\n</foo>" is a badly-formatted instance.
+
+Here are the output tags:
+```
+{tags}
+```"#;
 
 /// Parse an output using XML format.
 ///
@@ -199,9 +215,9 @@ impl BaseOutputParser for XMLOutputParser {
         match &self.tags {
             Some(tags) => {
                 let tags_str = format!("{:?}", tags);
-                Ok(format_xml_instructions(&tags_str))
+                Ok(XML_FORMAT_INSTRUCTIONS.replace("{tags}", &tags_str))
             }
-            None => Ok(format_xml_instructions("[]")),
+            None => Ok(XML_FORMAT_INSTRUCTIONS.replace("{tags}", "[]")),
         }
     }
 

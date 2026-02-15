@@ -777,7 +777,10 @@ fn test_model_profiles() {
     assert!(model.profile().is_none());
 
     // Create model with profile
-    let profile = ModelProfile::new().with_max_input_tokens(100);
+    let profile = ModelProfile {
+        max_input_tokens: Some(100),
+        ..Default::default()
+    };
     let config = ChatModelConfig::new().with_profile(profile.clone());
     let model_with_profile =
         GenericFakeChatModel::from_strings(vec!["test".to_string()]).with_config(config);
@@ -1012,7 +1015,10 @@ fn test_chat_model_config_builder() {
     assert_eq!(config.output_version, Some("v1".to_string()));
 
     // Test with profile
-    let profile = ModelProfile::new().with_max_input_tokens(1000);
+    let profile = ModelProfile {
+        max_input_tokens: Some(1000),
+        ..Default::default()
+    };
     let config_with_profile = ChatModelConfig::new().with_profile(profile);
     assert!(config_with_profile.profile.is_some());
     assert_eq!(

@@ -149,7 +149,7 @@ pub use chat_loaders::BaseChatLoader;
 pub use caches::{BaseCache, CacheReturnValue, InMemoryCache};
 
 // Re-export global functions
-pub use globals::{get_llm_cache, set_llm_cache};
+pub use globals::{get_debug, get_llm_cache, get_verbose, set_debug, set_llm_cache, set_verbose};
 
 // Re-export output parser types
 pub use output_parsers::{

@@ -2,7 +2,7 @@
 //!
 //! Converted from langchain/libs/core/tests/unit_tests/utils/test_rm_titles.py
 
-use agent_chain_core::utils::json_schema::remove_titles;
+use agent_chain_core::utils::function_calling::remove_titles;
 use serde_json::json;
 
 /// Test case 1: Basic schema with nested arrays

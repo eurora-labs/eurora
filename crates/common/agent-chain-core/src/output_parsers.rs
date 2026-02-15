@@ -57,10 +57,7 @@ pub use base::{
 };
 
 // Re-export format instructions
-pub use format_instructions::{
-    JSON_FORMAT_INSTRUCTIONS, PYDANTIC_FORMAT_INSTRUCTIONS, XML_FORMAT_INSTRUCTIONS,
-    format_json_instructions, format_pydantic_instructions, format_xml_instructions,
-};
+pub use format_instructions::JSON_FORMAT_INSTRUCTIONS;
 
 // Re-export string parser
 pub use string::StrOutputParser;

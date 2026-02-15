@@ -410,6 +410,24 @@ impl Graph {
             opts.frontmatter_config.as_ref(),
         )
     }
+
+    /// Draw the graph as an ASCII art string.
+    pub fn draw_ascii(&self) -> Result<String, String> {
+        let vertices: std::collections::HashMap<String, String> = self
+            .nodes
+            .iter()
+            .map(|(id, node)| (id.clone(), node.name.clone()))
+            .collect();
+        super::graph_ascii::draw_ascii(&vertices, &self.edges)
+    }
+
+    /// Print the graph as an ASCII art string.
+    pub fn print_ascii(&self) {
+        match self.draw_ascii() {
+            Ok(ascii) => println!("{}", ascii),
+            Err(err) => eprintln!("Error drawing ASCII: {}", err),
+        }
+    }
 }
 
 /// Options for Mermaid rendering.
