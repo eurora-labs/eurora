@@ -631,7 +631,10 @@ impl BaseChatModel for GenericFakeChatModel {
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
         let message = {
-            let mut guard = self.messages.lock().unwrap();
+            let mut guard = self
+                .messages
+                .lock()
+                .map_err(|e| crate::error::Error::Other(format!("Lock poisoned: {}", e)))?;
             guard
                 .next()
                 .unwrap_or_else(|| AIMessage::builder().content("").build())
@@ -651,9 +654,11 @@ impl BaseChatModel for GenericFakeChatModel {
         _stop: Option<Vec<String>>,
         run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
-        // Get the message via _generate
         let message = {
-            let mut guard = self.messages.lock().unwrap();
+            let mut guard = self
+                .messages
+                .lock()
+                .map_err(|e| crate::error::Error::Other(format!("Lock poisoned: {}", e)))?;
             guard
                 .next()
                 .unwrap_or_else(|| AIMessage::builder().content("").build())
@@ -678,7 +683,8 @@ impl BaseChatModel for GenericFakeChatModel {
             if !content.is_empty() {
                 // Use a regular expression to split on whitespace with a capture group
                 // so that we can preserve the whitespace in the output.
-                let re = Regex::new(r"(\s)").unwrap();
+                let re = Regex::new(r"(\s)")
+                    .map_err(|e| crate::error::Error::Other(format!("Regex error: {}", e)))?;
 
                 // Split content preserving whitespace using regex
                 let all_parts: Vec<String> = {
@@ -728,61 +734,94 @@ impl BaseChatModel for GenericFakeChatModel {
             // Handle additional_kwargs
             if !additional_kwargs.is_empty() {
                 for (key, value) in additional_kwargs.iter() {
-                    // Special case for function_call
                     if key == "function_call" {
                         if let Some(obj) = value.as_object() {
                             for (fkey, fvalue) in obj.iter() {
                                 if let Some(fvalue_str) = fvalue.as_str() {
-                                    // Break function call by `,`
-                                    let fvalue_chunks: Vec<&str> = fvalue_str.split(',').collect();
-                                    let num_fchunks = fvalue_chunks.len();
-                                    for (fi, fvalue_chunk) in fvalue_chunks.into_iter().enumerate() {
-                                        // Add comma back except for last
-                                        let chunk_content = if fi < num_fchunks - 1 {
-                                            format!("{},", fvalue_chunk)
-                                        } else {
-                                            fvalue_chunk.to_string()
-                                        };
-
-                                        let mut kwargs: HashMap<String, Value> = HashMap::new();
-                                        let mut fc: HashMap<String, Value> = HashMap::new();
-                                        fc.insert(fkey.clone(), Value::String(chunk_content));
-                                        kwargs.insert("function_call".to_string(), Value::Object(fc.into_iter().collect()));
-
-                                        let mut chunk_msg = AIMessageChunk::builder().content("").build();
-                                        if let Some(ref id) = message_id {
-                                            chunk_msg = AIMessageChunk::builder().id(id.clone()).content("").build();
+                                    // Break function call by `,` preserving the delimiter
+                                    // Python: re.split(r"(,)", fvalue) -> ["a", ",", "b"]
+                                    let re_comma = Regex::new(r"(,)")
+                                        .map_err(|e| crate::error::Error::Other(format!("Regex error: {}", e)))?;
+                                    let fvalue_parts: Vec<String> = {
+                                        let mut parts = Vec::new();
+                                        let mut last = 0;
+                                        for m in re_comma.find_iter(fvalue_str) {
+                                            if m.start() > last {
+                                                parts.push(fvalue_str[last..m.start()].to_string());
+                                            }
+                                            parts.push(m.as_str().to_string());
+                                            last = m.end();
                                         }
+                                        if last < fvalue_str.len() {
+                                            parts.push(fvalue_str[last..].to_string());
+                                        }
+                                        parts
+                                    };
+
+                                    for fvalue_chunk in &fvalue_parts {
+                                        let mut fc: HashMap<String, Value> = HashMap::new();
+                                        fc.insert(fkey.clone(), Value::String(fvalue_chunk.clone()));
+                                        let mut ak: HashMap<String, Value> = HashMap::new();
+                                        ak.insert("function_call".to_string(), Value::Object(fc.into_iter().collect()));
+
+                                        let chunk_msg = AIMessageChunk::builder()
+                                            .maybe_id(message_id.clone())
+                                            .content("")
+                                            .additional_kwargs(ak)
+                                            .build();
 
                                         let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
+
+                                        if let Some(run_id) = callback_run_id {
+                                            for handler in &callback_handlers {
+                                                handler.on_llm_new_token("", run_id, callback_parent_run_id, None);
+                                            }
+                                        }
+
                                         yield Ok(chunk);
                                     }
                                 } else {
-                                    let mut kwargs: HashMap<String, Value> = HashMap::new();
                                     let mut fc: HashMap<String, Value> = HashMap::new();
                                     fc.insert(fkey.clone(), fvalue.clone());
-                                    kwargs.insert("function_call".to_string(), Value::Object(fc.into_iter().collect()));
+                                    let mut ak: HashMap<String, Value> = HashMap::new();
+                                    ak.insert("function_call".to_string(), Value::Object(fc.into_iter().collect()));
 
-                                    let mut chunk_msg = AIMessageChunk::builder().content("").build();
-                                    if let Some(ref id) = message_id {
-                                        chunk_msg = AIMessageChunk::builder().id(id.clone()).content("").build();
-                                    }
+                                    let chunk_msg = AIMessageChunk::builder()
+                                        .maybe_id(message_id.clone())
+                                        .content("")
+                                        .additional_kwargs(ak)
+                                        .build();
 
                                     let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
+
+                                    if let Some(run_id) = callback_run_id {
+                                        for handler in &callback_handlers {
+                                            handler.on_llm_new_token("", run_id, callback_parent_run_id, None);
+                                        }
+                                    }
+
                                     yield Ok(chunk);
                                 }
                             }
                         }
                     } else {
-                        let mut kwargs: HashMap<String, Value> = HashMap::new();
-                        kwargs.insert(key.clone(), value.clone());
+                        let mut ak: HashMap<String, Value> = HashMap::new();
+                        ak.insert(key.clone(), value.clone());
 
-                        let mut chunk_msg = AIMessageChunk::builder().content("").build();
-                        if let Some(ref id) = message_id {
-                            chunk_msg = AIMessageChunk::builder().id(id.clone()).content("").build();
-                        }
+                        let chunk_msg = AIMessageChunk::builder()
+                            .maybe_id(message_id.clone())
+                            .content("")
+                            .additional_kwargs(ak)
+                            .build();
 
                         let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
+
+                        if let Some(run_id) = callback_run_id {
+                            for handler in &callback_handlers {
+                                handler.on_llm_new_token("", run_id, callback_parent_run_id, None);
+                            }
+                        }
+
                         yield Ok(chunk);
                     }
                 }

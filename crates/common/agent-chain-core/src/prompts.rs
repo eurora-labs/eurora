@@ -28,9 +28,9 @@
 //! assert_eq!(result, "Hello, World!");
 //!
 //! // Chat prompt with multiple messages
-//! let chat_prompt = ChatPromptTemplate::from_messages(&[
-//!     ("system", "You are a helpful assistant."),
-//!     ("human", "{question}"),
+//! let chat_prompt = ChatPromptTemplate::from_messages(vec![
+//!     ("system", "You are a helpful assistant.").into(),
+//!     ("human", "{question}").into(),
 //! ]);
 //! ```
 

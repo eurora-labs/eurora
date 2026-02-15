@@ -401,9 +401,9 @@ impl StringPromptTemplate for FewShotPromptTemplate {
 ///     ]),
 /// ];
 ///
-/// let example_prompt = ChatPromptTemplate::from_messages(&[
-///     ("human", "What is {input}?"),
-///     ("ai", "{output}"),
+/// let example_prompt = ChatPromptTemplate::from_messages(vec![
+///     ("human", "What is {input}?").into(),
+///     ("ai", "{output}").into(),
 /// ]).unwrap();
 ///
 /// let few_shot = FewShotChatMessagePromptTemplate::new(examples, example_prompt);
@@ -610,9 +610,11 @@ mod tests {
             ("output".to_string(), "4".to_string()),
         ])];
 
-        let example_prompt =
-            ChatPromptTemplate::from_messages(&[("human", "What is {input}?"), ("ai", "{output}")])
-                .unwrap();
+        let example_prompt = ChatPromptTemplate::from_messages(vec![
+            ("human", "What is {input}?").into(),
+            ("ai", "{output}").into(),
+        ])
+        .unwrap();
 
         let few_shot = FewShotChatMessagePromptTemplate::new(examples, example_prompt);
 

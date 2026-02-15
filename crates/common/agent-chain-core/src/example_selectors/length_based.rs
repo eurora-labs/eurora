@@ -82,23 +82,25 @@ impl BaseExampleSelector for LengthBasedExampleSelector {
             .cloned()
             .collect::<Vec<_>>()
             .join(" ");
-        let mut remaining_length = self
-            .max_length
-            .saturating_sub((self.get_text_length)(&inputs));
+        let mut remaining_length =
+            self.max_length as isize - (self.get_text_length)(&inputs) as isize;
+        let mut i = 0;
         let mut selected = Vec::new();
 
-        for (i, example) in self.examples.iter().enumerate() {
-            let example_length = self.example_text_lengths[i];
-            if remaining_length < example_length {
+        while remaining_length > 0 && i < self.examples.len() {
+            let example_length = self.example_text_lengths.get(i).copied().unwrap_or(0) as isize;
+            let new_length = remaining_length - example_length;
+            if new_length < 0 {
                 break;
             }
             selected.push(
-                example
+                self.examples[i]
                     .iter()
                     .map(|(k, v)| (k.clone(), Value::String(v.clone())))
                     .collect(),
             );
-            remaining_length -= example_length;
+            remaining_length = new_length;
+            i += 1;
         }
 
         Ok(selected)
