@@ -32,14 +32,15 @@ async_from = "0.2.0"
 async-stream = "0.3.6"
 async-trait = "0.1.89"
 auth-core = { path = "crates/common/auth-core" }
+axum = "0.8.8"
 backon = "1.6"
 base64 = "0.22.1"
 be-activity-service = { path = "crates/backend/be-activity-service" }
 be-asset = { path = "crates/backend/be-asset" }
 be-asset-service = { path = "crates/backend/be-asset-service" }
 be-auth-core = { path = "crates/backend/be-auth-core" }
-be-auth-grpc = { path = "crates/backend/be-auth-grpc" }
 be-auth-service = { path = "crates/backend/be-auth-service" }
+be-authz = { path = "crates/backend/be-authz" }
 be-conversation-service = { path = "crates/backend/be-conversation-service" }
 be-encrypt = { path = "crates/backend/be-encrypt" }
 be-local-config-service = { path = "crates/backend/be-local-config-service" }
@@ -50,6 +51,11 @@ be-storage = { path = "crates/backend/be-storage" }
 be-update-service = { path = "crates/backend/be-update-service" }
 bon = "3.8.2"
 bstr = "1.12.1"
+casbin = { version = "2.20.0", default-features = false, features = [
+  "incremental",
+  "logging",
+  "runtime-tokio"
+] }
 cfg-if = "1.0.4"
 chrono = "0.4.43"
 dirs = "6.0"

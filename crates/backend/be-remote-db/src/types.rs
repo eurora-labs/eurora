@@ -38,7 +38,7 @@ impl PaginationParams {
         let order = match order.to_lowercase().as_str() {
             "asc" => SortOrder::Asc,
             "desc" => SortOrder::Desc,
-            _ => panic!("Invalid sort order"),
+            _ => SortOrder::Desc,
         };
         Self {
             offset,
@@ -79,28 +79,6 @@ pub struct PasswordCredentials {
     pub password_hash: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewUser {
-    pub username: String,
-    pub email: String,
-    pub display_name: Option<String>,
-    pub password_hash: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateUser {
-    pub id: Uuid,
-    pub username: Option<String>,
-    pub email: Option<String>,
-    pub display_name: Option<String>,
-    pub email_verified: Option<bool>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdatePassword {
-    pub password_hash: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -148,32 +126,6 @@ pub struct RefreshToken {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateOAuthCredentials {
-    pub user_id: Uuid,
-    pub provider: OAuthProvider,
-    pub provider_user_id: String,
-    pub access_token: Option<Vec<u8>>,
-    pub refresh_token: Option<Vec<u8>>,
-    pub access_token_expiry: Option<DateTime<Utc>>,
-    pub scope: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateRefreshToken {
-    pub user_id: Uuid,
-    pub token_hash: Vec<u8>,
-    pub expires_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateOAuthCredentials {
-    pub access_token: Option<Vec<u8>>,
-    pub refresh_token: Option<Vec<u8>>,
-    pub access_token_expiry: Option<DateTime<Utc>>,
-    pub scope: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct OAuthState {
     pub id: Uuid,
@@ -190,16 +142,6 @@ pub struct OAuthState {
     pub nonce: Option<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateOAuthState {
-    pub state: String,
-    pub pkce_verifier: Vec<u8>,
-    pub redirect_uri: String,
-    pub ip_address: Option<ipnet::IpNet>,
-    pub expires_at: DateTime<Utc>,
-    pub nonce: Vec<u8>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct LoginToken {
     pub id: Uuid,
@@ -210,18 +152,6 @@ pub struct LoginToken {
     pub user_id: Uuid,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateLoginToken {
-    pub token_hash: Vec<u8>,
-    pub user_id: Uuid,
-    pub expires_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateLoginToken {
-    pub user_id: Uuid,
 }
 
 // =============================================================================
@@ -270,30 +200,6 @@ pub struct Asset {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewAsset {
-    pub id: Option<Uuid>,
-    pub user_id: Uuid,
-    pub name: String,
-    pub checksum_sha256: Option<Vec<u8>>,
-    pub size_bytes: Option<i64>,
-    pub storage_uri: String,
-    pub storage_backend: String,
-    pub mime_type: String,
-    pub status: Option<AssetStatus>,
-    pub metadata: Option<serde_json::Value>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateAsset {
-    pub checksum_sha256: Option<Vec<u8>>,
-    pub size_bytes: Option<i64>,
-    pub storage_uri: Option<String>,
-    pub mime_type: Option<String>,
-    pub status: Option<AssetStatus>,
-    pub metadata: Option<serde_json::Value>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct MessageAsset {
     pub message_id: Uuid,
@@ -326,49 +232,6 @@ pub struct Activity {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewActivity {
-    pub id: Option<Uuid>,
-    pub user_id: Uuid,
-    pub name: String,
-    pub icon_asset_id: Option<Uuid>,
-    pub process_name: String,
-    pub window_title: String,
-    pub started_at: DateTime<Utc>,
-    pub ended_at: Option<DateTime<Utc>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct UpdateActivity {
-    pub id: Uuid,
-    pub user_id: Uuid,
-    pub name: Option<String>,
-    pub icon_asset_id: Option<Uuid>,
-    pub process_name: Option<String>,
-    pub window_title: Option<String>,
-    pub started_at: Option<DateTime<Utc>>,
-    pub ended_at: Option<DateTime<Utc>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ListActivities {
-    pub user_id: Uuid,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetActivitiesByTimeRange {
-    pub user_id: Uuid,
-    pub start_time: DateTime<Utc>,
-    pub end_time: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateActivityEndTime {
-    pub activity_id: Uuid,
-    pub user_id: Uuid,
-    pub ended_at: DateTime<Utc>,
-}
-
 // =============================================================================
 // Conversation Types
 // =============================================================================
@@ -380,29 +243,6 @@ pub struct Conversation {
     pub title: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewConversation {
-    pub id: Option<Uuid>,
-    pub user_id: Uuid,
-    pub title: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetConversation {
-    pub id: Uuid,
-    pub user_id: Uuid,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct UpdateConversation {
-    pub title: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ListConversations {
-    pub user_id: Uuid,
 }
 
 // =============================================================================
@@ -442,14 +282,6 @@ pub struct Message {
     pub additional_kwargs: serde_json::Value,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct UpdateMessage {
-    pub content: Option<serde_json::Value>,
-    pub tool_call_id: Option<String>,
-    pub tool_calls: Option<serde_json::Value>,
-    pub additional_kwargs: Option<serde_json::Value>,
 }
 
 // =============================================================================
