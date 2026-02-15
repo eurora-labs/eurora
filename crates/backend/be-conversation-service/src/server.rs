@@ -562,19 +562,32 @@ impl ProtoConversationService for ConversationService {
                 .into(),
         );
 
-        let title = match self.title_provider.invoke(messages.into()).await {
+        let mut title = match self.title_provider.invoke(messages.into()).await {
             Ok(message) => message.content,
             Err(_) => "New Chat".to_string(),
         };
         let title_words: Vec<&str> = title.split_whitespace().collect();
-        let title = title_words[..title_words.len().min(6)].join(" ");
-        let title = match title.is_empty() {
+        title = title_words[..title_words.len().min(6)].join(" ");
+        title = match title.is_empty() {
             true => {
                 tracing::warn!("Failed to generate title");
                 "New Chat".to_string()
             }
             false => title,
         };
+
+        // Capitalize the first letter of the title
+        title = title
+            .chars()
+            .enumerate()
+            .map(|(i, c)| {
+                if i == 0 {
+                    c.to_uppercase().next().unwrap()
+                } else {
+                    c
+                }
+            })
+            .collect();
 
         let conversation = self
             .db

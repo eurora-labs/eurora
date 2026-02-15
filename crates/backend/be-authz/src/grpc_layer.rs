@@ -1,5 +1,6 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use auth_core::Claims;
@@ -17,12 +18,15 @@ use crate::bypass::is_grpc_bypass;
 #[derive(Clone)]
 pub struct GrpcAuthzLayer {
     authz: CasbinAuthz,
-    jwt_config: JwtConfig,
+    jwt_config: Arc<JwtConfig>,
 }
 
 impl GrpcAuthzLayer {
     pub fn new(authz: CasbinAuthz, jwt_config: JwtConfig) -> Self {
-        Self { authz, jwt_config }
+        Self {
+            authz,
+            jwt_config: Arc::new(jwt_config),
+        }
     }
 }
 
@@ -33,7 +37,7 @@ impl<S> Layer<S> for GrpcAuthzLayer {
         GrpcAuthzService {
             inner,
             authz: self.authz.clone(),
-            jwt_config: self.jwt_config.clone(),
+            jwt_config: Arc::clone(&self.jwt_config),
         }
     }
 }
@@ -43,7 +47,7 @@ impl<S> Layer<S> for GrpcAuthzLayer {
 pub struct GrpcAuthzService<S> {
     inner: S,
     authz: CasbinAuthz,
-    jwt_config: JwtConfig,
+    jwt_config: Arc<JwtConfig>,
 }
 
 impl<S, ReqBody> Service<Request<ReqBody>> for GrpcAuthzService<S>
@@ -64,14 +68,17 @@ where
     fn call(&mut self, mut req: Request<ReqBody>) -> Self::Future {
         let path = req.uri().path().to_string();
         let authz = self.authz.clone();
-        let jwt_config = self.jwt_config.clone();
+        let jwt_config = Arc::clone(&self.jwt_config);
         let inner = self.inner.clone();
         let mut inner = std::mem::replace(&mut self.inner, inner);
 
         Box::pin(async move {
             let (service_full, method) = match parse_grpc_path(&path) {
                 Some(parts) => parts,
-                None => return inner.call(req).await,
+                None => {
+                    warn!(path = %path, "Rejecting request with unparseable gRPC path");
+                    return Ok(Status::invalid_argument("Invalid gRPC path").into_http());
+                }
             };
 
             if is_grpc_bypass(&service_full) {
@@ -140,8 +147,23 @@ fn parse_grpc_path(path: &str) -> Option<(String, String)> {
     Some((service.to_string(), method.to_string()))
 }
 
-/// Extract the short service name from the full gRPC service path.
-/// `conversation_service.ProtoConversationService` -> `ConversationService`
+/// Extract the short service name used for policy matching from the full gRPC
+/// service path.
+///
+/// Convention: proto services are named `Proto{Name}` (e.g.
+/// `ProtoConversationService`). This function strips the package prefix and the
+/// `Proto` prefix so the policy CSV can use the short form (`ConversationService`).
+///
+/// The bypass list in [`crate::bypass`] uses *full* qualified names (e.g.
+/// `auth_service.ProtoAuthService`) because bypass checks happen before this
+/// extraction step.
+///
+/// # Examples
+///
+/// - `conversation_service.ProtoConversationService` -> `ConversationService`
+/// - `grpc.health.v1.Health` -> `Health`
+/// - `ProtoFoo` -> `Foo`
+/// - `MyService` -> `MyService`
 fn extract_service_name(full_service: &str) -> String {
     let name = full_service.rsplit('.').next().unwrap_or(full_service);
     name.strip_prefix("Proto").unwrap_or(name).to_string()

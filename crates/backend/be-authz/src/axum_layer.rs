@@ -39,11 +39,17 @@ pub async fn authz_middleware(
     // Use the route template (e.g. "/payment/checkout") for policy matching instead
     // of the concrete path (e.g. "/payment/subscription/sub_123"). This ensures
     // routes with path parameters match their policy entries correctly.
-    let policy_path = req
-        .extensions()
-        .get::<MatchedPath>()
-        .map(|m| m.as_str().to_string())
-        .unwrap_or_else(|| raw_path.clone());
+    let policy_path = match req.extensions().get::<MatchedPath>() {
+        Some(m) => m.as_str().to_string(),
+        None => {
+            warn!(
+                path = %raw_path,
+                "MatchedPath missing from request extensions, falling back to raw URI \
+                 — parameterized routes may fail policy matching"
+            );
+            raw_path.clone()
+        }
+    };
 
     let auth_header = match req
         .headers()

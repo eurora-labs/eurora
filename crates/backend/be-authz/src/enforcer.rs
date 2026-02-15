@@ -35,13 +35,10 @@ impl CasbinAuthz {
     }
 
     /// Check if a role is allowed to perform an action on a resource.
+    #[must_use = "authorization result must be checked"]
     pub fn enforce(&self, role: &str, resource: &str, action: &str) -> Result<bool, AuthzError> {
         self.enforcer
-            .enforce(vec![
-                role.to_string(),
-                resource.to_string(),
-                action.to_string(),
-            ])
+            .enforce((role, resource, action))
             .map_err(|e| AuthzError::Enforcement(e.to_string()))
     }
 }
