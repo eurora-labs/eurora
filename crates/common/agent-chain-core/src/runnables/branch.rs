@@ -223,11 +223,12 @@ where
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         let config = ensure_config(config);
         let callback_manager = get_callback_manager_for_config(&config);
-        let run_manager = callback_manager.on_chain_start(
-            &std::collections::HashMap::new(),
-            &std::collections::HashMap::new(),
-            config.run_id,
-        );
+        let run_manager = callback_manager
+            .on_chain_start()
+            .serialized(&std::collections::HashMap::new())
+            .inputs(&std::collections::HashMap::new())
+            .maybe_run_id(config.run_id)
+            .call();
 
         let result = (|| {
             for (idx, (condition, runnable)) in self.branches.iter().enumerate() {

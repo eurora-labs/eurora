@@ -226,11 +226,12 @@ where
         let callback_manager = get_callback_manager_for_config(&config);
 
         // Start the root run
-        let run_manager = callback_manager.on_chain_start(
-            &std::collections::HashMap::new(),
-            &std::collections::HashMap::new(),
-            config.run_id,
-        );
+        let run_manager = callback_manager
+            .on_chain_start()
+            .serialized(&std::collections::HashMap::new())
+            .inputs(&std::collections::HashMap::new())
+            .maybe_run_id(config.run_id)
+            .call();
 
         let mut first_error: Option<Error> = None;
         let mut last_error: Option<Error> = None;

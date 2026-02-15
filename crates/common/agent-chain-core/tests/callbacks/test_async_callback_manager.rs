@@ -52,7 +52,7 @@ async fn test_async_callback_manager_on_chain_start() {
     manager.add_handler(handler, true);
 
     let run_manager = manager
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None)
+        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
         .await;
 
     assert!(!run_manager.run_id().is_nil());
@@ -96,7 +96,7 @@ async fn test_async_callback_manager_on_chain_end() {
     manager.add_handler(handler, true);
 
     let run_manager = manager
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None)
+        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
         .await;
 
     run_manager.on_chain_end(&HashMap::new()).await;
@@ -141,7 +141,7 @@ async fn test_async_callback_manager_on_chain_error() {
     manager.add_handler(handler, true);
 
     let run_manager = manager
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None)
+        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
         .await;
 
     let error = std::io::Error::other("test");
@@ -236,7 +236,7 @@ async fn test_async_callback_manager_inheritable_handlers() {
     parent.add_handler(handler, true);
 
     let chain_run = parent
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None)
+        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
         .await;
 
     let child_manager = chain_run.get_child(None);
@@ -325,7 +325,7 @@ async fn test_async_callback_manager_ignore_chain() {
     manager.add_handler(handler, true);
 
     let run_manager = manager
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None)
+        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
         .await;
 
     // Run manager created, but the handler's on_chain_start was skipped via ignore
@@ -351,7 +351,7 @@ async fn test_async_callback_manager_chain_child_managers() {
     manager.add_handler(handler, true);
 
     let chain_run = manager
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None)
+        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
         .await;
 
     // Child LLM run
@@ -365,7 +365,7 @@ async fn test_async_callback_manager_chain_child_managers() {
     // Child chain run
     let child_chain_run = chain_run
         .get_child(None)
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None)
+        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
         .await;
     assert!(!child_chain_run.run_id().is_nil());
 
@@ -458,7 +458,7 @@ async fn test_async_callback_manager_chain_run_on_agent_action() {
     manager.add_handler(handler, true);
 
     let chain_run = manager
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None)
+        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
         .await;
 
     let action = serde_json::json!({
@@ -518,7 +518,7 @@ async fn test_async_callback_manager_full_lifecycle() {
 
     // Start chain
     let chain_run = manager
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None)
+        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
         .await;
 
     // Start LLM inside chain
