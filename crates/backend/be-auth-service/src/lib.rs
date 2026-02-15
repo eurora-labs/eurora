@@ -1,5 +1,5 @@
 pub use auth_core::{Claims, Role};
-use be_auth_grpc::JwtConfig;
+use be_auth_core::JwtConfig;
 use be_remote_db::{
     CreateLoginToken, CreateOAuthCredentials, CreateOAuthState, CreateRefreshToken,
     DatabaseManager, NewUser, OAuthProvider,

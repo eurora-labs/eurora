@@ -5,7 +5,7 @@ use agent_chain::openai::BuiltinTool;
 use agent_chain::{
     BaseChatModel, BaseMessage, HumanMessage, ollama::ChatOllama, openai::ChatOpenAI,
 };
-use be_auth_grpc::{extract_claims, parse_user_id};
+use be_authz::{extract_claims, parse_user_id};
 use be_remote_db::{
     DatabaseManager, GetConversation, ListConversations, MessageType, NewConversation,
     PaginationParams,

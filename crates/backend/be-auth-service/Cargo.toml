@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 argon2 = { workspace = true }
 auth-core = { workspace = true }
-be-auth-grpc = { workspace = true }
+be-auth-core = { workspace = true }
 be-remote-db = { workspace = true }
 chacha20poly1305 = "0.10"
 chrono = { workspace = true, features = ["serde"] }

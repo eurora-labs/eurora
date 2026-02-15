@@ -1435,7 +1435,7 @@ name = "be-activity-service"
 version = "0.0.0"
 dependencies = [
  "be-asset",
- "be-auth-grpc",
+ "be-authz",
  "be-remote-db",
  "be-storage",
  "chrono",
@@ -1472,7 +1472,7 @@ name = "be-asset-service"
 version = "0.0.0"
 dependencies = [
  "be-asset",
- "be-auth-grpc",
+ "be-authz",
  "be-remote-db",
  "be-storage",
  "prost",
@@ -1495,22 +1495,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "be-auth-grpc"
-version = "0.0.0"
-dependencies = [
- "be-auth-core",
- "tonic",
- "tonic-prost",
- "uuid",
-]
-
-[[package]]
 name = "be-auth-service"
 version = "0.0.0"
 dependencies = [
  "argon2",
  "auth-core",
- "be-auth-grpc",
+ "be-auth-core",
  "be-remote-db",
  "chacha20poly1305",
  "chrono",
@@ -1544,8 +1534,10 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tonic",
+ "tonic-prost",
  "tower",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -1554,7 +1546,7 @@ version = "0.0.0"
 dependencies = [
  "agent-chain",
  "async-stream",
- "be-auth-grpc",
+ "be-authz",
  "be-remote-db",
  "chrono",
  "prost",
