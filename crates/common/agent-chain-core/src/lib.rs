@@ -23,6 +23,7 @@
 //! - `default`: Includes all providers
 //! - `specta`: Specta derive support
 
+pub mod agents;
 pub mod api;
 pub mod caches;
 pub mod callbacks;
@@ -206,6 +207,9 @@ pub use tracers::{
 
 // Re-export rate limiter types
 pub use rate_limiters::{BaseRateLimiter, InMemoryRateLimiter, InMemoryRateLimiterConfig};
+
+// Re-export agent types
+pub use agents::{AgentAction, AgentActionMessageLog, AgentFinish, AgentStep, ToolInput};
 
 // Re-export document loader types
 pub use document_loaders::{
