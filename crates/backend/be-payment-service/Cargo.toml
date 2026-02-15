@@ -49,7 +49,7 @@ async-stripe-webhook = { version = "1.0.0-rc.1", features = [
   "async-stripe-billing",
   "async-stripe-checkout"
 ] }
-axum = { version = "0.8.8", features = ["macros"] }
+axum = { workspace = true, features = ["macros"] }
 be-auth-core = { workspace = true }
 be-remote-db = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
