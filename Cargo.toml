@@ -49,6 +49,7 @@ be-payment-service = { path = "crates/backend/be-payment-service" }
 be-remote-db = { path = "crates/backend/be-remote-db" }
 be-storage = { path = "crates/backend/be-storage" }
 be-update-service = { path = "crates/backend/be-update-service" }
+blake2 = "0.10"
 bon = "3.8.2"
 bstr = "1.12.1"
 casbin = { version = "2.20.0", default-features = false, features = [
@@ -107,6 +108,7 @@ sentry = "0.46.1"
 serde = "1.0"
 serde_json = "1.0"
 serde_json_lenient = "0.2.4"
+sha1 = "0.10"
 sha2 = "0.10.9"
 specta = "=2.0.0-rc.22"
 strum = "0.27.2"
