@@ -1,0 +1,239 @@
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
+
+use auth_core::Claims;
+use be_auth_core::JwtConfig;
+use http::Request;
+use tonic::Status;
+use tonic::body::Body;
+use tower::{Layer, Service};
+use tracing::{debug, warn};
+
+use crate::CasbinAuthz;
+use crate::bypass::is_grpc_bypass;
+
+/// Tower layer that combines JWT authentication and casbin authorization for gRPC.
+#[derive(Clone)]
+pub struct GrpcAuthzLayer {
+    authz: CasbinAuthz,
+    jwt_config: Arc<JwtConfig>,
+}
+
+impl GrpcAuthzLayer {
+    pub fn new(authz: CasbinAuthz, jwt_config: JwtConfig) -> Self {
+        Self {
+            authz,
+            jwt_config: Arc::new(jwt_config),
+        }
+    }
+}
+
+impl<S> Layer<S> for GrpcAuthzLayer {
+    type Service = GrpcAuthzService<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        GrpcAuthzService {
+            inner,
+            authz: self.authz.clone(),
+            jwt_config: Arc::clone(&self.jwt_config),
+        }
+    }
+}
+
+/// Tower service that enforces JWT + casbin policies on gRPC requests.
+#[derive(Clone)]
+pub struct GrpcAuthzService<S> {
+    inner: S,
+    authz: CasbinAuthz,
+    jwt_config: Arc<JwtConfig>,
+}
+
+impl<S, ReqBody> Service<Request<ReqBody>> for GrpcAuthzService<S>
+where
+    S: Service<Request<ReqBody>, Response = http::Response<Body>> + Clone + Send + 'static,
+    S::Future: Send + 'static,
+    S::Error: Send + 'static,
+    ReqBody: Send + 'static,
+{
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, mut req: Request<ReqBody>) -> Self::Future {
+        let path = req.uri().path().to_string();
+        let authz = self.authz.clone();
+        let jwt_config = Arc::clone(&self.jwt_config);
+        let inner = self.inner.clone();
+        let mut inner = std::mem::replace(&mut self.inner, inner);
+
+        Box::pin(async move {
+            let (service_full, method) = match parse_grpc_path(&path) {
+                Some(parts) => parts,
+                None => {
+                    warn!(path = %path, "Rejecting request with unparseable gRPC path");
+                    return Ok(Status::invalid_argument("Invalid gRPC path").into_http());
+                }
+            };
+
+            if is_grpc_bypass(&service_full) {
+                debug!(path = %path, "Bypassing authorization for public service");
+                return inner.call(req).await;
+            }
+
+            let claims = match extract_jwt_claims(&req, &jwt_config) {
+                Ok(claims) => claims,
+                Err(status) => return Ok(status.into_http()),
+            };
+
+            let service_name = extract_service_name(&service_full);
+            let role = claims.role.to_string();
+
+            match authz.enforce(&role, &service_name, &method) {
+                Ok(true) => {
+                    debug!(role = %role, service = %service_name, method = %method, "gRPC authorized");
+                    req.extensions_mut().insert(claims);
+                    inner.call(req).await
+                }
+                Ok(false) => {
+                    warn!(role = %role, service = %service_name, method = %method, "gRPC authorization denied");
+                    Ok(Status::permission_denied(
+                        "Insufficient permissions. Please upgrade your plan.",
+                    )
+                    .into_http())
+                }
+                Err(e) => {
+                    warn!(error = %e, "Authorization enforcement error");
+                    Ok(Status::internal("Authorization error").into_http())
+                }
+            }
+        })
+    }
+}
+
+/// Extract and validate JWT claims from the request's authorization header.
+fn extract_jwt_claims<B>(req: &Request<B>, jwt_config: &JwtConfig) -> Result<Claims, Status> {
+    let auth_header = req
+        .headers()
+        .get("authorization")
+        .ok_or_else(|| Status::unauthenticated("Missing authorization header"))?
+        .to_str()
+        .map_err(|_| Status::unauthenticated("Invalid authorization header"))?;
+
+    let token = auth_header
+        .strip_prefix("Bearer ")
+        .ok_or_else(|| Status::unauthenticated("Authorization header must start with 'Bearer '"))?;
+
+    jwt_config.validate_access_token(token).map_err(|e| {
+        warn!(error = %e, "JWT validation failed");
+        Status::unauthenticated("Invalid or expired token")
+    })
+}
+
+/// Parse a gRPC path `/package.ServiceName/MethodName` into `(full_service, method)`.
+fn parse_grpc_path(path: &str) -> Option<(String, String)> {
+    let path = path.strip_prefix('/')?;
+    let slash_idx = path.find('/')?;
+    let service = &path[..slash_idx];
+    let method = &path[slash_idx + 1..];
+    if method.is_empty() {
+        return None;
+    }
+    Some((service.to_string(), method.to_string()))
+}
+
+/// Extract the short service name used for policy matching from the full gRPC
+/// service path.
+///
+/// Convention: proto services are named `Proto{Name}` (e.g.
+/// `ProtoConversationService`). This function strips the package prefix and the
+/// `Proto` prefix so the policy CSV can use the short form (`ConversationService`).
+///
+/// The bypass list in [`crate::bypass`] uses *full* qualified names (e.g.
+/// `auth_service.ProtoAuthService`) because bypass checks happen before this
+/// extraction step.
+///
+/// # Examples
+///
+/// - `conversation_service.ProtoConversationService` -> `ConversationService`
+/// - `grpc.health.v1.Health` -> `Health`
+/// - `ProtoFoo` -> `Foo`
+/// - `MyService` -> `MyService`
+fn extract_service_name(full_service: &str) -> String {
+    let name = full_service.rsplit('.').next().unwrap_or(full_service);
+    name.strip_prefix("Proto").unwrap_or(name).to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_grpc_path_valid() {
+        let result = parse_grpc_path("/conversation_service.ProtoConversationService/ChatStream");
+        assert_eq!(
+            result,
+            Some((
+                "conversation_service.ProtoConversationService".to_string(),
+                "ChatStream".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn parse_grpc_path_health() {
+        let result = parse_grpc_path("/grpc.health.v1.Health/Check");
+        assert_eq!(
+            result,
+            Some(("grpc.health.v1.Health".to_string(), "Check".to_string()))
+        );
+    }
+
+    #[test]
+    fn parse_grpc_path_no_leading_slash() {
+        assert_eq!(parse_grpc_path("no_slash/Method"), None);
+    }
+
+    #[test]
+    fn parse_grpc_path_empty_method() {
+        assert_eq!(parse_grpc_path("/service.Name/"), None);
+    }
+
+    #[test]
+    fn parse_grpc_path_no_method_slash() {
+        assert_eq!(parse_grpc_path("/service.Name"), None);
+    }
+
+    #[test]
+    fn parse_grpc_path_root() {
+        assert_eq!(parse_grpc_path("/"), None);
+    }
+
+    #[test]
+    fn extract_service_name_strips_proto_prefix() {
+        assert_eq!(
+            extract_service_name("conversation_service.ProtoConversationService"),
+            "ConversationService"
+        );
+    }
+
+    #[test]
+    fn extract_service_name_no_proto_prefix() {
+        assert_eq!(extract_service_name("grpc.health.v1.Health"), "Health");
+    }
+
+    #[test]
+    fn extract_service_name_no_package() {
+        assert_eq!(extract_service_name("ProtoFoo"), "Foo");
+    }
+
+    #[test]
+    fn extract_service_name_plain() {
+        assert_eq!(extract_service_name("MyService"), "MyService");
+    }
+}

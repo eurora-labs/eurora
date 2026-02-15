@@ -2,8 +2,9 @@ use std::{net::SocketAddr, sync::Arc};
 
 use be_activity_service::{ActivityService, ProtoActivityServiceServer};
 use be_asset_service::{AssetService, ProtoAssetServiceServer};
-use be_auth_grpc::JwtInterceptor;
+use be_auth_core::JwtConfig;
 use be_auth_service::AuthService;
+use be_authz::{AuthzState, CasbinAuthz, GrpcAuthzLayer, authz_middleware};
 use be_conversation_service::{ConversationService, ProtoConversationServiceServer};
 use be_payment_service::init_payment_service;
 use be_remote_db::DatabaseManager;
@@ -74,9 +75,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parse()
         .expect("Invalid HTTP_ADDR format");
 
-    let jwt_interceptor = JwtInterceptor::default();
+    let jwt_config = JwtConfig::default();
 
-    let auth_service = AuthService::new(db_manager.clone(), jwt_interceptor.get_config().clone());
+    let model_path =
+        std::env::var("AUTHZ_MODEL_PATH").unwrap_or_else(|_| "config/authz/model.conf".to_string());
+    let policy_path = std::env::var("AUTHZ_POLICY_PATH")
+        .unwrap_or_else(|_| "config/authz/policy.csv".to_string());
+    let authz = CasbinAuthz::new(&model_path, &policy_path)
+        .await
+        .expect("Failed to initialize casbin enforcer");
+
+    let auth_service = AuthService::new(db_manager.clone(), jwt_config.clone());
 
     let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
         .map(|v| v.eq_ignore_ascii_case("true"))
@@ -139,24 +148,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         debug!("Shutting down gracefully...");
     };
 
+    let grpc_authz_layer = GrpcAuthzLayer::new(authz.clone(), jwt_config.clone());
+
     let mut grpc_router = Server::builder()
         .accept_http1(true)
-        .layer(cors)
+        .layer(grpc_authz_layer)
         .layer(GrpcWebLayer::new())
+        .layer(cors)
         .add_service(health_service)
         .add_service(ProtoAuthServiceServer::new(auth_service))
-        .add_service(ProtoActivityServiceServer::with_interceptor(
-            activity_service,
-            jwt_interceptor.clone(),
-        ))
-        .add_service(ProtoAssetServiceServer::with_interceptor(
-            assets_service,
-            jwt_interceptor.clone(),
-        ))
-        .add_service(ProtoConversationServiceServer::with_interceptor(
-            conversation_service,
-            jwt_interceptor.clone(),
-        ));
+        .add_service(ProtoActivityServiceServer::new(activity_service))
+        .add_service(ProtoAssetServiceServer::new(assets_service))
+        .add_service(ProtoConversationServiceServer::new(conversation_service));
 
     if local_mode {
         let local_config = be_local_config_service::LocalConfigService::new(storage.clone());
@@ -166,7 +169,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let grpc_server = grpc_router.serve_with_shutdown(grpc_addr, shutdown_signal);
 
-    let http_router = update_router.merge(payment_router);
+    let authz_state = Arc::new(AuthzState::new(authz, jwt_config));
+    let http_router =
+        update_router
+            .merge(payment_router)
+            .layer(axum::middleware::from_fn_with_state(
+                authz_state,
+                authz_middleware,
+            ));
 
     let http_listener = tokio::net::TcpListener::bind(http_addr).await?;
     let http_server = axum::serve(

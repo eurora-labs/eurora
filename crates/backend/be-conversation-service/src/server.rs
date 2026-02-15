@@ -5,11 +5,8 @@ use agent_chain::openai::BuiltinTool;
 use agent_chain::{
     BaseChatModel, BaseMessage, HumanMessage, ollama::ChatOllama, openai::ChatOpenAI,
 };
-use be_auth_grpc::{Role, extract_claims, parse_user_id, require_role};
-use be_remote_db::{
-    DatabaseManager, GetConversation, ListConversations, MessageType, NewConversation,
-    PaginationParams,
-};
+use be_authz::{extract_claims, parse_user_id};
+use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
 use std::{pin::Pin, sync::Arc};
@@ -119,7 +116,6 @@ impl ProtoConversationService for ConversationService {
         info!("CreateConversation request received");
 
         let claims = extract_claims(&request)?;
-        require_role(claims, Role::Tier1)?;
         let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
@@ -132,11 +128,10 @@ impl ProtoConversationService for ConversationService {
 
         let conversation = self
             .db
-            .create_conversation(NewConversation {
-                id: None,
-                user_id,
-                title,
-            })
+            .create_conversation()
+            .user_id(user_id)
+            .title(title)
+            .call()
             .await
             .map_err(ConversationServiceError::from)?;
 
@@ -163,10 +158,14 @@ impl ProtoConversationService for ConversationService {
 
         let conversations = self
             .db
-            .list_conversations(
-                ListConversations { user_id },
-                PaginationParams::new(req.offset, req.limit, "DESC".to_string()),
-            )
+            .list_conversations()
+            .user_id(user_id)
+            .params(PaginationParams::new(
+                req.offset,
+                req.limit,
+                "DESC".to_string(),
+            ))
+            .call()
             .await
             .map_err(ConversationServiceError::from)?;
 
@@ -191,7 +190,6 @@ impl ProtoConversationService for ConversationService {
         info!("AddHumanMessage request received");
 
         let claims = extract_claims(&request)?;
-        require_role(claims, Role::Tier1)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
@@ -243,7 +241,6 @@ impl ProtoConversationService for ConversationService {
         info!("AddHiddenHumanMessage request received");
 
         let claims = extract_claims(&request)?;
-        require_role(claims, Role::Tier1)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
@@ -296,7 +293,6 @@ impl ProtoConversationService for ConversationService {
         info!("AddSystemMessage request received");
 
         let claims = extract_claims(&request)?;
-        require_role(claims, Role::Tier1)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
@@ -348,7 +344,6 @@ impl ProtoConversationService for ConversationService {
         info!("ChatStream request received");
 
         let claims = extract_claims(&request)?;
-        require_role(claims, Role::Tier1)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
@@ -505,10 +500,10 @@ impl ProtoConversationService for ConversationService {
 
         let conversation = self
             .db
-            .get_conversation(GetConversation {
-                id: conversation_id,
-                user_id,
-            })
+            .get_conversation()
+            .id(conversation_id)
+            .user_id(user_id)
+            .call()
             .await
             .map_err(ConversationServiceError::from)?;
 
@@ -523,7 +518,6 @@ impl ProtoConversationService for ConversationService {
     ) -> Result<Response<GenerateConversationTitleResponse>, Status> {
         info!("Generate conversation title request received");
         let claims = extract_claims(&request)?;
-        require_role(claims, Role::Tier1)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
@@ -568,19 +562,25 @@ impl ProtoConversationService for ConversationService {
                 .into(),
         );
 
-        let title = match self.title_provider.invoke(messages.into()).await {
+        let mut title = match self.title_provider.invoke(messages.into()).await {
             Ok(message) => message.content,
             Err(_) => "New Chat".to_string(),
         };
         let title_words: Vec<&str> = title.split_whitespace().collect();
-        let title = title_words[..title_words.len().min(6)].join(" ");
-        let title = match title.is_empty() {
+        title = title_words[..title_words.len().min(6)].join(" ");
+        title = match title.is_empty() {
             true => {
                 tracing::warn!("Failed to generate title");
                 "New Chat".to_string()
             }
             false => title,
         };
+
+        // Capitalize the first letter of the title
+        if let Some(first) = title.chars().next() {
+            let rest = &title[first.len_utf8()..];
+            title = first.to_uppercase().collect::<String>() + rest;
+        }
 
         let conversation = self
             .db

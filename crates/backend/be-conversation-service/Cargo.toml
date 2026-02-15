@@ -10,7 +10,7 @@ ignored = ["tonic-prost"]
 [dependencies]
 agent-chain = { workspace = true, features = ["ollama", "openai"] }
 async-stream = { workspace = true }
-be-auth-grpc = { workspace = true }
+be-authz = { workspace = true }
 be-remote-db = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 prost = { workspace = true }
