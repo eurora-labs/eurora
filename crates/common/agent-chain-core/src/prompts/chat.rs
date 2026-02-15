@@ -14,6 +14,7 @@ use crate::prompt_values::{ChatPromptValue, PromptValue};
 use crate::utils::input::get_colored_text;
 use crate::utils::interactive_env::is_interactive_env;
 
+use super::base::BasePromptTemplate;
 use super::message::{BaseMessagePromptTemplate, get_msg_title_repr};
 use super::prompt::PromptTemplate;
 use super::string::{PromptTemplateFormat, StringPromptTemplate};
@@ -590,22 +591,7 @@ impl std::fmt::Debug for MessageLikeRepresentation {
 /// Base trait for chat prompt templates.
 ///
 /// Direct port of `langchain_core.prompts.chat.BaseChatPromptTemplate`.
-pub trait BaseChatPromptTemplate: Send + Sync {
-    /// Get the input variables for this template.
-    fn input_variables(&self) -> &[String];
-
-    /// Get the optional variables for this template.
-    fn optional_variables(&self) -> &[String] {
-        &[]
-    }
-
-    /// Get partial variables for this template.
-    fn partial_variables(&self) -> &HashMap<String, String> {
-        static EMPTY: std::sync::LazyLock<HashMap<String, String>> =
-            std::sync::LazyLock::new(HashMap::new);
-        &EMPTY
-    }
-
+pub trait BaseChatPromptTemplate: BasePromptTemplate {
     /// Format kwargs into a list of messages.
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>>;
 
@@ -619,16 +605,20 @@ pub trait BaseChatPromptTemplate: Send + Sync {
         Box::pin(async move { result })
     }
 
-    /// Format the chat template into a string.
-    fn format(&self, kwargs: &HashMap<String, String>) -> Result<String> {
-        let prompt_value = self.format_prompt(kwargs)?;
-        Ok(prompt_value.to_string())
-    }
-
     /// Format prompt. Returns a ChatPromptValue.
-    fn format_prompt(&self, kwargs: &HashMap<String, String>) -> Result<ChatPromptValue> {
+    fn format_prompt_chat(&self, kwargs: &HashMap<String, String>) -> Result<ChatPromptValue> {
         let messages = self.format_messages(kwargs)?;
         Ok(ChatPromptValue::new(messages))
+    }
+
+    /// Async format prompt. Returns a ChatPromptValue.
+    fn aformat_prompt_chat(
+        &self,
+        kwargs: &HashMap<String, String>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<ChatPromptValue>> + Send + '_>>
+    {
+        let result = self.format_prompt_chat(kwargs);
+        Box::pin(async move { result })
     }
 
     /// Get a pretty representation of the template.
@@ -888,18 +878,6 @@ impl ChatPromptTemplate {
 }
 
 impl BaseChatPromptTemplate for ChatPromptTemplate {
-    fn input_variables(&self) -> &[String] {
-        &self.input_variables
-    }
-
-    fn optional_variables(&self) -> &[String] {
-        &self.optional_variables
-    }
-
-    fn partial_variables(&self) -> &HashMap<String, String> {
-        &self.partial_variables
-    }
-
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
         let merged = self.merge_partial_and_user_variables(kwargs);
         let mut result = Vec::new();
@@ -1000,6 +978,53 @@ fn convert_to_message_template(
                 "Template variant should be passed as a concrete ChatPromptMessage.                  Use Tuple, Message, or String variants instead.".into(),
             ))
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BasePromptTemplate impl for ChatPromptTemplate
+// ---------------------------------------------------------------------------
+
+/// Implements `BasePromptTemplate` for `ChatPromptTemplate`, matching
+/// Python's inheritance chain where `BaseChatPromptTemplate` extends
+/// `BasePromptTemplate`.
+impl BasePromptTemplate for ChatPromptTemplate {
+    fn input_variables(&self) -> &[String] {
+        &self.input_variables
+    }
+
+    fn optional_variables(&self) -> &[String] {
+        &self.optional_variables
+    }
+
+    fn partial_variables(&self) -> &HashMap<String, String> {
+        &self.partial_variables
+    }
+
+    fn format(&self, kwargs: &HashMap<String, String>) -> Result<String> {
+        let messages = self.format_messages(kwargs)?;
+        let prompt_value = ChatPromptValue::new(messages);
+        Ok(prompt_value.to_string())
+    }
+
+    fn format_prompt(&self, kwargs: &HashMap<String, String>) -> Result<Box<dyn PromptValue>> {
+        let messages = self.format_messages(kwargs)?;
+        Ok(Box::new(ChatPromptValue::new(messages)))
+    }
+
+    fn partial(&self, kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>> {
+        Ok(Box::new(ChatPromptTemplate::partial(self, kwargs)))
+    }
+
+    fn prompt_type(&self) -> &str {
+        "chat"
+    }
+
+    fn to_dict(&self) -> serde_json::Value {
+        serde_json::json!({
+            "_type": self.prompt_type(),
+            "input_variables": self.input_variables,
+        })
     }
 }
 
@@ -1222,8 +1247,8 @@ mod tests {
         let mut kwargs = HashMap::new();
         kwargs.insert("question".to_string(), "Hello!".to_string());
 
-        let prompt_value = template.format_prompt(&kwargs).unwrap();
-        assert_eq!(prompt_value.messages.len(), 2);
+        let messages = template.format_messages(&kwargs).unwrap();
+        assert_eq!(messages.len(), 2);
     }
 
     #[test]

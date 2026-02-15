@@ -9,6 +9,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
+use crate::prompt_values::{PromptValue, StringPromptValue};
 
 /// Type alias for format output type.
 pub type FormatOutputType = String;
@@ -111,6 +112,27 @@ pub trait BasePromptTemplate: Send + Sync {
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<FormatOutputType>> + Send + '_>>
     {
         let result = self.format(kwargs);
+        Box::pin(async move { result })
+    }
+
+    /// Format the prompt into a PromptValue.
+    ///
+    /// Default implementation wraps the formatted string in a StringPromptValue.
+    fn format_prompt(&self, kwargs: &HashMap<String, String>) -> Result<Box<dyn PromptValue>> {
+        let text = self.format(kwargs)?;
+        Ok(Box::new(StringPromptValue::new(text)))
+    }
+
+    /// Async format the prompt into a PromptValue.
+    ///
+    /// Default implementation calls the sync version.
+    fn aformat_prompt(
+        &self,
+        kwargs: &HashMap<String, String>,
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<Box<dyn PromptValue>>> + Send + '_>,
+    > {
+        let result = self.format_prompt(kwargs);
         Box::pin(async move { result })
     }
 

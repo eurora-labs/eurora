@@ -436,7 +436,7 @@ impl Clone for Box<dyn ExamplePrompt> {
 /// Wrapper for ChatPromptTemplate as an ExamplePrompt.
 impl ExamplePrompt for super::chat::ChatPromptTemplate {
     fn input_variables(&self) -> Vec<String> {
-        BaseChatPromptTemplate::input_variables(self).to_vec()
+        BasePromptTemplate::input_variables(self).to_vec()
     }
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
         BaseChatPromptTemplate::format_messages(self, kwargs)
@@ -540,18 +540,37 @@ impl BaseMessagePromptTemplate for FewShotChatMessagePromptTemplate {
     }
 }
 
-impl BaseChatPromptTemplate for FewShotChatMessagePromptTemplate {
+impl BasePromptTemplate for FewShotChatMessagePromptTemplate {
     fn input_variables(&self) -> &[String] {
         &self.input_variables
-    }
-
-    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
-        BaseMessagePromptTemplate::format_messages(self, kwargs)
     }
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<String> {
         let messages = BaseChatPromptTemplate::format_messages(self, kwargs)?;
         Ok(get_buffer_string(&messages, "Human", "AI"))
+    }
+
+    fn partial(&self, _kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>> {
+        Err(crate::error::Error::NotImplemented(
+            "partial is not supported for FewShotChatMessagePromptTemplate".into(),
+        ))
+    }
+
+    fn prompt_type(&self) -> &str {
+        "few_shot_chat"
+    }
+
+    fn to_dict(&self) -> serde_json::Value {
+        serde_json::json!({
+            "_type": self.prompt_type(),
+            "input_variables": self.input_variables,
+        })
+    }
+}
+
+impl BaseChatPromptTemplate for FewShotChatMessagePromptTemplate {
+    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
+        BaseMessagePromptTemplate::format_messages(self, kwargs)
     }
 
     fn pretty_repr(&self, _html: bool) -> String {

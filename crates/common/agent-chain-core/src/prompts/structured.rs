@@ -13,8 +13,10 @@ use crate::api::{BetaParams, warn_beta};
 use crate::error::{Error, Result};
 use crate::messages::BaseMessage;
 
+use super::base::BasePromptTemplate;
 use super::chat::{BaseChatPromptTemplate, ChatPromptTemplate, MessageLikeRepresentation};
 use super::string::PromptTemplateFormat;
+use crate::prompt_values::PromptValue;
 
 /// Structured prompt template for a language model.
 ///
@@ -119,7 +121,7 @@ impl StructuredPrompt {
     }
 }
 
-impl BaseChatPromptTemplate for StructuredPrompt {
+impl BasePromptTemplate for StructuredPrompt {
     fn input_variables(&self) -> &[String] {
         self.chat_template.input_variables()
     }
@@ -132,6 +134,39 @@ impl BaseChatPromptTemplate for StructuredPrompt {
         self.chat_template.partial_variables()
     }
 
+    fn format(&self, kwargs: &HashMap<String, String>) -> Result<String> {
+        let messages = self.format_messages(kwargs)?;
+        let prompt_value = crate::prompt_values::ChatPromptValue::new(messages);
+        Ok(prompt_value.to_string())
+    }
+
+    fn format_prompt(&self, kwargs: &HashMap<String, String>) -> Result<Box<dyn PromptValue>> {
+        let messages = self.format_messages(kwargs)?;
+        Ok(Box::new(crate::prompt_values::ChatPromptValue::new(
+            messages,
+        )))
+    }
+
+    fn partial(&self, _kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>> {
+        Err(crate::error::Error::NotImplemented(
+            "partial is not supported for StructuredPrompt".into(),
+        ))
+    }
+
+    fn prompt_type(&self) -> &str {
+        "structured"
+    }
+
+    fn to_dict(&self) -> serde_json::Value {
+        serde_json::json!({
+            "_type": self.prompt_type(),
+            "input_variables": self.input_variables(),
+            "schema": self.schema,
+        })
+    }
+}
+
+impl BaseChatPromptTemplate for StructuredPrompt {
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
         self.chat_template.format_messages(kwargs)
     }
