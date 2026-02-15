@@ -77,6 +77,7 @@ fn test_sync_handler_has_methods() {
         None,
         None,
         None,
+        None,
     );
     CallbackManagerMixin::on_tool_start(
         &handler,

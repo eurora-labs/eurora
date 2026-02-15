@@ -374,11 +374,12 @@ where
         let callback_manager = get_callback_manager_for_config(&config);
 
         // Start the chain run
-        let run_manager = callback_manager.on_chain_start(
-            &std::collections::HashMap::new(),
-            &std::collections::HashMap::new(),
-            config.run_id,
-        );
+        let run_manager = callback_manager
+            .on_chain_start()
+            .serialized(&std::collections::HashMap::new())
+            .inputs(&std::collections::HashMap::new())
+            .maybe_run_id(config.run_id)
+            .call();
 
         let mut last_error = None;
 
@@ -426,11 +427,12 @@ where
         let callback_manager = get_callback_manager_for_config(&config);
 
         // Start the chain run
-        let run_manager = callback_manager.on_chain_start(
-            &std::collections::HashMap::new(),
-            &std::collections::HashMap::new(),
-            config.run_id,
-        );
+        let run_manager = callback_manager
+            .on_chain_start()
+            .serialized(&std::collections::HashMap::new())
+            .inputs(&std::collections::HashMap::new())
+            .maybe_run_id(config.run_id)
+            .call();
 
         let mut last_error = None;
 
@@ -491,11 +493,12 @@ where
             .iter()
             .map(|config| {
                 let callback_manager = get_callback_manager_for_config(config);
-                callback_manager.on_chain_start(
-                    &std::collections::HashMap::new(),
-                    &std::collections::HashMap::new(),
-                    config.run_id,
-                )
+                callback_manager
+                    .on_chain_start()
+                    .serialized(&std::collections::HashMap::new())
+                    .inputs(&std::collections::HashMap::new())
+                    .maybe_run_id(config.run_id)
+                    .call()
             })
             .collect();
 
@@ -614,11 +617,12 @@ where
             .iter()
             .map(|config| {
                 let callback_manager = get_callback_manager_for_config(config);
-                callback_manager.on_chain_start(
-                    &std::collections::HashMap::new(),
-                    &std::collections::HashMap::new(),
-                    config.run_id,
-                )
+                callback_manager
+                    .on_chain_start()
+                    .serialized(&std::collections::HashMap::new())
+                    .inputs(&std::collections::HashMap::new())
+                    .maybe_run_id(config.run_id)
+                    .call()
             })
             .collect();
 

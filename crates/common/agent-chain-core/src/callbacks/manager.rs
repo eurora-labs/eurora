@@ -1187,42 +1187,6 @@ impl CallbackManager {
         managers
     }
 
-    /// Run when chain starts running.
-    pub fn on_chain_start(
-        &self,
-        serialized: &HashMap<String, serde_json::Value>,
-        inputs: &HashMap<String, serde_json::Value>,
-        run_id: Option<Uuid>,
-    ) -> CallbackManagerForChainRun {
-        let run_id = run_id.unwrap_or_else(|| uuid7(None));
-
-        handle_event(
-            &self.handlers,
-            Some(|h: &dyn BaseCallbackHandler| h.ignore_chain()),
-            |handler| {
-                handler.on_chain_start(
-                    serialized,
-                    inputs,
-                    run_id,
-                    self.parent_run_id,
-                    Some(&self.tags),
-                    Some(&self.metadata),
-                );
-            },
-        );
-
-        CallbackManagerForChainRun::new(
-            run_id,
-            self.handlers.clone(),
-            self.inheritable_handlers.clone(),
-            self.parent_run_id,
-            Some(self.tags.clone()),
-            Some(self.inheritable_tags.clone()),
-            Some(self.metadata.clone()),
-            Some(self.inheritable_metadata.clone()),
-        )
-    }
-
     /// Run when tool starts running.
     pub fn on_tool_start(
         &self,
@@ -1418,6 +1382,45 @@ pub struct AsyncCallbackManager {
 
 #[bon]
 impl CallbackManager {
+    /// Run when chain starts running.
+    #[builder]
+    pub fn on_chain_start(
+        &self,
+        serialized: &HashMap<String, serde_json::Value>,
+        inputs: &HashMap<String, serde_json::Value>,
+        run_id: Option<Uuid>,
+        name: Option<&str>,
+    ) -> CallbackManagerForChainRun {
+        let run_id = run_id.unwrap_or_else(|| uuid7(None));
+
+        handle_event(
+            &self.handlers,
+            Some(|h: &dyn BaseCallbackHandler| h.ignore_chain()),
+            |handler| {
+                handler.on_chain_start(
+                    serialized,
+                    inputs,
+                    run_id,
+                    self.parent_run_id,
+                    Some(&self.tags),
+                    Some(&self.metadata),
+                    name,
+                );
+            },
+        );
+
+        CallbackManagerForChainRun::new(
+            run_id,
+            self.handlers.clone(),
+            self.inheritable_handlers.clone(),
+            self.parent_run_id,
+            Some(self.tags.clone()),
+            Some(self.inheritable_tags.clone()),
+            Some(self.metadata.clone()),
+            Some(self.inheritable_metadata.clone()),
+        )
+    }
+
     /// Run when retriever starts running.
     #[builder]
     pub fn on_retriever_start(
@@ -1548,9 +1551,16 @@ impl AsyncCallbackManager {
         serialized: &HashMap<String, serde_json::Value>,
         inputs: &HashMap<String, serde_json::Value>,
         run_id: Option<Uuid>,
+        name: Option<&str>,
     ) -> AsyncCallbackManagerForChainRun {
         AsyncCallbackManagerForChainRun::from_sync(
-            self.inner.on_chain_start(serialized, inputs, run_id),
+            self.inner
+                .on_chain_start()
+                .serialized(serialized)
+                .inputs(inputs)
+                .maybe_run_id(run_id)
+                .maybe_name(name)
+                .call(),
         )
     }
 
@@ -1876,7 +1886,11 @@ mod tests {
     #[test]
     fn test_callback_manager_on_chain_start() {
         let manager = CallbackManager::new();
-        let run_manager = manager.on_chain_start(&HashMap::new(), &HashMap::new(), None);
+        let run_manager = manager
+            .on_chain_start()
+            .serialized(&HashMap::new())
+            .inputs(&HashMap::new())
+            .call();
 
         assert!(!run_manager.run_id().is_nil());
     }
@@ -2055,8 +2069,15 @@ impl CallbackManagerForChainGroup {
         serialized: &HashMap<String, serde_json::Value>,
         inputs: &HashMap<String, serde_json::Value>,
         run_id: Option<Uuid>,
+        name: Option<&str>,
     ) -> CallbackManagerForChainRun {
-        self.inner.on_chain_start(serialized, inputs, run_id)
+        self.inner
+            .on_chain_start()
+            .serialized(serialized)
+            .inputs(inputs)
+            .maybe_run_id(run_id)
+            .maybe_name(name)
+            .call()
     }
 
     /// Run when tool starts running.
@@ -2239,8 +2260,11 @@ impl AsyncCallbackManagerForChainGroup {
         serialized: &HashMap<String, serde_json::Value>,
         inputs: &HashMap<String, serde_json::Value>,
         run_id: Option<Uuid>,
+        name: Option<&str>,
     ) -> AsyncCallbackManagerForChainRun {
-        self.inner.on_chain_start(serialized, inputs, run_id).await
+        self.inner
+            .on_chain_start(serialized, inputs, run_id, name)
+            .await
     }
 
     /// Run when tool starts running (async).
@@ -2301,7 +2325,13 @@ where
         serde_json::Value::String(group_name.to_string()),
     );
 
-    let run_manager = cm.on_chain_start(&serialized, &inputs.clone().unwrap_or_default(), run_id);
+    let run_manager = cm
+        .on_chain_start()
+        .serialized(&serialized)
+        .inputs(&inputs.clone().unwrap_or_default())
+        .maybe_run_id(run_id)
+        .name(group_name)
+        .call();
     let child_cm = run_manager.get_child(None);
 
     let mut group_cm = CallbackManagerForChainGroup::new(
@@ -2418,7 +2448,12 @@ where
     );
 
     let run_manager = cm
-        .on_chain_start(&serialized, &inputs.clone().unwrap_or_default(), run_id)
+        .on_chain_start(
+            &serialized,
+            &inputs.clone().unwrap_or_default(),
+            run_id,
+            Some(group_name),
+        )
         .await;
     let child_cm = run_manager.get_child(None);
 

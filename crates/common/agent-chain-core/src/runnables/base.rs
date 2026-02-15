@@ -569,8 +569,12 @@ where
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         let config = ensure_config(config);
         let callback_manager = get_callback_manager_for_config(&config);
-        let run_manager =
-            callback_manager.on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id);
+        let run_manager = callback_manager
+            .on_chain_start()
+            .serialized(&HashMap::new())
+            .inputs(&HashMap::new())
+            .maybe_run_id(config.run_id)
+            .call();
 
         match (self.func)(input) {
             Ok(output) => {
@@ -739,8 +743,12 @@ where
 
         let config = ensure_config(config);
         let callback_manager = get_callback_manager_for_config(&config);
-        let run_manager =
-            callback_manager.on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id);
+        let run_manager = callback_manager
+            .on_chain_start()
+            .serialized(&HashMap::new())
+            .inputs(&HashMap::new())
+            .maybe_run_id(config.run_id)
+            .call();
 
         let child_config = patch_config(
             Some(config),
@@ -774,7 +782,7 @@ where
         let config = ensure_config(config);
         let async_callback_manager = get_async_callback_manager_for_config(&config);
         let run_manager = async_callback_manager
-            .on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id)
+            .on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id, None)
             .await;
 
         let child_config = patch_config(
@@ -880,8 +888,12 @@ where
         let callback_manager = get_callback_manager_for_config(&config);
 
         // Start the chain run
-        let run_manager =
-            callback_manager.on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id);
+        let run_manager = callback_manager
+            .on_chain_start()
+            .serialized(&HashMap::new())
+            .inputs(&HashMap::new())
+            .maybe_run_id(config.run_id)
+            .call();
 
         // Invoke first step
         let first_config = patch_config(
@@ -932,7 +944,7 @@ where
         let config = ensure_config(config);
         let async_callback_manager = get_async_callback_manager_for_config(&config);
         let run_manager = async_callback_manager
-            .on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id)
+            .on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id, None)
             .await;
 
         // Invoke first step

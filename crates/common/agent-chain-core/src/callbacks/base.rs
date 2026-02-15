@@ -222,8 +222,17 @@ pub trait CallbackManagerMixin {
         parent_run_id: Option<Uuid>,
         tags: Option<&[String]>,
         metadata: Option<&HashMap<String, serde_json::Value>>,
+        name: Option<&str>,
     ) {
-        let _ = (serialized, inputs, run_id, parent_run_id, tags, metadata);
+        let _ = (
+            serialized,
+            inputs,
+            run_id,
+            parent_run_id,
+            tags,
+            metadata,
+            name,
+        );
     }
 
     /// Run when the tool starts running.
@@ -442,8 +451,17 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         parent_run_id: Option<Uuid>,
         tags: Option<&[String]>,
         metadata: Option<&HashMap<String, serde_json::Value>>,
+        name: Option<&str>,
     ) {
-        let _ = (serialized, inputs, run_id, parent_run_id, tags, metadata);
+        let _ = (
+            serialized,
+            inputs,
+            run_id,
+            parent_run_id,
+            tags,
+            metadata,
+            name,
+        );
     }
 
     /// Run when chain ends running (async).

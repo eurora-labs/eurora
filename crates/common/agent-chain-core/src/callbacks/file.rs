@@ -216,13 +216,10 @@ impl CallbackManagerMixin for FileCallbackHandler {
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
         _tags: Option<&[String]>,
-        metadata: Option<&HashMap<String, serde_json::Value>>,
+        _metadata: Option<&HashMap<String, serde_json::Value>>,
+        name: Option<&str>,
     ) {
-        // First check metadata for "name" (equivalent to kwargs["name"] in Python)
-        // Then fall back to serialized
-        let name = metadata
-            .and_then(|m| m.get("name"))
-            .and_then(|v| v.as_str())
+        let name = name
             .or_else(|| {
                 if !serialized.is_empty() {
                     serialized.get("name").and_then(|v| v.as_str()).or_else(|| {
@@ -415,7 +412,7 @@ mod tests {
             );
 
             let run_id = Uuid::new_v4();
-            handler.on_chain_start(&serialized, &HashMap::new(), run_id, None, None, None);
+            handler.on_chain_start(&serialized, &HashMap::new(), run_id, None, None, None, None);
             handler.on_chain_end(&HashMap::new(), run_id, None);
             handler.flush().unwrap();
         }
