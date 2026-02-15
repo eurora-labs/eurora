@@ -1,15 +1,20 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { currentUser, isAuthenticated } from '$lib/stores/auth.js';
-	import { subscriptionStore, subscription } from '$lib/stores/subscription.js';
+	import {
+		subscriptionStore,
+		subscription,
+		subscriptionLoading,
+	} from '$lib/stores/subscription.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Dialog from '@eurora/ui/components/dialog/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import BoltIcon from '@lucide/svelte/icons/bolt';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
 	import CreditCardIcon from '@lucide/svelte/icons/credit-card';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import MailIcon from '@lucide/svelte/icons/mail';
-	import PenLineIcon from '@lucide/svelte/icons/pen-line';
+	import SquarePen from '@lucide/svelte/icons/square-pen';
 	import { onMount } from 'svelte';
 
 	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID;
@@ -57,21 +62,28 @@
 		<div class="mx-auto flex w-full max-w-5xl items-start gap-12 px-8 py-10">
 			<nav class="flex w-56 shrink-0 flex-col gap-0.5">
 				{#if $currentUser}
-					<div class="mb-4 flex flex-col overflow-hidden py-1">
-						<span class="flex items-center gap-1.5 leading-tight">
-							<span class="truncate text-sm font-medium"
-								>{$currentUser.name || 'User'}</span
-							>
-							<a
-								href="/settings"
-								class="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-							>
-								<PenLineIcon size={11} />
-							</a>
-						</span>
-						<span class="truncate text-xs leading-tight text-muted-foreground">
-							{planLabel} - {$currentUser.email}
-						</span>
+					<div class="mb-4 flex flex-col overflow-hidden py-1 px-2">
+						{#if $subscriptionLoading}
+							<div class="flex items-center gap-2 py-0.5">
+								<Loader2Icon size={14} class="animate-spin text-muted-foreground" />
+								<span class="text-xs text-muted-foreground">Loading…</span>
+							</div>
+						{:else}
+							<span class="flex items-center gap-1.5 leading-tight">
+								<span class="truncate text-sm font-medium"
+									>{$currentUser.name || 'User'}</span
+								>
+								<a
+									href="/settings"
+									class="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+								>
+									<SquarePen size={11} />
+								</a>
+							</span>
+							<span class="truncate text-xs leading-tight text-muted-foreground">
+								{planLabel} - {$currentUser.email}
+							</span>
+						{/if}
 					</div>
 				{/if}
 

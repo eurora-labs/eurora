@@ -2,7 +2,7 @@
 # assemble-macos-dmg.sh
 #
 # Assembles the unified macOS app by embedding the Tauri desktop app
-# (EuroraDesktop.app / EuroraDesktop Nightly.app) inside the Swift launcher,
+# (Eurora.app / Eurora Nightly.app) inside the Swift launcher,
 # then re-signs the entire bundle and creates a DMG.
 #
 # For the "nightly" channel the launcher is renamed to "Eurora Nightly.app",
@@ -138,7 +138,7 @@ if [ -z "$TAURI_TARGZ" ]; then
     exit 1
 fi
 tar xzf "$TAURI_TARGZ" -C tauri-extracted
-# Find the extracted .app (e.g., EuroraDesktop.app or EuroraDesktop Nightly.app)
+# Find the extracted .app (e.g., Eurora.app or Eurora Nightly.app)
 TAURI_APP=$(find tauri-extracted -maxdepth 1 -name '*.app' -type d | head -1)
 if [ -z "$TAURI_APP" ]; then
     echo "ERROR: No .app found after extracting $TAURI_TARGZ"

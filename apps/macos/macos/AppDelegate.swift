@@ -1,5 +1,5 @@
 // AppDelegate.swift - Background launcher for the Eurora unified macOS app.
-// Launches the embedded Tauri desktop app (EuroraDesktop.app) and bridges
+// Launches the embedded Tauri desktop app (Eurora.app) and bridges
 // Safari extension traffic to the Tauri gRPC backend.
 
 import Cocoa
@@ -116,7 +116,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         else { return }
 
         if desktopBundleIdentifiers.contains(bundleId) {
-            logger.info("EuroraDesktop terminated, shutting down launcher")
+            logger.info("Eurora terminated, shutting down launcher")
             NSApplication.shared.terminate(nil)
         } else if safariBundleIdentifiers.contains(bundleId) {
             logger.info(
@@ -147,8 +147,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         }
 
         // Discover the embedded Tauri app dynamically — the product name
-        // differs between release ("EuroraDesktop.app") and nightly
-        // ("EuroraDesktop Nightly.app"), so we scan Resources for any .app
+        // differs between release ("Eurora.app") and nightly
+        // ("Eurora Nightly.app"), so we scan Resources for any .app
         // whose bundle identifier matches a known desktop build.
         let desktopAppURL: URL? = {
             guard
@@ -178,10 +178,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         NSWorkspace.shared.openApplication(at: desktopAppURL, configuration: config) {
             [weak self] app, error in
             if let error = error {
-                self?.logger.error("Failed to launch EuroraDesktop: \(error.localizedDescription)")
+                self?.logger.error("Failed to launch Eurora: \(error.localizedDescription)")
             } else {
                 self?.logger.info(
-                    "EuroraDesktop launched successfully (PID: \(app?.processIdentifier ?? 0))")
+                    "Eurora launched successfully (PID: \(app?.processIdentifier ?? 0))")
             }
         }
     }
