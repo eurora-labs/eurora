@@ -10,10 +10,11 @@ axum = { workspace = true }
 be-auth-core = { workspace = true }
 casbin = { workspace = true }
 http = "1"
-pin-project-lite = "0.2"
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true }
 tonic = { workspace = true }
 tower = { workspace = true, features = ["util"] }
 tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
