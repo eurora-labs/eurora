@@ -713,7 +713,7 @@ jobs:
                   RELEASE_DIR="release/darwin/${ARCH_DIR}"
 
                   # Find the original Tauri tar.gz filename so the update API
-                  # keeps serving the same key on S3 (e.g. EuroraDesktop.app.tar.gz)
+                  # keeps serving the same key on S3 (e.g. Eurora.app.tar.gz)
                   ORIG_TARGZ=$(find "tauri-release/darwin/${ARCH_DIR}" -maxdepth 1 -name '*.tar.gz' -not -name '*.sig' | head -1)
                   TARGZ_NAME=$(basename "$ORIG_TARGZ")
 
