@@ -1,22 +1,41 @@
 /// REST path prefixes that bypass authorization (public/unauthenticated routes).
-pub const REST_BYPASS_PREFIXES: &[&str] = &["/releases/", "/extensions/"];
+pub(crate) const REST_BYPASS_PREFIXES: &[&str] = &["/releases/", "/extensions/"];
 
 /// REST paths that bypass authorization via exact match.
-pub const REST_BYPASS_EXACT: &[&str] = &["/payment/webhook"];
+pub(crate) const REST_BYPASS_EXACT: &[&str] = &["/payment/webhook"];
 
 /// gRPC fully-qualified service names that bypass authorization.
-pub const GRPC_BYPASS_SERVICES: &[&str] = &[
+pub(crate) const GRPC_BYPASS_SERVICES: &[&str] = &[
     "auth_service.ProtoAuthService",
     "grpc.health.v1.Health",
     "local_config_service.ProtoLocalConfigService",
 ];
 
+/// Normalize a URL path by resolving `.` and `..` segments to prevent bypass via
+/// path traversal (e.g. `/releases/../payment/checkout`).
+fn normalize_path(path: &str) -> String {
+    let mut segments: Vec<&str> = Vec::new();
+    for seg in path.split('/') {
+        match seg {
+            "." | "" => {}
+            ".." => {
+                segments.pop();
+            }
+            s => segments.push(s),
+        }
+    }
+    format!("/{}", segments.join("/"))
+}
+
 /// Returns `true` if the given REST path should skip authorization.
+///
+/// The path is normalized before checking to prevent traversal-based bypasses.
 pub fn is_rest_bypass(path: &str) -> bool {
+    let normalized = normalize_path(path);
     REST_BYPASS_PREFIXES
         .iter()
-        .any(|prefix| path.starts_with(prefix))
-        || REST_BYPASS_EXACT.contains(&path)
+        .any(|prefix| normalized.starts_with(prefix))
+        || REST_BYPASS_EXACT.iter().any(|&exact| normalized == exact)
 }
 
 /// Returns `true` if the given gRPC service should skip authorization.
@@ -45,6 +64,23 @@ mod tests {
         assert!(!is_rest_bypass("/payment/checkout"));
         assert!(!is_rest_bypass("/api/users"));
         assert!(!is_rest_bypass("/releases")); // no trailing slash
+    }
+
+    #[test]
+    fn rest_bypass_rejects_traversal_attacks() {
+        // Path traversal must not trick the prefix check
+        assert!(!is_rest_bypass("/releases/../payment/checkout"));
+        assert!(!is_rest_bypass("/extensions/../admin/users"));
+        assert!(!is_rest_bypass("/releases/../../etc/passwd"));
+    }
+
+    #[test]
+    fn normalize_path_resolves_segments() {
+        assert_eq!(normalize_path("/a/b/../c"), "/a/c");
+        assert_eq!(normalize_path("/a/./b/c"), "/a/b/c");
+        assert_eq!(normalize_path("/a/b/../../c"), "/c");
+        assert_eq!(normalize_path("/../a"), "/a");
+        assert_eq!(normalize_path("/"), "/");
     }
 
     #[test]
