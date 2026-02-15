@@ -13,6 +13,7 @@ axum = { workspace = true }
 be-auth-core = { workspace = true }
 casbin = { workspace = true }
 http = "1"
+percent-encoding = "2"
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tonic = { workspace = true }

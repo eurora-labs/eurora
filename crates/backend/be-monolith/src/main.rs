@@ -152,9 +152,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut grpc_router = Server::builder()
         .accept_http1(true)
-        .layer(cors)
-        .layer(GrpcWebLayer::new())
         .layer(grpc_authz_layer)
+        .layer(GrpcWebLayer::new())
+        .layer(cors)
         .add_service(health_service)
         .add_service(ProtoAuthServiceServer::new(auth_service))
         .add_service(ProtoActivityServiceServer::new(activity_service))
