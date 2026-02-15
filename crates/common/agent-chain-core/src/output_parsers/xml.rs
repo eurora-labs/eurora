@@ -238,14 +238,14 @@ pub fn nested_element(path: &[String], tag: &str, text: Option<&str>) -> Addable
     };
 
     let mut inner = AddableDict::new();
-    inner.insert(tag, inner_value);
+    inner.0.insert(tag.to_string(), inner_value);
 
     // Build nested structure from path
     let mut result = inner;
     for key in path.iter().rev() {
         let mut wrapper = AddableDict::new();
-        wrapper.insert(
-            key.as_str(),
+        wrapper.0.insert(
+            key.clone(),
             Value::Array(vec![serde_json::to_value(&result).unwrap_or(Value::Null)]),
         );
         result = wrapper;
@@ -313,7 +313,7 @@ mod tests {
     fn test_nested_element() {
         let path = vec!["root".to_string()];
         let result = nested_element(&path, "item", Some("value"));
-        assert!(result.get("root").is_some());
+        assert!(result.0.get("root").is_some());
     }
 
     #[test]
@@ -321,7 +321,7 @@ mod tests {
         let path: Vec<String> = vec![];
         let result = nested_element(&path, "item", Some("value"));
         assert_eq!(
-            result.get("item"),
+            result.0.get("item"),
             Some(&Value::String("value".to_string()))
         );
     }

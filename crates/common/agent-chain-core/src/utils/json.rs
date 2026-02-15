@@ -28,7 +28,10 @@ use serde_json::Value;
 /// assert!(result.is_ok());
 /// ```
 pub fn parse_partial_json(s: &str, strict: bool) -> Result<Value, JsonParseError> {
-    if let Ok(value) = serde_json::from_str(s) {
+    if let Ok(value) = serde_json::from_str::<Value>(s) {
+        if strict && contains_control_chars(s) {
+            return Err(JsonParseError::ControlCharacters);
+        }
         return Ok(value);
     }
 
