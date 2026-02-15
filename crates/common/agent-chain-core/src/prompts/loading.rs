@@ -11,6 +11,7 @@ use tracing::warn;
 use crate::error::{Error, Result};
 
 use super::base::BasePromptTemplate;
+use super::chat::ChatPromptTemplate;
 use super::few_shot::FewShotPromptTemplate;
 use super::prompt::PromptTemplate;
 use super::string::PromptTemplateFormat;
@@ -255,11 +256,6 @@ fn load_few_shot_prompt(
 /// Load chat prompt from config.
 ///
 /// Direct port of Python `_load_chat_prompt`.
-///
-/// Note: In Python, `ChatPromptTemplate` extends `BasePromptTemplate`.
-/// In Rust, `ChatPromptTemplate` implements `BaseChatPromptTemplate` which is
-/// a separate trait. For `load_prompt` return type compatibility, we extract the
-/// template and return a `PromptTemplate`.
 fn load_chat_prompt(
     config: &mut serde_json::Map<String, serde_json::Value>,
 ) -> Result<Box<dyn BasePromptTemplate>> {
@@ -284,8 +280,8 @@ fn load_chat_prompt(
             Error::InvalidConfig("Can't load chat prompt without template".to_string())
         })?;
 
-    let prompt = PromptTemplate::from_template(template)?;
-    Ok(Box::new(prompt))
+    let chat_prompt = ChatPromptTemplate::from_template(template)?;
+    Ok(Box::new(chat_prompt))
 }
 
 /// Load a prompt from a file.
