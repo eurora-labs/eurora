@@ -86,7 +86,7 @@ fn test_minimal_reasoning_effort_payload_chat_completions() {
     let payload = llm.build_request_payload(&messages, None, None, false);
 
     assert_eq!(payload["reasoning_effort"], "minimal");
-    assert_eq!(payload["max_tokens"], 100);
+    assert_eq!(payload["max_completion_tokens"], 100);
 }
 
 /// Ported from `test_minimal_reasoning_effort_payload` (responses API).
@@ -113,7 +113,7 @@ fn test_minimal_reasoning_effort_payload_responses_api() {
 #[test]
 fn test_output_version_compat() {
     let llm = ChatOpenAI::new("gpt-5").output_version("responses/v1");
-    assert!(llm.should_use_responses_api(false));
+    assert!(llm.should_use_responses_api(None));
 }
 
 /// Ported from `test_verbosity_parameter_payload`.
@@ -230,10 +230,10 @@ fn test_create_usage_metadata_responses() {
 #[test]
 fn test_model_prefers_responses_api() {
     let llm = ChatOpenAI::new("gpt-5.2-pro");
-    assert!(llm.should_use_responses_api(false));
+    assert!(llm.should_use_responses_api(None));
 
     let llm = ChatOpenAI::new("gpt-5.1");
-    assert!(!llm.should_use_responses_api(false));
+    assert!(!llm.should_use_responses_api(None));
 }
 
 /// Tests that should_use_responses_api returns true for various conditions.
@@ -241,39 +241,43 @@ fn test_model_prefers_responses_api() {
 fn test_should_use_responses_api_conditions() {
     // Explicit setting
     let llm = ChatOpenAI::new("gpt-4o").with_responses_api(true);
-    assert!(llm.should_use_responses_api(false));
+    assert!(llm.should_use_responses_api(None));
 
     let llm = ChatOpenAI::new("gpt-4o").with_responses_api(false);
-    assert!(!llm.should_use_responses_api(false));
+    assert!(!llm.should_use_responses_api(None));
 
     // Has builtin tools
-    assert!(ChatOpenAI::new("gpt-4o").should_use_responses_api(true));
+    assert!(
+        ChatOpenAI::new("gpt-4o")
+            .with_builtin_tools(vec![agent_chain::providers::openai::BuiltinTool::WebSearch])
+            .should_use_responses_api(None)
+    );
 
     // Reasoning params
     let mut reasoning = HashMap::new();
     reasoning.insert("effort".to_string(), serde_json::json!("high"));
     let llm = ChatOpenAI::new("gpt-4o").reasoning(reasoning);
-    assert!(llm.should_use_responses_api(false));
+    assert!(llm.should_use_responses_api(None));
 
     // Verbosity
     let llm = ChatOpenAI::new("gpt-4o").verbosity("high");
-    assert!(llm.should_use_responses_api(false));
+    assert!(llm.should_use_responses_api(None));
 
     // Truncation
     let llm = ChatOpenAI::new("gpt-4o").truncation("auto");
-    assert!(llm.should_use_responses_api(false));
+    assert!(llm.should_use_responses_api(None));
 
     // Include
     let llm = ChatOpenAI::new("gpt-4o").include(vec!["reasoning".to_string()]);
-    assert!(llm.should_use_responses_api(false));
+    assert!(llm.should_use_responses_api(None));
 
     // output_version
     let llm = ChatOpenAI::new("gpt-4o").output_version("responses/v1");
-    assert!(llm.should_use_responses_api(false));
+    assert!(llm.should_use_responses_api(None));
 
     // Default (no special params)
     let llm = ChatOpenAI::new("gpt-4o");
-    assert!(!llm.should_use_responses_api(false));
+    assert!(!llm.should_use_responses_api(None));
 }
 
 // ====================================================================
