@@ -553,7 +553,10 @@ mod tests {
 
     #[test]
     fn test_blob_from_bytes() {
-        let blob = Blob::builder().bytes(b"Hello, bytes!".to_vec()).build().unwrap();
+        let blob = Blob::builder()
+            .bytes(b"Hello, bytes!".to_vec())
+            .build()
+            .unwrap();
         assert_eq!(blob.as_bytes().unwrap(), b"Hello, bytes!");
         assert_eq!(blob.as_string().unwrap(), "Hello, bytes!");
     }

@@ -109,8 +109,6 @@ impl AddableDict {
     pub fn from_map(map: HashMap<String, Value>) -> Self {
         Self(map)
     }
-
-
 }
 
 impl std::ops::Add for AddableDict {
@@ -138,7 +136,6 @@ impl std::ops::Add for AddableDict {
         chunk
     }
 }
-
 
 /// Try to add two JSON values together.
 ///
@@ -184,7 +181,6 @@ pub trait Addable: Clone {
     /// Add another value to this one
     fn add(self, other: Self) -> Self;
 }
-
 
 /// Add a sequence of addable objects together.
 ///
@@ -617,8 +613,6 @@ mod tests {
         assert_eq!(result, "line1\n  line2\n  line3");
     }
 
-
-
     #[tokio::test]
     async fn test_gather_with_concurrency() {
         let futures: Vec<Pin<Box<dyn Future<Output = i32> + Send>>> = vec![
@@ -653,17 +647,24 @@ mod tests {
     #[test]
     fn test_addable_dict() {
         let mut dict1 = AddableDict::new();
-        dict1.0.insert("a".to_string(), Value::String("hello".to_string()));
+        dict1
+            .0
+            .insert("a".to_string(), Value::String("hello".to_string()));
         dict1.0.insert("b".to_string(), Value::Number(1.into()));
 
         let mut dict2 = AddableDict::new();
         dict2.0.insert("b".to_string(), Value::Number(2.into()));
-        dict2.0.insert("c".to_string(), Value::String(" world".to_string()));
+        dict2
+            .0
+            .insert("c".to_string(), Value::String(" world".to_string()));
 
         let result = dict1 + dict2;
         assert_eq!(result.0.get("a"), Some(&Value::String("hello".to_string())));
         assert_eq!(result.0.get("b"), Some(&Value::Number(3.into())));
-        assert_eq!(result.0.get("c"), Some(&Value::String(" world".to_string())));
+        assert_eq!(
+            result.0.get("c"),
+            Some(&Value::String(" world".to_string()))
+        );
     }
 
     #[test]
