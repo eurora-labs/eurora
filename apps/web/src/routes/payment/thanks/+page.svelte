@@ -8,7 +8,7 @@
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { onMount } from 'svelte';
 
-	const PAYMENT_API_URL = import.meta.env.VITE_PAYMENT_API_URL;
+	const REST_API_URL = import.meta.env.VITE_REST_API_URL;
 
 	let status = $state<'loading' | 'complete' | 'failed'>('loading');
 
@@ -24,7 +24,7 @@
 			await auth.ensureValidToken();
 
 			const res = await fetch(
-				`${PAYMENT_API_URL}/payment/checkout-status?session_id=${encodeURIComponent(sessionId)}`,
+				`${REST_API_URL}/payment/checkout-status?session_id=${encodeURIComponent(sessionId)}`,
 				{
 					headers: {
 						Authorization: `Bearer ${$accessToken}`,

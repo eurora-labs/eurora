@@ -8,7 +8,7 @@
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import XIcon from '@lucide/svelte/icons/x';
 
-	const PAYMENT_API_URL = import.meta.env.VITE_PAYMENT_API_URL;
+	const REST_API_URL = import.meta.env.VITE_REST_API_URL;
 	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID;
 
 	let loading = $state(false);
@@ -29,7 +29,7 @@
 				return;
 			}
 
-			const res = await fetch(`${PAYMENT_API_URL}/payment/checkout`, {
+			const res = await fetch(`${REST_API_URL}/payment/checkout`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
