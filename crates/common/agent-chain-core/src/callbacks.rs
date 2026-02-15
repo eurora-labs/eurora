@@ -68,8 +68,7 @@ pub use stdout::{StdOutCallbackHandler, StreamingStdOutCallbackHandler, colors};
 
 // Re-export usage tracking
 pub use usage::{
-    UsageMetadataCallbackGuard, UsageMetadataCallbackHandler, add_usage,
-    get_usage_metadata_callback,
+    UsageMetadataCallbackGuard, UsageMetadataCallbackHandler, get_usage_metadata_callback,
 };
 
 #[cfg(test)]

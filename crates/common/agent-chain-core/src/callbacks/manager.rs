@@ -5,6 +5,7 @@
 
 use std::collections::HashMap;
 use std::future::Future;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
 
 use uuid::Uuid;
@@ -18,6 +19,8 @@ use crate::utils::uuid::uuid7;
 /// Handle an event for the given handlers.
 ///
 /// This function dispatches an event to all handlers that don't ignore it.
+/// Catches panics from handler calls, logs warnings, and re-panics if
+/// the handler has raise_error set to true.
 pub fn handle_event<F>(
     handlers: &[Arc<dyn BaseCallbackHandler>],
     ignore_condition: Option<fn(&dyn BaseCallbackHandler) -> bool>,
@@ -31,7 +34,27 @@ pub fn handle_event<F>(
         {
             continue;
         }
-        event_fn(handler);
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            event_fn(handler);
+        }));
+        if let Err(panic_payload) = result {
+            let error_msg = if let Some(s) = panic_payload.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = panic_payload.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "Unknown error".to_string()
+            };
+            tracing::warn!(
+                target: "agent_chain_core::callbacks",
+                "Error in {}.callback: {}",
+                handler.name(),
+                error_msg,
+            );
+            if handler.raise_error() {
+                std::panic::resume_unwind(panic_payload);
+            }
+        }
     }
 }
 
@@ -994,12 +1017,18 @@ impl CallbackManager {
         }
     }
 
-    /// Set handlers.
+    /// Set handlers as the only handlers on the callback manager.
     pub fn set_handlers(&mut self, handlers: Vec<Arc<dyn BaseCallbackHandler>>, inherit: bool) {
-        self.handlers = handlers.clone();
-        if inherit {
-            self.inheritable_handlers = handlers;
+        self.handlers = Vec::new();
+        self.inheritable_handlers = Vec::new();
+        for handler in handlers {
+            self.add_handler(handler, inherit);
         }
+    }
+
+    /// Set a single handler as the only handler on the callback manager.
+    pub fn set_handler(&mut self, handler: Arc<dyn BaseCallbackHandler>, inherit: bool) {
+        self.set_handlers(vec![handler], inherit);
     }
 
     /// Add handler.
@@ -1028,19 +1057,32 @@ impl CallbackManager {
         self.inheritable_handlers
             .retain(|h| !std::ptr::eq(h.as_ref(), handler.as_ref()));
     }
-    /// Add tags.
+    /// Add tags to the callback manager.
     pub fn add_tags(&mut self, tags: Vec<String>, inherit: bool) {
         for tag in &tags {
-            if !self.tags.contains(tag) {
-                self.tags.push(tag.clone());
+            if self.tags.contains(tag) {
+                self.remove_tags(&[tag.clone()]);
             }
         }
+        self.tags.extend(tags.clone());
         if inherit {
-            for tag in tags {
-                if !self.inheritable_tags.contains(&tag) {
-                    self.inheritable_tags.push(tag);
-                }
-            }
+            self.inheritable_tags.extend(tags);
+        }
+    }
+
+    /// Remove tags from the callback manager.
+    pub fn remove_tags(&mut self, tags: &[String]) {
+        for tag in tags {
+            self.tags.retain(|t| t != tag);
+            self.inheritable_tags.retain(|t| t != tag);
+        }
+    }
+
+    /// Remove metadata keys from the callback manager.
+    pub fn remove_metadata(&mut self, keys: &[String]) {
+        for key in keys {
+            self.metadata.remove(key);
+            self.inheritable_metadata.remove(key);
         }
     }
 
@@ -1269,6 +1311,76 @@ impl CallbackManager {
                 handler.on_custom_event(name, data, run_id, None, None);
             },
         );
+    }
+
+    /// Return a copy of the callback manager.
+    pub fn copy(&self) -> Self {
+        Self {
+            handlers: self.handlers.clone(),
+            inheritable_handlers: self.inheritable_handlers.clone(),
+            parent_run_id: self.parent_run_id,
+            tags: self.tags.clone(),
+            inheritable_tags: self.inheritable_tags.clone(),
+            metadata: self.metadata.clone(),
+            inheritable_metadata: self.inheritable_metadata.clone(),
+        }
+    }
+
+    /// Merge the callback manager with another callback manager.
+    pub fn merge(&self, other: &CallbackManager) -> Self {
+        let mut tags: Vec<String> = self.tags.clone();
+        for tag in &other.tags {
+            if !tags.contains(tag) {
+                tags.push(tag.clone());
+            }
+        }
+
+        let mut inheritable_tags: Vec<String> = self.inheritable_tags.clone();
+        for tag in &other.inheritable_tags {
+            if !inheritable_tags.contains(tag) {
+                inheritable_tags.push(tag.clone());
+            }
+        }
+
+        let mut metadata = self.metadata.clone();
+        metadata.extend(other.metadata.clone());
+
+        let mut inheritable_metadata = self.inheritable_metadata.clone();
+        inheritable_metadata.extend(other.inheritable_metadata.clone());
+
+        let mut manager = Self {
+            parent_run_id: self.parent_run_id.or(other.parent_run_id),
+            handlers: Vec::new(),
+            inheritable_handlers: Vec::new(),
+            tags,
+            inheritable_tags,
+            metadata,
+            inheritable_metadata,
+        };
+
+        let handlers: Vec<Arc<dyn BaseCallbackHandler>> = self
+            .handlers
+            .iter()
+            .chain(other.handlers.iter())
+            .cloned()
+            .collect();
+
+        let inheritable_handlers: Vec<Arc<dyn BaseCallbackHandler>> = self
+            .inheritable_handlers
+            .iter()
+            .chain(other.inheritable_handlers.iter())
+            .cloned()
+            .collect();
+
+        for handler in handlers {
+            manager.add_handler(handler, false);
+        }
+
+        for handler in inheritable_handlers {
+            manager.add_handler(handler, true);
+        }
+
+        manager
     }
 
     /// Configure the callback manager.
