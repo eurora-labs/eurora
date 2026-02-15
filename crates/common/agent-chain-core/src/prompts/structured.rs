@@ -1,0 +1,213 @@
+//! Structured prompt template for a language model.
+//!
+//! This module provides `StructuredPrompt`, a chat prompt that combines
+//! with a schema for structured output extraction.
+//!
+//! Direct port of `langchain_core.prompts.structured` in Python.
+
+use std::collections::HashMap;
+
+use serde_json::Value;
+
+use crate::api::{BetaParams, warn_beta};
+use crate::error::{Error, Result};
+use crate::messages::BaseMessage;
+
+use super::chat::{BaseChatPromptTemplate, ChatPromptTemplate, MessageLikeRepresentation};
+use super::string::PromptTemplateFormat;
+
+/// Structured prompt template for a language model.
+///
+/// Combines a `ChatPromptTemplate` with a schema for structured output.
+/// When piped to a language model, it calls `with_structured_output(schema)`
+/// on the model.
+///
+/// Direct port of Python `langchain_core.prompts.structured.StructuredPrompt`.
+///
+/// # Example
+///
+/// ```ignore
+/// use agent_chain_core::prompts::StructuredPrompt;
+/// use serde_json::json;
+///
+/// let schema = json!({
+///     "type": "object",
+///     "properties": {
+///         "name": {"type": "string"},
+///         "value": {"type": "integer"}
+///     }
+/// });
+///
+/// let prompt = StructuredPrompt::new(
+///     vec![
+///         ("system", "Extract structured data.").into(),
+///         ("human", "{input}").into(),
+///     ],
+///     schema,
+/// ).unwrap();
+/// ```
+#[derive(Debug, Clone)]
+pub struct StructuredPrompt {
+    /// The underlying chat prompt template.
+    chat_template: ChatPromptTemplate,
+    /// Schema for the structured prompt (JSON schema or model definition).
+    pub schema: Value,
+    /// Additional kwargs to pass to `with_structured_output`.
+    pub structured_output_kwargs: HashMap<String, Value>,
+}
+
+impl StructuredPrompt {
+    /// Create a new structured prompt template.
+    ///
+    /// Direct port of Python `StructuredPrompt.__init__`.
+    pub fn new(messages: Vec<MessageLikeRepresentation>, schema: Value) -> Result<Self> {
+        Self::with_kwargs(
+            messages,
+            schema,
+            HashMap::new(),
+            PromptTemplateFormat::FString,
+        )
+    }
+
+    /// Create a new structured prompt template with additional kwargs.
+    pub fn with_kwargs(
+        messages: Vec<MessageLikeRepresentation>,
+        schema: Value,
+        structured_output_kwargs: HashMap<String, Value>,
+        template_format: PromptTemplateFormat,
+    ) -> Result<Self> {
+        warn_beta(
+            BetaParams {
+                message: Some("StructuredPrompt is in beta. It is actively being worked on,                           so the API may change.".to_string()),
+                ..Default::default()
+            },
+            module_path!(),
+        );
+
+        if schema.is_null()
+            || (schema.is_object() && schema.as_object().map_or(true, |o| o.is_empty()))
+        {
+            return Err(Error::InvalidConfig(format!(
+                "Must pass in a non-empty structured output schema. Received: {}",
+                schema
+            )));
+        }
+
+        let chat_template =
+            ChatPromptTemplate::from_messages_with_format(messages, template_format)?;
+
+        Ok(Self {
+            chat_template,
+            schema,
+            structured_output_kwargs,
+        })
+    }
+
+    /// Create from messages and schema.
+    ///
+    /// Direct port of Python `StructuredPrompt.from_messages_and_schema`.
+    pub fn from_messages_and_schema(
+        messages: Vec<MessageLikeRepresentation>,
+        schema: Value,
+    ) -> Result<Self> {
+        Self::new(messages, schema)
+    }
+
+    /// Get the underlying chat template.
+    pub fn chat_template(&self) -> &ChatPromptTemplate {
+        &self.chat_template
+    }
+}
+
+impl BaseChatPromptTemplate for StructuredPrompt {
+    fn input_variables(&self) -> &[String] {
+        self.chat_template.input_variables()
+    }
+
+    fn optional_variables(&self) -> &[String] {
+        self.chat_template.optional_variables()
+    }
+
+    fn partial_variables(&self) -> &HashMap<String, String> {
+        self.chat_template.partial_variables()
+    }
+
+    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
+        self.chat_template.format_messages(kwargs)
+    }
+
+    fn pretty_repr(&self, html: bool) -> String {
+        self.chat_template.pretty_repr(html)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_structured_prompt_creation() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "value": {"type": "integer"}
+            }
+        });
+
+        let prompt = StructuredPrompt::new(
+            vec![
+                ("system", "Extract structured data.").into(),
+                ("human", "{input}").into(),
+            ],
+            schema.clone(),
+        )
+        .unwrap();
+
+        assert_eq!(prompt.input_variables(), &["input"]);
+        assert_eq!(prompt.schema, schema);
+    }
+
+    #[test]
+    fn test_structured_prompt_format_messages() {
+        let schema = json!({"type": "object"});
+
+        let prompt = StructuredPrompt::new(
+            vec![
+                ("system", "You extract data.").into(),
+                ("human", "{text}").into(),
+            ],
+            schema,
+        )
+        .unwrap();
+
+        let mut kwargs = HashMap::new();
+        kwargs.insert("text".to_string(), "Hello world".to_string());
+
+        let messages = prompt.format_messages(&kwargs).unwrap();
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[0].content(), "You extract data.");
+        assert_eq!(messages[1].content(), "Hello world");
+    }
+
+    #[test]
+    fn test_structured_prompt_rejects_empty_schema() {
+        let result = StructuredPrompt::new(vec![("human", "test").into()], json!({}));
+        assert!(result.is_err());
+
+        let result = StructuredPrompt::new(vec![("human", "test").into()], Value::Null);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_messages_and_schema() {
+        let schema = json!({"type": "object", "properties": {}});
+
+        let prompt =
+            StructuredPrompt::from_messages_and_schema(vec![("human", "{input}").into()], schema)
+                .unwrap();
+
+        assert_eq!(prompt.input_variables(), &["input"]);
+    }
+}
