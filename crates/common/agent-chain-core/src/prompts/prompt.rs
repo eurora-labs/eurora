@@ -96,10 +96,10 @@ impl PromptTemplate {
     ) -> Result<Self> {
         let template = template.into();
 
-        let input_variables = match input_variables {
-            Some(vars) => vars,
-            None => get_template_variables(&template, template_format)?,
-        };
+        // Python always re-infers input_variables from the template,
+        // even when user-provided ones are given (lines 108-110 of prompt.py).
+        let _ = input_variables;
+        let input_variables = get_template_variables(&template, template_format)?;
 
         let prompt = Self {
             template,
@@ -248,11 +248,7 @@ impl PromptTemplate {
         pieces.extend(examples.iter().cloned());
         pieces.push(suffix.to_string());
 
-        let template = pieces
-            .into_iter()
-            .filter(|p| !p.is_empty())
-            .collect::<Vec<_>>()
-            .join(example_separator);
+        let template = pieces.join(example_separator);
 
         Ok(Self {
             template,

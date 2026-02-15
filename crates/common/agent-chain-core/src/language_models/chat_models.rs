@@ -25,6 +25,7 @@ use crate::error::{Error, Result};
 use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition, UsageMetadata};
 use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, Generation, LLMResult};
 use crate::rate_limiters::BaseRateLimiter;
+use crate::runnables::config::RunnableConfig;
 use crate::tools::{BaseTool, ToolDefinition};
 
 /// Type alias for streaming output.
@@ -354,9 +355,10 @@ pub trait BaseChatModel: BaseLanguageModel {
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-        _run_manager: Option<&AsyncCallbackManagerForLLMRun>,
+        run_manager: Option<&AsyncCallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
-        self._generate(messages, stop, None).await
+        let sync_manager = run_manager.map(|m| m.get_sync());
+        self._generate(messages, stop, sync_manager.as_ref()).await
     }
 
     /// Stream the output of the model.
@@ -388,9 +390,10 @@ pub trait BaseChatModel: BaseLanguageModel {
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-        _run_manager: Option<&AsyncCallbackManagerForLLMRun>,
+        run_manager: Option<&AsyncCallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
-        self._stream(messages, stop, None)
+        let sync_manager = run_manager.map(|m| m.get_sync());
+        self._stream(messages, stop, sync_manager.as_ref())
     }
 
     /// Get the first AI message from a chat result.
@@ -1129,57 +1132,110 @@ pub trait BaseChatModel: BaseLanguageModel {
     }
 
     /// Invoke the model with input.
-    async fn invoke(&self, input: LanguageModelInput) -> Result<AIMessage> {
+    ///
+    /// Routes through `generate()` to ensure the full callback pipeline
+    /// (on_chat_model_start, on_llm_end, on_llm_error) is triggered.
+    async fn invoke(
+        &self,
+        input: LanguageModelInput,
+        config: Option<&RunnableConfig>,
+    ) -> Result<AIMessage> {
         let messages = self.convert_input(input)?;
-        let result = self._generate_with_cache(messages, None, None).await?;
 
-        if result.generations.is_empty() {
+        let (callbacks, tags, metadata, run_name, run_id) = if let Some(cfg) = config {
+            (
+                cfg.callbacks.clone(),
+                Some(cfg.tags.clone()).filter(|t| !t.is_empty()),
+                Some(cfg.metadata.clone()).filter(|m| !m.is_empty()),
+                cfg.run_name.clone(),
+                cfg.run_id,
+            )
+        } else {
+            (None, None, None, None, None)
+        };
+
+        let result = self
+            .generate(
+                vec![messages],
+                None,
+                callbacks,
+                tags,
+                metadata,
+                run_name,
+                run_id,
+            )
+            .await?;
+
+        if result.generations.is_empty() || result.generations[0].is_empty() {
             return Err(Error::Other("No generations returned".into()));
         }
 
-        match result.generations[0].message.clone() {
-            BaseMessage::AI(message) => Ok(message),
-            _ => Err(Error::Other("Unexpected message type".into())),
+        match &result.generations[0][0] {
+            GenerationType::ChatGeneration(chat_gen) => match &chat_gen.message {
+                BaseMessage::AI(ai) => Ok(ai.clone()),
+                other => Ok(AIMessage::builder().content(other.content()).build()),
+            },
+            _ => Err(Error::Other("Unexpected generation type".into())),
         }
     }
 
     /// Async invoke the model.
-    async fn ainvoke(&self, input: LanguageModelInput) -> Result<AIMessage> {
+    ///
+    /// Routes through `agenerate()` to ensure the full callback pipeline
+    /// (on_chat_model_start, on_llm_end, on_llm_error) is triggered.
+    async fn ainvoke(
+        &self,
+        input: LanguageModelInput,
+        config: Option<&RunnableConfig>,
+    ) -> Result<AIMessage> {
         let messages = self.convert_input(input)?;
-        let result = self._agenerate_with_cache(messages, None, None).await?;
 
-        if result.generations.is_empty() {
+        let (callbacks, tags, metadata, run_name, run_id) = if let Some(cfg) = config {
+            (
+                cfg.callbacks.clone(),
+                Some(cfg.tags.clone()).filter(|t| !t.is_empty()),
+                Some(cfg.metadata.clone()).filter(|m| !m.is_empty()),
+                cfg.run_name.clone(),
+                cfg.run_id,
+            )
+        } else {
+            (None, None, None, None, None)
+        };
+
+        let result = self
+            .agenerate(
+                vec![messages],
+                None,
+                callbacks,
+                tags,
+                metadata,
+                run_name,
+                run_id,
+            )
+            .await?;
+
+        if result.generations.is_empty() || result.generations[0].is_empty() {
             return Err(Error::Other("No generations returned".into()));
         }
 
-        match result.generations[0].message.clone() {
-            BaseMessage::AI(message) => Ok(message),
-            _ => Err(Error::Other("Unexpected message type".into())),
+        match &result.generations[0][0] {
+            GenerationType::ChatGeneration(chat_gen) => match &chat_gen.message {
+                BaseMessage::AI(ai) => Ok(ai.clone()),
+                other => Ok(AIMessage::builder().content(other.content()).build()),
+            },
+            _ => Err(Error::Other("Unexpected generation type".into())),
         }
     }
 
     /// Bind tools to the model.
     ///
-    /// This method returns a Runnable that can call tools. The default
-    /// implementation raises NotImplementedError.
-    ///
-    /// # Arguments
-    ///
-    /// * `tools` - Sequence of tools to bind to the model.
-    /// * `tool_choice` - Optional tool choice configuration.
-    ///
-    /// # Returns
-    ///
-    /// A Result with error indicating tools are not supported.
-    ///
-    /// # Note
-    ///
-    /// Provider implementations should override this method to return a configured model.
+    /// Returns a model with the given tools bound. Provider implementations
+    /// should override this method to return a configured model clone.
     fn bind_tools(
         &self,
         _tools: &[Arc<dyn BaseTool>],
         _tool_choice: Option<ToolChoice>,
-    ) -> Result<()> {
+    ) -> Result<Box<dyn BaseChatModel>> {
         Err(Error::NotImplemented(
             "bind_tools is not implemented for this model".into(),
         ))
@@ -1197,17 +1253,13 @@ pub trait BaseChatModel: BaseLanguageModel {
     /// This is the main streaming API. It yields `AIMessageChunk`s.
     /// Providers should override `_stream` for native streaming support.
     ///
-    /// # Arguments
-    ///
-    /// * `input` - The input to the model (string, messages, or PromptValue).
-    /// * `stop` - Optional stop sequences.
-    ///
-    /// # Returns
-    ///
-    /// A stream of `AIMessageChunk`s.
+    /// Sets up the full callback pipeline: on_chat_model_start before
+    /// streaming, on_llm_new_token for each chunk, on_llm_end at
+    /// completion, and on_llm_error on failure.
     async fn stream(
         &self,
         input: LanguageModelInput,
+        config: Option<&RunnableConfig>,
         stop: Option<Vec<String>>,
     ) -> Result<AIMessageChunkStream> {
         let messages = self.convert_input(input)?;
@@ -1215,52 +1267,114 @@ pub trait BaseChatModel: BaseLanguageModel {
 
         // Check if streaming should be used
         if !self._should_stream(false, has_tools, Some(true), None) {
-            // Model doesn't implement streaming or streaming is disabled,
-            // fall back to invoke and yield the result as a single chunk
+            // Fall back to invoke
             let result = self._generate(messages, stop, None).await?;
             let message = self.get_first_message(&result)?;
             let chunk = AIMessageChunk::builder().content(message.content()).build();
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
-        // Acquire rate limiter if configured (blocking until token available)
+        // Extract config fields
+        let (callbacks, tags, metadata, _run_name, run_id) = if let Some(cfg) = config {
+            (
+                cfg.callbacks.clone(),
+                Some(cfg.tags.clone()).filter(|t| !t.is_empty()),
+                Some(cfg.metadata.clone()).filter(|m| !m.is_empty()),
+                cfg.run_name.clone(),
+                cfg.run_id,
+            )
+        } else {
+            (None, None, None, None, None)
+        };
+
+        // Build inheritable metadata with LangSmith params
+        let mut inheritable_metadata = metadata.unwrap_or_default();
+        let ls_params = self.get_chat_ls_params(stop.as_deref());
+        if let Some(provider) = ls_params.ls_provider {
+            inheritable_metadata.insert("ls_provider".to_string(), Value::String(provider));
+        }
+        if let Some(model_name) = ls_params.ls_model_name {
+            inheritable_metadata.insert("ls_model_name".to_string(), Value::String(model_name));
+        }
+        if let Some(model_type) = ls_params.ls_model_type {
+            inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
+        }
+
+        // Configure callback manager
+        let params = self._get_invocation_params(stop.as_deref(), None);
+        let callback_manager = crate::callbacks::CallbackManager::configure(
+            callbacks,
+            self.callbacks().cloned(),
+            tags,
+            self.config().tags.clone(),
+            Some(inheritable_metadata),
+            self.config().metadata.clone(),
+        );
+        let run_managers =
+            callback_manager.on_chat_model_start(&params, &[messages.clone()], run_id);
+        let run_manager = run_managers.into_iter().next();
+
+        // Acquire rate limiter if configured
         if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
             rate_limiter.acquire(true);
         }
 
-        // Use the _stream method and convert ChatGenerationChunk to AIMessageChunk
-        let generation_stream = self._stream(messages, stop, None)?;
+        // Use the _stream method with callback run_manager
+        let generation_stream = self._stream(messages, stop, run_manager.as_ref())?;
 
-        // Transform the stream to yield AIMessageChunk instead of ChatGenerationChunk
         let chunk_stream = async_stream::stream! {
             use futures::StreamExt;
 
             let mut pinned_stream = generation_stream;
+            let mut chunks: Vec<ChatGenerationChunk> = Vec::new();
             let mut yielded = false;
 
             while let Some(result) = pinned_stream.next().await {
                 match result {
                     Ok(generation_chunk) => {
-                        // Extract AIMessageChunk from the generation chunk
-                        let ai_chunk = match generation_chunk.message {
+                        let ai_chunk = match &generation_chunk.message {
                             BaseMessage::AI(ai_msg) => AIMessageChunk::builder().content(ai_msg.content()).build(),
                             other => AIMessageChunk::builder().content(other.content()).build(),
                         };
+
+                        // Fire on_llm_new_token callback
+                        if let Some(ref rm) = run_manager {
+                            rm.on_llm_new_token(&ai_chunk.content, None);
+                        }
+
+                        chunks.push(generation_chunk);
                         yielded = true;
                         yield Ok(ai_chunk);
                     }
                     Err(e) => {
+                        if let Some(ref rm) = run_manager {
+                            rm.on_llm_error(&e);
+                        }
                         yield Err(e);
                         return;
                     }
                 }
             }
 
-            // Yield a final empty chunk with chunk_position="last" if we yielded anything
+            // Yield a final empty chunk with chunk_position="last"
             if yielded {
                 let mut final_chunk = AIMessageChunk::builder().content("").build();
                 final_chunk.set_chunk_position(Some(ChunkPosition::Last));
+
+                if let Some(ref rm) = run_manager {
+                    rm.on_llm_new_token("", None);
+                }
+
                 yield Ok(final_chunk);
+            }
+
+            // Fire on_llm_end with merged generation
+            if let Some(ref rm) = run_manager {
+                if let Some(merged) = crate::outputs::merge_chat_generation_chunks(chunks) {
+                    let chat_gen: ChatGeneration = merged.into();
+                    let chat_result = ChatResult::new(vec![chat_gen]);
+                    rm.on_llm_end(&chat_result);
+                }
             }
         };
 
@@ -1272,17 +1386,13 @@ pub trait BaseChatModel: BaseLanguageModel {
     /// This is the async version of `stream`. It yields `AIMessageChunk`s.
     /// Providers should override `_astream` for native async streaming support.
     ///
-    /// # Arguments
-    ///
-    /// * `input` - The input to the model (string, messages, or PromptValue).
-    /// * `stop` - Optional stop sequences.
-    ///
-    /// # Returns
-    ///
-    /// A stream of `AIMessageChunk`s.
+    /// Sets up the full async callback pipeline: on_chat_model_start before
+    /// streaming, on_llm_new_token for each chunk, on_llm_end at
+    /// completion, and on_llm_error on failure.
     async fn astream(
         &self,
         input: LanguageModelInput,
+        config: Option<&RunnableConfig>,
         stop: Option<Vec<String>>,
     ) -> Result<AIMessageChunkStream> {
         let messages = self.convert_input(input)?;
@@ -1297,44 +1407,108 @@ pub trait BaseChatModel: BaseLanguageModel {
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
-        // Acquire rate limiter if configured (blocking until token available)
+        // Extract config fields
+        let (callbacks, tags, metadata, _run_name, run_id) = if let Some(cfg) = config {
+            (
+                cfg.callbacks.clone(),
+                Some(cfg.tags.clone()).filter(|t| !t.is_empty()),
+                Some(cfg.metadata.clone()).filter(|m| !m.is_empty()),
+                cfg.run_name.clone(),
+                cfg.run_id,
+            )
+        } else {
+            (None, None, None, None, None)
+        };
+
+        // Build inheritable metadata with LangSmith params
+        let mut inheritable_metadata = metadata.unwrap_or_default();
+        let ls_params = self.get_chat_ls_params(stop.as_deref());
+        if let Some(provider) = ls_params.ls_provider {
+            inheritable_metadata.insert("ls_provider".to_string(), Value::String(provider));
+        }
+        if let Some(model_name) = ls_params.ls_model_name {
+            inheritable_metadata.insert("ls_model_name".to_string(), Value::String(model_name));
+        }
+        if let Some(model_type) = ls_params.ls_model_type {
+            inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
+        }
+
+        // Configure async callback manager
+        let params = self._get_invocation_params(stop.as_deref(), None);
+        let callback_manager = crate::callbacks::AsyncCallbackManager::configure(
+            callbacks,
+            self.callbacks().cloned(),
+            tags,
+            self.config().tags.clone(),
+            Some(inheritable_metadata),
+            self.config().metadata.clone(),
+        );
+        let run_managers = callback_manager
+            .on_chat_model_start(&params, &[messages.clone()], run_id)
+            .await;
+        let run_manager = run_managers.into_iter().next();
+
+        // Acquire rate limiter if configured
         if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
             rate_limiter.aacquire(true).await;
         }
 
-        // Use the _astream method
-        let generation_stream = self._astream(messages, stop, None).await?;
+        // Use the _astream method with callback run_manager
+        let generation_stream = self._astream(messages, stop, run_manager.as_ref()).await?;
 
-        // Transform the stream to yield AIMessageChunk instead of ChatGenerationChunk
         let chunk_stream = async_stream::stream! {
             use futures::StreamExt;
 
             let mut pinned_stream = generation_stream;
+            let mut chunks: Vec<ChatGenerationChunk> = Vec::new();
             let mut yielded = false;
 
             while let Some(result) = pinned_stream.next().await {
                 match result {
                     Ok(generation_chunk) => {
-                        // Extract AIMessageChunk from the generation chunk
-                        let ai_chunk = match generation_chunk.message {
+                        let ai_chunk = match &generation_chunk.message {
                             BaseMessage::AI(ai_msg) => AIMessageChunk::builder().content(ai_msg.content()).build(),
                             other => AIMessageChunk::builder().content(other.content()).build(),
                         };
+
+                        // Fire on_llm_new_token callback
+                        if let Some(ref rm) = run_manager {
+                            rm.on_llm_new_token(&ai_chunk.content, None).await;
+                        }
+
+                        chunks.push(generation_chunk);
                         yielded = true;
                         yield Ok(ai_chunk);
                     }
                     Err(e) => {
+                        if let Some(ref rm) = run_manager {
+                            rm.get_sync().on_llm_error(&e);
+                        }
                         yield Err(e);
                         return;
                     }
                 }
             }
 
-            // Yield a final empty chunk with chunk_position="last" if we yielded anything
+            // Yield a final empty chunk with chunk_position="last"
             if yielded {
                 let mut final_chunk = AIMessageChunk::builder().content("").build();
                 final_chunk.set_chunk_position(Some(ChunkPosition::Last));
+
+                if let Some(ref rm) = run_manager {
+                    rm.on_llm_new_token("", None).await;
+                }
+
                 yield Ok(final_chunk);
+            }
+
+            // Fire on_llm_end with merged generation
+            if let Some(ref rm) = run_manager {
+                if let Some(merged) = crate::outputs::merge_chat_generation_chunks(chunks) {
+                    let chat_gen: ChatGeneration = merged.into();
+                    let chat_result = ChatResult::new(vec![chat_gen]);
+                    rm.on_llm_end(&chat_result).await;
+                }
             }
         };
 
@@ -1401,23 +1575,14 @@ pub trait BaseChatModel: BaseLanguageModel {
 
     /// Create a wrapper that structures model output using a schema.
     ///
-    /// This method returns a Runnable that formats outputs to match the given schema.
-    /// The default implementation raises NotImplementedError.
-    ///
-    /// # Arguments
-    ///
-    /// * `schema` - The output schema (as a JSON value).
-    /// * `include_raw` - If true, include raw model response in output.
-    ///
-    /// # Returns
-    ///
-    /// A Result with error indicating structured output is not supported.
-    ///
-    /// # Note
-    ///
-    /// Provider implementations should override `bind_tools` first, as the default
-    /// implementation uses `bind_tools` internally.
-    fn with_structured_output(&self, _schema: Value, _include_raw: bool) -> Result<()> {
+    /// Returns a model configured to produce structured output matching the
+    /// given schema. Provider implementations should override `bind_tools`
+    /// first, as the default implementation uses `bind_tools` internally.
+    fn with_structured_output(
+        &self,
+        _schema: Value,
+        _include_raw: bool,
+    ) -> Result<Box<dyn BaseChatModel>> {
         Err(Error::NotImplemented(
             "with_structured_output is not implemented for this model".into(),
         ))
