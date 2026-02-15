@@ -5,6 +5,10 @@
 
 use std::fmt::Debug;
 
+use futures::stream::BoxStream;
+
+use crate::messages::BaseMessage;
+
 use serde_json::Value;
 
 use crate::error::{Error, Result};
@@ -13,7 +17,7 @@ use crate::utils::json::{parse_json_markdown, parse_partial_json};
 
 use super::base::{BaseOutputParser, OutputParserError};
 use super::format_instructions::JSON_FORMAT_INSTRUCTIONS;
-use super::transform::BaseCumulativeTransformOutputParser;
+use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
 
 /// Parse the output of an LLM call to a JSON object.
 ///
@@ -141,20 +145,42 @@ impl BaseOutputParser for JsonOutputParser {
     }
 }
 
+impl BaseTransformOutputParser for JsonOutputParser {
+    fn transform<'a>(
+        &'a self,
+        input: BoxStream<'a, BaseMessage>,
+    ) -> BoxStream<'a, Result<Self::Output>>
+    where
+        Self::Output: 'a,
+    {
+        self.cumulative_transform(input, None)
+    }
+
+    fn atransform<'a>(
+        &'a self,
+        input: BoxStream<'a, BaseMessage>,
+    ) -> BoxStream<'a, Result<Self::Output>>
+    where
+        Self::Output: 'a,
+    {
+        self.cumulative_transform(input, None)
+    }
+}
+
 impl BaseCumulativeTransformOutputParser for JsonOutputParser {
     fn diff_mode(&self) -> bool {
         self.diff
     }
 
-    fn compute_diff(&self, prev: Option<&Value>, next: Value) -> Value {
-        match prev {
+    fn compute_diff(&self, prev: Option<&Value>, next: Value) -> Result<Value> {
+        Ok(match prev {
             Some(prev_value) => compute_json_diff(prev_value, &next),
             None => Value::Array(vec![serde_json::json!({
                 "op": "replace",
                 "path": "",
                 "value": next,
             })]),
-        }
+        })
     }
 }
 

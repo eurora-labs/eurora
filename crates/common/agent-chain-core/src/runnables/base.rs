@@ -798,7 +798,7 @@ where
 
         match result {
             Ok(output) => {
-                run_manager.on_chain_end(&HashMap::new()).await;
+                run_manager.get_sync().on_chain_end(&HashMap::new());
                 Ok(output)
             }
             Err(e) => {
@@ -872,10 +872,7 @@ where
     type Output = R2::Output;
 
     fn name(&self) -> Option<String> {
-        self.name
-            .clone()
-            .or_else(|| self.first.name())
-            .or_else(|| self.last.name())
+        self.name.clone()
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
@@ -933,12 +930,55 @@ where
         Self: 'static,
     {
         let config = ensure_config(config);
+        let async_callback_manager = get_async_callback_manager_for_config(&config);
+        let run_manager = async_callback_manager
+            .on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id)
+            .await;
 
         // Invoke first step
-        let intermediate = self.first.ainvoke(input, Some(config.clone())).await?;
+        let first_config = patch_config(
+            Some(config.clone()),
+            Some(
+                run_manager
+                    .get_child(Some("seq:step:1"))
+                    .to_callback_manager(),
+            ),
+            None,
+            None,
+            None,
+            None,
+        );
+        let intermediate = match self.first.ainvoke(input, Some(first_config)).await {
+            Ok(output) => output,
+            Err(e) => {
+                run_manager.get_sync().on_chain_error(&e);
+                return Err(e);
+            }
+        };
 
         // Invoke second step
-        self.last.ainvoke(intermediate, Some(config)).await
+        let last_config = patch_config(
+            Some(config),
+            Some(
+                run_manager
+                    .get_child(Some("seq:step:2"))
+                    .to_callback_manager(),
+            ),
+            None,
+            None,
+            None,
+            None,
+        );
+        let result = match self.last.ainvoke(intermediate, Some(last_config)).await {
+            Ok(output) => output,
+            Err(e) => {
+                run_manager.get_sync().on_chain_error(&e);
+                return Err(e);
+            }
+        };
+
+        run_manager.get_sync().on_chain_end(&HashMap::new());
+        Ok(result)
     }
 
     fn stream(
@@ -1059,14 +1099,31 @@ where
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         let config = ensure_config(config);
+
+        let step_entries: Vec<_> = self.steps.iter().collect();
         let mut results = HashMap::new();
 
-        for (key, step) in &self.steps {
-            let result = step.invoke(input.clone(), Some(config.clone()))?;
-            results.insert(key.clone(), result);
-        }
+        std::thread::scope(|scope| {
+            let handles: Vec<_> = step_entries
+                .iter()
+                .map(|(key, step)| {
+                    let input = input.clone();
+                    let config = config.clone();
+                    let key = (*key).clone();
+                    scope.spawn(move || {
+                        let result = step.invoke(input, Some(config));
+                        (key, result)
+                    })
+                })
+                .collect();
 
-        Ok(results)
+            for handle in handles {
+                let (key, result) = handle.join().expect("thread should not panic");
+                results.insert(key, result?);
+            }
+
+            Ok(results)
+        })
     }
 
     async fn ainvoke(
@@ -1078,14 +1135,27 @@ where
         Self: 'static,
     {
         let config = ensure_config(config);
+
+        let futures: Vec<_> = self
+            .steps
+            .iter()
+            .map(|(key, step)| {
+                let input = input.clone();
+                let config = config.clone();
+                let key = key.clone();
+                async move {
+                    let result = step.ainvoke(input, Some(config)).await;
+                    (key, result)
+                }
+            })
+            .collect();
+
+        let completed = futures::future::join_all(futures).await;
+
         let mut results = HashMap::new();
-
-        // In a real implementation, these would run concurrently
-        for (key, step) in &self.steps {
-            let result = step.ainvoke(input.clone(), Some(config.clone())).await?;
-            results.insert(key.clone(), result);
+        for (key, result) in completed {
+            results.insert(key, result?);
         }
-
         Ok(results)
     }
 }
@@ -1229,13 +1299,10 @@ where
 
     fn invoke(&self, inputs: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         let config = ensure_config(config);
-        let configs: Vec<_> = inputs.iter().map(|_| config.clone()).collect();
+        let configs =
+            super::config::ConfigOrList::List(inputs.iter().map(|_| config.clone()).collect());
 
-        let results: Vec<Result<R::Output>> = inputs
-            .into_iter()
-            .zip(configs)
-            .map(|(input, config)| self.bound.invoke(input, Some(config)))
-            .collect();
+        let results = self.bound.batch(inputs, Some(configs), false);
 
         // Collect results, returning error if any failed
         results.into_iter().collect()
@@ -1250,13 +1317,12 @@ where
         Self: 'static,
     {
         let config = ensure_config(config);
-        let mut results = Vec::with_capacity(inputs.len());
+        let configs =
+            super::config::ConfigOrList::List(inputs.iter().map(|_| config.clone()).collect());
 
-        for input in inputs {
-            results.push(self.bound.ainvoke(input, Some(config.clone())).await?);
-        }
+        let results = self.bound.abatch(inputs, Some(configs), false).await;
 
-        Ok(results)
+        results.into_iter().collect()
     }
 }
 

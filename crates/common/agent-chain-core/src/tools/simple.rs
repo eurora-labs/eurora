@@ -149,6 +149,26 @@ impl Tool {
         Self::new(name, Some(Arc::new(func)), description)
     }
 
+    /// Create a Tool from a function with additional options matching Python's
+    /// `Tool.from_function(func, name, description, return_direct, args_schema, coroutine, **kwargs)`.
+    pub fn from_function_full<F>(
+        func: F,
+        name: impl Into<String>,
+        description: impl Into<String>,
+        return_direct: bool,
+        args_schema: Option<ArgsSchema>,
+        coroutine: Option<AsyncToolFunc>,
+    ) -> Self
+    where
+        F: Fn(String) -> Result<String> + Send + Sync + 'static,
+    {
+        let mut tool = Self::new(name, Some(Arc::new(func)), description);
+        tool.return_direct = return_direct;
+        tool.args_schema = args_schema;
+        tool.coroutine = coroutine;
+        tool
+    }
+
     /// Create a Tool from a sync and async function pair.
     pub fn from_function_with_async<F, AF, Fut>(
         func: F,
@@ -319,141 +339,6 @@ impl BaseTool for Tool {
     }
 }
 
-/// Builder for creating Tool instances.
-pub struct ToolBuilder {
-    name: Option<String>,
-    description: Option<String>,
-    func: Option<ToolFunc>,
-    coroutine: Option<AsyncToolFunc>,
-    args_schema: Option<ArgsSchema>,
-    return_direct: bool,
-    response_format: ResponseFormat,
-    tags: Option<Vec<String>>,
-    metadata: Option<HashMap<String, Value>>,
-    extras: Option<HashMap<String, Value>>,
-}
-
-impl ToolBuilder {
-    /// Create a new ToolBuilder.
-    pub fn new() -> Self {
-        Self {
-            name: None,
-            description: None,
-            func: None,
-            coroutine: None,
-            args_schema: None,
-            return_direct: false,
-            response_format: ResponseFormat::Content,
-            tags: None,
-            metadata: None,
-            extras: None,
-        }
-    }
-
-    /// Set the name.
-    pub fn name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
-
-    /// Set the description.
-    pub fn description(mut self, description: impl Into<String>) -> Self {
-        self.description = Some(description.into());
-        self
-    }
-
-    /// Set the sync function.
-    pub fn func<F>(mut self, func: F) -> Self
-    where
-        F: Fn(String) -> Result<String> + Send + Sync + 'static,
-    {
-        self.func = Some(Arc::new(func));
-        self
-    }
-
-    /// Set the async function.
-    pub fn coroutine<AF, Fut>(mut self, coroutine: AF) -> Self
-    where
-        AF: Fn(String) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<String>> + Send + 'static,
-    {
-        self.coroutine = Some(Arc::new(move |input| Box::pin(coroutine(input))));
-        self
-    }
-
-    /// Set the args schema.
-    pub fn args_schema(mut self, schema: ArgsSchema) -> Self {
-        self.args_schema = Some(schema);
-        self
-    }
-
-    /// Set return_direct.
-    pub fn return_direct(mut self, return_direct: bool) -> Self {
-        self.return_direct = return_direct;
-        self
-    }
-
-    /// Set the response format.
-    pub fn response_format(mut self, format: ResponseFormat) -> Self {
-        self.response_format = format;
-        self
-    }
-
-    /// Set tags.
-    pub fn tags(mut self, tags: Vec<String>) -> Self {
-        self.tags = Some(tags);
-        self
-    }
-
-    /// Set metadata.
-    pub fn metadata(mut self, metadata: HashMap<String, Value>) -> Self {
-        self.metadata = Some(metadata);
-        self
-    }
-
-    /// Set extras.
-    pub fn extras(mut self, extras: HashMap<String, Value>) -> Self {
-        self.extras = Some(extras);
-        self
-    }
-
-    /// Build the Tool.
-    pub fn build(self) -> Result<Tool> {
-        let name = self
-            .name
-            .ok_or_else(|| Error::InvalidConfig("Tool name is required".to_string()))?;
-        let description = self.description.unwrap_or_default();
-
-        if self.func.is_none() && self.coroutine.is_none() {
-            return Err(Error::InvalidConfig(
-                "Function and/or coroutine must be provided".to_string(),
-            ));
-        }
-
-        Ok(Tool {
-            name,
-            description,
-            func: self.func,
-            coroutine: self.coroutine,
-            args_schema: self.args_schema,
-            return_direct: self.return_direct,
-            verbose: false,
-            handle_tool_error: HandleToolError::Bool(false),
-            handle_validation_error: HandleValidationError::Bool(false),
-            response_format: self.response_format,
-            tags: self.tags,
-            metadata: self.metadata,
-            extras: self.extras,
-        })
-    }
-}
-
-impl Default for ToolBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -511,20 +396,6 @@ mod tests {
 
         let args = tool.args();
         assert!(args.contains_key("tool_input"));
-    }
-
-    #[test]
-    fn test_tool_builder() {
-        let tool = ToolBuilder::new()
-            .name("test_tool")
-            .description("A test tool")
-            .func(Ok)
-            .return_direct(true)
-            .build()
-            .unwrap();
-
-        assert_eq!(tool.name(), "test_tool");
-        assert!(tool.return_direct());
     }
 
     #[tokio::test]

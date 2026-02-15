@@ -159,14 +159,14 @@ async fn test_fake_list_llm_acall_method() {
 /// Ported from `test_error_can_be_raised`.
 #[test]
 fn test_fake_list_llm_error_can_be_raised() {
-    let error = FakeListLLMError(42);
-    assert_eq!(format!("{}", error), "FakeListLLM error on chunk 42");
+    let error = FakeListLLMError;
+    assert_eq!(format!("{}", error), "FakeListLLM error");
 }
 
 /// Ported from `test_error_is_exception`.
 #[test]
 fn test_fake_list_llm_error_is_exception() {
-    let error = FakeListLLMError(0);
+    let error = FakeListLLMError;
     let _: &dyn std::error::Error = &error;
 }
 
@@ -288,7 +288,7 @@ async fn test_fake_streaming_invoke_returns_full_response() {
 #[test]
 fn test_fake_streaming_llm_type() {
     let llm = FakeStreamingListLLM::new(vec!["test".to_string()]);
-    assert_eq!(llm.llm_type(), "fake-streaming-list");
+    assert_eq!(llm.llm_type(), "fake-list");
 }
 
 /// Ported from `test_stream_empty_response`.
