@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::Result;
 use crate::documents::Document;
 use crate::embeddings::Embeddings;
-use crate::vectorstores::base::VectorStore;
+use crate::vectorstores::base::{VectorStore, VectorStoreFactory};
 use crate::vectorstores::utils::{cosine_similarity, maximal_marginal_relevance};
 
 /// Entry stored in the in-memory vector store.
@@ -289,6 +289,21 @@ impl VectorStore for InMemoryVectorStore {
             .into_iter()
             .map(|idx| prefetch_hits[idx].0.clone())
             .collect())
+    }
+}
+
+
+impl VectorStoreFactory for InMemoryVectorStore {
+    fn from_texts(
+        texts: &[&str],
+        embedding: Box<dyn Embeddings>,
+        metadatas: Option<Vec<HashMap<String, Value>>>,
+        ids: Option<Vec<String>>,
+    ) -> Result<Self> {
+        let store = Self::new(embedding);
+        let text_strings: Vec<String> = texts.iter().map(|t| t.to_string()).collect();
+        store.add_texts(text_strings, metadatas, ids)?;
+        Ok(store)
     }
 }
 

@@ -262,7 +262,8 @@ pub use embeddings::{DeterministicFakeEmbedding, Embeddings, FakeEmbeddings};
 
 // Re-export vector store types
 pub use vectorstores::{
-    InMemoryVectorStore, SearchType, VectorStore, VectorStoreRetrieverConfig, cosine_similarity,
+    InMemoryVectorStore, SearchType, VectorStore, VectorStoreFactory, VectorStoreRetriever,
+    VectorStoreRetrieverConfig, VectorStoreRetrieverExt, cosine_similarity,
     maximal_marginal_relevance,
 };
 
