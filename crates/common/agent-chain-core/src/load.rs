@@ -47,9 +47,7 @@ pub use serializable::{
 };
 
 // Re-export dump functions
-pub use dump::{
-    default_serializer, dumpd, dumpd_serialized, dumpd_value, dumps, dumps_serialized, dumps_value,
-};
+pub use dump::{dumpd, dumps};
 
 // Re-export load functions and types
 pub use loader::{
