@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use be_asset::AssetService;
-use be_auth_grpc::{Role, extract_claims, parse_user_id, require_role};
+use be_auth_grpc::{extract_claims, parse_user_id};
 use be_remote_db::{
     DatabaseManager, ListActivities, NewActivity, PaginationParams, UpdateActivity,
 };
@@ -122,7 +122,6 @@ impl ProtoActivityService for ActivityService {
         info!("InsertActivity request received");
 
         let claims = extract_claims(&request)?;
-        require_role(claims, Role::Tier1)?;
         let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();

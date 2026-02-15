@@ -1,0 +1,25 @@
+# Role hierarchy: Enterprise > Tier1 > Free
+g, Tier1, Free
+g, Enterprise, Tier1
+
+# Free: read-only / auth-only gRPC endpoints
+p, Free, ConversationService, ListConversations
+p, Free, ConversationService, GetConversation
+p, Free, ConversationService, GetMessages
+p, Free, ActivityService, ListActivities
+
+# Tier1: paid features
+p, Tier1, ConversationService, CreateConversation
+p, Tier1, ConversationService, AddHumanMessage
+p, Tier1, ConversationService, AddHiddenHumanMessage
+p, Tier1, ConversationService, AddSystemMessage
+p, Tier1, ConversationService, ChatStream
+p, Tier1, ConversationService, GenerateConversationTitle
+p, Tier1, ActivityService, InsertActivity
+p, Tier1, AssetService, CreateAsset
+
+# REST: payment endpoints (any authenticated user)
+p, Free, /payment/checkout, POST
+p, Free, /payment/portal, POST
+p, Free, /payment/subscription, GET
+p, Free, /payment/checkout-status, GET
