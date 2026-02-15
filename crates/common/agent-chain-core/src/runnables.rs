@@ -47,7 +47,8 @@ pub use graph::{
 pub use graph_mermaid::{generate_mermaid_graph_styles, to_safe_id};
 pub use graph_png::{PngDrawError, PngDrawer};
 pub use history::{
-    GetSessionHistoryFn, HistoryInvokeFn, HistoryRunnable, RunnableWithMessageHistory,
+    GetSessionHistoryFn, HistoryAInvokeFn, HistoryInvokeFn, HistoryRunnable,
+    RunnableWithMessageHistory,
 };
 pub use passthrough::{
     PickKeys, RunnableAssign, RunnableAssignBuilder, RunnablePassthrough, RunnablePick,
