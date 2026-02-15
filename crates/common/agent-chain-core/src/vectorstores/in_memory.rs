@@ -36,6 +36,23 @@ impl InMemoryVectorStore {
         }
     }
 
+    /// Get a snapshot of the current store keys (for testing/inspection).
+    pub fn store_keys(&self) -> Result<Vec<String>> {
+        let store = self.lock_read()?;
+        Ok(store.keys().cloned().collect())
+    }
+
+    /// Get the number of documents in the store.
+    pub fn len(&self) -> Result<usize> {
+        let store = self.lock_read()?;
+        Ok(store.len())
+    }
+
+    /// Check if the store is empty.
+    pub fn is_empty(&self) -> Result<bool> {
+        let store = self.lock_read()?;
+        Ok(store.is_empty())
+    }
     fn lock_read(&self) -> Result<std::sync::RwLockReadGuard<'_, HashMap<String, StoreEntry>>> {
         self.store
             .read()

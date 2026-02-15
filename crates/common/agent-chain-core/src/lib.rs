@@ -37,6 +37,7 @@ pub mod env;
 pub mod error;
 pub mod example_selectors;
 pub mod globals;
+pub mod indexing;
 pub mod language_models;
 pub mod load;
 pub mod messages;

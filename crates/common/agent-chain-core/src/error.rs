@@ -112,6 +112,10 @@ pub enum Error {
     ToolInvocation(String),
 
     /// Feature or method not implemented.
+    /// Exception raised when an indexing operation fails.
+    #[error("Indexing error: {0}")]
+    Indexing(String),
+
     #[error("Not implemented: {0}")]
     NotImplemented(String),
 
