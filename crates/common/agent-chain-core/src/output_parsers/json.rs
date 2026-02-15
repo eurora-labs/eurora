@@ -12,7 +12,7 @@ use crate::outputs::Generation;
 use crate::utils::json::{parse_json_markdown, parse_partial_json};
 
 use super::base::{BaseOutputParser, OutputParserError};
-use super::format_instructions::format_json_instructions;
+use super::format_instructions::JSON_FORMAT_INSTRUCTIONS;
 use super::transform::BaseCumulativeTransformOutputParser;
 
 /// Parse the output of an LLM call to a JSON object.
@@ -130,7 +130,7 @@ impl BaseOutputParser for JsonOutputParser {
                 let schema_str =
                     serde_json::to_string(&schema_copy).unwrap_or_else(|_| "{}".to_string());
 
-                Ok(format_json_instructions(&schema_str))
+                Ok(JSON_FORMAT_INSTRUCTIONS.replace("{schema}", &schema_str))
             }
             None => Ok("Return a JSON object.".to_string()),
         }

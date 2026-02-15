@@ -10,7 +10,7 @@ use serde_json::{Map, Value};
 
 use crate::messages::{AIMessage, BaseMessage, HumanMessage, ToolMessage};
 use crate::tools::BaseTool;
-use crate::utils::json_schema::{dereference_refs, remove_titles};
+use crate::utils::json_schema::dereference_refs;
 use crate::utils::uuid::uuid7;
 
 /// Representation of a callable function to send to an LLM.
@@ -101,6 +101,38 @@ fn recursive_set_additional_properties_false(schema: &mut Value) {
         if let Some(items) = map.get_mut("items") {
             recursive_set_additional_properties_false(items);
         }
+    }
+}
+
+/// Recursively removes "title" fields from a JSON schema dictionary.
+///
+/// Remove "title" fields from the input JSON schema dictionary,
+/// except when a "title" appears within a property definition under "properties".
+pub fn remove_titles(schema: &Value) -> Value {
+    remove_titles_helper(schema, "")
+}
+
+fn remove_titles_helper(kv: &Value, prev_key: &str) -> Value {
+    match kv {
+        Value::Object(map) => {
+            let mut new_map = Map::new();
+            for (k, v) in map {
+                if k == "title" {
+                    if v.is_object() && prev_key == "properties" {
+                        new_map.insert(k.clone(), remove_titles_helper(v, k));
+                    }
+                } else {
+                    new_map.insert(k.clone(), remove_titles_helper(v, k));
+                }
+            }
+            Value::Object(new_map)
+        }
+        Value::Array(arr) => Value::Array(
+            arr.iter()
+                .map(|item| remove_titles_helper(item, prev_key))
+                .collect(),
+        ),
+        _ => kv.clone(),
     }
 }
 

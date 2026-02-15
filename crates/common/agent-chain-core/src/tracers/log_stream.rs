@@ -412,7 +412,7 @@ impl LogStreamCallbackHandler {
     ///
     /// `true` if the patches were sent successfully, `false` otherwise.
     pub fn send(&self, ops: Vec<JsonPatchOp>) -> bool {
-        self.send_stream.send_nowait(RunLogPatch::new(ops)).is_ok()
+        self.send_stream.send(RunLogPatch::new(ops)).is_ok()
     }
 
     /// Check if a Run should be included in the log.
@@ -688,7 +688,7 @@ impl<T: Send + 'static> StreamingCallbackHandler<T> for LogStreamCallbackHandler
                     // Note: We can't easily serialize generic T here
                     // This would need a more sophisticated implementation
                     // for real-world use with proper chunk serialization
-                    let _ = sender.send_nowait(RunLogPatch::new(vec![JsonPatchOp::add(
+                    let _ = sender.send(RunLogPatch::new(vec![JsonPatchOp::add(
                         format!("/logs/{}/streamed_output/-", k),
                         Value::Null, // Placeholder - real implementation would serialize the chunk
                     )]));
@@ -738,7 +738,7 @@ impl<T> Iterator for TappedIterator<T> {
         {
             let _ = self
                 .send_stream
-                .send_nowait(RunLogPatch::new(vec![JsonPatchOp::add(
+                .send(RunLogPatch::new(vec![JsonPatchOp::add(
                     format!("/logs/{}/streamed_output/-", k),
                     Value::Null, // Placeholder
                 )]));

@@ -9,6 +9,7 @@ pub mod config;
 pub mod configurable;
 pub mod fallbacks;
 pub mod graph;
+pub mod graph_ascii;
 pub mod graph_mermaid;
 pub mod graph_png;
 pub mod history;

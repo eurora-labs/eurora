@@ -94,10 +94,7 @@ pub use context::{
 };
 
 // Re-export memory stream types
-pub use memory_stream::{
-    BoundedMemoryStream, BoundedReceiveStream, BoundedSendStream, MemoryStream, ReceiveStream,
-    SendStream,
-};
+pub use memory_stream::{MemoryStream, ReceiveStream, SendStream};
 
 // Re-export log stream types
 pub use log_stream::{

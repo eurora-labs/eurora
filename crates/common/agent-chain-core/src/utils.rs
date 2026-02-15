@@ -38,11 +38,8 @@ pub use formatting::{FORMATTER, StrictFormatter, format_string};
 pub use input::{get_bolded_text, get_color_mapping, get_colored_text, print_text};
 pub use iter::{batch_iterate, tee};
 pub use json::{parse_and_check_json_markdown, parse_json_markdown, parse_partial_json};
-pub use json_schema::{dereference_refs, remove_titles};
+pub use json_schema::dereference_refs;
 pub use merge::{merge_dicts, merge_lists, merge_obj};
 pub use mustache::{MustacheValue, render as render_mustache};
 pub use strings::{comma_list, sanitize_for_postgres, stringify_dict, stringify_value};
-pub use usage::{
-    UsageValue, dict_int_add, dict_int_add_json, dict_int_op, dict_int_op_json, dict_int_sub,
-    dict_int_sub_floor_json,
-};
+pub use usage::{UsageError, dict_int_op};

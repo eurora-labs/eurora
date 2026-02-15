@@ -17,7 +17,7 @@ use super::tool::{
 use crate::utils::base::{LC_AUTO_PREFIX, LC_ID_PREFIX};
 use crate::utils::json::parse_partial_json;
 use crate::utils::merge::{merge_dicts, merge_lists};
-use crate::utils::usage::{dict_int_add_json, dict_int_sub_floor_json};
+use crate::utils::usage::dict_int_op;
 
 /// Breakdown of input token counts.
 ///
@@ -1469,7 +1469,7 @@ pub fn add_usage(left: Option<&UsageMetadata>, right: Option<&UsageMetadata>) ->
             let left_json = serde_json::to_value(l).unwrap_or_default();
             let right_json = serde_json::to_value(r).unwrap_or_default();
 
-            match dict_int_add_json(&left_json, &right_json) {
+            match dict_int_op(&left_json, &right_json, |a, b| a + b, 0, 100) {
                 Ok(merged) => serde_json::from_value(merged).unwrap_or_else(|_| l.add(r)),
                 Err(_) => l.add(r),
             }
@@ -1523,7 +1523,7 @@ pub fn subtract_usage(
             let left_json = serde_json::to_value(l).unwrap_or_default();
             let right_json = serde_json::to_value(r).unwrap_or_default();
 
-            match dict_int_sub_floor_json(&left_json, &right_json) {
+            match dict_int_op(&left_json, &right_json, |a, b| (a - b).max(0), 0, 100) {
                 Ok(subtracted) => {
                     serde_json::from_value(subtracted).unwrap_or_else(|_| subtract_manual(l, r))
                 }

@@ -72,21 +72,6 @@ pub fn stringify_dict(data: &std::collections::HashMap<String, String>) -> Strin
         .collect()
 }
 
-/// Stringify a JSON object.
-///
-/// # Arguments
-///
-/// * `data` - The JSON object to stringify.
-///
-/// # Returns
-///
-/// The stringified dictionary.
-pub fn stringify_json_dict(data: &serde_json::Map<String, Value>) -> String {
-    data.iter()
-        .map(|(k, v)| format!("{}: {}\n", k, stringify_value(v)))
-        .collect()
-}
-
 /// Convert a list to a comma-separated string.
 ///
 /// # Arguments
@@ -107,23 +92,6 @@ pub fn stringify_json_dict(data: &serde_json::Map<String, Value>) -> String {
 /// ```
 pub fn comma_list(items: &[String]) -> String {
     items.join(", ")
-}
-
-/// Convert items that implement Display to a comma-separated string.
-///
-/// # Arguments
-///
-/// * `items` - The items to convert.
-///
-/// # Returns
-///
-/// The comma-separated string.
-pub fn comma_list_display<T: std::fmt::Display>(items: &[T]) -> String {
-    items
-        .iter()
-        .map(|item| item.to_string())
-        .collect::<Vec<_>>()
-        .join(", ")
 }
 
 /// Sanitize text by removing NUL bytes that are incompatible with PostgreSQL.
@@ -151,75 +119,6 @@ pub fn comma_list_display<T: std::fmt::Display>(items: &[T]) -> String {
 /// ```
 pub fn sanitize_for_postgres(text: &str, replacement: &str) -> String {
     text.replace('\x00', replacement)
-}
-
-/// Truncate a string to a maximum length.
-///
-/// # Arguments
-///
-/// * `text` - The text to truncate.
-/// * `max_length` - The maximum length.
-/// * `suffix` - The suffix to append if truncated (default: "...").
-///
-/// # Returns
-///
-/// The truncated string.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::utils::strings::truncate;
-///
-/// assert_eq!(truncate("Hello, World!", 10, None), "Hello, ...");
-/// assert_eq!(truncate("Hello", 10, None), "Hello");
-/// ```
-pub fn truncate(text: &str, max_length: usize, suffix: Option<&str>) -> String {
-    let suffix = suffix.unwrap_or("...");
-    let text_char_count = text.chars().count();
-    let suffix_char_count = suffix.chars().count();
-
-    if text_char_count <= max_length {
-        text.to_string()
-    } else if max_length <= suffix_char_count {
-        suffix.chars().take(max_length).collect()
-    } else {
-        let truncate_at = max_length - suffix_char_count;
-        let truncated: String = text.chars().take(truncate_at).collect();
-        format!("{}{}", truncated, suffix)
-    }
-}
-
-/// Remove leading and trailing whitespace from each line.
-///
-/// # Arguments
-///
-/// * `text` - The text to process.
-///
-/// # Returns
-///
-/// The text with each line trimmed.
-pub fn strip_lines(text: &str) -> String {
-    text.lines()
-        .map(|line| line.trim())
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-/// Indent each line of text.
-///
-/// # Arguments
-///
-/// * `text` - The text to indent.
-/// * `indent` - The indentation string.
-///
-/// # Returns
-///
-/// The indented text.
-pub fn indent(text: &str, indent_str: &str) -> String {
-    text.lines()
-        .map(|line| format!("{}{}", indent_str, line))
-        .collect::<Vec<_>>()
-        .join("\n")
 }
 
 #[cfg(test)]
@@ -277,22 +176,5 @@ mod tests {
         assert_eq!(sanitize_for_postgres("Hello\x00world", ""), "Helloworld");
         assert_eq!(sanitize_for_postgres("Hello\x00world", " "), "Hello world");
         assert_eq!(sanitize_for_postgres("No nulls here", ""), "No nulls here");
-    }
-
-    #[test]
-    fn test_truncate() {
-        assert_eq!(truncate("Hello, World!", 10, None), "Hello, ...");
-        assert_eq!(truncate("Hello", 10, None), "Hello");
-        assert_eq!(truncate("Hello, World!", 8, Some("…")), "Hello, …");
-    }
-
-    #[test]
-    fn test_strip_lines() {
-        assert_eq!(strip_lines("  a  \n  b  \n  c  "), "a\nb\nc");
-    }
-
-    #[test]
-    fn test_indent() {
-        assert_eq!(indent("a\nb\nc", "  "), "  a\n  b\n  c");
     }
 }

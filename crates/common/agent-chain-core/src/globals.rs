@@ -4,7 +4,29 @@ use std::sync::{Arc, RwLock};
 
 use crate::caches::BaseCache;
 
+static VERBOSE: RwLock<bool> = RwLock::new(false);
+static DEBUG: RwLock<bool> = RwLock::new(false);
 static LLM_CACHE: RwLock<Option<Arc<dyn BaseCache>>> = RwLock::new(None);
+
+pub fn set_verbose(value: bool) {
+    let mut verbose = VERBOSE.write().expect("lock poisoned");
+    *verbose = value;
+}
+
+pub fn get_verbose() -> bool {
+    let verbose = VERBOSE.read().expect("lock poisoned");
+    *verbose
+}
+
+pub fn set_debug(value: bool) {
+    let mut debug = DEBUG.write().expect("lock poisoned");
+    *debug = value;
+}
+
+pub fn get_debug() -> bool {
+    let debug = DEBUG.read().expect("lock poisoned");
+    *debug
+}
 
 /// Set a new LLM cache, overwriting the previous value, if any.
 ///
@@ -30,6 +52,34 @@ pub fn get_llm_cache() -> Option<Arc<dyn BaseCache>> {
 mod tests {
     use super::*;
     use crate::caches::InMemoryCache;
+
+    #[test]
+    fn test_verbose_default() {
+        set_verbose(false);
+        assert!(!get_verbose());
+    }
+
+    #[test]
+    fn test_set_and_get_verbose() {
+        set_verbose(true);
+        assert!(get_verbose());
+        set_verbose(false);
+        assert!(!get_verbose());
+    }
+
+    #[test]
+    fn test_debug_default() {
+        set_debug(false);
+        assert!(!get_debug());
+    }
+
+    #[test]
+    fn test_set_and_get_debug() {
+        set_debug(true);
+        assert!(get_debug());
+        set_debug(false);
+        assert!(!get_debug());
+    }
 
     #[test]
     fn test_llm_cache_default() {

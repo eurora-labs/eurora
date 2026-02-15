@@ -261,6 +261,7 @@ dependencies = [
  "rand 0.9.2",
  "regex",
  "reqwest 0.12.28",
+ "rust-sugiyama",
  "rustc_version_runtime",
  "serde",
  "serde_json",
@@ -7640,6 +7641,7 @@ dependencies = [
  "fixedbitset 0.5.7",
  "hashbrown 0.15.5",
  "indexmap 2.13.0",
+ "serde",
 ]
 
 [[package]]
@@ -9018,6 +9020,16 @@ checksum = "796e8d2b6696392a43bea58116b667fb4c29727dc5abd27d6acf338bb4f688c7"
 dependencies = [
  "cfg-if",
  "ordered-multimap",
+]
+
+[[package]]
+name = "rust-sugiyama"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a81a3e22e7b3e9218ae4d1a3640a7e7ad142e120acd03e5e66d231d5861598b1"
+dependencies = [
+ "log",
+ "petgraph 0.8.3",
 ]
 
 [[package]]
