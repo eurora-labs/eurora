@@ -29,6 +29,7 @@ pub mod callbacks;
 pub mod chat_history;
 pub mod chat_loaders;
 pub mod chat_sessions;
+pub mod document_loaders;
 pub mod documents;
 pub mod env;
 pub mod error;
@@ -205,6 +206,11 @@ pub use tracers::{
 
 // Re-export rate limiter types
 pub use rate_limiters::{BaseRateLimiter, InMemoryRateLimiter, InMemoryRateLimiterConfig};
+
+// Re-export document loader types
+pub use document_loaders::{
+    BaseBlobParser, BaseLoader as BaseDocumentLoader, BlobLoader, PathLike,
+};
 
 // Re-export document types
 pub use documents::{

@@ -4,6 +4,7 @@
 //!
 //! This module provides various utilities ported from `langchain_core/utils/`.
 
+pub mod aiter;
 pub mod base;
 pub mod env;
 pub mod formatting;
@@ -34,6 +35,7 @@ pub use base::{
 };
 
 // Re-export from other modules
+pub use aiter::{ABatchIterator, AClosing, TeePeer, abatch_iterate, atee};
 pub use formatting::{FORMATTER, StrictFormatter, format_string};
 pub use input::{get_bolded_text, get_color_mapping, get_colored_text, print_text};
 pub use iter::{batch_iterate, tee};
