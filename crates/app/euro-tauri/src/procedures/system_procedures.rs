@@ -236,7 +236,7 @@ impl SystemApi for SystemApiImpl {
 
         if let Some(ref outer) = outer_app {
             // Point the updater at a path inside the outer bundle so it
-            // resolves Eurora.app (not Eurora.app) as the bundle
+            // resolves EuroraMacOS.app (not Eurora.app) as the bundle
             // to replace.
             let exe_inside_outer = outer.join("Contents").join("MacOS").join("Eurora");
             debug!(
