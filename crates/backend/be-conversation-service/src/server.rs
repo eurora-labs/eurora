@@ -574,6 +574,13 @@ impl ProtoConversationService for ConversationService {
         };
         let title_words: Vec<&str> = title.split_whitespace().collect();
         let title = title_words[..title_words.len().min(6)].join(" ");
+        let title = match title.is_empty() {
+            true => {
+                tracing::warn!("Failed to generate title");
+                "New Chat".to_string()
+            }
+            false => title,
+        };
 
         let conversation = self
             .db
