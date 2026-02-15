@@ -319,7 +319,7 @@ fn main() {
                     // In release builds:
                     //   • macOS — the Swift launcher (Eurora.app) registers
                     //     itself as a login item via SMAppService.  The
-                    //     embedded EuroraDesktop.app must not create its own
+                    //     embedded Eurora.app must not create its own
                     //     launch agent (unstable path, bypasses Safari bridge).
                     //   • Windows / Linux — the Tauri app is the top-level
                     //     binary so it registers itself directly.

@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 /// Walk up from the current executable and return the outermost `.app` bundle.
 ///
 /// When the Tauri binary lives at
-///   `Eurora.app/Contents/Resources/EuroraDesktop.app/Contents/MacOS/eurora`
+///   `Eurora.app/Contents/Resources/Eurora.app/Contents/MacOS/eurora`
 /// this returns `Some("/Applications/Eurora.app")`.
 ///
 /// If there is only a single `.app` in the path (i.e. no wrapper), returns `None`
@@ -224,7 +224,7 @@ impl SystemApi for SystemApiImpl {
         debug!("Installing update...");
 
         // On macOS, when running inside a nested bundle (Eurora.app wraps
-        // EuroraDesktop.app), we must tell the updater to target the
+        // Eurora.app), we must tell the updater to target the
         // *outermost* .app so it replaces the whole bundle — keeping the
         // Safari extension and its code signature intact.
         #[cfg(target_os = "macos")]
@@ -236,7 +236,7 @@ impl SystemApi for SystemApiImpl {
 
         if let Some(ref outer) = outer_app {
             // Point the updater at a path inside the outer bundle so it
-            // resolves Eurora.app (not EuroraDesktop.app) as the bundle
+            // resolves Eurora.app (not Eurora.app) as the bundle
             // to replace.
             let exe_inside_outer = outer.join("Contents").join("MacOS").join("Eurora");
             debug!(
