@@ -429,7 +429,11 @@ fn test_callback_manager_on_retriever_start() {
     let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
-    let run_manager = manager.on_retriever_start(&HashMap::new(), "search query", None);
+    let run_manager = manager
+        .on_retriever_start()
+        .serialized(&HashMap::new())
+        .query("search query")
+        .call();
 
     assert!(!run_manager.run_id().is_nil());
 }

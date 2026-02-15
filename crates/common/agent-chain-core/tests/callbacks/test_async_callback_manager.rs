@@ -385,7 +385,10 @@ async fn test_async_callback_manager_retriever_callbacks() {
     manager.add_handler(handler, true);
 
     let run_manager = manager
-        .on_retriever_start(&HashMap::new(), "test query", None)
+        .on_retriever_start()
+        .serialized(&HashMap::new())
+        .query("test query")
+        .call()
         .await;
 
     assert!(!run_manager.run_id().is_nil());
@@ -400,7 +403,10 @@ async fn test_async_callback_manager_retriever_error() {
     manager.add_handler(handler, true);
 
     let run_manager = manager
-        .on_retriever_start(&HashMap::new(), "test query", None)
+        .on_retriever_start()
+        .serialized(&HashMap::new())
+        .query("test query")
+        .call()
         .await;
 
     let error = std::io::Error::other("test error");

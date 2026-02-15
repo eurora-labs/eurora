@@ -53,7 +53,6 @@ mod xml;
 // Re-export base types
 pub use base::{
     BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser, OutputParserError,
-    chat_generation_to_value, generation_to_value,
 };
 
 // Re-export format instructions
