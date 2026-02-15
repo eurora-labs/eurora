@@ -199,8 +199,17 @@ pub trait CallbackManagerMixin {
         parent_run_id: Option<Uuid>,
         tags: Option<&[String]>,
         metadata: Option<&HashMap<String, serde_json::Value>>,
+        name: Option<&str>,
     ) {
-        let _ = (serialized, query, run_id, parent_run_id, tags, metadata);
+        let _ = (
+            serialized,
+            query,
+            run_id,
+            parent_run_id,
+            tags,
+            metadata,
+            name,
+        );
     }
 
     /// Run when a chain starts running.
@@ -557,8 +566,17 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         parent_run_id: Option<Uuid>,
         tags: Option<&[String]>,
         metadata: Option<&HashMap<String, serde_json::Value>>,
+        name: Option<&str>,
     ) {
-        let _ = (serialized, query, run_id, parent_run_id, tags, metadata);
+        let _ = (
+            serialized,
+            query,
+            run_id,
+            parent_run_id,
+            tags,
+            metadata,
+            name,
+        );
     }
 
     /// Run on the retriever end (async).

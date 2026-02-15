@@ -222,14 +222,11 @@ pub use document_loaders::{
 // Re-export document types
 pub use documents::{
     BaseDocumentCompressor, BaseDocumentTransformer, BaseMedia, Blob, BlobBuilder, BlobData,
-    Document, FilterTransformer, FunctionTransformer,
+    Document,
 };
 
 // Re-export retriever types
-pub use retrievers::{
-    BaseRetriever, DynRetriever, FilterRetriever, LangSmithRetrieverParams, RetrieverInput,
-    RetrieverOutput, SimpleRetriever,
-};
+pub use retrievers::{BaseRetriever, LangSmithRetrieverParams, RetrieverInput, RetrieverOutput};
 
 // Re-export store types
 pub use stores::{

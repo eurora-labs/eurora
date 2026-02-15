@@ -8,6 +8,7 @@ use std::future::Future;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
 
+use bon::bon;
 use uuid::Uuid;
 
 use crate::messages::BaseMessage;
@@ -1260,42 +1261,6 @@ impl CallbackManager {
         )
     }
 
-    /// Run when retriever starts running.
-    pub fn on_retriever_start(
-        &self,
-        serialized: &HashMap<String, serde_json::Value>,
-        query: &str,
-        run_id: Option<Uuid>,
-    ) -> CallbackManagerForRetrieverRun {
-        let run_id = run_id.unwrap_or_else(|| uuid7(None));
-
-        handle_event(
-            &self.handlers,
-            Some(|h: &dyn BaseCallbackHandler| h.ignore_retriever()),
-            |handler| {
-                handler.on_retriever_start(
-                    serialized,
-                    query,
-                    run_id,
-                    self.parent_run_id,
-                    Some(&self.tags),
-                    Some(&self.metadata),
-                );
-            },
-        );
-
-        CallbackManagerForRetrieverRun::new(
-            run_id,
-            self.handlers.clone(),
-            self.inheritable_handlers.clone(),
-            self.parent_run_id,
-            Some(self.tags.clone()),
-            Some(self.inheritable_tags.clone()),
-            Some(self.metadata.clone()),
-            Some(self.inheritable_metadata.clone()),
-        )
-    }
-
     /// Dispatch a custom event.
     pub fn on_custom_event(&self, name: &str, data: &serde_json::Value, run_id: Option<Uuid>) {
         if self.handlers.is_empty() {
@@ -1451,6 +1416,48 @@ pub struct AsyncCallbackManager {
     inner: CallbackManager,
 }
 
+#[bon]
+impl CallbackManager {
+    /// Run when retriever starts running.
+    #[builder]
+    pub fn on_retriever_start(
+        &self,
+        serialized: &HashMap<String, serde_json::Value>,
+        query: &str,
+        run_id: Option<Uuid>,
+        name: Option<&str>,
+    ) -> CallbackManagerForRetrieverRun {
+        let run_id = run_id.unwrap_or_else(|| uuid7(None));
+
+        handle_event(
+            &self.handlers,
+            Some(|h: &dyn BaseCallbackHandler| h.ignore_retriever()),
+            |handler| {
+                handler.on_retriever_start(
+                    serialized,
+                    query,
+                    run_id,
+                    self.parent_run_id,
+                    Some(&self.tags),
+                    Some(&self.metadata),
+                    name,
+                );
+            },
+        );
+
+        CallbackManagerForRetrieverRun::new(
+            run_id,
+            self.handlers.clone(),
+            self.inheritable_handlers.clone(),
+            self.parent_run_id,
+            Some(self.tags.clone()),
+            Some(self.inheritable_tags.clone()),
+            Some(self.metadata.clone()),
+            Some(self.inheritable_metadata.clone()),
+        )
+    }
+}
+
 impl AsyncCallbackManager {
     /// Create a new async callback manager.
     pub fn new() -> Self {
@@ -1561,18 +1568,6 @@ impl AsyncCallbackManager {
         )
     }
 
-    /// Run when retriever starts running (async).
-    pub async fn on_retriever_start(
-        &self,
-        serialized: &HashMap<String, serde_json::Value>,
-        query: &str,
-        run_id: Option<Uuid>,
-    ) -> AsyncCallbackManagerForRetrieverRun {
-        AsyncCallbackManagerForRetrieverRun::from_sync(
-            self.inner.on_retriever_start(serialized, query, run_id),
-        )
-    }
-
     /// Dispatch a custom event (async).
     pub async fn on_custom_event(
         &self,
@@ -1622,6 +1617,29 @@ impl AsyncCallbackManager {
 pub struct AsyncCallbackManagerForLLMRun {
     /// The inner sync callback manager.
     inner: CallbackManagerForLLMRun,
+}
+
+#[bon]
+impl AsyncCallbackManager {
+    /// Run when retriever starts running (async).
+    #[builder]
+    pub async fn on_retriever_start(
+        &self,
+        serialized: &HashMap<String, serde_json::Value>,
+        query: &str,
+        run_id: Option<Uuid>,
+        name: Option<&str>,
+    ) -> AsyncCallbackManagerForRetrieverRun {
+        AsyncCallbackManagerForRetrieverRun::from_sync(
+            self.inner
+                .on_retriever_start()
+                .serialized(serialized)
+                .query(query)
+                .maybe_run_id(run_id)
+                .maybe_name(name)
+                .call(),
+        )
+    }
 }
 
 impl AsyncCallbackManagerForLLMRun {
@@ -2059,8 +2077,15 @@ impl CallbackManagerForChainGroup {
         serialized: &HashMap<String, serde_json::Value>,
         query: &str,
         run_id: Option<Uuid>,
+        name: Option<&str>,
     ) -> CallbackManagerForRetrieverRun {
-        self.inner.on_retriever_start(serialized, query, run_id)
+        self.inner
+            .on_retriever_start()
+            .serialized(serialized)
+            .query(query)
+            .maybe_run_id(run_id)
+            .maybe_name(name)
+            .call()
     }
 }
 
@@ -2237,9 +2262,15 @@ impl AsyncCallbackManagerForChainGroup {
         serialized: &HashMap<String, serde_json::Value>,
         query: &str,
         run_id: Option<Uuid>,
+        name: Option<&str>,
     ) -> AsyncCallbackManagerForRetrieverRun {
         self.inner
-            .on_retriever_start(serialized, query, run_id)
+            .on_retriever_start()
+            .serialized(serialized)
+            .query(query)
+            .maybe_run_id(run_id)
+            .maybe_name(name)
+            .call()
             .await
     }
 }
