@@ -38,7 +38,7 @@ impl PaginationParams {
         let order = match order.to_lowercase().as_str() {
             "asc" => SortOrder::Asc,
             "desc" => SortOrder::Desc,
-            _ => panic!("Invalid sort order"),
+            _ => SortOrder::Desc,
         };
         Self {
             offset,

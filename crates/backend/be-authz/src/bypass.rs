@@ -11,22 +11,25 @@ pub(crate) const GRPC_BYPASS_SERVICES: &[&str] = &[
     "local_config_service.ProtoLocalConfigService",
 ];
 
-/// Normalize a URL path by stripping the query string / fragment and resolving
-/// `.` and `..` segments to prevent bypass via path traversal (e.g.
-/// `/releases/../payment/checkout`).
+/// Normalize a URL path by stripping the query string / fragment, percent-
+/// decoding each segment, and resolving `.` and `..` to prevent bypass via
+/// path traversal—including percent-encoded variants like `%2e%2e`.
 fn normalize_path(path: &str) -> String {
+    use percent_encoding::percent_decode_str;
+
     // Strip query string and fragment before normalizing segments.
     let path = path.split('?').next().unwrap_or(path);
     let path = path.split('#').next().unwrap_or(path);
 
-    let mut segments: Vec<&str> = Vec::new();
+    let mut segments: Vec<String> = Vec::new();
     for seg in path.split('/') {
-        match seg {
+        let decoded = percent_decode_str(seg).decode_utf8_lossy();
+        match decoded.as_ref() {
             "." | "" => {}
             ".." => {
                 segments.pop();
             }
-            s => segments.push(s),
+            s => segments.push(s.to_owned()),
         }
     }
     format!("/{}", segments.join("/"))
@@ -97,6 +100,27 @@ mod tests {
             "/releases/foo"
         );
         assert_eq!(normalize_path("/a/../b?q=1"), "/b");
+    }
+
+    #[test]
+    fn rest_bypass_rejects_percent_encoded_traversal() {
+        // %2e = '.', %2f = '/'
+        assert!(!is_rest_bypass("/releases/%2e%2e/payment/checkout"));
+        assert!(!is_rest_bypass("/extensions/%2e%2e/admin/users"));
+        // %2E%2E resolves to ".." → path becomes /payment/webhook (a legit bypass)
+        assert!(is_rest_bypass("/releases/%2E%2E/payment/webhook"));
+        // Mixed literal and encoded
+        assert!(!is_rest_bypass("/releases/.%2e/payment/checkout"));
+        // %2f decodes to '/' inside a segment but doesn't create a path split,
+        // so "/.." stays as one segment → path remains under /releases/
+        assert!(is_rest_bypass("/releases/%2f%2e%2e/admin"));
+    }
+
+    #[test]
+    fn normalize_path_decodes_percent_encoding() {
+        assert_eq!(normalize_path("/a/%2e%2e/b"), "/b");
+        assert_eq!(normalize_path("/%2e/a"), "/a");
+        assert_eq!(normalize_path("/a/b%20c"), "/a/b c");
     }
 
     #[test]
