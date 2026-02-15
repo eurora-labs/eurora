@@ -141,4 +141,71 @@ mod tests {
                 .unwrap()
         );
     }
+
+    // -- Policy ↔ Proto validation --
+
+    /// Exhaustive list of RPC methods defined in proto service definitions.
+    /// If a proto file gains or removes a method, update this list — the test
+    /// below will catch the drift.
+    const PROTO_METHODS: &[(&str, &str)] = &[
+        // conversation_service.proto — ProtoConversationService
+        ("ConversationService", "CreateConversation"),
+        ("ConversationService", "ListConversations"),
+        ("ConversationService", "GetConversation"),
+        ("ConversationService", "GetMessages"),
+        ("ConversationService", "AddHiddenHumanMessage"),
+        ("ConversationService", "AddHumanMessage"),
+        ("ConversationService", "AddSystemMessage"),
+        ("ConversationService", "ChatStream"),
+        ("ConversationService", "GenerateConversationTitle"),
+        // activity_service.proto — ProtoActivityService
+        ("ActivityService", "ListActivities"),
+        ("ActivityService", "InsertActivity"),
+        // asset_service.proto — ProtoAssetService
+        ("AssetService", "CreateAsset"),
+    ];
+
+    /// Every gRPC policy entry in policy.csv must reference a method that
+    /// actually exists in the proto definitions. This catches typos and stale
+    /// policies after proto renames.
+    #[tokio::test]
+    async fn policy_grpc_actions_match_proto_methods() {
+        let base = env!("CARGO_MANIFEST_DIR");
+        let policy_path = format!("{base}/../../../config/authz/policy.csv");
+        let policy = std::fs::read_to_string(&policy_path).expect("failed to read policy.csv");
+
+        let proto_set: std::collections::HashSet<(&str, &str)> =
+            PROTO_METHODS.iter().copied().collect();
+
+        let mut checked = 0;
+        for line in policy.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            let parts: Vec<&str> = line.splitn(4, ',').map(str::trim).collect();
+            if parts.len() < 4 || parts[0] != "p" {
+                continue;
+            }
+            let resource = parts[2];
+            let action = parts[3];
+
+            // Skip REST policies (paths start with '/')
+            if resource.starts_with('/') {
+                continue;
+            }
+
+            assert!(
+                proto_set.contains(&(resource, action)),
+                "Policy entry ({resource}, {action}) does not match any proto method. \
+                 Did a proto RPC get renamed or removed?"
+            );
+            checked += 1;
+        }
+
+        assert!(
+            checked > 0,
+            "No gRPC policy entries were checked — is the policy file empty?"
+        );
+    }
 }

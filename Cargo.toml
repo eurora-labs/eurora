@@ -39,7 +39,6 @@ be-activity-service = { path = "crates/backend/be-activity-service" }
 be-asset = { path = "crates/backend/be-asset" }
 be-asset-service = { path = "crates/backend/be-asset-service" }
 be-auth-core = { path = "crates/backend/be-auth-core" }
-be-auth-grpc = { path = "crates/backend/be-auth-grpc" }
 be-auth-service = { path = "crates/backend/be-auth-service" }
 be-authz = { path = "crates/backend/be-authz" }
 be-conversation-service = { path = "crates/backend/be-conversation-service" }

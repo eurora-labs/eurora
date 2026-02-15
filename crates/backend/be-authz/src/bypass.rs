@@ -11,9 +11,14 @@ pub(crate) const GRPC_BYPASS_SERVICES: &[&str] = &[
     "local_config_service.ProtoLocalConfigService",
 ];
 
-/// Normalize a URL path by resolving `.` and `..` segments to prevent bypass via
-/// path traversal (e.g. `/releases/../payment/checkout`).
+/// Normalize a URL path by stripping the query string / fragment and resolving
+/// `.` and `..` segments to prevent bypass via path traversal (e.g.
+/// `/releases/../payment/checkout`).
 fn normalize_path(path: &str) -> String {
+    // Strip query string and fragment before normalizing segments.
+    let path = path.split('?').next().unwrap_or(path);
+    let path = path.split('#').next().unwrap_or(path);
+
     let mut segments: Vec<&str> = Vec::new();
     for seg in path.split('/') {
         match seg {
@@ -81,6 +86,17 @@ mod tests {
         assert_eq!(normalize_path("/a/b/../../c"), "/c");
         assert_eq!(normalize_path("/../a"), "/a");
         assert_eq!(normalize_path("/"), "/");
+    }
+
+    #[test]
+    fn normalize_path_strips_query_and_fragment() {
+        assert_eq!(normalize_path("/releases/foo?bar=1"), "/releases/foo");
+        assert_eq!(normalize_path("/releases/foo#section"), "/releases/foo");
+        assert_eq!(
+            normalize_path("/releases/foo?bar=1#section"),
+            "/releases/foo"
+        );
+        assert_eq!(normalize_path("/a/../b?q=1"), "/b");
     }
 
     #[test]
