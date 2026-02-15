@@ -18,14 +18,6 @@ use super::base::{
     RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
 };
 
-/// Add two usage metadata objects together.
-///
-/// This function combines the token counts from two usage metadata objects,
-/// returning a new object with the summed values.
-pub fn add_usage(left: &UsageMetadata, right: &UsageMetadata) -> UsageMetadata {
-    left.add(right)
-}
-
 /// Callback Handler that tracks AIMessage.usage_metadata.
 ///
 /// This handler collects token usage metadata from chat model responses,
@@ -97,21 +89,13 @@ impl LLMManagerMixin for UsageMetadataCallbackHandler {
                     _ => None,
                 };
 
-                // Try to get model name from llm_output or response_metadata
-                let model = response
-                    .llm_output
-                    .as_ref()
-                    .and_then(|output| output.get("model"))
+                // Get model name from response_metadata
+                let model = generation
+                    .message
+                    .response_metadata()
+                    .and_then(|meta| meta.get("model_name"))
                     .and_then(|v| v.as_str())
-                    .map(|s| s.to_string())
-                    .or_else(|| {
-                        generation
-                            .message
-                            .response_metadata()
-                            .and_then(|meta| meta.get("model_name"))
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string())
-                    });
+                    .map(|s| s.to_string());
 
                 (usage, model)
             }
@@ -122,7 +106,7 @@ impl LLMManagerMixin for UsageMetadataCallbackHandler {
         if let (Some(usage), Some(model)) = (usage_metadata, model_name) {
             let mut guard = self.usage_metadata.lock().unwrap();
             if let Some(existing) = guard.get(&model) {
-                let combined = add_usage(existing, &usage);
+                let combined = existing.add(&usage);
                 guard.insert(model, combined);
             } else {
                 guard.insert(model, usage);
@@ -258,22 +242,23 @@ mod tests {
         input_tokens: u32,
         output_tokens: u32,
     ) -> ChatResult {
+        let mut response_metadata = HashMap::new();
+        response_metadata.insert("model_name".to_string(), json!(model));
+
         let ai_msg = AIMessage::builder()
             .content(content)
             .usage_metadata(UsageMetadata::new(
                 input_tokens as i64,
                 output_tokens as i64,
             ))
+            .response_metadata(response_metadata)
             .build();
 
         let generation = ChatGeneration::new(ai_msg.into());
 
-        let mut llm_output = HashMap::new();
-        llm_output.insert("model".to_string(), json!(model));
-
         ChatResult {
             generations: vec![generation],
-            llm_output: Some(llm_output),
+            llm_output: None,
         }
     }
 
@@ -282,17 +267,6 @@ mod tests {
         let handler = UsageMetadataCallbackHandler::new();
         assert!(handler.usage_metadata().is_empty());
         assert_eq!(handler.name(), "UsageMetadataCallbackHandler");
-    }
-
-    #[test]
-    fn test_add_usage() {
-        let usage1 = UsageMetadata::new(10, 20);
-        let usage2 = UsageMetadata::new(5, 15);
-        let combined = add_usage(&usage1, &usage2);
-
-        assert_eq!(combined.input_tokens, 15);
-        assert_eq!(combined.output_tokens, 35);
-        assert_eq!(combined.total_tokens, 50);
     }
 
     #[test]

@@ -175,7 +175,7 @@ pub use callbacks::{
     AsyncCallbackHandler, AsyncCallbackManager, AsyncCallbackManagerForChainRun,
     AsyncCallbackManagerForLLMRun, BaseCallbackHandler, BaseCallbackManager, CallbackManager,
     CallbackManagerForChainRun, CallbackManagerForLLMRun, Callbacks, StdOutCallbackHandler,
-    StreamingStdOutCallbackHandler, UsageMetadataCallbackHandler, add_usage,
+    StreamingStdOutCallbackHandler, UsageMetadataCallbackHandler,
 };
 
 // Re-export prompt types
