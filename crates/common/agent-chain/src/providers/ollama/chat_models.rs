@@ -25,13 +25,13 @@ use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
 
-use async_stream::try_stream;
 use async_trait::async_trait;
 use base64::Engine;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::AsyncBufReadExt;
 use tokio_util::io::StreamReader;
+use tracing::warn;
 
 use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::chat_models::{
@@ -40,11 +40,21 @@ use crate::chat_models::{
 use crate::error::{Error, Result};
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
 use crate::messages::{AIMessage, BaseMessage, ContentPart, ImageSource, MessageContent, ToolCall};
-use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
+use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, LLMResult};
 use crate::tools::{BaseTool, ToolDefinition};
 
 /// Default API base URL for Ollama.
 const DEFAULT_API_BASE: &str = "http://localhost:11434";
+
+/// Value for `keep_alive` parameter, matching Python's `int | str | None`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(untagged)]
+pub enum KeepAlive {
+    /// Duration as seconds (integer).
+    Seconds(i64),
+    /// Duration as a string (e.g. `"5m"`).
+    Duration(String),
+}
 
 /// Ollama chat model.
 ///
@@ -69,8 +79,8 @@ pub struct ChatOllama {
     model: String,
     /// Temperature for generation (0.0 - 1.0).
     temperature: Option<f64>,
-    /// Base URL for API requests.
-    base_url: String,
+    /// Base URL for API requests. `None` means use `OLLAMA_HOST` env var or default.
+    base_url: Option<String>,
     /// Whether to validate the model exists on initialization.
     validate_model_on_init: bool,
     /// Enable Mirostat sampling (0 = disabled, 1 = Mirostat, 2 = Mirostat 2.0).
@@ -104,7 +114,7 @@ pub struct ChatOllama {
     /// Output format (empty string, "json", or JSON schema).
     format: Option<OllamaFormat>,
     /// How long to keep model in memory.
-    keep_alive: Option<String>,
+    keep_alive: Option<KeepAlive>,
     /// Controls reasoning/thinking mode for supported models.
     /// Supports `true`/`false` or string intensities like `"low"`, `"medium"`, `"high"`.
     reasoning: Option<serde_json::Value>,
@@ -175,7 +185,7 @@ impl ChatOllama {
         Self {
             model: model.into(),
             temperature: None,
-            base_url: DEFAULT_API_BASE.to_string(),
+            base_url: None,
             validate_model_on_init: false,
             mirostat: None,
             mirostat_eta: None,
@@ -209,7 +219,7 @@ impl ChatOllama {
 
     /// Set the base URL for Ollama API.
     pub fn base_url(mut self, url: impl Into<String>) -> Self {
-        self.base_url = url.into();
+        self.base_url = Some(url.into());
         self
     }
 
@@ -315,9 +325,15 @@ impl ChatOllama {
         self
     }
 
-    /// Set how long to keep the model in memory.
+    /// Set how long to keep the model in memory (string duration like `"5m"`).
     pub fn keep_alive(mut self, duration: impl Into<String>) -> Self {
-        self.keep_alive = Some(duration.into());
+        self.keep_alive = Some(KeepAlive::Duration(duration.into()));
+        self
+    }
+
+    /// Set how long to keep the model in memory (seconds).
+    pub fn keep_alive_seconds(mut self, seconds: i64) -> Self {
+        self.keep_alive = Some(KeepAlive::Seconds(seconds));
         self
     }
 
@@ -339,24 +355,21 @@ impl ChatOllama {
         BoundChatOllama::new(self, tools)
     }
 
-    /// Get the base URL, checking environment variable if not set directly.
+    /// Get the resolved base URL. Checks env var `OLLAMA_HOST` if `base_url` is `None`.
     fn get_base_url(&self) -> String {
-        let raw_url = if self.base_url != DEFAULT_API_BASE {
-            self.base_url.clone()
-        } else {
-            env::var("OLLAMA_HOST").unwrap_or_else(|_| DEFAULT_API_BASE.to_string())
+        let raw_url = match &self.base_url {
+            Some(url) => url.clone(),
+            None => env::var("OLLAMA_HOST").unwrap_or_else(|_| DEFAULT_API_BASE.to_string()),
         };
 
-        // Strip userinfo from URL if present (auth is handled by build_client)
         strip_userinfo_from_url(&raw_url)
     }
 
     /// Build the HTTP client, optionally with basic auth from the URL.
     fn build_client(&self) -> reqwest::Client {
-        let raw_url = if self.base_url != DEFAULT_API_BASE {
-            self.base_url.clone()
-        } else {
-            env::var("OLLAMA_HOST").unwrap_or_else(|_| DEFAULT_API_BASE.to_string())
+        let raw_url = match &self.base_url {
+            Some(url) => url.clone(),
+            None => env::var("OLLAMA_HOST").unwrap_or_else(|_| DEFAULT_API_BASE.to_string()),
         };
 
         let mut builder = reqwest::Client::builder();
@@ -375,24 +388,64 @@ impl ChatOllama {
         builder.build().unwrap_or_else(|_| reqwest::Client::new())
     }
 
-    /// Validate that the model exists in Ollama.
+    /// Validate that the model exists in Ollama by listing local models.
+    ///
+    /// Matches Python's `validate_model()` which calls `client.list()` and checks
+    /// for an exact match or tag-prefixed match.
     pub async fn validate_model(&self) -> Result<()> {
         let client = self.build_client();
         let base_url = self.get_base_url();
         let response = client
-            .post(format!("{}/api/show", base_url))
-            .json(&serde_json::json!({ "name": self.model }))
+            .get(format!("{}/api/tags", base_url))
             .send()
             .await
-            .map_err(Error::Http)?;
+            .map_err(|e| {
+                Error::Other(format!(
+                    "Failed to connect to Ollama. Please check that Ollama is downloaded,                      running and accessible. https://ollama.com/download. Error: {}",
+                    e
+                ))
+            })?;
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
             return Err(Error::Other(format!(
-                "Model '{}' not found in Ollama: {}",
-                self.model, error_text
+                "Received an error from the Ollama API. \
+                 Please check your Ollama server logs. {}",
+                error_text
             )));
         }
+
+        let body: serde_json::Value = response.json().await.map_err(|e| {
+            Error::Json(serde_json::Error::io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                e.to_string(),
+            )))
+        })?;
+
+        let model_names: Vec<&str> = body
+            .get("models")
+            .and_then(|m| m.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|m| m.get("model").and_then(|n| n.as_str()))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let found = model_names
+            .iter()
+            .any(|m| *m == self.model || m.starts_with(&format!("{}:", self.model)));
+
+        if !found {
+            let available = model_names.join(", ");
+            return Err(Error::Other(format!(
+                "Model `{}` not found in Ollama. Please pull the model \
+                 (using `ollama pull {}`) or specify a valid model name. \
+                 Available local models: {}",
+                self.model, self.model, available
+            )));
+        }
+
         Ok(())
     }
 
@@ -421,22 +474,25 @@ impl ChatOllama {
     }
 
     /// Convert messages to Ollama API format.
-    fn format_messages(&self, messages: &[BaseMessage]) -> Vec<serde_json::Value> {
-        messages
-            .iter()
-            .filter_map(|msg| match msg {
-                BaseMessage::System(m) => Some(serde_json::json!({
+    ///
+    /// Matches Python's `_convert_messages_to_ollama_messages`.
+    fn format_messages(&self, messages: &[BaseMessage]) -> Result<Vec<serde_json::Value>> {
+        let mut ollama_messages = Vec::new();
+
+        for msg in messages {
+            let formatted = match msg {
+                BaseMessage::System(m) => serde_json::json!({
                     "role": "system",
                     "content": m.content.as_text(),
                     "images": [],
-                })),
+                }),
                 BaseMessage::Human(m) => {
                     let (content, images) = extract_content_and_images(&m.content);
-                    Some(serde_json::json!({
+                    serde_json::json!({
                         "role": "user",
                         "content": content,
                         "images": images,
-                    }))
+                    })
                 }
                 BaseMessage::AI(m) => {
                     let mut message = serde_json::json!({
@@ -454,27 +510,30 @@ impl ChatOllama {
                         message["tool_calls"] = serde_json::Value::Array(tool_calls);
                     }
 
-                    Some(message)
+                    message
                 }
-                BaseMessage::Tool(m) => Some(serde_json::json!({
+                BaseMessage::Tool(m) => serde_json::json!({
                     "role": "tool",
                     "content": m.content,
                     "images": [],
                     "tool_call_id": m.tool_call_id,
-                })),
-                BaseMessage::Remove(_) => None,
-                BaseMessage::Chat(m) => Some(serde_json::json!({
+                }),
+                BaseMessage::Chat(m) => serde_json::json!({
                     "role": m.role,
                     "content": m.content,
                     "images": [],
-                })),
-                BaseMessage::Function(m) => Some(serde_json::json!({
-                    "role": "function",
-                    "name": m.name,
-                    "content": m.content
-                })),
-            })
-            .collect()
+                }),
+                BaseMessage::Remove(_) => continue,
+                _ => {
+                    return Err(Error::Other(
+                        "Received unsupported message type for Ollama.".to_string(),
+                    ));
+                }
+            };
+            ollama_messages.push(formatted);
+        }
+
+        Ok(ollama_messages)
     }
 
     /// Build the options object for the request.
@@ -539,6 +598,8 @@ impl ChatOllama {
     }
 
     /// Build the request payload.
+    ///
+    /// Matches Python's `_chat_params`.
     fn build_request_payload(
         &self,
         messages: &[BaseMessage],
@@ -546,7 +607,7 @@ impl ChatOllama {
         tools: Option<&[serde_json::Value]>,
         stream: bool,
     ) -> Result<serde_json::Value> {
-        let formatted_messages = self.format_messages(messages);
+        let formatted_messages = self.format_messages(messages)?;
         let options = self.build_options(stop)?;
 
         let mut payload = serde_json::json!({
@@ -574,7 +635,10 @@ impl ChatOllama {
         }
 
         if let Some(keep_alive) = &self.keep_alive {
-            payload["keep_alive"] = serde_json::json!(keep_alive);
+            match keep_alive {
+                KeepAlive::Seconds(s) => payload["keep_alive"] = serde_json::json!(s),
+                KeepAlive::Duration(d) => payload["keep_alive"] = serde_json::json!(d),
+            }
         }
 
         if let Some(reasoning) = &self.reasoning {
@@ -648,7 +712,11 @@ impl ChatOllama {
             .build()
     }
 
-    /// Build generation_info from an Ollama response.
+    /// Build generation_info from a stream response, including all fields.
+    ///
+    /// Matches Python's `generation_info = dict(stream_resp)` which captures the
+    /// entire response dict (timing data, token counts, etc.) plus `model_name`
+    /// and `model_provider`, minus the `message` field.
     fn build_generation_info(response: &OllamaResponse) -> HashMap<String, serde_json::Value> {
         let mut info = HashMap::new();
         if let Some(model) = &response.model {
@@ -656,6 +724,9 @@ impl ChatOllama {
             info.insert("model_name".to_string(), serde_json::json!(model));
         }
         info.insert("model_provider".to_string(), serde_json::json!("ollama"));
+        if let Some(done) = response.done {
+            info.insert("done".to_string(), serde_json::json!(done));
+        }
         if let Some(done_reason) = &response.done_reason {
             info.insert("done_reason".to_string(), serde_json::json!(done_reason));
         }
@@ -667,6 +738,33 @@ impl ChatOllama {
         }
         if let Some(eval_count) = response.eval_count {
             info.insert("eval_count".to_string(), serde_json::json!(eval_count));
+        }
+        if let Some(total_duration) = response.total_duration {
+            info.insert(
+                "total_duration".to_string(),
+                serde_json::json!(total_duration),
+            );
+        }
+        if let Some(load_duration) = response.load_duration {
+            info.insert(
+                "load_duration".to_string(),
+                serde_json::json!(load_duration),
+            );
+        }
+        if let Some(prompt_eval_duration) = response.prompt_eval_duration {
+            info.insert(
+                "prompt_eval_duration".to_string(),
+                serde_json::json!(prompt_eval_duration),
+            );
+        }
+        if let Some(eval_duration) = response.eval_duration {
+            info.insert(
+                "eval_duration".to_string(),
+                serde_json::json!(eval_duration),
+            );
+        }
+        if let Some(created_at) = &response.created_at {
+            info.insert("created_at".to_string(), serde_json::json!(created_at));
         }
         info
     }
@@ -709,8 +807,8 @@ impl BaseLanguageModel for ChatOllama {
             ls_model_name: Some(self.model.clone()),
             ls_model_type: Some("chat".to_string()),
             ls_temperature: self.temperature,
-            ls_max_tokens: self.num_predict.map(|n| n as u32),
-            ls_stop: stop.map(|s| s.to_vec()),
+            ls_max_tokens: None,
+            ls_stop: stop.map(|s| s.to_vec()).or_else(|| self.stop.clone()),
         }
     }
 }
@@ -740,8 +838,6 @@ impl BaseChatModel for ChatOllama {
         stop: Option<Vec<String>>,
         _run_manager: Option<&crate::callbacks::AsyncCallbackManagerForLLMRun>,
     ) -> Result<crate::language_models::ChatGenerationStream> {
-        use crate::outputs::ChatGenerationChunk;
-
         let reasoning_enabled = self.is_reasoning_enabled();
         let chat_stream = self.stream_internal(messages, stop).await?;
 
@@ -858,6 +954,8 @@ impl ChatOllama {
     ///
     /// Aggregates the streaming response into a single result, matching
     /// Python's `_generate` which calls `_chat_stream_with_aggregation`.
+    /// Uses `ChatGenerationChunk` addition to aggregate, matching Python's
+    /// `final_chunk += chunk` semantics.
     async fn _generate_internal(
         &self,
         messages: Vec<BaseMessage>,
@@ -867,55 +965,78 @@ impl ChatOllama {
         let stream = self.stream_internal(messages, stop).await?;
         futures::pin_mut!(stream);
 
-        let mut full_content = String::new();
-        let mut all_tool_calls = Vec::new();
-        let mut final_usage: Option<UsageMetadata> = None;
-        let mut final_generation_info: Option<HashMap<String, serde_json::Value>> = None;
-        let mut additional_kwargs = HashMap::new();
+        let mut final_chunk: Option<ChatGenerationChunk> = None;
 
         while let Some(result) = stream.next().await {
-            let chunk = result?;
+            let ollama_chunk = result?;
 
-            full_content.push_str(&chunk.chunk.content);
-
-            if !chunk.chunk.tool_calls.is_empty() {
-                all_tool_calls.extend(chunk.chunk.tool_calls);
+            let mut additional_kwargs = HashMap::new();
+            if let Some(reasoning) = &ollama_chunk.reasoning_content {
+                additional_kwargs.insert(
+                    "reasoning_content".to_string(),
+                    serde_json::Value::String(reasoning.clone()),
+                );
             }
 
-            if let Some(reasoning) = &chunk.reasoning_content {
-                additional_kwargs
-                    .entry("reasoning_content".to_string())
-                    .and_modify(|v| {
-                        if let serde_json::Value::String(existing) = v {
-                            existing.push_str(reasoning);
-                        }
-                    })
-                    .or_insert_with(|| serde_json::Value::String(reasoning.clone()));
+            let mut response_metadata = HashMap::new();
+            if let Some(ref info) = ollama_chunk.generation_info {
+                if let Some(model) = info.get("model_name") {
+                    response_metadata.insert("model_name".to_string(), model.clone());
+                }
+                if let Some(provider) = info.get("model_provider") {
+                    response_metadata.insert("model_provider".to_string(), provider.clone());
+                }
+                if let Some(reason) = info.get("done_reason") {
+                    response_metadata.insert("done_reason".to_string(), reason.clone());
+                }
             }
 
-            if let Some(usage) = chunk.chunk.usage_metadata {
-                final_usage = Some(usage);
-            }
+            let message = AIMessage::builder()
+                .content(&ollama_chunk.chunk.content)
+                .tool_calls(ollama_chunk.chunk.tool_calls)
+                .maybe_usage_metadata(ollama_chunk.chunk.usage_metadata)
+                .additional_kwargs(additional_kwargs)
+                .response_metadata(response_metadata)
+                .build();
 
-            if let Some(info) = chunk.generation_info {
-                final_generation_info = Some(info);
-            }
+            let gen_chunk = if let Some(info) = ollama_chunk.generation_info {
+                ChatGenerationChunk::with_info(message.into(), info)
+            } else {
+                ChatGenerationChunk::new(message.into())
+            };
+
+            final_chunk = Some(match final_chunk {
+                Some(existing) => existing + gen_chunk,
+                None => gen_chunk,
+            });
         }
 
-        if full_content.is_empty() && all_tool_calls.is_empty() && final_generation_info.is_none() {
-            return Err(Error::Other(
-                "No data received from Ollama stream.".to_string(),
-            ));
-        }
+        let final_chunk = final_chunk
+            .ok_or_else(|| Error::Other("No data received from Ollama stream.".to_string()))?;
+
+        let generation_info = final_chunk.generation_info.clone();
+
+        // Extract fields from the aggregated chunk message to build the final AIMessage,
+        // matching Python's pattern of constructing AIMessage from final_chunk fields.
+        let (content, usage_metadata, tool_calls, chunk_additional_kwargs) =
+            match &final_chunk.message {
+                BaseMessage::AI(ai) => (
+                    ai.content().to_string(),
+                    ai.usage_metadata.clone(),
+                    ai.tool_calls.clone(),
+                    ai.additional_kwargs.clone(),
+                ),
+                other => (other.content().to_string(), None, vec![], HashMap::new()),
+            };
 
         let ai_message = AIMessage::builder()
-            .content(full_content)
-            .tool_calls(all_tool_calls)
-            .additional_kwargs(additional_kwargs)
-            .maybe_usage_metadata(final_usage)
+            .content(content)
+            .tool_calls(tool_calls)
+            .additional_kwargs(chunk_additional_kwargs)
+            .maybe_usage_metadata(usage_metadata)
             .build();
 
-        let generation = if let Some(info) = final_generation_info {
+        let generation = if let Some(info) = generation_info {
             ChatGeneration::with_info(ai_message.into(), info)
         } else {
             ChatGeneration::new(ai_message.into())
@@ -928,6 +1049,8 @@ impl ChatOllama {
     ///
     /// Returns a stream of `OllamaStreamChunk` which carries both the `ChatChunk`
     /// and Ollama-specific metadata (reasoning content, generation_info).
+    ///
+    /// Matches Python's `_aiterate_over_stream` / `_iterate_over_stream`.
     async fn stream_internal(
         &self,
         messages: Vec<BaseMessage>,
@@ -956,35 +1079,40 @@ impl ChatOllama {
 
         let byte_stream = response
             .bytes_stream()
-            .map(|result| result.map_err(std::io::Error::other));
-        let stream_reader = StreamReader::new(byte_stream);
-        let buf_reader = BufReader::new(stream_reader);
-        let mut lines = buf_reader.lines();
+            .map(|r| r.map_err(std::io::Error::other));
+        let reader = tokio::io::BufReader::new(StreamReader::new(byte_stream));
+        let mut lines = reader.lines();
 
         let reasoning_enabled = self.is_reasoning_enabled();
 
-        let stream = try_stream! {
-            while let Some(line) = lines.next_line().await.map_err(Error::Io)? {
-                if line.trim().is_empty() {
+        let stream = async_stream::try_stream! {
+            while let Some(line) = lines.next_line().await.map_err(|e| Error::Other(e.to_string()))? {
+                if line.is_empty() {
                     continue;
                 }
 
                 let stream_resp: OllamaResponse = serde_json::from_str(&line)
-                    .map_err(Error::Json)?;
+                    .map_err(|e| Error::Other(format!("Failed to parse Ollama response: {}", e)))?;
 
                 let content = stream_resp
                     .message
                     .as_ref()
-                    .and_then(|m| m.content.clone())
-                    .unwrap_or_default();
+                    .and_then(|m| m.content.as_deref())
+                    .unwrap_or("");
 
                 let is_done = stream_resp.done.unwrap_or(false);
 
-                // Skip responses with done_reason='load' and empty content
+                // Skip responses with done_reason='load' and empty content.
+                // These indicate the model was loaded but no actual generation occurred.
                 if is_done
                     && stream_resp.done_reason.as_deref() == Some("load")
                     && content.trim().is_empty()
                 {
+                    warn!(
+                        "Ollama returned empty response with done_reason='load'. \
+                         This typically indicates the model was loaded but no content \
+                         was generated. Skipping this response."
+                    );
                     continue;
                 }
 
@@ -1060,6 +1188,16 @@ struct OllamaResponse {
     prompt_eval_count: Option<u32>,
     #[serde(default)]
     eval_count: Option<u32>,
+    #[serde(default)]
+    total_duration: Option<u64>,
+    #[serde(default)]
+    load_duration: Option<u64>,
+    #[serde(default)]
+    prompt_eval_duration: Option<u64>,
+    #[serde(default)]
+    eval_duration: Option<u64>,
+    #[serde(default)]
+    created_at: Option<String>,
 }
 
 /// Ollama message in response.
@@ -1354,6 +1492,7 @@ mod tests {
         let model = ChatOllama::new("llama3.1");
         assert_eq!(model.model, "llama3.1");
         assert!(model.temperature.is_none());
+        assert!(model.base_url.is_none());
     }
 
     #[test]
@@ -1370,6 +1509,15 @@ mod tests {
         assert_eq!(model.top_p, Some(0.9));
         assert_eq!(model.repeat_penalty, Some(1.1));
         assert!(model.validate_model_on_init);
+    }
+
+    #[test]
+    fn test_base_url_option() {
+        let model = ChatOllama::new("llama3.1");
+        assert!(model.base_url.is_none());
+
+        let model = ChatOllama::new("llama3.1").base_url("http://custom:8080");
+        assert_eq!(model.base_url, Some("http://custom:8080".to_string()));
     }
 
     #[test]
@@ -1403,6 +1551,18 @@ mod tests {
         let model = ChatOllama::new("llama3.1").stop(vec!["foo".to_string()]);
         let result = model.build_options(Some(vec!["bar".to_string()]));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_keep_alive_string() {
+        let model = ChatOllama::new("llama3.1").keep_alive("5m");
+        assert!(matches!(model.keep_alive, Some(KeepAlive::Duration(ref s)) if s == "5m"));
+    }
+
+    #[test]
+    fn test_keep_alive_seconds() {
+        let model = ChatOllama::new("llama3.1").keep_alive_seconds(300);
+        assert!(matches!(model.keep_alive, Some(KeepAlive::Seconds(300))));
     }
 
     #[test]
@@ -1508,10 +1668,86 @@ mod tests {
                 ]))
                 .build(),
         )];
-        let formatted = model.format_messages(&messages);
+        let formatted = model.format_messages(&messages).unwrap();
         assert_eq!(formatted.len(), 1);
         assert_eq!(formatted[0]["role"], "user");
         assert_eq!(formatted[0]["content"], "\nDescribe this");
         assert_eq!(formatted[0]["images"][0], "base64data");
+    }
+
+    #[test]
+    fn test_format_messages_rejects_unsupported_types() {
+        let model = ChatOllama::new("llama3.1");
+        let messages = vec![BaseMessage::Function(
+            crate::messages::FunctionMessage::builder()
+                .name("fn_name")
+                .content("content")
+                .build(),
+        )];
+        let result = model.format_messages(&messages);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_base_url_default() {
+        // With no base_url set, should fall back to DEFAULT_API_BASE
+        // (assuming OLLAMA_HOST env var is not set in test environment)
+        let model = ChatOllama::new("llama3.1");
+        let url = model.get_base_url();
+        // Just verify it returns some URL (can't control env in tests)
+        assert!(url.starts_with("http"));
+    }
+
+    #[test]
+    fn test_get_base_url_explicit() {
+        let model = ChatOllama::new("llama3.1").base_url("http://custom:8080");
+        let url = model.get_base_url();
+        assert_eq!(url, "http://custom:8080");
+    }
+
+    #[test]
+    fn test_build_generation_info_includes_timing() {
+        let response = OllamaResponse {
+            model: Some("llama3.1".to_string()),
+            message: None,
+            done: Some(true),
+            done_reason: Some("stop".to_string()),
+            prompt_eval_count: Some(10),
+            eval_count: Some(20),
+            total_duration: Some(1000000),
+            load_duration: Some(200000),
+            prompt_eval_duration: Some(300000),
+            eval_duration: Some(500000),
+            created_at: Some("2024-01-01T00:00:00Z".to_string()),
+        };
+        let info = ChatOllama::build_generation_info(&response);
+        assert_eq!(info.get("model"), Some(&serde_json::json!("llama3.1")));
+        assert_eq!(info.get("model_name"), Some(&serde_json::json!("llama3.1")));
+        assert_eq!(
+            info.get("model_provider"),
+            Some(&serde_json::json!("ollama"))
+        );
+        assert_eq!(info.get("done"), Some(&serde_json::json!(true)));
+        assert_eq!(info.get("done_reason"), Some(&serde_json::json!("stop")));
+        assert_eq!(
+            info.get("total_duration"),
+            Some(&serde_json::json!(1000000u64))
+        );
+        assert_eq!(
+            info.get("load_duration"),
+            Some(&serde_json::json!(200000u64))
+        );
+        assert_eq!(
+            info.get("prompt_eval_duration"),
+            Some(&serde_json::json!(300000u64))
+        );
+        assert_eq!(
+            info.get("eval_duration"),
+            Some(&serde_json::json!(500000u64))
+        );
+        assert_eq!(
+            info.get("created_at"),
+            Some(&serde_json::json!("2024-01-01T00:00:00Z"))
+        );
     }
 }
