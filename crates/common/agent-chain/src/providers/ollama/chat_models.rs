@@ -71,7 +71,7 @@ pub enum KeepAlive {
 ///     .num_ctx(4096);
 ///
 /// let messages = vec![HumanMessage::builder().content("Hello!").build().into()];
-/// let response = model.generate(messages, None).await?;
+/// let response = model.generate(messages, GenerateConfig::default()).await?;
 /// ```
 #[derive(Debug)]
 pub struct ChatOllama {

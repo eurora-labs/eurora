@@ -17,7 +17,7 @@
 //!     .with_builtin_tools(vec![BuiltinTool::WebSearch]);
 //!
 //! let messages = vec![HumanMessage::builder().content("What is the latest news?").build().into()];
-//! let response = model.generate(messages, None).await?;
+//! let response = model.generate(messages, GenerateConfig::default()).await?;
 //! ```
 //!
 //! # Streaming with Responses API
