@@ -126,6 +126,10 @@ pub struct ChatOllama {
     language_model_config: LanguageModelConfig,
     /// Whether the model has been validated (for lazy validation).
     model_validated: std::sync::atomic::AtomicBool,
+    /// Tools bound to this model via `bind_tools()`.
+    bound_tools: Vec<ToolDefinition>,
+    /// Tool choice for bound tools.
+    bound_tool_choice: Option<ToolChoice>,
 }
 
 impl Clone for ChatOllama {
@@ -159,6 +163,8 @@ impl Clone for ChatOllama {
                 self.model_validated
                     .load(std::sync::atomic::Ordering::Relaxed),
             ),
+            bound_tools: self.bound_tools.clone(),
+            bound_tool_choice: self.bound_tool_choice.clone(),
         }
     }
 }
@@ -208,6 +214,8 @@ impl ChatOllama {
             chat_model_config: ChatModelConfig::new(),
             language_model_config: LanguageModelConfig::new(),
             model_validated: std::sync::atomic::AtomicBool::new(false),
+            bound_tools: Vec::new(),
+            bound_tool_choice: None,
         }
     }
 
@@ -829,6 +837,18 @@ impl BaseChatModel for ChatOllama {
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
+        if !self.bound_tools.is_empty() {
+            let ai_message = self
+                .generate_with_tools(
+                    messages,
+                    &self.bound_tools,
+                    self.bound_tool_choice.as_ref(),
+                    stop,
+                )
+                .await?;
+            let generation = ChatGeneration::new(ai_message.into());
+            return Ok(ChatResult::new(vec![generation]));
+        }
         self._generate_internal(messages, stop, None).await
     }
 
@@ -946,6 +966,35 @@ impl BaseChatModel for ChatOllama {
         })?;
 
         Ok(self.parse_response_to_ai_message(&ollama_resp))
+    }
+
+    fn bind_tools(
+        &self,
+        tools: &[Arc<dyn BaseTool>],
+        tool_choice: Option<ToolChoice>,
+    ) -> Result<Box<dyn BaseChatModel>> {
+        let mut bound = self.clone();
+        bound.bound_tools = tools.iter().map(|t| t.definition()).collect();
+        bound.bound_tool_choice = tool_choice;
+        Ok(Box::new(bound))
+    }
+
+    fn with_structured_output(
+        &self,
+        schema: serde_json::Value,
+        _include_raw: bool,
+    ) -> Result<Box<dyn BaseChatModel>> {
+        let name = schema.get("title").and_then(|t| t.as_str()).unwrap_or("structured_output").to_string();
+        let description = schema.get("description").and_then(|d| d.as_str()).unwrap_or("").to_string();
+        let tool_def = ToolDefinition {
+            name,
+            description,
+            parameters: schema,
+        };
+        let mut bound = self.clone();
+        bound.bound_tools = vec![tool_def];
+        bound.bound_tool_choice = Some(ToolChoice::String("any".to_string()));
+        Ok(Box::new(bound))
     }
 }
 
