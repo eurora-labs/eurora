@@ -74,12 +74,11 @@ pub use base::{
 };
 
 // Re-export from simple
-pub use simple::{AsyncToolFunc, Tool, ToolBuilder, ToolFunc};
+pub use simple::{AsyncToolFunc, Tool, ToolFunc};
 
 // Re-export from structured
 pub use structured::{
-    AsyncStructuredToolFunc, StructuredTool, StructuredToolBuilder, StructuredToolFunc,
-    create_args_schema,
+    AsyncStructuredToolFunc, StructuredTool, StructuredToolFunc, create_args_schema,
 };
 
 // Re-export from convert
@@ -90,10 +89,7 @@ pub use convert::{
 };
 
 // Re-export from render
-pub use render::{
-    ToolsRenderer, render_for_prompt, render_json, render_json_compact, render_numbered_list,
-    render_text_description, render_text_description_and_args, render_tool, render_with_schemas,
-};
+pub use render::{ToolsRenderer, render_text_description, render_text_description_and_args};
 
 // Re-export from retriever
 pub use retriever::{
