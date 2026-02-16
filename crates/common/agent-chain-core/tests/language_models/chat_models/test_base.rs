@@ -1713,3 +1713,146 @@ async fn test_stream_callback_receives_chunk_data() {
         recorded.iter().map(|c| c.is_some()).collect::<Vec<_>>()
     );
 }
+
+// ---- StructuredOutputWithRaw tests ----
+
+/// Test that StructuredOutputWithRaw returns raw + parsed + null error on successful parse.
+#[tokio::test]
+async fn test_structured_output_with_raw_success() {
+    use agent_chain_core::language_models::{ChatModelRunnable, StructuredOutputWithRaw};
+    use agent_chain_core::messages::ToolCall;
+    use agent_chain_core::output_parsers::JsonOutputKeyToolsParser;
+    use agent_chain_core::runnables::Runnable;
+    use std::sync::Arc;
+
+    let tool_args = serde_json::json!({"answer": "42", "justification": "The meaning of life"});
+    let ai_msg = AIMessage::builder()
+        .content("")
+        .tool_calls(vec![
+            ToolCall::builder()
+                .name("test_tool")
+                .args(tool_args.clone())
+                .build(),
+        ])
+        .build();
+
+    let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
+    let model_runnable = ChatModelRunnable::new(Arc::new(model));
+    let parser = JsonOutputKeyToolsParser::new("test_tool").with_first_tool_only(true);
+
+    let runnable = StructuredOutputWithRaw::new(model_runnable, parser);
+    let result = runnable
+        .ainvoke(LanguageModelInput::from("test"), None)
+        .await
+        .unwrap();
+
+    assert_eq!(result["parsed"], tool_args);
+    assert_eq!(result["parsing_error"], serde_json::Value::Null);
+    assert!(result.get("raw").is_some());
+    assert!(!result["raw"].is_null());
+}
+
+/// Test that StructuredOutputWithRaw returns null parsed when no tool calls match.
+///
+/// JsonOutputKeyToolsParser with first_tool_only returns Ok(Null) when no
+/// matching tool calls exist, so parsing_error remains null.
+#[tokio::test]
+async fn test_structured_output_with_raw_no_matching_tool() {
+    use agent_chain_core::language_models::{ChatModelRunnable, StructuredOutputWithRaw};
+    use agent_chain_core::output_parsers::JsonOutputKeyToolsParser;
+    use agent_chain_core::runnables::Runnable;
+    use std::sync::Arc;
+
+    // AIMessage with no tool calls — parser returns Ok(Null)
+    let ai_msg = AIMessage::builder().content("plain text").build();
+
+    let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
+    let model_runnable = ChatModelRunnable::new(Arc::new(model));
+    let parser = JsonOutputKeyToolsParser::new("test_tool").with_first_tool_only(true);
+
+    let runnable = StructuredOutputWithRaw::new(model_runnable, parser);
+    let result = runnable
+        .ainvoke(LanguageModelInput::from("test"), None)
+        .await
+        .unwrap();
+
+    // No matching tool call means parsed is null, but no error occurred
+    assert_eq!(result["parsed"], serde_json::Value::Null);
+    assert_eq!(result["parsing_error"], serde_json::Value::Null);
+    assert!(result.get("raw").is_some());
+    assert!(!result["raw"].is_null());
+}
+
+/// Test that StructuredOutputWithRaw catches parse errors and returns them.
+///
+/// Uses a tool call with invalid JSON in additional_kwargs to trigger a real parse error.
+#[tokio::test]
+async fn test_structured_output_with_raw_parse_error() {
+    use agent_chain_core::language_models::{ChatModelRunnable, StructuredOutputWithRaw};
+    use agent_chain_core::output_parsers::JsonOutputKeyToolsParser;
+    use agent_chain_core::runnables::Runnable;
+    use std::sync::Arc;
+
+    // AIMessage with malformed tool call in additional_kwargs (not in tool_calls)
+    // triggers parse_tool_calls() error path in strict mode
+    let ai_msg = AIMessage::builder()
+        .content("")
+        .additional_kwargs(std::collections::HashMap::from([(
+            "tool_calls".to_string(),
+            serde_json::json!([{"function": {"name": "test_tool", "arguments": "not json"}}]),
+        )]))
+        .build();
+
+    let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
+    let model_runnable = ChatModelRunnable::new(Arc::new(model));
+    let parser = JsonOutputKeyToolsParser::new("test_tool")
+        .with_first_tool_only(true)
+        .with_strict(true);
+
+    let runnable = StructuredOutputWithRaw::new(model_runnable, parser);
+    let result = runnable
+        .ainvoke(LanguageModelInput::from("test"), None)
+        .await
+        .unwrap();
+
+    assert_eq!(result["parsed"], serde_json::Value::Null);
+    assert!(
+        result["parsing_error"].is_string(),
+        "Expected string parsing_error, got: {:?}",
+        result["parsing_error"]
+    );
+    assert!(result.get("raw").is_some());
+}
+
+/// Test that StructuredOutputWithRaw returns correct raw serialization.
+#[tokio::test]
+async fn test_structured_output_with_raw_serializes_message() {
+    use agent_chain_core::language_models::{ChatModelRunnable, StructuredOutputWithRaw};
+    use agent_chain_core::messages::ToolCall;
+    use agent_chain_core::output_parsers::JsonOutputKeyToolsParser;
+    use agent_chain_core::runnables::Runnable;
+    use std::sync::Arc;
+
+    let tool_args = serde_json::json!({"key": "value"});
+    let ai_msg = AIMessage::builder()
+        .content("some content")
+        .tool_calls(vec![
+            ToolCall::builder().name("my_tool").args(tool_args).build(),
+        ])
+        .build();
+
+    let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
+    let model_runnable = ChatModelRunnable::new(Arc::new(model));
+    let parser = JsonOutputKeyToolsParser::new("my_tool").with_first_tool_only(true);
+
+    let runnable = StructuredOutputWithRaw::new(model_runnable, parser);
+    let result = runnable
+        .ainvoke(LanguageModelInput::from("test"), None)
+        .await
+        .unwrap();
+
+    // The raw field should be a serialized AIMessage with the content preserved
+    let raw = &result["raw"];
+    assert_eq!(raw["content"], "some content");
+    assert_eq!(raw["type"], "ai");
+}

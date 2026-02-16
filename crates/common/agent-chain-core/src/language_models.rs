@@ -56,9 +56,9 @@ pub use base::{
 // Re-export chat model types
 pub use chat_models::{
     AIMessageChunkStream, BaseChatModel, ChatChunk, ChatGenerationStream, ChatModelConfig,
-    ChatModelRunnable, ChatStream, DisableStreaming, GenerateConfig, SimpleChatModel, ToolChoice,
-    ToolLike, agenerate_from_stream, collect_and_merge_stream, extract_tool_name_from_schema,
-    generate_from_stream,
+    ChatModelRunnable, ChatStream, DisableStreaming, GenerateConfig, SimpleChatModel,
+    StructuredOutputWithRaw, ToolChoice, ToolLike, agenerate_from_stream, collect_and_merge_stream,
+    extract_tool_name_from_schema, generate_from_stream,
 };
 
 // Re-export UsageMetadata from messages (where it's canonically defined)

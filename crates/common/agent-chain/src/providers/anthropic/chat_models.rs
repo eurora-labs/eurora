@@ -459,7 +459,7 @@ impl BaseChatModel for ChatAnthropic {
     fn with_structured_output(
         &self,
         schema: serde_json::Value,
-        _include_raw: bool,
+        include_raw: bool,
     ) -> Result<
         Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
     > {
@@ -472,8 +472,15 @@ impl BaseChatModel for ChatAnthropic {
                 .with_first_tool_only(true);
 
         let model_runnable = ChatModelRunnable::new(std::sync::Arc::from(bound_model));
-        let chain = crate::runnables::base::pipe(model_runnable, output_parser);
-        Ok(Box::new(chain))
+
+        if include_raw {
+            Ok(Box::new(
+                crate::language_models::StructuredOutputWithRaw::new(model_runnable, output_parser),
+            ))
+        } else {
+            let chain = crate::runnables::base::pipe(model_runnable, output_parser);
+            Ok(Box::new(chain))
+        }
     }
 }
 
