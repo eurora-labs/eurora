@@ -4,7 +4,7 @@ pub use error::{AssetError, AssetResult};
 
 use std::sync::Arc;
 
-use be_remote_db::{DatabaseManager, NewAsset};
+use be_remote_db::DatabaseManager;
 use be_storage::StorageService;
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
@@ -13,7 +13,6 @@ use uuid::Uuid;
 
 use proto_gen::asset::{Asset, AssetResponse, CreateAssetRequest};
 
-/// The main assets service
 #[derive(Debug)]
 pub struct AssetService {
     db: Arc<DatabaseManager>,
@@ -21,29 +20,20 @@ pub struct AssetService {
 }
 
 impl AssetService {
-    /// Create a new AssetsService instance
     pub fn new(db: Arc<DatabaseManager>, storage: Arc<StorageService>) -> Self {
         info!("Creating new AssetsService instance");
         Self { db, storage }
     }
 
-    /// Create a new AssetsService with storage configured from environment
-    ///
-    /// # Errors
-    ///
-    /// Returns [`AssetError::StorageConfig`] if the storage service
-    /// cannot be configured from environment variables.
     pub fn from_env(db: Arc<DatabaseManager>) -> AssetResult<Self> {
         let storage = StorageService::from_env().map_err(AssetError::StorageConfig)?;
         Ok(Self::new(db, Arc::new(storage)))
     }
 
-    /// Get the storage service reference
     pub fn storage(&self) -> &StorageService {
         &self.storage
     }
 
-    /// Convert a database Asset to a proto Asset
     fn db_asset_to_proto(asset: &be_remote_db::Asset) -> Asset {
         use base64::{Engine as _, engine::general_purpose};
 
@@ -63,7 +53,6 @@ impl AssetService {
     }
 }
 
-/// Convert DateTime<Utc> to prost_types::Timestamp
 fn datetime_to_timestamp(dt: DateTime<Utc>) -> Timestamp {
     Timestamp {
         seconds: dt.timestamp(),
@@ -79,7 +68,6 @@ impl AssetService {
     ) -> AssetResult<AssetResponse> {
         info!("CreateAsset request received");
 
-        // Validate request
         if req.content.is_empty() {
             return Err(AssetError::EmptyContent);
         }
@@ -88,7 +76,6 @@ impl AssetService {
             return Err(AssetError::MissingMimeType);
         }
 
-        // Calculate SHA256 hash and byte size
         let checksum_sha256 = StorageService::calculate_sha256(&req.content);
         let size_bytes = req.content.len() as i64;
 
@@ -100,7 +87,6 @@ impl AssetService {
 
         let asset_id = Uuid::now_v7();
 
-        // Upload content to storage
         let storage_uri = self
             .storage
             .upload(&user_id, &asset_id, &req.content, &req.mime_type)
@@ -110,34 +96,32 @@ impl AssetService {
                 AssetError::StorageUpload(e)
             })?;
 
-        // Parse metadata if provided
-        let metadata = req
+        let metadata: Option<serde_json::Value> = req
             .metadata
             .as_ref()
             .map(|m| serde_json::from_str(m))
             .transpose()
             .map_err(AssetError::InvalidMetadata)?;
 
-        // Create database record
-        let db_request = NewAsset {
-            id: Some(asset_id),
-            user_id,
-            name: req.name,
-            checksum_sha256: Some(checksum_sha256),
-            size_bytes: Some(size_bytes),
-            storage_uri,
-            storage_backend: self.storage.get_backend_name().to_string(),
-            mime_type: req.mime_type,
-            status: None, // Uses default (Uploaded)
-            metadata,
-        };
+        let asset = self
+            .db
+            .create_asset()
+            .id(asset_id)
+            .user_id(user_id)
+            .name(req.name)
+            .checksum_sha256(checksum_sha256)
+            .size_bytes(size_bytes)
+            .storage_uri(storage_uri)
+            .storage_backend(self.storage.get_backend_name().to_string())
+            .mime_type(req.mime_type)
+            .maybe_metadata(metadata)
+            .call()
+            .await
+            .map_err(|e| {
+                error!("Failed to create asset in database: {}", e);
+                AssetError::DatabaseCreate(e)
+            })?;
 
-        let asset = self.db.create_asset(db_request).await.map_err(|e| {
-            error!("Failed to create asset in database: {}", e);
-            AssetError::DatabaseCreate(e)
-        })?;
-
-        // Link to activity if activity_id provided
         if let Some(activity_id_str) = &req.activity_id {
             let activity_id =
                 Uuid::parse_str(activity_id_str).map_err(AssetError::InvalidActivityId)?;

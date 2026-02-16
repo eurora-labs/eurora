@@ -1,39 +1,26 @@
-//! Error types for the Activity Service.
-//!
-//! This module provides structured error handling with automatic
-//! conversion to gRPC status codes.
-
 use thiserror::Error;
 use tonic::{Code, Status};
 
-/// Errors that can occur in the activity service.
 #[derive(Error, Debug)]
 pub enum ActivityServiceError {
-    /// Authentication error - missing or invalid claims.
     #[error("Authentication failed: {0}")]
     Unauthenticated(String),
 
-    /// Invalid argument provided in the request.
     #[error("Invalid argument: {0}")]
     InvalidArgument(String),
 
-    /// Requested resource was not found.
     #[error("Not found: {0}")]
     NotFound(String),
 
-    /// Database operation failed.
     #[error("Database error: {0}")]
     Database(#[source] be_remote_db::DbError),
 
-    /// Storage operation failed.
     #[error("Storage error: {0}")]
     Storage(#[source] be_storage::StorageError),
 
-    /// Asset operation failed.
     #[error("Asset error: {0}")]
     Asset(#[source] be_asset::AssetError),
 
-    /// UUID parsing failed.
     #[error("Invalid UUID '{field}': {source}")]
     InvalidUuid {
         field: &'static str,
@@ -41,57 +28,46 @@ pub enum ActivityServiceError {
         source: uuid::Error,
     },
 
-    /// Timestamp conversion failed.
     #[error("Invalid timestamp for field '{0}'")]
     InvalidTimestamp(&'static str),
 
-    /// Internal server error.
     #[error("Internal error: {0}")]
     Internal(String),
 }
 
 impl ActivityServiceError {
-    /// Create an unauthenticated error.
     pub fn unauthenticated(msg: impl Into<String>) -> Self {
         Self::Unauthenticated(msg.into())
     }
 
-    /// Create an invalid argument error.
     pub fn invalid_argument(msg: impl Into<String>) -> Self {
         Self::InvalidArgument(msg.into())
     }
 
-    /// Create a not found error.
     pub fn not_found(msg: impl Into<String>) -> Self {
         Self::NotFound(msg.into())
     }
 
-    /// Create an internal error.
     pub fn internal(msg: impl Into<String>) -> Self {
         Self::Internal(msg.into())
     }
 
-    /// Create an invalid UUID error.
     pub fn invalid_uuid(field: &'static str, source: uuid::Error) -> Self {
         Self::InvalidUuid { field, source }
     }
 
-    /// Create an invalid timestamp error.
     pub fn invalid_timestamp(field: &'static str) -> Self {
         Self::InvalidTimestamp(field)
     }
 
-    /// Check if this is a not found error.
     pub fn is_not_found(&self) -> bool {
         matches!(self, Self::NotFound(_))
     }
 
-    /// Check if this is an authentication error.
     pub fn is_unauthenticated(&self) -> bool {
         matches!(self, Self::Unauthenticated(_))
     }
 
-    /// Get the gRPC status code for this error.
     pub fn code(&self) -> Code {
         match self {
             Self::Unauthenticated(_) => Code::Unauthenticated,
@@ -122,7 +98,6 @@ impl From<ActivityServiceError> for Status {
         let code = err.code();
         let message = err.to_string();
 
-        // Log the error with appropriate level based on severity
         match &err {
             ActivityServiceError::Unauthenticated(_) => {
                 tracing::warn!("Authentication error: {}", message);
@@ -149,7 +124,6 @@ impl From<ActivityServiceError> for Status {
             }
         }
 
-        // For internal errors, don't expose implementation details to clients
         let client_message = match err {
             ActivityServiceError::Database(_) => "Database operation failed".to_string(),
             ActivityServiceError::Storage(_) => "Storage operation failed".to_string(),
@@ -161,7 +135,6 @@ impl From<ActivityServiceError> for Status {
     }
 }
 
-/// Result type alias for activity service operations.
 pub type ActivityResult<T> = std::result::Result<T, ActivityServiceError>;
 
 #[cfg(test)]

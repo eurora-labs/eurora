@@ -12,8 +12,11 @@ use serde_json::Value;
 
 use super::base::OutputParserError;
 use crate::error::{Error, Result};
+use crate::messages::AIMessage;
 use crate::messages::{InvalidToolCall, invalid_tool_call};
 use crate::outputs::ChatGeneration;
+use crate::runnables::base::Runnable;
+use crate::runnables::config::RunnableConfig;
 use crate::utils::json::parse_partial_json;
 
 /// Parse a single raw tool call dictionary into a structured result.
@@ -235,6 +238,18 @@ impl JsonOutputToolsParser {
     }
 }
 
+#[async_trait::async_trait]
+impl Runnable for JsonOutputToolsParser {
+    type Input = AIMessage;
+    type Output = Value;
+
+    fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let message = crate::messages::BaseMessage::AI(input);
+        let generation = ChatGeneration::new(message);
+        self.parse_result(&[generation], false)
+    }
+}
+
 /// Parse tools from OpenAI response, filtering by key name.
 ///
 /// Mirrors `langchain_core.output_parsers.openai_tools.JsonOutputKeyToolsParser`.
@@ -374,6 +389,18 @@ impl JsonOutputKeyToolsParser {
     }
 }
 
+#[async_trait::async_trait]
+impl Runnable for JsonOutputKeyToolsParser {
+    type Input = AIMessage;
+    type Output = Value;
+
+    fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let message = crate::messages::BaseMessage::AI(input);
+        let generation = ChatGeneration::new(message);
+        self.parse_result(&[generation], false)
+    }
+}
+
 /// Parse tools from OpenAI response into typed structs.
 ///
 /// Mirrors `langchain_core.output_parsers.openai_tools.PydanticToolsParser`.
@@ -500,6 +527,18 @@ impl PydanticToolsParser {
         } else {
             Ok(Value::Array(pydantic_objects))
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl Runnable for PydanticToolsParser {
+    type Input = AIMessage;
+    type Output = Value;
+
+    fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let message = crate::messages::BaseMessage::AI(input);
+        let generation = ChatGeneration::new(message);
+        self.parse_result(&[generation], false)
     }
 }
 

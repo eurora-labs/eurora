@@ -1,0 +1,26 @@
+[package]
+name = "be-authz"
+version = "0.0.0"
+edition.workspace = true
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+
+[package.metadata.cargo-machete]
+ignored = ["tonic-prost"]
+
+[dependencies]
+auth-core = { workspace = true }
+axum = { workspace = true }
+be-auth-core = { workspace = true }
+casbin = { workspace = true }
+http = "1"
+percent-encoding = "2"
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tonic = { workspace = true }
+tonic-prost = { workspace = true }
+tower = { workspace = true, features = ["util"] }
+tracing = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }

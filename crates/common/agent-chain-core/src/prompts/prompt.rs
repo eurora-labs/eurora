@@ -8,7 +8,12 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use async_trait::async_trait;
+
 use crate::error::{Error, Result};
+use crate::prompt_values::StringPromptValue;
+use crate::runnables::base::Runnable;
+use crate::runnables::config::{RunnableConfig, ensure_config};
 use crate::utils::input::get_colored_text;
 
 use super::base::{BasePromptTemplate, FormatOutputType};
@@ -96,10 +101,10 @@ impl PromptTemplate {
     ) -> Result<Self> {
         let template = template.into();
 
-        let input_variables = match input_variables {
-            Some(vars) => vars,
-            None => get_template_variables(&template, template_format)?,
-        };
+        // Python always re-infers input_variables from the template,
+        // even when user-provided ones are given (lines 108-110 of prompt.py).
+        let _ = input_variables;
+        let input_variables = get_template_variables(&template, template_format)?;
 
         let prompt = Self {
             template,
@@ -248,11 +253,7 @@ impl PromptTemplate {
         pieces.extend(examples.iter().cloned());
         pieces.push(suffix.to_string());
 
-        let template = pieces
-            .into_iter()
-            .filter(|p| !p.is_empty())
-            .collect::<Vec<_>>()
-            .join(example_separator);
+        let template = pieces.join(example_separator);
 
         Ok(Self {
             template,
@@ -458,6 +459,59 @@ impl std::ops::Add<&str> for PromptTemplate {
     fn add(self, other: &str) -> Self::Output {
         let other_prompt = PromptTemplate::from_template_with_format(other, self.template_format)?;
         self + other_prompt
+    }
+}
+
+#[async_trait]
+impl Runnable for PromptTemplate {
+    type Input = HashMap<String, String>;
+    type Output = StringPromptValue;
+
+    fn name(&self) -> Option<String> {
+        Some("PromptTemplate".to_string())
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let _config = ensure_config(config);
+        BasePromptTemplate::validate_input(self, &input)?;
+        let text = BasePromptTemplate::format(self, &input)?;
+        Ok(StringPromptValue::new(text))
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        self.invoke(input, config)
+    }
+}
+
+// --- Serializable impl ---
+
+use crate::load::Serializable;
+use serde_json::Value;
+
+impl Serializable for PromptTemplate {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "prompts".to_string(),
+            "prompt".to_string(),
+        ]
+    }
+
+    fn lc_attributes(&self) -> HashMap<String, Value> {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "template_format".to_string(),
+            Value::String(self.template_format.as_str().to_string()),
+        );
+        attrs
     }
 }
 

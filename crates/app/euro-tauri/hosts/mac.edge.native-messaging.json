@@ -1,0 +1,7 @@
+{
+	"allowed_origins": ["chrome-extension://jldnbebjeaegfgpboohhoipokpbpncke/"],
+	"description": "Eurora Native Messaging Host",
+	"name": "com.eurora.app",
+	"path": "/Applications/Eurora.app/Contents/Resources/Eurora.app/Contents/MacOS/euro-native-messaging",
+	"type": "stdio"
+}

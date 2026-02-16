@@ -424,12 +424,28 @@ impl Runnable for RunnableAssign {
             "properties": properties
         })
     }
+    fn get_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph> {
+        let mut graph = self.mapper.get_graph(config)?;
+        let input_node = graph.first_node().cloned();
+        let output_node = graph.last_node().cloned();
+        if let (Some(input_node), Some(output_node)) = (input_node, output_node) {
+            let passthrough_node = graph.add_node_named("Passthrough", None);
+            graph.add_edge(&input_node, &passthrough_node, None, false);
+            graph.add_edge(&passthrough_node, &output_node, None, false);
+        }
+        Ok(graph)
+    }
+
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         let config = ensure_config(config);
         let callback_manager = get_callback_manager_for_config(&config);
 
-        let run_manager =
-            callback_manager.on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id);
+        let run_manager = callback_manager
+            .on_chain_start()
+            .serialized(&HashMap::new())
+            .inputs(&HashMap::new())
+            .maybe_run_id(config.run_id)
+            .call();
 
         let child_config = patch_config(
             Some(config),
@@ -468,8 +484,12 @@ impl Runnable for RunnableAssign {
         let config = ensure_config(config);
         let callback_manager = get_callback_manager_for_config(&config);
 
-        let run_manager =
-            callback_manager.on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id);
+        let run_manager = callback_manager
+            .on_chain_start()
+            .serialized(&HashMap::new())
+            .inputs(&HashMap::new())
+            .maybe_run_id(config.run_id)
+            .call();
 
         let child_config = patch_config(
             Some(config),
@@ -638,6 +658,12 @@ impl Debug for RunnablePick {
             .field("keys", &self.keys)
             .field("name", &self.name)
             .finish()
+    }
+}
+
+impl From<PickKeys> for RunnablePick {
+    fn from(keys: PickKeys) -> Self {
+        Self { keys, name: None }
     }
 }
 

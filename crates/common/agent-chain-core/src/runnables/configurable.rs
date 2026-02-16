@@ -264,38 +264,6 @@ where
         self
     }
 
-    /// Get the configuration specifications for this runnable.
-    pub fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
-        let mut config_specs = Vec::new();
-
-        for spec in self.fields.values() {
-            match spec {
-                AnyConfigurableField::Field(field) => {
-                    config_specs.push(ConfigurableFieldSpec {
-                        id: field.id.clone(),
-                        annotation: field
-                            .annotation
-                            .clone()
-                            .unwrap_or_else(|| "Any".to_string()),
-                        name: field.name.clone(),
-                        description: field.description.clone(),
-                        default: None, // Would need reflection to get default from runnable
-                        is_shared: field.is_shared,
-                        dependencies: None,
-                    });
-                }
-                AnyConfigurableField::SingleOption(opt) => {
-                    config_specs.push(make_options_spec_single(opt, None));
-                }
-                AnyConfigurableField::MultiOption(opt) => {
-                    config_specs.push(make_options_spec_multi(opt, None));
-                }
-            }
-        }
-
-        get_unique_config_specs(config_specs).map_err(Error::other)
-    }
-
     /// Prepare the runnable for invocation.
     ///
     /// This method resolves the configuration and returns the runnable to use
@@ -385,6 +353,34 @@ where
 
     fn name(&self) -> Option<String> {
         self.default.name()
+    }
+
+    fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
+        let mut specs = Vec::new();
+
+        for field in self.fields.values() {
+            match field {
+                AnyConfigurableField::Field(f) => {
+                    specs.push(ConfigurableFieldSpec {
+                        id: f.id.clone(),
+                        annotation: f.annotation.clone().unwrap_or_else(|| "Any".to_string()),
+                        name: f.name.clone(),
+                        description: f.description.clone(),
+                        default: None,
+                        is_shared: f.is_shared,
+                        dependencies: None,
+                    });
+                }
+                AnyConfigurableField::SingleOption(opt) => {
+                    specs.push(make_options_spec_single(opt, None));
+                }
+                AnyConfigurableField::MultiOption(opt) => {
+                    specs.push(make_options_spec_multi(opt, None));
+                }
+            }
+        }
+
+        get_unique_config_specs(specs).map_err(Error::other)
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
@@ -498,13 +494,45 @@ where
         config: Option<RunnableConfig>,
     ) -> BoxStream<'_, Result<Self::Output>> {
         let (runnable, config) = self.prepare_internal(config);
-        // Note: This is a limitation - we need to return a stream that borrows self,
-        // but runnable doesn't live long enough. In a real implementation, we'd need
-        // to handle this differently, perhaps by storing the runnable.
         Box::pin(async_stream::stream! {
             let result = runnable.invoke(input, Some(config));
             yield result;
         })
+    }
+
+    fn transform<'a>(
+        &'a self,
+        input: BoxStream<'a, Self::Input>,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'a, Result<Self::Output>> {
+        let (runnable, config) = self.prepare_internal(config);
+        Box::pin(async_stream::stream! {
+            let mut stream = runnable.transform(input, Some(config));
+            while let Some(item) = futures::StreamExt::next(&mut stream).await {
+                yield item;
+            }
+        })
+    }
+
+    fn atransform<'a>(
+        &'a self,
+        input: BoxStream<'a, Self::Input>,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'a, Result<Self::Output>>
+    where
+        Self: 'static,
+    {
+        let (runnable, config) = self.prepare_internal(config);
+        Box::pin(async_stream::stream! {
+            let mut stream = runnable.atransform(input, Some(config));
+            while let Some(item) = futures::StreamExt::next(&mut stream).await {
+                yield item;
+            }
+        })
+    }
+
+    fn get_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph> {
+        self.default.get_graph(config)
     }
 }
 
@@ -616,30 +644,6 @@ where
         self
     }
 
-    /// Get the configuration specifications for this runnable.
-    pub fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
-        let mut all_keys: Vec<String> = self.alternatives.keys().cloned().collect();
-        all_keys.push(self.default_key.clone());
-
-        let which_spec = ConfigurableFieldSpec {
-            id: self.which.id.clone(),
-            annotation: format!("Enum[{}]", all_keys.join(", ")),
-            name: self.which.name.clone(),
-            description: self.which.description.clone(),
-            default: Some(Value::String(self.default_key.clone())),
-            is_shared: self.which.is_shared,
-            dependencies: None,
-        };
-
-        let specs = vec![which_spec];
-
-        // Note: In a full implementation, we would also add config specs from
-        // the default and alternative runnables, potentially with prefixes.
-        // This requires the runnables to implement a config_specs method.
-
-        get_unique_config_specs(specs).map_err(Error::other)
-    }
-
     /// Prepare the runnable for invocation.
     fn prepare_internal(
         &self,
@@ -703,6 +707,24 @@ where
 
     fn name(&self) -> Option<String> {
         self.default.name()
+    }
+
+    fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
+        let mut all_keys: Vec<String> = self.alternatives.keys().cloned().collect();
+        all_keys.push(self.default_key.clone());
+
+        let which_spec = ConfigurableFieldSpec {
+            id: self.which.id.clone(),
+            annotation: format!("Enum[{}]", all_keys.join(", ")),
+            name: self.which.name.clone(),
+            description: self.which.description.clone(),
+            default: Some(Value::String(self.default_key.clone())),
+            is_shared: self.which.is_shared,
+            dependencies: None,
+        };
+
+        let specs = vec![which_spec];
+        get_unique_config_specs(specs).map_err(Error::other)
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
@@ -843,6 +865,57 @@ where
                 }
             }
         })
+    }
+
+    fn transform<'a>(
+        &'a self,
+        input: BoxStream<'a, Self::Input>,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'a, Result<Self::Output>> {
+        Box::pin(async_stream::stream! {
+            match self.prepare_internal(config) {
+                Ok((runnable, config)) => {
+                    let mut stream = runnable.transform(input, Some(config));
+                    while let Some(item) = futures::StreamExt::next(&mut stream).await {
+                        yield item;
+                    }
+                }
+                Err(e) => {
+                    yield Err(e);
+                }
+            }
+        })
+    }
+
+    fn atransform<'a>(
+        &'a self,
+        input: BoxStream<'a, Self::Input>,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'a, Result<Self::Output>>
+    where
+        Self: 'static,
+    {
+        Box::pin(async_stream::stream! {
+            match self.prepare_internal(config) {
+                Ok((runnable, config)) => {
+                    let mut stream = runnable.atransform(input, Some(config));
+                    while let Some(item) = futures::StreamExt::next(&mut stream).await {
+                        yield item;
+                    }
+                }
+                Err(e) => {
+                    yield Err(e);
+                }
+            }
+        })
+    }
+
+    fn get_graph(
+        &self,
+        config: Option<&super::config::RunnableConfig>,
+    ) -> crate::error::Result<super::graph::Graph> {
+        let (runnable, config) = self.prepare_internal(config.cloned())?;
+        runnable.get_graph(Some(&config))
     }
 }
 

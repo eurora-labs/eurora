@@ -4,7 +4,33 @@ use std::sync::{Arc, RwLock};
 
 use crate::caches::BaseCache;
 
+static VERBOSE: RwLock<bool> = RwLock::new(false);
+static DEBUG: RwLock<bool> = RwLock::new(false);
 static LLM_CACHE: RwLock<Option<Arc<dyn BaseCache>>> = RwLock::new(None);
+
+pub fn set_verbose(value: bool) {
+    if let Ok(mut verbose) = VERBOSE.write() {
+        *verbose = value;
+    } else {
+        tracing::error!("VERBOSE lock poisoned");
+    }
+}
+
+pub fn get_verbose() -> bool {
+    VERBOSE.read().map(|v| *v).unwrap_or(false)
+}
+
+pub fn set_debug(value: bool) {
+    if let Ok(mut debug) = DEBUG.write() {
+        *debug = value;
+    } else {
+        tracing::error!("DEBUG lock poisoned");
+    }
+}
+
+pub fn get_debug() -> bool {
+    DEBUG.read().map(|d| *d).unwrap_or(false)
+}
 
 /// Set a new LLM cache, overwriting the previous value, if any.
 ///
@@ -12,8 +38,11 @@ static LLM_CACHE: RwLock<Option<Arc<dyn BaseCache>>> = RwLock::new(None);
 ///
 /// * `value` - The new LLM cache to use. If `None`, the LLM cache is disabled.
 pub fn set_llm_cache(value: Option<Arc<dyn BaseCache>>) {
-    let mut cache = LLM_CACHE.write().expect("lock poisoned");
-    *cache = value;
+    if let Ok(mut cache) = LLM_CACHE.write() {
+        *cache = value;
+    } else {
+        tracing::error!("LLM_CACHE lock poisoned");
+    }
 }
 
 /// Get the value of the `llm_cache` global setting.
@@ -22,14 +51,41 @@ pub fn set_llm_cache(value: Option<Arc<dyn BaseCache>>) {
 ///
 /// The value of the `llm_cache` global setting.
 pub fn get_llm_cache() -> Option<Arc<dyn BaseCache>> {
-    let cache = LLM_CACHE.read().expect("lock poisoned");
-    cache.clone()
+    LLM_CACHE.read().ok().and_then(|cache| cache.clone())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::caches::InMemoryCache;
+
+    #[test]
+    fn test_verbose_default() {
+        set_verbose(false);
+        assert!(!get_verbose());
+    }
+
+    #[test]
+    fn test_set_and_get_verbose() {
+        set_verbose(true);
+        assert!(get_verbose());
+        set_verbose(false);
+        assert!(!get_verbose());
+    }
+
+    #[test]
+    fn test_debug_default() {
+        set_debug(false);
+        assert!(!get_debug());
+    }
+
+    #[test]
+    fn test_set_and_get_debug() {
+        set_debug(true);
+        assert!(get_debug());
+        set_debug(false);
+        assert!(!get_debug());
+    }
 
     #[test]
     fn test_llm_cache_default() {

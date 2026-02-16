@@ -7,4 +7,3 @@
 *.rpm
 *.sig
 *.exe
-*.app

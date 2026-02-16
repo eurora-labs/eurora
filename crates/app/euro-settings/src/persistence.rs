@@ -1,9 +1,9 @@
-use std::path::Path;
-
 use anyhow::Result;
 use euro_fs::create_dirs_then_write;
 use serde_json::json;
 use serde_json_lenient::to_string_pretty;
+use std::path::Path;
+use tracing::debug;
 
 use crate::{
     AppSettings,
@@ -24,7 +24,23 @@ impl AppSettings {
 
         merge_non_null_json_value(customizations, &mut settings);
 
-        Ok(serde_json::from_value(settings)?)
+        let mut app_settings: AppSettings = serde_json::from_value(settings)?;
+
+        // Normal user login flows won't work during development
+        // if you have the variable set in the .env file
+        if let Ok(api_base_url) = std::env::var("API_BASE_URL") {
+            app_settings.api.endpoint = api_base_url;
+        } else if cfg!(debug_assertions) {
+            // This is handy for development so that
+            // the Tauri app connects after running
+            // pnpm docker:monolith
+            if let Some(endpoint) = euro_debug::detect_local_backend_endpoint() {
+                debug!("Detected local backend at {}", endpoint);
+                app_settings.api.endpoint = endpoint;
+            }
+        }
+
+        Ok(app_settings)
     }
 
     pub fn load_from_default_path_creating() -> Result<Self> {
@@ -35,25 +51,19 @@ impl AppSettings {
         AppSettings::load(config_dir.join(SETTINGS_FILE).as_path())
     }
 
-    /// Save all value in this instance to the custom configuration file *if they differ* from the defaults.
+    /// Save only values that differ from the current config file.
     pub fn save(&self, config_path: &Path) -> Result<()> {
-        // Load the current settings
         let current = serde_json::to_value(AppSettings::load(config_path)?)?;
-
-        // Derive changed values only compared to the current settings
         let update = serde_json::to_value(self)?;
         let diff = json_difference(current, &update);
 
-        // If there are no changes, do nothing
         if diff == json!({}) {
             return Ok(());
         }
 
-        // Load the existing customizations only
         let mut customizations =
             serde_json_lenient::from_str(&std::fs::read_to_string(config_path)?)?;
 
-        // Merge the new customizations into the existing ones
         // TODO: This will nuke any comments in the file
         merge_non_null_json_value(diff, &mut customizations);
         euro_fs::create_dirs_then_write(config_path, to_string_pretty(&customizations)?)?;

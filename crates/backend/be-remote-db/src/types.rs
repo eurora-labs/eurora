@@ -38,7 +38,7 @@ impl PaginationParams {
         let order = match order.to_lowercase().as_str() {
             "asc" => SortOrder::Asc,
             "desc" => SortOrder::Desc,
-            _ => panic!("Invalid sort order"),
+            _ => SortOrder::Desc,
         };
         Self {
             offset,
@@ -81,29 +81,6 @@ pub struct PasswordCredentials {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewUser {
-    pub username: String,
-    pub email: String,
-    pub display_name: Option<String>,
-    pub password_hash: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateUser {
-    pub id: Uuid,
-    pub username: Option<String>,
-    pub email: Option<String>,
-    pub display_name: Option<String>,
-    pub email_verified: Option<bool>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdatePassword {
-    pub password_hash: String,
-}
-
-/// OAuth provider enum matching the database enum
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[sqlx(type_name = "oauth_provider", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
@@ -140,7 +117,6 @@ pub struct OAuthCredentials {
 pub struct RefreshToken {
     pub id: Uuid,
     pub user_id: Uuid,
-    /// SHA-256 hash stored as 32 bytes
     #[serde(skip_serializing)]
     pub token_hash: Vec<u8>,
     pub issued_at: DateTime<Utc>,
@@ -150,38 +126,10 @@ pub struct RefreshToken {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateOAuthCredentials {
-    pub user_id: Uuid,
-    pub provider: OAuthProvider,
-    pub provider_user_id: String,
-    pub access_token: Option<Vec<u8>>,
-    pub refresh_token: Option<Vec<u8>>,
-    pub access_token_expiry: Option<DateTime<Utc>>,
-    pub scope: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateRefreshToken {
-    pub user_id: Uuid,
-    /// SHA-256 hash stored as 32 bytes
-    pub token_hash: Vec<u8>,
-    pub expires_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateOAuthCredentials {
-    pub access_token: Option<Vec<u8>>,
-    pub refresh_token: Option<Vec<u8>>,
-    pub access_token_expiry: Option<DateTime<Utc>>,
-    pub scope: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct OAuthState {
     pub id: Uuid,
     pub state: String,
-    /// Encrypted PKCE verifier stored as bytes (application handles encryption)
     #[serde(skip_serializing)]
     pub pkce_verifier: Vec<u8>,
     pub redirect_uri: String,
@@ -190,22 +138,13 @@ pub struct OAuthState {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateOAuthState {
-    pub state: String,
-    /// Encrypted PKCE verifier (application must encrypt before storing)
-    pub pkce_verifier: Vec<u8>,
-    pub redirect_uri: String,
-    pub ip_address: Option<ipnet::IpNet>,
-    pub expires_at: DateTime<Utc>,
+    #[serde(skip_serializing)]
+    pub nonce: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct LoginToken {
     pub id: Uuid,
-    /// SHA-256 hash of the token (32 bytes)
     #[serde(skip_serializing)]
     pub token_hash: Vec<u8>,
     pub consumed: bool,
@@ -213,26 +152,12 @@ pub struct LoginToken {
     pub user_id: Uuid,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateLoginToken {
-    /// SHA-256 hash of the token (32 bytes)
-    pub token_hash: Vec<u8>,
-    pub user_id: Uuid,
-    pub expires_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateLoginToken {
-    pub user_id: Uuid,
 }
 
 // =============================================================================
 // Asset Types
 // =============================================================================
 
-/// Asset status enum matching the database enum
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
 #[sqlx(type_name = "asset_status", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
@@ -259,7 +184,6 @@ impl std::fmt::Display for AssetStatus {
     }
 }
 
-/// Represents a file asset (screenshots, attachments, etc.)
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Asset {
     pub id: Uuid,
@@ -276,33 +200,6 @@ pub struct Asset {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Request for creating a new asset
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewAsset {
-    pub id: Option<Uuid>,
-    pub user_id: Uuid,
-    pub name: String,
-    pub checksum_sha256: Option<Vec<u8>>,
-    pub size_bytes: Option<i64>,
-    pub storage_uri: String,
-    pub storage_backend: String,
-    pub mime_type: String,
-    pub status: Option<AssetStatus>,
-    pub metadata: Option<serde_json::Value>,
-}
-
-/// Request for updating an asset
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateAsset {
-    pub checksum_sha256: Option<Vec<u8>>,
-    pub size_bytes: Option<i64>,
-    pub storage_uri: Option<String>,
-    pub mime_type: Option<String>,
-    pub status: Option<AssetStatus>,
-    pub metadata: Option<serde_json::Value>,
-}
-
-/// Message-asset link
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct MessageAsset {
     pub message_id: Uuid,
@@ -310,7 +207,6 @@ pub struct MessageAsset {
     pub created_at: DateTime<Utc>,
 }
 
-/// Activity-asset link
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ActivityAsset {
     pub activity_id: Uuid,
@@ -322,7 +218,6 @@ pub struct ActivityAsset {
 // Activity Types
 // =============================================================================
 
-/// Represents a user activity (application/process usage)
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Activity {
     pub id: Uuid,
@@ -337,59 +232,10 @@ pub struct Activity {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Request for creating a new activity
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewActivity {
-    pub id: Option<Uuid>,
-    pub user_id: Uuid,
-    pub name: String,
-    pub icon_asset_id: Option<Uuid>,
-    pub process_name: String,
-    pub window_title: String,
-    pub started_at: DateTime<Utc>,
-    pub ended_at: Option<DateTime<Utc>>,
-}
-
-/// Request for updating an existing activity
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct UpdateActivity {
-    pub id: Uuid,
-    pub user_id: Uuid,
-    pub name: Option<String>,
-    pub icon_asset_id: Option<Uuid>,
-    pub process_name: Option<String>,
-    pub window_title: Option<String>,
-    pub started_at: Option<DateTime<Utc>>,
-    pub ended_at: Option<DateTime<Utc>>,
-}
-
-/// Request for listing activities with pagination
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ListActivities {
-    pub user_id: Uuid,
-}
-
-/// Request for getting activities by time range
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetActivitiesByTimeRange {
-    pub user_id: Uuid,
-    pub start_time: DateTime<Utc>,
-    pub end_time: DateTime<Utc>,
-}
-
-/// Request for updating activity end time
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateActivityEndTime {
-    pub activity_id: Uuid,
-    pub user_id: Uuid,
-    pub ended_at: DateTime<Utc>,
-}
-
 // =============================================================================
 // Conversation Types
 // =============================================================================
 
-/// Database representation of a conversation
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Conversation {
     pub id: Uuid,
@@ -399,39 +245,10 @@ pub struct Conversation {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Request for creating a conversation
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewConversation {
-    pub id: Option<Uuid>,
-    pub user_id: Uuid,
-    pub title: String,
-}
-
-/// Request for getting a conversation
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetConversation {
-    pub id: Uuid,
-    pub user_id: Uuid,
-}
-
-/// Request for updating a conversation
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct UpdateConversation {
-    pub title: Option<String>,
-}
-
-/// Request for listing conversations with pagination
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ListConversations {
-    pub user_id: Uuid,
-}
-
 // =============================================================================
 // Message Types
 // =============================================================================
 
-/// Message type enum matching the database enum
-/// Corresponds to agent-chain BaseMessage variants
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[sqlx(type_name = "message_type", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
@@ -453,44 +270,45 @@ impl std::fmt::Display for MessageType {
     }
 }
 
-/// Database representation of a message within a conversation
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Message {
     pub id: Uuid,
     pub conversation_id: Uuid,
     pub user_id: Uuid,
     pub message_type: MessageType,
-    /// Content stored as JSONB
-    /// For human: MessageContent (can be {"Text": "..."} or {"Parts": [...]})
-    /// For system/ai/tool: Simple string stored as JSON string
     pub content: serde_json::Value,
-    /// For ToolMessage: the ID of the tool call this responds to
     pub tool_call_id: Option<String>,
-    /// For AIMessage: JSON array of ToolCall objects
     pub tool_calls: Option<serde_json::Value>,
-    /// Additional metadata as JSON object
     pub additional_kwargs: serde_json::Value,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
-/// Request for updating an existing message
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct UpdateMessage {
-    pub content: Option<serde_json::Value>,
-    pub tool_call_id: Option<String>,
-    pub tool_calls: Option<serde_json::Value>,
-    pub additional_kwargs: Option<serde_json::Value>,
 }
 
 // =============================================================================
 // Junction Types (Activity-Conversation)
 // =============================================================================
 
-/// Activity-conversation link
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ActivityConversation {
     pub activity_id: Uuid,
     pub conversation_id: Uuid,
     pub created_at: DateTime<Utc>,
+}
+
+// =============================================================================
+// Billing Types
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct AccountBillingState {
+    pub account_id: Uuid,
+    pub stripe_subscription_id: Option<String>,
+    pub status: Option<String>,
+    pub current_period_start: Option<DateTime<Utc>>,
+    pub current_period_end: Option<DateTime<Utc>>,
+    pub cancel_at_period_end: Option<bool>,
+    pub plan_id: Option<String>,
+    pub plan_name: Option<String>,
+    pub max_users: Option<i32>,
+    pub max_projects: Option<i32>,
 }

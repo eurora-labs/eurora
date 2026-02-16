@@ -38,9 +38,10 @@ tokio = { workspace = true, features = [
   "fs",
   "macros",
   "rt-multi-thread",
+  "sync",
 ] }
 tonic = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 url = { workspace = true }
 usvg = { version = "0.45" }
 uuid = { workspace = true }

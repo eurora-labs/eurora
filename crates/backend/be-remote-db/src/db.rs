@@ -1,21 +1,19 @@
 use crate::{
-    GetConversation, MessageType, PaginationParams,
-    error::DbResult,
+    MessageType, PaginationParams,
+    error::{DbError, DbResult},
     types::{
-        Activity, ActivityAsset, Asset, AssetStatus, Conversation, CreateLoginToken,
-        CreateOAuthCredentials, CreateOAuthState, CreateRefreshToken, GetActivitiesByTimeRange,
-        ListActivities, ListConversations, LoginToken, Message, NewActivity, NewAsset,
-        NewConversation, NewUser, OAuthCredentials, OAuthProvider, OAuthState, PasswordCredentials,
-        RefreshToken, UpdateActivity, UpdateActivityEndTime, UpdateOAuthCredentials, User,
+        Activity, ActivityAsset, Asset, AssetStatus, Conversation, LoginToken, Message,
+        OAuthCredentials, OAuthProvider, OAuthState, PasswordCredentials, RefreshToken, User,
     },
 };
 use bon::bon;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use sqlx::{
     migrate::MigrateDatabase,
     postgres::{PgPool, PgPoolOptions},
 };
 use std::time::Duration;
+use tracing::warn;
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -26,21 +24,19 @@ pub struct DatabaseManager {
 #[bon]
 impl DatabaseManager {
     pub async fn new(database_url: &str) -> DbResult<Self> {
-        // Create the database if it doesn't exist
         if !sqlx::Postgres::database_exists(database_url).await? {
             sqlx::Postgres::create_database(database_url).await?;
         }
 
         let pool = PgPoolOptions::new()
             .max_connections(50)
-            .min_connections(3) // Minimum number of idle connections
+            .min_connections(3)
             .acquire_timeout(Duration::from_secs(10))
             .connect(database_url)
             .await?;
 
         let db_manager = DatabaseManager { pool };
 
-        // Run migrations after establishing the connection
         Self::run_migrations(&db_manager.pool).await?;
 
         Ok(db_manager)
@@ -52,16 +48,19 @@ impl DatabaseManager {
         Ok(())
     }
 
-    // User management methods
-    pub async fn create_user(&self, request: NewUser) -> DbResult<User> {
+    #[builder]
+    pub async fn create_user(
+        &self,
+        username: String,
+        email: String,
+        display_name: Option<String>,
+        password_hash: Option<String>,
+    ) -> DbResult<User> {
         let user_id = Uuid::now_v7();
-        let password_id = Uuid::now_v7();
         let now = Utc::now();
 
-        // Start a transaction to ensure both user and password_credentials are created atomically
         let mut tx = self.pool.begin().await?;
 
-        // Insert user
         let user = sqlx::query_as::<_, User>(
             r#"
             INSERT INTO users (id, username, email, display_name, email_verified, created_at, updated_at)
@@ -70,31 +69,33 @@ impl DatabaseManager {
             "#,
         )
         .bind(user_id)
-        .bind(&request.username)
-        .bind(&request.email)
-        .bind(&request.display_name)
+        .bind(&username)
+        .bind(&email)
+        .bind(&display_name)
         .bind(false) // email_verified defaults to false
         .bind(now)
         .bind(now) // updated_at is NOT NULL, set to now initially
         .fetch_one(&mut *tx)
         .await?;
 
-        // Insert password credentials
-        sqlx::query(
-            r#"
-            INSERT INTO password_credentials (id, user_id, password_hash, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5)
-            "#,
-        )
-        .bind(password_id)
-        .bind(user_id)
-        .bind(&request.password_hash)
-        .bind(now) // created_at
-        .bind(now) // updated_at is NOT NULL, set to now initially
-        .execute(&mut *tx)
-        .await?;
+        // OAuth-only users don't have password credentials
+        if let Some(ref password_hash) = password_hash {
+            let password_id = Uuid::now_v7();
+            sqlx::query(
+                r#"
+                INSERT INTO password_credentials (id, user_id, password_hash, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5)
+                "#,
+            )
+            .bind(password_id)
+            .bind(user_id)
+            .bind(password_hash)
+            .bind(now) // created_at
+            .bind(now) // updated_at is NOT NULL, set to now initially
+            .execute(&mut *tx)
+            .await?;
+        }
 
-        // Commit the transaction
         tx.commit().await?;
 
         Ok(user)
@@ -145,7 +146,6 @@ impl DatabaseManager {
         Ok(user)
     }
 
-    // Password credentials management methods
     pub async fn get_password_credentials(&self, user_id: Uuid) -> DbResult<PasswordCredentials> {
         let credentials = sqlx::query_as::<_, PasswordCredentials>(
             r#"
@@ -161,7 +161,6 @@ impl DatabaseManager {
         Ok(credentials)
     }
 
-    // Utility methods
     pub async fn user_exists_by_username(&self, username: &str) -> DbResult<bool> {
         let count: (i64,) = sqlx::query_as(
             r#"
@@ -188,10 +187,16 @@ impl DatabaseManager {
         Ok(count.0 > 0)
     }
 
-    // OAuth credentials management methods
+    #[builder]
     pub async fn create_oauth_credentials(
         &self,
-        request: CreateOAuthCredentials,
+        user_id: Uuid,
+        provider: OAuthProvider,
+        provider_user_id: String,
+        access_token: Option<Vec<u8>>,
+        refresh_token: Option<Vec<u8>>,
+        access_token_expiry: Option<DateTime<Utc>>,
+        scope: Option<String>,
     ) -> DbResult<OAuthCredentials> {
         let id = Uuid::now_v7();
         let now = Utc::now();
@@ -208,13 +213,13 @@ impl DatabaseManager {
             "#,
         )
         .bind(id)
-        .bind(request.user_id)
-        .bind(request.provider)
-        .bind(&request.provider_user_id)
-        .bind(&request.access_token)
-        .bind(&request.refresh_token)
-        .bind(request.access_token_expiry)
-        .bind(&request.scope)
+        .bind(user_id)
+        .bind(provider)
+        .bind(&provider_user_id)
+        .bind(&access_token)
+        .bind(&refresh_token)
+        .bind(access_token_expiry)
+        .bind(&scope)
         .bind(now)
         .bind(now)
         .bind(now)
@@ -245,10 +250,14 @@ impl DatabaseManager {
         Ok(oauth_creds)
     }
 
+    #[builder]
     pub async fn update_oauth_credentials(
         &self,
         id: Uuid,
-        request: UpdateOAuthCredentials,
+        access_token: Option<Vec<u8>>,
+        refresh_token: Option<Vec<u8>>,
+        access_token_expiry: Option<DateTime<Utc>>,
+        scope: Option<String>,
     ) -> DbResult<OAuthCredentials> {
         let now = Utc::now();
 
@@ -266,10 +275,10 @@ impl DatabaseManager {
             "#,
         )
         .bind(id)
-        .bind(&request.access_token)
-        .bind(&request.refresh_token)
-        .bind(request.access_token_expiry)
-        .bind(&request.scope)
+        .bind(&access_token)
+        .bind(&refresh_token)
+        .bind(access_token_expiry)
+        .bind(&scope)
         .bind(now)
         .fetch_one(&self.pool)
         .await?;
@@ -298,10 +307,12 @@ impl DatabaseManager {
         Ok(user)
     }
 
-    // Refresh token management methods
+    #[builder]
     pub async fn create_refresh_token(
         &self,
-        request: CreateRefreshToken,
+        user_id: Uuid,
+        token_hash: Vec<u8>,
+        expires_at: DateTime<Utc>,
     ) -> DbResult<RefreshToken> {
         let id = Uuid::now_v7();
         let now = Utc::now();
@@ -314,10 +325,10 @@ impl DatabaseManager {
             "#,
         )
         .bind(id)
-        .bind(request.user_id)
-        .bind(&request.token_hash)
+        .bind(user_id)
+        .bind(&token_hash)
         .bind(now)
-        .bind(request.expires_at)
+        .bind(expires_at)
         .bind(false)
         .bind(now)
         .bind(now)
@@ -361,27 +372,36 @@ impl DatabaseManager {
         Ok(refresh_token)
     }
 
-    // OAuth state management methods
-    pub async fn create_oauth_state(&self, request: CreateOAuthState) -> DbResult<OAuthState> {
+    #[builder]
+    pub async fn create_oauth_state(
+        &self,
+        state: String,
+        pkce_verifier: Vec<u8>,
+        redirect_uri: String,
+        ip_address: Option<ipnet::IpNet>,
+        expires_at: DateTime<Utc>,
+        nonce: Vec<u8>,
+    ) -> DbResult<OAuthState> {
         let id = Uuid::now_v7();
         let now = Utc::now();
 
         let oauth_state = sqlx::query_as::<_, OAuthState>(
             r#"
-            INSERT INTO oauth_state (id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at
+            INSERT INTO oauth_state (id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce
             "#,
         )
         .bind(id)
-        .bind(&request.state)
-        .bind(&request.pkce_verifier)
-        .bind(&request.redirect_uri)
-        .bind(request.ip_address)
+        .bind(&state)
+        .bind(&pkce_verifier)
+        .bind(&redirect_uri)
+        .bind(ip_address)
         .bind(false) // consumed defaults to false
         .bind(now)
         .bind(now)
-        .bind(request.expires_at)
+        .bind(expires_at)
+        .bind(&nonce)
         .fetch_one(&self.pool)
         .await?;
 
@@ -391,7 +411,7 @@ impl DatabaseManager {
     pub async fn get_oauth_state_by_state(&self, state: &str) -> DbResult<OAuthState> {
         let oauth_state = sqlx::query_as::<_, OAuthState>(
             r#"
-            SELECT id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at
+            SELECT id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce
             FROM oauth_state
             WHERE state = $1 AND consumed = false AND expires_at > now()
             "#,
@@ -411,7 +431,7 @@ impl DatabaseManager {
             UPDATE oauth_state
             SET consumed = true, updated_at = $2
             WHERE state = $1 AND consumed = false AND expires_at > now()
-            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at
+            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce
             "#,
         )
         .bind(state)
@@ -422,8 +442,13 @@ impl DatabaseManager {
         Ok(oauth_state)
     }
 
-    // Login token management methods
-    pub async fn create_login_token(&self, request: CreateLoginToken) -> DbResult<LoginToken> {
+    #[builder]
+    pub async fn create_login_token(
+        &self,
+        token_hash: Vec<u8>,
+        user_id: Uuid,
+        expires_at: DateTime<Utc>,
+    ) -> DbResult<LoginToken> {
         let id = Uuid::now_v7();
         let now = Utc::now();
 
@@ -435,9 +460,9 @@ impl DatabaseManager {
             "#,
         )
         .bind(id)
-        .bind(&request.token_hash)
-        .bind(request.expires_at)
-        .bind(request.user_id)
+        .bind(&token_hash)
+        .bind(expires_at)
+        .bind(user_id)
         .bind(false) // consumed starts as false
         .bind(now)
         .bind(now)
@@ -453,6 +478,23 @@ impl DatabaseManager {
             SELECT id, token_hash, consumed, expires_at, user_id, created_at, updated_at
             FROM login_tokens
             WHERE token_hash = $1 AND consumed = false AND expires_at > now()
+            "#,
+        )
+        .bind(token_hash)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(login_token)
+    }
+
+    /// Look up a login token by hash regardless of consumed status (still checks expiry).
+    /// Used to detect already-consumed tokens for idempotent retry handling.
+    pub async fn get_login_token_by_hash_any(&self, token_hash: &[u8]) -> DbResult<LoginToken> {
+        let login_token = sqlx::query_as::<_, LoginToken>(
+            r#"
+            SELECT id, token_hash, consumed, expires_at, user_id, created_at, updated_at
+            FROM login_tokens
+            WHERE token_hash = $1 AND expires_at > now()
             "#,
         )
         .bind(token_hash)
@@ -485,9 +527,19 @@ impl DatabaseManager {
     // Activity Management Methods
     // =========================================================================
 
-    /// Create a new activity
-    pub async fn create_activity(&self, request: NewActivity) -> DbResult<Activity> {
-        let id = request.id.unwrap_or_else(Uuid::now_v7);
+    #[builder]
+    pub async fn create_activity(
+        &self,
+        id: Option<Uuid>,
+        user_id: Uuid,
+        name: String,
+        icon_asset_id: Option<Uuid>,
+        process_name: String,
+        window_title: String,
+        started_at: DateTime<Utc>,
+        ended_at: Option<DateTime<Utc>>,
+    ) -> DbResult<Activity> {
+        let id = id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
 
         let activity = sqlx::query_as::<_, Activity>(
@@ -498,13 +550,13 @@ impl DatabaseManager {
             "#,
         )
         .bind(id)
-        .bind(request.user_id)
-        .bind(&request.name)
-        .bind(request.icon_asset_id)
-        .bind(&request.process_name)
-        .bind(&request.window_title)
-        .bind(request.started_at)
-        .bind(request.ended_at)
+        .bind(user_id)
+        .bind(&name)
+        .bind(icon_asset_id)
+        .bind(&process_name)
+        .bind(&window_title)
+        .bind(started_at)
+        .bind(ended_at)
         .bind(now)
         .bind(now)
         .fetch_one(&self.pool)
@@ -513,7 +565,6 @@ impl DatabaseManager {
         Ok(activity)
     }
 
-    /// Get an activity by ID for a specific user
     pub async fn get_activity_for_user(
         &self,
         activity_id: Uuid,
@@ -534,10 +585,10 @@ impl DatabaseManager {
         Ok(activity)
     }
 
-    /// List activities for a user with pagination
+    #[builder]
     pub async fn list_activities(
         &self,
-        request: ListActivities,
+        user_id: Uuid,
         params: PaginationParams,
     ) -> DbResult<Vec<Activity>> {
         let query = format!(
@@ -552,7 +603,7 @@ impl DatabaseManager {
         );
 
         let activities = sqlx::query_as::<_, Activity>(&query)
-            .bind(request.user_id)
+            .bind(user_id)
             .bind(params.limit())
             .bind(params.offset())
             .fetch_all(&self.pool)
@@ -561,8 +612,18 @@ impl DatabaseManager {
         Ok(activities)
     }
 
-    /// Update an existing activity
-    pub async fn update_activity(&self, request: UpdateActivity) -> DbResult<Activity> {
+    #[builder]
+    pub async fn update_activity(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+        name: Option<String>,
+        icon_asset_id: Option<Uuid>,
+        process_name: Option<String>,
+        window_title: Option<String>,
+        started_at: Option<DateTime<Utc>>,
+        ended_at: Option<DateTime<Utc>>,
+    ) -> DbResult<Activity> {
         let now = Utc::now();
 
         let activity = sqlx::query_as::<_, Activity>(
@@ -579,14 +640,14 @@ impl DatabaseManager {
             RETURNING id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             "#,
         )
-        .bind(request.id)
-        .bind(request.user_id)
-        .bind(&request.name)
-        .bind(request.icon_asset_id)
-        .bind(&request.process_name)
-        .bind(&request.window_title)
-        .bind(request.started_at)
-        .bind(request.ended_at)
+        .bind(id)
+        .bind(user_id)
+        .bind(&name)
+        .bind(icon_asset_id)
+        .bind(&process_name)
+        .bind(&window_title)
+        .bind(started_at)
+        .bind(ended_at)
         .bind(now)
         .fetch_one(&self.pool)
         .await?;
@@ -594,8 +655,13 @@ impl DatabaseManager {
         Ok(activity)
     }
 
-    /// Update activity end time
-    pub async fn update_activity_end_time(&self, request: UpdateActivityEndTime) -> DbResult<()> {
+    #[builder]
+    pub async fn update_activity_end_time(
+        &self,
+        activity_id: Uuid,
+        user_id: Uuid,
+        ended_at: DateTime<Utc>,
+    ) -> DbResult<()> {
         let now = Utc::now();
 
         sqlx::query(
@@ -605,9 +671,9 @@ impl DatabaseManager {
             WHERE id = $1 AND user_id = $2
             "#,
         )
-        .bind(request.activity_id)
-        .bind(request.user_id)
-        .bind(request.ended_at)
+        .bind(activity_id)
+        .bind(user_id)
+        .bind(ended_at)
         .bind(now)
         .execute(&self.pool)
         .await?;
@@ -615,7 +681,6 @@ impl DatabaseManager {
         Ok(())
     }
 
-    /// Get the last active (not ended) activity for a user
     pub async fn get_last_active_activity(&self, user_id: Uuid) -> DbResult<Option<Activity>> {
         let activity = sqlx::query_as::<_, Activity>(
             r#"
@@ -633,7 +698,6 @@ impl DatabaseManager {
         Ok(activity)
     }
 
-    /// Delete an activity
     pub async fn delete_activity(&self, activity_id: Uuid, user_id: Uuid) -> DbResult<Activity> {
         let activity = sqlx::query_as::<_, Activity>(
             r#"
@@ -650,10 +714,12 @@ impl DatabaseManager {
         Ok(activity)
     }
 
-    /// Get activities by time range for a user
+    #[builder]
     pub async fn get_activities_by_time_range(
         &self,
-        request: GetActivitiesByTimeRange,
+        user_id: Uuid,
+        start_time: DateTime<Utc>,
+        end_time: DateTime<Utc>,
         params: PaginationParams,
     ) -> DbResult<Vec<Activity>> {
         let query = format!(
@@ -670,9 +736,9 @@ impl DatabaseManager {
         );
 
         let activities = sqlx::query_as::<_, Activity>(&query)
-            .bind(request.user_id)
-            .bind(request.start_time)
-            .bind(request.end_time)
+            .bind(user_id)
+            .bind(start_time)
+            .bind(end_time)
             .bind(params.limit())
             .bind(params.offset())
             .fetch_all(&self.pool)
@@ -685,12 +751,24 @@ impl DatabaseManager {
     // Asset Management Methods
     // =========================================================================
 
-    /// Create a new asset
-    pub async fn create_asset(&self, request: NewAsset) -> DbResult<Asset> {
-        let id = request.id.unwrap_or_else(Uuid::now_v7);
+    #[builder]
+    pub async fn create_asset(
+        &self,
+        id: Option<Uuid>,
+        user_id: Uuid,
+        name: String,
+        mime_type: String,
+        size_bytes: Option<i64>,
+        checksum_sha256: Option<Vec<u8>>,
+        storage_backend: String,
+        storage_uri: String,
+        status: Option<AssetStatus>,
+        metadata: Option<serde_json::Value>,
+    ) -> DbResult<Asset> {
+        let id = id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
-        let metadata = request.metadata.unwrap_or_else(|| serde_json::json!({}));
-        let status = request.status.unwrap_or(AssetStatus::Uploaded);
+        let metadata = metadata.unwrap_or_else(|| serde_json::json!({}));
+        let status = status.unwrap_or(AssetStatus::Uploaded);
 
         let asset = sqlx::query_as::<_, Asset>(
             r#"
@@ -700,13 +778,13 @@ impl DatabaseManager {
             "#,
         )
         .bind(id)
-        .bind(request.user_id)
-        .bind(&request.name)
-        .bind(&request.mime_type)
-        .bind(request.size_bytes)
-        .bind(&request.checksum_sha256)
-        .bind(&request.storage_backend)
-        .bind(&request.storage_uri)
+        .bind(user_id)
+        .bind(&name)
+        .bind(&mime_type)
+        .bind(size_bytes)
+        .bind(&checksum_sha256)
+        .bind(&storage_backend)
+        .bind(&storage_uri)
         .bind(status)
         .bind(&metadata)
         .bind(now)
@@ -717,8 +795,6 @@ impl DatabaseManager {
         Ok(asset)
     }
 
-    /// Link an asset to an activity
-    /// Verifies that both the activity and asset belong to the specified user
     pub async fn link_asset_to_activity(
         &self,
         activity_id: Uuid,
@@ -727,7 +803,6 @@ impl DatabaseManager {
     ) -> DbResult<ActivityAsset> {
         let now = Utc::now();
 
-        // Use CTE to verify ownership of both activity and asset before linking
         let activity_asset = sqlx::query_as::<_, ActivityAsset>(
             r#"
             WITH verified_activity AS (
@@ -756,9 +831,14 @@ impl DatabaseManager {
     // Conversation Management Methods
     // =========================================================================
 
-    /// Create a new conversation
-    pub async fn create_conversation(&self, request: NewConversation) -> DbResult<Conversation> {
-        let id = request.id.unwrap_or_else(Uuid::now_v7);
+    #[builder]
+    pub async fn create_conversation(
+        &self,
+        id: Option<Uuid>,
+        user_id: Uuid,
+        title: String,
+    ) -> DbResult<Conversation> {
+        let id = id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
 
         let conversation = sqlx::query_as::<_, Conversation>(
@@ -769,8 +849,8 @@ impl DatabaseManager {
             "#,
         )
         .bind(id)
-        .bind(request.user_id)
-        .bind(&request.title)
+        .bind(user_id)
+        .bind(&title)
         .bind(now)
         .bind(now)
         .fetch_one(&self.pool)
@@ -779,8 +859,8 @@ impl DatabaseManager {
         Ok(conversation)
     }
 
-    /// Get a conversation by ID
-    pub async fn get_conversation(&self, request: GetConversation) -> DbResult<Conversation> {
+    #[builder]
+    pub async fn get_conversation(&self, id: Uuid, user_id: Uuid) -> DbResult<Conversation> {
         let conversation = sqlx::query_as::<_, Conversation>(
             r#"
             SELECT id, user_id, title, created_at, updated_at
@@ -788,15 +868,14 @@ impl DatabaseManager {
             WHERE id = $1 AND user_id = $2
             "#,
         )
-        .bind(request.id)
-        .bind(request.user_id)
+        .bind(id)
+        .bind(user_id)
         .fetch_one(&self.pool)
         .await?;
 
         Ok(conversation)
     }
 
-    /// Update a conversation
     #[builder]
     pub async fn update_conversation(
         &self,
@@ -824,10 +903,10 @@ impl DatabaseManager {
         Ok(conversation)
     }
 
-    /// List conversations for a user with pagination
+    #[builder]
     pub async fn list_conversations(
         &self,
-        request: ListConversations,
+        user_id: Uuid,
         params: PaginationParams,
     ) -> DbResult<Vec<Conversation>> {
         let query = format!(
@@ -842,7 +921,7 @@ impl DatabaseManager {
         );
 
         let conversations = sqlx::query_as::<_, Conversation>(&query)
-            .bind(request.user_id)
+            .bind(user_id)
             .bind(params.limit())
             .bind(params.offset())
             .fetch_all(&self.pool)
@@ -855,7 +934,6 @@ impl DatabaseManager {
     // Message Management Methods
     // =========================================================================
 
-    /// Create a new message
     #[builder]
     pub async fn create_message(
         &self,
@@ -913,11 +991,7 @@ impl DatabaseManager {
     }
 
     #[builder]
-    /// List messages for a conversation with pagination
-    ///
-    /// By default, retrieves all messages regardless of `hidden_from_ui` status.
-    /// If `only_visible` is `Some(true)`, only retrieves messages where `hidden_from_ui = false` (visible messages).
-    /// If `only_visible` is `Some(false)`, only retrieves messages where `hidden_from_ui = true` (hidden messages).
+    /// `only_visible`: `None` = all, `Some(true)` = visible only, `Some(false)` = hidden only.
     pub async fn list_messages(
         &self,
         conversation_id: Uuid,
@@ -971,5 +1045,295 @@ impl DatabaseManager {
         };
 
         Ok(messages)
+    }
+
+    // =========================================================================
+    // Stripe Billing Methods
+    // =========================================================================
+
+    pub async fn is_webhook_event_processed(&self, event_id: &str) -> DbResult<bool> {
+        let count: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM stripe.webhook_events WHERE event_id = $1")
+                .bind(event_id)
+                .fetch_one(&self.pool)
+                .await?;
+
+        Ok(count.0 > 0)
+    }
+
+    pub async fn record_webhook_event(&self, event_id: &str, event_type: &str) -> DbResult<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO stripe.webhook_events (event_id, event_type)
+            VALUES ($1, $2)
+            ON CONFLICT (event_id) DO NOTHING
+            "#,
+        )
+        .bind(event_id)
+        .bind(event_type)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn get_billing_state_for_user(
+        &self,
+        user_id: Uuid,
+    ) -> DbResult<Option<crate::AccountBillingState>> {
+        let result = sqlx::query_as::<_, crate::AccountBillingState>(
+            "SELECT abs.*
+             FROM account_billing_state abs
+             JOIN accounts a ON a.id = abs.account_id
+             WHERE a.owner_user_id = $1",
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(result)
+    }
+
+    /// If `email` matches an existing user, `app_user_id` is set automatically.
+    pub async fn upsert_stripe_customer<'e, E>(
+        &self,
+        executor: E,
+        customer_id: &str,
+        email: Option<&str>,
+        raw_data: &serde_json::Value,
+    ) -> DbResult<()>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        let now = Utc::now();
+
+        let app_user_id: Option<Uuid> = if let Some(email) = email {
+            sqlx::query_scalar("SELECT id FROM users WHERE email = $1")
+                .bind(email)
+                .fetch_optional(&self.pool)
+                .await?
+        } else {
+            None
+        };
+
+        sqlx::query(
+            r#"
+            INSERT INTO stripe.customers (id, app_user_id, email, created_at, updated_at, raw_data)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (id) DO UPDATE
+            SET email = COALESCE(EXCLUDED.email, stripe.customers.email),
+                app_user_id = COALESCE(EXCLUDED.app_user_id, stripe.customers.app_user_id),
+                raw_data = EXCLUDED.raw_data,
+                updated_at = EXCLUDED.updated_at
+            "#,
+        )
+        .bind(customer_id)
+        .bind(app_user_id)
+        .bind(email)
+        .bind(now)
+        .bind(now)
+        .bind(raw_data)
+        .execute(executor)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Upserts an account for the user, linking to a Stripe customer. Returns the account ID.
+    pub async fn ensure_account_for_user<'e, E>(
+        &self,
+        executor: E,
+        user_id: Uuid,
+        stripe_customer_id: &str,
+    ) -> DbResult<Uuid>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        let now = Utc::now();
+
+        let account_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO accounts (owner_user_id, name, stripe_customer_id, created_at, updated_at)
+            SELECT $1, u.username, $2, $3, $4
+            FROM users u WHERE u.id = $1
+            ON CONFLICT (owner_user_id) DO UPDATE
+            SET stripe_customer_id = EXCLUDED.stripe_customer_id,
+                updated_at = EXCLUDED.updated_at
+            RETURNING id
+            "#,
+        )
+        .bind(user_id)
+        .bind(stripe_customer_id)
+        .bind(now)
+        .bind(now)
+        .fetch_one(executor)
+        .await?;
+
+        Ok(account_id)
+    }
+
+    #[builder]
+    pub async fn upsert_stripe_subscription<'e, E>(
+        &self,
+        executor: E,
+        subscription_id: &str,
+        customer_id: &str,
+        status: &str,
+        cancel_at_period_end: bool,
+        canceled_at: Option<i64>,
+        current_period_start: i64,
+        current_period_end: i64,
+        raw_data: &serde_json::Value,
+    ) -> DbResult<()>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        let now = Utc::now();
+        let canceled_at_ts = canceled_at.and_then(|ts| {
+            let dt = chrono::DateTime::from_timestamp(ts, 0);
+            if dt.is_none() {
+                warn!(
+                    subscription_id,
+                    ts, "malformed canceled_at timestamp in stripe subscription"
+                );
+            }
+            dt
+        });
+        let period_start = chrono::DateTime::from_timestamp(current_period_start, 0)
+            .unwrap_or_else(|| {
+                warn!(subscription_id, current_period_start, "malformed current_period_start timestamp in stripe subscription, falling back to now");
+                now
+            });
+        let period_end = chrono::DateTime::from_timestamp(current_period_end, 0).unwrap_or_else(
+            || {
+                warn!(subscription_id, current_period_end, "malformed current_period_end timestamp in stripe subscription, falling back to now");
+                now
+            },
+        );
+
+        sqlx::query(
+            r#"
+            INSERT INTO stripe.subscriptions (
+                id, customer_id, status,
+                cancel_at_period_end, canceled_at,
+                current_period_start, current_period_end,
+                created_at, updated_at, raw_data
+            )
+            VALUES ($1, $2, $3::stripe.subscription_status, $4, $5, $6, $7, $8, $9, $10)
+            ON CONFLICT (id) DO UPDATE
+            SET status = $3::stripe.subscription_status,
+                customer_id = EXCLUDED.customer_id,
+                cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+                canceled_at = EXCLUDED.canceled_at,
+                current_period_start = EXCLUDED.current_period_start,
+                current_period_end = EXCLUDED.current_period_end,
+                raw_data = EXCLUDED.raw_data,
+                updated_at = EXCLUDED.updated_at
+            "#,
+        )
+        .bind(subscription_id)
+        .bind(customer_id)
+        .bind(status)
+        .bind(cancel_at_period_end)
+        .bind(canceled_at_ts)
+        .bind(period_start)
+        .bind(period_end)
+        .bind(now)
+        .bind(now)
+        .bind(raw_data)
+        .execute(executor)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Replaces all existing items for the subscription with the provided set.
+    pub async fn sync_stripe_subscription_items<'e, E>(
+        &self,
+        executor: E,
+        subscription_id: &str,
+        items: &[(String, String, Option<i64>, serde_json::Value)], // (item_id, price_id, quantity, raw_data)
+    ) -> DbResult<()>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        if items.is_empty() {
+            sqlx::query("DELETE FROM stripe.subscription_items WHERE subscription_id = $1")
+                .bind(subscription_id)
+                .execute(executor)
+                .await?;
+            return Ok(());
+        }
+
+        // Single CTE to delete + insert in one round-trip (executor is consumed after one use)
+        let mut query = String::from(
+            "WITH deleted AS (DELETE FROM stripe.subscription_items WHERE subscription_id = $1) INSERT INTO stripe.subscription_items (id, subscription_id, price_id, quantity, raw_data) VALUES ",
+        );
+
+        let mut param_idx = 2u32;
+        for (i, _) in items.iter().enumerate() {
+            if i > 0 {
+                query.push_str(", ");
+            }
+            query.push_str(&format!(
+                "(${}, $1, ${}, ${}, ${})",
+                param_idx,
+                param_idx + 1,
+                param_idx + 2,
+                param_idx + 3,
+            ));
+            param_idx += 4;
+        }
+        query.push_str(" ON CONFLICT (id) DO UPDATE SET price_id = EXCLUDED.price_id, quantity = EXCLUDED.quantity, raw_data = EXCLUDED.raw_data");
+
+        let mut q = sqlx::query(&query).bind(subscription_id);
+        for (item_id, price_id, quantity, raw_data) in items {
+            q = q
+                .bind(item_id)
+                .bind(price_id)
+                .bind(quantity.map(|v| v as i32))
+                .bind(raw_data);
+        }
+
+        q.execute(executor).await?;
+
+        Ok(())
+    }
+
+    pub async fn update_stripe_subscription_status(
+        &self,
+        subscription_id: &str,
+        status: &str,
+        cancel_at_period_end: bool,
+        canceled_at: Option<i64>,
+        raw_data: &serde_json::Value,
+    ) -> DbResult<()> {
+        let now = Utc::now();
+        let canceled_at_ts = canceled_at.and_then(|ts| chrono::DateTime::from_timestamp(ts, 0));
+
+        let result = sqlx::query(
+            r#"
+            UPDATE stripe.subscriptions
+            SET status = $2::stripe.subscription_status,
+                cancel_at_period_end = $3,
+                canceled_at = $4,
+                raw_data = $5,
+                updated_at = $6
+            WHERE id = $1
+            "#,
+        )
+        .bind(subscription_id)
+        .bind(status)
+        .bind(cancel_at_period_end)
+        .bind(canceled_at_ts)
+        .bind(raw_data)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(DbError::not_found_with_id("subscription", subscription_id));
+        }
+
+        Ok(())
     }
 }

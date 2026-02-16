@@ -1,11 +1,8 @@
-//! Default snapshot implementation for unsupported activity types
-
 use agent_chain_core::{BaseMessage, HumanMessage};
 use serde::{Deserialize, Serialize};
 
 use crate::types::SnapshotFunctionality;
 
-/// Default snapshot for activities that don't have specific implementations
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DefaultSnapshot {
     pub id: String,
@@ -16,7 +13,6 @@ pub struct DefaultSnapshot {
 }
 
 impl DefaultSnapshot {
-    /// Create a new default snapshot
     pub fn new(state: String) -> Self {
         let now = chrono::Utc::now().timestamp() as u64;
         Self {
@@ -30,7 +26,6 @@ impl DefaultSnapshot {
 }
 
 impl SnapshotFunctionality for DefaultSnapshot {
-    /// Construct a message for LLM interaction
     fn construct_messages(&self) -> Vec<BaseMessage> {
         let mut content = format!("Current application state: {}", self.state);
 

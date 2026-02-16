@@ -5,6 +5,7 @@
 
 use std::collections::HashMap;
 use std::pin::Pin;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use futures::Stream;
@@ -176,7 +177,7 @@ impl std::fmt::Display for LanguageModelInput {
             LanguageModelInput::Messages(m) => {
                 let joined = m
                     .iter()
-                    .map(|msg| format!("{}: {}", msg.message_type(), msg.content()))
+                    .map(|msg| format!("{}: {}", msg.message_type(), msg.text()))
                     .collect::<Vec<_>>()
                     .join("\n");
                 write!(f, "{}", joined)
@@ -210,17 +211,17 @@ impl From<String> for LanguageModelOutput {
 
 impl LanguageModelOutput {
     /// Get the text content of the output.
-    pub fn text(&self) -> &str {
+    pub fn text(&self) -> String {
         match self {
-            LanguageModelOutput::Message(m) => m.content(),
-            LanguageModelOutput::Text(s) => s,
+            LanguageModelOutput::Message(m) => m.text(),
+            LanguageModelOutput::Text(s) => s.clone(),
         }
     }
 
     /// Convert to string, consuming the output.
     pub fn into_text(self) -> String {
         match self {
-            LanguageModelOutput::Message(m) => m.content().to_string(),
+            LanguageModelOutput::Message(m) => m.text(),
             LanguageModelOutput::Text(s) => s,
         }
     }
@@ -246,6 +247,14 @@ pub struct LanguageModelConfig {
     /// - If not set (`None`), will use the global cache if it's set.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache: Option<bool>,
+
+    /// Whether to print out response text.
+    ///
+    /// - If `None`, resolves to `false`.
+    ///
+    /// Matches Python's `BaseLanguageModel.verbose` field.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verbose: Option<bool>,
 
     /// Tags to add to the run trace.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -275,6 +284,12 @@ impl LanguageModelConfig {
     /// Enable caching.
     pub fn with_cache(mut self, cache: bool) -> Self {
         self.cache = Some(cache);
+        self
+    }
+
+    /// Set verbose output.
+    pub fn with_verbose(mut self, verbose: bool) -> Self {
+        self.verbose = Some(verbose);
         self
     }
 
@@ -331,6 +346,13 @@ pub trait BaseLanguageModel: Send + Sync {
     /// Get the callbacks for this model.
     fn callbacks(&self) -> Option<&Callbacks> {
         None
+    }
+
+    /// Whether verbose output is enabled.
+    ///
+    /// Resolves `None` to `false`. Matches Python's `BaseLanguageModel.verbose`.
+    fn verbose(&self) -> bool {
+        self.config().verbose.unwrap_or(false)
     }
 
     /// Pass a sequence of prompts to the model and return model generations.
@@ -437,13 +459,17 @@ pub trait BaseLanguageModel: Send + Sync {
     /// # Returns
     ///
     /// The sum of the number of tokens across the messages.
-    fn get_num_tokens_from_messages(&self, messages: &[BaseMessage]) -> usize {
+    fn get_num_tokens_from_messages(
+        &self,
+        messages: &[BaseMessage],
+        _tools: Option<&[crate::tools::ToolDefinition]>,
+    ) -> usize {
         messages
             .iter()
             .map(|m| {
                 // Add some tokens for the message role/type
                 let role_tokens = 4; // Approximate overhead for role
-                let content_tokens = self.get_num_tokens(m.content());
+                let content_tokens = self.get_num_tokens(&m.text());
                 role_tokens + content_tokens
             })
             .sum()
@@ -454,6 +480,13 @@ pub trait BaseLanguageModel: Send + Sync {
 #[allow(dead_code)]
 pub type LanguageModelOutputStream =
     Pin<Box<dyn Stream<Item = Result<LanguageModelOutput>> + Send>>;
+
+/// A runnable that accepts language model input and produces language model output.
+///
+/// Matches Python's `LanguageModelLike = Runnable[LanguageModelInput, LanguageModelOutput]`.
+pub type LanguageModelLike = Arc<
+    dyn crate::runnables::base::Runnable<Input = LanguageModelInput, Output = LanguageModelOutput>,
+>;
 
 #[cfg(test)]
 mod tests {

@@ -529,3 +529,35 @@ impl From<SystemMessageChunk> for SystemMessage {
         chunk.to_message()
     }
 }
+
+// --- Serializable impls ---
+
+use crate::load::Serializable;
+
+impl Serializable for SystemMessage {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "schema".to_string(),
+            "messages".to_string(),
+        ]
+    }
+}
+
+impl Serializable for SystemMessageChunk {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "schema".to_string(),
+            "messages".to_string(),
+        ]
+    }
+}

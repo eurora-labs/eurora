@@ -65,6 +65,80 @@ impl Edge {
     }
 }
 
+/// The data associated with a node in the graph.
+///
+/// Mirrors Python's `type[BaseModel] | RunnableType | None` union for `Node.data`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum NodeData {
+    /// A schema node (input/output type). Stores the schema name.
+    Schema { name: String },
+    /// A runnable node. Stores the runnable's name.
+    Runnable { name: String },
+}
+
+/// Convert node data to a display string.
+///
+/// Mirrors Python's `node_data_str()` from `langchain_core.runnables.graph`.
+/// If the node ID is not a UUID or data is None, returns the ID.
+/// For Runnables, strips the "Runnable" prefix if present.
+pub fn node_data_str(id: &str, data: Option<&NodeData>) -> String {
+    let data = match data {
+        Some(d) if is_uuid(id) => d,
+        _ => return id.to_string(),
+    };
+    let data_str = match data {
+        NodeData::Schema { name } => name.clone(),
+        NodeData::Runnable { name } => name.clone(),
+    };
+    match data_str.strip_prefix("Runnable") {
+        Some(stripped) => stripped.to_string(),
+        None => data_str,
+    }
+}
+
+/// Convert node data to a JSON-serializable format.
+///
+/// Mirrors Python's `node_data_json()` from `langchain_core.runnables.graph`.
+pub fn node_data_json(node: &Node) -> Value {
+    let mut json = serde_json::Map::new();
+
+    match &node.data {
+        None => {}
+        Some(NodeData::Runnable { name }) => {
+            json.insert("type".to_string(), Value::String("runnable".to_string()));
+            let mut data_obj = serde_json::Map::new();
+            data_obj.insert(
+                "id".to_string(),
+                Value::Array(
+                    name.split("::")
+                        .map(|s| Value::String(s.to_string()))
+                        .collect(),
+                ),
+            );
+            data_obj.insert(
+                "name".to_string(),
+                Value::String(node_data_str(&node.id, node.data.as_ref())),
+            );
+            json.insert("data".to_string(), Value::Object(data_obj));
+        }
+        Some(NodeData::Schema { .. }) => {
+            json.insert("type".to_string(), Value::String("schema".to_string()));
+            json.insert(
+                "data".to_string(),
+                Value::String(node_data_str(&node.id, node.data.as_ref())),
+            );
+        }
+    }
+
+    if let Some(ref metadata) = node.metadata
+        && let Ok(meta_val) = serde_json::to_value(metadata)
+    {
+        json.insert("metadata".to_string(), meta_val);
+    }
+
+    Value::Object(json)
+}
+
 /// Node in a graph.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Node {
@@ -72,6 +146,8 @@ pub struct Node {
     pub id: String,
     /// The name of the node.
     pub name: String,
+    /// The data associated with this node.
+    pub data: Option<NodeData>,
     /// Optional metadata for the node.
     pub metadata: Option<HashMap<String, Value>>,
 }
@@ -84,8 +160,15 @@ impl Node {
         Self {
             id,
             name,
+            data: None,
             metadata: None,
         }
+    }
+
+    /// Set the data for this node.
+    pub fn with_data(mut self, data: NodeData) -> Self {
+        self.data = Some(data);
+        self
     }
 
     /// Create a new node with metadata.
@@ -99,6 +182,7 @@ impl Node {
         Self {
             id: id.unwrap_or(&self.id).to_string(),
             name: name.unwrap_or(&self.name).to_string(),
+            data: self.data.clone(),
             metadata: self.metadata.clone(),
         }
     }
@@ -139,19 +223,53 @@ impl Graph {
         Uuid::new_v4().to_string()
     }
 
-    /// Add a node to the graph and return a reference to it.
+    /// Add a node to the graph and return it.
     ///
     /// If `id` is not provided, a new UUID is generated.
-    pub fn add_node(&mut self, name: impl Into<String>, id: Option<&str>) -> Node {
-        let name = name.into();
+    /// If `data` is provided, the node name is derived from it via `node_data_str()`.
+    /// Otherwise, the `name` parameter is used as the node name.
+    ///
+    /// Mirrors Python's `Graph.add_node()`.
+    pub fn add_node(
+        &mut self,
+        data: Option<NodeData>,
+        id: Option<&str>,
+        metadata: Option<HashMap<String, Value>>,
+    ) -> Node {
         let id = id.map(|s| s.to_string()).unwrap_or_else(|| self.next_id());
-        let node = Node::new(&id, &name);
+        let name = node_data_str(&id, data.as_ref());
+        let node = Node {
+            id: id.clone(),
+            name,
+            data,
+            metadata,
+        };
         self.nodes.insert(id, node.clone());
         node
     }
 
-    /// Add a node with metadata.
-    pub fn add_node_with_metadata(
+    /// Add a node with an explicit name (no NodeData).
+    ///
+    /// Convenience method for constructing graphs manually where the node
+    /// name is known directly. If `id` is not provided, a new UUID is
+    /// generated and the name is used as the display name.
+    pub fn add_node_named(&mut self, name: impl Into<String>, id: Option<&str>) -> Node {
+        let name = name.into();
+        let id = id.map(|s| s.to_string()).unwrap_or_else(|| self.next_id());
+        let node = Node {
+            id: id.clone(),
+            name,
+            data: None,
+            metadata: None,
+        };
+        self.nodes.insert(id, node.clone());
+        node
+    }
+
+    /// Add a named node with metadata (no NodeData).
+    ///
+    /// Convenience method for constructing graphs manually with metadata.
+    pub fn add_node_named_with_metadata(
         &mut self,
         name: impl Into<String>,
         id: Option<&str>,
@@ -159,7 +277,12 @@ impl Graph {
     ) -> Node {
         let name = name.into();
         let id = id.map(|s| s.to_string()).unwrap_or_else(|| self.next_id());
-        let node = Node::new(&id, &name).with_metadata(metadata);
+        let node = Node {
+            id: id.clone(),
+            name,
+            data: None,
+            metadata: Some(metadata),
+        };
         self.nodes.insert(id, node.clone());
         node
     }
@@ -234,6 +357,8 @@ impl Graph {
     }
 
     /// Convert the graph to a JSON-serializable format.
+    ///
+    /// Mirrors Python's `Graph.to_json()`.
     pub fn to_json(&self) -> Value {
         // Create stable integer IDs for UUID-based nodes
         let stable_ids: HashMap<&str, Value> = self
@@ -254,15 +379,11 @@ impl Graph {
             .nodes
             .values()
             .map(|node| {
-                let mut obj = serde_json::Map::new();
+                let mut obj = match node_data_json(node) {
+                    Value::Object(m) => m,
+                    _ => serde_json::Map::new(),
+                };
                 obj.insert("id".to_string(), stable_ids[node.id.as_str()].clone());
-                obj.insert("name".to_string(), Value::String(node.name.clone()));
-                if let Some(ref metadata) = node.metadata {
-                    obj.insert(
-                        "metadata".to_string(),
-                        serde_json::to_value(metadata).unwrap_or(Value::Null),
-                    );
-                }
                 Value::Object(obj)
             })
             .collect();
@@ -391,8 +512,53 @@ impl Graph {
         drawer.draw(self, output_file_path)
     }
 
+    /// Add all nodes and edges from another graph.
+    ///
+    /// Note this doesn't check for duplicates, nor does it connect the graphs.
+    /// Returns (first_node, last_node) of the merged subgraph.
+    pub fn extend(&mut self, graph: Graph, prefix: &str) -> (Option<Node>, Option<Node>) {
+        let prefix = if graph.nodes.values().all(|n| is_uuid(&n.id)) {
+            ""
+        } else {
+            prefix
+        };
+
+        let prefixed = |id: &str| -> String {
+            if prefix.is_empty() {
+                id.to_string()
+            } else {
+                format!("{}:{}", prefix, id)
+            }
+        };
+
+        // prefix each node
+        for (key, node) in &graph.nodes {
+            let new_id = prefixed(key);
+            self.nodes
+                .insert(new_id.clone(), node.copy(Some(&new_id), None));
+        }
+
+        // prefix each edge's source and target
+        for edge in &graph.edges {
+            self.edges
+                .push(edge.copy(Some(&prefixed(&edge.source)), Some(&prefixed(&edge.target))));
+        }
+
+        // return (prefixed) first and last nodes of the subgraph
+        let first = graph.first_node().map(|n| {
+            let new_id = prefixed(&n.id);
+            n.copy(Some(&new_id), None)
+        });
+        let last = graph.last_node().map(|n| {
+            let new_id = prefixed(&n.id);
+            n.copy(Some(&new_id), None)
+        });
+
+        (first, last)
+    }
+
     /// Draw the graph as a Mermaid syntax string.
-    pub fn draw_mermaid(&self, options: Option<MermaidOptions>) -> String {
+    pub fn draw_mermaid(&self, options: Option<MermaidOptions>) -> crate::error::Result<String> {
         let opts = options.unwrap_or_default();
         let graph = self.reid();
         let first_node = graph.first_node().map(|n| n.id.clone());
@@ -409,6 +575,50 @@ impl Graph {
             opts.wrap_label_n_words,
             opts.frontmatter_config.as_ref(),
         )
+    }
+
+    /// Draw the graph as a PNG image using Mermaid.
+    ///
+    /// Mirrors `Graph.draw_mermaid_png()` from `langchain_core.runnables.graph`.
+    pub async fn draw_mermaid_png(
+        &self,
+        options: Option<MermaidOptions>,
+        output_file_path: Option<&std::path::Path>,
+        draw_method: MermaidDrawMethod,
+        background_color: Option<&str>,
+        max_retries: usize,
+        retry_delay_secs: f64,
+        base_url: Option<&str>,
+    ) -> crate::error::Result<Vec<u8>> {
+        let mermaid_syntax = self.draw_mermaid(options)?;
+        super::graph_mermaid::draw_mermaid_png(
+            &mermaid_syntax,
+            output_file_path,
+            draw_method,
+            background_color,
+            max_retries,
+            retry_delay_secs,
+            base_url,
+        )
+        .await
+    }
+
+    /// Draw the graph as an ASCII art string.
+    pub fn draw_ascii(&self) -> Result<String, String> {
+        let vertices: std::collections::HashMap<String, String> = self
+            .nodes
+            .iter()
+            .map(|(id, node)| (id.clone(), node.name.clone()))
+            .collect();
+        super::graph_ascii::draw_ascii(&vertices, &self.edges)
+    }
+
+    /// Print the graph as an ASCII art string.
+    pub fn print_ascii(&self) {
+        match self.draw_ascii() {
+            Ok(ascii) => println!("{}", ascii),
+            Err(err) => eprintln!("Error drawing ASCII: {}", err),
+        }
     }
 }
 
@@ -431,6 +641,17 @@ impl Default for MermaidOptions {
             frontmatter_config: None,
         }
     }
+}
+
+/// Branch in a graph.
+///
+/// Mirrors `Branch` from `langchain_core.runnables.graph`.
+#[derive(Debug, Clone)]
+pub struct Branch {
+    /// A string representation of the condition.
+    pub condition: String,
+    /// Optional dictionary of end node IDs for the branches.
+    pub ends: Option<HashMap<String, String>>,
 }
 
 /// Enum for different curve styles supported by Mermaid.

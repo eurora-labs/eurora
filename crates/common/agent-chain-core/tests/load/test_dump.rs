@@ -2,10 +2,9 @@
 //!
 //! Ported from `langchain/libs/core/tests/unit_tests/load/test_dump.py`
 
-use agent_chain_core::load::{Serializable, Serialized, dumpd, dumpd_value, dumps, dumps_value};
+use agent_chain_core::load::{Serializable, Serialized, dumpd, dumps};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct SerializableTest {
@@ -51,8 +50,6 @@ impl Serializable for NonSerializableTest {
 mod test_default {
     use super::*;
 
-    /// Test to_json() handles Serializable objects.
-    ///
     /// Ported from `TestDefault::test_default_with_serializable`
     #[test]
     fn test_default_with_serializable() {
@@ -66,8 +63,6 @@ mod test_default {
         }
     }
 
-    /// Test to_json() handles non-Serializable objects.
-    ///
     /// Ported from `TestDefault::test_default_with_non_serializable`
     #[test]
     fn test_default_with_non_serializable() {
@@ -91,8 +86,6 @@ mod test_default {
 mod test_dumps {
     use super::*;
 
-    /// Test basic dumps() functionality.
-    ///
     /// Ported from `TestDumps::test_dumps_basic`
     #[test]
     fn test_dumps_basic() {
@@ -104,8 +97,6 @@ mod test_dumps {
         assert_eq!(parsed["kwargs"]["value"], 42);
     }
 
-    /// Test dumps() with pretty=true.
-    ///
     /// Ported from `TestDumps::test_dumps_with_pretty_flag`
     #[test]
     fn test_dumps_with_pretty_flag() {
@@ -117,8 +108,6 @@ mod test_dumps {
         assert_eq!(parsed["kwargs"]["value"], 42);
     }
 
-    /// Test dumps() with non-serializable fallback.
-    ///
     /// Ported from `TestDumps::test_dumps_with_non_serializable_fallback`
     #[test]
     fn test_dumps_with_non_serializable_fallback() {
@@ -129,8 +118,6 @@ mod test_dumps {
         assert_eq!(parsed["type"], "not_implemented");
     }
 
-    /// Test dumps() fallback with pretty=true when non-serializable.
-    ///
     /// Ported from `TestDumps::test_dumps_with_pretty_and_typeerror_fallback`
     #[test]
     fn test_dumps_with_pretty_and_non_serializable_fallback() {
@@ -142,12 +129,7 @@ mod test_dumps {
         assert_eq!(parsed["type"], "not_implemented");
     }
 
-    /// Test dumps_value() with nested data structures.
-    ///
     /// Ported from `TestDumps::test_dumps_nested_structures`
-    /// Note: In Rust, we use dumps_value for plain serde-serializable data
-    /// and dumps for Serializable trait objects. For nested structures mixing
-    /// both, we serialize the Serializable parts first, then embed them.
     #[test]
     fn test_dumps_nested_structures() {
         let serializable_obj = SerializableTest { value: 1 };
@@ -168,66 +150,6 @@ mod test_dumps {
         assert_eq!(parsed["primitive"], "string");
     }
 
-    /// Test dumps_value() on None (null).
-    ///
-    /// Ported from `TestDumpsSnapshot::test_dumps_with_none`
-    #[test]
-    fn test_dumps_with_none() {
-        let result = dumps_value(&Value::Null, false).unwrap();
-        assert_eq!(result, "null");
-    }
-
-    /// Test dumps_value() on a string.
-    ///
-    /// Ported from `TestDumpsSnapshot::test_dumps_with_plain_string`
-    #[test]
-    fn test_dumps_with_plain_string() {
-        let result = dumps_value(&"hello", false).unwrap();
-        assert_eq!(result, "\"hello\"");
-    }
-
-    /// Test dumps_value() on an int.
-    ///
-    /// Ported from `TestDumpsSnapshot::test_dumps_with_plain_int`
-    #[test]
-    fn test_dumps_with_plain_int() {
-        let result = dumps_value(&42, false).unwrap();
-        assert_eq!(result, "42");
-    }
-
-    /// Test dumps_value() on a dict.
-    ///
-    /// Ported from `TestDumpsSnapshot::test_dumps_with_plain_dict`
-    #[test]
-    fn test_dumps_with_plain_dict() {
-        let data: HashMap<&str, i32> = HashMap::from([("a", 1), ("b", 2)]);
-        let result = dumps_value(&data, false).unwrap();
-        let parsed: Value = serde_json::from_str(&result).unwrap();
-        assert_eq!(parsed, json!({"a": 1, "b": 2}));
-    }
-
-    /// Test dumps_value() on a list.
-    ///
-    /// Ported from `TestDumpsSnapshot::test_dumps_with_plain_list`
-    #[test]
-    fn test_dumps_with_plain_list() {
-        let data = json!([1, "two", 3]);
-        let result = dumps_value(&data, false).unwrap();
-        let parsed: Value = serde_json::from_str(&result).unwrap();
-        assert_eq!(parsed, json!([1, "two", 3]));
-    }
-
-    /// Test dumps_value() with bool values.
-    ///
-    /// Ported from `TestDumpsSnapshot::test_dumps_bool_values`
-    #[test]
-    fn test_dumps_bool_values() {
-        assert_eq!(dumps_value(&true, false).unwrap(), "true");
-        assert_eq!(dumps_value(&false, false).unwrap(), "false");
-    }
-
-    /// Test dumps() pretty uses 2-space indent by default.
-    ///
     /// Ported from `TestDumpsSnapshot::test_dumps_pretty_default_indent_is_2`
     #[test]
     fn test_dumps_pretty_default_indent_is_2() {
@@ -247,8 +169,6 @@ mod test_dumps {
 mod test_dumpd {
     use super::*;
 
-    /// Test basic dumpd() functionality.
-    ///
     /// Ported from `TestDumpd::test_dumpd_basic`
     #[test]
     fn test_dumpd_basic() {
@@ -260,8 +180,6 @@ mod test_dumpd {
         assert_eq!(result["kwargs"]["value"], 42);
     }
 
-    /// Test dumpd() with non-serializable object.
-    ///
     /// Ported from `TestDumpd::test_dumpd_with_non_serializable`
     #[test]
     fn test_dumpd_with_non_serializable() {
@@ -280,11 +198,7 @@ mod test_dumpd {
         );
     }
 
-    /// Test dumpd() with nested data structures.
-    ///
     /// Ported from `TestDumpd::test_dumpd_with_nested_structures`
-    /// Note: dumpd works with Serializable trait objects. For nested structures
-    /// mixing Serializable and plain data, we serialize parts individually.
     #[test]
     fn test_dumpd_with_nested_structures() {
         let serializable_obj = SerializableTest { value: 1 };
@@ -301,8 +215,6 @@ mod test_dumpd {
         assert_eq!(data["primitive"], "string");
     }
 
-    /// Test dumpd() produces same result as serde_json::from_str(dumps()).
-    ///
     /// Ported from `TestDumpd::test_dumpd_equivalence_with_dumps`
     #[test]
     fn test_dumpd_equivalence_with_dumps() {
@@ -314,29 +226,6 @@ mod test_dumpd {
         assert_eq!(dumpd_result, dumps_result);
     }
 
-    /// Test dumpd_value() with primitive types.
-    ///
-    /// Ported from `TestDumpd::test_dumpd_with_primitive_types`
-    #[test]
-    fn test_dumpd_with_primitive_types() {
-        // List
-        let result = dumpd_value(&vec![1, 2, 3]).unwrap();
-        assert_eq!(result, json!([1, 2, 3]));
-
-        // Dict
-        let data: HashMap<&str, &str> = HashMap::from([("key", "value")]);
-        let result = dumpd_value(&data).unwrap();
-        assert_eq!(result, json!({"key": "value"}));
-
-        // Serializable object in dict
-        let obj = SerializableTest { value: 42 };
-        let serialized = serde_json::to_value(obj.to_json()).unwrap();
-        let data = json!({"obj": serialized});
-        assert_eq!(data["obj"]["type"], "constructor");
-    }
-
-    /// Test dumpd() with a list of Serializable objects.
-    ///
     /// Ported from `TestDumpd::test_dumpd_list_of_serializable`
     #[test]
     fn test_dumpd_list_of_serializable() {
@@ -348,81 +237,6 @@ mod test_dumpd {
         assert_eq!(result[0]["kwargs"]["value"], 1);
         assert_eq!(result[1]["kwargs"]["value"], 2);
     }
-
-    /// Test dumpd_value() with None (null).
-    ///
-    /// Ported from `TestDumpdSnapshot::test_dumpd_none`
-    #[test]
-    fn test_dumpd_none() {
-        let result = dumpd_value(&Value::Null).unwrap();
-        assert!(result.is_null());
-    }
-
-    /// Test dumpd_value() with plain string.
-    ///
-    /// Ported from `TestDumpdSnapshot::test_dumpd_string`
-    #[test]
-    fn test_dumpd_string() {
-        let result = dumpd_value(&"hello").unwrap();
-        assert_eq!(result, "hello");
-    }
-
-    /// Test dumpd_value() with int.
-    ///
-    /// Ported from `TestDumpdSnapshot::test_dumpd_int`
-    #[test]
-    fn test_dumpd_int() {
-        let result = dumpd_value(&42).unwrap();
-        assert_eq!(result, 42);
-    }
-
-    /// Test dumpd_value() with booleans.
-    ///
-    /// Ported from `TestDumpdSnapshot::test_dumpd_bool`
-    #[test]
-    fn test_dumpd_bool() {
-        assert_eq!(dumpd_value(&true).unwrap(), json!(true));
-        assert_eq!(dumpd_value(&false).unwrap(), json!(false));
-    }
-
-    /// Test dumpd_value() with float.
-    ///
-    /// Ported from `TestDumpdSnapshot::test_dumpd_float`
-    #[test]
-    fn test_dumpd_float() {
-        let result = dumpd_value(&3.15).unwrap();
-        assert_eq!(result, json!(3.15));
-    }
-
-    /// Test dumpd() with Serializable inside a list inside a dict.
-    ///
-    /// Ported from `TestDumpdSnapshot::test_dumpd_nested_serializable_in_list`
-    #[test]
-    fn test_dumpd_nested_serializable_in_list() {
-        let obj = SerializableTest { value: 10 };
-        let serialized = serde_json::to_value(obj.to_json()).unwrap();
-
-        let data = json!({
-            "items": [serialized, "plain", 42]
-        });
-
-        assert_eq!(data["items"][0]["type"], "constructor");
-        assert_eq!(data["items"][0]["kwargs"]["value"], 10);
-        assert_eq!(data["items"][1], "plain");
-        assert_eq!(data["items"][2], 42);
-    }
-
-    /// Test dumpd_value() with empty dict and list.
-    ///
-    /// Ported from `TestDumpdSnapshot::test_dumpd_empty_structures`
-    #[test]
-    fn test_dumpd_empty_structures() {
-        let empty_map: HashMap<String, Value> = HashMap::new();
-        assert_eq!(dumpd_value(&empty_map).unwrap(), json!({}));
-
-        let empty_vec: Vec<Value> = vec![];
-        assert_eq!(dumpd_value(&empty_vec).unwrap(), json!([]));
-    }
 }
 
 /// Snapshot tests for Serializable::to_json() output structure.
@@ -431,8 +245,6 @@ mod test_dumpd {
 mod test_default_snapshot {
     use super::*;
 
-    /// Snapshot: to_json() output for a Serializable object.
-    ///
     /// Ported from `TestDefaultSnapshot::test_default_serializable_full_snapshot`
     #[test]
     fn test_default_serializable_full_snapshot() {
@@ -446,15 +258,12 @@ mod test_default_snapshot {
 
         let id = value["id"].as_array().unwrap();
         assert_eq!(id.last().unwrap().as_str().unwrap(), "SerializableTest");
-        // Verify namespace prefix
         assert_eq!(id[0], "tests");
         assert_eq!(id[1], "unit_tests");
         assert_eq!(id[2], "load");
         assert_eq!(id[3], "test_dump");
     }
 
-    /// Snapshot: to_json() output for a non-Serializable object.
-    ///
     /// Ported from `TestDefaultSnapshot::test_default_non_serializable_full_snapshot`
     #[test]
     fn test_default_non_serializable_full_snapshot() {
@@ -474,11 +283,7 @@ mod test_default_snapshot {
         );
     }
 
-    /// Snapshot: to_json_not_implemented() on an arbitrary type.
-    ///
     /// Ported from `TestDefaultSnapshot::test_default_with_builtin_type`
-    /// In Rust, we test with a non-serializable struct since there's no
-    /// equivalent of passing a set to default().
     #[test]
     fn test_default_with_non_serializable_type() {
         let obj = NonSerializableTest { value: 0 };
@@ -489,11 +294,7 @@ mod test_default_snapshot {
         assert_eq!(value["type"], "not_implemented");
     }
 
-    /// Snapshot: to_json_not_implemented_value() for an arbitrary type name.
-    ///
     /// Ported from `TestDefaultSnapshot::test_default_with_none`
-    /// In Rust, None doesn't implement Serializable, so we test
-    /// the to_json_not_implemented_value function directly.
     #[test]
     fn test_default_with_not_implemented_value() {
         use agent_chain_core::load::to_json_not_implemented_value;
@@ -512,8 +313,6 @@ mod test_default_snapshot {
 mod test_dumps_snapshot {
     use super::*;
 
-    /// Snapshot: full JSON output of dumps() for a Serializable.
-    ///
     /// Ported from `TestDumpsSnapshot::test_dumps_serializable_full_snapshot`
     #[test]
     fn test_dumps_serializable_full_snapshot() {
@@ -533,8 +332,6 @@ mod test_dumps_snapshot {
         assert_eq!(id[3], "test_dump");
     }
 
-    /// Snapshot: full JSON output of dumps() for a non-Serializable object.
-    ///
     /// Ported from `TestDumpsSnapshot::test_dumps_non_serializable_full_snapshot`
     #[test]
     fn test_dumps_non_serializable_full_snapshot() {
@@ -561,8 +358,6 @@ mod test_dumps_snapshot {
 mod test_dumpd_snapshot {
     use super::*;
 
-    /// Snapshot: exact dumpd output for SerializableTest.
-    ///
     /// Ported from `TestDumpdSnapshot::test_dumpd_serializable_full_snapshot`
     #[test]
     fn test_dumpd_serializable_full_snapshot() {

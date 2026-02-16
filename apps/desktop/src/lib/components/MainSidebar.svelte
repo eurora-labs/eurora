@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { type ConversationView } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
@@ -50,6 +51,8 @@
 				});
 			})
 			.catch((error) => {
+				goto('/onboarding');
+
 				console.error('Failed to check authentication:', error);
 			});
 	});

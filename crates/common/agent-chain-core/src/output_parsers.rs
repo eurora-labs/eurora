@@ -44,7 +44,7 @@ mod format_instructions;
 mod json;
 mod list;
 mod openai_functions;
-mod openai_tools;
+pub mod openai_tools;
 mod pydantic;
 mod string;
 mod transform;
@@ -53,14 +53,11 @@ mod xml;
 // Re-export base types
 pub use base::{
     BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser, OutputParserError,
-    chat_generation_to_value, generation_to_value,
+    RunnableOutputParser,
 };
 
 // Re-export format instructions
-pub use format_instructions::{
-    JSON_FORMAT_INSTRUCTIONS, PYDANTIC_FORMAT_INSTRUCTIONS, XML_FORMAT_INSTRUCTIONS,
-    format_json_instructions, format_pydantic_instructions, format_xml_instructions,
-};
+pub use format_instructions::JSON_FORMAT_INSTRUCTIONS;
 
 // Re-export string parser
 pub use string::StrOutputParser;

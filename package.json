@@ -11,6 +11,7 @@
 		"check-types": "turbo run check-types",
 		"dev:monolith": "cargo run -p be-monolith -- --mode development",
 		"prod:monolith": "cargo run -p be-monolith -- --mode production",
+		"docker:monolith": "./scripts/build-monolith-image.sh --restart",
 		"dev:desktop": "pnpm tauri dev",
 		"dev:ui": "pnpm --filter @eurora/ui storybook",
 		"check": "turbo run check --no-daemon",
@@ -32,7 +33,7 @@
 		"commit": "cz",
 		"proto:typescript": "buf generate && turbo run build --filter @eurora/shared --force",
 		"proto:rust": "cargo build -p proto-gen",
-		"proto:swift": "protoc --proto_path=proto --swift_out=apps/macos/Shared/Generated --grpc-swift_out=apps/macos/Shared/Generated proto/browser_bridge.proto",
+		"proto:swift": "protoc --proto_path=proto --swift_out=apps/macos/Shared/Generated --plugin=protoc-gen-grpc-swift=$(which protoc-gen-grpc-swift-2) --grpc-swift_out=apps/macos/Shared/Generated proto/browser_bridge.proto",
 		"prettier": "prettier --check",
 		"fix": "eslint --fix .",
 		"format": "prettier --write .",
@@ -76,11 +77,11 @@
 		"svelte-eslint-parser": "^1.4.1",
 		"tailwindcss": "catalog:",
 		"ts-proto": "^2.11.2",
-		"turbo": "^2.8.3",
+		"turbo": "^2.8.9",
 		"typescript-eslint": "^8.54.0",
 		"web-ext": "^8.10.0"
 	},
-	"packageManager": "pnpm@10.29.2",
+	"packageManager": "pnpm@10.29.3",
 	"engines": {
 		"node": ">=20.11"
 	},

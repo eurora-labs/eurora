@@ -1,12 +1,8 @@
-//! Server-side implementation for the Activity Service.
-
 use std::sync::Arc;
 
 use be_asset::AssetService;
-use be_auth_grpc::{extract_claims, parse_user_id};
-use be_remote_db::{
-    DatabaseManager, ListActivities, NewActivity, PaginationParams, UpdateActivity,
-};
+use be_authz::{extract_claims, parse_user_id};
+use be_remote_db::{DatabaseManager, PaginationParams};
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
 use proto_gen::asset::CreateAssetRequest;
@@ -25,7 +21,6 @@ pub use proto_gen::activity::proto_activity_service_server::{
     ProtoActivityService, ProtoActivityServiceServer,
 };
 
-/// The main activity service
 #[derive(Debug)]
 pub struct ActivityService {
     db: Arc<DatabaseManager>,
@@ -33,7 +28,6 @@ pub struct ActivityService {
 }
 
 impl ActivityService {
-    /// Create a new ActivityService instance
     pub fn new(db: Arc<DatabaseManager>, asset: Arc<AssetService>) -> Self {
         info!("Creating new ActivityService instance");
         Self {
@@ -42,19 +36,12 @@ impl ActivityService {
         }
     }
 
-    /// Create a new ActivityService from environment variables.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ActivityServiceError::Storage`] if the storage service
-    /// cannot be initialized from environment variables.
     pub fn from_env(db: Arc<DatabaseManager>) -> ActivityResult<Self> {
         let asset = AssetService::from_env(db.clone()).map_err(ActivityServiceError::Asset)?;
 
         Ok(Self::new(db, Arc::new(asset)))
     }
 
-    /// Convert a database Activity to a proto Activity
     fn db_activity_to_proto(activity: &be_remote_db::Activity) -> Activity {
         Activity {
             id: activity.id.to_string(),
@@ -70,7 +57,6 @@ impl ActivityService {
     }
 }
 
-/// Convert DateTime<Utc> to prost_types::Timestamp
 fn datetime_to_timestamp(dt: DateTime<Utc>) -> Timestamp {
     Timestamp {
         seconds: dt.timestamp(),
@@ -78,12 +64,10 @@ fn datetime_to_timestamp(dt: DateTime<Utc>) -> Timestamp {
     }
 }
 
-/// Convert prost_types::Timestamp to DateTime<Utc>
 fn timestamp_to_datetime(ts: &Timestamp) -> Option<DateTime<Utc>> {
     DateTime::from_timestamp(ts.seconds, ts.nanos as u32)
 }
 
-/// Parse an optional UUID from a string.
 fn parse_optional_uuid(
     value: Option<&String>,
     field: &'static str,
@@ -108,10 +92,14 @@ impl ProtoActivityService for ActivityService {
 
         let activities = self
             .db
-            .list_activities(
-                ListActivities { user_id },
-                PaginationParams::new(req.offset, req.limit, "DESC".to_string()),
-            )
+            .list_activities()
+            .user_id(user_id)
+            .params(PaginationParams::new(
+                req.offset,
+                req.limit,
+                "DESC".to_string(),
+            ))
+            .call()
             .await
             .map_err(ActivityServiceError::from)?;
 
@@ -153,20 +141,18 @@ impl ProtoActivityService for ActivityService {
 
         let activity = self
             .db
-            .create_activity(NewActivity {
-                id,
-                user_id,
-                name: req.name.clone(),
-                icon_asset_id: None,
-                process_name: req.process_name.clone(),
-                window_title: req.window_title.clone(),
-                started_at,
-                ended_at,
-            })
+            .create_activity()
+            .maybe_id(id)
+            .user_id(user_id)
+            .name(req.name.clone())
+            .process_name(req.process_name.clone())
+            .window_title(req.window_title.clone())
+            .started_at(started_at)
+            .maybe_ended_at(ended_at)
+            .call()
             .await
             .map_err(ActivityServiceError::from)?;
         info!("Created activity at: {:?}", activity.created_at);
-        // Upload icon to storage if provided
         let icon_id = match req.icon {
             Some(icon) => {
                 let icon_response = self
@@ -177,7 +163,7 @@ impl ProtoActivityService for ActivityService {
                             content: icon,
                             mime_type: "image/png".to_string(),
                             metadata: None,
-                            activity_id: None, // Prevent this icon from being treated as a regular activity asset
+                            activity_id: None,
                         },
                         user_id,
                     )
@@ -193,12 +179,11 @@ impl ProtoActivityService for ActivityService {
         };
 
         self.db
-            .update_activity(UpdateActivity {
-                id: activity.id,
-                user_id,
-                icon_asset_id: icon_id,
-                ..Default::default()
-            })
+            .update_activity()
+            .id(activity.id)
+            .user_id(user_id)
+            .maybe_icon_asset_id(icon_id)
+            .call()
             .await
             .map_err(ActivityServiceError::Database)?;
 

@@ -47,18 +47,6 @@ impl BaseMedia {
     pub fn new(id: Option<String>, metadata: HashMap<String, Value>) -> Self {
         Self { id, metadata }
     }
-
-    /// Set the ID.
-    pub fn with_id(mut self, id: impl Into<String>) -> Self {
-        self.id = Some(id.into());
-        self
-    }
-
-    /// Set the metadata.
-    pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
-        self.metadata = metadata;
-        self
-    }
 }
 
 /// Raw data abstraction for document loading and file processing.
@@ -175,18 +163,6 @@ impl Blob {
             id: None,
             metadata: HashMap::new(),
             data: Some(BlobData::Text(data.into())),
-            mimetype: None,
-            encoding: "utf-8".to_string(),
-            path: None,
-        }
-    }
-
-    /// Create a Blob from in-memory bytes.
-    pub fn from_bytes(data: Vec<u8>) -> Self {
-        Self {
-            id: None,
-            metadata: HashMap::new(),
-            data: Some(BlobData::Bytes(data)),
             mimetype: None,
             encoding: "utf-8".to_string(),
             path: None,
@@ -491,22 +467,6 @@ impl Document {
         self.metadata = metadata;
         self
     }
-
-    /// Add a single metadata entry.
-    pub fn with_metadata_entry(mut self, key: impl Into<String>, value: Value) -> Self {
-        self.metadata.insert(key.into(), value);
-        self
-    }
-
-    /// Get the page content as a string reference.
-    pub fn content(&self) -> &str {
-        &self.page_content
-    }
-
-    /// Check if the document is empty.
-    pub fn is_empty(&self) -> bool {
-        self.page_content.is_empty()
-    }
 }
 
 impl fmt::Display for Document {
@@ -520,18 +480,6 @@ impl fmt::Display for Document {
                 self.page_content, self.metadata
             )
         }
-    }
-}
-
-impl From<&str> for Document {
-    fn from(s: &str) -> Self {
-        Document::new(s)
-    }
-}
-
-impl From<String> for Document {
-    fn from(s: String) -> Self {
-        Document::new(s)
     }
 }
 
@@ -605,7 +553,10 @@ mod tests {
 
     #[test]
     fn test_blob_from_bytes() {
-        let blob = Blob::from_bytes(b"Hello, bytes!".to_vec());
+        let blob = Blob::builder()
+            .bytes(b"Hello, bytes!".to_vec())
+            .build()
+            .unwrap();
         assert_eq!(blob.as_bytes().unwrap(), b"Hello, bytes!");
         assert_eq!(blob.as_string().unwrap(), "Hello, bytes!");
     }
