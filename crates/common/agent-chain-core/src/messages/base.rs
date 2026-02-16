@@ -12,7 +12,7 @@ use std::fmt;
 
 use super::ai::{AIMessage, AIMessageChunk};
 use super::chat::{ChatMessage, ChatMessageChunk};
-use super::content::ReasoningContentBlock;
+use super::content::{MessageContent, ReasoningContentBlock};
 use super::function::{FunctionMessage, FunctionMessageChunk};
 use super::human::{HumanMessage, HumanMessageChunk};
 use super::modifier::RemoveMessage;
@@ -142,19 +142,16 @@ impl<'de> Deserialize<'de> for BaseMessage {
 }
 
 impl BaseMessage {
-    /// Get the message content as a string reference.
-    ///
-    /// For messages with multimodal content, this returns the first text content
-    /// or an empty string.
-    pub fn content(&self) -> &str {
+    /// Get the message content.
+    pub fn content(&self) -> &MessageContent {
         match self {
-            BaseMessage::Human(m) => m.content.as_text_ref(),
-            BaseMessage::System(m) => m.content.as_text_ref(),
+            BaseMessage::Human(m) => &m.content,
+            BaseMessage::System(m) => &m.content,
             BaseMessage::AI(m) => &m.content,
             BaseMessage::Tool(m) => &m.content,
-            BaseMessage::Chat(m) => m.content.as_text_ref(),
+            BaseMessage::Chat(m) => &m.content,
             BaseMessage::Function(m) => &m.content,
-            BaseMessage::Remove(_) => "",
+            BaseMessage::Remove(_) => MessageContent::empty(),
         }
     }
 
@@ -205,10 +202,10 @@ impl BaseMessage {
         match self {
             BaseMessage::Human(m) => m.content.as_text(),
             BaseMessage::System(m) => m.content.as_text(),
-            BaseMessage::AI(m) => m.content.to_string(),
-            BaseMessage::Tool(m) => m.content.clone(),
+            BaseMessage::AI(m) => m.content.as_text(),
+            BaseMessage::Tool(m) => m.content.as_text(),
             BaseMessage::Chat(m) => m.content.as_text(),
-            BaseMessage::Function(m) => m.content.clone(),
+            BaseMessage::Function(m) => m.content.as_text(),
             BaseMessage::Remove(_) => String::new(),
         }
     }
@@ -424,13 +421,13 @@ impl<'de> Deserialize<'de> for BaseMessageChunk {
 
 impl BaseMessageChunk {
     /// Get the message content.
-    pub fn content(&self) -> &str {
+    pub fn content(&self) -> &MessageContent {
         match self {
             BaseMessageChunk::AI(m) => &m.content,
-            BaseMessageChunk::Human(m) => m.content.as_text_ref(),
-            BaseMessageChunk::System(m) => m.content.as_text_ref(),
+            BaseMessageChunk::Human(m) => &m.content,
+            BaseMessageChunk::System(m) => &m.content,
             BaseMessageChunk::Tool(m) => &m.content,
-            BaseMessageChunk::Chat(m) => m.content.as_text_ref(),
+            BaseMessageChunk::Chat(m) => &m.content,
             BaseMessageChunk::Function(m) => &m.content,
         }
     }

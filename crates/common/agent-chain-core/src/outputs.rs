@@ -28,7 +28,7 @@ mod llm_result;
 mod run_info;
 
 // Re-export from generation
-pub use generation::{Generation, GenerationChunk};
+pub use generation::{Generation, GenerationChunk, merge_generation_chunks};
 
 // Re-export from run_info
 pub use run_info::RunInfo;

@@ -82,8 +82,8 @@ fn test_png_drawer_get_edge_label_custom() {
 #[test]
 fn test_graph_draw_png_returns_missing_dependency_error() {
     let mut graph = Graph::new();
-    let node1 = graph.add_node("node1", Some("node1"));
-    let node2 = graph.add_node("node2", Some("node2"));
+    let node1 = graph.add_node_named("node1", Some("node1"));
+    let node2 = graph.add_node_named("node2", Some("node2"));
     graph.add_edge(&node1, &node2, None, false);
 
     let result = graph.draw_png(None, None, None);
@@ -165,8 +165,8 @@ fn test_png_drawer_labels_dict_structure() {
 #[test]
 fn test_graph_draw_png_with_labels() {
     let mut graph = Graph::new();
-    let node1 = graph.add_node("node1", Some("node1"));
-    let node2 = graph.add_node("node2", Some("node2"));
+    let node1 = graph.add_node_named("node1", Some("node1"));
+    let node2 = graph.add_node_named("node2", Some("node2"));
     graph.add_edge(&node1, &node2, None, false);
 
     let custom_labels = LabelsDict {
@@ -190,8 +190,8 @@ fn test_graph_draw_png_with_labels() {
 #[test]
 fn test_graph_draw_png_with_fontname() {
     let mut graph = Graph::new();
-    let node1 = graph.add_node("node1", Some("node1"));
-    let node2 = graph.add_node("node2", Some("node2"));
+    let node1 = graph.add_node_named("node1", Some("node1"));
+    let node2 = graph.add_node_named("node2", Some("node2"));
     graph.add_edge(&node1, &node2, None, false);
 
     let result = graph.draw_png(None, Some("courier"), None);
@@ -206,8 +206,8 @@ fn test_graph_draw_png_with_fontname() {
 fn test_png_drawer_add_nodes_method() {
     let drawer = PngDrawer::default();
     let mut graph = Graph::new();
-    let n1 = graph.add_node("A", Some("a"));
-    let n2 = graph.add_node("B", Some("b"));
+    let n1 = graph.add_node_named("A", Some("a"));
+    let n2 = graph.add_node_named("B", Some("b"));
     graph.add_edge(&n1, &n2, None, false);
 
     let nodes = drawer.add_nodes(&graph);
@@ -218,8 +218,8 @@ fn test_png_drawer_add_nodes_method() {
 fn test_png_drawer_add_edges_method() {
     let drawer = PngDrawer::default();
     let mut graph = Graph::new();
-    let n1 = graph.add_node("A", Some("a"));
-    let n2 = graph.add_node("B", Some("b"));
+    let n1 = graph.add_node_named("A", Some("a"));
+    let n2 = graph.add_node_named("B", Some("b"));
     graph.add_edge(&n1, &n2, None, false);
 
     let edges = drawer.add_edges(&graph);
@@ -234,8 +234,8 @@ fn test_png_drawer_add_edges_method() {
 fn test_png_drawer_update_styles_method() {
     let drawer = PngDrawer::default();
     let mut graph = Graph::new();
-    let n1 = graph.add_node("A", Some("a"));
-    let n2 = graph.add_node("B", Some("b"));
+    let n1 = graph.add_node_named("A", Some("a"));
+    let n2 = graph.add_node_named("B", Some("b"));
     graph.add_edge(&n1, &n2, None, false);
 
     let (first, last) = drawer.styled_node_ids(&graph);
@@ -336,8 +336,8 @@ fn test_png_drawer_multiple_custom_labels() {
 #[test]
 fn test_graph_draw_png_returns_error_when_no_path() {
     let mut graph = Graph::new();
-    let node1 = graph.add_node("node1", Some("node1"));
-    let node2 = graph.add_node("node2", Some("node2"));
+    let node1 = graph.add_node_named("node1", Some("node1"));
+    let node2 = graph.add_node_named("node2", Some("node2"));
     graph.add_edge(&node1, &node2, None, false);
 
     let result = graph.draw_png(None, None, None);
@@ -432,9 +432,9 @@ fn test_png_drawer_labels_with_special_chars() {
 #[test]
 fn test_graph_first_last_node_styling() {
     let mut graph = Graph::new();
-    let first = graph.add_node("first", Some("first"));
-    let middle = graph.add_node("middle", Some("middle"));
-    let last = graph.add_node("last", Some("last"));
+    let first = graph.add_node_named("first", Some("first"));
+    let middle = graph.add_node_named("middle", Some("middle"));
+    let last = graph.add_node_named("last", Some("last"));
 
     graph.add_edge(&first, &middle, None, false);
     graph.add_edge(&middle, &last, None, false);
@@ -470,7 +470,7 @@ fn test_graph_draw_png_complex_structure() {
     let nodes: Vec<_> = (0..5)
         .map(|i| {
             let name = format!("node{i}");
-            graph.add_node(&name, Some(&name))
+            graph.add_node_named(&name, Some(&name))
         })
         .collect();
 
@@ -492,9 +492,9 @@ fn test_graph_draw_png_complex_structure() {
 #[test]
 fn test_png_drawer_with_subgraphs() {
     let mut graph = Graph::new();
-    let parent = graph.add_node("parent", Some("parent"));
-    let child1 = graph.add_node("parent:child1", Some("parent:child1"));
-    let child2 = graph.add_node("parent:child2", Some("parent:child2"));
+    let parent = graph.add_node_named("parent", Some("parent"));
+    let child1 = graph.add_node_named("parent:child1", Some("parent:child1"));
+    let child2 = graph.add_node_named("parent:child2", Some("parent:child2"));
 
     graph.add_edge(&parent, &child1, None, false);
     graph.add_edge(&parent, &child2, None, false);
@@ -554,9 +554,9 @@ fn test_png_drawer_fontname_used() {
 #[test]
 fn test_graph_draw_png_with_conditional_edges() {
     let mut graph = Graph::new();
-    let node1 = graph.add_node("node1", Some("node1"));
-    let node2 = graph.add_node("node2", Some("node2"));
-    let node3 = graph.add_node("node3", Some("node3"));
+    let node1 = graph.add_node_named("node1", Some("node1"));
+    let node2 = graph.add_node_named("node2", Some("node2"));
+    let node3 = graph.add_node_named("node3", Some("node3"));
 
     graph.add_edge(&node1, &node2, None, false);
     graph.add_edge(&node1, &node3, None, true);
@@ -572,8 +572,8 @@ fn test_graph_draw_png_with_conditional_edges() {
 #[test]
 fn test_png_drawer_edge_with_data() {
     let mut graph = Graph::new();
-    let node1 = graph.add_node("node1", Some("node1"));
-    let node2 = graph.add_node("node2", Some("node2"));
+    let node1 = graph.add_node_named("node1", Some("node1"));
+    let node2 = graph.add_node_named("node2", Some("node2"));
 
     graph.add_edge(&node1, &node2, Some("edge_label".into()), false);
 
@@ -634,8 +634,8 @@ fn test_png_drawer_labels_immutable_default() {
 #[test]
 fn test_graph_draw_png_returns_error_when_path_specified() {
     let mut graph = Graph::new();
-    let node1 = graph.add_node("node1", Some("node1"));
-    let node2 = graph.add_node("node2", Some("node2"));
+    let node1 = graph.add_node_named("node1", Some("node1"));
+    let node2 = graph.add_node_named("node2", Some("node2"));
     graph.add_edge(&node1, &node2, None, false);
 
     let result = graph.draw_png(
@@ -653,8 +653,8 @@ fn test_graph_draw_png_returns_error_when_path_specified() {
 #[test]
 fn test_png_drawer_handles_none_data() {
     let mut graph = Graph::new();
-    let node1 = graph.add_node("node1", Some("node1"));
-    let node2 = graph.add_node("node2", Some("node2"));
+    let node1 = graph.add_node_named("node1", Some("node1"));
+    let node2 = graph.add_node_named("node2", Some("node2"));
     graph.add_edge(&node1, &node2, None, false);
 
     let drawer = PngDrawer::default();
@@ -669,8 +669,8 @@ fn test_png_drawer_handles_none_data() {
 #[test]
 fn test_graph_draw_png_overload_signatures() {
     let mut graph = Graph::new();
-    let node1 = graph.add_node("node1", Some("node1"));
-    let node2 = graph.add_node("node2", Some("node2"));
+    let node1 = graph.add_node_named("node1", Some("node1"));
+    let node2 = graph.add_node_named("node2", Some("node2"));
     graph.add_edge(&node1, &node2, None, false);
 
     // Without path
@@ -708,8 +708,8 @@ fn test_graph_draw_png_with_metadata() {
     let meta1 = HashMap::from([("version".to_string(), serde_json::json!("1.0"))]);
     let meta2 = HashMap::from([("type".to_string(), serde_json::json!("processor"))]);
 
-    let node1 = graph.add_node_with_metadata("node1", Some("node1"), meta1);
-    let node2 = graph.add_node_with_metadata("node2", Some("node2"), meta2);
+    let node1 = graph.add_node_named_with_metadata("node1", Some("node1"), meta1);
+    let node2 = graph.add_node_named_with_metadata("node2", Some("node2"), meta2);
     graph.add_edge(&node1, &node2, None, false);
 
     let result = graph.draw_png(None, None, None);
@@ -726,7 +726,7 @@ fn test_png_drawer_preserves_graph_structure() {
     let nodes: Vec<_> = (0..4)
         .map(|i| {
             let name = format!("node{i}");
-            graph.add_node(&name, Some(&name))
+            graph.add_node_named(&name, Some(&name))
         })
         .collect();
 
@@ -809,9 +809,9 @@ fn test_collect_subgraphs_shared_prefix() {
 fn test_png_drawer_add_edges_conditional() {
     let drawer = PngDrawer::default();
     let mut graph = Graph::new();
-    let n1 = graph.add_node("A", Some("a"));
-    let n2 = graph.add_node("B", Some("b"));
-    let n3 = graph.add_node("C", Some("c"));
+    let n1 = graph.add_node_named("A", Some("a"));
+    let n2 = graph.add_node_named("B", Some("b"));
+    let n3 = graph.add_node_named("C", Some("c"));
 
     graph.add_edge(&n1, &n2, None, false);
     graph.add_edge(&n1, &n3, None, true);

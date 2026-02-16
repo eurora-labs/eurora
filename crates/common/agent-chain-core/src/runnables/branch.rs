@@ -16,7 +16,6 @@ use crate::load::{Serializable, Serialized, SerializedConstructorData};
 
 use super::base::{DynRunnable, Runnable, RunnableLambda, RunnableSerializable};
 use super::config::{RunnableConfig, ensure_config, get_callback_manager_for_config, patch_config};
-use super::utils::{ConfigurableFieldSpec, get_unique_config_specs};
 
 /// A `Runnable` that selects which branch to run based on a condition.
 ///
@@ -122,17 +121,6 @@ where
         self.name = Some(name.into());
         self
     }
-
-    /// Get the configurable field specs from all contained runnables.
-    pub fn config_specs(&self) -> std::result::Result<Vec<ConfigurableFieldSpec>, String> {
-        let specs = self
-            .branches
-            .iter()
-            .flat_map(|(_condition, _runnable)| Vec::<ConfigurableFieldSpec>::new())
-            .collect::<Vec<_>>();
-
-        get_unique_config_specs(specs)
-    }
 }
 
 /// Builder for creating RunnableBranch with closures.
@@ -220,14 +208,35 @@ where
             .or_else(|| Some("RunnableBranch".to_string()))
     }
 
+    fn get_input_schema(&self, config: Option<&RunnableConfig>) -> serde_json::Value {
+        // Collect all runnables: default + branch targets + branch conditions
+        // Return the first schema that has a valid "type" field
+        let schema = self.default.get_input_schema(config);
+        if schema.get("type").is_some() {
+            return schema;
+        }
+        for (condition, runnable) in &self.branches {
+            let schema = runnable.get_input_schema(config);
+            if schema.get("type").is_some() {
+                return schema;
+            }
+            let schema = condition.get_input_schema(config);
+            if schema.get("type").is_some() {
+                return schema;
+            }
+        }
+        self.default.get_input_schema(config)
+    }
+
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         let config = ensure_config(config);
         let callback_manager = get_callback_manager_for_config(&config);
-        let run_manager = callback_manager.on_chain_start(
-            &std::collections::HashMap::new(),
-            &std::collections::HashMap::new(),
-            config.run_id,
-        );
+        let run_manager = callback_manager
+            .on_chain_start()
+            .serialized(&std::collections::HashMap::new())
+            .inputs(&std::collections::HashMap::new())
+            .maybe_run_id(config.run_id)
+            .call();
 
         let result = (|| {
             for (idx, (condition, runnable)) in self.branches.iter().enumerate() {

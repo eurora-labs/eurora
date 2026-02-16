@@ -28,7 +28,7 @@ pub type MessageLikeRepresentation = serde_json::Value;
 /// Convert a `BaseMessage` to the corresponding `BaseMessageChunk`.
 ///
 /// This corresponds to `_msg_to_chunk` in LangChain Python.
-fn msg_to_chunk(message: &BaseMessage) -> BaseMessageChunk {
+pub(crate) fn msg_to_chunk(message: &BaseMessage) -> BaseMessageChunk {
     match message {
         BaseMessage::Human(m) => BaseMessageChunk::Human(
             HumanMessageChunk::builder()
@@ -103,7 +103,7 @@ fn msg_to_chunk(message: &BaseMessage) -> BaseMessageChunk {
 /// Convert a `BaseMessageChunk` to the corresponding `BaseMessage`.
 ///
 /// This corresponds to `_chunk_to_msg` in LangChain Python.
-fn chunk_to_msg(chunk: &BaseMessageChunk) -> BaseMessage {
+pub(crate) fn chunk_to_msg(chunk: &BaseMessageChunk) -> BaseMessage {
     chunk.to_message()
 }
 
@@ -366,13 +366,25 @@ fn create_message_from_role(
                 .tool_calls(parsed_tool_calls)
                 .build(),
         )),
-        "system" | "developer" => Ok(BaseMessage::System(
+        "system" => Ok(BaseMessage::System(
             SystemMessage::builder()
                 .content(content)
                 .maybe_name(name.map(|n| n.to_string()))
                 .maybe_id(id.map(|i| i.to_string()))
                 .build(),
         )),
+        "developer" => {
+            let mut msg = SystemMessage::builder()
+                .content(content)
+                .maybe_name(name.map(|n| n.to_string()))
+                .maybe_id(id.map(|i| i.to_string()))
+                .build();
+            msg.additional_kwargs.insert(
+                "__openai_role__".to_string(),
+                serde_json::Value::String("developer".to_string()),
+            );
+            Ok(BaseMessage::System(msg))
+        }
         "function" => {
             let fn_name = name.ok_or("Function messages require a name")?;
             Ok(BaseMessage::Function(
@@ -601,16 +613,17 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
                 let last_content = last_chunk.content();
                 let curr_content = curr_chunk.content();
                 if !last_content.is_empty() && !curr_content.is_empty() {
-                    // Check if both are plain strings (not JSON arrays)
                     let last_is_str =
-                        serde_json::from_str::<Vec<serde_json::Value>>(last_content).is_err();
+                        matches!(last_content, super::content::MessageContent::Text(_));
                     let curr_is_str =
-                        serde_json::from_str::<Vec<serde_json::Value>>(curr_content).is_err();
+                        matches!(curr_content, super::content::MessageContent::Text(_));
                     if last_is_str && curr_is_str {
                         // Append separator to the last chunk's content before merge
                         match &mut curr_chunk {
                             BaseMessageChunk::AI(c) => {
-                                c.content = format!("{}{}", chunk_separator, c.content);
+                                if let super::content::MessageContent::Text(ref mut s) = c.content {
+                                    *s = format!("{}{}", chunk_separator, s);
+                                }
                             }
                             BaseMessageChunk::Human(c) => {
                                 if let super::content::MessageContent::Text(ref mut s) = c.content {
@@ -628,10 +641,14 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
                                 }
                             }
                             BaseMessageChunk::Function(c) => {
-                                c.content = format!("{}{}", chunk_separator, c.content);
+                                if let super::content::MessageContent::Text(ref mut s) = c.content {
+                                    *s = format!("{}{}", chunk_separator, s);
+                                }
                             }
                             BaseMessageChunk::Tool(c) => {
-                                c.content = format!("{}{}", chunk_separator, c.content);
+                                if let super::content::MessageContent::Text(ref mut s) = c.content {
+                                    *s = format!("{}{}", chunk_separator, s);
+                                }
                             }
                         }
                     }
@@ -709,7 +726,7 @@ pub fn count_tokens_approximately(messages: &[BaseMessage], config: &CountTokens
         let mut message_chars: usize = 0;
 
         // Count content characters
-        message_chars += message.content().len();
+        message_chars += message.text().len();
 
         // For AI messages, also count tool calls if present
         if let BaseMessage::AI(ai_msg) = message
@@ -753,7 +770,18 @@ fn get_message_openai_role(message: &BaseMessage) -> &'static str {
         BaseMessage::AI(_) => "assistant",
         BaseMessage::Human(_) => "user",
         BaseMessage::Tool(_) => "tool",
-        BaseMessage::System(_) => "system",
+        BaseMessage::System(msg) => {
+            if msg
+                .additional_kwargs
+                .get("__openai_role__")
+                .and_then(|v| v.as_str())
+                == Some("developer")
+            {
+                "developer"
+            } else {
+                "system"
+            }
+        }
         BaseMessage::Function(_) => "function",
         BaseMessage::Chat(c) => {
             // Return static strings for common roles, otherwise return a generic one
@@ -860,7 +888,10 @@ fn convert_single_to_openai_message(
     // Handle content
     // Try to get content as list (for multimodal messages)
     let raw_content = message.content();
-    let content_list: Option<Vec<serde_json::Value>> = serde_json::from_str(raw_content).ok();
+    let content_list: Option<Vec<serde_json::Value>> = match raw_content {
+        super::content::MessageContent::Parts(_) => Some(raw_content.as_json_values()),
+        super::content::MessageContent::Text(s) => serde_json::from_str(s).ok(),
+    };
 
     let mut tool_messages: Vec<serde_json::Value> = Vec::new();
 
@@ -1249,7 +1280,9 @@ where
     if (config.token_counter)(&messages) <= config.max_tokens {
         // When all messages fit, only apply end_on filtering if needed
         if let Some(ref end_on) = config.end_on {
-            while !messages.is_empty() && !is_message_type(messages.last().unwrap(), end_on) {
+            while !messages.is_empty()
+                && !is_message_type(messages.last().expect("checked non-empty"), end_on)
+            {
                 messages.pop();
             }
         }
@@ -1275,10 +1308,13 @@ where
     if config.allow_partial && idx < messages.len() {
         let mut included_partial = false;
 
-        // First try list content (multimodal blocks)
+        // First try list content (multimodal blocks or JSON-encoded arrays in Text)
         let excluded_content = messages[idx].content();
-        if let Ok(mut content_blocks) =
-            serde_json::from_str::<Vec<serde_json::Value>>(excluded_content)
+        let content_blocks_opt: Option<Vec<serde_json::Value>> = match excluded_content {
+            super::content::MessageContent::Parts(_) => Some(excluded_content.as_json_values()),
+            super::content::MessageContent::Text(s) => serde_json::from_str(s).ok(),
+        };
+        if let Some(mut content_blocks) = content_blocks_opt
             && content_blocks.len() > 1
         {
             if reverse_partial {
@@ -1305,12 +1341,12 @@ where
 
         // Then try text splitting
         if !included_partial {
-            let content = messages[idx].content();
-            if !content.is_empty() {
+            let content_str = messages[idx].text();
+            if !content_str.is_empty() {
                 let mut split_texts = if let Some(ref splitter) = config.text_splitter {
-                    splitter(content)
+                    splitter(&content_str)
                 } else {
-                    default_text_splitter(content)
+                    default_text_splitter(&content_str)
                 };
                 if split_texts.len() > 1 {
                     if reverse_partial {
@@ -1377,7 +1413,9 @@ where
 
     // Apply end_on filtering first (for "last" strategy, done before trimming)
     if let Some(ref end_on) = config.end_on {
-        while !messages.is_empty() && !is_message_type(messages.last().unwrap(), end_on) {
+        while !messages.is_empty()
+            && !is_message_type(messages.last().expect("checked non-empty"), end_on)
+        {
             messages.pop();
         }
     }
@@ -1483,4 +1521,94 @@ fn create_message_with_content(original: &BaseMessage, content: &str) -> BaseMes
             BaseMessage::Remove(RemoveMessage::builder().id(&m.id).build())
         }
     }
+}
+
+// ============================================================================
+// Runnable variants of message utility functions
+// ============================================================================
+// In Python, the @_runnable_support decorator makes filter_messages,
+// merge_message_runs, and trim_messages return a RunnableLambda when called
+// without messages. In Rust, we provide separate *_runnable() functions.
+
+use crate::runnables::base::RunnableLambdaWithConfig;
+use std::sync::Arc;
+
+/// Create a [`RunnableLambdaWithConfig`] that filters messages.
+///
+/// This is the runnable counterpart to [`filter_messages`], matching Python's
+/// `filter_messages()` called without messages (which returns a `RunnableLambda`
+/// via the `@_runnable_support` decorator).
+pub fn filter_messages_runnable(
+    include_names: Option<Vec<String>>,
+    exclude_names: Option<Vec<String>>,
+    include_types: Option<Vec<String>>,
+    exclude_types: Option<Vec<String>>,
+    include_ids: Option<Vec<String>>,
+    exclude_ids: Option<Vec<String>>,
+    exclude_tool_calls: Option<ExcludeToolCalls>,
+) -> RunnableLambdaWithConfig<Vec<BaseMessage>, Vec<BaseMessage>> {
+    RunnableLambdaWithConfig::new(move |messages: Vec<BaseMessage>| {
+        let include_names_refs: Option<Vec<&str>> = include_names
+            .as_ref()
+            .map(|v| v.iter().map(|s| s.as_str()).collect());
+        let exclude_names_refs: Option<Vec<&str>> = exclude_names
+            .as_ref()
+            .map(|v| v.iter().map(|s| s.as_str()).collect());
+        let include_types_refs: Option<Vec<&str>> = include_types
+            .as_ref()
+            .map(|v| v.iter().map(|s| s.as_str()).collect());
+        let exclude_types_refs: Option<Vec<&str>> = exclude_types
+            .as_ref()
+            .map(|v| v.iter().map(|s| s.as_str()).collect());
+        let include_ids_refs: Option<Vec<&str>> = include_ids
+            .as_ref()
+            .map(|v| v.iter().map(|s| s.as_str()).collect());
+        let exclude_ids_refs: Option<Vec<&str>> = exclude_ids
+            .as_ref()
+            .map(|v| v.iter().map(|s| s.as_str()).collect());
+
+        Ok(filter_messages(
+            &messages,
+            include_names_refs.as_deref(),
+            exclude_names_refs.as_deref(),
+            include_types_refs.as_deref(),
+            exclude_types_refs.as_deref(),
+            include_ids_refs.as_deref(),
+            exclude_ids_refs.as_deref(),
+            exclude_tool_calls.as_ref(),
+        ))
+    })
+    .with_name("filter_messages")
+}
+
+/// Create a [`RunnableLambdaWithConfig`] that merges consecutive message runs.
+///
+/// This is the runnable counterpart to [`merge_message_runs`], matching Python's
+/// `merge_message_runs()` called without messages.
+pub fn merge_message_runs_runnable(
+    chunk_separator: Option<String>,
+) -> RunnableLambdaWithConfig<Vec<BaseMessage>, Vec<BaseMessage>> {
+    let separator = chunk_separator.unwrap_or_else(|| "\n".to_string());
+    RunnableLambdaWithConfig::new(move |messages: Vec<BaseMessage>| {
+        Ok(merge_message_runs(&messages, &separator))
+    })
+    .with_name("merge_message_runs")
+}
+
+/// Create a [`RunnableLambdaWithConfig`] that trims messages to a token budget.
+///
+/// This is the runnable counterpart to [`trim_messages`], matching Python's
+/// `trim_messages()` called without messages.
+pub fn trim_messages_runnable<F, S>(
+    config: TrimMessagesConfig<F, S>,
+) -> RunnableLambdaWithConfig<Vec<BaseMessage>, Vec<BaseMessage>>
+where
+    F: Fn(&[BaseMessage]) -> usize + Send + Sync + 'static,
+    S: Fn(&str) -> Vec<String> + Send + Sync + 'static,
+{
+    let config = Arc::new(config);
+    RunnableLambdaWithConfig::new(move |messages: Vec<BaseMessage>| {
+        Ok(trim_messages(&messages, &config))
+    })
+    .with_name("trim_messages")
 }

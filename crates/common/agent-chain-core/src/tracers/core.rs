@@ -374,8 +374,10 @@ pub trait TracerCore: Send + Sync + Debug {
         }
 
         run.end_time = Some(Utc::now());
-        run.events
-            .push(RunEvent::with_time("end", run.end_time.unwrap()));
+        run.events.push(RunEvent::with_time(
+            "end",
+            run.end_time.expect("end_time set before on_end"),
+        ));
 
         Ok(run.clone())
     }
@@ -425,8 +427,10 @@ pub trait TracerCore: Send + Sync + Debug {
         }
 
         run.end_time = Some(Utc::now());
-        run.events
-            .push(RunEvent::with_time("error", run.end_time.unwrap()));
+        run.events.push(RunEvent::with_time(
+            "error",
+            run.end_time.expect("end_time set before on_end"),
+        ));
 
         Ok(run.clone())
     }
@@ -534,8 +538,10 @@ pub trait TracerCore: Send + Sync + Debug {
         }
 
         run.end_time = Some(Utc::now());
-        run.events
-            .push(RunEvent::with_time("end", run.end_time.unwrap()));
+        run.events.push(RunEvent::with_time(
+            "end",
+            run.end_time.expect("end_time set before on_end"),
+        ));
 
         if let Some(inputs) = processed_inputs {
             run.inputs = inputs;
@@ -560,8 +566,10 @@ pub trait TracerCore: Send + Sync + Debug {
 
         run.error = Some(Self::get_stacktrace(error));
         run.end_time = Some(Utc::now());
-        run.events
-            .push(RunEvent::with_time("error", run.end_time.unwrap()));
+        run.events.push(RunEvent::with_time(
+            "error",
+            run.end_time.expect("end_time set before on_end"),
+        ));
 
         if let Some(inputs) = processed_inputs {
             run.inputs = inputs;
@@ -659,8 +667,10 @@ pub trait TracerCore: Send + Sync + Debug {
         }
 
         run.end_time = Some(Utc::now());
-        run.events
-            .push(RunEvent::with_time("end", run.end_time.unwrap()));
+        run.events.push(RunEvent::with_time(
+            "end",
+            run.end_time.expect("end_time set before on_end"),
+        ));
 
         Ok(run.clone())
     }
@@ -686,8 +696,10 @@ pub trait TracerCore: Send + Sync + Debug {
 
         run.error = Some(Self::get_stacktrace(error));
         run.end_time = Some(Utc::now());
-        run.events
-            .push(RunEvent::with_time("error", run.end_time.unwrap()));
+        run.events.push(RunEvent::with_time(
+            "error",
+            run.end_time.expect("end_time set before on_end"),
+        ));
 
         Ok(run.clone())
     }
@@ -775,8 +787,10 @@ pub trait TracerCore: Send + Sync + Debug {
         }
 
         run.end_time = Some(Utc::now());
-        run.events
-            .push(RunEvent::with_time("end", run.end_time.unwrap()));
+        run.events.push(RunEvent::with_time(
+            "end",
+            run.end_time.expect("end_time set before on_end"),
+        ));
 
         Ok(run.clone())
     }
@@ -802,8 +816,10 @@ pub trait TracerCore: Send + Sync + Debug {
 
         run.error = Some(Self::get_stacktrace(error));
         run.end_time = Some(Utc::now());
-        run.events
-            .push(RunEvent::with_time("error", run.end_time.unwrap()));
+        run.events.push(RunEvent::with_time(
+            "error",
+            run.end_time.expect("end_time set before on_end"),
+        ));
 
         Ok(run.clone())
     }

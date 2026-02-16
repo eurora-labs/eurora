@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 
+use tracing::warn;
 use uuid::Uuid;
 
 use super::base::{
@@ -30,12 +31,17 @@ pub mod colors {
 /// Write text with optional color to a writer.
 fn write_text(writer: &Mutex<Box<dyn Write + Send>>, text: &str, color: Option<&str>, end: &str) {
     if let Ok(mut w) = writer.lock() {
-        if let Some(c) = color {
-            let _ = write!(w, "{}{}{}{}", c, text, colors::RESET, end);
+        let result = if let Some(c) = color {
+            write!(w, "{}{}{}{}", c, text, colors::RESET, end)
         } else {
-            let _ = write!(w, "{}{}", text, end);
+            write!(w, "{}{}", text, end)
+        };
+        if let Err(e) = result {
+            warn!("StdOutCallbackHandler write error: {e}");
         }
-        let _ = w.flush();
+        if let Err(e) = w.flush() {
+            warn!("StdOutCallbackHandler flush error: {e}");
+        }
     }
 }
 
@@ -137,13 +143,10 @@ impl CallbackManagerMixin for StdOutCallbackHandler {
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
         _tags: Option<&[String]>,
-        metadata: Option<&HashMap<String, serde_json::Value>>,
+        _metadata: Option<&HashMap<String, serde_json::Value>>,
+        name: Option<&str>,
     ) {
-        // First check metadata for "name" (equivalent to kwargs["name"] in Python)
-        // Then fall back to serialized
-        let name = metadata
-            .and_then(|m| m.get("name"))
-            .and_then(|v| v.as_str())
+        let name = name
             .or_else(|| {
                 if !serialized.is_empty() {
                     serialized.get("name").and_then(|v| v.as_str()).or_else(|| {
@@ -160,14 +163,18 @@ impl CallbackManagerMixin for StdOutCallbackHandler {
             .unwrap_or("<unknown>");
 
         if let Ok(mut w) = self.writer.lock() {
-            let _ = writeln!(
+            if let Err(e) = writeln!(
                 w,
                 "\n\n{}> Entering new {} chain...{}",
                 colors::BOLD,
                 name,
                 colors::RESET
-            );
-            let _ = w.flush();
+            ) {
+                warn!("StdOutCallbackHandler write error: {e}");
+            }
+            if let Err(e) = w.flush() {
+                warn!("StdOutCallbackHandler flush error: {e}");
+            }
         }
     }
 }
@@ -180,8 +187,12 @@ impl ChainManagerMixin for StdOutCallbackHandler {
         _parent_run_id: Option<Uuid>,
     ) {
         if let Ok(mut w) = self.writer.lock() {
-            let _ = writeln!(w, "\n{}> Finished chain.{}", colors::BOLD, colors::RESET);
-            let _ = w.flush();
+            if let Err(e) = writeln!(w, "\n{}> Finished chain.{}", colors::BOLD, colors::RESET) {
+                warn!("StdOutCallbackHandler write error: {e}");
+            }
+            if let Err(e) = w.flush() {
+                warn!("StdOutCallbackHandler flush error: {e}");
+            }
         }
     }
 
@@ -218,67 +229,6 @@ impl BaseCallbackHandler for StdOutCallbackHandler {
     }
 }
 
-/// Callback handler for streaming. Only works with LLMs that support streaming.
-///
-/// This handler prints tokens to stdout as they are generated.
-#[derive(Clone)]
-pub struct StreamingStdOutCallbackHandler {
-    writer: Arc<Mutex<Box<dyn Write + Send>>>,
-}
-
-impl std::fmt::Debug for StreamingStdOutCallbackHandler {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("StreamingStdOutCallbackHandler").finish()
-    }
-}
-
-impl Default for StreamingStdOutCallbackHandler {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl StreamingStdOutCallbackHandler {
-    /// Create a new StreamingStdOutCallbackHandler.
-    pub fn new() -> Self {
-        Self {
-            writer: Arc::new(Mutex::new(Box::new(io::stdout()))),
-        }
-    }
-
-    /// Create a new StreamingStdOutCallbackHandler with a custom writer.
-    pub fn with_writer(writer: Arc<Mutex<Box<dyn Write + Send>>>) -> Self {
-        Self { writer }
-    }
-}
-
-impl LLMManagerMixin for StreamingStdOutCallbackHandler {
-    fn on_llm_new_token(
-        &self,
-        token: &str,
-        _run_id: Uuid,
-        _parent_run_id: Option<Uuid>,
-        _chunk: Option<&serde_json::Value>,
-    ) {
-        if let Ok(mut w) = self.writer.lock() {
-            let _ = write!(w, "{}", token);
-            let _ = w.flush();
-        }
-    }
-}
-
-impl ChainManagerMixin for StreamingStdOutCallbackHandler {}
-impl ToolManagerMixin for StreamingStdOutCallbackHandler {}
-impl RetrieverManagerMixin for StreamingStdOutCallbackHandler {}
-impl CallbackManagerMixin for StreamingStdOutCallbackHandler {}
-impl RunManagerMixin for StreamingStdOutCallbackHandler {}
-
-impl BaseCallbackHandler for StreamingStdOutCallbackHandler {
-    fn name(&self) -> &str {
-        "StreamingStdOutCallbackHandler"
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -294,11 +244,5 @@ mod tests {
     fn test_stdout_handler_with_color() {
         let handler = StdOutCallbackHandler::with_color(colors::GREEN);
         assert_eq!(handler.color, Some(colors::GREEN.to_string()));
-    }
-
-    #[test]
-    fn test_streaming_handler_creation() {
-        let handler = StreamingStdOutCallbackHandler::new();
-        assert_eq!(handler.name(), "StreamingStdOutCallbackHandler");
     }
 }

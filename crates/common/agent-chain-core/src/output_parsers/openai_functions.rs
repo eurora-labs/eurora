@@ -9,9 +9,17 @@ use std::fmt::Debug;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use super::base::OutputParserError;
+use async_trait::async_trait;
+
+use super::base::{
+    BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser, OutputParserError,
+};
+use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
 use crate::error::{Error, Result};
+use crate::messages::BaseMessage;
 use crate::outputs::ChatGeneration;
+use crate::outputs::Generation;
+use crate::runnables::RunnableConfig;
 use crate::utils::json::parse_partial_json;
 
 /// Parse an output that is one of sets of values.
@@ -183,11 +191,9 @@ impl JsonOutputFunctionsParser {
                     if self.args_only {
                         Ok(Some(parsed_arguments))
                     } else {
-                        let name = function_call.get("name").cloned().unwrap_or(Value::Null);
-                        Ok(Some(serde_json::json!({
-                            "arguments": parsed_arguments,
-                            "name": name,
-                        })))
+                        let mut result_obj = function_call.clone();
+                        result_obj["arguments"] = parsed_arguments;
+                        Ok(Some(result_obj))
                     }
                 }
                 Err(_) => Ok(None),
@@ -212,11 +218,9 @@ impl JsonOutputFunctionsParser {
             if self.args_only {
                 Ok(Some(parsed_arguments))
             } else {
-                let name = function_call.get("name").cloned().unwrap_or(Value::Null);
-                Ok(Some(serde_json::json!({
-                    "arguments": parsed_arguments,
-                    "name": name,
-                })))
+                let mut result_obj = function_call.clone();
+                result_obj["arguments"] = parsed_arguments;
+                Ok(Some(result_obj))
             }
         }
     }
@@ -577,18 +581,16 @@ fn parse_json_lenient(input: &str) -> std::result::Result<Value, String> {
             continue;
         }
 
-        if in_string && character == '\n' {
-            result.push_str("\\n");
-            continue;
-        }
-
-        if in_string && character == '\r' {
-            result.push_str("\\r");
-            continue;
-        }
-
-        if in_string && character == '\t' {
-            result.push_str("\\t");
+        if in_string && character.is_control() {
+            match character {
+                '\n' => result.push_str("\\n"),
+                '\r' => result.push_str("\\r"),
+                '\t' => result.push_str("\\t"),
+                c => {
+                    // Escape other control characters as \uXXXX
+                    result.push_str(&format!("\\u{:04x}", c as u32));
+                }
+            }
             continue;
         }
 
@@ -596,6 +598,77 @@ fn parse_json_lenient(input: &str) -> std::result::Result<Value, String> {
     }
 
     serde_json::from_str::<Value>(&result).map_err(|e| format!("JSON parse error: {}", e))
+}
+
+// --- Trait implementations to integrate with the base parser architecture ---
+
+#[async_trait]
+impl BaseLLMOutputParser for OutputFunctionsParser {
+    type Output = Value;
+
+    fn parse_result(&self, _result: &[Generation], _partial: bool) -> Result<Self::Output> {
+        Err(Error::OutputParser {
+            message: "This output parser can only be used with a chat generation.".to_string(),
+            observation: None,
+            llm_output: None,
+            send_to_llm: false,
+        })
+    }
+}
+
+#[async_trait]
+impl BaseGenerationOutputParser for OutputFunctionsParser {
+    fn invoke(&self, input: BaseMessage, _config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let chat_gen = ChatGeneration::new(input);
+        self.parse_result(&[chat_gen])
+    }
+}
+
+#[async_trait]
+impl BaseOutputParser for JsonOutputFunctionsParser {
+    type Output = Option<Value>;
+
+    fn parse(&self, _text: &str) -> Result<Self::Output> {
+        Err(Error::NotImplemented(
+            "JsonOutputFunctionsParser.parse is not implemented".to_string(),
+        ))
+    }
+
+    fn parse_result(&self, _result: &[Generation], _partial: bool) -> Result<Self::Output> {
+        Err(Error::OutputParser {
+            message: "This output parser can only be used with a chat generation.".to_string(),
+            observation: None,
+            llm_output: None,
+            send_to_llm: false,
+        })
+    }
+
+    fn parser_type(&self) -> &str {
+        "json_functions"
+    }
+}
+
+impl BaseTransformOutputParser for JsonOutputFunctionsParser {}
+
+#[async_trait]
+impl BaseCumulativeTransformOutputParser for JsonOutputFunctionsParser {
+    fn diff_mode(&self) -> bool {
+        false
+    }
+
+    fn compute_diff(
+        &self,
+        prev: Option<&Self::Output>,
+        next: Self::Output,
+    ) -> Result<Self::Output> {
+        let prev_val = prev
+            .and_then(|p| p.as_ref())
+            .cloned()
+            .unwrap_or(Value::Null);
+        let next_val = next.unwrap_or(Value::Null);
+        let patch = self.diff(&prev_val, &next_val);
+        Ok(Some(Value::Array(patch)))
+    }
 }
 
 #[cfg(test)]

@@ -824,3 +824,155 @@ fn test_binding_debug() {
     assert!(debug.contains("RunnableBinding"));
     assert!(debug.contains("key"));
 }
+
+// =============================================================================
+// Tests for Runnable convenience methods (Phase 39)
+// =============================================================================
+
+/// Test pick() convenience method with a single key.
+#[test]
+fn test_pick_single_key() {
+    use agent_chain_core::runnables::passthrough::PickKeys;
+
+    let runnable = RunnableLambda::new(|_x: i32| {
+        let mut map = HashMap::new();
+        map.insert("name".to_string(), json!("Alice"));
+        map.insert("age".to_string(), json!(30));
+        Ok(map)
+    });
+
+    let picked = runnable.pick(PickKeys::Single("name".to_string()));
+    let result = picked.invoke(1, None).unwrap();
+    assert_eq!(result, json!("Alice"));
+}
+
+/// Test pick() convenience method with multiple keys.
+#[test]
+fn test_pick_multiple_keys() {
+    use agent_chain_core::runnables::passthrough::PickKeys;
+
+    let runnable = RunnableLambda::new(|_x: i32| {
+        let mut map = HashMap::new();
+        map.insert("name".to_string(), json!("Alice"));
+        map.insert("age".to_string(), json!(30));
+        map.insert("city".to_string(), json!("NYC"));
+        Ok(map)
+    });
+
+    let picked = runnable.pick(PickKeys::Multiple(vec![
+        "name".to_string(),
+        "age".to_string(),
+    ]));
+    let result = picked.invoke(1, None).unwrap();
+    let result_map: HashMap<String, serde_json::Value> = serde_json::from_value(result).unwrap();
+    assert_eq!(result_map.len(), 2);
+    assert_eq!(result_map.get("name"), Some(&json!("Alice")));
+    assert_eq!(result_map.get("age"), Some(&json!(30)));
+}
+
+/// Test assign() convenience method.
+#[test]
+fn test_assign_convenience() {
+    let passthrough = RunnablePassthrough::<HashMap<String, serde_json::Value>>::new();
+
+    let mapper = RunnablePassthrough::<HashMap<String, serde_json::Value>>::assign()
+        .add(
+            "doubled",
+            RunnableLambda::new(|input: HashMap<String, serde_json::Value>| {
+                let val = input.get("x").and_then(|v| v.as_i64()).unwrap_or(0);
+                Ok(json!(val * 2))
+            }),
+        )
+        .build();
+
+    let chained = passthrough.assign(mapper);
+
+    let mut input = HashMap::new();
+    input.insert("x".to_string(), json!(5));
+
+    let result = chained.invoke(input, None).unwrap();
+    assert_eq!(result.get("x"), Some(&json!(5)));
+    assert_eq!(result.get("doubled"), Some(&json!(10)));
+}
+
+/// Test with_fallbacks() convenience method.
+#[test]
+fn test_with_fallbacks_convenience() {
+    let primary = RunnableLambda::new(|_x: i32| -> Result<i32, Error> {
+        Err(Error::other("primary failed"))
+    });
+
+    let fallback = RunnableLambda::new(|x: i32| -> Result<i32, Error> { Ok(x * 2) });
+
+    let with_fallbacks = primary.with_fallbacks(vec![Arc::new(fallback)]);
+    let result = with_fallbacks.invoke(5, None).unwrap();
+    assert_eq!(result, 10);
+}
+
+/// Test with_fallbacks() convenience method when primary succeeds.
+#[test]
+fn test_with_fallbacks_primary_succeeds() {
+    let primary = RunnableLambda::new(|x: i32| -> Result<i32, Error> { Ok(x + 1) });
+
+    let fallback = RunnableLambda::new(|x: i32| -> Result<i32, Error> { Ok(x * 100) });
+
+    let with_fallbacks = primary.with_fallbacks(vec![Arc::new(fallback)]);
+    let result = with_fallbacks.invoke(5, None).unwrap();
+    assert_eq!(result, 6);
+}
+
+/// Test with_listeners() convenience method.
+#[test]
+fn test_with_listeners_convenience() {
+    use agent_chain_core::tracers::root_listeners::Listener;
+    use std::sync::atomic::AtomicBool;
+
+    let started = Arc::new(AtomicBool::new(false));
+    let ended = Arc::new(AtomicBool::new(false));
+
+    let started_clone = started.clone();
+    let on_start: Listener = Box::new(move |_run, _config| {
+        started_clone.store(true, Ordering::SeqCst);
+    });
+
+    let ended_clone = ended.clone();
+    let on_end: Listener = Box::new(move |_run, _config| {
+        ended_clone.store(true, Ordering::SeqCst);
+    });
+
+    let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
+    let with_listeners = runnable.with_listeners(Some(on_start), Some(on_end), None);
+
+    let result = with_listeners.invoke(5, None).unwrap();
+    assert_eq!(result, 6);
+}
+
+/// Test chaining pick() with with_fallbacks().
+#[test]
+fn test_chaining_pick_with_fallbacks() {
+    use agent_chain_core::runnables::passthrough::PickKeys;
+
+    let runnable = RunnableLambda::new(|_x: i32| {
+        let mut map = HashMap::new();
+        map.insert("name".to_string(), json!("Alice"));
+        map.insert("age".to_string(), json!(30));
+        Ok(map)
+    });
+
+    let picked = runnable.pick(PickKeys::Single("name".to_string()));
+
+    let fallback_picked = {
+        let fallback_inner = RunnableLambda::new(|_x: i32| {
+            let mut map = HashMap::new();
+            map.insert("name".to_string(), json!("Fallback"));
+            Ok(map)
+        });
+        use agent_chain_core::runnables::passthrough::RunnablePick;
+        pipe(fallback_inner, RunnablePick::new_single("name"))
+    };
+
+    let with_fallbacks = picked.with_fallbacks(vec![Arc::new(fallback_picked)]);
+
+    let result = with_fallbacks.invoke(1, None).unwrap();
+    assert_eq!(result, json!("Alice"));
+}

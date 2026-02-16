@@ -10,7 +10,7 @@ use serde_json::{Map, Value};
 
 use crate::messages::{AIMessage, BaseMessage, HumanMessage, ToolMessage};
 use crate::tools::BaseTool;
-use crate::utils::json_schema::{dereference_refs, remove_titles};
+use crate::utils::json_schema::dereference_refs;
 use crate::utils::uuid::uuid7;
 
 /// Representation of a callable function to send to an LLM.
@@ -101,6 +101,38 @@ fn recursive_set_additional_properties_false(schema: &mut Value) {
         if let Some(items) = map.get_mut("items") {
             recursive_set_additional_properties_false(items);
         }
+    }
+}
+
+/// Recursively removes "title" fields from a JSON schema dictionary.
+///
+/// Remove "title" fields from the input JSON schema dictionary,
+/// except when a "title" appears within a property definition under "properties".
+pub fn remove_titles(schema: &Value) -> Value {
+    remove_titles_helper(schema, "")
+}
+
+fn remove_titles_helper(kv: &Value, prev_key: &str) -> Value {
+    match kv {
+        Value::Object(map) => {
+            let mut new_map = Map::new();
+            for (k, v) in map {
+                if k == "title" {
+                    if v.is_object() && prev_key == "properties" {
+                        new_map.insert(k.clone(), remove_titles_helper(v, k));
+                    }
+                } else {
+                    new_map.insert(k.clone(), remove_titles_helper(v, k));
+                }
+            }
+            Value::Object(new_map)
+        }
+        Value::Array(arr) => Value::Array(
+            arr.iter()
+                .map(|item| remove_titles_helper(item, prev_key))
+                .collect(),
+        ),
+        _ => kv.clone(),
     }
 }
 
@@ -237,8 +269,9 @@ impl ConvertibleToOpenAI for Value {
             oai_function = Value::Object(result);
         }
         // Check for Amazon Bedrock Converse format tool (has 'toolSpec')
-        else if self.is_object() && self.get("toolSpec").is_some() {
-            let tool_spec = self.get("toolSpec").unwrap();
+        else if self.is_object()
+            && let Some(tool_spec) = self.get("toolSpec")
+        {
             let mut result = Map::new();
             result.insert(
                 "name".to_string(),
@@ -492,22 +525,26 @@ where
 /// # Returns
 ///
 /// A JSON schema representation of the input schema.
-pub fn convert_to_json_schema<T>(schema: &T, strict: Option<bool>) -> Value
+pub fn convert_to_json_schema<T>(schema: &T, strict: Option<bool>) -> crate::Result<Value>
 where
     T: ConvertibleToOpenAITool + ?Sized,
 {
     let openai_tool = convert_to_openai_tool(schema, strict);
 
     // Validate and extract function
-    let function = openai_tool
-        .get("function")
-        .expect("Input must be a valid OpenAI-format tool");
+    let function = openai_tool.get("function").ok_or_else(|| {
+        crate::Error::InvalidConfig("Input must be a valid OpenAI-format tool".to_string())
+    })?;
 
     let name = function
         .get("name")
-        .expect("Input must be a valid OpenAI-format tool with name")
+        .ok_or_else(|| {
+            crate::Error::InvalidConfig(
+                "Input must be a valid OpenAI-format tool with name".to_string(),
+            )
+        })?
         .as_str()
-        .expect("Name must be a string");
+        .ok_or_else(|| crate::Error::InvalidConfig("Tool name must be a string".to_string()))?;
 
     let mut json_schema = Map::new();
     json_schema.insert("title".to_string(), Value::String(name.to_string()));
@@ -524,7 +561,7 @@ where
         }
     }
 
-    Value::Object(json_schema)
+    Ok(Value::Object(json_schema))
 }
 
 /// Convert an example into a list of messages that can be fed into an LLM.

@@ -217,8 +217,10 @@ impl NumberedListOutputParser {
         }
     }
 
-    fn get_regex(&self) -> Regex {
-        Regex::new(&self.pattern).expect("Invalid regex pattern")
+    fn get_regex(&self) -> Result<Regex> {
+        Regex::new(&self.pattern).map_err(|e| {
+            crate::Error::InvalidConfig(format!("Invalid regex pattern '{}': {}", self.pattern, e))
+        })
     }
 }
 
@@ -232,7 +234,7 @@ impl BaseOutputParser for NumberedListOutputParser {
     type Output = Vec<String>;
 
     fn parse(&self, text: &str) -> Result<Vec<String>> {
-        let re = self.get_regex();
+        let re = self.get_regex()?;
         Ok(re
             .captures_iter(text)
             .filter_map(|cap| cap.get(1).map(|m| m.as_str().trim().to_string()))
@@ -266,7 +268,10 @@ impl BaseTransformOutputParser for NumberedListOutputParser {
 
 impl ListOutputParser for NumberedListOutputParser {
     fn parse_iter(&self, text: &str) -> Vec<ParseMatch> {
-        let re = self.get_regex();
+        let re = match self.get_regex() {
+            Ok(re) => re,
+            Err(_) => return Vec::new(),
+        };
         re.captures_iter(text)
             .filter_map(|cap| {
                 let overall = cap.get(0)?;
@@ -312,8 +317,10 @@ impl MarkdownListOutputParser {
         }
     }
 
-    fn get_regex(&self) -> Regex {
-        Regex::new(&self.pattern).expect("Invalid regex pattern")
+    fn get_regex(&self) -> Result<Regex> {
+        Regex::new(&self.pattern).map_err(|e| {
+            crate::Error::InvalidConfig(format!("Invalid regex pattern '{}': {}", self.pattern, e))
+        })
     }
 }
 
@@ -327,7 +334,7 @@ impl BaseOutputParser for MarkdownListOutputParser {
     type Output = Vec<String>;
 
     fn parse(&self, text: &str) -> Result<Vec<String>> {
-        let re = self.get_regex();
+        let re = self.get_regex()?;
         Ok(text
             .lines()
             .filter_map(|line| {
@@ -360,7 +367,10 @@ impl BaseTransformOutputParser for MarkdownListOutputParser {
 
 impl ListOutputParser for MarkdownListOutputParser {
     fn parse_iter(&self, text: &str) -> Vec<ParseMatch> {
-        let re = self.get_regex();
+        let re = match self.get_regex() {
+            Ok(re) => re,
+            Err(_) => return Vec::new(),
+        };
         let mut offset = 0;
         text.lines()
             .filter_map(|line| {
@@ -400,8 +410,8 @@ fn list_transform<'a, P: ListOutputParser + 'a>(
         let mut stream = input;
 
         while let Some(message) = stream.next().await {
-            let chunk_content = message.content();
-            buffer.push_str(chunk_content);
+            let chunk_content = message.text();
+            buffer.push_str(&chunk_content);
 
             let iter_results = parser.parse_iter(&buffer);
             if !iter_results.is_empty() {

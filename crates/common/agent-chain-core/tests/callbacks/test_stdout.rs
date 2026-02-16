@@ -11,9 +11,8 @@ use agent_chain_core::callbacks::base::LLMManagerMixin;
 use agent_chain_core::callbacks::base::{
     BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, RunManagerMixin, ToolManagerMixin,
 };
-use agent_chain_core::callbacks::stdout::{
-    StdOutCallbackHandler, StreamingStdOutCallbackHandler, colors,
-};
+use agent_chain_core::callbacks::stdout::{StdOutCallbackHandler, colors};
+use agent_chain_core::callbacks::streaming_stdout::StreamingStdOutCallbackHandler;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -55,6 +54,7 @@ fn test_chain_start_with_serialized_name() {
         None,
         None,
         None,
+        None,
     );
 }
 
@@ -72,6 +72,7 @@ fn test_chain_start_with_name_in_metadata() {
         None,
         None,
         Some(&metadata),
+        None,
     );
 }
 
@@ -90,6 +91,7 @@ fn test_chain_start_with_serialized_id() {
         None,
         None,
         None,
+        None,
     );
 }
 
@@ -103,6 +105,7 @@ fn test_chain_start_unknown_name() {
         &HashMap::new(),
         &HashMap::new(),
         Uuid::new_v4(),
+        None,
         None,
         None,
         None,

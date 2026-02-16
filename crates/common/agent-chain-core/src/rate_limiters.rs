@@ -166,7 +166,13 @@ impl InMemoryRateLimiter {
     /// make the request. Returns `false` if the tokens were not consumed and
     /// the caller should try again later.
     fn consume(&self) -> bool {
-        let mut state = self.state.lock().expect("lock poisoned");
+        let mut state = match self.state.lock() {
+            Ok(guard) => guard,
+            Err(error) => {
+                tracing::error!("Rate limiter lock poisoned: {}", error);
+                return false;
+            }
+        };
         let now = Instant::now();
 
         if let Some(last) = state.last {

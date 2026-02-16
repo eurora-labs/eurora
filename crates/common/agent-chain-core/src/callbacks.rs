@@ -29,17 +29,17 @@
 //! manager.add_handler(Arc::new(handler), true);
 //!
 //! // Use the manager during chain execution
-//! let run_manager = manager.on_chain_start(
-//!     &Default::default(),
-//!     &Default::default(),
-//!     None,
-//! );
+//! let run_manager = manager.on_chain_start()
+//!     .serialized(&Default::default())
+//!     .inputs(&Default::default())
+//!     .call();
 //! ```
 
 pub mod base;
 pub mod file;
 pub mod manager;
 pub mod stdout;
+pub mod streaming_stdout;
 pub mod usage;
 
 // Re-export base types
@@ -64,12 +64,12 @@ pub use manager::{
 pub use file::FileCallbackHandler;
 
 // Re-export stdout handlers
-pub use stdout::{StdOutCallbackHandler, StreamingStdOutCallbackHandler, colors};
+pub use stdout::{StdOutCallbackHandler, colors};
+pub use streaming_stdout::StreamingStdOutCallbackHandler;
 
 // Re-export usage tracking
 pub use usage::{
-    UsageMetadataCallbackGuard, UsageMetadataCallbackHandler, add_usage,
-    get_usage_metadata_callback,
+    UsageMetadataCallbackGuard, UsageMetadataCallbackHandler, get_usage_metadata_callback,
 };
 
 #[cfg(test)]
@@ -100,11 +100,11 @@ mod tests {
         manager.add_handler(Arc::new(handler), true);
 
         // Start a chain
-        let run_manager = manager.on_chain_start(
-            &std::collections::HashMap::new(),
-            &std::collections::HashMap::new(),
-            None,
-        );
+        let run_manager = manager
+            .on_chain_start()
+            .serialized(&std::collections::HashMap::new())
+            .inputs(&std::collections::HashMap::new())
+            .call();
 
         // Verify run manager was created
         assert!(!run_manager.run_id().is_nil());

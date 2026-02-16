@@ -17,7 +17,7 @@
 //!     .with_builtin_tools(vec![BuiltinTool::WebSearch]);
 //!
 //! let messages = vec![HumanMessage::builder().content("What is the latest news?").build().into()];
-//! let response = model.generate(messages, None).await?;
+//! let response = model.generate(messages, GenerateConfig::default()).await?;
 //! ```
 //!
 //! # Streaming with Responses API
@@ -62,12 +62,14 @@ use crate::chat_models::{
 use crate::error::{Error, Result};
 use crate::language_models::ChatGenerationStream;
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
+use crate::language_models::{ChatModelRunnable, ToolLike, extract_tool_name_from_schema};
 use crate::messages::{
     AIMessage, BaseMessage, ContentPart, ImageDetail, ImageSource, InvalidToolCall, MessageContent,
     ToolCall,
 };
 use crate::outputs::ChatGenerationChunk;
 use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
+use crate::runnables::base::Runnable;
 use crate::tools::ToolDefinition;
 
 /// Default API base URL for OpenAI.
@@ -223,6 +225,10 @@ pub struct ChatOpenAI {
     extra_body: Option<HashMap<String, serde_json::Value>>,
     chat_model_config: ChatModelConfig,
     language_model_config: LanguageModelConfig,
+    /// Tools bound to this model via `bind_tools()`.
+    bound_tools: Vec<ToolDefinition>,
+    /// Tool choice for bound tools.
+    bound_tool_choice: Option<ToolChoice>,
 }
 
 impl ChatOpenAI {
@@ -292,6 +298,8 @@ impl ChatOpenAI {
             extra_body: None,
             chat_model_config: ChatModelConfig::new(),
             language_model_config: LanguageModelConfig::new(),
+            bound_tools: Vec::new(),
+            bound_tool_choice: None,
         }
     }
 
@@ -699,14 +707,14 @@ impl ChatOpenAI {
                 // When tool_calls are present, content must be null (not empty string)
                 let has_tool_calls = message.get("tool_calls").is_some();
                 if has_tool_calls {
-                    let content_str = m.content();
+                    let content_str = m.text();
                     if content_str.is_empty() {
                         message["content"] = serde_json::Value::Null;
                     } else {
                         message["content"] = serde_json::json!(content_str);
                     }
-                } else if !m.content().is_empty() {
-                    message["content"] = serde_json::json!(m.content());
+                } else if !m.content.is_empty() {
+                    message["content"] = serde_json::json!(m.content.as_text());
                 }
 
                 if let Some(ref name) = m.name {
@@ -804,13 +812,13 @@ impl ChatOpenAI {
                 }
                 BaseMessage::AI(m) => {
                     // Add message content as output_text block
-                    if !m.content().is_empty() || m.tool_calls.is_empty() {
+                    if !m.content.is_empty() || m.tool_calls.is_empty() {
                         input.push(serde_json::json!({
                             "type": "message",
                             "role": "assistant",
                             "content": [{
                                 "type": "output_text",
-                                "text": m.content(),
+                                "text": m.content.as_text(),
                                 "annotations": []
                             }]
                         }));
@@ -1734,6 +1742,18 @@ impl BaseChatModel for ChatOpenAI {
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
+        if !self.bound_tools.is_empty() {
+            let ai_message = self
+                .generate_with_tools_internal(
+                    messages,
+                    &self.bound_tools,
+                    self.bound_tool_choice.as_ref(),
+                    stop,
+                )
+                .await?;
+            let generation = ChatGeneration::new(ai_message.into());
+            return Ok(ChatResult::new(vec![generation]));
+        }
         self._generate_internal(messages, stop, None).await
     }
 
@@ -1743,6 +1763,23 @@ impl BaseChatModel for ChatOpenAI {
         stop: Option<Vec<String>>,
         _run_manager: Option<&AsyncCallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
+        // When tools are bound, fall back to non-streaming generation
+        // since stream_internal doesn't support tool parameters yet.
+        if !self.bound_tools.is_empty() {
+            let ai_message = self
+                .generate_with_tools_internal(
+                    messages,
+                    &self.bound_tools,
+                    self.bound_tool_choice.as_ref(),
+                    stop,
+                )
+                .await?;
+            let chunk = ChatGenerationChunk::new(ai_message.into());
+            return Ok(
+                Box::pin(futures::stream::once(async move { Ok(chunk) })) as ChatGenerationStream
+            );
+        }
+
         let chat_stream = self.stream_internal(messages, stop).await?;
 
         let generation_stream = async_stream::stream! {
@@ -1780,8 +1817,42 @@ impl BaseChatModel for ChatOpenAI {
             .await
     }
 
-    async fn invoke(&self, input: LanguageModelInput) -> Result<AIMessage> {
-        self.invoke_with_stop(input, None).await
+    fn bind_tools(
+        &self,
+        tools: &[ToolLike],
+        tool_choice: Option<ToolChoice>,
+    ) -> Result<Box<dyn BaseChatModel>> {
+        let mut bound = self.clone();
+        bound.bound_tools = tools.iter().map(|t| t.to_definition()).collect();
+        bound.bound_tool_choice = tool_choice;
+        Ok(Box::new(bound))
+    }
+
+    fn with_structured_output(
+        &self,
+        schema: serde_json::Value,
+        include_raw: bool,
+    ) -> Result<
+        Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
+    > {
+        let tool_name = extract_tool_name_from_schema(&schema);
+        let tool_like = ToolLike::Schema(schema);
+        let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
+
+        let output_parser =
+            crate::output_parsers::openai_tools::JsonOutputKeyToolsParser::new(&tool_name)
+                .with_first_tool_only(true);
+
+        let model_runnable = ChatModelRunnable::new(std::sync::Arc::from(bound_model));
+
+        if include_raw {
+            Ok(Box::new(
+                crate::language_models::StructuredOutputWithRaw::new(model_runnable, output_parser),
+            ))
+        } else {
+            let chain = crate::runnables::base::pipe(model_runnable, output_parser);
+            Ok(Box::new(chain))
+        }
     }
 }
 

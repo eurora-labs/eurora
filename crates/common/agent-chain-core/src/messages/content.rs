@@ -34,6 +34,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 use crate::utils::base::ensure_id;
 
@@ -129,7 +130,14 @@ pub enum MessageContent {
     Parts(Vec<ContentPart>),
 }
 
+static EMPTY_MESSAGE_CONTENT: LazyLock<MessageContent> =
+    LazyLock::new(|| MessageContent::Text(String::new()));
+
 impl MessageContent {
+    /// A static reference to an empty MessageContent.
+    pub fn empty() -> &'static MessageContent {
+        &EMPTY_MESSAGE_CONTENT
+    }
     /// Get the text content, concatenating text parts if multipart.
     pub fn as_text(&self) -> String {
         match self {
@@ -173,6 +181,41 @@ impl MessageContent {
             MessageContent::Parts(parts) => parts.clone(),
         }
     }
+
+    /// Check if the content is empty.
+    pub fn len(&self) -> usize {
+        match self {
+            MessageContent::Text(s) => s.len(),
+            MessageContent::Parts(parts) => parts.len(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            MessageContent::Text(s) => s.is_empty(),
+            MessageContent::Parts(parts) => parts.is_empty(),
+        }
+    }
+
+    /// Convert to a list of JSON values.
+    ///
+    /// For Text content, returns a single-element vec with a text block.
+    /// For Parts content, serializes each part to a JSON value.
+    pub fn as_json_values(&self) -> Vec<serde_json::Value> {
+        match self {
+            MessageContent::Text(s) => {
+                if s.is_empty() {
+                    vec![]
+                } else {
+                    vec![serde_json::json!({"type": "text", "text": s})]
+                }
+            }
+            MessageContent::Parts(parts) => parts
+                .iter()
+                .filter_map(|p| serde_json::to_value(p).ok())
+                .collect(),
+        }
+    }
 }
 
 impl Default for MessageContent {
@@ -202,6 +245,66 @@ impl From<&String> for MessageContent {
 impl From<Vec<ContentPart>> for MessageContent {
     fn from(parts: Vec<ContentPart>) -> Self {
         MessageContent::Parts(parts)
+    }
+}
+
+impl From<Vec<serde_json::Value>> for MessageContent {
+    fn from(values: Vec<serde_json::Value>) -> Self {
+        let parts: Vec<ContentPart> = values.into_iter().map(ContentPart::Other).collect();
+        MessageContent::Parts(parts)
+    }
+}
+impl std::fmt::Display for MessageContent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MessageContent::Text(s) => write!(f, "{}", s),
+            MessageContent::Parts(parts) => {
+                let texts: Vec<&str> = parts
+                    .iter()
+                    .filter_map(|p| match p {
+                        ContentPart::Text { text } => Some(text.as_str()),
+                        _ => None,
+                    })
+                    .collect();
+                write!(f, "{}", texts.join(" "))
+            }
+        }
+    }
+}
+impl PartialEq<str> for MessageContent {
+    fn eq(&self, other: &str) -> bool {
+        match self {
+            MessageContent::Text(s) => s == other,
+            MessageContent::Parts(_) => false,
+        }
+    }
+}
+
+impl PartialEq<&str> for MessageContent {
+    fn eq(&self, other: &&str) -> bool {
+        match self {
+            MessageContent::Text(s) => s == *other,
+            MessageContent::Parts(_) => false,
+        }
+    }
+}
+
+impl MessageContent {
+    pub fn contains(&self, pattern: &str) -> bool {
+        match self {
+            MessageContent::Text(s) => s.contains(pattern),
+            MessageContent::Parts(parts) => parts.iter().any(|p| match p {
+                ContentPart::Text { text } => text.contains(pattern),
+                _ => false,
+            }),
+        }
+    }
+
+    pub fn split(&self, pattern: &str) -> Vec<String> {
+        match self {
+            MessageContent::Text(s) => s.split(pattern).map(String::from).collect(),
+            MessageContent::Parts(_) => vec![self.as_text()],
+        }
     }
 }
 

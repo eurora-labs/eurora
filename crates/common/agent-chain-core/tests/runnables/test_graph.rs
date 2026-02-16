@@ -51,10 +51,10 @@ fn test_to_safe_id_special_chars() {
 #[test]
 fn test_trim() {
     let mut graph = Graph::new();
-    let start = graph.add_node("__start__", Some("__start__"));
-    let ask = graph.add_node("ask_question", Some("ask_question"));
-    let answer = graph.add_node("answer_question", Some("answer_question"));
-    let end = graph.add_node("__end__", Some("__end__"));
+    let start = graph.add_node_named("__start__", Some("__start__"));
+    let ask = graph.add_node_named("ask_question", Some("ask_question"));
+    let answer = graph.add_node_named("answer_question", Some("answer_question"));
+    let end = graph.add_node_named("__end__", Some("__end__"));
 
     graph.add_edge(&start, &ask, None, false);
     graph.add_edge(&ask, &answer, None, false);
@@ -76,9 +76,9 @@ fn test_trim() {
 fn test_trim_basic() {
     // A simple 3-node graph where start/end can't be trimmed (named nodes)
     let mut graph = Graph::new();
-    let start = graph.add_node("__start__", Some("__start__"));
-    let middle = graph.add_node("process", Some("process"));
-    let end = graph.add_node("__end__", Some("__end__"));
+    let start = graph.add_node_named("__start__", Some("__start__"));
+    let middle = graph.add_node_named("process", Some("process"));
+    let end = graph.add_node_named("__end__", Some("__end__"));
 
     graph.add_edge(&start, &middle, None, false);
     graph.add_edge(&middle, &end, None, false);
@@ -92,10 +92,10 @@ fn test_trim_basic() {
 #[test]
 fn test_trim_json_output() {
     let mut graph = Graph::new();
-    let start = graph.add_node("__start__", Some("__start__"));
-    let ask = graph.add_node("ask_question", Some("ask_question"));
-    let answer = graph.add_node("answer_question", Some("answer_question"));
-    let end = graph.add_node("__end__", Some("__end__"));
+    let start = graph.add_node_named("__start__", Some("__start__"));
+    let ask = graph.add_node_named("ask_question", Some("ask_question"));
+    let answer = graph.add_node_named("answer_question", Some("answer_question"));
+    let end = graph.add_node_named("__end__", Some("__end__"));
 
     graph.add_edge(&start, &ask, None, false);
     graph.add_edge(&ask, &answer, None, false);
@@ -130,9 +130,9 @@ fn test_trim_json_output() {
 #[test]
 fn test_trim_multi_edge() {
     let mut graph = Graph::new();
-    let start = graph.add_node("__start__", Some("__start__"));
-    let a = graph.add_node("a", Some("a"));
-    let last = graph.add_node("__end__", Some("__end__"));
+    let start = graph.add_node_named("__start__", Some("__start__"));
+    let a = graph.add_node_named("a", Some("a"));
+    let last = graph.add_node_named("__end__", Some("__end__"));
 
     graph.add_edge(&start, &a, None, false);
     graph.add_edge(&a, &last, None, false);
@@ -192,7 +192,7 @@ fn test_parallel_subgraph_mermaid() {
     ];
 
     let graph = Graph::from_parts(nodes, edges);
-    let mermaid = graph.draw_mermaid(None);
+    let mermaid = graph.draw_mermaid(None).unwrap();
 
     // Verify key structural elements
     assert!(mermaid.contains("graph TD;"));
@@ -243,7 +243,7 @@ fn test_double_nested_subgraph_mermaid() {
     ];
 
     let graph = Graph::from_parts(nodes, edges);
-    let mermaid = graph.draw_mermaid(None);
+    let mermaid = graph.draw_mermaid(None).unwrap();
 
     assert!(mermaid.contains("graph TD;"));
     assert!(mermaid.contains("subgraph child_1"));
@@ -307,7 +307,7 @@ fn test_triple_nested_subgraph_mermaid() {
     ];
 
     let graph = Graph::from_parts(nodes, edges);
-    let mermaid = graph.draw_mermaid(None);
+    let mermaid = graph.draw_mermaid(None).unwrap();
 
     assert!(mermaid.contains("graph TD;"));
     assert!(mermaid.contains("subgraph grandchild_1"));
@@ -331,7 +331,7 @@ fn test_single_node_subgraph_mermaid() {
     ];
 
     let graph = Graph::from_parts(nodes, edges);
-    let mermaid = graph.draw_mermaid(None);
+    let mermaid = graph.draw_mermaid(None).unwrap();
 
     assert!(mermaid.contains("graph TD;"));
     assert!(mermaid.contains("subgraph sub"));
@@ -367,10 +367,12 @@ fn test_graph_mermaid_frontmatter_config() {
     let mut frontmatter = HashMap::new();
     frontmatter.insert("config".to_string(), Value::Object(config_inner));
 
-    let mermaid = graph.draw_mermaid(Some(MermaidOptions {
-        frontmatter_config: Some(frontmatter),
-        ..Default::default()
-    }));
+    let mermaid = graph
+        .draw_mermaid(Some(MermaidOptions {
+            frontmatter_config: Some(frontmatter),
+            ..Default::default()
+        }))
+        .unwrap();
 
     // Verify frontmatter is present
     assert!(mermaid.starts_with("---\n"));
@@ -400,7 +402,7 @@ fn test_graph_mermaid_special_chars() {
     ];
 
     let graph = Graph::from_parts(nodes, edges);
-    let mermaid = graph.draw_mermaid(None);
+    let mermaid = graph.draw_mermaid(None).unwrap();
 
     assert!(mermaid.contains("graph TD;"));
     // Chinese characters should be escaped to safe ids
@@ -427,10 +429,12 @@ fn test_draw_mermaid_without_styles() {
     ];
 
     let graph = Graph::from_parts(nodes, edges);
-    let mermaid = graph.draw_mermaid(Some(MermaidOptions {
-        with_styles: false,
-        ..Default::default()
-    }));
+    let mermaid = graph
+        .draw_mermaid(Some(MermaidOptions {
+            with_styles: false,
+            ..Default::default()
+        }))
+        .unwrap();
 
     // Without styles: no frontmatter, no classDef
     assert!(mermaid.starts_with("graph TD;\n"));
@@ -445,7 +449,7 @@ fn test_draw_mermaid_without_styles() {
 #[test]
 fn test_graph_add_node() {
     let mut graph = Graph::new();
-    let node = graph.add_node("test_node", Some("my_id"));
+    let node = graph.add_node_named("test_node", Some("my_id"));
     assert_eq!(node.id, "my_id");
     assert_eq!(node.name, "test_node");
     assert!(graph.nodes.contains_key("my_id"));
@@ -454,7 +458,7 @@ fn test_graph_add_node() {
 #[test]
 fn test_graph_add_node_auto_id() {
     let mut graph = Graph::new();
-    let node = graph.add_node("test_node", None);
+    let node = graph.add_node_named("test_node", None);
     assert!(!node.id.is_empty());
     assert_eq!(node.name, "test_node");
     assert_eq!(graph.nodes.len(), 1);
@@ -463,8 +467,8 @@ fn test_graph_add_node_auto_id() {
 #[test]
 fn test_graph_add_edge() {
     let mut graph = Graph::new();
-    let source = graph.add_node("source", Some("s"));
-    let target = graph.add_node("target", Some("t"));
+    let source = graph.add_node_named("source", Some("s"));
+    let target = graph.add_node_named("target", Some("t"));
     let edge = graph.add_edge(&source, &target, None, false);
     assert_eq!(edge.source, "s");
     assert_eq!(edge.target, "t");
@@ -475,9 +479,9 @@ fn test_graph_add_edge() {
 #[test]
 fn test_graph_remove_node() {
     let mut graph = Graph::new();
-    let a = graph.add_node("a", Some("a"));
-    let b = graph.add_node("b", Some("b"));
-    let c = graph.add_node("c", Some("c"));
+    let a = graph.add_node_named("a", Some("a"));
+    let b = graph.add_node_named("b", Some("b"));
+    let c = graph.add_node_named("c", Some("c"));
     graph.add_edge(&a, &b, None, false);
     graph.add_edge(&b, &c, None, false);
 
@@ -490,9 +494,9 @@ fn test_graph_remove_node() {
 #[test]
 fn test_graph_first_last_node() {
     let mut graph = Graph::new();
-    let a = graph.add_node("a", Some("a"));
-    let b = graph.add_node("b", Some("b"));
-    let c = graph.add_node("c", Some("c"));
+    let a = graph.add_node_named("a", Some("a"));
+    let b = graph.add_node_named("b", Some("b"));
+    let c = graph.add_node_named("c", Some("c"));
     graph.add_edge(&a, &b, None, false);
     graph.add_edge(&b, &c, None, false);
 
@@ -503,9 +507,9 @@ fn test_graph_first_last_node() {
 #[test]
 fn test_graph_no_first_node_with_multiple_roots() {
     let mut graph = Graph::new();
-    let a = graph.add_node("a", Some("a"));
-    let b = graph.add_node("b", Some("b"));
-    let c = graph.add_node("c", Some("c"));
+    let a = graph.add_node_named("a", Some("a"));
+    let b = graph.add_node_named("b", Some("b"));
+    let c = graph.add_node_named("c", Some("c"));
     graph.add_edge(&a, &c, None, false);
     graph.add_edge(&b, &c, None, false);
 
@@ -518,8 +522,8 @@ fn test_graph_no_first_node_with_multiple_roots() {
 fn test_graph_reid() {
     let mut graph = Graph::new();
     // Use UUID-like ids
-    let a = graph.add_node("alpha", None);
-    let b = graph.add_node("beta", None);
+    let a = graph.add_node_named("alpha", None);
+    let b = graph.add_node_named("beta", None);
     graph.add_edge(&a, &b, None, false);
 
     let reided = graph.reid();
@@ -533,11 +537,11 @@ fn test_graph_reid() {
 #[test]
 fn test_graph_conditional_edge() {
     let mut graph = Graph::new();
-    let a = graph.add_node("a", Some("a"));
-    let b = graph.add_node("b", Some("b"));
+    let a = graph.add_node_named("a", Some("a"));
+    let b = graph.add_node_named("b", Some("b"));
     graph.add_edge(&a, &b, None, true);
 
-    let mermaid = graph.draw_mermaid(None);
+    let mermaid = graph.draw_mermaid(None).unwrap();
     assert!(
         mermaid.contains("-.->"),
         "Conditional edge should use dashed arrow"
@@ -547,11 +551,11 @@ fn test_graph_conditional_edge() {
 #[test]
 fn test_graph_edge_with_data() {
     let mut graph = Graph::new();
-    let a = graph.add_node("a", Some("a"));
-    let b = graph.add_node("b", Some("b"));
+    let a = graph.add_node_named("a", Some("a"));
+    let b = graph.add_node_named("b", Some("b"));
     graph.add_edge(&a, &b, Some("my label".to_string()), false);
 
-    let mermaid = graph.draw_mermaid(None);
+    let mermaid = graph.draw_mermaid(None).unwrap();
     assert!(
         mermaid.contains("my label"),
         "Edge data should appear as label"
@@ -575,8 +579,525 @@ fn test_node_with_metadata_renders_in_mermaid() {
     let edges = vec![Edge::new("other", "my_node")];
 
     let graph = Graph::from_parts(nodes, edges);
-    let mermaid = graph.draw_mermaid(None);
+    let mermaid = graph.draw_mermaid(None).unwrap();
 
     assert!(mermaid.contains("__interrupt"));
     assert!(mermaid.contains("before"));
+}
+
+// ===========================================================================
+// Tests for Graph.extend() (mirrors Python's graph.extend)
+// ===========================================================================
+
+#[test]
+fn test_graph_extend_basic() {
+    let mut graph = Graph::new();
+    let a = graph.add_node_named("a", Some("a"));
+    let b = graph.add_node_named("b", Some("b"));
+    graph.add_edge(&a, &b, None, false);
+
+    let mut other = Graph::new();
+    let c = other.add_node_named("c", Some("c"));
+    let d = other.add_node_named("d", Some("d"));
+    other.add_edge(&c, &d, None, false);
+
+    let (first, last) = graph.extend(other, "");
+    assert_eq!(first.unwrap().id, "c");
+    assert_eq!(last.unwrap().id, "d");
+    assert_eq!(graph.nodes.len(), 4);
+    assert_eq!(graph.edges.len(), 2);
+}
+
+#[test]
+fn test_graph_extend_with_prefix() {
+    let mut graph = Graph::new();
+    let a = graph.add_node_named("a", Some("a"));
+    let _ = a;
+
+    let mut other = Graph::new();
+    let b = other.add_node_named("b", Some("b"));
+    let c = other.add_node_named("c", Some("c"));
+    other.add_edge(&b, &c, None, false);
+
+    let (first, last) = graph.extend(other, "sub");
+    assert_eq!(first.as_ref().unwrap().id, "sub:b");
+    assert_eq!(last.as_ref().unwrap().id, "sub:c");
+    assert!(graph.nodes.contains_key("sub:b"));
+    assert!(graph.nodes.contains_key("sub:c"));
+    // Edge should also be prefixed
+    assert_eq!(graph.edges.last().unwrap().source, "sub:b");
+    assert_eq!(graph.edges.last().unwrap().target, "sub:c");
+}
+
+#[test]
+fn test_graph_extend_uuid_nodes_ignore_prefix() {
+    let mut graph = Graph::new();
+
+    let mut other = Graph::new();
+    // add_node with None id generates UUID
+    let b = other.add_node_named("b", None);
+    let c = other.add_node_named("c", None);
+    other.add_edge(&b, &c, None, false);
+
+    // All nodes have UUID ids, so prefix should be ignored
+    let (first, last) = graph.extend(other, "should_be_ignored");
+    let first = first.unwrap();
+    let last = last.unwrap();
+    assert!(!first.id.contains("should_be_ignored"));
+    assert!(!last.id.contains("should_be_ignored"));
+}
+
+#[test]
+fn test_graph_extend_empty_graph() {
+    let mut graph = Graph::new();
+    let a = graph.add_node_named("a", Some("a"));
+    let _ = a;
+
+    let other = Graph::new();
+    let (first, last) = graph.extend(other, "");
+    assert!(first.is_none());
+    assert!(last.is_none());
+    assert_eq!(graph.nodes.len(), 1);
+}
+
+#[test]
+fn test_graph_extend_returns_correct_first_last() {
+    let mut graph = Graph::new();
+
+    let mut other = Graph::new();
+    let x = other.add_node_named("x", Some("x"));
+    let y = other.add_node_named("y", Some("y"));
+    let z = other.add_node_named("z", Some("z"));
+    other.add_edge(&x, &y, None, false);
+    other.add_edge(&y, &z, None, false);
+
+    let (first, last) = graph.extend(other, "");
+    assert_eq!(first.unwrap().id, "x");
+    assert_eq!(last.unwrap().id, "z");
+}
+
+// ===========================================================================
+// Tests for Runnable.get_graph()
+// ===========================================================================
+
+use agent_chain_core::runnables::base::{Runnable, runnable_lambda};
+
+#[test]
+fn test_get_graph_base_runnable() {
+    let r = runnable_lambda(|x: String| Ok(x.len()));
+    let graph = r.get_graph(None).unwrap();
+
+    // Default: 3 nodes (Input, Runnable, Output) and 2 edges
+    assert_eq!(graph.nodes.len(), 3);
+    assert_eq!(graph.edges.len(), 2);
+
+    // Should have valid first and last
+    assert!(graph.first_node().is_some());
+    assert!(graph.last_node().is_some());
+}
+
+#[test]
+fn test_get_graph_base_runnable_names() {
+    let r = runnable_lambda(|x: String| Ok(x.len()));
+    let graph = r.get_graph(None).unwrap();
+    let reided = graph.reid();
+
+    // Verify node names contain Input and Output suffixes
+    let names: Vec<&str> = reided.nodes.values().map(|n| n.name.as_str()).collect();
+    assert!(
+        names.iter().any(|n| n.contains("Input")),
+        "Should have Input node, got: {:?}",
+        names
+    );
+    assert!(
+        names.iter().any(|n| n.contains("Output")),
+        "Should have Output node, got: {:?}",
+        names
+    );
+}
+
+#[test]
+fn test_get_graph_sequence() {
+    use agent_chain_core::runnables::base::pipe;
+
+    let a = runnable_lambda(|x: String| Ok(x.len()));
+    let b = runnable_lambda(|x: usize| Ok(x.to_string()));
+    let seq = pipe(a, b);
+    let graph = seq.get_graph(None).unwrap();
+
+    // Sequence trims intermediate nodes:
+    // first step: Input + Lambda (trimmed Output)
+    // last step: (trimmed Input) + Lambda + Output
+    // Connected by edge between them
+    // Total: 4 nodes, 3 edges
+    assert!(
+        graph.nodes.len() >= 3,
+        "Expected >= 3 nodes, got {}",
+        graph.nodes.len()
+    );
+    assert!(
+        graph.edges.len() >= 2,
+        "Expected >= 2 edges, got {}",
+        graph.edges.len()
+    );
+
+    // Should still have valid first and last
+    assert!(graph.first_node().is_some());
+    assert!(graph.last_node().is_some());
+}
+
+#[test]
+fn test_get_graph_sequence_draws_mermaid() {
+    use agent_chain_core::runnables::base::pipe;
+
+    let a = runnable_lambda(|x: String| Ok(x.len()));
+    let b = runnable_lambda(|x: usize| Ok(x.to_string()));
+    let seq = pipe(a, b);
+    let graph = seq.get_graph(None).unwrap();
+
+    let mermaid = graph.draw_mermaid(None).unwrap();
+    assert!(mermaid.contains("graph TD;"));
+    assert!(mermaid.contains(" --> "));
+}
+
+#[test]
+fn test_get_graph_parallel() {
+    use agent_chain_core::runnables::base::RunnableParallel;
+
+    let par = RunnableParallel::<String>::new()
+        .add(
+            "a",
+            runnable_lambda(|x: String| Ok(serde_json::Value::String(x.clone()))),
+        )
+        .add(
+            "b",
+            runnable_lambda(|x: String| {
+                Ok(serde_json::Value::Number(serde_json::Number::from(x.len())))
+            }),
+        );
+
+    let graph = par.get_graph(None).unwrap();
+
+    // Parallel: shared Input + Output nodes, plus the runnable nodes from each branch
+    // Each branch contributes 1 middle node (lambda), so total = 2 + 2 = 4 nodes
+    assert!(
+        graph.nodes.len() >= 4,
+        "Expected >= 4 nodes, got {}",
+        graph.nodes.len()
+    );
+
+    // Edges: 2 fan-out + 2 fan-in = 4
+    assert!(
+        graph.edges.len() >= 4,
+        "Expected >= 4 edges, got {}",
+        graph.edges.len()
+    );
+
+    assert!(graph.first_node().is_some());
+    assert!(graph.last_node().is_some());
+}
+
+#[test]
+fn test_get_graph_parallel_draws_mermaid() {
+    use agent_chain_core::runnables::base::RunnableParallel;
+
+    let par = RunnableParallel::<String>::new()
+        .add(
+            "a",
+            runnable_lambda(|x: String| Ok(serde_json::Value::String(x.clone()))),
+        )
+        .add(
+            "b",
+            runnable_lambda(|x: String| {
+                Ok(serde_json::Value::Number(serde_json::Number::from(x.len())))
+            }),
+        );
+
+    let graph = par.get_graph(None).unwrap();
+    let mermaid = graph.draw_mermaid(None).unwrap();
+
+    assert!(mermaid.contains("graph TD;"));
+}
+
+#[test]
+fn test_get_graph_binding_delegates() {
+    let r = runnable_lambda(|x: String| Ok(x.len()));
+    let binding = r.bind(HashMap::new());
+    let graph = binding.get_graph(None).unwrap();
+
+    // Binding delegates: same structure as base (3 nodes, 2 edges)
+    assert_eq!(graph.nodes.len(), 3);
+    assert_eq!(graph.edges.len(), 2);
+}
+
+// ===========================================================================
+// Tests for NodeData, node_data_str, node_data_json
+// ===========================================================================
+
+use agent_chain_core::runnables::graph::{NodeData, node_data_json, node_data_str};
+
+#[test]
+fn test_node_data_str_with_uuid_and_schema() {
+    let data = NodeData::Schema {
+        name: "MyInput".to_string(),
+    };
+    let uuid_id = "550e8400-e29b-41d4-a716-446655440000";
+    assert_eq!(node_data_str(uuid_id, Some(&data)), "MyInput");
+}
+
+#[test]
+fn test_node_data_str_with_uuid_and_runnable() {
+    let data = NodeData::Runnable {
+        name: "RunnableLambda".to_string(),
+    };
+    let uuid_id = "550e8400-e29b-41d4-a716-446655440000";
+    // Strips "Runnable" prefix
+    assert_eq!(node_data_str(uuid_id, Some(&data)), "Lambda");
+}
+
+#[test]
+fn test_node_data_str_with_uuid_and_no_prefix() {
+    let data = NodeData::Runnable {
+        name: "ChatOpenAI".to_string(),
+    };
+    let uuid_id = "550e8400-e29b-41d4-a716-446655440000";
+    // No "Runnable" prefix — kept as-is
+    assert_eq!(node_data_str(uuid_id, Some(&data)), "ChatOpenAI");
+}
+
+#[test]
+fn test_node_data_str_with_non_uuid_returns_id() {
+    let data = NodeData::Schema {
+        name: "MyInput".to_string(),
+    };
+    assert_eq!(node_data_str("my_node", Some(&data)), "my_node");
+}
+
+#[test]
+fn test_node_data_str_with_none_data_returns_id() {
+    let uuid_id = "550e8400-e29b-41d4-a716-446655440000";
+    assert_eq!(node_data_str(uuid_id, None), uuid_id);
+}
+
+#[test]
+fn test_node_data_json_runnable() {
+    let node = Node {
+        id: "550e8400-e29b-41d4-a716-446655440000".to_string(),
+        name: "Lambda".to_string(),
+        data: Some(NodeData::Runnable {
+            name: "RunnableLambda".to_string(),
+        }),
+        metadata: None,
+    };
+    let json = node_data_json(&node);
+    assert_eq!(json["type"], "runnable");
+    assert_eq!(json["data"]["name"], "Lambda");
+}
+
+#[test]
+fn test_node_data_json_schema() {
+    let node = Node {
+        id: "550e8400-e29b-41d4-a716-446655440000".to_string(),
+        name: "MyInput".to_string(),
+        data: Some(NodeData::Schema {
+            name: "MyInput".to_string(),
+        }),
+        metadata: None,
+    };
+    let json = node_data_json(&node);
+    assert_eq!(json["type"], "schema");
+    assert_eq!(json["data"], "MyInput");
+}
+
+#[test]
+fn test_node_data_json_none() {
+    let node = Node {
+        id: "my_id".to_string(),
+        name: "my_id".to_string(),
+        data: None,
+        metadata: None,
+    };
+    let json = node_data_json(&node);
+    // None data produces empty object
+    assert!(
+        json.as_object().unwrap().is_empty() || !json.as_object().unwrap().contains_key("type")
+    );
+}
+
+#[test]
+fn test_node_data_json_with_metadata() {
+    let mut meta = HashMap::new();
+    meta.insert("key".to_string(), Value::String("value".to_string()));
+    let node = Node {
+        id: "550e8400-e29b-41d4-a716-446655440000".to_string(),
+        name: "Lambda".to_string(),
+        data: Some(NodeData::Runnable {
+            name: "RunnableLambda".to_string(),
+        }),
+        metadata: Some(meta),
+    };
+    let json = node_data_json(&node);
+    assert_eq!(json["type"], "runnable");
+    assert_eq!(json["metadata"]["key"], "value");
+}
+
+// ===========================================================================
+// Tests for Graph.add_node with NodeData
+// ===========================================================================
+
+#[test]
+fn test_add_node_with_schema_data() {
+    let mut graph = Graph::new();
+    let node = graph.add_node(
+        Some(NodeData::Schema {
+            name: "MyInput".to_string(),
+        }),
+        None,
+        None,
+    );
+    // UUID-based ID, name derived from data
+    assert_eq!(node.name, "MyInput");
+    assert!(node.data.is_some());
+}
+
+#[test]
+fn test_add_node_with_runnable_data() {
+    let mut graph = Graph::new();
+    let node = graph.add_node(
+        Some(NodeData::Runnable {
+            name: "RunnableLambda".to_string(),
+        }),
+        None,
+        None,
+    );
+    // Strips "Runnable" prefix for display name
+    assert_eq!(node.name, "Lambda");
+}
+
+#[test]
+fn test_add_node_with_no_data() {
+    let mut graph = Graph::new();
+    let node = graph.add_node(None, Some("my_id"), None);
+    // Non-UUID id, no data: name = id
+    assert_eq!(node.name, "my_id");
+    assert!(node.data.is_none());
+}
+
+// ===========================================================================
+// Tests for Graph.to_json with NodeData
+// ===========================================================================
+
+#[test]
+fn test_to_json_includes_node_data_type() {
+    let mut graph = Graph::new();
+    let input = graph.add_node(
+        Some(NodeData::Schema {
+            name: "MyInput".to_string(),
+        }),
+        None,
+        None,
+    );
+    let runnable = graph.add_node(
+        Some(NodeData::Runnable {
+            name: "RunnableLambda".to_string(),
+        }),
+        None,
+        None,
+    );
+    graph.add_edge(&input, &runnable, None, false);
+
+    let json = graph.to_json();
+    let nodes = json["nodes"].as_array().unwrap();
+
+    let schema_node = nodes
+        .iter()
+        .find(|n| n.get("type").and_then(|t| t.as_str()) == Some("schema"));
+    assert!(schema_node.is_some(), "Should have a schema node");
+
+    let runnable_node = nodes
+        .iter()
+        .find(|n| n.get("type").and_then(|t| t.as_str()) == Some("runnable"));
+    assert!(runnable_node.is_some(), "Should have a runnable node");
+}
+
+// ===========================================================================
+// Tests for RunnableLambda with deps
+// ===========================================================================
+
+#[test]
+fn test_lambda_no_deps_default_graph() {
+    let r = runnable_lambda(|x: String| Ok(x.len()));
+    let graph = r.get_graph(None).unwrap();
+    // Default: 3 nodes, 2 edges
+    assert_eq!(graph.nodes.len(), 3);
+    assert_eq!(graph.edges.len(), 2);
+}
+
+#[test]
+fn test_lambda_with_deps_graph() {
+    use agent_chain_core::runnables::base::RunnableGraphProvider;
+    use std::sync::Arc;
+
+    let dep = runnable_lambda(|x: String| Ok(x.to_uppercase()));
+    let r = runnable_lambda(|x: String| Ok(x.len())).with_dep(Arc::new(RunnableGraphProvider(dep)));
+
+    let graph = r.get_graph(None).unwrap();
+    // With 1 dep: Input + dep's runnable node + Output = 3 nodes
+    // (dep's input/output are trimmed, its runnable node remains)
+    // Edges: input->dep_runnable, dep_runnable->output = 2
+    assert!(
+        graph.nodes.len() >= 3,
+        "Expected >= 3 nodes, got {}",
+        graph.nodes.len()
+    );
+    assert!(
+        graph.edges.len() >= 2,
+        "Expected >= 2 edges, got {}",
+        graph.edges.len()
+    );
+
+    // Should have valid first and last nodes
+    assert!(graph.first_node().is_some());
+    assert!(graph.last_node().is_some());
+}
+
+#[test]
+fn test_lambda_with_multiple_deps_graph() {
+    use agent_chain_core::runnables::base::RunnableGraphProvider;
+    use std::sync::Arc;
+
+    let dep1 = runnable_lambda(|x: String| Ok(x.to_uppercase()));
+    let dep2 = runnable_lambda(|x: String| Ok(x.to_lowercase()));
+    let r = runnable_lambda(|x: String| Ok(x.len())).with_deps(vec![
+        Arc::new(RunnableGraphProvider(dep1)),
+        Arc::new(RunnableGraphProvider(dep2)),
+    ]);
+
+    let graph = r.get_graph(None).unwrap();
+    // With 2 deps: Input + 2 dep runnable nodes + Output = 4 nodes
+    assert!(
+        graph.nodes.len() >= 4,
+        "Expected >= 4 nodes, got {}",
+        graph.nodes.len()
+    );
+    // Edges: 2 fan-out + 2 fan-in = 4
+    assert!(
+        graph.edges.len() >= 4,
+        "Expected >= 4 edges, got {}",
+        graph.edges.len()
+    );
+}
+
+#[test]
+fn test_lambda_with_deps_draws_mermaid() {
+    use agent_chain_core::runnables::base::RunnableGraphProvider;
+    use std::sync::Arc;
+
+    let dep = runnable_lambda(|x: String| Ok(x.to_uppercase()));
+    let r = runnable_lambda(|x: String| Ok(x.len())).with_dep(Arc::new(RunnableGraphProvider(dep)));
+
+    let graph = r.get_graph(None).unwrap();
+    let mermaid = graph.draw_mermaid(None).unwrap();
+    assert!(mermaid.contains("graph TD;"));
+    assert!(mermaid.contains(" --> "));
 }

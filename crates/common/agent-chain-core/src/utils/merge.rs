@@ -57,7 +57,7 @@ pub fn merge_dicts(left: Value, others: Vec<Value>) -> Result<Value, MergeError>
             } else if right_v == Value::Null {
                 continue;
             } else {
-                let left_v = merged.get(&right_k).unwrap();
+                let left_v = merged.get(&right_k).expect("key exists in merged");
 
                 if !values_same_type(left_v, &right_v) {
                     return Err(MergeError::TypeMismatch {
@@ -80,8 +80,10 @@ pub fn merge_dicts(left: Value, others: Vec<Value>) -> Result<Value, MergeError>
                         merged.insert(right_k, Value::String(left_str + &right_str));
                     }
                     (Value::Object(_), Value::Object(_)) => {
-                        let merged_nested =
-                            merge_dicts(merged.remove(&right_k).unwrap(), vec![right_v])?;
+                        let merged_nested = merge_dicts(
+                            merged.remove(&right_k).expect("key exists in merged"),
+                            vec![right_v],
+                        )?;
                         merged.insert(right_k, merged_nested);
                     }
                     (Value::Array(left_arr), Value::Array(right_arr)) => {
