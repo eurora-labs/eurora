@@ -6,8 +6,13 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use async_trait::async_trait;
+
 use crate::error::{Error, Result};
 use crate::messages::{BaseMessage, get_buffer_string};
+use crate::prompt_values::{ChatPromptValue, StringPromptValue};
+use crate::runnables::base::Runnable;
+use crate::runnables::config::{RunnableConfig, ensure_config};
 
 use super::base::{BasePromptTemplate, FormatOutputType};
 use super::chat::BaseChatPromptTemplate;
@@ -363,6 +368,31 @@ impl BasePromptTemplate for FewShotPromptTemplate {
     }
 }
 
+#[async_trait]
+impl Runnable for FewShotPromptTemplate {
+    type Input = HashMap<String, String>;
+    type Output = StringPromptValue;
+
+    fn name(&self) -> Option<String> {
+        Some("FewShotPromptTemplate".to_string())
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let _config = ensure_config(config);
+        BasePromptTemplate::validate_input(self, &input)?;
+        let text = BasePromptTemplate::format(self, &input)?;
+        Ok(StringPromptValue::new(text))
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        self.invoke(input, config)
+    }
+}
+
 impl StringPromptTemplate for FewShotPromptTemplate {
     fn input_variables(&self) -> &[String] {
         &self.input_variables
@@ -575,6 +605,31 @@ impl BaseChatPromptTemplate for FewShotChatMessagePromptTemplate {
 
     fn pretty_repr(&self, _html: bool) -> String {
         panic!("pretty_repr is not implemented for FewShotChatMessagePromptTemplate")
+    }
+}
+
+#[async_trait]
+impl Runnable for FewShotChatMessagePromptTemplate {
+    type Input = HashMap<String, String>;
+    type Output = ChatPromptValue;
+
+    fn name(&self) -> Option<String> {
+        Some("FewShotChatMessagePromptTemplate".to_string())
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let _config = ensure_config(config);
+        BasePromptTemplate::validate_input(self, &input)?;
+        let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
+        Ok(ChatPromptValue::new(messages))
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        self.invoke(input, config)
     }
 }
 

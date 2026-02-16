@@ -8,7 +8,12 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use async_trait::async_trait;
+
 use crate::error::{Error, Result};
+use crate::prompt_values::StringPromptValue;
+use crate::runnables::base::Runnable;
+use crate::runnables::config::{RunnableConfig, ensure_config};
 use crate::utils::input::get_colored_text;
 
 use super::base::{BasePromptTemplate, FormatOutputType};
@@ -454,6 +459,31 @@ impl std::ops::Add<&str> for PromptTemplate {
     fn add(self, other: &str) -> Self::Output {
         let other_prompt = PromptTemplate::from_template_with_format(other, self.template_format)?;
         self + other_prompt
+    }
+}
+
+#[async_trait]
+impl Runnable for PromptTemplate {
+    type Input = HashMap<String, String>;
+    type Output = StringPromptValue;
+
+    fn name(&self) -> Option<String> {
+        Some("PromptTemplate".to_string())
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let _config = ensure_config(config);
+        BasePromptTemplate::validate_input(self, &input)?;
+        let text = BasePromptTemplate::format(self, &input)?;
+        Ok(StringPromptValue::new(text))
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        self.invoke(input, config)
     }
 }
 

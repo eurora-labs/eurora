@@ -14,6 +14,11 @@ use crate::prompt_values::{ChatPromptValue, PromptValue};
 use crate::utils::input::get_colored_text;
 use crate::utils::interactive_env::is_interactive_env;
 
+use async_trait::async_trait;
+
+use crate::runnables::base::Runnable;
+use crate::runnables::config::{RunnableConfig, ensure_config};
+
 use super::base::BasePromptTemplate;
 use super::message::{BaseMessagePromptTemplate, get_msg_title_repr};
 use super::prompt::PromptTemplate;
@@ -896,6 +901,31 @@ impl BaseChatPromptTemplate for ChatPromptTemplate {
             .map(|m| m.pretty_repr(html))
             .collect::<Vec<_>>()
             .join("\n\n")
+    }
+}
+
+#[async_trait]
+impl Runnable for ChatPromptTemplate {
+    type Input = HashMap<String, String>;
+    type Output = ChatPromptValue;
+
+    fn name(&self) -> Option<String> {
+        Some("ChatPromptTemplate".to_string())
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let _config = ensure_config(config);
+        self.validate_input(&input)?;
+        let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
+        Ok(ChatPromptValue::new(messages))
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        self.invoke(input, config)
     }
 }
 
