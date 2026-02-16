@@ -664,7 +664,7 @@ impl BaseChatModel for GenericFakeChatModel {
                 .unwrap_or_else(|| AIMessage::builder().content("").build())
         };
 
-        let content = message.content().to_string();
+        let content = message.text();
         let message_id = message.id;
         let additional_kwargs = message.additional_kwargs.clone();
 

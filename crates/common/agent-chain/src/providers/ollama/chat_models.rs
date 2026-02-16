@@ -505,7 +505,7 @@ impl ChatOllama {
                 BaseMessage::AI(m) => {
                     let mut message = serde_json::json!({
                         "role": "assistant",
-                        "content": m.content(),
+                        "content": m.content.as_text(),
                         "images": [],
                     });
 
@@ -1078,12 +1078,12 @@ impl ChatOllama {
         let (content, usage_metadata, tool_calls, chunk_additional_kwargs) =
             match &final_chunk.message {
                 BaseMessage::AI(ai) => (
-                    ai.content().to_string(),
+                    ai.text(),
                     ai.usage_metadata.clone(),
                     ai.tool_calls.clone(),
                     ai.additional_kwargs.clone(),
                 ),
-                other => (other.content().to_string(), None, vec![], HashMap::new()),
+                other => (other.text(), None, vec![], HashMap::new()),
             };
 
         let ai_message = AIMessage::builder()

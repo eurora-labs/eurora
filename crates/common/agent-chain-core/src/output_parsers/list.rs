@@ -400,8 +400,8 @@ fn list_transform<'a, P: ListOutputParser + 'a>(
         let mut stream = input;
 
         while let Some(message) = stream.next().await {
-            let chunk_content = message.content();
-            buffer.push_str(chunk_content);
+            let chunk_content = message.text();
+            buffer.push_str(&chunk_content);
 
             let iter_results = parser.parse_iter(&buffer);
             if !iter_results.is_empty() {

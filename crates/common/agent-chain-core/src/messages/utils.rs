@@ -601,16 +601,17 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
                 let last_content = last_chunk.content();
                 let curr_content = curr_chunk.content();
                 if !last_content.is_empty() && !curr_content.is_empty() {
-                    // Check if both are plain strings (not JSON arrays)
                     let last_is_str =
-                        serde_json::from_str::<Vec<serde_json::Value>>(last_content).is_err();
+                        matches!(last_content, super::content::MessageContent::Text(_));
                     let curr_is_str =
-                        serde_json::from_str::<Vec<serde_json::Value>>(curr_content).is_err();
+                        matches!(curr_content, super::content::MessageContent::Text(_));
                     if last_is_str && curr_is_str {
                         // Append separator to the last chunk's content before merge
                         match &mut curr_chunk {
                             BaseMessageChunk::AI(c) => {
-                                c.content = format!("{}{}", chunk_separator, c.content);
+                                if let super::content::MessageContent::Text(ref mut s) = c.content {
+                                    *s = format!("{}{}", chunk_separator, s);
+                                }
                             }
                             BaseMessageChunk::Human(c) => {
                                 if let super::content::MessageContent::Text(ref mut s) = c.content {
@@ -628,10 +629,14 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
                                 }
                             }
                             BaseMessageChunk::Function(c) => {
-                                c.content = format!("{}{}", chunk_separator, c.content);
+                                if let super::content::MessageContent::Text(ref mut s) = c.content {
+                                    *s = format!("{}{}", chunk_separator, s);
+                                }
                             }
                             BaseMessageChunk::Tool(c) => {
-                                c.content = format!("{}{}", chunk_separator, c.content);
+                                if let super::content::MessageContent::Text(ref mut s) = c.content {
+                                    *s = format!("{}{}", chunk_separator, s);
+                                }
                             }
                         }
                     }
@@ -709,7 +714,7 @@ pub fn count_tokens_approximately(messages: &[BaseMessage], config: &CountTokens
         let mut message_chars: usize = 0;
 
         // Count content characters
-        message_chars += message.content().len();
+        message_chars += message.text().len();
 
         // For AI messages, also count tool calls if present
         if let BaseMessage::AI(ai_msg) = message
@@ -860,7 +865,10 @@ fn convert_single_to_openai_message(
     // Handle content
     // Try to get content as list (for multimodal messages)
     let raw_content = message.content();
-    let content_list: Option<Vec<serde_json::Value>> = serde_json::from_str(raw_content).ok();
+    let content_list: Option<Vec<serde_json::Value>> = match raw_content {
+        super::content::MessageContent::Parts(_) => Some(raw_content.as_json_values()),
+        super::content::MessageContent::Text(s) => serde_json::from_str(s).ok(),
+    };
 
     let mut tool_messages: Vec<serde_json::Value> = Vec::new();
 
@@ -1275,42 +1283,46 @@ where
     if config.allow_partial && idx < messages.len() {
         let mut included_partial = false;
 
-        // First try list content (multimodal blocks)
+        // First try list content (multimodal blocks or JSON-encoded arrays in Text)
         let excluded_content = messages[idx].content();
-        if let Ok(mut content_blocks) =
-            serde_json::from_str::<Vec<serde_json::Value>>(excluded_content)
-            && content_blocks.len() > 1
-        {
-            if reverse_partial {
-                content_blocks.reverse();
-            }
-            let num_blocks = content_blocks.len();
-            for remove_count in 1..num_blocks {
-                let mut partial_blocks = content_blocks[..num_blocks - remove_count].to_vec();
+        let content_blocks_opt: Option<Vec<serde_json::Value>> = match excluded_content {
+            super::content::MessageContent::Parts(_) => Some(excluded_content.as_json_values()),
+            super::content::MessageContent::Text(s) => serde_json::from_str(s).ok(),
+        };
+        if let Some(mut content_blocks) = content_blocks_opt {
+            if content_blocks.len() > 1 {
                 if reverse_partial {
-                    partial_blocks.reverse();
+                    content_blocks.reverse();
                 }
-                let partial_content = serde_json::to_string(&partial_blocks).unwrap_or_default();
-                let partial_msg = create_message_with_content(&messages[idx], &partial_content);
-                let mut test = messages[..idx].to_vec();
-                test.push(partial_msg);
-                if (config.token_counter)(&test) <= config.max_tokens {
-                    messages = test;
-                    idx += 1;
-                    included_partial = true;
-                    break;
+                let num_blocks = content_blocks.len();
+                for remove_count in 1..num_blocks {
+                    let mut partial_blocks = content_blocks[..num_blocks - remove_count].to_vec();
+                    if reverse_partial {
+                        partial_blocks.reverse();
+                    }
+                    let partial_content =
+                        serde_json::to_string(&partial_blocks).unwrap_or_default();
+                    let partial_msg = create_message_with_content(&messages[idx], &partial_content);
+                    let mut test = messages[..idx].to_vec();
+                    test.push(partial_msg);
+                    if (config.token_counter)(&test) <= config.max_tokens {
+                        messages = test;
+                        idx += 1;
+                        included_partial = true;
+                        break;
+                    }
                 }
             }
         }
 
         // Then try text splitting
         if !included_partial {
-            let content = messages[idx].content();
-            if !content.is_empty() {
+            let content_str = messages[idx].text();
+            if !content_str.is_empty() {
                 let mut split_texts = if let Some(ref splitter) = config.text_splitter {
-                    splitter(content)
+                    splitter(&content_str)
                 } else {
-                    default_text_splitter(content)
+                    default_text_splitter(&content_str)
                 };
                 if split_texts.len() > 1 {
                     if reverse_partial {

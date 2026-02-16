@@ -452,7 +452,7 @@ pub trait BaseChatModel: BaseLanguageModel {
 
         match result.generations[0].message.clone() {
             BaseMessage::AI(message) => Ok(message),
-            other => Ok(AIMessage::builder().content(other.content()).build()),
+            other => Ok(AIMessage::builder().content(other.text()).build()),
         }
     }
 
@@ -1014,9 +1014,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             let generations: Vec<crate::outputs::Generation> = result
                 .generations
                 .iter()
-                .map(|generation| {
-                    crate::outputs::Generation::new(generation.message.content().to_string())
-                })
+                .map(|generation| crate::outputs::Generation::new(generation.message.text()))
                 .collect();
             cache.update(&prompt_key, &llm_string, generations);
         }
@@ -1100,9 +1098,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             let generations: Vec<crate::outputs::Generation> = result
                 .generations
                 .iter()
-                .map(|generation| {
-                    crate::outputs::Generation::new(generation.message.content().to_string())
-                })
+                .map(|generation| crate::outputs::Generation::new(generation.message.text()))
                 .collect();
             cache.aupdate(&prompt_key, &llm_string, generations).await;
         }
@@ -1221,7 +1217,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         match &result.generations[0][0] {
             GenerationType::ChatGeneration(chat_gen) => match &chat_gen.message {
                 BaseMessage::AI(ai) => Ok(ai.clone()),
-                other => Ok(AIMessage::builder().content(other.content()).build()),
+                other => Ok(AIMessage::builder().content(other.text()).build()),
             },
             _ => Err(Error::Other("Unexpected generation type".into())),
         }
@@ -1270,7 +1266,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         match &result.generations[0][0] {
             GenerationType::ChatGeneration(chat_gen) => match &chat_gen.message {
                 BaseMessage::AI(ai) => Ok(ai.clone()),
-                other => Ok(AIMessage::builder().content(other.content()).build()),
+                other => Ok(AIMessage::builder().content(other.text()).build()),
             },
             _ => Err(Error::Other("Unexpected generation type".into())),
         }
@@ -1319,7 +1315,9 @@ pub trait BaseChatModel: BaseLanguageModel {
             // Fall back to invoke
             let result = self._generate(messages, stop, None).await?;
             let message = self.get_first_message(&result)?;
-            let chunk = AIMessageChunk::builder().content(message.content()).build();
+            let chunk = AIMessageChunk::builder()
+                .content(message.content.clone())
+                .build();
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
@@ -1382,13 +1380,13 @@ pub trait BaseChatModel: BaseLanguageModel {
                 match result {
                     Ok(generation_chunk) => {
                         let ai_chunk = match &generation_chunk.message {
-                            BaseMessage::AI(ai_msg) => AIMessageChunk::builder().content(ai_msg.content()).build(),
-                            other => AIMessageChunk::builder().content(other.content()).build(),
+                            BaseMessage::AI(ai_msg) => AIMessageChunk::builder().content(ai_msg.content.clone()).build(),
+                            other => AIMessageChunk::builder().content(other.text()).build(),
                         };
 
                         // Fire on_llm_new_token callback
                         if let Some(ref rm) = run_manager {
-                            rm.on_llm_new_token(&ai_chunk.content, None);
+                            rm.on_llm_new_token(ai_chunk.content.as_text_ref(), None);
                         }
 
                         chunks.push(generation_chunk);
@@ -1452,7 +1450,9 @@ pub trait BaseChatModel: BaseLanguageModel {
             // No async or sync stream is implemented, fall back to ainvoke
             let result = self._agenerate(messages, stop, None).await?;
             let message = self.get_first_message(&result)?;
-            let chunk = AIMessageChunk::builder().content(message.content()).build();
+            let chunk = AIMessageChunk::builder()
+                .content(message.content.clone())
+                .build();
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
@@ -1516,13 +1516,13 @@ pub trait BaseChatModel: BaseLanguageModel {
                 match result {
                     Ok(generation_chunk) => {
                         let ai_chunk = match &generation_chunk.message {
-                            BaseMessage::AI(ai_msg) => AIMessageChunk::builder().content(ai_msg.content()).build(),
-                            other => AIMessageChunk::builder().content(other.content()).build(),
+                            BaseMessage::AI(ai_msg) => AIMessageChunk::builder().content(ai_msg.content.clone()).build(),
+                            other => AIMessageChunk::builder().content(other.text()).build(),
                         };
 
                         // Fire on_llm_new_token callback
                         if let Some(ref rm) = run_manager {
-                            rm.on_llm_new_token(&ai_chunk.content, None).await;
+                            rm.on_llm_new_token(ai_chunk.content.as_text_ref(), None).await;
                         }
 
                         chunks.push(generation_chunk);

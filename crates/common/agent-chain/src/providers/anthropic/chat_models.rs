@@ -210,10 +210,10 @@ impl ChatAnthropic {
                 BaseMessage::AI(m) => {
                     let mut content: Vec<serde_json::Value> = Vec::new();
 
-                    if !m.content().is_empty() {
+                    if !m.content.is_empty() {
                         content.push(serde_json::json!({
                             "type": "text",
-                            "text": m.content()
+                            "text": m.content.as_text()
                         }));
                     }
 
