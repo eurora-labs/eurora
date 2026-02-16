@@ -12,12 +12,14 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::Value;
 
+use crate::callbacks::base::Callbacks;
+use crate::callbacks::manager::CallbackManagerForToolRun;
 use crate::error::{Error, Result};
 use crate::runnables::RunnableConfig;
 
 use super::base::{
     ArgsSchema, BaseTool, FILTERED_ARGS, HandleToolError, HandleValidationError, ResponseFormat,
-    ToolException, ToolInput, ToolOutput,
+    ToolInput, ToolOutput,
 };
 
 /// Type alias for sync structured tool function.
@@ -61,6 +63,8 @@ pub struct StructuredTool {
     metadata: Option<HashMap<String, Value>>,
     /// Optional provider-specific extras.
     extras: Option<HashMap<String, Value>>,
+    /// Optional callbacks for the tool.
+    callbacks: Option<Callbacks>,
 }
 
 impl Debug for StructuredTool {
@@ -96,6 +100,7 @@ impl StructuredTool {
             tags: None,
             metadata: None,
             extras: None,
+            callbacks: None,
         }
     }
 
@@ -138,6 +143,12 @@ impl StructuredTool {
     /// Set extras.
     pub fn with_extras(mut self, extras: HashMap<String, Value>) -> Self {
         self.extras = Some(extras);
+        self
+    }
+
+    /// Set callbacks.
+    pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
+        self.callbacks = Some(callbacks);
         self
     }
 
@@ -276,50 +287,43 @@ impl BaseTool for StructuredTool {
         self.extras.as_ref()
     }
 
-    fn run(&self, input: ToolInput, _config: Option<RunnableConfig>) -> Result<ToolOutput> {
+    fn callbacks(&self) -> Option<&Callbacks> {
+        self.callbacks.as_ref()
+    }
+
+    fn tool_run(
+        &self,
+        input: ToolInput,
+        _run_manager: Option<&CallbackManagerForToolRun>,
+        _config: &RunnableConfig,
+    ) -> Result<ToolOutput> {
         let args = self.extract_args(input)?;
         let filtered_args = self.filter_args(args);
 
         if let Some(ref func) = self.func {
-            match func(filtered_args) {
-                Ok(result) => {
-                    match self.response_format {
-                        ResponseFormat::Content => match result {
-                            Value::String(s) => Ok(ToolOutput::String(s)),
-                            other => Ok(ToolOutput::Json(other)),
-                        },
-                        ResponseFormat::ContentAndArtifact => {
-                            // Expect a tuple [content, artifact]
-                            if let Value::Array(arr) = result {
-                                if arr.len() == 2 {
-                                    Ok(ToolOutput::ContentAndArtifact {
-                                        content: arr[0].clone(),
-                                        artifact: arr[1].clone(),
-                                    })
-                                } else {
-                                    Err(Error::ToolInvocation(
-                                        "content_and_artifact response must be a 2-tuple"
-                                            .to_string(),
-                                    ))
-                                }
-                            } else {
-                                Err(Error::ToolInvocation(
-                                    "content_and_artifact response must be a 2-tuple".to_string(),
-                                ))
-                            }
+            let result = func(filtered_args)?;
+            match self.response_format {
+                ResponseFormat::Content => match result {
+                    Value::String(s) => Ok(ToolOutput::String(s)),
+                    other => Ok(ToolOutput::Json(other)),
+                },
+                ResponseFormat::ContentAndArtifact => {
+                    if let Value::Array(arr) = result {
+                        if arr.len() == 2 {
+                            Ok(ToolOutput::ContentAndArtifact {
+                                content: arr[0].clone(),
+                                artifact: arr[1].clone(),
+                            })
+                        } else {
+                            Err(Error::ToolException(
+                                "content_and_artifact response must be a 2-tuple".to_string(),
+                            ))
                         }
+                    } else {
+                        Err(Error::ToolException(
+                            "content_and_artifact response must be a 2-tuple".to_string(),
+                        ))
                     }
-                }
-                Err(e) => {
-                    if let Error::ToolInvocation(msg) = &e {
-                        let exc = ToolException::new(msg.clone());
-                        if let Some(handled) =
-                            super::base::handle_tool_error_impl(&exc, &self.handle_tool_error)
-                        {
-                            return Ok(ToolOutput::String(handled));
-                        }
-                    }
-                    Err(e)
                 }
             }
         } else {
@@ -329,51 +333,45 @@ impl BaseTool for StructuredTool {
         }
     }
 
-    async fn arun(&self, input: ToolInput, config: Option<RunnableConfig>) -> Result<ToolOutput> {
+    async fn tool_arun(
+        &self,
+        input: ToolInput,
+        _run_manager: Option<&crate::callbacks::manager::AsyncCallbackManagerForToolRun>,
+        _config: &RunnableConfig,
+    ) -> Result<ToolOutput> {
         let args = self.extract_args(input.clone())?;
         let filtered_args = self.filter_args(args);
 
         if let Some(ref coroutine) = self.coroutine {
-            match coroutine(filtered_args).await {
-                Ok(result) => match self.response_format {
-                    ResponseFormat::Content => match result {
-                        Value::String(s) => Ok(ToolOutput::String(s)),
-                        other => Ok(ToolOutput::Json(other)),
-                    },
-                    ResponseFormat::ContentAndArtifact => {
-                        if let Value::Array(arr) = result {
-                            if arr.len() == 2 {
-                                Ok(ToolOutput::ContentAndArtifact {
-                                    content: arr[0].clone(),
-                                    artifact: arr[1].clone(),
-                                })
-                            } else {
-                                Err(Error::ToolInvocation(
-                                    "content_and_artifact response must be a 2-tuple".to_string(),
-                                ))
-                            }
+            let result = coroutine(filtered_args).await?;
+            match self.response_format {
+                ResponseFormat::Content => match result {
+                    Value::String(s) => Ok(ToolOutput::String(s)),
+                    other => Ok(ToolOutput::Json(other)),
+                },
+                ResponseFormat::ContentAndArtifact => {
+                    if let Value::Array(arr) = result {
+                        if arr.len() == 2 {
+                            Ok(ToolOutput::ContentAndArtifact {
+                                content: arr[0].clone(),
+                                artifact: arr[1].clone(),
+                            })
                         } else {
-                            Err(Error::ToolInvocation(
+                            Err(Error::ToolException(
                                 "content_and_artifact response must be a 2-tuple".to_string(),
                             ))
                         }
+                    } else {
+                        Err(Error::ToolException(
+                            "content_and_artifact response must be a 2-tuple".to_string(),
+                        ))
                     }
-                },
-                Err(e) => {
-                    if let Error::ToolInvocation(msg) = &e {
-                        let exc = ToolException::new(msg.clone());
-                        if let Some(handled) =
-                            super::base::handle_tool_error_impl(&exc, &self.handle_tool_error)
-                        {
-                            return Ok(ToolOutput::String(handled));
-                        }
-                    }
-                    Err(e)
                 }
             }
         } else {
             // Fall back to sync implementation
-            self.run(input, config)
+            let sync_manager = _run_manager.map(|rm| rm.get_sync());
+            self.tool_run(input, sync_manager.as_ref(), _config)
         }
     }
 }
@@ -461,7 +459,7 @@ mod tests {
         input.insert("x".to_string(), Value::from(3.0));
         input.insert("y".to_string(), Value::from(4.0));
 
-        let result = tool.run(ToolInput::Dict(input), None).unwrap();
+        let result = tool.run(ToolInput::Dict(input), None, None).unwrap();
         match result {
             ToolOutput::Json(v) => assert_eq!(v.as_f64().unwrap(), 12.0),
             _ => panic!("Expected Json output"),
@@ -516,7 +514,7 @@ mod tests {
         input.insert("a".to_string(), Value::String("Hello".to_string()));
         input.insert("b".to_string(), Value::String("World".to_string()));
 
-        let result = tool.arun(ToolInput::Dict(input), None).await.unwrap();
+        let result = tool.arun(ToolInput::Dict(input), None, None).await.unwrap();
         match result {
             ToolOutput::String(s) => assert_eq!(s, "HelloWorld"),
             _ => panic!("Expected String output"),

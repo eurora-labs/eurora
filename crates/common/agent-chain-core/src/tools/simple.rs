@@ -12,12 +12,14 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::Value;
 
+use crate::callbacks::base::Callbacks;
+use crate::callbacks::manager::CallbackManagerForToolRun;
 use crate::error::{Error, Result};
 use crate::runnables::RunnableConfig;
 
 use super::base::{
-    ArgsSchema, BaseTool, HandleToolError, HandleValidationError, ResponseFormat, ToolException,
-    ToolInput, ToolOutput,
+    ArgsSchema, BaseTool, HandleToolError, HandleValidationError, ResponseFormat, ToolInput,
+    ToolOutput,
 };
 
 /// Type alias for sync tool function.
@@ -58,6 +60,8 @@ pub struct Tool {
     metadata: Option<HashMap<String, Value>>,
     /// Optional provider-specific extras.
     extras: Option<HashMap<String, Value>>,
+    /// Optional callbacks for the tool.
+    callbacks: Option<Callbacks>,
 }
 
 impl Debug for Tool {
@@ -92,6 +96,7 @@ impl Tool {
             tags: None,
             metadata: None,
             extras: None,
+            callbacks: None,
         }
     }
 
@@ -134,6 +139,12 @@ impl Tool {
     /// Set extras.
     pub fn with_extras(mut self, extras: HashMap<String, Value>) -> Self {
         self.extras = Some(extras);
+        self
+    }
+
+    /// Set callbacks.
+    pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
+        self.callbacks = Some(callbacks);
         self
     }
 
@@ -274,6 +285,10 @@ impl BaseTool for Tool {
         self.extras.as_ref()
     }
 
+    fn callbacks(&self) -> Option<&Callbacks> {
+        self.callbacks.as_ref()
+    }
+
     fn args(&self) -> HashMap<String, Value> {
         // For backwards compatibility, if the function signature is ambiguous,
         // assume it takes a single string input.
@@ -288,25 +303,17 @@ impl BaseTool for Tool {
         props
     }
 
-    fn run(&self, input: ToolInput, _config: Option<RunnableConfig>) -> Result<ToolOutput> {
+    fn tool_run(
+        &self,
+        input: ToolInput,
+        _run_manager: Option<&CallbackManagerForToolRun>,
+        _config: &RunnableConfig,
+    ) -> Result<ToolOutput> {
         let string_input = self.extract_single_input(input)?;
 
         if let Some(ref func) = self.func {
-            match func(string_input) {
-                Ok(result) => Ok(ToolOutput::String(result)),
-                Err(e) => {
-                    // Check if we should handle the error
-                    if let Error::ToolInvocation(msg) = &e {
-                        let exc = ToolException::new(msg.clone());
-                        if let Some(handled) =
-                            super::base::handle_tool_error_impl(&exc, &self.handle_tool_error)
-                        {
-                            return Ok(ToolOutput::String(handled));
-                        }
-                    }
-                    Err(e)
-                }
-            }
+            let result = func(string_input)?;
+            Ok(ToolOutput::String(result))
         } else {
             Err(Error::ToolInvocation(
                 "Tool does not support sync invocation.".to_string(),
@@ -314,27 +321,21 @@ impl BaseTool for Tool {
         }
     }
 
-    async fn arun(&self, input: ToolInput, config: Option<RunnableConfig>) -> Result<ToolOutput> {
+    async fn tool_arun(
+        &self,
+        input: ToolInput,
+        _run_manager: Option<&crate::callbacks::manager::AsyncCallbackManagerForToolRun>,
+        _config: &RunnableConfig,
+    ) -> Result<ToolOutput> {
         let string_input = self.extract_single_input(input.clone())?;
 
         if let Some(ref coroutine) = self.coroutine {
-            match coroutine(string_input).await {
-                Ok(result) => Ok(ToolOutput::String(result)),
-                Err(e) => {
-                    if let Error::ToolInvocation(msg) = &e {
-                        let exc = ToolException::new(msg.clone());
-                        if let Some(handled) =
-                            super::base::handle_tool_error_impl(&exc, &self.handle_tool_error)
-                        {
-                            return Ok(ToolOutput::String(handled));
-                        }
-                    }
-                    Err(e)
-                }
-            }
+            let result = coroutine(string_input).await?;
+            Ok(ToolOutput::String(result))
         } else {
             // Fall back to sync implementation
-            self.run(input, config)
+            let sync_manager = _run_manager.map(|rm| rm.get_sync());
+            self.tool_run(input, sync_manager.as_ref(), _config)
         }
     }
 }
@@ -364,7 +365,7 @@ mod tests {
         );
 
         let result = tool
-            .run(ToolInput::String("World".to_string()), None)
+            .run(ToolInput::String("World".to_string()), None, None)
             .unwrap();
         match result {
             ToolOutput::String(s) => assert_eq!(s, "Hello, World!"),
@@ -383,7 +384,7 @@ mod tests {
         let mut dict = HashMap::new();
         dict.insert("query".to_string(), Value::String("test".to_string()));
 
-        let result = tool.run(ToolInput::Dict(dict), None).unwrap();
+        let result = tool.run(ToolInput::Dict(dict), None, None).unwrap();
         match result {
             ToolOutput::String(s) => assert_eq!(s, "Got: test"),
             _ => panic!("Expected String output"),
@@ -408,7 +409,7 @@ mod tests {
 
         // Should fall back to sync implementation
         let result = tool
-            .arun(ToolInput::String("test".to_string()), None)
+            .arun(ToolInput::String("test".to_string()), None, None)
             .await
             .unwrap();
         match result {
