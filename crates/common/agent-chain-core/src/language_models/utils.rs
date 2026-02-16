@@ -4,7 +4,8 @@
 //! including message normalization and content block utilities.
 //! Mirrors `langchain_core.language_models._utils`.
 
-use crate::messages::content::MessageContent;
+use crate::messages::BaseMessage;
+use crate::messages::content::{ContentPart, MessageContent};
 use std::collections::HashMap;
 
 use regex::Regex;
@@ -382,6 +383,133 @@ pub fn update_message_content_to_blocks(
         .build()
 }
 
+/// Normalize message content blocks to LangChain v1 standard format.
+///
+/// Converts OpenAI Chat Completions multimodal blocks and LangChain v0
+/// blocks to v1 standard format. Messages with plain string content or
+/// already-v1 blocks pass through unchanged.
+///
+/// This mirrors Python's `_normalize_messages` from
+/// `langchain_core.language_models._utils`.
+pub fn normalize_messages(messages: Vec<BaseMessage>) -> Vec<BaseMessage> {
+    messages.into_iter().map(normalize_single_message).collect()
+}
+
+fn normalize_single_message(mut message: BaseMessage) -> BaseMessage {
+    let parts = match message.content() {
+        MessageContent::Parts(parts) => parts.clone(),
+        MessageContent::Text(_) => return message,
+    };
+
+    let mut modified = false;
+    let new_parts: Vec<ContentPart> = parts
+        .into_iter()
+        .map(|part| {
+            match &part {
+                ContentPart::Other(value) => {
+                    let block_type = value.get("type").and_then(|t| t.as_str());
+
+                    // OpenAI Chat Completions multimodal data blocks -> v1 standard
+                    if matches!(block_type, Some("input_audio") | Some("file"))
+                        && is_openai_data_block(value, None)
+                    {
+                        modified = true;
+                        let converted = convert_openai_format_to_data_block(value);
+                        let value =
+                            serde_json::to_value(converted).unwrap_or_else(|_| value.clone());
+                        return ContentPart::Other(value);
+                    }
+
+                    // LangChain v0 format blocks -> v1 standard
+                    let source_type = value.get("source_type").and_then(|s| s.as_str());
+                    if matches!(block_type, Some("image") | Some("audio") | Some("file"))
+                        && matches!(
+                            source_type,
+                            Some("url") | Some("base64") | Some("id") | Some("text")
+                        )
+                    {
+                        modified = true;
+                        if let Some(obj) = value.as_object() {
+                            let block_map: HashMap<String, serde_json::Value> =
+                                obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                            let converted = convert_legacy_v0_content_block_to_v1(&block_map);
+                            let value =
+                                serde_json::to_value(converted).unwrap_or_else(|_| value.clone());
+                            return ContentPart::Other(value);
+                        }
+                    }
+
+                    part
+                }
+                _ => part,
+            }
+        })
+        .collect();
+
+    if modified {
+        let new_content = MessageContent::Parts(new_parts);
+        match &mut message {
+            BaseMessage::Human(m) => m.content = new_content,
+            BaseMessage::System(m) => m.content = new_content,
+            BaseMessage::AI(m) => m.content = new_content,
+            BaseMessage::Tool(m) => m.content = new_content,
+            BaseMessage::Chat(m) => m.content = new_content,
+            BaseMessage::Function(m) => m.content = new_content,
+            BaseMessage::Remove(_) => {}
+        }
+    }
+
+    message
+}
+
+// ==========================================
+// Change 2: update_chunk_content_to_blocks()
+// ==========================================
+
+/// Update an AIMessageChunk's content to use content blocks format.
+///
+/// Creates a new AIMessageChunk where `content` is replaced by the
+/// serialized `content_blocks()` result, and
+/// `response_metadata["output_version"]` is set to the given version string.
+///
+/// This mirrors Python's `_update_message_content_to_blocks` for chunks.
+pub fn update_chunk_content_to_blocks(
+    chunk: &crate::messages::AIMessageChunk,
+    output_version: &str,
+) -> crate::messages::AIMessageChunk {
+    let content_blocks = chunk.content_blocks();
+
+    let block_values: Vec<serde_json::Value> = content_blocks
+        .iter()
+        .filter_map(|block| serde_json::to_value(block).ok())
+        .collect();
+
+    let new_content: MessageContent = if block_values.is_empty() {
+        chunk.content.clone()
+    } else {
+        let values: Vec<serde_json::Value> = block_values;
+        values.into()
+    };
+
+    let mut new_metadata = chunk.response_metadata.clone();
+    new_metadata.insert(
+        "output_version".to_string(),
+        serde_json::Value::String(output_version.to_string()),
+    );
+
+    crate::messages::AIMessageChunk::builder()
+        .content(new_content)
+        .response_metadata(new_metadata)
+        .tool_calls(chunk.tool_calls.clone())
+        .invalid_tool_calls(chunk.invalid_tool_calls.clone())
+        .tool_call_chunks(chunk.tool_call_chunks.clone())
+        .maybe_id(chunk.id.clone())
+        .maybe_name(chunk.name.clone())
+        .maybe_usage_metadata(chunk.usage_metadata.clone())
+        .maybe_chunk_position(chunk.chunk_position.clone())
+        .build()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -523,5 +651,240 @@ mod tests {
         assert_eq!(result.get("base64").unwrap(), "base64data");
         assert_eq!(result.get("mime_type").unwrap(), "image/png");
         assert!(!result.contains_key("source_type"));
+    }
+
+    #[test]
+    fn test_normalize_messages_plain_text_passthrough() {
+        use crate::messages::HumanMessage;
+
+        let messages = vec![BaseMessage::Human(
+            HumanMessage::builder().content("Hello").build(),
+        )];
+        let result = normalize_messages(messages.clone());
+        assert_eq!(result, messages);
+    }
+
+    #[test]
+    fn test_normalize_messages_v1_blocks_passthrough() {
+        use crate::messages::HumanMessage;
+        use crate::messages::content::ContentPart;
+
+        let parts = vec![
+            ContentPart::Text {
+                text: "Hello".to_string(),
+            },
+            ContentPart::Other(json!({"type": "image", "url": "https://example.com/img.png"})),
+        ];
+        let messages = vec![BaseMessage::Human(
+            HumanMessage::builder()
+                .content(MessageContent::Parts(parts))
+                .build(),
+        )];
+        let result = normalize_messages(messages.clone());
+        assert_eq!(result, messages);
+    }
+
+    #[test]
+    fn test_normalize_messages_openai_audio_converted() {
+        use crate::messages::HumanMessage;
+        use crate::messages::content::ContentPart;
+
+        let parts = vec![ContentPart::Other(json!({
+            "type": "input_audio",
+            "input_audio": {
+                "data": "base64audiodata",
+                "format": "wav"
+            }
+        }))];
+        let messages = vec![BaseMessage::Human(
+            HumanMessage::builder()
+                .content(MessageContent::Parts(parts))
+                .build(),
+        )];
+        let result = normalize_messages(messages);
+        let content = result[0].content();
+        if let MessageContent::Parts(parts) = content {
+            if let ContentPart::Other(val) = &parts[0] {
+                assert_eq!(val.get("type").unwrap(), "audio");
+                assert_eq!(val.get("base64").unwrap(), "base64audiodata");
+                assert_eq!(val.get("mime_type").unwrap(), "audio/wav");
+            } else {
+                panic!("Expected Other content part");
+            }
+        } else {
+            panic!("Expected Parts content");
+        }
+    }
+
+    #[test]
+    fn test_normalize_messages_openai_file_converted() {
+        use crate::messages::HumanMessage;
+        use crate::messages::content::ContentPart;
+
+        let parts = vec![ContentPart::Other(json!({
+            "type": "file",
+            "file": {
+                "file_id": "file-123"
+            }
+        }))];
+        let messages = vec![BaseMessage::Human(
+            HumanMessage::builder()
+                .content(MessageContent::Parts(parts))
+                .build(),
+        )];
+        let result = normalize_messages(messages);
+        let content = result[0].content();
+        if let MessageContent::Parts(parts) = content {
+            if let ContentPart::Other(val) = &parts[0] {
+                assert_eq!(val.get("type").unwrap(), "file");
+                assert_eq!(val.get("file_id").unwrap(), "file-123");
+            } else {
+                panic!("Expected Other content part");
+            }
+        } else {
+            panic!("Expected Parts content");
+        }
+    }
+
+    #[test]
+    fn test_normalize_messages_v0_image_url_converted() {
+        use crate::messages::HumanMessage;
+        use crate::messages::content::ContentPart;
+
+        let parts = vec![ContentPart::Other(json!({
+            "type": "image",
+            "source_type": "url",
+            "url": "https://example.com/img.png",
+            "mime_type": "image/png"
+        }))];
+        let messages = vec![BaseMessage::Human(
+            HumanMessage::builder()
+                .content(MessageContent::Parts(parts))
+                .build(),
+        )];
+        let result = normalize_messages(messages);
+        let content = result[0].content();
+        if let MessageContent::Parts(parts) = content {
+            if let ContentPart::Other(val) = &parts[0] {
+                assert_eq!(val.get("type").unwrap(), "image");
+                assert_eq!(val.get("url").unwrap(), "https://example.com/img.png");
+                assert!(val.get("source_type").is_none());
+            } else {
+                panic!("Expected Other content part");
+            }
+        } else {
+            panic!("Expected Parts content");
+        }
+    }
+
+    #[test]
+    fn test_normalize_messages_v0_image_base64_converted() {
+        use crate::messages::HumanMessage;
+        use crate::messages::content::ContentPart;
+
+        let parts = vec![ContentPart::Other(json!({
+            "type": "image",
+            "source_type": "base64",
+            "data": "iVBORw0KGgo=",
+            "mime_type": "image/png"
+        }))];
+        let messages = vec![BaseMessage::Human(
+            HumanMessage::builder()
+                .content(MessageContent::Parts(parts))
+                .build(),
+        )];
+        let result = normalize_messages(messages);
+        let content = result[0].content();
+        if let MessageContent::Parts(parts) = content {
+            if let ContentPart::Other(val) = &parts[0] {
+                assert_eq!(val.get("type").unwrap(), "image");
+                assert_eq!(val.get("base64").unwrap(), "iVBORw0KGgo=");
+                assert_eq!(val.get("mime_type").unwrap(), "image/png");
+                assert!(val.get("source_type").is_none());
+            } else {
+                panic!("Expected Other content part");
+            }
+        } else {
+            panic!("Expected Parts content");
+        }
+    }
+
+    #[test]
+    fn test_normalize_messages_mixed_blocks() {
+        use crate::messages::HumanMessage;
+        use crate::messages::content::ContentPart;
+
+        let parts = vec![
+            ContentPart::Text {
+                text: "Hello".to_string(),
+            },
+            ContentPart::Other(json!({
+                "type": "input_audio",
+                "input_audio": { "data": "audiodata", "format": "mp3" }
+            })),
+            ContentPart::Other(json!({"type": "image", "url": "https://example.com/img.png"})),
+        ];
+        let messages = vec![BaseMessage::Human(
+            HumanMessage::builder()
+                .content(MessageContent::Parts(parts))
+                .build(),
+        )];
+        let result = normalize_messages(messages);
+        let content = result[0].content();
+        if let MessageContent::Parts(parts) = content {
+            assert_eq!(parts.len(), 3);
+            // Text passes through
+            assert!(matches!(&parts[0], ContentPart::Text { text } if text == "Hello"));
+            // OpenAI audio converted
+            if let ContentPart::Other(val) = &parts[1] {
+                assert_eq!(val.get("type").unwrap(), "audio");
+            } else {
+                panic!("Expected Other content part for audio");
+            }
+            // v1 image passes through unchanged
+            if let ContentPart::Other(val) = &parts[2] {
+                assert_eq!(val.get("type").unwrap(), "image");
+                assert_eq!(val.get("url").unwrap(), "https://example.com/img.png");
+            } else {
+                panic!("Expected Other content part for image");
+            }
+        } else {
+            panic!("Expected Parts content");
+        }
+    }
+
+    #[test]
+    fn test_update_chunk_content_to_blocks_basic() {
+        use crate::messages::AIMessageChunk;
+
+        let chunk = AIMessageChunk::builder().content("Hello world").build();
+        let updated = update_chunk_content_to_blocks(&chunk, "v1");
+        // content_blocks() for a plain text chunk should produce a text block
+        let metadata = updated.response_metadata;
+        assert_eq!(
+            metadata.get("output_version").unwrap(),
+            &serde_json::Value::String("v1".to_string())
+        );
+    }
+
+    #[test]
+    fn test_update_chunk_content_to_blocks_preserves_metadata() {
+        use crate::messages::AIMessageChunk;
+
+        let mut existing_metadata = HashMap::new();
+        existing_metadata.insert("model".to_string(), json!("gpt-4"));
+        let chunk = AIMessageChunk::builder()
+            .content("test")
+            .response_metadata(existing_metadata)
+            .build();
+        let updated = update_chunk_content_to_blocks(&chunk, "v1");
+        assert_eq!(
+            updated.response_metadata.get("model").unwrap(),
+            &json!("gpt-4")
+        );
+        assert_eq!(
+            updated.response_metadata.get("output_version").unwrap(),
+            &json!("v1")
+        );
     }
 }
