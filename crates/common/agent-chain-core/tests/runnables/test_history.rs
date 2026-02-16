@@ -422,11 +422,11 @@ fn test_get_output_schema() {
 // ===========================================================================
 
 fn human_as_value(content: &str) -> Value {
-    serde_json::to_value(&human(content)).expect("human message serialization should not fail")
+    serde_json::to_value(human(content)).expect("human message serialization should not fail")
 }
 
 fn ai_as_value(content: &str) -> Value {
-    serde_json::to_value(&ai(content)).expect("ai message serialization should not fail")
+    serde_json::to_value(ai(content)).expect("ai message serialization should not fail")
 }
 
 /// Test dict input with `input_messages_key` and `history_messages_key`.
@@ -570,7 +570,7 @@ fn test_dict_input_with_output_messages_key() {
     let cfg = config_with(&[("session_id", "out1")]);
 
     let input =
-        serde_json::to_value(&vec![human("hello")]).expect("input serialization should not fail");
+        serde_json::to_value(vec![human("hello")]).expect("input serialization should not fail");
     let output = with_history
         .invoke(input, Some(cfg.clone()))
         .expect("invoke should succeed");
@@ -637,7 +637,7 @@ fn test_get_input_messages_normalization() {
     );
 
     // No input_messages_key: array input -> Vec<BaseMessage>
-    let arr = serde_json::to_value(&vec![human("a"), human("b")])
+    let arr = serde_json::to_value(vec![human("a"), human("b")])
         .expect("array serialization should not fail");
     let msgs = rwmh
         .get_input_messages(&arr)
@@ -699,7 +699,7 @@ fn test_get_output_messages_normalization() {
     );
 
     // Array output -> Vec<BaseMessage>
-    let arr = serde_json::to_value(&vec![ai("first"), ai("second")])
+    let arr = serde_json::to_value(vec![ai("first"), ai("second")])
         .expect("array serialization should not fail");
     let msgs = rwmh
         .get_output_messages(&arr)

@@ -163,7 +163,7 @@ fn test_addable_dict_preserves_dict_behavior() {
     d.0.insert("key".to_string(), json!("value"));
 
     assert_eq!(d.0.get("key"), Some(&json!("value")));
-    let keys: Vec<&String> = d.0.iter().map(|(k, _)| k).collect();
+    let keys: Vec<&String> = d.0.keys().collect();
     assert_eq!(keys, vec!["key"]);
     assert_eq!(d.0.len(), 1);
 }

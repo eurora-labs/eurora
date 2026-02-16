@@ -190,55 +190,6 @@ impl From<OutputParserError> for Error {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[derive(Debug)]
-    struct TestParser;
-
-    impl BaseOutputParser for TestParser {
-        type Output = String;
-
-        fn parse(&self, text: &str) -> Result<String> {
-            Ok(text.to_uppercase())
-        }
-
-        fn parser_type(&self) -> &str {
-            "test"
-        }
-    }
-
-    #[test]
-    fn test_base_output_parser() {
-        let parser = TestParser;
-        let result = parser.parse("hello").unwrap();
-        assert_eq!(result, "HELLO");
-    }
-
-    #[test]
-    fn test_parse_result() {
-        let parser = TestParser;
-        let generations = vec![Generation::new("hello")];
-        let result = parser.parse_result(&generations, false).unwrap();
-        assert_eq!(result, "HELLO");
-    }
-
-    #[test]
-    fn test_parse_result_empty() {
-        let parser = TestParser;
-        let result = parser.parse_result(&[], false);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_output_parser_error() {
-        let err = OutputParserError::parse_error("Invalid JSON", "{invalid}");
-        assert_eq!(err.message, "Invalid JSON");
-        assert_eq!(err.llm_output, Some("{invalid}".to_string()));
-    }
-}
-
 // ---------------------------------------------------------------------------
 // RunnableOutputParser adapter
 // ---------------------------------------------------------------------------
@@ -305,5 +256,54 @@ where
         Self: 'static,
     {
         self.parser.ainvoke(input, config).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug)]
+    struct TestParser;
+
+    impl BaseOutputParser for TestParser {
+        type Output = String;
+
+        fn parse(&self, text: &str) -> Result<String> {
+            Ok(text.to_uppercase())
+        }
+
+        fn parser_type(&self) -> &str {
+            "test"
+        }
+    }
+
+    #[test]
+    fn test_base_output_parser() {
+        let parser = TestParser;
+        let result = parser.parse("hello").unwrap();
+        assert_eq!(result, "HELLO");
+    }
+
+    #[test]
+    fn test_parse_result() {
+        let parser = TestParser;
+        let generations = vec![Generation::new("hello")];
+        let result = parser.parse_result(&generations, false).unwrap();
+        assert_eq!(result, "HELLO");
+    }
+
+    #[test]
+    fn test_parse_result_empty() {
+        let parser = TestParser;
+        let result = parser.parse_result(&[], false);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_output_parser_error() {
+        let err = OutputParserError::parse_error("Invalid JSON", "{invalid}");
+        assert_eq!(err.message, "Invalid JSON");
+        assert_eq!(err.llm_output, Some("{invalid}".to_string()));
     }
 }

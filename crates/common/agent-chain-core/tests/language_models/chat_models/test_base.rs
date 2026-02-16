@@ -1701,7 +1701,7 @@ async fn test_stream_callback_receives_chunk_data() {
         .await
         .unwrap();
 
-    while let Some(_) = stream.next().await {}
+    while stream.next().await.is_some() {}
 
     let recorded = recorder.chunks_received.lock().unwrap();
     // on_llm_new_token should have been called at least once with Some(chunk_json)

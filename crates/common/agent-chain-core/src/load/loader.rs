@@ -424,6 +424,84 @@ pub fn loads_with_namespaces(text: &str, namespaces: Vec<String>) -> Result<Valu
     loads(text, Some(config))
 }
 
+// --- Constructor Registry ---
+//
+// In Python, the Reviver uses `importlib.import_module` to dynamically
+// import and instantiate classes from their lc_id paths. In Rust, we use
+// a static registry mapping lc_id path strings to constructor functions.
+
+use std::sync::LazyLock;
+
+use crate::agents::{AgentAction, AgentFinish};
+use crate::documents::Document;
+use crate::messages::{
+    AIMessage, AIMessageChunk, ChatMessage, ChatMessageChunk, HumanMessage, HumanMessageChunk,
+    SystemMessage, SystemMessageChunk, ToolMessage,
+};
+use crate::output_parsers::StrOutputParser;
+use crate::prompt_values::{ChatPromptValue, StringPromptValue};
+use crate::prompts::{
+    AIMessagePromptTemplate, ChatMessagePromptTemplate, ChatPromptTemplate,
+    HumanMessagePromptTemplate, MessagesPlaceholder, PromptTemplate, SystemMessagePromptTemplate,
+};
+
+type ConstructorFn = fn(&Value) -> Result<Value>;
+
+fn register_constructor<T>(registry: &mut HashMap<String, ConstructorFn>)
+where
+    T: serde::de::DeserializeOwned + serde::Serialize + super::serializable::Serializable,
+{
+    let id = T::lc_id();
+    let key = id.join(":");
+    let constructor: ConstructorFn = |kwargs| {
+        let obj: T = serde_json::from_value(kwargs.clone())?;
+        let value = serde_json::to_value(&obj)?;
+        Ok(value)
+    };
+    registry.insert(key, constructor);
+
+    let mappings = get_all_serializable_mappings();
+    for (old_path, new_path) in &mappings {
+        if *old_path == id {
+            let mapped_key = new_path.join(":");
+            registry.insert(mapped_key, constructor);
+        }
+    }
+}
+
+static CONSTRUCTOR_REGISTRY: LazyLock<HashMap<String, ConstructorFn>> = LazyLock::new(|| {
+    let mut registry = HashMap::new();
+    register_constructor::<AIMessage>(&mut registry);
+    register_constructor::<HumanMessage>(&mut registry);
+    register_constructor::<SystemMessage>(&mut registry);
+    register_constructor::<ToolMessage>(&mut registry);
+    register_constructor::<ChatMessage>(&mut registry);
+    register_constructor::<Document>(&mut registry);
+    register_constructor::<PromptTemplate>(&mut registry);
+    register_constructor::<ChatPromptTemplate>(&mut registry);
+    register_constructor::<MessagesPlaceholder>(&mut registry);
+    register_constructor::<HumanMessagePromptTemplate>(&mut registry);
+    register_constructor::<AIMessagePromptTemplate>(&mut registry);
+    register_constructor::<SystemMessagePromptTemplate>(&mut registry);
+    register_constructor::<ChatMessagePromptTemplate>(&mut registry);
+    register_constructor::<StrOutputParser>(&mut registry);
+    register_constructor::<AIMessageChunk>(&mut registry);
+    register_constructor::<HumanMessageChunk>(&mut registry);
+    register_constructor::<SystemMessageChunk>(&mut registry);
+    register_constructor::<ChatMessageChunk>(&mut registry);
+    register_constructor::<StringPromptValue>(&mut registry);
+    register_constructor::<ChatPromptValue>(&mut registry);
+    register_constructor::<AgentAction>(&mut registry);
+    register_constructor::<AgentFinish>(&mut registry);
+    registry
+});
+
+/// Look up a constructor function by lc_id path.
+pub fn lookup_constructor(path: &[String]) -> Option<&'static ConstructorFn> {
+    let key = path.join(":");
+    CONSTRUCTOR_REGISTRY.get(&key)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -639,88 +717,4 @@ mod tests {
         assert_eq!(arr[0].as_str(), Some("value1"));
         assert_eq!(arr[1].as_str(), Some("value2"));
     }
-}
-
-// --- Constructor Registry ---
-//
-// In Python, the Reviver uses `importlib.import_module` to dynamically
-// import and instantiate classes from their lc_id paths. In Rust, we use
-// a static registry mapping lc_id path strings to constructor functions.
-
-use std::sync::LazyLock;
-
-use crate::agents::{AgentAction, AgentFinish};
-use crate::documents::Document;
-use crate::messages::{
-    AIMessage, AIMessageChunk, ChatMessage, ChatMessageChunk, HumanMessage, HumanMessageChunk,
-    SystemMessage, SystemMessageChunk, ToolMessage,
-};
-use crate::output_parsers::StrOutputParser;
-use crate::prompt_values::{ChatPromptValue, StringPromptValue};
-use crate::prompts::{
-    AIMessagePromptTemplate, ChatMessagePromptTemplate, ChatPromptTemplate,
-    HumanMessagePromptTemplate, MessagesPlaceholder, PromptTemplate, SystemMessagePromptTemplate,
-};
-
-type ConstructorFn = fn(&Value) -> Result<Value>;
-
-fn register_constructor<T>(registry: &mut HashMap<String, ConstructorFn>)
-where
-    T: serde::de::DeserializeOwned + serde::Serialize + super::serializable::Serializable,
-{
-    let id = T::lc_id();
-    let key = id.join(":");
-    let constructor: ConstructorFn = |kwargs| {
-        let obj: T = serde_json::from_value(kwargs.clone())?;
-        let value = serde_json::to_value(&obj)?;
-        Ok(value)
-    };
-    registry.insert(key, constructor);
-
-    // Also register under any mapped paths so that types serialized with
-    // langchain_core paths (e.g. ["langchain_core", "messages", "ai", "AIMessage"])
-    // can also be looked up.
-    let mappings = get_all_serializable_mappings();
-    for (old_path, new_path) in &mappings {
-        if *old_path == id {
-            let mapped_key = new_path.join(":");
-            registry.insert(mapped_key, constructor);
-        }
-    }
-}
-
-static CONSTRUCTOR_REGISTRY: LazyLock<HashMap<String, ConstructorFn>> = LazyLock::new(|| {
-    let mut registry = HashMap::new();
-    register_constructor::<AIMessage>(&mut registry);
-    register_constructor::<HumanMessage>(&mut registry);
-    register_constructor::<SystemMessage>(&mut registry);
-    register_constructor::<ToolMessage>(&mut registry);
-    register_constructor::<ChatMessage>(&mut registry);
-    register_constructor::<Document>(&mut registry);
-    register_constructor::<PromptTemplate>(&mut registry);
-    register_constructor::<ChatPromptTemplate>(&mut registry);
-    register_constructor::<MessagesPlaceholder>(&mut registry);
-    register_constructor::<HumanMessagePromptTemplate>(&mut registry);
-    register_constructor::<AIMessagePromptTemplate>(&mut registry);
-    register_constructor::<SystemMessagePromptTemplate>(&mut registry);
-    register_constructor::<ChatMessagePromptTemplate>(&mut registry);
-    register_constructor::<StrOutputParser>(&mut registry);
-    // Message chunk variants
-    register_constructor::<AIMessageChunk>(&mut registry);
-    register_constructor::<HumanMessageChunk>(&mut registry);
-    register_constructor::<SystemMessageChunk>(&mut registry);
-    register_constructor::<ChatMessageChunk>(&mut registry);
-    // Prompt values
-    register_constructor::<StringPromptValue>(&mut registry);
-    register_constructor::<ChatPromptValue>(&mut registry);
-    // Agent types
-    register_constructor::<AgentAction>(&mut registry);
-    register_constructor::<AgentFinish>(&mut registry);
-    registry
-});
-
-/// Look up a constructor function by lc_id path.
-pub fn lookup_constructor(path: &[String]) -> Option<&'static ConstructorFn> {
-    let key = path.join(":");
-    CONSTRUCTOR_REGISTRY.get(&key)
 }
