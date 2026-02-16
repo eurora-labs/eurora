@@ -443,7 +443,7 @@ pub trait BaseTool: Send + Sync + Debug {
     async fn invoke_args(&self, args: Value) -> Value {
         let tool_call = ToolCall::builder().name(self.name()).args(args).build();
         let result = self.invoke(tool_call).await;
-        Value::String(result.content().to_string())
+        Value::String(result.text())
     }
 }
 

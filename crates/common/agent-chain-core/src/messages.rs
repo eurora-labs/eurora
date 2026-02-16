@@ -44,7 +44,7 @@ mod ai;
 mod base;
 pub mod block_translators;
 mod chat;
-mod content;
+pub mod content;
 mod function;
 mod human;
 mod modifier;

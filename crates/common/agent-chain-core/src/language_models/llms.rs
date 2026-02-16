@@ -169,7 +169,7 @@ pub trait BaseLLM: BaseLanguageModel {
                 let messages = p.to_messages();
                 let parts: Vec<String> = messages
                     .iter()
-                    .map(|msg| format!("{}: {}", msg.message_type(), msg.content()))
+                    .map(|msg| format!("{}: {}", msg.message_type(), msg.text()))
                     .collect();
                 Ok(parts.join("\n"))
             }
@@ -178,7 +178,7 @@ pub trait BaseLLM: BaseLanguageModel {
                 // Convert messages to a string representation
                 let parts: Vec<String> = m
                     .iter()
-                    .map(|msg| format!("{}: {}", msg.message_type(), msg.content()))
+                    .map(|msg| format!("{}: {}", msg.message_type(), msg.text()))
                     .collect();
                 Ok(parts.join("\n"))
             }

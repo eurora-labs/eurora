@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
 use super::base::{get_msg_title_repr, is_interactive_env, merge_content};
+use super::content::MessageContent;
 use crate::utils::merge::{merge_dicts, merge_obj};
 
 /// Mixin trait for objects that tools can return directly.
@@ -148,7 +149,7 @@ impl InvalidToolCall {
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct ToolMessage {
     /// The tool result content
-    pub content: String,
+    pub content: MessageContent,
     /// The ID of the tool call this message is responding to
     pub tool_call_id: String,
     /// Optional unique identifier
@@ -261,7 +262,7 @@ impl ToolMessage {
     /// Create a new tool message.
     #[builder]
     pub fn new(
-        content: impl Into<String>,
+        content: impl Into<MessageContent>,
         tool_call_id: impl Into<String>,
         id: Option<String>,
         name: Option<String>,
@@ -293,8 +294,8 @@ impl ToolMessage {
     }
 
     /// Get the text content of the message.
-    pub fn text(&self) -> &str {
-        &self.content
+    pub fn text(&self) -> String {
+        self.content.as_text()
     }
 
     /// Get a pretty representation of the message.
@@ -327,7 +328,7 @@ impl ToolOutputMixin for ToolMessage {}
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct ToolMessageChunk {
     /// The tool result content (may be partial during streaming)
-    pub content: String,
+    pub content: MessageContent,
     /// The ID of the tool call this message is responding to
     pub tool_call_id: String,
     /// Optional unique identifier
@@ -388,7 +389,7 @@ impl ToolMessageChunk {
     /// Create a new tool message chunk.
     #[builder]
     pub fn new(
-        content: impl Into<String>,
+        content: impl Into<MessageContent>,
         tool_call_id: impl Into<String>,
         id: Option<String>,
         name: Option<String>,
@@ -428,7 +429,7 @@ impl ToolMessageChunk {
             panic!("Cannot concatenate ToolMessageChunks with different names.");
         }
 
-        let content = merge_content(&self.content, &other.content);
+        let content = merge_content(self.content.as_text_ref(), other.content.as_text_ref()).into();
 
         // Merge artifact using merge_obj (matching Python)
         let artifact = match (&self.artifact, &other.artifact) {

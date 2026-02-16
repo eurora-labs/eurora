@@ -100,8 +100,13 @@ impl ChatGeneration {
 fn extract_text_from_message(message: &BaseMessage) -> String {
     let content = message.content();
 
-    // Try parsing as a JSON array of content blocks (OpenAI format)
-    if let Ok(blocks) = serde_json::from_str::<Vec<Value>>(content) {
+    // Get content blocks for Parts content or JSON-encoded Text content
+    let blocks: Option<Vec<Value>> = match content {
+        crate::messages::content::MessageContent::Parts(_) => Some(content.as_json_values()),
+        crate::messages::content::MessageContent::Text(s) => serde_json::from_str(s).ok(),
+    };
+
+    if let Some(blocks) = blocks {
         for block in &blocks {
             if let Some(s) = block.as_str() {
                 return s.to_string();

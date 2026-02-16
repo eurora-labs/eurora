@@ -4,6 +4,7 @@
 //! including message normalization and content block utilities.
 //! Mirrors `langchain_core.language_models._utils`.
 
+use crate::messages::content::MessageContent;
 use std::collections::HashMap;
 
 use regex::Regex;
@@ -357,10 +358,11 @@ pub fn update_message_content_to_blocks(
         .filter_map(|block| serde_json::to_value(block).ok())
         .collect();
 
-    let new_content = if block_values.is_empty() {
+    let new_content: MessageContent = if block_values.is_empty() {
         message.content.clone()
     } else {
-        serde_json::to_string(&block_values).unwrap_or_else(|_| message.content.clone())
+        let values: Vec<serde_json::Value> = block_values;
+        values.into()
     };
 
     let mut new_metadata = message.response_metadata.clone();

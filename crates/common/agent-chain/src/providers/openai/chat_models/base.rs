@@ -706,14 +706,14 @@ impl ChatOpenAI {
                 // When tool_calls are present, content must be null (not empty string)
                 let has_tool_calls = message.get("tool_calls").is_some();
                 if has_tool_calls {
-                    let content_str = m.content();
+                    let content_str = m.text();
                     if content_str.is_empty() {
                         message["content"] = serde_json::Value::Null;
                     } else {
                         message["content"] = serde_json::json!(content_str);
                     }
-                } else if !m.content().is_empty() {
-                    message["content"] = serde_json::json!(m.content());
+                } else if !m.content.is_empty() {
+                    message["content"] = serde_json::json!(m.content.as_text());
                 }
 
                 if let Some(ref name) = m.name {
@@ -811,13 +811,13 @@ impl ChatOpenAI {
                 }
                 BaseMessage::AI(m) => {
                     // Add message content as output_text block
-                    if !m.content().is_empty() || m.tool_calls.is_empty() {
+                    if !m.content.is_empty() || m.tool_calls.is_empty() {
                         input.push(serde_json::json!({
                             "type": "message",
                             "role": "assistant",
                             "content": [{
                                 "type": "output_text",
-                                "text": m.content(),
+                                "text": m.content.as_text(),
                                 "annotations": []
                             }]
                         }));

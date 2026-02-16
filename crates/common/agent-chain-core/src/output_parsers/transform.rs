@@ -92,7 +92,7 @@ pub trait BaseCumulativeTransformOutputParser: BaseTransformOutputParser {
             let mut stream = input;
 
             while let Some(message) = stream.next().await {
-                let chunk_gen = GenerationChunk::new(message.content());
+                let chunk_gen = GenerationChunk::new(message.text());
 
                 acc_gen = Some(match acc_gen {
                     None => chunk_gen,

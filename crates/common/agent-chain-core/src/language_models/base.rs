@@ -176,7 +176,7 @@ impl std::fmt::Display for LanguageModelInput {
             LanguageModelInput::Messages(m) => {
                 let joined = m
                     .iter()
-                    .map(|msg| format!("{}: {}", msg.message_type(), msg.content()))
+                    .map(|msg| format!("{}: {}", msg.message_type(), msg.text()))
                     .collect::<Vec<_>>()
                     .join("\n");
                 write!(f, "{}", joined)
@@ -210,17 +210,17 @@ impl From<String> for LanguageModelOutput {
 
 impl LanguageModelOutput {
     /// Get the text content of the output.
-    pub fn text(&self) -> &str {
+    pub fn text(&self) -> String {
         match self {
-            LanguageModelOutput::Message(m) => m.content(),
-            LanguageModelOutput::Text(s) => s,
+            LanguageModelOutput::Message(m) => m.text(),
+            LanguageModelOutput::Text(s) => s.clone(),
         }
     }
 
     /// Convert to string, consuming the output.
     pub fn into_text(self) -> String {
         match self {
-            LanguageModelOutput::Message(m) => m.content().to_string(),
+            LanguageModelOutput::Message(m) => m.text(),
             LanguageModelOutput::Text(s) => s,
         }
     }
@@ -443,7 +443,7 @@ pub trait BaseLanguageModel: Send + Sync {
             .map(|m| {
                 // Add some tokens for the message role/type
                 let role_tokens = 4; // Approximate overhead for role
-                let content_tokens = self.get_num_tokens(m.content());
+                let content_tokens = self.get_num_tokens(&m.text());
                 role_tokens + content_tokens
             })
             .sum()
