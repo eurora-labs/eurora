@@ -38,9 +38,11 @@ use crate::chat_models::{
     BaseChatModel, ChatChunk, ChatModelConfig, LangSmithParams, ToolChoice, UsageMetadata,
 };
 use crate::error::{Error, Result};
+use crate::language_models::ToolLike;
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
 use crate::messages::{AIMessage, BaseMessage, ContentPart, ImageSource, MessageContent, ToolCall};
 use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, LLMResult};
+use crate::runnables::base::Runnable;
 use crate::tools::{BaseTool, ToolDefinition};
 
 /// Default API base URL for Ollama.
@@ -970,11 +972,11 @@ impl BaseChatModel for ChatOllama {
 
     fn bind_tools(
         &self,
-        tools: &[Arc<dyn BaseTool>],
+        tools: &[ToolLike],
         tool_choice: Option<ToolChoice>,
     ) -> Result<Box<dyn BaseChatModel>> {
         let mut bound = self.clone();
-        bound.bound_tools = tools.iter().map(|t| t.definition()).collect();
+        bound.bound_tools = tools.iter().map(|t| t.to_definition()).collect();
         bound.bound_tool_choice = tool_choice;
         Ok(Box::new(bound))
     }
@@ -983,26 +985,23 @@ impl BaseChatModel for ChatOllama {
         &self,
         schema: serde_json::Value,
         _include_raw: bool,
-    ) -> Result<Box<dyn BaseChatModel>> {
-        let name = schema
-            .get("title")
-            .and_then(|t| t.as_str())
-            .unwrap_or("structured_output")
-            .to_string();
-        let description = schema
-            .get("description")
-            .and_then(|d| d.as_str())
-            .unwrap_or("")
-            .to_string();
-        let tool_def = ToolDefinition {
-            name,
-            description,
-            parameters: schema,
-        };
-        let mut bound = self.clone();
-        bound.bound_tools = vec![tool_def];
-        bound.bound_tool_choice = Some(ToolChoice::String("any".to_string()));
-        Ok(Box::new(bound))
+    ) -> Result<
+        Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
+    > {
+        // Delegate to the default trait implementation which composes
+        // bind_tools + output parser into a proper Runnable chain
+        let tool_name = crate::language_models::extract_tool_name_from_schema(&schema);
+        let tool_like = ToolLike::Schema(schema);
+        let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
+
+        let output_parser =
+            crate::output_parsers::openai_tools::JsonOutputKeyToolsParser::new(&tool_name)
+                .with_first_tool_only(true);
+
+        let model_runnable =
+            crate::language_models::ChatModelRunnable::new(std::sync::Arc::from(bound_model));
+        let chain = crate::runnables::base::pipe(model_runnable, output_parser);
+        Ok(Box::new(chain))
     }
 }
 
