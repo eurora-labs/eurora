@@ -1077,8 +1077,8 @@ fn test_convert_to_openai_messages_developer() {
     )];
     let result = convert_to_openai_messages(&messages, TextFormat::String, false);
     assert_eq!(result.len(), 1);
-    // The Rust impl always maps System -> "system" role
-    assert_eq!(result[0]["role"], "system");
+    // SystemMessage with __openai_role__ = "developer" should produce "developer" role
+    assert_eq!(result[0]["role"], "developer");
     assert_eq!(result[0]["content"], "Be helpful");
 }
 

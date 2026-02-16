@@ -12,6 +12,23 @@ use super::base::{get_msg_title_repr, is_interactive_env, merge_content};
 use super::content::MessageContent;
 use crate::utils::merge::{merge_dicts, merge_obj};
 
+/// Custom deserializer for tool_call_id that coerces non-string values to strings.
+///
+/// Python's ToolMessage.coerce_args validator converts non-string tool_call_id
+/// (e.g., integers, UUIDs) to strings during deserialization.
+fn deserialize_tool_call_id<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    match value {
+        serde_json::Value::String(s) => Ok(s),
+        serde_json::Value::Number(n) => Ok(n.to_string()),
+        serde_json::Value::Null => Ok(String::new()),
+        other => Ok(other.to_string()),
+    }
+}
+
 /// Mixin trait for objects that tools can return directly.
 ///
 /// If a custom Tool is invoked with a `ToolCall` and the output of custom code is
@@ -151,6 +168,7 @@ pub struct ToolMessage {
     /// The tool result content
     pub content: MessageContent,
     /// The ID of the tool call this message is responding to
+    #[serde(deserialize_with = "deserialize_tool_call_id")]
     pub tool_call_id: String,
     /// Optional unique identifier
     pub id: Option<String>,
@@ -330,6 +348,7 @@ pub struct ToolMessageChunk {
     /// The tool result content (may be partial during streaming)
     pub content: MessageContent,
     /// The ID of the tool call this message is responding to
+    #[serde(deserialize_with = "deserialize_tool_call_id")]
     pub tool_call_id: String,
     /// Optional unique identifier
     pub id: Option<String>,

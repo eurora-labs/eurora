@@ -494,13 +494,45 @@ where
         config: Option<RunnableConfig>,
     ) -> BoxStream<'_, Result<Self::Output>> {
         let (runnable, config) = self.prepare_internal(config);
-        // Note: This is a limitation - we need to return a stream that borrows self,
-        // but runnable doesn't live long enough. In a real implementation, we'd need
-        // to handle this differently, perhaps by storing the runnable.
         Box::pin(async_stream::stream! {
             let result = runnable.invoke(input, Some(config));
             yield result;
         })
+    }
+
+    fn transform<'a>(
+        &'a self,
+        input: BoxStream<'a, Self::Input>,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'a, Result<Self::Output>> {
+        let (runnable, config) = self.prepare_internal(config);
+        Box::pin(async_stream::stream! {
+            let mut stream = runnable.transform(input, Some(config));
+            while let Some(item) = futures::StreamExt::next(&mut stream).await {
+                yield item;
+            }
+        })
+    }
+
+    fn atransform<'a>(
+        &'a self,
+        input: BoxStream<'a, Self::Input>,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'a, Result<Self::Output>>
+    where
+        Self: 'static,
+    {
+        let (runnable, config) = self.prepare_internal(config);
+        Box::pin(async_stream::stream! {
+            let mut stream = runnable.atransform(input, Some(config));
+            while let Some(item) = futures::StreamExt::next(&mut stream).await {
+                yield item;
+            }
+        })
+    }
+
+    fn get_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph> {
+        self.default.get_graph(config)
     }
 }
 
@@ -827,6 +859,49 @@ where
                 Ok((runnable, config)) => {
                     let result = runnable.invoke(input, Some(config));
                     yield result;
+                }
+                Err(e) => {
+                    yield Err(e);
+                }
+            }
+        })
+    }
+
+    fn transform<'a>(
+        &'a self,
+        input: BoxStream<'a, Self::Input>,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'a, Result<Self::Output>> {
+        Box::pin(async_stream::stream! {
+            match self.prepare_internal(config) {
+                Ok((runnable, config)) => {
+                    let mut stream = runnable.transform(input, Some(config));
+                    while let Some(item) = futures::StreamExt::next(&mut stream).await {
+                        yield item;
+                    }
+                }
+                Err(e) => {
+                    yield Err(e);
+                }
+            }
+        })
+    }
+
+    fn atransform<'a>(
+        &'a self,
+        input: BoxStream<'a, Self::Input>,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'a, Result<Self::Output>>
+    where
+        Self: 'static,
+    {
+        Box::pin(async_stream::stream! {
+            match self.prepare_internal(config) {
+                Ok((runnable, config)) => {
+                    let mut stream = runnable.atransform(input, Some(config));
+                    while let Some(item) = futures::StreamExt::next(&mut stream).await {
+                        yield item;
+                    }
                 }
                 Err(e) => {
                     yield Err(e);
