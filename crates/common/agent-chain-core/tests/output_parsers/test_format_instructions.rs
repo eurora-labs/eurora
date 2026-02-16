@@ -2,7 +2,7 @@
 //!
 //! Ported from langchain/libs/core/tests/unit_tests/output_parsers/test_format_instructions.py
 
-use agent_chain_core::output_parsers::{JSON_FORMAT_INSTRUCTIONS, format_json_instructions};
+use agent_chain_core::output_parsers::JSON_FORMAT_INSTRUCTIONS;
 
 #[test]
 fn test_json_format_instructions_exists() {
@@ -54,7 +54,7 @@ fn test_json_format_instructions_schema_placeholder() {
 #[test]
 fn test_json_format_instructions_formatting() {
     let test_schema = r#"{"properties": {"foo": {"type": "string"}}, "required": ["foo"]}"#;
-    let formatted = format_json_instructions(test_schema);
+    let formatted = JSON_FORMAT_INSTRUCTIONS.replace("{schema}", test_schema);
 
     assert!(formatted.contains(test_schema));
     assert!(!formatted.contains("{schema}"));
@@ -119,7 +119,7 @@ fn test_json_format_instructions_with_complex_schema() {
         "required": ["name", "age"]
     }"#;
 
-    let formatted = format_json_instructions(complex_schema);
+    let formatted = JSON_FORMAT_INSTRUCTIONS.replace("{schema}", complex_schema);
 
     assert!(formatted.contains("name"));
     assert!(formatted.contains("age"));
@@ -130,7 +130,7 @@ fn test_json_format_instructions_with_complex_schema() {
 #[test]
 fn test_json_format_instructions_with_unicode_schema() {
     let unicode_schema = r#"{"properties": {"名前": {"type": "string", "description": "用户名"}}}"#;
-    let formatted = format_json_instructions(unicode_schema);
+    let formatted = JSON_FORMAT_INSTRUCTIONS.replace("{schema}", unicode_schema);
 
     assert!(formatted.contains("名前"));
     assert!(formatted.contains("用户名"));

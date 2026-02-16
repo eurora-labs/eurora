@@ -4,6 +4,7 @@
 
 use std::collections::HashMap;
 use std::io::{self, Write};
+use tracing::warn;
 
 /// Text color mapping for terminal output.
 pub static TEXT_COLOR_MAPPING: std::sync::LazyLock<HashMap<&'static str, &'static str>> =
@@ -141,11 +142,17 @@ pub fn print_text(text: &str, color: Option<&str>, end: &str, writer: Option<&mu
     let output = format!("{}{}", text_to_print, end);
 
     if let Some(w) = writer {
-        let _ = write!(w, "{}", output);
-        let _ = w.flush();
+        if let Err(e) = write!(w, "{}", output) {
+            warn!("print_text write error: {e}");
+        }
+        if let Err(e) = w.flush() {
+            warn!("print_text flush error: {e}");
+        }
     } else {
         print!("{}", output);
-        let _ = io::stdout().flush();
+        if let Err(e) = io::stdout().flush() {
+            warn!("print_text flush error: {e}");
+        }
     }
 }
 

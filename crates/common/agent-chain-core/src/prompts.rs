@@ -28,9 +28,9 @@
 //! assert_eq!(result, "Hello, World!");
 //!
 //! // Chat prompt with multiple messages
-//! let chat_prompt = ChatPromptTemplate::from_messages(&[
-//!     ("system", "You are a helpful assistant."),
-//!     ("human", "{question}"),
+//! let chat_prompt = ChatPromptTemplate::from_messages(vec![
+//!     ("system", "You are a helpful assistant.").into(),
+//!     ("human", "{question}").into(),
 //! ]);
 //! ```
 
@@ -44,6 +44,7 @@ mod loading;
 mod message;
 mod prompt;
 mod string;
+mod structured;
 
 // Re-export from base
 pub use base::{BasePromptTemplate, FormatOutputType, aformat_document, format_document};
@@ -78,6 +79,9 @@ pub use few_shot::{FewShotChatMessagePromptTemplate, FewShotPromptTemplate};
 
 // Re-export from few_shot_with_templates
 pub use few_shot_with_templates::FewShotPromptWithTemplates;
+
+// Re-export from structured
+pub use structured::StructuredPrompt;
 
 // Re-export from loading
 pub use loading::load_prompt;

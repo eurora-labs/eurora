@@ -201,6 +201,7 @@ impl CallbackManagerMixin for RecordingHandler {
         _parent_run_id: Option<Uuid>,
         _tags: Option<&[String]>,
         _metadata: Option<&HashMap<String, serde_json::Value>>,
+        _name: Option<&str>,
     ) {
         self.record("on_chain_start");
     }
@@ -224,6 +225,7 @@ impl CallbackManagerMixin for RecordingHandler {
         _parent_run_id: Option<Uuid>,
         _tags: Option<&[String]>,
         _metadata: Option<&HashMap<String, serde_json::Value>>,
+        _name: Option<&str>,
     ) {
         self.record("on_retriever_start");
     }
@@ -656,7 +658,11 @@ fn test_callback_manager_on_chain_start_returns_chain_run_manager() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
     let mut mgr = CallbackManager::new();
     mgr.add_handler(h, true);
-    let rm = mgr.on_chain_start(&HashMap::new(), &HashMap::new(), None);
+    let rm = mgr
+        .on_chain_start()
+        .serialized(&HashMap::new())
+        .inputs(&HashMap::new())
+        .call();
     assert!(!rm.run_id().is_nil());
 }
 
@@ -667,7 +673,12 @@ fn test_callback_manager_on_chain_start_uses_provided_run_id() {
     let mut mgr = CallbackManager::new();
     mgr.add_handler(h, true);
     let rid = Uuid::new_v4();
-    let rm = mgr.on_chain_start(&HashMap::new(), &HashMap::new(), Some(rid));
+    let rm = mgr
+        .on_chain_start()
+        .serialized(&HashMap::new())
+        .inputs(&HashMap::new())
+        .maybe_run_id(Some(rid))
+        .call();
     assert_eq!(rm.run_id(), rid);
 }
 
@@ -698,7 +709,11 @@ fn test_callback_manager_on_retriever_start_returns_retriever_run_manager() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
     let mut mgr = CallbackManager::new();
     mgr.add_handler(h, true);
-    let rm = mgr.on_retriever_start(&HashMap::new(), "query", None);
+    let rm = mgr
+        .on_retriever_start()
+        .serialized(&HashMap::new())
+        .query("query")
+        .call();
     assert!(!rm.run_id().is_nil());
 }
 
@@ -709,7 +724,12 @@ fn test_callback_manager_on_retriever_start_uses_provided_run_id() {
     let mut mgr = CallbackManager::new();
     mgr.add_handler(h, true);
     let rid = Uuid::new_v4();
-    let rm = mgr.on_retriever_start(&HashMap::new(), "q", Some(rid));
+    let rm = mgr
+        .on_retriever_start()
+        .serialized(&HashMap::new())
+        .query("q")
+        .run_id(rid)
+        .call();
     assert_eq!(rm.run_id(), rid);
 }
 
@@ -737,7 +757,11 @@ fn test_callback_manager_run_managers_inherit_tags_and_metadata() {
         true,
     );
 
-    let rm = mgr.on_chain_start(&HashMap::new(), &HashMap::new(), None);
+    let rm = mgr
+        .on_chain_start()
+        .serialized(&HashMap::new())
+        .inputs(&HashMap::new())
+        .call();
     assert!(rm.tags().contains(&"t1".to_string()));
 }
 
@@ -964,7 +988,7 @@ async fn test_async_callback_manager_on_chain_start_returns_async_chain_manager(
     let mut mgr = AsyncCallbackManager::new();
     mgr.add_handler(h, true);
     let rm = mgr
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None)
+        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
         .await;
     assert!(!rm.run_id().is_nil());
 }
@@ -977,7 +1001,7 @@ async fn test_async_callback_manager_on_chain_start_uses_provided_run_id() {
     mgr.add_handler(h, true);
     let rid = Uuid::new_v4();
     let rm = mgr
-        .on_chain_start(&HashMap::new(), &HashMap::new(), Some(rid))
+        .on_chain_start(&HashMap::new(), &HashMap::new(), Some(rid), None)
         .await;
     assert_eq!(rm.run_id(), rid);
 }
@@ -1000,7 +1024,12 @@ async fn test_async_callback_manager_on_retriever_start_returns_async_retriever_
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
     let mut mgr = AsyncCallbackManager::new();
     mgr.add_handler(h, true);
-    let rm = mgr.on_retriever_start(&HashMap::new(), "query", None).await;
+    let rm = mgr
+        .on_retriever_start()
+        .serialized(&HashMap::new())
+        .query("query")
+        .call()
+        .await;
     assert!(!rm.run_id().is_nil());
 }
 

@@ -5,6 +5,7 @@
 //! This file contains tests for the BaseChatModel trait and related functionality.
 
 use agent_chain_core::error::{Error, Result};
+use agent_chain_core::language_models::GenerateConfig;
 use agent_chain_core::language_models::{
     BaseChatModel, BaseLanguageModel, ChatGenerationStream, ChatModelConfig, DisableStreaming,
     FakeListChatModel, GenericFakeChatModel, LangSmithParams, LanguageModelConfig,
@@ -612,7 +613,9 @@ async fn test_disable_streaming_async() {
 
     // Test Bool(true)
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::Bool(true));
-    let result = model.invoke(LanguageModelInput::Messages(vec![])).await;
+    let result = model
+        .invoke(LanguageModelInput::Messages(vec![]), None)
+        .await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap().content, "invoke");
 
@@ -632,7 +635,9 @@ async fn test_disable_streaming_no_streaming_model() {
     // Python equivalent: test_disable_streaming_no_streaming_model()
 
     let model = NoStreamingModel::new().with_disable_streaming(DisableStreaming::Bool(true));
-    let result = model.invoke(LanguageModelInput::Messages(vec![])).await;
+    let result = model
+        .invoke(LanguageModelInput::Messages(vec![]), None)
+        .await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap().content, "invoke");
 
@@ -652,7 +657,9 @@ async fn test_disable_streaming_no_streaming_model_async() {
         DisableStreaming::ToolCalling,
     ] {
         let model = NoStreamingModel::new().with_disable_streaming(disable);
-        let result = model.ainvoke(LanguageModelInput::Messages(vec![])).await;
+        let result = model
+            .ainvoke(LanguageModelInput::Messages(vec![]), None)
+            .await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().content, "invoke");
     }
@@ -777,7 +784,10 @@ fn test_model_profiles() {
     assert!(model.profile().is_none());
 
     // Create model with profile
-    let profile = ModelProfile::new().with_max_input_tokens(100);
+    let profile = ModelProfile {
+        max_input_tokens: Some(100),
+        ..Default::default()
+    };
     let config = ChatModelConfig::new().with_profile(profile.clone());
     let model_with_profile =
         GenericFakeChatModel::from_strings(vec!["test".to_string()]).with_config(config);
@@ -817,7 +827,7 @@ async fn test_async_batch_size() {
 
     // Test basic async operation works
     let llm = FakeListChatModel::new(vec!["test".to_string()]);
-    let result = llm.invoke(LanguageModelInput::Messages(vec![])).await;
+    let result = llm.invoke(LanguageModelInput::Messages(vec![]), None).await;
     assert!(result.is_ok());
 }
 
@@ -1012,7 +1022,10 @@ fn test_chat_model_config_builder() {
     assert_eq!(config.output_version, Some("v1".to_string()));
 
     // Test with profile
-    let profile = ModelProfile::new().with_max_input_tokens(1000);
+    let profile = ModelProfile {
+        max_input_tokens: Some(1000),
+        ..Default::default()
+    };
     let config_with_profile = ChatModelConfig::new().with_profile(profile);
     assert!(config_with_profile.profile.is_some());
     assert_eq!(
@@ -1027,7 +1040,7 @@ async fn test_invoke_basic() {
 
     let model = FakeListChatModel::new(vec!["hello world".to_string()]);
     let result = model
-        .invoke(LanguageModelInput::Text("test".to_string()))
+        .invoke(LanguageModelInput::Text("test".to_string()), None)
         .await;
 
     assert!(result.is_ok());
@@ -1040,7 +1053,7 @@ async fn test_ainvoke_basic() {
 
     let model = FakeListChatModel::new(vec!["async hello".to_string()]);
     let result = model
-        .ainvoke(LanguageModelInput::Text("test".to_string()))
+        .ainvoke(LanguageModelInput::Text("test".to_string()), None)
         .await;
 
     assert!(result.is_ok());
@@ -1082,15 +1095,7 @@ async fn test_generate_basic() {
     )];
 
     let result = model
-        .generate(
-            vec![messages1, messages2],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
+        .generate(vec![messages1, messages2], GenerateConfig::default())
         .await;
 
     assert!(result.is_ok());
@@ -1334,12 +1339,7 @@ async fn test_generate_single_message_list() {
             vec![vec![BaseMessage::Human(
                 HumanMessage::builder().content("hello").build(),
             )]],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            GenerateConfig::default(),
         )
         .await
         .unwrap();
@@ -1363,12 +1363,7 @@ async fn test_generate_multiple_message_lists() {
                     HumanMessage::builder().content("p3").build(),
                 )],
             ],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            GenerateConfig::default(),
         )
         .await
         .unwrap();
@@ -1384,12 +1379,7 @@ async fn test_generate_returns_chat_result() {
             vec![vec![BaseMessage::Human(
                 HumanMessage::builder().content("hi").build(),
             )]],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            GenerateConfig::default(),
         )
         .await
         .unwrap();
@@ -1414,12 +1404,7 @@ async fn test_agenerate_single_message_list() {
             vec![vec![BaseMessage::Human(
                 HumanMessage::builder().content("hello").build(),
             )]],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            GenerateConfig::default(),
         )
         .await
         .unwrap();
@@ -1440,12 +1425,7 @@ async fn test_agenerate_multiple_message_lists() {
                     HumanMessage::builder().content("p2").build(),
                 )],
             ],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            GenerateConfig::default(),
         )
         .await
         .unwrap();
@@ -1461,12 +1441,7 @@ async fn test_agenerate_returns_chat_result() {
             vec![vec![BaseMessage::Human(
                 HumanMessage::builder().content("hi").build(),
             )]],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            GenerateConfig::default(),
         )
         .await
         .unwrap();
@@ -1545,4 +1520,339 @@ async fn test_simple_fake_chat_agenerate_returns_chat_result() {
         .unwrap();
     assert_eq!(result.generations.len(), 1);
     assert_eq!(result.generations[0].message.content(), "fake response");
+}
+
+// ---- TestGenInfoAndMsgMetadata ----
+
+/// Ported from `TestGenInfoAndMsgMetadata::test_merges_generation_info_with_response_metadata`.
+#[test]
+fn test_gen_info_merges_with_response_metadata() {
+    use agent_chain_core::language_models::chat_models::_gen_info_and_msg_metadata;
+    use std::collections::HashMap;
+
+    let mut response_metadata = HashMap::new();
+    response_metadata.insert(
+        "model".to_string(),
+        serde_json::Value::String("test".to_string()),
+    );
+
+    let mut generation_info = HashMap::new();
+    generation_info.insert(
+        "finish_reason".to_string(),
+        serde_json::Value::String("stop".to_string()),
+    );
+
+    let result = _gen_info_and_msg_metadata(Some(&generation_info), &response_metadata);
+    assert_eq!(
+        result.get("finish_reason").and_then(|v| v.as_str()),
+        Some("stop")
+    );
+    assert_eq!(result.get("model").and_then(|v| v.as_str()), Some("test"));
+}
+
+/// Ported from `TestGenInfoAndMsgMetadata::test_empty_generation_info`.
+#[test]
+fn test_gen_info_empty_generation_info() {
+    use agent_chain_core::language_models::chat_models::_gen_info_and_msg_metadata;
+    use std::collections::HashMap;
+
+    let mut response_metadata = HashMap::new();
+    response_metadata.insert(
+        "key".to_string(),
+        serde_json::Value::String("val".to_string()),
+    );
+
+    let result = _gen_info_and_msg_metadata(None, &response_metadata);
+    assert_eq!(result.len(), 1);
+    assert_eq!(result.get("key").and_then(|v| v.as_str()), Some("val"));
+}
+
+/// Ported from `TestGenInfoAndMsgMetadata::test_empty_response_metadata`.
+#[test]
+fn test_gen_info_empty_response_metadata() {
+    use agent_chain_core::language_models::chat_models::_gen_info_and_msg_metadata;
+    use std::collections::HashMap;
+
+    let mut generation_info = HashMap::new();
+    generation_info.insert(
+        "token_count".to_string(),
+        serde_json::Value::Number(serde_json::Number::from(10)),
+    );
+
+    let empty_metadata = HashMap::new();
+    let result = _gen_info_and_msg_metadata(Some(&generation_info), &empty_metadata);
+    assert_eq!(result.get("token_count").and_then(|v| v.as_i64()), Some(10));
+}
+
+/// Ported from `TestGenInfoAndMsgMetadata::test_response_metadata_overrides_generation_info`.
+#[test]
+fn test_gen_info_response_metadata_overrides() {
+    use agent_chain_core::language_models::chat_models::_gen_info_and_msg_metadata;
+    use std::collections::HashMap;
+
+    let mut response_metadata = HashMap::new();
+    response_metadata.insert(
+        "key".to_string(),
+        serde_json::Value::String("from_metadata".to_string()),
+    );
+
+    let mut generation_info = HashMap::new();
+    generation_info.insert(
+        "key".to_string(),
+        serde_json::Value::String("from_gen_info".to_string()),
+    );
+
+    let result = _gen_info_and_msg_metadata(Some(&generation_info), &response_metadata);
+    // response_metadata values win (same as Python dict merge order)
+    assert_eq!(
+        result.get("key").and_then(|v| v.as_str()),
+        Some("from_metadata")
+    );
+}
+
+/// Test that streaming via `stream()` injects response_metadata on yielded chunks.
+#[tokio::test]
+async fn test_stream_injects_response_metadata() {
+    use agent_chain_core::messages::AIMessageChunk;
+
+    let model =
+        GenericFakeChatModel::from_vec(vec![AIMessage::builder().content("hello world").build()]);
+
+    let mut stream = model
+        .stream(LanguageModelInput::from("test"), None, None)
+        .await
+        .unwrap();
+
+    let mut chunks: Vec<AIMessageChunk> = Vec::new();
+    while let Some(result) = stream.next().await {
+        if let Ok(chunk) = result {
+            chunks.push(chunk);
+        }
+    }
+
+    // Should have content chunks + final empty chunk
+    assert!(chunks.len() >= 2);
+
+    // Last chunk should have chunk_position="last"
+    let last = chunks.last().unwrap();
+    assert_eq!(
+        last.chunk_position,
+        Some(agent_chain_core::messages::ChunkPosition::Last)
+    );
+}
+
+/// Test that `on_llm_new_token` receives chunk data when streaming.
+#[tokio::test]
+async fn test_stream_callback_receives_chunk_data() {
+    use agent_chain_core::callbacks::base::{
+        BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
+        RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
+    };
+    use agent_chain_core::runnables::config::RunnableConfig;
+    use std::sync::{Arc, Mutex};
+    use uuid::Uuid;
+
+    #[derive(Debug, Clone)]
+    struct ChunkRecorder {
+        chunks_received: Arc<Mutex<Vec<Option<serde_json::Value>>>>,
+    }
+
+    impl ChunkRecorder {
+        fn new() -> Self {
+            Self {
+                chunks_received: Arc::new(Mutex::new(Vec::new())),
+            }
+        }
+    }
+
+    impl LLMManagerMixin for ChunkRecorder {
+        fn on_llm_new_token(
+            &self,
+            _token: &str,
+            _run_id: Uuid,
+            _parent_run_id: Option<Uuid>,
+            chunk: Option<&serde_json::Value>,
+        ) {
+            self.chunks_received.lock().unwrap().push(chunk.cloned());
+        }
+    }
+
+    impl ChainManagerMixin for ChunkRecorder {}
+    impl ToolManagerMixin for ChunkRecorder {}
+    impl RetrieverManagerMixin for ChunkRecorder {}
+    impl CallbackManagerMixin for ChunkRecorder {}
+    impl RunManagerMixin for ChunkRecorder {}
+
+    impl BaseCallbackHandler for ChunkRecorder {
+        fn name(&self) -> &str {
+            "chunk_recorder"
+        }
+    }
+
+    let recorder = ChunkRecorder::new();
+    let handler: Arc<dyn BaseCallbackHandler> = Arc::new(recorder.clone());
+
+    let model = GenericFakeChatModel::from_vec(vec![AIMessage::builder().content("hi").build()]);
+
+    let config = RunnableConfig::new().with_callbacks(vec![handler].into());
+
+    let mut stream = model
+        .stream(LanguageModelInput::from("test"), Some(&config), None)
+        .await
+        .unwrap();
+
+    while stream.next().await.is_some() {}
+
+    let recorded = recorder.chunks_received.lock().unwrap();
+    // on_llm_new_token should have been called at least once with Some(chunk_json)
+    let non_none_chunks: Vec<_> = recorded.iter().filter(|c| c.is_some()).collect();
+    assert!(
+        !non_none_chunks.is_empty(),
+        "on_llm_new_token should receive chunk data, got {} calls with {:?}",
+        recorded.len(),
+        recorded.iter().map(|c| c.is_some()).collect::<Vec<_>>()
+    );
+}
+
+// ---- StructuredOutputWithRaw tests ----
+
+/// Test that StructuredOutputWithRaw returns raw + parsed + null error on successful parse.
+#[tokio::test]
+async fn test_structured_output_with_raw_success() {
+    use agent_chain_core::language_models::{ChatModelRunnable, StructuredOutputWithRaw};
+    use agent_chain_core::messages::ToolCall;
+    use agent_chain_core::output_parsers::JsonOutputKeyToolsParser;
+    use agent_chain_core::runnables::Runnable;
+    use std::sync::Arc;
+
+    let tool_args = serde_json::json!({"answer": "42", "justification": "The meaning of life"});
+    let ai_msg = AIMessage::builder()
+        .content("")
+        .tool_calls(vec![
+            ToolCall::builder()
+                .name("test_tool")
+                .args(tool_args.clone())
+                .build(),
+        ])
+        .build();
+
+    let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
+    let model_runnable = ChatModelRunnable::new(Arc::new(model));
+    let parser = JsonOutputKeyToolsParser::new("test_tool").with_first_tool_only(true);
+
+    let runnable = StructuredOutputWithRaw::new(model_runnable, parser);
+    let result = runnable
+        .ainvoke(LanguageModelInput::from("test"), None)
+        .await
+        .unwrap();
+
+    assert_eq!(result["parsed"], tool_args);
+    assert_eq!(result["parsing_error"], serde_json::Value::Null);
+    assert!(result.get("raw").is_some());
+    assert!(!result["raw"].is_null());
+}
+
+/// Test that StructuredOutputWithRaw returns null parsed when no tool calls match.
+///
+/// JsonOutputKeyToolsParser with first_tool_only returns Ok(Null) when no
+/// matching tool calls exist, so parsing_error remains null.
+#[tokio::test]
+async fn test_structured_output_with_raw_no_matching_tool() {
+    use agent_chain_core::language_models::{ChatModelRunnable, StructuredOutputWithRaw};
+    use agent_chain_core::output_parsers::JsonOutputKeyToolsParser;
+    use agent_chain_core::runnables::Runnable;
+    use std::sync::Arc;
+
+    // AIMessage with no tool calls — parser returns Ok(Null)
+    let ai_msg = AIMessage::builder().content("plain text").build();
+
+    let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
+    let model_runnable = ChatModelRunnable::new(Arc::new(model));
+    let parser = JsonOutputKeyToolsParser::new("test_tool").with_first_tool_only(true);
+
+    let runnable = StructuredOutputWithRaw::new(model_runnable, parser);
+    let result = runnable
+        .ainvoke(LanguageModelInput::from("test"), None)
+        .await
+        .unwrap();
+
+    // No matching tool call means parsed is null, but no error occurred
+    assert_eq!(result["parsed"], serde_json::Value::Null);
+    assert_eq!(result["parsing_error"], serde_json::Value::Null);
+    assert!(result.get("raw").is_some());
+    assert!(!result["raw"].is_null());
+}
+
+/// Test that StructuredOutputWithRaw catches parse errors and returns them.
+///
+/// Uses a tool call with invalid JSON in additional_kwargs to trigger a real parse error.
+#[tokio::test]
+async fn test_structured_output_with_raw_parse_error() {
+    use agent_chain_core::language_models::{ChatModelRunnable, StructuredOutputWithRaw};
+    use agent_chain_core::output_parsers::JsonOutputKeyToolsParser;
+    use agent_chain_core::runnables::Runnable;
+    use std::sync::Arc;
+
+    // AIMessage with malformed tool call in additional_kwargs (not in tool_calls)
+    // triggers parse_tool_calls() error path in strict mode
+    let ai_msg = AIMessage::builder()
+        .content("")
+        .additional_kwargs(std::collections::HashMap::from([(
+            "tool_calls".to_string(),
+            serde_json::json!([{"function": {"name": "test_tool", "arguments": "not json"}}]),
+        )]))
+        .build();
+
+    let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
+    let model_runnable = ChatModelRunnable::new(Arc::new(model));
+    let parser = JsonOutputKeyToolsParser::new("test_tool")
+        .with_first_tool_only(true)
+        .with_strict(true);
+
+    let runnable = StructuredOutputWithRaw::new(model_runnable, parser);
+    let result = runnable
+        .ainvoke(LanguageModelInput::from("test"), None)
+        .await
+        .unwrap();
+
+    assert_eq!(result["parsed"], serde_json::Value::Null);
+    assert!(
+        result["parsing_error"].is_string(),
+        "Expected string parsing_error, got: {:?}",
+        result["parsing_error"]
+    );
+    assert!(result.get("raw").is_some());
+}
+
+/// Test that StructuredOutputWithRaw returns correct raw serialization.
+#[tokio::test]
+async fn test_structured_output_with_raw_serializes_message() {
+    use agent_chain_core::language_models::{ChatModelRunnable, StructuredOutputWithRaw};
+    use agent_chain_core::messages::ToolCall;
+    use agent_chain_core::output_parsers::JsonOutputKeyToolsParser;
+    use agent_chain_core::runnables::Runnable;
+    use std::sync::Arc;
+
+    let tool_args = serde_json::json!({"key": "value"});
+    let ai_msg = AIMessage::builder()
+        .content("some content")
+        .tool_calls(vec![
+            ToolCall::builder().name("my_tool").args(tool_args).build(),
+        ])
+        .build();
+
+    let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
+    let model_runnable = ChatModelRunnable::new(Arc::new(model));
+    let parser = JsonOutputKeyToolsParser::new("my_tool").with_first_tool_only(true);
+
+    let runnable = StructuredOutputWithRaw::new(model_runnable, parser);
+    let result = runnable
+        .ainvoke(LanguageModelInput::from("test"), None)
+        .await
+        .unwrap();
+
+    // The raw field should be a serialized AIMessage with the content preserved
+    let raw = &result["raw"];
+    assert_eq!(raw["content"], "some content");
+    assert_eq!(raw["type"], "ai");
 }

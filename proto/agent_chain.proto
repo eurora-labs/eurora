@@ -150,8 +150,8 @@ message ProtoSystemMessageChunk {
 // An AI message in the conversation.
 // Represents the output of the model with both raw output and standardized fields.
 message ProtoAIMessage {
-  // The message content
-  string content = 1;
+  // The message content (text or multipart)
+  ProtoMessageContent content = 1;
 
   // Optional unique identifier
   optional string id = 2;
@@ -178,7 +178,7 @@ message ProtoAIMessage {
 // AI message chunk (yielded when streaming)
 message ProtoAIMessageChunk {
   // The message content (may be partial during streaming)
-  string content = 1;
+  ProtoMessageContent content = 1;
 
   // Optional unique identifier
   optional string id = 2;
@@ -221,8 +221,8 @@ enum ProtoChunkPosition {
 
 // A tool message containing the result of a tool call.
 message ProtoToolMessage {
-  // The tool result content
-  string content = 1;
+  // The tool result content (text or multipart)
+  ProtoMessageContent content = 1;
 
   // The ID of the tool call this message is responding to
   string tool_call_id = 2;
@@ -249,7 +249,7 @@ message ProtoToolMessage {
 // Tool message chunk (yielded when streaming)
 message ProtoToolMessageChunk {
   // The tool result content (may be partial during streaming)
-  string content = 1;
+  ProtoMessageContent content = 1;
 
   // The ID of the tool call this message is responding to
   string tool_call_id = 2;
@@ -286,8 +286,8 @@ enum ProtoToolStatus {
 
 // A chat message that can be assigned an arbitrary speaker (role).
 message ProtoChatMessage {
-  // The message content
-  string content = 1;
+  // The message content (text or multipart)
+  ProtoMessageContent content = 1;
 
   // The speaker / role of the message
   string role = 2;
@@ -308,7 +308,7 @@ message ProtoChatMessage {
 // Chat message chunk (yielded when streaming)
 message ProtoChatMessageChunk {
   // The message content (may be partial during streaming)
-  string content = 1;
+  ProtoMessageContent content = 1;
 
   // The speaker / role of the message
   string role = 2;
@@ -332,8 +332,8 @@ message ProtoChatMessageChunk {
 
 // A function message (deprecated, use ToolMessage instead)
 message ProtoFunctionMessage {
-  // The message content
-  string content = 1;
+  // The message content (text or multipart)
+  ProtoMessageContent content = 1;
 
   // The name of the function
   string name = 2;
@@ -351,7 +351,7 @@ message ProtoFunctionMessage {
 // Function message chunk (yielded when streaming)
 message ProtoFunctionMessageChunk {
   // The message content (may be partial during streaming)
-  string content = 1;
+  ProtoMessageContent content = 1;
 
   // The name of the function
   string name = 2;

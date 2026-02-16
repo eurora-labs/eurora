@@ -161,6 +161,9 @@ pub trait CallbackManagerMixin {
     }
 
     /// Run when a chat model starts running.
+    ///
+    /// The default implementation falls back to on_llm_start with stringified
+    /// messages, matching Python's NotImplementedError fallback behavior.
     #[allow(clippy::too_many_arguments)]
     fn on_chat_model_start(
         &self,
@@ -171,7 +174,19 @@ pub trait CallbackManagerMixin {
         tags: Option<&[String]>,
         metadata: Option<&HashMap<String, serde_json::Value>>,
     ) {
-        let _ = (serialized, messages, run_id, parent_run_id, tags, metadata);
+        use crate::messages::utils::get_buffer_string;
+        let message_strings: Vec<String> = messages
+            .iter()
+            .map(|m| get_buffer_string(m, "Human", "AI"))
+            .collect();
+        self.on_llm_start(
+            serialized,
+            &message_strings,
+            run_id,
+            parent_run_id,
+            tags,
+            metadata,
+        );
     }
 
     /// Run when the Retriever starts running.
@@ -184,8 +199,17 @@ pub trait CallbackManagerMixin {
         parent_run_id: Option<Uuid>,
         tags: Option<&[String]>,
         metadata: Option<&HashMap<String, serde_json::Value>>,
+        name: Option<&str>,
     ) {
-        let _ = (serialized, query, run_id, parent_run_id, tags, metadata);
+        let _ = (
+            serialized,
+            query,
+            run_id,
+            parent_run_id,
+            tags,
+            metadata,
+            name,
+        );
     }
 
     /// Run when a chain starts running.
@@ -198,8 +222,17 @@ pub trait CallbackManagerMixin {
         parent_run_id: Option<Uuid>,
         tags: Option<&[String]>,
         metadata: Option<&HashMap<String, serde_json::Value>>,
+        name: Option<&str>,
     ) {
-        let _ = (serialized, inputs, run_id, parent_run_id, tags, metadata);
+        let _ = (
+            serialized,
+            inputs,
+            run_id,
+            parent_run_id,
+            tags,
+            metadata,
+            name,
+        );
     }
 
     /// Run when the tool starts running.
@@ -345,6 +378,9 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
     }
 
     /// Run when a chat model starts running (async).
+    ///
+    /// The default implementation falls back to on_llm_start_async with stringified
+    /// messages, matching Python's NotImplementedError fallback behavior.
     #[allow(clippy::too_many_arguments)]
     async fn on_chat_model_start_async(
         &self,
@@ -355,7 +391,20 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         tags: Option<&[String]>,
         metadata: Option<&HashMap<String, serde_json::Value>>,
     ) {
-        let _ = (serialized, messages, run_id, parent_run_id, tags, metadata);
+        use crate::messages::utils::get_buffer_string;
+        let message_strings: Vec<String> = messages
+            .iter()
+            .map(|m| get_buffer_string(m, "Human", "AI"))
+            .collect();
+        self.on_llm_start_async(
+            serialized,
+            &message_strings,
+            run_id,
+            parent_run_id,
+            tags,
+            metadata,
+        )
+        .await;
     }
 
     /// Run on new output token (async).
@@ -402,8 +451,17 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         parent_run_id: Option<Uuid>,
         tags: Option<&[String]>,
         metadata: Option<&HashMap<String, serde_json::Value>>,
+        name: Option<&str>,
     ) {
-        let _ = (serialized, inputs, run_id, parent_run_id, tags, metadata);
+        let _ = (
+            serialized,
+            inputs,
+            run_id,
+            parent_run_id,
+            tags,
+            metadata,
+            name,
+        );
     }
 
     /// Run when chain ends running (async).
@@ -526,8 +584,17 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         parent_run_id: Option<Uuid>,
         tags: Option<&[String]>,
         metadata: Option<&HashMap<String, serde_json::Value>>,
+        name: Option<&str>,
     ) {
-        let _ = (serialized, query, run_id, parent_run_id, tags, metadata);
+        let _ = (
+            serialized,
+            query,
+            run_id,
+            parent_run_id,
+            tags,
+            metadata,
+            name,
+        );
     }
 
     /// Run on the retriever end (async).

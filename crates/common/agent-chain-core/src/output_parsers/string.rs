@@ -114,6 +114,17 @@ impl serde::Serialize for StrOutputParser {
     }
 }
 
+impl<'de> serde::Deserialize<'de> for StrOutputParser {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        // Accept any map/struct (including empty) and return a default instance
+        let _ = serde_json::Value::deserialize(deserializer)?;
+        Ok(Self::new())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

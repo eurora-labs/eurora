@@ -929,7 +929,7 @@ fn test_convert_typed_dict_to_openai_function() {
 fn test_convert_to_json_schema_from_json_schema() {
     let expected = expected_json_schema();
 
-    let actual = convert_to_json_schema(&expected_json_schema(), None);
+    let actual = convert_to_json_schema(&expected_json_schema(), None).unwrap();
 
     assert_eq!(actual, expected);
 }
@@ -939,7 +939,7 @@ fn test_convert_to_json_schema_from_json_schema() {
 fn test_convert_to_json_schema_from_anthropic_tool() {
     let expected = expected_json_schema();
 
-    let actual = convert_to_json_schema(&anthropic_tool(), None);
+    let actual = convert_to_json_schema(&anthropic_tool(), None).unwrap();
 
     assert_eq!(actual, expected);
 }
@@ -949,7 +949,7 @@ fn test_convert_to_json_schema_from_anthropic_tool() {
 fn test_convert_to_json_schema_from_bedrock_converse_tool() {
     let expected = expected_json_schema();
 
-    let actual = convert_to_json_schema(&bedrock_converse_tool(), None);
+    let actual = convert_to_json_schema(&bedrock_converse_tool(), None).unwrap();
 
     assert_eq!(actual, expected);
 }
@@ -959,7 +959,7 @@ fn test_convert_to_json_schema_from_bedrock_converse_tool() {
 fn test_convert_to_json_schema_from_openai_function() {
     let expected = expected_json_schema();
 
-    let actual = convert_to_json_schema(&expected_openai_function(), None);
+    let actual = convert_to_json_schema(&expected_openai_function(), None).unwrap();
 
     assert_eq!(actual, expected);
 }
@@ -1513,7 +1513,7 @@ fn test_convert_to_json_schema_comprehensive() {
     ];
 
     for (name, input) in test_inputs {
-        let actual = convert_to_json_schema(&input, None);
+        let actual = convert_to_json_schema(&input, None).unwrap();
         assert_eq!(actual, expected, "Failed for input type: {}", name);
     }
 }

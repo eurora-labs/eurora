@@ -144,7 +144,10 @@ impl BaseLanguageModel for FakeListLLM {
 
     fn identifying_params(&self) -> HashMap<String, Value> {
         let mut params = HashMap::new();
-        params.insert("_type".to_string(), Value::String("fake-list".to_string()));
+        params.insert(
+            "_type".to_string(),
+            Value::String(self.llm_type().to_string()),
+        );
         params.insert(
             "responses".to_string(),
             serde_json::to_value(&self.responses).unwrap_or_default(),
@@ -191,8 +194,8 @@ impl LLM for FakeListLLM {
 
 /// Error raised by FakeStreamingListLLM during streaming.
 #[derive(Debug, Clone, thiserror::Error)]
-#[error("FakeListLLM error on chunk {0}")]
-pub struct FakeListLLMError(pub usize);
+#[error("FakeListLLM error")]
+pub struct FakeListLLMError;
 
 /// Fake streaming list LLM for testing purposes.
 ///
@@ -256,11 +259,11 @@ impl Clone for FakeStreamingListLLM {
 #[async_trait]
 impl BaseLanguageModel for FakeStreamingListLLM {
     fn llm_type(&self) -> &str {
-        "fake-streaming-list"
+        "fake-list"
     }
 
     fn model_name(&self) -> &str {
-        "fake-streaming-list-llm"
+        "fake-list-llm"
     }
 
     fn config(&self) -> &LanguageModelConfig {
@@ -320,19 +323,19 @@ impl BaseLLM for FakeStreamingListLLM {
         // Create a stream that yields each character
         let stream = async_stream::stream! {
             for (i, c) in response.chars().enumerate() {
+                // Sleep if configured (Python sleeps before error check)
+                if let Some(duration) = sleep {
+                    tokio::time::sleep(duration).await;
+                }
+
                 // Check if we should error on this chunk
                 if let Some(error_chunk) = error_on_chunk
                     && i == error_chunk
                 {
                     yield Err(crate::error::Error::Other(
-                        format!("FakeListLLM error on chunk {}", i)
+                        "FakeListLLM error".to_string()
                     ));
                     return;
-                }
-
-                // Sleep if configured
-                if let Some(duration) = sleep {
-                    tokio::time::sleep(duration).await;
                 }
 
                 yield Ok(GenerationChunk::new(c.to_string()));
@@ -441,7 +444,8 @@ mod tests {
         let llm = FakeListLLM::new(vec!["Response".to_string()]);
         let params = llm.identifying_params();
 
-        assert_eq!(params.get("_type").unwrap(), "fake-list");
         assert!(params.contains_key("responses"));
+        assert!(params.contains_key("_type"));
+        assert_eq!(params["_type"], Value::String("fake-list".to_string()));
     }
 }

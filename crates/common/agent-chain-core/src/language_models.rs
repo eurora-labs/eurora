@@ -35,12 +35,12 @@
 //!     let messages = vec![
 //!         BaseMessage::Human(HumanMessage::builder().content("Hello, how are you?").build()),
 //!     ];
-//!     model.generate(messages, None, None).await
+//!     model.generate(messages, GenerateConfig::default()).await
 //! }
 //! ```
 
 mod base;
-mod chat_models;
+pub mod chat_models;
 mod fake;
 mod fake_chat_models;
 mod llms;
@@ -50,14 +50,17 @@ mod utils;
 // Re-export base types
 pub use base::{
     BaseLanguageModel, CustomGetTokenIds, LangSmithParams, LanguageModelConfig, LanguageModelInput,
-    LanguageModelOutput,
+    LanguageModelLike, LanguageModelOutput,
 };
 
 // Re-export chat model types
 pub use chat_models::{
     AIMessageChunkStream, BaseChatModel, ChatChunk, ChatGenerationStream, ChatModelConfig,
-    ChatStream, DisableStreaming, SimpleChatModel, ToolChoice, agenerate_from_stream,
-    collect_and_merge_stream, generate_from_stream,
+    ChatModelRunnable, ChatStream, DisableStreaming, GenerateConfig, SimpleChatModel,
+    StructuredOutputWithRaw, ToolChoice, ToolLike, agenerate_from_stream,
+    cleanup_llm_representation, collect_and_merge_stream, extract_tool_name_from_schema,
+    format_for_tracing, format_ls_structured_output, generate_from_stream,
+    generate_response_from_error,
 };
 
 // Re-export UsageMetadata from messages (where it's canonically defined)
@@ -65,8 +68,9 @@ pub use crate::messages::UsageMetadata;
 
 // Re-export LLM types
 pub use llms::{
-    BaseLLM, CacheValue, LLM, LLMConfig, RunIdInput, create_base_retry, get_prompts_from_cache,
-    get_run_ids_list, resolve_cache, save_llm, update_cache,
+    BaseLLM, CacheValue, LLM, LLMConfig, LLMGenerateConfig, RunIdInput, aget_prompts_from_cache,
+    aupdate_cache, create_base_retry, get_prompts_from_cache, get_run_ids_list, resolve_cache,
+    save_llm, update_cache,
 };
 
 // Re-export fake implementations for testing
@@ -84,7 +88,8 @@ pub use model_profile::{ModelProfile, ModelProfileRegistry};
 pub use utils::{
     DataBlockFilter as OpenAiDataBlockFilter, ParsedDataUri, convert_legacy_v0_content_block_to_v1,
     convert_openai_format_to_data_block, estimate_token_count, get_token_ids_default,
-    is_openai_data_block, parse_data_uri, update_message_content_to_blocks,
+    is_openai_data_block, normalize_messages, parse_data_uri, update_chunk_content_to_blocks,
+    update_message_content_to_blocks,
 };
 
 /// Type alias for a boxed language model input.

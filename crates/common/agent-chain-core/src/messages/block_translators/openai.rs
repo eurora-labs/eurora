@@ -553,26 +553,27 @@ fn explode_reasoning(block: &Value) -> Vec<Value> {
     // Clone the summary array to avoid borrow issues
     let summary_clone = block.get("summary").and_then(|v| v.as_array()).cloned();
 
-    if summary_clone.is_none() || summary_clone.as_ref().map(|s| s.is_empty()).unwrap_or(true) {
-        // [{'id': 'rs_...', 'summary': [], 'type': 'reasoning', 'index': 0}]
-        let mut result = json!({});
-        if let Some(obj) = block.as_object() {
-            for (k, v) in obj {
-                if k != "summary" {
-                    result[k] = v.clone();
+    let summary = match summary_clone {
+        Some(ref s) if !s.is_empty() => s,
+        _ => {
+            // [{'id': 'rs_...', 'summary': [], 'type': 'reasoning', 'index': 0}]
+            let mut result = json!({});
+            if let Some(obj) = block.as_object() {
+                for (k, v) in obj {
+                    if k != "summary" {
+                        result[k] = v.clone();
+                    }
                 }
             }
+
+            if let Some(index) = result.get("index").and_then(|v| v.as_i64()) {
+                let meaningful_idx = format!("{}_0", index);
+                result["index"] = json!(format!("lc_rs_{}", hex_encode(meaningful_idx.as_bytes())));
+            }
+
+            return vec![result];
         }
-
-        if let Some(index) = result.get("index").and_then(|v| v.as_i64()) {
-            let meaningful_idx = format!("{}_0", index);
-            result["index"] = json!(format!("lc_rs_{}", hex_encode(meaningful_idx.as_bytes())));
-        }
-
-        return vec![result];
-    }
-
-    let summary = summary_clone.unwrap();
+    };
 
     // Common part for every exploded line, except 'summary'
     let mut common = json!({});
@@ -755,20 +756,20 @@ fn convert_from_v03_format(
                 reasoning_with_type["type"] = json!("reasoning");
             }
             buckets
-                .get_mut("reasoning")
-                .unwrap()
+                .entry("reasoning")
+                .or_default()
                 .push(reasoning_with_type);
         } else {
             buckets
-                .get_mut("reasoning")
-                .unwrap()
+                .entry("reasoning")
+                .or_default()
                 .push(reasoning.clone());
         }
     }
 
     // Refusal
     if let Some(refusal) = context.additional_kwargs.get("refusal") {
-        buckets.get_mut("refusal").unwrap().push(json!({
+        buckets.entry("refusal").or_default().push(json!({
             "type": "refusal",
             "refusal": refusal
         }));
@@ -785,7 +786,7 @@ fn convert_from_v03_format(
             {
                 block_copy["id"] = json!(id);
             }
-            buckets.get_mut("text").unwrap().push(block_copy);
+            buckets.entry("text").or_default().push(block_copy);
         } else {
             unknown_blocks.push(block.clone());
         }
@@ -818,8 +819,8 @@ fn convert_from_v03_format(
             }
 
             buckets
-                .get_mut("function_call")
-                .unwrap()
+                .entry("function_call")
+                .or_default()
                 .push(function_call);
         }
     } else {
@@ -845,8 +846,8 @@ fn convert_from_v03_format(
             }
 
             buckets
-                .get_mut("function_call")
-                .unwrap()
+                .entry("function_call")
+                .or_default()
                 .push(function_call);
         }
     }
@@ -860,7 +861,7 @@ fn convert_from_v03_format(
                 && let Some(key) = obj.get("type").and_then(|t| t.as_str())
                 && buckets.contains_key(key)
             {
-                buckets.get_mut(key).unwrap().push(block.clone());
+                buckets.entry(key).or_default().push(block.clone());
             } else {
                 unknown_blocks.push(block.clone());
             }
@@ -975,8 +976,9 @@ fn convert_to_v1_from_responses(
                     && context
                         .map(|c| c.chunk_position.as_deref() != Some("last"))
                         .unwrap_or(true)
+                    && let Some(ctx) = context
                 {
-                    let chunk = &context.unwrap().tool_call_chunks[0];
+                    let chunk = &ctx.tool_call_chunks[0];
                     let mut tc = chunk.clone();
                     tc["type"] = json!("tool_call_chunk");
                     Some(tc)

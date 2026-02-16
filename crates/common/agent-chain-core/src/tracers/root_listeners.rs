@@ -1,7 +1,7 @@
 //! Tracers that call listeners.
 //!
 //! This module provides tracers that call listener functions on run start, end, and error.
-//! Mirrors `langchain_core.tracers.root_listeners`.
+//! Mirrors langchain_core.tracers.root_listeners.
 
 use std::collections::HashMap;
 use std::fmt;
@@ -9,26 +9,34 @@ use std::fmt;
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::callbacks::base::{
+    BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
+    RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
+};
+use crate::runnables::RunnableConfig;
 use crate::tracers::base::{AsyncBaseTracer, BaseTracer};
 use crate::tracers::core::{SchemaFormat, TracerCore, TracerCoreConfig};
 use crate::tracers::schemas::Run;
 
-/// Type alias for a synchronous listener function.
-pub type Listener = Box<dyn Fn(&Run) + Send + Sync>;
+/// Type alias for a synchronous listener function that receives a run and config.
+pub type Listener = Box<dyn Fn(&Run, &RunnableConfig) + Send + Sync>;
 
-/// Type alias for an asynchronous listener function.
-pub type AsyncListener = Box<dyn Fn(&Run) -> futures::future::BoxFuture<'static, ()> + Send + Sync>;
+/// Type alias for an asynchronous listener function that receives a run and config.
+pub type AsyncListener =
+    Box<dyn Fn(&Run, &RunnableConfig) -> futures::future::BoxFuture<'static, ()> + Send + Sync>;
 
 /// Tracer that calls listeners on run start, end, and error.
 pub struct RootListenersTracer {
     /// The tracer configuration.
-    config: TracerCoreConfig,
+    tracer_config: TracerCoreConfig,
     /// The run map.
     run_map: HashMap<String, Run>,
     /// The order map.
     order_map: HashMap<Uuid, (Uuid, String)>,
     /// The root run ID.
     root_id: Option<Uuid>,
+    /// The runnable config.
+    config: RunnableConfig,
     /// Listener called on run start.
     #[allow(dead_code)]
     on_start: Option<Listener>,
@@ -43,7 +51,7 @@ pub struct RootListenersTracer {
 impl fmt::Debug for RootListenersTracer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RootListenersTracer")
-            .field("config", &self.config)
+            .field("tracer_config", &self.tracer_config)
             .field("run_map", &self.run_map)
             .field("order_map", &self.order_map)
             .field("root_id", &self.root_id)
@@ -56,44 +64,25 @@ impl fmt::Debug for RootListenersTracer {
 
 impl RootListenersTracer {
     /// Create a new RootListenersTracer.
-    ///
-    /// # Arguments
-    ///
-    /// * `on_start` - Listener to call on run start.
-    /// * `on_end` - Listener to call on run end.
-    /// * `on_error` - Listener to call on run error.
     pub fn new(
+        config: RunnableConfig,
         on_start: Option<Listener>,
         on_end: Option<Listener>,
         on_error: Option<Listener>,
     ) -> Self {
         Self {
-            config: TracerCoreConfig {
+            tracer_config: TracerCoreConfig {
                 schema_format: SchemaFormat::OriginalChat,
                 log_missing_parent: false,
             },
             run_map: HashMap::new(),
             order_map: HashMap::new(),
             root_id: None,
+            config,
             on_start,
             on_end,
             on_error,
         }
-    }
-
-    /// Create a tracer with only an on_start listener.
-    pub fn with_on_start(on_start: impl Fn(&Run) + Send + Sync + 'static) -> Self {
-        Self::new(Some(Box::new(on_start)), None, None)
-    }
-
-    /// Create a tracer with only an on_end listener.
-    pub fn with_on_end(on_end: impl Fn(&Run) + Send + Sync + 'static) -> Self {
-        Self::new(None, Some(Box::new(on_end)), None)
-    }
-
-    /// Create a tracer with only an on_error listener.
-    pub fn with_on_error(on_error: impl Fn(&Run) + Send + Sync + 'static) -> Self {
-        Self::new(None, None, Some(Box::new(on_error)))
     }
 
     /// Get the root run ID.
@@ -104,11 +93,11 @@ impl RootListenersTracer {
 
 impl TracerCore for RootListenersTracer {
     fn config(&self) -> &TracerCoreConfig {
-        &self.config
+        &self.tracer_config
     }
 
     fn config_mut(&mut self) -> &mut TracerCoreConfig {
-        &mut self.config
+        &mut self.tracer_config
     }
 
     fn run_map(&self) -> &HashMap<String, Run> {
@@ -137,7 +126,7 @@ impl TracerCore for RootListenersTracer {
         self.root_id = Some(run.id);
 
         if let Some(ref on_start) = self.on_start {
-            on_start(run);
+            on_start(run, &self.config);
         }
     }
 
@@ -148,10 +137,10 @@ impl TracerCore for RootListenersTracer {
 
         if run.error.is_none() {
             if let Some(ref on_end) = self.on_end {
-                on_end(run);
+                on_end(run, &self.config);
             }
         } else if let Some(ref on_error) = self.on_error {
-            on_error(run);
+            on_error(run, &self.config);
         }
     }
 }
@@ -163,16 +152,31 @@ impl BaseTracer for RootListenersTracer {
     }
 }
 
+impl LLMManagerMixin for RootListenersTracer {}
+impl ChainManagerMixin for RootListenersTracer {}
+impl ToolManagerMixin for RootListenersTracer {}
+impl RetrieverManagerMixin for RootListenersTracer {}
+impl CallbackManagerMixin for RootListenersTracer {}
+impl RunManagerMixin for RootListenersTracer {}
+
+impl BaseCallbackHandler for RootListenersTracer {
+    fn name(&self) -> &str {
+        "RootListenersTracer"
+    }
+}
+
 /// Async tracer that calls async listeners on run start, end, and error.
 pub struct AsyncRootListenersTracer {
     /// The tracer configuration.
-    config: TracerCoreConfig,
+    tracer_config: TracerCoreConfig,
     /// The run map.
     run_map: HashMap<String, Run>,
     /// The order map.
     order_map: HashMap<Uuid, (Uuid, String)>,
     /// The root run ID.
     root_id: Option<Uuid>,
+    /// The runnable config.
+    config: RunnableConfig,
     /// Async listener called on run start.
     on_start: Option<AsyncListener>,
     /// Async listener called on run end.
@@ -184,7 +188,7 @@ pub struct AsyncRootListenersTracer {
 impl fmt::Debug for AsyncRootListenersTracer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AsyncRootListenersTracer")
-            .field("config", &self.config)
+            .field("tracer_config", &self.tracer_config)
             .field("run_map", &self.run_map)
             .field("order_map", &self.order_map)
             .field("root_id", &self.root_id)
@@ -197,25 +201,21 @@ impl fmt::Debug for AsyncRootListenersTracer {
 
 impl AsyncRootListenersTracer {
     /// Create a new AsyncRootListenersTracer.
-    ///
-    /// # Arguments
-    ///
-    /// * `on_start` - Async listener to call on run start.
-    /// * `on_end` - Async listener to call on run end.
-    /// * `on_error` - Async listener to call on run error.
     pub fn new(
+        config: RunnableConfig,
         on_start: Option<AsyncListener>,
         on_end: Option<AsyncListener>,
         on_error: Option<AsyncListener>,
     ) -> Self {
         Self {
-            config: TracerCoreConfig {
+            tracer_config: TracerCoreConfig {
                 schema_format: SchemaFormat::OriginalChat,
                 log_missing_parent: false,
             },
             run_map: HashMap::new(),
             order_map: HashMap::new(),
             root_id: None,
+            config,
             on_start,
             on_end,
             on_error,
@@ -230,11 +230,11 @@ impl AsyncRootListenersTracer {
 
 impl TracerCore for AsyncRootListenersTracer {
     fn config(&self) -> &TracerCoreConfig {
-        &self.config
+        &self.tracer_config
     }
 
     fn config_mut(&mut self) -> &mut TracerCoreConfig {
-        &mut self.config
+        &mut self.tracer_config
     }
 
     fn run_map(&self) -> &HashMap<String, Run> {
@@ -271,7 +271,7 @@ impl AsyncBaseTracer for AsyncRootListenersTracer {
         self.root_id = Some(run.id);
 
         if let Some(ref on_start) = self.on_start {
-            on_start(run).await;
+            on_start(run, &self.config).await;
         }
     }
 
@@ -282,11 +282,24 @@ impl AsyncBaseTracer for AsyncRootListenersTracer {
 
         if run.error.is_none() {
             if let Some(ref on_end) = self.on_end {
-                on_end(run).await;
+                on_end(run, &self.config).await;
             }
         } else if let Some(ref on_error) = self.on_error {
-            on_error(run).await;
+            on_error(run, &self.config).await;
         }
+    }
+}
+
+impl LLMManagerMixin for AsyncRootListenersTracer {}
+impl ChainManagerMixin for AsyncRootListenersTracer {}
+impl ToolManagerMixin for AsyncRootListenersTracer {}
+impl RetrieverManagerMixin for AsyncRootListenersTracer {}
+impl CallbackManagerMixin for AsyncRootListenersTracer {}
+impl RunManagerMixin for AsyncRootListenersTracer {}
+
+impl BaseCallbackHandler for AsyncRootListenersTracer {
+    fn name(&self) -> &str {
+        "AsyncRootListenersTracer"
     }
 }
 
@@ -297,7 +310,7 @@ mod tests {
 
     #[test]
     fn test_root_listeners_tracer_new() {
-        let tracer = RootListenersTracer::new(None, None, None);
+        let tracer = RootListenersTracer::new(RunnableConfig::default(), None, None, None);
         assert!(tracer.root_id().is_none());
     }
 
@@ -306,9 +319,12 @@ mod tests {
         let called = Arc::new(Mutex::new(false));
         let called_clone = called.clone();
 
-        let mut tracer = RootListenersTracer::with_on_start(move |_run| {
+        let on_start: Listener = Box::new(move |_run, _config| {
             *called_clone.lock().unwrap() = true;
         });
+
+        let mut tracer =
+            RootListenersTracer::new(RunnableConfig::default(), Some(on_start), None, None);
 
         let run = Run::new(
             Uuid::new_v4(),
@@ -329,9 +345,12 @@ mod tests {
         let called = Arc::new(Mutex::new(false));
         let called_clone = called.clone();
 
-        let mut tracer = RootListenersTracer::with_on_end(move |_run| {
+        let on_end: Listener = Box::new(move |_run, _config| {
             *called_clone.lock().unwrap() = true;
         });
+
+        let mut tracer =
+            RootListenersTracer::new(RunnableConfig::default(), None, Some(on_end), None);
 
         let mut run = Run::new(
             Uuid::new_v4(),
@@ -342,10 +361,7 @@ mod tests {
         );
         run.set_end();
 
-        // Set root_id first
         tracer.on_run_create(&run);
-
-        // Then call on_run_update
         tracer.on_run_update(&run);
 
         assert!(*called.lock().unwrap());
@@ -356,9 +372,12 @@ mod tests {
         let called = Arc::new(Mutex::new(false));
         let called_clone = called.clone();
 
-        let mut tracer = RootListenersTracer::with_on_error(move |_run| {
+        let on_error: Listener = Box::new(move |_run, _config| {
             *called_clone.lock().unwrap() = true;
         });
+
+        let mut tracer =
+            RootListenersTracer::new(RunnableConfig::default(), None, None, Some(on_error));
 
         let mut run = Run::new(
             Uuid::new_v4(),
@@ -369,10 +388,7 @@ mod tests {
         );
         run.set_error("Test error");
 
-        // Set root_id first
         tracer.on_run_create(&run);
-
-        // Then call on_run_update with error
         tracer.on_run_update(&run);
 
         assert!(*called.lock().unwrap());
@@ -383,9 +399,12 @@ mod tests {
         let call_count = Arc::new(Mutex::new(0));
         let call_count_clone = call_count.clone();
 
-        let mut tracer = RootListenersTracer::with_on_start(move |_run| {
+        let on_start: Listener = Box::new(move |_run, _config| {
             *call_count_clone.lock().unwrap() += 1;
         });
+
+        let mut tracer =
+            RootListenersTracer::new(RunnableConfig::default(), Some(on_start), None, None);
 
         let run1 = Run::new(
             Uuid::new_v4(),
@@ -405,7 +424,6 @@ mod tests {
         tracer.on_run_create(&run1);
         tracer.on_run_create(&run2);
 
-        // Should only be called once for the root run
         assert_eq!(*call_count.lock().unwrap(), 1);
     }
 
@@ -414,14 +432,15 @@ mod tests {
         let called = Arc::new(Mutex::new(false));
         let called_clone = called.clone();
 
-        let on_start: AsyncListener = Box::new(move |_run: &Run| {
+        let on_start: AsyncListener = Box::new(move |_run: &Run, _config: &RunnableConfig| {
             let called = called_clone.clone();
             Box::pin(async move {
                 *called.lock().unwrap() = true;
             })
         });
 
-        let mut tracer = AsyncRootListenersTracer::new(Some(on_start), None, None);
+        let mut tracer =
+            AsyncRootListenersTracer::new(RunnableConfig::default(), Some(on_start), None, None);
 
         let run = Run::new(
             Uuid::new_v4(),

@@ -7,7 +7,12 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+use async_trait::async_trait;
+
 use crate::error::{Error, Result};
+use crate::prompt_values::StringPromptValue;
+use crate::runnables::base::Runnable;
+use crate::runnables::config::{RunnableConfig, ensure_config};
 
 use super::base::{BasePromptTemplate, FormatOutputType};
 use super::string::{PromptTemplateFormat, format_template, get_template_variables};
@@ -70,6 +75,10 @@ pub struct ImagePromptTemplate {
     /// The format of the prompt template.
     #[serde(default)]
     pub template_format: PromptTemplateFormat,
+
+    /// Partial variables that are pre-filled.
+    #[serde(default)]
+    pub partial_variables: HashMap<String, String>,
 }
 
 impl ImagePromptTemplate {
@@ -103,6 +112,7 @@ impl ImagePromptTemplate {
             template,
             input_variables,
             template_format: PromptTemplateFormat::FString,
+            partial_variables: HashMap::new(),
         })
     }
 
@@ -125,6 +135,9 @@ impl ImagePromptTemplate {
 
     /// Format the template into an ImageURL.
     pub fn format_image(&self, kwargs: &HashMap<String, String>) -> Result<ImageURL> {
+        let mut merged_kwargs = self.partial_variables.clone();
+        merged_kwargs.extend(kwargs.iter().map(|(k, v)| (k.clone(), v.clone())));
+
         let mut formatted = HashMap::new();
 
         for (key, value) in &self.template {
@@ -136,19 +149,19 @@ impl ImagePromptTemplate {
                 ));
             }
 
-            let formatted_value = format_template(value, self.template_format, kwargs)?;
+            let formatted_value = format_template(value, self.template_format, &merged_kwargs)?;
             formatted.insert(key.clone(), formatted_value);
         }
 
         // Get or apply URL from kwargs
-        let url = kwargs
+        let url = merged_kwargs
             .get("url")
             .cloned()
             .or_else(|| formatted.get("url").cloned())
             .ok_or_else(|| Error::InvalidConfig("Must provide url.".to_string()))?;
 
         // Get detail if present
-        let detail = kwargs
+        let detail = merged_kwargs
             .get("detail")
             .cloned()
             .or_else(|| formatted.get("detail").cloned());
@@ -175,18 +188,14 @@ impl BasePromptTemplate for ImagePromptTemplate {
             .cloned()
             .collect();
 
-        // Apply partials to template
-        let mut new_template = HashMap::new();
-        for (key, value) in &self.template {
-            let formatted = format_template(value, self.template_format, &kwargs)
-                .unwrap_or_else(|_| value.clone());
-            new_template.insert(key.clone(), formatted);
-        }
+        let mut new_partial = self.partial_variables.clone();
+        new_partial.extend(kwargs);
 
         Ok(Box::new(Self {
-            template: new_template,
+            template: self.template.clone(),
             input_variables: new_vars,
             template_format: self.template_format,
+            partial_variables: new_partial,
         }))
     }
 
@@ -201,6 +210,31 @@ impl BasePromptTemplate for ImagePromptTemplate {
             "input_variables": self.input_variables,
             "template_format": self.template_format,
         })
+    }
+}
+
+#[async_trait]
+impl Runnable for ImagePromptTemplate {
+    type Input = HashMap<String, String>;
+    type Output = StringPromptValue;
+
+    fn name(&self) -> Option<String> {
+        Some("ImagePromptTemplate".to_string())
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let _config = ensure_config(config);
+        BasePromptTemplate::validate_input(self, &input)?;
+        let text = BasePromptTemplate::format(self, &input)?;
+        Ok(StringPromptValue::new(text))
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        self.invoke(input, config)
     }
 }
 
@@ -256,6 +290,7 @@ mod tests {
             template,
             input_variables: Vec::new(),
             template_format: PromptTemplateFormat::FString,
+            partial_variables: HashMap::new(),
         };
 
         let result = prompt.format_image(&HashMap::new());

@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity, clippy::too_many_arguments)]
 //! Agent Chain Core - A Rust implementation of LangChain core library.
 //!
 //! This crate provides:
@@ -23,16 +24,21 @@
 //! - `default`: Includes all providers
 //! - `specta`: Specta derive support
 
+pub mod agents;
 pub mod api;
 pub mod caches;
 pub mod callbacks;
 pub mod chat_history;
 pub mod chat_loaders;
 pub mod chat_sessions;
+pub mod document_loaders;
 pub mod documents;
+pub mod embeddings;
 pub mod env;
 pub mod error;
+pub mod example_selectors;
 pub mod globals;
+pub mod indexing;
 pub mod language_models;
 pub mod load;
 pub mod messages;
@@ -46,9 +52,11 @@ pub mod runnables;
 pub mod stores;
 pub mod structured_query;
 pub mod sys_info;
+pub mod text_splitters;
 pub mod tools;
 pub mod tracers;
 pub mod utils;
+pub mod vectorstores;
 
 // Keep chat_models as a backward-compatible re-export
 pub mod chat_models {
@@ -149,7 +157,7 @@ pub use chat_loaders::BaseChatLoader;
 pub use caches::{BaseCache, CacheReturnValue, InMemoryCache};
 
 // Re-export global functions
-pub use globals::{get_llm_cache, set_llm_cache};
+pub use globals::{get_debug, get_llm_cache, get_verbose, set_debug, set_llm_cache, set_verbose};
 
 // Re-export output parser types
 pub use output_parsers::{
@@ -170,7 +178,7 @@ pub use callbacks::{
     AsyncCallbackHandler, AsyncCallbackManager, AsyncCallbackManagerForChainRun,
     AsyncCallbackManagerForLLMRun, BaseCallbackHandler, BaseCallbackManager, CallbackManager,
     CallbackManagerForChainRun, CallbackManagerForLLMRun, Callbacks, StdOutCallbackHandler,
-    StreamingStdOutCallbackHandler, UsageMetadataCallbackHandler, add_usage,
+    StreamingStdOutCallbackHandler, UsageMetadataCallbackHandler,
 };
 
 // Re-export prompt types
@@ -206,17 +214,25 @@ pub use tracers::{
 // Re-export rate limiter types
 pub use rate_limiters::{BaseRateLimiter, InMemoryRateLimiter, InMemoryRateLimiterConfig};
 
+// Re-export agent types
+pub use agents::{AgentAction, AgentActionMessageLog, AgentFinish, AgentStep, ToolInput};
+
+// Re-export document loader types
+pub use document_loaders::{
+    BaseBlobParser, BaseLoader as BaseDocumentLoader, BlobLoader, PathLike,
+};
+
 // Re-export document types
 pub use documents::{
     BaseDocumentCompressor, BaseDocumentTransformer, BaseMedia, Blob, BlobBuilder, BlobData,
-    Document, FilterTransformer, FunctionTransformer,
+    Document,
 };
 
+// Re-export text splitter types
+pub use text_splitters::TextSplitter;
+
 // Re-export retriever types
-pub use retrievers::{
-    BaseRetriever, DynRetriever, FilterRetriever, LangSmithRetrieverParams, RetrieverInput,
-    RetrieverOutput, SimpleRetriever,
-};
+pub use retrievers::{BaseRetriever, LangSmithRetrieverParams, RetrieverInput, RetrieverOutput};
 
 // Re-export store types
 pub use stores::{
@@ -245,3 +261,19 @@ pub use sys_info::{PackageInfo, SystemInfo, get_sys_info, get_sys_info_map, prin
 
 // Re-export async_trait for use in generated code
 pub use async_trait::async_trait;
+
+// Re-export embedding types
+pub use embeddings::{DeterministicFakeEmbedding, Embeddings, FakeEmbeddings};
+
+// Re-export vector store types
+pub use vectorstores::{
+    InMemoryVectorStore, SearchType, VectorStore, VectorStoreFactory, VectorStoreRetriever,
+    VectorStoreRetrieverConfig, VectorStoreRetrieverExt, cosine_similarity,
+    maximal_marginal_relevance,
+};
+
+// Re-export example selector types
+pub use example_selectors::{
+    BaseExampleSelector, LengthBasedExampleSelector, MaxMarginalRelevanceExampleSelector,
+    SemanticSimilarityExampleSelector, sorted_values,
+};

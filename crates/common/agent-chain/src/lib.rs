@@ -28,7 +28,7 @@
 //!
 //! // Use the model
 //! let messages = vec![HumanMessage::builder().content("Hello!").build().into()];
-//! let response = model.generate(messages, None).await?;
+//! let response = model.generate(messages, GenerateConfig::default()).await?;
 //! ```
 //!
 //! # Provider Support

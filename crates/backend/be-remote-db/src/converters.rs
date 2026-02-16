@@ -95,7 +95,7 @@ impl From<Message> for ProtoBaseMessage {
                 }
             }
             MessageType::Ai => {
-                let content = json_to_string_content(&msg.content);
+                let content = json_to_proto_message_content(&msg.content);
                 let tool_calls = msg
                     .tool_calls
                     .as_ref()
@@ -103,7 +103,7 @@ impl From<Message> for ProtoBaseMessage {
                     .unwrap_or_default();
                 ProtoBaseMessage {
                     message: Some(proto_base_message::Message::Ai(ProtoAiMessage {
-                        content,
+                        content: Some(content),
                         id,
                         name: None,
                         tool_calls,
@@ -115,11 +115,11 @@ impl From<Message> for ProtoBaseMessage {
                 }
             }
             MessageType::Tool => {
-                let content = json_to_string_content(&msg.content);
+                let content = json_to_proto_message_content(&msg.content);
                 let tool_call_id = msg.tool_call_id.unwrap_or_default();
                 ProtoBaseMessage {
                     message: Some(proto_base_message::Message::Tool(ProtoToolMessage {
-                        content,
+                        content: Some(content),
                         tool_call_id,
                         id,
                         name: None,
@@ -177,14 +177,6 @@ fn json_to_proto_message_content(content: &serde_json::Value) -> ProtoMessageCon
     };
     ProtoMessageContent {
         content: Some(proto_message_content::Content::Text(text)),
-    }
-}
-
-/// Convert JSON content to a simple string
-fn json_to_string_content(content: &serde_json::Value) -> String {
-    match content {
-        serde_json::Value::String(s) => s.clone(),
-        _ => content.to_string(),
     }
 }
 

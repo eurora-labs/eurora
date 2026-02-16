@@ -44,13 +44,13 @@ mod ai;
 mod base;
 pub mod block_translators;
 mod chat;
-mod content;
+pub mod content;
 mod function;
 mod human;
 mod modifier;
 mod system;
 mod tool;
-mod utils;
+pub(crate) mod utils;
 
 // Re-export from ai
 pub use ai::{
@@ -141,7 +141,8 @@ pub use tool::{
 pub use utils::{
     AnyMessage, CountTokensConfig, ExcludeToolCalls, MessageLikeRepresentation, TextFormat,
     TrimMessagesConfig, TrimStrategy, convert_to_message, convert_to_messages,
-    convert_to_openai_messages, count_tokens_approximately, filter_messages, get_buffer_string,
-    merge_message_runs, message_chunk_to_message, message_from_dict, message_to_dict,
-    messages_from_dict, messages_to_dict, trim_messages,
+    convert_to_openai_messages, count_tokens_approximately, filter_messages,
+    filter_messages_runnable, get_buffer_string, merge_message_runs, merge_message_runs_runnable,
+    message_chunk_to_message, message_from_dict, message_to_dict, messages_from_dict,
+    messages_to_dict, trim_messages, trim_messages_runnable,
 };

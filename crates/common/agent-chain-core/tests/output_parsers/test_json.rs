@@ -4,7 +4,7 @@
 
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::output_parsers::{
-    BaseCumulativeTransformOutputParser, BaseOutputParser, SimpleJsonOutputParser,
+    BaseOutputParser, BaseTransformOutputParser, SimpleJsonOutputParser,
 };
 use agent_chain_core::utils::json::{
     parse_and_check_json_markdown, parse_json_markdown, parse_partial_json,
@@ -424,7 +424,7 @@ async fn test_partial_text_json_output_parser() {
     let input_stream = futures::stream::iter(tokens.into_iter().map(BaseMessage::from));
 
     let results: Vec<Value> = parser
-        .transform(Box::pin(input_stream), None)
+        .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
         .collect()
         .await;
@@ -452,7 +452,7 @@ async fn test_partial_text_json_output_parser_diff() {
     let input_stream = futures::stream::iter(tokens.into_iter().map(BaseMessage::from));
 
     let results: Vec<Value> = parser
-        .transform(Box::pin(input_stream), None)
+        .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
         .collect()
         .await;
@@ -480,7 +480,7 @@ async fn test_partial_text_json_output_parser_async() {
     let input_stream = futures::stream::iter(tokens.into_iter().map(BaseMessage::from));
 
     let results: Vec<Value> = parser
-        .atransform(Box::pin(input_stream), None)
+        .atransform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
         .collect()
         .await;
@@ -502,7 +502,7 @@ async fn test_partial_text_json_output_parser_diff_async() {
     let input_stream = futures::stream::iter(tokens.into_iter().map(BaseMessage::from));
 
     let results: Vec<Value> = parser
-        .atransform(Box::pin(input_stream), None)
+        .atransform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
         .collect()
         .await;
@@ -564,7 +564,7 @@ async fn test_partial_text_json_output_parser_with_json_code_block() {
     let input_stream = futures::stream::iter(tokens.into_iter().map(BaseMessage::from));
 
     let results: Vec<Value> = parser
-        .transform(Box::pin(input_stream), None)
+        .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
         .collect()
         .await;

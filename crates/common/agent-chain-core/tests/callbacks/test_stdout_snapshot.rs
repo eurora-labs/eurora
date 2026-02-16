@@ -97,18 +97,18 @@ fn test_default_flags() {
 
 /// Ported from `test_uses_name_from_kwargs`.
 ///
-/// In Python, name is passed as a kwarg. In Rust, it's passed via metadata.
+/// In Python, name is passed as a kwarg. In Rust, it is passed via the name parameter.
 #[test]
 fn test_chain_start_uses_name_from_kwargs() {
     let (handler, writer) = create_test_handler();
-    let metadata = HashMap::from([("name".to_string(), serde_json::json!("MyChain"))]);
     handler.on_chain_start(
         &HashMap::new(),
         &HashMap::new(),
         Uuid::new_v4(),
         None,
         None,
-        Some(&metadata),
+        None,
+        Some("MyChain"),
     );
     let output = writer.output();
     assert!(
@@ -127,6 +127,7 @@ fn test_chain_start_uses_name_from_serialized() {
         &serialized,
         &HashMap::new(),
         Uuid::new_v4(),
+        None,
         None,
         None,
         None,
@@ -154,6 +155,7 @@ fn test_chain_start_uses_id_from_serialized_as_fallback() {
         None,
         None,
         None,
+        None,
     );
     let output = writer.output();
     assert!(
@@ -174,6 +176,7 @@ fn test_chain_start_uses_unknown_when_no_name() {
         None,
         None,
         None,
+        None,
     );
     let output = writer.output();
     assert!(
@@ -188,14 +191,14 @@ fn test_chain_start_uses_unknown_when_no_name() {
 fn test_chain_start_name_kwarg_takes_precedence_over_serialized() {
     let (handler, writer) = create_test_handler();
     let serialized = HashMap::from([("name".to_string(), serde_json::json!("Serialized"))]);
-    let metadata = HashMap::from([("name".to_string(), serde_json::json!("KwargName"))]);
     handler.on_chain_start(
         &serialized,
         &HashMap::new(),
         Uuid::new_v4(),
         None,
         None,
-        Some(&metadata),
+        None,
+        Some("KwargName"),
     );
     let output = writer.output();
     assert!(
@@ -219,6 +222,7 @@ fn test_chain_start_output_has_bold_ansi_codes() {
         &serialized,
         &HashMap::new(),
         Uuid::new_v4(),
+        None,
         None,
         None,
         None,
@@ -246,6 +250,7 @@ fn test_chain_start_serialized_none_uses_unknown() {
         &HashMap::new(),
         &HashMap::new(),
         Uuid::new_v4(),
+        None,
         None,
         None,
         None,

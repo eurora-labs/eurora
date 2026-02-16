@@ -405,7 +405,11 @@ fn test_callback_manager_on_chain_start() {
     let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
-    let run_manager = manager.on_chain_start(&HashMap::new(), &HashMap::new(), None);
+    let run_manager = manager
+        .on_chain_start()
+        .serialized(&HashMap::new())
+        .inputs(&HashMap::new())
+        .call();
 
     assert!(!run_manager.run_id().is_nil());
 }
@@ -429,7 +433,11 @@ fn test_callback_manager_on_retriever_start() {
     let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
-    let run_manager = manager.on_retriever_start(&HashMap::new(), "search query", None);
+    let run_manager = manager
+        .on_retriever_start()
+        .serialized(&HashMap::new())
+        .query("search query")
+        .call();
 
     assert!(!run_manager.run_id().is_nil());
 }
@@ -466,7 +474,7 @@ async fn test_async_callback_manager_on_chain_start() {
     manager.add_handler(handler, true);
 
     let run_manager = manager
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None)
+        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
         .await;
 
     assert!(!run_manager.run_id().is_nil());
@@ -503,7 +511,7 @@ async fn test_async_parent_run_manager_get_child() {
     manager.add_handler(handler, true);
 
     let chain_run = manager
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None)
+        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
         .await;
 
     let child = chain_run.get_child(None);

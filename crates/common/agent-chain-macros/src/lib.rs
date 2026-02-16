@@ -117,7 +117,12 @@ pub fn tool(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     None
                 }
 
-                fn run(&self, input: ::agent_chain::_core::tools::ToolInput, _config: Option<::agent_chain::_core::runnables::RunnableConfig>) -> ::agent_chain::_core::error::Result<::agent_chain::_core::tools::ToolOutput> {
+                fn tool_run(
+                    &self,
+                    input: ::agent_chain::_core::tools::ToolInput,
+                    _run_manager: Option<&::agent_chain::_core::callbacks::manager::CallbackManagerForToolRun>,
+                    _config: &::agent_chain::_core::runnables::RunnableConfig,
+                ) -> ::agent_chain::_core::error::Result<::agent_chain::_core::tools::ToolOutput> {
                     // For generated tools, we always use async version
                     Err(::agent_chain::_core::error::Error::NotImplemented("Use async invoke instead".into()))
                 }
@@ -142,7 +147,7 @@ pub fn tool(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     }
                 }
 
-                async fn invoke(&self, tool_call: ::agent_chain::_core::messages::ToolCall) -> ::agent_chain::_core::messages::BaseMessage {
+                async fn invoke_tool_call(&self, tool_call: ::agent_chain::_core::messages::ToolCall) -> ::agent_chain::_core::messages::BaseMessage {
                     let args = &tool_call.args;
 
                     #(

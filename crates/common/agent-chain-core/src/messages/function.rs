@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
 use super::base::merge_content;
+use super::content::MessageContent;
 
 /// A function message in the conversation.
 ///
@@ -28,7 +29,7 @@ use super::base::merge_content;
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct FunctionMessage {
     /// The message content (result of the function)
-    pub content: String,
+    pub content: MessageContent,
     /// The name of the function that was executed
     pub name: String,
     /// Optional unique identifier
@@ -64,7 +65,7 @@ impl FunctionMessage {
     /// Create a new function message.
     #[builder]
     pub fn new(
-        content: impl Into<String>,
+        content: impl Into<MessageContent>,
         name: impl Into<String>,
         id: Option<String>,
         #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
@@ -90,8 +91,8 @@ impl FunctionMessage {
     }
 
     /// Get the text content of the message.
-    pub fn text(&self) -> &str {
-        &self.content
+    pub fn text(&self) -> String {
+        self.content.as_text()
     }
 }
 
@@ -102,7 +103,7 @@ impl FunctionMessage {
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct FunctionMessageChunk {
     /// The message content (may be partial during streaming)
-    pub content: String,
+    pub content: MessageContent,
     /// The name of the function that was executed
     pub name: String,
     /// Optional unique identifier
@@ -138,7 +139,7 @@ impl FunctionMessageChunk {
     /// Create a new function message chunk.
     #[builder]
     pub fn new(
-        content: impl Into<String>,
+        content: impl Into<MessageContent>,
         name: impl Into<String>,
         id: Option<String>,
         #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
@@ -159,8 +160,8 @@ impl FunctionMessageChunk {
     }
 
     /// Get the text content of the message.
-    pub fn text(&self) -> &str {
-        &self.content
+    pub fn text(&self) -> String {
+        self.content.as_text()
     }
 
     /// Concatenate this chunk with another chunk.
@@ -173,7 +174,8 @@ impl FunctionMessageChunk {
             panic!("Cannot concatenate FunctionMessageChunks with different names");
         }
 
-        let content = merge_content(&self.content, &other.content);
+        let content: MessageContent =
+            merge_content(self.content.as_text_ref(), other.content.as_text_ref()).into();
 
         // Merge additional_kwargs
         let mut additional_kwargs = self.additional_kwargs.clone();

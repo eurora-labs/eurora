@@ -109,36 +109,6 @@ impl AddableDict {
     pub fn from_map(map: HashMap<String, Value>) -> Self {
         Self(map)
     }
-
-    /// Insert a key-value pair into the dictionary
-    pub fn insert(&mut self, key: impl Into<String>, value: Value) {
-        self.0.insert(key.into(), value);
-    }
-
-    /// Get a reference to a value by key
-    pub fn get(&self, key: &str) -> Option<&Value> {
-        self.0.get(key)
-    }
-
-    /// Check if the dictionary contains a key
-    pub fn contains_key(&self, key: &str) -> bool {
-        self.0.contains_key(key)
-    }
-
-    /// Get an iterator over the key-value pairs
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &Value)> {
-        self.0.iter()
-    }
-
-    /// Get the number of entries in the dictionary
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Check if the dictionary is empty
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
 }
 
 impl std::ops::Add for AddableDict {
@@ -164,12 +134,6 @@ impl std::ops::Add for AddableDict {
         }
 
         chunk
-    }
-}
-
-impl std::ops::AddAssign for AddableDict {
-    fn add_assign(&mut self, other: Self) {
-        *self = self.clone() + other;
     }
 }
 
@@ -218,42 +182,6 @@ pub trait Addable: Clone {
     fn add(self, other: Self) -> Self;
 }
 
-impl Addable for String {
-    fn add(mut self, other: Self) -> Self {
-        self.push_str(&other);
-        self
-    }
-}
-
-impl<T: Clone> Addable for Vec<T> {
-    fn add(mut self, other: Self) -> Self {
-        self.extend(other);
-        self
-    }
-}
-
-macro_rules! impl_addable_for_numeric {
-    ($($t:ty),+) => {
-        $(
-            impl Addable for $t {
-                fn add(self, other: Self) -> Self {
-                    self + other
-                }
-            }
-        )+
-    };
-}
-
-impl_addable_for_numeric!(
-    i8, i16, i32, i64, i128, u8, u16, u32, u64, u128, f32, f64, isize, usize
-);
-
-impl Addable for AddableDict {
-    fn add(self, other: Self) -> Self {
-        self + other
-    }
-}
-
 /// Add a sequence of addable objects together.
 ///
 /// # Arguments
@@ -293,6 +221,49 @@ pub async fn aadd<T: Addable>(addables: impl Stream<Item = T> + Unpin) -> Option
     }
 
     final_value
+}
+
+// ---------------------------------------------------------------------------
+// Addable implementations
+// ---------------------------------------------------------------------------
+
+impl Addable for String {
+    fn add(self, other: Self) -> Self {
+        self + &other
+    }
+}
+
+impl Addable for Value {
+    fn add(self, other: Self) -> Self {
+        try_add_values(&self, &other)
+    }
+}
+
+impl Addable for AddableDict {
+    fn add(self, other: Self) -> Self {
+        std::ops::Add::add(self, other)
+    }
+}
+
+impl Addable for HashMap<String, Value> {
+    fn add(mut self, other: Self) -> Self {
+        for (key, value) in other {
+            match self.get(&key) {
+                None => {
+                    self.insert(key, value);
+                }
+                Some(existing) if existing.is_null() => {
+                    self.insert(key, value);
+                }
+                Some(existing) if !value.is_null() => {
+                    let added = try_add_values(existing, &value);
+                    self.insert(key, added);
+                }
+                _ => {}
+            }
+        }
+        self
+    }
 }
 
 /// Field that can be configured by the user.
@@ -532,6 +503,7 @@ pub fn get_unique_config_specs(
 ///
 /// This class provides filtering based on names, types, and tags for both
 /// inclusion and exclusion criteria.
+#[derive(Debug, Clone)]
 pub struct RootEventFilter {
     /// Names to include (if any match, include)
     pub include_names: Option<Vec<String>>,
@@ -685,17 +657,6 @@ mod tests {
         assert_eq!(result, "line1\n  line2\n  line3");
     }
 
-    #[test]
-    fn test_add() {
-        let values = vec![1, 2, 3, 4, 5];
-        let result = add(values);
-        assert_eq!(result, Some(15));
-
-        let empty: Vec<i32> = vec![];
-        let result = add(empty);
-        assert_eq!(result, None);
-    }
-
     #[tokio::test]
     async fn test_gather_with_concurrency() {
         let futures: Vec<Pin<Box<dyn Future<Output = i32> + Send>>> = vec![
@@ -730,17 +691,24 @@ mod tests {
     #[test]
     fn test_addable_dict() {
         let mut dict1 = AddableDict::new();
-        dict1.insert("a", Value::String("hello".to_string()));
-        dict1.insert("b", Value::Number(1.into()));
+        dict1
+            .0
+            .insert("a".to_string(), Value::String("hello".to_string()));
+        dict1.0.insert("b".to_string(), Value::Number(1.into()));
 
         let mut dict2 = AddableDict::new();
-        dict2.insert("b", Value::Number(2.into()));
-        dict2.insert("c", Value::String(" world".to_string()));
+        dict2.0.insert("b".to_string(), Value::Number(2.into()));
+        dict2
+            .0
+            .insert("c".to_string(), Value::String(" world".to_string()));
 
         let result = dict1 + dict2;
-        assert_eq!(result.get("a"), Some(&Value::String("hello".to_string())));
-        assert_eq!(result.get("b"), Some(&Value::Number(3.into())));
-        assert_eq!(result.get("c"), Some(&Value::String(" world".to_string())));
+        assert_eq!(result.0.get("a"), Some(&Value::String("hello".to_string())));
+        assert_eq!(result.0.get("b"), Some(&Value::Number(3.into())));
+        assert_eq!(
+            result.0.get("c"),
+            Some(&Value::String(" world".to_string()))
+        );
     }
 
     #[test]

@@ -66,6 +66,8 @@
 pub mod base;
 pub mod context;
 pub mod core;
+pub mod evaluation;
+pub mod event_stream;
 pub mod log_stream;
 pub mod memory_stream;
 pub mod root_listeners;
@@ -94,20 +96,27 @@ pub use context::{
 };
 
 // Re-export memory stream types
-pub use memory_stream::{
-    BoundedMemoryStream, BoundedReceiveStream, BoundedSendStream, MemoryStream, ReceiveStream,
-    SendStream,
-};
+pub use memory_stream::{MemoryStream, ReceiveStream, SendStream};
 
 // Re-export log stream types
 pub use log_stream::{
-    JsonPatchOp, LogEntry, LogStreamCallbackHandler, LogStreamConfig, RunLog, RunLogPatch, RunState,
+    JsonPatchOp, LogEntry, LogStreamCallbackHandler, LogStreamCallbackHandlerBridge,
+    LogStreamConfig, RunLog, RunLogPatch, RunState, astream_log_implementation,
 };
 
 // Re-export concrete tracers
 pub use root_listeners::{AsyncListener, AsyncRootListenersTracer, Listener, RootListenersTracer};
 pub use run_collector::RunCollectorCallbackHandler;
 pub use stdout::{ConsoleCallbackHandler, FunctionCallbackHandler, elapsed, try_json_stringify};
+
+// Re-export event stream types
+pub use event_stream::{AstreamEventsCallbackHandler, RunInfo, astream_events_implementation};
+
+// Re-export evaluation types
+pub use evaluation::{
+    EvaluationResult, EvaluatorCallbackHandler, LatencyEvaluator, NonEmptyOutputEvaluator,
+    RunEvaluator, wait_for_all_evaluators,
+};
 
 #[cfg(test)]
 mod tests {

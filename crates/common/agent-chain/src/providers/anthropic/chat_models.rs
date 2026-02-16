@@ -19,8 +19,10 @@ use crate::chat_models::{
 };
 use crate::error::{Error, Result};
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
+use crate::language_models::{ChatModelRunnable, ToolLike, extract_tool_name_from_schema};
 use crate::messages::{AIMessage, BaseMessage, ToolCall};
 use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
+use crate::runnables::base::Runnable;
 use crate::tools::ToolDefinition;
 
 /// Default API base URL for Anthropic.
@@ -47,7 +49,7 @@ const DEFAULT_MAX_TOKENS: u32 = 4096;
 ///     .max_tokens(1024);
 ///
 /// let messages = vec![HumanMessage::builder().content("Hello!").build().into()];
-/// let response = model.generate(messages, None).await?;
+/// let response = model.generate(messages, GenerateConfig::default()).await?;
 /// ```
 #[derive(Debug, Clone)]
 pub struct ChatAnthropic {
@@ -82,6 +84,10 @@ pub struct ChatAnthropic {
     /// HTTP client.
     #[allow(dead_code)]
     client: reqwest::Client,
+    /// Tools bound to this model via `bind_tools()`.
+    bound_tools: Vec<ToolDefinition>,
+    /// Tool choice for bound tools.
+    bound_tool_choice: Option<ToolChoice>,
 }
 
 impl ChatAnthropic {
@@ -107,6 +113,8 @@ impl ChatAnthropic {
             chat_model_config: ChatModelConfig::new(),
             language_model_config: LanguageModelConfig::new(),
             client: reqwest::Client::new(),
+            bound_tools: Vec::new(),
+            bound_tool_choice: None,
         }
     }
 
@@ -203,10 +211,10 @@ impl ChatAnthropic {
                 BaseMessage::AI(m) => {
                     let mut content: Vec<serde_json::Value> = Vec::new();
 
-                    if !m.content().is_empty() {
+                    if !m.content.is_empty() {
                         content.push(serde_json::json!({
                             "type": "text",
-                            "text": m.content()
+                            "text": m.content.as_text()
                         }));
                     }
 
@@ -411,6 +419,18 @@ impl BaseChatModel for ChatAnthropic {
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
+        if !self.bound_tools.is_empty() {
+            let ai_message = self
+                .generate_with_tools_internal(
+                    messages,
+                    &self.bound_tools,
+                    self.bound_tool_choice.as_ref(),
+                    stop,
+                )
+                .await?;
+            let generation = ChatGeneration::new(ai_message.into());
+            return Ok(ChatResult::new(vec![generation]));
+        }
         self._generate_internal(messages, stop, None).await
     }
 
@@ -423,6 +443,44 @@ impl BaseChatModel for ChatAnthropic {
     ) -> Result<AIMessage> {
         self.generate_with_tools_internal(messages, tools, tool_choice, stop)
             .await
+    }
+
+    fn bind_tools(
+        &self,
+        tools: &[ToolLike],
+        tool_choice: Option<ToolChoice>,
+    ) -> Result<Box<dyn BaseChatModel>> {
+        let mut bound = self.clone();
+        bound.bound_tools = tools.iter().map(|t| t.to_definition()).collect();
+        bound.bound_tool_choice = tool_choice;
+        Ok(Box::new(bound))
+    }
+
+    fn with_structured_output(
+        &self,
+        schema: serde_json::Value,
+        include_raw: bool,
+    ) -> Result<
+        Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
+    > {
+        let tool_name = extract_tool_name_from_schema(&schema);
+        let tool_like = ToolLike::Schema(schema);
+        let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
+
+        let output_parser =
+            crate::output_parsers::openai_tools::JsonOutputKeyToolsParser::new(&tool_name)
+                .with_first_tool_only(true);
+
+        let model_runnable = ChatModelRunnable::new(std::sync::Arc::from(bound_model));
+
+        if include_raw {
+            Ok(Box::new(
+                crate::language_models::StructuredOutputWithRaw::new(model_runnable, output_parser),
+            ))
+        } else {
+            let chain = crate::runnables::base::pipe(model_runnable, output_parser);
+            Ok(Box::new(chain))
+        }
     }
 }
 

@@ -51,4 +51,4 @@ pub use base::{BaseMedia, Blob, BlobBuilder, BlobData, Document};
 pub use compressor::BaseDocumentCompressor;
 
 // Re-export transformer types
-pub use transformers::{BaseDocumentTransformer, FilterTransformer, FunctionTransformer};
+pub use transformers::BaseDocumentTransformer;

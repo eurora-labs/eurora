@@ -8,6 +8,10 @@ use std::collections::HashMap;
 use serde_json::Value;
 use uuid::Uuid;
 
+use crate::callbacks::base::{
+    BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
+    RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
+};
 use crate::tracers::base::BaseTracer;
 use crate::tracers::core::{TracerCore, TracerCoreConfig};
 use crate::tracers::schemas::Run;
@@ -445,6 +449,19 @@ impl TracerCore for ConsoleCallbackHandler {
 impl BaseTracer for ConsoleCallbackHandler {
     fn persist_run_impl(&mut self, run: &Run) {
         self.inner.persist_run_impl(run)
+    }
+}
+
+impl LLMManagerMixin for ConsoleCallbackHandler {}
+impl ChainManagerMixin for ConsoleCallbackHandler {}
+impl ToolManagerMixin for ConsoleCallbackHandler {}
+impl RetrieverManagerMixin for ConsoleCallbackHandler {}
+impl CallbackManagerMixin for ConsoleCallbackHandler {}
+impl RunManagerMixin for ConsoleCallbackHandler {}
+
+impl BaseCallbackHandler for ConsoleCallbackHandler {
+    fn name(&self) -> &str {
+        "ConsoleCallbackHandler"
     }
 }
 
