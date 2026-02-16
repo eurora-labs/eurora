@@ -984,8 +984,16 @@ impl BaseChatModel for ChatOllama {
         schema: serde_json::Value,
         _include_raw: bool,
     ) -> Result<Box<dyn BaseChatModel>> {
-        let name = schema.get("title").and_then(|t| t.as_str()).unwrap_or("structured_output").to_string();
-        let description = schema.get("description").and_then(|d| d.as_str()).unwrap_or("").to_string();
+        let name = schema
+            .get("title")
+            .and_then(|t| t.as_str())
+            .unwrap_or("structured_output")
+            .to_string();
+        let description = schema
+            .get("description")
+            .and_then(|d| d.as_str())
+            .unwrap_or("")
+            .to_string();
         let tool_def = ToolDefinition {
             name,
             description,

@@ -20,9 +20,9 @@ use crate::load::{Serializable, Serialized};
 
 use super::config::{
     AsyncVariableArgsFn, ConfigOrList, RunnableConfig, VariableArgsFn,
-    acall_func_with_variable_args, call_func_with_variable_args, ensure_config,
-    get_async_callback_manager_for_config, get_callback_manager_for_config, get_config_list,
-    merge_configs, patch_config,
+    call_func_with_variable_args, ensure_config, get_async_callback_manager_for_config,
+    get_callback_manager_for_config, get_config_list, merge_configs, patch_config,
+    set_config_context,
 };
 
 /// Number of generic type arguments for Runnable (Input and Output).
@@ -79,6 +79,239 @@ pub trait Runnable: Send + Sync + Debug {
     /// Get the type name of this Runnable.
     fn type_name(&self) -> &'static str {
         std::any::type_name::<Self>()
+    }
+
+    /// Helper method to transform an input value to an output value, with
+    /// callbacks. Use this method to implement `invoke` in subclasses.
+    ///
+    /// Mirrors Python's `Runnable._call_with_config`.
+    fn call_with_config(
+        &self,
+        func: &dyn Fn(Self::Input, &RunnableConfig) -> Result<Self::Output>,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        let config = ensure_config(config);
+        let callback_manager = get_callback_manager_for_config(&config);
+        let run_manager = callback_manager
+            .on_chain_start()
+            .serialized(&HashMap::new())
+            .inputs(&HashMap::new())
+            .maybe_run_id(config.run_id)
+            .maybe_name(config.run_name.as_deref())
+            .call();
+
+        let child_config = patch_config(
+            Some(config),
+            Some(run_manager.get_child(None)),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let _context_guard = set_config_context(child_config.clone());
+
+        match func(input, &child_config) {
+            Ok(output) => {
+                run_manager.on_chain_end(&HashMap::new());
+                Ok(output)
+            }
+            Err(e) => {
+                run_manager.on_chain_error(&e);
+                Err(e)
+            }
+        }
+    }
+
+    /// Async helper method to transform an input value to an output value,
+    /// with callbacks. Use this method to implement `ainvoke` in subclasses.
+    ///
+    /// Mirrors Python's `Runnable._acall_with_config`.
+    #[allow(async_fn_in_trait)]
+    async fn acall_with_config(
+        &self,
+        func: &(
+             dyn Fn(
+            Self::Input,
+            RunnableConfig,
+        ) -> std::pin::Pin<
+            Box<dyn std::future::Future<Output = Result<Self::Output>> + Send>,
+        > + Send
+                 + Sync
+         ),
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output>
+    where
+        Self: 'static,
+    {
+        let config = ensure_config(config);
+        let async_callback_manager = get_async_callback_manager_for_config(&config);
+        let run_manager = async_callback_manager
+            .on_chain_start(
+                &HashMap::new(),
+                &HashMap::new(),
+                config.run_id,
+                config.run_name.as_deref(),
+            )
+            .await;
+
+        let child_config = patch_config(
+            Some(config),
+            Some(run_manager.get_child(None).to_callback_manager()),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let _context_guard = set_config_context(child_config.clone());
+
+        match func(input, child_config).await {
+            Ok(output) => {
+                run_manager.get_sync().on_chain_end(&HashMap::new());
+                Ok(output)
+            }
+            Err(e) => {
+                run_manager.get_sync().on_chain_error(&e);
+                Err(e)
+            }
+        }
+    }
+
+    /// Helper method to transform a list of inputs to a list of outputs,
+    /// with per-item callbacks.
+    ///
+    /// Mirrors Python's `Runnable._batch_with_config`.
+    fn batch_with_config(
+        &self,
+        func: &dyn Fn(Vec<Self::Input>, Vec<RunnableConfig>) -> Vec<Result<Self::Output>>,
+        inputs: Vec<Self::Input>,
+        config: Option<ConfigOrList>,
+        return_exceptions: bool,
+    ) -> Vec<Result<Self::Output>>
+    where
+        Self: 'static,
+    {
+        if inputs.is_empty() {
+            return Vec::new();
+        }
+
+        let configs = get_config_list(config, inputs.len());
+
+        let run_managers: Vec<_> = configs
+            .iter()
+            .map(|config| {
+                let callback_manager = get_callback_manager_for_config(config);
+                callback_manager
+                    .on_chain_start()
+                    .serialized(&HashMap::new())
+                    .inputs(&HashMap::new())
+                    .maybe_run_id(config.run_id)
+                    .maybe_name(config.run_name.as_deref())
+                    .call()
+            })
+            .collect();
+
+        let child_configs: Vec<_> = configs
+            .into_iter()
+            .zip(run_managers.iter())
+            .map(|(config, run_manager)| {
+                patch_config(
+                    Some(config),
+                    Some(run_manager.get_child(None)),
+                    None,
+                    None,
+                    None,
+                    None,
+                )
+            })
+            .collect();
+
+        let outputs = func(inputs, child_configs);
+
+        let mut first_exception: Option<usize> = None;
+        for (i, (run_manager, output)) in run_managers.iter().zip(outputs.iter()).enumerate() {
+            match output {
+                Ok(_) => run_manager.on_chain_end(&HashMap::new()),
+                Err(e) => {
+                    if first_exception.is_none() {
+                        first_exception = Some(i);
+                    }
+                    run_manager.on_chain_error(e as &dyn std::error::Error);
+                }
+            }
+        }
+
+        if return_exceptions || first_exception.is_none() {
+            outputs
+        } else {
+            let idx = first_exception.expect("checked above");
+            vec![Err(outputs.into_iter().nth(idx).unwrap().unwrap_err())]
+        }
+    }
+
+    /// Helper method to transform a stream of inputs to a stream of outputs,
+    /// with callbacks. Use this to implement `stream` or `transform` in
+    /// subclasses.
+    ///
+    /// Mirrors Python's `Runnable._transform_stream_with_config`.
+    fn transform_stream_with_config<'a>(
+        &'a self,
+        input: BoxStream<'a, Self::Input>,
+        transformer: Box<
+            dyn FnOnce(
+                    BoxStream<'a, Self::Input>,
+                    &RunnableConfig,
+                ) -> BoxStream<'a, Result<Self::Output>>
+                + Send
+                + 'a,
+        >,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'a, Result<Self::Output>> {
+        let config = ensure_config(config);
+        let callback_manager = get_callback_manager_for_config(&config);
+        let run_manager = callback_manager
+            .on_chain_start()
+            .serialized(&HashMap::new())
+            .inputs(&HashMap::new())
+            .maybe_run_id(config.run_id)
+            .maybe_name(config.run_name.as_deref())
+            .call();
+
+        let child_config = patch_config(
+            Some(config),
+            Some(run_manager.get_child(None)),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let output_stream = transformer(input, &child_config);
+
+        Box::pin(async_stream::stream! {
+            let mut stream = output_stream;
+            let mut had_error = false;
+
+            while let Some(item) = stream.next().await {
+                match &item {
+                    Ok(_) => {}
+                    Err(e) => {
+                        if !had_error {
+                            run_manager.on_chain_error(e as &dyn std::error::Error);
+                            had_error = true;
+                        }
+                    }
+                }
+                yield item;
+            }
+
+            if !had_error {
+                run_manager.on_chain_end(&HashMap::new());
+            }
+        })
     }
 
     /// Get a JSON schema describing the input type of this Runnable.
@@ -567,25 +800,7 @@ where
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let config = ensure_config(config);
-        let callback_manager = get_callback_manager_for_config(&config);
-        let run_manager = callback_manager
-            .on_chain_start()
-            .serialized(&HashMap::new())
-            .inputs(&HashMap::new())
-            .maybe_run_id(config.run_id)
-            .call();
-
-        match (self.func)(input) {
-            Ok(output) => {
-                run_manager.on_chain_end(&HashMap::new());
-                Ok(output)
-            }
-            Err(e) => {
-                run_manager.on_chain_error(&e);
-                Err(e)
-            }
-        }
+        self.call_with_config(&|input, _config| (self.func)(input), input, config)
     }
 }
 
@@ -741,34 +956,11 @@ where
             Error::other("Cannot invoke a coroutine function synchronously. Use ainvoke instead.")
         })?;
 
-        let config = ensure_config(config);
-        let callback_manager = get_callback_manager_for_config(&config);
-        let run_manager = callback_manager
-            .on_chain_start()
-            .serialized(&HashMap::new())
-            .inputs(&HashMap::new())
-            .maybe_run_id(config.run_id)
-            .call();
-
-        let child_config = patch_config(
-            Some(config),
-            Some(run_manager.get_child(None)),
-            None,
-            None,
-            None,
-            None,
-        );
-
-        match call_func_with_variable_args(func, input, &child_config) {
-            Ok(output) => {
-                run_manager.on_chain_end(&HashMap::new());
-                Ok(output)
-            }
-            Err(e) => {
-                run_manager.on_chain_error(&e);
-                Err(e)
-            }
-        }
+        self.call_with_config(
+            &|input, config| call_func_with_variable_args(func, input, config),
+            input,
+            config,
+        )
     }
 
     async fn ainvoke(
@@ -779,40 +971,29 @@ where
     where
         Self: 'static,
     {
-        let config = ensure_config(config);
-        let async_callback_manager = get_async_callback_manager_for_config(&config);
-        let run_manager = async_callback_manager
-            .on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id, None)
-            .await;
-
-        let child_config = patch_config(
-            Some(config),
-            Some(run_manager.get_child(None).to_callback_manager()),
-            None,
-            None,
-            None,
-            None,
-        );
-
-        let result = if let Some(afunc) = &self.afunc {
-            acall_func_with_variable_args(afunc, input, &child_config).await
+        if let Some(afunc) = &self.afunc {
+            self.acall_with_config(
+                &|input, config: RunnableConfig| {
+                    let result = match afunc {
+                        AsyncVariableArgsFn::InputOnly(f) => f(input),
+                        AsyncVariableArgsFn::WithConfig(f) => f(input, config),
+                    };
+                    Box::pin(result)
+                },
+                input,
+                config,
+            )
+            .await
         } else if let Some(func) = &self.func {
-            call_func_with_variable_args(func, input, &child_config)
+            self.call_with_config(
+                &|input, config| call_func_with_variable_args(func, input, config),
+                input,
+                config,
+            )
         } else {
             Err(Error::other(
                 "RunnableLambdaWithConfig has no func or afunc",
             ))
-        };
-
-        match result {
-            Ok(output) => {
-                run_manager.get_sync().on_chain_end(&HashMap::new());
-                Ok(output)
-            }
-            Err(e) => {
-                run_manager.get_sync().on_chain_error(&e);
-                Err(e)
-            }
         }
     }
 }
@@ -1111,19 +1292,35 @@ where
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         let config = ensure_config(config);
+        let callback_manager = get_callback_manager_for_config(&config);
+        let run_manager = callback_manager
+            .on_chain_start()
+            .serialized(&HashMap::new())
+            .inputs(&HashMap::new())
+            .maybe_run_id(config.run_id)
+            .maybe_name(config.run_name.as_deref())
+            .call();
 
         let step_entries: Vec<_> = self.steps.iter().collect();
         let mut results = HashMap::new();
 
-        std::thread::scope(|scope| {
+        let outcome: Result<()> = std::thread::scope(|scope| {
             let handles: Vec<_> = step_entries
                 .iter()
                 .map(|(key, step)| {
                     let input = input.clone();
-                    let config = config.clone();
+                    let child_config = patch_config(
+                        Some(config.clone()),
+                        Some(run_manager.get_child(Some(&format!("map:key:{}", key)))),
+                        None,
+                        None,
+                        None,
+                        None,
+                    );
                     let key = (*key).clone();
                     scope.spawn(move || {
-                        let result = step.invoke(input, Some(config));
+                        let _context_guard = set_config_context(child_config.clone());
+                        let result = step.invoke(input, Some(child_config));
                         (key, result)
                     })
                 })
@@ -1134,8 +1331,19 @@ where
                 results.insert(key, result?);
             }
 
-            Ok(results)
-        })
+            Ok(())
+        });
+
+        match outcome {
+            Ok(()) => {
+                run_manager.on_chain_end(&HashMap::new());
+                Ok(results)
+            }
+            Err(e) => {
+                run_manager.on_chain_error(&e);
+                Err(e)
+            }
+        }
     }
 
     async fn ainvoke(
@@ -1147,16 +1355,36 @@ where
         Self: 'static,
     {
         let config = ensure_config(config);
+        let async_callback_manager = get_async_callback_manager_for_config(&config);
+        let run_manager = async_callback_manager
+            .on_chain_start(
+                &HashMap::new(),
+                &HashMap::new(),
+                config.run_id,
+                config.run_name.as_deref(),
+            )
+            .await;
 
         let futures: Vec<_> = self
             .steps
             .iter()
             .map(|(key, step)| {
                 let input = input.clone();
-                let config = config.clone();
+                let child_config = patch_config(
+                    Some(config.clone()),
+                    Some(
+                        run_manager
+                            .get_child(Some(&format!("map:key:{}", key)))
+                            .to_callback_manager(),
+                    ),
+                    None,
+                    None,
+                    None,
+                    None,
+                );
                 let key = key.clone();
                 async move {
-                    let result = step.ainvoke(input, Some(config)).await;
+                    let result = step.ainvoke(input, Some(child_config)).await;
                     (key, result)
                 }
             })
@@ -1165,10 +1393,29 @@ where
         let completed = futures::future::join_all(futures).await;
 
         let mut results = HashMap::new();
+        let mut error: Option<Error> = None;
         for (key, result) in completed {
-            results.insert(key, result?);
+            match result {
+                Ok(value) => {
+                    results.insert(key, value);
+                }
+                Err(e) => {
+                    error = Some(e);
+                    break;
+                }
+            }
         }
-        Ok(results)
+
+        match error {
+            None => {
+                run_manager.get_sync().on_chain_end(&HashMap::new());
+                Ok(results)
+            }
+            Some(e) => {
+                run_manager.get_sync().on_chain_error(&e);
+                Err(e)
+            }
+        }
     }
 }
 
@@ -1310,14 +1557,17 @@ where
     }
 
     fn invoke(&self, inputs: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let config = ensure_config(config);
-        let configs =
-            super::config::ConfigOrList::List(inputs.iter().map(|_| config.clone()).collect());
-
-        let results = self.bound.batch(inputs, Some(configs), false);
-
-        // Collect results, returning error if any failed
-        results.into_iter().collect()
+        self.call_with_config(
+            &|inputs: Vec<R::Input>, config: &RunnableConfig| {
+                let configs = super::config::ConfigOrList::List(
+                    inputs.iter().map(|_| config.clone()).collect(),
+                );
+                let results = self.bound.batch(inputs, Some(configs), false);
+                results.into_iter().collect()
+            },
+            inputs,
+            config,
+        )
     }
 
     async fn ainvoke(
@@ -1329,12 +1579,42 @@ where
         Self: 'static,
     {
         let config = ensure_config(config);
-        let configs =
-            super::config::ConfigOrList::List(inputs.iter().map(|_| config.clone()).collect());
+        let async_callback_manager = get_async_callback_manager_for_config(&config);
+        let run_manager = async_callback_manager
+            .on_chain_start(
+                &HashMap::new(),
+                &HashMap::new(),
+                config.run_id,
+                config.run_name.as_deref(),
+            )
+            .await;
 
+        let child_config = patch_config(
+            Some(config),
+            Some(run_manager.get_child(None).to_callback_manager()),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let configs = super::config::ConfigOrList::List(
+            inputs.iter().map(|_| child_config.clone()).collect(),
+        );
         let results = self.bound.abatch(inputs, Some(configs), false).await;
 
-        results.into_iter().collect()
+        match results.iter().find(|r| r.is_err()) {
+            None => {
+                run_manager.get_sync().on_chain_end(&HashMap::new());
+                results.into_iter().collect()
+            }
+            Some(_) => {
+                let collected: Result<Vec<R::Output>> = results.into_iter().collect();
+                let e = collected.unwrap_err();
+                run_manager.get_sync().on_chain_error(&e);
+                Err(e)
+            }
+        }
     }
 }
 
