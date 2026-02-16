@@ -303,7 +303,9 @@ fn test_diff_add_key() {
     let parser = JsonOutputParser::new().with_diff();
     let prev = json!({"a": 1});
     let next = json!({"a": 1, "b": 2});
-    let diff = parser.compute_diff(Some(&prev), next);
+    let diff = parser
+        .compute_diff(Some(&prev), next)
+        .expect("compute_diff should succeed");
     let patches = diff.as_array().expect("diff should be an array");
     assert!(
         patches
@@ -318,7 +320,9 @@ fn test_diff_replace_value() {
     let parser = JsonOutputParser::new().with_diff();
     let prev = json!({"a": 1});
     let next = json!({"a": 2});
-    let diff = parser.compute_diff(Some(&prev), next);
+    let diff = parser
+        .compute_diff(Some(&prev), next)
+        .expect("compute_diff should succeed");
     let patches = diff.as_array().expect("diff should be an array");
     assert!(
         patches.iter().any(|op| op["op"] == "replace"),
@@ -331,7 +335,9 @@ fn test_diff_remove_key() {
     let parser = JsonOutputParser::new().with_diff();
     let prev = json!({"a": 1, "b": 2});
     let next = json!({"a": 1});
-    let diff = parser.compute_diff(Some(&prev), next);
+    let diff = parser
+        .compute_diff(Some(&prev), next)
+        .expect("compute_diff should succeed");
     let patches = diff.as_array().expect("diff should be an array");
     assert!(
         patches
@@ -345,7 +351,9 @@ fn test_diff_remove_key() {
 fn test_diff_from_none() {
     let parser = JsonOutputParser::new().with_diff();
     let next = json!({"a": 1});
-    let diff = parser.compute_diff(None, next);
+    let diff = parser
+        .compute_diff(None, next)
+        .expect("compute_diff should succeed");
     let patches = diff.as_array().expect("diff should be an array");
     assert!(!patches.is_empty(), "Diff from None should produce patches");
 }
@@ -355,7 +363,9 @@ fn test_diff_no_change() {
     let parser = JsonOutputParser::new().with_diff();
     let prev = json!({"a": 1});
     let next = json!({"a": 1});
-    let diff = parser.compute_diff(Some(&prev), next);
+    let diff = parser
+        .compute_diff(Some(&prev), next)
+        .expect("compute_diff should succeed");
     let patches = diff.as_array().expect("diff should be an array");
     assert!(patches.is_empty(), "No-change diff should be empty");
 }

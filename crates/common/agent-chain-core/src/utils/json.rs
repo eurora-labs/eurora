@@ -28,7 +28,10 @@ use serde_json::Value;
 /// assert!(result.is_ok());
 /// ```
 pub fn parse_partial_json(s: &str, strict: bool) -> Result<Value, JsonParseError> {
-    if let Ok(value) = serde_json::from_str(s) {
+    if let Ok(value) = serde_json::from_str::<Value>(s) {
+        if strict && contains_control_chars(s) {
+            return Err(JsonParseError::ControlCharacters);
+        }
         return Ok(value);
     }
 
@@ -188,7 +191,7 @@ fn escape_unescaped_quotes(s: &str) -> String {
         if c == '\\' {
             result.push(c);
             if chars.peek().is_some() {
-                result.push(chars.next().unwrap());
+                result.push(chars.next().expect("checked peek above"));
             }
         } else if c == '"' {
             result.push('\\');

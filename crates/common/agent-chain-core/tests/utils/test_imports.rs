@@ -93,7 +93,6 @@ const EXPECTED_EXPORTS: &[&str] = &[
     "parse_partial_json",
     // From json_schema.rs
     "dereference_refs",
-    "remove_titles",
     // From merge.rs
     "merge_dicts",
     "merge_lists",
@@ -104,13 +103,8 @@ const EXPECTED_EXPORTS: &[&str] = &[
     // From uuid.rs
     "uuid7",
     // From usage.rs
-    "UsageValue",
-    "dict_int_add",
-    "dict_int_add_json",
+    "UsageError",
     "dict_int_op",
-    "dict_int_op_json",
-    "dict_int_sub",
-    "dict_int_sub_floor_json",
     // Not yet implemented in Rust:
     // "check_package_version" - Python-specific
     // "get_pydantic_field_names" - pydantic-specific
@@ -213,8 +207,6 @@ fn test_all_imports() {
     // From json_schema.rs
     use agent_chain_core::utils::dereference_refs;
     let _ = dereference_refs(&serde_json::json!({}), None, None);
-    use agent_chain_core::utils::remove_titles;
-    let _ = remove_titles(&serde_json::json!({}));
 
     // From merge.rs
     use agent_chain_core::utils::merge_dicts;
@@ -235,12 +227,16 @@ fn test_all_imports() {
     let _ = uuid7(None);
 
     // From usage.rs
-    use agent_chain_core::utils::UsageValue;
-    let _: UsageValue = UsageValue::Int(0);
-    use agent_chain_core::utils::dict_int_add;
-    let map1: std::collections::HashMap<String, UsageValue> = std::collections::HashMap::new();
-    let map2: std::collections::HashMap<String, UsageValue> = std::collections::HashMap::new();
-    let _ = dict_int_add(&map1, &map2);
+    use agent_chain_core::utils::UsageError;
+    let _: Option<UsageError> = None;
+    use agent_chain_core::utils::dict_int_op;
+    let _ = dict_int_op(
+        &serde_json::json!({}),
+        &serde_json::json!({}),
+        |a, b| a + b,
+        0,
+        100,
+    );
 
     // Verify the expected exports list has the right count
     let expected: HashSet<_> = EXPECTED_EXPORTS.iter().collect();

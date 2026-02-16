@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use agent_chain_core::callbacks::base::{BaseCallbackHandler, LLMManagerMixin};
 use agent_chain_core::callbacks::usage::{
-    UsageMetadataCallbackHandler, add_usage, get_usage_metadata_callback,
+    UsageMetadataCallbackHandler, get_usage_metadata_callback,
 };
 use agent_chain_core::messages::{AIMessage, InputTokenDetails, OutputTokenDetails, UsageMetadata};
 use agent_chain_core::outputs::{ChatGeneration, ChatResult};
@@ -94,7 +94,7 @@ fn test_accumulates_multiple_responses_same_model() {
     handler.on_llm_end(&make_chat_result("a", &u1, "model-a"), Uuid::new_v4(), None);
     handler.on_llm_end(&make_chat_result("b", &u2, "model-a"), Uuid::new_v4(), None);
 
-    let expected = add_usage(&u1, &u2);
+    let expected = u1.add(&u2);
     assert_eq!(handler.usage_metadata().get("model-a").unwrap(), &expected);
 }
 

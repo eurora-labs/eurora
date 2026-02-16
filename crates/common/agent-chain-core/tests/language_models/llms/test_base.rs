@@ -22,11 +22,14 @@ use serde_json::json;
 async fn test_batch() {
     let llm = FakeListLLM::new(vec!["foo".to_string(); 3]);
     let output = llm
-        .batch(vec![
-            LanguageModelInput::from("foo"),
-            LanguageModelInput::from("bar"),
-            LanguageModelInput::from("foo"),
-        ])
+        .batch(
+            vec![
+                LanguageModelInput::from("foo"),
+                LanguageModelInput::from("bar"),
+                LanguageModelInput::from("foo"),
+            ],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(output, vec!["foo", "foo", "foo"]);
@@ -37,11 +40,14 @@ async fn test_batch() {
 async fn test_abatch() {
     let llm = FakeListLLM::new(vec!["foo".to_string(); 3]);
     let output = llm
-        .batch(vec![
-            LanguageModelInput::from("foo"),
-            LanguageModelInput::from("bar"),
-            LanguageModelInput::from("foo"),
-        ])
+        .batch(
+            vec![
+                LanguageModelInput::from("foo"),
+                LanguageModelInput::from("bar"),
+                LanguageModelInput::from("foo"),
+            ],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(output, vec!["foo", "foo", "foo"]);
@@ -51,7 +57,7 @@ async fn test_abatch() {
 #[tokio::test]
 async fn test_batch_empty_inputs_returns_empty_list() {
     let llm = FakeListLLM::new(vec!["a".to_string()]);
-    let result = llm.batch(vec![]).await.unwrap();
+    let result = llm.batch(vec![], None).await.unwrap();
     assert!(result.is_empty());
 }
 
@@ -59,7 +65,7 @@ async fn test_batch_empty_inputs_returns_empty_list() {
 #[tokio::test]
 async fn test_abatch_empty_inputs_returns_empty_list() {
     let llm = FakeListLLM::new(vec!["a".to_string()]);
-    let result = llm.batch(vec![]).await.unwrap();
+    let result = llm.batch(vec![], None).await.unwrap();
     assert!(result.is_empty());
 }
 
@@ -468,7 +474,7 @@ fn test_dict_contains_type_and_identifying_params() {
 async fn test_invoke() {
     let llm = FakeListLLM::new(vec!["hello".to_string()]);
     let result = llm
-        .invoke(LanguageModelInput::from("prompt"))
+        .invoke(LanguageModelInput::from("prompt"), None)
         .await
         .unwrap();
     assert_eq!(result, "hello");
@@ -632,11 +638,14 @@ fn test_resolve_cache_false() {
 async fn test_batch_with_exceptions() {
     let llm = FakeListLLM::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
     let results = llm
-        .batch_with_exceptions(vec![
-            LanguageModelInput::from("p1"),
-            LanguageModelInput::from("p2"),
-            LanguageModelInput::from("p3"),
-        ])
+        .batch_with_exceptions(
+            vec![
+                LanguageModelInput::from("p1"),
+                LanguageModelInput::from("p2"),
+                LanguageModelInput::from("p3"),
+            ],
+            None,
+        )
         .await;
 
     assert_eq!(results.len(), 3);

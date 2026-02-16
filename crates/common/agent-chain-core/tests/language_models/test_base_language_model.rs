@@ -558,7 +558,7 @@ mod test_base_language_model_trait {
             BaseMessage::AI(AIMessage::builder().content("Hello").build()),
         ];
 
-        let result = model.get_num_tokens_from_messages(&messages);
+        let result = model.get_num_tokens_from_messages(&messages, None);
 
         // Each message adds ~4 tokens overhead + content tokens
         // "Hi" = 1 word, "Hello" = 1 word
@@ -574,7 +574,7 @@ mod test_base_language_model_trait {
 
         let messages: Vec<BaseMessage> = vec![];
 
-        let result = model.get_num_tokens_from_messages(&messages);
+        let result = model.get_num_tokens_from_messages(&messages, None);
         assert_eq!(result, 0);
     }
 
@@ -698,7 +698,7 @@ mod test_get_num_tokens_from_messages_edge_cases {
         let messages = vec![BaseMessage::Human(
             HumanMessage::builder().content("Hello world").build(),
         )];
-        let result = model.get_num_tokens_from_messages(&messages);
+        let result = model.get_num_tokens_from_messages(&messages, None);
         // "Human: Hello world" => 3 words ("Human:", "Hello", "world")
         // + overhead from get_buffer_string formatting
         assert!(result > 0);

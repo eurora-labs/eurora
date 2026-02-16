@@ -1077,8 +1077,8 @@ fn test_convert_to_openai_messages_developer() {
     )];
     let result = convert_to_openai_messages(&messages, TextFormat::String, false);
     assert_eq!(result.len(), 1);
-    // The Rust impl always maps System -> "system" role
-    assert_eq!(result[0]["role"], "system");
+    // SystemMessage with __openai_role__ = "developer" should produce "developer" role
+    assert_eq!(result[0]["role"], "developer");
     assert_eq!(result[0]["content"], "Be helpful");
 }
 
@@ -2085,7 +2085,7 @@ fn test_trim_messages_allow_partial_text_splitter() {
         msgs.iter()
             .map(|m| {
                 // Match Python's split(" ") behavior
-                m.content().split(' ').count()
+                m.text().split(' ').count()
             })
             .sum()
     }
@@ -2170,8 +2170,8 @@ fn test_trim_messages_mixed_content_with_partial() {
     fn count_text_length(msgs: &[BaseMessage]) -> usize {
         let mut total = 0;
         for msg in msgs {
-            let raw = msg.content();
-            if let Ok(blocks) = serde_json::from_str::<Vec<serde_json::Value>>(raw) {
+            let raw = msg.text();
+            if let Ok(blocks) = serde_json::from_str::<Vec<serde_json::Value>>(&raw) {
                 for block in &blocks {
                     if block.get("type").and_then(|t| t.as_str()) == Some("text") {
                         total += block
@@ -2196,8 +2196,8 @@ fn test_trim_messages_mixed_content_with_partial() {
 
     assert_eq!(actual.len(), 1);
     // Should have only the first content block since "First part of text." is 19 chars
-    let content_str = actual[0].content();
-    let result_blocks: Vec<serde_json::Value> = serde_json::from_str(content_str).unwrap();
+    let content_str = actual[0].text();
+    let result_blocks: Vec<serde_json::Value> = serde_json::from_str(&content_str).unwrap();
     assert_eq!(result_blocks.len(), 1);
     assert_eq!(
         result_blocks[0].get("text").and_then(|t| t.as_str()),
