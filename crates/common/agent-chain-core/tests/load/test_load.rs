@@ -1538,7 +1538,7 @@ fn test_load_recursive_processes_kwargs_secrets() {
     let wrapper = result.get("wrapper").unwrap();
     // AIMessage is in the constructor registry, so it gets instantiated.
     // The secret in metadata should have been resolved before instantiation.
-    let metadata = wrapper.get("response_metadata").unwrap();
+    let _metadata = wrapper.get("response_metadata").unwrap();
     // The secret was inside kwargs.metadata.secret and was resolved by
     // load_recursive before the constructor was called. After deserialization
     // and re-serialization through AIMessage, the metadata ends up in
@@ -1787,3 +1787,112 @@ fn test_round_trip_unknown_type_falls_back_to_constructor_info() {
 }
 
 
+
+// ---------------------------------------------------------------------------
+// ChatPromptTemplate round-trip tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_round_trip_chat_prompt_template() {
+    use agent_chain_core::prompts::ChatPromptTemplate;
+
+    let template = ChatPromptTemplate::from_messages(vec![
+        ("system", "You are a helpful assistant.").into(),
+        ("human", "{question}").into(),
+    ])
+    .unwrap();
+
+    let serialized = dumpd(&template).unwrap();
+
+    // Verify serialized structure
+    assert_eq!(serialized.get("lc").and_then(|v| v.as_i64()), Some(1));
+    assert_eq!(
+        serialized.get("type").and_then(|v| v.as_str()),
+        Some("constructor")
+    );
+
+    let kwargs = serialized.get("kwargs").unwrap();
+    let input_vars = kwargs
+        .get("input_variables")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
+        .unwrap_or_default();
+    assert_eq!(input_vars, vec!["question"]);
+
+    // Round-trip through load
+    let loaded = load(serialized, None).unwrap();
+    assert!(loaded.is_object());
+    assert!(loaded.get("_type").is_none());
+
+    // Verify messages are preserved
+    let messages = loaded.get("messages").and_then(|v| v.as_array());
+    assert!(messages.is_some());
+    assert_eq!(messages.unwrap().len(), 2);
+}
+
+#[test]
+fn test_round_trip_chat_prompt_template_with_placeholder() {
+    use agent_chain_core::prompts::{ChatPromptTemplate, MessageLikeRepresentation};
+
+    let template = ChatPromptTemplate::from_messages(vec![
+        ("system", "You are a helpful assistant.").into(),
+        MessageLikeRepresentation::placeholder("history", false),
+        ("human", "{question}").into(),
+    ])
+    .unwrap();
+
+    let serialized = dumpd(&template).unwrap();
+    let loaded = load(serialized, None).unwrap();
+
+    assert!(loaded.is_object());
+    let messages = loaded.get("messages").and_then(|v| v.as_array());
+    assert!(messages.is_some());
+    assert_eq!(messages.unwrap().len(), 3);
+}
+
+#[test]
+fn test_round_trip_human_message_prompt_template() {
+    use agent_chain_core::prompts::HumanMessagePromptTemplate;
+
+    let template = HumanMessagePromptTemplate::from_template("Hello, {name}!").unwrap();
+    let serialized = dumpd(&template).unwrap();
+    let loaded = load(serialized, None).unwrap();
+
+    assert!(loaded.is_object());
+    assert!(loaded.get("_type").is_none());
+    // The inner prompt should be preserved
+    let prompt = loaded.get("prompt");
+    assert!(prompt.is_some());
+}
+
+#[test]
+fn test_round_trip_system_message_prompt_template() {
+    use agent_chain_core::prompts::SystemMessagePromptTemplate;
+
+    let template = SystemMessagePromptTemplate::from_template("You are {role}.").unwrap();
+    let serialized = dumpd(&template).unwrap();
+    let loaded = load(serialized, None).unwrap();
+
+    assert!(loaded.is_object());
+    assert!(loaded.get("_type").is_none());
+}
+
+#[test]
+fn test_round_trip_messages_placeholder() {
+    use agent_chain_core::prompts::MessagesPlaceholder;
+
+    let placeholder = MessagesPlaceholder::new("history").optional(true);
+    let serialized = dumpd(&placeholder).unwrap();
+    let loaded = load(serialized, None).unwrap();
+
+    assert!(loaded.is_object());
+    assert!(loaded.get("_type").is_none());
+    assert_eq!(
+        loaded.get("variable_name").and_then(|v| v.as_str()),
+        Some("history")
+    );
+    assert_eq!(
+        loaded.get("optional").and_then(|v| v.as_bool()),
+        Some(true)
+    );
+}
