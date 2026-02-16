@@ -1,5 +1,5 @@
-pub mod embeddings;
 pub mod fake;
+mod inner;
 
-pub use embeddings::Embeddings;
 pub use fake::{DeterministicFakeEmbedding, FakeEmbeddings};
+pub use inner::Embeddings;

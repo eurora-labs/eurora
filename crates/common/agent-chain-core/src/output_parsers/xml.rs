@@ -510,7 +510,7 @@ mod tests {
     fn test_nested_element() {
         let path = vec!["root".to_string()];
         let result = nested_element(&path, "item", Some("value"));
-        assert!(result.0.get("root").is_some());
+        assert!(result.0.contains_key("root"));
     }
 
     #[test]

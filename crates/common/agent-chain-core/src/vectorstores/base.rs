@@ -646,14 +646,14 @@ impl BaseRetriever for VectorStoreRetriever {
 // as_retriever extension
 // ---------------------------------------------------------------------------
 
-/// Extension trait providing `as_retriever()` for `Arc<dyn VectorStore>`.
+/// Extension trait providing `into_retriever()` for `Arc<dyn VectorStore>`.
 pub trait VectorStoreRetrieverExt {
     /// Create a VectorStoreRetriever from this vector store.
-    fn as_retriever(self, config: VectorStoreRetrieverConfig) -> Result<VectorStoreRetriever>;
+    fn into_retriever(self, config: VectorStoreRetrieverConfig) -> Result<VectorStoreRetriever>;
 }
 
 impl VectorStoreRetrieverExt for Arc<dyn VectorStore> {
-    fn as_retriever(self, config: VectorStoreRetrieverConfig) -> Result<VectorStoreRetriever> {
+    fn into_retriever(self, config: VectorStoreRetrieverConfig) -> Result<VectorStoreRetriever> {
         VectorStoreRetriever::new(self, config)
     }
 }
