@@ -259,6 +259,7 @@ dependencies = [
  "chrono",
  "csv",
  "futures",
+ "quick-xml 0.37.5",
  "rand 0.9.2",
  "rand_distr",
  "regex",
