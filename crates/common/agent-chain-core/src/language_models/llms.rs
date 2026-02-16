@@ -964,6 +964,13 @@ pub trait BaseLLM: BaseLanguageModel {
         params.ls_model_type = Some("llm".to_string());
         params
     }
+
+    /// Save the LLM configuration to a file.
+    ///
+    /// Mirrors Python's `BaseLLM.save()` instance method.
+    fn save(&self, path: &std::path::Path) -> Result<()> {
+        save_llm(&self.identifying_params(), path)
+    }
 }
 
 /// Simple interface for implementing a custom LLM.
