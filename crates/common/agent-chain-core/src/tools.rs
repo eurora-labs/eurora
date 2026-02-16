@@ -48,6 +48,7 @@ pub use base::{
     BaseTool,
     BaseToolkit,
     DynTool,
+    ToolRunnable,
     // Constants
     FILTERED_ARGS,
     HandleToolError,
