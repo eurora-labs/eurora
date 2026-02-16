@@ -99,7 +99,8 @@ pub use memory_stream::{MemoryStream, ReceiveStream, SendStream};
 
 // Re-export log stream types
 pub use log_stream::{
-    JsonPatchOp, LogEntry, LogStreamCallbackHandler, LogStreamConfig, RunLog, RunLogPatch, RunState,
+    JsonPatchOp, LogEntry, LogStreamCallbackHandler, LogStreamCallbackHandlerBridge,
+    LogStreamConfig, RunLog, RunLogPatch, RunState, astream_log_implementation,
 };
 
 // Re-export concrete tracers
