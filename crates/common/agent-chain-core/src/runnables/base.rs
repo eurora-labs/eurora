@@ -20,10 +20,11 @@ use crate::load::{Serializable, Serialized};
 
 use super::config::{
     AsyncVariableArgsFn, ConfigOrList, RunnableConfig, VariableArgsFn,
-    call_func_with_variable_args, ensure_config, get_async_callback_manager_for_config,
-    get_callback_manager_for_config, get_config_list, merge_configs, patch_config,
-    set_config_context,
+    acall_func_with_variable_args, call_func_with_variable_args, ensure_config,
+    get_async_callback_manager_for_config, get_callback_manager_for_config, get_config_list,
+    merge_configs, patch_config, set_config_context,
 };
+use super::utils::Addable;
 
 /// Number of generic type arguments for Runnable (Input and Output).
 #[allow(dead_code)]
@@ -1067,6 +1068,48 @@ where
             config,
         )
     }
+
+    fn atransform<'a>(
+        &'a self,
+        input: BoxStream<'a, Self::Input>,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'a, Result<Self::Output>>
+    where
+        Self: 'static,
+    {
+        if let Some(afunc) = &self.afunc {
+            let afunc = afunc;
+            self.transform_stream_with_config(
+                input,
+                Box::new(move |input_stream, config| {
+                    let config = config.clone();
+                    Box::pin(async_stream::stream! {
+                        let mut stream = input_stream;
+                        let mut final_input: Option<I> = None;
+                        while let Some(ichunk) = stream.next().await {
+                            final_input = Some(ichunk);
+                        }
+                        if let Some(input_val) = final_input {
+                            let result = acall_func_with_variable_args(
+                                afunc, input_val, &config
+                            ).await;
+                            yield result;
+                        }
+                    })
+                }),
+                config,
+            )
+        } else if self.func.is_some() {
+            // Fall back to sync transform
+            self.transform(input, config)
+        } else {
+            Box::pin(futures::stream::once(async {
+                Err(Error::other(
+                    "RunnableLambdaWithConfig has no func or afunc",
+                ))
+            }))
+        }
+    }
 }
 
 // =============================================================================
@@ -1575,17 +1618,55 @@ where
         input: BoxStream<'a, Self::Input>,
         config: Option<RunnableConfig>,
     ) -> BoxStream<'a, Result<Self::Output>> {
-        // Buffer input to a single value, then delegate to stream
+        let num_steps = self.steps.len();
+        if num_steps == 0 {
+            return Box::pin(futures::stream::empty());
+        }
+
+        // Tee the input stream: collect all chunks into a shared buffer,
+        // then replay them to each branch via separate streams.
         Box::pin(async_stream::stream! {
-            let mut input = input;
-            let mut final_input: Option<Self::Input> = None;
-            while let Some(ichunk) = input.next().await {
-                final_input = Some(ichunk);
+            let config = ensure_config(config);
+
+            // Collect the full input into a Vec for replay to each branch
+            let input_chunks: Vec<Self::Input> = input.collect().await;
+
+            // Create a tagged SelectAll over each branch's transform output
+            let mut tagged_streams: futures::stream::SelectAll<
+                BoxStream<'_, Result<(String, Value)>>
+            > = futures::stream::SelectAll::new();
+
+            for (name, step) in &self.steps {
+                let name = name.clone();
+                // Replay the collected input chunks as a fresh stream for this branch
+                let branch_input: BoxStream<'_, Self::Input> =
+                    Box::pin(futures::stream::iter(input_chunks.clone()));
+                let branch_config = patch_config(
+                    Some(config.clone()),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                );
+                let branch_output = step.transform(branch_input, Some(branch_config));
+                let named_stream = branch_output.map(move |result| {
+                    result.map(|value| (name.clone(), value))
+                });
+                tagged_streams.push(Box::pin(named_stream));
             }
-            if let Some(input_val) = final_input {
-                let mut stream = self.stream(input_val, config);
-                while let Some(result) = stream.next().await {
-                    yield result;
+
+            // Yield single-key HashMaps as chunks arrive
+            while let Some(result) = tagged_streams.next().await {
+                match result {
+                    Ok((key, value)) => {
+                        let mut chunk = HashMap::new();
+                        chunk.insert(key, value);
+                        yield Ok(chunk);
+                    }
+                    Err(e) => {
+                        yield Err(e);
+                    }
                 }
             }
         })
@@ -1825,7 +1906,7 @@ pub type TransformFn<I, O> =
 pub struct RunnableGenerator<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
-    O: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + Addable + 'static,
 {
     transform_fn: TransformFn<I, O>,
     name: Option<String>,
@@ -1834,7 +1915,7 @@ where
 impl<I, O> Debug for RunnableGenerator<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
-    O: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + Addable + 'static,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RunnableGenerator")
@@ -1846,7 +1927,7 @@ where
 impl<I, O> RunnableGenerator<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
-    O: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + Addable + 'static,
 {
     /// Create a new RunnableGenerator from a transform function.
     ///
@@ -1873,7 +1954,7 @@ where
 impl<I, O> Runnable for RunnableGenerator<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
-    O: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + Addable + 'static,
 {
     type Input = I;
     type Output = O;
@@ -1883,8 +1964,6 @@ where
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        // Accumulate stream output, keeping the last chunk (matches Python's
-        // fallback behavior when types don't support +).
         let rt = tokio::runtime::Handle::try_current()
             .map_err(|_| Error::other("RunnableGenerator::invoke requires a tokio runtime"))?;
 
@@ -1892,7 +1971,11 @@ where
             let mut stream = self.stream(input, config);
             let mut final_output: Option<Self::Output> = None;
             while let Some(result) = stream.next().await {
-                final_output = Some(result?);
+                let chunk = result?;
+                final_output = Some(match final_output {
+                    None => chunk,
+                    Some(prev) => prev.add(chunk),
+                });
             }
             final_output.ok_or_else(|| Error::other("RunnableGenerator produced no output"))
         })
@@ -1909,7 +1992,11 @@ where
         let mut stream = self.astream(input, config);
         let mut final_output: Option<Self::Output> = None;
         while let Some(result) = stream.next().await {
-            final_output = Some(result?);
+            let chunk = result?;
+            final_output = Some(match final_output {
+                None => chunk,
+                Some(prev) => prev.add(chunk),
+            });
         }
         final_output.ok_or_else(|| Error::other("RunnableGenerator produced no output"))
     }
@@ -2154,8 +2241,8 @@ mod tests {
         });
 
         let result = generator.ainvoke("input".to_string(), None).await.unwrap();
-        // Keeps last chunk
-        assert_eq!(result, " a nice day");
+        // Addable accumulation: "Have" + " a nice day" = "Have a nice day"
+        assert_eq!(result, "Have a nice day");
     }
 
     #[tokio::test]
