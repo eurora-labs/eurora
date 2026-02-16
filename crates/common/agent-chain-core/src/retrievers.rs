@@ -163,6 +163,7 @@ pub trait BaseRetriever: Send + Sync + Debug {
         let callback_manager = CallbackManager::configure(
             config.callbacks.clone(),
             None,
+            false,
             Some(config.tags.clone()),
             self.tags().map(|t| t.to_vec()),
             Some(inheritable_metadata),
@@ -206,6 +207,7 @@ pub trait BaseRetriever: Send + Sync + Debug {
         let callback_manager = AsyncCallbackManager::configure(
             config.callbacks.clone(),
             None,
+            false,
             Some(config.tags.clone()),
             self.tags().map(|t| t.to_vec()),
             Some(inheritable_metadata),

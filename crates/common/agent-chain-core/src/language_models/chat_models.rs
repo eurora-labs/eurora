@@ -692,6 +692,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         let callback_manager = CallbackManager::configure(
             callbacks,
             self.callbacks().cloned(),
+            false,
             tags,
             self.config().tags.clone(),
             Some(inheritable_metadata),
@@ -837,6 +838,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         let callback_manager = AsyncCallbackManager::configure(
             callbacks,
             self.callbacks().cloned(),
+            false,
             tags,
             self.config().tags.clone(),
             Some(inheritable_metadata),
@@ -1352,6 +1354,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         let callback_manager = crate::callbacks::CallbackManager::configure(
             callbacks,
             self.callbacks().cloned(),
+            false,
             tags,
             self.config().tags.clone(),
             Some(inheritable_metadata),
@@ -1487,6 +1490,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         let callback_manager = crate::callbacks::AsyncCallbackManager::configure(
             callbacks,
             self.callbacks().cloned(),
+            false,
             tags,
             self.config().tags.clone(),
             Some(inheritable_metadata),

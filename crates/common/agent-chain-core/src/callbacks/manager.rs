@@ -15,6 +15,13 @@ use crate::messages::BaseMessage;
 use crate::outputs::ChatResult;
 
 use super::base::{BaseCallbackHandler, BaseCallbackManager, Callbacks};
+use super::stdout::StdOutCallbackHandler;
+use crate::globals::get_debug;
+use crate::tracers::context::{
+    get_configure_hooks, get_tracer_project, get_tracing_callback, tracing_v2_is_enabled,
+};
+use crate::tracers::stdout::ConsoleCallbackHandler;
+use crate::utils::env::env_var_is_set;
 use crate::utils::uuid::uuid7;
 
 /// Handle an event for the given handlers.
@@ -1313,64 +1320,195 @@ impl CallbackManager {
     }
 
     /// Configure the callback manager.
+    ///
+    /// Matches Python's `CallbackManager.configure()` which delegates to `_configure()`.
     pub fn configure(
         inheritable_callbacks: Option<Callbacks>,
         local_callbacks: Option<Callbacks>,
+        verbose: bool,
         inheritable_tags: Option<Vec<String>>,
         local_tags: Option<Vec<String>>,
         inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
         local_metadata: Option<HashMap<String, serde_json::Value>>,
     ) -> Self {
-        let mut callback_manager = Self::new();
-
-        if let Some(callbacks) = inheritable_callbacks {
-            match callbacks {
-                Callbacks::Handlers(handlers) => {
-                    callback_manager.handlers = handlers.clone();
-                    callback_manager.inheritable_handlers = handlers;
-                }
-                Callbacks::Manager(manager) => {
-                    callback_manager.handlers = manager.handlers.clone();
-                    callback_manager.inheritable_handlers = manager.inheritable_handlers.clone();
-                    callback_manager.parent_run_id = manager.parent_run_id;
-                    callback_manager.tags = manager.tags.clone();
-                    callback_manager.inheritable_tags = manager.inheritable_tags.clone();
-                    callback_manager.metadata = manager.metadata.clone();
-                    callback_manager.inheritable_metadata = manager.inheritable_metadata.clone();
-                }
-            }
-        }
-
-        if let Some(callbacks) = local_callbacks {
-            match callbacks {
-                Callbacks::Handlers(handlers) => {
-                    for handler in handlers {
-                        callback_manager.add_handler(handler, false);
-                    }
-                }
-                Callbacks::Manager(manager) => {
-                    for handler in manager.handlers {
-                        callback_manager.add_handler(handler, false);
-                    }
-                }
-            }
-        }
-
-        if let Some(tags) = inheritable_tags {
-            callback_manager.add_tags(tags, true);
-        }
-        if let Some(tags) = local_tags {
-            callback_manager.add_tags(tags, false);
-        }
-        if let Some(metadata) = inheritable_metadata {
-            callback_manager.add_metadata(metadata, true);
-        }
-        if let Some(metadata) = local_metadata {
-            callback_manager.add_metadata(metadata, false);
-        }
-
-        callback_manager
+        _configure(
+            inheritable_callbacks,
+            local_callbacks,
+            verbose,
+            inheritable_tags,
+            local_tags,
+            inheritable_metadata,
+            local_metadata,
+        )
     }
+}
+
+/// Internal configure implementation shared by CallbackManager and AsyncCallbackManager.
+///
+/// This matches Python's `_configure()` function in manager.py.
+#[allow(clippy::too_many_arguments)]
+fn _configure(
+    inheritable_callbacks: Option<Callbacks>,
+    local_callbacks: Option<Callbacks>,
+    verbose: bool,
+    inheritable_tags: Option<Vec<String>>,
+    local_tags: Option<Vec<String>>,
+    inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
+    local_metadata: Option<HashMap<String, serde_json::Value>>,
+) -> CallbackManager {
+    // Step 1: Tracing context
+    // In Python this calls langsmith's get_tracing_context() to obtain
+    // parent run tree, metadata, and tags from the LangSmith context.
+    // Full LangSmith run-tree integration is a future phase.
+    let tracing_metadata: HashMap<String, serde_json::Value> = HashMap::new();
+    let tracing_tags: Vec<String> = Vec::new();
+    let parent_run_id: Option<Uuid> = None;
+
+    // Step 2: Merge inheritable/local callbacks
+    let mut callback_manager = CallbackManager::new();
+    callback_manager.parent_run_id = parent_run_id;
+
+    if let Some(callbacks) = inheritable_callbacks {
+        match callbacks {
+            Callbacks::Handlers(handlers) => {
+                callback_manager.handlers = handlers.clone();
+                callback_manager.inheritable_handlers = handlers;
+            }
+            Callbacks::Manager(manager) => {
+                let parent_run_id_ = if parent_run_id.is_some() {
+                    parent_run_id
+                } else {
+                    manager.parent_run_id
+                };
+                callback_manager.handlers = manager.handlers.clone();
+                callback_manager.inheritable_handlers = manager.inheritable_handlers.clone();
+                callback_manager.parent_run_id = parent_run_id_;
+                callback_manager.tags = manager.tags.clone();
+                callback_manager.inheritable_tags = manager.inheritable_tags.clone();
+                callback_manager.metadata = manager.metadata.clone();
+                callback_manager.inheritable_metadata = manager.inheritable_metadata.clone();
+            }
+        }
+    }
+
+    if let Some(callbacks) = local_callbacks {
+        let local_handlers = match callbacks {
+            Callbacks::Handlers(handlers) => handlers,
+            Callbacks::Manager(manager) => manager.handlers,
+        };
+        for handler in local_handlers {
+            callback_manager.add_handler(handler, false);
+        }
+    }
+
+    // Step 3: Merge tags and metadata
+    if let Some(tags) = inheritable_tags {
+        callback_manager.add_tags(tags, true);
+    }
+    if let Some(tags) = local_tags {
+        callback_manager.add_tags(tags, false);
+    }
+    if let Some(metadata) = inheritable_metadata {
+        callback_manager.add_metadata(metadata, true);
+    }
+    if let Some(metadata) = local_metadata {
+        callback_manager.add_metadata(metadata, false);
+    }
+
+    if !tracing_metadata.is_empty() {
+        callback_manager.add_metadata(tracing_metadata, true);
+    }
+    if !tracing_tags.is_empty() {
+        callback_manager.add_tags(tracing_tags, true);
+    }
+
+    // Step 4: V1 tracing guard
+    let v1_tracing_enabled =
+        env_var_is_set("LANGCHAIN_TRACING") || env_var_is_set("LANGCHAIN_HANDLER");
+    let tracing_v2_enabled = tracing_v2_is_enabled();
+
+    if v1_tracing_enabled && !tracing_v2_enabled {
+        tracing::warn!(
+            "Tracing using LangChainTracerV1 is no longer supported.              Please set the LANGCHAIN_TRACING_V2 environment variable to enable              tracing instead."
+        );
+    }
+
+    // Step 5: Auto-add verbose/debug/tracing handlers
+    let debug = get_debug();
+
+    if verbose || debug || tracing_v2_enabled {
+        if verbose
+            && !callback_manager
+                .handlers
+                .iter()
+                .any(|h| h.name() == "StdOutCallbackHandler")
+        {
+            if !debug {
+                callback_manager.add_handler(Arc::new(StdOutCallbackHandler::new()), false);
+            }
+        }
+
+        if debug
+            && !callback_manager
+                .handlers
+                .iter()
+                .any(|h| h.name() == "ConsoleCallbackHandler")
+        {
+            callback_manager.add_handler(Arc::new(ConsoleCallbackHandler::new()), true);
+        }
+
+        if tracing_v2_enabled
+            && !callback_manager
+                .handlers
+                .iter()
+                .any(|h| h.name() == "LangChainTracer")
+        {
+            if let Some(_tracer) = get_tracing_callback() {
+                tracing::debug!(
+                    "Tracing is enabled but LangChainTracer is not yet                      implemented in Rust. Tracing callbacks will not be sent."
+                );
+            } else {
+                let tracer_project = get_tracer_project();
+                tracing::debug!(
+                    "Tracing is enabled (project: {}) but LangChainTracer is not yet                      implemented in Rust. Tracing callbacks will not be sent.",
+                    tracer_project
+                );
+            }
+        }
+    }
+
+    // Step 6: Process configure hooks
+    if let Ok(registry) = get_configure_hooks().lock() {
+        for hook in registry.hooks() {
+            let create_from_env = hook.env_var.as_ref().is_some_and(|var| env_var_is_set(var))
+                && hook.handler_factory.is_some();
+
+            let context_handler = (hook.context_getter)();
+
+            if context_handler.is_some() || create_from_env {
+                let handler = context_handler
+                    .unwrap_or_else(|| (hook.handler_factory.as_ref().expect("checked above"))());
+
+                let already_present = if let Some(type_name) = &hook.handler_type_name {
+                    callback_manager
+                        .handlers
+                        .iter()
+                        .any(|h| h.name() == type_name)
+                } else {
+                    callback_manager
+                        .handlers
+                        .iter()
+                        .any(|h| std::ptr::eq(h.as_ref(), handler.as_ref()))
+                };
+
+                if !already_present {
+                    callback_manager.add_handler(handler, hook.inheritable);
+                }
+            }
+        }
+    }
+
+    callback_manager
 }
 
 /// Async callback manager for LangChain.
@@ -1601,18 +1739,22 @@ impl AsyncCallbackManager {
     }
 
     /// Configure the async callback manager.
+    ///
+    /// Matches Python's `AsyncCallbackManager.configure()` which delegates to `_configure()`.
     pub fn configure(
         inheritable_callbacks: Option<Callbacks>,
         local_callbacks: Option<Callbacks>,
+        verbose: bool,
         inheritable_tags: Option<Vec<String>>,
         local_tags: Option<Vec<String>>,
         inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
         local_metadata: Option<HashMap<String, serde_json::Value>>,
     ) -> Self {
         Self {
-            inner: CallbackManager::configure(
+            inner: _configure(
                 inheritable_callbacks,
                 local_callbacks,
+                verbose,
                 inheritable_tags,
                 local_tags,
                 inheritable_metadata,
@@ -1900,6 +2042,7 @@ mod tests {
         let manager = CallbackManager::configure(
             None,
             None,
+            false,
             Some(vec!["tag1".to_string()]),
             Some(vec!["tag2".to_string()]),
             None,
@@ -1910,6 +2053,81 @@ mod tests {
         assert!(manager.tags.contains(&"tag2".to_string()));
         assert!(manager.inheritable_tags.contains(&"tag1".to_string()));
         assert!(!manager.inheritable_tags.contains(&"tag2".to_string()));
+    }
+
+    #[test]
+    fn test_configure_with_verbose() {
+        // Reset debug to false
+        crate::globals::set_debug(false);
+
+        let manager = CallbackManager::configure(None, None, true, None, None, None, None);
+        assert!(
+            manager
+                .handlers
+                .iter()
+                .any(|h| h.name() == "StdOutCallbackHandler"),
+            "StdOutCallbackHandler should be added when verbose=true"
+        );
+    }
+
+    #[test]
+    fn test_configure_with_debug() {
+        crate::globals::set_debug(true);
+
+        let manager = CallbackManager::configure(None, None, false, None, None, None, None);
+        assert!(
+            manager
+                .handlers
+                .iter()
+                .any(|h| h.name() == "ConsoleCallbackHandler"),
+            "ConsoleCallbackHandler should be added when debug=true"
+        );
+
+        crate::globals::set_debug(false);
+    }
+
+    #[test]
+    fn test_configure_verbose_not_added_when_debug() {
+        crate::globals::set_debug(true);
+
+        let manager = CallbackManager::configure(None, None, true, None, None, None, None);
+        assert!(
+            !manager
+                .handlers
+                .iter()
+                .any(|h| h.name() == "StdOutCallbackHandler"),
+            "StdOutCallbackHandler should NOT be added when debug=true (debug supersedes verbose)"
+        );
+        assert!(
+            manager
+                .handlers
+                .iter()
+                .any(|h| h.name() == "ConsoleCallbackHandler"),
+            "ConsoleCallbackHandler should be added when debug=true"
+        );
+
+        crate::globals::set_debug(false);
+    }
+
+    #[test]
+    fn test_configure_deduplication() {
+        crate::globals::set_debug(false);
+
+        let handler: Arc<dyn BaseCallbackHandler> = Arc::new(StdOutCallbackHandler::new());
+        let callbacks = Callbacks::Handlers(vec![handler]);
+
+        let manager =
+            CallbackManager::configure(Some(callbacks), None, true, None, None, None, None);
+
+        let stdout_count = manager
+            .handlers
+            .iter()
+            .filter(|h| h.name() == "StdOutCallbackHandler")
+            .count();
+        assert_eq!(
+            stdout_count, 1,
+            "Should not duplicate StdOutCallbackHandler"
+        );
     }
 }
 
@@ -2316,7 +2534,15 @@ where
     F: FnOnce(&mut CallbackManagerForChainGroup) -> R,
 {
     let cm = callback_manager.unwrap_or_else(|| {
-        CallbackManager::configure(None, None, tags.clone(), None, metadata.clone(), None)
+        CallbackManager::configure(
+            None,
+            None,
+            false,
+            tags.clone(),
+            None,
+            metadata.clone(),
+            None,
+        )
     });
 
     let mut serialized = HashMap::new();
@@ -2438,7 +2664,15 @@ where
     Fut: Future<Output = R>,
 {
     let cm = callback_manager.unwrap_or_else(|| {
-        AsyncCallbackManager::configure(None, None, tags.clone(), None, metadata.clone(), None)
+        AsyncCallbackManager::configure(
+            None,
+            None,
+            false,
+            tags.clone(),
+            None,
+            metadata.clone(),
+            None,
+        )
     });
 
     let mut serialized = HashMap::new();

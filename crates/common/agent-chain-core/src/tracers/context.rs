@@ -7,8 +7,10 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use crate::callbacks::base::BaseCallbackHandler;
 use crate::tracers::run_collector::RunCollectorCallbackHandler;
 use crate::tracers::schemas::Run;
+use crate::utils::env::env_var_is_set;
 
 // Thread-local storage for the tracing callback handler.
 thread_local! {
@@ -77,9 +79,21 @@ pub fn tracing_v2_enabled(callback: Arc<dyn TracingCallback>) -> TracingV2Guard 
     TracingV2Guard { previous }
 }
 
-/// Check if tracing v2 is enabled.
+/// Check if tracing v2 is enabled via context or environment variables.
+///
+/// Checks (in order):
+/// 1. Thread-local tracing callback is set
+/// 2. LANGSMITH_TRACING_V2 or LANGCHAIN_TRACING_V2 env var is "true"
+/// 3. LANGSMITH_TRACING or LANGCHAIN_TRACING env var is "true"
 pub fn tracing_v2_is_enabled() -> bool {
-    TRACING_V2_CALLBACK.with(|cell| cell.borrow().is_some())
+    let has_callback = TRACING_V2_CALLBACK.with(|cell| cell.borrow().is_some());
+    if has_callback {
+        return true;
+    }
+    env_var_is_set("LANGSMITH_TRACING_V2")
+        || env_var_is_set("LANGCHAIN_TRACING_V2")
+        || env_var_is_set("LANGSMITH_TRACING")
+        || env_var_is_set("LANGCHAIN_TRACING")
 }
 
 /// Get the current tracing callback.
@@ -120,22 +134,75 @@ pub fn get_run_collector() -> Option<Arc<std::sync::Mutex<RunCollectorCallbackHa
     RUN_COLLECTOR.with(|cell| cell.borrow().clone())
 }
 
-/// Configuration hook for registering callback handlers.
-#[derive(Debug, Clone)]
+/// Get the project name for tracing.
+///
+/// Checks env vars in order: HOSTED_LANGSERVE_PROJECT_NAME,
+/// LANGSMITH_PROJECT / LANGCHAIN_PROJECT,
+/// LANGSMITH_SESSION / LANGCHAIN_SESSION, then falls back to "default".
+pub fn get_tracer_project() -> String {
+    if let Ok(val) = std::env::var("HOSTED_LANGSERVE_PROJECT_NAME") {
+        if !val.is_empty() {
+            return val;
+        }
+    }
+    for name in &["LANGSMITH_PROJECT", "LANGCHAIN_PROJECT"] {
+        if let Ok(val) = std::env::var(name) {
+            if !val.is_empty() {
+                return val;
+            }
+        }
+    }
+    for name in &["LANGSMITH_SESSION", "LANGCHAIN_SESSION"] {
+        if let Ok(val) = std::env::var(name) {
+            if !val.is_empty() {
+                return val;
+            }
+        }
+    }
+    "default".to_string()
+}
+
+/// Configuration hook for registering callback handlers that get
+/// auto-added during `configure()`.
 pub struct ConfigureHook {
-    /// Whether the hook is inheritable.
+    /// Function to get the current context value (replaces Python's ContextVar.get()).
+    pub context_getter: Box<dyn Fn() -> Option<Arc<dyn BaseCallbackHandler>> + Send + Sync>,
+    /// Whether the handler should be inheritable.
     pub inheritable: bool,
-    /// The environment variable to check.
+    /// Optional factory to create a new handler (replaces Python's handler_class()).
+    pub handler_factory: Option<Box<dyn Fn() -> Arc<dyn BaseCallbackHandler> + Send + Sync>>,
+    /// Optional handler type name for deduplication (replaces Python's isinstance check).
+    pub handler_type_name: Option<String>,
+    /// Optional environment variable that triggers auto-creation.
     pub env_var: Option<String>,
 }
 
 impl ConfigureHook {
     /// Create a new configure hook.
-    pub fn new(inheritable: bool, env_var: Option<String>) -> Self {
+    pub fn new(
+        context_getter: impl Fn() -> Option<Arc<dyn BaseCallbackHandler>> + Send + Sync + 'static,
+        inheritable: bool,
+        handler_factory: Option<Box<dyn Fn() -> Arc<dyn BaseCallbackHandler> + Send + Sync>>,
+        handler_type_name: Option<String>,
+        env_var: Option<String>,
+    ) -> Self {
         Self {
+            context_getter: Box::new(context_getter),
             inheritable,
+            handler_factory,
+            handler_type_name,
             env_var,
         }
+    }
+}
+
+impl std::fmt::Debug for ConfigureHook {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConfigureHook")
+            .field("inheritable", &self.inheritable)
+            .field("handler_type_name", &self.handler_type_name)
+            .field("env_var", &self.env_var)
+            .finish()
     }
 }
 
@@ -168,14 +235,29 @@ static CONFIGURE_HOOKS: std::sync::LazyLock<std::sync::Mutex<ConfigureHookRegist
 
 /// Register a configure hook.
 ///
-/// # Arguments
-///
-/// * `inheritable` - Whether the hook is inheritable.
-/// * `env_var` - The environment variable to check.
-pub fn register_configure_hook(inheritable: bool, env_var: Option<String>) {
+/// Matches Python's `register_configure_hook(context_var, inheritable, handler_class)`.
+pub fn register_configure_hook(
+    context_getter: impl Fn() -> Option<Arc<dyn BaseCallbackHandler>> + Send + Sync + 'static,
+    inheritable: bool,
+    handler_factory: Option<Box<dyn Fn() -> Arc<dyn BaseCallbackHandler> + Send + Sync>>,
+    handler_type_name: Option<String>,
+    env_var: Option<String>,
+) {
     if let Ok(mut registry) = CONFIGURE_HOOKS.lock() {
-        registry.register(ConfigureHook::new(inheritable, env_var));
+        registry.register(ConfigureHook::new(
+            context_getter,
+            inheritable,
+            handler_factory,
+            handler_type_name,
+            env_var,
+        ));
     }
+}
+
+/// Get a reference to the global configure hooks registry.
+pub fn get_configure_hooks() -> &'static std::sync::LazyLock<std::sync::Mutex<ConfigureHookRegistry>>
+{
+    &CONFIGURE_HOOKS
 }
 
 #[cfg(test)]
@@ -243,10 +325,72 @@ mod tests {
 
     #[test]
     fn test_register_configure_hook() {
-        register_configure_hook(false, None);
-        register_configure_hook(true, Some("LANGCHAIN_TRACING_V2".to_string()));
+        register_configure_hook(|| None, false, None, None, None);
+        register_configure_hook(
+            || None,
+            true,
+            None,
+            None,
+            Some("LANGCHAIN_TRACING_V2".to_string()),
+        );
 
         let registry = CONFIGURE_HOOKS.lock().unwrap();
         assert!(registry.hooks().len() >= 2);
+    }
+
+    #[test]
+    fn test_tracing_v2_is_enabled_env_vars() {
+        // Start clean
+        assert!(
+            !tracing_v2_is_enabled() || TRACING_V2_CALLBACK.with(|cell| cell.borrow().is_some())
+        );
+
+        // Test LANGCHAIN_TRACING_V2
+        unsafe {
+            std::env::set_var("LANGCHAIN_TRACING_V2", "true");
+        }
+        assert!(tracing_v2_is_enabled());
+        unsafe {
+            std::env::remove_var("LANGCHAIN_TRACING_V2");
+        }
+
+        // Test LANGSMITH_TRACING
+        unsafe {
+            std::env::set_var("LANGSMITH_TRACING", "true");
+        }
+        assert!(tracing_v2_is_enabled());
+        unsafe {
+            std::env::remove_var("LANGSMITH_TRACING");
+        }
+    }
+
+    #[test]
+    fn test_get_tracer_project() {
+        // Clean env
+        unsafe {
+            std::env::remove_var("HOSTED_LANGSERVE_PROJECT_NAME");
+            std::env::remove_var("LANGSMITH_PROJECT");
+            std::env::remove_var("LANGCHAIN_PROJECT");
+            std::env::remove_var("LANGSMITH_SESSION");
+            std::env::remove_var("LANGCHAIN_SESSION");
+        }
+
+        assert_eq!(get_tracer_project(), "default");
+
+        unsafe {
+            std::env::set_var("LANGCHAIN_PROJECT", "my_project");
+        }
+        assert_eq!(get_tracer_project(), "my_project");
+        unsafe {
+            std::env::remove_var("LANGCHAIN_PROJECT");
+        }
+
+        unsafe {
+            std::env::set_var("HOSTED_LANGSERVE_PROJECT_NAME", "hosted_proj");
+        }
+        assert_eq!(get_tracer_project(), "hosted_proj");
+        unsafe {
+            std::env::remove_var("HOSTED_LANGSERVE_PROJECT_NAME");
+        }
     }
 }
