@@ -22,9 +22,9 @@ pub mod utils;
 // Re-export commonly used types
 pub use base::{
     DynRunnable, GraphProvider, Runnable, RunnableBinding, RunnableEach, RunnableGenerator,
-    RunnableGraphProvider,
-    RunnableLambda, RunnableLambdaWithConfig, RunnableParallel, RunnableSequence,
-    RunnableSerializable, TransformFn, coerce_to_runnable, pipe, runnable_lambda, to_dyn,
+    RunnableGraphProvider, RunnableLambda, RunnableLambdaWithConfig, RunnableParallel,
+    RunnableSequence, RunnableSerializable, TransformFn, coerce_to_runnable, pipe, runnable_lambda,
+    to_dyn,
 };
 pub use branch::{RunnableBranch, RunnableBranchBuilder};
 pub use config::{

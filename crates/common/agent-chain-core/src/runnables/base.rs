@@ -643,7 +643,6 @@ pub trait Runnable: Send + Sync + Debug {
         )
     }
 
-
     /// Generate a stream of log patches.
     ///
     /// Use to create a stream of `RunLogPatch` that provide real-time
@@ -689,15 +688,14 @@ pub trait Runnable: Send + Sync + Debug {
     /// Input → Runnable → Output.
     ///
     /// Mirrors Python's `Runnable.get_graph()`.
-    fn get_graph(
-        &self,
-        config: Option<&RunnableConfig>,
-    ) -> Result<super::graph::Graph> {
+    fn get_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph> {
         use super::graph::NodeData;
         let mut graph = super::graph::Graph::new();
 
         let input_node = graph.add_node(
-            Some(NodeData::Schema { name: self.get_name(Some("Input"), None) }),
+            Some(NodeData::Schema {
+                name: self.get_name(Some("Input"), None),
+            }),
             None,
             None,
         );
@@ -707,13 +705,17 @@ pub trait Runnable: Send + Sync + Debug {
             .filter(|m| !m.is_empty())
             .cloned();
         let runnable_node = graph.add_node(
-            Some(NodeData::Runnable { name: self.get_name(None, None) }),
+            Some(NodeData::Runnable {
+                name: self.get_name(None, None),
+            }),
             None,
             metadata,
         );
 
         let output_node = graph.add_node(
-            Some(NodeData::Schema { name: self.get_name(Some("Output"), None) }),
+            Some(NodeData::Schema {
+                name: self.get_name(Some("Output"), None),
+            }),
             None,
             None,
         );
@@ -844,7 +846,9 @@ pub struct RunnableGraphProvider<R: Runnable>(pub R);
 
 impl<R: Runnable> Debug for RunnableGraphProvider<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("RunnableGraphProvider").field(&self.0).finish()
+        f.debug_tuple("RunnableGraphProvider")
+            .field(&self.0)
+            .finish()
     }
 }
 
@@ -1007,17 +1011,16 @@ where
         )
     }
 
-    fn get_graph(
-        &self,
-        config: Option<&RunnableConfig>,
-    ) -> Result<super::graph::Graph> {
+    fn get_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph> {
         if self.deps.is_empty() {
             // No deps: fall back to the default 3-node graph
             use super::graph::NodeData;
             let mut graph = super::graph::Graph::new();
 
             let input_node = graph.add_node(
-                Some(NodeData::Schema { name: self.get_name(Some("Input"), None) }),
+                Some(NodeData::Schema {
+                    name: self.get_name(Some("Input"), None),
+                }),
                 None,
                 None,
             );
@@ -1027,13 +1030,17 @@ where
                 .filter(|m| !m.is_empty())
                 .cloned();
             let runnable_node = graph.add_node(
-                Some(NodeData::Runnable { name: self.get_name(None, None) }),
+                Some(NodeData::Runnable {
+                    name: self.get_name(None, None),
+                }),
                 None,
                 metadata,
             );
 
             let output_node = graph.add_node(
-                Some(NodeData::Schema { name: self.get_name(Some("Output"), None) }),
+                Some(NodeData::Schema {
+                    name: self.get_name(Some("Output"), None),
+                }),
                 None,
                 None,
             );
@@ -1048,12 +1055,16 @@ where
             let mut graph = super::graph::Graph::new();
 
             let input_node = graph.add_node(
-                Some(NodeData::Schema { name: self.get_name(Some("Input"), None) }),
+                Some(NodeData::Schema {
+                    name: self.get_name(Some("Input"), None),
+                }),
                 None,
                 None,
             );
             let output_node = graph.add_node(
-                Some(NodeData::Schema { name: self.get_name(Some("Output"), None) }),
+                Some(NodeData::Schema {
+                    name: self.get_name(Some("Output"), None),
+                }),
                 None,
                 None,
             );
@@ -1067,12 +1078,10 @@ where
                     graph.add_edge(&input_node, &output_node, None, false);
                 } else {
                     let (dep_first, dep_last) = graph.extend(dep_graph, "");
-                    let dep_first = dep_first.ok_or_else(|| {
-                        Error::other("RunnableLambda dep has no first node")
-                    })?;
-                    let dep_last = dep_last.ok_or_else(|| {
-                        Error::other("RunnableLambda dep has no last node")
-                    })?;
+                    let dep_first = dep_first
+                        .ok_or_else(|| Error::other("RunnableLambda dep has no first node"))?;
+                    let dep_last = dep_last
+                        .ok_or_else(|| Error::other("RunnableLambda dep has no last node"))?;
                     graph.add_edge(&input_node, &dep_first, None, false);
                     graph.add_edge(&dep_last, &output_node, None, false);
                 }
@@ -1601,10 +1610,7 @@ where
         self.transform(input, config)
     }
 
-    fn get_graph(
-        &self,
-        config: Option<&RunnableConfig>,
-    ) -> Result<super::graph::Graph> {
+    fn get_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph> {
         let mut graph = super::graph::Graph::new();
 
         // First step: keep its input node, trim its output node
@@ -1612,7 +1618,9 @@ where
         first_graph.trim_last_node();
         let (step_first, _) = graph.extend(first_graph, "");
         if step_first.is_none() {
-            return Err(Error::other("RunnableSequence first step has no first node"));
+            return Err(Error::other(
+                "RunnableSequence first step has no first node",
+            ));
         }
 
         // Last step: trim its input node, keep its output node
@@ -1620,9 +1628,8 @@ where
         last_graph.trim_first_node();
         let current_last = graph.last_node().cloned();
         let (step_first, _) = graph.extend(last_graph, "");
-        let step_first = step_first.ok_or_else(|| {
-            Error::other("RunnableSequence last step has no first node")
-        })?;
+        let step_first = step_first
+            .ok_or_else(|| Error::other("RunnableSequence last step has no first node"))?;
         if let Some(last) = current_last {
             graph.add_edge(&last, &step_first, None, false);
         }
@@ -1947,20 +1954,21 @@ where
         })
     }
 
-    fn get_graph(
-        &self,
-        _config: Option<&RunnableConfig>,
-    ) -> Result<super::graph::Graph> {
+    fn get_graph(&self, _config: Option<&RunnableConfig>) -> Result<super::graph::Graph> {
         use super::graph::NodeData;
         let mut graph = super::graph::Graph::new();
 
         let input_node = graph.add_node(
-            Some(NodeData::Schema { name: self.get_name(Some("Input"), None) }),
+            Some(NodeData::Schema {
+                name: self.get_name(Some("Input"), None),
+            }),
             None,
             None,
         );
         let output_node = graph.add_node(
-            Some(NodeData::Schema { name: self.get_name(Some("Output"), None) }),
+            Some(NodeData::Schema {
+                name: self.get_name(Some("Output"), None),
+            }),
             None,
             None,
         );
@@ -1974,12 +1982,8 @@ where
                 graph.add_edge(&input_node, &output_node, None, false);
             } else {
                 let (first, last) = graph.extend(step_graph, "");
-                let first = first.ok_or_else(|| {
-                    Error::other("Parallel step has no first node")
-                })?;
-                let last = last.ok_or_else(|| {
-                    Error::other("Parallel step has no last node")
-                })?;
+                let first = first.ok_or_else(|| Error::other("Parallel step has no first node"))?;
+                let last = last.ok_or_else(|| Error::other("Parallel step has no last node"))?;
                 graph.add_edge(&input_node, &first, None, false);
                 graph.add_edge(&last, &output_node, None, false);
             }
@@ -2080,10 +2084,7 @@ where
         self.bound.stream(input, Some(self.merge_configs(config)))
     }
 
-    fn get_graph(
-        &self,
-        config: Option<&RunnableConfig>,
-    ) -> Result<super::graph::Graph> {
+    fn get_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph> {
         self.bound.get_graph(config)
     }
 }

@@ -680,7 +680,7 @@ fn test_graph_extend_returns_correct_first_last() {
 // Tests for Runnable.get_graph()
 // ===========================================================================
 
-use agent_chain_core::runnables::base::{runnable_lambda, Runnable};
+use agent_chain_core::runnables::base::{Runnable, runnable_lambda};
 
 #[test]
 fn test_get_graph_base_runnable() {
@@ -730,8 +730,16 @@ fn test_get_graph_sequence() {
     // last step: (trimmed Input) + Lambda + Output
     // Connected by edge between them
     // Total: 4 nodes, 3 edges
-    assert!(graph.nodes.len() >= 3, "Expected >= 3 nodes, got {}", graph.nodes.len());
-    assert!(graph.edges.len() >= 2, "Expected >= 2 edges, got {}", graph.edges.len());
+    assert!(
+        graph.nodes.len() >= 3,
+        "Expected >= 3 nodes, got {}",
+        graph.nodes.len()
+    );
+    assert!(
+        graph.edges.len() >= 2,
+        "Expected >= 2 edges, got {}",
+        graph.edges.len()
+    );
 
     // Should still have valid first and last
     assert!(graph.first_node().is_some());
@@ -757,17 +765,33 @@ fn test_get_graph_parallel() {
     use agent_chain_core::runnables::base::RunnableParallel;
 
     let par = RunnableParallel::<String>::new()
-        .add("a", runnable_lambda(|x: String| Ok(serde_json::Value::String(x.clone()))))
-        .add("b", runnable_lambda(|x: String| Ok(serde_json::Value::Number(serde_json::Number::from(x.len())))));
+        .add(
+            "a",
+            runnable_lambda(|x: String| Ok(serde_json::Value::String(x.clone()))),
+        )
+        .add(
+            "b",
+            runnable_lambda(|x: String| {
+                Ok(serde_json::Value::Number(serde_json::Number::from(x.len())))
+            }),
+        );
 
     let graph = par.get_graph(None).unwrap();
 
     // Parallel: shared Input + Output nodes, plus the runnable nodes from each branch
     // Each branch contributes 1 middle node (lambda), so total = 2 + 2 = 4 nodes
-    assert!(graph.nodes.len() >= 4, "Expected >= 4 nodes, got {}", graph.nodes.len());
+    assert!(
+        graph.nodes.len() >= 4,
+        "Expected >= 4 nodes, got {}",
+        graph.nodes.len()
+    );
 
     // Edges: 2 fan-out + 2 fan-in = 4
-    assert!(graph.edges.len() >= 4, "Expected >= 4 edges, got {}", graph.edges.len());
+    assert!(
+        graph.edges.len() >= 4,
+        "Expected >= 4 edges, got {}",
+        graph.edges.len()
+    );
 
     assert!(graph.first_node().is_some());
     assert!(graph.last_node().is_some());
@@ -778,8 +802,16 @@ fn test_get_graph_parallel_draws_mermaid() {
     use agent_chain_core::runnables::base::RunnableParallel;
 
     let par = RunnableParallel::<String>::new()
-        .add("a", runnable_lambda(|x: String| Ok(serde_json::Value::String(x.clone()))))
-        .add("b", runnable_lambda(|x: String| Ok(serde_json::Value::Number(serde_json::Number::from(x.len())))));
+        .add(
+            "a",
+            runnable_lambda(|x: String| Ok(serde_json::Value::String(x.clone()))),
+        )
+        .add(
+            "b",
+            runnable_lambda(|x: String| {
+                Ok(serde_json::Value::Number(serde_json::Number::from(x.len())))
+            }),
+        );
 
     let graph = par.get_graph(None).unwrap();
     let mermaid = graph.draw_mermaid(None).unwrap();
@@ -802,18 +834,22 @@ fn test_get_graph_binding_delegates() {
 // Tests for NodeData, node_data_str, node_data_json
 // ===========================================================================
 
-use agent_chain_core::runnables::graph::{NodeData, node_data_str, node_data_json};
+use agent_chain_core::runnables::graph::{NodeData, node_data_json, node_data_str};
 
 #[test]
 fn test_node_data_str_with_uuid_and_schema() {
-    let data = NodeData::Schema { name: "MyInput".to_string() };
+    let data = NodeData::Schema {
+        name: "MyInput".to_string(),
+    };
     let uuid_id = "550e8400-e29b-41d4-a716-446655440000";
     assert_eq!(node_data_str(uuid_id, Some(&data)), "MyInput");
 }
 
 #[test]
 fn test_node_data_str_with_uuid_and_runnable() {
-    let data = NodeData::Runnable { name: "RunnableLambda".to_string() };
+    let data = NodeData::Runnable {
+        name: "RunnableLambda".to_string(),
+    };
     let uuid_id = "550e8400-e29b-41d4-a716-446655440000";
     // Strips "Runnable" prefix
     assert_eq!(node_data_str(uuid_id, Some(&data)), "Lambda");
@@ -821,7 +857,9 @@ fn test_node_data_str_with_uuid_and_runnable() {
 
 #[test]
 fn test_node_data_str_with_uuid_and_no_prefix() {
-    let data = NodeData::Runnable { name: "ChatOpenAI".to_string() };
+    let data = NodeData::Runnable {
+        name: "ChatOpenAI".to_string(),
+    };
     let uuid_id = "550e8400-e29b-41d4-a716-446655440000";
     // No "Runnable" prefix — kept as-is
     assert_eq!(node_data_str(uuid_id, Some(&data)), "ChatOpenAI");
@@ -829,7 +867,9 @@ fn test_node_data_str_with_uuid_and_no_prefix() {
 
 #[test]
 fn test_node_data_str_with_non_uuid_returns_id() {
-    let data = NodeData::Schema { name: "MyInput".to_string() };
+    let data = NodeData::Schema {
+        name: "MyInput".to_string(),
+    };
     assert_eq!(node_data_str("my_node", Some(&data)), "my_node");
 }
 
@@ -844,7 +884,9 @@ fn test_node_data_json_runnable() {
     let node = Node {
         id: "550e8400-e29b-41d4-a716-446655440000".to_string(),
         name: "Lambda".to_string(),
-        data: Some(NodeData::Runnable { name: "RunnableLambda".to_string() }),
+        data: Some(NodeData::Runnable {
+            name: "RunnableLambda".to_string(),
+        }),
         metadata: None,
     };
     let json = node_data_json(&node);
@@ -857,7 +899,9 @@ fn test_node_data_json_schema() {
     let node = Node {
         id: "550e8400-e29b-41d4-a716-446655440000".to_string(),
         name: "MyInput".to_string(),
-        data: Some(NodeData::Schema { name: "MyInput".to_string() }),
+        data: Some(NodeData::Schema {
+            name: "MyInput".to_string(),
+        }),
         metadata: None,
     };
     let json = node_data_json(&node);
@@ -875,7 +919,9 @@ fn test_node_data_json_none() {
     };
     let json = node_data_json(&node);
     // None data produces empty object
-    assert!(json.as_object().unwrap().is_empty() || !json.as_object().unwrap().contains_key("type"));
+    assert!(
+        json.as_object().unwrap().is_empty() || !json.as_object().unwrap().contains_key("type")
+    );
 }
 
 #[test]
@@ -885,7 +931,9 @@ fn test_node_data_json_with_metadata() {
     let node = Node {
         id: "550e8400-e29b-41d4-a716-446655440000".to_string(),
         name: "Lambda".to_string(),
-        data: Some(NodeData::Runnable { name: "RunnableLambda".to_string() }),
+        data: Some(NodeData::Runnable {
+            name: "RunnableLambda".to_string(),
+        }),
         metadata: Some(meta),
     };
     let json = node_data_json(&node);
@@ -901,7 +949,9 @@ fn test_node_data_json_with_metadata() {
 fn test_add_node_with_schema_data() {
     let mut graph = Graph::new();
     let node = graph.add_node(
-        Some(NodeData::Schema { name: "MyInput".to_string() }),
+        Some(NodeData::Schema {
+            name: "MyInput".to_string(),
+        }),
         None,
         None,
     );
@@ -914,7 +964,9 @@ fn test_add_node_with_schema_data() {
 fn test_add_node_with_runnable_data() {
     let mut graph = Graph::new();
     let node = graph.add_node(
-        Some(NodeData::Runnable { name: "RunnableLambda".to_string() }),
+        Some(NodeData::Runnable {
+            name: "RunnableLambda".to_string(),
+        }),
         None,
         None,
     );
@@ -939,12 +991,16 @@ fn test_add_node_with_no_data() {
 fn test_to_json_includes_node_data_type() {
     let mut graph = Graph::new();
     let input = graph.add_node(
-        Some(NodeData::Schema { name: "MyInput".to_string() }),
+        Some(NodeData::Schema {
+            name: "MyInput".to_string(),
+        }),
         None,
         None,
     );
     let runnable = graph.add_node(
-        Some(NodeData::Runnable { name: "RunnableLambda".to_string() }),
+        Some(NodeData::Runnable {
+            name: "RunnableLambda".to_string(),
+        }),
         None,
         None,
     );
@@ -953,10 +1009,14 @@ fn test_to_json_includes_node_data_type() {
     let json = graph.to_json();
     let nodes = json["nodes"].as_array().unwrap();
 
-    let schema_node = nodes.iter().find(|n| n.get("type").and_then(|t| t.as_str()) == Some("schema"));
+    let schema_node = nodes
+        .iter()
+        .find(|n| n.get("type").and_then(|t| t.as_str()) == Some("schema"));
     assert!(schema_node.is_some(), "Should have a schema node");
 
-    let runnable_node = nodes.iter().find(|n| n.get("type").and_then(|t| t.as_str()) == Some("runnable"));
+    let runnable_node = nodes
+        .iter()
+        .find(|n| n.get("type").and_then(|t| t.as_str()) == Some("runnable"));
     assert!(runnable_node.is_some(), "Should have a runnable node");
 }
 
@@ -975,19 +1035,26 @@ fn test_lambda_no_deps_default_graph() {
 
 #[test]
 fn test_lambda_with_deps_graph() {
-    use std::sync::Arc;
     use agent_chain_core::runnables::base::RunnableGraphProvider;
+    use std::sync::Arc;
 
     let dep = runnable_lambda(|x: String| Ok(x.to_uppercase()));
-    let r = runnable_lambda(|x: String| Ok(x.len()))
-        .with_dep(Arc::new(RunnableGraphProvider(dep)));
+    let r = runnable_lambda(|x: String| Ok(x.len())).with_dep(Arc::new(RunnableGraphProvider(dep)));
 
     let graph = r.get_graph(None).unwrap();
     // With 1 dep: Input + dep's runnable node + Output = 3 nodes
     // (dep's input/output are trimmed, its runnable node remains)
     // Edges: input->dep_runnable, dep_runnable->output = 2
-    assert!(graph.nodes.len() >= 3, "Expected >= 3 nodes, got {}", graph.nodes.len());
-    assert!(graph.edges.len() >= 2, "Expected >= 2 edges, got {}", graph.edges.len());
+    assert!(
+        graph.nodes.len() >= 3,
+        "Expected >= 3 nodes, got {}",
+        graph.nodes.len()
+    );
+    assert!(
+        graph.edges.len() >= 2,
+        "Expected >= 2 edges, got {}",
+        graph.edges.len()
+    );
 
     // Should have valid first and last nodes
     assert!(graph.first_node().is_some());
@@ -996,32 +1063,38 @@ fn test_lambda_with_deps_graph() {
 
 #[test]
 fn test_lambda_with_multiple_deps_graph() {
-    use std::sync::Arc;
     use agent_chain_core::runnables::base::RunnableGraphProvider;
+    use std::sync::Arc;
 
     let dep1 = runnable_lambda(|x: String| Ok(x.to_uppercase()));
     let dep2 = runnable_lambda(|x: String| Ok(x.to_lowercase()));
-    let r = runnable_lambda(|x: String| Ok(x.len()))
-        .with_deps(vec![
-            Arc::new(RunnableGraphProvider(dep1)),
-            Arc::new(RunnableGraphProvider(dep2)),
-        ]);
+    let r = runnable_lambda(|x: String| Ok(x.len())).with_deps(vec![
+        Arc::new(RunnableGraphProvider(dep1)),
+        Arc::new(RunnableGraphProvider(dep2)),
+    ]);
 
     let graph = r.get_graph(None).unwrap();
     // With 2 deps: Input + 2 dep runnable nodes + Output = 4 nodes
-    assert!(graph.nodes.len() >= 4, "Expected >= 4 nodes, got {}", graph.nodes.len());
+    assert!(
+        graph.nodes.len() >= 4,
+        "Expected >= 4 nodes, got {}",
+        graph.nodes.len()
+    );
     // Edges: 2 fan-out + 2 fan-in = 4
-    assert!(graph.edges.len() >= 4, "Expected >= 4 edges, got {}", graph.edges.len());
+    assert!(
+        graph.edges.len() >= 4,
+        "Expected >= 4 edges, got {}",
+        graph.edges.len()
+    );
 }
 
 #[test]
 fn test_lambda_with_deps_draws_mermaid() {
-    use std::sync::Arc;
     use agent_chain_core::runnables::base::RunnableGraphProvider;
+    use std::sync::Arc;
 
     let dep = runnable_lambda(|x: String| Ok(x.to_uppercase()));
-    let r = runnable_lambda(|x: String| Ok(x.len()))
-        .with_dep(Arc::new(RunnableGraphProvider(dep)));
+    let r = runnable_lambda(|x: String| Ok(x.len())).with_dep(Arc::new(RunnableGraphProvider(dep)));
 
     let graph = r.get_graph(None).unwrap();
     let mermaid = graph.draw_mermaid(None).unwrap();

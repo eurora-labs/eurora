@@ -253,11 +253,7 @@ impl Graph {
     /// Convenience method for constructing graphs manually where the node
     /// name is known directly. If `id` is not provided, a new UUID is
     /// generated and the name is used as the display name.
-    pub fn add_node_named(
-        &mut self,
-        name: impl Into<String>,
-        id: Option<&str>,
-    ) -> Node {
+    pub fn add_node_named(&mut self, name: impl Into<String>, id: Option<&str>) -> Node {
         let name = name.into();
         let id = id.map(|s| s.to_string()).unwrap_or_else(|| self.next_id());
         let node = Node {
@@ -544,10 +540,8 @@ impl Graph {
 
         // prefix each edge's source and target
         for edge in &graph.edges {
-            self.edges.push(edge.copy(
-                Some(&prefixed(&edge.source)),
-                Some(&prefixed(&edge.target)),
-            ));
+            self.edges
+                .push(edge.copy(Some(&prefixed(&edge.source)), Some(&prefixed(&edge.target))));
         }
 
         // return (prefixed) first and last nodes of the subgraph
