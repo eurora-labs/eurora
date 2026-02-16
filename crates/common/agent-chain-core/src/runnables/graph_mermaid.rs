@@ -4,12 +4,14 @@
 //! mirroring `langchain_core.runnables.graph_mermaid`.
 
 use std::collections::{HashMap, HashSet};
+use std::path::Path;
 
+use base64::Engine;
 use serde_json::Value;
 
 use crate::error::{Error, Result};
 
-use super::graph::{Edge, Node, NodeStyles};
+use super::graph::{Edge, MermaidDrawMethod, Node, NodeStyles};
 
 const MARKDOWN_SPECIAL_CHARS: &[char] = &['*', '_', '`'];
 
@@ -396,6 +398,135 @@ pub fn generate_mermaid_graph_styles(node_colors: &NodeStyles) -> String {
     styles += &format!("\tclassDef first {}\n", node_colors.first);
     styles += &format!("\tclassDef last {}\n", node_colors.last);
     styles
+}
+
+/// Draw a Mermaid graph as PNG using the specified method.
+///
+/// Mirrors `draw_mermaid_png()` from `langchain_core.runnables.graph_mermaid`.
+///
+/// Only the API method is supported. Pyppeteer rendering is not available in Rust.
+pub async fn draw_mermaid_png(
+    mermaid_syntax: &str,
+    output_file_path: Option<&Path>,
+    draw_method: MermaidDrawMethod,
+    background_color: Option<&str>,
+    max_retries: usize,
+    retry_delay_secs: f64,
+    base_url: Option<&str>,
+) -> Result<Vec<u8>> {
+    match draw_method {
+        MermaidDrawMethod::Api => {
+            render_mermaid_using_api(
+                mermaid_syntax,
+                output_file_path,
+                background_color,
+                max_retries,
+                retry_delay_secs,
+                base_url,
+            )
+            .await
+        }
+        MermaidDrawMethod::Pyppeteer => Err(Error::other(
+            "Pyppeteer rendering is not available in Rust. Use MermaidDrawMethod::Api.",
+        )),
+    }
+}
+
+/// Render a Mermaid graph using the Mermaid.INK API.
+///
+/// Mirrors `_render_mermaid_using_api()` from `langchain_core.runnables.graph_mermaid`.
+async fn render_mermaid_using_api(
+    mermaid_syntax: &str,
+    output_file_path: Option<&Path>,
+    background_color: Option<&str>,
+    max_retries: usize,
+    retry_delay_secs: f64,
+    base_url: Option<&str>,
+) -> Result<Vec<u8>> {
+    let base_url = base_url.unwrap_or("https://mermaid.ink");
+
+    let encoded = base64::engine::general_purpose::STANDARD.encode(mermaid_syntax.as_bytes());
+
+    // Normalize background color: hex codes stay as-is, named colors get "!" prefix
+    let bg_color = match background_color {
+        Some(color) => {
+            let hex_pattern = regex::Regex::new(r"^#(?:[0-9a-fA-F]{3}){1,2}$")
+                .map_err(|e| Error::other(format!("regex error: {e}")))?;
+            if hex_pattern.is_match(color) {
+                color.to_string()
+            } else {
+                format!("!{color}")
+            }
+        }
+        None => "!white".to_string(),
+    };
+
+    let image_url = format!("{base_url}/img/{encoded}?type=png&bgColor={bg_color}");
+
+    let client = reqwest::Client::new();
+
+    for attempt in 0..=max_retries {
+        match client
+            .get(&image_url)
+            .timeout(std::time::Duration::from_secs(10))
+            .send()
+            .await
+        {
+            Ok(response) => {
+                if response.status().is_success() {
+                    let img_bytes = response
+                        .bytes()
+                        .await
+                        .map_err(|e| Error::other(format!("Failed to read response bytes: {e}")))?
+                        .to_vec();
+
+                    if let Some(path) = output_file_path {
+                        std::fs::write(path, &img_bytes)
+                            .map_err(|e| Error::other(format!("Failed to write PNG file: {e}")))?;
+                    }
+
+                    return Ok(img_bytes);
+                }
+
+                let status = response.status().as_u16();
+
+                // Retry on server errors (5xx)
+                if status >= 500 && attempt < max_retries {
+                    let jitter = 0.5 + 0.5 * (attempt as f64 / max_retries.max(1) as f64);
+                    let sleep_time = retry_delay_secs * (2.0_f64).powi(attempt as i32) * jitter;
+                    tokio::time::sleep(std::time::Duration::from_secs_f64(sleep_time)).await;
+                    continue;
+                }
+
+                return Err(Error::other(format!(
+                    "Failed to reach {base_url} API while trying to render                      your graph. Status code: {status}.
+
+                     To resolve this issue:
+                     1. Check your internet connection and try again
+                     2. Try with higher retry settings:                      `draw_mermaid_png(..., max_retries=5, retry_delay=2.0)`"
+                )));
+            }
+            Err(e) => {
+                if attempt < max_retries {
+                    let jitter = 0.5 + 0.5 * (attempt as f64 / max_retries.max(1) as f64);
+                    let sleep_time = retry_delay_secs * (2.0_f64).powi(attempt as i32) * jitter;
+                    tokio::time::sleep(std::time::Duration::from_secs_f64(sleep_time)).await;
+                } else {
+                    return Err(Error::other(format!(
+                        "Failed to reach {base_url} API while trying to render                          your graph after {max_retries} retries: {e}
+
+                         To resolve this issue:
+                         1. Check your internet connection and try again
+                         2. Try with higher retry settings:                          `draw_mermaid_png(..., max_retries=5, retry_delay=2.0)`"
+                    )));
+                }
+            }
+        }
+    }
+
+    Err(Error::other(format!(
+        "Failed to reach {base_url} API while trying to render          your graph after {max_retries} retries."
+    )))
 }
 
 #[cfg(test)]

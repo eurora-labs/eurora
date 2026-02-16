@@ -577,6 +577,32 @@ impl Graph {
         )
     }
 
+    /// Draw the graph as a PNG image using Mermaid.
+    ///
+    /// Mirrors `Graph.draw_mermaid_png()` from `langchain_core.runnables.graph`.
+    pub async fn draw_mermaid_png(
+        &self,
+        options: Option<MermaidOptions>,
+        output_file_path: Option<&std::path::Path>,
+        draw_method: MermaidDrawMethod,
+        background_color: Option<&str>,
+        max_retries: usize,
+        retry_delay_secs: f64,
+        base_url: Option<&str>,
+    ) -> crate::error::Result<Vec<u8>> {
+        let mermaid_syntax = self.draw_mermaid(options)?;
+        super::graph_mermaid::draw_mermaid_png(
+            &mermaid_syntax,
+            output_file_path,
+            draw_method,
+            background_color,
+            max_retries,
+            retry_delay_secs,
+            base_url,
+        )
+        .await
+    }
+
     /// Draw the graph as an ASCII art string.
     pub fn draw_ascii(&self) -> Result<String, String> {
         let vertices: std::collections::HashMap<String, String> = self
@@ -615,6 +641,17 @@ impl Default for MermaidOptions {
             frontmatter_config: None,
         }
     }
+}
+
+/// Branch in a graph.
+///
+/// Mirrors `Branch` from `langchain_core.runnables.graph`.
+#[derive(Debug, Clone)]
+pub struct Branch {
+    /// A string representation of the condition.
+    pub condition: String,
+    /// Optional dictionary of end node IDs for the branches.
+    pub ends: Option<HashMap<String, String>>,
 }
 
 /// Enum for different curve styles supported by Mermaid.

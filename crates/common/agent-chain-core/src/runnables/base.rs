@@ -353,6 +353,71 @@ pub trait Runnable: Send + Sync + Debug {
         })
     }
 
+    /// Get a JSON schema that represents the input to the Runnable.
+    ///
+    /// Mirrors `Runnable.get_input_jsonschema()` from
+    /// `langchain_core.runnables.base`.
+    fn get_input_jsonschema(&self, config: Option<&RunnableConfig>) -> Value {
+        self.get_input_schema(config)
+    }
+
+    /// Get a JSON schema that represents the output of the Runnable.
+    ///
+    /// Mirrors `Runnable.get_output_jsonschema()` from
+    /// `langchain_core.runnables.base`.
+    fn get_output_jsonschema(&self, config: Option<&RunnableConfig>) -> Value {
+        self.get_output_schema(config)
+    }
+
+    /// Get a JSON schema that represents the config of the Runnable.
+    ///
+    /// Mirrors `Runnable.get_config_jsonschema()` from
+    /// `langchain_core.runnables.base`.
+    fn get_config_jsonschema(&self, include: Option<&[&str]>) -> Result<Value> {
+        let specs = self.config_specs()?;
+        let include = include.unwrap_or(&[]);
+
+        let mut properties = serde_json::Map::new();
+
+        if !specs.is_empty() {
+            let mut config_props = serde_json::Map::new();
+            for spec in &specs {
+                let mut prop = serde_json::Map::new();
+                if let Some(ref name) = spec.name {
+                    prop.insert("title".into(), Value::String(name.clone()));
+                }
+                if let Some(ref desc) = spec.description {
+                    prop.insert("description".into(), Value::String(desc.clone()));
+                }
+                if let Some(ref default) = spec.default {
+                    prop.insert("default".into(), default.clone());
+                }
+                prop.insert("type".into(), Value::String(spec.annotation.clone()));
+                config_props.insert(spec.id.clone(), Value::Object(prop));
+            }
+            properties.insert(
+                "configurable".into(),
+                serde_json::json!({
+                    "title": "Configurable",
+                    "type": "object",
+                    "properties": Value::Object(config_props),
+                }),
+            );
+        }
+
+        for &field in include {
+            if field != "configurable" {
+                properties.insert(field.into(), serde_json::json!({}));
+            }
+        }
+
+        Ok(serde_json::json!({
+            "title": format!("{}Config", self.get_name(None, None)),
+            "type": "object",
+            "properties": Value::Object(properties),
+        }))
+    }
+
     /// Transform a single input into an output.
     ///
     /// # Arguments
@@ -2882,6 +2947,31 @@ where
     I: Send + Sync + Clone + Debug + 'static,
 {
     RunnableParallel::from(map)
+}
+
+/// Decorate a function to make it a Runnable.
+///
+/// Sets the name of the Runnable to the given name.
+/// Any runnables called by the function will be traced as dependencies.
+///
+/// Mirrors Python's `@chain` decorator from `langchain_core.runnables.base`.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use agent_chain_core::runnables::base::chain;
+///
+/// let my_chain = chain("my_func", |input: String| {
+///     Ok(format!("Hello, {input}!"))
+/// });
+/// ```
+pub fn chain<F, I, O>(name: &str, func: F) -> RunnableLambda<F, I, O>
+where
+    F: Fn(I) -> Result<O> + Send + Sync,
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    RunnableLambda::new(func).with_name(name)
 }
 
 #[cfg(test)]

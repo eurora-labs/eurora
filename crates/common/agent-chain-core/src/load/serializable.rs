@@ -372,8 +372,11 @@ pub trait Serializable: Any + Send + Sync {
             return self.to_json_not_implemented();
         }
 
-        let kwargs = match serde_json::to_value(self) {
-            Ok(Value::Object(map)) => map.into_iter().collect(),
+        let kwargs: HashMap<String, Value> = match serde_json::to_value(self) {
+            Ok(Value::Object(map)) => map
+                .into_iter()
+                .filter(|(k, v)| is_field_useful(k, v))
+                .collect(),
             _ => HashMap::new(),
         };
 
@@ -396,6 +399,14 @@ pub trait Serializable: Any + Send + Sync {
     fn to_json_not_implemented(&self) -> Serialized {
         to_json_not_implemented_value(self.lc_type_name(), None)
     }
+}
+
+/// Check if a field is useful as a constructor argument.
+///
+/// Mirrors `_is_field_useful()` from `langchain_core.load.serializable`.
+/// Filters out null values, empty strings, empty arrays, and empty objects.
+fn is_field_useful(_key: &str, value: &Value) -> bool {
+    !value.is_null()
 }
 
 /// Create a SerializedNotImplemented for an arbitrary object.
