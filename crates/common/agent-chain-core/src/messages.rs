@@ -143,5 +143,6 @@ pub use utils::{
     TrimMessagesConfig, TrimStrategy, convert_to_message, convert_to_messages,
     convert_to_openai_messages, count_tokens_approximately, filter_messages, get_buffer_string,
     merge_message_runs, message_chunk_to_message, message_from_dict, message_to_dict,
-    messages_from_dict, messages_to_dict, trim_messages,
+    filter_messages_runnable, merge_message_runs_runnable, messages_from_dict, messages_to_dict,
+    trim_messages, trim_messages_runnable,
 };
