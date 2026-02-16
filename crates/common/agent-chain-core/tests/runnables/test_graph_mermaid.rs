@@ -361,8 +361,8 @@ fn test_draw_mermaid_markdown_special_chars() {
 #[test]
 fn test_graph_draw_mermaid_method() {
     let mut graph = Graph::new();
-    let node1 = graph.add_node("node1", Some("node1"));
-    let node2 = graph.add_node("node2", Some("node2"));
+    let node1 = graph.add_node_named("node1", Some("node1"));
+    let node2 = graph.add_node_named("node2", Some("node2"));
     graph.add_edge(&node1, &node2, None, false);
 
     let result = graph.draw_mermaid(None).unwrap();
@@ -373,8 +373,8 @@ fn test_graph_draw_mermaid_method() {
 #[test]
 fn test_graph_draw_mermaid_without_styles() {
     let mut graph = Graph::new();
-    let node1 = graph.add_node("node1", Some("node1"));
-    let node2 = graph.add_node("node2", Some("node2"));
+    let node1 = graph.add_node_named("node1", Some("node1"));
+    let node2 = graph.add_node_named("node2", Some("node2"));
     graph.add_edge(&node1, &node2, None, false);
 
     let result = graph
@@ -593,8 +593,8 @@ fn test_mermaid_empty_subgraph() {
 #[test]
 fn test_graph_draw_mermaid_with_curve_styles() {
     let mut graph = Graph::new();
-    let node1 = graph.add_node("node1", Some("node1"));
-    let node2 = graph.add_node("node2", Some("node2"));
+    let node1 = graph.add_node_named("node1", Some("node1"));
+    let node2 = graph.add_node_named("node2", Some("node2"));
     graph.add_edge(&node1, &node2, None, false);
 
     for curve_style in &CurveStyle::ALL {
@@ -615,8 +615,8 @@ fn test_graph_draw_mermaid_with_curve_styles() {
 #[test]
 fn test_graph_draw_mermaid_custom_node_colors() {
     let mut graph = Graph::new();
-    let node1 = graph.add_node("node1", Some("node1"));
-    let node2 = graph.add_node("node2", Some("node2"));
+    let node1 = graph.add_node_named("node1", Some("node1"));
+    let node2 = graph.add_node_named("node2", Some("node2"));
     graph.add_edge(&node1, &node2, None, false);
 
     let custom_colors = NodeStyles {
@@ -836,8 +836,8 @@ fn test_mermaid_with_all_features() {
 fn test_graph_reid_with_duplicate_names() {
     let mut graph = Graph::new();
     // Use auto-generated UUID ids (None) to match Python behavior with BaseModel
-    let node1 = graph.add_node("BaseModel", None);
-    let node2 = graph.add_node("BaseModel", None);
+    let node1 = graph.add_node_named("BaseModel", None);
+    let node2 = graph.add_node_named("BaseModel", None);
     graph.add_edge(&node1, &node2, None, false);
 
     let reided_graph = graph.reid();

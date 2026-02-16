@@ -693,26 +693,28 @@ pub trait Runnable: Send + Sync + Debug {
         &self,
         config: Option<&RunnableConfig>,
     ) -> Result<super::graph::Graph> {
+        use super::graph::NodeData;
         let mut graph = super::graph::Graph::new();
 
         let input_node = graph.add_node(
-            self.get_name(Some("Input"), None),
+            Some(NodeData::Schema { name: self.get_name(Some("Input"), None) }),
+            None,
             None,
         );
 
-        let runnable_node = match config {
-            Some(c) if !c.metadata.is_empty() => {
-                graph.add_node_with_metadata(
-                    self.get_name(None, None),
-                    None,
-                    c.metadata.clone(),
-                )
-            }
-            _ => graph.add_node(self.get_name(None, None), None),
-        };
+        let metadata = config
+            .map(|c| &c.metadata)
+            .filter(|m| !m.is_empty())
+            .cloned();
+        let runnable_node = graph.add_node(
+            Some(NodeData::Runnable { name: self.get_name(None, None) }),
+            None,
+            metadata,
+        );
 
         let output_node = graph.add_node(
-            self.get_name(Some("Output"), None),
+            Some(NodeData::Schema { name: self.get_name(Some("Output"), None) }),
+            None,
             None,
         );
 
@@ -827,6 +829,31 @@ pub trait Runnable: Send + Sync + Debug {
 }
 
 /// Convert a string to title case.
+/// Trait for objects that can provide a graph representation.
+///
+/// Used by `RunnableLambda` to store dependencies that contribute to its graph.
+/// In Python, dependencies are detected via closure inspection;
+/// in Rust, they must be set explicitly.
+pub trait GraphProvider: Send + Sync + Debug {
+    /// Return a graph representation of this object.
+    fn provide_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph>;
+}
+
+/// Wrapper that adapts any Runnable into a GraphProvider.
+pub struct RunnableGraphProvider<R: Runnable>(pub R);
+
+impl<R: Runnable> Debug for RunnableGraphProvider<R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("RunnableGraphProvider").field(&self.0).finish()
+    }
+}
+
+impl<R: Runnable> GraphProvider for RunnableGraphProvider<R> {
+    fn provide_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph> {
+        self.0.get_graph(config)
+    }
+}
+
 /// Extract a short type name from a fully qualified Rust type path.
 ///
 /// Mirrors Python's behavior where `self.__class__.__name__` returns just
@@ -875,6 +902,7 @@ where
 {
     func: F,
     name: Option<String>,
+    deps: Vec<Arc<dyn GraphProvider>>,
     _phantom: std::marker::PhantomData<(I, O)>,
 }
 
@@ -902,6 +930,7 @@ where
         Self {
             func,
             name: None,
+            deps: Vec::new(),
             _phantom: std::marker::PhantomData,
         }
     }
@@ -909,6 +938,21 @@ where
     /// Create a new RunnableLambda with a name.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
+        self
+    }
+
+    /// Add a dependency runnable that contributes to this lambda's graph.
+    ///
+    /// In Python, dependencies are detected automatically by inspecting
+    /// closure variables. In Rust, they must be set explicitly.
+    pub fn with_dep(mut self, dep: Arc<dyn GraphProvider>) -> Self {
+        self.deps.push(dep);
+        self
+    }
+
+    /// Add multiple dependency runnables.
+    pub fn with_deps(mut self, deps: Vec<Arc<dyn GraphProvider>>) -> Self {
+        self.deps.extend(deps);
         self
     }
 }
@@ -961,6 +1005,81 @@ where
             }),
             config,
         )
+    }
+
+    fn get_graph(
+        &self,
+        config: Option<&RunnableConfig>,
+    ) -> Result<super::graph::Graph> {
+        if self.deps.is_empty() {
+            // No deps: fall back to the default 3-node graph
+            use super::graph::NodeData;
+            let mut graph = super::graph::Graph::new();
+
+            let input_node = graph.add_node(
+                Some(NodeData::Schema { name: self.get_name(Some("Input"), None) }),
+                None,
+                None,
+            );
+
+            let metadata = config
+                .map(|c| &c.metadata)
+                .filter(|m| !m.is_empty())
+                .cloned();
+            let runnable_node = graph.add_node(
+                Some(NodeData::Runnable { name: self.get_name(None, None) }),
+                None,
+                metadata,
+            );
+
+            let output_node = graph.add_node(
+                Some(NodeData::Schema { name: self.get_name(Some("Output"), None) }),
+                None,
+                None,
+            );
+
+            graph.add_edge(&input_node, &runnable_node, None, false);
+            graph.add_edge(&runnable_node, &output_node, None, false);
+
+            Ok(graph)
+        } else {
+            // Has deps: embed each dep's graph between input and output nodes
+            use super::graph::NodeData;
+            let mut graph = super::graph::Graph::new();
+
+            let input_node = graph.add_node(
+                Some(NodeData::Schema { name: self.get_name(Some("Input"), None) }),
+                None,
+                None,
+            );
+            let output_node = graph.add_node(
+                Some(NodeData::Schema { name: self.get_name(Some("Output"), None) }),
+                None,
+                None,
+            );
+
+            for dep in &self.deps {
+                let mut dep_graph = dep.provide_graph(None)?;
+                dep_graph.trim_first_node();
+                dep_graph.trim_last_node();
+
+                if dep_graph.nodes.is_empty() {
+                    graph.add_edge(&input_node, &output_node, None, false);
+                } else {
+                    let (dep_first, dep_last) = graph.extend(dep_graph, "");
+                    let dep_first = dep_first.ok_or_else(|| {
+                        Error::other("RunnableLambda dep has no first node")
+                    })?;
+                    let dep_last = dep_last.ok_or_else(|| {
+                        Error::other("RunnableLambda dep has no last node")
+                    })?;
+                    graph.add_edge(&input_node, &dep_first, None, false);
+                    graph.add_edge(&dep_last, &output_node, None, false);
+                }
+            }
+
+            Ok(graph)
+        }
     }
 }
 
@@ -1832,14 +1951,17 @@ where
         &self,
         _config: Option<&RunnableConfig>,
     ) -> Result<super::graph::Graph> {
+        use super::graph::NodeData;
         let mut graph = super::graph::Graph::new();
 
         let input_node = graph.add_node(
-            self.get_name(Some("Input"), None),
+            Some(NodeData::Schema { name: self.get_name(Some("Input"), None) }),
+            None,
             None,
         );
         let output_node = graph.add_node(
-            self.get_name(Some("Output"), None),
+            Some(NodeData::Schema { name: self.get_name(Some("Output"), None) }),
+            None,
             None,
         );
 
