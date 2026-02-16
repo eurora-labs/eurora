@@ -631,31 +631,31 @@ pub trait BaseTool: Send + Sync + Debug {
         );
 
         // Execute tool (async)
-        let result = self.tool_arun(input, Some(&run_manager), &child_config).await;
+        let result = self
+            .tool_arun(input, Some(&run_manager), &child_config)
+            .await;
 
         // Handle result with error recovery and callback dispatch
         match result {
             Ok(output) => {
                 let (content, artifact) = match self.response_format() {
-                    ResponseFormat::ContentAndArtifact => {
-                        match output {
-                            ToolOutput::Json(Value::Array(ref arr)) if arr.len() == 2 => {
-                                let content = match &arr[0] {
-                                    Value::String(s) => ToolOutput::String(s.clone()),
-                                    other => ToolOutput::Json(other.clone()),
-                                };
-                                (content, Some(arr[1].clone()))
-                            }
-                            _ => {
-                                let err = Error::ToolException(
+                    ResponseFormat::ContentAndArtifact => match output {
+                        ToolOutput::Json(Value::Array(ref arr)) if arr.len() == 2 => {
+                            let content = match &arr[0] {
+                                Value::String(s) => ToolOutput::String(s.clone()),
+                                other => ToolOutput::Json(other.clone()),
+                            };
+                            (content, Some(arr[1].clone()))
+                        }
+                        _ => {
+                            let err = Error::ToolException(
                                     "Since response_format='content_and_artifact', the tool                                      function must return a two-element JSON array                                      [content, artifact]."
                                         .to_string(),
                                 );
-                                run_manager.get_sync().on_tool_error(&err);
-                                return Err(err);
-                            }
+                            run_manager.get_sync().on_tool_error(&err);
+                            return Err(err);
                         }
-                    }
+                    },
                     ResponseFormat::Content => (output, None),
                 };
                 let formatted = format_output(
@@ -803,11 +803,7 @@ impl crate::runnables::base::Runnable for ToolRunnable {
         Some(self.tool.name().to_string())
     }
 
-    fn invoke(
-        &self,
-        input: Self::Input,
-        config: Option<RunnableConfig>,
-    ) -> Result<Self::Output> {
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         let (tool_input, tool_call_id, config) = prep_run_args(input, config);
         self.tool.run(tool_input, Some(config), tool_call_id)
     }

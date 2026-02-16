@@ -802,6 +802,38 @@ where
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         self.call_with_config(&|input, _config| (self.func)(input), input, config)
     }
+
+    fn stream(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'_, Result<Self::Output>> {
+        let result = self.invoke(input, config);
+        Box::pin(futures::stream::once(async move { result }))
+    }
+
+    fn transform<'a>(
+        &'a self,
+        input: BoxStream<'a, Self::Input>,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'a, Result<Self::Output>> {
+        self.transform_stream_with_config(
+            input,
+            Box::new(move |input_stream, _config| {
+                Box::pin(async_stream::stream! {
+                    let mut stream = input_stream;
+                    let mut final_input: Option<I> = None;
+                    while let Some(ichunk) = stream.next().await {
+                        final_input = Some(ichunk);
+                    }
+                    if let Some(input_val) = final_input {
+                        yield (self.func)(input_val);
+                    }
+                })
+            }),
+            config,
+        )
+    }
 }
 
 /// Create a RunnableLambda from a function.
@@ -996,6 +1028,45 @@ where
             ))
         }
     }
+
+    fn stream(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'_, Result<Self::Output>> {
+        let result = self.invoke(input, config);
+        Box::pin(futures::stream::once(async move { result }))
+    }
+
+    fn transform<'a>(
+        &'a self,
+        input: BoxStream<'a, Self::Input>,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'a, Result<Self::Output>> {
+        self.transform_stream_with_config(
+            input,
+            Box::new(move |input_stream, config| {
+                let config = config.clone();
+                Box::pin(async_stream::stream! {
+                    let mut stream = input_stream;
+                    let mut final_input: Option<I> = None;
+                    while let Some(ichunk) = stream.next().await {
+                        final_input = Some(ichunk);
+                    }
+                    if let Some(input_val) = final_input {
+                        if let Some(func) = &self.func {
+                            yield call_func_with_variable_args(func, input_val, &config);
+                        } else {
+                            yield Err(Error::other(
+                                "Cannot transform synchronously without a sync function",
+                            ));
+                        }
+                    }
+                })
+            }),
+            config,
+        )
+    }
 }
 
 // =============================================================================
@@ -1179,24 +1250,66 @@ where
         input: Self::Input,
         config: Option<RunnableConfig>,
     ) -> BoxStream<'_, Result<Self::Output>> {
+        let input_stream = Box::pin(futures::stream::once(async move { input }));
+        self.transform(input_stream, config)
+    }
+
+    fn transform<'a>(
+        &'a self,
+        input: BoxStream<'a, Self::Input>,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'a, Result<Self::Output>> {
         Box::pin(async_stream::stream! {
             let config = ensure_config(config);
 
-            // Invoke first step
-            let intermediate = match self.first.invoke(input, Some(config.clone())) {
-                Ok(output) => output,
-                Err(e) => {
-                    yield Err(e);
-                    return;
-                }
-            };
+            // Transform through first step
+            let first_output = self.first.transform(input, Some(config.clone()));
 
-            // Stream from second step
-            let mut stream = self.last.stream(intermediate, Some(config));
-            while let Some(output) = stream.next().await {
-                yield output;
+            // Feed Ok values from first step into second step's transform.
+            // On error, yield it and stop.
+            let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+            let mut first_stream = std::pin::pin!(first_output);
+
+            let mut had_error = false;
+            while let Some(result) = first_stream.next().await {
+                match result {
+                    Ok(value) => {
+                        if tx.send(value).is_err() {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        yield Err(e);
+                        had_error = true;
+                        break;
+                    }
+                }
+            }
+            drop(tx);
+
+            if !had_error {
+                let rx_stream: BoxStream<'_, R1::Output> = Box::pin(async_stream::stream! {
+                    while let Some(value) = rx.recv().await {
+                        yield value;
+                    }
+                });
+                let mut second_output = self.last.transform(rx_stream, Some(config));
+                while let Some(result) = second_output.next().await {
+                    yield result;
+                }
             }
         })
+    }
+
+    fn atransform<'a>(
+        &'a self,
+        input: BoxStream<'a, Self::Input>,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'a, Result<Self::Output>>
+    where
+        Self: 'static,
+    {
+        self.transform(input, config)
     }
 }
 
@@ -1417,6 +1530,66 @@ where
             }
         }
     }
+
+    fn stream(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'_, Result<Self::Output>> {
+        Box::pin(async_stream::stream! {
+            let config = ensure_config(config);
+
+            // Create a stream for each step, all receiving the same input
+            let mut tagged_streams: futures::stream::SelectAll<
+                BoxStream<'_, Result<(String, Value)>>
+            > = futures::stream::SelectAll::new();
+
+            for (name, step) in &self.steps {
+                let name = name.clone();
+                let step_stream = step.stream(input.clone(), Some(config.clone()));
+                // Tag each output with its step name
+                let named_stream = step_stream.map(move |result| {
+                    result.map(|value| (name.clone(), value))
+                });
+                tagged_streams.push(Box::pin(named_stream));
+            }
+
+            // Yield single-key HashMaps as chunks arrive
+            while let Some(result) = tagged_streams.next().await {
+                match result {
+                    Ok((key, value)) => {
+                        let mut chunk = HashMap::new();
+                        chunk.insert(key, value);
+                        yield Ok(chunk);
+                    }
+                    Err(e) => {
+                        yield Err(e);
+                    }
+                }
+            }
+        })
+    }
+
+    fn transform<'a>(
+        &'a self,
+        input: BoxStream<'a, Self::Input>,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'a, Result<Self::Output>> {
+        // Buffer input to a single value, then delegate to stream
+        Box::pin(async_stream::stream! {
+            let mut input = input;
+            let mut final_input: Option<Self::Input> = None;
+            while let Some(ichunk) = input.next().await {
+                final_input = Some(ichunk);
+            }
+            if let Some(input_val) = final_input {
+                let mut stream = self.stream(input_val, config);
+                while let Some(result) = stream.next().await {
+                    yield result;
+                }
+            }
+        })
+    }
 }
 
 // =============================================================================
@@ -1619,6 +1792,173 @@ where
 }
 
 // =============================================================================
+// RunnableGenerator
+// =============================================================================
+
+/// Type alias for a transform function that takes an input stream and produces
+/// an output stream.
+pub type TransformFn<I, O> =
+    Arc<dyn Fn(BoxStream<'_, I>) -> BoxStream<'_, Result<O>> + Send + Sync>;
+
+/// A Runnable that wraps a transform function (input stream -> output stream).
+///
+/// This is the primary mechanism for custom streaming transforms in chains.
+/// The wrapped function receives a stream of inputs and produces a stream of
+/// outputs, enabling chunk-by-chunk processing without buffering.
+///
+/// Mirrors Python's `RunnableGenerator`.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use agent_chain_core::runnables::base::RunnableGenerator;
+///
+/// let generator = RunnableGenerator::<String, String>::new(|input_stream| {
+///     Box::pin(async_stream::stream! {
+///         let mut stream = input_stream;
+///         while let Some(chunk) = stream.next().await {
+///             yield Ok(format!("processed: {}", chunk));
+///         }
+///     })
+/// });
+/// ```
+pub struct RunnableGenerator<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    transform_fn: TransformFn<I, O>,
+    name: Option<String>,
+}
+
+impl<I, O> Debug for RunnableGenerator<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RunnableGenerator")
+            .field("name", &self.name)
+            .finish()
+    }
+}
+
+impl<I, O> RunnableGenerator<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    /// Create a new RunnableGenerator from a transform function.
+    ///
+    /// The transform function takes a `BoxStream<I>` and returns a
+    /// `BoxStream<Result<O>>`.
+    pub fn new<F>(transform_fn: F) -> Self
+    where
+        F: Fn(BoxStream<'_, I>) -> BoxStream<'_, Result<O>> + Send + Sync + 'static,
+    {
+        Self {
+            transform_fn: Arc::new(transform_fn),
+            name: None,
+        }
+    }
+
+    /// Set the name of this RunnableGenerator.
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+}
+
+#[async_trait]
+impl<I, O> Runnable for RunnableGenerator<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    type Input = I;
+    type Output = O;
+
+    fn name(&self) -> Option<String> {
+        self.name.clone()
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        // Accumulate stream output, keeping the last chunk (matches Python's
+        // fallback behavior when types don't support +).
+        let rt = tokio::runtime::Handle::try_current()
+            .map_err(|_| Error::other("RunnableGenerator::invoke requires a tokio runtime"))?;
+
+        rt.block_on(async {
+            let mut stream = self.stream(input, config);
+            let mut final_output: Option<Self::Output> = None;
+            while let Some(result) = stream.next().await {
+                final_output = Some(result?);
+            }
+            final_output.ok_or_else(|| Error::other("RunnableGenerator produced no output"))
+        })
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output>
+    where
+        Self: 'static,
+    {
+        let mut stream = self.astream(input, config);
+        let mut final_output: Option<Self::Output> = None;
+        while let Some(result) = stream.next().await {
+            final_output = Some(result?);
+        }
+        final_output.ok_or_else(|| Error::other("RunnableGenerator produced no output"))
+    }
+
+    fn stream(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'_, Result<Self::Output>> {
+        let input_stream = Box::pin(futures::stream::once(async move { input }));
+        self.transform(input_stream, config)
+    }
+
+    fn astream(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'_, Result<Self::Output>>
+    where
+        Self: 'static,
+    {
+        self.stream(input, config)
+    }
+
+    fn transform<'a>(
+        &'a self,
+        input: BoxStream<'a, Self::Input>,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'a, Result<Self::Output>> {
+        self.transform_stream_with_config(
+            input,
+            Box::new(move |stream, _config| (self.transform_fn)(stream)),
+            config,
+        )
+    }
+
+    fn atransform<'a>(
+        &'a self,
+        input: BoxStream<'a, Self::Input>,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'a, Result<Self::Output>>
+    where
+        Self: 'static,
+    {
+        self.transform(input, config)
+    }
+}
+
+// =============================================================================
 // DynRunnable - Type-erased Runnable
 // =============================================================================
 
@@ -1752,5 +2092,225 @@ mod tests {
 
         let result = sequence.ainvoke(1, None).await.unwrap();
         assert_eq!(result, 4);
+    }
+
+    // =========================================================================
+    // Streaming tests
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_runnable_generator_stream() {
+        let generator = RunnableGenerator::<String, String>::new(|input_stream| {
+            Box::pin(async_stream::stream! {
+                use futures::StreamExt;
+                let mut stream = input_stream;
+                while let Some(chunk) = stream.next().await {
+                    yield Ok(format!("processed: {}", chunk));
+                }
+            })
+        });
+
+        let chunks: Vec<_> = generator
+            .stream("hello".to_string(), None)
+            .collect::<Vec<_>>()
+            .await;
+
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].as_ref().unwrap(), "processed: hello");
+    }
+
+    #[tokio::test]
+    async fn test_runnable_generator_transform() {
+        let generator = RunnableGenerator::<i32, String>::new(|input_stream| {
+            Box::pin(async_stream::stream! {
+                use futures::StreamExt;
+                let mut stream = input_stream;
+                while let Some(num) = stream.next().await {
+                    yield Ok(format!("num:{}", num));
+                }
+            })
+        });
+
+        let input = Box::pin(futures::stream::iter(vec![1, 2, 3]));
+        let chunks: Vec<_> = generator.transform(input, None).collect::<Vec<_>>().await;
+
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0].as_ref().unwrap(), "num:1");
+        assert_eq!(chunks[1].as_ref().unwrap(), "num:2");
+        assert_eq!(chunks[2].as_ref().unwrap(), "num:3");
+    }
+
+    #[tokio::test]
+    async fn test_runnable_generator_ainvoke() {
+        let generator = RunnableGenerator::<String, String>::new(|input_stream| {
+            Box::pin(async_stream::stream! {
+                use futures::StreamExt;
+                let mut stream = input_stream;
+                while let Some(_chunk) = stream.next().await {
+                    yield Ok("Have".to_string());
+                    yield Ok(" a nice day".to_string());
+                }
+            })
+        });
+
+        let result = generator.ainvoke("input".to_string(), None).await.unwrap();
+        // Keeps last chunk
+        assert_eq!(result, " a nice day");
+    }
+
+    #[tokio::test]
+    async fn test_runnable_lambda_stream() {
+        let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
+        let chunks: Vec<_> = runnable.stream(1, None).collect::<Vec<_>>().await;
+
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(*chunks[0].as_ref().unwrap(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_runnable_lambda_transform() {
+        let runnable = RunnableLambda::new(|x: i32| Ok(x * 10));
+        let input = Box::pin(futures::stream::iter(vec![1, 2, 3]));
+        let chunks: Vec<_> = runnable.transform(input, None).collect::<Vec<_>>().await;
+
+        // transform buffers all input (keeps last), then yields single result
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(*chunks[0].as_ref().unwrap(), 30); // 3 * 10
+    }
+
+    #[tokio::test]
+    async fn test_runnable_sequence_stream_pipes_correctly() {
+        let first = RunnableLambda::new(|x: i32| Ok(x + 1));
+        let second = RunnableLambda::new(|x: i32| Ok(x * 2));
+        let sequence = pipe(first, second);
+
+        let chunks: Vec<_> = sequence.stream(1, None).collect::<Vec<_>>().await;
+
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(*chunks[0].as_ref().unwrap(), 4); // (1+1)*2
+    }
+
+    #[tokio::test]
+    async fn test_runnable_sequence_transform() {
+        let first = RunnableLambda::new(|x: i32| Ok(x + 1));
+        let second = RunnableLambda::new(|x: i32| Ok(x * 2));
+        let sequence = pipe(first, second);
+
+        let input = Box::pin(futures::stream::iter(vec![5]));
+        let chunks: Vec<_> = sequence.transform(input, None).collect::<Vec<_>>().await;
+
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(*chunks[0].as_ref().unwrap(), 12); // (5+1)*2
+    }
+
+    #[tokio::test]
+    async fn test_nested_sequence_stream() {
+        let a = RunnableLambda::new(|x: i32| Ok(x + 1));
+        let b = RunnableLambda::new(|x: i32| Ok(x * 2));
+        let c = RunnableLambda::new(|x: i32| Ok(x + 10));
+        let chain = pipe(pipe(a, b), c);
+
+        let chunks: Vec<_> = chain.stream(1, None).collect::<Vec<_>>().await;
+
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(*chunks[0].as_ref().unwrap(), 14); // ((1+1)*2)+10
+    }
+
+    #[tokio::test]
+    async fn test_runnable_parallel_stream() {
+        let parallel = RunnableParallel::<Value>::new()
+            .add(
+                "double",
+                RunnableLambda::new(|x: Value| {
+                    let n = x.as_i64().unwrap_or(0);
+                    Ok(serde_json::json!(n * 2))
+                }),
+            )
+            .add(
+                "triple",
+                RunnableLambda::new(|x: Value| {
+                    let n = x.as_i64().unwrap_or(0);
+                    Ok(serde_json::json!(n * 3))
+                }),
+            );
+
+        let chunks: Vec<_> = parallel
+            .stream(serde_json::json!(5), None)
+            .collect::<Vec<_>>()
+            .await;
+
+        // Each branch yields one chunk, so we get 2 single-key HashMaps
+        assert_eq!(chunks.len(), 2);
+
+        // Collect all chunks into one map
+        let mut combined = HashMap::new();
+        for chunk in chunks {
+            let map = chunk.unwrap();
+            combined.extend(map);
+        }
+
+        assert_eq!(combined.get("double"), Some(&serde_json::json!(10)));
+        assert_eq!(combined.get("triple"), Some(&serde_json::json!(15)));
+    }
+
+    #[tokio::test]
+    async fn test_runnable_parallel_stream_matches_invoke() {
+        let parallel = RunnableParallel::<Value>::new()
+            .add(
+                "a",
+                RunnableLambda::new(|x: Value| Ok(serde_json::json!(x.as_i64().unwrap_or(0) + 1))),
+            )
+            .add(
+                "b",
+                RunnableLambda::new(|x: Value| Ok(serde_json::json!(x.as_i64().unwrap_or(0) * 2))),
+            );
+
+        let invoke_result = parallel.invoke(serde_json::json!(3), None).unwrap();
+
+        let stream_chunks: Vec<_> = parallel
+            .stream(serde_json::json!(3), None)
+            .collect::<Vec<_>>()
+            .await;
+
+        let mut stream_combined = HashMap::new();
+        for chunk in stream_chunks {
+            stream_combined.extend(chunk.unwrap());
+        }
+
+        assert_eq!(invoke_result, stream_combined);
+    }
+
+    #[tokio::test]
+    async fn test_generator_in_sequence() {
+        let lambda = RunnableLambda::new(|x: i32| Ok(x + 1));
+        let generator = RunnableGenerator::<i32, String>::new(|input_stream| {
+            Box::pin(async_stream::stream! {
+                use futures::StreamExt;
+                let mut stream = input_stream;
+                while let Some(num) = stream.next().await {
+                    yield Ok(format!("val:{}", num));
+                }
+            })
+        });
+        let chain = pipe(lambda, generator);
+
+        let chunks: Vec<_> = chain.stream(5, None).collect::<Vec<_>>().await;
+
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].as_ref().unwrap(), "val:6");
+    }
+
+    #[tokio::test]
+    async fn test_sequence_stream_error_propagation() {
+        let first = RunnableLambda::new(|_x: i32| -> Result<i32> {
+            Err(Error::other("first step failed"))
+        });
+        let second = RunnableLambda::new(|x: i32| Ok(x * 2));
+        let sequence = pipe(first, second);
+
+        let chunks: Vec<_> = sequence.stream(1, None).collect::<Vec<_>>().await;
+
+        assert_eq!(chunks.len(), 1);
+        assert!(chunks[0].is_err());
     }
 }
