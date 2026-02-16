@@ -844,6 +844,14 @@ where
             }
         })
     }
+
+    fn get_graph(
+        &self,
+        config: Option<&super::config::RunnableConfig>,
+    ) -> crate::error::Result<super::graph::Graph> {
+        let (runnable, config) = self.prepare_internal(config.cloned())?;
+        runnable.get_graph(Some(&config))
+    }
 }
 
 /// Extension trait for adding configurable methods to runnables.

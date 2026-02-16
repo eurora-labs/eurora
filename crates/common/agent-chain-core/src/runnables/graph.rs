@@ -391,6 +391,53 @@ impl Graph {
         drawer.draw(self, output_file_path)
     }
 
+    /// Add all nodes and edges from another graph.
+    ///
+    /// Note this doesn't check for duplicates, nor does it connect the graphs.
+    /// Returns (first_node, last_node) of the merged subgraph.
+    pub fn extend(&mut self, graph: Graph, prefix: &str) -> (Option<Node>, Option<Node>) {
+        let prefix = if graph.nodes.values().all(|n| is_uuid(&n.id)) {
+            ""
+        } else {
+            prefix
+        };
+
+        let prefixed = |id: &str| -> String {
+            if prefix.is_empty() {
+                id.to_string()
+            } else {
+                format!("{}:{}", prefix, id)
+            }
+        };
+
+        // prefix each node
+        for (key, node) in &graph.nodes {
+            let new_id = prefixed(key);
+            self.nodes
+                .insert(new_id.clone(), node.copy(Some(&new_id), None));
+        }
+
+        // prefix each edge's source and target
+        for edge in &graph.edges {
+            self.edges.push(edge.copy(
+                Some(&prefixed(&edge.source)),
+                Some(&prefixed(&edge.target)),
+            ));
+        }
+
+        // return (prefixed) first and last nodes of the subgraph
+        let first = graph.first_node().map(|n| {
+            let new_id = prefixed(&n.id);
+            n.copy(Some(&new_id), None)
+        });
+        let last = graph.last_node().map(|n| {
+            let new_id = prefixed(&n.id);
+            n.copy(Some(&new_id), None)
+        });
+
+        (first, last)
+    }
+
     /// Draw the graph as a Mermaid syntax string.
     pub fn draw_mermaid(&self, options: Option<MermaidOptions>) -> crate::error::Result<String> {
         let opts = options.unwrap_or_default();

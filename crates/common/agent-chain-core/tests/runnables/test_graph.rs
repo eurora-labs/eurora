@@ -584,3 +584,216 @@ fn test_node_with_metadata_renders_in_mermaid() {
     assert!(mermaid.contains("__interrupt"));
     assert!(mermaid.contains("before"));
 }
+
+// ===========================================================================
+// Tests for Graph.extend() (mirrors Python's graph.extend)
+// ===========================================================================
+
+#[test]
+fn test_graph_extend_basic() {
+    let mut graph = Graph::new();
+    let a = graph.add_node("a", Some("a"));
+    let b = graph.add_node("b", Some("b"));
+    graph.add_edge(&a, &b, None, false);
+
+    let mut other = Graph::new();
+    let c = other.add_node("c", Some("c"));
+    let d = other.add_node("d", Some("d"));
+    other.add_edge(&c, &d, None, false);
+
+    let (first, last) = graph.extend(other, "");
+    assert_eq!(first.unwrap().id, "c");
+    assert_eq!(last.unwrap().id, "d");
+    assert_eq!(graph.nodes.len(), 4);
+    assert_eq!(graph.edges.len(), 2);
+}
+
+#[test]
+fn test_graph_extend_with_prefix() {
+    let mut graph = Graph::new();
+    let a = graph.add_node("a", Some("a"));
+    let _ = a;
+
+    let mut other = Graph::new();
+    let b = other.add_node("b", Some("b"));
+    let c = other.add_node("c", Some("c"));
+    other.add_edge(&b, &c, None, false);
+
+    let (first, last) = graph.extend(other, "sub");
+    assert_eq!(first.as_ref().unwrap().id, "sub:b");
+    assert_eq!(last.as_ref().unwrap().id, "sub:c");
+    assert!(graph.nodes.contains_key("sub:b"));
+    assert!(graph.nodes.contains_key("sub:c"));
+    // Edge should also be prefixed
+    assert_eq!(graph.edges.last().unwrap().source, "sub:b");
+    assert_eq!(graph.edges.last().unwrap().target, "sub:c");
+}
+
+#[test]
+fn test_graph_extend_uuid_nodes_ignore_prefix() {
+    let mut graph = Graph::new();
+
+    let mut other = Graph::new();
+    // add_node with None id generates UUID
+    let b = other.add_node("b", None);
+    let c = other.add_node("c", None);
+    other.add_edge(&b, &c, None, false);
+
+    // All nodes have UUID ids, so prefix should be ignored
+    let (first, last) = graph.extend(other, "should_be_ignored");
+    let first = first.unwrap();
+    let last = last.unwrap();
+    assert!(!first.id.contains("should_be_ignored"));
+    assert!(!last.id.contains("should_be_ignored"));
+}
+
+#[test]
+fn test_graph_extend_empty_graph() {
+    let mut graph = Graph::new();
+    let a = graph.add_node("a", Some("a"));
+    let _ = a;
+
+    let other = Graph::new();
+    let (first, last) = graph.extend(other, "");
+    assert!(first.is_none());
+    assert!(last.is_none());
+    assert_eq!(graph.nodes.len(), 1);
+}
+
+#[test]
+fn test_graph_extend_returns_correct_first_last() {
+    let mut graph = Graph::new();
+
+    let mut other = Graph::new();
+    let x = other.add_node("x", Some("x"));
+    let y = other.add_node("y", Some("y"));
+    let z = other.add_node("z", Some("z"));
+    other.add_edge(&x, &y, None, false);
+    other.add_edge(&y, &z, None, false);
+
+    let (first, last) = graph.extend(other, "");
+    assert_eq!(first.unwrap().id, "x");
+    assert_eq!(last.unwrap().id, "z");
+}
+
+// ===========================================================================
+// Tests for Runnable.get_graph()
+// ===========================================================================
+
+use agent_chain_core::runnables::base::{runnable_lambda, Runnable};
+
+#[test]
+fn test_get_graph_base_runnable() {
+    let r = runnable_lambda(|x: String| Ok(x.len()));
+    let graph = r.get_graph(None).unwrap();
+
+    // Default: 3 nodes (Input, Runnable, Output) and 2 edges
+    assert_eq!(graph.nodes.len(), 3);
+    assert_eq!(graph.edges.len(), 2);
+
+    // Should have valid first and last
+    assert!(graph.first_node().is_some());
+    assert!(graph.last_node().is_some());
+}
+
+#[test]
+fn test_get_graph_base_runnable_names() {
+    let r = runnable_lambda(|x: String| Ok(x.len()));
+    let graph = r.get_graph(None).unwrap();
+    let reided = graph.reid();
+
+    // Verify node names contain Input and Output suffixes
+    let names: Vec<&str> = reided.nodes.values().map(|n| n.name.as_str()).collect();
+    assert!(
+        names.iter().any(|n| n.contains("Input")),
+        "Should have Input node, got: {:?}",
+        names
+    );
+    assert!(
+        names.iter().any(|n| n.contains("Output")),
+        "Should have Output node, got: {:?}",
+        names
+    );
+}
+
+#[test]
+fn test_get_graph_sequence() {
+    use agent_chain_core::runnables::base::pipe;
+
+    let a = runnable_lambda(|x: String| Ok(x.len()));
+    let b = runnable_lambda(|x: usize| Ok(x.to_string()));
+    let seq = pipe(a, b);
+    let graph = seq.get_graph(None).unwrap();
+
+    // Sequence trims intermediate nodes:
+    // first step: Input + Lambda (trimmed Output)
+    // last step: (trimmed Input) + Lambda + Output
+    // Connected by edge between them
+    // Total: 4 nodes, 3 edges
+    assert!(graph.nodes.len() >= 3, "Expected >= 3 nodes, got {}", graph.nodes.len());
+    assert!(graph.edges.len() >= 2, "Expected >= 2 edges, got {}", graph.edges.len());
+
+    // Should still have valid first and last
+    assert!(graph.first_node().is_some());
+    assert!(graph.last_node().is_some());
+}
+
+#[test]
+fn test_get_graph_sequence_draws_mermaid() {
+    use agent_chain_core::runnables::base::pipe;
+
+    let a = runnable_lambda(|x: String| Ok(x.len()));
+    let b = runnable_lambda(|x: usize| Ok(x.to_string()));
+    let seq = pipe(a, b);
+    let graph = seq.get_graph(None).unwrap();
+
+    let mermaid = graph.draw_mermaid(None).unwrap();
+    assert!(mermaid.contains("graph TD;"));
+    assert!(mermaid.contains(" --> "));
+}
+
+#[test]
+fn test_get_graph_parallel() {
+    use agent_chain_core::runnables::base::RunnableParallel;
+
+    let par = RunnableParallel::<String>::new()
+        .add("a", runnable_lambda(|x: String| Ok(serde_json::Value::String(x.clone()))))
+        .add("b", runnable_lambda(|x: String| Ok(serde_json::Value::Number(serde_json::Number::from(x.len())))));
+
+    let graph = par.get_graph(None).unwrap();
+
+    // Parallel: shared Input + Output nodes, plus the runnable nodes from each branch
+    // Each branch contributes 1 middle node (lambda), so total = 2 + 2 = 4 nodes
+    assert!(graph.nodes.len() >= 4, "Expected >= 4 nodes, got {}", graph.nodes.len());
+
+    // Edges: 2 fan-out + 2 fan-in = 4
+    assert!(graph.edges.len() >= 4, "Expected >= 4 edges, got {}", graph.edges.len());
+
+    assert!(graph.first_node().is_some());
+    assert!(graph.last_node().is_some());
+}
+
+#[test]
+fn test_get_graph_parallel_draws_mermaid() {
+    use agent_chain_core::runnables::base::RunnableParallel;
+
+    let par = RunnableParallel::<String>::new()
+        .add("a", runnable_lambda(|x: String| Ok(serde_json::Value::String(x.clone()))))
+        .add("b", runnable_lambda(|x: String| Ok(serde_json::Value::Number(serde_json::Number::from(x.len())))));
+
+    let graph = par.get_graph(None).unwrap();
+    let mermaid = graph.draw_mermaid(None).unwrap();
+
+    assert!(mermaid.contains("graph TD;"));
+}
+
+#[test]
+fn test_get_graph_binding_delegates() {
+    let r = runnable_lambda(|x: String| Ok(x.len()));
+    let binding = r.bind(HashMap::new());
+    let graph = binding.get_graph(None).unwrap();
+
+    // Binding delegates: same structure as base (3 nodes, 2 edges)
+    assert_eq!(graph.nodes.len(), 3);
+    assert_eq!(graph.edges.len(), 2);
+}
