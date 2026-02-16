@@ -757,6 +757,460 @@ impl<T> Iterator for TappedIterator<T> {
     }
 }
 
+// =============================================================================
+// BaseCallbackHandler bridge
+// =============================================================================
+
+/// A wrapper that allows `LogStreamCallbackHandler` to be used as a
+/// `BaseCallbackHandler` in `RunnableConfig.callbacks`.
+///
+/// This bridges the `BaseTracer` (which uses `&mut self`) to the
+/// `BaseCallbackHandler` (which uses `&self`) by wrapping the handler
+/// in an `Arc<Mutex<>>`.
+pub struct LogStreamCallbackHandlerBridge {
+    inner: Arc<Mutex<LogStreamCallbackHandler>>,
+}
+
+impl LogStreamCallbackHandlerBridge {
+    /// Create a new bridge wrapping a LogStreamCallbackHandler.
+    pub fn new(handler: LogStreamCallbackHandler) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(handler)),
+        }
+    }
+
+    /// Take the receive stream from the wrapped handler.
+    pub fn take_receive_stream(&self) -> Option<ReceiveStream<RunLogPatch>> {
+        self.inner
+            .lock()
+            .expect("lock poisoned")
+            .take_receive_stream()
+    }
+
+    /// Get a clone of the send stream.
+    pub fn get_send_stream(&self) -> SendStream<RunLogPatch> {
+        self.inner
+            .lock()
+            .expect("lock poisoned")
+            .send_stream
+            .clone()
+    }
+}
+
+impl fmt::Debug for LogStreamCallbackHandlerBridge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LogStreamCallbackHandlerBridge").finish()
+    }
+}
+
+impl crate::callbacks::base::LLMManagerMixin for LogStreamCallbackHandlerBridge {
+    fn on_llm_new_token(
+        &self,
+        token: &str,
+        run_id: Uuid,
+        parent_run_id: Option<Uuid>,
+        chunk: Option<&serde_json::Value>,
+    ) {
+        let chunk_any: Option<Box<dyn std::any::Any>> =
+            chunk.map(|v| Box::new(v.clone()) as Box<dyn std::any::Any>);
+        let chunk_ref = chunk_any.as_deref();
+        let mut handler = self.inner.lock().expect("lock poisoned");
+        if let Err(e) = handler.handle_llm_new_token(token, run_id, chunk_ref, parent_run_id) {
+            tracing::warn!(
+                "LogStreamCallbackHandlerBridge on_llm_new_token error: {:?}",
+                e
+            );
+        }
+    }
+
+    fn on_llm_end(
+        &self,
+        response: &crate::outputs::ChatResult,
+        run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+    ) {
+        use crate::outputs::{GenerationType, LLMResult};
+        let llm_result = LLMResult {
+            generations: vec![
+                response
+                    .generations
+                    .iter()
+                    .map(|cg| GenerationType::ChatGeneration(cg.clone()))
+                    .collect(),
+            ],
+            llm_output: response.llm_output.clone(),
+            run: None,
+            result_type: "LLMResult".to_string(),
+        };
+        let mut handler = self.inner.lock().expect("lock poisoned");
+        if let Err(e) = handler.handle_llm_end(&llm_result, run_id) {
+            tracing::warn!("LogStreamCallbackHandlerBridge on_llm_end error: {:?}", e);
+        }
+    }
+
+    fn on_llm_error(
+        &self,
+        error: &dyn std::error::Error,
+        run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+    ) {
+        let mut handler = self.inner.lock().expect("lock poisoned");
+        if let Err(e) = handler.handle_llm_error(error, run_id, None) {
+            tracing::warn!("LogStreamCallbackHandlerBridge on_llm_error error: {:?}", e);
+        }
+    }
+}
+
+impl crate::callbacks::base::ChainManagerMixin for LogStreamCallbackHandlerBridge {
+    fn on_chain_end(
+        &self,
+        outputs: &HashMap<String, serde_json::Value>,
+        run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+    ) {
+        let mut handler = self.inner.lock().expect("lock poisoned");
+        if let Err(e) = handler.handle_chain_end(outputs.clone(), run_id, None) {
+            tracing::warn!("LogStreamCallbackHandlerBridge on_chain_end error: {:?}", e);
+        }
+    }
+
+    fn on_chain_error(
+        &self,
+        error: &dyn std::error::Error,
+        run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+    ) {
+        let mut handler = self.inner.lock().expect("lock poisoned");
+        if let Err(e) = handler.handle_chain_error(error, run_id, None) {
+            tracing::warn!(
+                "LogStreamCallbackHandlerBridge on_chain_error error: {:?}",
+                e
+            );
+        }
+    }
+}
+
+impl crate::callbacks::base::ToolManagerMixin for LogStreamCallbackHandlerBridge {
+    fn on_tool_end(
+        &self,
+        output: &str,
+        run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+        _color: Option<&str>,
+        _observation_prefix: Option<&str>,
+        _llm_prefix: Option<&str>,
+    ) {
+        let mut handler = self.inner.lock().expect("lock poisoned");
+        if let Err(e) = handler.handle_tool_end(serde_json::json!(output), run_id) {
+            tracing::warn!("LogStreamCallbackHandlerBridge on_tool_end error: {:?}", e);
+        }
+    }
+
+    fn on_tool_error(
+        &self,
+        error: &dyn std::error::Error,
+        run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+    ) {
+        let mut handler = self.inner.lock().expect("lock poisoned");
+        if let Err(e) = handler.handle_tool_error(error, run_id) {
+            tracing::warn!(
+                "LogStreamCallbackHandlerBridge on_tool_error error: {:?}",
+                e
+            );
+        }
+    }
+}
+
+impl crate::callbacks::base::RetrieverManagerMixin for LogStreamCallbackHandlerBridge {
+    fn on_retriever_end(
+        &self,
+        documents: &[serde_json::Value],
+        run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+    ) {
+        let mut handler = self.inner.lock().expect("lock poisoned");
+        if let Err(e) = handler.handle_retriever_end(documents.to_vec(), run_id) {
+            tracing::warn!(
+                "LogStreamCallbackHandlerBridge on_retriever_end error: {:?}",
+                e
+            );
+        }
+    }
+
+    fn on_retriever_error(
+        &self,
+        error: &dyn std::error::Error,
+        run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+    ) {
+        let mut handler = self.inner.lock().expect("lock poisoned");
+        if let Err(e) = handler.handle_retriever_error(error, run_id) {
+            tracing::warn!(
+                "LogStreamCallbackHandlerBridge on_retriever_error error: {:?}",
+                e
+            );
+        }
+    }
+}
+
+impl crate::callbacks::base::CallbackManagerMixin for LogStreamCallbackHandlerBridge {
+    fn on_llm_start(
+        &self,
+        serialized: &HashMap<String, serde_json::Value>,
+        prompts: &[String],
+        run_id: Uuid,
+        parent_run_id: Option<Uuid>,
+        tags: Option<&[String]>,
+        metadata: Option<&HashMap<String, serde_json::Value>>,
+    ) {
+        let mut handler = self.inner.lock().expect("lock poisoned");
+        handler.handle_llm_start(
+            serialized.clone(),
+            prompts,
+            run_id,
+            parent_run_id,
+            tags.map(|t| t.to_vec()),
+            metadata.cloned(),
+            None,
+            HashMap::new(),
+        );
+    }
+
+    fn on_chat_model_start(
+        &self,
+        serialized: &HashMap<String, serde_json::Value>,
+        messages: &[Vec<crate::messages::BaseMessage>],
+        run_id: Uuid,
+        parent_run_id: Option<Uuid>,
+        tags: Option<&[String]>,
+        metadata: Option<&HashMap<String, serde_json::Value>>,
+    ) {
+        let mut handler = self.inner.lock().expect("lock poisoned");
+        if let Err(e) = handler.handle_chat_model_start(
+            serialized.clone(),
+            messages,
+            run_id,
+            parent_run_id,
+            tags.map(|t| t.to_vec()),
+            metadata.cloned(),
+            None,
+            HashMap::new(),
+        ) {
+            tracing::warn!(
+                "LogStreamCallbackHandlerBridge on_chat_model_start error: {:?}",
+                e
+            );
+        }
+    }
+
+    fn on_chain_start(
+        &self,
+        serialized: &HashMap<String, serde_json::Value>,
+        inputs: &HashMap<String, serde_json::Value>,
+        run_id: Uuid,
+        parent_run_id: Option<Uuid>,
+        tags: Option<&[String]>,
+        metadata: Option<&HashMap<String, serde_json::Value>>,
+        name: Option<&str>,
+    ) {
+        let mut handler = self.inner.lock().expect("lock poisoned");
+        handler.handle_chain_start(
+            serialized.clone(),
+            inputs.clone(),
+            run_id,
+            parent_run_id,
+            tags.map(|t| t.to_vec()),
+            metadata.cloned(),
+            None,
+            name.map(|n| n.to_string()),
+            HashMap::new(),
+        );
+    }
+
+    fn on_tool_start(
+        &self,
+        serialized: &HashMap<String, serde_json::Value>,
+        input_str: &str,
+        run_id: Uuid,
+        parent_run_id: Option<Uuid>,
+        tags: Option<&[String]>,
+        metadata: Option<&HashMap<String, serde_json::Value>>,
+        inputs: Option<&HashMap<String, serde_json::Value>>,
+    ) {
+        let mut handler = self.inner.lock().expect("lock poisoned");
+        handler.handle_tool_start(
+            serialized.clone(),
+            input_str,
+            run_id,
+            parent_run_id,
+            tags.map(|t| t.to_vec()),
+            metadata.cloned(),
+            None,
+            inputs.cloned(),
+            HashMap::new(),
+        );
+    }
+
+    fn on_retriever_start(
+        &self,
+        serialized: &HashMap<String, serde_json::Value>,
+        query: &str,
+        run_id: Uuid,
+        parent_run_id: Option<Uuid>,
+        tags: Option<&[String]>,
+        metadata: Option<&HashMap<String, serde_json::Value>>,
+        _name: Option<&str>,
+    ) {
+        let mut handler = self.inner.lock().expect("lock poisoned");
+        handler.handle_retriever_start(
+            serialized.clone(),
+            query,
+            run_id,
+            parent_run_id,
+            tags.map(|t| t.to_vec()),
+            metadata.cloned(),
+            None,
+            HashMap::new(),
+        );
+    }
+}
+
+impl crate::callbacks::base::RunManagerMixin for LogStreamCallbackHandlerBridge {}
+
+impl crate::callbacks::base::BaseCallbackHandler for LogStreamCallbackHandlerBridge {
+    fn name(&self) -> &str {
+        "LogStreamCallbackHandler"
+    }
+
+    fn run_inline(&self) -> bool {
+        true
+    }
+}
+
+// =============================================================================
+// astream_log_implementation (free function)
+// =============================================================================
+
+/// Implementation of the astream_log API.
+///
+/// This is a free function that mirrors Python's
+/// `_astream_log_implementation`. It creates the handler,
+/// injects it into the config, consumes `astream()` while
+/// forwarding log patches from the receive stream.
+///
+/// Mirrors `langchain_core.tracers.log_stream._astream_log_implementation`.
+pub fn astream_log_implementation<'a, R>(
+    runnable: &'a R,
+    input: R::Input,
+    config: Option<crate::runnables::config::RunnableConfig>,
+    diff: bool,
+    with_streamed_output_list: bool,
+    include_names: Option<Vec<String>>,
+    include_types: Option<Vec<String>>,
+    include_tags: Option<Vec<String>>,
+    exclude_names: Option<Vec<String>>,
+    exclude_types: Option<Vec<String>>,
+    exclude_tags: Option<Vec<String>>,
+) -> futures::stream::BoxStream<'a, RunLogPatch>
+where
+    R: crate::runnables::base::Runnable + 'static,
+    R::Output: serde::Serialize,
+{
+    use crate::callbacks::base::Callbacks;
+    use crate::runnables::config::ensure_config;
+    use futures::StreamExt;
+
+    let handler = LogStreamCallbackHandler::new(LogStreamConfig {
+        auto_close: false,
+        include_names,
+        include_types,
+        include_tags,
+        exclude_names,
+        exclude_types,
+        exclude_tags,
+        ..Default::default()
+    });
+
+    let bridge = Arc::new(LogStreamCallbackHandlerBridge::new(handler));
+
+    let mut config = ensure_config(config);
+
+    // Inject the bridge into callbacks
+    let cb_handler: Arc<dyn crate::callbacks::base::BaseCallbackHandler> = bridge.clone();
+    match &mut config.callbacks {
+        None => {
+            config.callbacks = Some(Callbacks::Handlers(vec![cb_handler]));
+        }
+        Some(Callbacks::Handlers(handlers)) => {
+            handlers.push(cb_handler);
+        }
+        Some(Callbacks::Manager(manager)) => {
+            manager.add_handler(cb_handler, true);
+        }
+    }
+
+    // Take the receive stream before starting
+    let receive_stream = bridge
+        .take_receive_stream()
+        .expect("receive stream should be available");
+
+    let send_stream = bridge.get_send_stream();
+
+    Box::pin(async_stream::stream! {
+        // Consume the astream output. For each chunk, generate patches
+        // for streamed_output and final_output.
+        let mut astream = std::pin::pin!(runnable.astream(input, Some(config)));
+        while let Some(chunk_result) = astream.next().await {
+            match chunk_result {
+                Ok(chunk) => {
+                    let serialized = serde_json::to_value(&chunk).unwrap_or_default();
+
+                    let mut ops = Vec::new();
+                    if with_streamed_output_list {
+                        ops.push(JsonPatchOp::add(
+                            "/streamed_output/-",
+                            serialized.clone(),
+                        ));
+                    }
+
+                    ops.push(JsonPatchOp::replace(
+                        "/final_output",
+                        serialized,
+                    ));
+
+                    if let Err(e) = send_stream.send(RunLogPatch::new(ops)) {
+                        tracing::warn!("Failed to send log patch: {}", e);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("astream_log chunk error: {}", e);
+                }
+            }
+        }
+
+        // Close the send stream to signal completion
+        let _ = send_stream.close();
+
+        // Now drain all buffered patches from the receive stream
+        let mut event_stream = std::pin::pin!(receive_stream.into_stream());
+
+        if diff {
+            while let Some(patch) = event_stream.next().await {
+                yield patch;
+            }
+        } else {
+            let mut state = RunLog::new(vec![], None);
+            while let Some(patch) = event_stream.next().await {
+                state.apply_patch(patch);
+                // Yield a RunLogPatch that represents the full state
+                // (consumer can access RunLog through the ops)
+                yield RunLogPatch::new(state.ops.clone());
+            }
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -892,5 +1346,16 @@ mod tests {
             ..Default::default()
         };
         assert!(!handler.include_run(&run));
+    }
+
+    #[test]
+    fn test_log_stream_bridge_implements_base_callback_handler() {
+        let handler = LogStreamCallbackHandler::new(LogStreamConfig::default());
+        let bridge = LogStreamCallbackHandlerBridge::new(handler);
+        let _handler_ref: &dyn crate::callbacks::base::BaseCallbackHandler = &bridge;
+        assert_eq!(
+            crate::callbacks::base::BaseCallbackHandler::name(&bridge),
+            "LogStreamCallbackHandler"
+        );
     }
 }
