@@ -1845,6 +1845,11 @@ pub trait BaseChatModel: BaseLanguageModel {
     /// Returns a `Runnable` that takes `LanguageModelInput` and produces
     /// parsed `Value` output. The chain is composed as `llm | output_parser`.
     ///
+    /// When `include_raw` is true, the output is a dict with keys:
+    /// - `"raw"`: the raw `AIMessage` from the model
+    /// - `"parsed"`: the parsed structured output (or null on parse failure)
+    /// - `"parsing_error"`: null on success, or the error string on failure
+    ///
     /// This matches Python's `BaseChatModel.with_structured_output()` which
     /// returns `Runnable[LanguageModelInput, Dict | BaseModel]`.
     ///
@@ -1853,22 +1858,26 @@ pub trait BaseChatModel: BaseLanguageModel {
     fn with_structured_output(
         &self,
         schema: Value,
-        _include_raw: bool,
+        include_raw: bool,
     ) -> Result<Box<dyn Runnable<Input = LanguageModelInput, Output = Value> + Send + Sync>> {
-        // Extract the tool name from the schema
         let tool_name = extract_tool_name_from_schema(&schema);
 
-        // Bind tools to the model with the schema
         let tool_like = ToolLike::Schema(schema);
         let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
 
-        // Create the output parser
         let output_parser = JsonOutputKeyToolsParser::new(&tool_name).with_first_tool_only(true);
 
-        // Wrap the bound model as a Runnable and compose with the parser
         let model_runnable = ChatModelRunnable::new(Arc::from(bound_model));
-        let chain = pipe(model_runnable, output_parser);
-        Ok(Box::new(chain))
+
+        if include_raw {
+            Ok(Box::new(StructuredOutputWithRaw::new(
+                model_runnable,
+                output_parser,
+            )))
+        } else {
+            let chain = pipe(model_runnable, output_parser);
+            Ok(Box::new(chain))
+        }
     }
 
     /// Get the identifying parameters for this model.
@@ -1964,6 +1973,75 @@ impl Runnable for ChatModelRunnable {
         config: Option<RunnableConfig>,
     ) -> Result<Self::Output> {
         self.model.ainvoke(input, config.as_ref()).await
+    }
+}
+
+/// Adapter that wraps a model + parser pipeline and returns raw output alongside parsed.
+///
+/// When parsing succeeds, returns:
+/// `{"raw": <serialized AIMessage>, "parsed": <parsed value>, "parsing_error": null}`
+///
+/// When parsing fails, returns:
+/// `{"raw": <serialized AIMessage>, "parsed": null, "parsing_error": <error string>}`
+///
+/// This matches Python's `with_structured_output(include_raw=True)` behavior which uses
+/// `RunnablePassthrough.assign` + `with_fallbacks(exception_key="parsing_error")`.
+pub struct StructuredOutputWithRaw {
+    model: ChatModelRunnable,
+    parser: JsonOutputKeyToolsParser,
+}
+
+impl StructuredOutputWithRaw {
+    pub fn new(model: ChatModelRunnable, parser: JsonOutputKeyToolsParser) -> Self {
+        Self { model, parser }
+    }
+
+    fn build_output(
+        raw: &AIMessage,
+        parsed: Option<Value>,
+        parsing_error: Option<String>,
+    ) -> Result<Value> {
+        let raw_value = serde_json::to_value(raw)?;
+        Ok(serde_json::json!({
+            "raw": raw_value,
+            "parsed": parsed,
+            "parsing_error": parsing_error,
+        }))
+    }
+}
+
+impl std::fmt::Debug for StructuredOutputWithRaw {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StructuredOutputWithRaw")
+            .field("model", &self.model)
+            .field("parser", &self.parser)
+            .finish()
+    }
+}
+
+#[async_trait]
+impl Runnable for StructuredOutputWithRaw {
+    type Input = LanguageModelInput;
+    type Output = Value;
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let raw: AIMessage = self.model.invoke(input, config.clone())?;
+        match self.parser.invoke(raw.clone(), config) {
+            Ok(parsed) => Self::build_output(&raw, Some(parsed), None),
+            Err(e) => Self::build_output(&raw, None, Some(e.to_string())),
+        }
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        let raw: AIMessage = self.model.ainvoke(input, config.clone()).await?;
+        match self.parser.ainvoke(raw.clone(), config).await {
+            Ok(parsed) => Self::build_output(&raw, Some(parsed), None),
+            Err(e) => Self::build_output(&raw, None, Some(e.to_string())),
+        }
     }
 }
 

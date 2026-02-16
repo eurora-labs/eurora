@@ -984,12 +984,10 @@ impl BaseChatModel for ChatOllama {
     fn with_structured_output(
         &self,
         schema: serde_json::Value,
-        _include_raw: bool,
+        include_raw: bool,
     ) -> Result<
         Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
     > {
-        // Delegate to the default trait implementation which composes
-        // bind_tools + output parser into a proper Runnable chain
         let tool_name = crate::language_models::extract_tool_name_from_schema(&schema);
         let tool_like = ToolLike::Schema(schema);
         let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
@@ -1000,8 +998,15 @@ impl BaseChatModel for ChatOllama {
 
         let model_runnable =
             crate::language_models::ChatModelRunnable::new(std::sync::Arc::from(bound_model));
-        let chain = crate::runnables::base::pipe(model_runnable, output_parser);
-        Ok(Box::new(chain))
+
+        if include_raw {
+            Ok(Box::new(
+                crate::language_models::StructuredOutputWithRaw::new(model_runnable, output_parser),
+            ))
+        } else {
+            let chain = crate::runnables::base::pipe(model_runnable, output_parser);
+            Ok(Box::new(chain))
+        }
     }
 }
 
