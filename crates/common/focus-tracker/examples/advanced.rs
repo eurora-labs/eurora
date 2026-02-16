@@ -37,14 +37,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Press Ctrl+C for graceful shutdown.");
     println!();
 
-    // Create advanced configuration with all options
-    let config = FocusTrackerConfig::new()
-        // Custom polling interval - faster than default for demo
-        .with_poll_interval_ms(50)
-        // Custom icon configuration
-        .with_icon_config(
-            IconConfig::new().with_size(64), // Larger icons for better quality
-        );
+    let config = FocusTrackerConfig::builder()
+        .poll_interval(std::time::Duration::from_millis(50))?
+        .icon(IconConfig::builder().size(64)?.build())
+        .build();
 
     println!("⚙️  Configuration:");
     println!("   Poll interval: {:?}", config.poll_interval);

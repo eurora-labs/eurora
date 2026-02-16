@@ -1,20 +1,11 @@
-//! Platform-specific code to capture the parent process ID.
-//!
-//! This module captures the PID of the parent process that started the native messaging host
-//! at startup and provides a way to retrieve it later via gRPC.
-
 use std::sync::OnceLock;
 
-/// Static storage for the parent PID captured at startup
 static PARENT_PID: OnceLock<u32> = OnceLock::new();
 
-/// Capture and store the parent PID. Should be called once at startup.
-///
 /// On Safari/macOS, the Swift bridge passes the actual Safari PID via
-/// the EURORA_BROWSER_PID environment variable since the native messaging
-/// host's parent would be the Swift bridge app, not Safari.
+/// EURORA_BROWSER_PID since the native messaging host's parent would be
+/// the Swift bridge app, not Safari.
 pub fn capture_parent_pid() {
-    // Check for environment variable override (used by Safari bridge)
     let ppid = if let Ok(env_pid) = std::env::var("EURORA_BROWSER_PID") {
         if let Ok(pid) = env_pid.parse::<u32>() {
             tracing::info!(
@@ -39,13 +30,10 @@ pub fn capture_parent_pid() {
     tracing::info!("Captured browser PID: {}", ppid);
 }
 
-/// Get the previously captured parent PID.
-/// Returns 0 if the parent PID was not captured.
 pub fn get_parent_pid() -> u32 {
     *PARENT_PID.get().unwrap_or(&0)
 }
 
-/// Platform-specific implementation to get the parent PID
 #[cfg(target_os = "linux")]
 fn get_parent_pid_impl() -> u32 {
     use std::os::unix::process::parent_id;
@@ -62,9 +50,6 @@ fn get_parent_pid_impl() -> u32 {
 fn get_parent_pid_impl() -> u32 {
     use std::mem::MaybeUninit;
     use std::process;
-
-    // Windows-specific implementation using NtQueryInformationProcess
-    // We use a snapshot-based approach which is more reliable
 
     #[repr(C)]
     #[allow(non_snake_case)]

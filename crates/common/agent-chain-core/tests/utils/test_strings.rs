@@ -3,7 +3,7 @@
 //! Converted from langchain/libs/core/tests/unit_tests/utils/test_strings.py
 
 use agent_chain_core::utils::strings::{
-    comma_list, comma_list_display, sanitize_for_postgres, stringify_json_dict, stringify_value,
+    comma_list, sanitize_for_postgres, stringify_dict, stringify_value,
 };
 use serde_json::json;
 
@@ -42,8 +42,9 @@ fn test_sanitize_for_postgres() {
 
 #[test]
 fn test_existing_string_functions() {
-    // Test comma_list with integers (using comma_list_display)
-    assert_eq!(comma_list_display(&[1, 2, 3]), "1, 2, 3");
+    // Test comma_list with numbers as strings
+    let nums = vec!["1".to_string(), "2".to_string(), "3".to_string()];
+    assert_eq!(comma_list(&nums), "1, 2, 3");
 
     // Test comma_list with strings
     let items = vec!["a".to_string(), "b".to_string(), "c".to_string()];
@@ -53,9 +54,11 @@ fn test_existing_string_functions() {
     assert_eq!(stringify_value(&json!("hello")), "hello");
     assert_eq!(stringify_value(&json!(42)), "42");
 
-    // Test stringify_json_dict
-    let data = json!({"key": "value", "number": 123});
-    let result = stringify_json_dict(data.as_object().unwrap());
+    // Test stringify_dict
+    let mut data = std::collections::HashMap::new();
+    data.insert("key".to_string(), "value".to_string());
+    data.insert("number".to_string(), "123".to_string());
+    let result = stringify_dict(&data);
     assert!(result.contains("key: value"));
     assert!(result.contains("number: 123"));
 }

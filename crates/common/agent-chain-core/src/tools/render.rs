@@ -1,7 +1,6 @@
 //! Utilities to render tools.
 //!
-//! This module provides functions for rendering tool descriptions
-//! in various text formats, mirroring `langchain_core.tools.render`.
+//! Mirrors `langchain_core.tools.render`.
 
 use std::sync::Arc;
 
@@ -51,80 +50,6 @@ pub fn render_text_description_and_args(tools: &[Arc<dyn BaseTool>]) -> String {
     tool_strings.join("\n")
 }
 
-/// Render tools as a JSON array of tool definitions.
-pub fn render_json(tools: &[Arc<dyn BaseTool>]) -> String {
-    let definitions: Vec<_> = tools.iter().map(|t| t.definition()).collect();
-    serde_json::to_string_pretty(&definitions).unwrap_or_else(|_| "[]".to_string())
-}
-
-/// Render tools as a compact JSON array.
-pub fn render_json_compact(tools: &[Arc<dyn BaseTool>]) -> String {
-    let definitions: Vec<_> = tools.iter().map(|t| t.definition()).collect();
-    serde_json::to_string(&definitions).unwrap_or_else(|_| "[]".to_string())
-}
-
-/// Render a single tool as a formatted string.
-pub fn render_tool(tool: &dyn BaseTool) -> String {
-    format!(
-        "Tool: {}\nDescription: {}\nArguments: {}",
-        tool.name(),
-        tool.description(),
-        serde_json::to_string_pretty(&tool.args()).unwrap_or_else(|_| "{}".to_string())
-    )
-}
-
-/// Render tools in a format suitable for system prompts.
-pub fn render_for_prompt(tools: &[Arc<dyn BaseTool>]) -> String {
-    let mut output = String::from("Available tools:\n\n");
-
-    for (i, tool) in tools.iter().enumerate() {
-        output.push_str(&format!("{}. {}\n", i + 1, tool.name()));
-        output.push_str(&format!("   Description: {}\n", tool.description()));
-
-        let args = tool.args();
-        if !args.is_empty() {
-            output.push_str("   Arguments:\n");
-            for (name, schema) in args {
-                let type_str = schema.get("type").and_then(|t| t.as_str()).unwrap_or("any");
-                let desc = schema
-                    .get("description")
-                    .and_then(|d| d.as_str())
-                    .unwrap_or("");
-                output.push_str(&format!("     - {} ({}): {}\n", name, type_str, desc));
-            }
-        }
-        output.push('\n');
-    }
-
-    output
-}
-
-/// Render tools as a numbered list.
-pub fn render_numbered_list(tools: &[Arc<dyn BaseTool>]) -> String {
-    tools
-        .iter()
-        .enumerate()
-        .map(|(i, tool)| format!("{}. {} - {}", i + 1, tool.name(), tool.description()))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-/// Render tools with their full schemas.
-pub fn render_with_schemas(tools: &[Arc<dyn BaseTool>]) -> String {
-    let mut output = String::new();
-
-    for tool in tools {
-        output.push_str(&format!("## {}\n\n", tool.name()));
-        output.push_str(&format!("{}\n\n", tool.description()));
-        output.push_str("### Schema\n\n");
-        output.push_str("```json\n");
-        output.push_str(&serde_json::to_string_pretty(&tool.definition()).unwrap_or_default());
-        output.push_str("\n```\n\n");
-    }
-
-    output
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,43 +86,5 @@ mod tests {
 
         assert!(rendered.contains("search -"));
         assert!(rendered.contains("args:"));
-    }
-
-    #[test]
-    fn test_render_json() {
-        let tools = create_test_tools();
-        let rendered = render_json(&tools);
-
-        assert!(rendered.contains("\"name\": \"search\""));
-        assert!(rendered.contains("\"name\": \"calculator\""));
-    }
-
-    #[test]
-    fn test_render_for_prompt() {
-        let tools = create_test_tools();
-        let rendered = render_for_prompt(&tools);
-
-        assert!(rendered.contains("Available tools:"));
-        assert!(rendered.contains("1. search"));
-        assert!(rendered.contains("2. calculator"));
-    }
-
-    #[test]
-    fn test_render_numbered_list() {
-        let tools = create_test_tools();
-        let rendered = render_numbered_list(&tools);
-
-        assert!(rendered.starts_with("1."));
-        assert!(rendered.contains("2. calculator"));
-    }
-
-    #[test]
-    fn test_render_tool() {
-        let tool = Tool::from_function(Ok, "test", "A test tool");
-
-        let rendered = render_tool(&tool);
-
-        assert!(rendered.contains("Tool: test"));
-        assert!(rendered.contains("Description: A test tool"));
     }
 }

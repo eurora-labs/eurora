@@ -64,12 +64,10 @@ pub fn convert_db_message_to_base_message(
 /// 1. A plain JSON string: `"hello"` -> `MessageContent::Text("hello")`
 /// 2. A serialized MessageContent: `{"Text": "..."}` or `{"Parts": [...]}`
 fn parse_message_content(content: &serde_json::Value) -> ConversationServiceResult<MessageContent> {
-    // If it's a plain string, convert directly to text content
     if let Some(text) = content.as_str() {
         return Ok(MessageContent::Text(text.to_string()));
     }
 
-    // Otherwise, try to deserialize as MessageContent
     serde_json::from_value(content.clone()).map_err(|e| {
         ConversationServiceError::Internal(format!("Failed to parse message content: {}", e))
     })
@@ -82,12 +80,10 @@ fn parse_message_content(content: &serde_json::Value) -> ConversationServiceResu
 /// 1. A plain JSON string: `"hello"` -> `"hello"`
 /// 2. Any other JSON value: serialized to string
 fn parse_ai_content(content: &serde_json::Value) -> ConversationServiceResult<String> {
-    // If it's a plain string, return it directly
     if let Some(text) = content.as_str() {
         return Ok(text.to_string());
     }
 
-    // Otherwise, serialize the JSON value to a string
     Ok(serde_json::to_string(content).unwrap_or_default())
 }
 

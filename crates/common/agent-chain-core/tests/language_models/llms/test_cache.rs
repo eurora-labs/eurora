@@ -29,7 +29,13 @@ async fn test_local_cache_generate_async() {
         .with_cache_instance(local_cache.clone());
 
     // First call — cache miss, generates "foo"
-    let output = llm.generate(vec!["foo".to_string()], None).await.unwrap();
+    let output = llm
+        .generate(
+            vec!["foo".to_string()],
+            agent_chain_core::language_models::LLMGenerateConfig::default(),
+        )
+        .await
+        .unwrap();
     assert_eq!(output.generations.len(), 1);
     match &output.generations[0][0] {
         GenerationType::Generation(generation) => assert_eq!(generation.text, "foo"),
@@ -37,7 +43,13 @@ async fn test_local_cache_generate_async() {
     }
 
     // Second call — cache hit, should return "foo" again (not "bar")
-    let output = llm.generate(vec!["foo".to_string()], None).await.unwrap();
+    let output = llm
+        .generate(
+            vec!["foo".to_string()],
+            agent_chain_core::language_models::LLMGenerateConfig::default(),
+        )
+        .await
+        .unwrap();
     assert_eq!(output.generations.len(), 1);
     match &output.generations[0][0] {
         GenerationType::Generation(generation) => assert_eq!(generation.text, "foo"),
@@ -72,14 +84,26 @@ async fn test_local_cache_generate_sync() {
         .with_cache_instance(local_cache.clone());
 
     // First call — generates "foo" and caches it
-    let output = llm.generate(vec!["foo".to_string()], None).await.unwrap();
+    let output = llm
+        .generate(
+            vec!["foo".to_string()],
+            agent_chain_core::language_models::LLMGenerateConfig::default(),
+        )
+        .await
+        .unwrap();
     match &output.generations[0][0] {
         GenerationType::Generation(generation) => assert_eq!(generation.text, "foo"),
         _ => panic!("Expected Generation variant"),
     }
 
     // Second call — cache hit returns "foo" again
-    let output = llm.generate(vec!["foo".to_string()], None).await.unwrap();
+    let output = llm
+        .generate(
+            vec!["foo".to_string()],
+            agent_chain_core::language_models::LLMGenerateConfig::default(),
+        )
+        .await
+        .unwrap();
     match &output.generations[0][0] {
         GenerationType::Generation(generation) => assert_eq!(generation.text, "foo"),
         _ => panic!("Expected Generation variant"),
@@ -102,14 +126,26 @@ async fn test_no_cache_generate_sync() {
     let llm = FakeListLLM::new(vec!["foo".to_string(), "bar".to_string()]).with_cache_disabled();
 
     // First call — no cache, gets "foo"
-    let output = llm.generate(vec!["foo".to_string()], None).await.unwrap();
+    let output = llm
+        .generate(
+            vec!["foo".to_string()],
+            agent_chain_core::language_models::LLMGenerateConfig::default(),
+        )
+        .await
+        .unwrap();
     match &output.generations[0][0] {
         GenerationType::Generation(generation) => assert_eq!(generation.text, "foo"),
         _ => panic!("Expected Generation variant"),
     }
 
     // Second call — no cache, gets "bar" (not a cache hit)
-    let output = llm.generate(vec!["foo".to_string()], None).await.unwrap();
+    let output = llm
+        .generate(
+            vec!["foo".to_string()],
+            agent_chain_core::language_models::LLMGenerateConfig::default(),
+        )
+        .await
+        .unwrap();
     match &output.generations[0][0] {
         GenerationType::Generation(generation) => assert_eq!(generation.text, "bar"),
         _ => panic!("Expected Generation variant"),
@@ -131,14 +167,26 @@ async fn test_no_cache_generate_async() {
     let llm = FakeListLLM::new(vec!["foo".to_string(), "bar".to_string()]).with_cache_disabled();
 
     // First call — no cache, gets "foo"
-    let output = llm.generate(vec!["foo".to_string()], None).await.unwrap();
+    let output = llm
+        .generate(
+            vec!["foo".to_string()],
+            agent_chain_core::language_models::LLMGenerateConfig::default(),
+        )
+        .await
+        .unwrap();
     match &output.generations[0][0] {
         GenerationType::Generation(generation) => assert_eq!(generation.text, "foo"),
         _ => panic!("Expected Generation variant"),
     }
 
     // Second call — no cache, gets "bar"
-    let output = llm.generate(vec!["foo".to_string()], None).await.unwrap();
+    let output = llm
+        .generate(
+            vec!["foo".to_string()],
+            agent_chain_core::language_models::LLMGenerateConfig::default(),
+        )
+        .await
+        .unwrap();
     match &output.generations[0][0] {
         GenerationType::Generation(generation) => assert_eq!(generation.text, "bar"),
         _ => panic!("Expected Generation variant"),

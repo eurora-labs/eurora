@@ -1,31 +1,25 @@
-use crate::get_secure_channel;
 use anyhow::{Ok, Result, anyhow};
 use proto_gen::auth::{
     EmailPasswordCredentials, GetLoginTokenResponse, LoginByLoginTokenRequest, LoginRequest,
     RefreshTokenRequest, RegisterRequest, TokenResponse, login_request::Credential,
     proto_auth_service_client::ProtoAuthServiceClient,
 };
+use tokio::sync::watch;
 use tonic::transport::Channel;
 use tracing::error;
 
-/// gRPC client for authentication service
 #[derive(Debug, Clone)]
 pub struct AuthClient {
-    client: ProtoAuthServiceClient<Channel>,
+    channel_rx: watch::Receiver<Channel>,
 }
 
 impl AuthClient {
-    /// Create a new gRPC client connected to the auth service
-    pub async fn new() -> Result<Self> {
-        let channel = get_secure_channel().await?;
-
-        let client = ProtoAuthServiceClient::new(channel);
-
-        Ok(Self { client })
+    pub fn new(channel_rx: watch::Receiver<Channel>) -> Self {
+        Self { channel_rx }
     }
 
     pub async fn login_by_password(
-        &self,
+        &mut self,
         login: impl Into<String>,
         password: impl Into<String>,
     ) -> Result<TokenResponse> {
@@ -35,12 +29,11 @@ impl AuthClient {
                 password: password.into(),
             })),
         };
-        Ok(self.login(req).await?)
+        self.login(req).await
     }
 
-    /// Login with email/username and password
-    async fn login(&self, data: LoginRequest) -> Result<TokenResponse> {
-        let mut client = self.client.clone();
+    async fn login(&mut self, data: LoginRequest) -> Result<TokenResponse> {
+        let mut client = self.client();
         let response = client.login(data).await.map_err(|e| {
             error!("Login failed: {}", e);
             anyhow!("Login failed: {}", e)
@@ -49,15 +42,14 @@ impl AuthClient {
         Ok(response.into_inner())
     }
 
-    /// Register a new user
     pub async fn register(
-        &self,
+        &mut self,
         username: impl Into<String>,
         email: impl Into<String>,
         password: impl Into<String>,
         display_name: Option<String>,
     ) -> Result<TokenResponse> {
-        let mut client = self.client.clone();
+        let mut client = self.client();
         let response = client
             .register(RegisterRequest {
                 username: username.into(),
@@ -74,10 +66,12 @@ impl AuthClient {
         Ok(response.into_inner())
     }
 
-    /// Refresh access token using refresh token
-    pub async fn refresh_token(&self, refresh_token: impl Into<String>) -> Result<TokenResponse> {
+    pub async fn refresh_token(
+        &mut self,
+        refresh_token: impl Into<String>,
+    ) -> Result<TokenResponse> {
         let refresh_token: String = refresh_token.into();
-        let mut client = self.client.clone();
+        let mut client = self.client();
         let mut request = tonic::Request::new(RefreshTokenRequest {});
         request.metadata_mut().insert(
             "authorization",
@@ -92,10 +86,10 @@ impl AuthClient {
     }
 
     pub async fn login_by_login_token(
-        &self,
+        &mut self,
         login_token: impl Into<String>,
     ) -> Result<TokenResponse> {
-        let mut client = self.client.clone();
+        let mut client = self.client();
         let login_token = login_token.into();
         let response = client
             .login_by_login_token(LoginByLoginTokenRequest {
@@ -110,13 +104,18 @@ impl AuthClient {
         Ok(response.into_inner())
     }
 
-    pub async fn get_login_token(&self) -> Result<GetLoginTokenResponse> {
-        let mut client = self.client.clone();
+    pub async fn get_login_token(&mut self) -> Result<GetLoginTokenResponse> {
+        let mut client = self.client();
         let response = client.get_login_token(()).await.map_err(|e| {
             error!("Get login token failed: {}", e);
             anyhow!("Get login token failed: {}", e)
         })?;
 
         Ok(response.into_inner())
+    }
+
+    fn client(&self) -> ProtoAuthServiceClient<Channel> {
+        let channel = self.channel_rx.borrow().clone();
+        ProtoAuthServiceClient::new(channel)
     }
 }

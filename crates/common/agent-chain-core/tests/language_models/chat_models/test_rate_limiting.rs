@@ -40,7 +40,10 @@ async fn test_rate_limit_invoke() {
 
     // First call — token bucket starts empty, must wait
     let tic = Instant::now();
-    let _ = model.invoke(LanguageModelInput::from("foo")).await.unwrap();
+    let _ = model
+        .invoke(LanguageModelInput::from("foo"), None)
+        .await
+        .unwrap();
     let elapsed = tic.elapsed();
     assert!(
         elapsed >= Duration::from_millis(100),
@@ -50,7 +53,10 @@ async fn test_rate_limit_invoke() {
 
     // Second call — should have a token available
     let tic = Instant::now();
-    let _ = model.invoke(LanguageModelInput::from("foo")).await.unwrap();
+    let _ = model
+        .invoke(LanguageModelInput::from("foo"), None)
+        .await
+        .unwrap();
     let elapsed = tic.elapsed();
     assert!(
         elapsed < Duration::from_millis(100),
@@ -75,7 +81,7 @@ async fn test_rate_limit_ainvoke() {
 
     let tic = Instant::now();
     let _ = model
-        .ainvoke(LanguageModelInput::from("foo"))
+        .ainvoke(LanguageModelInput::from("foo"), None)
         .await
         .unwrap();
     let elapsed = tic.elapsed();
@@ -83,7 +89,7 @@ async fn test_rate_limit_ainvoke() {
 
     let tic = Instant::now();
     let _ = model
-        .ainvoke(LanguageModelInput::from("foo"))
+        .ainvoke(LanguageModelInput::from("foo"), None)
         .await
         .unwrap();
     let elapsed = tic.elapsed();
@@ -92,7 +98,7 @@ async fn test_rate_limit_ainvoke() {
     // Third call — needs to wait again
     let tic = Instant::now();
     let _ = model
-        .ainvoke(LanguageModelInput::from("foo"))
+        .ainvoke(LanguageModelInput::from("foo"), None)
         .await
         .unwrap();
     let elapsed = tic.elapsed();
@@ -123,7 +129,10 @@ async fn test_rate_limit_skips_cache() {
 
     // First call — rate limited (cache miss)
     let tic = Instant::now();
-    let _ = model.invoke(LanguageModelInput::from("foo")).await.unwrap();
+    let _ = model
+        .invoke(LanguageModelInput::from("foo"), None)
+        .await
+        .unwrap();
     let elapsed = tic.elapsed();
     assert!(
         elapsed >= Duration::from_millis(100),
@@ -134,7 +143,10 @@ async fn test_rate_limit_skips_cache() {
     // Second and third calls — cache hits, no rate limiting
     for i in 0..2 {
         let tic = Instant::now();
-        let _ = model.invoke(LanguageModelInput::from("foo")).await.unwrap();
+        let _ = model
+            .invoke(LanguageModelInput::from("foo"), None)
+            .await
+            .unwrap();
         let elapsed = tic.elapsed();
         assert!(
             elapsed < Duration::from_millis(50),
@@ -164,7 +176,10 @@ async fn test_rate_limit_stream() {
 
     // First stream — must wait for rate limiter
     let tic = Instant::now();
-    let result = model.invoke(LanguageModelInput::from("foo")).await.unwrap();
+    let result = model
+        .invoke(LanguageModelInput::from("foo"), None)
+        .await
+        .unwrap();
     let elapsed = tic.elapsed();
     assert!(result.content.contains("hello"));
     assert!(
@@ -175,7 +190,10 @@ async fn test_rate_limit_stream() {
 
     // Second invoke — token available, should be fast
     let tic = Instant::now();
-    let _ = model.invoke(LanguageModelInput::from("bar")).await.unwrap();
+    let _ = model
+        .invoke(LanguageModelInput::from("bar"), None)
+        .await
+        .unwrap();
     let elapsed = tic.elapsed();
     assert!(
         elapsed < Duration::from_millis(100),
@@ -185,7 +203,10 @@ async fn test_rate_limit_stream() {
 
     // Third invoke — needs to wait again
     let tic = Instant::now();
-    let _ = model.invoke(LanguageModelInput::from("baz")).await.unwrap();
+    let _ = model
+        .invoke(LanguageModelInput::from("baz"), None)
+        .await
+        .unwrap();
     let elapsed = tic.elapsed();
     assert!(
         elapsed >= Duration::from_millis(100),
@@ -214,7 +235,7 @@ async fn test_rate_limit_astream() {
     // First call — rate limited
     let tic = Instant::now();
     let _ = model
-        .ainvoke(LanguageModelInput::from("foo"))
+        .ainvoke(LanguageModelInput::from("foo"), None)
         .await
         .unwrap();
     let elapsed = tic.elapsed();
@@ -223,7 +244,7 @@ async fn test_rate_limit_astream() {
     // Second — token available
     let tic = Instant::now();
     let _ = model
-        .ainvoke(LanguageModelInput::from("bar"))
+        .ainvoke(LanguageModelInput::from("bar"), None)
         .await
         .unwrap();
     let elapsed = tic.elapsed();
@@ -232,7 +253,7 @@ async fn test_rate_limit_astream() {
     // Third — rate limited again
     let tic = Instant::now();
     let _ = model
-        .ainvoke(LanguageModelInput::from("baz"))
+        .ainvoke(LanguageModelInput::from("baz"), None)
         .await
         .unwrap();
     let elapsed = tic.elapsed();
@@ -267,7 +288,7 @@ async fn test_rate_limit_skips_cache_async() {
     // First call — rate limited (cache miss)
     let tic = Instant::now();
     let _ = model
-        .ainvoke(LanguageModelInput::from("foo"))
+        .ainvoke(LanguageModelInput::from("foo"), None)
         .await
         .unwrap();
     let elapsed = tic.elapsed();
@@ -281,7 +302,7 @@ async fn test_rate_limit_skips_cache_async() {
     for i in 0..2 {
         let tic = Instant::now();
         let _ = model
-            .ainvoke(LanguageModelInput::from("foo"))
+            .ainvoke(LanguageModelInput::from("foo"), None)
             .await
             .unwrap();
         let elapsed = tic.elapsed();

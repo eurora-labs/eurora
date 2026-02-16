@@ -2,12 +2,11 @@
 
 use agent_chain::SystemMessage;
 use agent_chain::openai::BuiltinTool;
-use agent_chain::{BaseChatModel, BaseMessage, HumanMessage, openai::ChatOpenAI};
-use be_auth_grpc::{extract_claims, parse_user_id};
-use be_remote_db::{
-    DatabaseManager, GetConversation, ListConversations, MessageType, NewConversation,
-    PaginationParams,
+use agent_chain::{
+    BaseChatModel, BaseMessage, HumanMessage, ollama::ChatOllama, openai::ChatOpenAI,
 };
+use be_authz::{extract_claims, parse_user_id};
+use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
 use std::{pin::Pin, sync::Arc};
@@ -31,39 +30,60 @@ pub use proto_gen::conversation::proto_conversation_service_server::{
     ProtoConversationService, ProtoConversationServiceServer,
 };
 
-/// The main conversation service
-#[derive(Debug)]
 pub struct ConversationService {
-    chat_provider: ChatOpenAI,
-    title_provider: ChatOpenAI,
+    chat_provider: Box<dyn BaseChatModel + Send + Sync>,
+    title_provider: Box<dyn BaseChatModel + Send + Sync>,
     db: Arc<DatabaseManager>,
 }
 
 impl ConversationService {
-    /// Create a new ConversationService instance
     pub fn from_env(db: Arc<DatabaseManager>) -> ConversationServiceResult<Self> {
         info!("Creating new ConversationService instance");
 
-        let api_key = std::env::var("OPENAI_API_KEY").unwrap_or_else(|_| {
-            error!("OPENAI_API_KEY environment variable is not set");
-            String::new()
-        });
-        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-5.1".to_string());
+        let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
+            .map(|v| v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
 
-        let chat_provider = ChatOpenAI::new(&model)
-            .with_builtin_tools(vec![BuiltinTool::WebSearch])
-            .api_key(api_key.clone());
+        if local_mode {
+            let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "llama3.2".to_string());
+            let host = std::env::var("OLLAMA_HOST")
+                .unwrap_or_else(|_| "http://host.docker.internal:11434".to_string());
 
-        let _title_provider = ChatOpenAI::new("gpt-4.1-mini").api_key(api_key.clone());
+            info!(
+                "Local mode: using Ollama provider (model={}, host={})",
+                model, host
+            );
 
-        Ok(Self {
-            chat_provider,
-            title_provider: _title_provider,
-            db,
-        })
+            let chat_provider = ChatOllama::new(&model).base_url(&host);
+            let title_provider = ChatOllama::new(&model).base_url(&host);
+
+            Ok(Self {
+                chat_provider: Box::new(chat_provider),
+                title_provider: Box::new(title_provider),
+                db,
+            })
+        } else {
+            let api_key = std::env::var("OPENAI_API_KEY").unwrap_or_else(|_| {
+                error!("OPENAI_API_KEY environment variable is not set");
+                String::new()
+            });
+            let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-5.1".to_string());
+
+            info!("Cloud mode: using OpenAI provider (model={})", model);
+
+            let chat_provider = ChatOpenAI::new(&model)
+                .with_builtin_tools(vec![BuiltinTool::WebSearch])
+                .api_key(api_key.clone());
+            let title_provider = ChatOpenAI::new("gpt-4.1-mini").api_key(api_key.clone());
+
+            Ok(Self {
+                chat_provider: Box::new(chat_provider),
+                title_provider: Box::new(title_provider),
+                db,
+            })
+        }
     }
 
-    /// Convert a database Conversation to a proto Conversation
     fn db_conversation_to_proto(conversation: be_remote_db::Conversation) -> Conversation {
         Conversation {
             id: conversation.id.to_string(),
@@ -75,7 +95,6 @@ impl ConversationService {
     }
 }
 
-/// Convert DateTime<Utc> to prost_types::Timestamp
 fn datetime_to_timestamp(dt: DateTime<Utc>) -> Timestamp {
     Timestamp {
         seconds: dt.timestamp(),
@@ -109,11 +128,10 @@ impl ProtoConversationService for ConversationService {
 
         let conversation = self
             .db
-            .create_conversation(NewConversation {
-                id: None,
-                user_id,
-                title,
-            })
+            .create_conversation()
+            .user_id(user_id)
+            .title(title)
+            .call()
             .await
             .map_err(ConversationServiceError::from)?;
 
@@ -140,10 +158,14 @@ impl ProtoConversationService for ConversationService {
 
         let conversations = self
             .db
-            .list_conversations(
-                ListConversations { user_id },
-                PaginationParams::new(req.offset, req.limit, "DESC".to_string()),
-            )
+            .list_conversations()
+            .user_id(user_id)
+            .params(PaginationParams::new(
+                req.offset,
+                req.limit,
+                "DESC".to_string(),
+            ))
+            .call()
             .await
             .map_err(ConversationServiceError::from)?;
 
@@ -178,15 +200,12 @@ impl ProtoConversationService for ConversationService {
             }
         })?;
 
-        // Extract the HumanMessage from the proto message
         let proto_message = req
             .message
             .ok_or_else(|| Status::invalid_argument("message field is required"))?;
 
-        // Convert proto message to agent_chain HumanMessage for content serialization
         let human_message: HumanMessage = proto_message.into();
 
-        // Serialize content for database storage
         let content = serde_json::to_value(&human_message.content).map_err(|e| {
             ConversationServiceError::Internal(format!(
                 "Failed to serialize message content: {}",
@@ -194,7 +213,6 @@ impl ProtoConversationService for ConversationService {
             ))
         })?;
 
-        // Save the human message to the database
         let message = self
             .db
             .create_message()
@@ -233,15 +251,12 @@ impl ProtoConversationService for ConversationService {
             }
         })?;
 
-        // Extract the HumanMessage from the proto message
         let proto_message = req
             .message
             .ok_or_else(|| Status::invalid_argument("message field is required"))?;
 
-        // Convert proto message to agent_chain HumanMessage for content serialization
         let human_message: HumanMessage = proto_message.into();
 
-        // Serialize content for database storage
         let content = serde_json::to_value(&human_message.content).map_err(|e| {
             ConversationServiceError::Internal(format!(
                 "Failed to serialize message content: {}",
@@ -249,7 +264,6 @@ impl ProtoConversationService for ConversationService {
             ))
         })?;
 
-        // Save the human message to the database with hidden_from_ui set to true
         let message = self
             .db
             .create_message()
@@ -289,15 +303,12 @@ impl ProtoConversationService for ConversationService {
             }
         })?;
 
-        // Extract the SystemMessage from the proto message
         let proto_message = req
             .message
             .ok_or_else(|| Status::invalid_argument("message field is required"))?;
 
-        // Convert proto message to agent_chain SystemMessage for content serialization
         let system_message: SystemMessage = proto_message.into();
 
-        // Serialize content for database storage
         let content = serde_json::to_value(&system_message.content).map_err(|e| {
             ConversationServiceError::Internal(format!(
                 "Failed to serialize message content: {}",
@@ -305,7 +316,6 @@ impl ProtoConversationService for ConversationService {
             ))
         })?;
 
-        // Save the system message to the database
         let message = self
             .db
             .create_message()
@@ -368,7 +378,6 @@ impl ProtoConversationService for ConversationService {
 
         messages.push(human_message.clone().into());
 
-        // Serialize content for database storage using the same MessageContent shape
         let content = serde_json::to_value(&human_message.content).map_err(|e| {
             ConversationServiceError::Internal(format!(
                 "Failed to serialize message content: {}",
@@ -389,7 +398,7 @@ impl ProtoConversationService for ConversationService {
 
         let openai_stream = self
             .chat_provider
-            .astream(messages.into(), None)
+            .astream(messages.into(), None, None)
             .await
             .map_err(|e| {
                 debug!("Error in chat_stream: {}", e);
@@ -404,8 +413,6 @@ impl ProtoConversationService for ConversationService {
             while let Some(result) = openai_stream.next().await {
                 match result {
                     Ok(chunk) => {
-                        // AIMessageChunk has content for getting the text content
-                        // We determine finality by empty content or chunk_position
                         let content = chunk.content.to_string();
                         full_content.push_str(&content);
                         // TODO: Don't rely on empty string for finality
@@ -422,7 +429,6 @@ impl ProtoConversationService for ConversationService {
                 }
             }
 
-            // Save the AI message to the database after stream completes
             if !full_content.is_empty() && let Err(e) = db
                     .create_message().conversation_id(conversation_id)
                     .user_id(user_id)
@@ -494,10 +500,10 @@ impl ProtoConversationService for ConversationService {
 
         let conversation = self
             .db
-            .get_conversation(GetConversation {
-                id: conversation_id,
-                user_id,
-            })
+            .get_conversation()
+            .id(conversation_id)
+            .user_id(user_id)
+            .call()
             .await
             .map_err(ConversationServiceError::from)?;
 
@@ -556,12 +562,25 @@ impl ProtoConversationService for ConversationService {
                 .into(),
         );
 
-        let title = match self.title_provider.invoke(messages.into()).await {
-            Ok(message) => message.content,
+        let mut title = match self.title_provider.invoke(messages.into(), None).await {
+            Ok(message) => message.content.to_string(),
             Err(_) => "New Chat".to_string(),
         };
         let title_words: Vec<&str> = title.split_whitespace().collect();
-        let title = title_words[..title_words.len().min(6)].join(" ");
+        title = title_words[..title_words.len().min(6)].join(" ");
+        title = match title.is_empty() {
+            true => {
+                tracing::warn!("Failed to generate title");
+                "New Chat".to_string()
+            }
+            false => title,
+        };
+
+        // Capitalize the first letter of the title
+        if let Some(first) = title.chars().next() {
+            let rest = &title[first.len_utf8()..];
+            title = first.to_uppercase().collect::<String>() + rest;
+        }
 
         let conversation = self
             .db

@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
+	import { auth } from '$lib/stores/auth.js';
 	import { create } from '@bufbuild/protobuf';
 	import { LoginRequestSchema, Provider } from '@eurora/shared/proto/auth_service_pb.js';
 	import { authService } from '@eurora/shared/services/auth-service';
@@ -17,7 +18,6 @@
 	import { superForm } from 'sveltekit-superforms';
 	import { zodClient, type ZodObjectType } from 'sveltekit-superforms/adapters';
 	import { z } from 'zod';
-	// import { auth } from '$lib/stores/auth.js';
 
 	onMount(() => {
 		try {
@@ -75,16 +75,13 @@
 				},
 			});
 
-			// Call the auth service to login the user
-			await authService.login(loginData);
-
-			// Store tokens in auth store
-			// auth.login(tokens);
+			const tokens = await authService.login(loginData);
+			auth.login(tokens);
 			success = true;
 
-			// Redirect to home page after a short delay
+			const redirectTo = page.url.searchParams.get('redirect') || '/settings';
 			setTimeout(() => {
-				goto('/');
+				goto(redirectTo);
 			}, 1500);
 		} catch (err) {
 			console.error('Login error:', err);

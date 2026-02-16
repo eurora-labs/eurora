@@ -25,26 +25,38 @@ use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
 
-use async_stream::try_stream;
 use async_trait::async_trait;
+use base64::Engine;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::AsyncBufReadExt;
 use tokio_util::io::StreamReader;
+use tracing::warn;
 
 use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::chat_models::{
-    BaseChatModel, ChatChunk, ChatModelConfig, ChatStream, LangSmithParams, ToolChoice,
-    UsageMetadata,
+    BaseChatModel, ChatChunk, ChatModelConfig, LangSmithParams, ToolChoice, UsageMetadata,
 };
 use crate::error::{Error, Result};
+use crate::language_models::ToolLike;
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
-use crate::messages::{AIMessage, BaseMessage, ToolCall};
-use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
+use crate::messages::{AIMessage, BaseMessage, ContentPart, ImageSource, MessageContent, ToolCall};
+use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, LLMResult};
+use crate::runnables::base::Runnable;
 use crate::tools::{BaseTool, ToolDefinition};
 
 /// Default API base URL for Ollama.
 const DEFAULT_API_BASE: &str = "http://localhost:11434";
+
+/// Value for `keep_alive` parameter, matching Python's `int | str | None`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(untagged)]
+pub enum KeepAlive {
+    /// Duration as seconds (integer).
+    Seconds(i64),
+    /// Duration as a string (e.g. `"5m"`).
+    Duration(String),
+}
 
 /// Ollama chat model.
 ///
@@ -61,16 +73,16 @@ const DEFAULT_API_BASE: &str = "http://localhost:11434";
 ///     .num_ctx(4096);
 ///
 /// let messages = vec![HumanMessage::builder().content("Hello!").build().into()];
-/// let response = model.generate(messages, None).await?;
+/// let response = model.generate(messages, GenerateConfig::default()).await?;
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ChatOllama {
     /// Model name/identifier.
     model: String,
     /// Temperature for generation (0.0 - 1.0).
     temperature: Option<f64>,
-    /// Base URL for API requests.
-    base_url: String,
+    /// Base URL for API requests. `None` means use `OLLAMA_HOST` env var or default.
+    base_url: Option<String>,
     /// Whether to validate the model exists on initialization.
     validate_model_on_init: bool,
     /// Enable Mirostat sampling (0 = disabled, 1 = Mirostat, 2 = Mirostat 2.0).
@@ -104,19 +116,59 @@ pub struct ChatOllama {
     /// Output format (empty string, "json", or JSON schema).
     format: Option<OllamaFormat>,
     /// How long to keep model in memory.
-    keep_alive: Option<String>,
+    keep_alive: Option<KeepAlive>,
     /// Controls reasoning/thinking mode for supported models.
-    reasoning: Option<bool>,
+    /// Supports `true`/`false` or string intensities like `"low"`, `"medium"`, `"high"`.
+    reasoning: Option<serde_json::Value>,
     /// Additional client kwargs.
-    #[allow(dead_code)]
     client_kwargs: HashMap<String, serde_json::Value>,
     /// Chat model configuration.
     chat_model_config: ChatModelConfig,
     /// Language model configuration.
     language_model_config: LanguageModelConfig,
-    /// HTTP client.
-    #[allow(dead_code)]
-    client: reqwest::Client,
+    /// Whether the model has been validated (for lazy validation).
+    model_validated: std::sync::atomic::AtomicBool,
+    /// Tools bound to this model via `bind_tools()`.
+    bound_tools: Vec<ToolDefinition>,
+    /// Tool choice for bound tools.
+    bound_tool_choice: Option<ToolChoice>,
+}
+
+impl Clone for ChatOllama {
+    fn clone(&self) -> Self {
+        Self {
+            model: self.model.clone(),
+            temperature: self.temperature,
+            base_url: self.base_url.clone(),
+            validate_model_on_init: self.validate_model_on_init,
+            mirostat: self.mirostat,
+            mirostat_eta: self.mirostat_eta,
+            mirostat_tau: self.mirostat_tau,
+            num_ctx: self.num_ctx,
+            num_gpu: self.num_gpu,
+            num_thread: self.num_thread,
+            num_predict: self.num_predict,
+            repeat_last_n: self.repeat_last_n,
+            repeat_penalty: self.repeat_penalty,
+            seed: self.seed,
+            stop: self.stop.clone(),
+            tfs_z: self.tfs_z,
+            top_k: self.top_k,
+            top_p: self.top_p,
+            format: self.format.clone(),
+            keep_alive: self.keep_alive.clone(),
+            reasoning: self.reasoning.clone(),
+            client_kwargs: self.client_kwargs.clone(),
+            chat_model_config: self.chat_model_config.clone(),
+            language_model_config: self.language_model_config.clone(),
+            model_validated: std::sync::atomic::AtomicBool::new(
+                self.model_validated
+                    .load(std::sync::atomic::Ordering::Relaxed),
+            ),
+            bound_tools: self.bound_tools.clone(),
+            bound_tool_choice: self.bound_tool_choice.clone(),
+        }
+    }
 }
 
 /// Ollama output format.
@@ -141,7 +193,7 @@ impl ChatOllama {
         Self {
             model: model.into(),
             temperature: None,
-            base_url: DEFAULT_API_BASE.to_string(),
+            base_url: None,
             validate_model_on_init: false,
             mirostat: None,
             mirostat_eta: None,
@@ -163,7 +215,9 @@ impl ChatOllama {
             client_kwargs: HashMap::new(),
             chat_model_config: ChatModelConfig::new(),
             language_model_config: LanguageModelConfig::new(),
-            client: reqwest::Client::new(),
+            model_validated: std::sync::atomic::AtomicBool::new(false),
+            bound_tools: Vec::new(),
+            bound_tool_choice: None,
         }
     }
 
@@ -175,7 +229,7 @@ impl ChatOllama {
 
     /// Set the base URL for Ollama API.
     pub fn base_url(mut self, url: impl Into<String>) -> Self {
-        self.base_url = url.into();
+        self.base_url = Some(url.into());
         self
     }
 
@@ -281,15 +335,24 @@ impl ChatOllama {
         self
     }
 
-    /// Set how long to keep the model in memory.
+    /// Set how long to keep the model in memory (string duration like `"5m"`).
     pub fn keep_alive(mut self, duration: impl Into<String>) -> Self {
-        self.keep_alive = Some(duration.into());
+        self.keep_alive = Some(KeepAlive::Duration(duration.into()));
+        self
+    }
+
+    /// Set how long to keep the model in memory (seconds).
+    pub fn keep_alive_seconds(mut self, seconds: i64) -> Self {
+        self.keep_alive = Some(KeepAlive::Seconds(seconds));
         self
     }
 
     /// Set reasoning/thinking mode.
-    pub fn reasoning(mut self, enabled: bool) -> Self {
-        self.reasoning = Some(enabled);
+    ///
+    /// Accepts `true`/`false` to enable/disable, or a string intensity like
+    /// `"low"`, `"medium"`, `"high"` for supported models.
+    pub fn reasoning(mut self, value: impl Into<serde_json::Value>) -> Self {
+        self.reasoning = Some(value.into());
         self
     }
 
@@ -302,86 +365,195 @@ impl ChatOllama {
         BoundChatOllama::new(self, tools)
     }
 
-    /// Get the base URL, checking environment variable if not set directly.
+    /// Get the resolved base URL. Checks env var `OLLAMA_HOST` if `base_url` is `None`.
     fn get_base_url(&self) -> String {
-        if self.base_url != DEFAULT_API_BASE {
-            self.base_url.clone()
-        } else {
-            env::var("OLLAMA_HOST").unwrap_or_else(|_| DEFAULT_API_BASE.to_string())
+        let raw_url = match &self.base_url {
+            Some(url) => url.clone(),
+            None => env::var("OLLAMA_HOST").unwrap_or_else(|_| DEFAULT_API_BASE.to_string()),
+        };
+
+        strip_userinfo_from_url(&raw_url)
+    }
+
+    /// Build the HTTP client, optionally with basic auth from the URL.
+    fn build_client(&self) -> reqwest::Client {
+        let raw_url = match &self.base_url {
+            Some(url) => url.clone(),
+            None => env::var("OLLAMA_HOST").unwrap_or_else(|_| DEFAULT_API_BASE.to_string()),
+        };
+
+        let mut builder = reqwest::Client::builder();
+
+        if let Some((username, password)) = extract_userinfo(&raw_url) {
+            let credentials = format!("{}:{}", username, password);
+            let encoded = base64::engine::general_purpose::STANDARD.encode(credentials);
+            let mut headers = reqwest::header::HeaderMap::new();
+            if let Ok(value) = reqwest::header::HeaderValue::from_str(&format!("Basic {}", encoded))
+            {
+                headers.insert(reqwest::header::AUTHORIZATION, value);
+            }
+            builder = builder.default_headers(headers);
+        }
+
+        builder.build().unwrap_or_else(|_| reqwest::Client::new())
+    }
+
+    /// Validate that the model exists in Ollama by listing local models.
+    ///
+    /// Matches Python's `validate_model()` which calls `client.list()` and checks
+    /// for an exact match or tag-prefixed match.
+    pub async fn validate_model(&self) -> Result<()> {
+        let client = self.build_client();
+        let base_url = self.get_base_url();
+        let response = client
+            .get(format!("{}/api/tags", base_url))
+            .send()
+            .await
+            .map_err(|e| {
+                Error::Other(format!(
+                    "Failed to connect to Ollama. Please check that Ollama is downloaded,                      running and accessible. https://ollama.com/download. Error: {}",
+                    e
+                ))
+            })?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await.unwrap_or_default();
+            return Err(Error::Other(format!(
+                "Received an error from the Ollama API. \
+                 Please check your Ollama server logs. {}",
+                error_text
+            )));
+        }
+
+        let body: serde_json::Value = response.json().await.map_err(|e| {
+            Error::Json(serde_json::Error::io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                e.to_string(),
+            )))
+        })?;
+
+        let model_names: Vec<&str> = body
+            .get("models")
+            .and_then(|m| m.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|m| m.get("model").and_then(|n| n.as_str()))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let found = model_names
+            .iter()
+            .any(|m| *m == self.model || m.starts_with(&format!("{}:", self.model)));
+
+        if !found {
+            let available = model_names.join(", ");
+            return Err(Error::Other(format!(
+                "Model `{}` not found in Ollama. Please pull the model \
+                 (using `ollama pull {}`) or specify a valid model name. \
+                 Available local models: {}",
+                self.model, self.model, available
+            )));
+        }
+
+        Ok(())
+    }
+
+    /// Lazily validate the model if `validate_model_on_init` is set.
+    async fn ensure_model_validated(&self) -> Result<()> {
+        if self.validate_model_on_init
+            && !self
+                .model_validated
+                .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            self.validate_model().await?;
+            self.model_validated
+                .store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+        Ok(())
+    }
+
+    /// Returns true if reasoning mode is enabled (truthy value).
+    fn is_reasoning_enabled(&self) -> bool {
+        match &self.reasoning {
+            Some(serde_json::Value::Bool(b)) => *b,
+            Some(serde_json::Value::String(s)) => !s.is_empty(),
+            Some(serde_json::Value::Null) | None => false,
+            Some(_) => true,
         }
     }
 
-    /// Build the HTTP client.
-    fn build_client(&self) -> reqwest::Client {
-        reqwest::Client::new()
-    }
-
     /// Convert messages to Ollama API format.
-    fn format_messages(&self, messages: &[BaseMessage]) -> Vec<serde_json::Value> {
-        messages
-            .iter()
-            .filter_map(|msg| match msg {
-                BaseMessage::System(m) => Some(serde_json::json!({
+    ///
+    /// Matches Python's `_convert_messages_to_ollama_messages`.
+    fn format_messages(&self, messages: &[BaseMessage]) -> Result<Vec<serde_json::Value>> {
+        let mut ollama_messages = Vec::new();
+
+        for msg in messages {
+            let formatted = match msg {
+                BaseMessage::System(m) => serde_json::json!({
                     "role": "system",
-                    "content": m.content.as_text()
-                })),
-                BaseMessage::Human(m) => Some(serde_json::json!({
-                    "role": "user",
-                    "content": m.content.as_text()
-                })),
+                    "content": m.content.as_text(),
+                    "images": [],
+                }),
+                BaseMessage::Human(m) => {
+                    let (content, images) = extract_content_and_images(&m.content);
+                    serde_json::json!({
+                        "role": "user",
+                        "content": content,
+                        "images": images,
+                    })
+                }
                 BaseMessage::AI(m) => {
                     let mut message = serde_json::json!({
                         "role": "assistant",
+                        "content": m.content.as_text(),
+                        "images": [],
                     });
-
-                    if !m.content().is_empty() {
-                        message["content"] = serde_json::json!(m.content());
-                    }
 
                     if !m.tool_calls.is_empty() {
                         let tool_calls: Vec<serde_json::Value> = m
                             .tool_calls
                             .iter()
-                            .map(|tc| {
-                                serde_json::json!({
-                                    "type": "function",
-                                    "id": tc.id,
-                                    "function": {
-                                        "name": tc.name,
-                                        "arguments": tc.args
-                                    }
-                                })
-                            })
+                            .map(lc_tool_call_to_openai_tool_call)
                             .collect();
                         message["tool_calls"] = serde_json::Value::Array(tool_calls);
                     }
 
-                    Some(message)
+                    message
                 }
-                BaseMessage::Tool(m) => Some(serde_json::json!({
+                BaseMessage::Tool(m) => serde_json::json!({
                     "role": "tool",
+                    "content": m.content,
+                    "images": [],
                     "tool_call_id": m.tool_call_id,
-                    "content": m.content
-                })),
-                BaseMessage::Remove(_) => {
-                    // RemoveMessage is used for message management, not sent to API
-                    None
-                }
-                BaseMessage::Chat(m) => Some(serde_json::json!({
+                }),
+                BaseMessage::Chat(m) => serde_json::json!({
                     "role": m.role,
-                    "content": m.content
-                })),
-                BaseMessage::Function(m) => Some(serde_json::json!({
-                    "role": "function",
-                    "name": m.name,
-                    "content": m.content
-                })),
-            })
-            .collect()
+                    "content": m.content,
+                    "images": [],
+                }),
+                BaseMessage::Remove(_) => continue,
+                _ => {
+                    return Err(Error::Other(
+                        "Received unsupported message type for Ollama.".to_string(),
+                    ));
+                }
+            };
+            ollama_messages.push(formatted);
+        }
+
+        Ok(ollama_messages)
     }
 
     /// Build the options object for the request.
-    fn build_options(&self, stop: Option<Vec<String>>) -> serde_json::Value {
+    fn build_options(&self, stop: Option<Vec<String>>) -> Result<serde_json::Value> {
+        if self.stop.is_some() && stop.is_some() {
+            return Err(Error::Other(
+                "`stop` found in both the input and default params.".into(),
+            ));
+        }
+
         let mut options = serde_json::Map::new();
 
         if let Some(temp) = self.temperature {
@@ -432,19 +604,21 @@ impl ChatOllama {
             options.insert("stop".to_string(), serde_json::json!(stop));
         }
 
-        serde_json::Value::Object(options)
+        Ok(serde_json::Value::Object(options))
     }
 
     /// Build the request payload.
+    ///
+    /// Matches Python's `_chat_params`.
     fn build_request_payload(
         &self,
         messages: &[BaseMessage],
         stop: Option<Vec<String>>,
         tools: Option<&[serde_json::Value]>,
         stream: bool,
-    ) -> serde_json::Value {
-        let formatted_messages = self.format_messages(messages);
-        let options = self.build_options(stop);
+    ) -> Result<serde_json::Value> {
+        let formatted_messages = self.format_messages(messages)?;
+        let options = self.build_options(stop)?;
 
         let mut payload = serde_json::json!({
             "model": self.model,
@@ -452,7 +626,6 @@ impl ChatOllama {
             "stream": stream
         });
 
-        // Only include options if not empty
         if let serde_json::Value::Object(ref opts) = options
             && !opts.is_empty()
         {
@@ -472,11 +645,14 @@ impl ChatOllama {
         }
 
         if let Some(keep_alive) = &self.keep_alive {
-            payload["keep_alive"] = serde_json::json!(keep_alive);
+            match keep_alive {
+                KeepAlive::Seconds(s) => payload["keep_alive"] = serde_json::json!(s),
+                KeepAlive::Duration(d) => payload["keep_alive"] = serde_json::json!(d),
+            }
         }
 
-        if let Some(reasoning) = self.reasoning {
-            payload["think"] = serde_json::json!(reasoning);
+        if let Some(reasoning) = &self.reasoning {
+            payload["think"] = reasoning.clone();
         }
 
         if let Some(tools) = tools
@@ -485,57 +661,122 @@ impl ChatOllama {
             payload["tools"] = serde_json::Value::Array(tools.to_vec());
         }
 
-        payload
+        Ok(payload)
     }
 
     /// Parse the API response into an AIMessage.
-    fn parse_response_to_ai_message(&self, response: OllamaResponse) -> AIMessage {
+    fn parse_response_to_ai_message(&self, response: &OllamaResponse) -> AIMessage {
         let content = response
             .message
             .as_ref()
             .and_then(|m| m.content.clone())
             .unwrap_or_default();
 
-        let tool_calls: Vec<ToolCall> = response
-            .message
-            .as_ref()
-            .and_then(|m| m.tool_calls.as_ref())
-            .map(|tcs| {
-                tcs.iter()
-                    .filter_map(|tc| {
-                        tc.function.as_ref().map(|f| {
-                            let args = if let Some(args) = &f.arguments {
-                                match args {
-                                    serde_json::Value::String(s) => {
-                                        serde_json::from_str(s).unwrap_or_default()
-                                    }
-                                    other => other.clone(),
-                                }
-                            } else {
-                                serde_json::json!({})
-                            };
-                            ToolCall::builder().name(&f.name).args(args).build()
-                        })
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
+        let tool_calls = get_tool_calls_from_response(response);
 
-        let ai_message = AIMessage::builder().content(content).tool_calls(tool_calls);
+        let mut additional_kwargs = HashMap::new();
+        if self.is_reasoning_enabled()
+            && let Some(thinking) = response.message.as_ref().and_then(|m| m.thinking.as_ref())
+        {
+            additional_kwargs.insert(
+                "reasoning_content".to_string(),
+                serde_json::Value::String(thinking.clone()),
+            );
+        }
 
-        // Add usage metadata if available
-        if let (Some(prompt_eval_count), Some(eval_count)) =
+        let mut response_metadata = HashMap::new();
+        if let Some(model) = &response.model {
+            response_metadata.insert(
+                "model_name".to_string(),
+                serde_json::Value::String(model.clone()),
+            );
+        }
+        response_metadata.insert(
+            "model_provider".to_string(),
+            serde_json::Value::String("ollama".to_string()),
+        );
+        if let Some(done_reason) = &response.done_reason {
+            response_metadata.insert(
+                "done_reason".to_string(),
+                serde_json::Value::String(done_reason.clone()),
+            );
+        }
+
+        let usage_metadata = if let (Some(prompt_eval_count), Some(eval_count)) =
             (response.prompt_eval_count, response.eval_count)
         {
-            ai_message
-                .usage_metadata(UsageMetadata::new(
-                    prompt_eval_count as i64,
-                    eval_count as i64,
-                ))
-                .build()
+            Some(UsageMetadata::new(
+                prompt_eval_count as i64,
+                eval_count as i64,
+            ))
         } else {
-            ai_message.build()
+            None
+        };
+
+        AIMessage::builder()
+            .content(content)
+            .tool_calls(tool_calls)
+            .additional_kwargs(additional_kwargs)
+            .response_metadata(response_metadata)
+            .maybe_usage_metadata(usage_metadata)
+            .build()
+    }
+
+    /// Build generation_info from a stream response, including all fields.
+    ///
+    /// Matches Python's `generation_info = dict(stream_resp)` which captures the
+    /// entire response dict (timing data, token counts, etc.) plus `model_name`
+    /// and `model_provider`, minus the `message` field.
+    fn build_generation_info(response: &OllamaResponse) -> HashMap<String, serde_json::Value> {
+        let mut info = HashMap::new();
+        if let Some(model) = &response.model {
+            info.insert("model".to_string(), serde_json::json!(model));
+            info.insert("model_name".to_string(), serde_json::json!(model));
         }
+        info.insert("model_provider".to_string(), serde_json::json!("ollama"));
+        if let Some(done) = response.done {
+            info.insert("done".to_string(), serde_json::json!(done));
+        }
+        if let Some(done_reason) = &response.done_reason {
+            info.insert("done_reason".to_string(), serde_json::json!(done_reason));
+        }
+        if let Some(prompt_eval_count) = response.prompt_eval_count {
+            info.insert(
+                "prompt_eval_count".to_string(),
+                serde_json::json!(prompt_eval_count),
+            );
+        }
+        if let Some(eval_count) = response.eval_count {
+            info.insert("eval_count".to_string(), serde_json::json!(eval_count));
+        }
+        if let Some(total_duration) = response.total_duration {
+            info.insert(
+                "total_duration".to_string(),
+                serde_json::json!(total_duration),
+            );
+        }
+        if let Some(load_duration) = response.load_duration {
+            info.insert(
+                "load_duration".to_string(),
+                serde_json::json!(load_duration),
+            );
+        }
+        if let Some(prompt_eval_duration) = response.prompt_eval_duration {
+            info.insert(
+                "prompt_eval_duration".to_string(),
+                serde_json::json!(prompt_eval_duration),
+            );
+        }
+        if let Some(eval_duration) = response.eval_duration {
+            info.insert(
+                "eval_duration".to_string(),
+                serde_json::json!(eval_duration),
+            );
+        }
+        if let Some(created_at) = &response.created_at {
+            info.insert("created_at".to_string(), serde_json::json!(created_at));
+        }
+        info
     }
 }
 
@@ -576,8 +817,8 @@ impl BaseLanguageModel for ChatOllama {
             ls_model_name: Some(self.model.clone()),
             ls_model_type: Some("chat".to_string()),
             ls_temperature: self.temperature,
-            ls_max_tokens: self.num_predict.map(|n| n as u32),
-            ls_stop: stop.map(|s| s.to_vec()),
+            ls_max_tokens: None,
+            ls_stop: stop.map(|s| s.to_vec()).or_else(|| self.stop.clone()),
         }
     }
 }
@@ -598,6 +839,18 @@ impl BaseChatModel for ChatOllama {
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
+        if !self.bound_tools.is_empty() {
+            let ai_message = self
+                .generate_with_tools(
+                    messages,
+                    &self.bound_tools,
+                    self.bound_tool_choice.as_ref(),
+                    stop,
+                )
+                .await?;
+            let generation = ChatGeneration::new(ai_message.into());
+            return Ok(ChatResult::new(vec![generation]));
+        }
         self._generate_internal(messages, stop, None).await
     }
 
@@ -607,8 +860,7 @@ impl BaseChatModel for ChatOllama {
         stop: Option<Vec<String>>,
         _run_manager: Option<&crate::callbacks::AsyncCallbackManagerForLLMRun>,
     ) -> Result<crate::language_models::ChatGenerationStream> {
-        use crate::outputs::ChatGenerationChunk;
-
+        let reasoning_enabled = self.is_reasoning_enabled();
         let chat_stream = self.stream_internal(messages, stop).await?;
 
         let generation_stream = async_stream::stream! {
@@ -619,9 +871,42 @@ impl BaseChatModel for ChatOllama {
             while let Some(result) = pinned_stream.next().await {
                 match result {
                     Ok(chat_chunk) => {
-                        let message = AIMessage::builder().content(&chat_chunk.content).build();
-                        let generation_chunk = ChatGenerationChunk::new(message.into());
-                        yield Ok(generation_chunk);
+                        let mut additional_kwargs = HashMap::new();
+                        if reasoning_enabled
+                            && let Some(reasoning) = &chat_chunk.reasoning_content {
+                                additional_kwargs.insert(
+                                    "reasoning_content".to_string(),
+                                    serde_json::Value::String(reasoning.clone()),
+                                );
+                            }
+
+                        let mut response_metadata = HashMap::new();
+                        if let Some(ref info) = chat_chunk.generation_info {
+                            if let Some(model) = info.get("model_name") {
+                                response_metadata.insert("model_name".to_string(), model.clone());
+                            }
+                            if let Some(provider) = info.get("model_provider") {
+                                response_metadata.insert("model_provider".to_string(), provider.clone());
+                            }
+                            if let Some(reason) = info.get("done_reason") {
+                                response_metadata.insert("done_reason".to_string(), reason.clone());
+                            }
+                        }
+
+                        let message = AIMessage::builder()
+                            .content(&chat_chunk.chunk.content)
+                            .tool_calls(chat_chunk.chunk.tool_calls.clone())
+                            .maybe_usage_metadata(chat_chunk.chunk.usage_metadata.clone())
+                            .additional_kwargs(additional_kwargs)
+                            .response_metadata(response_metadata)
+                            .build();
+
+                        let chunk = if let Some(info) = chat_chunk.generation_info {
+                            ChatGenerationChunk::with_info(message.into(), info)
+                        } else {
+                            ChatGenerationChunk::new(message.into())
+                        };
+                        yield Ok(chunk);
                     }
                     Err(e) => {
                         yield Err(e);
@@ -641,7 +926,8 @@ impl BaseChatModel for ChatOllama {
         _tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,
     ) -> Result<AIMessage> {
-        // Convert tool definitions to Ollama format
+        self.ensure_model_validated().await?;
+
         let ollama_tools: Vec<serde_json::Value> = tools
             .iter()
             .map(|t| {
@@ -657,7 +943,7 @@ impl BaseChatModel for ChatOllama {
             .collect();
 
         let client = self.build_client();
-        let payload = self.build_request_payload(&messages, stop, Some(&ollama_tools), false);
+        let payload = self.build_request_payload(&messages, stop, Some(&ollama_tools), false)?;
         let base_url = self.get_base_url();
 
         let response = client
@@ -681,57 +967,161 @@ impl BaseChatModel for ChatOllama {
             )))
         })?;
 
-        Ok(self.parse_response_to_ai_message(ollama_resp))
+        Ok(self.parse_response_to_ai_message(&ollama_resp))
+    }
+
+    fn bind_tools(
+        &self,
+        tools: &[ToolLike],
+        tool_choice: Option<ToolChoice>,
+    ) -> Result<Box<dyn BaseChatModel>> {
+        let mut bound = self.clone();
+        bound.bound_tools = tools.iter().map(|t| t.to_definition()).collect();
+        bound.bound_tool_choice = tool_choice;
+        Ok(Box::new(bound))
+    }
+
+    fn with_structured_output(
+        &self,
+        schema: serde_json::Value,
+        include_raw: bool,
+    ) -> Result<
+        Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
+    > {
+        let tool_name = crate::language_models::extract_tool_name_from_schema(&schema);
+        let tool_like = ToolLike::Schema(schema);
+        let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
+
+        let output_parser =
+            crate::output_parsers::openai_tools::JsonOutputKeyToolsParser::new(&tool_name)
+                .with_first_tool_only(true);
+
+        let model_runnable =
+            crate::language_models::ChatModelRunnable::new(std::sync::Arc::from(bound_model));
+
+        if include_raw {
+            Ok(Box::new(
+                crate::language_models::StructuredOutputWithRaw::new(model_runnable, output_parser),
+            ))
+        } else {
+            let chain = crate::runnables::base::pipe(model_runnable, output_parser);
+            Ok(Box::new(chain))
+        }
     }
 }
 
 impl ChatOllama {
     /// Internal generate implementation.
+    ///
+    /// Aggregates the streaming response into a single result, matching
+    /// Python's `_generate` which calls `_chat_stream_with_aggregation`.
+    /// Uses `ChatGenerationChunk` addition to aggregate, matching Python's
+    /// `final_chunk += chunk` semantics.
     async fn _generate_internal(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
-        let client = self.build_client();
-        let payload = self.build_request_payload(&messages, stop, None, false);
-        let base_url = self.get_base_url();
+        let stream = self.stream_internal(messages, stop).await?;
+        futures::pin_mut!(stream);
 
-        let response = client
-            .post(format!("{}/api/chat", base_url))
-            .header("Content-Type", "application/json")
-            .json(&payload)
-            .send()
-            .await
-            .map_err(Error::Http)?;
+        let mut final_chunk: Option<ChatGenerationChunk> = None;
 
-        if !response.status().is_success() {
-            let status = response.status().as_u16();
-            let error_text = response.text().await.unwrap_or_default();
-            return Err(Error::api(status, error_text));
+        while let Some(result) = stream.next().await {
+            let ollama_chunk = result?;
+
+            let mut additional_kwargs = HashMap::new();
+            if let Some(reasoning) = &ollama_chunk.reasoning_content {
+                additional_kwargs.insert(
+                    "reasoning_content".to_string(),
+                    serde_json::Value::String(reasoning.clone()),
+                );
+            }
+
+            let mut response_metadata = HashMap::new();
+            if let Some(ref info) = ollama_chunk.generation_info {
+                if let Some(model) = info.get("model_name") {
+                    response_metadata.insert("model_name".to_string(), model.clone());
+                }
+                if let Some(provider) = info.get("model_provider") {
+                    response_metadata.insert("model_provider".to_string(), provider.clone());
+                }
+                if let Some(reason) = info.get("done_reason") {
+                    response_metadata.insert("done_reason".to_string(), reason.clone());
+                }
+            }
+
+            let message = AIMessage::builder()
+                .content(&ollama_chunk.chunk.content)
+                .tool_calls(ollama_chunk.chunk.tool_calls)
+                .maybe_usage_metadata(ollama_chunk.chunk.usage_metadata)
+                .additional_kwargs(additional_kwargs)
+                .response_metadata(response_metadata)
+                .build();
+
+            let gen_chunk = if let Some(info) = ollama_chunk.generation_info {
+                ChatGenerationChunk::with_info(message.into(), info)
+            } else {
+                ChatGenerationChunk::new(message.into())
+            };
+
+            final_chunk = Some(match final_chunk {
+                Some(existing) => existing + gen_chunk,
+                None => gen_chunk,
+            });
         }
 
-        let ollama_resp: OllamaResponse = response.json().await.map_err(|e| {
-            Error::Json(serde_json::Error::io(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                e.to_string(),
-            )))
-        })?;
+        let final_chunk = final_chunk
+            .ok_or_else(|| Error::Other("No data received from Ollama stream.".to_string()))?;
 
-        let ai_message = self.parse_response_to_ai_message(ollama_resp);
-        let generation = ChatGeneration::new(ai_message.into());
+        let generation_info = final_chunk.generation_info.clone();
+
+        // Extract fields from the aggregated chunk message to build the final AIMessage,
+        // matching Python's pattern of constructing AIMessage from final_chunk fields.
+        let (content, usage_metadata, tool_calls, chunk_additional_kwargs) =
+            match &final_chunk.message {
+                BaseMessage::AI(ai) => (
+                    ai.text(),
+                    ai.usage_metadata.clone(),
+                    ai.tool_calls.clone(),
+                    ai.additional_kwargs.clone(),
+                ),
+                other => (other.text(), None, vec![], HashMap::new()),
+            };
+
+        let ai_message = AIMessage::builder()
+            .content(content)
+            .tool_calls(tool_calls)
+            .additional_kwargs(chunk_additional_kwargs)
+            .maybe_usage_metadata(usage_metadata)
+            .build();
+
+        let generation = if let Some(info) = generation_info {
+            ChatGeneration::with_info(ai_message.into(), info)
+        } else {
+            ChatGeneration::new(ai_message.into())
+        };
+
         Ok(ChatResult::new(vec![generation]))
     }
 
     /// Internal stream implementation.
-    #[allow(dead_code)]
+    ///
+    /// Returns a stream of `OllamaStreamChunk` which carries both the `ChatChunk`
+    /// and Ollama-specific metadata (reasoning content, generation_info).
+    ///
+    /// Matches Python's `_aiterate_over_stream` / `_iterate_over_stream`.
     async fn stream_internal(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-    ) -> Result<ChatStream> {
+    ) -> Result<std::pin::Pin<Box<dyn futures::Stream<Item = Result<OllamaStreamChunk>> + Send>>>
+    {
+        self.ensure_model_validated().await?;
+
         let client = self.build_client();
-        let payload = self.build_request_payload(&messages, stop, None, true);
+        let payload = self.build_request_payload(&messages, stop, None, true)?;
         let base_url = self.get_base_url();
 
         let response = client
@@ -750,50 +1140,81 @@ impl ChatOllama {
 
         let byte_stream = response
             .bytes_stream()
-            .map(|result| result.map_err(std::io::Error::other));
-        let stream_reader = StreamReader::new(byte_stream);
-        let buf_reader = BufReader::new(stream_reader);
-        let mut lines = buf_reader.lines();
+            .map(|r| r.map_err(std::io::Error::other));
+        let reader = tokio::io::BufReader::new(StreamReader::new(byte_stream));
+        let mut lines = reader.lines();
 
-        let stream = try_stream! {
-            while let Some(line) = lines.next_line().await.map_err(Error::Io)? {
-                if line.trim().is_empty() {
+        let reasoning_enabled = self.is_reasoning_enabled();
+
+        let stream = async_stream::try_stream! {
+            while let Some(line) = lines.next_line().await.map_err(|e| Error::Other(e.to_string()))? {
+                if line.is_empty() {
                     continue;
                 }
 
                 let stream_resp: OllamaResponse = serde_json::from_str(&line)
-                    .map_err(Error::Json)?;
+                    .map_err(|e| Error::Other(format!("Failed to parse Ollama response: {}", e)))?;
 
                 let content = stream_resp
                     .message
                     .as_ref()
-                    .and_then(|m| m.content.clone())
-                    .unwrap_or_default();
+                    .and_then(|m| m.content.as_deref())
+                    .unwrap_or("");
 
                 let is_done = stream_resp.done.unwrap_or(false);
 
-                // Skip responses with done_reason='load' and empty content
+                // Skip responses with done_reason='load' and empty content.
+                // These indicate the model was loaded but no actual generation occurred.
                 if is_done
                     && stream_resp.done_reason.as_deref() == Some("load")
                     && content.trim().is_empty()
                 {
+                    warn!(
+                        "Ollama returned empty response with done_reason='load'. \
+                         This typically indicates the model was loaded but no content \
+                         was generated. Skipping this response."
+                    );
                     continue;
                 }
 
-                if is_done {
-                    // Final chunk - include usage metadata and finish reason
-                    let usage = if let (Some(prompt_eval_count), Some(eval_count)) =
-                        (stream_resp.prompt_eval_count, stream_resp.eval_count)
-                    {
-                        Some(UsageMetadata::new(prompt_eval_count as i64, eval_count as i64))
-                    } else {
-                        None
-                    };
-                    let finish_reason = stream_resp.done_reason;
-                    yield ChatChunk::final_chunk(usage, finish_reason);
+                let tool_calls = get_tool_calls_from_response(&stream_resp);
+
+                let reasoning_content = if reasoning_enabled {
+                    stream_resp
+                        .message
+                        .as_ref()
+                        .and_then(|m| m.thinking.clone())
                 } else {
-                    yield ChatChunk::new(content);
+                    None
+                };
+
+                let usage = if let (Some(prompt_eval_count), Some(eval_count)) =
+                    (stream_resp.prompt_eval_count, stream_resp.eval_count)
+                {
+                    Some(UsageMetadata::new(prompt_eval_count as i64, eval_count as i64))
+                } else {
+                    None
+                };
+
+                let generation_info = if is_done {
+                    Some(Self::build_generation_info(&stream_resp))
+                } else {
+                    None
+                };
+
+                let mut chunk = ChatChunk::new(content);
+                chunk.tool_calls = tool_calls;
+                chunk.usage_metadata = usage;
+                if is_done {
+                    chunk.is_final = true;
+                    chunk.finish_reason = stream_resp.done_reason.clone();
                 }
+
+                yield OllamaStreamChunk {
+                    chunk,
+                    reasoning_content,
+                    generation_info,
+                };
             }
         };
 
@@ -801,19 +1222,43 @@ impl ChatOllama {
     }
 }
 
+// ============================================================================
+// Ollama-specific stream chunk (carries metadata beyond ChatChunk)
+// ============================================================================
+
+/// A streaming chunk from Ollama that carries both the standard `ChatChunk`
+/// and Ollama-specific metadata like reasoning content and generation info.
+struct OllamaStreamChunk {
+    chunk: ChatChunk,
+    reasoning_content: Option<String>,
+    generation_info: Option<HashMap<String, serde_json::Value>>,
+}
+
+// ============================================================================
+// Ollama API response structures
+// ============================================================================
+
 /// Ollama API response structure.
 #[derive(Debug, Deserialize)]
 struct OllamaResponse {
-    #[allow(dead_code)]
     model: Option<String>,
     message: Option<OllamaMessage>,
-    #[allow(dead_code)]
     done: Option<bool>,
     done_reason: Option<String>,
     #[serde(default)]
     prompt_eval_count: Option<u32>,
     #[serde(default)]
     eval_count: Option<u32>,
+    #[serde(default)]
+    total_duration: Option<u64>,
+    #[serde(default)]
+    load_duration: Option<u64>,
+    #[serde(default)]
+    prompt_eval_duration: Option<u64>,
+    #[serde(default)]
+    eval_duration: Option<u64>,
+    #[serde(default)]
+    created_at: Option<String>,
 }
 
 /// Ollama message in response.
@@ -823,6 +1268,7 @@ struct OllamaMessage {
     role: Option<String>,
     content: Option<String>,
     tool_calls: Option<Vec<OllamaToolCall>>,
+    thinking: Option<String>,
 }
 
 /// Ollama tool call in response.
@@ -836,6 +1282,208 @@ struct OllamaToolCall {
 struct OllamaFunction {
     name: String,
     arguments: Option<serde_json::Value>,
+}
+
+// ============================================================================
+// Helper functions
+// ============================================================================
+
+/// Convert a LangChain ToolCall to OpenAI tool call format.
+fn lc_tool_call_to_openai_tool_call(tc: &ToolCall) -> serde_json::Value {
+    serde_json::json!({
+        "type": "function",
+        "id": tc.id,
+        "function": {
+            "name": tc.name,
+            "arguments": tc.args
+        }
+    })
+}
+
+/// Extract tool calls from an Ollama response.
+fn get_tool_calls_from_response(response: &OllamaResponse) -> Vec<ToolCall> {
+    response
+        .message
+        .as_ref()
+        .and_then(|m| m.tool_calls.as_ref())
+        .map(|tcs| {
+            tcs.iter()
+                .filter_map(|tc| {
+                    tc.function.as_ref().and_then(|f| {
+                        let args = parse_tool_call_arguments(f.arguments.as_ref(), &f.name).ok()?;
+                        Some(ToolCall::builder().name(&f.name).args(args).build())
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Parse tool call arguments with robust handling of Ollama's inconsistent formats.
+///
+/// Handles: dict arguments (with nested string-encoded JSON), string arguments
+/// (tries JSON parse), and filters out `functionName` metadata.
+fn parse_tool_call_arguments(
+    raw_args: Option<&serde_json::Value>,
+    function_name: &str,
+) -> Result<serde_json::Value> {
+    let Some(args) = raw_args else {
+        return Ok(serde_json::json!({}));
+    };
+
+    match args {
+        serde_json::Value::String(s) => match serde_json::from_str::<serde_json::Value>(s) {
+            Ok(v) => Ok(v),
+            Err(e) => Err(Error::Other(format!(
+                "Function {} arguments:\n\n{}\n\nare not valid JSON. Received error: {}",
+                function_name, s, e
+            ))),
+        },
+        serde_json::Value::Object(map) => {
+            let mut parsed = serde_json::Map::new();
+            for (key, value) in map {
+                // Filter out metadata fields like 'functionName' that echo function name
+                if key == "functionName"
+                    && let serde_json::Value::String(v) = value
+                    && v == function_name
+                {
+                    continue;
+                }
+                match value {
+                    serde_json::Value::String(s) => {
+                        // Try to parse string values that might be JSON
+                        if let Ok(parsed_value) = serde_json::from_str::<serde_json::Value>(s)
+                            && (parsed_value.is_object() || parsed_value.is_array())
+                        {
+                            parsed.insert(key.clone(), parsed_value);
+                            continue;
+                        }
+                        parsed.insert(key.clone(), value.clone());
+                    }
+                    _ => {
+                        parsed.insert(key.clone(), value.clone());
+                    }
+                }
+            }
+            Ok(serde_json::Value::Object(parsed))
+        }
+        other => Ok(other.clone()),
+    }
+}
+
+/// Extract content text and base64 images from a MessageContent.
+fn extract_content_and_images(content: &MessageContent) -> (String, Vec<String>) {
+    match content {
+        MessageContent::Text(s) => (s.clone(), vec![]),
+        MessageContent::Parts(parts) => {
+            let mut text_parts = Vec::new();
+            let mut images = Vec::new();
+
+            for part in parts {
+                match part {
+                    ContentPart::Text { text } => {
+                        text_parts.push(text.as_str());
+                    }
+                    ContentPart::Image { source, .. } => {
+                        if let Some(image_data) = extract_image_data(source) {
+                            images.push(image_data);
+                        }
+                    }
+                    ContentPart::Other(value) => {
+                        let part_type = value.get("type").and_then(|t| t.as_str());
+                        match part_type {
+                            Some("text") => {
+                                if let Some(text) = value.get("text").and_then(|t| t.as_str()) {
+                                    text_parts.push(text);
+                                }
+                            }
+                            Some("image_url") => {
+                                if let Some(image_data) = extract_image_url_data(value) {
+                                    images.push(image_data);
+                                }
+                            }
+                            Some("tool_use") => {
+                                // Skip tool_use blocks (matching Python)
+                            }
+                            _ => {
+                                // Skip unknown types
+                            }
+                        }
+                    }
+                }
+            }
+
+            let combined_content = if text_parts.is_empty() {
+                String::new()
+            } else {
+                // Match Python's `content += f"\n{part}"` which prepends newline to each part
+                let mut result = String::new();
+                for part in &text_parts {
+                    result.push('\n');
+                    result.push_str(part);
+                }
+                result
+            };
+            (combined_content, images)
+        }
+    }
+}
+
+/// Extract base64 image data from an ImageSource.
+fn extract_image_data(source: &ImageSource) -> Option<String> {
+    match source {
+        ImageSource::Base64 { data, .. } => Some(data.clone()),
+        ImageSource::Url { url } => {
+            // Support data:image/jpeg;base64,<data> format and plain base64 strings
+            if let Some((_prefix, data)) = url.split_once(',') {
+                Some(data.to_string())
+            } else {
+                Some(url.clone())
+            }
+        }
+        ImageSource::FileId { .. } => None,
+    }
+}
+
+/// Extract image data from an image_url content part (Other variant).
+fn extract_image_url_data(value: &serde_json::Value) -> Option<String> {
+    let image_url = value.get("image_url")?;
+    let url = if let Some(s) = image_url.as_str() {
+        s.to_string()
+    } else if let Some(obj) = image_url.as_object() {
+        obj.get("url")?.as_str()?.to_string()
+    } else {
+        return None;
+    };
+
+    // Strip data URI prefix
+    if let Some((_prefix, data)) = url.split_once(',') {
+        Some(data.to_string())
+    } else {
+        Some(url)
+    }
+}
+
+/// Extract userinfo (username:password) from a URL string.
+fn extract_userinfo(url: &str) -> Option<(String, String)> {
+    // Parse: http://username:password@host:port/path
+    let after_scheme = url.split_once("://").map(|(_, rest)| rest)?;
+    let before_host = after_scheme.split_once('@').map(|(userinfo, _)| userinfo)?;
+    let (username, password) = before_host.split_once(':')?;
+    if username.is_empty() {
+        return None;
+    }
+    Some((username.to_string(), password.to_string()))
+}
+
+/// Strip userinfo from a URL string, returning the URL without credentials.
+fn strip_userinfo_from_url(url: &str) -> String {
+    if let Some((scheme, rest)) = url.split_once("://")
+        && let Some((_userinfo, after_at)) = rest.split_once('@')
+    {
+        return format!("{}://{}", scheme, after_at);
+    }
+    url.to_string()
 }
 
 // ============================================================================
@@ -886,88 +1534,13 @@ impl BoundChatOllama {
         &self.tools
     }
 
-    /// Invoke the model with a prompt (synchronous).
-    ///
-    /// This method creates a tokio runtime to run the async operation.
-    /// For better performance in async contexts, use `invoke_async` instead.
-    pub fn invoke(&self, prompt: impl Into<String>) -> Box<dyn MessageWithAny> {
-        let prompt = prompt.into();
-        let messages = vec![
-            crate::messages::HumanMessage::builder()
-                .content(prompt)
-                .build()
-                .into(),
-        ];
-
-        // Try to use existing runtime, or create a new one
-        match tokio::runtime::Handle::try_current() {
-            Ok(handle) => {
-                // We're already in a tokio context, use block_in_place
-                tokio::task::block_in_place(|| {
-                    handle.block_on(self.invoke_async_internal(messages))
-                })
-            }
-            Err(_) => {
-                // No runtime, create a new one
-                let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
-                rt.block_on(self.invoke_async_internal(messages))
-            }
-        }
-    }
-
-    /// Invoke the model with messages (async).
-    pub async fn invoke_async(&self, messages: Vec<BaseMessage>) -> Box<dyn MessageWithAny> {
-        self.invoke_async_internal(messages).await
-    }
-
-    /// Internal async implementation.
-    async fn invoke_async_internal(&self, messages: Vec<BaseMessage>) -> Box<dyn MessageWithAny> {
+    /// Invoke the model with messages.
+    pub async fn invoke(&self, messages: Vec<BaseMessage>) -> Result<AIMessage> {
         use crate::language_models::BaseChatModel;
         let tool_definitions = self.tool_definitions();
-        match self
-            .model
+        self.model
             .generate_with_tools(messages, &tool_definitions, self.tool_choice.as_ref(), None)
             .await
-        {
-            Ok(ai_message) => Box::new(ai_message),
-            Err(e) => Box::new(
-                AIMessage::builder()
-                    .content(format!("Error: {}", e))
-                    .build(),
-            ),
-        }
-    }
-}
-
-/// Trait for messages that can be downcast via Any.
-///
-/// This allows for type-safe downcasting of message results,
-/// similar to Python's isinstance() checks.
-pub trait MessageWithAny: Send + Sync {
-    /// Get a reference to self as Any for downcasting.
-    fn as_any(&self) -> &dyn std::any::Any;
-
-    /// Get the message content.
-    fn content(&self) -> &str;
-}
-
-impl MessageWithAny for AIMessage {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    fn content(&self) -> &str {
-        AIMessage::content(self)
-    }
-}
-
-impl MessageWithAny for BaseMessage {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    fn content(&self) -> &str {
-        BaseMessage::content(self)
     }
 }
 
@@ -980,6 +1553,7 @@ mod tests {
         let model = ChatOllama::new("llama3.1");
         assert_eq!(model.model, "llama3.1");
         assert!(model.temperature.is_none());
+        assert!(model.base_url.is_none());
     }
 
     #[test]
@@ -999,9 +1573,242 @@ mod tests {
     }
 
     #[test]
+    fn test_base_url_option() {
+        let model = ChatOllama::new("llama3.1");
+        assert!(model.base_url.is_none());
+
+        let model = ChatOllama::new("llama3.1").base_url("http://custom:8080");
+        assert_eq!(model.base_url, Some("http://custom:8080".to_string()));
+    }
+
+    #[test]
     fn test_llm_type() {
         use crate::language_models::BaseLanguageModel;
         let model = ChatOllama::new("llama3.1");
         assert_eq!(model.llm_type(), "chat-ollama");
+    }
+
+    #[test]
+    fn test_reasoning_bool() {
+        let model = ChatOllama::new("deepseek-r1").reasoning(true);
+        assert!(model.is_reasoning_enabled());
+
+        let model = ChatOllama::new("deepseek-r1").reasoning(false);
+        assert!(!model.is_reasoning_enabled());
+    }
+
+    #[test]
+    fn test_reasoning_string() {
+        let model = ChatOllama::new("deepseek-r1").reasoning("high");
+        assert!(model.is_reasoning_enabled());
+        assert_eq!(
+            model.reasoning,
+            Some(serde_json::Value::String("high".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_stop_both_set_errors() {
+        let model = ChatOllama::new("llama3.1").stop(vec!["foo".to_string()]);
+        let result = model.build_options(Some(vec!["bar".to_string()]));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_keep_alive_string() {
+        let model = ChatOllama::new("llama3.1").keep_alive("5m");
+        assert!(matches!(model.keep_alive, Some(KeepAlive::Duration(ref s)) if s == "5m"));
+    }
+
+    #[test]
+    fn test_keep_alive_seconds() {
+        let model = ChatOllama::new("llama3.1").keep_alive_seconds(300);
+        assert!(matches!(model.keep_alive, Some(KeepAlive::Seconds(300))));
+    }
+
+    #[test]
+    fn test_parse_tool_call_arguments_string() {
+        let args = serde_json::json!(r#"{"a": 1, "b": 2}"#);
+        let parsed = parse_tool_call_arguments(Some(&args), "test").unwrap();
+        assert_eq!(parsed, serde_json::json!({"a": 1, "b": 2}));
+    }
+
+    #[test]
+    fn test_parse_tool_call_arguments_dict() {
+        let args = serde_json::json!({"a": 1, "b": "hello"});
+        let parsed = parse_tool_call_arguments(Some(&args), "test").unwrap();
+        assert_eq!(parsed, serde_json::json!({"a": 1, "b": "hello"}));
+    }
+
+    #[test]
+    fn test_parse_tool_call_arguments_filters_function_name() {
+        let args = serde_json::json!({"a": 1, "functionName": "test"});
+        let parsed = parse_tool_call_arguments(Some(&args), "test").unwrap();
+        assert_eq!(parsed, serde_json::json!({"a": 1}));
+    }
+
+    #[test]
+    fn test_parse_tool_call_arguments_nested_json_string() {
+        let args = serde_json::json!({"a": r#"{"nested": true}"#});
+        let parsed = parse_tool_call_arguments(Some(&args), "test").unwrap();
+        assert_eq!(parsed, serde_json::json!({"a": {"nested": true}}));
+    }
+
+    #[test]
+    fn test_extract_userinfo() {
+        assert_eq!(
+            extract_userinfo("http://user:pass@localhost:11434"),
+            Some(("user".to_string(), "pass".to_string()))
+        );
+        assert_eq!(extract_userinfo("http://localhost:11434"), None);
+    }
+
+    #[test]
+    fn test_strip_userinfo() {
+        assert_eq!(
+            strip_userinfo_from_url("http://user:pass@localhost:11434"),
+            "http://localhost:11434"
+        );
+        assert_eq!(
+            strip_userinfo_from_url("http://localhost:11434"),
+            "http://localhost:11434"
+        );
+    }
+
+    #[test]
+    fn test_extract_content_and_images_text() {
+        let content = MessageContent::Text("hello".to_string());
+        let (text, images) = extract_content_and_images(&content);
+        assert_eq!(text, "hello");
+        assert!(images.is_empty());
+    }
+
+    #[test]
+    fn test_extract_content_and_images_multipart() {
+        let content = MessageContent::Parts(vec![
+            ContentPart::Text {
+                text: "What's in this image?".to_string(),
+            },
+            ContentPart::Image {
+                source: ImageSource::Base64 {
+                    media_type: "image/jpeg".to_string(),
+                    data: "abc123".to_string(),
+                },
+                detail: None,
+            },
+        ]);
+        let (text, images) = extract_content_and_images(&content);
+        assert_eq!(text, "\nWhat's in this image?");
+        assert_eq!(images, vec!["abc123"]);
+    }
+
+    #[test]
+    fn test_extract_image_data_uri() {
+        let source = ImageSource::Url {
+            url: "data:image/jpeg;base64,abc123".to_string(),
+        };
+        assert_eq!(extract_image_data(&source), Some("abc123".to_string()));
+    }
+
+    #[test]
+    fn test_format_messages_with_images() {
+        let model = ChatOllama::new("llama3.2-vision");
+        let messages = vec![BaseMessage::Human(
+            crate::messages::HumanMessage::builder()
+                .content(MessageContent::Parts(vec![
+                    ContentPart::Text {
+                        text: "Describe this".to_string(),
+                    },
+                    ContentPart::Image {
+                        source: ImageSource::Base64 {
+                            media_type: "image/png".to_string(),
+                            data: "base64data".to_string(),
+                        },
+                        detail: None,
+                    },
+                ]))
+                .build(),
+        )];
+        let formatted = model.format_messages(&messages).unwrap();
+        assert_eq!(formatted.len(), 1);
+        assert_eq!(formatted[0]["role"], "user");
+        assert_eq!(formatted[0]["content"], "\nDescribe this");
+        assert_eq!(formatted[0]["images"][0], "base64data");
+    }
+
+    #[test]
+    fn test_format_messages_rejects_unsupported_types() {
+        let model = ChatOllama::new("llama3.1");
+        let messages = vec![BaseMessage::Function(
+            crate::messages::FunctionMessage::builder()
+                .name("fn_name")
+                .content("content")
+                .build(),
+        )];
+        let result = model.format_messages(&messages);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_base_url_default() {
+        // With no base_url set, should fall back to DEFAULT_API_BASE
+        // (assuming OLLAMA_HOST env var is not set in test environment)
+        let model = ChatOllama::new("llama3.1");
+        let url = model.get_base_url();
+        // Just verify it returns some URL (can't control env in tests)
+        assert!(url.starts_with("http"));
+    }
+
+    #[test]
+    fn test_get_base_url_explicit() {
+        let model = ChatOllama::new("llama3.1").base_url("http://custom:8080");
+        let url = model.get_base_url();
+        assert_eq!(url, "http://custom:8080");
+    }
+
+    #[test]
+    fn test_build_generation_info_includes_timing() {
+        let response = OllamaResponse {
+            model: Some("llama3.1".to_string()),
+            message: None,
+            done: Some(true),
+            done_reason: Some("stop".to_string()),
+            prompt_eval_count: Some(10),
+            eval_count: Some(20),
+            total_duration: Some(1000000),
+            load_duration: Some(200000),
+            prompt_eval_duration: Some(300000),
+            eval_duration: Some(500000),
+            created_at: Some("2024-01-01T00:00:00Z".to_string()),
+        };
+        let info = ChatOllama::build_generation_info(&response);
+        assert_eq!(info.get("model"), Some(&serde_json::json!("llama3.1")));
+        assert_eq!(info.get("model_name"), Some(&serde_json::json!("llama3.1")));
+        assert_eq!(
+            info.get("model_provider"),
+            Some(&serde_json::json!("ollama"))
+        );
+        assert_eq!(info.get("done"), Some(&serde_json::json!(true)));
+        assert_eq!(info.get("done_reason"), Some(&serde_json::json!("stop")));
+        assert_eq!(
+            info.get("total_duration"),
+            Some(&serde_json::json!(1000000u64))
+        );
+        assert_eq!(
+            info.get("load_duration"),
+            Some(&serde_json::json!(200000u64))
+        );
+        assert_eq!(
+            info.get("prompt_eval_duration"),
+            Some(&serde_json::json!(300000u64))
+        );
+        assert_eq!(
+            info.get("eval_duration"),
+            Some(&serde_json::json!(500000u64))
+        );
+        assert_eq!(
+            info.get("created_at"),
+            Some(&serde_json::json!("2024-01-01T00:00:00Z"))
+        );
     }
 }

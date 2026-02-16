@@ -1,5 +1,3 @@
-//! YouTube asset implementation
-
 use std::collections::HashMap;
 
 use agent_chain_core::{BaseMessage, HumanMessage};
@@ -14,7 +12,6 @@ use crate::{
     types::{AssetFunctionality, ContextChip},
 };
 
-/// Transcript line for YouTube videos
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranscriptLine {
     pub text: String,
@@ -22,7 +19,6 @@ pub struct TranscriptLine {
     pub duration: f32,
 }
 
-/// YouTube video asset with transcript and metadata
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct YoutubeAsset {
     pub id: String,
@@ -33,7 +29,6 @@ pub struct YoutubeAsset {
 }
 
 impl YoutubeAsset {
-    /// Create a new YouTube asset
     pub fn new(
         id: String,
         url: String,
@@ -50,7 +45,6 @@ impl YoutubeAsset {
         }
     }
 
-    /// Try to create from protocol buffer state
     pub fn try_from(asset: NativeYoutubeAsset) -> Result<Self, ActivityError> {
         let transcript = serde_json::from_str::<Vec<TranscriptLine>>(&asset.transcript)
             .map_err(ActivityError::from)?;
@@ -74,7 +68,6 @@ impl AssetFunctionality for YoutubeAsset {
         Some("youtube")
     }
 
-    /// Construct a message for LLM interaction
     fn construct_messages(&self) -> Vec<BaseMessage> {
         let content = format!(
             "The user is watching a YouTube video titled '{}'. \
@@ -89,7 +82,6 @@ impl AssetFunctionality for YoutubeAsset {
         vec![HumanMessage::builder().content(content).build().into()]
     }
 
-    /// Get context chip for UI integration
     fn get_context_chip(&self) -> Option<ContextChip> {
         let title = self.title.clone();
         let title = title.chars().take(9).collect::<String>();

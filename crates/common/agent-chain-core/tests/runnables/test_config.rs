@@ -70,8 +70,10 @@ fn test_ensure_config_copies_tags_metadata_configurable() {
 
     // Values should be equal
     assert_eq!(ensured.tags, original_tags);
-    assert_eq!(ensured.metadata, original_metadata);
     assert_eq!(ensured.configurable, original_configurable);
+    // ensure_config copies primitive configurable values into metadata
+    assert_eq!(ensured.metadata["k"], serde_json::json!("v"));
+    assert_eq!(ensured.metadata["x"], serde_json::json!("y"));
 }
 
 // ---------------------------------------------------------------------------

@@ -18,7 +18,6 @@ use super::config::{
     ConfigOrList, RunnableConfig, ensure_config, get_callback_manager_for_config, get_config_list,
     patch_config,
 };
-use super::utils::{ConfigurableFieldSpec, get_unique_config_specs};
 
 /// A `Runnable` that can fallback to other `Runnable`s if it fails.
 ///
@@ -177,20 +176,6 @@ where
         std::iter::once(&self.runnable).chain(self.fallbacks.iter())
     }
 
-    /// Get the config specs from all runnables.
-    pub fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
-        let specs: Vec<ConfigurableFieldSpec> = self
-            .runnables()
-            .flat_map(|_r| {
-                // In a full implementation, we would get config specs from each runnable
-                // For now, return empty as the trait doesn't expose config_specs
-                Vec::<ConfigurableFieldSpec>::new()
-            })
-            .collect();
-
-        get_unique_config_specs(specs).map_err(Error::other)
-    }
-
     /// Check if an error should trigger a fallback.
     fn should_fallback(&self, error: &Error) -> bool {
         match &self.error_predicate {
@@ -226,11 +211,12 @@ where
         let callback_manager = get_callback_manager_for_config(&config);
 
         // Start the root run
-        let run_manager = callback_manager.on_chain_start(
-            &std::collections::HashMap::new(),
-            &std::collections::HashMap::new(),
-            config.run_id,
-        );
+        let run_manager = callback_manager
+            .on_chain_start()
+            .serialized(&std::collections::HashMap::new())
+            .inputs(&std::collections::HashMap::new())
+            .maybe_run_id(config.run_id)
+            .call();
 
         let mut first_error: Option<Error> = None;
         let mut last_error: Option<Error> = None;
@@ -403,7 +389,9 @@ where
                         Some(result) => results.push(result),
                         None => {
                             if !error_consumed {
-                                results.push(Err(first_to_raise.take().unwrap()));
+                                results.push(Err(first_to_raise
+                                    .take()
+                                    .expect("first_to_raise set when errors exist")));
                                 error_consumed = true;
                             } else {
                                 results.push(Err(Error::other("Batch aborted due to error")));
@@ -511,7 +499,9 @@ where
                         Some(result) => results.push(result),
                         None => {
                             if !error_consumed {
-                                results.push(Err(first_to_raise.take().unwrap()));
+                                results.push(Err(first_to_raise
+                                    .take()
+                                    .expect("first_to_raise set when errors exist")));
                                 error_consumed = true;
                             } else {
                                 results.push(Err(Error::other("Batch aborted due to error")));
@@ -658,29 +648,6 @@ where
         })
     }
 }
-
-/// Extension trait to add `with_fallbacks` method to any Runnable.
-pub trait RunnableWithFallbacksExt: Runnable {
-    /// Create a new Runnable that tries this runnable first, then falls back to others.
-    ///
-    /// # Arguments
-    /// * `fallbacks` - A list of fallback runnables to try if this one fails
-    ///
-    /// # Returns
-    /// A new `RunnableWithFallbacks` instance
-    fn with_fallbacks(
-        self,
-        fallbacks: Vec<DynRunnable<Self::Input, Self::Output>>,
-    ) -> RunnableWithFallbacks<Self::Input, Self::Output>
-    where
-        Self: Sized + Send + Sync + 'static,
-    {
-        RunnableWithFallbacks::new(self, fallbacks)
-    }
-}
-
-// Implement the extension trait for all Runnables
-impl<R: Runnable> RunnableWithFallbacksExt for R {}
 
 #[cfg(test)]
 mod tests {
