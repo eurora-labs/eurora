@@ -1890,3 +1890,35 @@ mod tests {
         assert_eq!(result.id, Some("lc_run-789".to_string()));
     }
 }
+
+// --- Serializable impls ---
+
+use crate::load::Serializable;
+
+impl Serializable for AIMessage {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "schema".to_string(),
+            "messages".to_string(),
+        ]
+    }
+}
+
+impl Serializable for AIMessageChunk {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "schema".to_string(),
+            "messages".to_string(),
+        ]
+    }
+}
