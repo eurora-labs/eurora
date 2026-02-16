@@ -7,8 +7,8 @@ use std::sync::{Arc, Mutex};
 
 use agent_chain_core::chat_history::{BaseChatMessageHistory, InMemoryChatMessageHistory};
 use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage, SystemMessage};
-use agent_chain_core::runnables::config::RunnableConfig;
 use agent_chain_core::runnables::base::Runnable;
+use agent_chain_core::runnables::config::RunnableConfig;
 use agent_chain_core::runnables::history::{
     GetSessionHistoryFn, HistoryRunnable, RunnableWithMessageHistory,
 };

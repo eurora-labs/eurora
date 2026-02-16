@@ -20,6 +20,7 @@ use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::error::Result;
 use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition};
 use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, GenerationType, LLMResult};
+use crate::runnables::RunnableConfig;
 
 /// Fake chat model for testing purposes.
 ///
@@ -272,6 +273,34 @@ impl FakeListChatModel {
         self.index.store(next_i, Ordering::SeqCst);
 
         response
+    }
+
+    /// Process inputs sequentially to preserve response ordering.
+    ///
+    /// Unlike the default concurrent `Runnable::batch`, this processes inputs
+    /// one at a time to ensure deterministic response ordering. Matches
+    /// Python's `FakeListChatModel.batch()` override.
+    pub async fn batch(
+        &self,
+        inputs: Vec<LanguageModelInput>,
+        config: Option<&RunnableConfig>,
+    ) -> Result<Vec<AIMessage>> {
+        let mut results = Vec::with_capacity(inputs.len());
+        for input in inputs {
+            results.push(self.invoke(input, config).await?);
+        }
+        Ok(results)
+    }
+
+    /// Async version of sequential batch processing.
+    ///
+    /// Matches Python's `FakeListChatModel.abatch()` override.
+    pub async fn abatch(
+        &self,
+        inputs: Vec<LanguageModelInput>,
+        config: Option<&RunnableConfig>,
+    ) -> Result<Vec<AIMessage>> {
+        self.batch(inputs, config).await
     }
 }
 

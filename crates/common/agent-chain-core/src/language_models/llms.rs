@@ -12,7 +12,7 @@ use futures::Stream;
 use serde_json::Value;
 
 use super::base::{BaseLanguageModel, LangSmithParams, LanguageModelConfig, LanguageModelInput};
-use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
+use crate::callbacks::{AsyncCallbackManagerForLLMRun, CallbackManagerForLLMRun, Callbacks};
 use crate::error::Result;
 use crate::outputs::{
     ChatGeneration, ChatResult, Generation, GenerationChunk, GenerationType, LLMResult, RunInfo,
@@ -316,7 +316,7 @@ pub trait BaseLLM: BaseLanguageModel {
         let callback_manager = CallbackManager::configure(
             callbacks,
             self.callbacks().cloned(),
-            false,
+            self.verbose(),
             tags,
             self.config().tags.clone(),
             Some(inheritable_metadata),
@@ -550,7 +550,7 @@ pub trait BaseLLM: BaseLanguageModel {
         let callback_manager = crate::callbacks::CallbackManager::configure(
             callbacks,
             self.callbacks().cloned(),
-            false,
+            self.verbose(),
             tags,
             self.config().tags.clone(),
             Some(inheritable_metadata),
@@ -651,7 +651,7 @@ pub trait BaseLLM: BaseLanguageModel {
         let callback_manager = crate::callbacks::AsyncCallbackManager::configure(
             callbacks,
             self.callbacks().cloned(),
-            false,
+            self.verbose(),
             tags,
             self.config().tags.clone(),
             Some(inheritable_metadata),
@@ -710,6 +710,252 @@ pub trait BaseLLM: BaseLanguageModel {
         };
 
         Ok(Box::pin(chunk_stream))
+    }
+
+    /// Invoke the model with input, using async callback pipeline.
+    ///
+    /// Routes through `agenerate()` to ensure the async callback pipeline
+    /// (on_llm_start, on_llm_end, on_llm_error) is triggered.
+    ///
+    /// Mirrors Python's `BaseLLM.ainvoke()`.
+    async fn ainvoke(
+        &self,
+        input: LanguageModelInput,
+        config: Option<&RunnableConfig>,
+    ) -> Result<String> {
+        let prompt = self.convert_input(input)?;
+
+        let generate_config = if let Some(cfg) = config {
+            LLMGenerateConfig::from_runnable_config(cfg)
+        } else {
+            LLMGenerateConfig::default()
+        };
+
+        let result = self.agenerate(vec![prompt], generate_config).await?;
+
+        if let Some(generations) = result.generations.first()
+            && let Some(generation) = generations.first()
+        {
+            return Ok(extract_text(generation));
+        }
+
+        Ok(String::new())
+    }
+
+    /// Generate with async cache and async callback support.
+    ///
+    /// Mirrors Python's `BaseLLM.agenerate()`. Uses `AsyncCallbackManager`
+    /// and async cache operations (`aget_prompts_from_cache`, `aupdate_cache`).
+    async fn agenerate(
+        &self,
+        prompts: Vec<String>,
+        config: LLMGenerateConfig,
+    ) -> Result<LLMResult> {
+        use crate::caches::BaseCache;
+        use crate::callbacks::AsyncCallbackManager;
+
+        let LLMGenerateConfig {
+            stop,
+            callbacks,
+            tags,
+            metadata,
+            run_name: _run_name,
+            run_id,
+        } = config;
+
+        let params = self.identifying_params();
+
+        // Build inheritable metadata with LangSmith params
+        let mut inheritable_metadata = metadata.clone().unwrap_or_default();
+        let ls_params = self.get_llm_ls_params(stop.as_deref());
+        if let Some(provider) = ls_params.ls_provider {
+            inheritable_metadata.insert("ls_provider".to_string(), Value::String(provider));
+        }
+        if let Some(model_name) = ls_params.ls_model_name {
+            inheritable_metadata.insert("ls_model_name".to_string(), Value::String(model_name));
+        }
+        if let Some(model_type) = ls_params.ls_model_type {
+            inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
+        }
+
+        // Configure async callback manager
+        let callback_manager = AsyncCallbackManager::configure(
+            callbacks,
+            self.callbacks().cloned(),
+            self.verbose(),
+            tags,
+            self.config().tags.clone(),
+            Some(inheritable_metadata),
+            self.config().metadata.clone(),
+        );
+
+        // Resolve which cache to use
+        let cache_config = self.llm_config().base.cache;
+        let cache_instance = self.llm_config().cache_instance.clone();
+
+        let resolved_cache: Option<std::sync::Arc<dyn BaseCache>> =
+            if let Some(instance) = cache_instance {
+                Some(instance)
+            } else if cache_config == Some(false) {
+                None
+            } else {
+                crate::globals::get_llm_cache()
+            };
+
+        if let Some(cache) = &resolved_cache {
+            // Cache is available — async lookup
+            let (mut existing, llm_string, missing_idxs, missing_prompts) =
+                aget_prompts_from_cache(&params, &prompts, Some(cache.as_ref())).await;
+
+            if missing_prompts.is_empty() {
+                let generations = (0..prompts.len())
+                    .map(|i| {
+                        existing
+                            .remove(&i)
+                            .unwrap_or_default()
+                            .into_iter()
+                            .map(GenerationType::Generation)
+                            .collect()
+                    })
+                    .collect();
+                return Ok(LLMResult::new(generations));
+            }
+
+            // Fire on_llm_start only for missing prompts (async)
+            let run_managers = callback_manager
+                .on_llm_start(&params, &missing_prompts, run_id)
+                .await;
+
+            // Generate only for misses
+            let new_results = self
+                ._agenerate_helper(missing_prompts, stop, &run_managers)
+                .await?;
+
+            // Async cache update
+            aupdate_cache(
+                Some(cache.as_ref()),
+                &mut existing,
+                &llm_string,
+                &missing_idxs,
+                &new_results,
+                &prompts,
+            )
+            .await;
+
+            // Reconstruct full result in order
+            let generations = (0..prompts.len())
+                .map(|i| {
+                    existing
+                        .remove(&i)
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(GenerationType::Generation)
+                        .collect()
+                })
+                .collect();
+
+            let mut output = LLMResult::new(generations);
+
+            if !run_managers.is_empty() {
+                output.run = Some(
+                    run_managers
+                        .iter()
+                        .map(|rm| RunInfo::new(rm.run_id()))
+                        .collect(),
+                );
+            }
+
+            Ok(output)
+        } else {
+            // No cache — fire on_llm_start for all prompts (async)
+            let run_managers = callback_manager
+                .on_llm_start(&params, &prompts, run_id)
+                .await;
+
+            let mut output = self._agenerate_helper(prompts, stop, &run_managers).await?;
+
+            if !run_managers.is_empty() {
+                output.run = Some(
+                    run_managers
+                        .iter()
+                        .map(|rm| RunInfo::new(rm.run_id()))
+                        .collect(),
+                );
+            }
+
+            Ok(output)
+        }
+    }
+
+    /// Async helper that calls `generate_prompts` and fires async callbacks.
+    ///
+    /// Mirrors Python's `BaseLLM._agenerate_helper`.
+    async fn _agenerate_helper(
+        &self,
+        prompts: Vec<String>,
+        stop: Option<Vec<String>>,
+        run_managers: &[AsyncCallbackManagerForLLMRun],
+    ) -> Result<LLMResult> {
+        match self
+            .generate_prompts(
+                prompts,
+                stop,
+                run_managers.first().map(|rm| rm.get_sync()).as_ref(),
+            )
+            .await
+        {
+            Ok(output) => {
+                let flattened = output.flatten();
+                for (run_manager, flattened_output) in run_managers.iter().zip(flattened.iter()) {
+                    let chat_result = llm_result_to_chat_result(flattened_output);
+                    run_manager.on_llm_end(&chat_result).await;
+                }
+                Ok(output)
+            }
+            Err(e) => {
+                for run_manager in run_managers {
+                    run_manager.get_sync().on_llm_error(&e);
+                }
+                Err(e)
+            }
+        }
+    }
+
+    /// Process multiple inputs using async callback pipeline.
+    ///
+    /// Routes all prompts through a single `agenerate()` call,
+    /// matching Python's `BaseLLM.abatch()` behavior.
+    async fn abatch(
+        &self,
+        inputs: Vec<LanguageModelInput>,
+        config: Option<&RunnableConfig>,
+    ) -> Result<Vec<String>> {
+        if inputs.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let prompts: Vec<String> = inputs
+            .into_iter()
+            .map(|i| self.convert_input(i))
+            .collect::<Result<Vec<_>>>()?;
+
+        let generate_config = if let Some(cfg) = config {
+            LLMGenerateConfig::from_runnable_config(cfg)
+        } else {
+            LLMGenerateConfig::default()
+        };
+
+        let result = self.agenerate(prompts, generate_config).await?;
+
+        let mut outputs = Vec::new();
+        for generations in &result.generations {
+            if let Some(generation) = generations.first() {
+                outputs.push(extract_text(generation));
+            } else {
+                outputs.push(String::new());
+            }
+        }
+        Ok(outputs)
     }
 
     /// Get standard params for tracing.
@@ -824,6 +1070,84 @@ pub fn update_cache(
 
                 if let Some(prompt) = prompts.get(idx) {
                     cache.update(prompt, llm_string, generations);
+                }
+            }
+        }
+    }
+
+    new_results.llm_output.clone()
+}
+
+/// Async version of `get_prompts_from_cache`.
+///
+/// Uses async cache lookups. Mirrors Python's `aget_prompts`.
+pub async fn aget_prompts_from_cache(
+    params: &HashMap<String, Value>,
+    prompts: &[String],
+    cache: Option<&dyn crate::caches::BaseCache>,
+) -> (
+    HashMap<usize, Vec<Generation>>,
+    String,
+    Vec<usize>,
+    Vec<String>,
+) {
+    let sorted: std::collections::BTreeMap<_, _> = params.iter().collect();
+    let llm_string = serde_json::to_string(&sorted).unwrap_or_default();
+    let mut existing_prompts = HashMap::new();
+    let mut missing_prompt_idxs = Vec::new();
+    let mut missing_prompts = Vec::new();
+
+    if let Some(cache) = cache {
+        for (i, prompt) in prompts.iter().enumerate() {
+            if let Some(cached) = cache.alookup(prompt, &llm_string).await {
+                existing_prompts.insert(i, cached);
+            } else {
+                missing_prompts.push(prompt.clone());
+                missing_prompt_idxs.push(i);
+            }
+        }
+    } else {
+        for (i, prompt) in prompts.iter().enumerate() {
+            missing_prompts.push(prompt.clone());
+            missing_prompt_idxs.push(i);
+        }
+    }
+
+    (
+        existing_prompts,
+        llm_string,
+        missing_prompt_idxs,
+        missing_prompts,
+    )
+}
+
+/// Async version of `update_cache`.
+///
+/// Uses async cache updates. Mirrors Python's `aupdate_cache`.
+pub async fn aupdate_cache(
+    cache: Option<&dyn crate::caches::BaseCache>,
+    existing_prompts: &mut HashMap<usize, Vec<Generation>>,
+    llm_string: &str,
+    missing_prompt_idxs: &[usize],
+    new_results: &LLMResult,
+    prompts: &[String],
+) -> Option<HashMap<String, Value>> {
+    if let Some(cache) = cache {
+        for (i, result) in new_results.generations.iter().enumerate() {
+            if let Some(&idx) = missing_prompt_idxs.get(i) {
+                let generations: Vec<Generation> = result
+                    .iter()
+                    .filter_map(|g| match g {
+                        GenerationType::Generation(generation) => Some(generation.clone()),
+                        GenerationType::GenerationChunk(chunk) => Some(chunk.clone().into()),
+                        _ => None,
+                    })
+                    .collect();
+
+                existing_prompts.insert(idx, generations.clone());
+
+                if let Some(prompt) = prompts.get(idx) {
+                    cache.aupdate(prompt, llm_string, generations).await;
                 }
             }
         }

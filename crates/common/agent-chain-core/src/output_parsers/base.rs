@@ -286,7 +286,10 @@ where
     type Output = P::Output;
 
     fn name(&self) -> Option<String> {
-        Some(format!("RunnableOutputParser<{}>", self.parser.parser_type()))
+        Some(format!(
+            "RunnableOutputParser<{}>",
+            self.parser.parser_type()
+        ))
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {

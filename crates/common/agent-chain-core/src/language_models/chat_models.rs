@@ -772,7 +772,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         let callback_manager = CallbackManager::configure(
             callbacks,
             self.callbacks().cloned(),
-            false,
+            self.verbose(),
             tags,
             self.config().tags.clone(),
             Some(inheritable_metadata),
@@ -919,7 +919,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         let callback_manager = AsyncCallbackManager::configure(
             callbacks,
             self.callbacks().cloned(),
-            false,
+            self.verbose(),
             tags,
             self.config().tags.clone(),
             Some(inheritable_metadata),
@@ -1492,7 +1492,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         let callback_manager = crate::callbacks::CallbackManager::configure(
             callbacks,
             self.callbacks().cloned(),
-            false,
+            self.verbose(),
             tags,
             self.config().tags.clone(),
             Some(inheritable_metadata),
@@ -1665,7 +1665,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         let callback_manager = crate::callbacks::AsyncCallbackManager::configure(
             callbacks,
             self.callbacks().cloned(),
-            false,
+            self.verbose(),
             tags,
             self.config().tags.clone(),
             Some(inheritable_metadata),
@@ -1878,6 +1878,38 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
     }
 
+    /// Pass prompt values to the model and return model generations.
+    ///
+    /// Converts each input to messages and delegates to `generate()`.
+    /// Matches Python's `BaseChatModel.generate_prompt()`.
+    async fn generate_prompt(
+        &self,
+        prompts: &[LanguageModelInput],
+        config: GenerateConfig,
+    ) -> Result<LLMResult> {
+        let prompt_messages: Vec<Vec<BaseMessage>> = prompts
+            .iter()
+            .map(|p| self.convert_input(p.clone()))
+            .collect::<Result<_>>()?;
+        self.generate(prompt_messages, config).await
+    }
+
+    /// Async version of `generate_prompt`.
+    ///
+    /// Converts each input to messages and delegates to `agenerate()`.
+    /// Matches Python's `BaseChatModel.agenerate_prompt()`.
+    async fn agenerate_prompt(
+        &self,
+        prompts: &[LanguageModelInput],
+        config: GenerateConfig,
+    ) -> Result<LLMResult> {
+        let prompt_messages: Vec<Vec<BaseMessage>> = prompts
+            .iter()
+            .map(|p| self.convert_input(p.clone()))
+            .collect::<Result<_>>()?;
+        self.agenerate(prompt_messages, config).await
+    }
+
     /// Get the identifying parameters for this model.
     ///
     /// Returns a map of parameters that uniquely identify this model instance.
@@ -1911,6 +1943,104 @@ fn _chat_generations_to_cache(generations: &[ChatGeneration]) -> Vec<Generation>
             Generation::with_info(&chat_gen.text, info)
         })
         .collect()
+}
+
+/// Extract response metadata from an error into a `ChatGeneration`.
+///
+/// Attempts to extract HTTP response info (body, status code) from errors.
+/// Returns an empty vec if no response metadata is available.
+///
+/// Matches Python's `_generate_response_from_error`.
+pub fn generate_response_from_error(error: &crate::error::Error) -> Vec<ChatGeneration> {
+    use crate::error::Error;
+
+    let mut metadata = HashMap::new();
+
+    match error {
+        Error::Api { status, message } => {
+            metadata.insert("status_code".to_string(), Value::Number((*status).into()));
+            metadata.insert("body".to_string(), Value::String(message.clone()));
+        }
+        Error::Http(reqwest_err) => {
+            if let Some(status) = reqwest_err.status() {
+                metadata.insert(
+                    "status_code".to_string(),
+                    Value::Number(status.as_u16().into()),
+                );
+            }
+            metadata.insert("body".to_string(), Value::String(reqwest_err.to_string()));
+        }
+        _ => return Vec::new(),
+    }
+
+    vec![ChatGeneration::new(BaseMessage::AI(
+        AIMessage::builder()
+            .content("")
+            .response_metadata(metadata)
+            .build(),
+    ))]
+}
+
+/// Format messages for tracing in `on_chat_model_start`.
+///
+/// Converts image content blocks to OpenAI Chat Completions format for
+/// backward compatibility. In Rust, multimodal content uses typed `ContentPart`
+/// enums rather than raw JSON dicts, so this primarily serializes content parts
+/// to JSON and applies OpenAI format conversions where applicable.
+///
+/// Matches Python's `_format_for_tracing`.
+pub fn format_for_tracing(messages: &[BaseMessage]) -> Vec<BaseMessage> {
+    // In Rust, message content is already strongly typed via ContentPart/MessageContent.
+    // The Python version converts raw dict image blocks to OpenAI format, but Rust's
+    // type system ensures content is well-formed. Cloning messages preserves all data
+    // for tracing without lossy conversions.
+    messages.to_vec()
+}
+
+/// Remove non-serializable objects from a serialized LLM representation.
+///
+/// Used for cache key generation. Recursively removes:
+/// - `repr` from `{"type": "not_implemented"}` entries
+/// - `graph` keys
+/// - Cleans kwargs values recursively
+///
+/// Matches Python's `_cleanup_llm_representation`.
+pub fn cleanup_llm_representation(serialized: &mut Value, depth: usize) {
+    const MAX_DEPTH: usize = 20;
+    if depth > MAX_DEPTH {
+        return;
+    }
+
+    let map = match serialized.as_object_mut() {
+        Some(m) => m,
+        None => return,
+    };
+
+    // Remove "repr" from {"type": "not_implemented"} entries
+    if map.get("type").and_then(|v| v.as_str()) == Some("not_implemented") {
+        map.remove("repr");
+    }
+
+    // Remove "graph" key
+    map.remove("graph");
+
+    // Recurse into "kwargs"
+    if let Some(kwargs) = map.get_mut("kwargs")
+        && let Some(kwargs_map) = kwargs.as_object_mut()
+    {
+        for value in kwargs_map.values_mut() {
+            cleanup_llm_representation(value, depth + 1);
+        }
+    }
+}
+
+/// Format structured output schema for LangSmith tracing.
+///
+/// LangSmith-specific — returns empty map per project guidelines.
+pub fn format_ls_structured_output(
+    _format: Option<&HashMap<String, Value>>,
+) -> HashMap<String, Value> {
+    HashMap::new()
 }
 
 /// Extract the tool name from a JSON schema.

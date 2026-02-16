@@ -1525,18 +1525,24 @@ pub fn filter_messages_runnable(
     exclude_tool_calls: Option<ExcludeToolCalls>,
 ) -> RunnableLambdaWithConfig<Vec<BaseMessage>, Vec<BaseMessage>> {
     RunnableLambdaWithConfig::new(move |messages: Vec<BaseMessage>| {
-        let include_names_refs: Option<Vec<&str>> =
-            include_names.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
-        let exclude_names_refs: Option<Vec<&str>> =
-            exclude_names.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
-        let include_types_refs: Option<Vec<&str>> =
-            include_types.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
-        let exclude_types_refs: Option<Vec<&str>> =
-            exclude_types.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
-        let include_ids_refs: Option<Vec<&str>> =
-            include_ids.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
-        let exclude_ids_refs: Option<Vec<&str>> =
-            exclude_ids.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
+        let include_names_refs: Option<Vec<&str>> = include_names
+            .as_ref()
+            .map(|v| v.iter().map(|s| s.as_str()).collect());
+        let exclude_names_refs: Option<Vec<&str>> = exclude_names
+            .as_ref()
+            .map(|v| v.iter().map(|s| s.as_str()).collect());
+        let include_types_refs: Option<Vec<&str>> = include_types
+            .as_ref()
+            .map(|v| v.iter().map(|s| s.as_str()).collect());
+        let exclude_types_refs: Option<Vec<&str>> = exclude_types
+            .as_ref()
+            .map(|v| v.iter().map(|s| s.as_str()).collect());
+        let include_ids_refs: Option<Vec<&str>> = include_ids
+            .as_ref()
+            .map(|v| v.iter().map(|s| s.as_str()).collect());
+        let exclude_ids_refs: Option<Vec<&str>> = exclude_ids
+            .as_ref()
+            .map(|v| v.iter().map(|s| s.as_str()).collect());
 
         Ok(filter_messages(
             &messages,
