@@ -1499,7 +1499,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             self.config().metadata.clone(),
         );
         let run_managers =
-            callback_manager.on_chat_model_start(&params, &[messages.clone()], run_id);
+            callback_manager.on_chat_model_start(&params, std::slice::from_ref(&messages), run_id);
         let run_manager = run_managers.into_iter().next();
 
         // Acquire rate limiter if configured
@@ -1595,13 +1595,12 @@ pub trait BaseChatModel: BaseLanguageModel {
             }
 
             // Fire on_llm_end with merged generation
-            if let Some(ref rm) = run_manager {
-                if let Some(merged) = crate::outputs::merge_chat_generation_chunks(chunks) {
+            if let Some(ref rm) = run_manager
+                && let Some(merged) = crate::outputs::merge_chat_generation_chunks(chunks) {
                     let chat_gen: ChatGeneration = merged.into();
                     let chat_result = ChatResult::new(vec![chat_gen]);
                     rm.on_llm_end(&chat_result);
                 }
-            }
         };
 
         Ok(Box::pin(chunk_stream))
@@ -1673,7 +1672,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             self.config().metadata.clone(),
         );
         let run_managers = callback_manager
-            .on_chat_model_start(&params, &[messages.clone()], run_id)
+            .on_chat_model_start(&params, std::slice::from_ref(&messages), run_id)
             .await;
         let run_manager = run_managers.into_iter().next();
 
@@ -1770,13 +1769,12 @@ pub trait BaseChatModel: BaseLanguageModel {
             }
 
             // Fire on_llm_end with merged generation
-            if let Some(ref rm) = run_manager {
-                if let Some(merged) = crate::outputs::merge_chat_generation_chunks(chunks) {
+            if let Some(ref rm) = run_manager
+                && let Some(merged) = crate::outputs::merge_chat_generation_chunks(chunks) {
                     let chat_gen: ChatGeneration = merged.into();
                     let chat_result = ChatResult::new(vec![chat_gen]);
                     rm.on_llm_end(&chat_result).await;
                 }
-            }
         };
 
         Ok(Box::pin(chunk_stream))
@@ -2102,12 +2100,10 @@ pub fn generate_from_stream<I>(mut stream: I) -> Result<ChatResult>
 where
     I: Iterator<Item = ChatGenerationChunk>,
 {
-    let first = stream.next();
-    if first.is_none() {
-        return Err(Error::Other("No generations found in stream.".into()));
-    }
-
-    let mut generation = first.unwrap();
+    let mut generation = match stream.next() {
+        Some(g) => g,
+        None => return Err(Error::Other("No generations found in stream.".into())),
+    };
 
     // Merge remaining chunks
     for chunk in stream {
@@ -2228,10 +2224,8 @@ fn apply_block_indices(
                 }
             }
         }
-        if changed {
-            if let Ok(new_content) = serde_json::to_string(&blocks) {
-                chunk.content = crate::messages::content::MessageContent::Text(new_content);
-            }
+        if changed && let Ok(new_content) = serde_json::to_string(&blocks) {
+            chunk.content = crate::messages::content::MessageContent::Text(new_content);
         }
     }
 }

@@ -140,23 +140,23 @@ pub fn get_run_collector() -> Option<Arc<std::sync::Mutex<RunCollectorCallbackHa
 /// LANGSMITH_PROJECT / LANGCHAIN_PROJECT,
 /// LANGSMITH_SESSION / LANGCHAIN_SESSION, then falls back to "default".
 pub fn get_tracer_project() -> String {
-    if let Ok(val) = std::env::var("HOSTED_LANGSERVE_PROJECT_NAME") {
-        if !val.is_empty() {
+    if let Ok(val) = std::env::var("HOSTED_LANGSERVE_PROJECT_NAME")
+        && !val.is_empty()
+    {
+        return val;
+    }
+    for name in &["LANGSMITH_PROJECT", "LANGCHAIN_PROJECT"] {
+        if let Ok(val) = std::env::var(name)
+            && !val.is_empty()
+        {
             return val;
         }
     }
-    for name in &["LANGSMITH_PROJECT", "LANGCHAIN_PROJECT"] {
-        if let Ok(val) = std::env::var(name) {
-            if !val.is_empty() {
-                return val;
-            }
-        }
-    }
     for name in &["LANGSMITH_SESSION", "LANGCHAIN_SESSION"] {
-        if let Ok(val) = std::env::var(name) {
-            if !val.is_empty() {
-                return val;
-            }
+        if let Ok(val) = std::env::var(name)
+            && !val.is_empty()
+        {
+            return val;
         }
     }
     "default".to_string()

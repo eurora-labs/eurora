@@ -361,7 +361,7 @@ pub trait VectorStore: Send + Sync {
         if distance > 0.0 {
             1.0 - distance
         } else {
-            -1.0 * distance
+            -distance
         }
     }
 }
@@ -461,14 +461,14 @@ fn validate_retriever_config(config: &VectorStoreRetrieverConfig) -> Result<()> 
             search_type_str, allowed
         )));
     }
-    if config.search_type == SearchType::SimilarityScoreThreshold {
-        if config.score_threshold().is_none() {
-            return Err(Error::InvalidConfig(
-                "`score_threshold` is not specified with a float value (0~1) \
+    if config.search_type == SearchType::SimilarityScoreThreshold
+        && config.score_threshold().is_none()
+    {
+        return Err(Error::InvalidConfig(
+            "`score_threshold` is not specified with a float value (0~1) \
                  in `search_kwargs`."
-                    .to_string(),
-            ));
-        }
+                .to_string(),
+        ));
     }
     Ok(())
 }

@@ -136,10 +136,10 @@ impl InMemoryRecordManager {
     }
 
     fn current_time(&self) -> f64 {
-        if let Ok(override_guard) = self.time_override.read() {
-            if let Some(t) = *override_guard {
-                return t;
-            }
+        if let Ok(override_guard) = self.time_override.read()
+            && let Some(t) = *override_guard
+        {
+            return t;
         }
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -168,24 +168,24 @@ impl RecordManager for InMemoryRecordManager {
         group_ids: Option<&[Option<String>]>,
         time_at_least: Option<f64>,
     ) -> Result<()> {
-        if let Some(gids) = group_ids {
-            if gids.len() != keys.len() {
-                return Err(Error::InvalidConfig(format!(
-                    "Number of keys ({}) does not match number of group_ids ({})",
-                    keys.len(),
-                    gids.len()
-                )));
-            }
+        if let Some(gids) = group_ids
+            && gids.len() != keys.len()
+        {
+            return Err(Error::InvalidConfig(format!(
+                "Number of keys ({}) does not match number of group_ids ({})",
+                keys.len(),
+                gids.len()
+            )));
         }
 
         let current = self.current_time();
 
-        if let Some(time_at_least) = time_at_least {
-            if time_at_least > current {
-                return Err(Error::InvalidConfig(format!(
-                    "time_at_least ({time_at_least}) is in the future (current: {current})"
-                )));
-            }
+        if let Some(time_at_least) = time_at_least
+            && time_at_least > current
+        {
+            return Err(Error::InvalidConfig(format!(
+                "time_at_least ({time_at_least}) is in the future (current: {current})"
+            )));
         }
 
         let timestamp = if let Some(time_at_least) = time_at_least {
@@ -236,15 +236,15 @@ impl RecordManager for InMemoryRecordManager {
         let mut result: Vec<String> = records
             .iter()
             .filter(|(_, record)| {
-                if let Some(before) = before {
-                    if record.updated_at >= before {
-                        return false;
-                    }
+                if let Some(before) = before
+                    && record.updated_at >= before
+                {
+                    return false;
                 }
-                if let Some(after) = after {
-                    if record.updated_at <= after {
-                        return false;
-                    }
+                if let Some(after) = after
+                    && record.updated_at <= after
+                {
+                    return false;
                 }
                 if let Some(group_ids) = group_ids {
                     match &record.group_id {

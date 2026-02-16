@@ -143,7 +143,7 @@ impl Reviver {
         }
 
         let id: Vec<String> = id
-            .unwrap()
+            .expect("checked is_none above")
             .iter()
             .filter_map(|v| v.as_str().map(|s| s.to_string()))
             .collect();
@@ -203,7 +203,7 @@ impl Reviver {
         }
 
         let namespace: Vec<String> = id[..id.len() - 1].to_vec();
-        let name = id.last().unwrap().clone();
+        let name = id.last().expect("checked non-empty above").clone();
 
         // Validate namespace
         let root_namespace = namespace.first().map(|s| s.as_str()).unwrap_or("");
@@ -251,13 +251,11 @@ impl Reviver {
         // original namespace (e.g. "langchain:schema:document:Document"),
         // while the resolved path may be the mapped form
         // (e.g. "langchain_core:documents:base:Document").
-        let constructor = lookup_constructor(id)
-            .or_else(|| lookup_constructor(&resolved_path));
-        if let Some(constructor) = constructor {
-            match constructor(&kwargs_value) {
-                Ok(value) => return Ok(RevivedValue::Value(value)),
-                Err(_) => {}
-            }
+        let constructor = lookup_constructor(id).or_else(|| lookup_constructor(&resolved_path));
+        if let Some(constructor) = constructor
+            && let Ok(value) = constructor(&kwargs_value)
+        {
+            return Ok(RevivedValue::Value(value));
         }
 
         // Fallback: return constructor info for unknown types
@@ -656,8 +654,7 @@ use crate::messages::{AIMessage, ChatMessage, HumanMessage, SystemMessage, ToolM
 use crate::output_parsers::StrOutputParser;
 use crate::prompts::{
     AIMessagePromptTemplate, ChatMessagePromptTemplate, ChatPromptTemplate,
-    HumanMessagePromptTemplate, MessagesPlaceholder, PromptTemplate,
-    SystemMessagePromptTemplate,
+    HumanMessagePromptTemplate, MessagesPlaceholder, PromptTemplate, SystemMessagePromptTemplate,
 };
 
 type ConstructorFn = fn(&Value) -> Result<Value>;

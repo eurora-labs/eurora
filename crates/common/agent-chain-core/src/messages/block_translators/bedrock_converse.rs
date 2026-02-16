@@ -22,12 +22,10 @@ fn populate_extras(standard_block: &mut Value, block: &Value, known_fields: &Has
 
     if let Some(block_obj) = block.as_object() {
         for (key, value) in block_obj {
-            if !known_fields.contains(key.as_str()) {
-                let extras = standard_block
-                    .as_object_mut()
-                    .unwrap()
-                    .entry("extras")
-                    .or_insert_with(|| json!({}));
+            if !known_fields.contains(key.as_str())
+                && let Some(obj) = standard_block.as_object_mut()
+            {
+                let extras = obj.entry("extras").or_insert_with(|| json!({}));
                 if let Some(extras_obj) = extras.as_object_mut() {
                     extras_obj.insert(key.clone(), value.clone());
                 }
@@ -82,95 +80,93 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
         let num_keys = obj.len();
 
         // {"text": "..."} -> TextContentBlock
-        if num_keys == 1 {
-            if let Some(text) = obj.get("text").and_then(|v| v.as_str()) {
-                result.push(json!({"type": "text", "text": text}));
-                continue;
-            }
+        if num_keys == 1
+            && let Some(text) = obj.get("text").and_then(|v| v.as_str())
+        {
+            result.push(json!({"type": "text", "text": text}));
+            continue;
         }
 
         // {"document": {"format": "pdf", "source": {"bytes": ...}}} -> FileContentBlock
-        if num_keys == 1 {
-            if let Some(document) = obj.get("document").and_then(|v| v.as_object()) {
-                if let Some(format) = document.get("format").and_then(|v| v.as_str()) {
-                    match format {
-                        "pdf" => {
-                            if let Some(bytes_val) = document
-                                .get("source")
-                                .and_then(|s| s.as_object())
-                                .and_then(|s| s.get("bytes"))
-                            {
-                                let mut file_block = json!({
-                                    "type": "file",
-                                    "base64": bytes_to_b64_str(bytes_val),
-                                    "mime_type": "application/pdf",
-                                });
-                                let known: HashSet<&str> = ["format", "source"].into();
-                                populate_extras(&mut file_block, &json!(document), &known);
-                                result.push(file_block);
-                            } else {
-                                result.push(json!({"type": "non_standard", "value": block}));
-                            }
-                        }
-                        "txt" => {
-                            if let Some(text) = document
-                                .get("source")
-                                .and_then(|s| s.as_object())
-                                .and_then(|s| s.get("text"))
-                                .and_then(|t| t.as_str())
-                            {
-                                let mut plain_text = json!({
-                                    "type": "text-plain",
-                                    "text": text,
-                                    "mime_type": "text/plain",
-                                });
-                                let known: HashSet<&str> = ["format", "source"].into();
-                                populate_extras(&mut plain_text, &json!(document), &known);
-                                result.push(plain_text);
-                            } else {
-                                result.push(json!({"type": "non_standard", "value": block}));
-                            }
-                        }
-                        _ => {
-                            result.push(json!({"type": "non_standard", "value": block}));
-                        }
-                    }
-                    continue;
-                }
-            }
-        }
-
-        // {"image": {"format": "png", "source": {"bytes": ...}}} -> ImageContentBlock
-        if num_keys == 1 {
-            if let Some(image) = obj.get("image").and_then(|v| v.as_object()) {
-                if let Some(format) = image.get("format").and_then(|v| v.as_str()) {
-                    if let Some(bytes_val) = image
+        if num_keys == 1
+            && let Some(document) = obj.get("document").and_then(|v| v.as_object())
+            && let Some(format) = document.get("format").and_then(|v| v.as_str())
+        {
+            match format {
+                "pdf" => {
+                    if let Some(bytes_val) = document
                         .get("source")
                         .and_then(|s| s.as_object())
                         .and_then(|s| s.get("bytes"))
                     {
-                        let mut image_block = json!({
-                            "type": "image",
+                        let mut file_block = json!({
+                            "type": "file",
                             "base64": bytes_to_b64_str(bytes_val),
-                            "mime_type": format!("image/{}", format),
+                            "mime_type": "application/pdf",
                         });
                         let known: HashSet<&str> = ["format", "source"].into();
-                        populate_extras(&mut image_block, &json!(image), &known);
-                        result.push(image_block);
+                        populate_extras(&mut file_block, &json!(document), &known);
+                        result.push(file_block);
                     } else {
                         result.push(json!({"type": "non_standard", "value": block}));
                     }
-                    continue;
+                }
+                "txt" => {
+                    if let Some(text) = document
+                        .get("source")
+                        .and_then(|s| s.as_object())
+                        .and_then(|s| s.get("text"))
+                        .and_then(|t| t.as_str())
+                    {
+                        let mut plain_text = json!({
+                            "type": "text-plain",
+                            "text": text,
+                            "mime_type": "text/plain",
+                        });
+                        let known: HashSet<&str> = ["format", "source"].into();
+                        populate_extras(&mut plain_text, &json!(document), &known);
+                        result.push(plain_text);
+                    } else {
+                        result.push(json!({"type": "non_standard", "value": block}));
+                    }
+                }
+                _ => {
+                    result.push(json!({"type": "non_standard", "value": block}));
                 }
             }
+            continue;
+        }
+
+        // {"image": {"format": "png", "source": {"bytes": ...}}} -> ImageContentBlock
+        if num_keys == 1
+            && let Some(image) = obj.get("image").and_then(|v| v.as_object())
+            && let Some(format) = image.get("format").and_then(|v| v.as_str())
+        {
+            if let Some(bytes_val) = image
+                .get("source")
+                .and_then(|s| s.as_object())
+                .and_then(|s| s.get("bytes"))
+            {
+                let mut image_block = json!({
+                    "type": "image",
+                    "base64": bytes_to_b64_str(bytes_val),
+                    "mime_type": format!("image/{}", format),
+                });
+                let known: HashSet<&str> = ["format", "source"].into();
+                populate_extras(&mut image_block, &json!(image), &known);
+                result.push(image_block);
+            } else {
+                result.push(json!({"type": "non_standard", "value": block}));
+            }
+            continue;
         }
 
         // Known v1 block type — pass through
-        if let Some(block_type) = obj.get("type").and_then(|v| v.as_str()) {
-            if KNOWN_BLOCK_TYPES.contains(&block_type) {
-                result.push(block.clone());
-                continue;
-            }
+        if let Some(block_type) = obj.get("type").and_then(|v| v.as_str())
+            && KNOWN_BLOCK_TYPES.contains(&block_type)
+        {
+            result.push(block.clone());
+            continue;
         }
 
         // Unknown — wrap as non_standard
@@ -273,15 +269,12 @@ pub fn convert_to_standard_blocks_with_context(
                     }
                     if let Some(signature) =
                         reasoning_content.get("signature").and_then(|v| v.as_str())
+                        && let Some(obj) = reasoning_block.as_object_mut()
                     {
-                        reasoning_block
-                            .as_object_mut()
-                            .unwrap()
-                            .entry("extras")
-                            .or_insert_with(|| json!({}))
-                            .as_object_mut()
-                            .unwrap()
-                            .insert("signature".to_string(), json!(signature));
+                        let extras = obj.entry("extras").or_insert_with(|| json!({}));
+                        if let Some(extras_obj) = extras.as_object_mut() {
+                            extras_obj.insert("signature".to_string(), json!(signature));
+                        }
                     }
                 }
 
@@ -301,8 +294,9 @@ pub fn convert_to_standard_blocks_with_context(
                     && context
                         .map(|c| c.tool_call_chunks.len() == 1)
                         .unwrap_or(false)
+                    && let Some(ctx) = context
                 {
-                    let chunk = &context.unwrap().tool_call_chunks[0];
+                    let chunk = &ctx.tool_call_chunks[0];
                     let mut tool_call_chunk = json!({
                         "type": "tool_call_chunk",
                         "name": chunk.get("name").cloned().unwrap_or(Value::Null),
@@ -332,23 +326,23 @@ pub fn convert_to_standard_blocks_with_context(
             }
 
             "input_json_delta" => {
-                if let Some(ctx) = context {
-                    if ctx.tool_call_chunks.len() == 1 {
-                        let chunk = &ctx.tool_call_chunks[0];
-                        let mut tool_call_chunk = json!({
-                            "type": "tool_call_chunk",
-                            "name": chunk.get("name").cloned().unwrap_or(Value::Null),
-                            "args": chunk.get("args").and_then(|v| v.as_str()).unwrap_or(""),
-                            "id": chunk.get("id").cloned().unwrap_or(Value::Null),
-                        });
+                if let Some(ctx) = context
+                    && ctx.tool_call_chunks.len() == 1
+                {
+                    let chunk = &ctx.tool_call_chunks[0];
+                    let mut tool_call_chunk = json!({
+                        "type": "tool_call_chunk",
+                        "name": chunk.get("name").cloned().unwrap_or(Value::Null),
+                        "args": chunk.get("args").and_then(|v| v.as_str()).unwrap_or(""),
+                        "id": chunk.get("id").cloned().unwrap_or(Value::Null),
+                    });
 
-                        if let Some(index) = chunk.get("index").or_else(|| block.get("index")) {
-                            tool_call_chunk["index"] = index.clone();
-                        }
-
-                        result.push(tool_call_chunk);
-                        continue;
+                    if let Some(index) = chunk.get("index").or_else(|| block.get("index")) {
+                        tool_call_chunk["index"] = index.clone();
                     }
+
+                    result.push(tool_call_chunk);
+                    continue;
                 }
 
                 let mut tool_call_chunk = json!({

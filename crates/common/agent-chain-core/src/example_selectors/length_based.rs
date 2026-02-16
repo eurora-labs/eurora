@@ -8,7 +8,7 @@ use crate::example_selectors::BaseExampleSelector;
 use crate::prompts::PromptTemplate;
 
 fn get_length_based(text: &str) -> usize {
-    text.split(|c: char| c == '\n' || c == ' ').count()
+    text.split(['\n', ' ']).count()
 }
 
 /// Select examples based on length.

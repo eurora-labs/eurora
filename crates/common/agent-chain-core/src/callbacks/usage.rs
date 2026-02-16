@@ -66,13 +66,22 @@ impl UsageMetadataCallbackHandler {
     ///
     /// Returns a clone of the current usage metadata map, keyed by model name.
     pub fn usage_metadata(&self) -> HashMap<String, UsageMetadata> {
-        self.usage_metadata.lock().unwrap().clone()
+        self.usage_metadata
+            .lock()
+            .expect("usage_metadata lock poisoned")
+            .clone()
     }
 }
 
 impl fmt::Display for UsageMetadataCallbackHandler {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.usage_metadata.lock().unwrap())
+        write!(
+            f,
+            "{:?}",
+            self.usage_metadata
+                .lock()
+                .expect("usage_metadata lock poisoned")
+        )
     }
 }
 
@@ -104,7 +113,10 @@ impl LLMManagerMixin for UsageMetadataCallbackHandler {
 
         // Update shared state behind lock
         if let (Some(usage), Some(model)) = (usage_metadata, model_name) {
-            let mut guard = self.usage_metadata.lock().unwrap();
+            let mut guard = self
+                .usage_metadata
+                .lock()
+                .expect("usage_metadata lock poisoned");
             if let Some(existing) = guard.get(&model) {
                 let combined = existing.add(&usage);
                 guard.insert(model, combined);

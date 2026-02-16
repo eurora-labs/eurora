@@ -58,10 +58,10 @@ fn assign_name(name: Option<&str>, serialized: Option<&HashMap<String, Value>>) 
         if let Some(Value::String(n)) = s.get("name") {
             return n.clone();
         }
-        if let Some(Value::Array(ids)) = s.get("id") {
-            if let Some(Value::String(last)) = ids.last() {
-                return last.clone();
-            }
+        if let Some(Value::Array(ids)) = s.get("id")
+            && let Some(Value::String(last)) = ids.last()
+        {
+            return last.clone();
         }
     }
     "Unnamed".to_string()
@@ -174,10 +174,9 @@ impl AstreamEventsCallbackHandler {
         if self
             .root_event_filter
             .include_event(event_name, event_tags, event_type)
+            && let Err(error) = self.send_stream.send(event)
         {
-            if let Err(error) = self.send_stream.send(event) {
-                tracing::warn!("Failed to send stream event: {}", error);
-            }
+            tracing::warn!("Failed to send stream event: {}", error);
         }
     }
 
@@ -234,13 +233,13 @@ impl AstreamEventsCallbackHandler {
             Self::get_parent_ids(&state.parent_map, run_id)
         };
 
-        let event = StandardStreamEvent::new("on_chat_model_start", &run_id.to_string(), &name_)
+        let event = StandardStreamEvent::new("on_chat_model_start", run_id.to_string(), &name_)
             .with_tags(tags.unwrap_or_default())
             .with_metadata(metadata.unwrap_or_default())
             .with_parent_ids(parent_ids)
             .with_data(
                 EventData::new().with_input(
-                    serde_json::to_value(&HashMap::from([(
+                    serde_json::to_value(HashMap::from([(
                         "messages",
                         serde_json::to_value(messages).unwrap_or_default(),
                     )]))
@@ -276,20 +275,19 @@ impl AstreamEventsCallbackHandler {
                 name_.clone(),
                 run_type.to_string(),
                 Some(
-                    serde_json::to_value(&HashMap::from([("prompts", prompts)]))
-                        .unwrap_or_default(),
+                    serde_json::to_value(HashMap::from([("prompts", prompts)])).unwrap_or_default(),
                 ),
             );
             Self::get_parent_ids(&state.parent_map, run_id)
         };
 
-        let event = StandardStreamEvent::new("on_llm_start", &run_id.to_string(), &name_)
+        let event = StandardStreamEvent::new("on_llm_start", run_id.to_string(), &name_)
             .with_tags(tags.unwrap_or_default())
             .with_metadata(metadata.unwrap_or_default())
             .with_parent_ids(parent_ids)
             .with_data(
                 EventData::new().with_input(
-                    serde_json::to_value(&HashMap::from([(
+                    serde_json::to_value(HashMap::from([(
                         "prompts",
                         serde_json::to_value(prompts).unwrap_or_default(),
                     )]))
@@ -314,7 +312,7 @@ impl AstreamEventsCallbackHandler {
             Self::get_parent_ids(&state.parent_map, run_id)
         };
 
-        let event = CustomStreamEvent::new(name, &run_id.to_string(), data.clone())
+        let event = CustomStreamEvent::new(name, run_id.to_string(), data.clone())
             .with_tags(tags.unwrap_or_default())
             .with_metadata(metadata.unwrap_or_default())
             .with_parent_ids(parent_ids);
@@ -336,7 +334,7 @@ impl AstreamEventsCallbackHandler {
             .get(&run_id)
             .ok_or_else(|| format!("Run ID {} not found in run map.", run_id))?;
 
-        if state.is_tapped.get(&run_id).is_some() {
+        if state.is_tapped.contains_key(&run_id) {
             return Ok(());
         }
 
@@ -367,7 +365,7 @@ impl AstreamEventsCallbackHandler {
 
         let parent_ids = Self::get_parent_ids(&state.parent_map, run_id);
 
-        let event = StandardStreamEvent::new(event_name, &run_id.to_string(), &run_info.name)
+        let event = StandardStreamEvent::new(event_name, run_id.to_string(), &run_info.name)
             .with_tags(run_info.tags.clone())
             .with_metadata(run_info.metadata.clone())
             .with_parent_ids(parent_ids)
@@ -395,21 +393,21 @@ impl AstreamEventsCallbackHandler {
         let inputs = run_info.inputs.clone();
 
         let (event_name, output) = if run_info.run_type == "chat_model" {
-            let mut output: Value = Value::Null;
-            'outer: for generation_list in &response.generations {
-                for generation in generation_list {
-                    output = match generation {
-                        GenerationType::ChatGeneration(cg) => {
-                            serde_json::to_value(&cg.message).unwrap_or(Value::Null)
-                        }
-                        GenerationType::ChatGenerationChunk(cgc) => {
-                            serde_json::to_value(&cgc.message).unwrap_or(Value::Null)
-                        }
-                        _ => Value::Null,
-                    };
-                    break 'outer;
-                }
-            }
+            let output = response
+                .generations
+                .iter()
+                .flatten()
+                .next()
+                .map(|generation| match generation {
+                    GenerationType::ChatGeneration(cg) => {
+                        serde_json::to_value(&cg.message).unwrap_or(Value::Null)
+                    }
+                    GenerationType::ChatGenerationChunk(cgc) => {
+                        serde_json::to_value(&cgc.message).unwrap_or(Value::Null)
+                    }
+                    _ => Value::Null,
+                })
+                .unwrap_or(Value::Null);
             ("on_chat_model_end", output)
         } else if run_info.run_type == "llm" {
             let generations_value: Vec<Vec<Value>> = response
@@ -458,7 +456,7 @@ impl AstreamEventsCallbackHandler {
             data = data.with_input(inp);
         }
 
-        let event = StandardStreamEvent::new(event_name, &run_id.to_string(), &run_info.name)
+        let event = StandardStreamEvent::new(event_name, run_id.to_string(), &run_info.name)
             .with_tags(run_info.tags.clone())
             .with_metadata(run_info.metadata.clone())
             .with_parent_ids(parent_ids)
@@ -511,8 +509,8 @@ impl AstreamEventsCallbackHandler {
         };
 
         let event = StandardStreamEvent::new(
-            &format!("on_{}_start", run_type_),
-            &run_id.to_string(),
+            format!("on_{}_start", run_type_),
+            run_id.to_string(),
             &name_,
         )
         .with_tags(tags.unwrap_or_default())
@@ -552,7 +550,7 @@ impl AstreamEventsCallbackHandler {
             .with_output(serde_json::to_value(outputs).unwrap_or_default())
             .with_input(resolved_inputs);
 
-        let event = StandardStreamEvent::new(&event_name, &run_id.to_string(), &run_info.name)
+        let event = StandardStreamEvent::new(&event_name, run_id.to_string(), &run_info.name)
             .with_tags(run_info.tags.clone())
             .with_metadata(run_info.metadata.clone())
             .with_parent_ids(parent_ids)
@@ -594,7 +592,7 @@ impl AstreamEventsCallbackHandler {
             Self::get_parent_ids(&state.parent_map, run_id)
         };
 
-        let event = StandardStreamEvent::new("on_tool_start", &run_id.to_string(), &name_)
+        let event = StandardStreamEvent::new("on_tool_start", run_id.to_string(), &name_)
             .with_tags(tags.unwrap_or_default())
             .with_metadata(metadata.unwrap_or_default())
             .with_parent_ids(parent_ids)
@@ -636,7 +634,7 @@ impl AstreamEventsCallbackHandler {
 
         let data = EventData::new().with_error(error).with_input(inputs);
 
-        let event = StandardStreamEvent::new("on_tool_error", &run_id.to_string(), &run_info.name)
+        let event = StandardStreamEvent::new("on_tool_error", run_id.to_string(), &run_info.name)
             .with_tags(run_info.tags.clone())
             .with_metadata(run_info.metadata.clone())
             .with_parent_ids(parent_ids)
@@ -655,7 +653,7 @@ impl AstreamEventsCallbackHandler {
 
         let data = EventData::new().with_output(output).with_input(inputs);
 
-        let event = StandardStreamEvent::new("on_tool_end", &run_id.to_string(), &run_info.name)
+        let event = StandardStreamEvent::new("on_tool_end", run_id.to_string(), &run_info.name)
             .with_tags(run_info.tags.clone())
             .with_metadata(run_info.metadata.clone())
             .with_parent_ids(parent_ids)
@@ -695,7 +693,7 @@ impl AstreamEventsCallbackHandler {
             Self::get_parent_ids(&state.parent_map, run_id)
         };
 
-        let event = StandardStreamEvent::new("on_retriever_start", &run_id.to_string(), &name_)
+        let event = StandardStreamEvent::new("on_retriever_start", run_id.to_string(), &name_)
             .with_tags(tags.unwrap_or_default())
             .with_metadata(metadata.unwrap_or_default())
             .with_parent_ids(parent_ids)
@@ -722,7 +720,7 @@ impl AstreamEventsCallbackHandler {
         }
 
         let event =
-            StandardStreamEvent::new("on_retriever_end", &run_id.to_string(), &run_info.name)
+            StandardStreamEvent::new("on_retriever_end", run_id.to_string(), &run_info.name)
                 .with_tags(run_info.tags.clone())
                 .with_metadata(run_info.metadata.clone())
                 .with_parent_ids(parent_ids)
@@ -922,7 +920,7 @@ impl CallbackManagerMixin for AstreamEventsCallbackHandler {
         metadata: Option<&HashMap<String, serde_json::Value>>,
         name: Option<&str>,
     ) {
-        let _ = name;
+        let _name = name;
         self.handle_retriever_start(
             serialized,
             query,
@@ -1026,17 +1024,17 @@ impl StreamingCallbackHandler<crate::error::Result<Value>> for AstreamEventsCall
         Box::pin(output.map(move |chunk| {
             if let Ok(ref value) = chunk {
                 let event =
-                    StandardStreamEvent::new(&event_name, &run_id.to_string(), &run_info.name)
+                    StandardStreamEvent::new(&event_name, run_id.to_string(), &run_info.name)
                         .with_tags(run_info.tags.clone())
                         .with_metadata(run_info.metadata.clone())
                         .with_parent_ids(parent_ids.clone())
                         .with_data(EventData::new().with_chunk(value.clone()));
 
                 let (name, tags) = (run_info.name.as_str(), run_info.tags.as_slice());
-                if root_event_filter.include_event(name, tags, &run_type) {
-                    if let Err(e) = send_stream.send(StreamEvent::Standard(event)) {
-                        tracing::warn!("Failed to send stream event: {}", e);
-                    }
+                if root_event_filter.include_event(name, tags, &run_type)
+                    && let Err(e) = send_stream.send(StreamEvent::Standard(event))
+                {
+                    tracing::warn!("Failed to send stream event: {}", e);
                 }
             }
             chunk
@@ -1141,7 +1139,7 @@ where
             // Chunks are consumed to drive the runnable forward.
             // All events are produced via callbacks into the channel.
         }
-        let _ = send_stream.close();
+        if let Err(e) = send_stream.close() { tracing::warn!("Failed to close stream: {e}"); }
 
         // Now drain all buffered events from the receive stream.
         let mut first_event_sent = false;
@@ -1162,13 +1160,12 @@ where
 
             // If it's the end event corresponding to the root runnable,
             // remove the input from data since it was in the first event.
-            if let StreamEvent::Standard(ref mut e) = event {
-                if Some(&e.base.run_id) == first_event_run_id.as_ref()
+            if let StreamEvent::Standard(ref mut e) = event
+                && Some(&e.base.run_id) == first_event_run_id.as_ref()
                     && e.base.event.ends_with("_end")
                 {
                     e.data.input = None;
                 }
-            }
 
             yield event;
         }

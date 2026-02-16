@@ -256,12 +256,12 @@ fn delete_from_destination(destination: &IndexDestination<'_>, ids: &[String]) -
         }
         IndexDestination::DocumentIndex(di) => {
             let response = di.delete(Some(ids))?;
-            if let Some(num_failed) = response.num_failed {
-                if num_failed > 0 {
-                    return Err(Error::Indexing(
-                        "The delete operation to DocumentIndex failed.".to_string(),
-                    ));
-                }
+            if let Some(num_failed) = response.num_failed
+                && num_failed > 0
+            {
+                return Err(Error::Indexing(
+                    "The delete operation to DocumentIndex failed.".to_string(),
+                ));
             }
             Ok(())
         }
@@ -280,12 +280,12 @@ async fn adelete_from_destination(
         }
         IndexDestination::DocumentIndex(di) => {
             let response = di.adelete(Some(ids)).await?;
-            if let Some(num_failed) = response.num_failed {
-                if num_failed > 0 {
-                    return Err(Error::Indexing(
-                        "The delete operation to DocumentIndex failed.".to_string(),
-                    ));
-                }
+            if let Some(num_failed) = response.num_failed
+                && num_failed > 0
+            {
+                return Err(Error::Indexing(
+                    "The delete operation to DocumentIndex failed.".to_string(),
+                ));
             }
             Ok(())
         }
@@ -377,10 +377,7 @@ pub fn index(
 
         num_skipped += original_batch_size - hashed_docs.len();
 
-        let source_ids: Vec<Option<String>> = hashed_docs
-            .iter()
-            .map(|doc| source_id_assigner(doc))
-            .collect();
+        let source_ids: Vec<Option<String>> = hashed_docs.iter().map(&source_id_assigner).collect();
 
         if matches!(
             config.cleanup,
@@ -395,8 +392,7 @@ pub fn index(
                     )));
                 }
                 if config.cleanup == Some(CleanupMode::ScopedFull) {
-                    scoped_full_cleanup_source_ids
-                        .insert(source_id.as_ref().map(|id| id.clone()).unwrap_or_default());
+                    scoped_full_cleanup_source_ids.insert(source_id.clone().unwrap_or_default());
                 }
             }
         }
@@ -555,10 +551,7 @@ pub async fn aindex(
 
         num_skipped += original_batch_size - hashed_docs.len();
 
-        let source_ids: Vec<Option<String>> = hashed_docs
-            .iter()
-            .map(|doc| source_id_assigner(doc))
-            .collect();
+        let source_ids: Vec<Option<String>> = hashed_docs.iter().map(&source_id_assigner).collect();
 
         if matches!(
             config.cleanup,
@@ -573,8 +566,7 @@ pub async fn aindex(
                     )));
                 }
                 if config.cleanup == Some(CleanupMode::ScopedFull) {
-                    scoped_full_cleanup_source_ids
-                        .insert(source_id.as_ref().map(|id| id.clone()).unwrap_or_default());
+                    scoped_full_cleanup_source_ids.insert(source_id.clone().unwrap_or_default());
                 }
             }
         }

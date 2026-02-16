@@ -1257,7 +1257,9 @@ where
     if (config.token_counter)(&messages) <= config.max_tokens {
         // When all messages fit, only apply end_on filtering if needed
         if let Some(ref end_on) = config.end_on {
-            while !messages.is_empty() && !is_message_type(messages.last().unwrap(), end_on) {
+            while !messages.is_empty()
+                && !is_message_type(messages.last().expect("checked non-empty"), end_on)
+            {
                 messages.pop();
             }
         }
@@ -1289,28 +1291,27 @@ where
             super::content::MessageContent::Parts(_) => Some(excluded_content.as_json_values()),
             super::content::MessageContent::Text(s) => serde_json::from_str(s).ok(),
         };
-        if let Some(mut content_blocks) = content_blocks_opt {
-            if content_blocks.len() > 1 {
+        if let Some(mut content_blocks) = content_blocks_opt
+            && content_blocks.len() > 1
+        {
+            if reverse_partial {
+                content_blocks.reverse();
+            }
+            let num_blocks = content_blocks.len();
+            for remove_count in 1..num_blocks {
+                let mut partial_blocks = content_blocks[..num_blocks - remove_count].to_vec();
                 if reverse_partial {
-                    content_blocks.reverse();
+                    partial_blocks.reverse();
                 }
-                let num_blocks = content_blocks.len();
-                for remove_count in 1..num_blocks {
-                    let mut partial_blocks = content_blocks[..num_blocks - remove_count].to_vec();
-                    if reverse_partial {
-                        partial_blocks.reverse();
-                    }
-                    let partial_content =
-                        serde_json::to_string(&partial_blocks).unwrap_or_default();
-                    let partial_msg = create_message_with_content(&messages[idx], &partial_content);
-                    let mut test = messages[..idx].to_vec();
-                    test.push(partial_msg);
-                    if (config.token_counter)(&test) <= config.max_tokens {
-                        messages = test;
-                        idx += 1;
-                        included_partial = true;
-                        break;
-                    }
+                let partial_content = serde_json::to_string(&partial_blocks).unwrap_or_default();
+                let partial_msg = create_message_with_content(&messages[idx], &partial_content);
+                let mut test = messages[..idx].to_vec();
+                test.push(partial_msg);
+                if (config.token_counter)(&test) <= config.max_tokens {
+                    messages = test;
+                    idx += 1;
+                    included_partial = true;
+                    break;
                 }
             }
         }
@@ -1389,7 +1390,9 @@ where
 
     // Apply end_on filtering first (for "last" strategy, done before trimming)
     if let Some(ref end_on) = config.end_on {
-        while !messages.is_empty() && !is_message_type(messages.last().unwrap(), end_on) {
+        while !messages.is_empty()
+            && !is_message_type(messages.last().expect("checked non-empty"), end_on)
+        {
             messages.pop();
         }
     }

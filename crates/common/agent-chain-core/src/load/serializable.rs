@@ -435,7 +435,8 @@ fn replace_secrets(
             if kwargs.contains_key(path) {
                 kwargs.insert(
                     path.clone(),
-                    serde_json::to_value(SerializedSecret::from_secret_id(secret_id)).unwrap(),
+                    serde_json::to_value(SerializedSecret::from_secret_id(secret_id))
+                        .expect("SerializedSecret serialization"),
                 );
             }
         } else {
@@ -457,7 +458,8 @@ fn replace_nested_secret(current: &mut HashMap<String, Value>, parts: &[&str], s
         if current.contains_key(key) {
             current.insert(
                 key.to_string(),
-                serde_json::to_value(SerializedSecret::from_secret_id(secret_id)).unwrap(),
+                serde_json::to_value(SerializedSecret::from_secret_id(secret_id))
+                    .expect("SerializedSecret serialization"),
             );
         }
     } else if let Some(Value::Object(map)) = current.get_mut(key) {

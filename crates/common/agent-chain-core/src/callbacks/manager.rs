@@ -1069,7 +1069,7 @@ impl CallbackManager {
     pub fn add_tags(&mut self, tags: Vec<String>, inherit: bool) {
         for tag in &tags {
             if self.tags.contains(tag) {
-                self.remove_tags(&[tag.clone()]);
+                self.remove_tags(std::slice::from_ref(tag));
             }
         }
         self.tags.extend(tags.clone());
@@ -1442,10 +1442,9 @@ fn _configure(
                 .handlers
                 .iter()
                 .any(|h| h.name() == "StdOutCallbackHandler")
+            && !debug
         {
-            if !debug {
-                callback_manager.add_handler(Arc::new(StdOutCallbackHandler::new()), false);
-            }
+            callback_manager.add_handler(Arc::new(StdOutCallbackHandler::new()), false);
         }
 
         if debug

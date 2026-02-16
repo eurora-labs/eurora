@@ -542,7 +542,7 @@ impl TracerCore for LogStreamCallbackHandler {
         }
 
         // Determine key name with counter
-        let _lock = self.lock.lock().unwrap();
+        let _lock = self.lock.lock().expect("lock poisoned");
         let count = self
             .counter_map_by_name
             .entry(run.name.clone())
@@ -585,10 +585,11 @@ impl TracerCore for LogStreamCallbackHandler {
             Some(k) => k.clone(),
             None => {
                 // Check if this is the root run ending
-                if run.id == self.root_id.unwrap_or(Uuid::nil()) && self.auto_close {
-                    if let Err(error) = self.send_stream.close() {
-                        tracing::warn!("Failed to close log stream: {}", error);
-                    }
+                if run.id == self.root_id.unwrap_or(Uuid::nil())
+                    && self.auto_close
+                    && let Err(error) = self.send_stream.close()
+                {
+                    tracing::warn!("Failed to close log stream: {}", error);
                 }
                 return;
             }
@@ -621,10 +622,11 @@ impl TracerCore for LogStreamCallbackHandler {
 
         self.send(ops);
 
-        if run.id == self.root_id.unwrap_or(Uuid::nil()) && self.auto_close {
-            if let Err(error) = self.send_stream.close() {
-                tracing::warn!("Failed to close log stream: {}", error);
-            }
+        if run.id == self.root_id.unwrap_or(Uuid::nil())
+            && self.auto_close
+            && let Err(error) = self.send_stream.close()
+        {
+            tracing::warn!("Failed to close log stream: {}", error);
         }
     }
 
@@ -741,16 +743,14 @@ impl<T> Iterator for TappedIterator<T> {
         // Root run is handled separately
         if self.run_id != self.root_id.unwrap_or(Uuid::nil())
             && let Some(ref k) = self.key
-        {
-            if let Err(error) = self
+            && let Err(error) = self
                 .send_stream
                 .send(RunLogPatch::new(vec![JsonPatchOp::add(
                     format!("/logs/{}/streamed_output/-", k),
                     Value::Null, // Placeholder
                 )]))
-            {
-                tracing::warn!("Failed to send log stream patch: {}", error);
-            }
+        {
+            tracing::warn!("Failed to send log stream patch: {}", error);
         }
 
         Some(item)
@@ -1190,7 +1190,7 @@ where
         }
 
         // Close the send stream to signal completion
-        let _ = send_stream.close();
+        if let Err(e) = send_stream.close() { tracing::warn!("Failed to close stream: {e}"); }
 
         // Now drain all buffered patches from the receive stream
         let mut event_stream = std::pin::pin!(receive_stream.into_stream());

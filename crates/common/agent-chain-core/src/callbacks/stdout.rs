@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 
+use tracing::warn;
 use uuid::Uuid;
 
 use super::base::{
@@ -30,12 +31,17 @@ pub mod colors {
 /// Write text with optional color to a writer.
 fn write_text(writer: &Mutex<Box<dyn Write + Send>>, text: &str, color: Option<&str>, end: &str) {
     if let Ok(mut w) = writer.lock() {
-        if let Some(c) = color {
-            let _ = write!(w, "{}{}{}{}", c, text, colors::RESET, end);
+        let result = if let Some(c) = color {
+            write!(w, "{}{}{}{}", c, text, colors::RESET, end)
         } else {
-            let _ = write!(w, "{}{}", text, end);
+            write!(w, "{}{}", text, end)
+        };
+        if let Err(e) = result {
+            warn!("StdOutCallbackHandler write error: {e}");
         }
-        let _ = w.flush();
+        if let Err(e) = w.flush() {
+            warn!("StdOutCallbackHandler flush error: {e}");
+        }
     }
 }
 
@@ -157,14 +163,18 @@ impl CallbackManagerMixin for StdOutCallbackHandler {
             .unwrap_or("<unknown>");
 
         if let Ok(mut w) = self.writer.lock() {
-            let _ = writeln!(
+            if let Err(e) = writeln!(
                 w,
                 "\n\n{}> Entering new {} chain...{}",
                 colors::BOLD,
                 name,
                 colors::RESET
-            );
-            let _ = w.flush();
+            ) {
+                warn!("StdOutCallbackHandler write error: {e}");
+            }
+            if let Err(e) = w.flush() {
+                warn!("StdOutCallbackHandler flush error: {e}");
+            }
         }
     }
 }
@@ -177,8 +187,12 @@ impl ChainManagerMixin for StdOutCallbackHandler {
         _parent_run_id: Option<Uuid>,
     ) {
         if let Ok(mut w) = self.writer.lock() {
-            let _ = writeln!(w, "\n{}> Finished chain.{}", colors::BOLD, colors::RESET);
-            let _ = w.flush();
+            if let Err(e) = writeln!(w, "\n{}> Finished chain.{}", colors::BOLD, colors::RESET) {
+                warn!("StdOutCallbackHandler write error: {e}");
+            }
+            if let Err(e) = w.flush() {
+                warn!("StdOutCallbackHandler flush error: {e}");
+            }
         }
     }
 

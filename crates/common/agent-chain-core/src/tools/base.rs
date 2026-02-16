@@ -554,20 +554,19 @@ pub trait BaseTool: Send + Sync + Debug {
                     }
                 }
                 // Check if this is a validation error
-                if let Some(validation_msg) = e.as_validation_error() {
-                    if let Some(handled) =
+                if let Some(validation_msg) = e.as_validation_error()
+                    && let Some(handled) =
                         handle_validation_error_impl(validation_msg, self.handle_validation_error())
-                    {
-                        let formatted = format_output(
-                            ToolOutput::String(handled.clone()),
-                            None,
-                            tool_call_id.as_deref(),
-                            self.name(),
-                            "error",
-                        );
-                        run_manager.on_tool_end(&handled);
-                        return Ok(formatted);
-                    }
+                {
+                    let formatted = format_output(
+                        ToolOutput::String(handled.clone()),
+                        None,
+                        tool_call_id.as_deref(),
+                        self.name(),
+                        "error",
+                    );
+                    run_manager.on_tool_end(&handled);
+                    return Ok(formatted);
                 }
                 // Unhandled error
                 run_manager.on_tool_error(&e);
@@ -691,20 +690,19 @@ pub trait BaseTool: Send + Sync + Debug {
                     }
                 }
                 // Check if this is a validation error
-                if let Some(validation_msg) = e.as_validation_error() {
-                    if let Some(handled) =
+                if let Some(validation_msg) = e.as_validation_error()
+                    && let Some(handled) =
                         handle_validation_error_impl(validation_msg, self.handle_validation_error())
-                    {
-                        let formatted = format_output(
-                            ToolOutput::String(handled.clone()),
-                            None,
-                            tool_call_id.as_deref(),
-                            self.name(),
-                            "error",
-                        );
-                        run_manager.on_tool_end(&handled).await;
-                        return Ok(formatted);
-                    }
+                {
+                    let formatted = format_output(
+                        ToolOutput::String(handled.clone()),
+                        None,
+                        tool_call_id.as_deref(),
+                        self.name(),
+                        "error",
+                    );
+                    run_manager.on_tool_end(&handled).await;
+                    return Ok(formatted);
                 }
                 // Unhandled error
                 run_manager.get_sync().on_tool_error(&e);
@@ -899,7 +897,7 @@ pub fn format_output(
     let content_str = match &content {
         ToolOutput::String(s) => s.clone(),
         ToolOutput::Json(v) => stringify(v),
-        ToolOutput::Message(_) => unreachable!(),
+        ToolOutput::Message(_) => return content,
         ToolOutput::ContentAndArtifact { content, .. } => stringify(content),
     };
 

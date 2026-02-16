@@ -404,7 +404,9 @@ where
                         Some(result) => results.push(result),
                         None => {
                             if !error_consumed {
-                                results.push(Err(first_to_raise.take().unwrap()));
+                                results.push(Err(first_to_raise
+                                    .take()
+                                    .expect("first_to_raise set when errors exist")));
                                 error_consumed = true;
                             } else {
                                 results.push(Err(Error::other("Batch aborted due to error")));
@@ -512,7 +514,9 @@ where
                         Some(result) => results.push(result),
                         None => {
                             if !error_consumed {
-                                results.push(Err(first_to_raise.take().unwrap()));
+                                results.push(Err(first_to_raise
+                                    .take()
+                                    .expect("first_to_raise set when errors exist")));
                                 error_consumed = true;
                             } else {
                                 results.push(Err(Error::other("Batch aborted due to error")));

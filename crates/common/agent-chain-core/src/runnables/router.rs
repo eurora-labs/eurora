@@ -223,7 +223,7 @@ where
 
         let configs = get_config_list(config, keys.len());
 
-        let _ = return_exceptions; // Vec<Result<O>> already captures exceptions per-item
+        let _return_exceptions = return_exceptions; // Vec<Result<O>> already captures exceptions per-item
         let results: Vec<Result<O>> = keys
             .into_iter()
             .zip(actual_inputs)
@@ -267,7 +267,7 @@ where
         let configs = get_config_list(config, keys.len());
         let max_concurrency = configs.first().and_then(|c| c.max_concurrency);
 
-        let _ = return_exceptions; // Vec<Result<O>> already captures exceptions per-item
+        let _return_exceptions = return_exceptions; // Vec<Result<O>> already captures exceptions per-item
         // Create futures for each invocation
         let futures: Vec<_> = keys
             .into_iter()

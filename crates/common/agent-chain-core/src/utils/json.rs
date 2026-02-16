@@ -191,7 +191,7 @@ fn escape_unescaped_quotes(s: &str) -> String {
         if c == '\\' {
             result.push(c);
             if chars.peek().is_some() {
-                result.push(chars.next().unwrap());
+                result.push(chars.next().expect("checked peek above"));
             }
         } else if c == '"' {
             result.push('\\');

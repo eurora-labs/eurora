@@ -361,7 +361,7 @@ impl RunnableWithMessageHistory {
             }
             // If the first element is itself an array, unwrap one level
             // (mirrors Python's handling of batched inputs)
-            if arr.first().map_or(false, |v| v.is_array()) {
+            if arr.first().is_some_and(|v| v.is_array()) {
                 if arr.len() != 1 {
                     return Err(Error::Other(format!(
                         "Expected a single list of messages. Got {} lists.",
