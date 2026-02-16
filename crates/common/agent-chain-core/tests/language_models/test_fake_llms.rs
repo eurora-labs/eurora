@@ -42,7 +42,7 @@ fn test_fake_list_llm_type() {
 #[tokio::test]
 async fn test_fake_list_llm_invoke_single_response() {
     let llm = FakeListLLM::new(vec!["hello".to_string()]);
-    let result = llm.invoke("any prompt".into()).await.unwrap();
+    let result = llm.invoke("any prompt".into(), None).await.unwrap();
     assert_eq!(result, "hello");
 }
 
@@ -89,7 +89,7 @@ async fn test_fake_list_llm_single_response_stays_at_same() {
 #[tokio::test]
 async fn test_fake_list_llm_ainvoke_single_response() {
     let llm = FakeListLLM::new(vec!["async hello".to_string()]);
-    let result = llm.invoke("any prompt".into()).await.unwrap();
+    let result = llm.invoke("any prompt".into(), None).await.unwrap();
     assert_eq!(result, "async hello");
 }
 
@@ -98,11 +98,11 @@ async fn test_fake_list_llm_ainvoke_single_response() {
 async fn test_fake_list_llm_ainvoke_cycles_through_responses() {
     let llm = FakeListLLM::new(vec!["first".to_string(), "second".to_string()]);
 
-    let result = llm.invoke("prompt1".into()).await.unwrap();
+    let result = llm.invoke("prompt1".into(), None).await.unwrap();
     assert_eq!(result, "first");
-    let result = llm.invoke("prompt2".into()).await.unwrap();
+    let result = llm.invoke("prompt2".into(), None).await.unwrap();
     assert_eq!(result, "second");
-    let result = llm.invoke("prompt3".into()).await.unwrap();
+    let result = llm.invoke("prompt3".into(), None).await.unwrap();
     assert_eq!(result, "first");
 }
 
@@ -633,7 +633,7 @@ async fn test_invoke_with_human_message_list() {
         HumanMessage::builder().content("Hello").build(),
     )];
     let input = LanguageModelInput::from(messages);
-    let result = llm.invoke(input).await.unwrap();
+    let result = llm.invoke(input, None).await.unwrap();
     assert_eq!(result, "message response");
 }
 
@@ -752,11 +752,14 @@ async fn test_stream_with_sleep() {
 async fn test_batch_processing() {
     let llm = FakeListLLM::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
     let results = llm
-        .batch(vec![
-            LanguageModelInput::from("p1"),
-            LanguageModelInput::from("p2"),
-            LanguageModelInput::from("p3"),
-        ])
+        .batch(
+            vec![
+                LanguageModelInput::from("p1"),
+                LanguageModelInput::from("p2"),
+                LanguageModelInput::from("p3"),
+            ],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(results, vec!["r1", "r2", "r3"]);
@@ -767,11 +770,14 @@ async fn test_batch_processing() {
 async fn test_abatch_processing() {
     let llm = FakeListLLM::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
     let results = llm
-        .batch(vec![
-            LanguageModelInput::from("p1"),
-            LanguageModelInput::from("p2"),
-            LanguageModelInput::from("p3"),
-        ])
+        .batch(
+            vec![
+                LanguageModelInput::from("p1"),
+                LanguageModelInput::from("p2"),
+                LanguageModelInput::from("p3"),
+            ],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(results, vec!["r1", "r2", "r3"]);
@@ -782,11 +788,14 @@ async fn test_abatch_processing() {
 async fn test_batch_cycles_correctly_and_updates_counter() {
     let llm = FakeListLLM::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
     let results = llm
-        .batch(vec![
-            LanguageModelInput::from("p1"),
-            LanguageModelInput::from("p2"),
-            LanguageModelInput::from("p3"),
-        ])
+        .batch(
+            vec![
+                LanguageModelInput::from("p1"),
+                LanguageModelInput::from("p2"),
+                LanguageModelInput::from("p3"),
+            ],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(results, vec!["r1", "r2", "r3"]);
@@ -798,7 +807,7 @@ async fn test_batch_cycles_correctly_and_updates_counter() {
 async fn test_batch_partial_cycle_updates_counter() {
     let llm = FakeListLLM::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
     let results = llm
-        .batch(vec![LanguageModelInput::from("p1")])
+        .batch(vec![LanguageModelInput::from("p1")], None)
         .await
         .unwrap();
     assert_eq!(results, vec!["r1"]);
@@ -873,7 +882,7 @@ async fn test_invoke_with_multiple_messages() {
         BaseMessage::Human(HumanMessage::builder().content("What is 2+2?").build()),
     ];
     let result = llm
-        .invoke(LanguageModelInput::from(messages))
+        .invoke(LanguageModelInput::from(messages), None)
         .await
         .unwrap();
     assert_eq!(result, "multi message response");
@@ -887,7 +896,7 @@ async fn test_ainvoke_with_human_message_list() {
         HumanMessage::builder().content("Hello").build(),
     )];
     let result = llm
-        .invoke(LanguageModelInput::from(messages))
+        .invoke(LanguageModelInput::from(messages), None)
         .await
         .unwrap();
     assert_eq!(result, "async message response");

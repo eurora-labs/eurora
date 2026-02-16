@@ -195,6 +195,24 @@ impl From<GenerationChunk> for Generation {
     }
 }
 
+/// Merge a list of `GenerationChunk`s into a single chunk.
+///
+/// Analogous to `merge_chat_generation_chunks` for chat models.
+/// Uses the `Add` implementation to concatenate text and merge generation_info.
+pub fn merge_generation_chunks(chunks: Vec<GenerationChunk>) -> Option<GenerationChunk> {
+    if chunks.is_empty() {
+        return None;
+    }
+
+    if chunks.len() == 1 {
+        return chunks.into_iter().next();
+    }
+
+    let mut iter = chunks.into_iter();
+    let first = iter.next()?;
+    Some(iter.fold(first, |acc, chunk| acc + chunk))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251,5 +269,46 @@ mod tests {
 
         let deserialized: Generation = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.text, "test");
+    }
+
+    #[test]
+    fn test_merge_generation_chunks_empty() {
+        assert_eq!(merge_generation_chunks(vec![]), None);
+    }
+
+    #[test]
+    fn test_merge_generation_chunks_single() {
+        let chunk = GenerationChunk::new("Hello");
+        let result = merge_generation_chunks(vec![chunk.clone()]);
+        assert_eq!(result, Some(chunk));
+    }
+
+    #[test]
+    fn test_merge_generation_chunks_multiple() {
+        let chunks = vec![
+            GenerationChunk::new("Hello"),
+            GenerationChunk::new(", "),
+            GenerationChunk::new("world!"),
+        ];
+        let result = merge_generation_chunks(chunks).unwrap();
+        assert_eq!(result.text, "Hello, world!");
+    }
+
+    #[test]
+    fn test_merge_generation_chunks_with_info() {
+        let mut info1 = HashMap::new();
+        info1.insert("key1".to_string(), json!("val1"));
+        let mut info2 = HashMap::new();
+        info2.insert("key2".to_string(), json!("val2"));
+
+        let chunks = vec![
+            GenerationChunk::with_info("a", info1),
+            GenerationChunk::with_info("b", info2),
+        ];
+        let result = merge_generation_chunks(chunks).unwrap();
+        assert_eq!(result.text, "ab");
+        let info = result.generation_info.unwrap();
+        assert_eq!(info.get("key1"), Some(&json!("val1")));
+        assert_eq!(info.get("key2"), Some(&json!("val2")));
     }
 }
