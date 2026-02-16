@@ -66,8 +66,8 @@ pub use crate::messages::UsageMetadata;
 
 // Re-export LLM types
 pub use llms::{
-    BaseLLM, CacheValue, LLM, LLMConfig, RunIdInput, create_base_retry, get_prompts_from_cache,
-    get_run_ids_list, resolve_cache, save_llm, update_cache,
+    BaseLLM, CacheValue, LLM, LLMConfig, LLMGenerateConfig, RunIdInput, create_base_retry,
+    get_prompts_from_cache, get_run_ids_list, resolve_cache, save_llm, update_cache,
 };
 
 // Re-export fake implementations for testing
