@@ -23,10 +23,13 @@ use crate::callbacks::{
 };
 use crate::error::{Error, Result};
 use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition, UsageMetadata};
+use crate::output_parsers::JsonOutputKeyToolsParser;
 use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, Generation, LLMResult};
 use crate::rate_limiters::BaseRateLimiter;
+use crate::runnables::base::{Runnable, pipe};
 use crate::runnables::config::RunnableConfig;
 use crate::tools::{BaseTool, ToolDefinition};
+use crate::utils::function_calling::convert_to_openai_tool;
 
 /// Type alias for streaming output.
 pub type ChatStream = Pin<Box<dyn Stream<Item = Result<ChatChunk>> + Send>>;
@@ -141,6 +144,60 @@ impl ChatChunk {
     pub fn with_finish_reason(mut self, reason: impl Into<String>) -> Self {
         self.finish_reason = Some(reason.into());
         self
+    }
+}
+
+/// Represents a tool-like object that can be bound to a chat model.
+///
+/// Mirrors Python's polymorphic parameter type for `bind_tools`:
+/// `Sequence[Dict | type | Callable | BaseTool]`. In Rust, we support
+/// `BaseTool` trait objects and raw JSON schema values.
+#[derive(Debug, Clone)]
+pub enum ToolLike {
+    /// A concrete tool implementing the BaseTool trait.
+    Tool(Arc<dyn BaseTool>),
+    /// A JSON schema describing a tool (OpenAI tool format or JSON Schema).
+    Schema(Value),
+}
+
+impl ToolLike {
+    /// Convert to a ToolDefinition.
+    pub fn to_definition(&self) -> ToolDefinition {
+        match self {
+            ToolLike::Tool(tool) => tool.definition(),
+            ToolLike::Schema(schema) => {
+                let openai_tool = convert_to_openai_tool(schema, None);
+                let function = openai_tool.get("function").cloned().unwrap_or_default();
+                ToolDefinition {
+                    name: function
+                        .get("name")
+                        .and_then(|n| n.as_str())
+                        .unwrap_or("unknown")
+                        .to_string(),
+                    description: function
+                        .get("description")
+                        .and_then(|d| d.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    parameters: function
+                        .get("parameters")
+                        .cloned()
+                        .unwrap_or(Value::Object(Default::default())),
+                }
+            }
+        }
+    }
+}
+
+impl From<Arc<dyn BaseTool>> for ToolLike {
+    fn from(tool: Arc<dyn BaseTool>) -> Self {
+        ToolLike::Tool(tool)
+    }
+}
+
+impl From<Value> for ToolLike {
+    fn from(schema: Value) -> Self {
+        ToolLike::Schema(schema)
     }
 }
 
@@ -1278,9 +1335,12 @@ pub trait BaseChatModel: BaseLanguageModel {
     ///
     /// Returns a model with the given tools bound. Provider implementations
     /// should override this method to return a configured model clone.
+    ///
+    /// Accepts `&[ToolLike]` to support both concrete `BaseTool` trait objects
+    /// and raw JSON schema values (matching Python's polymorphic parameter).
     fn bind_tools(
         &self,
-        _tools: &[Arc<dyn BaseTool>],
+        _tools: &[ToolLike],
         _tool_choice: Option<ToolChoice>,
     ) -> Result<Box<dyn BaseChatModel>> {
         Err(Error::NotImplemented(
@@ -1290,9 +1350,9 @@ pub trait BaseChatModel: BaseLanguageModel {
 
     /// Get tool definitions from tools.
     ///
-    /// Helper method to convert tools to their definitions.
-    fn get_tool_definitions(&self, tools: &[Arc<dyn BaseTool>]) -> Vec<ToolDefinition> {
-        tools.iter().map(|t| t.definition()).collect()
+    /// Helper method to convert tool-like objects to their definitions.
+    fn get_tool_definitions(&self, tools: &[ToolLike]) -> Vec<ToolDefinition> {
+        tools.iter().map(|t| t.to_definition()).collect()
     }
 
     /// Generate a streaming response from the model.
@@ -1626,19 +1686,35 @@ pub trait BaseChatModel: BaseLanguageModel {
         result
     }
 
-    /// Create a wrapper that structures model output using a schema.
+    /// Create a runnable that structures model output using a schema.
     ///
-    /// Returns a model configured to produce structured output matching the
-    /// given schema. Provider implementations should override `bind_tools`
-    /// first, as the default implementation uses `bind_tools` internally.
+    /// Returns a `Runnable` that takes `LanguageModelInput` and produces
+    /// parsed `Value` output. The chain is composed as `llm | output_parser`.
+    ///
+    /// This matches Python's `BaseChatModel.with_structured_output()` which
+    /// returns `Runnable[LanguageModelInput, Dict | BaseModel]`.
+    ///
+    /// Provider implementations should override `bind_tools` first, as the
+    /// default implementation uses `bind_tools` internally.
     fn with_structured_output(
         &self,
-        _schema: Value,
+        schema: Value,
         _include_raw: bool,
-    ) -> Result<Box<dyn BaseChatModel>> {
-        Err(Error::NotImplemented(
-            "with_structured_output is not implemented for this model".into(),
-        ))
+    ) -> Result<Box<dyn Runnable<Input = LanguageModelInput, Output = Value> + Send + Sync>> {
+        // Extract the tool name from the schema
+        let tool_name = extract_tool_name_from_schema(&schema);
+
+        // Bind tools to the model with the schema
+        let tool_like = ToolLike::Schema(schema);
+        let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
+
+        // Create the output parser
+        let output_parser = JsonOutputKeyToolsParser::new(&tool_name).with_first_tool_only(true);
+
+        // Wrap the bound model as a Runnable and compose with the parser
+        let model_runnable = ChatModelRunnable::new(Arc::from(bound_model));
+        let chain = pipe(model_runnable, output_parser);
+        Ok(Box::new(chain))
     }
 
     /// Get the identifying parameters for this model.
@@ -1655,6 +1731,67 @@ pub trait BaseChatModel: BaseLanguageModel {
             Value::String(self.model_name().to_string()),
         );
         params
+    }
+}
+
+/// Extract the tool name from a JSON schema.
+///
+/// Uses `convert_to_openai_tool` to normalize the schema, then extracts
+/// the function name from the result.
+pub fn extract_tool_name_from_schema(schema: &Value) -> String {
+    let openai_tool = convert_to_openai_tool(schema, None);
+    openai_tool
+        .get("function")
+        .and_then(|f| f.get("name"))
+        .and_then(|n| n.as_str())
+        .unwrap_or("unknown")
+        .to_string()
+}
+
+/// Adapter that wraps a `BaseChatModel` as a `Runnable`.
+///
+/// This bridges the gap between `BaseChatModel` (which has its own invoke/stream
+/// methods) and the `Runnable` trait (which uses associated types). This adapter
+/// is needed for chain composition (e.g., `with_structured_output` which pipes
+/// a chat model into an output parser).
+///
+/// Mirrors how Python's `BaseChatModel` inherits from `Runnable`.
+pub struct ChatModelRunnable {
+    model: Arc<dyn BaseChatModel>,
+}
+
+impl ChatModelRunnable {
+    /// Create a new ChatModelRunnable wrapping a chat model.
+    pub fn new(model: Arc<dyn BaseChatModel>) -> Self {
+        Self { model }
+    }
+}
+
+impl std::fmt::Debug for ChatModelRunnable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ChatModelRunnable")
+            .field("model", &self.model.model_name())
+            .finish()
+    }
+}
+
+#[async_trait]
+impl Runnable for ChatModelRunnable {
+    type Input = LanguageModelInput;
+    type Output = AIMessage;
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let rt = tokio::runtime::Handle::current();
+        let model = self.model.clone();
+        rt.block_on(async move { model.invoke(input, config.as_ref()).await })
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        self.model.ainvoke(input, config.as_ref()).await
     }
 }
 

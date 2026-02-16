@@ -44,7 +44,7 @@ mod format_instructions;
 mod json;
 mod list;
 mod openai_functions;
-mod openai_tools;
+pub mod openai_tools;
 mod pydantic;
 mod string;
 mod transform;
