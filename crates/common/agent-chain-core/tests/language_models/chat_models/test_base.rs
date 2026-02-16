@@ -1521,3 +1521,195 @@ async fn test_simple_fake_chat_agenerate_returns_chat_result() {
     assert_eq!(result.generations.len(), 1);
     assert_eq!(result.generations[0].message.content(), "fake response");
 }
+
+// ---- TestGenInfoAndMsgMetadata ----
+
+/// Ported from `TestGenInfoAndMsgMetadata::test_merges_generation_info_with_response_metadata`.
+#[test]
+fn test_gen_info_merges_with_response_metadata() {
+    use agent_chain_core::language_models::chat_models::_gen_info_and_msg_metadata;
+    use std::collections::HashMap;
+
+    let mut response_metadata = HashMap::new();
+    response_metadata.insert(
+        "model".to_string(),
+        serde_json::Value::String("test".to_string()),
+    );
+
+    let mut generation_info = HashMap::new();
+    generation_info.insert(
+        "finish_reason".to_string(),
+        serde_json::Value::String("stop".to_string()),
+    );
+
+    let result = _gen_info_and_msg_metadata(Some(&generation_info), &response_metadata);
+    assert_eq!(
+        result.get("finish_reason").and_then(|v| v.as_str()),
+        Some("stop")
+    );
+    assert_eq!(result.get("model").and_then(|v| v.as_str()), Some("test"));
+}
+
+/// Ported from `TestGenInfoAndMsgMetadata::test_empty_generation_info`.
+#[test]
+fn test_gen_info_empty_generation_info() {
+    use agent_chain_core::language_models::chat_models::_gen_info_and_msg_metadata;
+    use std::collections::HashMap;
+
+    let mut response_metadata = HashMap::new();
+    response_metadata.insert(
+        "key".to_string(),
+        serde_json::Value::String("val".to_string()),
+    );
+
+    let result = _gen_info_and_msg_metadata(None, &response_metadata);
+    assert_eq!(result.len(), 1);
+    assert_eq!(result.get("key").and_then(|v| v.as_str()), Some("val"));
+}
+
+/// Ported from `TestGenInfoAndMsgMetadata::test_empty_response_metadata`.
+#[test]
+fn test_gen_info_empty_response_metadata() {
+    use agent_chain_core::language_models::chat_models::_gen_info_and_msg_metadata;
+    use std::collections::HashMap;
+
+    let mut generation_info = HashMap::new();
+    generation_info.insert(
+        "token_count".to_string(),
+        serde_json::Value::Number(serde_json::Number::from(10)),
+    );
+
+    let empty_metadata = HashMap::new();
+    let result = _gen_info_and_msg_metadata(Some(&generation_info), &empty_metadata);
+    assert_eq!(result.get("token_count").and_then(|v| v.as_i64()), Some(10));
+}
+
+/// Ported from `TestGenInfoAndMsgMetadata::test_response_metadata_overrides_generation_info`.
+#[test]
+fn test_gen_info_response_metadata_overrides() {
+    use agent_chain_core::language_models::chat_models::_gen_info_and_msg_metadata;
+    use std::collections::HashMap;
+
+    let mut response_metadata = HashMap::new();
+    response_metadata.insert(
+        "key".to_string(),
+        serde_json::Value::String("from_metadata".to_string()),
+    );
+
+    let mut generation_info = HashMap::new();
+    generation_info.insert(
+        "key".to_string(),
+        serde_json::Value::String("from_gen_info".to_string()),
+    );
+
+    let result = _gen_info_and_msg_metadata(Some(&generation_info), &response_metadata);
+    // response_metadata values win (same as Python dict merge order)
+    assert_eq!(
+        result.get("key").and_then(|v| v.as_str()),
+        Some("from_metadata")
+    );
+}
+
+/// Test that streaming via `stream()` injects response_metadata on yielded chunks.
+#[tokio::test]
+async fn test_stream_injects_response_metadata() {
+    use agent_chain_core::messages::AIMessageChunk;
+
+    let model =
+        GenericFakeChatModel::from_vec(vec![AIMessage::builder().content("hello world").build()]);
+
+    let mut stream = model
+        .stream(LanguageModelInput::from("test"), None, None)
+        .await
+        .unwrap();
+
+    let mut chunks: Vec<AIMessageChunk> = Vec::new();
+    while let Some(result) = stream.next().await {
+        if let Ok(chunk) = result {
+            chunks.push(chunk);
+        }
+    }
+
+    // Should have content chunks + final empty chunk
+    assert!(chunks.len() >= 2);
+
+    // Last chunk should have chunk_position="last"
+    let last = chunks.last().unwrap();
+    assert_eq!(
+        last.chunk_position,
+        Some(agent_chain_core::messages::ChunkPosition::Last)
+    );
+}
+
+/// Test that `on_llm_new_token` receives chunk data when streaming.
+#[tokio::test]
+async fn test_stream_callback_receives_chunk_data() {
+    use agent_chain_core::callbacks::base::{
+        BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
+        RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
+    };
+    use agent_chain_core::runnables::config::RunnableConfig;
+    use std::sync::{Arc, Mutex};
+    use uuid::Uuid;
+
+    #[derive(Debug, Clone)]
+    struct ChunkRecorder {
+        chunks_received: Arc<Mutex<Vec<Option<serde_json::Value>>>>,
+    }
+
+    impl ChunkRecorder {
+        fn new() -> Self {
+            Self {
+                chunks_received: Arc::new(Mutex::new(Vec::new())),
+            }
+        }
+    }
+
+    impl LLMManagerMixin for ChunkRecorder {
+        fn on_llm_new_token(
+            &self,
+            _token: &str,
+            _run_id: Uuid,
+            _parent_run_id: Option<Uuid>,
+            chunk: Option<&serde_json::Value>,
+        ) {
+            self.chunks_received.lock().unwrap().push(chunk.cloned());
+        }
+    }
+
+    impl ChainManagerMixin for ChunkRecorder {}
+    impl ToolManagerMixin for ChunkRecorder {}
+    impl RetrieverManagerMixin for ChunkRecorder {}
+    impl CallbackManagerMixin for ChunkRecorder {}
+    impl RunManagerMixin for ChunkRecorder {}
+
+    impl BaseCallbackHandler for ChunkRecorder {
+        fn name(&self) -> &str {
+            "chunk_recorder"
+        }
+    }
+
+    let recorder = ChunkRecorder::new();
+    let handler: Arc<dyn BaseCallbackHandler> = Arc::new(recorder.clone());
+
+    let model = GenericFakeChatModel::from_vec(vec![AIMessage::builder().content("hi").build()]);
+
+    let config = RunnableConfig::new().with_callbacks(vec![handler].into());
+
+    let mut stream = model
+        .stream(LanguageModelInput::from("test"), Some(&config), None)
+        .await
+        .unwrap();
+
+    while let Some(_) = stream.next().await {}
+
+    let recorded = recorder.chunks_received.lock().unwrap();
+    // on_llm_new_token should have been called at least once with Some(chunk_json)
+    let non_none_chunks: Vec<_> = recorded.iter().filter(|c| c.is_some()).collect();
+    assert!(
+        !non_none_chunks.is_empty(),
+        "on_llm_new_token should receive chunk data, got {} calls with {:?}",
+        recorded.len(),
+        recorded.iter().map(|c| c.is_some()).collect::<Vec<_>>()
+    );
+}

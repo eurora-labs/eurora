@@ -40,7 +40,7 @@
 //! ```
 
 mod base;
-mod chat_models;
+pub mod chat_models;
 mod fake;
 mod fake_chat_models;
 mod llms;
