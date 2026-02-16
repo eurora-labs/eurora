@@ -302,29 +302,10 @@ impl BaseTool for StructuredTool {
 
         if let Some(ref func) = self.func {
             let result = func(filtered_args)?;
-            match self.response_format {
-                ResponseFormat::Content => match result {
-                    Value::String(s) => Ok(ToolOutput::String(s)),
-                    other => Ok(ToolOutput::Json(other)),
-                },
-                ResponseFormat::ContentAndArtifact => {
-                    if let Value::Array(arr) = result {
-                        if arr.len() == 2 {
-                            Ok(ToolOutput::ContentAndArtifact {
-                                content: arr[0].clone(),
-                                artifact: arr[1].clone(),
-                            })
-                        } else {
-                            Err(Error::ToolException(
-                                "content_and_artifact response must be a 2-tuple".to_string(),
-                            ))
-                        }
-                    } else {
-                        Err(Error::ToolException(
-                            "content_and_artifact response must be a 2-tuple".to_string(),
-                        ))
-                    }
-                }
+            // Return raw result — response_format handling is in BaseTool::run()
+            match result {
+                Value::String(s) => Ok(ToolOutput::String(s)),
+                other => Ok(ToolOutput::Json(other)),
             }
         } else {
             Err(Error::ToolInvocation(
@@ -344,29 +325,10 @@ impl BaseTool for StructuredTool {
 
         if let Some(ref coroutine) = self.coroutine {
             let result = coroutine(filtered_args).await?;
-            match self.response_format {
-                ResponseFormat::Content => match result {
-                    Value::String(s) => Ok(ToolOutput::String(s)),
-                    other => Ok(ToolOutput::Json(other)),
-                },
-                ResponseFormat::ContentAndArtifact => {
-                    if let Value::Array(arr) = result {
-                        if arr.len() == 2 {
-                            Ok(ToolOutput::ContentAndArtifact {
-                                content: arr[0].clone(),
-                                artifact: arr[1].clone(),
-                            })
-                        } else {
-                            Err(Error::ToolException(
-                                "content_and_artifact response must be a 2-tuple".to_string(),
-                            ))
-                        }
-                    } else {
-                        Err(Error::ToolException(
-                            "content_and_artifact response must be a 2-tuple".to_string(),
-                        ))
-                    }
-                }
+            // Return raw result — response_format handling is in BaseTool::arun()
+            match result {
+                Value::String(s) => Ok(ToolOutput::String(s)),
+                other => Ok(ToolOutput::Json(other)),
             }
         } else {
             // Fall back to sync implementation

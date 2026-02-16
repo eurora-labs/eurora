@@ -14,7 +14,8 @@ use thiserror::Error;
 
 use crate::callbacks::base::Callbacks;
 use crate::callbacks::manager::{
-    AsyncCallbackManagerForToolRun, CallbackManager, CallbackManagerForToolRun,
+    AsyncCallbackManager, AsyncCallbackManagerForToolRun, CallbackManager,
+    CallbackManagerForToolRun,
 };
 use crate::error::{Error, Result};
 use crate::messages::{BaseMessage, ToolCall, ToolMessage};
@@ -497,19 +498,27 @@ pub trait BaseTool: Send + Sync + Debug {
         match result {
             Ok(output) => {
                 let (content, artifact) = match self.response_format() {
-                    ResponseFormat::ContentAndArtifact => match output {
-                        ToolOutput::ContentAndArtifact { content, artifact } => {
-                            (ToolOutput::Json(content), Some(artifact))
+                    ResponseFormat::ContentAndArtifact => {
+                        // tool_run() returns raw values; for content_and_artifact
+                        // we expect a JSON array [content, artifact]
+                        match output {
+                            ToolOutput::Json(Value::Array(ref arr)) if arr.len() == 2 => {
+                                let content = match &arr[0] {
+                                    Value::String(s) => ToolOutput::String(s.clone()),
+                                    other => ToolOutput::Json(other.clone()),
+                                };
+                                (content, Some(arr[1].clone()))
+                            }
+                            _ => {
+                                let err = Error::ToolException(
+                                    "Since response_format='content_and_artifact', the tool                                      function must return a two-element JSON array                                      [content, artifact]."
+                                        .to_string(),
+                                );
+                                run_manager.on_tool_error(&err);
+                                return Err(err);
+                            }
                         }
-                        _ => {
-                            let err = Error::ToolInvocation(
-                                "content_and_artifact response must be a ContentAndArtifact variant"
-                                    .to_string(),
-                            );
-                            run_manager.on_tool_error(&err);
-                            return Err(err);
-                        }
-                    },
+                    }
                     ResponseFormat::Content => (output, None),
                 };
                 let formatted = format_output(
@@ -569,17 +578,139 @@ pub trait BaseTool: Send + Sync + Debug {
 
     /// Run the tool asynchronously with the full callback pipeline.
     ///
-    /// Mirrors Python's `BaseTool.arun()`. Same flow as `run()` but async.
+    /// Mirrors Python's `BaseTool.arun()`. Uses `AsyncCallbackManager` for
+    /// async callback dispatch and calls `tool_arun()` for the implementation.
     async fn arun(
         &self,
         input: ToolInput,
         config: Option<RunnableConfig>,
         tool_call_id: Option<String>,
     ) -> Result<ToolOutput> {
-        // For now, delegate to sync run. A full async pipeline would use
-        // AsyncCallbackManager, but sync is sufficient since callback dispatch
-        // is lightweight and the async tool_arun is called via the sync wrapper.
-        self.run(input, config, tool_call_id)
+        let config = ensure_config(config);
+
+        // Configure async callback manager
+        let async_callback_manager = AsyncCallbackManager::configure(
+            config.callbacks.clone(),
+            self.callbacks().cloned(),
+            self.verbose(),
+            Some(config.tags.clone()),
+            self.tags().map(|t| t.to_vec()),
+            Some(config.metadata.clone()),
+            self.metadata().cloned(),
+        );
+
+        // Build serialized info and input string for callbacks
+        let mut serialized = HashMap::new();
+        serialized.insert(
+            "name".to_string(),
+            serde_json::Value::String(self.name().to_string()),
+        );
+        serialized.insert(
+            "description".to_string(),
+            serde_json::Value::String(self.description().to_string()),
+        );
+
+        let input_str = match &input {
+            ToolInput::String(s) => s.clone(),
+            ToolInput::Dict(d) => format!("{:?}", d),
+            ToolInput::ToolCall(tc) => tc.args.to_string(),
+        };
+
+        let run_manager = async_callback_manager
+            .on_tool_start(&serialized, &input_str, config.run_id, None)
+            .await;
+
+        // Create child config using the sync child from the async run manager
+        let child_config = patch_config(
+            Some(config.clone()),
+            Some(run_manager.get_sync().get_child(None)),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        // Execute tool (async)
+        let result = self.tool_arun(input, Some(&run_manager), &child_config).await;
+
+        // Handle result with error recovery and callback dispatch
+        match result {
+            Ok(output) => {
+                let (content, artifact) = match self.response_format() {
+                    ResponseFormat::ContentAndArtifact => {
+                        match output {
+                            ToolOutput::Json(Value::Array(ref arr)) if arr.len() == 2 => {
+                                let content = match &arr[0] {
+                                    Value::String(s) => ToolOutput::String(s.clone()),
+                                    other => ToolOutput::Json(other.clone()),
+                                };
+                                (content, Some(arr[1].clone()))
+                            }
+                            _ => {
+                                let err = Error::ToolException(
+                                    "Since response_format='content_and_artifact', the tool                                      function must return a two-element JSON array                                      [content, artifact]."
+                                        .to_string(),
+                                );
+                                run_manager.get_sync().on_tool_error(&err);
+                                return Err(err);
+                            }
+                        }
+                    }
+                    ResponseFormat::Content => (output, None),
+                };
+                let formatted = format_output(
+                    content,
+                    artifact,
+                    tool_call_id.as_deref(),
+                    self.name(),
+                    "success",
+                );
+                let output_str = match &formatted {
+                    ToolOutput::String(s) => s.clone(),
+                    ToolOutput::Message(m) => m.content.to_string(),
+                    ToolOutput::Json(v) => stringify(v),
+                    ToolOutput::ContentAndArtifact { content, .. } => stringify(content),
+                };
+                run_manager.on_tool_end(&output_str).await;
+                Ok(formatted)
+            }
+            Err(e) => {
+                // Check if this is a ToolException
+                if let Some(tool_err_msg) = e.as_tool_exception() {
+                    let exc = ToolException::new(tool_err_msg);
+                    if let Some(handled) = handle_tool_error_impl(&exc, self.handle_tool_error()) {
+                        let formatted = format_output(
+                            ToolOutput::String(handled.clone()),
+                            None,
+                            tool_call_id.as_deref(),
+                            self.name(),
+                            "error",
+                        );
+                        run_manager.on_tool_end(&handled).await;
+                        return Ok(formatted);
+                    }
+                }
+                // Check if this is a validation error
+                if let Some(validation_msg) = e.as_validation_error() {
+                    if let Some(handled) =
+                        handle_validation_error_impl(validation_msg, self.handle_validation_error())
+                    {
+                        let formatted = format_output(
+                            ToolOutput::String(handled.clone()),
+                            None,
+                            tool_call_id.as_deref(),
+                            self.name(),
+                            "error",
+                        );
+                        run_manager.on_tool_end(&handled).await;
+                        return Ok(formatted);
+                    }
+                }
+                // Unhandled error
+                run_manager.get_sync().on_tool_error(&e);
+                Err(e)
+            }
+        }
     }
 
     /// Invoke the tool, routing through the callback pipeline.
@@ -632,6 +763,62 @@ pub trait BaseTool: Send + Sync + Debug {
         let tool_call = ToolCall::builder().name(self.name()).args(args).build();
         let result = self.invoke_tool_call(tool_call).await;
         Value::String(result.text())
+    }
+}
+
+/// Adapter that makes a `BaseTool` usable as a `Runnable`.
+///
+/// Mirrors how Python's `BaseTool` extends `RunnableSerializable`.
+/// In Rust, we use the adapter pattern (like `ChatModelRunnable`)
+/// since trait objects cannot directly implement other traits.
+#[derive(Clone)]
+pub struct ToolRunnable {
+    tool: Arc<dyn BaseTool>,
+}
+
+impl ToolRunnable {
+    pub fn new(tool: Arc<dyn BaseTool>) -> Self {
+        Self { tool }
+    }
+
+    pub fn tool(&self) -> &dyn BaseTool {
+        &*self.tool
+    }
+}
+
+impl Debug for ToolRunnable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ToolRunnable")
+            .field("name", &self.tool.name())
+            .finish()
+    }
+}
+
+#[async_trait]
+impl crate::runnables::base::Runnable for ToolRunnable {
+    type Input = ToolInput;
+    type Output = ToolOutput;
+
+    fn name(&self) -> Option<String> {
+        Some(self.tool.name().to_string())
+    }
+
+    fn invoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        let (tool_input, tool_call_id, config) = prep_run_args(input, config);
+        self.tool.run(tool_input, Some(config), tool_call_id)
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        let (tool_input, tool_call_id, config) = prep_run_args(input, config);
+        self.tool.arun(tool_input, Some(config), tool_call_id).await
     }
 }
 
