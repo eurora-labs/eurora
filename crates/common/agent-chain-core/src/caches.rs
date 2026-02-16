@@ -150,22 +150,28 @@ impl InMemoryCache {
     /// # Panics
     ///
     /// Panics if `maxsize` is less than or equal to `0`.
-    pub fn new(maxsize: Option<usize>) -> Self {
+    pub fn new(maxsize: Option<usize>) -> crate::Result<Self> {
         if let Some(size) = maxsize
             && size == 0
         {
-            panic!("maxsize must be greater than 0");
+            return Err(crate::Error::InvalidConfig(
+                "maxsize must be greater than 0".to_string(),
+            ));
         }
-        Self {
+        Ok(Self {
             cache: RwLock::new(HashMap::new()),
             maxsize,
             key_order: RwLock::new(Vec::new()),
-        }
+        })
     }
 
     /// Create a new InMemoryCache with no maximum size.
     pub fn unbounded() -> Self {
-        Self::new(None)
+        Self {
+            cache: RwLock::new(HashMap::new()),
+            maxsize: None,
+            key_order: RwLock::new(Vec::new()),
+        }
     }
 }
 
@@ -175,10 +181,48 @@ impl Default for InMemoryCache {
     }
 }
 
+impl InMemoryCache {
+    fn lock_read_cache(
+        &self,
+    ) -> Option<std::sync::RwLockReadGuard<'_, HashMap<(String, String), CacheReturnValue>>> {
+        match self.cache.read() {
+            Ok(guard) => Some(guard),
+            Err(error) => {
+                tracing::error!("Cache read lock poisoned: {}", error);
+                None
+            }
+        }
+    }
+
+    fn lock_write_cache(
+        &self,
+    ) -> Option<std::sync::RwLockWriteGuard<'_, HashMap<(String, String), CacheReturnValue>>> {
+        match self.cache.write() {
+            Ok(guard) => Some(guard),
+            Err(error) => {
+                tracing::error!("Cache write lock poisoned: {}", error);
+                None
+            }
+        }
+    }
+
+    fn lock_write_key_order(
+        &self,
+    ) -> Option<std::sync::RwLockWriteGuard<'_, Vec<(String, String)>>> {
+        match self.key_order.write() {
+            Ok(guard) => Some(guard),
+            Err(error) => {
+                tracing::error!("Cache key_order lock poisoned: {}", error);
+                None
+            }
+        }
+    }
+}
+
 #[async_trait]
 impl BaseCache for InMemoryCache {
     fn lookup(&self, prompt: &str, llm_string: &str) -> Option<CacheReturnValue> {
-        let cache = self.cache.read().expect("Lock poisoned");
+        let cache = self.lock_read_cache()?;
         cache
             .get(&(prompt.to_string(), llm_string.to_string()))
             .cloned()
@@ -186,8 +230,12 @@ impl BaseCache for InMemoryCache {
 
     fn update(&self, prompt: &str, llm_string: &str, return_val: CacheReturnValue) {
         let key = (prompt.to_string(), llm_string.to_string());
-        let mut cache = self.cache.write().expect("Lock poisoned");
-        let mut key_order = self.key_order.write().expect("Lock poisoned");
+        let Some(mut cache) = self.lock_write_cache() else {
+            return;
+        };
+        let Some(mut key_order) = self.lock_write_key_order() else {
+            return;
+        };
 
         // If key already exists, remove it from the order list (it will be added at the end)
         if cache.contains_key(&key) {
@@ -207,8 +255,12 @@ impl BaseCache for InMemoryCache {
     }
 
     fn clear(&self) {
-        let mut cache = self.cache.write().expect("Lock poisoned");
-        let mut key_order = self.key_order.write().expect("Lock poisoned");
+        let Some(mut cache) = self.lock_write_cache() else {
+            return;
+        };
+        let Some(mut key_order) = self.lock_write_key_order() else {
+            return;
+        };
         cache.clear();
         key_order.clear();
     }
@@ -233,7 +285,7 @@ mod tests {
 
     #[test]
     fn test_in_memory_cache_new() {
-        let cache = InMemoryCache::new(None);
+        let cache = InMemoryCache::new(None).unwrap();
         assert!(cache.lookup("prompt", "llm").is_none());
     }
 
@@ -250,21 +302,23 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "maxsize must be greater than 0")]
     fn test_in_memory_cache_zero_maxsize() {
-        InMemoryCache::new(Some(0));
+        let result = InMemoryCache::new(Some(0));
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("maxsize must be greater than 0"));
     }
 
     #[test]
     fn test_in_memory_cache_lookup_miss() {
-        let cache = InMemoryCache::new(None);
+        let cache = InMemoryCache::new(None).unwrap();
         let result = cache.lookup("prompt", "llm_string");
         assert!(result.is_none());
     }
 
     #[test]
     fn test_in_memory_cache_update_and_lookup() {
-        let cache = InMemoryCache::new(None);
+        let cache = InMemoryCache::new(None).unwrap();
         let generations = vec![Generation::new("Hello, world!")];
 
         cache.update("prompt", "llm_string", generations.clone());
@@ -278,7 +332,7 @@ mod tests {
 
     #[test]
     fn test_in_memory_cache_clear() {
-        let cache = InMemoryCache::new(None);
+        let cache = InMemoryCache::new(None).unwrap();
         let generations = vec![Generation::new("Hello")];
 
         cache.update("prompt1", "llm", generations.clone());
@@ -295,7 +349,7 @@ mod tests {
 
     #[test]
     fn test_in_memory_cache_maxsize() {
-        let cache = InMemoryCache::new(Some(2));
+        let cache = InMemoryCache::new(Some(2)).unwrap();
 
         cache.update("prompt1", "llm", vec![Generation::new("1")]);
         cache.update("prompt2", "llm", vec![Generation::new("2")]);
@@ -313,7 +367,7 @@ mod tests {
 
     #[test]
     fn test_in_memory_cache_update_existing_key() {
-        let cache = InMemoryCache::new(None);
+        let cache = InMemoryCache::new(None).unwrap();
 
         cache.update("prompt", "llm", vec![Generation::new("first")]);
         let result = cache.lookup("prompt", "llm").unwrap();
@@ -326,7 +380,7 @@ mod tests {
 
     #[test]
     fn test_in_memory_cache_different_llm_strings() {
-        let cache = InMemoryCache::new(None);
+        let cache = InMemoryCache::new(None).unwrap();
 
         cache.update("prompt", "llm1", vec![Generation::new("from llm1")]);
         cache.update("prompt", "llm2", vec![Generation::new("from llm2")]);
@@ -340,7 +394,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_in_memory_cache_alookup() {
-        let cache = InMemoryCache::new(None);
+        let cache = InMemoryCache::new(None).unwrap();
         let generations = vec![Generation::new("async test")];
 
         cache.update("prompt", "llm", generations);
@@ -352,7 +406,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_in_memory_cache_aupdate() {
-        let cache = InMemoryCache::new(None);
+        let cache = InMemoryCache::new(None).unwrap();
         let generations = vec![Generation::new("async update")];
 
         cache.aupdate("prompt", "llm", generations).await;
@@ -364,7 +418,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_in_memory_cache_aclear() {
-        let cache = InMemoryCache::new(None);
+        let cache = InMemoryCache::new(None).unwrap();
 
         cache.update("prompt", "llm", vec![Generation::new("test")]);
         assert!(cache.lookup("prompt", "llm").is_some());
@@ -375,7 +429,7 @@ mod tests {
 
     #[test]
     fn test_in_memory_cache_maxsize_update_refreshes_position() {
-        let cache = InMemoryCache::new(Some(2));
+        let cache = InMemoryCache::new(Some(2)).unwrap();
 
         cache.update("prompt1", "llm", vec![Generation::new("1")]);
         cache.update("prompt2", "llm", vec![Generation::new("2")]);
@@ -393,7 +447,7 @@ mod tests {
 
     #[test]
     fn test_in_memory_cache_multiple_generations() {
-        let cache = InMemoryCache::new(None);
+        let cache = InMemoryCache::new(None).unwrap();
         let generations = vec![
             Generation::new("First generation"),
             Generation::new("Second generation"),

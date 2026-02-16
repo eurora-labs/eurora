@@ -145,7 +145,9 @@ impl AstreamEventsCallbackHandler {
             .root_event_filter
             .include_event(event_name, event_tags, event_type)
         {
-            let _ = self.send_stream.send(event);
+            if let Err(error) = self.send_stream.send(event) {
+                tracing::warn!("Failed to send stream event: {}", error);
+            }
         }
     }
 

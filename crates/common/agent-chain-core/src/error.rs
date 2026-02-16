@@ -128,6 +128,18 @@ pub enum Error {
     #[error("Not implemented: {0}")]
     NotImplemented(String),
 
+    /// Operation timed out.
+    #[error("Timeout: {0}")]
+    Timeout(String),
+
+    /// All retry attempts exhausted.
+    #[error("Retry exhausted: {0}")]
+    RetryExhausted(String),
+
+    /// Lock poisoned (mutex/rwlock).
+    #[error("Lock poisoned: {0}")]
+    LockPoisoned(String),
+
     /// Generic error with message.
     #[error("{0}")]
     Other(String),
@@ -210,6 +222,7 @@ impl Error {
     pub fn is_retryable(&self) -> bool {
         match self {
             Self::Http(_) => true,
+            Self::Timeout(_) => true,
             Self::Api { status, .. } => *status == 429 || *status >= 500,
             _ => false,
         }

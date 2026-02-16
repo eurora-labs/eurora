@@ -396,15 +396,19 @@ pub fn index(
                 }
                 if config.cleanup == Some(CleanupMode::ScopedFull) {
                     scoped_full_cleanup_source_ids
-                        .insert(source_id.as_ref().expect("checked above").clone());
+                        .insert(source_id.as_ref().map(|id| id.clone()).unwrap_or_default());
                 }
             }
         }
 
         let doc_ids: Vec<String> = hashed_docs
             .iter()
-            .map(|doc| doc.id.clone().expect("hash should have set id"))
-            .collect();
+            .map(|doc| {
+                doc.id
+                    .clone()
+                    .ok_or_else(|| Error::Indexing("hash should have set document id".to_string()))
+            })
+            .collect::<std::result::Result<Vec<_>, _>>()?;
 
         let exists_batch = record_manager.exists(&doc_ids)?;
 
@@ -414,7 +418,10 @@ pub fn index(
         let mut seen_docs: HashSet<String> = HashSet::new();
 
         for (hashed_doc, doc_exists) in hashed_docs.into_iter().zip(exists_batch) {
-            let hashed_id = hashed_doc.id.clone().expect("hash should have set id");
+            let hashed_id = hashed_doc
+                .id
+                .clone()
+                .ok_or_else(|| Error::Indexing("hash should have set document id".to_string()))?;
             if doc_exists {
                 if config.force_update {
                     seen_docs.insert(hashed_id.clone());
@@ -567,15 +574,19 @@ pub async fn aindex(
                 }
                 if config.cleanup == Some(CleanupMode::ScopedFull) {
                     scoped_full_cleanup_source_ids
-                        .insert(source_id.as_ref().expect("checked above").clone());
+                        .insert(source_id.as_ref().map(|id| id.clone()).unwrap_or_default());
                 }
             }
         }
 
         let doc_ids: Vec<String> = hashed_docs
             .iter()
-            .map(|doc| doc.id.clone().expect("hash should have set id"))
-            .collect();
+            .map(|doc| {
+                doc.id
+                    .clone()
+                    .ok_or_else(|| Error::Indexing("hash should have set document id".to_string()))
+            })
+            .collect::<std::result::Result<Vec<_>, _>>()?;
 
         let exists_batch = record_manager.aexists(&doc_ids).await?;
 
@@ -585,7 +596,10 @@ pub async fn aindex(
         let mut seen_docs: HashSet<String> = HashSet::new();
 
         for (hashed_doc, doc_exists) in hashed_docs.into_iter().zip(exists_batch) {
-            let hashed_id = hashed_doc.id.clone().expect("hash should have set id");
+            let hashed_id = hashed_doc
+                .id
+                .clone()
+                .ok_or_else(|| Error::Indexing("hash should have set document id".to_string()))?;
             if doc_exists {
                 if config.force_update {
                     seen_docs.insert(hashed_id.clone());

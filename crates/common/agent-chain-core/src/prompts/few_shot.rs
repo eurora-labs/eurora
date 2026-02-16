@@ -213,8 +213,9 @@ impl FewShotPromptTemplate {
             let combined = format!("{}{}", self.prefix, self.suffix);
             let mut check_vars = self.input_variables.clone();
             check_vars.extend(self.partial_variables.keys().cloned());
-            // Python raises ValueError on mismatch; we log but don't fail
-            let _ = check_valid_template(&combined, self.template_format, &check_vars);
+            if let Err(error) = check_valid_template(&combined, self.template_format, &check_vars) {
+                tracing::warn!("Template validation warning: {}", error);
+            }
         } else {
             let combined = format!("{}{}", self.prefix, self.suffix);
             if let Ok(template_vars) = get_template_variables(&combined, self.template_format) {
