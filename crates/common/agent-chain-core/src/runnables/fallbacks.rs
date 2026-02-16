@@ -660,29 +660,6 @@ where
     }
 }
 
-/// Extension trait to add `with_fallbacks` method to any Runnable.
-pub trait RunnableWithFallbacksExt: Runnable {
-    /// Create a new Runnable that tries this runnable first, then falls back to others.
-    ///
-    /// # Arguments
-    /// * `fallbacks` - A list of fallback runnables to try if this one fails
-    ///
-    /// # Returns
-    /// A new `RunnableWithFallbacks` instance
-    fn with_fallbacks(
-        self,
-        fallbacks: Vec<DynRunnable<Self::Input, Self::Output>>,
-    ) -> RunnableWithFallbacks<Self::Input, Self::Output>
-    where
-        Self: Sized + Send + Sync + 'static,
-    {
-        RunnableWithFallbacks::new(self, fallbacks)
-    }
-}
-
-// Implement the extension trait for all Runnables
-impl<R: Runnable> RunnableWithFallbacksExt for R {}
-
 #[cfg(test)]
 mod tests {
     use super::*;

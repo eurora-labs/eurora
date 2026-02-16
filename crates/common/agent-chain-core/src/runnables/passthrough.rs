@@ -649,6 +649,12 @@ impl Debug for RunnablePick {
     }
 }
 
+impl From<PickKeys> for RunnablePick {
+    fn from(keys: PickKeys) -> Self {
+        Self { keys, name: None }
+    }
+}
+
 impl RunnablePick {
     /// Create a new RunnablePick that picks a single key.
     pub fn new_single(key: impl Into<String>) -> Self {
