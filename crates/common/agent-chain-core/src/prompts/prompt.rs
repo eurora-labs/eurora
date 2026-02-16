@@ -596,3 +596,31 @@ mod tests {
         assert_eq!(repr, "Hello, {name}!");
     }
 }
+
+// --- Serializable impl ---
+
+use crate::load::Serializable;
+use serde_json::Value;
+
+impl Serializable for PromptTemplate {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "prompts".to_string(),
+            "prompt".to_string(),
+        ]
+    }
+
+    fn lc_attributes(&self) -> HashMap<String, Value> {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "template_format".to_string(),
+            Value::String(self.template_format.as_str().to_string()),
+        );
+        attrs
+    }
+}

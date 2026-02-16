@@ -657,3 +657,21 @@ pub fn default_tool_chunk_parser(raw_tool_calls: &[serde_json::Value]) -> Vec<To
 
     chunks
 }
+
+// --- Serializable impls ---
+
+use crate::load::Serializable;
+
+impl Serializable for ToolMessage {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "schema".to_string(),
+            "messages".to_string(),
+        ]
+    }
+}
