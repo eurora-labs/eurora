@@ -16,7 +16,6 @@ use crate::load::{Serializable, Serialized, SerializedConstructorData};
 
 use super::base::{DynRunnable, Runnable, RunnableLambda, RunnableSerializable};
 use super::config::{RunnableConfig, ensure_config, get_callback_manager_for_config, patch_config};
-use super::utils::{ConfigurableFieldSpec, get_unique_config_specs};
 
 /// A `Runnable` that selects which branch to run based on a condition.
 ///
@@ -121,17 +120,6 @@ where
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
-    }
-
-    /// Get the configurable field specs from all contained runnables.
-    pub fn config_specs(&self) -> std::result::Result<Vec<ConfigurableFieldSpec>, String> {
-        let specs = self
-            .branches
-            .iter()
-            .flat_map(|(_condition, _runnable)| Vec::<ConfigurableFieldSpec>::new())
-            .collect::<Vec<_>>();
-
-        get_unique_config_specs(specs)
     }
 }
 
