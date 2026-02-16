@@ -7,7 +7,12 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+use async_trait::async_trait;
+
 use crate::error::{Error, Result};
+use crate::prompt_values::StringPromptValue;
+use crate::runnables::base::Runnable;
+use crate::runnables::config::{RunnableConfig, ensure_config};
 
 use super::base::{BasePromptTemplate, FormatOutputType};
 use super::string::{PromptTemplateFormat, format_template, get_template_variables};
@@ -205,6 +210,31 @@ impl BasePromptTemplate for ImagePromptTemplate {
             "input_variables": self.input_variables,
             "template_format": self.template_format,
         })
+    }
+}
+
+#[async_trait]
+impl Runnable for ImagePromptTemplate {
+    type Input = HashMap<String, String>;
+    type Output = StringPromptValue;
+
+    fn name(&self) -> Option<String> {
+        Some("ImagePromptTemplate".to_string())
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let _config = ensure_config(config);
+        BasePromptTemplate::validate_input(self, &input)?;
+        let text = BasePromptTemplate::format(self, &input)?;
+        Ok(StringPromptValue::new(text))
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        self.invoke(input, config)
     }
 }
 

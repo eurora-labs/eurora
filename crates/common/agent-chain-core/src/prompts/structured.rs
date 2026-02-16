@@ -9,14 +9,18 @@ use std::collections::HashMap;
 
 use serde_json::Value;
 
+use async_trait::async_trait;
+
 use crate::api::{BetaParams, warn_beta};
 use crate::error::{Error, Result};
 use crate::messages::BaseMessage;
+use crate::prompt_values::{ChatPromptValue, PromptValue};
+use crate::runnables::base::Runnable;
+use crate::runnables::config::{RunnableConfig, ensure_config};
 
 use super::base::BasePromptTemplate;
 use super::chat::{BaseChatPromptTemplate, ChatPromptTemplate, MessageLikeRepresentation};
 use super::string::PromptTemplateFormat;
-use crate::prompt_values::PromptValue;
 
 /// Structured prompt template for a language model.
 ///
@@ -173,6 +177,31 @@ impl BaseChatPromptTemplate for StructuredPrompt {
 
     fn pretty_repr(&self, html: bool) -> String {
         self.chat_template.pretty_repr(html)
+    }
+}
+
+#[async_trait]
+impl Runnable for StructuredPrompt {
+    type Input = HashMap<String, String>;
+    type Output = ChatPromptValue;
+
+    fn name(&self) -> Option<String> {
+        Some("StructuredPrompt".to_string())
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let _config = ensure_config(config);
+        BasePromptTemplate::validate_input(self, &input)?;
+        let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
+        Ok(ChatPromptValue::new(messages))
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        self.invoke(input, config)
     }
 }
 

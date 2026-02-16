@@ -6,7 +6,12 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use async_trait::async_trait;
+
 use crate::error::{Error, Result};
+use crate::prompt_values::StringPromptValue;
+use crate::runnables::base::Runnable;
+use crate::runnables::config::{RunnableConfig, ensure_config};
 
 use super::base::{BasePromptTemplate, FormatOutputType};
 use super::few_shot::ExampleSelectorClone;
@@ -350,6 +355,31 @@ impl BasePromptTemplate for FewShotPromptWithTemplates {
         Err(Error::InvalidConfig(
             "Saving few-shot prompts with templates is not currently supported".to_string(),
         ))
+    }
+}
+
+#[async_trait]
+impl Runnable for FewShotPromptWithTemplates {
+    type Input = HashMap<String, String>;
+    type Output = StringPromptValue;
+
+    fn name(&self) -> Option<String> {
+        Some("FewShotPromptWithTemplates".to_string())
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let _config = ensure_config(config);
+        BasePromptTemplate::validate_input(self, &input)?;
+        let text = BasePromptTemplate::format(self, &input)?;
+        Ok(StringPromptValue::new(text))
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        self.invoke(input, config)
     }
 }
 
