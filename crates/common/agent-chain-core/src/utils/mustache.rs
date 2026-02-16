@@ -192,7 +192,7 @@ fn tokenize(template: &str, l_del: &str, r_del: &str) -> Result<Vec<Token>, Must
                     return Err(MustacheError::EmptyTag { line: current_line });
                 }
 
-                let first_char = tag.chars().next().unwrap();
+                let first_char = tag.chars().next().expect("checked non-empty above");
                 let (token_type, key) = match first_char {
                     '!' => (TokenType::Comment, tag[1..].trim().to_string()),
                     '#' => {

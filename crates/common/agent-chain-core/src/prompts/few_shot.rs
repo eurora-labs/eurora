@@ -79,6 +79,7 @@ impl std::fmt::Debug for Box<dyn ExampleSelectorClone + Send + Sync> {
 
 /// A simple example selector that always returns the same examples.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct StaticExampleSelector {
     examples: Vec<HashMap<String, String>>,
 }
@@ -566,8 +567,7 @@ impl BaseMessagePromptTemplate for FewShotChatMessagePromptTemplate {
     }
 
     fn pretty_repr(&self, _html: bool) -> String {
-        // Python raises NotImplementedError
-        panic!("pretty_repr is not implemented for FewShotChatMessagePromptTemplate")
+        "FewShotChatMessagePromptTemplate(pretty_repr not implemented)".to_string()
     }
 }
 
@@ -605,7 +605,7 @@ impl BaseChatPromptTemplate for FewShotChatMessagePromptTemplate {
     }
 
     fn pretty_repr(&self, _html: bool) -> String {
-        panic!("pretty_repr is not implemented for FewShotChatMessagePromptTemplate")
+        "FewShotChatMessagePromptTemplate(pretty_repr not implemented)".to_string()
     }
 }
 

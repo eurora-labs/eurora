@@ -104,34 +104,34 @@ pub fn convert_to_standard_blocks_with_message_context(
                 }
             }
 
-            if let Some(args_val) = &args {
-                if args_val.is_object() {
-                    let tool_type = executed_tool
-                        .get("type")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("");
-                    let tool_name = executed_tool
-                        .get("name")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("");
+            if let Some(args_val) = &args
+                && args_val.is_object()
+            {
+                let tool_type = executed_tool
+                    .get("type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let tool_name = executed_tool
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
 
-                    let name = if tool_type == "search" {
-                        "web_search"
-                    } else if tool_type == "python"
-                        || (tool_type == "function" && tool_name == "python")
-                    {
-                        "code_interpreter"
-                    } else {
-                        ""
-                    };
+                let name = if tool_type == "search" {
+                    "web_search"
+                } else if tool_type == "python"
+                    || (tool_type == "function" && tool_name == "python")
+                {
+                    "code_interpreter"
+                } else {
+                    ""
+                };
 
-                    content_blocks.push(json!({
-                        "type": "server_tool_call",
-                        "name": name,
-                        "id": idx.to_string(),
-                        "args": args_val,
-                    }));
-                }
+                content_blocks.push(json!({
+                    "type": "server_tool_call",
+                    "name": name,
+                    "id": idx.to_string(),
+                    "args": args_val,
+                }));
             }
 
             if let Some(tool_output) = executed_tool.get("output") {
@@ -156,13 +156,13 @@ pub fn convert_to_standard_blocks_with_message_context(
     // Add text content
     if content.is_empty() {
         // Content is a string, not blocks
-        if let Some(text) = text_content {
-            if !text.is_empty() {
-                content_blocks.push(json!({
-                    "type": "text",
-                    "text": text,
-                }));
-            }
+        if let Some(text) = text_content
+            && !text.is_empty()
+        {
+            content_blocks.push(json!({
+                "type": "text",
+                "text": text,
+            }));
         }
     } else {
         // Content is blocks — pass through text blocks
@@ -171,13 +171,13 @@ pub fn convert_to_standard_blocks_with_message_context(
                 if block_type == "text" {
                     content_blocks.push(block.clone());
                 }
-            } else if let Some(text) = block.as_str() {
-                if !text.is_empty() {
-                    content_blocks.push(json!({
-                        "type": "text",
-                        "text": text,
-                    }));
-                }
+            } else if let Some(text) = block.as_str()
+                && !text.is_empty()
+            {
+                content_blocks.push(json!({
+                    "type": "text",
+                    "text": text,
+                }));
             }
         }
     }

@@ -91,7 +91,7 @@ impl StructuredPrompt {
         );
 
         if schema.is_null()
-            || (schema.is_object() && schema.as_object().map_or(true, |o| o.is_empty()))
+            || (schema.is_object() && schema.as_object().is_none_or(|o| o.is_empty()))
         {
             return Err(Error::InvalidConfig(format!(
                 "Must pass in a non-empty structured output schema. Received: {}",

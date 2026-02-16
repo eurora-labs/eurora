@@ -71,7 +71,7 @@ pub trait Runnable: Send + Sync + Debug {
             .unwrap_or_else(|| short_type_name(self.type_name()));
 
         match suffix {
-            Some(s) if !name_.is_empty() && name_.chars().next().unwrap().is_uppercase() => {
+            Some(s) if name_.chars().next().is_some_and(|c| c.is_uppercase()) => {
                 format!("{}{}", name_, to_title_case(s))
             }
             Some(s) => format!("{}_{}", name_, s.to_lowercase()),
@@ -252,11 +252,16 @@ pub trait Runnable: Send + Sync + Debug {
             }
         }
 
-        if return_exceptions || first_exception.is_none() {
+        if return_exceptions {
             outputs
+        } else if let Some(idx) = first_exception {
+            vec![Err(outputs
+                .into_iter()
+                .nth(idx)
+                .expect("idx within bounds")
+                .unwrap_err())]
         } else {
-            let idx = first_exception.expect("checked above");
-            vec![Err(outputs.into_iter().nth(idx).unwrap().unwrap_err())]
+            outputs
         }
     }
 
@@ -396,8 +401,8 @@ pub trait Runnable: Send + Sync + Debug {
 
         // For single input, just invoke directly
         if inputs.len() == 1 {
-            let input = inputs.into_iter().next().unwrap();
-            let config = configs.into_iter().next().unwrap();
+            let input = inputs.into_iter().next().expect("checked len == 1");
+            let config = configs.into_iter().next().expect("checked len == 1");
             let result = self.invoke(input, Some(config));
             if return_exceptions {
                 return vec![result];
@@ -426,7 +431,7 @@ pub trait Runnable: Send + Sync + Debug {
 
                 let handle = scope.spawn(move || {
                     // TODO: when return_exceptions is true, catch panics and return them as errors
-                    let _ = return_exceptions;
+                    let _return_exceptions = return_exceptions;
                     let result = self.invoke(input, Some(config));
                     active.fetch_sub(1, Ordering::SeqCst);
                     (i, result)
@@ -440,7 +445,10 @@ pub trait Runnable: Send + Sync + Debug {
             }
         });
 
-        results.into_iter().map(|r| r.unwrap()).collect()
+        results
+            .into_iter()
+            .map(|r| r.expect("all results populated by thread::scope"))
+            .collect()
     }
 
     /// Transform multiple inputs into outputs asynchronously.
@@ -511,8 +519,8 @@ pub trait Runnable: Send + Sync + Debug {
         let configs = get_config_list(config, inputs.len());
 
         if inputs.len() == 1 {
-            let input = inputs.into_iter().next().unwrap();
-            let config = configs.into_iter().next().unwrap();
+            let input = inputs.into_iter().next().expect("checked len == 1");
+            let config = configs.into_iter().next().expect("checked len == 1");
             return vec![(0, self.invoke(input, Some(config)))];
         }
 
@@ -972,11 +980,12 @@ pub trait Runnable: Send + Sync + Debug {
                 }),
             );
 
-            let mut result = super::config::RunnableConfig::default();
-            result.callbacks = Some(Callbacks::Handlers(vec![
-                Arc::new(tracer) as Arc<dyn crate::callbacks::base::BaseCallbackHandler>
-            ]));
-            result
+            super::config::RunnableConfig {
+                callbacks: Some(Callbacks::Handlers(vec![
+                    Arc::new(tracer) as Arc<dyn crate::callbacks::base::BaseCallbackHandler>
+                ])),
+                ..Default::default()
+            }
         });
 
         RunnableBinding::with_config_factories(self, HashMap::new(), None, vec![factory])
@@ -1097,11 +1106,12 @@ pub trait Runnable: Send + Sync + Debug {
                 }),
             );
 
-            let mut result = super::config::RunnableConfig::default();
-            result.callbacks = Some(Callbacks::Handlers(vec![
-                Arc::new(tracer) as Arc<dyn crate::callbacks::base::BaseCallbackHandler>
-            ]));
-            result
+            super::config::RunnableConfig {
+                callbacks: Some(Callbacks::Handlers(vec![
+                    Arc::new(tracer) as Arc<dyn crate::callbacks::base::BaseCallbackHandler>
+                ])),
+                ..Default::default()
+            }
         });
 
         RunnableBinding::with_config_factories(self, HashMap::new(), None, vec![factory])
@@ -1611,7 +1621,6 @@ where
         Self: 'static,
     {
         if let Some(afunc) = &self.afunc {
-            let afunc = afunc;
             self.transform_stream_with_config(
                 input,
                 Box::new(move |input_stream, config| {
@@ -2251,7 +2260,7 @@ where
             None,
         );
 
-        for (_name, step) in &self.steps {
+        for step in self.steps.values() {
             let mut step_graph = step.get_graph(None)?;
             step_graph.trim_first_node();
             step_graph.trim_last_node();

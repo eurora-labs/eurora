@@ -3,6 +3,7 @@
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 
+use tracing::warn;
 use uuid::Uuid;
 
 use super::base::{
@@ -53,8 +54,12 @@ impl LLMManagerMixin for StreamingStdOutCallbackHandler {
         _chunk: Option<&serde_json::Value>,
     ) {
         if let Ok(mut w) = self.writer.lock() {
-            let _ = write!(w, "{}", token);
-            let _ = w.flush();
+            if let Err(e) = write!(w, "{}", token) {
+                warn!("StreamingStdOutCallbackHandler write error: {e}");
+            }
+            if let Err(e) = w.flush() {
+                warn!("StreamingStdOutCallbackHandler flush error: {e}");
+            }
         }
     }
 }

@@ -269,8 +269,9 @@ impl ConvertibleToOpenAI for Value {
             oai_function = Value::Object(result);
         }
         // Check for Amazon Bedrock Converse format tool (has 'toolSpec')
-        else if self.is_object() && self.get("toolSpec").is_some() {
-            let tool_spec = self.get("toolSpec").unwrap();
+        else if self.is_object()
+            && let Some(tool_spec) = self.get("toolSpec")
+        {
             let mut result = Map::new();
             result.insert(
                 "name".to_string(),

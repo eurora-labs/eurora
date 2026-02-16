@@ -23,10 +23,10 @@ pub fn convert_v0_multimodal_input_to_v1(
         .iter()
         .map(|block| {
             let block_type = block.get("type").and_then(|t| t.as_str());
-            if block_type == Some("non_standard") {
-                if let Some(Value::Object(inner)) = block.get("value") {
-                    return inner.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-                }
+            if block_type == Some("non_standard")
+                && let Some(Value::Object(inner)) = block.get("value")
+            {
+                return inner.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
             }
             block.clone()
         })
@@ -65,21 +65,20 @@ pub fn convert_v0_multimodal_input_to_v1(
 pub fn convert_legacy_v0_content_block_to_v1(
     block: &HashMap<String, Value>,
 ) -> HashMap<String, Value> {
-    let block_type = block.get("type").and_then(|t| t.as_str());
-    let source_type = block.get("source_type").and_then(|s| s.as_str());
-
-    if !matches!(block_type, Some("image" | "audio" | "file")) || source_type.is_none() {
-        return block.clone();
-    }
-
-    let block_type = block_type.unwrap();
-    let source_type = source_type.unwrap();
+    let block_type = match block.get("type").and_then(|t| t.as_str()) {
+        Some(t @ ("image" | "audio" | "file")) => t,
+        _ => return block.clone(),
+    };
+    let source_type = match block.get("source_type").and_then(|s| s.as_str()) {
+        Some(s) => s,
+        None => return block.clone(),
+    };
 
     let mut result = HashMap::new();
     result.insert("type".to_string(), Value::String(block_type.to_string()));
 
     match (block_type, source_type) {
-        (media_type, "url") if matches!(media_type, "image" | "audio" | "file") => {
+        ("image" | "audio" | "file", "url") => {
             let known_keys: &[&str] = &["mime_type", "type", "source_type", "url"];
             if let Some(url) = block.get("url") {
                 result.insert("url".to_string(), url.clone());
@@ -92,7 +91,7 @@ pub fn convert_legacy_v0_content_block_to_v1(
             }
             insert_extras(&mut result, block, known_keys);
         }
-        (media_type, "base64") if matches!(media_type, "image" | "audio" | "file") => {
+        ("image" | "audio" | "file", "base64") => {
             let known_keys: &[&str] = &["mime_type", "type", "source_type", "data"];
             if let Some(data) = block.get("data") {
                 result.insert("base64".to_string(), data.clone());
@@ -105,7 +104,7 @@ pub fn convert_legacy_v0_content_block_to_v1(
             }
             insert_extras(&mut result, block, known_keys);
         }
-        (media_type, "id") if matches!(media_type, "image" | "audio" | "file") => {
+        ("image" | "audio" | "file", "id") => {
             let known_keys: &[&str] = &["type", "source_type", "id"];
             if let Some(id) = block.get("id") {
                 result.insert("file_id".to_string(), id.clone());

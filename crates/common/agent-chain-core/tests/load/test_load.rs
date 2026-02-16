@@ -106,7 +106,10 @@ fn test_reviver_init_custom_namespaces() {
     });
     let result = reviver.revive(&test_langchain).unwrap();
     // AIMessage is in the constructor registry, so it may be instantiated as a Value
-    assert!(matches!(result, RevivedValue::Value(_) | RevivedValue::Constructor(_)));
+    assert!(matches!(
+        result,
+        RevivedValue::Value(_) | RevivedValue::Constructor(_)
+    ));
 
     // "tests" should be valid as a custom namespace
     let test_custom = json!({
@@ -1608,11 +1611,10 @@ fn test_round_trip_document() {
 fn test_round_trip_document_with_metadata() {
     use agent_chain_core::documents::Document;
 
-    let doc = Document::new("Test content").with_metadata(
-        HashMap::from([
-            ("source".to_string(), serde_json::Value::String("test.txt".to_string())),
-        ]),
-    );
+    let doc = Document::new("Test content").with_metadata(HashMap::from([(
+        "source".to_string(),
+        serde_json::Value::String("test.txt".to_string()),
+    )]));
 
     let serialized = dumpd(&doc).unwrap();
     let loaded = load(serialized, None).unwrap();
@@ -1634,7 +1636,9 @@ fn test_round_trip_document_with_metadata() {
 fn test_round_trip_human_message() {
     use agent_chain_core::messages::HumanMessage;
 
-    let msg = HumanMessage::builder().content("What is the meaning of life?").build();
+    let msg = HumanMessage::builder()
+        .content("What is the meaning of life?")
+        .build();
     let serialized = dumpd(&msg).unwrap();
     let loaded = load(serialized, None).unwrap();
 
@@ -1642,10 +1646,7 @@ fn test_round_trip_human_message() {
         loaded.get("content").and_then(|v| v.as_str()),
         Some("What is the meaning of life?")
     );
-    assert_eq!(
-        loaded.get("type").and_then(|v| v.as_str()),
-        Some("human")
-    );
+    assert_eq!(loaded.get("type").and_then(|v| v.as_str()), Some("human"));
 }
 
 #[test]
@@ -1656,21 +1657,17 @@ fn test_round_trip_ai_message() {
     let serialized = dumpd(&msg).unwrap();
     let loaded = load(serialized, None).unwrap();
 
-    assert_eq!(
-        loaded.get("content").and_then(|v| v.as_str()),
-        Some("42")
-    );
-    assert_eq!(
-        loaded.get("type").and_then(|v| v.as_str()),
-        Some("ai")
-    );
+    assert_eq!(loaded.get("content").and_then(|v| v.as_str()), Some("42"));
+    assert_eq!(loaded.get("type").and_then(|v| v.as_str()), Some("ai"));
 }
 
 #[test]
 fn test_round_trip_system_message() {
     use agent_chain_core::messages::SystemMessage;
 
-    let msg = SystemMessage::builder().content("You are a helpful assistant.").build();
+    let msg = SystemMessage::builder()
+        .content("You are a helpful assistant.")
+        .build();
     let serialized = dumpd(&msg).unwrap();
     let loaded = load(serialized, None).unwrap();
 
@@ -1678,17 +1675,17 @@ fn test_round_trip_system_message() {
         loaded.get("content").and_then(|v| v.as_str()),
         Some("You are a helpful assistant.")
     );
-    assert_eq!(
-        loaded.get("type").and_then(|v| v.as_str()),
-        Some("system")
-    );
+    assert_eq!(loaded.get("type").and_then(|v| v.as_str()), Some("system"));
 }
 
 #[test]
 fn test_round_trip_tool_message() {
     use agent_chain_core::messages::ToolMessage;
 
-    let msg = ToolMessage::builder().content("result data").tool_call_id("call_123").build();
+    let msg = ToolMessage::builder()
+        .content("result data")
+        .tool_call_id("call_123")
+        .build();
     let serialized = dumpd(&msg).unwrap();
     let loaded = load(serialized, None).unwrap();
 
@@ -1721,11 +1718,7 @@ fn test_round_trip_prompt_template() {
     let input_vars = loaded
         .get("input_variables")
         .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str())
-                .collect::<Vec<_>>()
-        })
+        .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
         .unwrap_or_default();
     assert_eq!(input_vars, vec!["name"]);
 }
@@ -1785,8 +1778,6 @@ fn test_round_trip_unknown_type_falls_back_to_constructor_info() {
         Some("constructor")
     );
 }
-
-
 
 // ---------------------------------------------------------------------------
 // ChatPromptTemplate round-trip tests
@@ -1891,8 +1882,5 @@ fn test_round_trip_messages_placeholder() {
         loaded.get("variable_name").and_then(|v| v.as_str()),
         Some("history")
     );
-    assert_eq!(
-        loaded.get("optional").and_then(|v| v.as_bool()),
-        Some(true)
-    );
+    assert_eq!(loaded.get("optional").and_then(|v| v.as_bool()), Some(true));
 }

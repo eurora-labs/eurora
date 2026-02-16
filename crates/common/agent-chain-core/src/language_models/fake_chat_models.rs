@@ -740,20 +740,16 @@ impl BaseChatModel for GenericFakeChatModel {
                                 if let Some(fvalue_str) = fvalue.as_str() {
                                     // Break function call by `,` preserving the delimiter
                                     // Python: re.split(r"(,)", fvalue) -> ["a", ",", "b"]
-                                    let re_comma = Regex::new(r"(,)")
-                                        .map_err(|e| crate::error::Error::Other(format!("Regex error: {}", e)))?;
                                     let fvalue_parts: Vec<String> = {
                                         let mut parts = Vec::new();
-                                        let mut last = 0;
-                                        for m in re_comma.find_iter(fvalue_str) {
-                                            if m.start() > last {
-                                                parts.push(fvalue_str[last..m.start()].to_string());
+                                        let segments: Vec<&str> = fvalue_str.split(',').collect();
+                                        for (i, segment) in segments.iter().enumerate() {
+                                            if !segment.is_empty() {
+                                                parts.push(segment.to_string());
                                             }
-                                            parts.push(m.as_str().to_string());
-                                            last = m.end();
-                                        }
-                                        if last < fvalue_str.len() {
-                                            parts.push(fvalue_str[last..].to_string());
+                                            if i < segments.len() - 1 {
+                                                parts.push(",".to_string());
+                                            }
                                         }
                                         parts
                                     };

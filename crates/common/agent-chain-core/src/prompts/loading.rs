@@ -77,10 +77,10 @@ fn load_template(var_name: &str, config: &mut serde_json::Map<String, serde_json
 
         if let Some(path_str) = path_value.as_str() {
             let path = Path::new(path_str);
-            if path.extension().and_then(|e| e.to_str()) == Some("txt") {
-                if let Ok(content) = std::fs::read_to_string(path) {
-                    config.insert(var_name.to_string(), serde_json::Value::String(content));
-                }
+            if path.extension().and_then(|e| e.to_str()) == Some("txt")
+                && let Ok(content) = std::fs::read_to_string(path)
+            {
+                config.insert(var_name.to_string(), serde_json::Value::String(content));
             }
         }
     }
@@ -300,14 +300,14 @@ pub fn load_prompt_with_encoding(
 ) -> Result<Box<dyn BasePromptTemplate>> {
     let path = path.as_ref();
 
-    if let Some(path_str) = path.to_str() {
-        if path_str.starts_with("lc://") {
-            return Err(Error::Other(
-                "Loading from the deprecated github-based Hub is no longer supported. \
+    if let Some(path_str) = path.to_str()
+        && path_str.starts_with("lc://")
+    {
+        return Err(Error::Other(
+            "Loading from the deprecated github-based Hub is no longer supported. \
                  Please use the new LangChain Hub at https://smith.langchain.com/hub instead."
-                    .to_string(),
-            ));
-        }
+                .to_string(),
+        ));
     }
 
     load_prompt_from_file(path)

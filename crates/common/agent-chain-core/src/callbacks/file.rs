@@ -9,6 +9,7 @@ use std::io::{self, BufWriter, Write};
 use std::path::Path;
 use std::sync::Mutex;
 
+use tracing::warn;
 use uuid::Uuid;
 
 use super::base::{
@@ -132,8 +133,10 @@ impl FileCallbackHandler {
     /// This method is safe to call multiple times and will only close
     /// the file if it's currently open.
     pub fn close(&self) {
-        if let Some(mut writer) = self.file.lock().unwrap().take() {
-            let _ = writer.flush();
+        if let Some(mut writer) = self.file.lock().expect("file lock poisoned").take()
+            && let Err(e) = writer.flush()
+        {
+            warn!("FileCallbackHandler close flush error: {e}");
         }
     }
 
@@ -144,15 +147,19 @@ impl FileCallbackHandler {
     /// * `text` - The text to write to the file.
     /// * `end` - String appended after the text.
     fn write(&self, text: &str, end: &str) {
-        if let Some(ref mut writer) = *self.file.lock().unwrap() {
-            let _ = write!(writer, "{}{}", text, end);
-            let _ = writer.flush();
+        if let Some(ref mut writer) = *self.file.lock().expect("file lock poisoned") {
+            if let Err(e) = write!(writer, "{}{}", text, end) {
+                warn!("FileCallbackHandler write error: {e}");
+            }
+            if let Err(e) = writer.flush() {
+                warn!("FileCallbackHandler flush error: {e}");
+            }
         }
     }
 
     /// Flush the writer.
     pub fn flush(&self) -> io::Result<()> {
-        if let Some(ref mut writer) = *self.file.lock().unwrap() {
+        if let Some(ref mut writer) = *self.file.lock().expect("file lock poisoned") {
             writer.flush()
         } else {
             Ok(())
@@ -162,8 +169,10 @@ impl FileCallbackHandler {
 
 impl Drop for FileCallbackHandler {
     fn drop(&mut self) {
-        if let Some(mut writer) = self.file.lock().unwrap().take() {
-            let _ = writer.flush();
+        if let Some(mut writer) = self.file.lock().expect("file lock poisoned").take()
+            && let Err(e) = writer.flush()
+        {
+            eprintln!("FileCallbackHandler drop flush error: {e}");
         }
     }
 }

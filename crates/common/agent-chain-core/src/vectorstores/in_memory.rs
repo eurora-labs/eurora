@@ -154,14 +154,14 @@ impl InMemoryVectorStore {
         vectors: Vec<Vec<f32>>,
         ids: Option<Vec<String>>,
     ) -> Result<Vec<String>> {
-        if let Some(ref ids) = ids {
-            if ids.len() != documents.len() {
-                return Err(crate::Error::Other(format!(
-                    "ids must be the same length as documents. Got {} ids and {} documents.",
-                    ids.len(),
-                    documents.len()
-                )));
-            }
+        if let Some(ref ids) = ids
+            && ids.len() != documents.len()
+        {
+            return Err(crate::Error::Other(format!(
+                "ids must be the same length as documents. Got {} ids and {} documents.",
+                ids.len(),
+                documents.len()
+            )));
         }
 
         let mut id_iter: Box<dyn Iterator<Item = Option<String>>> = if let Some(ids) = ids {

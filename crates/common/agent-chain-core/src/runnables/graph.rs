@@ -82,17 +82,17 @@ pub enum NodeData {
 /// If the node ID is not a UUID or data is None, returns the ID.
 /// For Runnables, strips the "Runnable" prefix if present.
 pub fn node_data_str(id: &str, data: Option<&NodeData>) -> String {
-    if !is_uuid(id) || data.is_none() {
-        return id.to_string();
-    }
-    let data_str = match data.unwrap() {
+    let data = match data {
+        Some(d) if is_uuid(id) => d,
+        _ => return id.to_string(),
+    };
+    let data_str = match data {
         NodeData::Schema { name } => name.clone(),
         NodeData::Runnable { name } => name.clone(),
     };
-    if data_str.starts_with("Runnable") {
-        data_str[8..].to_string()
-    } else {
-        data_str
+    match data_str.strip_prefix("Runnable") {
+        Some(stripped) => stripped.to_string(),
+        None => data_str,
     }
 }
 
@@ -130,10 +130,10 @@ pub fn node_data_json(node: &Node) -> Value {
         }
     }
 
-    if let Some(ref metadata) = node.metadata {
-        if let Ok(meta_val) = serde_json::to_value(metadata) {
-            json.insert("metadata".to_string(), meta_val);
-        }
+    if let Some(ref metadata) = node.metadata
+        && let Ok(meta_val) = serde_json::to_value(metadata)
+    {
+        json.insert("metadata".to_string(), meta_val);
     }
 
     Value::Object(json)

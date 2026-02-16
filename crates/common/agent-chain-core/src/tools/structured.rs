@@ -208,7 +208,7 @@ impl StructuredTool {
                     // Use as single argument if schema has one field
                     let props = self.args_schema.properties();
                     if props.len() == 1 {
-                        let key = props.keys().next().unwrap().clone();
+                        let key = props.keys().next().expect("checked len == 1").clone();
                         let mut args = HashMap::new();
                         args.insert(key, Value::String(s));
                         Ok(args)

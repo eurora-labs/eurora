@@ -558,7 +558,8 @@ pub trait BaseLLM: BaseLanguageModel {
         );
 
         // Fire on_llm_start
-        let run_managers = callback_manager.on_llm_start(&params, &[prompt.clone()], run_id);
+        let run_managers =
+            callback_manager.on_llm_start(&params, std::slice::from_ref(&prompt), run_id);
         let run_manager = run_managers.into_iter().next();
 
         // Get the inner stream
@@ -593,14 +594,13 @@ pub trait BaseLLM: BaseLanguageModel {
             }
 
             // Fire on_llm_end with merged generation
-            if let Some(ref rm) = run_manager {
-                if let Some(merged) = crate::outputs::merge_generation_chunks(chunks) {
+            if let Some(ref rm) = run_manager
+                && let Some(merged) = crate::outputs::merge_generation_chunks(chunks) {
                     let generation: Generation = merged.into();
                     let result = LLMResult::new(vec![vec![GenerationType::Generation(generation)]]);
                     let chat_result = llm_result_to_chat_result(&result);
                     rm.on_llm_end(&chat_result);
                 }
-            }
         };
 
         Ok(Box::pin(chunk_stream))
@@ -660,7 +660,7 @@ pub trait BaseLLM: BaseLanguageModel {
 
         // Fire on_llm_start
         let run_managers = callback_manager
-            .on_llm_start(&params, &[prompt.clone()], run_id)
+            .on_llm_start(&params, std::slice::from_ref(&prompt), run_id)
             .await;
         let run_manager = run_managers.into_iter().next();
 
@@ -700,14 +700,13 @@ pub trait BaseLLM: BaseLanguageModel {
             }
 
             // Fire on_llm_end with merged generation
-            if let Some(ref rm) = run_manager {
-                if let Some(merged) = crate::outputs::merge_generation_chunks(chunks) {
+            if let Some(ref rm) = run_manager
+                && let Some(merged) = crate::outputs::merge_generation_chunks(chunks) {
                     let generation: Generation = merged.into();
                     let result = LLMResult::new(vec![vec![GenerationType::Generation(generation)]]);
                     let chat_result = llm_result_to_chat_result(&result);
                     rm.on_llm_end(&chat_result).await;
                 }
-            }
         };
 
         Ok(Box::pin(chunk_stream))
