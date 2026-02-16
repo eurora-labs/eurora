@@ -654,7 +654,11 @@ use std::sync::LazyLock;
 use crate::documents::Document;
 use crate::messages::{AIMessage, ChatMessage, HumanMessage, SystemMessage, ToolMessage};
 use crate::output_parsers::StrOutputParser;
-use crate::prompts::PromptTemplate;
+use crate::prompts::{
+    AIMessagePromptTemplate, ChatMessagePromptTemplate, ChatPromptTemplate,
+    HumanMessagePromptTemplate, MessagesPlaceholder, PromptTemplate,
+    SystemMessagePromptTemplate,
+};
 
 type ConstructorFn = fn(&Value) -> Result<Value>;
 
@@ -692,6 +696,12 @@ static CONSTRUCTOR_REGISTRY: LazyLock<HashMap<String, ConstructorFn>> = LazyLock
     register_constructor::<ChatMessage>(&mut registry);
     register_constructor::<Document>(&mut registry);
     register_constructor::<PromptTemplate>(&mut registry);
+    register_constructor::<ChatPromptTemplate>(&mut registry);
+    register_constructor::<MessagesPlaceholder>(&mut registry);
+    register_constructor::<HumanMessagePromptTemplate>(&mut registry);
+    register_constructor::<AIMessagePromptTemplate>(&mut registry);
+    register_constructor::<SystemMessagePromptTemplate>(&mut registry);
+    register_constructor::<ChatMessagePromptTemplate>(&mut registry);
     register_constructor::<StrOutputParser>(&mut registry);
     registry
 });

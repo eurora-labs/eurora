@@ -642,7 +642,7 @@ pub trait BaseChatPromptTemplate: BasePromptTemplate {
 /// A message in a chat prompt template.
 ///
 /// Internal enum dispatching to the concrete message template types.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ChatPromptMessage {
     /// A static message.
     Message(BaseMessage),
@@ -711,7 +711,7 @@ impl ChatPromptMessage {
 ///     ("human", "{user_input}").into(),
 /// ]).unwrap();
 /// ```
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ChatPromptTemplate {
     /// List of messages or message templates.
     pub messages: Vec<ChatPromptMessage>,
@@ -1306,5 +1306,103 @@ mod tests {
 
         assert_eq!(template.len(), 2);
         assert_eq!(template.input_variables(), &["question"]);
+    }
+}
+
+// --- Serializable impls ---
+
+use crate::load::Serializable;
+use serde_json::Value;
+
+impl Serializable for MessagesPlaceholder {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "prompts".to_string(),
+            "chat".to_string(),
+        ]
+    }
+}
+
+impl Serializable for HumanMessagePromptTemplate {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "prompts".to_string(),
+            "chat".to_string(),
+        ]
+    }
+}
+
+impl Serializable for AIMessagePromptTemplate {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "prompts".to_string(),
+            "chat".to_string(),
+        ]
+    }
+}
+
+impl Serializable for SystemMessagePromptTemplate {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "prompts".to_string(),
+            "chat".to_string(),
+        ]
+    }
+}
+
+impl Serializable for ChatMessagePromptTemplate {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "prompts".to_string(),
+            "chat".to_string(),
+        ]
+    }
+}
+
+impl Serializable for ChatPromptTemplate {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "prompts".to_string(),
+            "chat".to_string(),
+        ]
+    }
+
+    fn lc_attributes(&self) -> std::collections::HashMap<String, Value> {
+        let mut attrs = std::collections::HashMap::new();
+        attrs.insert(
+            "input_variables".to_string(),
+            serde_json::to_value(&self.input_variables).unwrap_or_default(),
+        );
+        attrs
     }
 }
