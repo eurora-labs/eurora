@@ -649,9 +649,14 @@ mod tests {
 
 use std::sync::LazyLock;
 
+use crate::agents::{AgentAction, AgentFinish};
 use crate::documents::Document;
-use crate::messages::{AIMessage, ChatMessage, HumanMessage, SystemMessage, ToolMessage};
+use crate::messages::{
+    AIMessage, AIMessageChunk, ChatMessage, ChatMessageChunk, HumanMessage, HumanMessageChunk,
+    SystemMessage, SystemMessageChunk, ToolMessage,
+};
 use crate::output_parsers::StrOutputParser;
+use crate::prompt_values::{ChatPromptValue, StringPromptValue};
 use crate::prompts::{
     AIMessagePromptTemplate, ChatMessagePromptTemplate, ChatPromptTemplate,
     HumanMessagePromptTemplate, MessagesPlaceholder, PromptTemplate, SystemMessagePromptTemplate,
@@ -700,6 +705,17 @@ static CONSTRUCTOR_REGISTRY: LazyLock<HashMap<String, ConstructorFn>> = LazyLock
     register_constructor::<SystemMessagePromptTemplate>(&mut registry);
     register_constructor::<ChatMessagePromptTemplate>(&mut registry);
     register_constructor::<StrOutputParser>(&mut registry);
+    // Message chunk variants
+    register_constructor::<AIMessageChunk>(&mut registry);
+    register_constructor::<HumanMessageChunk>(&mut registry);
+    register_constructor::<SystemMessageChunk>(&mut registry);
+    register_constructor::<ChatMessageChunk>(&mut registry);
+    // Prompt values
+    register_constructor::<StringPromptValue>(&mut registry);
+    register_constructor::<ChatPromptValue>(&mut registry);
+    // Agent types
+    register_constructor::<AgentAction>(&mut registry);
+    register_constructor::<AgentFinish>(&mut registry);
     registry
 });
 

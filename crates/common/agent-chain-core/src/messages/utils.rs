@@ -366,13 +366,25 @@ fn create_message_from_role(
                 .tool_calls(parsed_tool_calls)
                 .build(),
         )),
-        "system" | "developer" => Ok(BaseMessage::System(
+        "system" => Ok(BaseMessage::System(
             SystemMessage::builder()
                 .content(content)
                 .maybe_name(name.map(|n| n.to_string()))
                 .maybe_id(id.map(|i| i.to_string()))
                 .build(),
         )),
+        "developer" => {
+            let mut msg = SystemMessage::builder()
+                .content(content)
+                .maybe_name(name.map(|n| n.to_string()))
+                .maybe_id(id.map(|i| i.to_string()))
+                .build();
+            msg.additional_kwargs.insert(
+                "__openai_role__".to_string(),
+                serde_json::Value::String("developer".to_string()),
+            );
+            Ok(BaseMessage::System(msg))
+        }
         "function" => {
             let fn_name = name.ok_or("Function messages require a name")?;
             Ok(BaseMessage::Function(
@@ -758,7 +770,18 @@ fn get_message_openai_role(message: &BaseMessage) -> &'static str {
         BaseMessage::AI(_) => "assistant",
         BaseMessage::Human(_) => "user",
         BaseMessage::Tool(_) => "tool",
-        BaseMessage::System(_) => "system",
+        BaseMessage::System(msg) => {
+            if msg
+                .additional_kwargs
+                .get("__openai_role__")
+                .and_then(|v| v.as_str())
+                == Some("developer")
+            {
+                "developer"
+            } else {
+                "system"
+            }
+        }
         BaseMessage::Function(_) => "function",
         BaseMessage::Chat(c) => {
             // Return static strings for common roles, otherwise return a generic one
