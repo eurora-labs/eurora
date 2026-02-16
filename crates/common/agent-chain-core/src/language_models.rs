@@ -50,15 +50,17 @@ mod utils;
 // Re-export base types
 pub use base::{
     BaseLanguageModel, CustomGetTokenIds, LangSmithParams, LanguageModelConfig, LanguageModelInput,
-    LanguageModelOutput,
+    LanguageModelLike, LanguageModelOutput,
 };
 
 // Re-export chat model types
 pub use chat_models::{
     AIMessageChunkStream, BaseChatModel, ChatChunk, ChatGenerationStream, ChatModelConfig,
     ChatModelRunnable, ChatStream, DisableStreaming, GenerateConfig, SimpleChatModel,
-    StructuredOutputWithRaw, ToolChoice, ToolLike, agenerate_from_stream, collect_and_merge_stream,
-    extract_tool_name_from_schema, generate_from_stream,
+    StructuredOutputWithRaw, ToolChoice, ToolLike, agenerate_from_stream,
+    cleanup_llm_representation, collect_and_merge_stream, extract_tool_name_from_schema,
+    format_for_tracing, format_ls_structured_output, generate_from_stream,
+    generate_response_from_error,
 };
 
 // Re-export UsageMetadata from messages (where it's canonically defined)
@@ -66,8 +68,9 @@ pub use crate::messages::UsageMetadata;
 
 // Re-export LLM types
 pub use llms::{
-    BaseLLM, CacheValue, LLM, LLMConfig, LLMGenerateConfig, RunIdInput, create_base_retry,
-    get_prompts_from_cache, get_run_ids_list, resolve_cache, save_llm, update_cache,
+    BaseLLM, CacheValue, LLM, LLMConfig, LLMGenerateConfig, RunIdInput, aget_prompts_from_cache,
+    aupdate_cache, create_base_retry, get_prompts_from_cache, get_run_ids_list, resolve_cache,
+    save_llm, update_cache,
 };
 
 // Re-export fake implementations for testing

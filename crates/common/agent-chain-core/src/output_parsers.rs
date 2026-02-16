@@ -52,7 +52,8 @@ mod xml;
 
 // Re-export base types
 pub use base::{
-    BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser, OutputParserError, RunnableOutputParser,
+    BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser, OutputParserError,
+    RunnableOutputParser,
 };
 
 // Re-export format instructions

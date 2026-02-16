@@ -562,7 +562,11 @@ impl RunnableWithMessageHistory {
     /// 3. Build augmented input with history injected.
     /// 4. Call the inner runnable.
     /// 5. Exit history: save input + output messages.
-    pub fn invoke_with_history(&self, input: Value, config: Option<RunnableConfig>) -> Result<Value> {
+    pub fn invoke_with_history(
+        &self,
+        input: Value,
+        config: Option<RunnableConfig>,
+    ) -> Result<Value> {
         let config = config.unwrap_or_default();
         let (config, history) = self.merge_configs(config)?;
 
@@ -604,7 +608,11 @@ impl RunnableWithMessageHistory {
     ///
     /// TODO: Use async history methods once `BaseChatMessageHistory` has
     /// truly async variants accessible through `Arc<Mutex<..>>`.
-    pub async fn ainvoke_with_history(&self, input: Value, config: Option<RunnableConfig>) -> Result<Value> {
+    pub async fn ainvoke_with_history(
+        &self,
+        input: Value,
+        config: Option<RunnableConfig>,
+    ) -> Result<Value> {
         let config = config.unwrap_or_default();
         let (config, history) = self.merge_configs(config)?;
 
