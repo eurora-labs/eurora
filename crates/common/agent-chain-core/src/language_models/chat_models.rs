@@ -763,9 +763,10 @@ pub trait BaseChatModel: BaseLanguageModel {
         let mut results = Vec::new();
         for (i, message_list) in messages.iter().enumerate() {
             let run_manager = run_managers.get(i);
+            let normalized = super::utils::normalize_messages(message_list.clone());
 
             match self
-                ._generate_with_cache(message_list.clone(), stop.clone(), run_manager)
+                ._generate_with_cache(normalized, stop.clone(), run_manager)
                 .await
             {
                 Ok(result) => {
@@ -912,12 +913,12 @@ pub trait BaseChatModel: BaseLanguageModel {
             .iter()
             .enumerate()
             .map(|(i, message_list)| {
-                let message_list = message_list.clone();
+                let normalized = super::utils::normalize_messages(message_list.clone());
                 let stop = stop.clone();
                 let run_manager = run_managers.get(i);
                 async move {
                     let result = self
-                        ._agenerate_with_cache(message_list, stop, run_manager)
+                        ._agenerate_with_cache(normalized, stop, run_manager)
                         .await;
                     (i, result)
                 }
@@ -1051,7 +1052,17 @@ pub trait BaseChatModel: BaseLanguageModel {
             match stream_result {
                 Ok(stream) => {
                     // Collect stream and merge chunks
-                    let chat_result = agenerate_from_stream(stream).await?;
+                    let mut chat_result = agenerate_from_stream(stream).await?;
+                    // Apply output_version v1 to merged result
+                    if self.chat_config().output_version.as_deref() == Some("v1") {
+                        for generation in &mut chat_result.generations {
+                            if let BaseMessage::AI(ref ai_msg) = generation.message {
+                                let updated =
+                                    super::utils::update_message_content_to_blocks(ai_msg, "v1");
+                                generation.message = BaseMessage::AI(updated);
+                            }
+                        }
+                    }
                     return Ok(chat_result);
                 }
                 Err(Error::NotImplemented(_)) => {
@@ -1062,9 +1073,19 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
 
         // Non-streaming path
-        let result = self
+        let mut result = self
             ._generate(messages.clone(), stop.clone(), run_manager)
             .await?;
+
+        // Apply output_version v1 to non-streaming result
+        if self.chat_config().output_version.as_deref() == Some("v1") {
+            for generation in &mut result.generations {
+                if let BaseMessage::AI(ref ai_msg) = generation.message {
+                    let updated = super::utils::update_message_content_to_blocks(ai_msg, "v1");
+                    generation.message = BaseMessage::AI(updated);
+                }
+            }
+        }
 
         // Update cache with new result
         if let Some(ref cache) = resolved_cache {
@@ -1135,7 +1156,17 @@ pub trait BaseChatModel: BaseLanguageModel {
             match stream_result {
                 Ok(stream) => {
                     // Collect stream and merge chunks
-                    let chat_result = agenerate_from_stream(stream).await?;
+                    let mut chat_result = agenerate_from_stream(stream).await?;
+                    // Apply output_version v1 to merged result
+                    if self.chat_config().output_version.as_deref() == Some("v1") {
+                        for generation in &mut chat_result.generations {
+                            if let BaseMessage::AI(ref ai_msg) = generation.message {
+                                let updated =
+                                    super::utils::update_message_content_to_blocks(ai_msg, "v1");
+                                generation.message = BaseMessage::AI(updated);
+                            }
+                        }
+                    }
                     return Ok(chat_result);
                 }
                 Err(Error::NotImplemented(_)) => {
@@ -1146,9 +1177,19 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
 
         // Non-streaming path
-        let result = self
+        let mut result = self
             ._agenerate(messages.clone(), stop.clone(), run_manager)
             .await?;
+
+        // Apply output_version v1 to non-streaming result
+        if self.chat_config().output_version.as_deref() == Some("v1") {
+            for generation in &mut result.generations {
+                if let BaseMessage::AI(ref ai_msg) = generation.message {
+                    let updated = super::utils::update_message_content_to_blocks(ai_msg, "v1");
+                    generation.message = BaseMessage::AI(updated);
+                }
+            }
+        }
 
         // Update cache with new result
         if let Some(ref cache) = resolved_cache {
@@ -1429,8 +1470,13 @@ pub trait BaseChatModel: BaseLanguageModel {
             rate_limiter.acquire(true);
         }
 
+        // Normalize messages before streaming
+        let messages = super::utils::normalize_messages(messages);
+
         // Use the _stream method with callback run_manager
         let generation_stream = self._stream(messages, stop, run_manager.as_ref())?;
+
+        let output_version = self.chat_config().output_version.clone();
 
         let chunk_stream = async_stream::stream! {
             use futures::StreamExt;
@@ -1438,14 +1484,22 @@ pub trait BaseChatModel: BaseLanguageModel {
             let mut pinned_stream = generation_stream;
             let mut chunks: Vec<ChatGenerationChunk> = Vec::new();
             let mut yielded = false;
+            let mut block_index: i64 = -1;
+            let mut block_index_type = String::new();
 
             while let Some(result) = pinned_stream.next().await {
                 match result {
                     Ok(generation_chunk) => {
-                        let ai_chunk = match &generation_chunk.message {
+                        let mut ai_chunk = match &generation_chunk.message {
                             BaseMessage::AI(ai_msg) => AIMessageChunk::builder().content(ai_msg.content.clone()).build(),
                             other => AIMessageChunk::builder().content(other.text()).build(),
                         };
+
+                        // Apply output_version v1 processing
+                        if output_version.as_deref() == Some("v1") {
+                            ai_chunk = super::utils::update_chunk_content_to_blocks(&ai_chunk, "v1");
+                            apply_block_indices(&mut ai_chunk, &mut block_index, &mut block_index_type);
+                        }
 
                         // Fire on_llm_new_token callback
                         if let Some(ref rm) = run_manager {
@@ -1566,8 +1620,13 @@ pub trait BaseChatModel: BaseLanguageModel {
             rate_limiter.aacquire(true).await;
         }
 
+        // Normalize messages before streaming
+        let messages = super::utils::normalize_messages(messages);
+
         // Use the _astream method with callback run_manager
         let generation_stream = self._astream(messages, stop, run_manager.as_ref()).await?;
+
+        let output_version = self.chat_config().output_version.clone();
 
         let chunk_stream = async_stream::stream! {
             use futures::StreamExt;
@@ -1575,14 +1634,22 @@ pub trait BaseChatModel: BaseLanguageModel {
             let mut pinned_stream = generation_stream;
             let mut chunks: Vec<ChatGenerationChunk> = Vec::new();
             let mut yielded = false;
+            let mut block_index: i64 = -1;
+            let mut block_index_type = String::new();
 
             while let Some(result) = pinned_stream.next().await {
                 match result {
                     Ok(generation_chunk) => {
-                        let ai_chunk = match &generation_chunk.message {
+                        let mut ai_chunk = match &generation_chunk.message {
                             BaseMessage::AI(ai_msg) => AIMessageChunk::builder().content(ai_msg.content.clone()).build(),
                             other => AIMessageChunk::builder().content(other.text()).build(),
                         };
+
+                        // Apply output_version v1 processing
+                        if output_version.as_deref() == Some("v1") {
+                            ai_chunk = super::utils::update_chunk_content_to_blocks(&ai_chunk, "v1");
+                            apply_block_indices(&mut ai_chunk, &mut block_index, &mut block_index_type);
+                        }
 
                         // Fire on_llm_new_token callback
                         if let Some(ref rm) = run_manager {
@@ -1929,6 +1996,45 @@ pub async fn collect_and_merge_stream(
     }
 
     Ok(crate::outputs::merge_chat_generation_chunks(chunks))
+}
+
+/// Apply sequential block indices to content blocks in an AIMessageChunk.
+///
+/// This tracks block type changes across streaming chunks and assigns
+/// incrementing `index` values when the block type changes.
+/// Mirrors Python's index tracking in `stream()` and `astream()`.
+fn apply_block_indices(
+    chunk: &mut AIMessageChunk,
+    block_index: &mut i64,
+    block_index_type: &mut String,
+) {
+    let content_str = match &chunk.content {
+        crate::messages::content::MessageContent::Text(s) => s.clone(),
+        crate::messages::content::MessageContent::Parts(_) => return,
+    };
+
+    if let Ok(mut blocks) = serde_json::from_str::<Vec<Value>>(&content_str) {
+        let mut changed = false;
+        for block in &mut blocks {
+            if let Some(block_type) = block.get("type").and_then(|t| t.as_str()) {
+                if block_type != block_index_type.as_str() {
+                    *block_index_type = block_type.to_string();
+                    *block_index += 1;
+                }
+                if block.get("index").is_none() {
+                    block.as_object_mut().map(|obj| {
+                        obj.insert("index".to_string(), Value::Number((*block_index).into()))
+                    });
+                    changed = true;
+                }
+            }
+        }
+        if changed {
+            if let Ok(new_content) = serde_json::to_string(&blocks) {
+                chunk.content = crate::messages::content::MessageContent::Text(new_content);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
