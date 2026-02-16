@@ -524,22 +524,26 @@ where
 /// # Returns
 ///
 /// A JSON schema representation of the input schema.
-pub fn convert_to_json_schema<T>(schema: &T, strict: Option<bool>) -> Value
+pub fn convert_to_json_schema<T>(schema: &T, strict: Option<bool>) -> crate::Result<Value>
 where
     T: ConvertibleToOpenAITool + ?Sized,
 {
     let openai_tool = convert_to_openai_tool(schema, strict);
 
     // Validate and extract function
-    let function = openai_tool
-        .get("function")
-        .expect("Input must be a valid OpenAI-format tool");
+    let function = openai_tool.get("function").ok_or_else(|| {
+        crate::Error::InvalidConfig("Input must be a valid OpenAI-format tool".to_string())
+    })?;
 
     let name = function
         .get("name")
-        .expect("Input must be a valid OpenAI-format tool with name")
+        .ok_or_else(|| {
+            crate::Error::InvalidConfig(
+                "Input must be a valid OpenAI-format tool with name".to_string(),
+            )
+        })?
         .as_str()
-        .expect("Name must be a string");
+        .ok_or_else(|| crate::Error::InvalidConfig("Tool name must be a string".to_string()))?;
 
     let mut json_schema = Map::new();
     json_schema.insert("title".to_string(), Value::String(name.to_string()));
@@ -556,7 +560,7 @@ where
         }
     }
 
-    Value::Object(json_schema)
+    Ok(Value::Object(json_schema))
 }
 
 /// Convert an example into a list of messages that can be fed into an LLM.

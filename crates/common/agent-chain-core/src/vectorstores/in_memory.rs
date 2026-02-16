@@ -1,6 +1,8 @@
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::RwLock;
 
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -11,7 +13,7 @@ use crate::vectorstores::base::{VectorStore, VectorStoreFactory};
 use crate::vectorstores::utils::{cosine_similarity, maximal_marginal_relevance};
 
 /// Entry stored in the in-memory vector store.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct StoreEntry {
     id: String,
     vector: Vec<f32>,
@@ -52,6 +54,36 @@ impl InMemoryVectorStore {
     pub fn is_empty(&self) -> Result<bool> {
         let store = self.lock_read()?;
         Ok(store.is_empty())
+    }
+
+    /// Dump the vector store to a JSON file.
+    ///
+    /// Mirrors Python's `InMemoryVectorStore.dump()`.
+    pub fn dump(&self, path: &Path) -> Result<()> {
+        let store = self.lock_read()?;
+
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let file = std::fs::File::create(path)?;
+        let writer = std::io::BufWriter::new(file);
+        serde_json::to_writer_pretty(writer, &*store)?;
+        Ok(())
+    }
+
+    /// Load a vector store from a JSON file.
+    ///
+    /// Mirrors Python's `InMemoryVectorStore.load()`.
+    pub fn load(path: &Path, embedding: Box<dyn Embeddings>) -> Result<Self> {
+        let file = std::fs::File::open(path)?;
+        let reader = std::io::BufReader::new(file);
+        let store: HashMap<String, StoreEntry> = serde_json::from_reader(reader)?;
+
+        Ok(Self {
+            store: RwLock::new(store),
+            embedding,
+        })
     }
     fn lock_read(&self) -> Result<std::sync::RwLockReadGuard<'_, HashMap<String, StoreEntry>>> {
         self.store
@@ -412,6 +444,47 @@ mod tests {
             .max_marginal_relevance_search("apple", 2, 3, 0.5, None)
             .unwrap();
         assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn test_dump_and_load() {
+        let store = make_store();
+        let docs = vec![
+            Document::new("hello world").with_id("1"),
+            Document::new("goodbye world").with_id("2"),
+        ];
+        store.add_documents(docs, None).unwrap();
+
+        let temp_dir = std::env::temp_dir().join("agent_chain_test_vectorstore");
+        let path = temp_dir.join("test_store.json");
+
+        // Dump
+        store.dump(&path).unwrap();
+        assert!(path.exists());
+
+        // Load
+        let loaded_store =
+            InMemoryVectorStore::load(&path, Box::new(DeterministicFakeEmbedding::new(10)))
+                .unwrap();
+        let loaded_docs = loaded_store
+            .get_by_ids(&["1".to_string(), "2".to_string()])
+            .unwrap();
+        assert_eq!(loaded_docs.len(), 2);
+
+        let doc1 = loaded_docs
+            .iter()
+            .find(|d| d.id.as_deref() == Some("1"))
+            .unwrap();
+        assert_eq!(doc1.page_content, "hello world");
+
+        let doc2 = loaded_docs
+            .iter()
+            .find(|d| d.id.as_deref() == Some("2"))
+            .unwrap();
+        assert_eq!(doc2.page_content, "goodbye world");
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]

@@ -80,7 +80,10 @@ impl DocumentIndex for InMemoryDocumentIndex {
                 doc.id = Some(id.clone());
                 (id, doc)
             } else {
-                let id = item.id.clone().expect("checked above");
+                let id = match item.id.clone() {
+                    Some(id) => id,
+                    None => continue, // unreachable due to outer if
+                };
                 (id, item.clone())
             };
 

@@ -586,7 +586,9 @@ impl TracerCore for LogStreamCallbackHandler {
             None => {
                 // Check if this is the root run ending
                 if run.id == self.root_id.unwrap_or(Uuid::nil()) && self.auto_close {
-                    let _ = self.send_stream.close();
+                    if let Err(error) = self.send_stream.close() {
+                        tracing::warn!("Failed to close log stream: {}", error);
+                    }
                 }
                 return;
             }
@@ -620,7 +622,9 @@ impl TracerCore for LogStreamCallbackHandler {
         self.send(ops);
 
         if run.id == self.root_id.unwrap_or(Uuid::nil()) && self.auto_close {
-            let _ = self.send_stream.close();
+            if let Err(error) = self.send_stream.close() {
+                tracing::warn!("Failed to close log stream: {}", error);
+            }
         }
     }
 
@@ -688,10 +692,12 @@ impl<T: Send + 'static> StreamingCallbackHandler<T> for LogStreamCallbackHandler
                     // Note: We can't easily serialize generic T here
                     // This would need a more sophisticated implementation
                     // for real-world use with proper chunk serialization
-                    let _ = sender.send(RunLogPatch::new(vec![JsonPatchOp::add(
+                    if let Err(error) = sender.send(RunLogPatch::new(vec![JsonPatchOp::add(
                         format!("/logs/{}/streamed_output/-", k),
                         Value::Null, // Placeholder - real implementation would serialize the chunk
-                    )]));
+                    )])) {
+                        tracing::warn!("Failed to send log stream patch: {}", error);
+                    }
                 }
 
                 Some((item, (stream, run_id, root_id, key, sender)))
@@ -736,12 +742,15 @@ impl<T> Iterator for TappedIterator<T> {
         if self.run_id != self.root_id.unwrap_or(Uuid::nil())
             && let Some(ref k) = self.key
         {
-            let _ = self
+            if let Err(error) = self
                 .send_stream
                 .send(RunLogPatch::new(vec![JsonPatchOp::add(
                     format!("/logs/{}/streamed_output/-", k),
                     Value::Null, // Placeholder
-                )]));
+                )]))
+            {
+                tracing::warn!("Failed to send log stream patch: {}", error);
+            }
         }
 
         Some(item)

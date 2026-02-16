@@ -129,25 +129,21 @@ impl InMemoryRecordManager {
 
     /// Set a fixed time for testing purposes. Pass `None` to restore real time.
     pub fn set_time_override(&self, time: Option<f64>) {
-        let mut override_guard = self
-            .time_override
-            .write()
-            .expect("time_override lock poisoned");
-        *override_guard = time;
+        match self.time_override.write() {
+            Ok(mut override_guard) => *override_guard = time,
+            Err(error) => tracing::error!("time_override lock poisoned: {}", error),
+        }
     }
 
     fn current_time(&self) -> f64 {
-        let override_guard = self
-            .time_override
-            .read()
-            .expect("time_override lock poisoned");
-        if let Some(t) = *override_guard {
-            return t;
+        if let Ok(override_guard) = self.time_override.read() {
+            if let Some(t) = *override_guard {
+                return t;
+            }
         }
-        drop(override_guard);
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .expect("system time before UNIX epoch")
+            .unwrap_or_default()
             .as_secs_f64()
     }
 }
