@@ -61,7 +61,7 @@ pub trait Runnable: Send + Sync + Debug {
         let name_ = name
             .map(|s| s.to_string())
             .or_else(|| self.name())
-            .unwrap_or_else(|| self.type_name().to_string());
+            .unwrap_or_else(|| short_type_name(self.type_name()));
 
         match suffix {
             Some(s) if !name_.is_empty() && name_.chars().next().unwrap().is_uppercase() => {
@@ -643,6 +643,85 @@ pub trait Runnable: Send + Sync + Debug {
         )
     }
 
+
+    /// Generate a stream of log patches.
+    ///
+    /// Use to create a stream of `RunLogPatch` that provide real-time
+    /// information about the progress of the Runnable.
+    ///
+    /// Mirrors Python's `Runnable.astream_log()`.
+    fn astream_log<'a>(
+        &'a self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+        diff: bool,
+        with_streamed_output_list: bool,
+        include_names: Option<Vec<String>>,
+        include_types: Option<Vec<String>>,
+        include_tags: Option<Vec<String>>,
+        exclude_names: Option<Vec<String>>,
+        exclude_types: Option<Vec<String>>,
+        exclude_tags: Option<Vec<String>>,
+    ) -> BoxStream<'a, crate::tracers::log_stream::RunLogPatch>
+    where
+        Self: 'static,
+        Self::Output: serde::Serialize,
+        Self: Sized,
+    {
+        crate::tracers::log_stream::astream_log_implementation(
+            self,
+            input,
+            config,
+            diff,
+            with_streamed_output_list,
+            include_names,
+            include_types,
+            include_tags,
+            exclude_names,
+            exclude_types,
+            exclude_tags,
+        )
+    }
+
+    /// Return a graph representation of this Runnable.
+    ///
+    /// The default implementation creates a simple 3-node graph:
+    /// Input → Runnable → Output.
+    ///
+    /// Mirrors Python's `Runnable.get_graph()`.
+    fn get_graph(
+        &self,
+        config: Option<&RunnableConfig>,
+    ) -> Result<super::graph::Graph> {
+        let mut graph = super::graph::Graph::new();
+
+        let input_node = graph.add_node(
+            self.get_name(Some("Input"), None),
+            None,
+        );
+
+        let runnable_node = match config {
+            Some(c) if !c.metadata.is_empty() => {
+                graph.add_node_with_metadata(
+                    self.get_name(None, None),
+                    None,
+                    c.metadata.clone(),
+                )
+            }
+            _ => graph.add_node(self.get_name(None, None), None),
+        };
+
+        let output_node = graph.add_node(
+            self.get_name(Some("Output"), None),
+            None,
+        );
+
+        graph.add_edge(&input_node, &runnable_node, None, false);
+        graph.add_edge(&runnable_node, &output_node, None, false);
+
+        Ok(graph)
+    }
+
     /// Transform an input stream into an output stream.
     ///
     /// Default implementation buffers input and calls stream().
@@ -748,6 +827,18 @@ pub trait Runnable: Send + Sync + Debug {
 }
 
 /// Convert a string to title case.
+/// Extract a short type name from a fully qualified Rust type path.
+///
+/// Mirrors Python's behavior where `self.__class__.__name__` returns just
+/// the class name (e.g. "RunnableLambda") rather than the full module path.
+/// Strips module paths and generic parameters.
+fn short_type_name(full_name: &str) -> String {
+    // Strip generic parameters: take everything before first '<'
+    let base = full_name.split('<').next().unwrap_or(full_name);
+    // Take the last segment after "::"
+    base.rsplit("::").next().unwrap_or(base).to_string()
+}
+
 fn to_title_case(s: &str) -> String {
     let mut chars = s.chars();
     match chars.next() {
@@ -1390,6 +1481,35 @@ where
     {
         self.transform(input, config)
     }
+
+    fn get_graph(
+        &self,
+        config: Option<&RunnableConfig>,
+    ) -> Result<super::graph::Graph> {
+        let mut graph = super::graph::Graph::new();
+
+        // First step: keep its input node, trim its output node
+        let mut first_graph = self.first.get_graph(config)?;
+        first_graph.trim_last_node();
+        let (step_first, _) = graph.extend(first_graph, "");
+        if step_first.is_none() {
+            return Err(Error::other("RunnableSequence first step has no first node"));
+        }
+
+        // Last step: trim its input node, keep its output node
+        let mut last_graph = self.last.get_graph(config)?;
+        last_graph.trim_first_node();
+        let current_last = graph.last_node().cloned();
+        let (step_first, _) = graph.extend(last_graph, "");
+        let step_first = step_first.ok_or_else(|| {
+            Error::other("RunnableSequence last step has no first node")
+        })?;
+        if let Some(last) = current_last {
+            graph.add_edge(&last, &step_first, None, false);
+        }
+
+        Ok(graph)
+    }
 }
 
 /// Create a RunnableSequence by piping two Runnables together.
@@ -1707,6 +1827,44 @@ where
             }
         })
     }
+
+    fn get_graph(
+        &self,
+        _config: Option<&RunnableConfig>,
+    ) -> Result<super::graph::Graph> {
+        let mut graph = super::graph::Graph::new();
+
+        let input_node = graph.add_node(
+            self.get_name(Some("Input"), None),
+            None,
+        );
+        let output_node = graph.add_node(
+            self.get_name(Some("Output"), None),
+            None,
+        );
+
+        for (_name, step) in &self.steps {
+            let mut step_graph = step.get_graph(None)?;
+            step_graph.trim_first_node();
+            step_graph.trim_last_node();
+
+            if step_graph.nodes.is_empty() {
+                graph.add_edge(&input_node, &output_node, None, false);
+            } else {
+                let (first, last) = graph.extend(step_graph, "");
+                let first = first.ok_or_else(|| {
+                    Error::other("Parallel step has no first node")
+                })?;
+                let last = last.ok_or_else(|| {
+                    Error::other("Parallel step has no last node")
+                })?;
+                graph.add_edge(&input_node, &first, None, false);
+                graph.add_edge(&last, &output_node, None, false);
+            }
+        }
+
+        Ok(graph)
+    }
 }
 
 // =============================================================================
@@ -1798,6 +1956,13 @@ where
         config: Option<RunnableConfig>,
     ) -> BoxStream<'_, Result<Self::Output>> {
         self.bound.stream(input, Some(self.merge_configs(config)))
+    }
+
+    fn get_graph(
+        &self,
+        config: Option<&RunnableConfig>,
+    ) -> Result<super::graph::Graph> {
+        self.bound.get_graph(config)
     }
 }
 
