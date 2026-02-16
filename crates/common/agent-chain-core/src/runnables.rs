@@ -21,9 +21,10 @@ pub mod utils;
 
 // Re-export commonly used types
 pub use base::{
-    DynRunnable, Runnable, RunnableBinding, RunnableEach, RunnableGenerator, RunnableLambda,
-    RunnableLambdaWithConfig, RunnableParallel, RunnableSequence, RunnableSerializable,
-    TransformFn, coerce_to_runnable, pipe, runnable_lambda, to_dyn,
+    DynRunnable, GraphProvider, Runnable, RunnableBinding, RunnableEach, RunnableGenerator,
+    RunnableGraphProvider,
+    RunnableLambda, RunnableLambdaWithConfig, RunnableParallel, RunnableSequence,
+    RunnableSerializable, TransformFn, coerce_to_runnable, pipe, runnable_lambda, to_dyn,
 };
 pub use branch::{RunnableBranch, RunnableBranchBuilder};
 pub use config::{
@@ -42,7 +43,8 @@ pub use fallbacks::{
     ExceptionInserter, FallbackErrorPredicate, RunnableWithFallbacks, RunnableWithFallbacksExt,
 };
 pub use graph::{
-    CurveStyle, Edge, Graph, LabelsDict, MermaidDrawMethod, MermaidOptions, Node, NodeStyles,
+    CurveStyle, Edge, Graph, LabelsDict, MermaidDrawMethod, MermaidOptions, Node, NodeData,
+    NodeStyles, node_data_json, node_data_str,
 };
 pub use graph_mermaid::{generate_mermaid_graph_styles, to_safe_id};
 pub use graph_png::{PngDrawError, PngDrawer};
