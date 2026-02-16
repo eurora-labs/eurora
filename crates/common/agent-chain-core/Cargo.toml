@@ -17,6 +17,7 @@ futures = { workspace = true }
 rand = { workspace = true }
 rand_distr = { workspace = true }
 regex = { workspace = true }
+quick-xml = "0.37"
 reqwest = { version = "0.12", features = ["json", "stream"] }
 rust-sugiyama = "0.4"
 rustc_version_runtime = "0.3.0"
