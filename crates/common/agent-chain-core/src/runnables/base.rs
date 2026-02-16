@@ -24,7 +24,7 @@ use super::config::{
     get_async_callback_manager_for_config, get_callback_manager_for_config, get_config_list,
     merge_configs, patch_config, set_config_context,
 };
-use super::utils::Addable;
+use super::utils::{Addable, ConfigurableFieldSpec, get_unique_config_specs};
 
 /// Type alias for config factory functions used by `RunnableBinding`.
 ///
@@ -420,7 +420,6 @@ pub trait Runnable: Send + Sync + Debug {
             let mut handles = Vec::with_capacity(len);
 
             for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
-                // Simple concurrency limiting: wait until a slot is available
                 if let Some(max) = semaphore_like {
                     while active_count.load(Ordering::SeqCst) >= max {
                         std::thread::sleep(std::time::Duration::from_millis(1));
@@ -430,9 +429,25 @@ pub trait Runnable: Send + Sync + Debug {
                 active.fetch_add(1, Ordering::SeqCst);
 
                 let handle = scope.spawn(move || {
-                    // TODO: when return_exceptions is true, catch panics and return them as errors
-                    let _return_exceptions = return_exceptions;
-                    let result = self.invoke(input, Some(config));
+                    let result = if return_exceptions {
+                        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            self.invoke(input, Some(config))
+                        })) {
+                            Ok(r) => r,
+                            Err(panic_info) => {
+                                let msg = panic_info
+                                    .downcast_ref::<String>()
+                                    .cloned()
+                                    .or_else(|| {
+                                        panic_info.downcast_ref::<&str>().map(|s| s.to_string())
+                                    })
+                                    .unwrap_or_else(|| "unknown panic".to_string());
+                                Err(Error::other(format!("Panic in batch item: {msg}")))
+                            }
+                        }
+                    } else {
+                        self.invoke(input, Some(config))
+                    };
                     active.fetch_sub(1, Ordering::SeqCst);
                     (i, result)
                 });
@@ -440,15 +455,37 @@ pub trait Runnable: Send + Sync + Debug {
             }
 
             for handle in handles {
-                let (i, result) = handle.join().expect("thread should not panic");
-                results[i] = Some(result);
+                match handle.join() {
+                    Ok((i, result)) => {
+                        results[i] = Some(result);
+                    }
+                    Err(panic_info) => {
+                        if !return_exceptions {
+                            std::panic::resume_unwind(panic_info);
+                        }
+                    }
+                }
             }
         });
 
-        results
+        let collected: Vec<Result<Self::Output>> = results
             .into_iter()
             .map(|r| r.expect("all results populated by thread::scope"))
-            .collect()
+            .collect();
+
+        if return_exceptions {
+            collected
+        } else {
+            // When not returning exceptions, propagate the first error
+            if let Some(first_err_idx) = collected.iter().position(|r| r.is_err()) {
+                return collected
+                    .into_iter()
+                    .nth(first_err_idx)
+                    .into_iter()
+                    .collect();
+            }
+            collected
+        }
     }
 
     /// Transform multiple inputs into outputs asynchronously.
@@ -459,7 +496,7 @@ pub trait Runnable: Send + Sync + Debug {
         &self,
         inputs: Vec<Self::Input>,
         config: Option<ConfigOrList>,
-        _return_exceptions: bool,
+        return_exceptions: bool,
     ) -> Vec<Result<Self::Output>>
     where
         Self: 'static,
@@ -471,7 +508,7 @@ pub trait Runnable: Send + Sync + Debug {
         let configs = get_config_list(config, inputs.len());
         let max_concurrency = configs[0].max_concurrency;
 
-        match max_concurrency {
+        let results = match max_concurrency {
             Some(limit) if limit > 0 => {
                 let semaphore = Arc::new(Semaphore::new(limit));
                 let futures: Vec<_> = inputs
@@ -496,6 +533,15 @@ pub trait Runnable: Send + Sync + Debug {
                     .collect();
                 futures::future::join_all(futures).await
             }
+        };
+
+        if return_exceptions {
+            results
+        } else {
+            if let Some(first_err_idx) = results.iter().position(|r| r.is_err()) {
+                return results.into_iter().nth(first_err_idx).into_iter().collect();
+            }
+            results
         }
     }
 
@@ -507,7 +553,7 @@ pub trait Runnable: Send + Sync + Debug {
         &self,
         inputs: Vec<Self::Input>,
         config: Option<ConfigOrList>,
-        _return_exceptions: bool,
+        return_exceptions: bool,
     ) -> Vec<(usize, Result<Self::Output>)>
     where
         Self: 'static,
@@ -541,7 +587,25 @@ pub trait Runnable: Send + Sync + Debug {
                 let tx = sender.clone();
 
                 scope.spawn(move || {
-                    let result = self.invoke(input, Some(config));
+                    let result = if return_exceptions {
+                        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            self.invoke(input, Some(config))
+                        })) {
+                            Ok(r) => r,
+                            Err(panic_info) => {
+                                let msg = panic_info
+                                    .downcast_ref::<String>()
+                                    .cloned()
+                                    .or_else(|| {
+                                        panic_info.downcast_ref::<&str>().map(|s| s.to_string())
+                                    })
+                                    .unwrap_or_else(|| "unknown panic".to_string());
+                                Err(Error::other(format!("Panic in batch item: {msg}")))
+                            }
+                        }
+                    } else {
+                        self.invoke(input, Some(config))
+                    };
                     active.fetch_sub(1, Ordering::SeqCst);
                     tx.send((i, result))
                         .expect("receiver should not be dropped");
@@ -805,6 +869,17 @@ pub trait Runnable: Send + Sync + Debug {
     }
 
     /// Bind arguments to this Runnable, returning a new Runnable.
+    /// Compose this Runnable with another, returning a RunnableSequence.
+    ///
+    /// Mirrors Python's `Runnable.pipe()`.
+    fn pipe<R2>(self, other: R2) -> RunnableSequence<Self, R2>
+    where
+        Self: Sized,
+        R2: Runnable<Input = Self::Output>,
+    {
+        RunnableSequence::new(self, other)
+    }
+
     fn bind(self, kwargs: HashMap<String, Value>) -> RunnableBinding<Self>
     where
         Self: Sized,
@@ -1115,6 +1190,31 @@ pub trait Runnable: Send + Sync + Debug {
         });
 
         RunnableBinding::with_config_factories(self, HashMap::new(), None, vec![factory])
+    }
+
+    /// List configurable fields for this Runnable.
+    ///
+    /// Mirrors Python's `Runnable.config_specs` property.
+    fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
+        Ok(vec![])
+    }
+
+    /// Return a list of prompts used by this Runnable.
+    ///
+    /// Mirrors Python's `Runnable.get_prompts()`.
+    fn get_prompts(&self) -> Vec<Arc<dyn crate::BasePromptTemplate>> {
+        vec![]
+    }
+
+    /// Convert this Runnable into a BaseTool.
+    ///
+    /// Mirrors Python's `Runnable.as_tool()`. Only available when
+    /// Input and Output types are compatible with tool interfaces.
+    fn as_tool(self: Arc<Self>, name: &str, description: &str) -> crate::tools::StructuredTool
+    where
+        Self: Sized + Runnable<Input = HashMap<String, Value>, Output = Value> + 'static,
+    {
+        crate::tools::convert_runnable_to_tool(self, name, description)
     }
 }
 
@@ -1720,6 +1820,18 @@ where
         self.name.clone()
     }
 
+    fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
+        let mut specs = self.first.config_specs()?;
+        specs.extend(self.last.config_specs()?);
+        get_unique_config_specs(specs).map_err(Error::other)
+    }
+
+    fn get_prompts(&self) -> Vec<Arc<dyn crate::BasePromptTemplate>> {
+        let mut prompts = self.first.get_prompts();
+        prompts.extend(self.last.get_prompts());
+        prompts
+    }
+
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         let config = ensure_config(config);
         let callback_manager = get_callback_manager_for_config(&config);
@@ -1961,6 +2073,9 @@ where
     }
 }
 
+/// Type alias mirroring Python's `RunnableMap = RunnableParallel`.
+pub type RunnableMap<I> = RunnableParallel<I>;
+
 impl<I> RunnableParallel<I>
 where
     I: Send + Sync + Clone + Debug + 'static,
@@ -1998,6 +2113,18 @@ where
     }
 }
 
+impl<I> From<HashMap<String, Arc<dyn Runnable<Input = I, Output = Value> + Send + Sync>>>
+    for RunnableParallel<I>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+{
+    fn from(
+        steps: HashMap<String, Arc<dyn Runnable<Input = I, Output = Value> + Send + Sync>>,
+    ) -> Self {
+        Self { steps, name: None }
+    }
+}
+
 #[async_trait]
 impl<I> Runnable for RunnableParallel<I>
 where
@@ -2013,6 +2140,22 @@ where
                 self.steps.keys().cloned().collect::<Vec<_>>().join(",")
             ))
         })
+    }
+
+    fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
+        let mut specs = Vec::new();
+        for step in self.steps.values() {
+            specs.extend(step.config_specs()?);
+        }
+        get_unique_config_specs(specs).map_err(Error::other)
+    }
+
+    fn get_prompts(&self) -> Vec<Arc<dyn crate::BasePromptTemplate>> {
+        let mut prompts = Vec::new();
+        for step in self.steps.values() {
+            prompts.extend(step.get_prompts());
+        }
+        prompts
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
@@ -2382,6 +2525,14 @@ where
         self.bound.get_output_schema(config)
     }
 
+    fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
+        self.bound.config_specs()
+    }
+
+    fn get_prompts(&self) -> Vec<Arc<dyn crate::BasePromptTemplate>> {
+        self.bound.get_prompts()
+    }
+
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         self.bound.invoke(input, Some(self.merge_configs(config)))
     }
@@ -2719,6 +2870,18 @@ where
     O: Send + Sync + Clone + Debug + 'static,
 {
     RunnableLambda::new(func)
+}
+
+/// Coerce a HashMap of Runnables into a RunnableParallel.
+///
+/// Mirrors the dict-to-RunnableParallel coercion in Python's `coerce_to_runnable()`.
+pub fn coerce_map_to_runnable<I>(
+    map: HashMap<String, Arc<dyn Runnable<Input = I, Output = Value> + Send + Sync>>,
+) -> RunnableParallel<I>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+{
+    RunnableParallel::from(map)
 }
 
 #[cfg(test)]

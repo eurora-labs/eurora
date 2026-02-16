@@ -18,7 +18,6 @@ use super::config::{
     ConfigOrList, RunnableConfig, ensure_config, get_callback_manager_for_config, get_config_list,
     patch_config,
 };
-use super::utils::{ConfigurableFieldSpec, get_unique_config_specs};
 
 /// A `Runnable` that can fallback to other `Runnable`s if it fails.
 ///
@@ -175,20 +174,6 @@ where
     /// Get an iterator over all runnables (primary + fallbacks).
     pub fn runnables(&self) -> impl Iterator<Item = &DynRunnable<I, O>> {
         std::iter::once(&self.runnable).chain(self.fallbacks.iter())
-    }
-
-    /// Get the config specs from all runnables.
-    pub fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
-        let specs: Vec<ConfigurableFieldSpec> = self
-            .runnables()
-            .flat_map(|_r| {
-                // In a full implementation, we would get config specs from each runnable
-                // For now, return empty as the trait doesn't expose config_specs
-                Vec::<ConfigurableFieldSpec>::new()
-            })
-            .collect();
-
-        get_unique_config_specs(specs).map_err(Error::other)
     }
 
     /// Check if an error should trigger a fallback.

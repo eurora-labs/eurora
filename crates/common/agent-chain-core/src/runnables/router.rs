@@ -18,7 +18,7 @@ use crate::load::{Serializable, Serialized, SerializedConstructorData};
 
 use super::base::{DynRunnable, Runnable, RunnableSerializable};
 use super::config::{ConfigOrList, RunnableConfig, get_config_list};
-use super::utils::{ConfigurableFieldSpec, gather_with_concurrency, get_unique_config_specs};
+use super::utils::gather_with_concurrency;
 
 /// Router input.
 ///
@@ -119,21 +119,6 @@ where
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
-    }
-
-    /// Get the configurable field specs from all contained runnables.
-    pub fn config_specs(&self) -> std::result::Result<Vec<ConfigurableFieldSpec>, String> {
-        let specs = self
-            .runnables
-            .values()
-            .flat_map(|_r| {
-                // For now, return empty specs since DynRunnable doesn't expose config_specs
-                // In a full implementation, this would need to be part of the Runnable trait
-                Vec::<ConfigurableFieldSpec>::new()
-            })
-            .collect::<Vec<_>>();
-
-        get_unique_config_specs(specs)
     }
 }
 
