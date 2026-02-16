@@ -26,6 +26,13 @@ use super::config::{
 };
 use super::utils::Addable;
 
+/// Type alias for config factory functions used by `RunnableBinding`.
+///
+/// Config factories are lazily evaluated functions that produce config overrides.
+/// They receive the current merged config and return additional config to merge.
+/// This mirrors Python's `RunnableBinding.config_factories`.
+pub type ConfigFactory = Arc<dyn Fn(&RunnableConfig) -> RunnableConfig + Send + Sync>;
+
 /// Number of generic type arguments for Runnable (Input and Output).
 #[allow(dead_code)]
 const RUNNABLE_GENERIC_NUM_ARGS: usize = 2;
@@ -827,6 +834,277 @@ pub trait Runnable: Send + Sync + Debug {
         Self: Sized,
     {
         RunnableEach::new(self)
+    }
+
+    /// Select keys from the output of this runnable.
+    ///
+    /// Returns a `RunnableSequence` that pipes this runnable's output through
+    /// a `RunnablePick` to select specific keys from a dict output.
+    ///
+    /// Mirrors Python's `Runnable.pick()`.
+    fn pick(
+        self,
+        keys: super::passthrough::PickKeys,
+    ) -> RunnableSequence<Self, super::passthrough::RunnablePick>
+    where
+        Self: Sized + Runnable<Output = HashMap<String, Value>>,
+    {
+        pipe(self, super::passthrough::RunnablePick::from(keys))
+    }
+
+    /// Assign key-value pairs to dict outputs from this runnable.
+    ///
+    /// Returns a `RunnableSequence` that pipes this runnable's output through
+    /// a `RunnableAssign` to merge additional computed fields into the output.
+    ///
+    /// Mirrors Python's `Runnable.assign()`.
+    fn assign(
+        self,
+        mapper: super::passthrough::RunnableAssign,
+    ) -> RunnableSequence<Self, super::passthrough::RunnableAssign>
+    where
+        Self: Sized + Runnable<Output = HashMap<String, Value>>,
+    {
+        pipe(self, mapper)
+    }
+
+    /// Add fallback runnables that are invoked if this runnable fails.
+    ///
+    /// Returns a `RunnableWithFallbacks` that tries this runnable first,
+    /// then falls back to the provided alternatives on failure.
+    ///
+    /// Mirrors Python's `Runnable.with_fallbacks()`.
+    fn with_fallbacks(
+        self,
+        fallbacks: Vec<DynRunnable<Self::Input, Self::Output>>,
+    ) -> super::fallbacks::RunnableWithFallbacks<Self::Input, Self::Output>
+    where
+        Self: Sized + Send + Sync + 'static,
+    {
+        super::fallbacks::RunnableWithFallbacks::new(self, fallbacks)
+    }
+
+    /// Bind lifecycle listeners to this runnable.
+    ///
+    /// Creates a `RunnableBinding` with a config factory that adds a
+    /// `RootListenersTracer` as a callback. The tracer invokes the provided
+    /// listener functions on the root run's start, end, and error events.
+    ///
+    /// Mirrors Python's `Runnable.with_listeners()`.
+    fn with_listeners(
+        self,
+        on_start: Option<crate::tracers::root_listeners::Listener>,
+        on_end: Option<crate::tracers::root_listeners::Listener>,
+        on_error: Option<crate::tracers::root_listeners::Listener>,
+    ) -> RunnableBinding<Self>
+    where
+        Self: Sized,
+    {
+        let on_start: Option<
+            Arc<
+                dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig) + Send + Sync,
+            >,
+        > = on_start.map(|f| {
+            Arc::from(f)
+                as Arc<
+                    dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig)
+                        + Send
+                        + Sync,
+                >
+        });
+        let on_end: Option<
+            Arc<
+                dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig) + Send + Sync,
+            >,
+        > = on_end.map(|f| {
+            Arc::from(f)
+                as Arc<
+                    dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig)
+                        + Send
+                        + Sync,
+                >
+        });
+        let on_error: Option<
+            Arc<
+                dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig) + Send + Sync,
+            >,
+        > = on_error.map(|f| {
+            Arc::from(f)
+                as Arc<
+                    dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig)
+                        + Send
+                        + Sync,
+                >
+        });
+
+        let factory: ConfigFactory = Arc::new(move |config: &super::config::RunnableConfig| {
+            use crate::callbacks::base::Callbacks;
+            use crate::tracers::root_listeners::RootListenersTracer;
+
+            let tracer = RootListenersTracer::new(
+                config.clone(),
+                on_start.as_ref().map(|f| {
+                    Box::new({
+                        let f = f.clone();
+                        move |run: &crate::tracers::schemas::Run,
+                              cfg: &super::config::RunnableConfig| {
+                            f(run, cfg)
+                        }
+                    }) as crate::tracers::root_listeners::Listener
+                }),
+                on_end.as_ref().map(|f| {
+                    Box::new({
+                        let f = f.clone();
+                        move |run: &crate::tracers::schemas::Run,
+                              cfg: &super::config::RunnableConfig| {
+                            f(run, cfg)
+                        }
+                    }) as crate::tracers::root_listeners::Listener
+                }),
+                on_error.as_ref().map(|f| {
+                    Box::new({
+                        let f = f.clone();
+                        move |run: &crate::tracers::schemas::Run,
+                              cfg: &super::config::RunnableConfig| {
+                            f(run, cfg)
+                        }
+                    }) as crate::tracers::root_listeners::Listener
+                }),
+            );
+
+            let mut result = super::config::RunnableConfig::default();
+            result.callbacks = Some(Callbacks::Handlers(vec![
+                Arc::new(tracer) as Arc<dyn crate::callbacks::base::BaseCallbackHandler>
+            ]));
+            result
+        });
+
+        RunnableBinding::with_config_factories(self, HashMap::new(), None, vec![factory])
+    }
+
+    /// Bind async lifecycle listeners to this runnable.
+    ///
+    /// Creates a `RunnableBinding` with a config factory that adds an
+    /// `AsyncRootListenersTracer` as a callback. The tracer invokes the provided
+    /// async listener functions on the root run's start, end, and error events.
+    ///
+    /// Mirrors Python's `Runnable.with_alisteners()`.
+    fn with_alisteners(
+        self,
+        on_start: Option<crate::tracers::root_listeners::AsyncListener>,
+        on_end: Option<crate::tracers::root_listeners::AsyncListener>,
+        on_error: Option<crate::tracers::root_listeners::AsyncListener>,
+    ) -> RunnableBinding<Self>
+    where
+        Self: Sized,
+    {
+        let on_start: Option<
+            Arc<
+                dyn Fn(
+                        &crate::tracers::schemas::Run,
+                        &super::config::RunnableConfig,
+                    ) -> futures::future::BoxFuture<'static, ()>
+                    + Send
+                    + Sync,
+            >,
+        > = on_start.map(|f| {
+            Arc::from(f)
+                as Arc<
+                    dyn Fn(
+                            &crate::tracers::schemas::Run,
+                            &super::config::RunnableConfig,
+                        ) -> futures::future::BoxFuture<'static, ()>
+                        + Send
+                        + Sync,
+                >
+        });
+        let on_end: Option<
+            Arc<
+                dyn Fn(
+                        &crate::tracers::schemas::Run,
+                        &super::config::RunnableConfig,
+                    ) -> futures::future::BoxFuture<'static, ()>
+                    + Send
+                    + Sync,
+            >,
+        > = on_end.map(|f| {
+            Arc::from(f)
+                as Arc<
+                    dyn Fn(
+                            &crate::tracers::schemas::Run,
+                            &super::config::RunnableConfig,
+                        ) -> futures::future::BoxFuture<'static, ()>
+                        + Send
+                        + Sync,
+                >
+        });
+        let on_error: Option<
+            Arc<
+                dyn Fn(
+                        &crate::tracers::schemas::Run,
+                        &super::config::RunnableConfig,
+                    ) -> futures::future::BoxFuture<'static, ()>
+                    + Send
+                    + Sync,
+            >,
+        > = on_error.map(|f| {
+            Arc::from(f)
+                as Arc<
+                    dyn Fn(
+                            &crate::tracers::schemas::Run,
+                            &super::config::RunnableConfig,
+                        ) -> futures::future::BoxFuture<'static, ()>
+                        + Send
+                        + Sync,
+                >
+        });
+
+        let factory: ConfigFactory = Arc::new(move |config: &super::config::RunnableConfig| {
+            use crate::callbacks::base::Callbacks;
+            use crate::tracers::root_listeners::AsyncRootListenersTracer;
+
+            let tracer = AsyncRootListenersTracer::new(
+                config.clone(),
+                on_start.as_ref().map(|f| {
+                    Box::new({
+                        let f = f.clone();
+                        move |run: &crate::tracers::schemas::Run,
+                              cfg: &crate::runnables::config::RunnableConfig|
+                              -> futures::future::BoxFuture<'static, ()> {
+                            f(run, cfg)
+                        }
+                    }) as crate::tracers::root_listeners::AsyncListener
+                }),
+                on_end.as_ref().map(|f| {
+                    Box::new({
+                        let f = f.clone();
+                        move |run: &crate::tracers::schemas::Run,
+                              cfg: &crate::runnables::config::RunnableConfig|
+                              -> futures::future::BoxFuture<'static, ()> {
+                            f(run, cfg)
+                        }
+                    }) as crate::tracers::root_listeners::AsyncListener
+                }),
+                on_error.as_ref().map(|f| {
+                    Box::new({
+                        let f = f.clone();
+                        move |run: &crate::tracers::schemas::Run,
+                              cfg: &crate::runnables::config::RunnableConfig|
+                              -> futures::future::BoxFuture<'static, ()> {
+                            f(run, cfg)
+                        }
+                    }) as crate::tracers::root_listeners::AsyncListener
+                }),
+            );
+
+            let mut result = super::config::RunnableConfig::default();
+            result.callbacks = Some(Callbacks::Handlers(vec![
+                Arc::new(tracer) as Arc<dyn crate::callbacks::base::BaseCallbackHandler>
+            ]));
+            result
+        });
+
+        RunnableBinding::with_config_factories(self, HashMap::new(), None, vec![factory])
     }
 }
 
@@ -2005,6 +2283,7 @@ where
     bound: R,
     kwargs: HashMap<String, Value>,
     config: Option<RunnableConfig>,
+    config_factories: Vec<ConfigFactory>,
 }
 
 impl<R> Debug for RunnableBinding<R>
@@ -2016,6 +2295,7 @@ where
             .field("bound", &self.bound)
             .field("kwargs", &self.kwargs)
             .field("config", &self.config)
+            .field("config_factories_count", &self.config_factories.len())
             .finish()
     }
 }
@@ -2030,12 +2310,46 @@ where
             bound,
             kwargs,
             config,
+            config_factories: Vec::new(),
+        }
+    }
+
+    /// Create a new RunnableBinding with config factories.
+    ///
+    /// Config factories are lazily evaluated functions that produce config
+    /// overrides. They are applied after merging the bound and provided configs.
+    pub fn with_config_factories(
+        bound: R,
+        kwargs: HashMap<String, Value>,
+        config: Option<RunnableConfig>,
+        config_factories: Vec<ConfigFactory>,
+    ) -> Self {
+        Self {
+            bound,
+            kwargs,
+            config,
+            config_factories,
         }
     }
 
     /// Merge configs for the binding.
+    ///
+    /// Mirrors Python's `RunnableBinding._merge_configs`: merges the bound config
+    /// with the provided config, then applies each config factory to the result.
     fn merge_configs(&self, config: Option<RunnableConfig>) -> RunnableConfig {
-        merge_configs(vec![self.config.clone(), config])
+        let merged = merge_configs(vec![self.config.clone(), config]);
+        if self.config_factories.is_empty() {
+            merged
+        } else {
+            let factory_configs: Vec<Option<RunnableConfig>> = self
+                .config_factories
+                .iter()
+                .map(|f| Some(f(&merged)))
+                .collect();
+            let mut all = vec![Some(merged)];
+            all.extend(factory_configs);
+            merge_configs(all)
+        }
     }
 }
 

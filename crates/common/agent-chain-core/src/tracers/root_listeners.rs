@@ -9,6 +9,10 @@ use std::fmt;
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::callbacks::base::{
+    BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
+    RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
+};
 use crate::runnables::RunnableConfig;
 use crate::tracers::base::{AsyncBaseTracer, BaseTracer};
 use crate::tracers::core::{SchemaFormat, TracerCore, TracerCoreConfig};
@@ -148,6 +152,19 @@ impl BaseTracer for RootListenersTracer {
     }
 }
 
+impl LLMManagerMixin for RootListenersTracer {}
+impl ChainManagerMixin for RootListenersTracer {}
+impl ToolManagerMixin for RootListenersTracer {}
+impl RetrieverManagerMixin for RootListenersTracer {}
+impl CallbackManagerMixin for RootListenersTracer {}
+impl RunManagerMixin for RootListenersTracer {}
+
+impl BaseCallbackHandler for RootListenersTracer {
+    fn name(&self) -> &str {
+        "RootListenersTracer"
+    }
+}
+
 /// Async tracer that calls async listeners on run start, end, and error.
 pub struct AsyncRootListenersTracer {
     /// The tracer configuration.
@@ -270,6 +287,19 @@ impl AsyncBaseTracer for AsyncRootListenersTracer {
         } else if let Some(ref on_error) = self.on_error {
             on_error(run, &self.config).await;
         }
+    }
+}
+
+impl LLMManagerMixin for AsyncRootListenersTracer {}
+impl ChainManagerMixin for AsyncRootListenersTracer {}
+impl ToolManagerMixin for AsyncRootListenersTracer {}
+impl RetrieverManagerMixin for AsyncRootListenersTracer {}
+impl CallbackManagerMixin for AsyncRootListenersTracer {}
+impl RunManagerMixin for AsyncRootListenersTracer {}
+
+impl BaseCallbackHandler for AsyncRootListenersTracer {
+    fn name(&self) -> &str {
+        "AsyncRootListenersTracer"
     }
 }
 

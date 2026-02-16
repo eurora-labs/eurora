@@ -527,20 +527,43 @@ pub trait BaseChatModel: BaseLanguageModel {
         HashMap::new()
     }
 
-    /// Convert cached Generation objects to ChatGeneration objects.
+    /// Convert cached `Generation` objects to `ChatGeneration` objects.
     ///
-    /// Handle case where cache contains Generation objects instead of
-    /// ChatGeneration objects. This can happen due to serialization/deserialization
-    /// issues or legacy cache data.
+    /// Handle case where cache contains `Generation` objects instead of
+    /// `ChatGeneration` objects. If the `generation_info` contains a
+    /// serialized message (stored under the `"message"` key), it is
+    /// deserialized and used. Otherwise, an `AIMessage` is created from
+    /// the text content.
+    ///
+    /// Mirrors Python's `BaseChatModel._convert_cached_generations`.
     fn _convert_cached_generations(&self, cache_val: Vec<Generation>) -> Vec<ChatGeneration> {
         cache_val
             .into_iter()
             .map(|cached_gen| {
-                // Convert Generation to ChatGeneration by creating AIMessage from text
-                let message = AIMessage::builder().content(&cached_gen.text).build();
-                match cached_gen.generation_info {
-                    Some(info) => ChatGeneration::with_info(message.into(), info),
-                    None => ChatGeneration::new(message.into()),
+                let message = cached_gen
+                    .generation_info
+                    .as_ref()
+                    .and_then(|info| info.get("message"))
+                    .and_then(|msg_val| serde_json::from_value::<BaseMessage>(msg_val.clone()).ok())
+                    .unwrap_or_else(|| {
+                        AIMessage::builder()
+                            .content(&cached_gen.text)
+                            .build()
+                            .into()
+                    });
+
+                // Strip generation_info of the "message" key to avoid duplication
+                let generation_info = cached_gen
+                    .generation_info
+                    .map(|mut info| {
+                        info.remove("message");
+                        info
+                    })
+                    .filter(|info| !info.is_empty());
+
+                match generation_info {
+                    Some(info) => ChatGeneration::with_info(message, info),
+                    None => ChatGeneration::new(message),
                 }
             })
             .collect()
@@ -1091,11 +1114,8 @@ pub trait BaseChatModel: BaseLanguageModel {
         if let Some(ref cache) = resolved_cache {
             let llm_string = self._get_llm_string(stop.as_deref(), None);
             let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
-            let generations: Vec<crate::outputs::Generation> = result
-                .generations
-                .iter()
-                .map(|generation| crate::outputs::Generation::new(generation.message.text()))
-                .collect();
+            let generations: Vec<crate::outputs::Generation> =
+                _chat_generations_to_cache(&result.generations);
             cache.update(&prompt_key, &llm_string, generations);
         }
 
@@ -1195,11 +1215,8 @@ pub trait BaseChatModel: BaseLanguageModel {
         if let Some(ref cache) = resolved_cache {
             let llm_string = self._get_llm_string(stop.as_deref(), None);
             let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
-            let generations: Vec<crate::outputs::Generation> = result
-                .generations
-                .iter()
-                .map(|generation| crate::outputs::Generation::new(generation.message.text()))
-                .collect();
+            let generations: Vec<crate::outputs::Generation> =
+                _chat_generations_to_cache(&result.generations);
             cache.aupdate(&prompt_key, &llm_string, generations).await;
         }
 
@@ -1799,6 +1816,24 @@ pub trait BaseChatModel: BaseLanguageModel {
         );
         params
     }
+}
+
+/// Convert `ChatGeneration` objects to `Generation` objects for cache storage.
+///
+/// Serializes the message into `generation_info` under the `"message"` key so
+/// that `_convert_cached_generations` can reconstruct the full `ChatGeneration`
+/// on a cache hit.
+fn _chat_generations_to_cache(generations: &[ChatGeneration]) -> Vec<Generation> {
+    generations
+        .iter()
+        .map(|chat_gen| {
+            let mut info = chat_gen.generation_info.clone().unwrap_or_default();
+            if let Ok(msg_val) = serde_json::to_value(&chat_gen.message) {
+                info.insert("message".to_string(), msg_val);
+            }
+            Generation::with_info(&chat_gen.text, info)
+        })
+        .collect()
 }
 
 /// Extract the tool name from a JSON schema.
