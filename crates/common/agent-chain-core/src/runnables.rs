@@ -64,7 +64,7 @@ pub use schema::{
     StreamEvent,
 };
 pub use utils::{
-    AddableDict, AnyConfigurableField, ConfigurableField, ConfigurableFieldMultiOption,
+    Addable, AddableDict, AnyConfigurableField, ConfigurableField, ConfigurableFieldMultiOption,
     ConfigurableFieldSingleOption, ConfigurableFieldSpec, RootEventFilter, aadd, add,
     gather_with_concurrency, get_unique_config_specs, indent_lines_after_first,
 };

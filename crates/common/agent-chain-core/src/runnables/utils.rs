@@ -223,6 +223,49 @@ pub async fn aadd<T: Addable>(addables: impl Stream<Item = T> + Unpin) -> Option
     final_value
 }
 
+// ---------------------------------------------------------------------------
+// Addable implementations
+// ---------------------------------------------------------------------------
+
+impl Addable for String {
+    fn add(self, other: Self) -> Self {
+        self + &other
+    }
+}
+
+impl Addable for Value {
+    fn add(self, other: Self) -> Self {
+        try_add_values(&self, &other)
+    }
+}
+
+impl Addable for AddableDict {
+    fn add(self, other: Self) -> Self {
+        std::ops::Add::add(self, other)
+    }
+}
+
+impl Addable for HashMap<String, Value> {
+    fn add(mut self, other: Self) -> Self {
+        for (key, value) in other {
+            match self.get(&key) {
+                None => {
+                    self.insert(key, value);
+                }
+                Some(existing) if existing.is_null() => {
+                    self.insert(key, value);
+                }
+                Some(existing) if !value.is_null() => {
+                    let added = try_add_values(existing, &value);
+                    self.insert(key, added);
+                }
+                _ => {}
+            }
+        }
+        self
+    }
+}
+
 /// Field that can be configured by the user.
 ///
 /// This corresponds to Python's `ConfigurableField` NamedTuple.
