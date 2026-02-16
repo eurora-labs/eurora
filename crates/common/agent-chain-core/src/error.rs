@@ -111,6 +111,15 @@ pub enum Error {
     #[error("Tool invocation error: {0}")]
     ToolInvocation(String),
 
+    /// Tool exception — raised by tool implementations to signal a handled error.
+    /// Mirrors Python's `ToolException`.
+    #[error("{0}")]
+    ToolException(String),
+
+    /// Validation error on tool input.
+    #[error("Validation error: {0}")]
+    ValidationError(String),
+
     /// Feature or method not implemented.
     /// Exception raised when an indexing operation fails.
     #[error("Indexing error: {0}")]
@@ -125,6 +134,23 @@ pub enum Error {
 }
 
 impl Error {
+    /// Check if this error is a ToolException.
+    pub fn as_tool_exception(&self) -> Option<&str> {
+        match self {
+            Error::ToolException(msg) => Some(msg),
+            Error::ToolInvocation(msg) => Some(msg),
+            _ => None,
+        }
+    }
+
+    /// Check if this error is a validation error.
+    pub fn as_validation_error(&self) -> Option<&str> {
+        match self {
+            Error::ValidationError(msg) => Some(msg),
+            _ => None,
+        }
+    }
+
     /// Create an output parser error, mirroring `OutputParserException.__init__`.
     ///
     /// If `send_to_llm` is true, both `observation` and `llm_output` must be `Some`.
