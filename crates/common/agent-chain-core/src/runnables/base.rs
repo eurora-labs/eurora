@@ -607,6 +607,42 @@ pub trait Runnable: Send + Sync + Debug {
         }))
     }
 
+    /// Generate a stream of events.
+    ///
+    /// Use to create a stream of `StreamEvent` that provide real-time
+    /// information about the progress of the Runnable, including events
+    /// from intermediate results.
+    ///
+    /// Mirrors Python's `Runnable.astream_events()` (V2 implementation).
+    fn astream_events<'a>(
+        &'a self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+        include_names: Option<Vec<String>>,
+        include_types: Option<Vec<String>>,
+        include_tags: Option<Vec<String>>,
+        exclude_names: Option<Vec<String>>,
+        exclude_types: Option<Vec<String>>,
+        exclude_tags: Option<Vec<String>>,
+    ) -> BoxStream<'a, crate::runnables::schema::StreamEvent>
+    where
+        Self: 'static,
+        Self::Output: serde::Serialize,
+        Self: Sized,
+    {
+        crate::tracers::event_stream::astream_events_implementation(
+            self,
+            input,
+            config,
+            include_names,
+            include_types,
+            include_tags,
+            exclude_names,
+            exclude_types,
+            exclude_tags,
+        )
+    }
+
     /// Transform an input stream into an output stream.
     ///
     /// Default implementation buffers input and calls stream().

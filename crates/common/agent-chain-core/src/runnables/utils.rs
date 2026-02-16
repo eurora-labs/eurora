@@ -503,6 +503,7 @@ pub fn get_unique_config_specs(
 ///
 /// This class provides filtering based on names, types, and tags for both
 /// inclusion and exclusion criteria.
+#[derive(Debug, Clone)]
 pub struct RootEventFilter {
     /// Names to include (if any match, include)
     pub include_names: Option<Vec<String>>,
