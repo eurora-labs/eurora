@@ -279,8 +279,7 @@ impl RunnableWithMessageHistory {
     ///
     /// Mirrors `RunnableWithMessageHistory.get_input_schema()` from Python.
     pub fn get_input_schema(&self) -> Value {
-        if self.input_messages_key.is_some() && self.history_messages_key.is_some() {
-            let input_key = self.input_messages_key.as_ref().expect("checked above");
+        if let (Some(input_key), Some(_)) = (&self.input_messages_key, &self.history_messages_key) {
             serde_json::json!({
                 "title": "RunnableWithChatHistoryInput",
                 "type": "object",
@@ -294,8 +293,7 @@ impl RunnableWithMessageHistory {
                     }
                 }
             })
-        } else if self.input_messages_key.is_some() {
-            let input_key = self.input_messages_key.as_ref().expect("checked above");
+        } else if let Some(input_key) = &self.input_messages_key {
             serde_json::json!({
                 "title": "RunnableWithChatHistoryInput",
                 "type": "object",

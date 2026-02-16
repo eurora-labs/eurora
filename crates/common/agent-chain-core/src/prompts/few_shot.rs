@@ -79,7 +79,6 @@ impl std::fmt::Debug for Box<dyn ExampleSelectorClone + Send + Sync> {
 
 /// A simple example selector that always returns the same examples.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct StaticExampleSelector {
     examples: Vec<HashMap<String, String>>,
 }

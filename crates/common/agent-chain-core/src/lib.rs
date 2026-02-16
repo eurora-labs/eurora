@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity, clippy::too_many_arguments)]
 //! Agent Chain Core - A Rust implementation of LangChain core library.
 //!
 //! This crate provides:

@@ -250,8 +250,8 @@ mod tests {
         let source = stream::iter(vec![1, 2, 3]);
         let peers = atee(Box::pin(source), 2);
         let mut peer0 = peers.into_iter();
-        let mut first = peer0.next().unwrap();
-        let mut second = peer0.next().unwrap();
+        let first = peer0.next().unwrap();
+        let second = peer0.next().unwrap();
 
         let result0: Vec<i32> = first.collect().await;
         let result1: Vec<i32> = second.collect().await;
