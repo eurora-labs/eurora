@@ -504,6 +504,7 @@ pub fn get_callback_manager_for_config(config: &RunnableConfig) -> CallbackManag
     CallbackManager::configure(
         config.callbacks.clone(),
         None,
+        false,
         Some(config.tags.clone()),
         None,
         Some(config.metadata.clone()),
@@ -516,6 +517,7 @@ pub fn get_async_callback_manager_for_config(config: &RunnableConfig) -> AsyncCa
     AsyncCallbackManager::configure(
         config.callbacks.clone(),
         None,
+        false,
         Some(config.tags.clone()),
         None,
         Some(config.metadata.clone()),
