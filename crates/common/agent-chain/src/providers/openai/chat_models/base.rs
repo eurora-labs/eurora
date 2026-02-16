@@ -1774,7 +1774,9 @@ impl BaseChatModel for ChatOpenAI {
                 )
                 .await?;
             let chunk = ChatGenerationChunk::new(ai_message.into());
-            return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })) as ChatGenerationStream);
+            return Ok(
+                Box::pin(futures::stream::once(async move { Ok(chunk) })) as ChatGenerationStream
+            );
         }
 
         let chat_stream = self.stream_internal(messages, stop).await?;
@@ -1814,7 +1816,6 @@ impl BaseChatModel for ChatOpenAI {
             .await
     }
 
-
     fn bind_tools(
         &self,
         tools: &[Arc<dyn BaseTool>],
@@ -1831,8 +1832,16 @@ impl BaseChatModel for ChatOpenAI {
         schema: serde_json::Value,
         _include_raw: bool,
     ) -> Result<Box<dyn BaseChatModel>> {
-        let name = schema.get("title").and_then(|t| t.as_str()).unwrap_or("structured_output").to_string();
-        let description = schema.get("description").and_then(|d| d.as_str()).unwrap_or("").to_string();
+        let name = schema
+            .get("title")
+            .and_then(|t| t.as_str())
+            .unwrap_or("structured_output")
+            .to_string();
+        let description = schema
+            .get("description")
+            .and_then(|d| d.as_str())
+            .unwrap_or("")
+            .to_string();
         let tool_def = ToolDefinition {
             name,
             description,
@@ -1843,7 +1852,6 @@ impl BaseChatModel for ChatOpenAI {
         bound.bound_tool_choice = Some(ToolChoice::String("required".to_string()));
         Ok(Box::new(bound))
     }
-
 }
 
 impl ChatOpenAI {
