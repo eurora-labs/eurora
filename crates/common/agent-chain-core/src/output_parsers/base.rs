@@ -12,6 +12,7 @@ use crate::messages::BaseMessage;
 use crate::outputs::{ChatGeneration, Generation};
 use crate::prompt_values::PromptValue;
 use crate::runnables::RunnableConfig;
+use crate::runnables::base::Runnable;
 
 /// Abstract base trait for parsing the outputs of a model.
 ///
@@ -128,6 +129,16 @@ pub trait BaseOutputParser: Send + Sync + Debug {
     ) -> Result<Self::Output> {
         self.invoke(input, config)
     }
+
+    /// Convert this parser into a Runnable for use in chains.
+    ///
+    /// Mirrors Python where BaseOutputParser extends RunnableSerializable.
+    fn into_runnable(self) -> RunnableOutputParser<Self>
+    where
+        Self: Sized,
+    {
+        RunnableOutputParser::new(self)
+    }
 }
 
 /// Error type for output parser operations.
@@ -225,5 +236,71 @@ mod tests {
         let err = OutputParserError::parse_error("Invalid JSON", "{invalid}");
         assert_eq!(err.message, "Invalid JSON");
         assert_eq!(err.llm_output, Some("{invalid}".to_string()));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RunnableOutputParser adapter
+// ---------------------------------------------------------------------------
+
+/// Adapter that wraps a BaseOutputParser as a Runnable.
+///
+/// Mirrors Python where BaseOutputParser extends RunnableSerializable,
+/// allowing parsers to participate in chain composition via `pipe()`.
+pub struct RunnableOutputParser<P> {
+    parser: P,
+}
+
+impl<P: BaseOutputParser> RunnableOutputParser<P> {
+    /// Create a new RunnableOutputParser wrapping the given parser.
+    pub fn new(parser: P) -> Self {
+        Self { parser }
+    }
+
+    /// Get a reference to the inner parser.
+    pub fn parser(&self) -> &P {
+        &self.parser
+    }
+
+    /// Consume the adapter and return the inner parser.
+    pub fn into_inner(self) -> P {
+        self.parser
+    }
+}
+
+impl<P: BaseOutputParser> Debug for RunnableOutputParser<P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RunnableOutputParser")
+            .field("parser", &self.parser)
+            .finish()
+    }
+}
+
+#[async_trait]
+impl<P> Runnable for RunnableOutputParser<P>
+where
+    P: BaseOutputParser + 'static,
+    P::Output: 'static,
+{
+    type Input = BaseMessage;
+    type Output = P::Output;
+
+    fn name(&self) -> Option<String> {
+        Some(format!("RunnableOutputParser<{}>", self.parser.parser_type()))
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        self.parser.invoke(input, config)
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output>
+    where
+        Self: 'static,
+    {
+        self.parser.ainvoke(input, config).await
     }
 }

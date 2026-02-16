@@ -14,9 +14,12 @@ use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
 
+use async_trait::async_trait;
+
 use crate::chat_history::BaseChatMessageHistory;
 use crate::error::{Error, Result};
 use crate::messages::{AIMessage, BaseMessage, HumanMessage};
+use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
 use crate::runnables::utils::ConfigurableFieldSpec;
 
@@ -559,7 +562,7 @@ impl RunnableWithMessageHistory {
     /// 3. Build augmented input with history injected.
     /// 4. Call the inner runnable.
     /// 5. Exit history: save input + output messages.
-    pub fn invoke(&self, input: Value, config: Option<RunnableConfig>) -> Result<Value> {
+    pub fn invoke_with_history(&self, input: Value, config: Option<RunnableConfig>) -> Result<Value> {
         let config = config.unwrap_or_default();
         let (config, history) = self.merge_configs(config)?;
 
@@ -601,7 +604,7 @@ impl RunnableWithMessageHistory {
     ///
     /// TODO: Use async history methods once `BaseChatMessageHistory` has
     /// truly async variants accessible through `Arc<Mutex<..>>`.
-    pub async fn ainvoke(&self, input: Value, config: Option<RunnableConfig>) -> Result<Value> {
+    pub async fn ainvoke_with_history(&self, input: Value, config: Option<RunnableConfig>) -> Result<Value> {
         let config = config.unwrap_or_default();
         let (config, history) = self.merge_configs(config)?;
 
@@ -650,7 +653,7 @@ impl RunnableWithMessageHistory {
     ) -> Result<Vec<BaseMessage>> {
         let input_value = serde_json::to_value(&input)
             .map_err(|e| Error::Other(format!("Failed to serialize input messages: {}", e)))?;
-        let output_value = self.invoke(input_value, config)?;
+        let output_value = self.invoke_with_history(input_value, config)?;
         serde_json::from_value::<Vec<BaseMessage>>(output_value)
             .map_err(|e| Error::Other(format!("Failed to deserialize output messages: {}", e)))
     }
@@ -663,8 +666,49 @@ impl RunnableWithMessageHistory {
     ) -> Result<Vec<BaseMessage>> {
         let input_value = serde_json::to_value(&input)
             .map_err(|e| Error::Other(format!("Failed to serialize input messages: {}", e)))?;
-        let output_value = self.ainvoke(input_value, config).await?;
+        let output_value = self.ainvoke_with_history(input_value, config).await?;
         serde_json::from_value::<Vec<BaseMessage>>(output_value)
             .map_err(|e| Error::Other(format!("Failed to deserialize output messages: {}", e)))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Runnable trait implementation
+// ---------------------------------------------------------------------------
+
+#[async_trait]
+impl Runnable for RunnableWithMessageHistory {
+    type Input = Value;
+    type Output = Value;
+
+    fn name(&self) -> Option<String> {
+        Some("RunnableWithMessageHistory".to_string())
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        self.invoke_with_history(input, config)
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output>
+    where
+        Self: 'static,
+    {
+        self.ainvoke_with_history(input, config).await
+    }
+
+    fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
+        Ok(self.history_factory_config.clone())
+    }
+
+    fn get_input_schema(&self, _config: Option<&RunnableConfig>) -> Value {
+        RunnableWithMessageHistory::get_input_schema(self)
+    }
+
+    fn get_output_schema(&self, _config: Option<&RunnableConfig>) -> Value {
+        RunnableWithMessageHistory::get_output_schema(self)
     }
 }

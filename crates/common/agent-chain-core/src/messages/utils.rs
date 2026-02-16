@@ -1499,3 +1499,87 @@ fn create_message_with_content(original: &BaseMessage, content: &str) -> BaseMes
         }
     }
 }
+
+// ============================================================================
+// Runnable variants of message utility functions
+// ============================================================================
+// In Python, the @_runnable_support decorator makes filter_messages,
+// merge_message_runs, and trim_messages return a RunnableLambda when called
+// without messages. In Rust, we provide separate *_runnable() functions.
+
+use crate::runnables::base::RunnableLambdaWithConfig;
+use std::sync::Arc;
+
+/// Create a [`RunnableLambdaWithConfig`] that filters messages.
+///
+/// This is the runnable counterpart to [`filter_messages`], matching Python's
+/// `filter_messages()` called without messages (which returns a `RunnableLambda`
+/// via the `@_runnable_support` decorator).
+pub fn filter_messages_runnable(
+    include_names: Option<Vec<String>>,
+    exclude_names: Option<Vec<String>>,
+    include_types: Option<Vec<String>>,
+    exclude_types: Option<Vec<String>>,
+    include_ids: Option<Vec<String>>,
+    exclude_ids: Option<Vec<String>>,
+    exclude_tool_calls: Option<ExcludeToolCalls>,
+) -> RunnableLambdaWithConfig<Vec<BaseMessage>, Vec<BaseMessage>> {
+    RunnableLambdaWithConfig::new(move |messages: Vec<BaseMessage>| {
+        let include_names_refs: Option<Vec<&str>> =
+            include_names.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
+        let exclude_names_refs: Option<Vec<&str>> =
+            exclude_names.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
+        let include_types_refs: Option<Vec<&str>> =
+            include_types.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
+        let exclude_types_refs: Option<Vec<&str>> =
+            exclude_types.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
+        let include_ids_refs: Option<Vec<&str>> =
+            include_ids.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
+        let exclude_ids_refs: Option<Vec<&str>> =
+            exclude_ids.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
+
+        Ok(filter_messages(
+            &messages,
+            include_names_refs.as_deref(),
+            exclude_names_refs.as_deref(),
+            include_types_refs.as_deref(),
+            exclude_types_refs.as_deref(),
+            include_ids_refs.as_deref(),
+            exclude_ids_refs.as_deref(),
+            exclude_tool_calls.as_ref(),
+        ))
+    })
+    .with_name("filter_messages")
+}
+
+/// Create a [`RunnableLambdaWithConfig`] that merges consecutive message runs.
+///
+/// This is the runnable counterpart to [`merge_message_runs`], matching Python's
+/// `merge_message_runs()` called without messages.
+pub fn merge_message_runs_runnable(
+    chunk_separator: Option<String>,
+) -> RunnableLambdaWithConfig<Vec<BaseMessage>, Vec<BaseMessage>> {
+    let separator = chunk_separator.unwrap_or_else(|| "\n".to_string());
+    RunnableLambdaWithConfig::new(move |messages: Vec<BaseMessage>| {
+        Ok(merge_message_runs(&messages, &separator))
+    })
+    .with_name("merge_message_runs")
+}
+
+/// Create a [`RunnableLambdaWithConfig`] that trims messages to a token budget.
+///
+/// This is the runnable counterpart to [`trim_messages`], matching Python's
+/// `trim_messages()` called without messages.
+pub fn trim_messages_runnable<F, S>(
+    config: TrimMessagesConfig<F, S>,
+) -> RunnableLambdaWithConfig<Vec<BaseMessage>, Vec<BaseMessage>>
+where
+    F: Fn(&[BaseMessage]) -> usize + Send + Sync + 'static,
+    S: Fn(&str) -> Vec<String> + Send + Sync + 'static,
+{
+    let config = Arc::new(config);
+    RunnableLambdaWithConfig::new(move |messages: Vec<BaseMessage>| {
+        Ok(trim_messages(&messages, &config))
+    })
+    .with_name("trim_messages")
+}
