@@ -66,6 +66,7 @@
 pub mod base;
 pub mod context;
 pub mod core;
+pub mod evaluation;
 pub mod event_stream;
 pub mod log_stream;
 pub mod memory_stream;
@@ -110,6 +111,12 @@ pub use stdout::{ConsoleCallbackHandler, FunctionCallbackHandler, elapsed, try_j
 
 // Re-export event stream types
 pub use event_stream::{AstreamEventsCallbackHandler, RunInfo, astream_events_implementation};
+
+// Re-export evaluation types
+pub use evaluation::{
+    EvaluationResult, EvaluatorCallbackHandler, LatencyEvaluator, NonEmptyOutputEvaluator,
+    RunEvaluator, wait_for_all_evaluators,
+};
 
 #[cfg(test)]
 mod tests {
