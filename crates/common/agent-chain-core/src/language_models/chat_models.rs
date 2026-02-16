@@ -1110,6 +1110,16 @@ pub trait BaseChatModel: BaseLanguageModel {
             }
         }
 
+        // Inject response_metadata into each generation's message
+        for generation in &mut result.generations {
+            if let BaseMessage::AI(ref mut ai_msg) = generation.message {
+                ai_msg.response_metadata = _gen_info_and_msg_metadata(
+                    generation.generation_info.as_ref(),
+                    &ai_msg.response_metadata,
+                );
+            }
+        }
+
         // Update cache with new result
         if let Some(ref cache) = resolved_cache {
             let llm_string = self._get_llm_string(stop.as_deref(), None);
@@ -1208,6 +1218,16 @@ pub trait BaseChatModel: BaseLanguageModel {
                     let updated = super::utils::update_message_content_to_blocks(ai_msg, "v1");
                     generation.message = BaseMessage::AI(updated);
                 }
+            }
+        }
+
+        // Inject response_metadata into each generation's message
+        for generation in &mut result.generations {
+            if let BaseMessage::AI(ref mut ai_msg) = generation.message {
+                ai_msg.response_metadata = _gen_info_and_msg_metadata(
+                    generation.generation_info.as_ref(),
+                    &ai_msg.response_metadata,
+                );
             }
         }
 
@@ -1501,6 +1521,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             let mut pinned_stream = generation_stream;
             let mut chunks: Vec<ChatGenerationChunk> = Vec::new();
             let mut yielded = false;
+            let mut last_chunk_position: Option<ChunkPosition> = None;
             let mut block_index: i64 = -1;
             let mut block_index_type = String::new();
 
@@ -1512,17 +1533,36 @@ pub trait BaseChatModel: BaseLanguageModel {
                             other => AIMessageChunk::builder().content(other.text()).build(),
                         };
 
+                        // Inject response_metadata from generation_info + message metadata
+                        let ai_response_meta = match &generation_chunk.message {
+                            BaseMessage::AI(ai_msg) => &ai_msg.response_metadata,
+                            _ => &ai_chunk.response_metadata,
+                        };
+                        ai_chunk.response_metadata = _gen_info_and_msg_metadata(
+                            generation_chunk.generation_info.as_ref(),
+                            ai_response_meta,
+                        );
+
                         // Apply output_version v1 processing
                         if output_version.as_deref() == Some("v1") {
                             ai_chunk = super::utils::update_chunk_content_to_blocks(&ai_chunk, "v1");
                             apply_block_indices(&mut ai_chunk, &mut block_index, &mut block_index_type);
                         }
 
-                        // Fire on_llm_new_token callback
+                        // Fire on_llm_new_token callback with chunk data
                         if let Some(ref rm) = run_manager {
-                            rm.on_llm_new_token(ai_chunk.content.as_text_ref(), None);
+                            let chunk_json = serde_json::to_value(&generation_chunk).ok();
+                            rm.on_llm_new_token(
+                                ai_chunk.content.as_text_ref(),
+                                chunk_json.as_ref(),
+                            );
                         }
 
+                        last_chunk_position = generation_chunk
+                            .generation_info
+                            .as_ref()
+                            .and_then(|info| info.get("chunk_position"))
+                            .and_then(|v| serde_json::from_value::<ChunkPosition>(v.clone()).ok());
                         chunks.push(generation_chunk);
                         yielded = true;
                         yield Ok(ai_chunk);
@@ -1537,13 +1577,18 @@ pub trait BaseChatModel: BaseLanguageModel {
                 }
             }
 
-            // Yield a final empty chunk with chunk_position="last"
-            if yielded {
+            // Yield a final empty chunk with chunk_position="last" if
+            // the last chunk didn't already have it
+            if yielded && last_chunk_position.is_none() {
                 let mut final_chunk = AIMessageChunk::builder().content("").build();
                 final_chunk.set_chunk_position(Some(ChunkPosition::Last));
 
                 if let Some(ref rm) = run_manager {
-                    rm.on_llm_new_token("", None);
+                    let msg_chunk = ChatGenerationChunk::new(
+                        BaseMessage::AI(crate::messages::AIMessage::builder().content("").build())
+                    );
+                    let chunk_json = serde_json::to_value(&msg_chunk).ok();
+                    rm.on_llm_new_token("", chunk_json.as_ref());
                 }
 
                 yield Ok(final_chunk);
@@ -1651,6 +1696,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             let mut pinned_stream = generation_stream;
             let mut chunks: Vec<ChatGenerationChunk> = Vec::new();
             let mut yielded = false;
+            let mut last_chunk_position: Option<ChunkPosition> = None;
             let mut block_index: i64 = -1;
             let mut block_index_type = String::new();
 
@@ -1662,17 +1708,36 @@ pub trait BaseChatModel: BaseLanguageModel {
                             other => AIMessageChunk::builder().content(other.text()).build(),
                         };
 
+                        // Inject response_metadata from generation_info + message metadata
+                        let ai_response_meta = match &generation_chunk.message {
+                            BaseMessage::AI(ai_msg) => &ai_msg.response_metadata,
+                            _ => &ai_chunk.response_metadata,
+                        };
+                        ai_chunk.response_metadata = _gen_info_and_msg_metadata(
+                            generation_chunk.generation_info.as_ref(),
+                            ai_response_meta,
+                        );
+
                         // Apply output_version v1 processing
                         if output_version.as_deref() == Some("v1") {
                             ai_chunk = super::utils::update_chunk_content_to_blocks(&ai_chunk, "v1");
                             apply_block_indices(&mut ai_chunk, &mut block_index, &mut block_index_type);
                         }
 
-                        // Fire on_llm_new_token callback
+                        // Fire on_llm_new_token callback with chunk data
                         if let Some(ref rm) = run_manager {
-                            rm.on_llm_new_token(ai_chunk.content.as_text_ref(), None).await;
+                            let chunk_json = serde_json::to_value(&generation_chunk).ok();
+                            rm.on_llm_new_token(
+                                ai_chunk.content.as_text_ref(),
+                                chunk_json.as_ref(),
+                            ).await;
                         }
 
+                        last_chunk_position = generation_chunk
+                            .generation_info
+                            .as_ref()
+                            .and_then(|info| info.get("chunk_position"))
+                            .and_then(|v| serde_json::from_value::<ChunkPosition>(v.clone()).ok());
                         chunks.push(generation_chunk);
                         yielded = true;
                         yield Ok(ai_chunk);
@@ -1687,13 +1752,18 @@ pub trait BaseChatModel: BaseLanguageModel {
                 }
             }
 
-            // Yield a final empty chunk with chunk_position="last"
-            if yielded {
+            // Yield a final empty chunk with chunk_position="last" if
+            // the last chunk didn't already have it
+            if yielded && last_chunk_position.is_none() {
                 let mut final_chunk = AIMessageChunk::builder().content("").build();
                 final_chunk.set_chunk_position(Some(ChunkPosition::Last));
 
                 if let Some(ref rm) = run_manager {
-                    rm.on_llm_new_token("", None).await;
+                    let msg_chunk = ChatGenerationChunk::new(
+                        BaseMessage::AI(crate::messages::AIMessage::builder().content("").build())
+                    );
+                    let chunk_json = serde_json::to_value(&msg_chunk).ok();
+                    rm.on_llm_new_token("", chunk_json.as_ref()).await;
                 }
 
                 yield Ok(final_chunk);
@@ -2038,6 +2108,22 @@ pub async fn collect_and_merge_stream(
 /// This tracks block type changes across streaming chunks and assigns
 /// incrementing `index` values when the block type changes.
 /// Mirrors Python's index tracking in `stream()` and `astream()`.
+/// Merge `generation_info` and the message's `response_metadata` into one map.
+///
+/// Mirrors Python's `_gen_info_and_msg_metadata()`.
+pub fn _gen_info_and_msg_metadata(
+    generation_info: Option<&HashMap<String, Value>>,
+    response_metadata: &HashMap<String, Value>,
+) -> HashMap<String, Value> {
+    let mut result = generation_info.cloned().unwrap_or_default();
+    result.extend(
+        response_metadata
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone())),
+    );
+    result
+}
+
 fn apply_block_indices(
     chunk: &mut AIMessageChunk,
     block_index: &mut i64,
