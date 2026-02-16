@@ -1579,6 +1579,38 @@ pub fn backwards_compat_tool_calls(
     (tool_calls, invalid_tool_calls, tool_call_chunks)
 }
 
+// --- Serializable impls ---
+
+use crate::load::Serializable;
+
+impl Serializable for AIMessage {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "schema".to_string(),
+            "messages".to_string(),
+        ]
+    }
+}
+
+impl Serializable for AIMessageChunk {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "schema".to_string(),
+            "messages".to_string(),
+        ]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1888,37 +1920,5 @@ mod tests {
         let result = add_ai_message_chunks(chunk1, vec![chunk2]);
 
         assert_eq!(result.id, Some("lc_run-789".to_string()));
-    }
-}
-
-// --- Serializable impls ---
-
-use crate::load::Serializable;
-
-impl Serializable for AIMessage {
-    fn is_lc_serializable() -> bool {
-        true
-    }
-
-    fn get_lc_namespace() -> Vec<String> {
-        vec![
-            "langchain".to_string(),
-            "schema".to_string(),
-            "messages".to_string(),
-        ]
-    }
-}
-
-impl Serializable for AIMessageChunk {
-    fn is_lc_serializable() -> bool {
-        true
-    }
-
-    fn get_lc_namespace() -> Vec<String> {
-        vec![
-            "langchain".to_string(),
-            "schema".to_string(),
-            "messages".to_string(),
-        ]
     }
 }

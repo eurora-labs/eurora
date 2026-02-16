@@ -78,17 +78,20 @@ impl std::fmt::Debug for Box<dyn ExampleSelectorClone + Send + Sync> {
 }
 
 /// A simple example selector that always returns the same examples.
+#[cfg(test)]
 #[derive(Debug, Clone)]
-pub struct StaticExampleSelector {
+struct StaticExampleSelector {
     examples: Vec<HashMap<String, String>>,
 }
 
+#[cfg(test)]
 impl StaticExampleSelector {
-    pub fn new(examples: Vec<HashMap<String, String>>) -> Self {
+    fn new(examples: Vec<HashMap<String, String>>) -> Self {
         Self { examples }
     }
 }
 
+#[cfg(test)]
 impl ExampleSelector for StaticExampleSelector {
     fn select_examples(
         &self,

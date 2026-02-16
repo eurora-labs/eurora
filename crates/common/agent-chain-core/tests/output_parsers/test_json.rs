@@ -4,8 +4,7 @@
 
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::output_parsers::{
-    BaseCumulativeTransformOutputParser, BaseOutputParser, BaseTransformOutputParser,
-    SimpleJsonOutputParser,
+    BaseOutputParser, BaseTransformOutputParser, SimpleJsonOutputParser,
 };
 use agent_chain_core::utils::json::{
     parse_and_check_json_markdown, parse_json_markdown, parse_partial_json,
