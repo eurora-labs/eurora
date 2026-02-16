@@ -12,12 +12,14 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::Value;
 
+use crate::callbacks::base::Callbacks;
+use crate::callbacks::manager::CallbackManagerForToolRun;
 use crate::error::{Error, Result};
 use crate::runnables::RunnableConfig;
 
 use super::base::{
     ArgsSchema, BaseTool, FILTERED_ARGS, HandleToolError, HandleValidationError, ResponseFormat,
-    ToolException, ToolInput, ToolOutput,
+    ToolInput, ToolOutput,
 };
 
 /// Type alias for sync structured tool function.
@@ -61,6 +63,8 @@ pub struct StructuredTool {
     metadata: Option<HashMap<String, Value>>,
     /// Optional provider-specific extras.
     extras: Option<HashMap<String, Value>>,
+    /// Optional callbacks for the tool.
+    callbacks: Option<Callbacks>,
 }
 
 impl Debug for StructuredTool {
@@ -96,6 +100,7 @@ impl StructuredTool {
             tags: None,
             metadata: None,
             extras: None,
+            callbacks: None,
         }
     }
 
@@ -138,6 +143,12 @@ impl StructuredTool {
     /// Set extras.
     pub fn with_extras(mut self, extras: HashMap<String, Value>) -> Self {
         self.extras = Some(extras);
+        self
+    }
+
+    /// Set callbacks.
+    pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
+        self.callbacks = Some(callbacks);
         self
     }
 
@@ -186,21 +197,6 @@ impl StructuredTool {
             .with_coroutine(Arc::new(move |args| Box::pin(coroutine(args))))
     }
 
-    /// Create a tool from an async function only.
-    pub fn from_async_function<AF, Fut>(
-        coroutine: AF,
-        name: impl Into<String>,
-        description: impl Into<String>,
-        args_schema: ArgsSchema,
-    ) -> Self
-    where
-        AF: Fn(HashMap<String, Value>) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<Value>> + Send + 'static,
-    {
-        Self::new(name, description, args_schema)
-            .with_coroutine(Arc::new(move |args| Box::pin(coroutine(args))))
-    }
-
     /// Extract the arguments from the tool input.
     fn extract_args(&self, input: ToolInput) -> Result<HashMap<String, Value>> {
         match input {
@@ -212,7 +208,7 @@ impl StructuredTool {
                     // Use as single argument if schema has one field
                     let props = self.args_schema.properties();
                     if props.len() == 1 {
-                        let key = props.keys().next().unwrap().clone();
+                        let key = props.keys().next().expect("checked len == 1").clone();
                         let mut args = HashMap::new();
                         args.insert(key, Value::String(s));
                         Ok(args)
@@ -291,51 +287,25 @@ impl BaseTool for StructuredTool {
         self.extras.as_ref()
     }
 
-    fn run(&self, input: ToolInput, _config: Option<RunnableConfig>) -> Result<ToolOutput> {
+    fn callbacks(&self) -> Option<&Callbacks> {
+        self.callbacks.as_ref()
+    }
+
+    fn tool_run(
+        &self,
+        input: ToolInput,
+        _run_manager: Option<&CallbackManagerForToolRun>,
+        _config: &RunnableConfig,
+    ) -> Result<ToolOutput> {
         let args = self.extract_args(input)?;
         let filtered_args = self.filter_args(args);
 
         if let Some(ref func) = self.func {
-            match func(filtered_args) {
-                Ok(result) => {
-                    match self.response_format {
-                        ResponseFormat::Content => match result {
-                            Value::String(s) => Ok(ToolOutput::String(s)),
-                            other => Ok(ToolOutput::Json(other)),
-                        },
-                        ResponseFormat::ContentAndArtifact => {
-                            // Expect a tuple [content, artifact]
-                            if let Value::Array(arr) = result {
-                                if arr.len() == 2 {
-                                    Ok(ToolOutput::ContentAndArtifact {
-                                        content: arr[0].clone(),
-                                        artifact: arr[1].clone(),
-                                    })
-                                } else {
-                                    Err(Error::ToolInvocation(
-                                        "content_and_artifact response must be a 2-tuple"
-                                            .to_string(),
-                                    ))
-                                }
-                            } else {
-                                Err(Error::ToolInvocation(
-                                    "content_and_artifact response must be a 2-tuple".to_string(),
-                                ))
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    if let Error::ToolInvocation(msg) = &e {
-                        let exc = ToolException::new(msg.clone());
-                        if let Some(handled) =
-                            super::base::handle_tool_error_impl(&exc, &self.handle_tool_error)
-                        {
-                            return Ok(ToolOutput::String(handled));
-                        }
-                    }
-                    Err(e)
-                }
+            let result = func(filtered_args)?;
+            // Return raw result — response_format handling is in BaseTool::run()
+            match result {
+                Value::String(s) => Ok(ToolOutput::String(s)),
+                other => Ok(ToolOutput::Json(other)),
             }
         } else {
             Err(Error::ToolInvocation(
@@ -344,204 +314,27 @@ impl BaseTool for StructuredTool {
         }
     }
 
-    async fn arun(&self, input: ToolInput, config: Option<RunnableConfig>) -> Result<ToolOutput> {
+    async fn tool_arun(
+        &self,
+        input: ToolInput,
+        _run_manager: Option<&crate::callbacks::manager::AsyncCallbackManagerForToolRun>,
+        _config: &RunnableConfig,
+    ) -> Result<ToolOutput> {
         let args = self.extract_args(input.clone())?;
         let filtered_args = self.filter_args(args);
 
         if let Some(ref coroutine) = self.coroutine {
-            match coroutine(filtered_args).await {
-                Ok(result) => match self.response_format {
-                    ResponseFormat::Content => match result {
-                        Value::String(s) => Ok(ToolOutput::String(s)),
-                        other => Ok(ToolOutput::Json(other)),
-                    },
-                    ResponseFormat::ContentAndArtifact => {
-                        if let Value::Array(arr) = result {
-                            if arr.len() == 2 {
-                                Ok(ToolOutput::ContentAndArtifact {
-                                    content: arr[0].clone(),
-                                    artifact: arr[1].clone(),
-                                })
-                            } else {
-                                Err(Error::ToolInvocation(
-                                    "content_and_artifact response must be a 2-tuple".to_string(),
-                                ))
-                            }
-                        } else {
-                            Err(Error::ToolInvocation(
-                                "content_and_artifact response must be a 2-tuple".to_string(),
-                            ))
-                        }
-                    }
-                },
-                Err(e) => {
-                    if let Error::ToolInvocation(msg) = &e {
-                        let exc = ToolException::new(msg.clone());
-                        if let Some(handled) =
-                            super::base::handle_tool_error_impl(&exc, &self.handle_tool_error)
-                        {
-                            return Ok(ToolOutput::String(handled));
-                        }
-                    }
-                    Err(e)
-                }
+            let result = coroutine(filtered_args).await?;
+            // Return raw result — response_format handling is in BaseTool::arun()
+            match result {
+                Value::String(s) => Ok(ToolOutput::String(s)),
+                other => Ok(ToolOutput::Json(other)),
             }
         } else {
             // Fall back to sync implementation
-            self.run(input, config)
+            let sync_manager = _run_manager.map(|rm| rm.get_sync());
+            self.tool_run(input, sync_manager.as_ref(), _config)
         }
-    }
-}
-
-/// Builder for creating StructuredTool instances.
-pub struct StructuredToolBuilder {
-    name: Option<String>,
-    description: Option<String>,
-    func: Option<StructuredToolFunc>,
-    coroutine: Option<AsyncStructuredToolFunc>,
-    args_schema: Option<ArgsSchema>,
-    return_direct: bool,
-    response_format: ResponseFormat,
-    parse_docstring: bool,
-    error_on_invalid_docstring: bool,
-    tags: Option<Vec<String>>,
-    metadata: Option<HashMap<String, Value>>,
-    extras: Option<HashMap<String, Value>>,
-}
-
-impl StructuredToolBuilder {
-    /// Create a new StructuredToolBuilder.
-    pub fn new() -> Self {
-        Self {
-            name: None,
-            description: None,
-            func: None,
-            coroutine: None,
-            args_schema: None,
-            return_direct: false,
-            response_format: ResponseFormat::Content,
-            parse_docstring: false,
-            error_on_invalid_docstring: false,
-            tags: None,
-            metadata: None,
-            extras: None,
-        }
-    }
-
-    /// Set the name.
-    pub fn name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
-
-    /// Set the description.
-    pub fn description(mut self, description: impl Into<String>) -> Self {
-        self.description = Some(description.into());
-        self
-    }
-
-    /// Set the sync function.
-    pub fn func<F>(mut self, func: F) -> Self
-    where
-        F: Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync + 'static,
-    {
-        self.func = Some(Arc::new(func));
-        self
-    }
-
-    /// Set the async function.
-    pub fn coroutine<AF, Fut>(mut self, coroutine: AF) -> Self
-    where
-        AF: Fn(HashMap<String, Value>) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<Value>> + Send + 'static,
-    {
-        self.coroutine = Some(Arc::new(move |args| Box::pin(coroutine(args))));
-        self
-    }
-
-    /// Set the args schema.
-    pub fn args_schema(mut self, schema: ArgsSchema) -> Self {
-        self.args_schema = Some(schema);
-        self
-    }
-
-    /// Set return_direct.
-    pub fn return_direct(mut self, return_direct: bool) -> Self {
-        self.return_direct = return_direct;
-        self
-    }
-
-    /// Set the response format.
-    pub fn response_format(mut self, format: ResponseFormat) -> Self {
-        self.response_format = format;
-        self
-    }
-
-    /// Set parse_docstring.
-    pub fn parse_docstring(mut self, parse: bool) -> Self {
-        self.parse_docstring = parse;
-        self
-    }
-
-    /// Set error_on_invalid_docstring.
-    pub fn error_on_invalid_docstring(mut self, error: bool) -> Self {
-        self.error_on_invalid_docstring = error;
-        self
-    }
-
-    /// Set tags.
-    pub fn tags(mut self, tags: Vec<String>) -> Self {
-        self.tags = Some(tags);
-        self
-    }
-
-    /// Set metadata.
-    pub fn metadata(mut self, metadata: HashMap<String, Value>) -> Self {
-        self.metadata = Some(metadata);
-        self
-    }
-
-    /// Set extras.
-    pub fn extras(mut self, extras: HashMap<String, Value>) -> Self {
-        self.extras = Some(extras);
-        self
-    }
-
-    /// Build the StructuredTool.
-    pub fn build(self) -> Result<StructuredTool> {
-        let name = self
-            .name
-            .ok_or_else(|| Error::InvalidConfig("Tool name is required".to_string()))?;
-        let description = self.description.unwrap_or_default();
-        let args_schema = self.args_schema.unwrap_or_default();
-
-        if self.func.is_none() && self.coroutine.is_none() {
-            return Err(Error::InvalidConfig(
-                "Function and/or coroutine must be provided".to_string(),
-            ));
-        }
-
-        Ok(StructuredTool {
-            name,
-            description,
-            func: self.func,
-            coroutine: self.coroutine,
-            args_schema,
-            return_direct: self.return_direct,
-            verbose: false,
-            handle_tool_error: HandleToolError::Bool(false),
-            handle_validation_error: HandleValidationError::Bool(false),
-            response_format: self.response_format,
-            tags: self.tags,
-            metadata: self.metadata,
-            extras: self.extras,
-        })
-    }
-}
-
-impl Default for StructuredToolBuilder {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -628,41 +421,11 @@ mod tests {
         input.insert("x".to_string(), Value::from(3.0));
         input.insert("y".to_string(), Value::from(4.0));
 
-        let result = tool.run(ToolInput::Dict(input), None).unwrap();
+        let result = tool.run(ToolInput::Dict(input), None, None).unwrap();
         match result {
             ToolOutput::Json(v) => assert_eq!(v.as_f64().unwrap(), 12.0),
             _ => panic!("Expected Json output"),
         }
-    }
-
-    #[test]
-    fn test_structured_tool_builder() {
-        let tool = StructuredToolBuilder::new()
-            .name("greet")
-            .description("Greets a person")
-            .args_schema(create_args_schema(
-                "greet",
-                {
-                    let mut props = HashMap::new();
-                    props.insert("name".to_string(), serde_json::json!({"type": "string"}));
-                    props
-                },
-                vec!["name".to_string()],
-                None,
-            ))
-            .func(|args| {
-                let name = args
-                    .get("name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("stranger");
-                Ok(Value::String(format!("Hello, {}!", name)))
-            })
-            .return_direct(true)
-            .build()
-            .unwrap();
-
-        assert_eq!(tool.name(), "greet");
-        assert!(tool.return_direct());
     }
 
     #[test]
@@ -713,7 +476,7 @@ mod tests {
         input.insert("a".to_string(), Value::String("Hello".to_string()));
         input.insert("b".to_string(), Value::String("World".to_string()));
 
-        let result = tool.arun(ToolInput::Dict(input), None).await.unwrap();
+        let result = tool.arun(ToolInput::Dict(input), None, None).await.unwrap();
         match result {
             ToolOutput::String(s) => assert_eq!(s, "HelloWorld"),
             _ => panic!("Expected String output"),

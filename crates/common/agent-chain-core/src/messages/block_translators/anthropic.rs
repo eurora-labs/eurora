@@ -35,12 +35,10 @@ fn populate_extras(standard_block: &mut Value, block: &Value, known_fields: &Has
 
     if let Some(block_obj) = block.as_object() {
         for (key, value) in block_obj {
-            if !known_fields.contains(key.as_str()) {
-                let extras = standard_block
-                    .as_object_mut()
-                    .unwrap()
-                    .entry("extras")
-                    .or_insert_with(|| json!({}));
+            if !known_fields.contains(key.as_str())
+                && let Some(obj) = standard_block.as_object_mut()
+            {
+                let extras = obj.entry("extras").or_insert_with(|| json!({}));
                 if let Some(extras_obj) = extras.as_object_mut() {
                     extras_obj.insert(key.clone(), value.clone());
                 }
@@ -71,12 +69,10 @@ fn convert_citation_to_v1(citation: &Value) -> Value {
 
         if let Some(citation_obj) = citation.as_object() {
             for (key, value) in citation_obj {
-                if !known_fields.contains(key.as_str()) {
-                    let extras = url_citation
-                        .as_object_mut()
-                        .unwrap()
-                        .entry("extras")
-                        .or_insert_with(|| json!({}));
+                if !known_fields.contains(key.as_str())
+                    && let Some(obj) = url_citation.as_object_mut()
+                {
+                    let extras = obj.entry("extras").or_insert_with(|| json!({}));
                     if let Some(extras_obj) = extras.as_object_mut() {
                         extras_obj.insert(key.clone(), value.clone());
                     }
@@ -116,12 +112,10 @@ fn convert_citation_to_v1(citation: &Value) -> Value {
 
         if let Some(citation_obj) = citation.as_object() {
             for (key, value) in citation_obj {
-                if !known_fields.contains(key.as_str()) {
-                    let extras = document_citation
-                        .as_object_mut()
-                        .unwrap()
-                        .entry("extras")
-                        .or_insert_with(|| json!({}));
+                if !known_fields.contains(key.as_str())
+                    && let Some(obj) = document_citation.as_object_mut()
+                {
+                    let extras = obj.entry("extras").or_insert_with(|| json!({}));
                     if let Some(extras_obj) = extras.as_object_mut() {
                         extras_obj.insert(key.clone(), value.clone());
                     }
@@ -230,8 +224,9 @@ pub fn convert_to_standard_blocks_with_context(
                     && context
                         .map(|c| c.tool_call_chunks.len() == 1)
                         .unwrap_or(false)
+                    && let Some(ctx) = context
                 {
-                    let chunk = &context.unwrap().tool_call_chunks[0];
+                    let chunk = &ctx.tool_call_chunks[0];
                     let mut tool_call_chunk = json!({
                         "type": "tool_call_chunk",
                         "name": chunk.get("name").cloned().unwrap_or(Value::Null),

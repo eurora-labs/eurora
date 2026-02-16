@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 use agent_chain_core::callbacks::base::LLMManagerMixin;
 use agent_chain_core::callbacks::usage::{
-    UsageMetadataCallbackHandler, add_usage, get_usage_metadata_callback,
+    UsageMetadataCallbackHandler, get_usage_metadata_callback,
 };
 use agent_chain_core::messages::{AIMessage, InputTokenDetails, OutputTokenDetails, UsageMetadata};
 use agent_chain_core::outputs::{ChatGeneration, ChatResult};
@@ -115,7 +115,7 @@ fn test_usage_callback_accumulation() {
     handler.on_llm_end(&result2, Uuid::new_v4(), None);
 
     // Check intermediate state: usage1 + usage2
-    let total_1_2 = add_usage(&usage1(), &usage2());
+    let total_1_2 = usage1().add(&usage2());
     let metadata = callback.usage_metadata();
     assert_eq!(metadata.len(), 1);
     assert_eq!(
@@ -133,8 +133,8 @@ fn test_usage_callback_accumulation() {
     handler.on_llm_end(&result4, Uuid::new_v4(), None);
 
     // Check final state: usage1 + usage2 + usage3 + usage4
-    let total_3_4 = add_usage(&usage3(), &usage4());
-    let expected = add_usage(&total_1_2, &total_3_4);
+    let total_3_4 = usage3().add(&usage4());
+    let expected = total_1_2.add(&total_3_4);
     let metadata = callback.usage_metadata();
     assert_eq!(
         metadata.get("test_model").unwrap(),
@@ -157,7 +157,7 @@ fn test_usage_callback_via_handler() {
     callback.on_llm_end(&result1, Uuid::new_v4(), None);
     callback.on_llm_end(&result2, Uuid::new_v4(), None);
 
-    let total_1_2 = add_usage(&usage1(), &usage2());
+    let total_1_2 = usage1().add(&usage2());
     assert_eq!(
         callback.usage_metadata(),
         HashMap::from([("test_model".to_string(), total_1_2)])
@@ -183,8 +183,8 @@ fn test_usage_callback_multiple_models() {
     callback.on_llm_end(&result3, Uuid::new_v4(), None);
     callback.on_llm_end(&result4, Uuid::new_v4(), None);
 
-    let total_1_2 = add_usage(&usage1(), &usage2());
-    let total_3_4 = add_usage(&usage3(), &usage4());
+    let total_1_2 = usage1().add(&usage2());
+    let total_3_4 = usage3().add(&usage4());
 
     let metadata = callback.usage_metadata();
     assert_eq!(metadata.len(), 2);

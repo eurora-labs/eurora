@@ -47,14 +47,12 @@ pub use serializable::{
 };
 
 // Re-export dump functions
-pub use dump::{
-    default_serializer, dumpd, dumpd_serialized, dumpd_value, dumps, dumps_serialized, dumps_value,
-};
+pub use dump::{dumpd, dumps};
 
 // Re-export load functions and types
 pub use loader::{
     ConstructorInfo, RevivedValue, Reviver, ReviverConfig, load, loads, loads_with_namespaces,
-    loads_with_secrets,
+    loads_with_secrets, lookup_constructor,
 };
 
 // Re-export mapping types and constants

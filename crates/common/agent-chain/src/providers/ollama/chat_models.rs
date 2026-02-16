@@ -38,9 +38,11 @@ use crate::chat_models::{
     BaseChatModel, ChatChunk, ChatModelConfig, LangSmithParams, ToolChoice, UsageMetadata,
 };
 use crate::error::{Error, Result};
+use crate::language_models::ToolLike;
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
 use crate::messages::{AIMessage, BaseMessage, ContentPart, ImageSource, MessageContent, ToolCall};
 use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, LLMResult};
+use crate::runnables::base::Runnable;
 use crate::tools::{BaseTool, ToolDefinition};
 
 /// Default API base URL for Ollama.
@@ -71,7 +73,7 @@ pub enum KeepAlive {
 ///     .num_ctx(4096);
 ///
 /// let messages = vec![HumanMessage::builder().content("Hello!").build().into()];
-/// let response = model.generate(messages, None).await?;
+/// let response = model.generate(messages, GenerateConfig::default()).await?;
 /// ```
 #[derive(Debug)]
 pub struct ChatOllama {
@@ -126,6 +128,10 @@ pub struct ChatOllama {
     language_model_config: LanguageModelConfig,
     /// Whether the model has been validated (for lazy validation).
     model_validated: std::sync::atomic::AtomicBool,
+    /// Tools bound to this model via `bind_tools()`.
+    bound_tools: Vec<ToolDefinition>,
+    /// Tool choice for bound tools.
+    bound_tool_choice: Option<ToolChoice>,
 }
 
 impl Clone for ChatOllama {
@@ -159,6 +165,8 @@ impl Clone for ChatOllama {
                 self.model_validated
                     .load(std::sync::atomic::Ordering::Relaxed),
             ),
+            bound_tools: self.bound_tools.clone(),
+            bound_tool_choice: self.bound_tool_choice.clone(),
         }
     }
 }
@@ -208,6 +216,8 @@ impl ChatOllama {
             chat_model_config: ChatModelConfig::new(),
             language_model_config: LanguageModelConfig::new(),
             model_validated: std::sync::atomic::AtomicBool::new(false),
+            bound_tools: Vec::new(),
+            bound_tool_choice: None,
         }
     }
 
@@ -497,7 +507,7 @@ impl ChatOllama {
                 BaseMessage::AI(m) => {
                     let mut message = serde_json::json!({
                         "role": "assistant",
-                        "content": m.content(),
+                        "content": m.content.as_text(),
                         "images": [],
                     });
 
@@ -829,6 +839,18 @@ impl BaseChatModel for ChatOllama {
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
+        if !self.bound_tools.is_empty() {
+            let ai_message = self
+                .generate_with_tools(
+                    messages,
+                    &self.bound_tools,
+                    self.bound_tool_choice.as_ref(),
+                    stop,
+                )
+                .await?;
+            let generation = ChatGeneration::new(ai_message.into());
+            return Ok(ChatResult::new(vec![generation]));
+        }
         self._generate_internal(messages, stop, None).await
     }
 
@@ -947,6 +969,45 @@ impl BaseChatModel for ChatOllama {
 
         Ok(self.parse_response_to_ai_message(&ollama_resp))
     }
+
+    fn bind_tools(
+        &self,
+        tools: &[ToolLike],
+        tool_choice: Option<ToolChoice>,
+    ) -> Result<Box<dyn BaseChatModel>> {
+        let mut bound = self.clone();
+        bound.bound_tools = tools.iter().map(|t| t.to_definition()).collect();
+        bound.bound_tool_choice = tool_choice;
+        Ok(Box::new(bound))
+    }
+
+    fn with_structured_output(
+        &self,
+        schema: serde_json::Value,
+        include_raw: bool,
+    ) -> Result<
+        Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
+    > {
+        let tool_name = crate::language_models::extract_tool_name_from_schema(&schema);
+        let tool_like = ToolLike::Schema(schema);
+        let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
+
+        let output_parser =
+            crate::output_parsers::openai_tools::JsonOutputKeyToolsParser::new(&tool_name)
+                .with_first_tool_only(true);
+
+        let model_runnable =
+            crate::language_models::ChatModelRunnable::new(std::sync::Arc::from(bound_model));
+
+        if include_raw {
+            Ok(Box::new(
+                crate::language_models::StructuredOutputWithRaw::new(model_runnable, output_parser),
+            ))
+        } else {
+            let chain = crate::runnables::base::pipe(model_runnable, output_parser);
+            Ok(Box::new(chain))
+        }
+    }
 }
 
 impl ChatOllama {
@@ -1021,12 +1082,12 @@ impl ChatOllama {
         let (content, usage_metadata, tool_calls, chunk_additional_kwargs) =
             match &final_chunk.message {
                 BaseMessage::AI(ai) => (
-                    ai.content().to_string(),
+                    ai.text(),
                     ai.usage_metadata.clone(),
                     ai.tool_calls.clone(),
                     ai.additional_kwargs.clone(),
                 ),
-                other => (other.content().to_string(), None, vec![], HashMap::new()),
+                other => (other.text(), None, vec![], HashMap::new()),
             };
 
         let ai_message = AIMessage::builder()

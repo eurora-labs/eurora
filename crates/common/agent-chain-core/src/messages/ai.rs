@@ -8,8 +8,8 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
-use super::base::get_msg_title_repr;
-use super::content::ContentBlock;
+use super::base::{MergeableContent, get_msg_title_repr, merge_content_complex};
+use super::content::{ContentBlock, ContentPart, MessageContent};
 use super::tool::{
     InvalidToolCall, ToolCall, ToolCallChunk, default_tool_chunk_parser, default_tool_parser,
     invalid_tool_call, tool_call,
@@ -17,7 +17,7 @@ use super::tool::{
 use crate::utils::base::{LC_AUTO_PREFIX, LC_ID_PREFIX};
 use crate::utils::json::parse_partial_json;
 use crate::utils::merge::{merge_dicts, merge_lists};
-use crate::utils::usage::{dict_int_add_json, dict_int_sub_floor_json};
+use crate::utils::usage::dict_int_op;
 
 /// Breakdown of input token counts.
 ///
@@ -143,7 +143,7 @@ impl UsageMetadata {
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct AIMessage {
     /// The message content
-    pub content: String,
+    pub content: MessageContent,
     /// Optional unique identifier
     pub id: Option<String>,
     /// Optional name for the message
@@ -224,7 +224,7 @@ impl AIMessage {
     /// ```
     #[builder]
     pub fn new(
-        content: impl Into<String>,
+        content: impl Into<MessageContent>,
         id: Option<String>,
         name: Option<String>,
         #[builder(default)] tool_calls: Vec<ToolCall>,
@@ -249,7 +249,7 @@ impl AIMessage {
     ///
     /// This is a convenience method for creating messages with structured content.
     pub fn with_content_list(content_list: Vec<serde_json::Value>) -> Self {
-        let content = serde_json::to_string(&content_list).unwrap_or_default();
+        let content: MessageContent = content_list.into();
         Self::builder().content(content).build()
     }
 
@@ -258,20 +258,26 @@ impl AIMessage {
         self.id = Some(id);
     }
 
-    /// Get the message content.
-    pub fn content(&self) -> &str {
-        &self.content
+    /// Get the text content of the message.
+    pub fn text(&self) -> String {
+        self.content.as_text()
     }
 
     /// Get the raw content as a list of JSON values.
     ///
-    /// If the content is a JSON array, it returns the parsed array.
-    /// If the content is a string, it returns a single text block.
+    /// For Text content that is a JSON array, parses and returns the array.
+    /// For Parts content, serializes each part.
+    /// Otherwise wraps the text in a text block.
     pub fn content_list(&self) -> Vec<serde_json::Value> {
-        if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(&self.content) {
-            arr
-        } else {
-            vec![serde_json::json!({"type": "text", "text": self.content})]
+        match &self.content {
+            MessageContent::Text(s) => {
+                if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(s) {
+                    arr
+                } else {
+                    self.content.as_json_values()
+                }
+            }
+            MessageContent::Parts(_) => self.content.as_json_values(),
         }
     }
 
@@ -433,7 +439,7 @@ impl AIMessage {
         } else {
             String::new()
         };
-        let base = format!("{}{}\n\n{}", title, name_line, self.content);
+        let base = format!("{}{}\n\n{}", title, name_line, self.content.as_text());
 
         // Append tool call formatting
         let mut lines = Vec::new();
@@ -551,7 +557,7 @@ pub enum ChunkPosition {
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct AIMessageChunk {
     /// The message content (may be partial during streaming)
-    pub content: String,
+    pub content: MessageContent,
     /// Optional unique identifier
     pub id: Option<String>,
     /// Optional name for the message
@@ -648,7 +654,7 @@ impl AIMessageChunk {
     /// ```
     #[builder]
     pub fn new(
-        content: impl Into<String>,
+        content: impl Into<MessageContent>,
         id: Option<String>,
         name: Option<String>,
         #[builder(default)] tool_calls: Vec<ToolCall>,
@@ -677,19 +683,30 @@ impl AIMessageChunk {
     ///
     /// This is a convenience method for creating chunks with structured content.
     pub fn with_content_list(content_list: Vec<serde_json::Value>) -> Self {
-        let content = serde_json::to_string(&content_list).unwrap_or_default();
+        let content: MessageContent = content_list.into();
         Self::builder().content(content).build()
+    }
+
+    /// Get the text content of the message.
+    pub fn text(&self) -> String {
+        self.content.as_text()
     }
 
     /// Get the raw content as a list of JSON values.
     ///
-    /// If the content is a JSON array, it returns the parsed array.
-    /// If the content is a string, it returns a single text block.
+    /// For Text content that is a JSON array, parses and returns the array.
+    /// For Parts content, serializes each part.
+    /// Otherwise wraps the text in a text block.
     pub fn content_list(&self) -> Vec<serde_json::Value> {
-        if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(&self.content) {
-            arr
-        } else {
-            vec![serde_json::json!({"type": "text", "text": self.content})]
+        match &self.content {
+            MessageContent::Text(s) => {
+                if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(s) {
+                    arr
+                } else {
+                    self.content.as_json_values()
+                }
+            }
+            MessageContent::Parts(_) => self.content.as_json_values(),
         }
     }
 
@@ -985,48 +1002,52 @@ impl AIMessageChunk {
                 .get("output_version")
                 .and_then(|v| v.as_str())
                 == Some("v1")
-            && let Ok(mut content_list) =
-                serde_json::from_str::<Vec<serde_json::Value>>(&self.content)
         {
-            // Build a map of id -> tool_call for replacement
-            let id_to_tc: HashMap<String, serde_json::Value> = self
-                .tool_calls
-                .iter()
-                .filter_map(|tc| {
-                    tc.id.as_ref().map(|id| {
-                        let mut tc_val = serde_json::json!({
-                            "type": "tool_call",
-                            "name": tc.name,
-                            "args": tc.args,
-                            "id": id,
-                        });
-                        tc_val
-                            .as_object_mut()
-                            .map(|m| (id.clone(), serde_json::Value::Object(m.clone())))
+            let content_list_opt: Option<Vec<serde_json::Value>> = match &self.content {
+                MessageContent::Parts(_) => Some(self.content.as_json_values()),
+                MessageContent::Text(s) => serde_json::from_str(s).ok(),
+            };
+            if let Some(mut content_list) = content_list_opt {
+                // Build a map of id -> tool_call for replacement
+                let id_to_tc: HashMap<String, serde_json::Value> = self
+                    .tool_calls
+                    .iter()
+                    .filter_map(|tc| {
+                        tc.id.as_ref().map(|id| {
+                            let mut tc_val = serde_json::json!({
+                                "type": "tool_call",
+                                "name": tc.name,
+                                "args": tc.args,
+                                "id": id,
+                            });
+                            tc_val
+                                .as_object_mut()
+                                .map(|m| (id.clone(), serde_json::Value::Object(m.clone())))
+                        })
                     })
-                })
-                .flatten()
-                .collect();
+                    .flatten()
+                    .collect();
 
-            let mut changed = false;
-            for block in &mut content_list {
-                if let Some(block_type) = block.get("type").and_then(|t| t.as_str())
-                    && block_type == "tool_call_chunk"
-                    && let Some(call_id) = block.get("id").and_then(|i| i.as_str())
-                    && let Some(tc) = id_to_tc.get(call_id)
-                {
-                    let mut replacement = tc.clone();
-                    // Preserve "extras" from the original block
-                    if let Some(extras) = block.get("extras") {
-                        replacement["extras"] = extras.clone();
+                let mut changed = false;
+                for block in &mut content_list {
+                    if let Some(block_type) = block.get("type").and_then(|t| t.as_str())
+                        && block_type == "tool_call_chunk"
+                        && let Some(call_id) = block.get("id").and_then(|i| i.as_str())
+                        && let Some(tc) = id_to_tc.get(call_id)
+                    {
+                        let mut replacement = tc.clone();
+                        // Preserve "extras" from the original block
+                        if let Some(extras) = block.get("extras") {
+                            replacement["extras"] = extras.clone();
+                        }
+                        *block = replacement;
+                        changed = true;
                     }
-                    *block = replacement;
-                    changed = true;
                 }
-            }
 
-            if changed {
-                self.content = serde_json::to_string(&content_list).unwrap_or(self.content.clone());
+                if changed {
+                    self.content = content_list.into();
+                }
             }
         }
     }
@@ -1052,8 +1073,11 @@ impl AIMessageChunk {
             return;
         }
 
-        if let Ok(mut content_list) = serde_json::from_str::<Vec<serde_json::Value>>(&self.content)
-        {
+        let server_content_opt: Option<Vec<serde_json::Value>> = match &self.content {
+            MessageContent::Parts(_) => Some(self.content.as_json_values()),
+            MessageContent::Text(s) => serde_json::from_str(s).ok(),
+        };
+        if let Some(mut content_list) = server_content_opt {
             let mut changed = false;
             for block in &mut content_list {
                 if let Some(block_type) = block.get("type").and_then(|t| t.as_str())
@@ -1069,7 +1093,7 @@ impl AIMessageChunk {
             }
 
             if changed {
-                self.content = serde_json::to_string(&content_list).unwrap_or(self.content.clone());
+                self.content = content_list.into();
             }
         }
     }
@@ -1108,7 +1132,7 @@ impl AIMessageChunk {
         } else {
             String::new()
         };
-        let base = format!("{}{}\n\n{}", title, name_line, self.content);
+        let base = format!("{}{}\n\n{}", title, name_line, self.content.as_text());
 
         // Append tool call formatting
         let mut lines = Vec::new();
@@ -1143,89 +1167,38 @@ impl AIMessageChunk {
 /// # Returns
 ///
 /// The merged content as a string (either plain text or JSON array)
-fn merge_message_content(first: &str, others: &[&str]) -> String {
-    // Try to parse first content as JSON array
-    let mut merged: serde_json::Value = match serde_json::from_str::<Vec<serde_json::Value>>(first)
-    {
-        Ok(arr) => serde_json::Value::Array(arr),
-        Err(_) => {
-            // Not a JSON array, treat as plain string
-            serde_json::Value::String(first.to_string())
+fn merge_message_content(first: &MessageContent, others: &[&MessageContent]) -> MessageContent {
+    let to_mergeable = |mc: &MessageContent| -> MergeableContent {
+        match mc {
+            MessageContent::Text(s) => {
+                if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(s) {
+                    MergeableContent::List(arr)
+                } else {
+                    MergeableContent::Text(s.clone())
+                }
+            }
+            MessageContent::Parts(parts) => {
+                let values: Vec<serde_json::Value> = parts
+                    .iter()
+                    .filter_map(|p| serde_json::to_value(p).ok())
+                    .collect();
+                MergeableContent::List(values)
+            }
         }
     };
 
-    for content in others {
-        // Try to parse other content as JSON array
-        let other_val: serde_json::Value =
-            match serde_json::from_str::<Vec<serde_json::Value>>(content) {
-                Ok(arr) => serde_json::Value::Array(arr),
-                Err(_) => {
-                    // Not a JSON array, treat as plain string
-                    serde_json::Value::String(content.to_string())
-                }
-            };
+    let first_mergeable = to_mergeable(first);
+    let other_mergeables: Vec<MergeableContent> =
+        others.iter().map(|mc| to_mergeable(mc)).collect();
 
-        merged = match (merged, other_val) {
-            // String + String → String concatenation
-            (serde_json::Value::String(s1), serde_json::Value::String(s2)) => {
-                serde_json::Value::String(format!("{}{}", s1, s2))
-            }
-            // String + List → Prepend string to list
-            (serde_json::Value::String(s), serde_json::Value::Array(mut arr)) => {
-                if !s.is_empty() {
-                    arr.insert(0, serde_json::json!({"type": "text", "text": s}));
-                }
-                serde_json::Value::Array(arr)
-            }
-            // List + List → Use merge_lists
-            (serde_json::Value::Array(arr1), serde_json::Value::Array(arr2)) => {
-                let other_chunks: Vec<Option<Vec<serde_json::Value>>> = vec![Some(arr2.clone())];
-                match merge_lists(Some(arr1.clone()), other_chunks) {
-                    Ok(Some(merged_arr)) => serde_json::Value::Array(merged_arr),
-                    _ => {
-                        // Fallback: just concatenate arrays
-                        let mut result = arr1;
-                        result.extend(arr2);
-                        serde_json::Value::Array(result)
-                    }
-                }
-            }
-            // List + String → Append string to last element if it's a string, otherwise add as new element
-            (serde_json::Value::Array(mut arr), serde_json::Value::String(s)) => {
-                if s.is_empty() {
-                    // Empty string is a no-op
-                    serde_json::Value::Array(arr)
-                } else if let Some(last) = arr.last_mut() {
-                    // Check if last element is a text block or plain string
-                    if let Some(text) = last.get_mut("text") {
-                        if let Some(text_str) = text.as_str() {
-                            *text = serde_json::Value::String(format!("{}{}", text_str, s));
-                        }
-                    } else if last.is_string() {
-                        if let Some(last_str) = last.as_str() {
-                            *last = serde_json::Value::String(format!("{}{}", last_str, s));
-                        }
-                    } else {
-                        // Last element is not a string, add as new element
-                        arr.push(serde_json::json!({"type": "text", "text": s}));
-                    }
-                    serde_json::Value::Array(arr)
-                } else {
-                    // Empty array, add as new element
-                    arr.push(serde_json::json!({"type": "text", "text": s}));
-                    serde_json::Value::Array(arr)
-                }
-            }
-            // Fallback for other cases
-            (m, _) => m,
-        };
-    }
+    let merged = merge_content_complex(first_mergeable, other_mergeables);
 
-    // Serialize back to string
     match merged {
-        serde_json::Value::String(s) => s,
-        serde_json::Value::Array(arr) => serde_json::to_string(&arr).unwrap_or_default(),
-        _ => String::new(),
+        MergeableContent::Text(s) => MessageContent::Text(s),
+        MergeableContent::List(values) => {
+            let parts: Vec<ContentPart> = values.into_iter().map(ContentPart::Other).collect();
+            MessageContent::Parts(parts)
+        }
     }
 }
 
@@ -1245,10 +1218,7 @@ pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) 
     // Merge content using merge_content logic from Python
     let content = merge_message_content(
         &left.content,
-        &others
-            .iter()
-            .map(|o| o.content.as_str())
-            .collect::<Vec<_>>(),
+        &others.iter().map(|o| &o.content).collect::<Vec<_>>(),
     );
 
     // Merge additional_kwargs using merge_dicts
@@ -1469,7 +1439,7 @@ pub fn add_usage(left: Option<&UsageMetadata>, right: Option<&UsageMetadata>) ->
             let left_json = serde_json::to_value(l).unwrap_or_default();
             let right_json = serde_json::to_value(r).unwrap_or_default();
 
-            match dict_int_add_json(&left_json, &right_json) {
+            match dict_int_op(&left_json, &right_json, |a, b| a + b, 0, 100) {
                 Ok(merged) => serde_json::from_value(merged).unwrap_or_else(|_| l.add(r)),
                 Err(_) => l.add(r),
             }
@@ -1523,7 +1493,7 @@ pub fn subtract_usage(
             let left_json = serde_json::to_value(l).unwrap_or_default();
             let right_json = serde_json::to_value(r).unwrap_or_default();
 
-            match dict_int_sub_floor_json(&left_json, &right_json) {
+            match dict_int_op(&left_json, &right_json, |a, b| (a - b).max(0), 0, 100) {
                 Ok(subtracted) => {
                     serde_json::from_value(subtracted).unwrap_or_else(|_| subtract_manual(l, r))
                 }
@@ -1607,6 +1577,38 @@ pub fn backwards_compat_tool_calls(
     }
 
     (tool_calls, invalid_tool_calls, tool_call_chunks)
+}
+
+// --- Serializable impls ---
+
+use crate::load::Serializable;
+
+impl Serializable for AIMessage {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "schema".to_string(),
+            "messages".to_string(),
+        ]
+    }
+}
+
+impl Serializable for AIMessageChunk {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "schema".to_string(),
+            "messages".to_string(),
+        ]
+    }
 }
 
 #[cfg(test)]

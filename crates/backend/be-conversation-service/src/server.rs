@@ -398,7 +398,7 @@ impl ProtoConversationService for ConversationService {
 
         let openai_stream = self
             .chat_provider
-            .astream(messages.into(), None)
+            .astream(messages.into(), None, None)
             .await
             .map_err(|e| {
                 debug!("Error in chat_stream: {}", e);
@@ -562,8 +562,8 @@ impl ProtoConversationService for ConversationService {
                 .into(),
         );
 
-        let mut title = match self.title_provider.invoke(messages.into()).await {
-            Ok(message) => message.content,
+        let mut title = match self.title_provider.invoke(messages.into(), None).await {
+            Ok(message) => message.content.to_string(),
             Err(_) => "New Chat".to_string(),
         };
         let title_words: Vec<&str> = title.split_whitespace().collect();
