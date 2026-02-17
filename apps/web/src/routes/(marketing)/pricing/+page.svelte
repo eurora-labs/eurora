@@ -71,7 +71,6 @@
 	{/if}
 
 	<div class="mb-16 grid grid-cols-1 gap-8 md:grid-cols-3">
-		<!-- Free Plan -->
 		<Card.Root class="border-t-4 border-gray-400 p-6">
 			<Card.Header>
 				<Card.Title>Free</Card.Title>
@@ -116,7 +115,6 @@
 			</Card.Content>
 		</Card.Root>
 
-		<!-- Pro Plan -->
 		<Card.Root class="relative border-t-4 border-purple-600 p-6 shadow-lg">
 			<div
 				class="absolute right-0 top-0 rounded-bl-md bg-purple-600 px-3 py-1 text-sm font-medium text-white"
@@ -173,7 +171,6 @@
 			</Card.Content>
 		</Card.Root>
 
-		<!-- Enterprise Plan -->
 		<Card.Root class="border-t-4 border-blue-600 p-6">
 			<Card.Header>
 				<Card.Title>Enterprise</Card.Title>

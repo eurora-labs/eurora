@@ -46,7 +46,6 @@
 	} from '@lucide/svelte';
 </script>
 
-<!-- Default Command -->
 <Story name="Default">
 	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
@@ -80,7 +79,6 @@
 	</StorybookContainer>
 </Story>
 
-<!-- With Multiple Groups -->
 <Story name="With Groups">
 	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
@@ -140,7 +138,6 @@
 	</StorybookContainer>
 </Story>
 
-<!-- With Colored Icons -->
 <Story name="With Icons">
 	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
@@ -195,7 +192,6 @@
 	</StorybookContainer>
 </Story>
 
-<!-- Empty State -->
 <Story name="Empty">
 	<StorybookContainer>
 		<Command.Root
@@ -229,7 +225,6 @@
 	</StorybookContainer>
 </Story>
 
-<!-- Loading State -->
 <Story name="Loading">
 	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
@@ -257,7 +252,6 @@
 	</StorybookContainer>
 </Story>
 
-<!-- Interactive Example -->
 {#snippet template(args: { value: string }, _context: StoryContext<typeof Story>)}
 	<StorybookContainer>
 		<Command.Root

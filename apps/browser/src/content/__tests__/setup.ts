@@ -1,7 +1,6 @@
 import { vi } from 'vitest';
 import '@testing-library/jest-dom';
 
-// Mock webextension-polyfill
 const mockBrowser = {
 	runtime: {
 		onMessage: {
@@ -17,7 +16,6 @@ vi.mock('webextension-polyfill', () => ({
 	default: mockBrowser,
 }));
 
-// Mock chrome API
 global.chrome = {
 	runtime: {
 		onMessage: {
@@ -29,14 +27,11 @@ global.chrome = {
 	},
 } as any;
 
-// Mock browser API
 (global as any).browser = mockBrowser;
 
-// Setup DOM environment
 global.document = window.document;
 global.navigator = window.navigator;
 
-// Mock canvas context for jsdom
 HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
 	drawImage: vi.fn(),
 	fillRect: vi.fn(),

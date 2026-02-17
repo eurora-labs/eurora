@@ -3,81 +3,23 @@
 	"version": "0.1.0",
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev",
-		"check": "svelte-check --tsconfig ./tsconfig.json",
-		"check:watch": "pnpm check --watch",
-		"package": "pnpm run --sequential \"/^package:.*/\"",
-		"package:svelte": "svelte-kit sync && svelte-package",
-		"prepublishOnly": "pnpm run package",
-		"prepare": "svelte-kit sync",
+		"build": "vite build",
+		"check": "tsc --noEmit",
 		"test": "vitest run --mode development",
 		"test:watch": "vitest --watch --mode development"
 	},
-	"peerDependencies": {
-		"svelte": "^5.0.0"
-	},
 	"devDependencies": {
-		"@eslint/compat": "^1.4.1",
-		"@eslint/js": "^9.39.2",
-		"@internationalized/date": "^3.11.0",
-		"@lucide/svelte": "catalog:",
-		"@playwright/test": "^1.58.1",
-		"@sveltejs/adapter-static": "catalog:svelte",
-		"@sveltejs/kit": "catalog:svelte",
-		"@sveltejs/package": "^2.5.7",
-		"@sveltejs/vite-plugin-svelte": "catalog:svelte",
-		"@tailwindcss/container-queries": "^0.1.1",
-		"@tailwindcss/forms": "^0.5.11",
-		"@tailwindcss/postcss": "catalog:",
-		"@tailwindcss/typography": "^0.5.19",
-		"@tailwindcss/vite": "^4.1.18",
-		"@tanstack/table-core": "^8.21.3",
-		"@testing-library/jest-dom": "^6.9.1",
-		"@testing-library/svelte": "^5.3.1",
-		"autoprefixer": "^10.4.24",
-		"clsx": "^2.1.1",
-		"eslint": "^9.39.2",
-		"eslint-config-prettier": "^10.1.8",
-		"eslint-plugin-svelte": "^2.46.1",
-		"globals": "^15.14.0",
-		"jsdom": "^25.0.1",
-		"mode-watcher": "^1.1.0",
-		"layerchart": "2.0.0-next.44",
-		"paneforge": "1.0.2",
-		"postcss": "catalog:",
-		"postcss-cli": "^11.0.0",
-		"postcss-import": "^16.1.1",
-		"postcss-minify": "^1.1.0",
-		"postcss-nesting": "^13.0.2",
-		"postcss-pxtorem": "^6.1.0",
-		"prettier": "^3.8.1",
-		"prettier-plugin-svelte": "^3.4.1",
-		"prettier-plugin-tailwindcss": "^0.7.2",
-		"@connectrpc/connect": "^2.1.1",
-		"@connectrpc/connect-web": "^2.1.1",
-		"publint": "^0.3.17",
-		"svelte": "catalog:svelte",
-		"svelte-check": "catalog:svelte",
-		"svelte-sonner": "^1.0.7",
-		"sveltekit-superforms": "^2.29.1",
-		"tailwind-merge": "^3.4.0",
-		"tailwind-variants": "^1.0.0",
 		"@bufbuild/buf": "^1.65.0",
 		"@bufbuild/protobuf": "^2.11.0",
 		"@bufbuild/protoc-gen-es": "^2.11.0",
-		"tailwindcss": "catalog:",
-		"tw-animate-css": "^1.4.0",
+		"@connectrpc/connect": "^2.1.1",
+		"@connectrpc/connect-web": "^2.1.1",
 		"typescript": "^5.9.3",
-		"typescript-eslint": "^8.54.0",
-		"vaul-svelte": "1.0.0-next.7",
 		"vite": "catalog:",
+		"vite-plugin-dts": "^4.5.4",
 		"vitest": "catalog:"
 	},
 	"exports": {
-		"./*.svelte": {
-			"svelte": "./dist/*.svelte",
-			"types": "./dist/*.svelte.d.ts"
-		},
 		"./proto/*.js": {
 			"import": "./dist/protos/*.js",
 			"types": "./dist/protos/*.d.ts"
@@ -85,13 +27,6 @@
 		"./*": {
 			"import": "./dist/*.js",
 			"types": "./dist/*.d.ts"
-		},
-		"./*.css": {
-			"import": "./dist/styles/*.css"
-		},
-		"./*.json": {
-			"import": "./dist/*.json",
-			"types": "./dist/*.json"
 		}
 	},
 	"files": [

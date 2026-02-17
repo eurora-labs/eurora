@@ -12,13 +12,11 @@
 		const loginToken = await taurpc.auth.get_login_token();
 		await open(loginToken.url);
 
-		// Attempt to login by token every 5 seconds
 		const interval = setInterval(async () => {
 			const isLoginSuccess = await taurpc.auth.poll_for_login();
 			if (!isLoginSuccess) {
 				return;
 			}
-			// goto('/onboarding/login/first-party/browser-extension');
 			goto('/');
 			clearInterval(interval);
 		}, 5000);

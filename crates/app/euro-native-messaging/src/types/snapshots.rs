@@ -9,7 +9,6 @@ pub struct NativeYoutubeSnapshot {
     pub video_frame_base64: String,
     pub video_frame_width: i32,
     pub video_frame_height: i32,
-    // pub video_frame_format: ProtoImageFormat,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, Type)]

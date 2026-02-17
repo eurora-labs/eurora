@@ -1,5 +1,4 @@
 // swift-tools-version:5.9
-// The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
@@ -10,27 +9,21 @@ let package = Package(
         .macOS(.v13)
     ],
     products: [
-        // Shared library for Safari extension communication
         .library(
             name: "EuroraShared",
             targets: ["EuroraShared"]),
-        // Container app library with gRPC client
         .library(
             name: "EuroraContainerApp",
             targets: ["EuroraContainerApp"])
     ],
     dependencies: [
-        // gRPC Swift 2.x packages
         .package(url: "https://github.com/grpc/grpc-swift-2.git", from: "2.0.0"),
         .package(url: "https://github.com/grpc/grpc-swift-nio-transport.git", from: "2.0.0"),
         .package(url: "https://github.com/grpc/grpc-swift-protobuf.git", from: "2.0.0"),
         .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.63.2"),
-        // Swift Protobuf for generated message types
         .package(url: "https://github.com/apple/swift-protobuf.git", from: "1.25.0")
     ],
     targets: [
-        // Shared target - used by both container app and extension
-        // Only uses Network framework for local IPC, no gRPC dependencies
         .target(
             name: "EuroraShared",
             dependencies: [],
@@ -38,7 +31,6 @@ let package = Package(
             sources: ["NativeMessagingBridge.swift"],
             plugins: [.plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")]
         ),
-        // Container app target - includes gRPC client
         .target(
             name: "EuroraContainerApp",
             dependencies: [
@@ -58,7 +50,6 @@ let package = Package(
             ],
             plugins: [.plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")]
         ),
-        // Generated protobuf target
         .target(
             name: "BrowserBridgeProto",
             dependencies: [

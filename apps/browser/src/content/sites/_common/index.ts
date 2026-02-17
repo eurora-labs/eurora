@@ -1,6 +1,6 @@
 import browser from 'webextension-polyfill';
 import type { CommonBrowserMessage, WatcherParams } from './types.js';
-import type { WatcherResponse } from '@eurora/browser-shared/content/extensions/watchers/watcher';
+import type { WatcherResponse } from '../../../shared/content/extensions/watchers/watcher';
 
 export class CommonWatcher {
 	public params: WatcherParams;
@@ -23,7 +23,6 @@ export class CommonWatcher {
 				promise = this.handleGetMetadata(obj, _sender);
 				break;
 			default:
-				// Return false for unhandled message types to allow other listeners to process
 				return false;
 		}
 

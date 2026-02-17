@@ -53,16 +53,9 @@ export interface SveltePMNode<T> {
 	attrs?: T;
 	selectors?: string[];
 	schema: NodeSpec;
-	// component?: Component<NodeProps<T>>;
 	component?: Component<NodeProps<T>, Record<string, never>, ''>;
 	nodeView?: (editor: Editor) => NodeViewConstructor;
-
-	// component?: Component;
 }
-
-// Props extends Record<string, any> = {},
-// 		Exports extends Record<string, any> = {},
-// 		Bindings extends keyof Props | '' = string
 
 export interface PMExtension {
 	nodes: { [name: string]: NodeSpec };

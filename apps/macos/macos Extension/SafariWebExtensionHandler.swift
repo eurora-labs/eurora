@@ -1,14 +1,3 @@
-//
-//  SafariWebExtensionHandler.swift
-//  macos Extension
-//
-//  Handles messages from the Safari web extension JavaScript and forwards them
-//  to the container app via NativeMessagingBridge.
-//
-//  This is the extension-side equivalent of reading from/writing to stdin/stdout
-//  in the Chrome native messaging model.
-//
-
 import SafariServices
 import os.log
 
@@ -45,6 +34,7 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         }
 
         // Check if this is a response to a pending native request (from gRPC server)
+        // rather than a new outbound request from the extension.
         if let kind = messageDict["kind"] as? [String: Any],
            kind["Response"] != nil {
             if NativeMessagingBridge.shared.handleResponseFromExtension(messageDict) {
@@ -57,7 +47,6 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             return
         }
 
-        // Ensure the bridge is connected, then send the message
         NativeMessagingBridge.shared.ensureConnected()
 
         NativeMessagingBridge.shared.sendMessage(messageDict) { [weak self] result in

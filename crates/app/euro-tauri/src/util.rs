@@ -1,7 +1,6 @@
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut};
 
-/// Convert string modifiers to Tauri Modifiers
 #[allow(unused)]
 pub fn string_modifiers_to_tauri(modifiers: &[String]) -> Option<Modifiers> {
     let mut tauri_modifiers = Modifiers::empty();
@@ -23,7 +22,6 @@ pub fn string_modifiers_to_tauri(modifiers: &[String]) -> Option<Modifiers> {
     }
 }
 
-/// Convert string key to Tauri Code
 #[allow(unused)]
 pub fn string_key_to_tauri_code(key: &str) -> Option<Code> {
     match key.to_lowercase().as_str() {
@@ -53,7 +51,6 @@ pub fn string_key_to_tauri_code(key: &str) -> Option<Code> {
         "f10" => Some(Code::F10),
         "f11" => Some(Code::F11),
         "f12" => Some(Code::F12),
-        // Single character keys
         "keya" => Some(Code::KeyA),
         "keyb" => Some(Code::KeyB),
         "keyc" => Some(Code::KeyC),
@@ -104,15 +101,6 @@ pub fn string_key_to_tauri_code(key: &str) -> Option<Code> {
     }
 }
 
-// /// Convert user hotkey to Tauri shortcut
-// #[allow(unused)]
-// pub fn user_hotkey_to_shortcut(hotkey: &euro_user::Hotkey) -> Option<Shortcut> {
-//     let key_code = string_key_to_tauri_code(&hotkey.key)?;
-//     let modifiers = string_modifiers_to_tauri(&hotkey.modifiers);
-//     Some(Shortcut::new(modifiers, key_code))
-// }
-
-/// Get default shortcut for the current OS
 #[allow(unused)]
 pub fn get_default_shortcut() -> Shortcut {
     #[cfg(target_os = "macos")]
@@ -127,13 +115,6 @@ pub fn get_default_shortcut() -> Shortcut {
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     return Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
 }
-
-// pub fn convert_hotkey_to_shortcut(hotkey: Hotkey) -> Shortcut {
-//     debug!("Converting hotkey to shortcut: {:?}", hotkey.clone());
-//     let key_code = Code::from_str(&hotkey.key).unwrap_or(Code::Space);
-//     let modifiers = string_modifiers_to_tauri(&hotkey.modifiers);
-//     Shortcut::new(modifiers, key_code)
-// }
 
 pub fn get_db_path(app_handle: &tauri::AppHandle) -> String {
     let base_path = app_handle.path().app_data_dir().unwrap();
