@@ -93,6 +93,7 @@ keyring = "3.6.3"
 once_cell = "1.21"
 openidconnect = "4"
 parking_lot = "0.12.5"
+percent-encoding = "2"
 posthog-rs = "0.3.7"
 # prompt-kit = { path = "crates/common/prompt-kit" }
 prost = "0.14"
