@@ -17,7 +17,14 @@ export function getOS(): OSType {
 
 	if (osName.includes('windows')) return 'windows';
 	if (osName.includes('mac')) return 'macos';
-	if (osName.includes('linux') || osName.includes('ubuntu') || osName.includes('debian') || osName.includes('fedora') || osName.includes('centos')) return 'linux';
+	if (
+		osName.includes('linux') ||
+		osName.includes('ubuntu') ||
+		osName.includes('debian') ||
+		osName.includes('fedora') ||
+		osName.includes('centos')
+	)
+		return 'linux';
 
 	return 'unknown';
 }
