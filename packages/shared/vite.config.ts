@@ -25,6 +25,11 @@ function collectEntries(dir: string, base = ''): Record<string, string> {
 }
 
 export default defineConfig({
+	resolve: {
+		alias: {
+			$lib: resolve(__dirname, 'src/lib'),
+		},
+	},
 	plugins: [
 		dts({
 			include: ['src/lib/**/*.ts'],
