@@ -1,28 +1,3 @@
-/**
- * Transforms HTML node and a DOMOutputSpec into a ParseRule for parseDOM method
- *
- * @example
- * ['figure', { id }, ['img', { src, alt }], ['figcaption', { caption }, 0]]
- * ->
- * {
- *   tag: 'figure',
- *   getAttrs: (dom: HTMLElement | string) => {
- *     if (dom instanceof HTMLElement) {
- *       return {
- *         id: dom.getAttribute('id'),
- *         src: dom.querySelector('figure > img').getAttribute('src'),
- *         alt: dom.querySelector('figure > img').getAttribute('alt'),
- *         caption: dom.querySelector('figure > figcaption').getAttribute('caption'),
- *       }
- *     }
- *     return null
- *   }
- * }
- *
- * @param dom
- * @param spec
- * @param customHandler
- */
 export function getAttrsWithOutputSpec(
 	spec: readonly any[],
 	dom: HTMLElement,
@@ -31,7 +6,6 @@ export function getAttrsWithOutputSpec(
 ) {
 	let attrs = {} as { [attr: string]: any };
 	if (!output.tag) {
-		// TODO should use default values & DOMOutputSpec union to derive what's defined
 		output.tag = dom.tagName.toLowerCase();
 		if (dom.classList.length > 1) {
 			output.tag += Array.from(dom.classList.values()).join('.');
@@ -40,7 +14,6 @@ export function getAttrsWithOutputSpec(
 	let idx = 0;
 	while (spec.length > idx) {
 		const val = spec[idx];
-		// console.log('val', val)
 		if (typeof val === 'string') {
 			output.selector.push(val);
 			idx += 1;

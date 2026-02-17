@@ -12,7 +12,7 @@
 		id?: string;
 		url?: string;
 		title?: string;
-		tweets?: string; // JSON string containing array of tweet objects
+		tweets?: string;
 		timestamp?: string;
 		author?: string;
 		text?: string;
@@ -106,7 +106,6 @@
 	});
 
 	function handleClick(event: MouseEvent) {
-		// Parse tweets and show them
 		if (attrs.tweets) {
 			try {
 				const tweets = JSON.parse(attrs.tweets) as Tweet[];
@@ -127,7 +126,6 @@
 		ref?.remove();
 	}
 
-	// Get display text - either specific text or first tweet
 	function getDisplayText(): string {
 		if (attrs.text) return attrs.text;
 		if (attrs.tweets) {
@@ -138,15 +136,11 @@
 						? tweets[0].text.substring(0, 50) + '...'
 						: tweets[0].text;
 				}
-			} catch (_e) {
-				// Fall through to default
-			}
+			} catch (_e) {}
 		}
 		return 'content';
-		// return attrs.title || 'Twitter Content';
 	}
 
-	// Get tweet count for display
 	function getTweetCount(): number {
 		if (attrs.tweets) {
 			try {

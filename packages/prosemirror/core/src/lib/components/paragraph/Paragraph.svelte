@@ -26,7 +26,6 @@
 
 	let { attrs, ref }: Props = $props();
 
-	// Export the ref for external access
 	export { attrs, ref };
 </script>
 
@@ -35,6 +34,5 @@
 <style lang="postcss">
 	:global(p) {
 		margin-bottom: 1rem;
-		/*margin: 1rem 0;*/
 	}
 </style>

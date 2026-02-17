@@ -24,7 +24,6 @@ export {
 	Separator,
 	Shortcut,
 	Loading,
-	//
 	Root as Command,
 	Empty as CommandEmpty,
 	Group as CommandGroup,
