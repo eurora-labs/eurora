@@ -2,10 +2,10 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
+	import { authService } from '$lib/services/auth-service';
 	import { auth } from '$lib/stores/auth.js';
 	import { create } from '@bufbuild/protobuf';
 	import { LoginRequestSchema, Provider } from '@eurora/shared/proto/auth_service_pb.js';
-	import { authService } from '@eurora/shared/services/auth-service';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import * as Form from '@eurora/ui/components/form/index';

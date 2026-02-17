@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { authService } from '$lib/services/auth-service';
 	import { create } from '@bufbuild/protobuf';
 	import { LoginRequestSchema, Provider } from '@eurora/shared/proto/auth_service_pb.js';
-	import { authService } from '@eurora/shared/services/auth-service';
 	import { onMount } from 'svelte';
 
 	onMount(async () => {
