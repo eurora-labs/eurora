@@ -1,3 +1,5 @@
+import { createClient, type Client } from '@connectrpc/connect';
+import { createGrpcWebTransport } from '@connectrpc/connect-web';
 import {
 	ProtoAuthService,
 	type LoginRequest,
@@ -8,9 +10,7 @@ import {
 	type ThirdPartyAuthUrlResponse,
 	type LoginByLoginTokenRequest,
 	type GetLoginTokenResponse,
-} from '$lib/protos/auth_service_pb.js';
-import { createClient, type Client } from '@connectrpc/connect';
-import { createGrpcWebTransport } from '@connectrpc/connect-web';
+} from '@eurora/shared/proto/auth_service_pb.js';
 
 const VITE_GRPC_API_URL: string = import.meta.env.VITE_GRPC_API_URL;
 
