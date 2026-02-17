@@ -16,6 +16,9 @@ impl TryFrom<proto::OpenAiSettings> for OpenAIConfig {
     type Error = Error;
 
     fn try_from(p: proto::OpenAiSettings) -> Result<Self> {
+        if p.base_url.is_empty() {
+            return Err(Error::EmptyField("base_url"));
+        }
         if p.api_key.is_empty() {
             return Err(Error::EmptyField("api_key"));
         }

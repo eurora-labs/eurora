@@ -37,6 +37,19 @@ impl<T> From<T> for Redacted<T> {
     }
 }
 
+impl Redacted<String> {
+    /// Returns a masked version of the string for safe display.
+    /// Shows the first 3 characters followed by `****`, or just `****`
+    /// if the string is too short.
+    pub fn masked(&self) -> String {
+        if self.0.len() > 3 {
+            format!("{}****", &self.0[..3])
+        } else {
+            "****".to_string()
+        }
+    }
+}
+
 impl PartialEq for Redacted<String> {
     fn eq(&self, other: &Self) -> bool {
         let a = self.0.as_bytes();

@@ -7,7 +7,7 @@ pub enum LocalSettingsError {
     InvalidKey(#[from] be_encrypt::EncryptError),
 
     #[error("invalid provider settings: {0}")]
-    InvalidProviderSettings(String),
+    InvalidProviderSettings(#[from] be_local_settings::Error),
 }
 
 impl From<LocalSettingsError> for Status {

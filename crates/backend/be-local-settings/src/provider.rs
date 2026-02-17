@@ -52,7 +52,7 @@ impl From<&ProviderSettings> for proto::ProviderSettings {
             }),
             ProviderSettings::OpenAI(c) => Provider::Openai(proto::OpenAiSettings {
                 base_url: c.base_url.to_string(),
-                api_key: String::new(),
+                api_key: c.api_key.masked(),
                 model: c.model.clone(),
                 title_model: c.title_model.clone().unwrap_or_default(),
             }),

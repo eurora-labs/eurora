@@ -64,11 +64,10 @@ impl ProtoLocalSettingsService for LocalSettingsService {
 
         let provider: ProviderSettings = proto_settings
             .try_into()
-            .map_err(|e| LocalSettingsError::InvalidProviderSettings(format!("{e}")))?;
+            .map_err(LocalSettingsError::from)?;
 
         info!("Provider settings updated: {:?}", provider);
 
-        // Build the response proto *before* `send()` moves `provider`.
         let response_proto: proto::ProviderSettings = (&provider).into();
 
         self.settings_tx
