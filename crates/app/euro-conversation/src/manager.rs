@@ -37,7 +37,6 @@ impl ConversationManager {
         }
     }
 
-    /// Build a client from the latest channel with auth interceptor.
     fn client(&self) -> ProtoConversationServiceClient<AuthedChannel> {
         let channel = self.channel_rx.borrow().clone();
         let authed = build_authed_channel(channel, self.auth_manager.clone());

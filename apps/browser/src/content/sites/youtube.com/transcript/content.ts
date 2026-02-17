@@ -11,13 +11,12 @@ class YouTubeTranscriptExtractor {
 	}
 
 	private init(): void {
-		// Listen for messages from popup
 		browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 			this.handleMessage(request, sender, sendResponse);
-			return true; // Keep message channel open for async response
+			// Keep message channel open for async response
+			return true;
 		});
 
-		// Monitor for video changes
 		this.monitorVideoChanges();
 	}
 
@@ -69,7 +68,6 @@ class YouTubeTranscriptExtractor {
 	}
 
 	private getCurrentVideoId(): string | null {
-		// Method 1: Extract from URL
 		const urlParams = new URLSearchParams(window.location.search);
 		const videoId = urlParams.get('v');
 
@@ -77,7 +75,6 @@ class YouTubeTranscriptExtractor {
 			return videoId;
 		}
 
-		// Method 2: Extract from page data
 		try {
 			const ytInitialData = this.extractYtInitialData();
 			if (ytInitialData?.currentVideoEndpoint?.watchEndpoint?.videoId) {
@@ -87,7 +84,6 @@ class YouTubeTranscriptExtractor {
 			console.warn('Could not extract video ID from ytInitialData:', e);
 		}
 
-		// Method 3: Extract from player data
 		try {
 			const scripts = document.querySelectorAll('script');
 			for (const script of Array.from(scripts)) {
@@ -124,7 +120,6 @@ class YouTubeTranscriptExtractor {
 		let lastVideoId = this.getCurrentVideoId();
 		this.currentVideoId = lastVideoId;
 
-		// Monitor URL changes (for SPA navigation)
 		const observer = new MutationObserver(() => {
 			const currentVideoId = this.getCurrentVideoId();
 			if (currentVideoId && currentVideoId !== lastVideoId) {
@@ -139,7 +134,6 @@ class YouTubeTranscriptExtractor {
 			subtree: true,
 		});
 
-		// Also listen for popstate events
 		window.addEventListener('popstate', () => {
 			setTimeout(() => {
 				const currentVideoId = this.getCurrentVideoId();
@@ -153,19 +147,15 @@ class YouTubeTranscriptExtractor {
 	}
 
 	private notifyVideoChange(videoId: string): void {
-		// Send message to background script about video change
 		browser.runtime
 			.sendMessage({
 				action: 'videoChanged',
 				videoId: videoId,
 			})
-			.catch(() => {
-				// Ignore errors if background script is not listening
-			});
+			.catch(() => {});
 	}
 }
 
-// Initialize the extractor when the page loads
 if (document.readyState === 'loading') {
 	document.addEventListener('DOMContentLoaded', () => {
 		new YouTubeTranscriptExtractor();

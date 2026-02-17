@@ -12,7 +12,6 @@ export function articleExtension(): SveltePMExtension {
 			[ID]: {
 				attrs: articleAttrs,
 				schema: articleSchema,
-				// component: Article,
 				nodeView: (editor: Editor) =>
 					SvelteNodeView.fromComponent(editor, Article as unknown as Component),
 			},

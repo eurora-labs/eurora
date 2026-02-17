@@ -1,5 +1,3 @@
-// Core data structures matching the Python library
-
 export interface TranscriptSnippet {
 	text: string;
 	start: number;
@@ -63,7 +61,6 @@ export interface InnertubeData {
 	};
 }
 
-// Error classes
 export class YouTubeTranscriptError extends Error {
 	constructor(
 		message: string,

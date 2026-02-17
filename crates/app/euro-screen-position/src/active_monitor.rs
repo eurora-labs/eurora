@@ -2,14 +2,11 @@ use tauri::PhysicalSize;
 
 use crate::{MonitorInfo, platform::ImplActiveMonitor};
 
-/// ActiveMonitor represents the currently active monitor (based on cursor position)
-/// and provides generalized positioning methods for that monitor
 pub struct ActiveMonitor {
     impl_active_monitor: ImplActiveMonitor,
 }
 
 impl ActiveMonitor {
-    /// Create a new ActiveMonitor for a specific monitor
     pub fn new() -> Self {
         Self {
             impl_active_monitor: ImplActiveMonitor::default(),
@@ -37,8 +34,6 @@ impl ActiveMonitor {
 }
 
 impl Default for ActiveMonitor {
-    /// Create an ActiveMonitor for the monitor containing the cursor
-    /// Falls back to primary monitor if cursor position cannot be determined
     fn default() -> Self {
         Self::new()
     }

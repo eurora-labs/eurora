@@ -65,22 +65,6 @@ impl TryFrom<NativeMessage> for ActivityAsset {
     }
 }
 
-// impl From<NativeMessage> for ActivityAsset {
-//     fn from(asset: NativeMessage) -> Self {
-//         match asset {
-//             NativeMessage::NativeYoutubeAsset(asset) => {
-//                 ActivityAsset::YoutubeAsset(YoutubeAsset::from(asset))
-//             }
-//             NativeMessage::NativeArticleAsset(asset) => {
-//                 ActivityAsset::ArticleAsset(ArticleAsset::from(asset))
-//             }
-//             NativeMessage::NativeTwitterAsset(asset) => {
-//                 ActivityAsset::TwitterAsset(TwitterAsset::from(asset))
-//             }
-//         }
-//     }
-// }
-
 #[enum_dispatch]
 pub trait AssetFunctionality {
     fn get_id(&self) -> &str;

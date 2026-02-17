@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { authService } from '$lib/services/auth-service';
 	import { auth } from '$lib/stores/auth.js';
 	import { create } from '@bufbuild/protobuf';
 	import { LoginRequestSchema, Provider } from '@eurora/shared/proto/auth_service_pb.js';
-	import { authService } from '@eurora/shared/services/auth-service';
 	import { onMount } from 'svelte';
 
 	onMount(async () => {
@@ -25,9 +25,6 @@
 			return;
 		}
 
-		// State validation is now handled by the backend auth service
-		// The backend will validate the state parameter against the stored OAuth state
-		// and return an error if the state is invalid or expired
 		const loginToken = sessionStorage.getItem('loginToken') ?? undefined;
 		const challengeMethod = sessionStorage.getItem('challengeMethod') ?? undefined;
 		if (loginToken) sessionStorage.removeItem('loginToken');
@@ -58,7 +55,6 @@
 	});
 </script>
 
-<!-- A simple wait to be redirected page -->
 <div class="flex items-center justify-center h-screen">
 	<p>Wait to be redirected...</p>
 </div>

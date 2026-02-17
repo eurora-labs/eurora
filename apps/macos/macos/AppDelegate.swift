@@ -1,7 +1,3 @@
-// AppDelegate.swift - Background launcher for the Eurora unified macOS app.
-// Launches the embedded Tauri desktop app (Eurora.app) and bridges
-// Safari extension traffic to the Tauri gRPC backend.
-
 import Cocoa
 import SafariServices
 import ServiceManagement
@@ -13,7 +9,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     LocalBridgeServerDelegate
 {
     private let logger = Logger(subsystem: "com.eurora.macos", category: "AppDelegate")
-    /// Timeout for extension requests awaiting a gRPC response (seconds).
     private let requestTimeoutSeconds: TimeInterval = 30
     private let extensionBundleIdentifier = "com.eurora-labs.eurora.macos.extension"
     private let desktopBundleIdentifiers = [
@@ -39,20 +34,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
             registerAsLoginItem()
         #endif
 
-        // Launch the embedded Tauri desktop app
         launchEuroraDesktop()
 
         // Observe Tauri app termination so we can shut down with it,
         // and Safari launch/quit so we keep the browser PID current.
         observeWorkspaceAppLifecycle()
 
-        // Start the local bridge server for Safari extension communication
         let server = LocalBridgeServer()
         server.delegate = self
         server.start()
         self.localBridgeServer = server
 
-        // Connect gRPC client to the Tauri backend
         let hostPid = UInt32(getpid())
         let browserPid = findSafariPid().map { UInt32($0) } ?? 0
         logger.info("Starting gRPC client: host=\(hostPid), browser=\(browserPid)")
@@ -373,11 +365,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     }
 }
 
-// MARK: - Frame ↔ Dictionary Conversion (moved outside class to reduce type body length)
+// MARK: - Frame / Dictionary Conversion
 
 @available(macOS 15.0, *)
 extension AppDelegate {
-    /// Convert a JSON dictionary to a protobuf Frame
     static func frameFromDictionary(_ dict: [String: Any]) -> BrowserBridge_Frame? {
         guard let kind = dict["kind"] as? [String: Any] else { return nil }
         var frame = BrowserBridge_Frame()
@@ -446,7 +437,6 @@ extension AppDelegate {
         return regFrame
     }
 
-    /// Convert a protobuf Frame to a JSON dictionary
     static func dictionaryFromFrame(_ frame: BrowserBridge_Frame) -> [String: Any]? {
         guard let frameKind = frame.kind else { return nil }
         guard let kind = kindDictFromFrameKind(frameKind) else { return nil }

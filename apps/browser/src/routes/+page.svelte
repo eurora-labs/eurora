@@ -24,10 +24,7 @@
 		</h1>
 	</div>
 
-	<!-- Content Area (can be used for additional content) -->
-	<div class="flex w-full flex-grow items-center justify-center">
-		<!-- You can add additional content here if needed -->
-	</div>
+	<div class="flex w-full flex-grow items-center justify-center"></div>
 
 	<Separator />
 

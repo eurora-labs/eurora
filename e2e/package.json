@@ -23,7 +23,6 @@
 		"test:e2e:webextension": "pnpm exec playwright test --config ./webextension/playwright.config.ts --tsconfig ./webextension/tsconfig.json"
 	},
 	"dependencies": {
-		"@eurora/browser-shared": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"get-port": "^7.1.0",
 		"tmp-promise": "^3.0.3"

@@ -18,7 +18,6 @@
 
 		taurpcService.timeline.new_app_event
 			.on((e) => {
-				// Limit the items to 5
 				if (timelineItems.length >= 5) {
 					timelineItems.shift();
 				}

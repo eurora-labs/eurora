@@ -1,7 +1,6 @@
 import { main } from '../index.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock dependencies
 vi.mock('webextension-polyfill', () => ({
 	default: {
 		runtime: {
@@ -13,7 +12,7 @@ vi.mock('webextension-polyfill', () => ({
 	},
 }));
 
-vi.mock('@eurora/browser-shared/content/extensions/article/util', () => ({
+vi.mock('../../../../shared/content/extensions/article/util', () => ({
 	createArticleAsset: vi.fn().mockResolvedValue({
 		kind: 'NativeArticleAsset',
 		data: { url: 'test-url', title: 'test-title' },
@@ -32,12 +31,10 @@ describe('youtube.com site handler', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 
-		// Setup YouTube-like DOM
 		document.body.innerHTML = `
 			<video class="html5-main-video"></video>
 		`;
 
-		// Mock window.location
 		Object.defineProperty(window, 'location', {
 			value: {
 				href: 'https://www.youtube.com/watch?v=test123',

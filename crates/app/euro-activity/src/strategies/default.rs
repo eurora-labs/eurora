@@ -7,7 +7,8 @@ use tracing::debug;
 use crate::{
     error::ActivityResult,
     strategies::{
-        ActivityReport, ActivityStrategyFunctionality, StrategyMetadata, StrategySupport,
+        ActivityReport, ActivityStrategy, ActivityStrategyFunctionality, StrategyMetadata,
+        StrategySupport,
     },
     types::{Activity, ActivityAsset, ActivitySnapshot},
 };
@@ -20,6 +21,10 @@ pub struct DefaultStrategy;
 impl StrategySupport for DefaultStrategy {
     fn get_supported_processes() -> Vec<&'static str> {
         vec![]
+    }
+
+    async fn create() -> ActivityResult<ActivityStrategy> {
+        Ok(ActivityStrategy::DefaultStrategy(DefaultStrategy))
     }
 }
 

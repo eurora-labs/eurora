@@ -18,7 +18,6 @@
 		</Card.Header>
 		<Card.Content>
 			<div class="prose prose-gray max-w-none space-y-6">
-				<!-- Introduction -->
 				<section>
 					<p>
 						This is the Privacy Policy of Eurora Labs B.V. (hereinafter referred to as
@@ -39,7 +38,6 @@
 					</p>
 				</section>
 
-				<!-- What kinds of information do we collect? -->
 				<section>
 					<h2 class="mb-4 text-2xl font-bold">
 						What kinds of information do we collect?
@@ -90,7 +88,6 @@
 					</p>
 				</section>
 
-				<!-- Purposes of processing data -->
 				<section>
 					<h2 class="mb-4 text-2xl font-bold">Purposes of processing data</h2>
 					<p>
@@ -105,7 +102,6 @@
 					</p>
 				</section>
 
-				<!-- Legal basis for processing data -->
 				<section>
 					<h2 class="mb-4 text-2xl font-bold">Legal basis for processing data</h2>
 					<p>
@@ -117,7 +113,6 @@
 					</p>
 				</section>
 
-				<!-- How do we use this information? -->
 				<section>
 					<h2 class="mb-4 text-2xl font-bold">How do we use this information?</h2>
 					<p>
@@ -142,7 +137,6 @@
 					</ul>
 				</section>
 
-				<!-- Communications -->
 				<section>
 					<h2 class="mb-4 text-2xl font-bold">Communications</h2>
 					<p>
@@ -153,7 +147,6 @@
 					</p>
 				</section>
 
-				<!-- How is this information shared? -->
 				<section>
 					<h2 class="mb-4 text-2xl font-bold">How is this information shared?</h2>
 					<p>
@@ -162,7 +155,6 @@
 					</p>
 				</section>
 
-				<!-- Change of control -->
 				<section>
 					<h2 class="mb-4 text-2xl font-bold">Change of control</h2>
 					<p>
@@ -175,7 +167,6 @@
 					</p>
 				</section>
 
-				<!-- Legal requests and preventing harm -->
 				<section>
 					<h2 class="mb-4 text-2xl font-bold">Legal requests and preventing harm</h2>
 					<p>
@@ -193,7 +184,6 @@
 					</p>
 				</section>
 
-				<!-- Safety and security -->
 				<section>
 					<h2 class="mb-4 text-2xl font-bold">Safety and security</h2>
 					<p>
@@ -213,7 +203,6 @@
 					</p>
 				</section>
 
-				<!-- International transfer -->
 				<section>
 					<h2 class="mb-4 text-2xl font-bold">International transfer</h2>
 					<p>
@@ -227,7 +216,6 @@
 					</p>
 				</section>
 
-				<!-- Retention period -->
 				<section>
 					<h2 class="mb-4 text-2xl font-bold">Retention period</h2>
 					<p>
@@ -237,7 +225,6 @@
 					</p>
 				</section>
 
-				<!-- Inspection and correction -->
 				<section>
 					<h2 class="mb-4 text-2xl font-bold">Inspection and correction</h2>
 					<p>
@@ -247,7 +234,6 @@
 					</p>
 				</section>
 
-				<!-- Third-party applications, websites and services -->
 				<section>
 					<h2 class="mb-4 text-2xl font-bold">
 						Third-party applications, websites and services
@@ -265,7 +251,6 @@
 					</p>
 				</section>
 
-				<!-- Children's privacy -->
 				<section>
 					<h2 class="mb-4 text-2xl font-bold">Children's privacy</h2>
 					<p>
@@ -281,7 +266,6 @@
 					</p>
 				</section>
 
-				<!-- Changes to this privacy policy -->
 				<section>
 					<h2 class="mb-4 text-2xl font-bold">Changes to this privacy policy</h2>
 					<p>
@@ -293,7 +277,6 @@
 					</p>
 				</section>
 
-				<!-- How to contact us -->
 				<section>
 					<h2 class="mb-4 text-2xl font-bold">How to contact us</h2>
 					<p>

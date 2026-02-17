@@ -1,26 +1,11 @@
-//
-//  LocalBridgeServer.swift
-//  Eurora
-//
-//  Local TCP server for IPC between the Safari extension and the container app.
-//  The Safari extension (via NativeMessagingBridge) connects here over localhost.
-//  Messages are length-prefixed JSON (4 bytes LE length + JSON body).
-//
-//  This replaces stdin/stdout from the Chrome native messaging model.
-//
-
 import Foundation
 import Network
 import os.log
 
-/// Port for the local bridge server (extension connects here)
 private let kLocalBridgeServerPort: UInt16 = 14311
 
-/// Protocol for handling messages received from the Safari extension
 @available(macOS 15.0, *)
 protocol LocalBridgeServerDelegate: AnyObject {
-    /// Called when a JSON message is received from an extension connection.
-    /// Call `completion` with a response dictionary to send back, or nil for no response.
     func localBridgeServer(
         _ server: LocalBridgeServer,
         didReceiveMessage message: [String: Any],
@@ -28,10 +13,6 @@ protocol LocalBridgeServerDelegate: AnyObject {
     )
 }
 
-/// Local TCP server for communication with the Safari extension.
-///
-/// The extension process connects to this server on localhost:14311.
-/// Messages use the same length-prefixed JSON format as Chrome native messaging.
 @available(macOS 15.0, *)
 class LocalBridgeServer {
 
@@ -56,21 +37,18 @@ class LocalBridgeServer {
 
     // MARK: - Server Control
 
-    /// Start the TCP listener on localhost.
     func start() {
         queue.async { [weak self] in
             self?.startInternal()
         }
     }
 
-    /// Stop the server and close all connections.
     func stop() {
         queue.async { [weak self] in
             self?.stopInternal()
         }
     }
 
-    /// Synchronous stop (for deinit).
     private func stopSync() {
         listener?.cancel()
         listener = nil
@@ -81,8 +59,6 @@ class LocalBridgeServer {
         isRunning = false
     }
 
-    /// Broadcast a message to all connected extension clients.
-    /// Used for server-initiated push messages (events, requests from gRPC server).
     func broadcast(message: [String: Any]) {
         guard let data = try? JSONSerialization.data(withJSONObject: message, options: []) else {
             logger.error("Failed to serialize broadcast message")
@@ -163,10 +139,8 @@ class LocalBridgeServer {
 
         case .failed(let error):
             logger.error("Local bridge server failed: \(error.localizedDescription)")
-            // IMPORTANT: Do NOT auto-restart here.
-            // The old code restarted on failure, which caused an infinite loop:
-            // port still in use → restart → "Address already in use" → restart → ...
-            // The AppDelegate should handle restart if needed, with proper delay.
+            // Do NOT auto-restart here — the old code restarted on failure, which caused
+            // an infinite loop: port still in use -> restart -> "Address already in use" -> ...
             stopInternal()
 
         case .cancelled:
@@ -191,7 +165,6 @@ class LocalBridgeServer {
         connections[connId] = connection
         connection.start(queue: queue)
 
-        // Begin receiving messages
         receiveMessage(from: connection, connId: connId)
     }
 
@@ -210,10 +183,9 @@ class LocalBridgeServer {
         }
     }
 
-    // MARK: - Private: Message Framing (length-prefixed JSON)
+    // MARK: - Private: Message Framing
 
     private func receiveMessage(from connection: NWConnection, connId: ObjectIdentifier) {
-        // Read the 4-byte little-endian length prefix
         connection.receive(minimumIncompleteLength: 4, maximumLength: 4) { [weak self] data, _, isComplete, error in
             guard let self else { return }
 
@@ -270,7 +242,6 @@ class LocalBridgeServer {
                 return
             }
 
-            // Parse JSON
             do {
                 if let message = try JSONSerialization.jsonObject(with: messageData, options: []) as? [String: Any] {
                     self.handleReceivedMessage(message, from: connection)
@@ -281,7 +252,6 @@ class LocalBridgeServer {
                 self.logger.error("JSON parse error: \(error.localizedDescription)")
             }
 
-            // Continue receiving next message
             self.receiveMessage(from: connection, connId: connId)
         }
     }
@@ -316,7 +286,6 @@ class LocalBridgeServer {
 
     // MARK: - Static Helpers
 
-    /// Frame a message with a 4-byte little-endian length prefix
     static func frameMessage(_ data: Data) -> Data {
         var length = UInt32(data.count).littleEndian
         var framedData = Data(bytes: &length, count: 4)
