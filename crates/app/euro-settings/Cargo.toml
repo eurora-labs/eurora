@@ -7,14 +7,18 @@ publish = false
 
 [dependencies]
 anyhow = { workspace = true }
+async-trait = { workspace = true }
 dirs = { workspace = true }
+enum_dispatch = { workspace = true }
 euro-debug = { workspace = true }
 euro-fs = { workspace = true }
+euro-secret = { workspace = true }
 notify = { version = "8.2.0" }
-# prompt-kit = { workspace = true }
+proto-gen = { workspace = true }
 serde = { workspace = true, features = ["derive", "std"] }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 serde_json_lenient = { workspace = true }
 specta = { workspace = true, features = ["derive", "function"] }
+thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }
 tracing = { workspace = true }

@@ -30,6 +30,7 @@ pub trait AuthApi {
         password: String,
     ) -> Result<(), String>;
 
+    async fn logout<R: Runtime>(app_handle: AppHandle<R>) -> Result<(), String>;
     async fn is_authenticated<R: Runtime>(app_handle: AppHandle<R>) -> Result<bool, String>;
     async fn get_role<R: Runtime>(app_handle: AppHandle<R>) -> Result<String, String>;
 }
@@ -151,6 +152,25 @@ impl AuthApi for AuthApiImpl {
             .login(&login, &password)
             .await
             .map_err(|e| format!("Login failed: {}", e))?;
+
+        let state = app_handle.state::<SharedAppSettings>();
+        let settings = state.lock().await;
+        settings
+            .save_to_default_path()
+            .map_err(|e| format!("Failed to save settings: {}", e))?;
+
+        Ok(())
+    }
+
+    async fn logout<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<(), String> {
+        let user_state = app_handle
+            .try_state::<SharedUserController>()
+            .ok_or_else(|| "User controller not available".to_string())?;
+        let mut controller = user_state.lock().await;
+
+        controller
+            .delete_user()
+            .map_err(|e| format!("Logout failed: {}", e))?;
 
         let state = app_handle.state::<SharedAppSettings>();
         let settings = state.lock().await;

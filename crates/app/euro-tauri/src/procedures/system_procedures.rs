@@ -477,8 +477,8 @@ impl SystemApi for SystemApiImpl {
 async fn send_encryption_key(backend_url: &str) -> Result<(), String> {
     use backon::{ConstantBuilder, Retryable};
     use base64::prelude::*;
-    use proto_gen::local_config::SetEncryptionKeyRequest;
-    use proto_gen::local_config::proto_local_config_service_client::ProtoLocalConfigServiceClient;
+    use proto_gen::local_settings::SetEncryptionKeyRequest;
+    use proto_gen::local_settings::proto_local_settings_service_client::ProtoLocalSettingsServiceClient;
 
     let main_key = euro_encrypt::MainKey::new()
         .map_err(|e| format!("Failed to retrieve encryption key from keyring: {e}"))?;
@@ -491,7 +491,7 @@ async fn send_encryption_key(backend_url: &str) -> Result<(), String> {
         let encoded = encoded.clone();
         let url = url.clone();
         async move {
-            let mut client = ProtoLocalConfigServiceClient::connect(url).await?;
+            let mut client = ProtoLocalSettingsServiceClient::connect(url).await?;
             client
                 .set_encryption_key(SetEncryptionKeyRequest {
                     encryption_key: encoded,
