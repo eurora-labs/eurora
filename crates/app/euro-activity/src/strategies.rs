@@ -1,4 +1,4 @@
-use crate::utils::convert_svg_to_rgba;
+use crate::{strategies::safari::SafariStrategy, utils::convert_svg_to_rgba};
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use enum_dispatch::enum_dispatch;
@@ -10,6 +10,7 @@ pub mod browser;
 pub mod default;
 pub mod no_strategy;
 pub mod processes;
+pub mod safari;
 
 pub use browser::BrowserStrategy;
 pub use default::DefaultStrategy;
@@ -61,6 +62,7 @@ impl From<NativeMetadata> for StrategyMetadata {
 #[enum_dispatch(ActivityStrategyFunctionality)]
 #[derive(Clone)]
 pub enum ActivityStrategy {
+    SafariStrategy,
     BrowserStrategy,
     DefaultStrategy,
     NoStrategy,
@@ -91,6 +93,12 @@ impl ActivityStrategy {
     pub async fn new(process_name: &str) -> ActivityResult<ActivityStrategy> {
         if NoStrategy::get_supported_processes().contains(&process_name) {
             return Ok(ActivityStrategy::NoStrategy(NoStrategy));
+        }
+
+        if SafariStrategy::get_supported_processes().contains(&process_name) {
+            return Ok(ActivityStrategy::SafariStrategy(
+                SafariStrategy::new().await?,
+            ));
         }
 
         if BrowserStrategy::get_supported_processes().contains(&process_name) {

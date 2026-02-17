@@ -1,19 +1,13 @@
-//! Browser strategy implementation for the activity system
+//! Browser strategy implementation for the refactored activity system
 //!
 //! This module uses the singleton gRPC server from `euro_browser` crate to accept
 //! connections from multiple native messaging hosts (euro-native-messaging). Each
 //! host registers with its browser PID, allowing the server to route requests to
 //! the correct browser.
 //!
-//! ## Push-based collection model
-//!
-//! The browser extension proactively sends metadata, assets and snapshots as
-//! Event frames whenever the browser window is focused.  The strategy simply
-//! subscribes to these events and forwards them through the `ActivityReport`
-//! channel.  This avoids the previous pull-based model where the server sent
-//! Request frames (GENERATE_ASSETS, GENERATE_SNAPSHOT, GET_METADATA) that had
-//! to be routed back to the extension – a path that was unreliable on Safari
-//! due to `SFSafariApplication.dispatchMessage` limitations.
+//! The gRPC server is managed by the TimelineManager and runs as long as the manager
+//! is alive. The BrowserStrategy only connects to the singleton service but does not
+//! manage its lifecycle.
 
 pub use crate::strategies::ActivityStrategyFunctionality;
 pub use crate::strategies::processes::*;
@@ -33,7 +27,6 @@ use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 use url::Url;
 
-// Re-export the singleton service and types from euro_browser crate
 pub use euro_browser::{
     BrowserBridgeServer, BrowserBridgeService, EventFrame, Frame, FrameKind, RequestFrame,
     ResponseFrame,
@@ -51,6 +44,9 @@ pub struct BrowserStrategy {
     event_subscription_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
 
     #[serde(skip)]
+    snapshot_collection_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
+
+    #[serde(skip)]
     active_browser: Option<String>,
 
     #[serde(skip)]
@@ -60,21 +56,13 @@ pub struct BrowserStrategy {
 impl BrowserStrategy {
     async fn initialize_service(&mut self) -> ActivityResult<()> {
         let service = BrowserBridgeService::get_or_init().await;
+
         self.bridge_service = Some(service);
+
         Ok(())
     }
 
-    /// Subscribe to the event stream coming from browser extensions.
-    ///
-    /// The extension now pushes three kinds of events:
-    ///
-    /// | `action`         | Payload type       | What we do                          |
-    /// |------------------|--------------------|-------------------------------------|
-    /// | `TAB_UPDATED`    | `NativeMetadata`   | Create a new `Activity`             |
-    /// | `TAB_ACTIVATED`  | `NativeMetadata`   | Create a new `Activity`             |
-    /// | `ASSETS`         | Any asset variant  | Forward as `ActivityReport::Assets` |
-    /// | `SNAPSHOT`       | Any snapshot variant | Forward as `ActivityReport::Snapshots` |
-    async fn init_collection(&mut self, _focus_window: &FocusedWindow) -> ActivityResult<()> {
+    async fn init_collection(&mut self, focus_window: &FocusedWindow) -> ActivityResult<()> {
         let Some(sender) = self.sender.clone() else {
             return Err(ActivityError::Strategy(
                 "Sender not initialized".to_string(),
@@ -87,6 +75,8 @@ impl BrowserStrategy {
             .ok_or_else(|| ActivityError::Strategy("Bridge service not initialized".to_string()))?;
 
         let mut events_rx = service.subscribe_to_events();
+        let _default_icon = focus_window.icon.clone();
+        let mut strategy = self.clone();
         let last_url: Arc<tokio::sync::Mutex<Option<Url>>> =
             Arc::new(tokio::sync::Mutex::new(None));
 
@@ -103,120 +93,57 @@ impl BrowserStrategy {
                     continue;
                 };
 
-                match event_frame.action.as_str() {
-                    // ---------------------------------------------------------
-                    // Metadata events → create / update the current Activity
-                    // ---------------------------------------------------------
-                    "TAB_UPDATED" | "TAB_ACTIVATED" => {
-                        let native_message =
-                            match serde_json::from_str::<NativeMessage>(&payload_str) {
-                                Ok(msg) => msg,
-                                Err(e) => {
-                                    warn!("Failed to parse metadata payload: {}", e);
-                                    continue;
-                                }
-                            };
-
-                        let metadata = match native_message {
-                            NativeMessage::NativeMetadata(data) => StrategyMetadata::from(data),
-                            _ => {
-                                debug!("Ignoring non-metadata event");
-                                continue;
-                            }
-                        };
-
-                        let mut prev = last_url.lock().await;
-                        let url = match Url::parse(&metadata.url.clone().unwrap_or_default()) {
-                            Ok(u) => u,
-                            Err(_) => continue,
-                        };
-
-                        // Skip if the URL domain hasn't changed – avoids
-                        // duplicate Activity creation when the extension keeps
-                        // pushing metadata for the same site every 3 s.
-                        if let Some(prev_url) = prev.take()
-                            && prev_url.domain() == url.domain()
-                        {
-                            *prev = Some(url);
-                            continue;
-                        }
-                        *prev = Some(url);
-
-                        let icon = metadata.icon.clone();
-                        let url_str = metadata.url.clone().unwrap_or_default();
-
-                        let activity = Activity::new(url_str, icon, "".to_string(), vec![]);
-
-                        info!(
-                            "Creating new activity from event: browser_pid={}, name={}",
-                            browser_pid, activity.name
-                        );
-                        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                            warn!("Failed to send new activity report - receiver dropped");
-                            break;
-                        }
+                let native_message = match serde_json::from_str::<NativeMessage>(&payload_str) {
+                    Ok(msg) => msg,
+                    Err(e) => {
+                        warn!("Failed to parse native message: {}", e);
+                        continue;
                     }
+                };
 
-                    // ---------------------------------------------------------
-                    // Asset events → forward to the activity system
-                    // ---------------------------------------------------------
-                    "ASSETS" => {
-                        let native_message =
-                            match serde_json::from_str::<NativeMessage>(&payload_str) {
-                                Ok(msg) => msg,
-                                Err(e) => {
-                                    warn!("Failed to parse asset payload: {}", e);
-                                    continue;
-                                }
-                            };
-
-                        match ActivityAsset::try_from(native_message) {
-                            Ok(asset) => {
-                                debug!("Received asset from browser PID {}", browser_pid);
-                                if sender.send(ActivityReport::Assets(vec![asset])).is_err() {
-                                    warn!("Failed to send assets - receiver dropped");
-                                    break;
-                                }
-                            }
-                            Err(e) => {
-                                warn!("Failed to convert native message to asset: {}", e);
-                            }
-                        }
+                let metadata = match native_message {
+                    NativeMessage::NativeMetadata(data) => StrategyMetadata::from(data),
+                    _ => {
+                        debug!("Ignoring non-metadata event");
+                        continue;
                     }
+                };
 
-                    // ---------------------------------------------------------
-                    // Snapshot events → forward to the activity system
-                    // ---------------------------------------------------------
-                    "SNAPSHOT" => {
-                        let native_message =
-                            match serde_json::from_str::<NativeMessage>(&payload_str) {
-                                Ok(msg) => msg,
-                                Err(e) => {
-                                    warn!("Failed to parse snapshot payload: {}", e);
-                                    continue;
-                                }
-                            };
+                let mut prev = last_url.lock().await;
+                let url = match Url::parse(&metadata.url.clone().unwrap_or_default()) {
+                    Ok(u) => u,
+                    Err(_) => continue,
+                };
 
-                        match ActivitySnapshot::try_from(native_message) {
-                            Ok(snapshot) => {
-                                debug!("Received snapshot from browser PID {}", browser_pid);
-                                if sender
-                                    .send(ActivityReport::Snapshots(vec![snapshot]))
-                                    .is_err()
-                                {
-                                    warn!("Failed to send snapshots - receiver dropped");
-                                    break;
-                                }
-                            }
-                            Err(e) => {
-                                warn!("Failed to convert native message to snapshot: {}", e);
-                            }
-                        }
-                    }
+                if let Some(prev_url) = prev.take()
+                    && prev_url.domain() == url.domain()
+                {
+                    *prev = Some(url);
+                    continue;
+                }
+                *prev = Some(url);
 
-                    other => {
-                        debug!("Ignoring unknown event action: {}", other);
-                    }
+                let icon = metadata.icon.clone();
+                let url_str = metadata.url.clone().unwrap_or_default();
+
+                let assets = strategy.retrieve_assets().await.map_err(|e| {
+                    warn!("Failed to retrieve assets: {}", e);
+                    e
+                });
+
+                let activity =
+                    Activity::new(url_str, icon, "".to_string(), assets.unwrap_or_default());
+
+                info!(
+                    "Creating new activity from event: browser_pid={}, name={}",
+                    browser_pid, activity.name
+                );
+                if sender
+                    .send(ActivityReport::NewActivity(activity.clone()))
+                    .is_err()
+                {
+                    warn!("Failed to send new activity report - receiver dropped");
+                    break;
                 }
             }
 
@@ -224,12 +151,15 @@ impl BrowserStrategy {
         });
 
         self.event_subscription_handle = Some(Arc::new(handle));
+
+        self.collect_assets_and_snapshots();
         Ok(())
     }
 
     pub async fn new() -> ActivityResult<Self> {
         let mut strategy = BrowserStrategy::default();
         strategy.initialize_service().await?;
+
         Ok(strategy)
     }
 }
@@ -237,12 +167,7 @@ impl BrowserStrategy {
 #[async_trait]
 impl StrategySupport for BrowserStrategy {
     fn get_supported_processes() -> Vec<&'static str> {
-        vec![
-            Librewolf.get_name(),
-            Firefox.get_name(),
-            Chrome.get_name(),
-            Safari.get_name(),
-        ]
+        vec![Librewolf.get_name(), Firefox.get_name(), Chrome.get_name()]
     }
 }
 
@@ -262,15 +187,38 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         self.active_browser = Some(process_name.clone());
         self.active_browser_pid = Some(focus_window.process_id);
 
-        // Don't send a placeholder activity here — the browser extension will
-        // push real metadata (URL, website icon) almost immediately via a
-        // TAB_ACTIVATED event which `init_collection` handles.  Sending a
-        // placeholder with the browser process icon would cause a duplicate
-        // icon to briefly appear in the UI.
+        match self.get_metadata().await {
+            Ok(metadata) => {
+                let assets = self.retrieve_assets().await.unwrap_or(vec![]);
+                let activity = Activity::new(
+                    metadata.url.unwrap_or_default(),
+                    metadata.icon,
+                    process_name.clone(),
+                    assets,
+                );
+                if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                    warn!("Failed to send new activity report - receiver dropped");
+                }
+            }
+            Err(err) => {
+                let activity = Activity::new(
+                    focus_window.process_name.clone(),
+                    focus_window.icon.clone(),
+                    focus_window.process_name.clone(),
+                    vec![],
+                );
+                if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                    warn!("Failed to send new activity report - receiver dropped");
+                }
+
+                warn!("Failed to get metadata: {}", err);
+            }
+        }
 
         self.init_collection(focus_window).await?;
 
         debug!("Browser strategy starting tracking for: {:?}", process_name);
+
         Ok(())
     }
 
@@ -289,17 +237,12 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                 focus_window.process_name
             );
             if self.active_browser_pid == Some(focus_window.process_id) {
-                info!("Detected the same browser. Ignoring...");
+                info!("Detected the same browser. Ignoring...",);
             } else {
                 self.active_browser_pid = Some(focus_window.process_id);
                 self.active_browser = Some(focus_window.process_name.to_string());
             }
 
-            // When a gRPC client is registered the browser extension is
-            // connected and will push metadata events through the event
-            // subscription set up in `init_collection`.  When there is no
-            // client we fall back to a basic activity with just the process
-            // name.
             let has_registered_client = if let Some(service) = self.bridge_service.as_ref() {
                 service.is_registered(focus_window.process_id).await
             } else {
@@ -308,20 +251,36 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
             if !has_registered_client {
                 if let Some(sender) = self.sender.clone() {
-                    let activity = Activity::new(
-                        focus_window.process_name.clone(),
-                        focus_window.icon.clone(),
-                        focus_window.process_name.clone(),
-                        vec![],
-                    );
-                    if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                        warn!("Failed to send new activity report - receiver dropped");
+                    match self.get_metadata().await {
+                        Ok(metadata) => {
+                            let activity = Activity::new(
+                                metadata.url.unwrap_or_default(),
+                                metadata.icon,
+                                focus_window.process_name.to_string(),
+                                vec![],
+                            );
+                            if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                                warn!("Failed to send new activity report - receiver dropped");
+                            }
+                        }
+                        Err(err) => {
+                            let activity = Activity::new(
+                                focus_window.process_name.clone(),
+                                focus_window.icon.clone(),
+                                focus_window.process_name.clone(),
+                                vec![],
+                            );
+                            if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                                warn!("Failed to send new activity report - receiver dropped");
+                            }
+
+                            warn!("Failed to get metadata: {}", err);
+                        }
                     }
                 }
             } else {
                 debug!(
-                    "Browser PID {} has registered gRPC client, skipping activity report \
-                     (will be handled by event subscription)",
+                    "Browser PID {} has registered gRPC client, skipping activity report (will be handled by event subscription)",
                     focus_window.process_id
                 );
             }
@@ -342,7 +301,13 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         self.active_browser = None;
         self.active_browser_pid = None;
 
-        if let Some(handle) = self.event_subscription_handle.take()
+        if let Some(handle) = self.event_subscription_handle.take() {
+            if let Ok(handle) = Arc::try_unwrap(handle) {
+                handle.abort();
+            }
+        }
+
+        if let Some(handle) = self.snapshot_collection_handle.take()
             && let Ok(handle) = Arc::try_unwrap(handle)
         {
             handle.abort();
@@ -352,25 +317,165 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     }
 
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
-        // Assets are now pushed by the browser extension via ASSETS events.
-        // This method is kept to satisfy the trait but is no longer called from
-        // a polling loop.
-        debug!("retrieve_assets called (no-op in push model)");
-        Ok(vec![])
+        debug!("Retrieving assets for browser strategy");
+
+        let service = self
+            .bridge_service
+            .as_ref()
+            .ok_or_else(|| ActivityError::invalid_data("Bridge service not available"))?;
+
+        let browser_pid = self
+            .active_browser_pid
+            .ok_or_else(|| ActivityError::invalid_data("No active browser PID set"))?;
+
+        let response_frame = service.generate_assets(browser_pid).await.map_err(|e| {
+            ActivityError::invalid_data(format!("Failed to generate assets: {}", e))
+        })?;
+
+        let Some(payload) = response_frame.payload else {
+            warn!("No payload in assets response");
+            return Ok(vec![]);
+        };
+
+        let native_asset = serde_json::from_str::<NativeMessage>(&payload)
+            .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
+
+        let asset = ActivityAsset::try_from(native_asset)
+            .map_err(|e| -> ActivityError { ActivityError::InvalidAssetType(e.to_string()) })?;
+
+        debug!("Retrieved 1 asset from browser");
+        Ok(vec![asset])
     }
 
     async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        // Snapshots are now pushed by the browser extension via SNAPSHOT events.
-        debug!("retrieve_snapshots called (no-op in push model)");
-        Ok(vec![])
+        let service = self
+            .bridge_service
+            .as_ref()
+            .ok_or_else(|| ActivityError::invalid_data("Bridge service not available"))?;
+
+        let browser_pid = self
+            .active_browser_pid
+            .ok_or_else(|| ActivityError::invalid_data("No active browser PID set"))?;
+
+        let response_frame = service.generate_snapshot(browser_pid).await.map_err(|e| {
+            ActivityError::invalid_data(format!("Failed to generate snapshot: {}", e))
+        })?;
+
+        let Some(payload) = response_frame.payload else {
+            warn!("No payload in snapshot response");
+            return Ok(vec![]);
+        };
+
+        let native_message = serde_json::from_str::<NativeMessage>(&payload)
+            .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
+
+        let snapshot = ActivitySnapshot::try_from(native_message)
+            .map_err(|e| -> ActivityError { ActivityError::InvalidSnapshotType(e.to_string()) })?;
+
+        Ok(vec![snapshot])
     }
 
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
-        // Metadata is now pushed by the browser extension via TAB_ACTIVATED /
-        // TAB_UPDATED events.  This method is kept for the trait contract and
-        // as a potential fallback.
-        debug!("get_metadata called (no-op in push model)");
-        Ok(StrategyMetadata::default())
+        debug!("Retrieving metadata for browser strategy");
+
+        let service = self
+            .bridge_service
+            .as_ref()
+            .ok_or_else(|| ActivityError::invalid_data("Bridge service not available"))?;
+
+        let browser_pid = self
+            .active_browser_pid
+            .ok_or_else(|| ActivityError::invalid_data("No active browser PID set"))?;
+
+        let response_frame = service
+            .get_metadata(browser_pid)
+            .await
+            .map_err(|e| ActivityError::invalid_data(format!("Failed to get metadata: {}", e)))?;
+
+        let Some(payload) = response_frame.payload else {
+            warn!("No payload in metadata response");
+            return Ok(StrategyMetadata::default());
+        };
+
+        let native_metadata = serde_json::from_str::<NativeMessage>(&payload)
+            .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
+
+        let metadata = match native_metadata {
+            NativeMessage::NativeMetadata(metadata) => {
+                if let Some(ref url) = metadata.url
+                    && !url.starts_with("http")
+                    && !url.starts_with("chrome-extension:")
+                {
+                    return Err(ActivityError::invalid_data(format!(
+                        "Invalid metadata URL: must start with 'http', got: {}",
+                        url
+                    )));
+                }
+                StrategyMetadata::from(metadata)
+            }
+            _ => StrategyMetadata::default(),
+        };
+        Ok(metadata)
+    }
+}
+
+impl BrowserStrategy {
+    fn collect_assets_and_snapshots(&mut self) {
+        info!("Starting active collection task");
+        let sender = match self.sender.clone() {
+            Some(sender) => sender,
+            None => {
+                warn!("No sender available for snapshot collection");
+                return;
+            }
+        };
+
+        let mut strategy_clone = self.clone();
+
+        let handle = tokio::spawn(async move {
+            debug!("Starting snapshot collection task");
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(3));
+
+            loop {
+                interval.tick().await;
+
+                match strategy_clone.retrieve_assets().await {
+                    Ok(assets) if !assets.is_empty() => {
+                        debug!("Collected {} asset(s)", assets.len());
+                        if sender.send(ActivityReport::Assets(assets)).is_err() {
+                            warn!("Failed to send assets - receiver dropped");
+                            break;
+                        }
+                    }
+                    Ok(_) => {
+                        debug!("No assets collected");
+                    }
+                    Err(e) => {
+                        warn!("Failed to retrieve assets: {}", e);
+                    }
+                }
+
+                match strategy_clone.retrieve_snapshots().await {
+                    Ok(snapshots) if !snapshots.is_empty() => {
+                        debug!("Collected {} snapshot(s)", snapshots.len());
+                        if sender.send(ActivityReport::Snapshots(snapshots)).is_err() {
+                            warn!("Failed to send snapshots - receiver dropped");
+                            break;
+                        }
+                    }
+                    Ok(_) => {
+                        debug!("No snapshots collected");
+                    }
+                    Err(e) => {
+                        warn!("Failed to retrieve snapshots: {}", e);
+                    }
+                }
+            }
+
+            debug!("Snapshot collection task ended");
+        });
+
+        self.snapshot_collection_handle = Some(Arc::new(handle));
     }
 }
 
