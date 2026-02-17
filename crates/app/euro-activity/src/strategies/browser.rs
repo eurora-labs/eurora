@@ -169,6 +169,12 @@ impl StrategySupport for BrowserStrategy {
     fn get_supported_processes() -> Vec<&'static str> {
         vec![Librewolf.get_name(), Firefox.get_name(), Chrome.get_name()]
     }
+
+    async fn create() -> ActivityResult<ActivityStrategy> {
+        Ok(ActivityStrategy::BrowserStrategy(
+            BrowserStrategy::new().await?,
+        ))
+    }
 }
 
 #[async_trait]

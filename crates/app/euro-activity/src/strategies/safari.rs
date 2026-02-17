@@ -226,6 +226,12 @@ impl StrategySupport for SafariStrategy {
     fn get_supported_processes() -> Vec<&'static str> {
         vec![Safari.get_name()]
     }
+
+    async fn create() -> ActivityResult<ActivityStrategy> {
+        Ok(ActivityStrategy::SafariStrategy(
+            SafariStrategy::new().await?,
+        ))
+    }
 }
 
 #[async_trait]
