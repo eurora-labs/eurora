@@ -6,17 +6,19 @@ use agent_chain::{
     BaseChatModel, BaseMessage, HumanMessage, ollama::ChatOllama, openai::ChatOpenAI,
 };
 use be_authz::{extract_claims, parse_user_id};
+use be_local_settings::{OllamaConfig, OpenAIConfig, ProviderSettings, SettingsReceiver};
 use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
-use std::{pin::Pin, sync::Arc};
+use std::pin::Pin;
+use std::sync::{Arc, RwLock};
 use tokio_stream::{Stream, StreamExt};
 use tonic::{Request, Response, Status};
 use tracing::{debug, error, info};
 use uuid::Uuid;
 
+use crate::converters::convert_db_message_to_base_message;
 use crate::error::ConversationServiceError;
-use crate::{ConversationServiceResult, converters::convert_db_message_to_base_message};
 
 use proto_gen::conversation::{
     AddHiddenHumanMessageRequest, AddHiddenHumanMessageResponse, AddHumanMessageRequest,
@@ -30,57 +32,186 @@ pub use proto_gen::conversation::proto_conversation_service_server::{
     ProtoConversationService, ProtoConversationServiceServer,
 };
 
+/// Env-var fallback providers, built once at service construction.
+struct EnvFallback {
+    chat: Arc<dyn BaseChatModel + Send + Sync>,
+    title: Arc<dyn BaseChatModel + Send + Sync>,
+}
+
+/// Cached providers built from the latest `ProviderSettings`.
+struct CachedProviders {
+    settings: ProviderSettings,
+    chat: Arc<dyn BaseChatModel + Send + Sync>,
+    title: Arc<dyn BaseChatModel + Send + Sync>,
+}
+
+fn build_ollama(
+    config: &OllamaConfig,
+    model_override: Option<&str>,
+) -> Box<dyn BaseChatModel + Send + Sync> {
+    let model = model_override.unwrap_or(&config.model);
+    Box::new(ChatOllama::new(model).base_url(config.base_url.as_str()))
+}
+
+fn build_openai(
+    config: &OpenAIConfig,
+    model_override: Option<&str>,
+    web_search: bool,
+) -> Box<dyn BaseChatModel + Send + Sync> {
+    let model = model_override.unwrap_or(&config.model);
+    let mut provider = ChatOpenAI::new(model)
+        .api_key(config.api_key.as_str())
+        .api_base(config.base_url.as_str());
+    if web_search {
+        provider = provider.with_builtin_tools(vec![BuiltinTool::WebSearch]);
+    }
+    Box::new(provider)
+}
+
+fn build_chat_provider_from(settings: &ProviderSettings) -> Box<dyn BaseChatModel + Send + Sync> {
+    match settings {
+        ProviderSettings::Ollama(c) => build_ollama(c, None),
+        ProviderSettings::OpenAI(c) => build_openai(c, None, true),
+    }
+}
+
+fn build_title_provider_from(settings: &ProviderSettings) -> Box<dyn BaseChatModel + Send + Sync> {
+    match settings {
+        ProviderSettings::Ollama(c) => build_ollama(c, None),
+        ProviderSettings::OpenAI(c) => {
+            let title_model = c.title_model.as_deref();
+            build_openai(c, title_model, false)
+        }
+    }
+}
+
+fn build_env_fallback() -> Option<EnvFallback> {
+    let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
+        .map(|v| v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
+    if local_mode {
+        let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "llama3.2".to_string());
+        let host = std::env::var("OLLAMA_HOST")
+            .unwrap_or_else(|_| "http://host.docker.internal:11434".to_string());
+        let chat: Arc<dyn BaseChatModel + Send + Sync> =
+            Arc::new(ChatOllama::new(&model).base_url(&host));
+        let title: Arc<dyn BaseChatModel + Send + Sync> =
+            Arc::new(ChatOllama::new(&model).base_url(&host));
+        Some(EnvFallback { chat, title })
+    } else {
+        let api_key = std::env::var("OPENAI_API_KEY").ok()?;
+        if api_key.is_empty() {
+            return None;
+        }
+        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-5.1".to_string());
+        let chat: Arc<dyn BaseChatModel + Send + Sync> = Arc::new(
+            ChatOpenAI::new(&model)
+                .with_builtin_tools(vec![BuiltinTool::WebSearch])
+                .api_key(&api_key),
+        );
+        let title: Arc<dyn BaseChatModel + Send + Sync> =
+            Arc::new(ChatOpenAI::new("gpt-4.1-mini").api_key(&api_key));
+        Some(EnvFallback { chat, title })
+    }
+}
+
+// --- Service ---
+
 pub struct ConversationService {
-    chat_provider: Box<dyn BaseChatModel + Send + Sync>,
-    title_provider: Box<dyn BaseChatModel + Send + Sync>,
+    settings_rx: SettingsReceiver,
     db: Arc<DatabaseManager>,
+    env_fallback: Option<EnvFallback>,
+    cached: RwLock<Option<CachedProviders>>,
 }
 
 impl ConversationService {
-    pub fn from_env(db: Arc<DatabaseManager>) -> ConversationServiceResult<Self> {
-        info!("Creating new ConversationService instance");
+    pub fn new(db: Arc<DatabaseManager>, settings_rx: SettingsReceiver) -> Self {
+        let env_fallback = build_env_fallback();
+        info!(
+            "Creating new ConversationService instance (env fallback: {})",
+            env_fallback.is_some()
+        );
+        Self {
+            settings_rx,
+            db,
+            env_fallback,
+            cached: RwLock::new(None),
+        }
+    }
 
-        let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
-            .map(|v| v.eq_ignore_ascii_case("true"))
-            .unwrap_or(false);
+    /// Get a chat provider, using cached version if settings haven't changed.
+    fn get_chat_provider(&self) -> Result<Arc<dyn BaseChatModel + Send + Sync>, Status> {
+        // Clone out of watch::Ref immediately to avoid holding the borrow.
+        let current = self.settings_rx.borrow().clone();
 
-        if local_mode {
-            let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "llama3.2".to_string());
-            let host = std::env::var("OLLAMA_HOST")
-                .unwrap_or_else(|_| "http://host.docker.internal:11434".to_string());
+        match current {
+            Some(settings) => {
+                {
+                    let cache = self.cached.read().unwrap();
+                    if let Some(ref cached) = *cache
+                        && cached.settings == settings
+                    {
+                        return Ok(cached.chat.clone());
+                    }
+                }
+                let chat: Arc<dyn BaseChatModel + Send + Sync> =
+                    build_chat_provider_from(&settings).into();
+                let title: Arc<dyn BaseChatModel + Send + Sync> =
+                    build_title_provider_from(&settings).into();
+                let mut cache = self.cached.write().unwrap();
+                *cache = Some(CachedProviders {
+                    settings,
+                    chat: chat.clone(),
+                    title,
+                });
+                Ok(chat)
+            }
+            None => {
+                let fb = self.env_fallback.as_ref().ok_or_else(|| {
+                    Status::failed_precondition(
+                        "No provider settings configured and no environment fallback available",
+                    )
+                })?;
+                Ok(fb.chat.clone())
+            }
+        }
+    }
 
-            info!(
-                "Local mode: using Ollama provider (model={}, host={})",
-                model, host
-            );
+    /// Get a title-generation provider, using cached version if settings haven't changed.
+    fn get_title_provider(&self) -> Result<Arc<dyn BaseChatModel + Send + Sync>, Status> {
+        let current = self.settings_rx.borrow().clone();
 
-            let chat_provider = ChatOllama::new(&model).base_url(&host);
-            let title_provider = ChatOllama::new(&model).base_url(&host);
-
-            Ok(Self {
-                chat_provider: Box::new(chat_provider),
-                title_provider: Box::new(title_provider),
-                db,
-            })
-        } else {
-            let api_key = std::env::var("OPENAI_API_KEY").unwrap_or_else(|_| {
-                error!("OPENAI_API_KEY environment variable is not set");
-                String::new()
-            });
-            let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-5.1".to_string());
-
-            info!("Cloud mode: using OpenAI provider (model={})", model);
-
-            let chat_provider = ChatOpenAI::new(&model)
-                .with_builtin_tools(vec![BuiltinTool::WebSearch])
-                .api_key(api_key.clone());
-            let title_provider = ChatOpenAI::new("gpt-4.1-mini").api_key(api_key.clone());
-
-            Ok(Self {
-                chat_provider: Box::new(chat_provider),
-                title_provider: Box::new(title_provider),
-                db,
-            })
+        match current {
+            Some(settings) => {
+                {
+                    let cache = self.cached.read().unwrap();
+                    if let Some(ref cached) = *cache
+                        && cached.settings == settings
+                    {
+                        return Ok(cached.title.clone());
+                    }
+                }
+                let chat: Arc<dyn BaseChatModel + Send + Sync> =
+                    build_chat_provider_from(&settings).into();
+                let title: Arc<dyn BaseChatModel + Send + Sync> =
+                    build_title_provider_from(&settings).into();
+                let mut cache = self.cached.write().unwrap();
+                *cache = Some(CachedProviders {
+                    settings,
+                    chat,
+                    title: title.clone(),
+                });
+                Ok(title)
+            }
+            None => {
+                let fb = self.env_fallback.as_ref().ok_or_else(|| {
+                    Status::failed_precondition(
+                        "No provider settings configured and no environment fallback available",
+                    )
+                })?;
+                Ok(fb.title.clone())
+            }
         }
     }
 
@@ -396,8 +527,8 @@ impl ProtoConversationService for ConversationService {
             .await
             .map_err(ConversationServiceError::from)?;
 
-        let openai_stream = self
-            .chat_provider
+        let chat_provider = self.get_chat_provider()?;
+        let provider_stream = chat_provider
             .astream(messages.into(), None, None)
             .await
             .map_err(|e| {
@@ -407,10 +538,10 @@ impl ProtoConversationService for ConversationService {
 
         let db = self.db.clone();
         let output_stream = async_stream::try_stream! {
-            tokio::pin!(openai_stream);
+            tokio::pin!(provider_stream);
             let mut full_content = String::new();
 
-            while let Some(result) = openai_stream.next().await {
+            while let Some(result) = provider_stream.next().await {
                 match result {
                     Ok(chunk) => {
                         let content = chunk.content.to_string();
@@ -562,7 +693,8 @@ impl ProtoConversationService for ConversationService {
                 .into(),
         );
 
-        let mut title = match self.title_provider.invoke(messages.into(), None).await {
+        let title_provider = self.get_title_provider()?;
+        let mut title = match title_provider.invoke(messages.into(), None).await {
             Ok(message) => message.content.to_string(),
             Err(_) => "New Chat".to_string(),
         };
