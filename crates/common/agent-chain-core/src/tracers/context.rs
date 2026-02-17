@@ -264,27 +264,27 @@ pub fn get_configure_hooks() -> &'static std::sync::LazyLock<std::sync::Mutex<Co
 mod tests {
     use super::*;
 
-    struct TestCallback {
-        project: String,
-    }
+    // struct TestCallback {
+    //     project: String,
+    // }
 
-    impl TracingCallback for TestCallback {
-        fn project_name(&self) -> Option<&str> {
-            Some(&self.project)
-        }
+    // impl TracingCallback for TestCallback {
+    //     fn project_name(&self) -> Option<&str> {
+    //         Some(&self.project)
+    //     }
 
-        fn example_id(&self) -> Option<Uuid> {
-            None
-        }
+    //     fn example_id(&self) -> Option<Uuid> {
+    //         None
+    //     }
 
-        fn latest_run(&self) -> Option<&Run> {
-            None
-        }
+    //     fn latest_run(&self) -> Option<&Run> {
+    //         None
+    //     }
 
-        fn get_run_url(&self) -> Option<String> {
-            None
-        }
-    }
+    //     fn get_run_url(&self) -> Option<String> {
+    //         None
+    //     }
+    // }
 
     // #[test]
     // fn test_tracing_v2_enabled() {
