@@ -42,6 +42,7 @@ services:
             APPROVED_EMAILS: '*'
         volumes:
             - ${EURORA_ASSET_DIR:-~/.local/share/eurora/assets}:/data/assets
+            - ${EURORA_AUTHZ_DIR:-../../../config/authz}:/config/authz:ro
 
 volumes:
     eurora-pgdata:

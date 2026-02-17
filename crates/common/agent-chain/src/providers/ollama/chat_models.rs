@@ -403,7 +403,8 @@ impl ChatOllama {
         };
 
         let (cleaned_url, _) = parse_url_with_auth(Some(&raw_url));
-        cleaned_url.unwrap_or(raw_url)
+        let url = cleaned_url.unwrap_or(raw_url);
+        url.trim_end_matches('/').to_string()
     }
 
     /// Build the HTTP client, optionally with basic auth from the URL.

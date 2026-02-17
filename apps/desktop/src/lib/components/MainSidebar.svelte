@@ -11,6 +11,7 @@
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import CircleUserRoundIcon from '@lucide/svelte/icons/circle-user-round';
+	import LogoutIcon from '@lucide/svelte/icons/log-out';
 	import PowerIcon from '@lucide/svelte/icons/power';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
@@ -158,6 +159,20 @@
 						{/snippet}
 					</DropdownMenu.Trigger>
 					<DropdownMenu.Content side="top" class="w-(--bits-dropdown-menu-anchor-width)">
+						<DropdownMenu.Item
+							onclick={() => {
+								taurpc.auth.logout().then(() => {
+									goto('/onboarding');
+								});
+							}}
+						>
+							{#snippet child({ props })}
+								<a {...props}>
+									<LogoutIcon />
+									<span>Log Out</span>
+								</a>
+							{/snippet}
+						</DropdownMenu.Item>
 						<DropdownMenu.Item onclick={() => (quitDialogOpen = true)}>
 							{#snippet child({ props })}
 								<a {...props}>
