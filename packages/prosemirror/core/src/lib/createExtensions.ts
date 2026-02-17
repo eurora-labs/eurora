@@ -34,7 +34,6 @@ export async function createExtensions(
 		}
 
 		for (const nodeKey in ext.svelteNodes) {
-			// TODO: make sure the node is not duplicate
 			const node = ext.svelteNodes[nodeKey];
 			extData.nodes[nodeKey] = await createNodeSpec(node);
 			if (node.nodeView) {
@@ -74,11 +73,6 @@ export async function createExtensions(
 		},
 		marks: extData.marks,
 	});
-
-	// const schema = new Schema({
-	// 	nodes: addListNodes(defaultSchema.spec.nodes, 'paragraph block*', 'block').append(nodes),
-	// 	marks: defaultSchema.spec.marks
-	// });
 
 	const keymaps = Object.keys(extData.sortedKeymaps).reduce(
 		(acc, key) => {

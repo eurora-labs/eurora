@@ -7,7 +7,6 @@
 	import LinkedinIcon from '@lucide/svelte/icons/linkedin';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import UsersIcon from '@lucide/svelte/icons/users';
-	// Use static images instead of importing from lib
 	const laura_thommen_img = '/images/avatars/laura_thommen.jpg';
 	const andre_roelofs_img = '/images/avatars/andre_roelofs.jpg';
 	const linda_rosner_img = '/images/avatars/linda_rosner.jpg';
@@ -22,7 +21,6 @@
 		</p>
 	</div>
 
-	<!-- Company Overview -->
 	<Card.Root class="mb-12 p-6">
 		<Card.Header>
 			<div class="flex items-center gap-2">
@@ -45,11 +43,9 @@
 		</Card.Content>
 	</Card.Root>
 
-	<!-- Leadership Team -->
 	<h2 class="mb-8 text-3xl font-bold">Leadership Team</h2>
 
 	<div class="mb-16 grid grid-cols-1 gap-8 md:grid-cols-3">
-		<!-- CEO -->
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="mb-4 flex flex-col items-center">
@@ -59,7 +55,6 @@
 						class="mb-4 h-32 w-32 rounded-full object-cover"
 					/>
 
-					<!-- <div class="w-32 h-32 rounded-full bg-gray-200 mb-4"></div> -->
 					<Card.Title>Laura Thommen</Card.Title>
 					<p class="font-medium text-purple-600">Chief Executive Officer</p>
 				</div>
@@ -101,7 +96,6 @@
 			</Card.Content>
 		</Card.Root>
 
-		<!-- CTO -->
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="mb-4 flex flex-col items-center">
@@ -151,7 +145,6 @@
 			</Card.Content>
 		</Card.Root>
 
-		<!-- COO -->
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="mb-4 flex flex-col items-center">
@@ -200,7 +193,6 @@
 		</Card.Root>
 	</div>
 
-	<!-- Space for More Team Members -->
 	<Card.Root class="mb-16 border-none bg-purple-50 p-6">
 		<Card.Content class="text-center">
 			<h2 class="mb-4 text-2xl font-bold">Join Our Team</h2>
@@ -213,7 +205,6 @@
 		</Card.Content>
 	</Card.Root>
 
-	<!-- Company Values -->
 	<h2 class="mb-8 text-3xl font-bold">Our Values</h2>
 	<div class="mb-16 grid grid-cols-1 gap-8 md:grid-cols-2">
 		<Card.Root class="p-6">
@@ -265,7 +256,6 @@
 		</Card.Root>
 	</div>
 
-	<!-- Call to Action -->
 	<Card.Root class="border-none bg-purple-50 p-8">
 		<Card.Content class="text-center">
 			<h2 class="mb-4 text-3xl font-bold">Want to Learn More?</h2>

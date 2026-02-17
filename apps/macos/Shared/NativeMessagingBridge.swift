@@ -1,22 +1,9 @@
-//
-//  NativeMessagingBridge.swift
-//  Eurora
-//
-//  Bridge between Safari extension and the container app.
-//  Connects to the local bridge server running in the container app
-//  over TCP on localhost:14311, using length-prefixed JSON messages.
-//
-//  This replaces Chrome's stdin/stdout native messaging channel.
-//
-
 import Foundation
 import Network
 import os.log
 
-/// Port for connecting to the local bridge server in the container app
 private let kBridgeConnectionPort: UInt16 = 14311
 
-/// Singleton bridge that manages communication with the container app
 @available(macOS 15.0, *)
 class NativeMessagingBridge {
 
@@ -29,20 +16,17 @@ class NativeMessagingBridge {
     private var isConnected = false
     private var isConnecting = false
 
-    /// Pending response callbacks, keyed by request ID
     private let responseLock = NSLock()
     private var pendingCallbacks: [String: (Result<Data, Error>) -> Void] = [:]
 
     private init() {}
 
-    /// Ensure the bridge is connected. Call this before sending messages.
     func ensureConnected() {
         queue.async { [weak self] in
             self?.connectIfNeeded()
         }
     }
 
-    /// Send a message to the container app and wait for a response.
     func sendMessage(
         _ message: [String: Any],
         timeout: TimeInterval = 10.0,
@@ -54,7 +38,6 @@ class NativeMessagingBridge {
                 return
             }
 
-            // Ensure we're connected
             if !self.isConnected {
                 self.connectIfNeeded()
 
@@ -77,8 +60,6 @@ class NativeMessagingBridge {
         }
     }
 
-    /// Forward a response from the extension back to the container app.
-    /// Returns true if the response was handled.
     func handleResponseFromExtension(_ response: [String: Any]) -> Bool {
         guard let kind = response["kind"] as? [String: Any],
               kind["Response"] != nil else {
@@ -108,7 +89,6 @@ class NativeMessagingBridge {
         return true
     }
 
-    /// Stop the bridge connection.
     func stop() {
         queue.async { [weak self] in
             self?.disconnectInternal()
@@ -118,12 +98,10 @@ class NativeMessagingBridge {
     // MARK: - Private: Connection
 
     private func connectIfNeeded() {
-        // Already connected or connecting — nothing to do
         guard !isConnected && !isConnecting else { return }
 
         isConnecting = true
 
-        // Clean up any stale connection
         connection?.cancel()
         connection = nil
 
@@ -147,7 +125,6 @@ class NativeMessagingBridge {
         connection?.cancel()
         connection = nil
 
-        // Cancel all pending callbacks
         responseLock.lock()
         let callbacks = pendingCallbacks
         pendingCallbacks.removeAll()
@@ -273,6 +250,7 @@ class NativeMessagingBridge {
     }
 
     // MARK: - Static Helpers
+
     static func frameMessage(_ data: Data) -> Data {
         var length = UInt32(data.count).littleEndian
         var framedData = Data(bytes: &length, count: 4)
@@ -281,7 +259,8 @@ class NativeMessagingBridge {
     }
 }
 
-// MARK: - Receiving (extension to reduce type body length)
+// MARK: - Receiving
+
 @available(macOS 15.0, *)
 extension NativeMessagingBridge {
     func startReceiving() { receiveNextMessage() }

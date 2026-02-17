@@ -67,16 +67,18 @@ function RegistryPlugin() {
  *
  * Site scripts are loaded dynamically via browser.runtime.getURL() and import()
  */
-export function contentConfig({ browser, outDir, emptyOutDir }) {
+export function contentConfig({ browser, outDir, emptyOutDir, mode }) {
 	const rootDir = path.resolve(import.meta.dirname, '../..');
 	const siteEntries = listSiteEntries();
 
 	return {
 		// Don't load vite.config.ts (which has SvelteKit) for this build
 		configFile: false,
+		mode: mode || 'production',
 		root: rootDir,
 		define: {
 			__BROWSER__: JSON.stringify(browser),
+			__DEV__: JSON.stringify(mode === 'development'),
 		},
 		plugins: [RegistryPlugin()],
 		build: {

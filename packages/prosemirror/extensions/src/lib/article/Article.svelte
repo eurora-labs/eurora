@@ -28,7 +28,6 @@
 			(acc, [key, value]) => ({ ...acc, [key]: { default: value } }),
 			{},
 		),
-		// content: 'inline+',
 		group: 'inline',
 		inline: true,
 		atom: true,
@@ -59,7 +58,7 @@
 					'data-text': text,
 					'data-name': 'contextChip',
 				},
-				name || 'article', // Add the text content as the third element
+				name || 'article',
 			];
 		},
 	};
@@ -88,8 +87,6 @@
 		ref?.remove();
 	}
 </script>
-
-<!-- <ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>{attrs.name}</ContextChip> -->
 
 <Popover.Root>
 	<Popover.Trigger>

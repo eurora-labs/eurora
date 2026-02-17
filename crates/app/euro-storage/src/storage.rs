@@ -31,7 +31,6 @@ impl Storage {
         Self::validate_path(relative_path.as_ref())?;
         let full_path = self.local_data_dir.join(relative_path);
 
-        // Create parent directories if they don't exist
         if let Some(parent) = full_path.parent() {
             fs::create_dir_all(parent)?;
         }

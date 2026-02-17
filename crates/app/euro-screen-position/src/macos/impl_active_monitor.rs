@@ -37,7 +37,6 @@ impl ImplActiveMonitor {
         (x, y)
     }
 
-    /// Get all available monitors
     #[allow(dead_code)]
     pub fn get_all_monitors() -> Result<Vec<MonitorInfo>, String> {
         let monitors = Monitor::all().map_err(|e| format!("Failed to get monitors: {}", e))?;
@@ -53,7 +52,6 @@ impl ImplActiveMonitor {
     pub fn get_primary_monitor() -> Option<MonitorInfo> {
         let monitors = Monitor::all().ok()?;
 
-        // Try to find the primary monitor (usually the one at 0,0)
         for monitor in &monitors {
             if monitor.x().unwrap_or(0) == 0 && monitor.y().unwrap_or(0) == 0 {
                 return Some(MonitorInfo::from(monitor));
@@ -65,8 +63,6 @@ impl ImplActiveMonitor {
 }
 
 impl Default for ImplActiveMonitor {
-    /// Create an ImplActiveMonitor for the monitor containing the cursor
-    /// Falls back to primary monitor if cursor position cannot be determined
     fn default() -> Self {
         let cursor_xy = Enigo::new(&Settings::default())
             .ok()
@@ -85,7 +81,6 @@ impl Default for ImplActiveMonitor {
             return Self::new(primary_monitor);
         }
 
-        // Fallback to a default monitor if nothing else works
         Self::new(MonitorInfo {
             id: "default".to_string(),
             x: 0,
