@@ -13,6 +13,9 @@ impl TryFrom<proto::OllamaSettings> for OllamaConfig {
     type Error = Error;
 
     fn try_from(p: proto::OllamaSettings) -> Result<Self> {
+        if p.base_url.is_empty() {
+            return Err(Error::EmptyField("base_url"));
+        }
         if p.model.is_empty() {
             return Err(Error::EmptyField("model"));
         }
