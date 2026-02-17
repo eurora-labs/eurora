@@ -265,6 +265,7 @@ impl XMLOutputParser {
     }
 
     /// Read the content of an element (text or children) until its closing tag.
+    #[allow(clippy::only_used_in_recursion)]
     fn read_element_content(
         &self,
         reader: &mut quick_xml::Reader<&[u8]>,
