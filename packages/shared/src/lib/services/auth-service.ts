@@ -8,7 +8,7 @@ import {
 	type ThirdPartyAuthUrlResponse,
 	type LoginByLoginTokenRequest,
 	type GetLoginTokenResponse,
-} from '../protos/auth_service_pb.js';
+} from '$lib/protos/auth_service_pb.js';
 import { createClient, type Client } from '@connectrpc/connect';
 import { createGrpcWebTransport } from '@connectrpc/connect-web';
 
