@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { type ApiSettings } from '$lib/bindings/bindings.js';
+	import { type APISettings } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
 	import { Checkbox } from '@eurora/ui/components/checkbox/index';
@@ -9,7 +9,7 @@
 
 	const taurpc = inject(TAURPC_SERVICE);
 
-	let apiSettings = $state<ApiSettings | null>(null);
+	let apiSettings = $state<APISettings | null>(null);
 	let customEndpoint = $state(false);
 	let endpointValue = $state('');
 	let initialEndpoint = $state('https://api.eurora-labs.com');
