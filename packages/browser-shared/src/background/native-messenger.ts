@@ -5,7 +5,7 @@ import { isSafari } from './util.js';
 import browser from 'webextension-polyfill';
 import type { Frame, RequestFrame, ResponseFrame } from '../content/bindings.js';
 
-const host = 'com.eurora.app';
+const host = import.meta.env.MODE === 'development' ? 'com.eurora.dev' : 'com.eurora.app';
 const connectTimeout = 5000;
 let nativePort: browser.Runtime.Port | null = null;
 
@@ -78,7 +78,7 @@ async function onNativePortMessage(message: unknown, sender: browser.Runtime.Por
 		// → LocalBridgeServer instead of through the (unreliable) dispatch path.
 		if (isSafari() && safariMessage.name === 'NativeRequest') {
 			try {
-				await browser.runtime.sendNativeMessage('com.eurora.app', response);
+				await browser.runtime.sendNativeMessage(host, response);
 			} catch (error) {
 				console.error('Failed to send response via sendNativeMessage:', error);
 				sender.postMessage(response);
