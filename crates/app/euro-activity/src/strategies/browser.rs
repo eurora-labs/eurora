@@ -227,6 +227,26 @@ impl BrowserStrategy {
         Ok(())
     }
 
+    /// Send a `BROWSER_FOCUSED` event to the extension so it can recover its
+    /// focus state.  The Chrome `windows.onFocusChanged` event is unreliable
+    /// on Linux, but the OS-level focus tracker on the Rust side is not.
+    async fn send_browser_focused_event(&self, browser_pid: u32) {
+        let Some(service) = self.bridge_service.as_ref() else {
+            return;
+        };
+
+        let frame = Frame {
+            kind: Some(FrameKind::Event(EventFrame {
+                action: "BROWSER_FOCUSED".to_string(),
+                payload: None,
+            })),
+        };
+
+        if let Err(e) = service.send_to_browser(browser_pid, frame).await {
+            debug!("Failed to send BROWSER_FOCUSED event: {}", e);
+        }
+    }
+
     pub async fn new() -> ActivityResult<Self> {
         let mut strategy = BrowserStrategy::default();
         strategy.initialize_service().await?;
@@ -269,6 +289,8 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         // icon to briefly appear in the UI.
 
         self.init_collection(focus_window).await?;
+        self.send_browser_focused_event(focus_window.process_id)
+            .await;
 
         debug!("Browser strategy starting tracking for: {:?}", process_name);
         Ok(())
@@ -324,6 +346,8 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                      (will be handled by event subscription)",
                     focus_window.process_id
                 );
+                self.send_browser_focused_event(focus_window.process_id)
+                    .await;
             }
 
             Ok(true)

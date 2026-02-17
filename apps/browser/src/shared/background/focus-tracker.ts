@@ -69,6 +69,19 @@ export function setNativePort(port: browser.Runtime.Port | null): void {
 }
 
 /**
+ * Called when the native app detects that the browser window gained OS-level
+ * focus.  This is more reliable than `windows.onFocusChanged` on some
+ * platforms (notably Chrome on Linux) where the extension event can be missed
+ * after returning from another application.
+ */
+export async function notifyBrowserFocused(): Promise<void> {
+	if (isBrowserFocused) return; // already tracking
+	isBrowserFocused = true;
+	await collectAndSend();
+	startCollectionInterval();
+}
+
+/**
  * Clean up URL tracking state when a tab is removed.
  */
 export async function onRemoved(tabId: number): Promise<void> {
@@ -93,11 +106,18 @@ async function onWindowFocusChanged(windowId: number): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Tab events – only act while the browser is focused
+// Tab events
+//
+// These events can only fire when the browser is in the foreground, so they
+// double as an implicit focus-recovery mechanism for platforms where
+// `windows.onFocusChanged` is unreliable (Chrome on Linux).
 // ---------------------------------------------------------------------------
 
 async function onTabActivated(_activeInfo: browser.Tabs.OnActivatedActiveInfoType): Promise<void> {
-	if (!isBrowserFocused || !activeNativePort) return;
+	if (!activeNativePort) return;
+	if (!isBrowserFocused) {
+		isBrowserFocused = true;
+	}
 	await collectAndSend();
 	// Restart the interval so the next tick is a full 3 s from now.
 	startCollectionInterval();
@@ -109,9 +129,13 @@ async function onTabUpdated(
 	tab: browser.Tabs.Tab,
 ): Promise<void> {
 	if (changeInfo.status !== 'complete') return;
-	if (!isBrowserFocused || !activeNativePort) return;
+	if (!activeNativePort) return;
 	// Only care about the currently active tab.
 	if (!tab.active) return;
+	if (!isBrowserFocused) {
+		isBrowserFocused = true;
+		startCollectionInterval();
+	}
 	await collectAndSend();
 }
 

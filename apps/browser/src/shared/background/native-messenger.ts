@@ -1,4 +1,4 @@
-import { initFocusTracker, destroyFocusTracker } from './focus-tracker';
+import { initFocusTracker, destroyFocusTracker, notifyBrowserFocused } from './focus-tracker';
 import { handleMessage } from './messaging';
 import { getCurrentTabIcon } from './tabs';
 import { isSafari } from './util';
@@ -91,8 +91,12 @@ async function onNativePortMessage(message: unknown, sender: browser.Runtime.Por
 		// We don't expect Response frames from the native side.
 		console.warn('Unexpected response frame:', kind.Response);
 	} else if ('Event' in kind) {
-		// The app shouldn't send events to the extension in normal operation.
-		console.warn('Received event frame from native host:', kind.Event);
+		const event = kind.Event;
+		if (event.action === 'BROWSER_FOCUSED') {
+			notifyBrowserFocused().catch(console.error);
+		} else {
+			console.warn('Received unknown event frame from native host:', event);
+		}
 	} else if ('Error' in kind) {
 		// Log but don't crash – the Safari bridge may return timeout errors for
 		// fire-and-forget Event frames.  This is harmless.

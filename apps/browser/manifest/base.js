@@ -9,7 +9,7 @@ export const base = {
 	content_security_policy: {
 		extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
 	},
-	permissions: ['nativeMessaging', 'tabs', 'scripting', 'webNavigation'],
+	permissions: ['nativeMessaging', 'tabs', 'scripting', 'webNavigation', 'windows'],
 	icons: {
 		16: 'icon-16x16.png',
 		32: 'icon-32x32.png',
