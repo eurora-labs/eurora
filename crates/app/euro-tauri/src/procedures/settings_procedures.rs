@@ -1,4 +1,4 @@
-use euro_settings::{ApiSettings, AppSettings, GeneralSettings, TelemetrySettings};
+use euro_settings::{APISettings, AppSettings, GeneralSettings, TelemetrySettings};
 use tauri::{Manager, Runtime};
 
 use crate::shared_types::{SharedAppSettings, SharedEndpointManager};
@@ -29,12 +29,12 @@ pub trait SettingsApi {
 
     async fn get_api_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
-    ) -> Result<ApiSettings, String>;
+    ) -> Result<APISettings, String>;
 
     async fn set_api_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
-        api_settings: ApiSettings,
-    ) -> Result<ApiSettings, String>;
+        api_settings: APISettings,
+    ) -> Result<APISettings, String>;
 }
 #[derive(Clone)]
 pub struct SettingsApiImpl;
@@ -106,7 +106,7 @@ impl SettingsApi for SettingsApiImpl {
     async fn get_api_settings<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
-    ) -> Result<ApiSettings, String> {
+    ) -> Result<APISettings, String> {
         let state = app_handle.state::<SharedAppSettings>();
         let settings = state.lock().await;
 
@@ -116,13 +116,20 @@ impl SettingsApi for SettingsApiImpl {
     async fn set_api_settings<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
-        api_settings: ApiSettings,
-    ) -> Result<ApiSettings, String> {
+        api_settings: APISettings,
+    ) -> Result<APISettings, String> {
         let state = app_handle.state::<SharedAppSettings>();
         let mut settings = state.lock().await;
 
         let new_endpoint = api_settings.endpoint.clone();
         settings.api = api_settings;
+
+        settings
+            .api
+            .sync()
+            .await
+            .map_err(|e| format!("Failed to sync provider settings: {e}"))?;
+
         settings
             .save_to_default_path()
             .map_err(|e| format!("Failed to persist api settings: {e}"))?;
