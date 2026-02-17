@@ -8,7 +8,6 @@ import type { NativeMetadata, Frame } from '../content/bindings';
 // ---------------------------------------------------------------------------
 
 let collectionInterval: ReturnType<typeof setInterval> | null = null;
-let isBrowserFocused = false;
 let activeNativePort: browser.Runtime.Port | null = null;
 
 /**
@@ -39,7 +38,6 @@ export function initFocusTracker(port: browser.Runtime.Port): void {
 		.getLastFocused()
 		.then((win) => {
 			if (win && win.focused && win.id !== browser.windows.WINDOW_ID_NONE) {
-				isBrowserFocused = true;
 				collectAndSend().catch(console.error);
 				startCollectionInterval();
 			}
@@ -53,7 +51,6 @@ export function initFocusTracker(port: browser.Runtime.Port): void {
  */
 export function destroyFocusTracker(): void {
 	stopCollectionInterval();
-	isBrowserFocused = false;
 	activeNativePort = null;
 
 	browser.windows.onFocusChanged.removeListener(onWindowFocusChanged);
@@ -81,12 +78,8 @@ export async function onRemoved(tabId: number): Promise<void> {
 
 async function onWindowFocusChanged(windowId: number): Promise<void> {
 	if (windowId === browser.windows.WINDOW_ID_NONE) {
-		// All browser windows lost focus (user switched to another app).
-		isBrowserFocused = false;
 		stopCollectionInterval();
 	} else {
-		// A browser window gained focus.
-		isBrowserFocused = true;
 		await collectAndSend();
 		startCollectionInterval();
 	}
@@ -97,7 +90,7 @@ async function onWindowFocusChanged(windowId: number): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function onTabActivated(_activeInfo: browser.Tabs.OnActivatedActiveInfoType): Promise<void> {
-	if (!isBrowserFocused || !activeNativePort) return;
+	if (!activeNativePort) return;
 	await collectAndSend();
 	// Restart the interval so the next tick is a full 3 s from now.
 	startCollectionInterval();
@@ -109,7 +102,7 @@ async function onTabUpdated(
 	tab: browser.Tabs.Tab,
 ): Promise<void> {
 	if (changeInfo.status !== 'complete') return;
-	if (!isBrowserFocused || !activeNativePort) return;
+	if (!activeNativePort) return;
 	// Only care about the currently active tab.
 	if (!tab.active) return;
 	await collectAndSend();
