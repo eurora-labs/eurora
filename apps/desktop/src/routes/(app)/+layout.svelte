@@ -37,7 +37,7 @@
 			});
 
 		taurpcService.timeline.new_app_event.on((e) => {
-			if (timelineItems.length >= 2) {
+			if (timelineItems.length >= 5) {
 				timelineItems.shift();
 			}
 			timelineItems.push(e);
