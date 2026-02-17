@@ -239,12 +239,14 @@ dependencies = [
  "backon",
  "base64 0.22.1",
  "futures",
+ "percent-encoding",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
  "tokio",
  "tokio-util",
  "tracing",
+ "url",
 ]
 
 [[package]]
