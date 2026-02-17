@@ -1,3 +1,5 @@
-import { attachConsole } from '@fltsci/tauri-plugin-tracing';
+import { info, attachConsole } from '@fltsci/tauri-plugin-tracing';
 
-await attachConsole();
+attachConsole().then(() => {
+	info('Javascript Console Attached');
+});
