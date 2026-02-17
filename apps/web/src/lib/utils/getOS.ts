@@ -1,12 +1,7 @@
 import { UAParser } from 'ua-parser-js';
 import type { OSType } from '$lib/download/downloadService';
 
-/**
- * Detects the user's operating system using ua-parser-js
- * @returns The detected OS type ('windows', 'macos', 'linux', or 'unknown')
- */
 export function getOS(): OSType {
-	// Handle SSR - no navigator available
 	if (typeof navigator === 'undefined' || typeof window === 'undefined') {
 		return 'unknown';
 	}
@@ -29,9 +24,6 @@ export function getOS(): OSType {
 	return 'unknown';
 }
 
-/**
- * Returns a human-readable OS name for display purposes
- */
 export function getOSDisplayName(os: OSType): string {
 	switch (os) {
 		case 'windows':

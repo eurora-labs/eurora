@@ -18,8 +18,6 @@ function connect() {
 	nativePort = browser.runtime.connectNative(host);
 	nativePort.onDisconnect.addListener(onNativePortDisconnect);
 	nativePort.onMessage.addListener(onNativePortMessage);
-
-	// Hand the port to the focus tracker so it can push events proactively.
 	initFocusTracker(nativePort);
 }
 
@@ -27,31 +25,16 @@ function onNativePortDisconnect(port: browser.Runtime.Port) {
 	const error = port.error;
 	console.error('Native port disconnected:', error || 'Unknown error');
 
-	// Tear down the focus tracker before we lose the port reference.
 	destroyFocusTracker();
 	nativePort = null;
 
-	// Try to reconnect after a delay.
 	setTimeout(() => {
 		connect();
 	}, connectTimeout);
 }
 
-/**
- * Handle inbound messages from the native host.
- *
- * With the push-based model the extension proactively sends metadata, assets
- * and snapshots to the app.  The app should no longer need to send Request
- * frames for GENERATE_ASSETS / GENERATE_SNAPSHOT / GET_METADATA, but we keep
- * a lightweight request handler as a fallback so the protocol remains
- * backwards-compatible.
- */
 async function onNativePortMessage(message: unknown, sender: browser.Runtime.Port) {
-	// -----------------------------------------------------------------------
-	// Safari dispatch-message format
-	// SFSafariApplication.dispatchMessage sends:
-	//   { name: string, userInfo: { frame, frameJson, action, requestId } }
-	// -----------------------------------------------------------------------
+	// Safari's SFSafariApplication.dispatchMessage wraps frames differently
 	const safariMessage = message as {
 		name?: string;
 		userInfo?: { frame?: Frame; frameJson?: string; action?: string; requestId?: string };
@@ -74,9 +57,7 @@ async function onNativePortMessage(message: unknown, sender: browser.Runtime.Por
 	if ('Request' in kind) {
 		const response = await onRequestFrame(kind.Request);
 
-		// For Safari dispatch messages send the response via sendNativeMessage
-		// so it travels through SafariWebExtensionHandler → NativeMessagingBridge
-		// → LocalBridgeServer instead of through the (unreliable) dispatch path.
+		// Safari dispatch path is unreliable — use sendNativeMessage instead
 		if (isSafari() && safariMessage.name === 'NativeRequest') {
 			try {
 				await browser.runtime.sendNativeMessage(host, response);
@@ -88,14 +69,10 @@ async function onNativePortMessage(message: unknown, sender: browser.Runtime.Por
 			sender.postMessage(response);
 		}
 	} else if ('Response' in kind) {
-		// We don't expect Response frames from the native side.
 		console.warn('Unexpected response frame:', kind.Response);
 	} else if ('Event' in kind) {
-		// The app shouldn't send events to the extension in normal operation.
 		console.warn('Received event frame from native host:', kind.Event);
 	} else if ('Error' in kind) {
-		// Log but don't crash – the Safari bridge may return timeout errors for
-		// fire-and-forget Event frames.  This is harmless.
 		console.warn('Received error frame from native host:', kind.Error);
 	} else if ('Cancel' in kind) {
 		console.warn('Received cancel frame from native host:', kind.Cancel);
@@ -103,10 +80,6 @@ async function onNativePortMessage(message: unknown, sender: browser.Runtime.Por
 
 	return true;
 }
-
-// ---------------------------------------------------------------------------
-// Request handling (fallback – the app normally does NOT send these any more)
-// ---------------------------------------------------------------------------
 
 async function onRequestFrame(frame: RequestFrame): Promise<Frame> {
 	switch (frame.action) {

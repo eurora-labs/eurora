@@ -112,6 +112,5 @@
 		</div>
 	</div>
 
-	<!-- Footer space -->
 	<div class="pb-16"></div>
 </div>

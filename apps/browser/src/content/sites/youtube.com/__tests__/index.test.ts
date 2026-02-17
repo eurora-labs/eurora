@@ -1,7 +1,6 @@
 import { main } from '../index.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock dependencies
 vi.mock('webextension-polyfill', () => ({
 	default: {
 		runtime: {
@@ -32,12 +31,10 @@ describe('youtube.com site handler', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 
-		// Setup YouTube-like DOM
 		document.body.innerHTML = `
 			<video class="html5-main-video"></video>
 		`;
 
-		// Mock window.location
 		Object.defineProperty(window, 'location', {
 			value: {
 				href: 'https://www.youtube.com/watch?v=test123',

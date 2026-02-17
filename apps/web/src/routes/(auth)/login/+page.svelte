@@ -41,13 +41,11 @@
 			return;
 		}
 	});
-	// Define form schema
 	const loginSchema = z.object({
 		login: z.string().min(1, 'Username or email is required'),
 		password: z.string().min(1, 'Password is required'),
 	});
 
-	// Initialize form with client-side validation only
 	const form = superForm(
 		{ login: '', password: '' },
 		{
@@ -93,7 +91,6 @@
 		showPassword = !showPassword;
 	}
 
-	// Social login handlers
 	async function handleGoogleLogin() {
 		try {
 			const url = (await authService.getThirdPartyAuthUrl(Provider.GOOGLE)).url;

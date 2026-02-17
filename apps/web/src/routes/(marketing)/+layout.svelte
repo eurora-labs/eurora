@@ -60,22 +60,16 @@
 	</div>
 
 	<div class="flex items-center gap-4">
-		<!-- <Button variant="ghost" href="/features">Features</Button> -->
 		<Button variant="ghost" href="/about">About Us</Button>
 		<Button variant="ghost" href="/pricing">Pricing</Button>
-		<!-- <Button variant="ghost" href="/privacy">Privacy</Button> -->
-		<!-- <Button variant="ghost" href="/contact">Contact</Button> -->
-		<!-- <JoinWaitlist /> -->
 
 		<Button variant="default" href="/download">Download</Button>
 		<Button variant="ghost" size="icon" href="https://github.com/Eurora-Labs/eurora">
 			<SiGithub />
 		</Button>
-		<!-- <Button variant="default" href="/download">Get Eurora</Button> -->
 		{#if $isAuthenticated}
 			<UserButton />
 		{:else}
-			<!-- Login -->
 			<Button variant="outline" href="/login" class="backdrop-blur-2xl">
 				Login
 				<LogInIcon />
@@ -86,11 +80,9 @@
 
 {@render children?.()}
 
-<!-- Footer -->
 <footer class="border-t border-border bg-background mt-auto">
 	<div class="mx-auto max-w-7xl px-6 py-12 lg:px-8">
 		<div class="grid grid-cols-2 gap-8 md:grid-cols-4">
-			<!-- Product -->
 			<div>
 				<h3 class="text-sm font-semibold text-foreground">{footerLinks.product.title}</h3>
 				<ul class="mt-4 space-y-3">
@@ -107,7 +99,6 @@
 				</ul>
 			</div>
 
-			<!-- Company -->
 			<div>
 				<h3 class="text-sm font-semibold text-foreground">{footerLinks.company.title}</h3>
 				<ul class="mt-4 space-y-3">
@@ -124,7 +115,6 @@
 				</ul>
 			</div>
 
-			<!-- Resources & Support -->
 			<div>
 				<h3 class="text-sm font-semibold text-foreground">{footerLinks.resources.title}</h3>
 				<ul class="mt-4 space-y-3">
@@ -141,7 +131,6 @@
 				</ul>
 			</div>
 
-			<!-- Social -->
 			<div>
 				<h3 class="text-sm font-semibold text-foreground">{footerLinks.social.title}</h3>
 				<ul class="mt-4 space-y-3">
@@ -170,7 +159,6 @@
 			</div>
 		</div>
 
-		<!-- Bottom section with logo and copyright -->
 		<div
 			class="mt-12 border-t border-border pt-8 flex flex-col md:flex-row items-center justify-between gap-4"
 		>

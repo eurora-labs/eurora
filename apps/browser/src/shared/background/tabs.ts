@@ -25,9 +25,6 @@ export async function getTabsByUrlPattern(urlPattern: string): Promise<browser.T
 	}
 }
 
-/**
- * Fetches a favicon URL and converts it to a base64 data URL.
- */
 async function fetchFaviconAsBase64(faviconUrl: string): Promise<string> {
 	const response = await fetch(faviconUrl, { credentials: 'include' });
 	if (!response.ok) {
@@ -46,10 +43,7 @@ async function fetchFaviconAsBase64(faviconUrl: string): Promise<string> {
 	});
 }
 
-/**
- * Gets the favicon URL by injecting a content script that queries the DOM.
- * This is needed for Safari where favIconUrl is often null.
- */
+// Safari often has null favIconUrl — fall back to content script DOM query
 async function getFaviconUrlFromContentScript(tabId: number): Promise<string | null> {
 	try {
 		const results = await browser.scripting.executeScript({
@@ -70,7 +64,6 @@ async function getFaviconUrlFromContentScript(tabId: number): Promise<string | n
 					}
 				}
 
-				// Fallback: /favicon.ico on same origin
 				try {
 					return new URL('/favicon.ico', window.location.origin).href;
 				} catch {
@@ -97,7 +90,6 @@ export async function getCurrentTabIcon(activeTab: browser.Tabs.Tab): Promise<st
 
 		let faviconUrl = activeTab.favIconUrl;
 
-		// If favIconUrl is not available (common on Safari), try getting it from the content script
 		if (!faviconUrl && activeTab.id !== undefined) {
 			faviconUrl = (await getFaviconUrlFromContentScript(activeTab.id)) ?? undefined;
 		}
@@ -106,19 +98,16 @@ export async function getCurrentTabIcon(activeTab: browser.Tabs.Tab): Promise<st
 			return '';
 		}
 
-		// If it's a data URL (already base64), return it directly
 		if (faviconUrl.startsWith('data:')) {
-			// Extract base64 part from data URL
 			const base64Match = faviconUrl.match(/^data:image\/[^;]+;base64,(.+)$/);
 			return base64Match ? base64Match[1] : '';
 		}
 
-		// If it's a chrome:// or chrome-extension:// URL, we can't fetch it
+		// chrome:// and chrome-extension:// URLs can't be fetched
 		if (faviconUrl.startsWith('chrome://') || faviconUrl.startsWith('chrome-extension://')) {
 			return '';
 		}
 
-		// Fetch the favicon and convert to base64
 		return await fetchFaviconAsBase64(faviconUrl);
 	} catch (error) {
 		console.error('Error getting current tab icon:', error);

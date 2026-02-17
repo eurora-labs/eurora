@@ -36,9 +36,7 @@
 
 	let { class: className } = $props();
 
-	onMount(() => {
-		// console.log('EditorRef:', launcherInputRef);
-	});
+	onMount(() => {});
 
 	function handleKeydown(event: KeyboardEvent) {
 		if (placeholder.length > 0) {

@@ -1,7 +1,6 @@
 import { main } from '../index.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock dependencies
 vi.mock('webextension-polyfill', () => ({
 	default: {
 		runtime: {
@@ -28,7 +27,6 @@ describe('_default site handler', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 
-		// Setup basic DOM
 		document.body.innerHTML = '<div>Test content</div>';
 	});
 
@@ -50,7 +48,6 @@ describe('_default site handler', () => {
 			type: 'NEW',
 		};
 
-		// The actual handler would be tested with more setup
 		expect(message.type).toBe('NEW');
 	});
 

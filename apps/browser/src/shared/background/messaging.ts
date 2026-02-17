@@ -1,9 +1,6 @@
 import { getCurrentTab } from './tabs';
 import browser from 'webextension-polyfill';
 
-/**
- * Sends a message to a tab with retry logic to handle content script initialization delays
- */
 export async function sendMessageWithRetry(
 	tabId: number,
 	message: any,
@@ -31,7 +28,6 @@ export async function sendMessageWithRetry(
 
 export async function handleMessage(messageType: string) {
 	try {
-		// Get the current active tab
 		const activeTab = await getCurrentTab();
 
 		if (!activeTab || !activeTab.id) {

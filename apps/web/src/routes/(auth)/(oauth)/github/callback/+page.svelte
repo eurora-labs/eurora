@@ -24,9 +24,6 @@
 			return;
 		}
 
-		// State validation is now handled by the backend auth service
-		// The backend will validate the state parameter against the stored OAuth state
-		// and return an error if the state is invalid or expired
 		const loginToken = sessionStorage.getItem('loginToken') ?? undefined;
 		const challengeMethod = sessionStorage.getItem('challengeMethod') ?? undefined;
 		if (loginToken) sessionStorage.removeItem('loginToken');
@@ -48,10 +45,6 @@
 
 			await authService.login(loginData);
 
-			// Store tokens in auth store
-			// auth.login(tokens);
-
-			// Redirect to home page
 			goto('/');
 		} catch (error) {
 			console.error('Token exchange failed:', error);
@@ -60,7 +53,6 @@
 	});
 </script>
 
-<!-- A simple wait to be redirected page -->
 <div class="flex items-center justify-center h-screen">
 	<p>Wait to be redirected...</p>
 </div>
