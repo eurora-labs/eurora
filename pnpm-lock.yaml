@@ -156,9 +156,6 @@ importers:
       '@eslint/js':
         specifier: ^9.39.1
         version: 9.39.2
-      '@eurora/browser-shared':
-        specifier: workspace:*
-        version: link:../../packages/browser-shared
       '@eurora/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -171,6 +168,9 @@ importers:
       '@lucide/svelte':
         specifier: 'catalog:'
         version: 0.563.1(svelte@5.49.2)
+      '@mozilla/readability':
+        specifier: ^0.6.0
+        version: 0.6.0
       '@playwright/test':
         specifier: ^1.58.1
         version: 1.58.1
@@ -607,9 +607,6 @@ importers:
 
   e2e:
     dependencies:
-      '@eurora/browser-shared':
-        specifier: workspace:*
-        version: link:../packages/browser-shared
       '@eurora/ui':
         specifier: workspace:*
         version: link:../packages/ui
@@ -650,63 +647,6 @@ importers:
       wdio-video-reporter:
         specifier: ^6.0.0
         version: 6.2.0(expect-webdriverio@5.6.4)(webdriverio@9.23.3)
-
-  packages/browser-shared:
-    devDependencies:
-      '@eslint/compat':
-        specifier: ^1.4.1
-        version: 1.4.1(eslint@9.39.2(jiti@2.6.1))
-      '@eslint/js':
-        specifier: ^9.39.2
-        version: 9.39.2
-      '@mozilla/readability':
-        specifier: ^0.6.0
-        version: 0.6.0
-      '@playwright/test':
-        specifier: ^1.58.1
-        version: 1.58.1
-      '@testing-library/jest-dom':
-        specifier: ^6.9.1
-        version: 6.9.1
-      '@types/chrome':
-        specifier: ^0.1.36
-        version: 0.1.36
-      '@types/webextension-polyfill':
-        specifier: ^0.12.4
-        version: 0.12.4
-      eslint:
-        specifier: ^9.39.2
-        version: 9.39.2(jiti@2.6.1)
-      eslint-config-prettier:
-        specifier: ^10.1.8
-        version: 10.1.8(eslint@9.39.2(jiti@2.6.1))
-      globals:
-        specifier: ^15.15.0
-        version: 15.15.0
-      jsdom:
-        specifier: ^25.0.1
-        version: 25.0.1
-      prettier:
-        specifier: ^3.8.1
-        version: 3.8.1
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      typescript-eslint:
-        specifier: ^8.54.0
-        version: 8.54.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
-      vite:
-        specifier: 'catalog:'
-        version: 6.4.1(@types/node@25.2.0)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.0)
-      vite-plugin-dts:
-        specifier: ^4.5.3
-        version: 4.5.4(@types/node@25.2.0)(rollup@4.57.0)(typescript@5.9.3)(vite@6.4.1(@types/node@25.2.0)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.0))
-      vitest:
-        specifier: 'catalog:'
-        version: 3.2.4(@types/debug@4.1.12)(@types/node@25.2.0)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.0)
-      webextension-polyfill:
-        specifier: ^0.12.0
-        version: 0.12.0
 
   packages/prosemirror/core:
     devDependencies:

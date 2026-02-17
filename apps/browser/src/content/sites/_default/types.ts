@@ -1,7 +1,4 @@
-import type {
-	MessageType,
-	BrowserObj,
-} from '@eurora/browser-shared/content/extensions/watchers/watcher';
+import type { MessageType, BrowserObj } from '../../../shared/content/extensions/watchers/watcher';
 
 export type ArticleMessageType = MessageType;
 

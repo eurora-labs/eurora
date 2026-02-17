@@ -1,4 +1,4 @@
-import { type Entry } from './registry.js';
+import { type Entry } from './registry';
 
 export function matchSite(host: string, entries: Entry[]): Entry | null {
 	// Precompute maps once per activation for O(1) exact / suffix

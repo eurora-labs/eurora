@@ -1,5 +1,5 @@
-import { matchSite } from './match.js';
-import { loadRegistry } from './registry.js';
+import { matchSite } from './match';
+import { loadRegistry } from './registry';
 import browser from 'webextension-polyfill';
 
 export async function webNavigationListener(tabId: number, url: string, frameId: number) {

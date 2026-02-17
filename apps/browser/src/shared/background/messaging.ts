@@ -1,4 +1,4 @@
-import { getCurrentTab } from './tabs.js';
+import { getCurrentTab } from './tabs';
 import browser from 'webextension-polyfill';
 
 /**

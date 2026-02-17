@@ -13,7 +13,7 @@ vi.mock('webextension-polyfill', () => ({
 	},
 }));
 
-vi.mock('@eurora/browser-shared/content/extensions/article/util', () => ({
+vi.mock('../../../../shared/content/extensions/article/util', () => ({
 	createArticleAsset: vi.fn().mockResolvedValue({
 		kind: 'NativeArticleAsset',
 		data: { url: 'test-url', title: 'test-title' },
