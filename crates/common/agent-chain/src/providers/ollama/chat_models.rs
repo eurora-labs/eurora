@@ -26,13 +26,14 @@ use std::env;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use base64::Engine;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncBufReadExt;
 use tokio_util::io::StreamReader;
 use tracing::warn;
 
+use super::compat::convert_from_v1_to_ollama;
+use super::utils::{merge_auth_headers, parse_url_with_auth, validate_model};
 use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::chat_models::{
     BaseChatModel, ChatChunk, ChatModelConfig, LangSmithParams, ToolChoice, UsageMetadata,
@@ -120,8 +121,13 @@ pub struct ChatOllama {
     /// Controls reasoning/thinking mode for supported models.
     /// Supports `true`/`false` or string intensities like `"low"`, `"medium"`, `"high"`.
     reasoning: Option<serde_json::Value>,
-    /// Additional client kwargs.
+    /// Additional kwargs to pass to the HTTP clients. Pass headers in here.
+    /// These arguments are passed to both synchronous and async clients.
     client_kwargs: HashMap<String, serde_json::Value>,
+    /// Additional kwargs for async client only.
+    async_client_kwargs: HashMap<String, serde_json::Value>,
+    /// Additional kwargs for sync client only.
+    sync_client_kwargs: HashMap<String, serde_json::Value>,
     /// Chat model configuration.
     chat_model_config: ChatModelConfig,
     /// Language model configuration.
@@ -159,6 +165,8 @@ impl Clone for ChatOllama {
             keep_alive: self.keep_alive.clone(),
             reasoning: self.reasoning.clone(),
             client_kwargs: self.client_kwargs.clone(),
+            async_client_kwargs: self.async_client_kwargs.clone(),
+            sync_client_kwargs: self.sync_client_kwargs.clone(),
             chat_model_config: self.chat_model_config.clone(),
             language_model_config: self.language_model_config.clone(),
             model_validated: std::sync::atomic::AtomicBool::new(
@@ -213,6 +221,8 @@ impl ChatOllama {
             keep_alive: None,
             reasoning: None,
             client_kwargs: HashMap::new(),
+            async_client_kwargs: HashMap::new(),
+            sync_client_kwargs: HashMap::new(),
             chat_model_config: ChatModelConfig::new(),
             language_model_config: LanguageModelConfig::new(),
             model_validated: std::sync::atomic::AtomicBool::new(false),
@@ -356,6 +366,24 @@ impl ChatOllama {
         self
     }
 
+    /// Set additional client kwargs.
+    pub fn client_kwargs(mut self, kwargs: HashMap<String, serde_json::Value>) -> Self {
+        self.client_kwargs = kwargs;
+        self
+    }
+
+    /// Set additional async client kwargs.
+    pub fn async_client_kwargs(mut self, kwargs: HashMap<String, serde_json::Value>) -> Self {
+        self.async_client_kwargs = kwargs;
+        self
+    }
+
+    /// Set additional sync client kwargs.
+    pub fn sync_client_kwargs(mut self, kwargs: HashMap<String, serde_json::Value>) -> Self {
+        self.sync_client_kwargs = kwargs;
+        self
+    }
+
     /// Bind tools to this chat model.
     ///
     /// Returns a `BoundChatOllama` that includes the tools.
@@ -366,33 +394,46 @@ impl ChatOllama {
     }
 
     /// Get the resolved base URL. Checks env var `OLLAMA_HOST` if `base_url` is `None`.
+    ///
+    /// Uses `parse_url_with_auth` to strip userinfo credentials from the URL.
     fn get_base_url(&self) -> String {
         let raw_url = match &self.base_url {
             Some(url) => url.clone(),
             None => env::var("OLLAMA_HOST").unwrap_or_else(|_| DEFAULT_API_BASE.to_string()),
         };
 
-        strip_userinfo_from_url(&raw_url)
+        let (cleaned_url, _) = parse_url_with_auth(Some(&raw_url));
+        cleaned_url.unwrap_or(raw_url)
     }
 
     /// Build the HTTP client, optionally with basic auth from the URL.
+    ///
+    /// Uses `parse_url_with_auth` and `merge_auth_headers` from the utils module,
+    /// matching Python's `_set_clients` validator pattern.
     fn build_client(&self) -> reqwest::Client {
         let raw_url = match &self.base_url {
             Some(url) => url.clone(),
             None => env::var("OLLAMA_HOST").unwrap_or_else(|_| DEFAULT_API_BASE.to_string()),
         };
 
+        let (_, auth_headers) = parse_url_with_auth(Some(&raw_url));
+
+        let mut all_headers = HashMap::new();
+        merge_auth_headers(&mut all_headers, auth_headers);
+
         let mut builder = reqwest::Client::builder();
 
-        if let Some((username, password)) = extract_userinfo(&raw_url) {
-            let credentials = format!("{}:{}", username, password);
-            let encoded = base64::engine::general_purpose::STANDARD.encode(credentials);
-            let mut headers = reqwest::header::HeaderMap::new();
-            if let Ok(value) = reqwest::header::HeaderValue::from_str(&format!("Basic {}", encoded))
-            {
-                headers.insert(reqwest::header::AUTHORIZATION, value);
+        if !all_headers.is_empty() {
+            let mut header_map = reqwest::header::HeaderMap::new();
+            for (key, value) in &all_headers {
+                if let (Ok(name), Ok(val)) = (
+                    reqwest::header::HeaderName::from_bytes(key.as_bytes()),
+                    reqwest::header::HeaderValue::from_str(value),
+                ) {
+                    header_map.insert(name, val);
+                }
             }
-            builder = builder.default_headers(headers);
+            builder = builder.default_headers(header_map);
         }
 
         builder.build().unwrap_or_else(|_| reqwest::Client::new())
@@ -400,63 +441,12 @@ impl ChatOllama {
 
     /// Validate that the model exists in Ollama by listing local models.
     ///
-    /// Matches Python's `validate_model()` which calls `client.list()` and checks
-    /// for an exact match or tag-prefixed match.
+    /// Delegates to `utils::validate_model()`, matching Python's pattern where
+    /// `validate_model` is a standalone utility function.
     pub async fn validate_model(&self) -> Result<()> {
         let client = self.build_client();
         let base_url = self.get_base_url();
-        let response = client
-            .get(format!("{}/api/tags", base_url))
-            .send()
-            .await
-            .map_err(|e| {
-                Error::Other(format!(
-                    "Failed to connect to Ollama. Please check that Ollama is downloaded,                      running and accessible. https://ollama.com/download. Error: {}",
-                    e
-                ))
-            })?;
-
-        if !response.status().is_success() {
-            let error_text = response.text().await.unwrap_or_default();
-            return Err(Error::Other(format!(
-                "Received an error from the Ollama API. \
-                 Please check your Ollama server logs. {}",
-                error_text
-            )));
-        }
-
-        let body: serde_json::Value = response.json().await.map_err(|e| {
-            Error::Json(serde_json::Error::io(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                e.to_string(),
-            )))
-        })?;
-
-        let model_names: Vec<&str> = body
-            .get("models")
-            .and_then(|m| m.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|m| m.get("model").and_then(|n| n.as_str()))
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        let found = model_names
-            .iter()
-            .any(|m| *m == self.model || m.starts_with(&format!("{}:", self.model)));
-
-        if !found {
-            let available = model_names.join(", ");
-            return Err(Error::Other(format!(
-                "Model `{}` not found in Ollama. Please pull the model \
-                 (using `ollama pull {}`) or specify a valid model name. \
-                 Available local models: {}",
-                self.model, self.model, available
-            )));
-        }
-
-        Ok(())
+        validate_model(&client, &base_url, &self.model).await
     }
 
     /// Lazily validate the model if `validate_model_on_init` is set.
@@ -486,11 +476,38 @@ impl ChatOllama {
     /// Convert messages to Ollama API format.
     ///
     /// Matches Python's `_convert_messages_to_ollama_messages`.
+    /// Pre-processes v1-format AIMessages by converting their content blocks
+    /// via `convert_from_v1_to_ollama`.
     fn format_messages(&self, messages: &[BaseMessage]) -> Result<Vec<serde_json::Value>> {
+        // Pre-process: handle v1-format AIMessages
+        let messages: Vec<std::borrow::Cow<'_, BaseMessage>> = messages
+            .iter()
+            .map(|msg| {
+                if let BaseMessage::AI(ai) = msg {
+                    let is_v1 = ai
+                        .response_metadata
+                        .get("output_version")
+                        .and_then(|v| v.as_str())
+                        == Some("v1");
+                    if is_v1 {
+                        let content_values = ai.content.as_json_values();
+                        let converted = convert_from_v1_to_ollama(&content_values);
+                        let new_content = MessageContent::Parts(
+                            converted.into_iter().map(ContentPart::Other).collect(),
+                        );
+                        let mut new_ai = ai.clone();
+                        new_ai.content = new_content;
+                        return std::borrow::Cow::Owned(BaseMessage::AI(new_ai));
+                    }
+                }
+                std::borrow::Cow::Borrowed(msg)
+            })
+            .collect();
+
         let mut ollama_messages = Vec::new();
 
-        for msg in messages {
-            let formatted = match msg {
+        for msg in messages.iter() {
+            let formatted = match msg.as_ref() {
                 BaseMessage::System(m) => serde_json::json!({
                     "role": "system",
                     "content": m.content.as_text(),
@@ -1371,6 +1388,34 @@ fn parse_tool_call_arguments(
     }
 }
 
+/// Format standard data content block to format expected by Ollama.
+///
+/// Matches Python `_get_image_from_data_content_block()`.
+fn get_image_from_data_content_block(block: &serde_json::Value) -> Result<String> {
+    let block_type = block.get("type").and_then(|t| t.as_str()).unwrap_or("");
+
+    if block_type == "image" {
+        // v0 style: source_type == "base64"
+        if block.get("source_type").and_then(|s| s.as_str()) == Some("base64")
+            && let Some(data) = block.get("data").and_then(|d| d.as_str())
+        {
+            return Ok(data.to_string());
+        }
+        // v1 content blocks
+        if let Some(base64_data) = block.get("base64").and_then(|b| b.as_str()) {
+            return Ok(base64_data.to_string());
+        }
+        return Err(Error::Other(
+            "Image data only supported through in-line base64 format.".to_string(),
+        ));
+    }
+
+    Err(Error::Other(format!(
+        "Blocks of type {} not supported.",
+        block_type
+    )))
+}
+
 /// Extract content text and base64 images from a MessageContent.
 fn extract_content_and_images(content: &MessageContent) -> (String, Vec<String>) {
     match content {
@@ -1399,6 +1444,12 @@ fn extract_content_and_images(content: &MessageContent) -> (String, Vec<String>)
                             }
                             Some("image_url") => {
                                 if let Some(image_data) = extract_image_url_data(value) {
+                                    images.push(image_data);
+                                }
+                            }
+                            Some("image") => {
+                                // Handle v1 data content blocks
+                                if let Ok(image_data) = get_image_from_data_content_block(value) {
                                     images.push(image_data);
                                 }
                             }
@@ -1462,28 +1513,6 @@ fn extract_image_url_data(value: &serde_json::Value) -> Option<String> {
     } else {
         Some(url)
     }
-}
-
-/// Extract userinfo (username:password) from a URL string.
-fn extract_userinfo(url: &str) -> Option<(String, String)> {
-    // Parse: http://username:password@host:port/path
-    let after_scheme = url.split_once("://").map(|(_, rest)| rest)?;
-    let before_host = after_scheme.split_once('@').map(|(userinfo, _)| userinfo)?;
-    let (username, password) = before_host.split_once(':')?;
-    if username.is_empty() {
-        return None;
-    }
-    Some((username.to_string(), password.to_string()))
-}
-
-/// Strip userinfo from a URL string, returning the URL without credentials.
-fn strip_userinfo_from_url(url: &str) -> String {
-    if let Some((scheme, rest)) = url.split_once("://")
-        && let Some((_userinfo, after_at)) = rest.split_once('@')
-    {
-        return format!("{}://{}", scheme, after_at);
-    }
-    url.to_string()
 }
 
 // ============================================================================
@@ -1655,24 +1684,18 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_userinfo() {
-        assert_eq!(
-            extract_userinfo("http://user:pass@localhost:11434"),
-            Some(("user".to_string(), "pass".to_string()))
-        );
-        assert_eq!(extract_userinfo("http://localhost:11434"), None);
+    fn test_parse_url_with_auth_credentials() {
+        let (cleaned, headers) = parse_url_with_auth(Some("http://user:pass@localhost:11434"));
+        assert_eq!(cleaned.as_deref(), Some("http://localhost:11434"));
+        assert!(headers.is_some());
+        assert!(headers.unwrap().contains_key("Authorization"));
     }
 
     #[test]
-    fn test_strip_userinfo() {
-        assert_eq!(
-            strip_userinfo_from_url("http://user:pass@localhost:11434"),
-            "http://localhost:11434"
-        );
-        assert_eq!(
-            strip_userinfo_from_url("http://localhost:11434"),
-            "http://localhost:11434"
-        );
+    fn test_parse_url_with_auth_no_credentials() {
+        let (cleaned, headers) = parse_url_with_auth(Some("http://localhost:11434"));
+        assert_eq!(cleaned.as_deref(), Some("http://localhost:11434"));
+        assert!(headers.is_none());
     }
 
     #[test]
