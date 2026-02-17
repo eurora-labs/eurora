@@ -54,6 +54,20 @@ pub struct BrowserStrategy {
 }
 
 impl BrowserStrategy {
+    /// Creates a lightweight clone suitable for spawned worker tasks.
+    /// Copies only the fields needed by retrieve_assets/retrieve_snapshots,
+    /// omitting task handles so that stop_tracking can Arc::try_unwrap them.
+    fn worker_clone(&self) -> Self {
+        BrowserStrategy {
+            sender: self.sender.clone(),
+            bridge_service: self.bridge_service,
+            event_subscription_handle: None,
+            snapshot_collection_handle: None,
+            active_browser: self.active_browser.clone(),
+            active_browser_pid: self.active_browser_pid,
+        }
+    }
+
     async fn initialize_service(&mut self) -> ActivityResult<()> {
         let service = BrowserBridgeService::get_or_init().await;
 
@@ -76,7 +90,7 @@ impl BrowserStrategy {
 
         let mut events_rx = service.subscribe_to_events();
         let _default_icon = focus_window.icon.clone();
-        let mut strategy = self.clone();
+        let mut strategy = self.worker_clone();
         let last_url: Arc<tokio::sync::Mutex<Option<Url>>> =
             Arc::new(tokio::sync::Mutex::new(None));
 
@@ -436,7 +450,7 @@ impl BrowserStrategy {
             }
         };
 
-        let mut strategy_clone = self.clone();
+        let mut worker = self.worker_clone();
 
         let handle = tokio::spawn(async move {
             debug!("Starting snapshot collection task");
@@ -445,7 +459,7 @@ impl BrowserStrategy {
             loop {
                 interval.tick().await;
 
-                match strategy_clone.retrieve_assets().await {
+                match worker.retrieve_assets().await {
                     Ok(assets) if !assets.is_empty() => {
                         debug!("Collected {} asset(s)", assets.len());
                         if sender.send(ActivityReport::Assets(assets)).is_err() {
@@ -461,7 +475,7 @@ impl BrowserStrategy {
                     }
                 }
 
-                match strategy_clone.retrieve_snapshots().await {
+                match worker.retrieve_snapshots().await {
                     Ok(snapshots) if !snapshots.is_empty() => {
                         debug!("Collected {} snapshot(s)", snapshots.len());
                         if sender.send(ActivityReport::Snapshots(snapshots)).is_err() {
