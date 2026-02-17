@@ -166,7 +166,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let local_settings =
             be_local_settings_service::LocalSettingsService::new(storage.clone(), settings_tx);
         grpc_router = grpc_router.add_service(local_settings.into_server());
-        info!("Local mode: registered LocalConfigService (encryption key will be set by client)");
+        info!("Local mode: registered LocalSettingsService (encryption key will be set by client)");
     }
 
     let grpc_server = grpc_router.serve_with_shutdown(grpc_addr, shutdown_signal);
