@@ -85,7 +85,7 @@
 	}
 </script>
 
-<!-- <ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>{attrs.name}</ContextChip> -->
-<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}
-	>www.hydration-water.com</ContextChip
+<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>{attrs.name}</ContextChip>
+<!-- <ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}
+	>www.hydration-water.com</ContextChip -->
 >
