@@ -19,5 +19,4 @@ export interface DocJSON extends Record<string, any> {}
 export interface EditorStateJSON {
 	doc: DocJSON;
 	selection?: { [key: string]: any };
-	// plugins?: { [key: string]: any }
 }

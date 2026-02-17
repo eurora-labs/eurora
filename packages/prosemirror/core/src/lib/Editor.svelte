@@ -24,7 +24,6 @@
 	import { onDestroy } from 'svelte';
 	import type { SveltePMExtension } from '$lib/typings/extension.js';
 	import type { Cmd } from '$lib/typings/index.js';
-	// import '$lib/Editor.css';
 
 	let editorRef: HTMLDivElement | null = $state(null);
 	let view: EditorView | null = null;
@@ -45,7 +44,6 @@
 	export async function init(queryParam?: Query) {
 		if (!editorRef) return;
 		const currentQuery = queryParam || query;
-		// Update the query reference if a new one is provided
 		if (queryParam) {
 			query = queryParam;
 		}
@@ -53,15 +51,12 @@
 		const doc = document.createElement('p');
 		doc.textContent = currentQuery?.text ?? '';
 
-		// Make a copy of the extensions to avoid modifying the original
 		const extensions = [...(currentQuery?.extensions ?? [])];
 
-		// Add paragraph extension if not already present
 		if (!extensions.some((ext) => ext.name === 'paragraph')) {
 			extensions.unshift(paragraphExtension());
 		}
 
-		// Store the current extensions
 		currentExtensions = extensions;
 
 		// @ts-expect-error - This component needs to be passed as editor context
@@ -88,19 +83,15 @@
 
 	export async function updateExtensions(newQuery: Query) {
 		if (!view || !editorRef) return;
-		// Make a copy of the extensions to avoid modifying the original
 		const newExtensions = [...(newQuery.extensions ?? [])];
 
-		// Add paragraph extension if not already present
 		if (!newExtensions.some((ext) => ext.name === 'paragraph')) {
 			newExtensions.unshift(paragraphExtension());
 		}
 
-		// Check if extensions have changed
 		const extensionsChanged = hasExtensionsChanged(currentExtensions, newExtensions);
 
 		if (!extensionsChanged) {
-			// If extensions haven't changed, just update the content if needed
 			if (newQuery.text !== query?.text) {
 				const doc = document.createElement('p');
 				doc.textContent = newQuery.text;
@@ -114,25 +105,19 @@
 				);
 				view.dispatch(tr);
 
-				// Update the query reference
 				query = newQuery;
 			}
 			return;
 		}
 
-		// Store the new extensions
 		currentExtensions = newExtensions;
-
-		// Update the query reference
 		query = newQuery;
 
 		// @ts-expect-error - This component needs to be passed as editor context
 		const created = await createExtensions(this as any, newExtensions);
 
-		// Get the current selection and doc content if we want to preserve it
 		const currentState = view.state;
 
-		// Create a new state with the updated schema and plugins
 		const newState = EditorState.create({
 			schema: created.schema,
 			plugins: [...created.plugins, placeholderPlugin(placeholder)],
@@ -145,28 +130,23 @@
 				: currentState.doc,
 		});
 
-		// Update the view with the new state
 		view.updateState(newState);
 
-		// Update nodeViews and markViews
 		view.setProps({
 			nodeViews: created.nodeViews,
 			markViews: created.markViews,
 		});
 	}
 
-	// Helper function to check if extensions have changed
 	function hasExtensionsChanged(
 		oldExts: SveltePMExtension[],
 		newExts: SveltePMExtension[],
 	): boolean {
 		if (oldExts.length !== newExts.length) return true;
 
-		// Create maps of extension names for faster lookup
 		const oldExtMap = new Map(oldExts.map((ext) => [ext.name, ext]));
 		const newExtMap = new Map(newExts.map((ext) => [ext.name, ext]));
 
-		// Check if any extension names differ
 		for (const [name] of oldExtMap) {
 			if (!newExtMap.has(name)) return true;
 		}
@@ -175,18 +155,12 @@
 			if (!oldExtMap.has(name)) return true;
 		}
 
-		// For extensions with the same name, we could do a deeper comparison
-		// but for simplicity, we'll assume they're different if they have the same name
-		// A more thorough check would compare the actual extension properties
-
 		return false;
 	}
 
 	export async function sendQuery(newQuery?: Query) {
 		if (!view) {
 			await init(newQuery);
-		} else {
-			// await updateExtensions(newQuery);
 		}
 	}
 
@@ -196,10 +170,8 @@
 		commands.focus()(view.state, view.dispatch, view);
 	}
 
-	// Set up resize observer when editorRef becomes available
 	$effect(() => {
 		if (editorRef && onheightchange) {
-			// Clean up existing observer if any
 			resizeObserver?.disconnect();
 
 			resizeObserver = new ResizeObserver((entries) => {
@@ -211,7 +183,6 @@
 			resizeObserver.observe(editorRef);
 		}
 
-		// Cleanup function
 		return () => {
 			resizeObserver?.disconnect();
 		};
@@ -270,7 +241,6 @@
 		width: 100%;
 		border-top: 0;
 		outline: none;
-		/*line-height: 100px;*/
 		white-space: pre-wrap;
 		overflow-wrap: break-word;
 	}
@@ -279,7 +249,6 @@
 		position: absolute;
 		content: attr(data-placeholder);
 		color: rgba(255, 255, 255, 0.2);
-		/*line-height: 100px;*/
 		pointer-events: none;
 	}
 </style>

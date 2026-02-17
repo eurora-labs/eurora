@@ -88,15 +88,10 @@ export class SvelteNodeView<A extends Attrs> implements NodeView {
 		if (!toDOM)
 			throw Error(`@my-org/core: node "${this.node.type}" was not given a toDOM method!`);
 		const { contentDOM } = DOMSerializer.renderSpec(document, toDOM(this.node));
-		// this._dom = dom as HTMLElement
 		this.contentDOM = contentDOM;
 		this._dom = document.createElement(this.node.type.spec.inline ? 'span' : 'div');
-		// this._dom.style.display = 'inline-flex';
-		// this._dom.setAttribute('contenteditable', 'false');
 
 		if (this.component) {
-			// Mount the component synchronously but don't wait for it to complete
-			// This allows init() to return immediately while the component mounts in the background
 			this.mounted = mount(this.component!, {
 				target: this.dom,
 				props: this.props,
@@ -123,7 +118,6 @@ export class SvelteNodeView<A extends Attrs> implements NodeView {
 		decorations: readonly Decoration[],
 		innerDecorations: DecorationSource,
 	): boolean => {
-		// if (!newNode.sameMarkup(this.node)) return false
 		if (node.type.name !== this.node.type.name) {
 			return false;
 		}
@@ -138,19 +132,6 @@ export class SvelteNodeView<A extends Attrs> implements NodeView {
 		this.selected = true;
 		this.render();
 	};
-
-	// stopEvent = (e: Event) => {
-	// 	// Allow keyboard events to reach the editor
-	// 	if (
-	// 		e.type === 'keydown' ||
-	// 		e.type === 'keypress' ||
-	// 		e.type === 'beforeinput' ||
-	// 		e.type === 'input'
-	// 	)
-	// 		return false;
-	// 	// Swallow pointer events inside the chip UI only
-	// 	return this.dom.contains(e.target as Node);
-	// };
 
 	deselectNode = () => {
 		this.selected = false;

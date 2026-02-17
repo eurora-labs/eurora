@@ -14,7 +14,7 @@ export const caretAfterChip = new Plugin({
 				)
 					return;
 				if (last.isInline && last.isAtom) {
-					const endPos = pos + node.nodeSize - 1; // block end
+					const endPos = pos + node.nodeSize - 1;
 					decos.push(
 						Decoration.widget(endPos, () => document.createTextNode('\u200B'), {
 							side: 1,
