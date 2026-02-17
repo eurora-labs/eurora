@@ -1,4 +1,4 @@
-import type { BrowserObj } from '@eurora/browser-shared/content/extensions/watchers/watcher';
+import type { BrowserObj } from '../../../shared/content/extensions/watchers/watcher';
 
 export type CommonMessageType = 'GET_METADATA';
 

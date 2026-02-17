@@ -1,16 +1,10 @@
 import { YouTubeTranscriptApi } from './transcript/index.js';
-import { createArticleAsset } from '@eurora/browser-shared/content/extensions/article/util';
-import {
-	Watcher,
-	type WatcherResponse,
-} from '@eurora/browser-shared/content/extensions/watchers/watcher';
+import { createArticleAsset } from '../../../shared/content/extensions/article/util';
+import { Watcher, type WatcherResponse } from '../../../shared/content/extensions/watchers/watcher';
 import { ProtoImageFormat } from '@eurora/shared/proto/shared_pb.js';
 import browser from 'webextension-polyfill';
 import type { YoutubeBrowserMessage, WatcherParams } from './types.js';
-import type {
-	NativeYoutubeAsset,
-	NativeYoutubeSnapshot,
-} from '@eurora/browser-shared/content/bindings';
+import type { NativeYoutubeAsset, NativeYoutubeSnapshot } from '../../../shared/content/bindings';
 import type { ProtoImage } from '@eurora/shared/proto/shared_pb.js';
 
 interface EurImage extends Partial<ProtoImage> {

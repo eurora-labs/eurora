@@ -1,5 +1,5 @@
 import browser from 'webextension-polyfill';
-import type { NativeResponse } from '../../models.js';
+import type { NativeResponse } from '../../models';
 
 export type MessageType = 'NEW' | 'GENERATE_ASSETS' | 'GENERATE_SNAPSHOT';
 

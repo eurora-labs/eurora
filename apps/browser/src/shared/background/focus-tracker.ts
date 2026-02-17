@@ -1,7 +1,7 @@
-import { sendMessageWithRetry } from './messaging.js';
-import { getCurrentTabIcon } from './tabs.js';
+import { sendMessageWithRetry } from './messaging';
+import { getCurrentTabIcon } from './tabs';
 import browser from 'webextension-polyfill';
-import type { NativeMetadata, Frame } from '../content/bindings.js';
+import type { NativeMetadata, Frame } from '../content/bindings';
 
 // ---------------------------------------------------------------------------
 // State

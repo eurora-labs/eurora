@@ -1,11 +1,12 @@
-import { initFocusTracker, destroyFocusTracker } from './focus-tracker.js';
-import { handleMessage } from './messaging.js';
-import { getCurrentTabIcon } from './tabs.js';
-import { isSafari } from './util.js';
+import { initFocusTracker, destroyFocusTracker } from './focus-tracker';
+import { handleMessage } from './messaging';
+import { getCurrentTabIcon } from './tabs';
+import { isSafari } from './util';
 import browser from 'webextension-polyfill';
-import type { Frame, RequestFrame, ResponseFrame } from '../content/bindings.js';
+import type { Frame, RequestFrame, ResponseFrame } from '../content/bindings';
 
-const host = import.meta.env.MODE === 'development' ? 'com.eurora.dev' : 'com.eurora.app';
+declare const __DEV__: boolean;
+const host = __DEV__ ? 'com.eurora.dev' : 'com.eurora.app';
 const connectTimeout = 5000;
 let nativePort: browser.Runtime.Port | null = null;
 

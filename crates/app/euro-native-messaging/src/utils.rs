@@ -58,7 +58,7 @@ pub fn generate_typescript_definitions() -> Result<()> {
     if let Err(e) = Typescript::default()
         .bigint(BigIntExportBehavior::Fail)
         .export_to(
-            "packages/browser-shared/src/content/bindings.ts",
+            "apps/browser/src/shared/content/bindings.ts",
             &specta::export(),
         )
     {
