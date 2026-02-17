@@ -20,13 +20,7 @@ impl ContextChipApi for ContextChipApiImpl {
         let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle.state();
         let timeline = timeline_state.lock().await;
 
-        // Get all activities from the timeline
         let activities = timeline.get_context_chips().await;
-
-        // Sort activities by start time (most recent first)
-        // activities.sort_by(|a, b| b.start.cmp(&a.start));
-
-        // Limit to the 5 most recent activities to avoid cluttering the UI
         let limited_activities = activities.into_iter().take(5).collect();
 
         Ok(limited_activities)

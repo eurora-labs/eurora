@@ -122,7 +122,6 @@ mod tests {
     #[test]
     fn test_get_parent_pid_impl() {
         let ppid = get_parent_pid_impl();
-        // Parent PID should always be > 0 on any running system
         assert!(ppid > 0, "Parent PID should be greater than 0");
     }
 }
