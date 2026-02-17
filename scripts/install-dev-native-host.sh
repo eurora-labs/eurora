@@ -85,7 +85,7 @@ FIREFOX_MANIFEST=$(cat <<EOF
 	"description": "Eurora Native Messaging Host (dev)",
 	"path": "${BINARY_PATH}",
 	"type": "stdio",
-	"allowed_extensions": ["${EXTENSION_ID}"]
+	"allowed_extensions": ["dev@eurora-labs.com"]
 }
 EOF
 )
