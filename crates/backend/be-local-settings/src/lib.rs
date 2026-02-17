@@ -1,7 +1,8 @@
-mod convert;
+mod error;
 mod provider;
 mod redacted;
 
+pub use error::{Error, Result};
 pub use proto_gen::local_settings as proto;
 pub use provider::*;
 pub use redacted::Redacted;

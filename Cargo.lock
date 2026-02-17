@@ -1595,6 +1595,7 @@ name = "be-local-settings"
 version = "0.0.0"
 dependencies = [
  "proto-gen",
+ "thiserror 2.0.18",
  "tokio",
  "url",
 ]
@@ -1610,7 +1611,6 @@ dependencies = [
  "tonic",
  "tonic-prost-build",
  "tracing",
- "url",
 ]
 
 [[package]]
