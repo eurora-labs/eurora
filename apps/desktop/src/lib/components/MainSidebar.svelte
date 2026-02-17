@@ -159,7 +159,13 @@
 						{/snippet}
 					</DropdownMenu.Trigger>
 					<DropdownMenu.Content side="top" class="w-(--bits-dropdown-menu-anchor-width)">
-						<DropdownMenu.Item onclick={() => goto('/onboarding')}>
+						<DropdownMenu.Item
+							onclick={() => {
+								taurpc.auth.logout().then(() => {
+									goto('/onboarding');
+								});
+							}}
+						>
 							{#snippet child({ props })}
 								<a {...props}>
 									<LogoutIcon />
