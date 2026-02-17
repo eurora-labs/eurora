@@ -1,0 +1,42 @@
+syntax = "proto3";
+package local_settings_service;
+
+service ProtoLocalSettingsService {
+  rpc SetEncryptionKey(SetEncryptionKeyRequest) returns (SetEncryptionKeyResponse);
+  rpc SetProviderSettings(SetProviderSettingsRequest) returns (SetProviderSettingsResponse);
+}
+
+message OllamaSettings {
+  string base_url = 1;
+  string model = 2;
+}
+
+message OpenAISettings {
+  string base_url = 1;
+  string api_key = 2;
+  string model = 3;
+  string title_model = 4;
+}
+
+message SetEncryptionKeyRequest {
+  string encryption_key = 1;
+}
+
+message SetEncryptionKeyResponse {
+  bool success = 1;
+}
+
+message ProviderSettings {
+  oneof provider {
+    OllamaSettings ollama = 1;
+    OpenAISettings openai = 2;
+  }
+}
+
+message SetProviderSettingsRequest {
+  ProviderSettings settings = 1;
+}
+
+message SetProviderSettingsResponse {
+  ProviderSettings settings = 1;
+}

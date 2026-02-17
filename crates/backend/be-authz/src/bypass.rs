@@ -8,7 +8,7 @@ pub(crate) const REST_BYPASS_EXACT: &[&str] = &["/payment/webhook"];
 pub(crate) const GRPC_BYPASS_SERVICES: &[&str] = &[
     "auth_service.ProtoAuthService",
     "grpc.health.v1.Health",
-    "local_config_service.ProtoLocalConfigService",
+    "local_settings_service.ProtoLocalConfigService",
 ];
 
 /// Normalize a URL path by stripping the query string / fragment, percent-
@@ -128,7 +128,7 @@ mod tests {
         assert!(is_grpc_bypass("auth_service.ProtoAuthService"));
         assert!(is_grpc_bypass("grpc.health.v1.Health"));
         assert!(is_grpc_bypass(
-            "local_config_service.ProtoLocalConfigService"
+            "local_settings_service.ProtoLocalConfigService"
         ));
     }
 

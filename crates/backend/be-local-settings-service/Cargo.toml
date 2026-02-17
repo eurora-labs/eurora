@@ -1,5 +1,5 @@
 [package]
-name = "be-local-config-service"
+name = "be-local-settings-service"
 version = "0.0.0"
 edition.workspace = true
 description = "Local-only configuration gRPC service"
@@ -7,11 +7,12 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
 be-encrypt = { workspace = true }
+be-local-settings = { workspace = true, features = ["server"] }
 be-storage = { workspace = true, features = ["encryption"] }
-proto-gen = { workspace = true, features = ["server"] }
 thiserror = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
+url = { workspace = true }
 
 [build-dependencies]
 tonic-prost-build = { workspace = true }
