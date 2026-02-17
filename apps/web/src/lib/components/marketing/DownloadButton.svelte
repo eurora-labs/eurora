@@ -24,7 +24,6 @@
 
 	async function handleDownload() {
 		if (os === 'unknown') {
-			// Redirect to download page for manual selection
 			window.location.href = '/download';
 			return;
 		}
@@ -36,7 +35,6 @@
 			const success = await downloadService.initiateDownload(os);
 			if (!success) {
 				error = 'Download not available for your platform';
-				// Redirect to download page after a delay
 				setTimeout(() => {
 					window.location.href = '/download';
 				}, 2000);

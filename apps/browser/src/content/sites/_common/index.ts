@@ -23,7 +23,6 @@ export class CommonWatcher {
 				promise = this.handleGetMetadata(obj, _sender);
 				break;
 			default:
-				// Return false for unhandled message types to allow other listeners to process
 				return false;
 		}
 

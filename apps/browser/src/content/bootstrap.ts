@@ -39,15 +39,11 @@ async function listener(msg: any, sender: any, sendResponse: (response?: any) =>
 		}
 	}
 
-	// Always run common script first
 	await runCommon();
 
 	try {
 		const mod = await imp(msg.chunk);
-		// For now this is unused but could be useful for some future websites
 		const canHandle = typeof mod.canHandle === 'function' ? mod.canHandle(document) : true;
-
-		// Execute the main function if present
 		const mainResult = typeof mod.main === 'function' ? mod.main() : true;
 
 		const ok = canHandle && (mainResult ?? true);
@@ -62,6 +58,5 @@ async function listener(msg: any, sender: any, sendResponse: (response?: any) =>
 		await runDefault();
 	}
 
-	// Notify that the script is loaded and ready
 	sendResponse({ loaded: true });
 }

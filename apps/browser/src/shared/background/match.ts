@@ -1,7 +1,6 @@
 import { type Entry } from './registry';
 
 export function matchSite(host: string, entries: Entry[]): Entry | null {
-	// Precompute maps once per activation for O(1) exact / suffix
 	const exact = new Map<string, Entry>();
 	const suffix: [string, Entry][] = [];
 	for (const e of entries) {

@@ -36,7 +36,6 @@
 </script>
 
 <div class="container mx-auto px-4 py-8">
-	<!-- Top section: Left-aligned title and button -->
 	<div class="flex flex-col items-start gap-4 mb-8">
 		<h1 class="text-2xl font-bold text-shadow-xl">
 			Never explain yourself again,
@@ -46,7 +45,6 @@
 		<DownloadButton class="rounded-full" />
 	</div>
 
-	<!-- Video section: Full container width, slightly rounded, autoplay -->
 	<div class="w-full rounded-xl overflow-hidden">
 		<video
 			class="w-full h-auto object-cover"

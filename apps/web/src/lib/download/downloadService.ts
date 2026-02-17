@@ -2,33 +2,19 @@ import { InjectionToken } from '@eurora/shared/context';
 
 export const DOWNLOAD_SERVICE = new InjectionToken<DownloadService>('DOWNLOAD_SERVICE');
 
-/**
- * Platform information from the release API
- */
 interface PlatformInfo {
 	url: string;
 	signature: string;
 }
 
-/**
- * Response from the /releases/{channel} endpoint
- */
 export interface ReleaseInfoResponse {
 	version: string;
 	pub_date: string;
 	platforms: Record<string, PlatformInfo>;
 }
 
-/**
- * Operating system types
- */
 export type OSType = 'windows' | 'macos' | 'linux' | 'unknown';
 
-/**
- * Maps OS names to platform identifiers used by the backend.
- * Multiple variants are listed in preference order (e.g., arm64 first for macOS since Apple Silicon is more common now)
- * Uses "darwin" for macOS to match Tauri/Rust convention
- */
 const OS_TO_PLATFORM: Record<OSType, string[]> = {
 	windows: ['windows-x86_64'],
 	macos: ['darwin-aarch64', 'darwin-x86_64'],
@@ -36,10 +22,6 @@ const OS_TO_PLATFORM: Record<OSType, string[]> = {
 	unknown: [],
 };
 
-/**
- * Service for downloading the Eurora desktop application.
- * Connects to the be-update-service to get signed S3 URLs.
- */
 export class DownloadService {
 	private readonly baseUrl: string;
 	private readonly channel: string;
@@ -50,9 +32,6 @@ export class DownloadService {
 		this.channel = channel;
 	}
 
-	/**
-	 * Fetches the latest release information for the configured channel
-	 */
 	async getLatestRelease(): Promise<ReleaseInfoResponse | null> {
 		try {
 			const response = await fetch(`${this.baseUrl}/releases/${this.channel}`);
@@ -72,11 +51,6 @@ export class DownloadService {
 		}
 	}
 
-	/**
-	 * Gets the download URL for a specific operating system
-	 * @param os - The operating system to get the download for
-	 * @returns The signed S3 download URL or null if not available
-	 */
 	async getDownloadUrl(os: OSType): Promise<string | null> {
 		const release = await this.getLatestRelease();
 
@@ -86,7 +60,6 @@ export class DownloadService {
 
 		const platformKeys = OS_TO_PLATFORM[os];
 
-		// Try each platform variant for the OS (e.g., darwin-aarch64, darwin-x86_64)
 		for (const platformKey of platformKeys) {
 			const platform = release.platforms[platformKey];
 			if (platform?.url) {
@@ -97,11 +70,6 @@ export class DownloadService {
 		return null;
 	}
 
-	/**
-	 * Initiates a download for the user's detected operating system
-	 * @param os - The operating system to download for
-	 * @returns True if download was initiated, false otherwise
-	 */
 	async initiateDownload(os: OSType): Promise<boolean> {
 		try {
 			const url = await this.getDownloadUrl(os);
@@ -111,7 +79,6 @@ export class DownloadService {
 				return false;
 			}
 
-			// Trigger download by navigating to the signed URL
 			window.location.href = url;
 			return true;
 		} catch (error) {
@@ -120,10 +87,6 @@ export class DownloadService {
 		}
 	}
 
-	/**
-	 * Gets information about available platforms in the latest release
-	 * @returns Map of platform identifiers to their availability
-	 */
 	async getAvailablePlatforms(): Promise<Record<string, boolean>> {
 		const release = await this.getLatestRelease();
 
@@ -139,9 +102,6 @@ export class DownloadService {
 		return availability;
 	}
 
-	/**
-	 * Gets the latest version string
-	 */
 	async getLatestVersion(): Promise<string | null> {
 		const release = await this.getLatestRelease();
 		return release?.version ?? null;

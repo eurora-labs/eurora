@@ -29,14 +29,12 @@
 		taurpc.auth
 			.is_authenticated()
 			.then((isAuthenticated) => {
-				// Don't get conversation lists if not authenticated
 				if (!isAuthenticated) return;
 				taurpc.conversation.list(10, 0).then((res) => {
 					conversations = res;
 				});
 
 				taurpc.conversation.new_conversation_added.on((conversation) => {
-					// Avoid duplicate conversations by checking if already exists
 					if (!conversations.some((c) => c.id === conversation.id)) {
 						conversations = [conversation, ...conversations];
 					}
@@ -132,7 +130,6 @@
 								>
 									{#snippet child({ props })}
 										<a {...props}>
-											<!-- <item.icon /> -->
 											<span>{item.title ?? 'New Conversation'}</span>
 										</a>
 									{/snippet}
@@ -143,25 +140,6 @@
 				</Sidebar.GroupContent>
 			</Sidebar.Group>
 		{/if}
-		<!-- <Sidebar.Group>
-			<Sidebar.GroupLabel>Chats</Sidebar.GroupLabel>
-			<Sidebar.GroupContent>
-				<Sidebar.Menu>
-					{#each items as item (item.title)}
-						<Sidebar.MenuItem>
-							<Sidebar.MenuButton>
-								{#snippet child({ props })}
-									<a href={item.url} {...props}>
-										<item.icon />
-										<span>{item.title}</span>
-									</a>
-								{/snippet}
-							</Sidebar.MenuButton>
-						</Sidebar.MenuItem>
-					{/each}
-				</Sidebar.Menu>
-			</Sidebar.GroupContent>
-		</Sidebar.Group> -->
 	</Sidebar.Content>
 	<Sidebar.Footer>
 		<Sidebar.Menu>

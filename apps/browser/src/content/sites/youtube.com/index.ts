@@ -103,7 +103,6 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 
 	private async generateVideoAsset(): Promise<any> {
 		try {
-			// Get current timestamp
 			const currentTime = this.getCurrentVideoTime();
 			const reportData: NativeYoutubeAsset = {
 				url: window.location.href,
@@ -169,7 +168,6 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 			video_frame_base64: videoFrame.dataBase64,
 			video_frame_width: videoFrame.width,
 			video_frame_height: videoFrame.height,
-			// video_frame_format: videoFrame.format,
 		};
 
 		return { kind: 'NativeYoutubeSnapshot', data: reportData };
@@ -196,7 +194,6 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		const player = this.getYouTubePlayer();
 		if (!player) return -1.0;
 
-		// Check if the video is actually loaded and playable
 		if (player.readyState === 0 || player.duration === 0) return -1.0;
 
 		return player.currentTime;
@@ -204,7 +201,6 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 
 	getYouTubePlayer(): HTMLVideoElement | null {
 		const { youtubePlayer } = this.params;
-		// Try to find the video element if we don't have it yet
 		if (!youtubePlayer) {
 			this.params.youtubePlayer = document.querySelector(
 				'video.html5-main-video',
