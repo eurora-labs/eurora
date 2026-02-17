@@ -350,16 +350,16 @@ mod tests {
 
     #[test]
     fn test_supported_processes() {
-        let processes = BrowserStrategy::get_supported_processes();
+        let processes = SafariStrategy::get_supported_processes();
         assert!(!processes.is_empty());
 
         #[cfg(target_os = "windows")]
-        assert!(processes.contains(&"firefox.exe"));
+        assert!(processes.contains(&"safari.exe"));
 
         #[cfg(target_os = "linux")]
-        assert!(processes.contains(&"firefox"));
+        assert!(processes.contains(&"safari"));
 
         #[cfg(target_os = "macos")]
-        assert!(processes.contains(&"Firefox"));
+        assert!(processes.contains(&"Safari"));
     }
 }

@@ -50,10 +50,6 @@
 
 	onMount(() => {
 		document.addEventListener('keydown', handleEscapeKey);
-		taurpc.prompt
-			.get_service_name()
-			.then((name: string) => {})
-			.catch(() => {});
 
 		taurpc.conversation.current_conversation_changed.on((new_conv) => {
 			conversation = new_conv;
