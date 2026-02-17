@@ -3,7 +3,8 @@ use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use enum_dispatch::enum_dispatch;
 use focus_tracker::FocusedWindow;
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, LazyLock};
 use tokio::sync::mpsc;
 
 pub mod browser;
@@ -59,6 +60,32 @@ impl From<NativeMetadata> for StrategyMetadata {
     }
 }
 
+macro_rules! register_strategies {
+    ($($Strategy:ident),+ $(,)?) => {
+        static PROCESS_STRATEGY_MAP: LazyLock<HashMap<&'static str, ActivityStrategy>> =
+            LazyLock::new(|| {
+                let mut map = HashMap::new();
+                $(
+                    for name in $Strategy::get_supported_processes() {
+                        map.insert(name, ActivityStrategy::$Strategy($Strategy::default()));
+                    }
+                )+
+                map
+            });
+
+        impl ActivityStrategy {
+            pub async fn new(process_name: &str) -> ActivityResult<ActivityStrategy> {
+                match PROCESS_STRATEGY_MAP.get(process_name) {
+                    $(
+                        Some(ActivityStrategy::$Strategy(_)) => $Strategy::create().await,
+                    )+
+                    _ => Ok(ActivityStrategy::DefaultStrategy(DefaultStrategy)),
+                }
+            }
+        }
+    };
+}
+
 #[enum_dispatch(ActivityStrategyFunctionality)]
 #[derive(Clone)]
 pub enum ActivityStrategy {
@@ -67,6 +94,8 @@ pub enum ActivityStrategy {
     DefaultStrategy,
     NoStrategy,
 }
+
+register_strategies!(NoStrategy, SafariStrategy, BrowserStrategy);
 
 #[async_trait]
 #[enum_dispatch]
@@ -89,31 +118,10 @@ pub trait ActivityStrategyFunctionality {
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata>;
 }
 
-impl ActivityStrategy {
-    pub async fn new(process_name: &str) -> ActivityResult<ActivityStrategy> {
-        if NoStrategy::get_supported_processes().contains(&process_name) {
-            return Ok(ActivityStrategy::NoStrategy(NoStrategy));
-        }
-
-        if SafariStrategy::get_supported_processes().contains(&process_name) {
-            return Ok(ActivityStrategy::SafariStrategy(
-                SafariStrategy::new().await?,
-            ));
-        }
-
-        if BrowserStrategy::get_supported_processes().contains(&process_name) {
-            return Ok(ActivityStrategy::BrowserStrategy(
-                BrowserStrategy::new().await?,
-            ));
-        }
-
-        Ok(ActivityStrategy::DefaultStrategy(DefaultStrategy))
-    }
-}
-
 #[async_trait]
 pub trait StrategySupport {
     fn get_supported_processes() -> Vec<&'static str>;
+    async fn create() -> ActivityResult<ActivityStrategy>;
 }
 
 #[cfg(test)]
