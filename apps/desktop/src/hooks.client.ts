@@ -1,13 +1,3 @@
-import { error as logErrorToFile } from '@tauri-apps/plugin-log';
+import { attachConsole } from '@fltsci/tauri-plugin-tracing';
 
-window.onunhandledrejection = (e: PromiseRejectionEvent) => {
-	logError(e.reason);
-};
-
-function logError(error: unknown) {
-	try {
-		logErrorToFile(String(error));
-	} catch (err: unknown) {
-		console.error('Error while trying to log error.', err);
-	}
-}
+await attachConsole();

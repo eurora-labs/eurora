@@ -11,7 +11,7 @@
 		"strict": true,
 		"module": "NodeNext",
 		"moduleResolution": "nodenext",
-		"target": "ES6"
+		"target": "ES2024"
 	},
 	"include": [
 		"playwright.config.ts",

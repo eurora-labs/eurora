@@ -18,6 +18,21 @@ use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use crate::converters::convert_db_message_to_base_message;
+
+/// When running inside Docker (`RUNNING_EURORA_FULLY_LOCAL=true`), rewrite
+/// `localhost` / `127.0.0.1` to `host.docker.internal` so the container can
+/// reach services on the host machine.
+fn resolve_host_url(url: &str) -> String {
+    let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
+        .map(|v| v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    if local_mode {
+        url.replace("://localhost", "://host.docker.internal")
+            .replace("://127.0.0.1", "://host.docker.internal")
+    } else {
+        url.to_string()
+    }
+}
 use crate::error::ConversationServiceError;
 
 use proto_gen::conversation::{
@@ -50,7 +65,10 @@ fn build_ollama(
     model_override: Option<&str>,
 ) -> Box<dyn BaseChatModel + Send + Sync> {
     let model = model_override.unwrap_or(&config.model);
-    Box::new(ChatOllama::new(model).base_url(config.base_url.as_str()))
+    // When running inside Docker, localhost refers to the container itself.
+    // Rewrite to host.docker.internal so the backend can reach the host's Ollama.
+    let base_url = resolve_host_url(config.base_url.as_str());
+    Box::new(ChatOllama::new(model).base_url(&base_url))
 }
 
 fn build_openai(
