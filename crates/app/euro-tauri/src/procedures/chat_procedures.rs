@@ -52,8 +52,6 @@ impl ChatApi for ChatApiImpl {
             });
         });
 
-        // Scope for timeline and conversation_manager locks
-        // These locks are released before stream processing to avoid blocking
         {
             let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle.state();
             let timeline = timeline_state.lock().await;
@@ -91,7 +89,6 @@ impl ChatApi for ChatApiImpl {
                         messages.push(last_snapshot_message);
                     }
 
-                    // Make a for loop
                     for message in messages {
                         match &message {
                             BaseMessage::System(m) => {
@@ -105,11 +102,7 @@ impl ChatApi for ChatApiImpl {
                     }
                 }
             }
-            // timeline and conversation_manager locks are released here
         }
-
-        // Create new thread to handle conversation title generation
-        // This runs in a separate task so it doesn't block the main flow
         let title_app_handle = app_handle.clone();
         let content = query.text.clone();
         let conversation_id_for_title = conversation_id.clone();
@@ -133,7 +126,6 @@ impl ChatApi for ChatApiImpl {
 
         let mut complete_response = String::new();
 
-        // Send initial empty chunk to signal start of streaming
         channel
             .send(ResponseChunk {
                 chunk: "".to_string(),
@@ -141,33 +133,27 @@ impl ChatApi for ChatApiImpl {
             .map_err(|e| format!("Failed to send initial response: {e}"))?;
 
         debug!("Sending chat stream");
-        // Acquire the lock just for creating the stream, then release it
         let stream_result = {
             let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
             let mut conversation_manager = conversation_state.lock().await;
             conversation_manager.chat_stream(query.text.clone()).await
-            // conversation_manager lock is released here at end of scope
         };
 
         match stream_result {
             Ok(mut stream) => {
                 debug!("Starting to consume stream...");
 
-                // Add timeout for stream processing
-                let timeout_duration = std::time::Duration::from_secs(300); // 5 minutes
+                let timeout_duration = std::time::Duration::from_secs(300);
                 let stream_future = async {
                     while let Some(result) = stream.next().await {
                         match result {
                             Ok(chunk) => {
-                                // Skip empty chunks to reduce noise
                                 if chunk.is_empty() {
                                     continue;
                                 }
 
-                                // Append to the complete response
                                 complete_response.push_str(&chunk);
 
-                                // Send the chunk to the frontend
                                 if let Err(e) = channel.send(ResponseChunk { chunk }) {
                                     return Err(format!("Failed to send response chunk: {e}"));
                                 }
@@ -180,7 +166,6 @@ impl ChatApi for ChatApiImpl {
                     Ok(())
                 };
 
-                // Apply timeout to stream processing
                 match tokio::time::timeout(timeout_duration, stream_future).await {
                     Ok(Ok(())) => {
                         debug!("Stream completed successfully");

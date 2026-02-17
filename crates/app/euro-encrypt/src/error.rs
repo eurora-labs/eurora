@@ -1,13 +1,7 @@
-//! Error types for the activity system
-
-// use orion::errors::UnknownCryptoError;
 use thiserror::Error;
 
-/// Errors that can occur in the activity system
 #[derive(Error, Debug)]
 pub enum EncryptError {
-    // #[error("cryptography error: {0}")]
-    // CryptoError(#[from] UnknownCryptoError),
     #[error("base64 decode error")]
     Base64Decode(#[from] base64::DecodeError),
 
@@ -17,7 +11,6 @@ pub enum EncryptError {
     #[error("Key error {0}")]
     Key(#[from] anyhow::Error),
 
-    /// Format error
     #[error("Format error: {0}")]
     Format(String),
 
@@ -31,5 +24,4 @@ pub enum EncryptError {
     Json(#[from] serde_json::Error),
 }
 
-/// Result type alias for encryption operations
 pub type EncryptResult<T> = std::result::Result<T, EncryptError>;
