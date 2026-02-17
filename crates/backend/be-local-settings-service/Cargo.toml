@@ -12,7 +12,6 @@ be-storage = { workspace = true, features = ["encryption"] }
 thiserror = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
-url = { workspace = true }
 
 [build-dependencies]
 tonic-prost-build = { workspace = true }

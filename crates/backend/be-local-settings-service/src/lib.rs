@@ -12,7 +12,6 @@ use be_local_settings::{
         proto_local_settings_service_server::{
             ProtoLocalSettingsService, ProtoLocalSettingsServiceServer,
         },
-        provider_settings::Provider,
     },
 };
 use be_storage::StorageService;
@@ -58,31 +57,18 @@ impl ProtoLocalSettingsService for LocalSettingsService {
         &self,
         request: Request<SetProviderSettingsRequest>,
     ) -> std::result::Result<Response<SetProviderSettingsResponse>, Status> {
-        let proto_provider = request
+        let proto_settings = request
             .into_inner()
             .settings
-            .and_then(|s| s.provider)
             .ok_or_else(|| Status::invalid_argument("provider settings are required"))?;
 
-        let provider: ProviderSettings = match proto_provider {
-            Provider::Ollama(p) => {
-                p.try_into()
-                    .map(ProviderSettings::Ollama)
-                    .map_err(|e: url::ParseError| {
-                        LocalSettingsError::InvalidProviderSettings(e.to_string())
-                    })?
-            }
-            Provider::Openai(p) => {
-                p.try_into()
-                    .map(ProviderSettings::OpenAI)
-                    .map_err(|e: url::ParseError| {
-                        LocalSettingsError::InvalidProviderSettings(e.to_string())
-                    })?
-            }
-        };
+        let provider: ProviderSettings = proto_settings
+            .try_into()
+            .map_err(|e| LocalSettingsError::InvalidProviderSettings(format!("{e}")))?;
 
         info!("Provider settings updated: {:?}", provider);
 
+        // Build the response proto *before* `send()` moves `provider`.
         let response_proto: proto::ProviderSettings = (&provider).into();
 
         self.settings_tx

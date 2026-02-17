@@ -37,8 +37,17 @@ impl<T> From<T> for Redacted<T> {
     }
 }
 
-impl<T: PartialEq> PartialEq for Redacted<T> {
+impl PartialEq for Redacted<String> {
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+        let a = self.0.as_bytes();
+        let b = other.0.as_bytes();
+        if a.len() != b.len() {
+            return false;
+        }
+        let mut diff = 0u8;
+        for (x, y) in a.iter().zip(b.iter()) {
+            diff |= x ^ y;
+        }
+        diff == 0
     }
 }

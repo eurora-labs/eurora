@@ -148,7 +148,7 @@ impl ConversationService {
         match current {
             Some(settings) => {
                 {
-                    let cache = self.cached.read().unwrap();
+                    let cache = self.cached.read().unwrap_or_else(|e| e.into_inner());
                     if let Some(ref cached) = *cache
                         && cached.settings == settings
                     {
@@ -159,7 +159,7 @@ impl ConversationService {
                     build_chat_provider_from(&settings).into();
                 let title: Arc<dyn BaseChatModel + Send + Sync> =
                     build_title_provider_from(&settings).into();
-                let mut cache = self.cached.write().unwrap();
+                let mut cache = self.cached.write().unwrap_or_else(|e| e.into_inner());
                 *cache = Some(CachedProviders {
                     settings,
                     chat: chat.clone(),
@@ -185,7 +185,7 @@ impl ConversationService {
         match current {
             Some(settings) => {
                 {
-                    let cache = self.cached.read().unwrap();
+                    let cache = self.cached.read().unwrap_or_else(|e| e.into_inner());
                     if let Some(ref cached) = *cache
                         && cached.settings == settings
                     {
@@ -196,7 +196,7 @@ impl ConversationService {
                     build_chat_provider_from(&settings).into();
                 let title: Arc<dyn BaseChatModel + Send + Sync> =
                     build_title_provider_from(&settings).into();
-                let mut cache = self.cached.write().unwrap();
+                let mut cache = self.cached.write().unwrap_or_else(|e| e.into_inner());
                 *cache = Some(CachedProviders {
                     settings,
                     chat,
