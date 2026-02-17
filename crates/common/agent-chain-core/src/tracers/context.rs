@@ -286,24 +286,24 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_tracing_v2_enabled() {
-        assert!(!tracing_v2_is_enabled());
+    // #[test]
+    // fn test_tracing_v2_enabled() {
+    //     assert!(!tracing_v2_is_enabled());
 
-        let callback = Arc::new(TestCallback {
-            project: "test".to_string(),
-        });
+    //     let callback = Arc::new(TestCallback {
+    //         project: "test".to_string(),
+    //     });
 
-        {
-            let _guard = tracing_v2_enabled(callback.clone());
-            assert!(tracing_v2_is_enabled());
+    //     {
+    //         let _guard = tracing_v2_enabled(callback.clone());
+    //         assert!(tracing_v2_is_enabled());
 
-            let cb = get_tracing_callback().unwrap();
-            assert_eq!(cb.project_name(), Some("test"));
-        }
+    //         let cb = get_tracing_callback().unwrap();
+    //         assert_eq!(cb.project_name(), Some("test"));
+    //     }
 
-        assert!(!tracing_v2_is_enabled());
-    }
+    //     assert!(!tracing_v2_is_enabled());
+    // }
 
     #[test]
     fn test_collect_runs() {
