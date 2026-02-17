@@ -106,8 +106,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     let activity_service = ActivityService::new(db_manager.clone(), core_asset.clone());
     let assets_service = AssetService::new(db_manager.clone(), storage.clone());
-    let conversation_service = ConversationService::from_env(db_manager.clone())
-        .expect("Failed to initialize conversation service");
+    let (settings_tx, settings_rx) = be_local_settings::settings_channel();
+
+    let conversation_service = ConversationService::new(db_manager.clone(), settings_rx);
 
     info!("Starting gRPC server at {}", grpc_addr);
     info!("Starting HTTP server at {}", http_addr);
@@ -162,9 +163,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_service(ProtoConversationServiceServer::new(conversation_service));
 
     if local_mode {
-        let local_config = be_local_config_service::LocalConfigService::new(storage.clone());
-        grpc_router = grpc_router.add_service(local_config.into_server());
-        info!("Local mode: registered LocalConfigService (encryption key will be set by client)");
+        let local_settings =
+            be_local_settings_service::LocalSettingsService::new(storage.clone(), settings_tx);
+        grpc_router = grpc_router.add_service(local_settings.into_server());
+        info!("Local mode: registered LocalSettingsService (encryption key will be set by client)");
     }
 
     let grpc_server = grpc_router.serve_with_shutdown(grpc_addr, shutdown_signal);

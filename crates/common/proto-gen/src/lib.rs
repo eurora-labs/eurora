@@ -31,8 +31,8 @@ mod proto {
         pub use super::*;
     }
 
-    pub mod local_config {
-        tonic::include_proto!("local_config_service");
+    pub mod local_settings {
+        tonic::include_proto!("local_settings_service");
         pub use super::*;
     }
 
