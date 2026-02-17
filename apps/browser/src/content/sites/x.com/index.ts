@@ -1,7 +1,4 @@
-import {
-	Watcher,
-	type WatcherResponse,
-} from '@eurora/browser-shared/content/extensions/watchers/watcher';
+import { Watcher, type WatcherResponse } from '../../../shared/content/extensions/watchers/watcher';
 import browser from 'webextension-polyfill';
 import type { TwitterBrowserMessage, WatcherParams } from './types.js';
 
@@ -9,7 +6,7 @@ import type {
 	NativeTwitterAsset,
 	NativeTwitterSnapshot,
 	NativeTwitterTweet,
-} from '@eurora/browser-shared/content/bindings';
+} from '../../../shared/content/bindings';
 
 export class TwitterWatcher extends Watcher<WatcherParams> {
 	constructor(params: WatcherParams) {
@@ -19,11 +16,9 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 	private getTweetTexts(): NativeTwitterTweet[] {
 		const tweets: NativeTwitterTweet[] = [];
 
-		// Find all tweet elements with data-testid="tweetText"
 		const tweetElements = document.querySelectorAll('[data-testid="tweetText"]');
 
 		tweetElements.forEach((tweetElement) => {
-			// Get the span child that contains the actual text
 			const spanElement = tweetElement.querySelector('span');
 			if (spanElement && spanElement.textContent) {
 				tweets.push({
@@ -71,11 +66,8 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 		_obj: TwitterBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
-		// Update current URL and page info
 		this.params.currentUrl = window.location.href;
 		this.params.pageTitle = document.title;
-
-		// Get initial tweet data
 		this.params.tweets = this.getTweetTexts();
 
 		return { kind: 'Ok', data: null };
@@ -86,7 +78,6 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		try {
-			// Get current tweet texts
 			const currentTweets = this.getTweetTexts();
 
 			const reportData: NativeTwitterAsset = {

@@ -44,7 +44,6 @@
 	} from '@lucide/svelte';
 </script>
 
-<!-- Basic Group -->
 <Story name="Basic Group">
 	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
@@ -68,7 +67,6 @@
 	</StorybookContainer>
 </Story>
 
-<!-- Group without Heading -->
 <Story name="Without Heading">
 	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
@@ -92,7 +90,6 @@
 	</StorybookContainer>
 </Story>
 
-<!-- Multiple Groups -->
 <Story name="Multiple Groups">
 	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
@@ -138,7 +135,6 @@
 	</StorybookContainer>
 </Story>
 
-<!-- Groups with Shortcuts -->
 <Story name="With Shortcuts">
 	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
@@ -173,7 +169,6 @@
 	</StorybookContainer>
 </Story>
 
-<!-- Different Group Styles -->
 <Story name="Different Headings">
 	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
@@ -202,8 +197,6 @@
 		</Command.Root>
 	</StorybookContainer>
 </Story>
-
-<!-- Interactive Example -->
 
 {#snippet template(args: { heading: string }, _context: StoryContext<typeof Story>)}
 	<StorybookContainer>

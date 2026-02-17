@@ -16,7 +16,6 @@ pub struct SettingsWithDiskSync {
     snapshot: Arc<RwLock<AppSettings>>,
 }
 
-/// Wrapper that asserts mutations are saved to disk before being dropped.
 pub(crate) struct SettingsEnforceSaveToDisk<'a> {
     config_path: &'a Path,
     snapshot: RwLockWriteGuard<'a, AppSettings>,
@@ -133,9 +132,7 @@ impl SettingsWithDiskSync {
                         break;
                     }
 
-                    _ => {
-                        // Noop
-                    }
+                    _ => {}
                 }
             }
             Ok(())

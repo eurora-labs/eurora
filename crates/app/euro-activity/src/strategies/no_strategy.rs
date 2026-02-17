@@ -13,7 +13,8 @@ use crate::{
     error::ActivityResult,
     processes::{Eurora, ProcessFunctionality},
     strategies::{
-        ActivityReport, ActivityStrategyFunctionality, StrategyMetadata, StrategySupport,
+        ActivityReport, ActivityStrategy, ActivityStrategyFunctionality, StrategyMetadata,
+        StrategySupport,
     },
     types::{ActivityAsset, ActivitySnapshot},
 };
@@ -25,6 +26,10 @@ pub struct NoStrategy;
 impl StrategySupport for NoStrategy {
     fn get_supported_processes() -> Vec<&'static str> {
         vec![Eurora.get_name()]
+    }
+
+    async fn create() -> ActivityResult<ActivityStrategy> {
+        Ok(ActivityStrategy::NoStrategy(NoStrategy))
     }
 }
 

@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-export function backgroundConfig({ browser, outDir, emptyOutDir }) {
+export function backgroundConfig({ browser, outDir, emptyOutDir, mode }) {
 	const rootDir = path.resolve(import.meta.dirname, '../..');
 	const input =
 		browser === 'firefox' || browser === 'safari'
@@ -9,9 +9,11 @@ export function backgroundConfig({ browser, outDir, emptyOutDir }) {
 	return {
 		// Don't load vite.config.ts (which has SvelteKit) for this build
 		configFile: false,
+		mode: mode || 'production',
 		root: rootDir,
 		define: {
 			__BROWSER__: JSON.stringify(browser),
+			__DEV__: JSON.stringify(mode === 'development'),
 		},
 		build: {
 			outDir,

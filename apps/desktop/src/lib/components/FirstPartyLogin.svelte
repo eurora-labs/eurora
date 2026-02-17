@@ -10,13 +10,7 @@
 		const loginToken = await taurpc.auth.get_login_token();
 		await open(loginToken.url);
 
-		// Attempt to login by token every 5 seconds
 		const interval = setInterval(async () => {
-			// if (loginToken.expires_in < Date.now()) {
-			// 	clearInterval(interval);
-			// 	return;
-			// }
-
 			const isLoginSuccess = await taurpc.auth.poll_for_login();
 			if (!isLoginSuccess) {
 				return;
@@ -32,5 +26,4 @@
 		<Card.Title class="mb-2 text-2xl font-semibold">Get started with Eurora</Card.Title>
 		<Card.Description class="">Fastest way to get started.</Card.Description>
 	</Card.Header>
-	<!-- <Card.Content class="flex justify-center">Easiest and fastest way to get started.</Card.Content> -->
 </Card.Root>

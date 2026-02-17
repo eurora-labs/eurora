@@ -10,7 +10,6 @@ pub fn find_cursor_monitor(
     for monitor in monitors {
         let monitor_info = MonitorInfo::from(&monitor);
 
-        // Check if cursor is on this monitor
         if cursor_position.x >= monitor_info.x as f64
             && cursor_position.x <= (monitor_info.x + monitor_info.width as i32) as f64
             && cursor_position.y >= monitor_info.y as f64

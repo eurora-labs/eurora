@@ -51,5 +51,3 @@
 <span bind:this={htmlElement}>
 	{math}
 </span>
-
-<!-- <span class="katex" bind:this={htmlElement}>{math}</span> -->

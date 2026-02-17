@@ -8,7 +8,6 @@ use anyhow::{Context, Result};
 use serde::de::DeserializeOwned;
 use walkdir::WalkDir;
 
-// Returns an ordered list of relative paths for files inside a directory recursively.
 pub fn list_files<P: AsRef<Path>>(
     dir_path: P,
     ignore_prefixes: &[P],
@@ -46,22 +45,18 @@ pub fn list_files<P: AsRef<Path>>(
     Ok(files)
 }
 
-/// Write a single file so that the write either fully succeeds, or fully fails,
-/// assuming the containing directory already exists.
+/// Write atomically — either fully succeeds or fully fails.
 pub fn write<P: AsRef<Path>>(file_path: P, contents: impl AsRef<[u8]>) -> anyhow::Result<()> {
     let file_path = file_path.as_ref();
     let parent_dir = file_path
         .parent()
         .ok_or_else(|| anyhow::anyhow!("File path has no parent directory"))?;
 
-    // Create a temporary file in the same directory
     let temp_path = create_temp_file_path(parent_dir)?;
 
-    // Write to temporary file
     fs::write(&temp_path, contents.as_ref())
         .with_context(|| format!("Failed to write to temporary file: {}", temp_path.display()))?;
 
-    // Atomically move temporary file to final location
     fs::rename(&temp_path, file_path).with_context(|| {
         format!(
             "Failed to move temporary file to final location: {}",
@@ -72,20 +67,17 @@ pub fn write<P: AsRef<Path>>(file_path: P, contents: impl AsRef<[u8]>) -> anyhow
     Ok(())
 }
 
-/// Write a single file so that the write either fully succeeds, or fully fails,
-/// and create all leading directories.
+/// Write atomically, creating all leading directories.
 pub fn create_dirs_then_write<P: AsRef<Path>>(
     file_path: P,
     contents: impl AsRef<[u8]>,
 ) -> std::io::Result<()> {
     let file_path = file_path.as_ref();
 
-    // Create all parent directories
     if let Some(parent_dir) = file_path.parent() {
         fs::create_dir_all(parent_dir)?;
     }
 
-    // Create a temporary file in the same directory
     let parent_dir = file_path.parent().ok_or_else(|| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -95,16 +87,13 @@ pub fn create_dirs_then_write<P: AsRef<Path>>(
 
     let temp_path = create_temp_file_path(parent_dir).map_err(std::io::Error::other)?;
 
-    // Write to temporary file
     fs::write(&temp_path, contents.as_ref())?;
 
-    // Atomically move temporary file to final location
     fs::rename(&temp_path, file_path)?;
 
     Ok(())
 }
 
-/// Create a unique temporary file path in the given directory
 fn create_temp_file_path(dir: &Path) -> anyhow::Result<PathBuf> {
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -119,9 +108,6 @@ fn create_temp_file_path(dir: &Path) -> anyhow::Result<PathBuf> {
     Ok(dir.join(temp_name))
 }
 
-/// Reads and parses the state file.
-///
-/// If the file does not exist, it will be created.
 pub fn read_toml_file_or_default<T: DeserializeOwned + Default>(path: &Path) -> Result<T> {
     let mut file = match File::open(path) {
         Ok(f) => f,

@@ -224,16 +224,9 @@ export class YouTubeTranscriptApi {
 	}
 
 	private async fetchCaptionsJson(videoId: string): Promise<CaptionsJson> {
-		// Get the current page HTML (we're running in a content script context)
 		const html = document.documentElement.outerHTML;
-
-		// Extract the API key
 		const apiKey = this.extractInnertubeApiKey(html, videoId);
-
-		// Fetch innertube data
 		const innertubeData = await this.fetchInnertubeData(videoId, apiKey);
-
-		// Extract captions JSON
 		return this.extractCaptionsJson(innertubeData, videoId);
 	}
 

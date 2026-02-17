@@ -1,8 +1,8 @@
 <script lang="ts">
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
+	import { authService } from '$lib/services/auth-service';
 	import { create } from '@bufbuild/protobuf';
 	import { RegisterRequestSchema } from '@eurora/shared/proto/auth_service_pb.js';
-	import { authService } from '@eurora/shared/services/auth-service';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import * as Form from '@eurora/ui/components/form/index';
@@ -15,7 +15,6 @@
 	import { zodClient, type ZodObjectType } from 'sveltekit-superforms/adapters';
 	import { z } from 'zod';
 
-	// Define form schema
 	const registerSchema = z
 		.object({
 			username: z
@@ -41,7 +40,6 @@
 			path: ['confirmPassword'],
 		});
 
-	// Initialize form with client-side validation only
 	const form = superForm(
 		{
 			username: '',
@@ -73,7 +71,6 @@
 				displayName: $formData.displayName || undefined,
 			});
 
-			// Call the auth service to register the user
 			await authService.register(registerData);
 			success = true;
 		} catch (err) {
@@ -91,7 +88,6 @@
 		showConfirmPassword = !showConfirmPassword;
 	}
 
-	// Social registration handlers
 	function handleGoogleRegister() {
 		// TODO: Implement Google OAuth registration
 	}
@@ -147,7 +143,6 @@
 			</Card.Root>
 		{:else}
 			<Card.Root class="p-6">
-				<!-- Social Registration Buttons -->
 				<SocialAuthButtons
 					mode="register"
 					disabled={$submitting}
@@ -155,7 +150,6 @@
 					onGitHub={handleGitHubRegister}
 				/>
 
-				<!-- Divider -->
 				<div class="relative my-6">
 					<div class="absolute inset-0 flex items-center">
 						<Separator.Root class="w-full" />
@@ -167,7 +161,6 @@
 					</div>
 				</div>
 
-				<!-- Email Registration Form -->
 				<form use:enhance method="POST" onsubmit={handleSubmit} class="space-y-4">
 					{#if submitError}
 						<div class="rounded-md bg-red-50 p-4">

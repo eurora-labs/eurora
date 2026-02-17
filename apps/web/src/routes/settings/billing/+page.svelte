@@ -24,7 +24,7 @@
 	const planName = $derived.by(() => {
 		if (!$subscription?.price_id) return 'Free';
 		if ($subscription.price_id === STRIPE_PRO_PRICE_ID) return 'Pro';
-		return 'Pro'; // Any paid price is treated as a paid plan
+		return 'Pro';
 	});
 
 	const planPrice = $derived.by(() => {
@@ -96,8 +96,6 @@
 			goto('/login?redirect=/settings/billing');
 			return;
 		}
-		// The layout already fetches; this is a no-op if already fetched,
-		// or picks up the in-flight request's result.
 		subscriptionStore.fetch();
 	});
 </script>

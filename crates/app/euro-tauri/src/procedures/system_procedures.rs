@@ -9,14 +9,6 @@ use tauri::{Manager, Runtime};
 use tauri_plugin_updater::UpdaterExt;
 use tokio::sync::Mutex;
 
-/// Walk up from the current executable and return the outermost `.app` bundle.
-///
-/// When the Tauri binary lives at
-///   `Eurora.app/Contents/Resources/Eurora.app/Contents/MacOS/eurora`
-/// this returns `Some("/Applications/Eurora.app")`.
-///
-/// If there is only a single `.app` in the path (i.e. no wrapper), returns `None`
-/// so the caller can fall back to the default updater behaviour.
 #[cfg(target_os = "macos")]
 fn find_outermost_app_bundle() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
@@ -28,7 +20,6 @@ fn find_outermost_app_bundle() -> Option<PathBuf> {
             count += 1;
         }
     }
-    // Only return the outer bundle when we are truly nested (≥ 2 .app levels).
     if count >= 2 { outermost } else { None }
 }
 
@@ -112,11 +103,9 @@ fn resolve_docker_compose_path<R: Runtime>(
 const DEFAULT_PORTS: [u16; 3] = [39051, 39080, 39432];
 
 fn find_available_port(preferred: u16) -> Result<u16, String> {
-    // Try the preferred port first
     if TcpListener::bind(("localhost", preferred)).is_ok() {
         return Ok(preferred);
     }
-    // Bind to :0 to let the OS pick a free port
     let listener = TcpListener::bind("localhost:0")
         .map_err(|e| format!("Failed to find available port: {}", e))?;
     let port = listener
@@ -331,7 +320,6 @@ impl SystemApi for SystemApiImpl {
                 ) -> bool;
             }
 
-            // Check without prompting
             let key = CFString::new("AXTrustedCheckOptionPrompt");
             let value = CFBoolean::false_value();
             let options = CFDictionary::from_CFType_pairs(&[(key, value)]);
@@ -361,7 +349,6 @@ impl SystemApi for SystemApiImpl {
                 ) -> bool;
             }
 
-            // Call with prompt option to trigger the system dialog
             let key = CFString::new("AXTrustedCheckOptionPrompt");
             let value = CFBoolean::true_value();
             let options = CFDictionary::from_CFType_pairs(&[(key, value)]);
@@ -477,7 +464,6 @@ impl SystemApi for SystemApiImpl {
             .set_global_backend_url(&local_url)
             .map_err(|e| format!("Failed to switch API endpoint: {e}"))?;
 
-        // Send the encryption key from the system keyring to the local backend
         send_encryption_key(&local_url).await?;
 
         Ok(LocalBackendInfo {
@@ -488,8 +474,6 @@ impl SystemApi for SystemApiImpl {
     }
 }
 
-/// Retrieve (or generate) the encryption key from the system keyring and send
-/// it to the local backend via the `LocalConfigService` gRPC endpoint.
 async fn send_encryption_key(backend_url: &str) -> Result<(), String> {
     use backon::{ConstantBuilder, Retryable};
     use base64::prelude::*;

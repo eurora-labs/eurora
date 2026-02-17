@@ -116,27 +116,7 @@ impl ConversationApi for ConversationApiImpl {
         let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
         let _conversation_manager = conversation_state.lock().await;
 
-        // Ok(conversation_manager
-        //     .get_current_conversation()
-        //     .await
-        //     .clone());
         todo!()
-        // let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
-
-        // let conversation = personal_db
-        //     .insert_empty_conversation()
-        //     .await
-        //     .map_err(|e| e.to_string())?;
-
-        // let current = app_handle.state::<SharedCurrentConversation>();
-        // let mut guard = current.lock().await;
-        // *guard = Some(conversation.clone());
-
-        // TauRpcConversationApiEventTrigger::new(app_handle.clone())
-        //     .new_conversation_added(conversation.clone())
-        //     .map_err(|e| e.to_string())?;
-
-        // Ok(conversation)
     }
 
     async fn get_messages<R: Runtime>(
@@ -156,7 +136,6 @@ impl ConversationApi for ConversationApiImpl {
         Ok(messages
             .into_iter()
             .filter_map(|message| match message {
-                // System messages are not meant to be displayed
                 BaseMessage::System(_) => None,
                 _ => Some(MessageView::from(message)),
             })
@@ -198,11 +177,6 @@ impl From<&Conversation> for ConversationView {
         ConversationView {
             id: conversation.id().map(|id| id.to_string()),
             title: conversation.title().to_string(),
-            // messages: conversation
-            //     .messages()
-            //     .iter()
-            //     .map(MessageView::from)
-            //     .collect(),
         }
     }
 }

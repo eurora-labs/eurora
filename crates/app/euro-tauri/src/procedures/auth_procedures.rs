@@ -1,7 +1,4 @@
-//! Authentication procedures for the Tauri application.
-
 use euro_secret::{Sensitive, secret};
-// use prompt_kit::PromptKitService;
 use tauri::{AppHandle, Manager, Runtime};
 use tracing::error;
 use url::Url;
@@ -15,7 +12,6 @@ pub struct LoginToken {
     pub url: String,
 }
 
-/// Authentication API trait for TauRPC procedures
 #[taurpc::procedures(path = "auth")]
 pub trait AuthApi {
     async fn poll_for_login<R: Runtime>(app_handle: AppHandle<R>) -> Result<bool, String>;
@@ -39,7 +35,7 @@ pub trait AuthApi {
 }
 
 const LOGIN_CODE_VERIFIER: &str = "LOGIN_CODE_VERIFIER";
-/// Implementation of the AuthApi trait
+
 #[derive(Clone)]
 pub struct AuthApiImpl;
 
@@ -61,7 +57,6 @@ impl AuthApi for AuthApiImpl {
                 .unwrap_or("https://www.eurora-labs.com".to_string());
             let mut url = Url::parse(&format!("{}/login", base_url))
                 .map_err(|e| format!("Invalid AUTH_SERVICE_URL: {}", e))?;
-            // Add code challenge as parameter
             url.query_pairs_mut()
                 .append_pair("code_challenge", &code_challenge)
                 .append_pair("code_challenge_method", "S256");
@@ -99,14 +94,6 @@ impl AuthApi for AuthApiImpl {
                     settings
                         .save_to_default_path()
                         .map_err(|e| format!("Failed to save settings: {}", e))?;
-
-                    // TauRpcPromptApiEventTrigger::new(app_handle.clone())
-                    //     .prompt_service_change(Some(
-                    //         promptkit_client
-                    //             .get_service_name()
-                    //             .map_err(|e| e.to_string())?,
-                    //     ))
-                    //     .map_err(|e| e.to_string())?;
 
                     Ok(true)
                 }

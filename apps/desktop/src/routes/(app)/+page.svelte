@@ -3,7 +3,6 @@
 	import {
 		type ResponseChunk,
 		type Query,
-		// type BaseMessage,
 		type MessageView,
 		type ConversationView,
 	} from '$lib/bindings/bindings.js';
@@ -30,8 +29,6 @@
 
 	let conversation = $state<ConversationView | null>(null);
 	let messages = $state<MessageView[]>([]);
-	// let messages = $state<BaseMessage[]>([]);
-	// let status = $state<string>('');
 	let taurpc = inject(TAURPC_SERVICE);
 
 	let editorRef: ProsemirrorEditor | undefined = $state();
@@ -53,16 +50,6 @@
 
 	onMount(() => {
 		document.addEventListener('keydown', handleEscapeKey);
-		taurpc.prompt
-			.get_service_name()
-			.then((name: string) => {
-				if (name) {
-					// status = 'ready';
-				}
-			})
-			.catch(() => {
-				// goto('/onboarding');
-			});
 
 		taurpc.conversation.current_conversation_changed.on((new_conv) => {
 			conversation = new_conv;
@@ -88,15 +75,10 @@
 
 	function handleEscapeKey(event: KeyboardEvent) {
 		if (event.key === 'Escape') {
-			// messages.splice(0, messages.length);
-			// console.log('Escape pressed: cleared messages and set conversation to NEW');
 		}
 	}
 
-	// Helper to get content from BaseMessage
-	// function getMessageContent(message: BaseMessage): string {
 	function getMessageContent(message: any): string {
-		// RemoveMessage doesn't have content
 		if (message.type === 'remove') {
 			return '';
 		}
@@ -104,7 +86,6 @@
 		if (typeof content === 'string') {
 			return content;
 		}
-		// For multipart content, extract text parts
 		if (Array.isArray(content)) {
 			return content
 				.filter((part): part is { type: 'text'; text: string } => part.type === 'text')
@@ -114,16 +95,12 @@
 		return '';
 	}
 
-	// Helper to check if message is from user/human
-	// function isUserMessage(message: BaseMessage): boolean {
 	function isUserMessage(message: any): boolean {
 		return message.role === 'human';
 	}
 
 	async function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Enter' && !event.shiftKey) {
-			// await taurpc.window.resize_launcher_window(100, 1.0);
-
 			try {
 				if (!editorRef) {
 					console.error('No editor ref found');
@@ -135,11 +112,9 @@
 					role: 'human',
 					content: query.text,
 				});
-				// console.log('query', query);
 				searchQuery.text = '';
 				clearQuery(editorRef);
 				await askQuestion(query);
-				// Responses will come through the event listener
 			} catch (error) {
 				console.error('Error:', error);
 			}
@@ -147,14 +122,11 @@
 	}
 
 	async function askQuestion(query: QueryAssets): Promise<void> {
-		// console.log('askQuestion', query);
 		try {
-			// Convert QueryAssets to Query type expected by TauRPC
 			const tauRpcQuery: Query = {
 				text: query.text,
 				assets: query.assets,
 			};
-			// Create an AI message placeholder for streaming response
 			const aiMessage: MessageView = {
 				id: null,
 				role: 'ai',
@@ -164,7 +136,6 @@
 			const agentMessage = messages.at(-1);
 
 			function onEvent(response: ResponseChunk) {
-				// Append chunk to the last message
 				if (agentMessage && agentMessage.role === 'ai') {
 					agentMessage.content += response.chunk;
 				}
@@ -172,29 +143,9 @@
 				chatRef?.scrollToBottom();
 			}
 
-			// If no conversation is selected create a new one
-			// TODO: convert this to new architecture
-			// if (!conversation) {
-			// conversation = await taurpc.personal_db.conversation.create();
-			// console.log('conversation', conversation);
-			// } else {
-			// Use TauRPC send_query procedure
-			// }
-			// if (!conversation) {
-			// 	return;
-			// }
-
 			await taurpc.chat.send_query(conversation?.id ?? null, onEvent, tauRpcQuery);
-			// // Use TauRPC send_query procedure
-			// await taurpc.chat.send_query(conversation, onEvent, tauRpcQuery);
 		} catch (error) {
 			console.error('Failed to get answer:', error);
-			// messages.push({
-			// 	type: 'system',
-			// 	content: 'Error: Failed to get response from server' + error,
-			// 	id: null,
-			// 	additional_kwargs: {},
-			// });
 		}
 	}
 </script>

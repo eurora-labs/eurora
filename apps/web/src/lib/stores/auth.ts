@@ -1,9 +1,8 @@
 import { browser } from '$app/environment';
+import { authService, type TokenResponse } from '$lib/services/auth-service';
 import { create } from '@bufbuild/protobuf';
 import { RefreshTokenRequestSchema } from '@eurora/shared/proto/auth_service_pb.js';
-import { authService } from '@eurora/shared/services/auth-service';
 import { writable, derived, get } from 'svelte/store';
-import type { TokenResponse } from '@eurora/shared/services/auth-service';
 
 export interface User {
 	id: string;
@@ -27,7 +26,6 @@ const STORAGE_KEYS = {
 	USER: 'eurora_user',
 } as const;
 
-// Initialize auth state from localStorage if available
 function initializeAuthState(): AuthState {
 	if (!browser) {
 		return {
@@ -50,7 +48,6 @@ function initializeAuthState(): AuthState {
 			const expiresAtNum = parseInt(expiresAt, 10);
 			const now = Date.now();
 
-			// Check if token is still valid (with 5 minute buffer)
 			const isValid = expiresAtNum > now + 5 * 60 * 1000;
 
 			return {
@@ -63,7 +60,6 @@ function initializeAuthState(): AuthState {
 		}
 	} catch (_error) {
 		console.error('Error initializing auth state:', _error);
-		// Clear corrupted data
 		clearStoredTokens();
 	}
 
@@ -76,10 +72,8 @@ function initializeAuthState(): AuthState {
 	};
 }
 
-// Create the auth store
 const authStore = writable<AuthState>(initializeAuthState());
 
-// Helper function to clear stored tokens
 function clearStoredTokens() {
 	if (!browser) return;
 
@@ -89,7 +83,6 @@ function clearStoredTokens() {
 	localStorage.removeItem(STORAGE_KEYS.USER);
 }
 
-// Helper function to store tokens
 function storeTokens(tokens: TokenResponse, user: User) {
 	if (!browser) return;
 
@@ -101,7 +94,6 @@ function storeTokens(tokens: TokenResponse, user: User) {
 	localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
 }
 
-// Helper function to decode JWT payload (basic implementation)
 function decodeJWTPayload(token: string): any {
 	try {
 		const base64Url = token.split('.')[1];
@@ -119,15 +111,11 @@ function decodeJWTPayload(token: string): any {
 	}
 }
 
-// Auth actions
 export const auth = {
-	// Subscribe to auth state
 	subscribe: authStore.subscribe,
 
-	// Login with tokens
 	login: (tokens: TokenResponse) => {
 		try {
-			// Decode user info from access token
 			const payload = decodeJWTPayload(tokens.accessToken);
 			if (!payload) {
 				throw new Error('Invalid access token');
@@ -140,10 +128,8 @@ export const auth = {
 				avatar: payload.avatar || payload.picture,
 			};
 
-			// Store tokens in localStorage
 			storeTokens(tokens, user);
 
-			// Update store
 			authStore.set({
 				isAuthenticated: true,
 				user,
@@ -157,7 +143,6 @@ export const auth = {
 		}
 	},
 
-	// Logout
 	logout: () => {
 		clearStoredTokens();
 		authStore.set({
@@ -169,7 +154,6 @@ export const auth = {
 		});
 	},
 
-	// Refresh token
 	refreshToken: async () => {
 		const currentState = get(authStore);
 
@@ -181,7 +165,6 @@ export const auth = {
 			const refreshRequest = create(RefreshTokenRequestSchema, {});
 			const tokens = await authService.refreshToken(refreshRequest);
 
-			// Update tokens while keeping user info
 			if (currentState.user) {
 				storeTokens(tokens, currentState.user);
 				authStore.update((state) => ({
@@ -195,13 +178,11 @@ export const auth = {
 			return tokens;
 		} catch (error) {
 			console.error('Token refresh failed:', error);
-			// If refresh fails, logout user
 			auth.logout();
 			throw error;
 		}
 	},
 
-	// Check if token needs refresh and refresh if necessary
 	ensureValidToken: async () => {
 		const currentState = get(authStore);
 
@@ -209,7 +190,6 @@ export const auth = {
 			return false;
 		}
 
-		// Check if token expires in the next 5 minutes
 		const now = Date.now();
 		const fiveMinutes = 5 * 60 * 1000;
 
@@ -226,12 +206,10 @@ export const auth = {
 	},
 };
 
-// Derived stores for convenience
 export const isAuthenticated = derived(authStore, ($auth) => $auth.isAuthenticated);
 export const currentUser = derived(authStore, ($auth) => $auth.user);
 export const accessToken = derived(authStore, ($auth) => $auth.accessToken);
 
-// Auto-refresh token on app load if needed
 if (browser) {
 	auth.ensureValidToken().catch((error) => {
 		console.error('Failed to ensure valid token on app load:', error);

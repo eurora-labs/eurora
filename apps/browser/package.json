@@ -14,11 +14,14 @@
 		"test": "npm run test:unit -- --run",
 		"build:all": "pnpm run build:chrome && pnpm run build:firefox && pnpm run build:safari",
 		"build:chrome": "cross-env BROWSER=chrome node scripts/build.mjs",
+		"build:chrome:dev": "cross-env BROWSER=chrome BUILD_MODE=development node scripts/build.mjs",
 		"build:firefox": "cross-env BROWSER=firefox node scripts/build.mjs",
-		"build:safari": "cross-env BROWSER=safari node scripts/build.mjs"
+		"build:firefox:dev": "cross-env BROWSER=firefox BUILD_MODE=development node scripts/build.mjs",
+		"build:safari": "cross-env BROWSER=safari node scripts/build.mjs",
+		"build:safari:dev": "cross-env BROWSER=safari BUILD_MODE=development node scripts/build.mjs"
 	},
 	"devDependencies": {
-		"@eurora/browser-shared": "workspace:*",
+		"@mozilla/readability": "^0.6.0",
 		"@eslint/compat": "^1.4.1",
 		"@eslint/js": "^9.39.1",
 		"@sveltejs/adapter-static": "catalog:svelte",

@@ -15,7 +15,6 @@ interface SubscriptionState {
 	data: SubscriptionStatus | null;
 	loading: boolean;
 	error: string | null;
-	/** Whether the store has been fetched at least once this session. */
 	fetched: boolean;
 }
 
@@ -29,7 +28,6 @@ const store = writable<SubscriptionState>({
 export const subscriptionStore = {
 	subscribe: store.subscribe,
 
-	/** Fetch subscription status from the backend. Skips if already fetched unless `force` is true. */
 	async fetch(force = false) {
 		const current = get(store);
 		if (current.fetched && !force) return;
@@ -67,12 +65,10 @@ export const subscriptionStore = {
 		}
 	},
 
-	/** Force a re-fetch (e.g. after returning from Stripe portal). */
 	async refresh() {
 		return await this.fetch(true);
 	},
 
-	/** Reset the store (e.g. on logout). */
 	reset() {
 		store.set({ data: null, loading: false, error: null, fetched: false });
 	},

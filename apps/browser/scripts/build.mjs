@@ -9,6 +9,7 @@ import path from 'node:path';
 
 async function main() {
 	const browser = process.env['BROWSER'] ?? 'chrome'; // chrome | firefox | safari
+	const mode = process.env['BUILD_MODE'] ?? 'production'; // development | production
 	const outDir = `dist/${browser}`;
 
 	// Clean output directory
@@ -17,7 +18,7 @@ async function main() {
 
 	// Build SvelteKit popup using command line (it uses vite.config.ts and svelte.config.js)
 	console.log('Building SvelteKit popup...');
-	execSync('pnpm exec vite build', { stdio: 'inherit' });
+	execSync(`pnpm exec vite build --mode ${mode}`, { stdio: 'inherit' });
 
 	// Copy SvelteKit build output to the target directory
 	const sveltekitBuildDir = 'build';
@@ -53,11 +54,11 @@ async function main() {
 	// Build content and background scripts
 	console.log('Building content script...');
 	// @ts-ignore
-	await build(contentConfig({ browser, outDir, emptyOutDir: false }));
+	await build(contentConfig({ browser, outDir, emptyOutDir: false, mode }));
 
 	console.log('Building background script...');
 	// @ts-ignore
-	await build(backgroundConfig({ browser, outDir, emptyOutDir: false }));
+	await build(backgroundConfig({ browser, outDir, emptyOutDir: false, mode }));
 
 	await writeManifest({ browser, outDir });
 }

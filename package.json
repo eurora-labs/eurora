@@ -20,6 +20,7 @@
 		"build:browser": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:all",
 		"build:firefox": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:firefox",
 		"build:chrome": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:chrome",
+		"dev:chrome": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:chrome:dev",
 		"build:safari": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:safari",
 		"dev:web": "pnpm --filter @eurora/web dev",
 		"dev:web:watch": "pnpm --filter @eurora/ui package && concurrently \"pnpm --filter @eurora/ui dev:watch\" \"pnpm --filter @eurora/web dev\" --names \"ui,web\" --prefix-colors \"blue,green\"",
@@ -77,7 +78,7 @@
 		"svelte-eslint-parser": "^1.4.1",
 		"tailwindcss": "catalog:",
 		"ts-proto": "^2.11.2",
-		"turbo": "^2.8.8",
+		"turbo": "^2.8.9",
 		"typescript-eslint": "^8.54.0",
 		"web-ext": "^8.10.0"
 	},

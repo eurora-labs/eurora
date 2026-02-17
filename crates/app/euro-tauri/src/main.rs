@@ -15,7 +15,6 @@ use euro_tauri::{
         chat_procedures::{ChatApi, ChatApiImpl},
         context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
         conversation_procedures::{ConversationApi, ConversationApiImpl},
-        // message_procedures::{MessageApi, MessageApiImpl},
         monitor_procedures::{MonitorApi, MonitorApiImpl},
         onboarding_procedures::{OnboardingApi, OnboardingApiImpl},
         prompt_procedures::{PromptApi, PromptApiImpl},
@@ -37,11 +36,6 @@ use taurpc::Router;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
 
-/// Installs native messaging host manifests so browsers can discover the
-/// `euro-native-messaging` sidecar binary. On macOS the manifests are written
-/// into each browser's `NativeMessagingHosts` directory under
-/// `~/Library/Application Support/`. On Linux they go under `~/.config/`.
-/// Windows is handled by the WiX MSI installer, so this is a no-op there.
 fn install_native_messaging_manifests(app: &tauri::App) {
     #[cfg(target_os = "windows")]
     {
@@ -64,7 +58,6 @@ fn install_native_messaging_manifests(app: &tauri::App) {
             }
         };
 
-        // Resolve the actual sidecar binary path (next to the main executable)
         let binary_path = match std::env::current_exe() {
             Ok(exe) => match exe.parent() {
                 Some(dir) => dir.join("euro-native-messaging"),
@@ -93,7 +86,6 @@ fn install_native_messaging_manifests(app: &tauri::App) {
                 .to_string()
         };
 
-        // (template resource file, target browser directories)
         #[cfg(target_os = "macos")]
         let manifest_configs: Vec<(&str, Vec<PathBuf>)> = {
             let home = dirs::home_dir().unwrap_or_default();
@@ -137,7 +129,6 @@ fn install_native_messaging_manifests(app: &tauri::App) {
                 let dest = native_messaging_dir.join("euro-native-messaging");
                 match std::fs::copy(&binary_path, &dest) {
                     Ok(_) => {
-                        // Ensure the copied binary is executable
                         if let Err(e) = std::fs::set_permissions(
                             &dest,
                             <std::fs::Permissions as PermissionsExt>::from_mode(0o755),
@@ -186,7 +177,6 @@ fn install_native_messaging_manifests(app: &tauri::App) {
                 }
             };
 
-            // Parse and override the "path" field with the resolved binary location
             let mut manifest: serde_json::Value = match serde_json::from_str(&content) {
                 Ok(v) => v,
                 Err(e) => {
@@ -240,7 +230,6 @@ async fn initialize_posthog() -> Result<(), posthog_rs::Error> {
 fn main() {
     dotenv().ok();
 
-    // Initialize mock keyring for e2e tests and CI environments
     #[cfg(feature = "mock-keyring")]
     {
         use keyring::{mock, set_default_credential_builder};
@@ -263,7 +252,6 @@ fn main() {
         ));
     }
 
-    // Regular application startup
     let tauri_context = generate_context!();
 
     debug!("Starting Tauri application...");
@@ -338,9 +326,7 @@ fn main() {
                             Some(vec!["--startup-launch"]),
                         ));
 
-                        // Get the autostart manager
                         let autostart_manager = tauri_app.autolaunch();
-                        // Enable autostart
                         if !autostart_manager.is_enabled().unwrap_or(false) {
                             match autostart_manager.enable() {
                                 Ok(_) => debug!("Autostart enabled"),
@@ -379,12 +365,6 @@ fn main() {
                             }
                         }
                     });
-
-                    #[cfg(debug_assertions)]
-                    {
-                        // main_window.open_devtools();
-                        // launcher_window.open_devtools();
-                    }
 
                     let open_i = MenuItem::with_id(tauri_app, "open", "Open", true, None::<&str>)?;
                     let quit_i = MenuItem::with_id(tauri_app, "quit", "Quit", true, None::<&str>)?;
@@ -449,7 +429,6 @@ fn main() {
                             }
                         });
 
-                        // Subscribe to activity change events before starting timeline
                         let mut activity_receiver = {
                             let timeline = timeline_mutex.lock().await;
                             timeline.subscribe_to_activity_events()
@@ -457,7 +436,6 @@ fn main() {
 
                         let activity_timeline_handle = db_app_handle.clone();
                         tauri::async_runtime::spawn(async move {
-                            // let db_manager = activity_timeline_handle.state::<PersonalDatabaseManager>().inner();
                             while let Ok(activity_event) = activity_receiver.recv().await {
                                 debug!("Activity changed to: {}", activity_event.name.clone(),);
 
@@ -491,32 +469,6 @@ fn main() {
                                     color: primary_icon_color,
                                     icon_base64,
                                 });
-
-                                // // Close previous active activity if exists
-                                // if let Ok(Some(last_activity)) = db_manager.get_last_active_activity().await {
-                                //     let _ = db_manager.update_activity_end_time(&last_activity.id, focus_event.timestamp).await;
-                                //     debug!("Closed previous activity: {}", last_activity.name);
-                                // }
-
-                                // // Create new activity for the focus change
-                                // let activity = Activity {
-                                //     id: Uuid::new_v4().to_string(),
-                                //     name: focus_event.window_title.clone(),
-                                //     icon_path: None,
-                                //     process_name: focus_event.process_name.clone(),
-                                //     started_at: focus_event.timestamp.to_rfc3339(),
-                                //     ended_at: None,
-                                // };
-
-                                // match db_manager.insert_activity(&activity).await {
-                                //     Ok(_) => {
-                                //         debug!("Inserted activity: {} ({})", activity.name, activity.process_name);
-                                //         debug!("Activity inserted with ID: {}", activity.id);
-                                //     }
-                                //     Err(e) => {
-                                //         error!("Failed to insert activity: {}", e);
-                                //     }
-                                // }
                             }
                         });
 
@@ -526,8 +478,6 @@ fn main() {
                         } else {
                             debug!("Timeline collection started successfully");
                         }
-
-                        // }
                     });
 
                     let app_handle_user = app_handle.clone();
@@ -551,17 +501,13 @@ fn main() {
                     tauri_plugin_tracing::Builder::new()
                         .filter(|metadata| {
                             let target = metadata.target();
-                            // Allow all logs from euro-* crates (Rust converts hyphens to underscores in module paths)
                             let is_euro_crate = target.starts_with("euro_");
-                            // Allow all logs from common folder crates
                             let is_common_crate = target.starts_with("agent_chain")
                                 || target.starts_with("agent_graph")
                                 || target.starts_with("auth_core")
                                 || target.starts_with("focus_tracker")
                                 || target.starts_with("proto_gen");
-                            // Allow webview logs
                             let is_webview = target.starts_with("webview");
-                            // For third-party crates, only allow warnings and above
                             let is_warning_or_above = *metadata.level() <= tracing::Level::WARN;
                             is_euro_crate || is_common_crate || is_webview || is_warning_or_above
                         })
@@ -592,32 +538,13 @@ fn main() {
                             .state::<WindowState>()
                             .remove(window.label());
                     }
-                    tauri::WindowEvent::Focused(false) => {
-                        // Handle launcher window focus loss for non-Linux OS
-                        // #[cfg(not(target_os = "linux"))]
-                        // {
-                        //     // Check if this is the launcher window
-                        //     if window.label() == "launcher" {
-                        //         window.hide().expect("Failed to hide launcher window");
-                        //         // Emit an event to clear the conversation when launcher is hidden
-                        //         window
-                        //             .emit("launcher_closed", ())
-                        //             .expect("Failed to emit launcher_closed event");
-                        //         set_launcher_visible(false);
-                        //         // Ensure state is updated
-                        //     }
-                        // }
-                    }
+                    tauri::WindowEvent::Focused(false) => {}
 
                     _ => {}
                 });
 
             #[cfg(not(target_os = "linux"))]
             let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
-            // let typescript_config = specta_typescript::Typescript::default();
-            // typescript_config
-            //     .export_to("../../../bindings.ts", &specta::export())
-            //     .unwrap();
 
             let router = Router::new()
                 .export_config(
@@ -630,14 +557,12 @@ fn main() {
                 .merge(SettingsApiImpl.into_handler())
                 .merge(ThirdPartyApiImpl.into_handler())
                 .merge(MonitorApiImpl.into_handler())
-                // .merge(MessageApiImpl.into_handler())
                 .merge(SystemApiImpl.into_handler())
                 .merge(ContextChipApiImpl.into_handler())
                 .merge(PromptApiImpl.into_handler())
                 .merge(OnboardingApiImpl.into_handler())
                 .merge(ChatApiImpl.into_handler());
             builder
-                // .invoke_handler(tauri::generate_handler![list_conversations,])
                 .invoke_handler(router.into_handler())
                 .build(tauri_context)
                 .expect("Failed to build tauri app")

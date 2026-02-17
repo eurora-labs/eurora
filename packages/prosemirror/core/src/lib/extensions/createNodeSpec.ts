@@ -4,21 +4,6 @@ import { type DOMOutputSpec, Node as PMNode, type NodeSpec } from 'prosemirror-m
 import { mount } from 'svelte';
 import type { SveltePMNode } from '$lib/typings/index.js';
 
-// function applyAttrsToSpec(spec: any[], attrs: Record<string, any>): any[] {
-// 	const clone = (v: any): any => {
-// 		if (Array.isArray(v)) return v.map(clone);
-// 		if (v && typeof v === 'object') {
-// 			const out: any = {};
-// 			for (const k of Object.keys(v)) {
-// 				out[k] = k in attrs ? String(attrs[k]) : v[k];
-// 			}
-// 			return out;
-// 		}
-// 		return v;
-// 	};
-// 	return clone(spec);
-// };
-
 export async function createNodeSpec(pm_node: SveltePMNode<any>): Promise<NodeSpec> {
 	const { schema, component } = pm_node;
 	if (component && schema) {

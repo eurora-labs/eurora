@@ -9,7 +9,6 @@ describe('bootstrap', () => {
 	it('should register message listener on load', async () => {
 		const mockAddListener = vi.fn();
 
-		// Mock browser runtime
 		(global as any).browser = {
 			runtime: {
 				onMessage: {
@@ -19,7 +18,6 @@ describe('bootstrap', () => {
 			},
 		};
 
-		// Import bootstrap to trigger listener registration
 		// @ts-ignore
 		await import('../bootstrap.js');
 
@@ -39,7 +37,6 @@ describe('bootstrap', () => {
 			},
 		};
 
-		// Mock dynamic import
 		vi.mock('../bootstrap.js', async () => {
 			const actual = await vi.importActual('../bootstrap.js');
 			return actual;
@@ -51,7 +48,6 @@ describe('bootstrap', () => {
 			defaultChunk: 'sites/_default/index.js',
 		};
 
-		// This is a basic structure test - actual message handling would require more setup
 		expect(message.type).toBe('SITE_LOAD');
 		expect(message.chunk).toBeDefined();
 		expect(message.defaultChunk).toBeDefined();
@@ -66,17 +62,12 @@ describe('bootstrap', () => {
 	});
 
 	it('should only load once', () => {
-		// Test that loaded flag prevents multiple loads
 		const messages = [
 			{ type: 'SITE_LOAD', chunk: 'test1.js', defaultChunk: 'default.js' },
 			{ type: 'SITE_LOAD', chunk: 'test2.js', defaultChunk: 'default.js' },
 		];
 
-		// Both messages have SITE_LOAD type
 		expect(messages[0].type).toBe('SITE_LOAD');
 		expect(messages[1].type).toBe('SITE_LOAD');
-
-		// But the bootstrap should only process the first one
-		// (actual implementation test would require more complex setup)
 	});
 });
