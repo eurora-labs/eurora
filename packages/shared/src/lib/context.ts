@@ -1,4 +1,4 @@
-import { setContext, getContext as svelteGetContext } from 'svelte';
+const context = new Map<symbol, unknown>();
 
 export class InjectionToken<_T> {
 	private readonly _desc: string;
@@ -23,7 +23,7 @@ export class InjectionToken<_T> {
 }
 
 export function provide<T>(token: InjectionToken<T>, value: T): void {
-	setContext(token._key, value);
+	context.set(token._key, value);
 }
 
 export function provideAll(entries: [InjectionToken<any>, any][]) {
@@ -33,7 +33,7 @@ export function provideAll(entries: [InjectionToken<any>, any][]) {
 }
 
 export function inject<T>(token: InjectionToken<T>): T {
-	const value = svelteGetContext<T>(token._key);
+	const value = context.get(token._key) as T | undefined;
 	if (value === undefined) {
 		throw new Error(`No provider found for ${token.toString()}`);
 	}
@@ -41,6 +41,6 @@ export function inject<T>(token: InjectionToken<T>): T {
 }
 
 export function injectOptional<T>(token: InjectionToken<T>, defaultValue: T): T {
-	const value = svelteGetContext<T>(token._key);
+	const value = context.get(token._key) as T | undefined;
 	return value !== undefined ? value : defaultValue;
 }
