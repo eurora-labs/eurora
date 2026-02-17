@@ -4,9 +4,9 @@ import { createTauRPCProxy as createProxy, type InferCommandOutput } from 'taurp
 type TAURI_CHANNEL<T> = (response: T) => void
 
 
-export type ApiSettings = { endpoint: string }
+export type APISettings = { endpoint: string; provider: ProviderSettings | null }
 
-export type AppSettings = { general: GeneralSettings; telemetry: TelemetrySettings; api: ApiSettings }
+export type AppSettings = { general: GeneralSettings; telemetry: TelemetrySettings; api: APISettings }
 
 export type ContextChip = { id: string; extension_id: string; name: string; attrs: Partial<{ [key in string]: string }>; icon: string | null; position: number | null }
 
@@ -19,6 +19,12 @@ export type LocalBackendInfo = { grpc_port: number; http_port: number; postgres_
 export type LoginToken = { code_challenge: string; expires_in: bigint; url: string }
 
 export type MessageView = { id: string | null; role: string; content: string }
+
+export type OllamaSettings = { base_url: string; model: string }
+
+export type OpenAISettings = { base_url: string; model: string; title_model: string | null }
+
+export type ProviderSettings = { OllamaSettings: OllamaSettings } | { OpenAISettings: OpenAISettings }
 
 export type Query = { text: string; assets: string[] }
 
@@ -55,10 +61,10 @@ prompt_service_change: (serviceName: string | null) => Promise<void>,
 switch_to_ollama: (baseUrl: string, model: string) => Promise<null>, 
 switch_to_remote: (provider: string, apiKey: string, model: string) => Promise<null>},
 "settings": {get_all_settings: () => Promise<AppSettings>, 
-get_api_settings: () => Promise<ApiSettings>, 
+get_api_settings: () => Promise<APISettings>, 
 get_general_settings: () => Promise<GeneralSettings>, 
 get_telemetry_settings: () => Promise<TelemetrySettings>, 
-set_api_settings: (apiSettings: ApiSettings) => Promise<ApiSettings>, 
+set_api_settings: (apiSettings: APISettings) => Promise<APISettings>, 
 set_general_settings: (generalSettings: GeneralSettings) => Promise<GeneralSettings>, 
 set_telemetry_settings: (telemetrySettings: TelemetrySettings) => Promise<TelemetrySettings>},
 "system": {check_accessibility_permission: () => Promise<boolean>, 
