@@ -6,11 +6,6 @@ service ProtoLocalSettingsService {
   rpc SetProviderSettings(SetProviderSettingsRequest) returns (SetProviderSettingsResponse);
 }
 
-message NebulSettings {
-  string model = 1;
-  string api_key = 2;
-}
-
 message OllamaSettings {
   string base_url = 1;
   string model = 2;
@@ -35,7 +30,6 @@ message ProviderSettings {
   oneof provider {
     OllamaSettings ollama = 1;
     OpenAISettings openai = 2;
-    NebulSettings nebul = 3;
   }
 }
 

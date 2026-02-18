@@ -4,12 +4,9 @@ use agent_chain::{
     BaseChatModel, BaseMessage, HumanMessage, ollama::ChatOllama, openai::ChatOpenAI,
 };
 use be_authz::{extract_claims, parse_user_id};
-use be_local_settings::{
-    NebulConfig, OllamaConfig, OpenAIConfig, ProviderSettings, SettingsReceiver,
-};
+use be_local_settings::{OllamaConfig, OpenAIConfig, ProviderSettings, SettingsReceiver};
 use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
 use chrono::{DateTime, Utc};
-use co_utils::Sensitive;
 use prost_types::Timestamp;
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
@@ -19,6 +16,8 @@ use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use crate::converters::convert_db_message_to_base_message;
+
+const BASE_NEBUL_URL: &str = "https://api.inference.nebul.io/v1";
 
 /// When running inside Docker (`RUNNING_EURORA_FULLY_LOCAL=true`), rewrite
 /// `localhost` / `127.0.0.1` to `host.docker.internal` so the container can
@@ -77,21 +76,10 @@ fn build_openai(
     Box::new(provider)
 }
 
-fn build_nebul(config: &NebulConfig, web_search: bool) -> Box<dyn BaseChatModel + Send + Sync> {
-    let mut provider = ChatOpenAI::new(config.model.clone())
-        .api_key(config.api_key.as_str())
-        .api_base(config.base_url().as_str());
-    if web_search {
-        provider = provider.with_builtin_tools(vec![BuiltinTool::WebSearch]);
-    }
-    Box::new(provider)
-}
-
 fn build_chat_provider_from(settings: &ProviderSettings) -> Box<dyn BaseChatModel + Send + Sync> {
     match settings {
         ProviderSettings::Ollama(c) => build_ollama(c, None),
         ProviderSettings::OpenAI(c) => build_openai(c, None, true),
-        ProviderSettings::Nebul(c) => build_nebul(c, true),
     }
 }
 
@@ -102,7 +90,6 @@ fn build_title_provider_from(settings: &ProviderSettings) -> Box<dyn BaseChatMod
             let title_model = c.title_model.as_deref();
             build_openai(c, title_model, false)
         }
-        ProviderSettings::Nebul(c) => build_nebul(c, false),
     }
 }
 
@@ -121,20 +108,21 @@ fn build_env_fallback() -> Option<Providers> {
             Arc::new(ChatOllama::new(&model).base_url(&host));
         Some(Providers { chat, title })
     } else {
-        let config = NebulConfig::new(
-            std::env::var("NEBUL_MODEL").expect("Nebul model should be set"),
-            Sensitive(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set")),
+        let chat = Arc::new(
+            ChatOpenAI::new(std::env::var("NEBUL_MODEL").expect("Nebul model should be set"))
+                .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"))
+                .api_base(BASE_NEBUL_URL), // .with_builtin_tools(vec![BuiltinTool::WebSearch]),
         );
-        let chat = build_nebul(&config, false);
-        let config = NebulConfig::new(
-            std::env::var("NEBUL_TITLE_MODEL").expect("Nebul title model should be set"),
-            Sensitive(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set")),
+
+        let title = Arc::new(
+            ChatOpenAI::new(
+                std::env::var("NEBUL_TITLE_MODEL").expect("Nebul title model should be set"),
+            )
+            .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"))
+            .api_base(BASE_NEBUL_URL),
         );
-        let title = build_nebul(&config, false);
-        Some(Providers {
-            chat: chat.into(),
-            title: title.into(),
-        })
+
+        Some(Providers { chat, title })
     }
 }
 
@@ -646,22 +634,8 @@ impl ProtoConversationService for ConversationService {
             }
         })?;
 
-        let db_messages = self
-            .db
-            .list_messages()
-            .conversation_id(conversation_id)
-            .user_id(user_id)
-            .params(PaginationParams::new(0, 5, "ASC".to_string()))
-            .call()
-            .await
-            .map_err(ConversationServiceError::from)?;
-
-        let mut messages: Vec<BaseMessage> = db_messages
-            .into_iter()
-            .map(|msg| convert_db_message_to_base_message(msg).unwrap())
-            .collect();
-
-        messages.push(HumanMessage::builder().content(req.content).build().into());
+        let mut messages: Vec<BaseMessage> =
+            vec![HumanMessage::builder().content(req.content).build().into()];
 
         messages.push(
             SystemMessage::builder()
