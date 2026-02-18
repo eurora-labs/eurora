@@ -1,5 +1,3 @@
-//! Server-side implementation for the Conversation Service.
-
 use agent_chain::SystemMessage;
 use agent_chain::openai::BuiltinTool;
 use agent_chain::{
@@ -18,6 +16,8 @@ use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use crate::converters::convert_db_message_to_base_message;
+
+const BASE_NEBUL_URL: &str = "https://api.inference.nebul.io/v1";
 
 /// When running inside Docker (`RUNNING_EURORA_FULLY_LOCAL=true`), rewrite
 /// `localhost` / `127.0.0.1` to `host.docker.internal` so the container can
@@ -47,15 +47,7 @@ pub use proto_gen::conversation::proto_conversation_service_server::{
     ProtoConversationService, ProtoConversationServiceServer,
 };
 
-/// Env-var fallback providers, built once at service construction.
-struct EnvFallback {
-    chat: Arc<dyn BaseChatModel + Send + Sync>,
-    title: Arc<dyn BaseChatModel + Send + Sync>,
-}
-
-/// Cached providers built from the latest `ProviderSettings`.
-struct CachedProviders {
-    settings: ProviderSettings,
+struct Providers {
     chat: Arc<dyn BaseChatModel + Send + Sync>,
     title: Arc<dyn BaseChatModel + Send + Sync>,
 }
@@ -65,8 +57,6 @@ fn build_ollama(
     model_override: Option<&str>,
 ) -> Box<dyn BaseChatModel + Send + Sync> {
     let model = model_override.unwrap_or(&config.model);
-    // When running inside Docker, localhost refers to the container itself.
-    // Rewrite to host.docker.internal so the backend can reach the host's Ollama.
     let base_url = resolve_host_url(config.base_url.as_str());
     Box::new(ChatOllama::new(model).base_url(&base_url))
 }
@@ -103,7 +93,7 @@ fn build_title_provider_from(settings: &ProviderSettings) -> Box<dyn BaseChatMod
     }
 }
 
-fn build_env_fallback() -> Option<EnvFallback> {
+fn build_env_fallback() -> Option<Providers> {
     let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
         .map(|v| v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
@@ -116,121 +106,88 @@ fn build_env_fallback() -> Option<EnvFallback> {
             Arc::new(ChatOllama::new(&model).base_url(&host));
         let title: Arc<dyn BaseChatModel + Send + Sync> =
             Arc::new(ChatOllama::new(&model).base_url(&host));
-        Some(EnvFallback { chat, title })
+        Some(Providers { chat, title })
     } else {
-        let api_key = std::env::var("OPENAI_API_KEY").ok()?;
-        if api_key.is_empty() {
-            return None;
-        }
-        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-5.1".to_string());
-        let chat: Arc<dyn BaseChatModel + Send + Sync> = Arc::new(
-            ChatOpenAI::new(&model)
-                .with_builtin_tools(vec![BuiltinTool::WebSearch])
-                .api_key(&api_key),
+        let chat = Arc::new(
+            ChatOpenAI::new(std::env::var("NEBUL_MODEL").expect("Nebul model should be set"))
+                .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"))
+                .api_base(BASE_NEBUL_URL), // .with_builtin_tools(vec![BuiltinTool::WebSearch]),
         );
-        let title: Arc<dyn BaseChatModel + Send + Sync> =
-            Arc::new(ChatOpenAI::new("gpt-4.1-mini").api_key(&api_key));
-        Some(EnvFallback { chat, title })
+
+        let title = Arc::new(
+            ChatOpenAI::new(
+                std::env::var("NEBUL_TITLE_MODEL").expect("Nebul title model should be set"),
+            )
+            .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"))
+            .api_base(BASE_NEBUL_URL),
+        );
+
+        Some(Providers { chat, title })
     }
 }
 
-// --- Service ---
-
 pub struct ConversationService {
-    settings_rx: SettingsReceiver,
     db: Arc<DatabaseManager>,
-    env_fallback: Option<EnvFallback>,
-    cached: RwLock<Option<CachedProviders>>,
+    providers: Arc<RwLock<Option<Providers>>>,
 }
 
 impl ConversationService {
-    pub fn new(db: Arc<DatabaseManager>, settings_rx: SettingsReceiver) -> Self {
+    pub fn new(db: Arc<DatabaseManager>, mut settings_rx: SettingsReceiver) -> Self {
         let env_fallback = build_env_fallback();
         info!(
             "Creating new ConversationService instance (env fallback: {})",
             env_fallback.is_some()
         );
-        Self {
-            settings_rx,
-            db,
-            env_fallback,
-            cached: RwLock::new(None),
-        }
+
+        let initial = settings_rx.borrow_and_update().clone();
+        let initial_providers = initial
+            .map(|s| Providers {
+                chat: build_chat_provider_from(&s).into(),
+                title: build_title_provider_from(&s).into(),
+            })
+            .or(env_fallback);
+
+        let providers = Arc::new(RwLock::new(initial_providers));
+
+        let providers_handle = providers.clone();
+        tokio::spawn(async move {
+            loop {
+                if settings_rx.changed().await.is_err() {
+                    info!("Settings channel closed, stopping provider watcher");
+                    break;
+                }
+                let new_settings = settings_rx.borrow_and_update().clone();
+                let new_providers = new_settings.map(|s| {
+                    info!("Provider settings changed, rebuilding providers");
+                    Providers {
+                        chat: build_chat_provider_from(&s).into(),
+                        title: build_title_provider_from(&s).into(),
+                    }
+                });
+                let mut lock = providers_handle.write().unwrap_or_else(|e| e.into_inner());
+                *lock = new_providers;
+            }
+        });
+
+        Self { db, providers }
     }
 
-    /// Get a chat provider, using cached version if settings haven't changed.
     fn get_chat_provider(&self) -> Result<Arc<dyn BaseChatModel + Send + Sync>, Status> {
-        // Clone out of watch::Ref immediately to avoid holding the borrow.
-        let current = self.settings_rx.borrow().clone();
-
-        match current {
-            Some(settings) => {
-                {
-                    let cache = self.cached.read().unwrap_or_else(|e| e.into_inner());
-                    if let Some(ref cached) = *cache
-                        && cached.settings == settings
-                    {
-                        return Ok(cached.chat.clone());
-                    }
-                }
-                let chat: Arc<dyn BaseChatModel + Send + Sync> =
-                    build_chat_provider_from(&settings).into();
-                let title: Arc<dyn BaseChatModel + Send + Sync> =
-                    build_title_provider_from(&settings).into();
-                let mut cache = self.cached.write().unwrap_or_else(|e| e.into_inner());
-                *cache = Some(CachedProviders {
-                    settings,
-                    chat: chat.clone(),
-                    title,
-                });
-                Ok(chat)
-            }
-            None => {
-                let fb = self.env_fallback.as_ref().ok_or_else(|| {
-                    Status::failed_precondition(
-                        "No provider settings configured and no environment fallback available",
-                    )
-                })?;
-                Ok(fb.chat.clone())
-            }
-        }
+        let lock = self.providers.read().unwrap_or_else(|e| e.into_inner());
+        lock.as_ref().map(|p| p.chat.clone()).ok_or_else(|| {
+            Status::failed_precondition(
+                "No provider settings configured and no environment fallback available",
+            )
+        })
     }
 
-    /// Get a title-generation provider, using cached version if settings haven't changed.
     fn get_title_provider(&self) -> Result<Arc<dyn BaseChatModel + Send + Sync>, Status> {
-        let current = self.settings_rx.borrow().clone();
-
-        match current {
-            Some(settings) => {
-                {
-                    let cache = self.cached.read().unwrap_or_else(|e| e.into_inner());
-                    if let Some(ref cached) = *cache
-                        && cached.settings == settings
-                    {
-                        return Ok(cached.title.clone());
-                    }
-                }
-                let chat: Arc<dyn BaseChatModel + Send + Sync> =
-                    build_chat_provider_from(&settings).into();
-                let title: Arc<dyn BaseChatModel + Send + Sync> =
-                    build_title_provider_from(&settings).into();
-                let mut cache = self.cached.write().unwrap_or_else(|e| e.into_inner());
-                *cache = Some(CachedProviders {
-                    settings,
-                    chat,
-                    title: title.clone(),
-                });
-                Ok(title)
-            }
-            None => {
-                let fb = self.env_fallback.as_ref().ok_or_else(|| {
-                    Status::failed_precondition(
-                        "No provider settings configured and no environment fallback available",
-                    )
-                })?;
-                Ok(fb.title.clone())
-            }
-        }
+        let lock = self.providers.read().unwrap_or_else(|e| e.into_inner());
+        lock.as_ref().map(|p| p.title.clone()).ok_or_else(|| {
+            Status::failed_precondition(
+                "No provider settings configured and no environment fallback available",
+            )
+        })
     }
 
     fn db_conversation_to_proto(conversation: be_remote_db::Conversation) -> Conversation {
@@ -677,22 +634,8 @@ impl ProtoConversationService for ConversationService {
             }
         })?;
 
-        let db_messages = self
-            .db
-            .list_messages()
-            .conversation_id(conversation_id)
-            .user_id(user_id)
-            .params(PaginationParams::new(0, 5, "ASC".to_string()))
-            .call()
-            .await
-            .map_err(ConversationServiceError::from)?;
-
-        let mut messages: Vec<BaseMessage> = db_messages
-            .into_iter()
-            .map(|msg| convert_db_message_to_base_message(msg).unwrap())
-            .collect();
-
-        messages.push(HumanMessage::builder().content(req.content).build().into());
+        let mut messages: Vec<BaseMessage> =
+            vec![HumanMessage::builder().content(req.content).build().into()];
 
         messages.push(
             SystemMessage::builder()

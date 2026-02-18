@@ -1,11 +1,9 @@
 mod error;
 mod provider;
-mod redacted;
 
 pub use error::{Error, Result};
 pub use proto_gen::local_settings as proto;
 pub use provider::*;
-pub use redacted::Redacted;
 
 pub type SettingsSender = tokio::sync::watch::Sender<Option<ProviderSettings>>;
 pub type SettingsReceiver = tokio::sync::watch::Receiver<Option<ProviderSettings>>;

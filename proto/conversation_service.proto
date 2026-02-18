@@ -6,19 +6,15 @@ import "agent_chain.proto";
 import "google/protobuf/timestamp.proto";
 
 service ProtoConversationService {
-  // Conversation CRUD
   rpc CreateConversation(CreateConversationRequest) returns (CreateConversationResponse);
   rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
   rpc GetConversation(GetConversationRequest) returns (GetConversationResponse);
 
-  // Messages CRUD
   rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse);
-  /// Temporary measure that should be removed once we properly implement tool messages for assets
   rpc AddHiddenHumanMessage(AddHiddenHumanMessageRequest) returns (AddHiddenHumanMessageResponse);
   rpc AddHumanMessage(AddHumanMessageRequest) returns (AddHumanMessageResponse);
   rpc AddSystemMessage(AddSystemMessageRequest) returns (AddSystemMessageResponse);
 
-  // AI Calls
   rpc ChatStream(ChatStreamRequest) returns (stream ChatStreamResponse);
   rpc GenerateConversationTitle(GenerateConversationTitleRequest) returns (GenerateConversationTitleResponse);
 }
@@ -31,7 +27,6 @@ message Conversation {
   string id = 1;
   string user_id = 2;
   string title = 3;
-
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp updated_at = 5;
 }
@@ -41,10 +36,7 @@ message CreateConversationResponse {
 }
 
 message ListConversationsRequest {
-  // Maximum number of conversations to return
   uint32 limit = 1;
-
-  // Offset for pagination
   uint32 offset = 2;
 }
 
@@ -53,17 +45,12 @@ message ListConversationsResponse {
 }
 
 message ChatStreamRequest {
-  // Conversation that is used as starting point for the chat
   string conversation_id = 1;
-  // User's message content
   string content = 2;
 }
 
 message ChatStreamResponse {
-  // The message chunk
   string chunk = 1;
-
-  // Whether this is the final chunk
   bool is_final = 2;
 }
 

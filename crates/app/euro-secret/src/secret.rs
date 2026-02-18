@@ -3,11 +3,9 @@
 //! These are stateless and global, while discouraging storing secrets
 //! in memory beyond their use.
 
-use std::sync::Mutex;
-
 use anyhow::Result;
-
-use crate::Sensitive;
+use co_utils::Sensitive;
+use std::sync::Mutex;
 
 /// Determines how a secret's name should be modified to produce a namespace.
 ///
