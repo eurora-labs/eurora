@@ -56,14 +56,13 @@ impl From<&ProviderSettings> for proto::ProviderSettings {
             }),
             ProviderSettings::OpenAI(c) => Provider::Openai(proto::OpenAiSettings {
                 base_url: c.base_url.to_string(),
-                api_key: c.api_key.0.clone(),
+                api_key: String::from(""),
                 model: c.model.clone(),
                 title_model: c.title_model.clone().unwrap_or_default(),
             }),
             ProviderSettings::Nebul(c) => Provider::Nebul(proto::NebulSettings {
                 model: c.model.clone(),
-                api_key: c.api_key.0.clone(),
-                title_model: c.title_model.clone(),
+                api_key: String::from(""),
             }),
         };
         proto::ProviderSettings {

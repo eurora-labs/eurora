@@ -9,7 +9,6 @@ service ProtoLocalSettingsService {
 message NebulSettings {
   string model = 1;
   string api_key = 2;
-  string title_model = 3;
 }
 
 message OllamaSettings {
@@ -34,9 +33,9 @@ message SetEncryptionKeyResponse {
 
 message ProviderSettings {
   oneof provider {
-    NebulSettings nebul = 1;
-    OllamaSettings ollama = 2;
-    OpenAISettings openai = 3;
+    OllamaSettings ollama = 1;
+    OpenAISettings openai = 2;
+    NebulSettings nebul = 3;
   }
 }
 
