@@ -11,11 +11,6 @@
 		 * @default true
 		 */
 		defaultOpen?: boolean;
-		/**
-		 * Label to display at the top of the timeline
-		 * @default "Now"
-		 */
-		label?: string;
 	}
 </script>
 
@@ -25,10 +20,8 @@
 		children,
 		open = $bindable(true),
 		defaultOpen = true,
-		label = 'Now',
 	}: TimelineProps = $props();
 
-	// Initialize open state with defaultOpen if not explicitly set
 	$effect(() => {
 		if (defaultOpen !== undefined) {
 			open = defaultOpen;
@@ -36,15 +29,12 @@
 	});
 </script>
 
-<div class="flex flex-col {className} overflow-hidden">
-	<div class="flex flex-row mb-4 h-8">
-		<div class="flex w-1/2 min-w-0 items-center justify-end overflow-hidden">
-			<div class="flex flex-row gap-2">
-				{@render children?.()}
-			</div>
-		</div>
-		<div class="flex w-fit shrink-0 justify-center pl-2 ml-4 border-l-2 items-center">
-			{label}
+<div class="flex flex-col {className} ">
+	<div class="relative mb-4 h-8 overflow-hidden group-data-[collapsible=icon]:overflow-visible">
+		<div
+			class="absolute right-[calc(50%-3.125rem)] flex flex-row gap-2 items-center group-data-[collapsible=icon]:static group-data-[collapsible=icon]:justify-center"
+		>
+			{@render children?.()}
 		</div>
 	</div>
 </div>
