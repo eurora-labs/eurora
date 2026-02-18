@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::WARN.into())
-        .parse_lossy("be_=debug,hyper=off,tokio=off");
+        .parse_lossy("be_=debug,agent_chain=debug,hyper=off,tokio=off");
 
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_filter(filter.clone()))
