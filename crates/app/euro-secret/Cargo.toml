@@ -7,10 +7,10 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
 anyhow = { workspace = true }
+co-utils = { workspace = true }
 keyring = { workspace = true, features = [
   "apple-native",
   "crypto-rust",
   "linux-native",
   "windows-native",
 ] }
-serde = { workspace = true, features = ["std"] }

@@ -123,6 +123,10 @@ impl AuthService {
     }
 
     async fn resolve_role(&self, user_id: Uuid) -> Role {
+        if cfg!(debug_assertions) {
+            return Role::Enterprise;
+        }
+
         let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
             .map(|v| v.eq_ignore_ascii_case("true"))
             .unwrap_or(false);

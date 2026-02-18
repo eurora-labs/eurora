@@ -5,6 +5,7 @@ edition.workspace = true
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
+co-utils = { workspace = true }
 proto-gen = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }

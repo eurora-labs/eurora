@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { type ConversationView } from '$lib/bindings/bindings.js';
+	import { type ConversationView, type TimelineAppEvent } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
@@ -8,52 +8,86 @@
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
 	import { useSidebar } from '@eurora/ui/components/sidebar/index';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
+	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
-	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
-	import CircleUserRoundIcon from '@lucide/svelte/icons/circle-user-round';
 	import LogoutIcon from '@lucide/svelte/icons/log-out';
 	import PowerIcon from '@lucide/svelte/icons/power';
-	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	const taurpc = inject(TAURPC_SERVICE);
 	let conversations: ConversationView[] = $state([]);
+	let timelineItems: TimelineAppEvent[] = $state([]);
 
 	let sidebarState: ReturnType<typeof useSidebar> | undefined = $state(undefined);
 	let quitDialogOpen = $state(false);
+	let username = $state('');
+
+	let visibleTimelineItems = $derived.by(() => {
+		const limit = sidebarState?.open ? 3 : 1;
+		return timelineItems.slice(-limit);
+	});
+
+	function getFirstLetterAndCapitalize(name: string) {
+		if (!name) return '';
+		return name.charAt(0).toUpperCase();
+	}
 
 	onMount(() => {
 		sidebarState = useSidebar();
+
+		const unlistenPromises: Promise<() => void>[] = [];
+
+		unlistenPromises.push(
+			taurpc.timeline.new_app_event.on((e) => {
+				if (timelineItems.length >= 5) {
+					timelineItems.shift();
+				}
+				timelineItems.push(e);
+			}),
+		);
 
 		taurpc.auth
 			.is_authenticated()
 			.then((isAuthenticated) => {
 				if (!isAuthenticated) return;
+				taurpc.auth.get_username().then((name) => {
+					username = name;
+				});
 				taurpc.conversation.list(10, 0).then((res) => {
 					conversations = res;
 				});
 
-				taurpc.conversation.new_conversation_added.on((conversation) => {
-					if (!conversations.some((c) => c.id === conversation.id)) {
-						conversations = [conversation, ...conversations];
-					}
-				});
-
-				taurpc.conversation.conversation_title_changed.on((conversation) => {
-					for (const c of conversations) {
-						if (c.id === conversation.id) {
-							c.title = conversation.title;
+				unlistenPromises.push(
+					taurpc.conversation.new_conversation_added.on((conversation) => {
+						if (!conversations.some((c) => c.id === conversation.id)) {
+							conversations = [conversation, ...conversations];
 						}
-					}
-				});
+					}),
+				);
+
+				unlistenPromises.push(
+					taurpc.conversation.conversation_title_changed.on((conversation) => {
+						for (const c of conversations) {
+							if (c.id === conversation.id) {
+								c.title = conversation.title;
+							}
+						}
+					}),
+				);
 			})
 			.catch((error) => {
 				goto('/onboarding');
 
 				console.error('Failed to check authentication:', error);
 			});
+
+		return () => {
+			for (const p of unlistenPromises) {
+				p.then((unlisten) => unlisten());
+			}
+		};
 	});
 
 	async function createChat() {
@@ -142,23 +176,69 @@
 			</Sidebar.Group>
 		{/if}
 	</Sidebar.Content>
+	{#if visibleTimelineItems.length > 0}
+		<div class="px-2 py-2">
+			<Timeline.Root class="w-full" defaultOpen={false}>
+				{#each visibleTimelineItems as item, i}
+					<Timeline.Item
+						color={item.color}
+						highlighted={i === visibleTimelineItems.length - 1}
+					>
+						{#if item.icon_base64}
+							<img
+								src={item.icon_base64}
+								alt={item.name}
+								class="w-8 h-8 bg-white rounded-full drop-shadow p-1"
+							/>
+						{:else}
+							<div
+								class="w-8 h-8 bg-white rounded-full drop-shadow p-1 flex items-center justify-center"
+							>
+								{getFirstLetterAndCapitalize(item.name)}
+							</div>
+						{/if}
+					</Timeline.Item>
+				{/each}
+			</Timeline.Root>
+		</div>
+	{/if}
 	<Sidebar.Footer>
-		<Sidebar.Menu>
-			<Sidebar.MenuItem>
+		<div class="flex items-center justify-between gap-2">
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger>
+					{#snippet child({ props })}
+						<Button
+							{...props}
+							variant="ghost"
+							class="flex items-center gap-2 min-w-0 h-auto px-1 py-1 flex-1 justify-start"
+						>
+							<div
+								class="flex size-7 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground text-xs font-medium"
+							>
+								{getFirstLetterAndCapitalize(username)}
+							</div>
+							{#if sidebarState?.open}
+								<span class="truncate text-sm">{username}</span>
+							{/if}
+						</Button>
+					{/snippet}
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content side="top" align="start">
+					<DropdownMenu.Item onclick={() => goto('/settings')}>
+						<span>Settings</span>
+					</DropdownMenu.Item>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
+			{#if sidebarState?.open}
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
 						{#snippet child({ props })}
-							<Sidebar.MenuButton
-								{...props}
-								class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-							>
-								<CircleUserRoundIcon />
-								<span>Profile</span>
-								<ChevronUpIcon class="ml-auto" />
-							</Sidebar.MenuButton>
+							<Button {...props} variant="ghost" size="icon" class="size-7 shrink-0">
+								<PowerIcon class="size-4" />
+							</Button>
 						{/snippet}
 					</DropdownMenu.Trigger>
-					<DropdownMenu.Content side="top" class="w-(--bits-dropdown-menu-anchor-width)">
+					<DropdownMenu.Content side="top" align="end">
 						<DropdownMenu.Item
 							onclick={() => {
 								taurpc.auth.logout().then(() => {
@@ -166,33 +246,17 @@
 								});
 							}}
 						>
-							{#snippet child({ props })}
-								<a {...props}>
-									<LogoutIcon />
-									<span>Log Out</span>
-								</a>
-							{/snippet}
+							<LogoutIcon />
+							<span>Log Out</span>
 						</DropdownMenu.Item>
 						<DropdownMenu.Item onclick={() => (quitDialogOpen = true)}>
-							{#snippet child({ props })}
-								<a {...props}>
-									<PowerIcon />
-									<span>Quit</span>
-								</a>
-							{/snippet}
-						</DropdownMenu.Item>
-						<DropdownMenu.Item>
-							{#snippet child({ props })}
-								<a {...props} href="/settings">
-									<SettingsIcon />
-									<span>Settings</span>
-								</a>
-							{/snippet}
+							<PowerIcon />
+							<span>Quit</span>
 						</DropdownMenu.Item>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
-			</Sidebar.MenuItem>
-		</Sidebar.Menu>
+			{/if}
+		</div>
 	</Sidebar.Footer>
 </Sidebar.Root>
 

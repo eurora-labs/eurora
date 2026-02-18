@@ -2,58 +2,28 @@ syntax = "proto3";
 
 package chat_service;
 
-// =============================================================================
-// Chat Service
-// =============================================================================
-
-// Chat service definition
 service ProtoChatService {
-  // Send a chat request and receive a response
   rpc Chat(ProtoChatRequest) returns (ProtoChatResponse);
-
-  // Send a chat request and receive a streaming response
   rpc ChatStream(ProtoChatRequest) returns (stream ProtoChatStreamResponse);
 }
 
-// A chat request containing messages and parameters
 message ProtoChatRequest {
-  // The conversation ID
   string conversation_id = 1;
-
-  // The conversation messages
   repeated ProtoBaseMessage messages = 2;
-
-  // Request parameters
   ProtoParameters parameters = 3;
 }
 
-// A chat response
 message ProtoChatResponse {
-  // The AI message response
   ProtoAIMessage message = 1;
-
-  // Usage statistics
   optional ProtoUsageMetadata usage = 2;
-
-  // Reason why generation finished
   optional string stop_reason = 3;
 }
 
-// A streaming chat response chunk
 message ProtoChatStreamResponse {
-  // The AI message chunk
   ProtoAIMessageChunk chunk = 1;
-
-  // Whether this is the final chunk
   bool is_final = 2;
 }
 
-// =============================================================================
-// Base Message Types
-// =============================================================================
-
-// A unified message type that can represent any message role.
-// Matches agent-chain's BaseMessage enum.
 message ProtoBaseMessage {
   oneof message {
     ProtoHumanMessage human = 1;
@@ -66,8 +36,6 @@ message ProtoBaseMessage {
   }
 }
 
-// A unified message chunk type for streaming.
-// Matches agent-chain's BaseMessageChunk enum.
 message ProtoBaseMessageChunk {
   oneof chunk {
     ProtoAIMessageChunk ai = 1;
@@ -79,384 +47,172 @@ message ProtoBaseMessageChunk {
   }
 }
 
-// =============================================================================
-// Human Message
-// =============================================================================
-
-// A human message in the conversation.
-// Supports both simple text content and multimodal content with images.
 message ProtoHumanMessage {
-  // The message content (text or multipart)
   ProtoMessageContent content = 1;
-
-  // Optional unique identifier
   optional string id = 2;
-
-  // Optional name for the message
   optional string name = 3;
-
-  // Additional metadata as JSON string
   optional string additional_kwargs = 4;
 }
 
-// Human message chunk (yielded when streaming)
 message ProtoHumanMessageChunk {
-  // The message content (may be partial during streaming)
   ProtoMessageContent content = 1;
-
-  // Optional unique identifier
   optional string id = 2;
-
-  // Optional name for the message
   optional string name = 3;
-
-  // Additional metadata as JSON string
   optional string additional_kwargs = 4;
-
-  // Response metadata as JSON string
   optional string response_metadata = 5;
 }
 
-// =============================================================================
-// System Message
-// =============================================================================
-
-// A system message in the conversation.
-// Used to prime AI behavior with instructions.
 message ProtoSystemMessage {
-  // The message content (always text)
   string content = 1;
-
-  // Optional unique identifier
   optional string id = 2;
-
-  // Optional name for the message
   optional string name = 3;
-
-  // Additional metadata as JSON string
   optional string additional_kwargs = 4;
 }
 
-// System message chunk (yielded when streaming)
 message ProtoSystemMessageChunk {
-  // The message content (may be partial during streaming)
   string content = 1;
-
-  // Optional unique identifier
   optional string id = 2;
-
-  // Optional name for the message
   optional string name = 3;
-
-  // Additional metadata as JSON string
   optional string additional_kwargs = 4;
-
-  // Response metadata as JSON string
   optional string response_metadata = 5;
 }
 
-// =============================================================================
-// AI Message
-// =============================================================================
-
-// An AI message in the conversation.
-// Represents the output of the model with both raw output and standardized fields.
 message ProtoAIMessage {
-  // The message content
   string content = 1;
-
-  // Optional unique identifier
   optional string id = 2;
-
-  // Optional name for the message
   optional string name = 3;
-
-  // Tool calls made by the AI
   repeated ProtoToolCall tool_calls = 4;
-
-  // Tool calls with parsing errors
   repeated ProtoInvalidToolCall invalid_tool_calls = 5;
-
-  // Usage metadata for the message
   optional ProtoUsageMetadata usage_metadata = 6;
-
-  // Additional metadata as JSON string
   optional string additional_kwargs = 7;
-
-  // Response metadata as JSON string
   optional string response_metadata = 8;
 }
 
-// AI message chunk (yielded when streaming)
 message ProtoAIMessageChunk {
-  // The message content (may be partial during streaming)
   string content = 1;
-
-  // Optional unique identifier
   optional string id = 2;
-
-  // Optional name for the message
   optional string name = 3;
-
-  // Tool calls made by the AI
   repeated ProtoToolCall tool_calls = 4;
-
-  // Tool calls with parsing errors
   repeated ProtoInvalidToolCall invalid_tool_calls = 5;
-
-  // Tool call chunks (for streaming tool calls)
   repeated ProtoToolCallChunk tool_call_chunks = 6;
-
-  // Usage metadata for the message
   optional ProtoUsageMetadata usage_metadata = 7;
-
-  // Additional metadata as JSON string
   optional string additional_kwargs = 8;
-
-  // Response metadata as JSON string
   optional string response_metadata = 9;
-
-  // Optional span represented by an aggregated chunk
   optional ProtoChunkPosition chunk_position = 10;
 }
 
-// Position indicator for an aggregated AIMessageChunk
 enum ProtoChunkPosition {
   CHUNK_POSITION_UNSPECIFIED = 0;
-  // This is the last chunk in the stream
   CHUNK_POSITION_LAST = 1;
 }
 
-// =============================================================================
-// Tool Message
-// =============================================================================
-
-// A tool message containing the result of a tool call.
 message ProtoToolMessage {
-  // The tool result content
   string content = 1;
-
-  // The ID of the tool call this message is responding to
   string tool_call_id = 2;
-
-  // Optional unique identifier
   optional string id = 3;
-
-  // Optional name for the tool
   optional string name = 4;
-
-  // Status of the tool invocation
   ProtoToolStatus status = 5;
-
-  // Artifact of the tool execution (JSON string)
   optional string artifact = 6;
-
-  // Additional metadata as JSON string
   optional string additional_kwargs = 7;
-
-  // Response metadata as JSON string
   optional string response_metadata = 8;
 }
 
-// Tool message chunk (yielded when streaming)
 message ProtoToolMessageChunk {
-  // The tool result content (may be partial during streaming)
   string content = 1;
-
-  // The ID of the tool call this message is responding to
   string tool_call_id = 2;
-
-  // Optional unique identifier
   optional string id = 3;
-
-  // Optional name for the tool
   optional string name = 4;
-
-  // Status of the tool invocation
   ProtoToolStatus status = 5;
-
-  // Artifact of the tool execution (JSON string)
   optional string artifact = 6;
-
-  // Additional metadata as JSON string
   optional string additional_kwargs = 7;
-
-  // Response metadata as JSON string
   optional string response_metadata = 8;
 }
 
-// Status of a tool invocation
 enum ProtoToolStatus {
   TOOL_STATUS_UNSPECIFIED = 0;
   TOOL_STATUS_SUCCESS = 1;
   TOOL_STATUS_ERROR = 2;
 }
 
-// =============================================================================
-// Chat Message (arbitrary role)
-// =============================================================================
-
-// A chat message that can be assigned an arbitrary speaker (role).
 message ProtoChatMessage {
-  // The message content
   string content = 1;
-
-  // The speaker / role of the message
   string role = 2;
-
-  // Optional unique identifier
   optional string id = 3;
-
-  // Optional name for the message
   optional string name = 4;
-
-  // Additional metadata as JSON string
   optional string additional_kwargs = 5;
-
-  // Response metadata as JSON string
   optional string response_metadata = 6;
 }
 
-// Chat message chunk (yielded when streaming)
 message ProtoChatMessageChunk {
-  // The message content (may be partial during streaming)
   string content = 1;
-
-  // The speaker / role of the message
   string role = 2;
-
-  // Optional unique identifier
   optional string id = 3;
-
-  // Optional name for the message
   optional string name = 4;
-
-  // Additional metadata as JSON string
   optional string additional_kwargs = 5;
-
-  // Response metadata as JSON string
   optional string response_metadata = 6;
 }
 
-// =============================================================================
-// Function Message (deprecated, use Tool)
-// =============================================================================
-
-// A function message (deprecated, use ToolMessage instead)
+// Deprecated: use ToolMessage instead
 message ProtoFunctionMessage {
-  // The message content
   string content = 1;
-
-  // The name of the function
   string name = 2;
-
-  // Optional unique identifier
   optional string id = 3;
-
-  // Additional metadata as JSON string
   optional string additional_kwargs = 4;
-
-  // Response metadata as JSON string
   optional string response_metadata = 5;
 }
 
-// Function message chunk (yielded when streaming)
+// Deprecated: use ToolMessage instead
 message ProtoFunctionMessageChunk {
-  // The message content (may be partial during streaming)
   string content = 1;
-
-  // The name of the function
   string name = 2;
-
-  // Optional unique identifier
   optional string id = 3;
-
-  // Additional metadata as JSON string
   optional string additional_kwargs = 4;
-
-  // Response metadata as JSON string
   optional string response_metadata = 5;
 }
 
-// =============================================================================
-// Remove Message (for message deletion)
-// =============================================================================
-
-// A remove message (for message deletion operations)
 message ProtoRemoveMessage {
-  // The ID of the message to remove (required - matches Rust's non-optional String field)
   string id = 1;
 }
 
-// =============================================================================
-// Message Content Types
-// =============================================================================
-
-// Message content that can be either simple text or multipart.
-// Matches agent-chain's MessageContent enum.
 message ProtoMessageContent {
   oneof content {
-    // Simple text content
     string text = 1;
-
-    // Multiple content parts (for multimodal messages)
     ProtoContentParts parts = 2;
   }
 }
 
-// Wrapper for multiple content parts.
 message ProtoContentParts {
   repeated ProtoContentPart parts = 1;
 }
 
-// A content part in a multimodal message (legacy format).
-// Matches agent-chain's ContentPart enum.
 message ProtoContentPart {
   oneof part {
-    // Text content
     ProtoTextPart text = 1;
-
-    // Image content
     ProtoImagePart image = 2;
   }
 }
 
-// Text content part.
 message ProtoTextPart {
   string text = 1;
 }
 
-// Image content part.
 message ProtoImagePart {
-  // Image source (URL or base64)
   ProtoImageSource source = 1;
-
-  // Detail level for image processing
   optional ProtoImageDetail detail = 2;
 }
 
-// Source of an image for multimodal messages.
-// Matches agent-chain's ImageSource enum.
 message ProtoImageSource {
   oneof source {
-    // Image from a URL
     string url = 1;
-
-    // Base64-encoded image data
     ProtoBase64Image base64 = 2;
   }
 }
 
-// Base64-encoded image data.
 message ProtoBase64Image {
-  // MIME type (e.g., "image/jpeg", "image/png")
   string media_type = 1;
-
-  // Base64-encoded image data (without data URL prefix)
   string data = 2;
 }
 
-// Image detail level for vision models.
 enum ProtoImageDetail {
   IMAGE_DETAIL_UNSPECIFIED = 0;
   IMAGE_DETAIL_LOW = 1;
@@ -464,11 +220,6 @@ enum ProtoImageDetail {
   IMAGE_DETAIL_AUTO = 3;
 }
 
-// =============================================================================
-// Standard Content Blocks (new format matching langchain_core 1.0)
-// =============================================================================
-
-// A union of all defined ContentBlock types.
 message ProtoContentBlock {
   oneof block {
     ProtoTextContentBlock text = 1;
@@ -488,181 +239,80 @@ message ProtoContentBlock {
   }
 }
 
-// Text output from a LLM.
 message ProtoTextContentBlock {
-  // Content block identifier
   optional string id = 1;
-
-  // Block text
   string text = 2;
-
-  // Citations and other annotations
   repeated ProtoAnnotation annotations = 3;
-
-  // Index of block in aggregate response (for streaming)
   optional ProtoBlockIndex index = 4;
-
-  // Provider-specific metadata as JSON string
   optional string extras = 5;
 }
 
-// Reasoning output from a LLM (chain-of-thought)
 message ProtoReasoningContentBlock {
-  // Content block identifier
   optional string id = 1;
-
-  // Reasoning text or thought summary
   optional string reasoning = 2;
-
-  // Index of block in aggregate response (for streaming)
   optional ProtoBlockIndex index = 3;
-
-  // Provider-specific metadata as JSON string
   optional string extras = 4;
 }
 
-// Image data content block.
 message ProtoImageContentBlock {
-  // Content block identifier
   optional string id = 1;
-
-  // ID of the image file from a file storage system
   optional string file_id = 2;
-
-  // MIME type of the image
   optional string mime_type = 3;
-
-  // Index of block in aggregate response (for streaming)
   optional ProtoBlockIndex index = 4;
-
-  // URL of the image
   optional string url = 5;
-
-  // Data as a base64 string
   optional string base64 = 6;
-
-  // Provider-specific metadata as JSON string
   optional string extras = 7;
 }
 
-// Video data content block.
 message ProtoVideoContentBlock {
-  // Content block identifier
   optional string id = 1;
-
-  // ID of the video file from a file storage system
   optional string file_id = 2;
-
-  // MIME type of the video
   optional string mime_type = 3;
-
-  // Index of block in aggregate response (for streaming)
   optional ProtoBlockIndex index = 4;
-
-  // URL of the video
   optional string url = 5;
-
-  // Data as a base64 string
   optional string base64 = 6;
-
-  // Provider-specific metadata as JSON string
   optional string extras = 7;
 }
 
-// Audio data content block.
 message ProtoAudioContentBlock {
-  // Content block identifier
   optional string id = 1;
-
-  // ID of the audio file from a file storage system
   optional string file_id = 2;
-
-  // MIME type of the audio
   optional string mime_type = 3;
-
-  // Index of block in aggregate response (for streaming)
   optional ProtoBlockIndex index = 4;
-
-  // URL of the audio
   optional string url = 5;
-
-  // Data as a base64 string
   optional string base64 = 6;
-
-  // Provider-specific metadata as JSON string
   optional string extras = 7;
 }
 
-// Plaintext data content block (e.g., from a .txt or .md document)
 message ProtoPlainTextContentBlock {
-  // Content block identifier
   optional string id = 1;
-
-  // ID of the plaintext file from a file storage system
   optional string file_id = 2;
-
-  // MIME type (always "text/plain")
   string mime_type = 3;
-
-  // Index of block in aggregate response (for streaming)
   optional ProtoBlockIndex index = 4;
-
-  // URL of the plaintext
   optional string url = 5;
-
-  // Data as a base64 string
   optional string base64 = 6;
-
-  // Plaintext content
   optional string text = 7;
-
-  // Title of the text data
   optional string title = 8;
-
-  // Context for the text (description or summary)
   optional string context = 9;
-
-  // Provider-specific metadata as JSON string
   optional string extras = 10;
 }
 
-// File data content block for files that don't fit other categories (e.g., PDFs)
 message ProtoFileContentBlock {
-  // Content block identifier
   optional string id = 1;
-
-  // ID of the file from a file storage system
   optional string file_id = 2;
-
-  // MIME type of the file
   optional string mime_type = 3;
-
-  // Index of block in aggregate response (for streaming)
   optional ProtoBlockIndex index = 4;
-
-  // URL of the file
   optional string url = 5;
-
-  // Data as a base64 string
   optional string base64 = 6;
-
-  // Provider-specific metadata as JSON string
   optional string extras = 7;
 }
 
-// Provider-specific content data.
 message ProtoNonStandardContentBlock {
-  // Content block identifier
   optional string id = 1;
-
-  // Provider-specific content data as JSON string
   string value = 2;
-
-  // Index of block in aggregate response (for streaming)
   optional ProtoBlockIndex index = 3;
 }
 
-// Index type that can be either an integer or string (for streaming)
 message ProtoBlockIndex {
   oneof index {
     int64 int_index = 1;
@@ -670,11 +320,6 @@ message ProtoBlockIndex {
   }
 }
 
-// =============================================================================
-// Annotations
-// =============================================================================
-
-// A union of all defined Annotation types.
 message ProtoAnnotation {
   oneof annotation {
     ProtoCitation citation = 1;
@@ -682,315 +327,139 @@ message ProtoAnnotation {
   }
 }
 
-// Annotation for citing data from a document.
 message ProtoCitation {
-  // Content block identifier
   optional string id = 1;
-
-  // URL of the document source
   optional string url = 2;
-
-  // Source document title
   optional string title = 3;
-
-  // Start index of the response text
   optional int64 start_index = 4;
-
-  // End index of the response text
   optional int64 end_index = 5;
-
-  // Excerpt of source text being cited
   optional string cited_text = 6;
-
-  // Provider-specific metadata as JSON string
   optional string extras = 7;
 }
 
-// Provider-specific annotation format.
 message ProtoNonStandardAnnotation {
-  // Content block identifier
   optional string id = 1;
-
-  // Provider-specific annotation data as JSON string
   string value = 2;
 }
 
-// =============================================================================
-// Tool Call Types
-// =============================================================================
-
-// A tool call made by the AI model.
-// Matches agent-chain's ToolCall struct.
 message ProtoToolCall {
-  // Unique identifier for this tool call
   string id = 1;
-
-  // Name of the tool to call
   string name = 2;
-
-  // Arguments for the tool call as a JSON string
   string args = 3;
 }
 
-// A chunk of a tool call (yielded when streaming).
 message ProtoToolCallChunk {
-  // The name of the tool to be called (may be partial during streaming)
   optional string name = 1;
-
-  // The arguments to the tool call (may be partial JSON string during streaming)
   optional string args = 2;
-
-  // An identifier associated with the tool call
   optional string id = 3;
-
-  // The index of the tool call in a sequence
   optional int32 index = 4;
 }
 
-// Represents an invalid tool call that failed parsing.
 message ProtoInvalidToolCall {
-  // The name of the tool to be called
   optional string name = 1;
-
-  // The arguments to the tool call (unparsed string)
   optional string args = 2;
-
-  // An identifier associated with the tool call
   optional string id = 3;
-
-  // An error message associated with the tool call
   optional string error = 4;
 }
 
-// Tool call content block version (with type field for discrimination)
 message ProtoToolCallBlock {
-  // An identifier associated with the tool call
   optional string id = 1;
-
-  // The name of the tool to be called
   string name = 2;
-
-  // The arguments to the tool call as JSON string
   string args = 3;
-
-  // Index of block in aggregate response (for streaming)
   optional ProtoBlockIndex index = 4;
-
-  // Provider-specific metadata as JSON string
   optional string extras = 5;
 }
 
-// Tool call chunk content block version
 message ProtoToolCallChunkBlock {
-  // An identifier associated with the tool call
   optional string id = 1;
-
-  // The name of the tool to be called
   optional string name = 2;
-
-  // The arguments to the tool call (as a string, since it may be partial JSON)
   optional string args = 3;
-
-  // Index of block in aggregate response (for streaming)
   optional ProtoBlockIndex index = 4;
-
-  // Provider-specific metadata as JSON string
   optional string extras = 5;
 }
 
-// Invalid tool call content block version
 message ProtoInvalidToolCallBlock {
-  // An identifier associated with the tool call
   optional string id = 1;
-
-  // The name of the tool to be called
   optional string name = 2;
-
-  // The arguments to the tool call
   optional string args = 3;
-
-  // An error message associated with the tool call
   optional string error = 4;
-
-  // Index of block in aggregate response (for streaming)
   optional ProtoBlockIndex index = 5;
-
-  // Provider-specific metadata as JSON string
   optional string extras = 6;
 }
 
-// =============================================================================
-// Server-Side Tool Calls
-// =============================================================================
-
-// Tool call that is executed server-side (e.g., code execution, web search)
 message ProtoServerToolCall {
-  // An identifier associated with the tool call
   string id = 1;
-
-  // The name of the tool to be called
   string name = 2;
-
-  // The arguments to the tool call as JSON string
   string args = 3;
-
-  // Index of block in aggregate response (for streaming)
   optional ProtoBlockIndex index = 4;
-
-  // Provider-specific metadata as JSON string
   optional string extras = 5;
 }
 
-// A chunk of a server-side tool call (yielded when streaming)
 message ProtoServerToolCallChunk {
-  // The name of the tool to be called
   optional string name = 1;
-
-  // JSON substring of the arguments to the tool call
   optional string args = 2;
-
-  // An identifier associated with the tool call
   optional string id = 3;
-
-  // Index of block in aggregate response (for streaming)
   optional ProtoBlockIndex index = 4;
-
-  // Provider-specific metadata as JSON string
   optional string extras = 5;
 }
 
-// Execution status of a server-side tool
 enum ProtoServerToolStatus {
   SERVER_TOOL_STATUS_UNSPECIFIED = 0;
   SERVER_TOOL_STATUS_SUCCESS = 1;
   SERVER_TOOL_STATUS_ERROR = 2;
 }
 
-// Result of a server-side tool call
 message ProtoServerToolResult {
-  // An identifier associated with the server tool result
   optional string id = 1;
-
-  // ID of the corresponding server tool call
   string tool_call_id = 2;
-
-  // Execution status of the server-side tool
   ProtoServerToolStatus status = 3;
-
-  // Output of the executed tool as JSON string
   optional string output = 4;
-
-  // Index of block in aggregate response (for streaming)
   optional ProtoBlockIndex index = 5;
-
-  // Provider-specific metadata as JSON string
   optional string extras = 6;
 }
 
-// =============================================================================
-// Usage Metadata
-// =============================================================================
-
-// Usage metadata for a message, such as token counts.
 message ProtoUsageMetadata {
-  // Count of input (or prompt) tokens
   int64 input_tokens = 1;
-
-  // Count of output (or completion) tokens
   int64 output_tokens = 2;
-
-  // Total token count (input_tokens + output_tokens)
   int64 total_tokens = 3;
-
-  // Breakdown of input token counts
   optional ProtoInputTokenDetails input_token_details = 4;
-
-  // Breakdown of output token counts
   optional ProtoOutputTokenDetails output_token_details = 5;
 }
 
-// Breakdown of input token counts.
 message ProtoInputTokenDetails {
-  // Audio input tokens
   optional int64 audio = 1;
-
-  // Input tokens that were cached (cache miss)
   optional int64 cache_creation = 2;
-
-  // Input tokens that were cached (cache hit)
   optional int64 cache_read = 3;
 }
 
-// Breakdown of output token counts.
 message ProtoOutputTokenDetails {
-  // Audio output tokens
   optional int64 audio = 1;
-
-  // Reasoning output tokens
   optional int64 reasoning = 2;
 }
 
-// =============================================================================
-// Request Parameters
-// =============================================================================
-
-// Common parameters used across providers
 message ProtoParameters {
-  // Controls randomness in the response (0.0 to 2.0)
   optional float temperature = 1;
-
-  // Maximum number of tokens to generate
   optional uint32 max_tokens = 2;
-
-  // Nucleus sampling parameter (0.0 to 1.0)
   optional float top_p = 3;
-
-  // Top-k sampling parameter
   optional uint32 top_k = 4;
-
-  // Sequences where the API will stop generating further tokens
   repeated string stop_sequences = 5;
-
-  // Frequency penalty (-2.0 to 2.0)
   optional float frequency_penalty = 6;
-
-  // Presence penalty (-2.0 to 2.0)
   optional float presence_penalty = 7;
 }
 
-// =============================================================================
-// Chat Result Types
-// =============================================================================
-
-// Result of a chat model call with a single prompt
 message ProtoChatResult {
-  // List of the chat generations
   repeated ProtoChatGeneration generations = 1;
-
-  // Provider-specific output as JSON string
   optional string llm_output = 2;
 }
 
-// A single chat generation output
 message ProtoChatGeneration {
-  // The text contents of the output message
   string text = 1;
-
-  // The message output by the chat model
   ProtoBaseMessage message = 2;
-
-  // Raw response from the provider as JSON string
   optional string generation_info = 3;
 }
 
-// Chat generation chunk (for streaming)
 message ProtoChatGenerationChunk {
-  // The text contents of the output message
   string text = 1;
-
-  // The message chunk output by the chat model
   ProtoBaseMessageChunk message = 2;
-
-  // Raw response from the provider as JSON string
   optional string generation_info = 3;
 }

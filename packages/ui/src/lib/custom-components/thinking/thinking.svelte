@@ -32,21 +32,21 @@
 	.thinking-char {
 		display: inline-block;
 		animation: ripple var(--duration) ease-in-out calc(var(--i) * var(--stagger)) infinite;
-		opacity: 0.5;
+		opacity: 1;
 	}
 
 	@keyframes ripple {
 		0% {
-			opacity: 0.5;
-		}
-		15% {
 			opacity: 1;
 		}
-		35% {
+		15% {
 			opacity: 0.5;
 		}
+		35% {
+			opacity: 1;
+		}
 		100% {
-			opacity: 0.5;
+			opacity: 1;
 		}
 	}
 </style>
