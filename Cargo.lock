@@ -1561,7 +1561,6 @@ dependencies = [
  "be-local-settings",
  "be-remote-db",
  "chrono",
- "co-utils",
  "prost",
  "prost-types",
  "proto-gen",
