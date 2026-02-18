@@ -2,14 +2,7 @@
 	export interface TimelineProps {
 		class?: string;
 		children?: any;
-		/**
-		 * Controlled open state for two-way binding
-		 */
 		open?: boolean;
-		/**
-		 * Default open state when uncontrolled
-		 * @default true
-		 */
 		defaultOpen?: boolean;
 	}
 </script>

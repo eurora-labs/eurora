@@ -10,11 +10,8 @@
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
-	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
-	import CircleUserRoundIcon from '@lucide/svelte/icons/circle-user-round';
 	import LogoutIcon from '@lucide/svelte/icons/log-out';
 	import PowerIcon from '@lucide/svelte/icons/power';
-	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -25,6 +22,7 @@
 
 	let sidebarState: ReturnType<typeof useSidebar> | undefined = $state(undefined);
 	let quitDialogOpen = $state(false);
+	let username = $state('');
 
 	let visibleTimelineItems = $derived.by(() => {
 		const limit = sidebarState?.open ? 3 : 1;
@@ -50,6 +48,9 @@
 			.is_authenticated()
 			.then((isAuthenticated) => {
 				if (!isAuthenticated) return;
+				taurpc.auth.get_username().then((name) => {
+					username = name;
+				});
 				taurpc.conversation.list(10, 0).then((res) => {
 					conversations = res;
 				});
@@ -185,56 +186,58 @@
 		</div>
 	{/if}
 	<Sidebar.Footer>
-		<Sidebar.Menu>
-			<Sidebar.MenuItem>
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
-						{#snippet child({ props })}
-							<Sidebar.MenuButton
-								{...props}
-								class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-							>
-								<CircleUserRoundIcon />
-								<span>Profile</span>
-								<ChevronUpIcon class="ml-auto" />
-							</Sidebar.MenuButton>
-						{/snippet}
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content side="top" class="w-(--bits-dropdown-menu-anchor-width)">
-						<DropdownMenu.Item
-							onclick={() => {
-								taurpc.auth.logout().then(() => {
-									goto('/onboarding');
-								});
-							}}
+		<div class="flex items-center justify-between gap-2">
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger>
+					{#snippet child({ props })}
+						<Button
+							{...props}
+							variant="ghost"
+							class="flex items-center gap-2 min-w-0 h-auto px-1 py-1 flex-1 justify-start"
 						>
-							{#snippet child({ props })}
-								<a {...props}>
-									<LogoutIcon />
-									<span>Log Out</span>
-								</a>
-							{/snippet}
-						</DropdownMenu.Item>
-						<DropdownMenu.Item onclick={() => (quitDialogOpen = true)}>
-							{#snippet child({ props })}
-								<a {...props}>
-									<PowerIcon />
-									<span>Quit</span>
-								</a>
-							{/snippet}
-						</DropdownMenu.Item>
-						<DropdownMenu.Item>
-							{#snippet child({ props })}
-								<a {...props} href="/settings">
-									<SettingsIcon />
-									<span>Settings</span>
-								</a>
-							{/snippet}
-						</DropdownMenu.Item>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
-			</Sidebar.MenuItem>
-		</Sidebar.Menu>
+							<div
+								class="flex size-7 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground text-xs font-medium"
+							>
+								{getFirstLetterAndCapitalize(username)}
+							</div>
+							{#if sidebarState?.open}
+								<span class="truncate text-sm">{username}</span>
+							{/if}
+						</Button>
+					{/snippet}
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content side="top" align="start">
+					<DropdownMenu.Item onclick={() => goto('/settings')}>
+						<span>Settings</span>
+					</DropdownMenu.Item>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger>
+					{#snippet child({ props })}
+						<Button {...props} variant="ghost" size="icon" class="size-7 shrink-0">
+							<PowerIcon class="size-4" />
+						</Button>
+					{/snippet}
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content side="top" align="end">
+					<DropdownMenu.Item
+						onclick={() => {
+							taurpc.auth.logout().then(() => {
+								goto('/onboarding');
+							});
+						}}
+					>
+						<LogoutIcon />
+						<span>Log Out</span>
+					</DropdownMenu.Item>
+					<DropdownMenu.Item onclick={() => (quitDialogOpen = true)}>
+						<PowerIcon />
+						<span>Quit</span>
+					</DropdownMenu.Item>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
+		</div>
 	</Sidebar.Footer>
 </Sidebar.Root>
 
