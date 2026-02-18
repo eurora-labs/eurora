@@ -34,6 +34,14 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             get(handlers::check_update_with_bundle_type_handler),
         )
         .route(
+            "/download/{channel}/{target_arch}",
+            get(handlers::download_handler),
+        )
+        .route(
+            "/download/{channel}/{target_arch}/{bundle_type}",
+            get(handlers::download_with_bundle_type_handler),
+        )
+        .route(
             "/extensions/{channel}",
             get(handlers::get_extension_release_handler),
         )
@@ -59,7 +67,7 @@ pub async fn init_update_service(bucket_name: String) -> Result<Router> {
 
 pub use error::{ErrorResponse, UpdateServiceError};
 pub use types::{
-    BrowserExtensionInfo, BrowserType, ExtensionChannel, ExtensionReleaseParams,
-    ExtensionReleaseResponse, PlatformInfo, ReleaseInfoResponse, ReleaseParams, UpdateParams,
-    UpdateResponse, UpdateWithBundleTypeParams,
+    BrowserExtensionInfo, BrowserType, DownloadParams, DownloadWithBundleTypeParams,
+    ExtensionChannel, ExtensionReleaseParams, ExtensionReleaseResponse, PlatformInfo,
+    ReleaseInfoResponse, ReleaseParams, UpdateParams, UpdateResponse, UpdateWithBundleTypeParams,
 };
