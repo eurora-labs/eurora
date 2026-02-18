@@ -49,8 +49,6 @@
 	}
 
 	onMount(() => {
-		document.addEventListener('keydown', handleEscapeKey);
-
 		taurpc.conversation.current_conversation_changed.on((new_conv) => {
 			conversation = new_conv;
 
@@ -72,11 +70,6 @@
 			});
 		});
 	});
-
-	function handleEscapeKey(event: KeyboardEvent) {
-		if (event.key === 'Escape') {
-		}
-	}
 
 	function getMessageContent(message: any): string {
 		if (message.type === 'remove') {
@@ -150,16 +143,12 @@
 	}
 </script>
 
-<div
-	class="w-full h-full flex flex-col {messages.length === 0
-		? 'justify-center'
-		: 'justify-end'} items-center gap-4"
->
+<div class="w-full h-full">
 	{#if messages.length > 0}
-		<ScrollArea class="w-full px-6 flex flex-col justify-end items-center gap-4">
+		<ScrollArea class="h-full w-full px-6">
 			<Chat.Root
 				bind:this={chatRef}
-				class="w-full h-full flex flex-col gap-4 overflow-hidden"
+				class="w-full h-full flex flex-col gap-4 overflow-hidden pb-28"
 			>
 				{#each messages as message}
 					{@const content = getMessageContent(message)}
@@ -171,7 +160,7 @@
 						>
 							<Chat.MessageContent>
 								{#if content.length > 0}
-									<Katex math={content} finishRendering={() => {}} />
+									<Katex math={content} />
 								{:else}
 									<Thinking class="text-primary/60" />
 								{/if}
@@ -183,15 +172,24 @@
 		</ScrollArea>
 	{/if}
 
-	<Launcher.Root
-		class="h-fit rounded-[36px] shadow-none flex flex-col p-4 m-0 w-[70%] bg-gray-700"
+	<div
+		class={[
+			'flex justify-center',
+			messages.length > 0
+				? 'fixed bottom-4 left-[var(--sidebar-width)] right-0 z-10'
+				: 'h-full items-center',
+		]}
 	>
-		<Launcher.Input
-			placeholder="What can I help you with?"
-			class="min-h-25 h-fit w-full text-[24px]"
-			bind:query={searchQuery}
-			bind:editorRef
-			onkeydown={handleKeydown}
-		/>
-	</Launcher.Root>
+		<Launcher.Root
+			class="h-fit rounded-2xl shadow-none flex flex-col p-4 w-[90%] bg-card text-card-foreground border border-border"
+		>
+			<Launcher.Input
+				placeholder="What can I help you with?"
+				class="min-h-25 h-fit w-full text-[24px]"
+				bind:query={searchQuery}
+				bind:editorRef
+				onkeydown={handleKeydown}
+			/>
+		</Launcher.Root>
+	</div>
 </div>

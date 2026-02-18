@@ -3,10 +3,6 @@ import path from 'node:path';
 
 const sitesDir = path.resolve(import.meta.dirname, '../../src/content/sites');
 
-/**
- * Automatically discover site entries from the sites directory.
- * Each subdirectory with an index.ts becomes a site entry.
- */
 function listSiteEntries() {
 	return readdirSync(sitesDir, { withFileTypes: true })
 		.filter((entry) => entry.isDirectory())
@@ -18,22 +14,12 @@ function listSiteEntries() {
 		}));
 }
 
-/**
- * Generate URL patterns for a site ID.
- * - _default and _pdf get empty patterns (handled specially)
- * - Other sites get exact match + wildcard subdomain patterns
- */
 function patternsFor(id) {
 	if (id === '_default' || id === '_pdf') return [];
 	if (id.includes('*')) return [id];
 	return [id, `*.${id}`];
 }
 
-/**
- * Rollup plugin to emit registry.json with site patterns.
- * This is loaded by the background script to determine which
- * site script to inject based on the current URL.
- */
 function RegistryPlugin() {
 	return {
 		name: 'emit-site-registry',
@@ -72,7 +58,6 @@ export function contentConfig({ browser, outDir, emptyOutDir, mode }) {
 	const siteEntries = listSiteEntries();
 
 	return {
-		// Don't load vite.config.ts (which has SvelteKit) for this build
 		configFile: false,
 		mode: mode || 'production',
 		root: rootDir,
@@ -92,7 +77,6 @@ export function contentConfig({ browser, outDir, emptyOutDir, mode }) {
 				output: {
 					format: 'es',
 					entryFileNames: (chunk) => {
-						// bootstrap stays at root, site entries go into sites/[name]/
 						if (chunk.name === 'bootstrap') {
 							return 'bootstrap.js';
 						}
