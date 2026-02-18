@@ -239,13 +239,12 @@ impl BaseCache for InMemoryCache {
 
         if cache.contains_key(&key) {
             key_order.retain(|k| k != &key);
-        } else if let Some(maxsize) = self.maxsize {
-            if cache.len() >= maxsize
-                && let Some(oldest_key) = key_order.first().cloned()
-            {
-                cache.remove(&oldest_key);
-                key_order.remove(0);
-            }
+        } else if let Some(maxsize) = self.maxsize
+            && cache.len() >= maxsize
+            && let Some(oldest_key) = key_order.first().cloned()
+        {
+            cache.remove(&oldest_key);
+            key_order.remove(0);
         }
 
         cache.insert(key.clone(), return_val);

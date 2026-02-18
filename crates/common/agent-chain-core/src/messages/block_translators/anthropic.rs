@@ -604,15 +604,13 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
                             }));
                         }
                     }
+                } else if KNOWN_BLOCK_TYPES.contains(&block_type) {
+                    result.push(block.clone());
                 } else {
-                    if KNOWN_BLOCK_TYPES.contains(&block_type) {
-                        result.push(block.clone());
-                    } else {
-                        result.push(json!({
-                            "type": "non_standard",
-                            "value": block.clone(),
-                        }));
-                    }
+                    result.push(json!({
+                        "type": "non_standard",
+                        "value": block.clone(),
+                    }));
                 }
             }
 
