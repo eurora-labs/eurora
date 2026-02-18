@@ -1,6 +1,5 @@
 <script lang="ts">
 	import rehypeKatex from 'rehype-katex';
-	import rehypeRaw from 'rehype-raw';
 	import rehypeStringify from 'rehype-stringify';
 	import remarkGfm from 'remark-gfm';
 	import remarkMath from 'remark-math';
@@ -8,36 +7,41 @@
 	import remarkRehype from 'remark-rehype';
 	import { unified } from 'unified';
 
+	const processor = unified()
+		.use(remarkParse)
+		.use(remarkGfm)
+		.use(remarkMath)
+		.use(remarkRehype)
+		.use(rehypeKatex, { output: 'htmlAndMathml' })
+		.use(rehypeStringify);
+
+	let renderGeneration = 0;
+
 	async function renderKatex(elem: HTMLElement, math: string) {
+		const generation = ++renderGeneration;
+
 		try {
-			math = math
-				.replace(/\\\[/g, '$$$')
-				.replace(/\\\]/g, '$$$')
-				.replace(/\\\(/g, '$$$')
-				.replace(/\\\)/g, '$$$')
-				.replace(/```math/g, '$$$')
-				.replace(/```latex/g, '$$$')
-				.replace(/```/g, '$$$');
+			math = normalizeMathDelimiters(math);
+			const file = await processor.process(math);
 
-			const file = await unified()
-				.use(remarkParse)
-				.use(remarkMath, { singleDollarTextMath: false })
-				.use(remarkRehype, { allowDangerousHtml: true })
-				.use(rehypeRaw)
-				.use(remarkGfm)
-				.use(rehypeKatex, { output: 'htmlAndMathml', displayMode: true } as any)
-				.use(rehypeStringify)
-				.process(math);
-
+			if (generation !== renderGeneration) return;
 			elem.innerHTML = String(file);
 		} catch (error) {
-			console.error('Failed to render Katex:', error);
-		} finally {
-			finishRendering();
+			if (generation !== renderGeneration) return;
+			console.error('Failed to render KaTeX:', error);
 		}
 	}
 
-	let { finishRendering, math = $bindable() } = $props();
+	function normalizeMathDelimiters(input: string): string {
+		return input
+			.replace(/\\\[/g, '$$$$\n')
+			.replace(/\\\]/g, '\n$$$$')
+			.replace(/\\\(/g, '$$')
+			.replace(/\\\)/g, '$$')
+			.replace(/```(?:math|latex)\n([\s\S]*?)\n```/g, '$$$$\n$1\n$$$$');
+	}
+
+	let { math }: { math: string } = $props();
 
 	let htmlElement: HTMLElement;
 
@@ -48,6 +52,4 @@
 	});
 </script>
 
-<span bind:this={htmlElement}>
-	{math}
-</span>
+<span bind:this={htmlElement}></span>

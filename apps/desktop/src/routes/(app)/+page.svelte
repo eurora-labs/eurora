@@ -49,8 +49,6 @@
 	}
 
 	onMount(() => {
-		document.addEventListener('keydown', handleEscapeKey);
-
 		taurpc.conversation.current_conversation_changed.on((new_conv) => {
 			conversation = new_conv;
 
@@ -72,11 +70,6 @@
 			});
 		});
 	});
-
-	function handleEscapeKey(event: KeyboardEvent) {
-		if (event.key === 'Escape') {
-		}
-	}
 
 	function getMessageContent(message: any): string {
 		if (message.type === 'remove') {
@@ -171,7 +164,7 @@
 						>
 							<Chat.MessageContent>
 								{#if content.length > 0}
-									<Katex math={content} finishRendering={() => {}} />
+									<Katex math={content} />
 								{:else}
 									<Thinking class="text-primary/60" />
 								{/if}
