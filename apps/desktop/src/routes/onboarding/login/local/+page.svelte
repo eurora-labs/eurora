@@ -176,6 +176,6 @@
 	</div>
 
 	<div class="pt-8">
-		<Button variant="default" onclick={() => goto('/onboarding/no-access')}>Back</Button>
+		<Button variant="default" onclick={() => goto('/no-access')}>Back</Button>
 	</div>
 </div>

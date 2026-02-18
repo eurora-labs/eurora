@@ -8,7 +8,7 @@ use crate::{
 pub use ollama::OllamaConfig;
 pub use openai::OpenAIConfig;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum ProviderSettings {
     Ollama(OllamaConfig),
     OpenAI(OpenAIConfig),
@@ -52,7 +52,7 @@ impl From<&ProviderSettings> for proto::ProviderSettings {
             }),
             ProviderSettings::OpenAI(c) => Provider::Openai(proto::OpenAiSettings {
                 base_url: c.base_url.to_string(),
-                api_key: c.api_key.masked(),
+                api_key: String::from(""),
                 model: c.model.clone(),
                 title_model: c.title_model.clone().unwrap_or_default(),
             }),

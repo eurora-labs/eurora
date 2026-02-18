@@ -4,96 +4,42 @@ package activity_service;
 
 import "google/protobuf/timestamp.proto";
 
-// =============================================================================
-// Activity Service
-// =============================================================================
-
-// Activity service provides cloud-based storage for user activities.
-// This service tracks application/process usage and browser activity.
-// Conversation and Asset services will be implemented separately.
 service ProtoActivityService {
-  // List activities with pagination
   rpc ListActivities(ListActivitiesRequest) returns (ListActivitiesResponse);
-
-  // Insert a new activity
   rpc InsertActivity(InsertActivityRequest) returns (ActivityResponse);
 }
 
-// =============================================================================
-// Activity Types
-// =============================================================================
-
-// Represents an activity (application/process usage)
 message Activity {
-  // Unique identifier for the activity (UUID)
   string id = 1;
-
-  // Name of the activity decided by the strategy
   string name = 2;
-
-  // System process name (e.g., "firefox", "code")
   optional string process_name = 3;
-
-  // Window title (e.g., "Firefox", "Visual Studio Code")
   optional string window_title = 4;
-
-  // Base64 encoded png icon data
   optional string icon_asset_id = 5;
-
-  // When the activity started
   google.protobuf.Timestamp started_at = 6;
-
-  // When the activity ended (NULL if still active)
   optional google.protobuf.Timestamp ended_at = 7;
-
-  // When the record was created
   google.protobuf.Timestamp created_at = 8;
-
-  // When the record was last updated
   google.protobuf.Timestamp updated_at = 9;
 }
 
-// =============================================================================
-// Activity Requests/Responses
-// =============================================================================
-
 message ListActivitiesRequest {
-  // Maximum number of activities to return (default: 50, max: 100)
   uint32 limit = 1;
-
-  // Offset for pagination
   uint32 offset = 2;
 }
 
 message ListActivitiesResponse {
-  // List of activities
   repeated Activity activities = 1;
 }
 
 message InsertActivityRequest {
-  // Optional ID (if not provided, server generates UUID)
   optional string id = 1;
-
-  // Display name of the activity
   string name = 2;
-
-  // PNG icon data
   optional bytes icon = 3;
-
-  // System process name
   string process_name = 4;
-
-  // Window title
   string window_title = 5;
-
-  // When the activity started
   google.protobuf.Timestamp started_at = 6;
-
-  // When the activity ended (optional - NULL if still active)
   optional google.protobuf.Timestamp ended_at = 7;
 }
 
 message ActivityResponse {
-  // The activity (may be null for GetLastActiveActivity if no active activity)
   optional Activity activity = 1;
 }

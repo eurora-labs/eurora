@@ -19,21 +19,17 @@ message Frame {
 message RequestFrame {
   uint32 id = 1;
   string action = 2;
-  // JSON string
   optional string payload = 3;
 }
 
 message ResponseFrame {
   uint32 id = 1;
   string action = 2;
-  // JSON string
   optional string payload = 3;
 }
 
-// Event doesn't have an id because it doesn't expect a response
 message EventFrame {
   string action = 1;
-  // JSON string
   optional string payload = 2;
 }
 
@@ -41,7 +37,6 @@ message ErrorFrame {
   uint32 id = 1;
   uint32 code = 2;
   string message = 3;
-  // JSON string
   optional string details = 4;
 }
 

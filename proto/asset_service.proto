@@ -4,72 +4,29 @@ package asset_service;
 
 import "google/protobuf/timestamp.proto";
 
-// =============================================================================
-// Asset Service
-// =============================================================================
-
-// Assets service provides cloud-based storage for user file assets.
-// This service manages file metadata (screenshots, attachments, etc.) with
-// actual file content stored externally (e.g., S3, filesystem).
-// This replaces the asset-related functionality in the local personal database.
 service ProtoAssetService {
-  // Create a new asset
   rpc CreateAsset(CreateAssetRequest) returns (AssetResponse);
 }
 
-// =============================================================================
-// Asset Types
-// =============================================================================
-
-// Represents a file asset (screenshots, attachments, etc.)
 message Asset {
-  // Unique identifier for the asset (UUID)
   string id = 1;
-
-  // SHA256 hash of the file content (for deduplication) - base64 encoded
   optional string checksum_sha256 = 2;
-
-  // Size of the asset in bytes
   optional int64 size_bytes = 3;
-
-  // Path to the file (S3 key, local path, etc.)
   string storage_uri = 4;
-
-  // MIME type of the asset
   string mime_type = 5;
-
-  // Additional metadata as JSON string
   string metadata = 6;
-
-  // When the record was created
   google.protobuf.Timestamp created_at = 7;
-
-  // When the record was last updated
   google.protobuf.Timestamp updated_at = 8;
 }
 
-// =============================================================================
-// Asset Requests/Responses
-// =============================================================================
-
 message CreateAssetRequest {
-  // File name of the asset - required
   string name = 1;
-
-  // File content as bytes
   bytes content = 2;
-
-  // MIME type of the asset - required
   string mime_type = 3;
-
-  // Additional metadata as JSON string
   optional string metadata = 4;
-
-  // Optional activity ID to link asset to
   optional string activity_id = 5;
 }
 
 message AssetResponse {
-  // The asset (may be null for FindAssetBySha256 if not found)
   optional Asset asset = 1;
 }

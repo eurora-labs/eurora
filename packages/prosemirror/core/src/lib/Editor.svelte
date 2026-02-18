@@ -248,7 +248,7 @@
 	:global(.ProseMirror[data-placeholder])::before {
 		position: absolute;
 		content: attr(data-placeholder);
-		color: rgba(255, 255, 255, 0.2);
+		color: var(--muted-foreground);
 		pointer-events: none;
 	}
 </style>
