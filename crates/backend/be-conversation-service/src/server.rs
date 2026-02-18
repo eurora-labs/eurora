@@ -9,6 +9,7 @@ use be_local_settings::{
 };
 use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
 use chrono::{DateTime, Utc};
+use co_utils::Sensitive;
 use prost_types::Timestamp;
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
@@ -76,12 +77,8 @@ fn build_openai(
     Box::new(provider)
 }
 
-fn build_nebul(
-    config: &NebulConfig,
-    model: &str,
-    web_search: bool,
-) -> Box<dyn BaseChatModel + Send + Sync> {
-    let mut provider = ChatOpenAI::new(model)
+fn build_nebul(config: &NebulConfig, web_search: bool) -> Box<dyn BaseChatModel + Send + Sync> {
+    let mut provider = ChatOpenAI::new(config.model.clone())
         .api_key(config.api_key.as_str())
         .api_base(config.base_url().as_str());
     if web_search {
@@ -94,7 +91,7 @@ fn build_chat_provider_from(settings: &ProviderSettings) -> Box<dyn BaseChatMode
     match settings {
         ProviderSettings::Ollama(c) => build_ollama(c, None),
         ProviderSettings::OpenAI(c) => build_openai(c, None, true),
-        ProviderSettings::Nebul(c) => build_nebul(c, &c.model, true),
+        ProviderSettings::Nebul(c) => build_nebul(c, true),
     }
 }
 
@@ -105,7 +102,7 @@ fn build_title_provider_from(settings: &ProviderSettings) -> Box<dyn BaseChatMod
             let title_model = c.title_model.as_deref();
             build_openai(c, title_model, false)
         }
-        ProviderSettings::Nebul(c) => build_nebul(c, &c.title_model, false),
+        ProviderSettings::Nebul(c) => build_nebul(c, false),
     }
 }
 
@@ -124,19 +121,20 @@ fn build_env_fallback() -> Option<Providers> {
             Arc::new(ChatOllama::new(&model).base_url(&host));
         Some(Providers { chat, title })
     } else {
-        let api_key = std::env::var("OPENAI_API_KEY").ok()?;
-        if api_key.is_empty() {
-            return None;
-        }
-        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-5.1".to_string());
-        let chat: Arc<dyn BaseChatModel + Send + Sync> = Arc::new(
-            ChatOpenAI::new(&model)
-                .with_builtin_tools(vec![BuiltinTool::WebSearch])
-                .api_key(&api_key),
+        let config = NebulConfig::new(
+            std::env::var("NEBUL_MODEL").expect("Nebul model should be set"),
+            Sensitive(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set")),
         );
-        let title: Arc<dyn BaseChatModel + Send + Sync> =
-            Arc::new(ChatOpenAI::new("gpt-4.1-mini").api_key(&api_key));
-        Some(Providers { chat, title })
+        let chat = build_nebul(&config, false);
+        let config = NebulConfig::new(
+            std::env::var("NEBUL_TITLE_MODEL").expect("Nebul title model should be set"),
+            Sensitive(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set")),
+        );
+        let title = build_nebul(&config, false);
+        Some(Providers {
+            chat: chat.into(),
+            title: title.into(),
+        })
     }
 }
 
