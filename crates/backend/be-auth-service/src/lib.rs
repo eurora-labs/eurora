@@ -122,9 +122,17 @@ impl AuthService {
         hasher.finalize().to_vec()
     }
 
+    fn is_approved_email(&self, email: &str) -> bool {
+        let email = email.to_lowercase();
+        self.jwt_config
+            .approved_emails
+            .iter()
+            .any(|approved| approved == "*" || *approved == email)
+    }
+
     async fn resolve_role(&self, user_id: Uuid) -> Role {
         if cfg!(debug_assertions) {
-            return Role::Enterprise;
+            return Role::Tier1;
         }
 
         let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
@@ -132,18 +140,31 @@ impl AuthService {
             .unwrap_or(false);
 
         if local_mode {
-            return Role::Enterprise;
+            return Role::Tier1;
         }
 
-        match self.db.get_billing_state_for_user(user_id).await {
-            Ok(Some(state)) if matches!(state.status.as_deref(), Some("active" | "trialing")) => {
-                match state.plan_id.as_deref() {
-                    Some("enterprise") => Role::Enterprise,
-                    _ => Role::Tier1,
-                }
-            }
+        match self.db.get_plan_id_for_user(user_id).await {
+            Ok(Some(ref plan)) if plan == "tier1" => Role::Tier1,
             _ => Role::Free,
         }
+    }
+
+    async fn ensure_account_and_resolve_role(&self, user_id: Uuid, email: &str) -> Role {
+        let plan_id = if self.is_approved_email(email) {
+            "tier1"
+        } else {
+            "free"
+        };
+
+        if let Err(e) = self
+            .db
+            .ensure_account_for_user_with_plan(&self.db.pool, user_id, plan_id)
+            .await
+        {
+            error!("Failed to ensure account for user {}: {}", user_id, e);
+        }
+
+        self.resolve_role(user_id).await
     }
 
     async fn generate_tokens(
@@ -299,7 +320,9 @@ impl AuthService {
             .call()
             .await?;
 
-        let role = self.resolve_role(user.id).await;
+        let role = self
+            .ensure_account_and_resolve_role(user.id, &user.email)
+            .await;
         let (access_token, refresh_token) = self
             .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
             .await?;
@@ -327,7 +350,9 @@ impl AuthService {
 
         self.db.revoke_refresh_token(&token_hash).await?;
 
-        let role = self.resolve_role(user.id).await;
+        let role = self
+            .ensure_account_and_resolve_role(user.id, &user.email)
+            .await;
         let (access_token, new_refresh_token) = self
             .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
             .await?;
@@ -522,7 +547,9 @@ impl AuthService {
                 .await;
         }
 
-        let role = self.resolve_role(user.id).await;
+        let role = self
+            .ensure_account_and_resolve_role(user.id, &user.email)
+            .await;
         let (access_token, refresh_token) = self
             .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
             .await?;
@@ -727,7 +754,9 @@ impl ProtoAuthService for AuthService {
                 Status::from(AuthError::Internal("User not found".into()))
             })?;
 
-        let role = self.resolve_role(user.id).await;
+        let role = self
+            .ensure_account_and_resolve_role(user.id, &user.email)
+            .await;
         let (access_token, refresh_token) = self
             .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
             .await
@@ -785,7 +814,9 @@ impl AuthService {
             return Err(AuthError::InvalidCredentials);
         }
 
-        let role = self.resolve_role(user.id).await;
+        let role = self
+            .ensure_account_and_resolve_role(user.id, &user.email)
+            .await;
         let (access_token, refresh_token) = self
             .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
             .await?;

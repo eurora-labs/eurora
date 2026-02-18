@@ -99,23 +99,6 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn enterprise_inherits_all() {
-        let authz = test_authz().await;
-        // Inherited from Free via Tier1
-        assert!(
-            authz
-                .enforce("Enterprise", "ConversationService", "ListConversations")
-                .unwrap()
-        );
-        // Inherited from Tier1
-        assert!(
-            authz
-                .enforce("Enterprise", "ConversationService", "ChatStream")
-                .unwrap()
-        );
-    }
-
     // -- REST policies --
 
     #[tokio::test]

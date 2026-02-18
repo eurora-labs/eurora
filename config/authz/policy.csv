@@ -1,6 +1,5 @@
-# Role hierarchy: Enterprise > Tier1 > Free
+# Role hierarchy: Tier1 > Free
 g, Tier1, Free
-g, Enterprise, Tier1
 
 # ── gRPC policies ──
 # Resource = short service name (Proto prefix stripped), Action = RPC method name.
