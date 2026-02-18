@@ -71,8 +71,6 @@ fn test_format_escaped_braces() {
     let formatter = StrictFormatter::new();
     let kwargs = HashMap::new();
 
-    // Note: In Rust, the current implementation doesn't handle escaped braces during formatting,
-    // it only handles them in placeholder extraction. This test documents the current behavior.
     let result = formatter.format("Hello, {{name}}!", &kwargs).unwrap();
     assert_eq!(result, "Hello, {{name}}!");
 }

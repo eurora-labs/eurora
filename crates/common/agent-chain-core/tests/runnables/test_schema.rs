@@ -10,10 +10,6 @@ use agent_chain_core::runnables::schema::{
 };
 use serde_json::json;
 
-// ===========================================================================
-// EventData structure
-// ===========================================================================
-
 /// Mirrors `test_event_data_structure`.
 #[test]
 fn test_event_data_structure() {
@@ -26,7 +22,6 @@ fn test_event_data_structure() {
     assert_eq!(data.output, Some(json!({"answer": "response"})));
     assert_eq!(data.chunk, Some(json!({"partial": "data"})));
 
-    // Minimal data (all optional)
     let minimal = EventData::new();
     assert!(minimal.input.is_none());
     assert!(minimal.output.is_none());
@@ -50,7 +45,6 @@ fn test_event_data_with_error() {
 fn test_event_data_empty() {
     let data = EventData::new();
     let json_str = serde_json::to_string(&data).unwrap();
-    // All fields are None and skipped
     assert_eq!(json_str, "{}");
 }
 
@@ -60,7 +54,6 @@ fn test_event_data_chunk_field() {
     let data = EventData::new().with_chunk(json!("partial output"));
     assert_eq!(data.chunk, Some(json!("partial output")));
 
-    // Chunks can be any JSON type
     let chunk_list = EventData::new().with_chunk(json!([1, 2, 3]));
     assert_eq!(chunk_list.chunk, Some(json!([1, 2, 3])));
 }
@@ -68,19 +61,15 @@ fn test_event_data_chunk_field() {
 /// Mirrors `test_event_data_supports_various_input_types`.
 #[test]
 fn test_event_data_supports_various_input_types() {
-    // String input
     let data1 = EventData::new().with_input(json!("simple string"));
     assert_eq!(data1.input, Some(json!("simple string")));
 
-    // Dict input
     let data2 = EventData::new().with_input(json!({"key": "value"}));
     assert_eq!(data2.input.as_ref().unwrap()["key"], json!("value"));
 
-    // List input
     let data3 = EventData::new().with_input(json!([1, 2, 3]));
     assert_eq!(data3.input, Some(json!([1, 2, 3])));
 
-    // Complex object
     let data4 = EventData::new().with_input(json!({"field1": "test", "field2": 42}));
     assert_eq!(data4.input.as_ref().unwrap()["field1"], json!("test"));
     assert_eq!(data4.input.as_ref().unwrap()["field2"], json!(42));
@@ -155,10 +144,6 @@ fn test_event_with_multiple_chunks() {
     assert_eq!(accumulated, "Hello World!");
 }
 
-// ===========================================================================
-// BaseStreamEvent structure
-// ===========================================================================
-
 /// Mirrors `test_base_stream_event_structure`.
 #[test]
 fn test_base_stream_event_structure() {
@@ -184,16 +169,13 @@ fn test_base_stream_event_with_optional_fields() {
 /// Mirrors `test_parent_ids_hierarchy`.
 #[test]
 fn test_parent_ids_hierarchy() {
-    // Root event (no parents)
     let root = BaseStreamEvent::new("on_chain_start", "root-id");
     assert!(root.parent_ids.is_empty());
 
-    // Child event
     let child =
         BaseStreamEvent::new("on_chain_start", "child-id").with_parent_ids(vec!["root-id".into()]);
     assert_eq!(child.parent_ids, vec!["root-id"]);
 
-    // Grandchild event
     let grandchild = BaseStreamEvent::new("on_chain_start", "grandchild-id")
         .with_parent_ids(vec!["root-id".into(), "child-id".into()]);
     assert_eq!(grandchild.parent_ids, vec!["root-id", "child-id"]);
@@ -217,13 +199,8 @@ fn test_event_run_id_format() {
     let run_id = uuid::Uuid::new_v4().to_string();
     let event = BaseStreamEvent::new("on_chain_start", &run_id);
     assert_eq!(event.run_id, run_id);
-    // Verify it's a valid UUID string
     assert!(uuid::Uuid::parse_str(&event.run_id).is_ok());
 }
-
-// ===========================================================================
-// StandardStreamEvent structure
-// ===========================================================================
 
 /// Mirrors `test_standard_stream_event_structure`.
 #[test]
@@ -351,17 +328,14 @@ fn test_event_tags_empty_list() {
 /// Mirrors `test_event_minimal_required_fields`.
 #[test]
 fn test_event_minimal_required_fields() {
-    // BaseStreamEvent minimal
     let base = BaseStreamEvent::new("on_chain_start", "id");
     assert_eq!(base.event, "on_chain_start");
     assert_eq!(base.run_id, "id");
 
-    // StandardStreamEvent minimal
     let standard = StandardStreamEvent::new("on_chain_start", "id", "test");
     assert_eq!(standard.name, "test");
     assert!(standard.data.input.is_none());
 
-    // CustomStreamEvent minimal
     let custom = CustomStreamEvent::new("id", "custom", json!("any"));
     assert_eq!(custom.base.event, "on_custom_event");
 }
@@ -427,9 +401,7 @@ fn test_event_metadata_nested_structure() {
 /// Mirrors `test_standard_event_data_field_required`.
 #[test]
 fn test_standard_event_data_field_required() {
-    // StandardStreamEvent always has a data field (EventData)
     let event = StandardStreamEvent::new("on_chain_start", "id", "test");
-    // data field exists (it's a struct field, always present)
     let _ = &event.data;
 }
 
@@ -446,10 +418,6 @@ fn test_event_tags_inherited_from_parent() {
     assert!(child.base.tags.contains(&"parent-tag".to_string()));
     assert!(child.base.tags.contains(&"child-tag".to_string()));
 }
-
-// ===========================================================================
-// CustomStreamEvent structure
-// ===========================================================================
 
 /// Mirrors `test_custom_stream_event_structure`.
 #[test]
@@ -468,15 +436,12 @@ fn test_custom_stream_event_structure() {
 /// Mirrors `test_custom_stream_event_with_any_data`.
 #[test]
 fn test_custom_stream_event_with_any_data() {
-    // String data
     let event1 = CustomStreamEvent::new("id1", "event1", json!("string data"));
     assert_eq!(event1.data, json!("string data"));
 
-    // List data
     let event2 = CustomStreamEvent::new("id2", "event2", json!([1, 2, 3]));
     assert_eq!(event2.data, json!([1, 2, 3]));
 
-    // Complex nested data
     let event3 = CustomStreamEvent::new(
         "id3",
         "event3",
@@ -523,10 +488,6 @@ fn test_custom_event_data_field_required() {
     let event = CustomStreamEvent::new("id", "test", json!({"info": "required"}));
     assert_eq!(event.data["info"], json!("required"));
 }
-
-// ===========================================================================
-// StreamEvent union
-// ===========================================================================
 
 /// Mirrors `test_stream_event_union_type`.
 #[test]

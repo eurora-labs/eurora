@@ -257,7 +257,6 @@ where
 
     /// Validate the graph structure.
     fn validate(&self) -> Result<(), String> {
-        // Check that START has at least one outgoing edge or conditional branch
         let has_start_edge = self.edges.iter().any(|(from, _)| from == START);
         let has_start_branch = self.branches.contains_key(START);
 
@@ -268,14 +267,12 @@ where
             );
         }
 
-        // Check that all edge sources exist (except START)
         for (from, _) in &self.edges {
             if from != START && !self.nodes.contains_key(from) {
                 return Err(format!("Edge source '{}' not found in nodes", from));
             }
         }
 
-        // Check that all edge targets exist (except END)
         for (_, to) in &self.edges {
             if to != END && !self.nodes.contains_key(to) {
                 return Err(format!("Edge target '{}' not found in nodes", to));
@@ -322,7 +319,6 @@ where
 {
     /// Find the next node(s) to execute after the given node.
     async fn get_next_nodes(&self, current: &str, state: &S) -> Vec<String> {
-        // First check conditional branches
         if let Some(branch) = self.branches.get(current) {
             let result = (branch.condition)(state).await;
             let next = if let Some(ref path_map) = branch.path_map {
@@ -333,7 +329,6 @@ where
             return vec![next];
         }
 
-        // Then check regular edges
         self.edges
             .iter()
             .filter(|(from, _)| from == current)
@@ -405,7 +400,6 @@ where
                     let current = current_nodes.remove(0);
 
                     if current == END {
-                        // Emit final state in Values mode
                         if mode == StreamMode::Values && current_nodes.is_empty() {
                             return Some((
                                 StreamChunk::new(END, state.clone()),
@@ -416,7 +410,6 @@ where
                     }
 
                     if current == START {
-                        // Get next nodes from START
                         if let Some(branch) = branches.get(START) {
                             let result = (branch.condition)(&state).await;
                             let next = if let Some(ref path_map) = branch.path_map {
@@ -439,7 +432,6 @@ where
                     if let Some(node_spec) = nodes.get(&current) {
                         state = (node_spec.action)(state.clone()).await;
 
-                        // Get next nodes
                         if let Some(branch) = branches.get(&current) {
                             let result = (branch.condition)(&state).await;
                             let next = if let Some(ref path_map) = branch.path_map {
@@ -457,7 +449,6 @@ where
                             current_nodes.extend(next);
                         }
 
-                        // Emit chunk based on mode
                         match mode {
                             StreamMode::Updates | StreamMode::Values => {
                                 return Some((

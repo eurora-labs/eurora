@@ -10,8 +10,6 @@ use agent_chain_core::output_parsers::{
 };
 use futures::StreamExt;
 
-// --- droplastn() utility function tests ---
-
 #[test]
 fn test_drop_last_one() {
     let result: Vec<_> = drop_last_n(vec![1, 2, 3, 4, 5].into_iter(), 1).collect();
@@ -59,8 +57,6 @@ fn test_string_elements() {
     let result: Vec<_> = drop_last_n(vec!["a", "b", "c"].into_iter(), 1).collect();
     assert_eq!(result, vec!["a", "b"]);
 }
-
-// --- CommaSeparatedListOutputParser tests ---
 
 #[test]
 fn test_comma_single_item() {
@@ -152,15 +148,11 @@ async fn test_comma_transform_single_chunk() {
     assert_eq!(results, vec![vec!["foo"], vec!["bar"], vec!["baz"]]);
 }
 
-// --- CommaSeparatedListOutputParser async tests ---
-
 #[tokio::test]
 async fn test_comma_aparse() {
     let parser = CommaSeparatedListOutputParser::new();
     assert_eq!(parser.aparse("foo, bar").await.unwrap(), vec!["foo", "bar"]);
 }
-
-// --- NumberedListOutputParser tests ---
 
 #[test]
 fn test_numbered_basic_list() {
@@ -258,8 +250,6 @@ async fn test_numbered_transform_single_chunk() {
     assert_eq!(results, vec![vec!["foo"], vec!["bar"], vec!["baz"]]);
 }
 
-// --- NumberedListOutputParser async tests ---
-
 #[tokio::test]
 async fn test_numbered_aparse() {
     let parser = NumberedListOutputParser::new();
@@ -269,8 +259,6 @@ async fn test_numbered_aparse() {
         vec!["foo", "bar", "baz"]
     );
 }
-
-// --- MarkdownListOutputParser tests ---
 
 #[test]
 fn test_markdown_basic_dash_list() {
@@ -359,8 +347,6 @@ async fn test_markdown_transform_single_chunk() {
     assert_eq!(results, vec![vec!["foo"], vec!["bar"], vec!["baz"]]);
 }
 
-// --- MarkdownListOutputParser async tests ---
-
 #[tokio::test]
 async fn test_markdown_aparse() {
     let parser = MarkdownListOutputParser::new();
@@ -370,8 +356,6 @@ async fn test_markdown_aparse() {
         vec!["foo", "bar", "baz"]
     );
 }
-
-// --- ListOutputParser base trait tests ---
 
 #[test]
 fn test_list_type_property_via_numbered() {

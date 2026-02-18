@@ -6,7 +6,6 @@ pub struct PaymentConfig {
     pub stripe_webhook_secret: String,
     pub frontend_url: String,
     pub pro_price_id: String,
-    pub enterprise_price_id: String,
 }
 
 impl PaymentConfig {
@@ -38,22 +37,15 @@ impl PaymentConfig {
             )
         })?;
 
-        let enterprise_price_id = std::env::var("STRIPE_ENTERPRISE_PRICE_ID").map_err(|_| {
-            crate::error::PaymentError::Config(
-                "STRIPE_ENTERPRISE_PRICE_ID environment variable must be set".into(),
-            )
-        })?;
-
         Ok(Self {
             stripe_secret_key,
             stripe_webhook_secret,
             frontend_url,
             pro_price_id,
-            enterprise_price_id,
         })
     }
 
     pub fn allowed_price_ids(&self) -> Vec<&str> {
-        vec![&self.pro_price_id, &self.enterprise_price_id]
+        vec![&self.pro_price_id]
     }
 }

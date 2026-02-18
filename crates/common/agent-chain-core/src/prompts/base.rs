@@ -245,7 +245,6 @@ pub trait BasePromptTemplate: Send + Sync {
             ));
         }
 
-        // Ensure parent directory exists
         if let Some(parent) = file_path.parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -395,7 +394,6 @@ pub async fn aformat_document(doc: &Document, prompt: &dyn BasePromptTemplate) -
 mod tests {
     use super::*;
 
-    // Simple test implementation for testing
     struct TestPromptTemplate {
         input_variables: Vec<String>,
         template: String,

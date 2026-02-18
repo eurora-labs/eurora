@@ -31,14 +31,14 @@
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
 					Eurora's advanced AI models can understand complex queries, remember context
-					from previous conversations, and provide more accurate and relevant responses
-					than traditional AI assistants.
+					from previous threads, and provide more accurate and relevant responses than
+					traditional AI assistants.
 				</p>
 				<div class="rounded-md border border-gray-200 bg-gray-50 p-4">
 					<h4 class="mb-2 font-medium">Key Capabilities:</h4>
 					<ul class="list-disc space-y-1 pl-5 text-gray-600">
 						<li>Natural language understanding with contextual awareness</li>
-						<li>Memory of previous interactions for more coherent conversations</li>
+						<li>Memory of previous interactions for more coherent threads</li>
 						<li>Understanding of complex instructions with multiple steps</li>
 						<li>Ability to learn from your preferences over time</li>
 					</ul>
@@ -66,7 +66,7 @@
 						<li>Local processing for sensitive information</li>
 						<li>End-to-end encryption for all data transmissions</li>
 						<li>Granular permission controls for data sharing</li>
-						<li>Option to delete conversation history at any time</li>
+						<li>Option to delete thread history at any time</li>
 					</ul>
 				</div>
 			</Card.Content>
@@ -184,15 +184,15 @@
 			<Card.Header>
 				<div class="flex items-center gap-2">
 					<MessageSquareIcon class="h-6 w-6 text-purple-600" />
-					<Card.Title>Natural Conversations</Card.Title>
+					<Card.Title>Natural Threads</Card.Title>
 				</div>
 				<Card.Description>Talk to Eurora like you would to a human</Card.Description>
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Eurora's conversational abilities go beyond simple command-response
-					interactions. Have natural, flowing conversations with follow-up questions,
-					clarifications, and even humor.
+					Eurora's threadal abilities go beyond simple command-response interactions. Have
+					natural, flowing threads with follow-up questions, clarifications, and even
+					humor.
 				</p>
 				<div class="mb-4 rounded-md border border-gray-200 bg-gray-50 p-4">
 					<div class="mb-3 flex gap-2">

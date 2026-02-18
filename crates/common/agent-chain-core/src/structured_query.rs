@@ -492,18 +492,14 @@ mod tests {
     fn test_visitor_validation() {
         let visitor = TestVisitor::new();
 
-        // Valid operator
         assert!(visitor.validate_func(Operator::And.into()).is_ok());
         assert!(visitor.validate_func(Operator::Or.into()).is_ok());
 
-        // Invalid operator
         assert!(visitor.validate_func(Operator::Not.into()).is_err());
 
-        // Valid comparator
         assert!(visitor.validate_func(Comparator::Eq.into()).is_ok());
         assert!(visitor.validate_func(Comparator::Ne.into()).is_ok());
 
-        // Invalid comparator
         assert!(visitor.validate_func(Comparator::Gt.into()).is_err());
     }
 

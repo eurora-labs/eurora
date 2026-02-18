@@ -197,7 +197,6 @@ impl RunLog {
     pub fn apply_patch(&mut self, patch: RunLogPatch) {
         self.ops.extend(patch.ops.clone());
 
-        // Apply the operations to the state
         if let Some(ref mut state) = self.state {
             for op in patch.ops {
                 Self::apply_op_to_state(state, &op);
@@ -211,7 +210,6 @@ impl RunLog {
         match op.op.as_str() {
             "replace" => {
                 if op.path.is_empty() || op.path == "/" {
-                    // Replace entire state
                     if let Some(value) = &op.value
                         && let Ok(new_state) = serde_json::from_value::<RunState>(value.clone())
                     {
@@ -226,47 +224,45 @@ impl RunLog {
                     match path_parts[0] {
                         "logs" => {
                             if path_parts.len() == 2 {
-                                // Adding a new log entry
                                 if let Some(value) = &op.value
                                     && let Ok(entry) =
                                         serde_json::from_value::<LogEntry>(value.clone())
                                 {
                                     state.logs.insert(path_parts[1].to_string(), entry);
                                 }
-                            } else if path_parts.len() >= 3 {
-                                // Updating an existing log entry field
-                                if let Some(entry) = state.logs.get_mut(path_parts[1]) {
-                                    match path_parts[2] {
-                                        "streamed_output"
-                                            if path_parts.len() == 4 && path_parts[3] == "-" =>
-                                        {
-                                            if let Some(value) = &op.value {
-                                                entry.streamed_output.push(value.clone());
-                                            }
+                            } else if path_parts.len() >= 3
+                                && let Some(entry) = state.logs.get_mut(path_parts[1])
+                            {
+                                match path_parts[2] {
+                                    "streamed_output"
+                                        if path_parts.len() == 4 && path_parts[3] == "-" =>
+                                    {
+                                        if let Some(value) = &op.value {
+                                            entry.streamed_output.push(value.clone());
                                         }
-                                        "streamed_output_str"
-                                            if path_parts.len() == 4 && path_parts[3] == "-" =>
-                                        {
-                                            if let Some(value) = &op.value
-                                                && let Some(s) = value.as_str()
-                                            {
-                                                entry.streamed_output_str.push(s.to_string());
-                                            }
-                                        }
-                                        "final_output" => {
-                                            entry.final_output = op.value.clone();
-                                        }
-                                        "end_time" => {
-                                            entry.end_time = op
-                                                .value
-                                                .clone()
-                                                .and_then(|v| v.as_str().map(String::from));
-                                        }
-                                        "inputs" => {
-                                            entry.inputs = op.value.clone();
-                                        }
-                                        _ => {}
                                     }
+                                    "streamed_output_str"
+                                        if path_parts.len() == 4 && path_parts[3] == "-" =>
+                                    {
+                                        if let Some(value) = &op.value
+                                            && let Some(s) = value.as_str()
+                                        {
+                                            entry.streamed_output_str.push(s.to_string());
+                                        }
+                                    }
+                                    "final_output" => {
+                                        entry.final_output = op.value.clone();
+                                    }
+                                    "end_time" => {
+                                        entry.end_time = op
+                                            .value
+                                            .clone()
+                                            .and_then(|v| v.as_str().map(String::from));
+                                    }
+                                    "inputs" => {
+                                        entry.inputs = op.value.clone();
+                                    }
+                                    _ => {}
                                 }
                             }
                         }
@@ -520,10 +516,7 @@ impl TracerCore for LogStreamCallbackHandler {
         &mut self.order_map
     }
 
-    fn persist_run(&mut self, _run: &Run) {
-        // This is a legacy method only called once for an entire run tree
-        // therefore not useful here
-    }
+    fn persist_run(&mut self, _run: &Run) {}
 
     fn on_run_create(&mut self, run: &Run) {
         if self.root_id.is_none() {
@@ -541,7 +534,6 @@ impl TracerCore for LogStreamCallbackHandler {
             return;
         }
 
-        // Determine key name with counter
         let _lock = self.lock.lock().expect("lock poisoned");
         let count = self
             .counter_map_by_name
@@ -584,7 +576,6 @@ impl TracerCore for LogStreamCallbackHandler {
         let key = match self.key_map_by_run_id.get(&run.id) {
             Some(k) => k.clone(),
             None => {
-                // Check if this is the root run ending
                 if run.id == self.root_id.unwrap_or(Uuid::nil())
                     && self.auto_close
                     && let Err(error) = self.send_stream.close()
@@ -642,7 +633,6 @@ impl TracerCore for LogStreamCallbackHandler {
             } else if let Some(chat_chunk) =
                 chunk_any.downcast_ref::<crate::outputs::ChatGenerationChunk>()
             {
-                // For chat chunks, include the message
                 serde_json::to_value(&chat_chunk.message)
                     .unwrap_or(Value::String(token.to_string()))
             } else {
@@ -663,10 +653,7 @@ impl TracerCore for LogStreamCallbackHandler {
 }
 
 impl BaseTracer for LogStreamCallbackHandler {
-    fn persist_run_impl(&mut self, _run: &Run) {
-        // This is a legacy method only called once for an entire run tree
-        // therefore not useful here
-    }
+    fn persist_run_impl(&mut self, _run: &Run) {}
 }
 
 impl<T: Send + 'static> StreamingCallbackHandler<T> for LogStreamCallbackHandler {
@@ -686,20 +673,14 @@ impl<T: Send + 'static> StreamingCallbackHandler<T> for LogStreamCallbackHandler
             |(mut stream, run_id, root_id, key, sender)| async move {
                 let item = stream.next().await?;
 
-                // Root run is handled separately
-                // If we can't find the run key, silently ignore
                 if run_id != root_id.unwrap_or(Uuid::nil())
                     && let Some(ref k) = key
-                {
-                    // Note: We can't easily serialize generic T here
-                    // This would need a more sophisticated implementation
-                    // for real-world use with proper chunk serialization
-                    if let Err(error) = sender.send(RunLogPatch::new(vec![JsonPatchOp::add(
+                    && let Err(error) = sender.send(RunLogPatch::new(vec![JsonPatchOp::add(
                         format!("/logs/{}/streamed_output/-", k),
                         Value::Null, // Placeholder - real implementation would serialize the chunk
-                    )])) {
-                        tracing::warn!("Failed to send log stream patch: {}", error);
-                    }
+                    )]))
+                {
+                    tracing::warn!("Failed to send log stream patch: {}", error);
                 }
 
                 Some((item, (stream, run_id, root_id, key, sender)))
@@ -740,7 +721,6 @@ impl<T> Iterator for TappedIterator<T> {
     fn next(&mut self) -> Option<Self::Item> {
         let item = self.inner.next()?;
 
-        // Root run is handled separately
         if self.run_id != self.root_id.unwrap_or(Uuid::nil())
             && let Some(ref k) = self.key
             && let Err(error) = self
@@ -756,10 +736,6 @@ impl<T> Iterator for TappedIterator<T> {
         Some(item)
     }
 }
-
-// =============================================================================
-// BaseCallbackHandler bridge
-// =============================================================================
 
 /// A wrapper that allows `LogStreamCallbackHandler` to be used as a
 /// `BaseCallbackHandler` in `RunnableConfig.callbacks`.
@@ -1088,10 +1064,6 @@ impl crate::callbacks::base::BaseCallbackHandler for LogStreamCallbackHandlerBri
     }
 }
 
-// =============================================================================
-// astream_log_implementation (free function)
-// =============================================================================
-
 /// Implementation of the astream_log API.
 ///
 /// This is a free function that mirrors Python's
@@ -1136,7 +1108,6 @@ where
 
     let mut config = ensure_config(config);
 
-    // Inject the bridge into callbacks
     let cb_handler: Arc<dyn crate::callbacks::base::BaseCallbackHandler> = bridge.clone();
     match &mut config.callbacks {
         None => {
@@ -1150,7 +1121,6 @@ where
         }
     }
 
-    // Take the receive stream before starting
     let receive_stream = bridge
         .take_receive_stream()
         .expect("receive stream should be available");
@@ -1158,8 +1128,6 @@ where
     let send_stream = bridge.get_send_stream();
 
     Box::pin(async_stream::stream! {
-        // Consume the astream output. For each chunk, generate patches
-        // for streamed_output and final_output.
         let mut astream = std::pin::pin!(runnable.astream(input, Some(config)));
         while let Some(chunk_result) = astream.next().await {
             match chunk_result {
@@ -1189,10 +1157,8 @@ where
             }
         }
 
-        // Close the send stream to signal completion
         if let Err(e) = send_stream.close() { tracing::warn!("Failed to close stream: {e}"); }
 
-        // Now drain all buffered patches from the receive stream
         let mut event_stream = std::pin::pin!(receive_stream.into_stream());
 
         if diff {
@@ -1203,8 +1169,6 @@ where
             let mut state = RunLog::new(vec![], None);
             while let Some(patch) = event_stream.next().await {
                 state.apply_patch(patch);
-                // Yield a RunLogPatch that represents the full state
-                // (consumer can access RunLog through the ops)
                 yield RunLogPatch::new(state.ops.clone());
             }
         }

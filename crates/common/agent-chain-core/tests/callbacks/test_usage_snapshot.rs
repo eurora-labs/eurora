@@ -32,10 +32,6 @@ fn make_chat_result(content: &str, usage: &UsageMetadata, model_name: &str) -> C
     }
 }
 
-// ====================================================================
-// TestUsageMetadataCallbackHandlerInit
-// ====================================================================
-
 /// Ported from `test_empty_usage_metadata_on_init`.
 #[test]
 fn test_empty_usage_metadata_on_init() {
@@ -56,7 +52,6 @@ fn test_handler_is_thread_safe() {
     let result = make_chat_result("x", &usage, "m");
     handler1.on_llm_end(&result, Uuid::new_v4(), None);
 
-    // Both clones should see the same data (proving shared state)
     assert_eq!(handler1.usage_metadata(), handler2.usage_metadata());
 }
 
@@ -67,10 +62,6 @@ fn test_display_empty() {
     let repr = format!("{}", handler);
     assert_eq!(repr, "{}");
 }
-
-// ====================================================================
-// TestOnLLMEnd
-// ====================================================================
 
 /// Ported from `test_collects_single_response`.
 #[test]
@@ -229,10 +220,6 @@ fn test_missing_usage_metadata_ignored() {
     assert!(handler.usage_metadata().is_empty());
 }
 
-// ====================================================================
-// TestRepr
-// ====================================================================
-
 /// Ported from `test_repr_with_data`.
 #[test]
 fn test_display_with_data() {
@@ -246,10 +233,6 @@ fn test_display_with_data() {
         "Display should contain model name, got: {repr}"
     );
 }
-
-// ====================================================================
-// TestThreadSafety
-// ====================================================================
 
 /// Ported from `test_concurrent_on_llm_end_calls`.
 #[test]
@@ -284,15 +267,10 @@ fn test_concurrent_on_llm_end_calls() {
     assert_eq!(model_usage.total_tokens, expected_count * 2);
 }
 
-// ====================================================================
-// TestGetUsageMetadataCallback
-// ====================================================================
-
 /// Ported from `test_yields_handler`.
 #[test]
 fn test_guard_yields_handler() {
     let guard = get_usage_metadata_callback();
-    // Verify it yields a UsageMetadataCallbackHandler (via name check)
     assert_eq!(guard.handler().name(), "UsageMetadataCallbackHandler");
 }
 
@@ -327,7 +305,6 @@ fn test_multiple_guards_independent() {
         .handler()
         .on_llm_end(&make_chat_result("a", &usage, "m"), Uuid::new_v4(), None);
 
-    // guard2 should be unaffected
     assert!(guard2.usage_metadata().is_empty());
     assert_eq!(guard1.usage_metadata().len(), 1);
 }

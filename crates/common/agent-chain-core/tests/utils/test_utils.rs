@@ -11,10 +11,6 @@ use agent_chain_core::outputs::GenerationChunk;
 use agent_chain_core::utils::base::{EnvError, from_env, secret_from_env};
 use agent_chain_core::utils::merge::{MergeError, merge_dicts};
 
-// ============================================================================
-// test_merge_dicts
-// ============================================================================
-
 /// Test case parameters for merge_dicts tests
 struct MergeDictsTestCase {
     left: serde_json::Value,
@@ -24,19 +20,16 @@ struct MergeDictsTestCase {
 
 fn get_merge_dicts_test_cases() -> Vec<MergeDictsTestCase> {
     vec![
-        // Merge `None` and `1`.
         MergeDictsTestCase {
             left: json!({"a": null}),
             right: json!({"a": 1}),
             expected: Ok(json!({"a": 1})),
         },
-        // Merge `1` and `None`.
         MergeDictsTestCase {
             left: json!({"a": 1}),
             right: json!({"a": null}),
             expected: Ok(json!({"a": 1})),
         },
-        // Merge `None` and a value.
         MergeDictsTestCase {
             left: json!({"a": null}),
             right: json!({"a": 0}),
@@ -47,7 +40,6 @@ fn get_merge_dicts_test_cases() -> Vec<MergeDictsTestCase> {
             right: json!({"a": "txt"}),
             expected: Ok(json!({"a": "txt"})),
         },
-        // Merge equal values.
         MergeDictsTestCase {
             left: json!({"a": 1}),
             right: json!({"a": 1}),
@@ -83,13 +75,11 @@ fn get_merge_dicts_test_cases() -> Vec<MergeDictsTestCase> {
             right: json!({"a": {"b": "txt"}}),
             expected: Ok(json!({"a": {"b": "txttxt"}})),
         },
-        // Merge strings.
         MergeDictsTestCase {
             left: json!({"a": "one"}),
             right: json!({"a": "two"}),
             expected: Ok(json!({"a": "onetwo"})),
         },
-        // Merge dicts.
         MergeDictsTestCase {
             left: json!({"a": {"b": 1}}),
             right: json!({"a": {"c": 2}}),
@@ -100,7 +90,6 @@ fn get_merge_dicts_test_cases() -> Vec<MergeDictsTestCase> {
             right: json!({"function_call": {"arguments": "{\n"}}),
             expected: Ok(json!({"function_call": {"arguments": "{\n"}})),
         },
-        // Merge lists.
         MergeDictsTestCase {
             left: json!({"a": [1, 2]}),
             right: json!({"a": [3]}),
@@ -116,13 +105,11 @@ fn get_merge_dicts_test_cases() -> Vec<MergeDictsTestCase> {
             right: json!({"c": null}),
             expected: Ok(json!({"a": 1, "b": 2, "c": null})),
         },
-        // Invalid inputs - type mismatch
         MergeDictsTestCase {
             left: json!({"a": 1}),
             right: json!({"a": "1"}),
             expected: Err("TypeMismatch"),
         },
-        // 'index' keyword has special handling
         MergeDictsTestCase {
             left: json!({"a": [{"index": 0, "b": "{"}]}),
             right: json!({"a": [{"index": 0, "b": "f"}]}),
@@ -148,12 +135,8 @@ fn test_merge_dicts() {
             (Ok(actual), Ok(expected)) => {
                 assert_eq!(actual, expected, "Test case {} failed", i);
             }
-            (Err(MergeError::TypeMismatch { .. }), Err("TypeMismatch")) => {
-                // Expected type mismatch error
-            }
-            (Err(MergeError::UnsupportedType { .. }), Err("UnsupportedType")) => {
-                // Expected unsupported type error
-            }
+            (Err(MergeError::TypeMismatch { .. }), Err("TypeMismatch")) => {}
+            (Err(MergeError::UnsupportedType { .. }), Err("UnsupportedType")) => {}
             (result, expected) => {
                 panic!(
                     "Test case {} - unexpected result. Got {:?}, expected {:?}",
@@ -162,7 +145,6 @@ fn test_merge_dicts() {
             }
         }
 
-        // Verify no mutation
         assert_eq!(
             test_case.left, left_copy,
             "Test case {} - left was mutated",
@@ -176,16 +158,11 @@ fn test_merge_dicts() {
     }
 }
 
-// ============================================================================
-// test_from_env_*
-// ============================================================================
-
 #[test]
 fn test_from_env_with_env_variable() {
     let key = "TEST_KEY_FROM_ENV";
     let value = "test_value";
 
-    // SAFETY: This test is run in isolation
     unsafe {
         env::set_var(key, value);
     }
@@ -204,7 +181,6 @@ fn test_from_env_with_default_value() {
     let key = "TEST_KEY_NONEXISTENT_DEFAULT";
     let default_value = "default_value";
 
-    // Make sure the key doesn't exist
     unsafe {
         env::remove_var(key);
     }
@@ -219,7 +195,6 @@ fn test_from_env_with_error_message() {
     let key = "TEST_KEY_NONEXISTENT_ERROR";
     let error_message = "Custom error message";
 
-    // Make sure the key doesn't exist
     unsafe {
         env::remove_var(key);
     }
@@ -241,7 +216,6 @@ fn test_from_env_with_error_message() {
 fn test_from_env_with_default_error_message() {
     let key = "TEST_KEY_NONEXISTENT_DEFAULT_ERR";
 
-    // Make sure the key doesn't exist
     unsafe {
         env::remove_var(key);
     }
@@ -259,16 +233,11 @@ fn test_from_env_with_default_error_message() {
     }
 }
 
-// ============================================================================
-// test_secret_from_env_*
-// ============================================================================
-
 #[test]
 fn test_secret_from_env_with_env_variable() {
     let key = "TEST_SECRET_KEY";
     let value = "secret_value";
 
-    // SAFETY: This test is run in isolation
     unsafe {
         env::set_var(key, value);
     }
@@ -288,7 +257,6 @@ fn test_secret_from_env_with_default_value() {
     let key = "TEST_SECRET_KEY_DEFAULT";
     let default_value = "default_value";
 
-    // Make sure the key doesn't exist
     unsafe {
         env::remove_var(key);
     }
@@ -303,7 +271,6 @@ fn test_secret_from_env_with_default_value() {
 fn test_secret_from_env_without_default_raises_error() {
     let key = "TEST_SECRET_KEY_NO_DEFAULT";
 
-    // Make sure the key doesn't exist
     unsafe {
         env::remove_var(key);
     }
@@ -326,7 +293,6 @@ fn test_secret_from_env_with_custom_error_message() {
     let key = "TEST_SECRET_KEY_CUSTOM_ERR";
     let error_message = "Custom error message";
 
-    // Make sure the key doesn't exist
     unsafe {
         env::remove_var(key);
     }
@@ -343,10 +309,6 @@ fn test_secret_from_env_with_custom_error_message() {
         _ => panic!("Expected Custom error"),
     }
 }
-
-// ============================================================================
-// test_generation_chunk_addition
-// ============================================================================
 
 #[test]
 fn test_generation_chunk_addition_combines_metadata() {

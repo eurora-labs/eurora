@@ -22,7 +22,6 @@ use util::*;
 #[serial]
 #[ignore] // Only run when AX_ALLOWED=1 is set
 fn test_macos_accessibility_permission() {
-    // Only run this test if explicitly enabled
     if env::var("AX_ALLOWED").unwrap_or_default() != "1" {
         info!("Skipping macOS accessibility test - AX_ALLOWED=1 not set");
         return;
@@ -39,8 +38,6 @@ fn test_macos_accessibility_permission() {
     let stop_signal = AtomicBool::new(false);
     let focus_events = Arc::new(Mutex::new(Vec::new()));
 
-    // Try to track focus - this should either work (if permission granted)
-    // or return an error/None window title (if permission denied)
     let focus_events_clone = Arc::clone(&focus_events);
     let result = tracker.track_focus_with_stop(
         move |window: FocusedWindow| -> FocusTrackerResult<()> {
@@ -53,14 +50,12 @@ fn test_macos_accessibility_permission() {
         &stop_signal,
     );
 
-    // Stop after a short time
     std::thread::sleep(Duration::from_millis(500));
     stop_signal.store(true, Ordering::Relaxed);
 
     match result {
         Ok(_) => {
             info!("Focus tracking succeeded - accessibility permission likely granted");
-            // Check if we got meaningful window titles
             if let Ok(events) = focus_events.lock()
                 && events.iter().any(|w| w.window_title.is_none())
             {
@@ -88,22 +83,15 @@ fn test_macos_accessibility_no_permission_mock() {
 
     info!("Testing macOS Accessibility mock permission denial");
 
-    // This test simulates what should happen when accessibility permission is denied
-    // We'll create a mock scenario by testing the error handling path
-
-    // Test that we can create the tracker without panicking
     let tracker = FocusTracker::new();
     info!("FocusTracker created successfully: {:?}", tracker);
 
-    // Test that calling the API doesn't panic even in error conditions
     let stop_signal = AtomicBool::new(false);
 
-    // Set stop signal immediately to avoid long-running test
     stop_signal.store(true, Ordering::Relaxed);
 
     let result = tracker.track_focus_with_stop(
         |window: FocusedWindow| -> FocusTrackerResult<()> {
-            // If we get a window with no title, that could indicate permission issues
             if window.window_title.is_none() {
                 info!("Received window with no title - possible permission issue");
             }
@@ -112,7 +100,6 @@ fn test_macos_accessibility_no_permission_mock() {
         &stop_signal,
     );
 
-    // The important thing is that we don't panic
     match result {
         Ok(_) => info!("Focus tracking completed without error"),
         Err(e) => info!("Focus tracking failed gracefully: {}", e),
@@ -129,7 +116,6 @@ fn test_wayland_unsupported_compositor() {
         return;
     }
 
-    // Only run this test if we're in a Wayland environment
     if !should_use_wayland() {
         info!("Skipping Wayland test - not in Wayland environment");
         return;
@@ -137,23 +123,17 @@ fn test_wayland_unsupported_compositor() {
 
     info!("Testing Wayland unsupported compositor handling");
 
-    // Test under conditions that might not support wlr-toplevel or GNOME DBus
-    // This simulates running under Weston headless or other minimal compositors
-
     let tracker = FocusTracker::new();
     let stop_signal = AtomicBool::new(false);
 
-    // Set a short timeout to avoid hanging
     let timeout_handle = std::thread::spawn(|| {
         std::thread::sleep(Duration::from_millis(1000));
     });
 
-    // Set stop signal after a short delay
     std::thread::spawn(|| {
         std::thread::sleep(Duration::from_millis(500));
     });
 
-    // Set stop signal immediately to avoid long test
     stop_signal.store(true, Ordering::Relaxed);
 
     let result = tracker.track_focus_with_stop(
@@ -167,7 +147,6 @@ fn test_wayland_unsupported_compositor() {
         &stop_signal,
     );
 
-    // Clean up timeout thread
     let _ = timeout_handle.join();
 
     match result {
@@ -195,15 +174,12 @@ fn test_missing_x_server() {
 
     info!("Testing missing X server handling");
 
-    // Save original DISPLAY value
     let original_display = env::var("DISPLAY").ok();
 
-    // Unset DISPLAY to simulate missing X server
     unsafe {
         env::remove_var("DISPLAY");
     }
 
-    // Also ensure we're not using Wayland for this test
     let original_wayland_display = env::var("WAYLAND_DISPLAY").ok();
     unsafe {
         env::remove_var("WAYLAND_DISPLAY");
@@ -213,7 +189,6 @@ fn test_missing_x_server() {
         let tracker = FocusTracker::new();
         let stop_signal = AtomicBool::new(false);
 
-        // Set stop signal quickly to avoid hanging
         stop_signal.store(true, Ordering::Relaxed);
 
         tracker.track_focus_with_stop(
@@ -225,7 +200,6 @@ fn test_missing_x_server() {
         )
     });
 
-    // Restore environment variables
     if let Some(display) = original_display {
         unsafe {
             env::set_var("DISPLAY", display);
@@ -270,13 +244,9 @@ fn test_windows_service_context_mock() {
 
     info!("Testing Windows service context handling (mock)");
 
-    // This test simulates what should happen in a Windows service context
-    // where there's no interactive desktop session
-
     let tracker = FocusTracker::new();
     let stop_signal = AtomicBool::new(false);
 
-    // Set stop signal quickly
     stop_signal.store(true, Ordering::Relaxed);
 
     let result = tracker.track_focus_with_stop(
@@ -311,7 +281,6 @@ fn test_error_handling_robustness() {
 
     info!("Testing general error handling robustness");
 
-    // Test that creating a FocusTracker doesn't panic
     let result = std::panic::catch_unwind(|| {
         let tracker = FocusTracker::new();
         info!("FocusTracker created: {:?}", tracker);
@@ -373,17 +342,14 @@ fn test_timeout_behavior() {
     let tracker = FocusTracker::new();
     let stop_signal = AtomicBool::new(false);
 
-    // Set up a timeout using a separate thread that doesn't capture stop_signal
     let _timeout_handle = std::thread::spawn(|| {
         std::thread::sleep(Duration::from_millis(500));
     });
 
-    // Set stop signal after timeout
     std::thread::spawn(|| {
         std::thread::sleep(Duration::from_millis(400));
     });
 
-    // Set stop signal to ensure test completes quickly
     stop_signal.store(true, Ordering::Relaxed);
 
     let start_time = std::time::Instant::now();
@@ -400,7 +366,6 @@ fn test_timeout_behavior() {
 
     info!("Focus tracking completed in {:?}", elapsed);
 
-    // Should complete within reasonable time (not hang)
     assert!(
         elapsed < Duration::from_secs(2),
         "Test took too long - possible hang"

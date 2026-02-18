@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, time::Duration};
 
 use anyhow::{Context, Result};
 use aws_config::BehaviorVersion;
-use aws_sdk_s3::{Client as S3Client, presigning::PresigningConfig};
+use aws_sdk_s3::{Client as S3Client, presigning::PresigningConfig, types::Object};
 use chrono::{DateTime, Utc};
 use semver::Version;
 use tracing::{debug, instrument};
@@ -37,6 +37,146 @@ impl AppState {
         })
     }
 
+    async fn list_versions(
+        &self,
+        prefix: &str,
+    ) -> Result<Vec<(Version, String)>, UpdateServiceError> {
+        let mut versions: Vec<(Version, String)> = Vec::new();
+
+        let mut paginator = self
+            .s3_client
+            .list_objects_v2()
+            .bucket(&self.bucket_name)
+            .prefix(prefix)
+            .delimiter("/")
+            .into_paginator()
+            .send();
+
+        while let Some(resp) = paginator.next().await {
+            let resp = resp.map_err(|e| UpdateServiceError::S3Error(format!("{e:#}")))?;
+
+            for common_prefix in resp.common_prefixes() {
+                let Some(prefix_str) = common_prefix.prefix() else {
+                    continue;
+                };
+                let version_str = prefix_str
+                    .strip_prefix(prefix)
+                    .and_then(|s| s.strip_suffix('/'))
+                    .unwrap_or("");
+
+                if let Ok(version) = Version::parse(version_str) {
+                    versions.push((version, version_str.to_owned()));
+                }
+            }
+        }
+
+        versions.sort_unstable_by(|a, b| b.0.cmp(&a.0));
+        Ok(versions)
+    }
+
+    /// List all objects under an S3 prefix, paginating to collect everything.
+    async fn list_all_objects(&self, prefix: &str) -> Result<Vec<Object>, UpdateServiceError> {
+        let mut objects = Vec::new();
+
+        let mut paginator = self
+            .s3_client
+            .list_objects_v2()
+            .bucket(&self.bucket_name)
+            .prefix(prefix)
+            .into_paginator()
+            .send();
+
+        while let Some(resp) = paginator.next().await {
+            let resp = resp.map_err(|e| UpdateServiceError::S3Error(format!("{e:#}")))?;
+            objects.extend(resp.contents().iter().cloned());
+        }
+
+        Ok(objects)
+    }
+
+    /// List immediate subdirectory names under a given S3 prefix.
+    async fn list_subdirectories(&self, prefix: &str) -> Result<Vec<String>, UpdateServiceError> {
+        let mut dirs = Vec::new();
+
+        let mut paginator = self
+            .s3_client
+            .list_objects_v2()
+            .bucket(&self.bucket_name)
+            .prefix(prefix)
+            .delimiter("/")
+            .into_paginator()
+            .send();
+
+        while let Some(resp) = paginator.next().await {
+            let resp = resp.map_err(|e| UpdateServiceError::S3Error(format!("{e:#}")))?;
+
+            for common_prefix in resp.common_prefixes() {
+                let Some(prefix_str) = common_prefix.prefix() else {
+                    continue;
+                };
+                if let Some(name) = prefix_str
+                    .strip_prefix(prefix)
+                    .and_then(|s| s.strip_suffix('/'))
+                {
+                    dirs.push(name.to_owned());
+                }
+            }
+        }
+
+        Ok(dirs)
+    }
+
+    async fn get_file_content(&self, key: &str) -> Result<String> {
+        let resp = self
+            .s3_client
+            .get_object()
+            .bucket(&self.bucket_name)
+            .key(key)
+            .send()
+            .await
+            .with_context(|| format!("Failed to get object from S3: {}", key))?;
+
+        let body = resp
+            .body
+            .collect()
+            .await
+            .context("Failed to read object body")?;
+
+        String::from_utf8(body.to_vec()).context("Failed to convert body to string")
+    }
+
+    async fn generate_presigned_url(&self, file_key: &str) -> Result<String, UpdateServiceError> {
+        let presigning_config = PresigningConfig::expires_in(Duration::from_secs(3600))
+            .map_err(|e| UpdateServiceError::PresignedUrlError(e.to_string()))?;
+
+        let presigned_request = self
+            .s3_client
+            .get_object()
+            .bucket(&self.bucket_name)
+            .key(file_key)
+            .presigned(presigning_config)
+            .await
+            .map_err(|e| UpdateServiceError::PresignedUrlError(e.to_string()))?;
+
+        Ok(presigned_request.uri().to_string())
+    }
+
+    fn validate_channel(&self, channel: &str) -> Result<(), UpdateServiceError> {
+        if !matches!(channel, "nightly" | "release" | "beta") {
+            return Err(UpdateServiceError::InvalidChannel(channel.to_owned()));
+        }
+        Ok(())
+    }
+
+    fn validate_extension_channel(
+        &self,
+        channel: &str,
+    ) -> Result<ExtensionChannel, UpdateServiceError> {
+        channel
+            .parse()
+            .map_err(|_| UpdateServiceError::InvalidExtensionChannel(channel.to_owned()))
+    }
+
     #[instrument(skip(self), fields(channel, target_arch, current_version, ?bundle_type))]
     pub async fn check_for_update(
         &self,
@@ -45,46 +185,21 @@ impl AppState {
         current_version: &str,
         bundle_type: Option<&str>,
     ) -> Result<Option<UpdateResponse>, UpdateServiceError> {
-        self.validate_inputs(channel, target_arch, current_version)?;
+        self.validate_channel(channel)?;
 
         let current_ver = Version::parse(current_version)
             .map_err(|_| UpdateServiceError::InvalidVersion(current_version.to_owned()))?;
 
         let (target, arch) = parse_target_arch(target_arch)?;
 
-        // Use delimiter to efficiently list only version directories
-        // Structure: releases/{channel}/{version}/...
         let prefix = format!("releases/{}/", channel);
-        let mut candidates: Vec<(Version, String)> = Vec::new();
+        let all_versions = self.list_versions(&prefix).await?;
 
-        let mut paginator = self
-            .s3_client
-            .list_objects_v2()
-            .bucket(&self.bucket_name)
-            .prefix(&prefix)
-            .delimiter("/")
-            .into_paginator()
-            .send();
-
-        while let Some(resp) = paginator.next().await {
-            let resp = resp.map_err(|e| UpdateServiceError::S3Error(e.to_string()))?;
-
-            for common_prefix in resp.common_prefixes() {
-                let Some(prefix_str) = common_prefix.prefix() else {
-                    continue;
-                };
-                let version_str = prefix_str
-                    .strip_prefix(&prefix)
-                    .and_then(|s| s.strip_suffix('/'))
-                    .unwrap_or("");
-
-                if let Ok(version) = Version::parse(version_str)
-                    && version > current_ver
-                {
-                    candidates.push((version, version_str.to_owned()));
-                }
-            }
-        }
+        let candidates: Vec<&str> = all_versions
+            .iter()
+            .filter(|(v, _)| v > &current_ver)
+            .map(|(_, s)| s.as_str())
+            .collect();
 
         debug!(
             "Found {} candidate versions newer than {}",
@@ -92,11 +207,7 @@ impl AppState {
             current_version
         );
 
-        // Sort descending (newest first)
-        candidates.sort_unstable_by(|a, b| b.0.cmp(&a.0));
-
-        // Find the latest version that has files for our target platform
-        for (_, version_str) in &candidates {
+        for version_str in &candidates {
             let target_prefix =
                 format!("releases/{}/{}/{}/{}/", channel, version_str, target, arch);
 
@@ -108,7 +219,7 @@ impl AppState {
                 .max_keys(1)
                 .send()
                 .await
-                .map_err(|e| UpdateServiceError::S3Error(e.to_string()))?;
+                .map_err(|e| UpdateServiceError::S3Error(format!("{e:#}")))?;
 
             if !resp.contents().is_empty() {
                 debug!(
@@ -136,15 +247,9 @@ impl AppState {
     ) -> Result<UpdateResponse, UpdateServiceError> {
         let directory_prefix = format!("releases/{}/{}/{}/{}/", channel, version, target, arch);
 
-        let (file_key, last_modified) = self
-            .find_download_file(&directory_prefix, target, bundle_type)
+        let (file_key, last_modified, signature) = self
+            .find_signed_download_file(&directory_prefix, target, bundle_type)
             .await?;
-
-        let signature_key = format!("{}.sig", file_key);
-        let signature = self
-            .get_file_content(&signature_key)
-            .await
-            .map_err(|_| UpdateServiceError::SignatureNotFound(signature_key))?;
 
         let download_url = self.generate_presigned_url(&file_key).await?;
 
@@ -166,51 +271,19 @@ impl AppState {
         })
     }
 
-    async fn get_file_content(&self, key: &str) -> Result<String> {
-        let resp = self
-            .s3_client
-            .get_object()
-            .bucket(&self.bucket_name)
-            .key(key)
-            .send()
-            .await
-            .with_context(|| format!("Failed to get object from S3: {}", key))?;
-
-        let body = resp
-            .body
-            .collect()
-            .await
-            .context("Failed to read object body")?;
-
-        String::from_utf8(body.to_vec()).context("Failed to convert body to string")
-    }
-
     /// Find download file candidates in the S3 directory, ordered by priority.
     ///
-    /// Returns candidates in priority order based on bundle_type. For example,
-    /// `bundle_type = "deb"` returns `.deb` files first, then `.AppImage` as fallback.
-    /// Only files that have a corresponding `.sig` signature are included.
+    /// Returns the file key, last-modified timestamp, and the signature content.
+    /// Only files that have a corresponding `.sig` signature are considered.
     #[instrument(skip(self), fields(directory_prefix, target, ?bundle_type))]
-    async fn find_download_file(
+    async fn find_signed_download_file(
         &self,
         directory_prefix: &str,
         target: &str,
         bundle_type: Option<&str>,
-    ) -> Result<(String, DateTime<Utc>), UpdateServiceError> {
-        let resp = self
-            .s3_client
-            .list_objects_v2()
-            .bucket(&self.bucket_name)
-            .prefix(directory_prefix)
-            .send()
-            .await
-            .map_err(|e| UpdateServiceError::S3Error(e.to_string()))?;
+    ) -> Result<(String, DateTime<Utc>, String), UpdateServiceError> {
+        let objects = self.list_all_objects(directory_prefix).await?;
 
-        // With createUpdaterArtifacts: true, native bundles are served directly:
-        //   - Linux AppImage: .AppImage (no tar.gz wrapper)
-        //   - Linux deb/rpm: .deb / .rpm (fall back to .AppImage if not available)
-        //   - Windows MSI: .msi (no zip wrapper)
-        //   - macOS: .app.tar.gz
         let expected_extensions = match bundle_type {
             Some("deb") => vec![".deb", ".AppImage"],
             Some("rpm") => vec![".rpm", ".AppImage"],
@@ -228,18 +301,11 @@ impl AppState {
 
         let is_metadata = |filename: &str| filename.ends_with(".sig") || filename == "notes.txt";
 
-        // Collect all S3 keys for quick `.sig` existence checks
         let all_keys: std::collections::HashSet<&str> =
-            resp.contents().iter().filter_map(|o| o.key()).collect();
+            objects.iter().filter_map(|o| o.key()).collect();
 
-        // Find the first file matching expected extensions, respecting priority order.
-        // Extensions are listed in priority order (e.g. [".deb", ".AppImage"] prefers .deb),
-        // so we iterate extensions first to avoid S3's lexicographic ordering from
-        // returning a lower-priority match (e.g. .AppImage before .deb).
-        // Only return files that have a corresponding .sig signature file,
-        // since Tauri's updater requires a valid signature.
         for ext in &expected_extensions {
-            for object in resp.contents() {
+            for object in &objects {
                 let Some(key) = object.key() else { continue };
                 let filename = key.strip_prefix(directory_prefix).unwrap_or(key);
 
@@ -251,15 +317,18 @@ impl AppState {
                     let sig_key = format!("{}.sig", key);
                     if all_keys.contains(sig_key.as_str()) {
                         let last_modified = extract_last_modified(object)?;
-                        return Ok((key.to_owned(), last_modified));
+                        let signature = self
+                            .get_file_content(&sig_key)
+                            .await
+                            .map_err(|_| UpdateServiceError::SignatureNotFound(sig_key))?;
+                        return Ok((key.to_owned(), last_modified, signature));
                     }
                     debug!("Skipping {} (no signature file {})", key, sig_key);
                 }
             }
         }
 
-        // Fallback: return the first non-metadata file that has a signature
-        for object in resp.contents() {
+        for object in &objects {
             let Some(key) = object.key() else { continue };
             let filename = key.strip_prefix(directory_prefix).unwrap_or(key);
 
@@ -267,7 +336,11 @@ impl AppState {
                 let sig_key = format!("{}.sig", key);
                 if all_keys.contains(sig_key.as_str()) {
                     let last_modified = extract_last_modified(object)?;
-                    return Ok((key.to_owned(), last_modified));
+                    let signature = self
+                        .get_file_content(&sig_key)
+                        .await
+                        .map_err(|_| UpdateServiceError::SignatureNotFound(sig_key))?;
+                    return Ok((key.to_owned(), last_modified, signature));
                 }
             }
         }
@@ -277,34 +350,102 @@ impl AppState {
         ))
     }
 
-    fn validate_inputs(
+    #[instrument(skip(self), fields(channel, target_arch, ?bundle_type))]
+    pub async fn get_download_url(
         &self,
         channel: &str,
         target_arch: &str,
-        current_version: &str,
-    ) -> Result<(), UpdateServiceError> {
+        bundle_type: Option<&str>,
+    ) -> Result<String, UpdateServiceError> {
         self.validate_channel(channel)?;
 
-        if target_arch.is_empty() || !target_arch.contains('-') {
-            return Err(UpdateServiceError::InvalidTargetArch(
-                target_arch.to_owned(),
-            ));
+        let (target, arch) = parse_target_arch(target_arch)?;
+
+        let prefix = format!("releases/{}/", channel);
+        let all_versions = self.list_versions(&prefix).await?;
+
+        if all_versions.is_empty() {
+            return Err(UpdateServiceError::DownloadFileNotFound(prefix));
         }
 
-        if Version::parse(current_version).is_err() {
-            return Err(UpdateServiceError::InvalidVersion(
-                current_version.to_owned(),
-            ));
+        for (_, version_str) in &all_versions {
+            let directory_prefix =
+                format!("releases/{}/{}/{}/{}/", channel, version_str, target, arch);
+
+            match self
+                .find_download_file_unsigned(&directory_prefix, &target, bundle_type)
+                .await
+            {
+                Ok(file_key) => {
+                    let url = self.generate_presigned_url(&file_key).await?;
+                    return Ok(url);
+                }
+                Err(_) => continue,
+            }
         }
 
-        Ok(())
+        Err(UpdateServiceError::DownloadFileNotFound(format!(
+            "releases/{}/{}/{}/",
+            channel, target, arch
+        )))
     }
 
-    fn validate_channel(&self, channel: &str) -> Result<(), UpdateServiceError> {
-        if !matches!(channel, "nightly" | "release" | "beta") {
-            return Err(UpdateServiceError::InvalidChannel(channel.to_owned()));
+    /// Find a download file without requiring a `.sig` signature file.
+    /// Used for website downloads where Tauri signature verification is not needed.
+    #[instrument(skip(self), fields(directory_prefix, target, ?bundle_type))]
+    async fn find_download_file_unsigned(
+        &self,
+        directory_prefix: &str,
+        target: &str,
+        bundle_type: Option<&str>,
+    ) -> Result<String, UpdateServiceError> {
+        let objects = self.list_all_objects(directory_prefix).await?;
+
+        let expected_extensions = match bundle_type {
+            Some("deb") => vec![".deb"],
+            Some("rpm") => vec![".rpm"],
+            Some("appimage") => vec![".AppImage"],
+            Some("msi") => vec![".msi"],
+            Some("nsis") => vec![".exe"],
+            Some("dmg") => vec![".dmg"],
+            Some("app") => vec![".app.tar.gz", ".tar.gz"],
+            _ => match target {
+                "linux" => vec![".AppImage"],
+                "darwin" => vec![".dmg", ".app.tar.gz", ".tar.gz"],
+                "windows" => vec![".msi"],
+                _ => vec![".tar.gz", ".zip"],
+            },
+        };
+
+        let is_metadata = |filename: &str| filename.ends_with(".sig") || filename == "notes.txt";
+
+        for ext in &expected_extensions {
+            for object in &objects {
+                let Some(key) = object.key() else { continue };
+                let filename = key.strip_prefix(directory_prefix).unwrap_or(key);
+
+                if is_metadata(filename) {
+                    continue;
+                }
+
+                if filename.ends_with(ext) {
+                    return Ok(key.to_owned());
+                }
+            }
         }
-        Ok(())
+
+        for object in &objects {
+            let Some(key) = object.key() else { continue };
+            let filename = key.strip_prefix(directory_prefix).unwrap_or(key);
+
+            if !is_metadata(filename) && !filename.is_empty() {
+                return Ok(key.to_owned());
+            }
+        }
+
+        Err(UpdateServiceError::DownloadFileNotFound(
+            directory_prefix.to_owned(),
+        ))
     }
 
     #[instrument(skip(self), fields(channel))]
@@ -315,40 +456,11 @@ impl AppState {
         self.validate_channel(channel)?;
 
         let prefix = format!("releases/{}/", channel);
-        let mut all_versions: Vec<(Version, String)> = Vec::new();
-
-        let mut paginator = self
-            .s3_client
-            .list_objects_v2()
-            .bucket(&self.bucket_name)
-            .prefix(&prefix)
-            .delimiter("/")
-            .into_paginator()
-            .send();
-
-        while let Some(resp) = paginator.next().await {
-            let resp = resp.map_err(|e| UpdateServiceError::S3Error(e.to_string()))?;
-
-            for common_prefix in resp.common_prefixes() {
-                let Some(prefix_str) = common_prefix.prefix() else {
-                    continue;
-                };
-                let version_str = prefix_str
-                    .strip_prefix(&prefix)
-                    .and_then(|s| s.strip_suffix('/'))
-                    .unwrap_or("");
-
-                if let Ok(version) = Version::parse(version_str) {
-                    all_versions.push((version, version_str.to_owned()));
-                }
-            }
-        }
+        let all_versions = self.list_versions(&prefix).await?;
 
         if all_versions.is_empty() {
             return Ok(None);
         }
-
-        all_versions.sort_unstable_by(|a, b| b.0.cmp(&a.0));
 
         let latest_version_str = &all_versions[0].1;
         debug!(
@@ -394,8 +506,8 @@ impl AppState {
                 let directory_prefix =
                     format!("releases/{}/{}/{}/{}/", channel, version, target, arch);
 
-                let (file_key, last_modified) = match self
-                    .find_download_file(&directory_prefix, target, None)
+                let (file_key, last_modified, signature) = match self
+                    .find_signed_download_file(&directory_prefix, target, None)
                     .await
                 {
                     Ok(result) => result,
@@ -406,15 +518,6 @@ impl AppState {
                 };
 
                 update_max(&mut max_last_modified, last_modified);
-
-                let signature_key = format!("{}.sig", file_key);
-                let signature = match self.get_file_content(&signature_key).await {
-                    Ok(sig) => sig,
-                    Err(e) => {
-                        debug!("No signature for {}/{}: {}", target, arch, e);
-                        continue;
-                    }
-                };
 
                 let url = match self.generate_presigned_url(&file_key).await {
                     Ok(url) => url,
@@ -431,63 +534,6 @@ impl AppState {
 
         let pub_date = max_last_modified.unwrap_or_else(Utc::now);
         Ok((platforms, pub_date))
-    }
-
-    /// List immediate subdirectory names under a given S3 prefix.
-    async fn list_subdirectories(&self, prefix: &str) -> Result<Vec<String>, UpdateServiceError> {
-        let mut dirs = Vec::new();
-
-        let mut paginator = self
-            .s3_client
-            .list_objects_v2()
-            .bucket(&self.bucket_name)
-            .prefix(prefix)
-            .delimiter("/")
-            .into_paginator()
-            .send();
-
-        while let Some(resp) = paginator.next().await {
-            let resp = resp.map_err(|e| UpdateServiceError::S3Error(e.to_string()))?;
-
-            for common_prefix in resp.common_prefixes() {
-                let Some(prefix_str) = common_prefix.prefix() else {
-                    continue;
-                };
-                if let Some(name) = prefix_str
-                    .strip_prefix(prefix)
-                    .and_then(|s| s.strip_suffix('/'))
-                {
-                    dirs.push(name.to_owned());
-                }
-            }
-        }
-
-        Ok(dirs)
-    }
-
-    async fn generate_presigned_url(&self, file_key: &str) -> Result<String, UpdateServiceError> {
-        let presigning_config = PresigningConfig::expires_in(Duration::from_secs(3600))
-            .map_err(|e| UpdateServiceError::PresignedUrlError(e.to_string()))?;
-
-        let presigned_request = self
-            .s3_client
-            .get_object()
-            .bucket(&self.bucket_name)
-            .key(file_key)
-            .presigned(presigning_config)
-            .await
-            .map_err(|e| UpdateServiceError::PresignedUrlError(e.to_string()))?;
-
-        Ok(presigned_request.uri().to_string())
-    }
-
-    fn validate_extension_channel(
-        &self,
-        channel: &str,
-    ) -> Result<ExtensionChannel, UpdateServiceError> {
-        channel
-            .parse()
-            .map_err(|_| UpdateServiceError::InvalidExtensionChannel(channel.to_owned()))
     }
 
     /// Get the latest extension versions for all browsers in a specific channel.
@@ -546,40 +592,11 @@ impl AppState {
         channel: ExtensionChannel,
     ) -> Result<Option<(BrowserExtensionInfo, DateTime<Utc>)>, UpdateServiceError> {
         let prefix = format!("extensions/{}/{}/", channel.as_str(), browser.as_str());
-        let mut all_versions: Vec<(Version, String)> = Vec::new();
-
-        let mut paginator = self
-            .s3_client
-            .list_objects_v2()
-            .bucket(&self.bucket_name)
-            .prefix(&prefix)
-            .delimiter("/")
-            .into_paginator()
-            .send();
-
-        while let Some(resp) = paginator.next().await {
-            let resp = resp.map_err(|e| UpdateServiceError::S3Error(e.to_string()))?;
-
-            for common_prefix in resp.common_prefixes() {
-                let Some(prefix_str) = common_prefix.prefix() else {
-                    continue;
-                };
-                let version_str = prefix_str
-                    .strip_prefix(&prefix)
-                    .and_then(|s| s.strip_suffix('/'))
-                    .unwrap_or("");
-
-                if let Ok(version) = Version::parse(version_str) {
-                    all_versions.push((version, version_str.to_owned()));
-                }
-            }
-        }
+        let all_versions = self.list_versions(&prefix).await?;
 
         if all_versions.is_empty() {
             return Ok(None);
         }
-
-        all_versions.sort_unstable_by(|a, b| b.0.cmp(&a.0));
 
         let latest_version_str = &all_versions[0].1;
         debug!(
@@ -613,17 +630,10 @@ impl AppState {
         directory_prefix: &str,
         browser: BrowserType,
     ) -> Result<(String, DateTime<Utc>), UpdateServiceError> {
-        let resp = self
-            .s3_client
-            .list_objects_v2()
-            .bucket(&self.bucket_name)
-            .prefix(directory_prefix)
-            .send()
-            .await
-            .map_err(|e| UpdateServiceError::S3Error(e.to_string()))?;
+        let objects = self.list_all_objects(directory_prefix).await?;
 
-        let expected_extensions = match browser {
-            BrowserType::Firefox => &[".xpi", ".zip"] as &[&str],
+        let expected_extensions: &[&str] = match browser {
+            BrowserType::Firefox => &[".xpi", ".zip"],
             BrowserType::Chrome => &[".crx", ".zip"],
             BrowserType::Safari => &[".zip", ".safariextz"],
         };
@@ -632,27 +642,24 @@ impl AppState {
             filename.ends_with(".sig") || filename == "notes.txt" || filename == "manifest.json"
         };
 
-        // Find the first file matching expected extensions
-        for object in resp.contents() {
-            let Some(key) = object.key() else { continue };
-            let filename = key.strip_prefix(directory_prefix).unwrap_or(key);
+        for ext in expected_extensions {
+            for object in &objects {
+                let Some(key) = object.key() else { continue };
+                let filename = key.strip_prefix(directory_prefix).unwrap_or(key);
 
-            if is_metadata(filename) {
-                continue;
-            }
+                if is_metadata(filename) {
+                    continue;
+                }
 
-            if expected_extensions
-                .iter()
-                .any(|ext| filename.ends_with(ext))
-            {
-                let last_modified = extract_last_modified(object)?;
-                let url = self.generate_presigned_url(key).await?;
-                return Ok((url, last_modified));
+                if filename.ends_with(ext) {
+                    let last_modified = extract_last_modified(object)?;
+                    let url = self.generate_presigned_url(key).await?;
+                    return Ok((url, last_modified));
+                }
             }
         }
 
-        // Fallback: return the first non-metadata file
-        for object in resp.contents() {
+        for object in &objects {
             let Some(key) = object.key() else { continue };
             let filename = key.strip_prefix(directory_prefix).unwrap_or(key);
 
@@ -669,15 +676,20 @@ impl AppState {
     }
 }
 
-fn extract_last_modified(
-    object: &aws_sdk_s3::types::Object,
-) -> Result<DateTime<Utc>, UpdateServiceError> {
+fn extract_last_modified(object: &Object) -> Result<DateTime<Utc>, UpdateServiceError> {
     let smithy_dt = object.last_modified().ok_or_else(|| {
         UpdateServiceError::S3Error("Object missing last_modified timestamp".to_owned())
     })?;
 
-    DateTime::from_timestamp(smithy_dt.secs(), smithy_dt.subsec_nanos())
-        .ok_or_else(|| UpdateServiceError::S3Error("Invalid S3 timestamp".to_owned()))
+    let nanos = smithy_dt.subsec_nanos().clamp(0, 999_999_999);
+
+    DateTime::from_timestamp(smithy_dt.secs(), nanos).ok_or_else(|| {
+        UpdateServiceError::S3Error(format!(
+            "Invalid S3 timestamp: secs={}, nanos={}",
+            smithy_dt.secs(),
+            nanos,
+        ))
+    })
 }
 
 fn update_max(current: &mut Option<DateTime<Utc>>, candidate: DateTime<Utc>) {

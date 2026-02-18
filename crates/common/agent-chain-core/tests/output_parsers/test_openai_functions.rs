@@ -35,7 +35,6 @@ fn test_json_output_function_parser() {
     let chat_generation =
         make_function_call_generation("function_name", "{\"arg1\": \"code\\ncode\"}");
 
-    // Full output (args_only=false) with non-strict mode
     let parser = JsonOutputFunctionsParser::new(false);
     let result = parser
         .parse_result(std::slice::from_ref(&chat_generation))
@@ -45,14 +44,12 @@ fn test_json_output_function_parser() {
         Some(json!({"arguments": {"arg1": "code\ncode"}, "name": "function_name"}))
     );
 
-    // Args only
     let parser = JsonOutputFunctionsParser::new(true);
     let result = parser
         .parse_result(std::slice::from_ref(&chat_generation))
         .unwrap();
     assert_eq!(result, Some(json!({"arg1": "code\ncode"})));
 
-    // Verify that the original message is not modified
     let additional_kwargs = chat_generation.message.additional_kwargs().unwrap();
     let function_call = additional_kwargs.get("function_call").unwrap();
     assert_eq!(
@@ -221,8 +218,6 @@ fn test_pydantic_output_functions_parser_multiple_schemas() {
         species: String,
     }
 
-    // In the Python test, function_name is "cookie" and the schema dict maps
-    // "cookie" -> Cookie, "dog" -> Dog. We replicate this with the resolver pattern.
     #[derive(Debug, Clone, PartialEq)]
     enum SchemaResult {
         Cookie(Cookie),

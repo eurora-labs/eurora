@@ -92,7 +92,6 @@ impl BaseOutputParser for CommaSeparatedListOutputParser {
     type Output = Vec<String>;
 
     fn parse(&self, text: &str) -> Result<Vec<String>> {
-        // Try to parse as CSV first
         let mut reader = csv::ReaderBuilder::new()
             .has_headers(false)
             .flexible(true)
@@ -110,7 +109,6 @@ impl BaseOutputParser for CommaSeparatedListOutputParser {
                     }
                 }
                 Err(_) => {
-                    // Fallback to simple split
                     return Ok(text
                         .split(',')
                         .map(|s| s.trim().to_string())
@@ -121,7 +119,6 @@ impl BaseOutputParser for CommaSeparatedListOutputParser {
         }
 
         if result.is_empty() {
-            // Fallback to simple split
             Ok(text
                 .split(',')
                 .map(|s| s.trim().to_string())
@@ -375,7 +372,6 @@ impl ListOutputParser for MarkdownListOutputParser {
         text.lines()
             .filter_map(|line| {
                 let line_start = offset;
-                // +1 accounts for the newline character (or 0 at end of text)
                 offset += line.len() + 1;
                 re.captures(line).and_then(|cap| {
                     let group = cap.get(1)?;

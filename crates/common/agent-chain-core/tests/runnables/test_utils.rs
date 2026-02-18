@@ -22,10 +22,6 @@ use agent_chain_core::runnables::utils::{
     indent_lines_after_first,
 };
 
-// ============================================================================
-// Tests for indent_lines_after_first
-// ============================================================================
-
 struct IndentTestCase {
     text: &'static str,
     prefix: &'static str,
@@ -66,10 +62,6 @@ fn test_indent_lines_after_first_empty_prefix() {
     let result = indent_lines_after_first("a\nb\nc", "");
     assert_eq!(result, "a\nb\nc");
 }
-
-// ============================================================================
-// Tests for AddableDict
-// ============================================================================
 
 #[test]
 fn test_addable_dict_add_basic() {
@@ -168,14 +160,6 @@ fn test_addable_dict_preserves_dict_behavior() {
     assert_eq!(d.0.len(), 1);
 }
 
-// ============================================================================
-// Tests for add()
-// ============================================================================
-
-// ============================================================================
-// Tests for gather_with_concurrency
-// ============================================================================
-
 #[tokio::test]
 async fn test_gather_with_concurrency_none() {
     let futures: Vec<Pin<Box<dyn Future<Output = i32> + Send>>> = vec![
@@ -220,10 +204,6 @@ async fn test_gather_with_concurrency_empty() {
     let results = gather_with_concurrency(Some(5), futures).await;
     assert!(results.is_empty());
 }
-
-// ============================================================================
-// Tests for ConfigurableField
-// ============================================================================
 
 #[test]
 fn test_configurable_field_defaults() {
@@ -341,10 +321,6 @@ fn test_configurable_field_multi_option_hash() {
     assert_eq!(compute_hash(&f1), compute_hash(&f2));
 }
 
-// ============================================================================
-// Tests for ConfigurableFieldSpec
-// ============================================================================
-
 #[test]
 fn test_configurable_field_spec_defaults() {
     let spec = ConfigurableFieldSpec::new("s", "str");
@@ -366,10 +342,6 @@ fn test_configurable_field_spec_with_dependencies() {
         Some(vec!["dep1".to_string(), "dep2".to_string()])
     );
 }
-
-// ============================================================================
-// Tests for get_unique_config_specs
-// ============================================================================
 
 #[test]
 fn test_get_unique_config_specs_no_duplicates() {
@@ -410,10 +382,6 @@ fn test_get_unique_config_specs_empty() {
     let result = get_unique_config_specs(Vec::<ConfigurableFieldSpec>::new()).unwrap();
     assert!(result.is_empty());
 }
-
-// ============================================================================
-// Tests for RootEventFilter
-// ============================================================================
 
 #[test]
 fn test_root_event_filter_include_all_by_default() {

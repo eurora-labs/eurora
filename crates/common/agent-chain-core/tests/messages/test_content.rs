@@ -16,10 +16,6 @@ use agent_chain_core::messages::{
 };
 use serde_json::json;
 
-// ============================================================================
-// TestKnownBlockTypes - Tests for KNOWN_BLOCK_TYPES constant
-// ============================================================================
-
 #[test]
 fn test_known_block_types_contains_text() {
     assert!(KNOWN_BLOCK_TYPES.contains(&"text"));
@@ -59,10 +55,6 @@ fn test_known_block_types_contains_video() {
 fn test_known_block_types_contains_non_standard() {
     assert!(KNOWN_BLOCK_TYPES.contains(&"non_standard"));
 }
-
-// ============================================================================
-// TestIsDataContentBlock - Tests for is_data_content_block function
-// ============================================================================
 
 #[test]
 fn test_image_block_with_url() {
@@ -260,10 +252,6 @@ fn test_edge_case_missing_type() {
     assert!(!is_data_content_block(&block));
 }
 
-// ============================================================================
-// TestCreateTextBlock - Tests for create_text_block factory function
-// ============================================================================
-
 #[test]
 fn test_basic_text_block() {
     let block = create_text_block("Hello world", None, None, None, None);
@@ -325,10 +313,6 @@ fn test_text_block_with_none_extras() {
     let block = create_text_block("hello", None, None, None, None);
     assert!(block.extras.is_none());
 }
-
-// ============================================================================
-// TestCreateImageBlock - Tests for create_image_block factory function
-// ============================================================================
 
 #[test]
 fn test_create_image_block_with_url() {
@@ -454,10 +438,6 @@ fn test_create_image_block_base64_without_mime_type_does_not_raise() {
     assert!(block.mime_type.is_none());
 }
 
-// ============================================================================
-// TestCreateVideoBlock - Tests for create_video_block factory function
-// ============================================================================
-
 #[test]
 fn test_create_video_block_with_url() {
     let block = create_video_block(
@@ -544,10 +524,6 @@ fn test_create_video_block_with_custom_id() {
     assert_eq!(block.id.as_ref().unwrap(), "vid-123");
 }
 
-// ============================================================================
-// TestCreateAudioBlock - Tests for create_audio_block factory function
-// ============================================================================
-
 #[test]
 fn test_create_audio_block_with_url() {
     let block = create_audio_block(
@@ -633,10 +609,6 @@ fn test_create_audio_block_with_custom_id() {
     .unwrap();
     assert_eq!(block.id.as_ref().unwrap(), "aud-123");
 }
-
-// ============================================================================
-// TestCreateFileBlock - Tests for create_file_block factory function
-// ============================================================================
 
 #[test]
 fn test_create_file_block_with_url() {
@@ -745,10 +717,6 @@ fn test_create_file_block_all_fields_populated() {
     assert_eq!(block.id.as_ref().unwrap(), "file-all");
     assert!(block.index.is_some());
 }
-
-// ============================================================================
-// TestCreatePlaintextBlock - Tests for create_plaintext_block factory function
-// ============================================================================
 
 #[test]
 fn test_plaintext_block_with_text() {
@@ -861,10 +829,6 @@ fn test_plaintext_block_with_extras() {
     assert_eq!(block_extras["another"], json!("val"));
 }
 
-// ============================================================================
-// TestCreateToolCall - Tests for create_tool_call factory function
-// ============================================================================
-
 #[test]
 fn test_basic_tool_call() {
     let mut args = HashMap::new();
@@ -946,10 +910,6 @@ fn test_tool_call_auto_generated_ids_are_unique() {
     assert_ne!(block_a.id, block_b.id);
 }
 
-// ============================================================================
-// TestCreateReasoningBlock - Tests for create_reasoning_block factory function
-// ============================================================================
-
 #[test]
 fn test_basic_reasoning_block() {
     let block = create_reasoning_block(
@@ -1004,10 +964,6 @@ fn test_reasoning_block_none_reasoning_defaults_to_empty_string() {
     assert_eq!(block.block_type, "reasoning");
     assert!(block.id.is_some());
 }
-
-// ============================================================================
-// TestCreateCitation - Tests for create_citation factory function
-// ============================================================================
 
 #[test]
 fn test_basic_citation() {
@@ -1107,10 +1063,6 @@ fn test_citation_with_no_optional_fields() {
     }
 }
 
-// ============================================================================
-// TestCreateNonStandardBlock - Tests for create_non_standard_block factory
-// ============================================================================
-
 #[test]
 fn test_basic_non_standard_block() {
     let mut value = HashMap::new();
@@ -1156,10 +1108,6 @@ fn test_non_standard_block_empty_dict_value() {
     assert!(block.value.is_empty());
     assert!(block.id.as_ref().unwrap().starts_with("lc_"));
 }
-
-// ============================================================================
-// TestTypedDictStructures - Tests to verify struct structures
-// ============================================================================
 
 #[test]
 fn test_text_content_block_structure() {
@@ -1294,10 +1242,6 @@ fn test_non_standard_content_block_structure() {
     assert_eq!(block.block_type, "non_standard");
 }
 
-// ============================================================================
-// TestKnownBlockTypesSnapshot - Snapshot-style tests for KNOWN_BLOCK_TYPES
-// ============================================================================
-
 #[test]
 fn test_known_block_types_exact_set() {
     let expected: HashSet<&str> = [
@@ -1338,10 +1282,6 @@ fn test_non_standard_annotation_not_in_known_block_types() {
     assert!(!KNOWN_BLOCK_TYPES.contains(&"non_standard_annotation"));
 }
 
-// ============================================================================
-// TestGetDataContentBlockTypes - Tests for get_data_content_block_types
-// ============================================================================
-
 #[test]
 fn test_get_data_content_block_types_returns_slice() {
     let result = get_data_content_block_types();
@@ -1365,10 +1305,6 @@ fn test_get_data_content_block_types_each_member_is_string() {
         assert!(!item.is_empty());
     }
 }
-
-// ============================================================================
-// TestIsDataContentBlockAdditional - Additional edge-case tests
-// ============================================================================
 
 #[test]
 fn test_plaintext_block_with_source_type_text_and_url() {
@@ -1397,10 +1333,6 @@ fn test_audio_block_with_file_id_is_data_content() {
     let block = json!({"type": "audio", "file_id": "aud-file-002"});
     assert!(is_data_content_block(&block));
 }
-
-// ============================================================================
-// TestContentBlockUnionType - Verify ContentBlock enum variants
-// ============================================================================
 
 fn assert_content_block_has_type(block: &ContentBlock) {
     let json = serde_json::to_value(block).unwrap();
@@ -1514,10 +1446,6 @@ fn test_content_block_non_standard() {
     assert_content_block_has_type(&cb);
 }
 
-// ============================================================================
-// TestDataContentBlockUnionType - Verify DataContentBlock enum variants
-// ============================================================================
-
 fn assert_data_block_has_type(block: &DataContentBlock) {
     let json = serde_json::to_value(block).unwrap();
     assert!(json.get("type").is_some());
@@ -1563,9 +1491,6 @@ fn test_data_content_block_file() {
 
 #[test]
 fn test_data_content_block_union_has_exactly_five_members() {
-    // Verify that DataContentBlock has exactly 5 variants by constructing each one.
-    // In Rust, enum variant count is enforced at compile time. We verify by
-    // constructing one of each and checking that matches are exhaustive.
     let variants: Vec<DataContentBlock> = vec![
         DataContentBlock::Image(ImageContentBlock::new()),
         DataContentBlock::Video(VideoContentBlock::new()),

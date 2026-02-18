@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { type ConversationView, type TimelineAppEvent } from '$lib/bindings/bindings.js';
+	import { type ThreadView, type TimelineAppEvent } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
@@ -12,15 +12,17 @@
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import LogoutIcon from '@lucide/svelte/icons/log-out';
 	import PowerIcon from '@lucide/svelte/icons/power';
+	import { Spinner } from '@eurora/ui/components/spinner/index';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	const taurpc = inject(TAURPC_SERVICE);
-	let conversations: ConversationView[] = $state([]);
+	let threads: ThreadView[] = $state([]);
 	let timelineItems: TimelineAppEvent[] = $state([]);
 
 	let sidebarState: ReturnType<typeof useSidebar> | undefined = $state(undefined);
+	let chatsLoading = $state(true);
 	let quitDialogOpen = $state(false);
 	let username = $state('');
 
@@ -51,33 +53,38 @@
 		taurpc.auth
 			.is_authenticated()
 			.then((isAuthenticated) => {
-				if (!isAuthenticated) return;
+				if (!isAuthenticated) {
+					chatsLoading = false;
+					return;
+				}
 				taurpc.auth.get_username().then((name) => {
 					username = name;
 				});
-				taurpc.conversation.list(10, 0).then((res) => {
-					conversations = res;
+				taurpc.thread.list(10, 0).then((res) => {
+					threads = res;
+					chatsLoading = false;
 				});
 
 				unlistenPromises.push(
-					taurpc.conversation.new_conversation_added.on((conversation) => {
-						if (!conversations.some((c) => c.id === conversation.id)) {
-							conversations = [conversation, ...conversations];
+					taurpc.thread.new_thread_added.on((thread) => {
+						if (!threads.some((c) => c.id === thread.id)) {
+							threads = [thread, ...threads];
 						}
 					}),
 				);
 
 				unlistenPromises.push(
-					taurpc.conversation.conversation_title_changed.on((conversation) => {
-						for (const c of conversations) {
-							if (c.id === conversation.id) {
-								c.title = conversation.title;
+					taurpc.thread.thread_title_changed.on((thread) => {
+						for (const c of threads) {
+							if (c.id === thread.id) {
+								c.title = thread.title;
 							}
 						}
 					}),
 				);
 			})
 			.catch((error) => {
+				chatsLoading = false;
 				goto('/onboarding');
 
 				console.error('Failed to check authentication:', error);
@@ -91,8 +98,8 @@
 	});
 
 	async function createChat() {
-		await taurpc.conversation.create_empty_conversation().catch((error) => {
-			console.error('Failed to create conversation:', error);
+		await taurpc.thread.create_empty_thread().catch((error) => {
+			console.error('Failed to create thread:', error);
 			toast.error(`The app encountered the following error: ${error}`, {
 				description: 'Please try again later.',
 				duration: 5000,
@@ -104,8 +111,8 @@
 		});
 	}
 
-	async function switchConversation(id: string) {
-		await taurpc.conversation.switch_conversation(id);
+	async function switchThread(id: string) {
+		await taurpc.thread.switch_thread(id);
 	}
 
 	async function quit() {
@@ -150,28 +157,38 @@
 				</Sidebar.Menu>
 			</Sidebar.GroupContent>
 		</Sidebar.Group>
-		{#if conversations.length > 0 && sidebarState?.open}
+		{#if sidebarState?.open}
 			<Sidebar.Group>
 				<Sidebar.GroupLabel>Chats</Sidebar.GroupLabel>
 
 				<Sidebar.GroupContent>
-					<Sidebar.Menu>
-						{#each conversations as item (item.id)}
-							<Sidebar.MenuItem>
-								<Sidebar.MenuButton
-									onclick={() => {
-										switchConversation(item.id ?? '');
-									}}
-								>
-									{#snippet child({ props })}
-										<a {...props}>
-											<span>{item.title ?? 'New Conversation'}</span>
-										</a>
-									{/snippet}
-								</Sidebar.MenuButton>
-							</Sidebar.MenuItem>
-						{/each}
-					</Sidebar.Menu>
+					{#if chatsLoading}
+						<div class="flex items-center justify-center py-4">
+							<Spinner />
+						</div>
+					{:else if threads.length === 0}
+						<p class="px-3 py-4 text-sm text-muted-foreground text-center">
+							No Chats Yet
+						</p>
+					{:else}
+						<Sidebar.Menu>
+							{#each threads as item (item.id)}
+								<Sidebar.MenuItem>
+									<Sidebar.MenuButton
+										onclick={() => {
+											switchThread(item.id ?? '');
+										}}
+									>
+										{#snippet child({ props })}
+											<a {...props}>
+												<span>{item.title ?? 'New Thread'}</span>
+											</a>
+										{/snippet}
+									</Sidebar.MenuButton>
+								</Sidebar.MenuItem>
+							{/each}
+						</Sidebar.Menu>
+					{/if}
 				</Sidebar.GroupContent>
 			</Sidebar.Group>
 		{/if}

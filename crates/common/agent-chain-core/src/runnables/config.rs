@@ -156,10 +156,6 @@ impl From<Vec<RunnableConfig>> for ConfigOrList {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Context variable for child runnable config
-// ---------------------------------------------------------------------------
-
 thread_local! {
     static VAR_CHILD_RUNNABLE_CONFIG: RefCell<Option<RunnableConfig>> = const { RefCell::new(None) };
 }
@@ -191,10 +187,6 @@ pub fn get_child_runnable_config() -> Option<RunnableConfig> {
     VAR_CHILD_RUNNABLE_CONFIG.with(|cell| cell.borrow().clone())
 }
 
-// ---------------------------------------------------------------------------
-// ensure_config
-// ---------------------------------------------------------------------------
-
 /// Ensure that a config has all keys present with defaults.
 ///
 /// Reads from the thread-local child runnable config context variable,
@@ -203,17 +195,14 @@ pub fn get_child_runnable_config() -> Option<RunnableConfig> {
 pub fn ensure_config(config: Option<RunnableConfig>) -> RunnableConfig {
     let mut result = RunnableConfig::default();
 
-    // Merge from context variable (parent runnable config)
     if let Some(var_config) = get_child_runnable_config() {
         merge_into_config(&mut result, &var_config);
     }
 
-    // Merge from the provided config
     if let Some(config) = &config {
         merge_into_config(&mut result, config);
     }
 
-    // Copy primitive configurable values into metadata
     for (key, value) in &result.configurable {
         if key.starts_with("__") || key == "api_key" {
             continue;
@@ -262,10 +251,6 @@ fn merge_into_config(target: &mut RunnableConfig, source: &RunnableConfig) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// get_config_list
-// ---------------------------------------------------------------------------
-
 /// Get a list of configs from either a single config or a list.
 ///
 /// If a single config is provided, it will be cloned `length` times.
@@ -306,10 +291,6 @@ pub fn get_config_list(config: Option<ConfigOrList>, length: usize) -> Vec<Runna
         None => (0..length).map(|_| ensure_config(None)).collect(),
     }
 }
-
-// ---------------------------------------------------------------------------
-// patch_config
-// ---------------------------------------------------------------------------
 
 /// Patch a config with updates.
 ///
@@ -354,10 +335,6 @@ pub fn patch_config(
     config
 }
 
-// ---------------------------------------------------------------------------
-// merge_configs
-// ---------------------------------------------------------------------------
-
 /// Merge multiple configs into one.
 ///
 /// Later configs take precedence over earlier ones.
@@ -376,7 +353,6 @@ pub fn merge_configs(configs: Vec<Option<RunnableConfig>>) -> RunnableConfig {
     for config in configs.into_iter().flatten() {
         let config = ensure_config(Some(config));
 
-        // Merge tags (sorted and deduplicated)
         for tag in config.tags {
             if !base.tags.contains(&tag) {
                 base.tags.push(tag);
@@ -384,10 +360,8 @@ pub fn merge_configs(configs: Vec<Option<RunnableConfig>>) -> RunnableConfig {
         }
         base.tags.sort();
 
-        // Merge metadata
         base.metadata.extend(config.metadata);
 
-        // Handle callbacks merging
         match (&base.callbacks, &config.callbacks) {
             (_, None) => {}
             (None, Some(cb)) => {
@@ -417,15 +391,12 @@ pub fn merge_configs(configs: Vec<Option<RunnableConfig>>) -> RunnableConfig {
             }
         }
 
-        // Merge configurable
         base.configurable.extend(config.configurable);
 
-        // Only update recursion_limit if it's not the default
         if config.recursion_limit != DEFAULT_RECURSION_LIMIT {
             base.recursion_limit = config.recursion_limit;
         }
 
-        // Take last non-None value for other fields
         if config.run_name.is_some() {
             base.run_name = config.run_name;
         }
@@ -439,10 +410,6 @@ pub fn merge_configs(configs: Vec<Option<RunnableConfig>>) -> RunnableConfig {
 
     base
 }
-
-// ---------------------------------------------------------------------------
-// call_func_with_variable_args
-// ---------------------------------------------------------------------------
 
 /// A callable that takes input and optionally a config.
 ///
@@ -495,10 +462,6 @@ pub async fn acall_func_with_variable_args<I, O>(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Callback manager helpers
-// ---------------------------------------------------------------------------
-
 /// Get a callback manager configured from the given RunnableConfig.
 pub fn get_callback_manager_for_config(config: &RunnableConfig) -> CallbackManager {
     CallbackManager::configure(
@@ -524,10 +487,6 @@ pub fn get_async_callback_manager_for_config(config: &RunnableConfig) -> AsyncCa
         None,
     )
 }
-
-// ---------------------------------------------------------------------------
-// run_in_executor
-// ---------------------------------------------------------------------------
 
 /// Run a synchronous function on a blocking thread.
 ///
@@ -602,10 +561,8 @@ mod tests {
         assert_eq!(ensured.metadata["model"], serde_json::json!("gpt-4"));
         assert_eq!(ensured.metadata["temperature"], serde_json::json!(0.7));
         assert_eq!(ensured.metadata["verbose"], serde_json::json!(true));
-        // __internal and api_key should NOT be copied
         assert!(!ensured.metadata.contains_key("__internal"));
         assert!(!ensured.metadata.contains_key("api_key"));
-        // Nested objects should NOT be copied
         assert!(!ensured.metadata.contains_key("nested"));
     }
 

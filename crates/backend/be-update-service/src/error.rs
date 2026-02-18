@@ -24,14 +24,8 @@ pub enum UpdateServiceError {
     #[error("Invalid channel: {0}")]
     InvalidChannel(String),
 
-    #[error("Invalid browser type: {0}")]
-    InvalidBrowserType(String),
-
     #[error("Invalid extension channel: {0}")]
     InvalidExtensionChannel(String),
-
-    #[error("Extension not found for browser '{browser}' channel '{channel}'")]
-    ExtensionNotFound { browser: String, channel: String },
 
     #[error("S3 operation failed: {0}")]
     S3Error(String),
@@ -82,18 +76,6 @@ impl IntoResponse for UpdateServiceError {
                     )),
                 )
             }
-            UpdateServiceError::InvalidBrowserType(b) => {
-                warn!("Invalid browser type: {}", b);
-                (
-                    StatusCode::BAD_REQUEST,
-                    "invalid_browser_type",
-                    "Invalid browser type",
-                    Some(format!(
-                        "Browser '{}' is not supported. Use 'firefox', 'chrome', or 'safari'",
-                        b
-                    )),
-                )
-            }
             UpdateServiceError::InvalidExtensionChannel(c) => {
                 warn!("Invalid extension channel: {}", c);
                 (
@@ -103,21 +85,6 @@ impl IntoResponse for UpdateServiceError {
                     Some(format!(
                         "Channel '{}' is not supported. Use 'release' or 'nightly'",
                         c
-                    )),
-                )
-            }
-            UpdateServiceError::ExtensionNotFound { browser, channel } => {
-                warn!(
-                    "Extension not found for browser '{}' channel '{}'",
-                    browser, channel
-                );
-                (
-                    StatusCode::NOT_FOUND,
-                    "extension_not_found",
-                    "Extension version not found",
-                    Some(format!(
-                        "No extension found for browser '{}' in channel '{}'",
-                        browser, channel
                     )),
                 )
             }

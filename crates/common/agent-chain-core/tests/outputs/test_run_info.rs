@@ -36,7 +36,6 @@ mod run_info_tests {
     fn test_run_id_is_uuid_type() {
         let run_id = Uuid::new_v4();
         let run_info = RunInfo::new(run_id);
-        // In Rust, type checking is compile-time, but we verify the value is correct
         let _: Uuid = run_info.run_id;
     }
 
@@ -68,9 +67,6 @@ mod run_info_tests {
         let run_info2 = RunInfo::new(run_id2);
         assert_ne!(run_info1, run_info2);
     }
-
-    // Note: test_run_info_is_pydantic_model - Rust doesn't use Pydantic.
-    // RunInfo is a plain struct with Serde derives.
 
     /// Test serialization of RunInfo to dictionary (via serde_json).
     #[test]
@@ -113,9 +109,6 @@ mod run_info_tests {
         assert_eq!(deserialized.run_id, run_id);
     }
 
-    // Note: test_run_id_immutability - In Rust, struct fields are mutable by default
-    // if you have ownership. This is different from Python's Pydantic models.
-    // We can demonstrate mutability:
     #[test]
     fn test_run_id_mutability() {
         let run_id = Uuid::new_v4();
@@ -142,7 +135,6 @@ mod run_info_tests {
     fn test_str_representation() {
         let run_id = Uuid::new_v4();
         let run_info = RunInfo::new(run_id);
-        // In Rust, Debug is used for representation
         let str_repr = format!("{:?}", run_info);
         assert!(str_repr.contains("run_id"));
     }
@@ -200,7 +192,6 @@ mod run_info_tests {
     #[test]
     fn test_new_random() {
         let run_info = RunInfo::new_random();
-        // UUID v4 has version field set to 4
         assert_eq!(run_info.run_id.get_version_num(), 4);
     }
 
@@ -208,7 +199,6 @@ mod run_info_tests {
     #[test]
     fn test_default() {
         let run_info = RunInfo::default();
-        // Default uses new_random, so should be v4 UUID
         assert_eq!(run_info.run_id.get_version_num(), 4);
     }
 }

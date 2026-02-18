@@ -29,7 +29,6 @@ fn test_icon_format_png() {
         return;
     }
 
-    // This test is primarily for Windows/macOS where icons are returned as PNG bytes
     #[cfg(any(target_os = "windows", target_os = "macos"))]
     {
         let focus_events = Arc::new(Mutex::new(Vec::<FocusedWindow>::new()));
@@ -37,17 +36,14 @@ fn test_icon_format_png() {
         let stop_signal = Arc::new(AtomicBool::new(false));
         let stop_signal_clone = stop_signal.clone();
 
-        // Spawn a test window
         match spawn_test_window("PNG Icon Test Window") {
             Ok(mut child) => {
                 info!("Spawned test window for PNG icon test");
 
-                // Focus the window
                 if let Err(e) = focus_window(&mut child) {
                     info!("Warning: Failed to focus window: {}", e);
                 }
 
-                // Start focus tracking
                 let tracker_handle = std::thread::spawn(move || {
                     let tracker = FocusTracker::new();
                     let _ = tracker.track_focus_with_stop(
@@ -61,12 +57,10 @@ fn test_icon_format_png() {
                     );
                 });
 
-                // Let it run briefly
                 std::thread::sleep(Duration::from_millis(1000));
                 stop_signal.store(true, Ordering::Relaxed);
                 let _ = tracker_handle.join();
 
-                // Cleanup
                 if let Err(e) = cleanup_child_process(child) {
                     info!("Warning: Failed to cleanup child process: {}", e);
                 }
@@ -97,7 +91,6 @@ fn test_icon_format_rgba() {
         return;
     }
 
-    // This test is primarily for X11 systems using _NET_WM_ICON
     #[cfg(target_os = "linux")]
     {
         let focus_events = Arc::new(Mutex::new(Vec::<FocusedWindow>::new()));
@@ -105,17 +98,14 @@ fn test_icon_format_rgba() {
         let stop_signal = Arc::new(AtomicBool::new(false));
         let stop_signal_clone = stop_signal.clone();
 
-        // Spawn a test window
         match spawn_test_window("RGBA Icon Test Window") {
             Ok(mut child) => {
                 info!("Spawned test window for RGBA icon test");
 
-                // Focus the window
                 if let Err(e) = focus_window(&mut child) {
                     info!("Warning: Failed to focus window: {}", e);
                 }
 
-                // Start focus tracking
                 let tracker_handle = std::thread::spawn(move || {
                     let tracker = FocusTracker::new();
                     let _ = tracker.track_focus_with_stop(
@@ -129,17 +119,13 @@ fn test_icon_format_rgba() {
                     );
                 });
 
-                // Let it run briefly
                 std::thread::sleep(Duration::from_millis(1000));
                 stop_signal.store(true, Ordering::Relaxed);
                 let _ = tracker_handle.join();
 
-                // Check for RGBA format icons
                 if let Ok(events) = focus_events.lock() {
                     for event in events.iter() {
                         if let Some(icon) = &event.icon {
-                            // For X11 _NET_WM_ICON, we expect RGBA format
-                            // Assert width * height * 4 == data.len()
                             let expected_size = icon.width() * icon.height() * 4;
                             let actual_size = icon.pixels().len() as u32;
 
@@ -151,7 +137,6 @@ fn test_icon_format_rgba() {
                                 actual_size
                             );
 
-                            // Always assert for RGBA format on Linux X11
                             assert_eq!(
                                 expected_size, actual_size,
                                 "Icon data size should match width * height * 4 for RGBA format. Expected: {expected_size} bytes, Actual: {actual_size} bytes",
@@ -161,7 +146,6 @@ fn test_icon_format_rgba() {
                     }
                 }
 
-                // Cleanup
                 if let Err(e) = cleanup_child_process(child) {
                     info!("Warning: Failed to cleanup child process: {}", e);
                 }
@@ -192,7 +176,6 @@ fn test_icon_diff_between_apps() {
         return;
     }
 
-    // Test with multiple different window titles to simulate different apps
     let test_windows = vec!["Text Editor Window", "Browser Window", "Terminal Window"];
 
     for window_title in test_windows {
@@ -205,12 +188,10 @@ fn test_icon_diff_between_apps() {
             Ok(mut child) => {
                 info!("Spawned test window: {}", window_title);
 
-                // Focus the window
                 if let Err(e) = focus_window(&mut child) {
                     info!("Warning: Failed to focus window: {}", e);
                 }
 
-                // Start focus tracking
                 let tracker_handle = std::thread::spawn(move || {
                     let tracker = FocusTracker::new();
                     let _ = tracker.track_focus_with_stop(
@@ -224,17 +205,14 @@ fn test_icon_diff_between_apps() {
                     );
                 });
 
-                // Let it run briefly
                 std::thread::sleep(Duration::from_millis(1000));
                 stop_signal.store(true, Ordering::Relaxed);
                 let _ = tracker_handle.join();
 
-                // Cleanup
                 if let Err(e) = cleanup_child_process(child) {
                     info!("Warning: Failed to cleanup child process: {}", e);
                 }
 
-                // Small delay between windows
                 std::thread::sleep(Duration::from_millis(500));
             }
             Err(e) => {

@@ -27,8 +27,6 @@ fn swap_case(s: &str) -> String {
         .collect()
 }
 
-// --- BaseGenerationOutputParser test ---
-
 /// A parser that inverts the case of the characters in the message.
 /// Implements BaseGenerationOutputParser (via BaseLLMOutputParser + BaseGenerationOutputParser).
 #[derive(Debug)]
@@ -53,7 +51,6 @@ impl BaseGenerationOutputParser for GenerationStrInvertCase {}
 async fn test_base_generation_parser() {
     let model = GenericFakeChatModel::from_vec(vec![AIMessage::builder().content("hEllo").build()]);
 
-    // Simulate model | StrInvertCase: invoke model, then invoke parser on the output
     let model_output = model
         ._generate(
             vec![BaseMessage::Human(
@@ -72,8 +69,6 @@ async fn test_base_generation_parser() {
 
     assert_eq!(result, "HeLLO");
 }
-
-// --- BaseTransformOutputParser test ---
 
 /// A parser that inverts the case of the characters in the message.
 /// Implements BaseTransformOutputParser (via BaseOutputParser + BaseTransformOutputParser).
@@ -110,7 +105,6 @@ async fn test_base_transform_output_parser() {
     let model =
         GenericFakeChatModel::from_vec(vec![AIMessage::builder().content("hello world").build()]);
 
-    // Stream from model: GenericFakeChatModel splits on whitespace, preserving it
     let stream = model
         ._stream(
             vec![BaseMessage::Human(

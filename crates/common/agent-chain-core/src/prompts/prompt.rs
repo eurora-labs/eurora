@@ -101,8 +101,6 @@ impl PromptTemplate {
     ) -> Result<Self> {
         let template = template.into();
 
-        // Python always re-infers input_variables from the template,
-        // even when user-provided ones are given (lines 108-110 of prompt.py).
         let _ = input_variables;
         let input_variables = get_template_variables(&template, template_format)?;
 
@@ -486,8 +484,6 @@ impl Runnable for PromptTemplate {
         self.invoke(input, config)
     }
 }
-
-// --- Serializable impl ---
 
 use crate::load::Serializable;
 use serde_json::Value;

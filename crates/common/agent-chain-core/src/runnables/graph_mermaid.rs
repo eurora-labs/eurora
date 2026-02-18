@@ -42,7 +42,6 @@ fn value_to_yaml(value: &Value, indent: usize) -> String {
                 match val {
                     Value::Object(_) => {
                         lines.push(format!("{}{}:", prefix, key));
-                        // Recurse without adding prefix on the nested call output
                         let nested = value_to_yaml(val, indent + 2);
                         lines.push(nested);
                     }
@@ -87,11 +86,9 @@ pub fn draw_mermaid(
     wrap_label_n_words: usize,
     frontmatter_config: Option<&HashMap<String, Value>>,
 ) -> Result<String> {
-    // Build frontmatter config with curve style
     let original_config = frontmatter_config.cloned().unwrap_or_default();
 
     let mut mermaid_graph = if with_styles {
-        // Build nested config with flowchart curve
         let mut config_obj = match original_config.get("config") {
             Some(Value::Object(m)) => m.clone(),
             _ => serde_json::Map::new(),
@@ -115,7 +112,6 @@ pub fn draw_mermaid(
         "graph TD;\n".to_string()
     };
 
-    // Group nodes by subgraph
     let mut subgraph_nodes: HashMap<String, Vec<(&String, &Node)>> = HashMap::new();
     let mut regular_nodes: Vec<(&String, &Node)> = Vec::new();
 
@@ -129,10 +125,8 @@ pub fn draw_mermaid(
         }
     }
 
-    // Sort regular nodes for deterministic output
     regular_nodes.sort_by_key(|(key, _)| (*key).clone());
 
-    // Node formatting
     let render_node = |key: &str, node: &Node, indent: &str| -> String {
         let node_name = node.name.split(':').next_back().unwrap_or(&node.name);
         let label = if node_name.starts_with(MARKDOWN_SPECIAL_CHARS)
@@ -174,14 +168,12 @@ pub fn draw_mermaid(
         format!("{}{}\n", indent, node_label)
     };
 
-    // Add non-subgraph nodes
     if with_styles {
         for (key, node) in &regular_nodes {
             mermaid_graph += &render_node(key, node, "\t");
         }
     }
 
-    // Group edges by their common prefixes
     let mut edge_groups: HashMap<String, Vec<&Edge>> = HashMap::new();
     for edge in edges {
         let src_parts: Vec<&str> = edge.source.split(':').collect();
@@ -198,7 +190,6 @@ pub fn draw_mermaid(
 
     let mut seen_subgraphs: HashSet<String> = HashSet::new();
 
-    // Recursive subgraph rendering
     #[allow(clippy::too_many_arguments)]
     fn add_subgraph(
         mermaid_graph: &mut String,
@@ -225,7 +216,6 @@ pub fn draw_mermaid(
             seen_subgraphs.insert(subgraph.to_string());
             mermaid_graph.push_str(&format!("\tsubgraph {}\n", subgraph));
 
-            // Add nodes belonging to this subgraph
             if with_styles && let Some(sub_nodes) = subgraph_nodes.get(prefix) {
                 let mut sorted_nodes: Vec<_> = sub_nodes.clone();
                 sorted_nodes.sort_by_key(|(key, _)| (*key).clone());
@@ -235,7 +225,6 @@ pub fn draw_mermaid(
             }
         }
 
-        // Render edges
         for edge in edges {
             let edge_label = if let Some(ref data) = edge.data {
                 let words: Vec<&str> = data.split_whitespace().collect();
@@ -267,7 +256,6 @@ pub fn draw_mermaid(
             ));
         }
 
-        // Recursively add nested subgraphs
         let prefix_with_colon = if prefix.is_empty() {
             String::new()
         } else {
@@ -312,7 +300,6 @@ pub fn draw_mermaid(
         Ok(())
     }
 
-    // Start with top-level edges
     if let Some(top_edges) = edge_groups.get("") {
         add_subgraph(
             &mut mermaid_graph,
@@ -329,7 +316,6 @@ pub fn draw_mermaid(
         )?;
     }
 
-    // Add remaining top-level subgraphs
     let mut top_level_prefixes: Vec<&String> = edge_groups
         .keys()
         .filter(|p| !p.is_empty() && !p.contains(':') && !seen_subgraphs.contains(&p.to_string()))
@@ -354,7 +340,6 @@ pub fn draw_mermaid(
         }
     }
 
-    // Add empty subgraphs (with nodes but no internal edges)
     if with_styles {
         let mut empty_prefixes: Vec<&String> = subgraph_nodes
             .keys()
@@ -383,7 +368,6 @@ pub fn draw_mermaid(
         }
     }
 
-    // Add styles
     if with_styles {
         mermaid_graph += &generate_mermaid_graph_styles(node_styles);
     }
@@ -447,7 +431,6 @@ async fn render_mermaid_using_api(
 
     let encoded = base64::engine::general_purpose::STANDARD.encode(mermaid_syntax.as_bytes());
 
-    // Normalize background color: hex codes stay as-is, named colors get "!" prefix
     let bg_color = match background_color {
         Some(color) => {
             let hex_pattern = regex::Regex::new(r"^#(?:[0-9a-fA-F]{3}){1,2}$")
@@ -490,7 +473,6 @@ async fn render_mermaid_using_api(
 
                 let status = response.status().as_u16();
 
-                // Retry on server errors (5xx)
                 if status >= 500 && attempt < max_retries {
                     let jitter = 0.5 + 0.5 * (attempt as f64 / max_retries.max(1) as f64);
                     let sleep_time = retry_delay_secs * (2.0_f64).powi(attempt as i32) * jitter;

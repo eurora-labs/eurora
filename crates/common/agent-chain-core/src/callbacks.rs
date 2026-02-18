@@ -42,14 +42,12 @@ pub mod stdout;
 pub mod streaming_stdout;
 pub mod usage;
 
-// Re-export base types
 pub use base::{
     ArcCallbackHandler, AsyncCallbackHandler, BaseCallbackHandler, BaseCallbackManager,
     BoxedCallbackHandler, CallbackManagerMixin, Callbacks, ChainManagerMixin, LLMManagerMixin,
     RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
 };
 
-// Re-export manager types
 pub use manager::{
     AsyncCallbackManager, AsyncCallbackManagerForChainGroup, AsyncCallbackManagerForChainRun,
     AsyncCallbackManagerForLLMRun, AsyncCallbackManagerForRetrieverRun,
@@ -60,14 +58,11 @@ pub use manager::{
     dispatch_custom_event, handle_event, trace_as_chain_group,
 };
 
-// Re-export file handler
 pub use file::FileCallbackHandler;
 
-// Re-export stdout handlers
 pub use stdout::{StdOutCallbackHandler, colors};
 pub use streaming_stdout::StreamingStdOutCallbackHandler;
 
-// Re-export usage tracking
 pub use usage::{
     UsageMetadataCallbackGuard, UsageMetadataCallbackHandler, get_usage_metadata_callback,
 };
@@ -79,16 +74,13 @@ mod tests {
 
     #[test]
     fn test_callback_system_integration() {
-        // Create handlers
         let stdout_handler = StdOutCallbackHandler::new();
         let streaming_handler = StreamingStdOutCallbackHandler::new();
 
-        // Create a callback manager
         let mut manager = CallbackManager::new();
         manager.add_handler(Arc::new(stdout_handler), true);
         manager.add_handler(Arc::new(streaming_handler), true);
 
-        // Verify handlers are added
         assert_eq!(manager.handlers.len(), 2);
         assert_eq!(manager.inheritable_handlers.len(), 2);
     }
@@ -99,18 +91,15 @@ mod tests {
         let handler = StdOutCallbackHandler::new();
         manager.add_handler(Arc::new(handler), true);
 
-        // Start a chain
         let run_manager = manager
             .on_chain_start()
             .serialized(&std::collections::HashMap::new())
             .inputs(&std::collections::HashMap::new())
             .call();
 
-        // Verify run manager was created
         assert!(!run_manager.run_id().is_nil());
         assert!(run_manager.parent_run_id().is_none());
 
-        // Get a child manager
         let child_manager = run_manager.get_child(Some("test"));
         assert!(child_manager.tags.contains(&"test".to_string()));
     }

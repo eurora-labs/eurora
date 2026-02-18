@@ -233,11 +233,11 @@ pub struct Activity {
 }
 
 // =============================================================================
-// Conversation Types
+// Thread Types
 // =============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct Conversation {
+pub struct Thread {
     pub id: Uuid,
     pub user_id: Uuid,
     pub title: Option<String>,
@@ -273,7 +273,7 @@ impl std::fmt::Display for MessageType {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Message {
     pub id: Uuid,
-    pub conversation_id: Uuid,
+    pub thread_id: Uuid,
     pub user_id: Uuid,
     pub message_type: MessageType,
     pub content: serde_json::Value,
@@ -285,30 +285,12 @@ pub struct Message {
 }
 
 // =============================================================================
-// Junction Types (Activity-Conversation)
+// Junction Types (Activity-Thread)
 // =============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct ActivityConversation {
+pub struct ActivityThread {
     pub activity_id: Uuid,
-    pub conversation_id: Uuid,
+    pub thread_id: Uuid,
     pub created_at: DateTime<Utc>,
-}
-
-// =============================================================================
-// Billing Types
-// =============================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct AccountBillingState {
-    pub account_id: Uuid,
-    pub stripe_subscription_id: Option<String>,
-    pub status: Option<String>,
-    pub current_period_start: Option<DateTime<Utc>>,
-    pub current_period_end: Option<DateTime<Utc>>,
-    pub cancel_at_period_end: Option<bool>,
-    pub plan_id: Option<String>,
-    pub plan_name: Option<String>,
-    pub max_users: Option<i32>,
-    pub max_projects: Option<i32>,
 }

@@ -90,9 +90,6 @@ pub trait BaseDocumentCompressor: Send + Sync {
     where
         Self: Sized,
     {
-        // Note: In a real implementation, this would need to be handled differently
-        // as we can't easily call async from sync without a runtime.
-        // This is a placeholder that indicates the sync version needs to be implemented.
         let _ = (documents, query, callbacks);
         Err("Sync version not implemented - use compress_documents instead".into())
     }

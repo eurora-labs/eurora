@@ -45,7 +45,6 @@ pub fn is_openai_data_block(block: &serde_json::Value, filter: Option<DataBlockF
                 return false;
             }
 
-            // Only allow keys: "type", "image_url", "detail" (matching Python behavior)
             if let Some(obj) = block.as_object()
                 && !obj
                     .keys()
@@ -54,7 +53,6 @@ pub fn is_openai_data_block(block: &serde_json::Value, filter: Option<DataBlockF
                 return false;
             }
 
-            // Check for valid image_url structure
             if let Some(image_url) = block.get("image_url")
                 && let Some(obj) = image_url.as_object()
             {
@@ -69,7 +67,6 @@ pub fn is_openai_data_block(block: &serde_json::Value, filter: Option<DataBlockF
                 return false;
             }
 
-            // Check for valid input_audio structure
             if let Some(audio) = block.get("input_audio")
                 && let Some(obj) = audio.as_object()
             {
@@ -86,7 +83,6 @@ pub fn is_openai_data_block(block: &serde_json::Value, filter: Option<DataBlockF
                 return false;
             }
 
-            // Check for valid file structure
             if let Some(file) = block.get("file")
                 && let Some(obj) = file.as_object()
             {
@@ -151,8 +147,6 @@ pub fn parse_data_uri(uri: &str) -> Option<ParsedDataUri> {
 ///
 /// Estimated token IDs (just indices in this simple implementation).
 pub fn get_token_ids_default(text: &str) -> Vec<u32> {
-    // Simple whitespace-based tokenization as a fallback
-    // Real implementations should use proper tokenizers
     text.split_whitespace()
         .enumerate()
         .map(|(i, _)| i as u32)
@@ -171,8 +165,6 @@ pub fn get_token_ids_default(text: &str) -> Vec<u32> {
 ///
 /// Estimated token count.
 pub fn estimate_token_count(text: &str) -> usize {
-    // Rule of thumb: ~4 characters per token for English text
-    // This is a very rough estimate
     let char_count = text.chars().count();
     char_count.div_ceil(4)
 }
@@ -186,14 +178,12 @@ pub fn convert_legacy_v0_content_block_to_v1(
 ) -> HashMap<String, serde_json::Value> {
     let mut result = HashMap::new();
 
-    // Get the type
     let block_type = block.get("type").and_then(|t| t.as_str()).unwrap_or("text");
     result.insert(
         "type".to_string(),
         serde_json::Value::String(block_type.to_string()),
     );
 
-    // Handle different source types
     let source_type = block.get("source_type").and_then(|t| t.as_str());
 
     match source_type {
@@ -224,7 +214,6 @@ pub fn convert_legacy_v0_content_block_to_v1(
             }
         }
         _ => {
-            // Copy all other fields
             for (key, value) in block {
                 if key != "source_type" {
                     result.insert(key.clone(), value.clone());
@@ -253,7 +242,6 @@ pub fn convert_openai_format_to_data_block(
 
             if let Some(image_url) = block.get("image_url").and_then(|i| i.as_object()) {
                 if let Some(url) = image_url.get("url").and_then(|u| u.as_str()) {
-                    // Check if it's a data URI
                     if let Some(parsed) = parse_data_uri(url) {
                         result.insert("base64".to_string(), serde_json::Value::String(parsed.data));
                         result.insert(
@@ -286,7 +274,6 @@ pub fn convert_openai_format_to_data_block(
                     );
                 }
                 if let Some(format) = audio.get("format").and_then(|f| f.as_str()) {
-                    // Map format to mime_type
                     let mime_type = match format {
                         "wav" => "audio/wav",
                         "mp3" => "audio/mpeg",
@@ -327,7 +314,6 @@ pub fn convert_openai_format_to_data_block(
             }
         }
         _ => {
-            // Copy all fields for unknown types
             if let Some(obj) = block.as_object() {
                 for (key, value) in obj {
                     result.insert(key.clone(), value.clone());
@@ -352,8 +338,6 @@ pub fn update_message_content_to_blocks(
 ) -> crate::messages::AIMessage {
     let content_blocks = message.content_blocks();
 
-    // Serialize content blocks to a JSON array string (matching how AIMessage
-    // stores multimodal content as a JSON string).
     let block_values: Vec<serde_json::Value> = content_blocks
         .iter()
         .filter_map(|block| serde_json::to_value(block).ok())
@@ -404,45 +388,40 @@ fn normalize_single_message(mut message: BaseMessage) -> BaseMessage {
     let mut modified = false;
     let new_parts: Vec<ContentPart> = parts
         .into_iter()
-        .map(|part| {
-            match &part {
-                ContentPart::Other(value) => {
-                    let block_type = value.get("type").and_then(|t| t.as_str());
+        .map(|part| match &part {
+            ContentPart::Other(value) => {
+                let block_type = value.get("type").and_then(|t| t.as_str());
 
-                    // OpenAI Chat Completions multimodal data blocks -> v1 standard
-                    if matches!(block_type, Some("input_audio") | Some("file"))
-                        && is_openai_data_block(value, None)
-                    {
-                        modified = true;
-                        let converted = convert_openai_format_to_data_block(value);
+                if matches!(block_type, Some("input_audio") | Some("file"))
+                    && is_openai_data_block(value, None)
+                {
+                    modified = true;
+                    let converted = convert_openai_format_to_data_block(value);
+                    let value = serde_json::to_value(converted).unwrap_or_else(|_| value.clone());
+                    return ContentPart::Other(value);
+                }
+
+                let source_type = value.get("source_type").and_then(|s| s.as_str());
+                if matches!(block_type, Some("image") | Some("audio") | Some("file"))
+                    && matches!(
+                        source_type,
+                        Some("url") | Some("base64") | Some("id") | Some("text")
+                    )
+                {
+                    modified = true;
+                    if let Some(obj) = value.as_object() {
+                        let block_map: HashMap<String, serde_json::Value> =
+                            obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                        let converted = convert_legacy_v0_content_block_to_v1(&block_map);
                         let value =
                             serde_json::to_value(converted).unwrap_or_else(|_| value.clone());
                         return ContentPart::Other(value);
                     }
-
-                    // LangChain v0 format blocks -> v1 standard
-                    let source_type = value.get("source_type").and_then(|s| s.as_str());
-                    if matches!(block_type, Some("image") | Some("audio") | Some("file"))
-                        && matches!(
-                            source_type,
-                            Some("url") | Some("base64") | Some("id") | Some("text")
-                        )
-                    {
-                        modified = true;
-                        if let Some(obj) = value.as_object() {
-                            let block_map: HashMap<String, serde_json::Value> =
-                                obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-                            let converted = convert_legacy_v0_content_block_to_v1(&block_map);
-                            let value =
-                                serde_json::to_value(converted).unwrap_or_else(|_| value.clone());
-                            return ContentPart::Other(value);
-                        }
-                    }
-
-                    part
                 }
-                _ => part,
+
+                part
             }
+            _ => part,
         })
         .collect();
 
@@ -461,10 +440,6 @@ fn normalize_single_message(mut message: BaseMessage) -> BaseMessage {
 
     message
 }
-
-// ==========================================
-// Change 2: update_chunk_content_to_blocks()
-// ==========================================
 
 /// Update an AIMessageChunk's content to use content blocks format.
 ///
@@ -591,7 +566,6 @@ mod tests {
     fn test_estimate_token_count() {
         let text = "Hello, world!";
         let count = estimate_token_count(text);
-        // 13 chars / 4 ≈ 4 tokens (ceiling)
         assert!(count > 0);
         assert!(count < 10);
     }
@@ -833,15 +807,12 @@ mod tests {
         let content = result[0].content();
         if let MessageContent::Parts(parts) = content {
             assert_eq!(parts.len(), 3);
-            // Text passes through
             assert!(matches!(&parts[0], ContentPart::Text { text } if text == "Hello"));
-            // OpenAI audio converted
             if let ContentPart::Other(val) = &parts[1] {
                 assert_eq!(val.get("type").unwrap(), "audio");
             } else {
                 panic!("Expected Other content part for audio");
             }
-            // v1 image passes through unchanged
             if let ContentPart::Other(val) = &parts[2] {
                 assert_eq!(val.get("type").unwrap(), "image");
                 assert_eq!(val.get("url").unwrap(), "https://example.com/img.png");
@@ -859,7 +830,6 @@ mod tests {
 
         let chunk = AIMessageChunk::builder().content("Hello world").build();
         let updated = update_chunk_content_to_blocks(&chunk, "v1");
-        // content_blocks() for a plain text chunk should produce a text block
         let metadata = updated.response_metadata;
         assert_eq!(
             metadata.get("output_version").unwrap(),

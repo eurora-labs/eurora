@@ -232,8 +232,6 @@ fn test_rm_titles_schema5() {
         "type": "array"
     });
 
-    // Schema 5 has no "title" key entries (only "title" as property names),
-    // so it should remain unchanged
     let expected = json!({
         "description": "A list of data.",
         "items": {

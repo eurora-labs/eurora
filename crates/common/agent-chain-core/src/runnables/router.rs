@@ -197,7 +197,6 @@ where
         let keys: Vec<_> = inputs.iter().map(|i| i.key.clone()).collect();
         let actual_inputs: Vec<_> = inputs.into_iter().map(|i| i.input).collect();
 
-        // Check if all keys have corresponding runnables
         for key in &keys {
             if !self.runnables.contains_key(key) {
                 return vec![Err(Error::Other(
@@ -240,7 +239,6 @@ where
         let keys: Vec<_> = inputs.iter().map(|i| i.key.clone()).collect();
         let actual_inputs: Vec<_> = inputs.into_iter().map(|i| i.input).collect();
 
-        // Check if all keys have corresponding runnables
         for key in &keys {
             if !self.runnables.contains_key(key) {
                 return vec![Err(Error::Other(
@@ -253,7 +251,6 @@ where
         let max_concurrency = configs.first().and_then(|c| c.max_concurrency);
 
         let _return_exceptions = return_exceptions; // Vec<Result<O>> already captures exceptions per-item
-        // Create futures for each invocation
         let futures: Vec<_> = keys
             .into_iter()
             .zip(actual_inputs)

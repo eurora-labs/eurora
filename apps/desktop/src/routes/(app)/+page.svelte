@@ -4,7 +4,7 @@
 		type ResponseChunk,
 		type Query,
 		type MessageView,
-		type ConversationView,
+		type ThreadView,
 	} from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { executeCommand } from '$lib/commands.js';
@@ -27,7 +27,7 @@
 	import { Thinking } from '@eurora/ui/custom-components/thinking/index';
 	import { onMount } from 'svelte';
 
-	let conversation = $state<ConversationView | null>(null);
+	let thread = $state<ThreadView | null>(null);
 	let messages = $state<MessageView[]>([]);
 	let taurpc = inject(TAURPC_SERVICE);
 
@@ -49,15 +49,15 @@
 	}
 
 	onMount(() => {
-		taurpc.conversation.current_conversation_changed.on((new_conv) => {
-			conversation = new_conv;
+		taurpc.thread.current_thread_changed.on((new_conv) => {
+			thread = new_conv;
 
 			if (!new_conv.id) {
 				messages.splice(0, messages.length);
 				return;
 			}
 
-			taurpc.conversation.get_messages(new_conv.id, 50, 0).then((response) => {
+			taurpc.thread.get_messages(new_conv.id, 50, 0).then((response) => {
 				messages = response;
 			});
 		});
@@ -136,7 +136,7 @@
 				chatRef?.scrollToBottom();
 			}
 
-			await taurpc.chat.send_query(conversation?.id ?? null, onEvent, tauRpcQuery);
+			await taurpc.chat.send_query(thread?.id ?? null, onEvent, tauRpcQuery);
 		} catch (error) {
 			console.error('Failed to get answer:', error);
 		}
@@ -159,7 +159,7 @@
 							finishRendering={() => {}}
 						>
 							<Chat.MessageContent>
-								{#if content.length > 0}
+								{#if content.trim().length > 0}
 									<Katex math={content} />
 								{:else}
 									<Thinking class="text-primary/60" />

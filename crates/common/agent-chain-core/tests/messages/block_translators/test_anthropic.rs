@@ -10,34 +10,13 @@
 //! for what needs to be implemented.
 
 use agent_chain_core::messages::{
-    AIMessage,
-    AIMessageChunk,
-    Annotation,
-    BlockIndex,
-    ChunkPosition,
-    // Content block types (re-exported from messages module)
-    ContentBlock,
-    FileContentBlock,
-    HumanMessage,
-    ImageContentBlock,
-    MessageContent,
-    NonStandardContentBlock,
-    PlainTextContentBlock,
-    ReasoningContentBlock,
-    ServerToolCall,
-    ServerToolResult,
-    ServerToolStatus,
-    TextContentBlock,
-    ToolCallBlock,
-    ToolCallChunkBlock,
-    tool_call_chunk,
+    AIMessage, AIMessageChunk, Annotation, BlockIndex, ChunkPosition, ContentBlock,
+    FileContentBlock, HumanMessage, ImageContentBlock, MessageContent, NonStandardContentBlock,
+    PlainTextContentBlock, ReasoningContentBlock, ServerToolCall, ServerToolResult,
+    ServerToolStatus, TextContentBlock, ToolCallBlock, ToolCallChunkBlock, tool_call_chunk,
 };
 use serde_json::json;
 use std::collections::HashMap;
-
-// ============================================================================
-// test_convert_to_v1_from_anthropic
-// ============================================================================
 
 /// Test conversion of Anthropic AI message content to v1 format.
 ///
@@ -46,7 +25,6 @@ use std::collections::HashMap;
 /// are correctly translated to standard v1 content blocks.
 #[test]
 fn test_convert_to_v1_from_anthropic() {
-    // Create an AIMessage with Anthropic-style content blocks
     let content = vec![
         json!({
             "type": "thinking",
@@ -146,9 +124,7 @@ fn test_convert_to_v1_from_anthropic() {
         .response_metadata(response_metadata)
         .build();
 
-    // Expected v1 content blocks after translation
     let expected_content: Vec<ContentBlock> = vec![
-        // thinking -> reasoning
         ContentBlock::Reasoning(ReasoningContentBlock {
             block_type: "reasoning".to_string(),
             id: None,
@@ -160,7 +136,6 @@ fn test_convert_to_v1_from_anthropic() {
                 extras
             }),
         }),
-        // text -> text
         ContentBlock::Text(TextContentBlock {
             block_type: "text".to_string(),
             id: None,
@@ -169,7 +144,6 @@ fn test_convert_to_v1_from_anthropic() {
             index: None,
             extras: None,
         }),
-        // tool_use -> tool_call
         ContentBlock::ToolCall(ToolCallBlock {
             block_type: "tool_call".to_string(),
             id: Some("abc_123".to_string()),
@@ -182,7 +156,6 @@ fn test_convert_to_v1_from_anthropic() {
             index: None,
             extras: None,
         }),
-        // tool_use with caller -> tool_call with extras
         ContentBlock::ToolCall(ToolCallBlock {
             block_type: "tool_call".to_string(),
             id: Some("abc_234".to_string()),
@@ -205,7 +178,6 @@ fn test_convert_to_v1_from_anthropic() {
                 extras
             }),
         }),
-        // text with citations -> text with annotations
         ContentBlock::Text(TextContentBlock {
             block_type: "text".to_string(),
             id: None,
@@ -239,7 +211,6 @@ fn test_convert_to_v1_from_anthropic() {
             index: None,
             extras: None,
         }),
-        // server_tool_use -> server_tool_call
         ContentBlock::ServerToolCall(ServerToolCall {
             block_type: "server_tool_call".to_string(),
             id: "srvtoolu_abc123".to_string(),
@@ -252,7 +223,6 @@ fn test_convert_to_v1_from_anthropic() {
             index: None,
             extras: None,
         }),
-        // web_search_tool_result -> server_tool_result
         ContentBlock::ServerToolResult(ServerToolResult {
             block_type: "server_tool_result".to_string(),
             id: None,
@@ -281,7 +251,6 @@ fn test_convert_to_v1_from_anthropic() {
                 extras
             }),
         }),
-        // server_tool_use (code_execution) -> server_tool_call (code_interpreter)
         ContentBlock::ServerToolCall(ServerToolCall {
             block_type: "server_tool_call".to_string(),
             id: "srvtoolu_def456".to_string(),
@@ -294,7 +263,6 @@ fn test_convert_to_v1_from_anthropic() {
             index: None,
             extras: None,
         }),
-        // code_execution_tool_result -> server_tool_result
         ContentBlock::ServerToolResult(ServerToolResult {
             block_type: "server_tool_result".to_string(),
             id: None,
@@ -316,7 +284,6 @@ fn test_convert_to_v1_from_anthropic() {
                 extras
             }),
         }),
-        // something_else -> non_standard
         ContentBlock::NonStandard(NonStandardContentBlock {
             block_type: "non_standard".to_string(),
             id: None,
@@ -330,14 +297,11 @@ fn test_convert_to_v1_from_anthropic() {
         }),
     ];
 
-    // Get content_blocks from message (this calls the translator)
     let content_blocks = message.content_blocks();
     assert_eq!(content_blocks, expected_content);
 
-    // Check no mutation - original content should be unchanged (content_list returns JSON, not ContentBlocks)
     assert_eq!(message.content_list(), content);
 
-    // Test simple string content
     let mut response_metadata2 = HashMap::new();
     response_metadata2.insert("model_provider".to_string(), json!("anthropic"));
 
@@ -348,13 +312,8 @@ fn test_convert_to_v1_from_anthropic() {
 
     let expected_content2 = vec![ContentBlock::Text(TextContentBlock::new("Hello"))];
     assert_eq!(message2.content_blocks(), expected_content2);
-    // Check no mutation
     assert_ne!(message2.content, "");
 }
-
-// ============================================================================
-// test_convert_to_v1_from_anthropic_chunk
-// ============================================================================
 
 /// Test conversion of Anthropic AI message chunks to v1 format.
 ///
@@ -366,7 +325,6 @@ fn test_convert_to_v1_from_anthropic_chunk() {
     let mut response_metadata = HashMap::new();
     response_metadata.insert("model_provider".to_string(), json!("anthropic"));
 
-    // Create streaming chunks as they would come from Anthropic
     let chunks = vec![
         {
             let content = serde_json::to_string(&vec![
@@ -473,7 +431,6 @@ fn test_convert_to_v1_from_anthropic_chunk() {
         },
     ];
 
-    // Expected content_blocks for each chunk
     let expected_contents: Vec<ContentBlock> = vec![
         ContentBlock::Text(TextContentBlock {
             block_type: "text".to_string(),
@@ -533,12 +490,10 @@ fn test_convert_to_v1_from_anthropic_chunk() {
         }),
     ];
 
-    // Verify each chunk's content_blocks
     for (chunk, expected) in chunks.iter().zip(expected_contents.iter()) {
         assert_eq!(chunk.content_blocks(), vec![expected.clone()]);
     }
 
-    // Merge all chunks
     let mut full: Option<AIMessageChunk> = None;
     for chunk in chunks {
         full = Some(match full {
@@ -548,7 +503,6 @@ fn test_convert_to_v1_from_anthropic_chunk() {
     }
     let full = full.unwrap();
 
-    // Expected merged content
     let expected_merged_content = vec![
         json!({"type": "text", "text": "Looking now.", "index": 0}),
         json!({
@@ -562,7 +516,6 @@ fn test_convert_to_v1_from_anthropic_chunk() {
     ];
     assert_eq!(&full.content_list(), &expected_merged_content);
 
-    // Expected merged content_blocks
     let expected_merged_content_blocks = vec![
         ContentBlock::Text(TextContentBlock {
             block_type: "text".to_string(),
@@ -583,7 +536,6 @@ fn test_convert_to_v1_from_anthropic_chunk() {
     ];
     assert_eq!(full.content_blocks(), expected_merged_content_blocks);
 
-    // Test parsing partial_json for server tool calls
     let content = serde_json::to_string(&vec![
         json!({
             "id": "srvtoolu_abc123",
@@ -644,10 +596,6 @@ fn test_convert_to_v1_from_anthropic_chunk() {
     ];
     assert_eq!(full_server.content_blocks(), expected_server_content_blocks);
 }
-
-// ============================================================================
-// test_convert_to_v1_from_anthropic_input
-// ============================================================================
 
 /// Test conversion of Anthropic input content (HumanMessage) to v1 format.
 ///
@@ -730,9 +678,7 @@ fn test_convert_to_v1_from_anthropic_input() {
         .build();
 
     let expected: Vec<ContentBlock> = vec![
-        // text -> text
         ContentBlock::Text(TextContentBlock::new("foo")),
-        // document with base64 source -> file
         ContentBlock::File(FileContentBlock {
             block_type: "file".to_string(),
             id: None,
@@ -743,7 +689,6 @@ fn test_convert_to_v1_from_anthropic_input() {
             base64: Some("<base64 data>".to_string()),
             extras: None,
         }),
-        // document with url source -> file
         ContentBlock::File(FileContentBlock {
             block_type: "file".to_string(),
             id: None,
@@ -754,7 +699,6 @@ fn test_convert_to_v1_from_anthropic_input() {
             base64: None,
             extras: None,
         }),
-        // document with content source -> non_standard (not convertible)
         ContentBlock::NonStandard(NonStandardContentBlock {
             block_type: "non_standard".to_string(),
             id: None,
@@ -776,7 +720,6 @@ fn test_convert_to_v1_from_anthropic_input() {
             },
             index: None,
         }),
-        // document with text source -> text-plain
         ContentBlock::PlainText(PlainTextContentBlock {
             block_type: "text-plain".to_string(),
             id: None,
@@ -790,7 +733,6 @@ fn test_convert_to_v1_from_anthropic_input() {
             context: None,
             extras: None,
         }),
-        // image with base64 source -> image
         ContentBlock::Image(ImageContentBlock {
             block_type: "image".to_string(),
             id: None,
@@ -801,7 +743,6 @@ fn test_convert_to_v1_from_anthropic_input() {
             base64: Some("<base64 image data>".to_string()),
             extras: None,
         }),
-        // image with url source -> image
         ContentBlock::Image(ImageContentBlock {
             block_type: "image".to_string(),
             id: None,
@@ -812,7 +753,6 @@ fn test_convert_to_v1_from_anthropic_input() {
             base64: None,
             extras: None,
         }),
-        // image with file source -> image with id
         ContentBlock::Image(ImageContentBlock {
             block_type: "image".to_string(),
             id: Some("<image file id>".to_string()),
@@ -823,7 +763,6 @@ fn test_convert_to_v1_from_anthropic_input() {
             base64: None,
             extras: None,
         }),
-        // document with file source -> file with id
         ContentBlock::File(FileContentBlock {
             block_type: "file".to_string(),
             id: Some("<pdf file id>".to_string()),

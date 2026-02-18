@@ -12,10 +12,6 @@ use agent_chain_core::runnables::base::{DynRunnable, Runnable, RunnableLambda, p
 use agent_chain_core::runnables::branch::{RunnableBranch, RunnableBranchBuilder};
 use agent_chain_core::runnables::config::RunnableConfig;
 
-// ============================================================================
-// Initialization tests
-// ============================================================================
-
 #[test]
 fn test_branch_initialization() {
     let branch = RunnableBranchBuilder::<i32, i32>::new()
@@ -53,10 +49,6 @@ fn test_branch_requires_minimum_branches_new() {
     );
 }
 
-// ============================================================================
-// Invoke tests
-// ============================================================================
-
 #[test]
 fn test_branch_invoke_first_condition_true() {
     let branch = RunnableBranchBuilder::new()
@@ -93,10 +85,6 @@ fn test_branch_invoke_default() {
     assert_eq!(result, 500);
 }
 
-// ============================================================================
-// Async invoke tests
-// ============================================================================
-
 #[tokio::test]
 async fn test_branch_ainvoke_first_condition() {
     let branch = RunnableBranchBuilder::new()
@@ -118,10 +106,6 @@ async fn test_branch_ainvoke_default() {
     let result = branch.ainvoke(5, None).await.unwrap();
     assert_eq!(result, 50);
 }
-
-// ============================================================================
-// Batch tests
-// ============================================================================
 
 #[test]
 fn test_branch_batch() {
@@ -204,10 +188,6 @@ async fn test_branch_batch_preserves_order() {
     assert_eq!(results, vec![2, 20, 4, 16, 3]);
 }
 
-// ============================================================================
-// Stream tests
-// ============================================================================
-
 #[tokio::test]
 async fn test_branch_stream() {
     let branch = RunnableBranchBuilder::new()
@@ -230,10 +210,6 @@ async fn test_branch_astream() {
     assert_eq!(results, vec![6]);
 }
 
-// ============================================================================
-// Tests with Runnable objects (Arc'd)
-// ============================================================================
-
 #[test]
 fn test_branch_with_runnable_objects() {
     let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::new(|x: i32| Ok(x > 0)));
@@ -245,10 +221,6 @@ fn test_branch_with_runnable_objects() {
     assert_eq!(branch.invoke(5, None).unwrap(), 6);
     assert_eq!(branch.invoke(-5, None).unwrap(), -6);
 }
-
-// ============================================================================
-// Multiple conditions test
-// ============================================================================
 
 #[test]
 fn test_branch_multiple_conditions() {
@@ -267,10 +239,6 @@ fn test_branch_multiple_conditions() {
     assert_eq!(branch.invoke(-5, None).unwrap(), "negative or zero");
     assert_eq!(branch.invoke(0, None).unwrap(), "negative or zero");
 }
-
-// ============================================================================
-// Dict-like input tests (using HashMap)
-// ============================================================================
 
 #[test]
 fn test_branch_with_hashmap_input() {
@@ -317,10 +285,6 @@ fn test_branch_with_hashmap_input() {
     assert_eq!(branch.invoke(unknown_input, None).unwrap(), "0");
 }
 
-// ============================================================================
-// Error propagation tests
-// ============================================================================
-
 #[test]
 fn test_branch_exception_in_condition() {
     let branch = RunnableBranchBuilder::new()
@@ -366,10 +330,6 @@ async fn test_branch_exception_in_async_action() {
     assert!(result.unwrap_err().to_string().contains("Action failed"));
 }
 
-// ============================================================================
-// Condition evaluation order tests
-// ============================================================================
-
 #[test]
 fn test_branch_conditions_evaluated_in_order() {
     let evaluations = Arc::new(Mutex::new(Vec::<usize>::new()));
@@ -412,25 +372,21 @@ fn test_branch_conditions_evaluated_in_order() {
     )
     .unwrap();
 
-    // Input > 10: only first condition should be evaluated
     evaluations.lock().unwrap().clear();
     let result = branch.invoke(15, None).unwrap();
     assert_eq!(result, "first");
     assert_eq!(*evaluations.lock().unwrap(), vec![1]);
 
-    // Input between 5 and 10: first two conditions evaluated
     evaluations.lock().unwrap().clear();
     let result = branch.invoke(7, None).unwrap();
     assert_eq!(result, "second");
     assert_eq!(*evaluations.lock().unwrap(), vec![1, 2]);
 
-    // Input between 0 and 5: all three conditions evaluated
     evaluations.lock().unwrap().clear();
     let result = branch.invoke(3, None).unwrap();
     assert_eq!(result, "third");
     assert_eq!(*evaluations.lock().unwrap(), vec![1, 2, 3]);
 
-    // Input <= 0: all conditions evaluated, use default
     evaluations.lock().unwrap().clear();
     let result = branch.invoke(-5, None).unwrap();
     assert_eq!(result, "default");
@@ -478,13 +434,8 @@ fn test_branch_short_circuit_evaluation() {
     condition_calls.lock().unwrap().clear();
     let result = branch.invoke(5, None).unwrap();
     assert_eq!(result, 6);
-    // Should only evaluate first condition
     assert_eq!(*condition_calls.lock().unwrap(), vec!["first"]);
 }
-
-// ============================================================================
-// Complex condition tests
-// ============================================================================
 
 #[test]
 fn test_branch_with_complex_conditions() {
@@ -506,10 +457,6 @@ fn test_branch_with_complex_conditions() {
     assert_eq!(branch.invoke(-3, None).unwrap(), "non-positive: -3");
 }
 
-// ============================================================================
-// Config propagation tests
-// ============================================================================
-
 #[test]
 fn test_branch_config_propagation() {
     let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::new(|x: i32| Ok(x > 0)));
@@ -523,10 +470,6 @@ fn test_branch_config_propagation() {
     assert_eq!(result, 6);
 }
 
-// ============================================================================
-// Serialization tests
-// ============================================================================
-
 #[test]
 fn test_branch_serialization() {
     use agent_chain_core::load::Serializable;
@@ -537,10 +480,6 @@ fn test_branch_serialization() {
         vec!["langchain", "schema", "runnable"]
     );
 }
-
-// ============================================================================
-// All conditions false tests
-// ============================================================================
 
 #[test]
 fn test_branch_all_conditions_false_uses_default() {
@@ -554,10 +493,6 @@ fn test_branch_all_conditions_false_uses_default() {
     let result = branch.invoke(10, None).unwrap();
     assert_eq!(result, "default");
 }
-
-// ============================================================================
-// Type preservation tests
-// ============================================================================
 
 #[test]
 fn test_branch_preserves_intermediate_types() {
@@ -596,10 +531,6 @@ fn test_branch_with_complex_return_types() {
     );
 }
 
-// ============================================================================
-// Type annotation tests (Rust equivalent: explicit generic types)
-// ============================================================================
-
 #[test]
 fn test_branch_with_type_annotations() {
     fn condition_typed(x: i32) -> agent_chain_core::error::Result<bool> {
@@ -623,10 +554,6 @@ fn test_branch_with_type_annotations() {
     assert_eq!(branch.invoke(-5, None).unwrap(), "non-positive: -5");
 }
 
-// ============================================================================
-// Chain composition tests
-// ============================================================================
-
 #[test]
 fn test_branch_with_runnables_in_chain() {
     let preprocess = RunnableLambda::new(|x: (i32,)| Ok(x.0));
@@ -646,10 +573,6 @@ fn test_branch_with_runnables_in_chain() {
     assert_eq!(chain.invoke((-5,), None).unwrap(), "Result: -15");
 }
 
-// ============================================================================
-// None/Option output tests
-// ============================================================================
-
 #[test]
 fn test_branch_with_none_output() {
     let branch = RunnableBranchBuilder::new()
@@ -666,10 +589,6 @@ fn test_branch_with_none_output() {
     let result = branch.invoke("other".to_string(), None).unwrap();
     assert_eq!(result, Some("other".to_string()));
 }
-
-// ============================================================================
-// Naming tests
-// ============================================================================
 
 #[test]
 fn test_branch_name() {
@@ -691,10 +610,6 @@ fn test_branch_default_name() {
 
     assert_eq!(branch.name(), Some("RunnableBranch".to_string()));
 }
-
-// ============================================================================
-// Stream error propagation tests
-// ============================================================================
 
 #[tokio::test]
 async fn test_branch_stream_condition_error() {
@@ -743,10 +658,6 @@ async fn test_branch_astream_condition_error() {
     );
 }
 
-// ============================================================================
-// Stream with default path tests
-// ============================================================================
-
 #[tokio::test]
 async fn test_branch_stream_default_path() {
     let branch = RunnableBranchBuilder::new()
@@ -769,27 +680,16 @@ async fn test_branch_astream_default_path() {
     assert_eq!(results, vec![50]);
 }
 
-// ============================================================================
-// Coercion tests (builder automatically wraps closures into RunnableLambda)
-// ============================================================================
-
 #[test]
 fn test_branch_coerces_conditions_and_actions() {
-    // The builder wraps closures in RunnableLambda automatically
-    // This test verifies the builder API works with plain closures
     let branch = RunnableBranchBuilder::new()
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 1))
         .default(|x: i32| Ok(x - 1))
         .unwrap();
 
-    // If it compiled and works, closures were successfully coerced
     assert_eq!(branch.invoke(5, None).unwrap(), 6);
     assert_eq!(branch.invoke(-5, None).unwrap(), -6);
 }
-
-// ============================================================================
-// Concurrent execution test
-// ============================================================================
 
 #[tokio::test]
 async fn test_branch_ainvoke_multiple_sequential() {
@@ -814,10 +714,6 @@ async fn test_branch_ainvoke_multiple_sequential() {
     assert_eq!(call_count.load(Ordering::SeqCst), 2);
 }
 
-// ============================================================================
-// Builder pattern tests
-// ============================================================================
-
 #[test]
 fn test_branch_builder_branch_arc() {
     let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::new(|x: i32| Ok(x > 10)));
@@ -835,13 +731,8 @@ fn test_branch_builder_branch_arc() {
     assert_eq!(branch.invoke(5, None).unwrap(), "small: 5");
 }
 
-// ============================================================================
-// Truthy/falsy condition tests (Rust equivalent: conditions always return bool)
-// ============================================================================
-
 #[test]
 fn test_branch_condition_edge_values() {
-    // In Rust, conditions always return bool, but we can test boolean edge cases
     let branch = RunnableBranchBuilder::new()
         .branch(|x: i32| Ok(x != 0), |_: i32| Ok("truthy".to_string()))
         .default(|_: i32| Ok("falsy".to_string()))
@@ -852,10 +743,6 @@ fn test_branch_condition_edge_values() {
     assert_eq!(branch.invoke(0, None).unwrap(), "falsy");
 }
 
-// ============================================================================
-// Callbacks test
-// ============================================================================
-
 #[test]
 fn test_branch_with_callbacks() {
     let branch = RunnableBranchBuilder::new()
@@ -863,35 +750,24 @@ fn test_branch_with_callbacks() {
         .default(|x: i32| Ok(x - 1))
         .unwrap();
 
-    // Should not panic, even with a config containing tags for tracing
     let config = RunnableConfig::new().with_tags(vec!["test-tag".to_string()]);
     let result = branch.invoke(5, Some(config)).unwrap();
     assert_eq!(result, 6);
 }
 
-// ============================================================================
-// Mixed sync/async test
-// ============================================================================
-
 #[tokio::test]
 async fn test_branch_mixed_sync_async() {
-    // In Rust, all closures are sync but ainvoke provides async execution
     let branch = RunnableBranchBuilder::new()
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 1))
         .default(|x: i32| Ok(x - 1))
         .unwrap();
 
-    // Should work via ainvoke
     let result = branch.ainvoke(5, None).await.unwrap();
     assert_eq!(result, 6);
 
     let result2 = branch.ainvoke(-5, None).await.unwrap();
     assert_eq!(result2, -6);
 }
-
-// ============================================================================
-// Large number of branches test
-// ============================================================================
 
 #[test]
 fn test_branch_many_branches() {
@@ -916,10 +792,6 @@ fn test_branch_many_branches() {
     assert_eq!(branch.invoke(0, None).unwrap(), "other");
 }
 
-// ============================================================================
-// Stream from multiple branches test
-// ============================================================================
-
 #[tokio::test]
 async fn test_branch_stream_routes_to_correct_branch() {
     let branch = RunnableBranchBuilder::new()
@@ -930,7 +802,6 @@ async fn test_branch_stream_routes_to_correct_branch() {
         .default(|_: String| Ok("response two".to_string()))
         .unwrap();
 
-    // Route to first branch
     let result1: Vec<String> = branch
         .stream("a".to_string(), None)
         .map(|r| r.unwrap())
@@ -938,7 +809,6 @@ async fn test_branch_stream_routes_to_correct_branch() {
         .await;
     assert_eq!(result1.join(""), "response one");
 
-    // Route to default
     let result2: Vec<String> = branch
         .stream("b".to_string(), None)
         .map(|r| r.unwrap())

@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use super::base::merge_content;
 use super::content::MessageContent;
 
-/// A function message in the conversation.
+/// A function message in the thread.
 ///
 /// `FunctionMessage` objects are an older version of the `ToolMessage` schema, and
 /// do not contain the `tool_call_id` field.
@@ -177,13 +177,11 @@ impl FunctionMessageChunk {
         let content: MessageContent =
             merge_content(self.content.as_text_ref(), other.content.as_text_ref()).into();
 
-        // Merge additional_kwargs
         let mut additional_kwargs = self.additional_kwargs.clone();
         for (k, v) in &other.additional_kwargs {
             additional_kwargs.insert(k.clone(), v.clone());
         }
 
-        // Merge response_metadata
         let mut response_metadata = self.response_metadata.clone();
         for (k, v) in &other.response_metadata {
             response_metadata.insert(k.clone(), v.clone());

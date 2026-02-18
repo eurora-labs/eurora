@@ -11,10 +11,6 @@ use agent_chain_core::runnables::router::{RouterInput, RouterRunnable};
 use futures::StreamExt;
 use serde_json::Value;
 
-// ===========================================================================
-// Initialization
-// ===========================================================================
-
 /// Mirrors `test_router_initialization`.
 #[test]
 fn test_router_initialization() {
@@ -37,7 +33,6 @@ fn test_router_initialization_with_runnables() {
         .add("add", add_runnable)
         .add("multiply", multiply_runnable);
 
-    // Both routes should be invocable
     assert_eq!(router.invoke(RouterInput::new("add", 5), None).unwrap(), 6);
     assert_eq!(
         router
@@ -46,10 +41,6 @@ fn test_router_initialization_with_runnables() {
         10
     );
 }
-
-// ===========================================================================
-// Invoke
-// ===========================================================================
 
 /// Mirrors `test_router_invoke`.
 #[test]
@@ -93,10 +84,6 @@ fn test_router_invoke_with_spy() {
     assert_eq!(router.invoke(RouterInput::new("b", 5), None).unwrap(), 25);
 }
 
-// ===========================================================================
-// Async invoke
-// ===========================================================================
-
 /// Mirrors `test_router_ainvoke`.
 #[tokio::test]
 async fn test_router_ainvoke() {
@@ -135,10 +122,6 @@ async fn test_router_ainvoke_invalid_key() {
     );
 }
 
-// ===========================================================================
-// Batch
-// ===========================================================================
-
 /// Mirrors `test_router_batch`.
 #[test]
 fn test_router_batch() {
@@ -166,7 +149,6 @@ fn test_router_batch_invalid_key() {
     let inputs = vec![RouterInput::new("add", 1), RouterInput::new("invalid", 2)];
 
     let results = router.batch(inputs, None, false);
-    // Should contain an error about invalid key
     assert!(results.iter().any(|r| r.is_err()));
     let err = results.iter().find(|r| r.is_err()).unwrap();
     assert!(
@@ -271,10 +253,6 @@ fn test_router_batch_with_configs() {
     assert_eq!(*results[2].as_ref().unwrap(), 4);
 }
 
-// ===========================================================================
-// Async batch
-// ===========================================================================
-
 /// Mirrors `test_router_abatch`.
 #[tokio::test]
 async fn test_router_abatch() {
@@ -355,10 +333,6 @@ async fn test_router_abatch_different_keys() {
     assert_eq!(*results[2].as_ref().unwrap(), 4);
 }
 
-// ===========================================================================
-// Stream
-// ===========================================================================
-
 /// Mirrors `test_router_stream`.
 #[tokio::test]
 async fn test_router_stream() {
@@ -436,10 +410,6 @@ async fn test_router_stream_sync() {
     assert_eq!(result, vec!["test".to_string()]);
 }
 
-// ===========================================================================
-// Config
-// ===========================================================================
-
 /// Mirrors `test_router_with_config`.
 #[test]
 fn test_router_with_config() {
@@ -453,10 +423,6 @@ fn test_router_with_config() {
         .unwrap();
     assert_eq!(result, 6);
 }
-
-// ===========================================================================
-// Different input types
-// ===========================================================================
 
 /// Mirrors `test_router_with_different_input_types`.
 ///
@@ -514,10 +480,6 @@ fn test_router_with_dict_input() {
     assert_eq!(result, "Alice is 30 years old");
 }
 
-// ===========================================================================
-// Complex routing
-// ===========================================================================
-
 /// Mirrors `test_router_complex_routing_logic`.
 #[test]
 fn test_router_complex_routing_logic() {
@@ -570,10 +532,6 @@ fn test_router_single_route() {
     assert_eq!(result, 12);
 }
 
-// ===========================================================================
-// RouterInput
-// ===========================================================================
-
 /// Mirrors `test_router_input_type`.
 #[test]
 fn test_router_input_type() {
@@ -581,10 +539,6 @@ fn test_router_input_type() {
     assert_eq!(input.key, "test");
     assert_eq!(input.input, 42);
 }
-
-// ===========================================================================
-// Serialization / naming
-// ===========================================================================
 
 /// Mirrors `test_router_serialization` / `test_router_namespace`.
 #[test]
@@ -630,7 +584,6 @@ fn test_router_config_specs() {
     let router = RouterRunnable::new().add("add", RunnableLambda::new(|x: i32| Ok(x + 1)));
 
     let specs = router.config_specs().unwrap();
-    // Currently returns empty since DynRunnable doesn't expose config_specs
     assert!(specs.is_empty());
 }
 

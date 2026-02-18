@@ -10,8 +10,6 @@ export type AppSettings = { general: GeneralSettings; telemetry: TelemetrySettin
 
 export type ContextChip = { id: string; extension_id: string; name: string; attrs: Partial<{ [key in string]: string }>; icon: string | null; position: number | null }
 
-export type ConversationView = { id: string | null; title: string }
-
 export type GeneralSettings = { autostart: boolean }
 
 export type LocalBackendInfo = { grpc_port: number; http_port: number; postgres_port: number }
@@ -32,11 +30,13 @@ export type ResponseChunk = { chunk: string }
 
 export type TelemetrySettings = { considered: boolean; anonymousMetrics: boolean; anonymousErrors: boolean; nonAnonymousMetrics: boolean; distinctId: string | null }
 
+export type ThreadView = { id: string | null; title: string }
+
 export type TimelineAppEvent = { name: string; color: string | null; icon_base64: string | null }
 
 export type UpdateInfo = { version: string; body: string | null }
 
-const ARGS_MAP = { 'auth':'{"get_login_token":[],"get_role":[],"get_username":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"register":["username","email","password"]}', 'chat':'{"send_query":["conversation_id","channel","query"]}', 'context_chip':'{"get":[]}', 'conversation':'{"conversation_title_changed":["conversation"],"create":[],"create_empty_conversation":[],"current_conversation_changed":["conversation"],"get_messages":["conversation_id","limit","offset"],"list":["limit","offset"],"new_conversation_added":["conversation"],"switch_conversation":["conversation_id"]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"get_docker_compose_path":[],"install_update":[],"list_activities":[],"quit":[],"request_accessibility_permission":[],"start_local_backend":["ollama_model"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
+const ARGS_MAP = { 'auth':'{"get_login_token":[],"get_role":[],"get_username":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"register":["username","email","password"]}', 'chat':'{"send_query":["thread_id","channel","query"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"get_docker_compose_path":[],"install_update":[],"list_activities":[],"quit":[],"request_accessibility_permission":[],"start_local_backend":["ollama_model"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'thread':'{"create":[],"create_empty_thread":[],"current_thread_changed":["thread"],"get_messages":["thread_id","limit","offset"],"list":["limit","offset"],"new_thread_added":["thread"],"switch_thread":["thread_id"],"thread_title_changed":["thread"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
 export type Router = { "auth": {get_login_token: () => Promise<LoginToken>, 
 get_role: () => Promise<string>, 
 get_username: () => Promise<string>, 
@@ -45,16 +45,8 @@ login: (login: string, password: string) => Promise<null>,
 logout: () => Promise<null>, 
 poll_for_login: () => Promise<boolean>, 
 register: (username: string, email: string, password: string) => Promise<null>},
-"chat": {send_query: (conversationId: string | null, channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>},
+"chat": {send_query: (threadId: string | null, channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>},
 "context_chip": {get: () => Promise<ContextChip[]>},
-"conversation": {conversation_title_changed: (conversation: ConversationView) => Promise<void>, 
-create: () => Promise<ConversationView>, 
-create_empty_conversation: () => Promise<ConversationView>, 
-current_conversation_changed: (conversation: ConversationView) => Promise<void>, 
-get_messages: (conversationId: string, limit: number, offset: number) => Promise<MessageView[]>, 
-list: (limit: number, offset: number) => Promise<ConversationView[]>, 
-new_conversation_added: (conversation: ConversationView) => Promise<void>, 
-switch_conversation: (conversationId: string) => Promise<ConversationView>},
 "monitor": {capture_monitor: (monitorId: string) => Promise<string>},
 "onboarding": {get_browser_extension_download_url: () => Promise<string>},
 "prompt": {disconnect: () => Promise<null>, 
@@ -80,6 +72,14 @@ request_accessibility_permission: () => Promise<null>,
 start_local_backend: (ollamaModel: string) => Promise<LocalBackendInfo>},
 "third_party": {check_api_key_exists: () => Promise<boolean>, 
 save_api_key: (apiKey: string) => Promise<null>},
+"thread": {create: () => Promise<ThreadView>, 
+create_empty_thread: () => Promise<ThreadView>, 
+current_thread_changed: (thread: ThreadView) => Promise<void>, 
+get_messages: (threadId: string, limit: number, offset: number) => Promise<MessageView[]>, 
+list: (limit: number, offset: number) => Promise<ThreadView[]>, 
+new_thread_added: (thread: ThreadView) => Promise<void>, 
+switch_thread: (threadId: string) => Promise<ThreadView>, 
+thread_title_changed: (thread: ThreadView) => Promise<void>},
 "timeline": {list: () => Promise<string[]>, 
 new_app_event: (event: TimelineAppEvent) => Promise<void>, 
 new_assets_event: (chips: ContextChip[]) => Promise<void>} };

@@ -64,7 +64,6 @@ mod tests {
 
     #[test]
     fn test_uuid7_with_nanoseconds() {
-        // Test with a specific timestamp
         let nanos = 1_609_459_200_000_000_000_u64; // 2021-01-01 00:00:00 UTC
         let id = uuid7(Some(nanos));
         assert!(!id.is_nil());

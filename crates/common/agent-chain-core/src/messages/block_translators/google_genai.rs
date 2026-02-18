@@ -155,7 +155,6 @@ pub fn translate_grounding_metadata_to_citations(grounding_metadata: &Value) -> 
 pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
     let mut result = Vec::new();
 
-    // Unpack non_standard blocks
     let blocks: Vec<Value> = content
         .iter()
         .map(|block| {
@@ -176,7 +175,6 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
         let num_keys = obj.len();
         let block_type = obj.get("type").and_then(|v| v.as_str());
 
-        // {"text": "..."} -> TextContentBlock
         if num_keys == 1
             && let Some(text) = obj.get("text").and_then(|v| v.as_str())
         {
@@ -184,7 +182,6 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
             continue;
         }
 
-        // {"document": {"format": ..., "source": ...}} -> FileContentBlock / PlainTextContentBlock
         if num_keys == 1
             && let Some(document) = obj.get("document").and_then(|v| v.as_object())
             && let Some(format) = document.get("format").and_then(|v| v.as_str())
@@ -232,7 +229,6 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
             continue;
         }
 
-        // {"image": {"format": ..., "source": {"bytes": ...}}} -> ImageContentBlock
         if num_keys == 1
             && let Some(image) = obj.get("image").and_then(|v| v.as_object())
             && let Some(format) = image.get("format").and_then(|v| v.as_str())
@@ -261,7 +257,6 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
             continue;
         }
 
-        // {"type": "file_data", "file_uri": ...} -> FileContentBlock
         if block_type == Some("file_data")
             && let Some(uri) = obj.get("file_uri").and_then(|v| v.as_str())
         {
@@ -273,7 +268,6 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
             continue;
         }
 
-        // {"type": "function_call", ...} -> ToolCall
         if block_type == Some("function_call")
             && let Some(name) = obj.get("name").and_then(|v| v.as_str())
         {
@@ -286,7 +280,6 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
             continue;
         }
 
-        // {"type": "executable_code", ...} -> ServerToolCall
         if block_type == Some("executable_code") {
             result.push(json!({
                 "type": "server_tool_call",
@@ -300,7 +293,6 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
             continue;
         }
 
-        // {"type": "code_execution_result", ...} -> ServerToolResult
         if block_type == Some("code_execution_result") {
             let outcome = obj.get("outcome").and_then(|v| v.as_i64()).unwrap_or(1);
             let status = if outcome == 1 { "success" } else { "error" };
@@ -315,7 +307,6 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
             continue;
         }
 
-        // Known v1 block type — pass through
         if let Some(bt) = block_type
             && KNOWN_BLOCK_TYPES.contains(&bt)
         {
@@ -323,7 +314,6 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
             continue;
         }
 
-        // Unknown — wrap as non_standard
         result.push(json!({"type": "non_standard", "value": block}));
     }
 
@@ -358,10 +348,8 @@ pub fn convert_to_standard_blocks(content: &[Value], _is_chunk: bool) -> Vec<Val
             }
 
             Some("image_url") => {
-                // image_url format from previous implementations
                 if let Some(image_url) = obj.get("image_url").and_then(|v| v.as_object()) {
                     if let Some(url) = image_url.get("url").and_then(|v| v.as_str()) {
-                        // Check if it's a data URI
                         if let Some(rest) = url.strip_prefix("data:") {
                             if let Some((mime_type, data)) = rest.split_once(";base64,") {
                                 result.push(json!({
@@ -373,7 +361,6 @@ pub fn convert_to_standard_blocks(content: &[Value], _is_chunk: bool) -> Vec<Val
                                 result.push(json!({"type": "non_standard", "value": block}));
                             }
                         } else {
-                            // Try as raw base64
                             result.push(json!({
                                 "type": "image",
                                 "base64": url,

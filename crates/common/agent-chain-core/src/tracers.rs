@@ -76,43 +76,33 @@ pub mod schemas;
 pub mod stdout;
 pub mod streaming;
 
-// Re-export core types
 pub use core::{SchemaFormat, TracerCore, TracerCoreConfig, TracerError};
 
-// Re-export schemas
 pub use schemas::{Run, RunEvent, RunType};
 
-// Re-export base types
 pub use base::{AsyncBaseTracer, BaseTracer};
 
-// Re-export streaming types
 pub use streaming::{PassthroughStreamingHandler, StreamingCallbackHandler};
 
-// Re-export context types
 pub use context::{
     ConfigureHook, ConfigureHookRegistry, RunCollectorGuard, TracingCallback, TracingV2Guard,
     collect_runs, get_run_collector, get_tracing_callback, register_configure_hook,
     tracing_v2_enabled, tracing_v2_is_enabled,
 };
 
-// Re-export memory stream types
 pub use memory_stream::{MemoryStream, ReceiveStream, SendStream};
 
-// Re-export log stream types
 pub use log_stream::{
     JsonPatchOp, LogEntry, LogStreamCallbackHandler, LogStreamCallbackHandlerBridge,
     LogStreamConfig, RunLog, RunLogPatch, RunState, astream_log_implementation,
 };
 
-// Re-export concrete tracers
 pub use root_listeners::{AsyncListener, AsyncRootListenersTracer, Listener, RootListenersTracer};
 pub use run_collector::RunCollectorCallbackHandler;
 pub use stdout::{ConsoleCallbackHandler, FunctionCallbackHandler, elapsed, try_json_stringify};
 
-// Re-export event stream types
 pub use event_stream::{AstreamEventsCallbackHandler, RunInfo, astream_events_implementation};
 
-// Re-export evaluation types
 pub use evaluation::{
     EvaluationResult, EvaluatorCallbackHandler, LatencyEvaluator, NonEmptyOutputEvaluator,
     RunEvaluator, wait_for_all_evaluators,
@@ -126,12 +116,10 @@ mod tests {
 
     #[test]
     fn test_module_exports() {
-        // Test that all major types are accessible
         let _run = Run::default();
         let _event = RunEvent::new("test");
         let _config = TracerCoreConfig::default();
 
-        // Test tracers can be created
         let _collector = RunCollectorCallbackHandler::new(None);
         let _console = ConsoleCallbackHandler::new();
     }
@@ -142,7 +130,6 @@ mod tests {
 
         let mut collector = RunCollectorCallbackHandler::new(None);
 
-        // Create and start a chain run
         let run = collector.handle_chain_start(
             HashMap::new(),
             HashMap::new(),
@@ -158,7 +145,6 @@ mod tests {
         assert_eq!(run.name, "test_chain");
         assert_eq!(run.run_type, "chain");
 
-        // End the chain run
         let run_id = run.id;
         let result = collector.handle_chain_end(
             [("result".to_string(), serde_json::json!("success"))]

@@ -98,7 +98,6 @@ impl FakeListLLM {
         let i = self.index.load(Ordering::SeqCst);
         let response = self.responses.get(i).cloned().unwrap_or_default();
 
-        // Advance index, cycling back to start
         let next_i = if i + 1 < self.responses.len() {
             i + 1
         } else {
@@ -315,20 +314,16 @@ impl BaseLLM for FakeStreamingListLLM {
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<LLMStream> {
-        // Get the response for this prompt
         let response = self.inner.call(prompt, None, None).await?;
         let sleep = self.inner.sleep;
         let error_on_chunk = self.error_on_chunk_number;
 
-        // Create a stream that yields each character
         let stream = async_stream::stream! {
             for (i, c) in response.chars().enumerate() {
-                // Sleep if configured (Python sleeps before error check)
                 if let Some(duration) = sleep {
                     tokio::time::sleep(duration).await;
                 }
 
-                // Check if we should error on this chunk
                 if let Some(error_chunk) = error_on_chunk
                     && i == error_chunk
                 {
@@ -370,19 +365,15 @@ mod tests {
             "Response 3".to_string(),
         ]);
 
-        // First call
         let result = llm.call("prompt".to_string(), None, None).await.unwrap();
         assert_eq!(result, "Response 1");
 
-        // Second call
         let result = llm.call("prompt".to_string(), None, None).await.unwrap();
         assert_eq!(result, "Response 2");
 
-        // Third call
         let result = llm.call("prompt".to_string(), None, None).await.unwrap();
         assert_eq!(result, "Response 3");
 
-        // Fourth call (cycles back)
         let result = llm.call("prompt".to_string(), None, None).await.unwrap();
         assert_eq!(result, "Response 1");
     }
@@ -391,15 +382,12 @@ mod tests {
     async fn test_fake_list_llm_reset() {
         let llm = FakeListLLM::new(vec!["Response 1".to_string(), "Response 2".to_string()]);
 
-        // Advance index
         let _ = llm.call("prompt".to_string(), None, None).await;
         assert_eq!(llm.current_index(), 1);
 
-        // Reset
         llm.reset();
         assert_eq!(llm.current_index(), 0);
 
-        // Should get first response again
         let result = llm.call("prompt".to_string(), None, None).await.unwrap();
         assert_eq!(result, "Response 1");
     }

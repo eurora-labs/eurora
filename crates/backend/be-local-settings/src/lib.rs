@@ -12,7 +12,7 @@ pub type SettingsReceiver = tokio::sync::watch::Receiver<Option<ProviderSettings
 ///
 /// Returns a `(Sender, Receiver)` pair. The settings service owns the sender
 /// and calls `send()` when provider configuration changes. Other services
-/// (e.g. conversation) hold a receiver and are notified via `changed()`.
+/// (e.g. thread) hold a receiver and are notified via `changed()`.
 pub fn settings_channel() -> (SettingsSender, SettingsReceiver) {
     tokio::sync::watch::channel(None)
 }

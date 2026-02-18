@@ -1,4 +1,4 @@
-//! Chat models for conversational AI.
+//! Chat models for threadal AI.
 //!
 //! This module provides the base abstraction for chat models,
 //! following the LangChain pattern of having a common interface
@@ -552,7 +552,6 @@ pub trait BaseChatModel: BaseLanguageModel {
                             .into()
                     });
 
-                // Strip generation_info of the "message" key to avoid duplication
                 let generation_info = cached_gen
                     .generation_info
                     .map(|mut info| {
@@ -600,7 +599,6 @@ pub trait BaseChatModel: BaseLanguageModel {
     ) -> String {
         let params = self._get_invocation_params(stop, kwargs);
 
-        // Sort params for deterministic key
         let mut sorted_items: Vec<_> = params.iter().collect();
         sorted_items.sort_by_key(|(k, _)| *k);
 
@@ -656,20 +654,16 @@ pub trait BaseChatModel: BaseLanguageModel {
         stream_kwarg: Option<bool>,
         run_manager: Option<&[Arc<dyn BaseCallbackHandler>]>,
     ) -> bool {
-        // Check if streaming is implemented
         let sync_not_implemented = !self.has_stream_impl();
         let async_not_implemented = !self.has_astream_impl();
 
-        // Check if streaming is implemented
         if !async_api && sync_not_implemented {
             return false;
         }
-        // Note: since async falls back to sync, we check both here
         if async_api && async_not_implemented && sync_not_implemented {
             return false;
         }
 
-        // Check if streaming has been disabled on this instance
         if self
             .chat_config()
             .disable_streaming
@@ -678,28 +672,20 @@ pub trait BaseChatModel: BaseLanguageModel {
             return false;
         }
 
-        // Check if a runtime streaming flag has been passed in
         if let Some(stream) = stream_kwarg {
             return stream;
         }
 
-        // Check if streaming field is set on the model
         if let Some(streaming) = self.has_streaming_field() {
             return streaming;
         }
 
-        // TODO: Python checks for `_StreamingCallbackHandler` marker trait here,
-        // but we can't easily check for a marker trait in Rust. This returns true
-        // if ANY handlers are present, which is more permissive than the Python
-        // implementation. Consider adding a `is_streaming_handler()` method to
-        // `BaseCallbackHandler` to allow filtering.
         if let Some(handlers) = run_manager
             && !handlers.is_empty()
         {
             return true;
         }
 
-        // Default: no streaming without explicit request or callback handlers
         false
     }
 
@@ -742,7 +728,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             run_id,
         } = config;
 
-        // Get invocation params and options
         let params = self._get_invocation_params(stop.as_deref(), None);
         let _options = {
             let mut opts = HashMap::new();
@@ -755,7 +740,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             opts
         };
 
-        // Get inheritable metadata including LangSmith params
         let mut inheritable_metadata = metadata.clone().unwrap_or_default();
         let ls_params = self.get_chat_ls_params(stop.as_deref());
         if let Some(provider) = ls_params.ls_provider {
@@ -768,7 +752,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
         }
 
-        // Configure callback manager
         let callback_manager = CallbackManager::configure(
             callbacks,
             self.callbacks().cloned(),
@@ -779,10 +762,8 @@ pub trait BaseChatModel: BaseLanguageModel {
             self.config().metadata.clone(),
         );
 
-        // Start chat model runs
         let run_managers = callback_manager.on_chat_model_start(&params, &messages, run_id);
 
-        // Process each message list
         let mut results = Vec::new();
         for (i, message_list) in messages.iter().enumerate() {
             let run_manager = run_managers.get(i);
@@ -796,7 +777,6 @@ pub trait BaseChatModel: BaseLanguageModel {
                     results.push(result);
                 }
                 Err(e) => {
-                    // Report error to run manager
                     if let Some(rm) = run_manager {
                         rm.on_llm_error(&e);
                     }
@@ -805,7 +785,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             }
         }
 
-        // Create flattened outputs for on_llm_end callbacks
         let flattened_outputs: Vec<LLMResult> = results
             .iter()
             .map(|res| LLMResult {
@@ -816,18 +795,15 @@ pub trait BaseChatModel: BaseLanguageModel {
             })
             .collect();
 
-        // Combine LLM outputs
         let llm_outputs: Vec<Option<HashMap<String, Value>>> =
             results.iter().map(|res| res.llm_output.clone()).collect();
         let combined_llm_output = self._combine_llm_outputs(&llm_outputs);
 
-        // Collect all generations
         let generations: Vec<Vec<GenerationType>> = results
             .into_iter()
             .map(|res| res.generations.into_iter().map(|g| g.into()).collect())
             .collect();
 
-        // Create final output
         let mut output = LLMResult {
             generations,
             llm_output: if combined_llm_output.is_empty() {
@@ -839,11 +815,8 @@ pub trait BaseChatModel: BaseLanguageModel {
             result_type: "LLMResult".to_string(),
         };
 
-        // Call on_llm_end for each run manager and collect run info
         let mut run_infos = Vec::new();
         for (run_manager, flattened_output) in run_managers.iter().zip(flattened_outputs.iter()) {
-            // Convert flattened_output to ChatResult for on_llm_end
-            // Extract the first generation if available
             if let Some(gen_list) = flattened_output.generations.first()
                 && let Some(generation) = gen_list.first()
                 && let GenerationType::ChatGeneration(chat_gen) = generation
@@ -854,7 +827,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             run_infos.push(RunInfo::new(run_manager.run_id()));
         }
 
-        // Attach run info to output
         if !run_infos.is_empty() {
             output.run = Some(run_infos);
         }
@@ -889,7 +861,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             run_id,
         } = config;
 
-        // Get invocation params and options
         let params = self._get_invocation_params(stop.as_deref(), None);
         let _options = {
             let mut opts = HashMap::new();
@@ -902,7 +873,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             opts
         };
 
-        // Get inheritable metadata including LangSmith params
         let mut inheritable_metadata = metadata.clone().unwrap_or_default();
         let ls_params = self.get_chat_ls_params(stop.as_deref());
         if let Some(provider) = ls_params.ls_provider {
@@ -915,7 +885,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
         }
 
-        // Configure async callback manager
         let callback_manager = AsyncCallbackManager::configure(
             callbacks,
             self.callbacks().cloned(),
@@ -926,12 +895,10 @@ pub trait BaseChatModel: BaseLanguageModel {
             self.config().metadata.clone(),
         );
 
-        // Start chat model runs
         let run_managers = callback_manager
             .on_chat_model_start(&params, &messages, run_id)
             .await;
 
-        // Process each message list concurrently (matches Python's asyncio.gather)
         let futures: Vec<_> = messages
             .iter()
             .enumerate()
@@ -965,7 +932,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             }
         }
 
-        // Create flattened outputs for on_llm_end callbacks
         let flattened_outputs: Vec<LLMResult> = results
             .iter()
             .map(|res| LLMResult {
@@ -976,18 +942,15 @@ pub trait BaseChatModel: BaseLanguageModel {
             })
             .collect();
 
-        // Combine LLM outputs
         let llm_outputs: Vec<Option<HashMap<String, Value>>> =
             results.iter().map(|res| res.llm_output.clone()).collect();
         let combined_llm_output = self._combine_llm_outputs(&llm_outputs);
 
-        // Collect all generations
         let generations: Vec<Vec<GenerationType>> = results
             .into_iter()
             .map(|res| res.generations.into_iter().map(|g| g.into()).collect())
             .collect();
 
-        // Create final output
         let mut output = LLMResult {
             generations,
             llm_output: if combined_llm_output.is_empty() {
@@ -999,10 +962,8 @@ pub trait BaseChatModel: BaseLanguageModel {
             result_type: "LLMResult".to_string(),
         };
 
-        // Call on_llm_end for each run manager and collect run info
         let mut run_infos = Vec::new();
         for (run_manager, flattened_output) in run_managers.iter().zip(flattened_outputs.iter()) {
-            // Extract the first generation if available
             if let Some(gen_list) = flattened_output.generations.first()
                 && let Some(generation) = gen_list.first()
                 && let GenerationType::ChatGeneration(chat_gen) = generation
@@ -1013,7 +974,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             run_infos.push(RunInfo::new(run_manager.run_id()));
         }
 
-        // Attach run info to output
         if !run_infos.is_empty() {
             output.run = Some(run_infos);
         }
@@ -1031,7 +991,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         stop: Option<Vec<String>>,
         run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<crate::outputs::ChatResult> {
-        // Resolve cache: local instance > global, respect cache=false
         let cache_config = self.chat_config().base.cache;
         let cache_instance = self.chat_config().cache_instance.clone();
 
@@ -1049,11 +1008,9 @@ pub trait BaseChatModel: BaseLanguageModel {
                 }
                 global
             } else {
-                // cache is None — use global if available
                 crate::globals::get_llm_cache()
             };
 
-        // Check cache before rate limiting
         if let Some(ref cache) = resolved_cache {
             let llm_string = self._get_llm_string(stop.as_deref(), None);
             let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
@@ -1063,20 +1020,15 @@ pub trait BaseChatModel: BaseLanguageModel {
             }
         }
 
-        // Apply rate limiter after cache check
         if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
             rate_limiter.acquire(true);
         }
 
-        // Check if streaming should be used
         if self._should_stream(false, false, None, run_manager.map(|rm| rm.handlers())) {
-            // Use streaming
             let stream_result = self._stream(messages.clone(), stop.clone(), run_manager);
             match stream_result {
                 Ok(stream) => {
-                    // Collect stream and merge chunks
                     let mut chat_result = agenerate_from_stream(stream).await?;
-                    // Apply output_version v1 to merged result
                     if self.chat_config().output_version.as_deref() == Some("v1") {
                         for generation in &mut chat_result.generations {
                             if let BaseMessage::AI(ref ai_msg) = generation.message {
@@ -1088,19 +1040,15 @@ pub trait BaseChatModel: BaseLanguageModel {
                     }
                     return Ok(chat_result);
                 }
-                Err(Error::NotImplemented(_)) => {
-                    // Fall through to non-streaming
-                }
+                Err(Error::NotImplemented(_)) => {}
                 Err(e) => return Err(e),
             }
         }
 
-        // Non-streaming path
         let mut result = self
             ._generate(messages.clone(), stop.clone(), run_manager)
             .await?;
 
-        // Apply output_version v1 to non-streaming result
         if self.chat_config().output_version.as_deref() == Some("v1") {
             for generation in &mut result.generations {
                 if let BaseMessage::AI(ref ai_msg) = generation.message {
@@ -1110,7 +1058,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             }
         }
 
-        // Inject response_metadata into each generation's message
         for generation in &mut result.generations {
             if let BaseMessage::AI(ref mut ai_msg) = generation.message {
                 ai_msg.response_metadata = _gen_info_and_msg_metadata(
@@ -1120,7 +1067,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             }
         }
 
-        // Update cache with new result
         if let Some(ref cache) = resolved_cache {
             let llm_string = self._get_llm_string(stop.as_deref(), None);
             let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
@@ -1142,7 +1088,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         stop: Option<Vec<String>>,
         run_manager: Option<&AsyncCallbackManagerForLLMRun>,
     ) -> Result<crate::outputs::ChatResult> {
-        // Resolve cache (same logic as sync version)
         let cache_config = self.chat_config().base.cache;
         let cache_instance = self.chat_config().cache_instance.clone();
 
@@ -1163,7 +1108,6 @@ pub trait BaseChatModel: BaseLanguageModel {
                 crate::globals::get_llm_cache()
             };
 
-        // Check cache before rate limiting
         if let Some(ref cache) = resolved_cache {
             let llm_string = self._get_llm_string(stop.as_deref(), None);
             let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
@@ -1172,22 +1116,17 @@ pub trait BaseChatModel: BaseLanguageModel {
                 return Ok(crate::outputs::ChatResult::new(generations));
             }
         }
-        // Apply rate limiter after cache check
         if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
             rate_limiter.aacquire(true).await;
         }
 
-        // Check if streaming should be used
         if self._should_stream(true, false, None, run_manager.map(|rm| rm.handlers())) {
-            // Use async streaming
             let stream_result = self
                 ._astream(messages.clone(), stop.clone(), run_manager)
                 .await;
             match stream_result {
                 Ok(stream) => {
-                    // Collect stream and merge chunks
                     let mut chat_result = agenerate_from_stream(stream).await?;
-                    // Apply output_version v1 to merged result
                     if self.chat_config().output_version.as_deref() == Some("v1") {
                         for generation in &mut chat_result.generations {
                             if let BaseMessage::AI(ref ai_msg) = generation.message {
@@ -1199,19 +1138,15 @@ pub trait BaseChatModel: BaseLanguageModel {
                     }
                     return Ok(chat_result);
                 }
-                Err(Error::NotImplemented(_)) => {
-                    // Fall through to non-streaming
-                }
+                Err(Error::NotImplemented(_)) => {}
                 Err(e) => return Err(e),
             }
         }
 
-        // Non-streaming path
         let mut result = self
             ._agenerate(messages.clone(), stop.clone(), run_manager)
             .await?;
 
-        // Apply output_version v1 to non-streaming result
         if self.chat_config().output_version.as_deref() == Some("v1") {
             for generation in &mut result.generations {
                 if let BaseMessage::AI(ref ai_msg) = generation.message {
@@ -1221,7 +1156,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             }
         }
 
-        // Inject response_metadata into each generation's message
         for generation in &mut result.generations {
             if let BaseMessage::AI(ref mut ai_msg) = generation.message {
                 ai_msg.response_metadata = _gen_info_and_msg_metadata(
@@ -1231,7 +1165,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             }
         }
 
-        // Update cache with new result
         if let Some(ref cache) = resolved_cache {
             let llm_string = self._get_llm_string(stop.as_deref(), None);
             let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
@@ -1279,7 +1212,7 @@ pub trait BaseChatModel: BaseLanguageModel {
     ///
     /// # Arguments
     ///
-    /// * `messages` - The conversation history.
+    /// * `messages` - The thread history.
     /// * `tools` - Tool definitions for the model to use.
     /// * `tool_choice` - Optional configuration for tool selection.
     /// * `stop` - Optional stop sequences.
@@ -1450,9 +1383,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         let messages = self.convert_input(input)?;
         let has_tools = false;
 
-        // Check if streaming should be used
         if !self._should_stream(false, has_tools, Some(true), None) {
-            // Fall back to invoke
             let result = self._generate(messages, stop, None).await?;
             let message = self.get_first_message(&result)?;
             let chunk = AIMessageChunk::builder()
@@ -1461,7 +1392,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
-        // Extract config fields
         let (callbacks, tags, metadata, _run_name, run_id) = if let Some(cfg) = config {
             (
                 cfg.callbacks.clone(),
@@ -1474,7 +1404,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             (None, None, None, None, None)
         };
 
-        // Build inheritable metadata with LangSmith params
         let mut inheritable_metadata = metadata.unwrap_or_default();
         let ls_params = self.get_chat_ls_params(stop.as_deref());
         if let Some(provider) = ls_params.ls_provider {
@@ -1487,7 +1416,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
         }
 
-        // Configure callback manager
         let params = self._get_invocation_params(stop.as_deref(), None);
         let callback_manager = crate::callbacks::CallbackManager::configure(
             callbacks,
@@ -1502,15 +1430,12 @@ pub trait BaseChatModel: BaseLanguageModel {
             callback_manager.on_chat_model_start(&params, std::slice::from_ref(&messages), run_id);
         let run_manager = run_managers.into_iter().next();
 
-        // Acquire rate limiter if configured
         if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
             rate_limiter.acquire(true);
         }
 
-        // Normalize messages before streaming
         let messages = super::utils::normalize_messages(messages);
 
-        // Use the _stream method with callback run_manager
         let generation_stream = self._stream(messages, stop, run_manager.as_ref())?;
 
         let output_version = self.chat_config().output_version.clone();
@@ -1529,11 +1454,13 @@ pub trait BaseChatModel: BaseLanguageModel {
                 match result {
                     Ok(generation_chunk) => {
                         let mut ai_chunk = match &generation_chunk.message {
-                            BaseMessage::AI(ai_msg) => AIMessageChunk::builder().content(ai_msg.content.clone()).build(),
+                            BaseMessage::AI(ai_msg) => AIMessageChunk::builder()
+                                .content(ai_msg.content.clone())
+                                .tool_calls(ai_msg.tool_calls.clone())
+                                .build(),
                             other => AIMessageChunk::builder().content(other.text()).build(),
                         };
 
-                        // Inject response_metadata from generation_info + message metadata
                         let ai_response_meta = match &generation_chunk.message {
                             BaseMessage::AI(ai_msg) => &ai_msg.response_metadata,
                             _ => &ai_chunk.response_metadata,
@@ -1543,13 +1470,11 @@ pub trait BaseChatModel: BaseLanguageModel {
                             ai_response_meta,
                         );
 
-                        // Apply output_version v1 processing
                         if output_version.as_deref() == Some("v1") {
                             ai_chunk = super::utils::update_chunk_content_to_blocks(&ai_chunk, "v1");
                             apply_block_indices(&mut ai_chunk, &mut block_index, &mut block_index_type);
                         }
 
-                        // Fire on_llm_new_token callback with chunk data
                         if let Some(ref rm) = run_manager {
                             let chunk_json = serde_json::to_value(&generation_chunk).ok();
                             rm.on_llm_new_token(
@@ -1577,8 +1502,6 @@ pub trait BaseChatModel: BaseLanguageModel {
                 }
             }
 
-            // Yield a final empty chunk with chunk_position="last" if
-            // the last chunk didn't already have it
             if yielded && last_chunk_position.is_none() {
                 let mut final_chunk = AIMessageChunk::builder().content("").build();
                 final_chunk.set_chunk_position(Some(ChunkPosition::Last));
@@ -1594,7 +1517,6 @@ pub trait BaseChatModel: BaseLanguageModel {
                 yield Ok(final_chunk);
             }
 
-            // Fire on_llm_end with merged generation
             if let Some(ref rm) = run_manager
                 && let Some(merged) = crate::outputs::merge_chat_generation_chunks(chunks) {
                     let chat_gen: ChatGeneration = merged.into();
@@ -1623,9 +1545,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         let messages = self.convert_input(input)?;
         let has_tools = false;
 
-        // Check if streaming should be used
         if !self._should_stream(true, has_tools, Some(true), None) {
-            // No async or sync stream is implemented, fall back to ainvoke
             let result = self._agenerate(messages, stop, None).await?;
             let message = self.get_first_message(&result)?;
             let chunk = AIMessageChunk::builder()
@@ -1634,7 +1554,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
-        // Extract config fields
         let (callbacks, tags, metadata, _run_name, run_id) = if let Some(cfg) = config {
             (
                 cfg.callbacks.clone(),
@@ -1647,7 +1566,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             (None, None, None, None, None)
         };
 
-        // Build inheritable metadata with LangSmith params
         let mut inheritable_metadata = metadata.unwrap_or_default();
         let ls_params = self.get_chat_ls_params(stop.as_deref());
         if let Some(provider) = ls_params.ls_provider {
@@ -1660,7 +1578,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
         }
 
-        // Configure async callback manager
         let params = self._get_invocation_params(stop.as_deref(), None);
         let callback_manager = crate::callbacks::AsyncCallbackManager::configure(
             callbacks,
@@ -1676,15 +1593,12 @@ pub trait BaseChatModel: BaseLanguageModel {
             .await;
         let run_manager = run_managers.into_iter().next();
 
-        // Acquire rate limiter if configured
         if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
             rate_limiter.aacquire(true).await;
         }
 
-        // Normalize messages before streaming
         let messages = super::utils::normalize_messages(messages);
 
-        // Use the _astream method with callback run_manager
         let generation_stream = self._astream(messages, stop, run_manager.as_ref()).await?;
 
         let output_version = self.chat_config().output_version.clone();
@@ -1703,11 +1617,13 @@ pub trait BaseChatModel: BaseLanguageModel {
                 match result {
                     Ok(generation_chunk) => {
                         let mut ai_chunk = match &generation_chunk.message {
-                            BaseMessage::AI(ai_msg) => AIMessageChunk::builder().content(ai_msg.content.clone()).build(),
+                            BaseMessage::AI(ai_msg) => AIMessageChunk::builder()
+                                .content(ai_msg.content.clone())
+                                .tool_calls(ai_msg.tool_calls.clone())
+                                .build(),
                             other => AIMessageChunk::builder().content(other.text()).build(),
                         };
 
-                        // Inject response_metadata from generation_info + message metadata
                         let ai_response_meta = match &generation_chunk.message {
                             BaseMessage::AI(ai_msg) => &ai_msg.response_metadata,
                             _ => &ai_chunk.response_metadata,
@@ -1717,13 +1633,11 @@ pub trait BaseChatModel: BaseLanguageModel {
                             ai_response_meta,
                         );
 
-                        // Apply output_version v1 processing
                         if output_version.as_deref() == Some("v1") {
                             ai_chunk = super::utils::update_chunk_content_to_blocks(&ai_chunk, "v1");
                             apply_block_indices(&mut ai_chunk, &mut block_index, &mut block_index_type);
                         }
 
-                        // Fire on_llm_new_token callback with chunk data
                         if let Some(ref rm) = run_manager {
                             let chunk_json = serde_json::to_value(&generation_chunk).ok();
                             rm.on_llm_new_token(
@@ -1751,8 +1665,6 @@ pub trait BaseChatModel: BaseLanguageModel {
                 }
             }
 
-            // Yield a final empty chunk with chunk_position="last" if
-            // the last chunk didn't already have it
             if yielded && last_chunk_position.is_none() {
                 let mut final_chunk = AIMessageChunk::builder().content("").build();
                 final_chunk.set_chunk_position(Some(ChunkPosition::Last));
@@ -1768,7 +1680,6 @@ pub trait BaseChatModel: BaseLanguageModel {
                 yield Ok(final_chunk);
             }
 
-            // Fire on_llm_end with merged generation
             if let Some(ref rm) = run_manager
                 && let Some(merged) = crate::outputs::merge_chat_generation_chunks(chunks) {
                     let chat_gen: ChatGeneration = merged.into();
@@ -1787,7 +1698,7 @@ pub trait BaseChatModel: BaseLanguageModel {
     ///
     /// # Arguments
     ///
-    /// * `messages` - The conversation history.
+    /// * `messages` - The thread history.
     /// * `stop` - Optional stop sequences.
     /// * `run_manager` - Optional callback manager for the run.
     ///
@@ -1802,9 +1713,7 @@ pub trait BaseChatModel: BaseLanguageModel {
     ) -> Result<ChatGenerationStream> {
         let has_tools = false;
 
-        // Check if streaming should be used
         if !self._should_stream(false, has_tools, None, None) {
-            // Fall back to non-streaming
             let result = self._generate(messages, stop, run_manager).await?;
             if result.generations.is_empty() {
                 return Err(Error::Other("No generations returned".into()));
@@ -1815,7 +1724,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
-        // Try to use streaming
         self._stream(messages, stop, run_manager)
     }
 
@@ -1990,10 +1898,6 @@ pub fn generate_response_from_error(error: &crate::error::Error) -> Vec<ChatGene
 ///
 /// Matches Python's `_format_for_tracing`.
 pub fn format_for_tracing(messages: &[BaseMessage]) -> Vec<BaseMessage> {
-    // In Rust, message content is already strongly typed via ContentPart/MessageContent.
-    // The Python version converts raw dict image blocks to OpenAI format, but Rust's
-    // type system ensures content is well-formed. Cloning messages preserves all data
-    // for tracing without lossy conversions.
     messages.to_vec()
 }
 
@@ -2016,15 +1920,12 @@ pub fn cleanup_llm_representation(serialized: &mut Value, depth: usize) {
         None => return,
     };
 
-    // Remove "repr" from {"type": "not_implemented"} entries
     if map.get("type").and_then(|v| v.as_str()) == Some("not_implemented") {
         map.remove("repr");
     }
 
-    // Remove "graph" key
     map.remove("graph");
 
-    // Recurse into "kwargs"
     if let Some(kwargs) = map.get_mut("kwargs")
         && let Some(kwargs_map) = kwargs.as_object_mut()
     {
@@ -2235,12 +2136,10 @@ where
         None => return Err(Error::Other("No generations found in stream.".into())),
     };
 
-    // Merge remaining chunks
     for chunk in stream {
         generation = generation + chunk;
     }
 
-    // Convert ChatGenerationChunk to ChatGeneration
     let chat_generation: ChatGeneration = generation.into();
     Ok(ChatResult::new(vec![chat_generation]))
 }
