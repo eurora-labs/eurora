@@ -143,16 +143,12 @@
 	}
 </script>
 
-<div
-	class="w-full h-full flex flex-col {messages.length === 0
-		? 'justify-center'
-		: 'justify-end'} items-center gap-4"
->
+<div class="relative w-full h-full">
 	{#if messages.length > 0}
-		<ScrollArea class="w-full px-6 flex flex-col justify-end items-center gap-4">
+		<ScrollArea class="h-full w-full px-6">
 			<Chat.Root
 				bind:this={chatRef}
-				class="w-full h-full flex flex-col gap-4 overflow-hidden"
+				class="w-full h-full flex flex-col gap-4 overflow-hidden pb-28"
 			>
 				{#each messages as message}
 					{@const content = getMessageContent(message)}
@@ -176,15 +172,17 @@
 		</ScrollArea>
 	{/if}
 
-	<Launcher.Root
-		class="h-fit rounded-[36px] shadow-none flex flex-col p-4 m-0 w-[70%] bg-gray-700"
-	>
-		<Launcher.Input
-			placeholder="What can I help you with?"
-			class="min-h-25 h-fit w-full text-[24px]"
-			bind:query={searchQuery}
-			bind:editorRef
-			onkeydown={handleKeydown}
-		/>
-	</Launcher.Root>
+	<div class="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none">
+		<Launcher.Root
+			class="pointer-events-auto h-fit rounded-2xl shadow-none flex flex-col p-4 w-[90%] bg-gray-700"
+		>
+			<Launcher.Input
+				placeholder="What can I help you with?"
+				class="min-h-25 h-fit w-full text-[24px]"
+				bind:query={searchQuery}
+				bind:editorRef
+				onkeydown={handleKeydown}
+			/>
+		</Launcher.Root>
+	</div>
 </div>

@@ -55,9 +55,8 @@
 	<Sidebar.Provider open={true}>
 		<MainSidebar />
 		<Sidebar.Inset>
-			<!-- <div class="flex flex-col h-screen min-w-0 overflow-x-hidden"> -->
 			<div class="flex flex-col h-screen">
-				<div class="flex-1 bg-background">
+				<div class="flex-1 min-h-0">
 					{@render children?.()}
 				</div>
 				<div class="flex flex-col w-full">
