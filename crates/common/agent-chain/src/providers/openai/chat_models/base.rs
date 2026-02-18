@@ -1070,10 +1070,11 @@ impl ChatOpenAI {
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
+        tools: Option<&[serde_json::Value]>,
     ) -> Result<ChatStream> {
         let api_key = self.get_api_key()?;
         let client = self.build_client()?;
-        let payload = self.build_responses_api_payload(&messages, stop, None, true);
+        let payload = self.build_responses_api_payload(&messages, stop, tools, true);
 
         let mut request = client
             .post(format!("{}/responses", self.api_base))
@@ -1502,7 +1503,25 @@ impl ChatOpenAI {
         tool_choice: Option<&ToolChoice>,
     ) -> Result<ChatStream> {
         if self.should_use_responses_api(None) {
-            return self.stream_responses_api(messages, stop).await;
+            let openai_tools: Option<Vec<serde_json::Value>> =
+                tools.filter(|t| !t.is_empty()).map(|tools| {
+                    tools
+                        .iter()
+                        .map(|t| {
+                            serde_json::json!({
+                                "type": "function",
+                                "function": {
+                                    "name": t.name,
+                                    "description": t.description,
+                                    "parameters": t.parameters
+                                }
+                            })
+                        })
+                        .collect()
+                });
+            return self
+                .stream_responses_api(messages, stop, openai_tools.as_deref())
+                .await;
         }
 
         let api_key = self.get_api_key()?;
