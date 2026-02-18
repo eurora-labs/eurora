@@ -683,15 +683,13 @@ pub fn merge_content_complex(
                 }
             }
             (MergeableContent::List(mut left), MergeableContent::Text(right)) => {
-                if right.is_empty() {
-                } else if left.is_empty() {
-                } else if let Some(last) = left.last_mut()
-                    && last.is_string()
-                {
-                    if let Value::String(s) = last {
+                if !left.is_empty() && left.last().is_some_and(|v| v.is_string()) {
+                    if let Some(Value::String(s)) = left.last_mut() {
                         s.push_str(&right);
                     }
-                } else {
+                } else if right.is_empty() {
+                    // no-op
+                } else if !left.is_empty() {
                     left.push(Value::String(right));
                 }
                 MergeableContent::List(left)
