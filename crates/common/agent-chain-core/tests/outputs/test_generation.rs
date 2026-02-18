@@ -101,7 +101,6 @@ mod test_generation_chunk {
         let info = result.generation_info.unwrap();
         assert_eq!(info.get("key1"), Some(&json!("value1")));
         assert_eq!(info.get("key2"), Some(&json!("value2")));
-        // String values are concatenated in merge_dicts
         assert_eq!(info.get("shared"), Some(&json!("firstsecond")));
     }
 
@@ -145,13 +144,6 @@ mod test_generation_chunk {
         let result = chunk1 + chunk2 + chunk3;
         assert_eq!(result.text, "ABC");
     }
-
-    // Note: test_add_with_invalid_type_raises_error is not applicable in Rust.
-    // The type system prevents adding incompatible types at compile time.
-
-    // Note: test_add_with_generation_raises_error is not applicable in Rust.
-    // In Rust, GenerationChunk + Generation would be a compile error since
-    // the Add trait is only implemented for GenerationChunk + GenerationChunk.
 
     /// Test that GenerationChunk can be created from Generation via From trait.
     /// In Python this would test inheritance; in Rust we use the From trait.
@@ -334,15 +326,8 @@ mod test_generation_chunk_merging {
         let chunk1 = GenerationChunk::new("A");
         let chunk2 = GenerationChunk::new("B");
         let result = chunk1 + chunk2;
-        // Verify the result is a GenerationChunk by using it as one
         let _: GenerationChunk = result;
     }
-
-    // Note: test_add_with_none_type_raises_error is not applicable in Rust.
-    // The type system prevents adding None to a GenerationChunk at compile time.
-
-    // Note: test_add_with_int_raises_error is not applicable in Rust.
-    // The type system prevents adding an integer to a GenerationChunk at compile time.
 
     /// Test that sequential adds properly accumulate generation_info.
     #[test]

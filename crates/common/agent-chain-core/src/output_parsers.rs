@@ -50,43 +50,33 @@ mod string;
 mod transform;
 mod xml;
 
-// Re-export base types
 pub use base::{
     BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser, OutputParserError,
     RunnableOutputParser,
 };
 
-// Re-export format instructions
 pub use format_instructions::JSON_FORMAT_INSTRUCTIONS;
 
-// Re-export string parser
 pub use string::StrOutputParser;
 
-// Re-export transform types
 pub use transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
 
-// Re-export JSON parser
 pub use json::{JsonOutputParser, SimpleJsonOutputParser};
 
-// Re-export list parsers
 pub use list::{
     CommaSeparatedListOutputParser, ListOutputParser, MarkdownListOutputParser,
     NumberedListOutputParser, ParseMatch, drop_last_n,
 };
 
-// Re-export Pydantic (struct) parser
 pub use pydantic::PydanticOutputParser;
 
-// Re-export XML parser
 pub use xml::{XMLOutputParser, nested_element};
 
-// Re-export OpenAI functions parsers
 pub use openai_functions::{
     JsonKeyOutputFunctionsParser, JsonOutputFunctionsParser, OutputFunctionsParser,
     PydanticAttrOutputFunctionsParser, PydanticOutputFunctionsParser, PydanticSchema,
 };
 
-// Re-export OpenAI tools parsers
 pub use openai_tools::{
     JsonOutputKeyToolsParser, JsonOutputToolsParser, PydanticToolsParser, make_invalid_tool_call,
     parse_tool_call, parse_tool_calls,

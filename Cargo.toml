@@ -41,7 +41,6 @@ be-asset-service = { path = "crates/backend/be-asset-service" }
 be-auth-core = { path = "crates/backend/be-auth-core" }
 be-auth-service = { path = "crates/backend/be-auth-service" }
 be-authz = { path = "crates/backend/be-authz" }
-be-conversation-service = { path = "crates/backend/be-conversation-service" }
 be-encrypt = { path = "crates/backend/be-encrypt" }
 be-local-settings = { path = "crates/backend/be-local-settings" }
 be-local-settings-service = { path = "crates/backend/be-local-settings-service" }
@@ -49,6 +48,7 @@ be-monolith = { path = "crates/backend/be-monolith" }
 be-payment-service = { path = "crates/backend/be-payment-service" }
 be-remote-db = { path = "crates/backend/be-remote-db" }
 be-storage = { path = "crates/backend/be-storage" }
+be-thread-service = { path = "crates/backend/be-thread-service" }
 be-update-service = { path = "crates/backend/be-update-service" }
 blake2 = "0.10"
 bon = "3.8.2"
@@ -67,7 +67,6 @@ enum_dispatch = "0.3.13"
 euro-activity = { path = "crates/app/euro-activity" }
 euro-auth = { path = "crates/app/euro-auth" }
 euro-browser = { path = "crates/app/euro-browser" }
-euro-conversation = { path = "crates/app/euro-conversation" }
 euro-debug = { path = "crates/app/euro-debug" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
 euro-endpoint = { path = "crates/app/euro-endpoint" }
@@ -78,6 +77,7 @@ euro-secret = { path = "crates/app/euro-secret" }
 euro-settings = { path = "crates/app/euro-settings" }
 euro-storage = { path = "crates/app/euro-storage" }
 euro-tauri = { path = "crates/app/euro-tauri" }
+euro-thread = { path = "crates/app/euro-thread" }
 euro-timeline = { path = "crates/app/euro-timeline" }
 euro-user = { path = "crates/app/euro-user" }
 euro-vision = { path = "crates/app/euro-vision" }

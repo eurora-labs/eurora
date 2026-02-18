@@ -330,7 +330,6 @@ impl Graph {
             None => return,
         };
 
-        // Check that removing this node would leave a valid first node
         let has_replacement = first_node_impl(self, &[&first.id]).is_some();
         let outgoing_count = self.edges.iter().filter(|e| e.source == first.id).count();
 
@@ -347,7 +346,6 @@ impl Graph {
             None => return,
         };
 
-        // Check that removing this node would leave a valid last node
         let has_replacement = last_node_impl(self, &[&last.id]).is_some();
         let incoming_count = self.edges.iter().filter(|e| e.target == last.id).count();
 
@@ -360,7 +358,6 @@ impl Graph {
     ///
     /// Mirrors Python's `Graph.to_json()`.
     pub fn to_json(&self) -> Value {
-        // Create stable integer IDs for UUID-based nodes
         let stable_ids: HashMap<&str, Value> = self
             .nodes
             .values()
@@ -421,7 +418,6 @@ impl Graph {
     pub fn reid(&self) -> Graph {
         use std::collections::BTreeMap;
 
-        // Group node names to detect duplicates
         let mut name_to_ids: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for node in self.nodes.values() {
             name_to_ids
@@ -430,7 +426,6 @@ impl Graph {
                 .push(node.id.clone());
         }
 
-        // Create unique labels
         let mut unique_labels: HashMap<String, String> = HashMap::new();
         for (name, ids) in &name_to_ids {
             if ids.len() == 1 {
@@ -531,20 +526,17 @@ impl Graph {
             }
         };
 
-        // prefix each node
         for (key, node) in &graph.nodes {
             let new_id = prefixed(key);
             self.nodes
                 .insert(new_id.clone(), node.copy(Some(&new_id), None));
         }
 
-        // prefix each edge's source and target
         for edge in &graph.edges {
             self.edges
                 .push(edge.copy(Some(&prefixed(&edge.source)), Some(&prefixed(&edge.target))));
         }
 
-        // return (prefixed) first and last nodes of the subgraph
         let first = graph.first_node().map(|n| {
             let new_id = prefixed(&n.id);
             n.copy(Some(&new_id), None)
@@ -741,10 +733,6 @@ impl MermaidDrawMethod {
         }
     }
 }
-
-// ============================================================================
-// Internal helper functions
-// ============================================================================
 
 fn first_node_impl<'a>(graph: &'a Graph, exclude: &[&str]) -> Option<&'a Node> {
     let targets: std::collections::HashSet<&str> = graph

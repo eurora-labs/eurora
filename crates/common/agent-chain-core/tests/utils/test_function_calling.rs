@@ -111,10 +111,6 @@ fn bedrock_converse_tool() -> Value {
     })
 }
 
-// =============================================================================
-// TESTS: convert_to_openai_function
-// =============================================================================
-
 #[test]
 
 fn test_convert_to_openai_function_from_json_schema() {
@@ -151,7 +147,6 @@ fn test_convert_to_openai_function_from_bedrock_converse_tool() {
 fn test_convert_to_openai_function_from_openai_function() {
     let expected = expected_openai_function();
 
-    // Convert from already-OpenAI format should return the same
     let actual = convert_to_openai_function(&expected, None);
 
     assert_eq!(actual, expected);
@@ -159,8 +154,6 @@ fn test_convert_to_openai_function_from_openai_function() {
 
 #[test]
 fn test_convert_to_openai_function_nested() {
-    // In Rust, we'd represent the function schema differently.
-    // The test verifies nested Pydantic models work correctly.
     let nested_schema = json!({
         "title": "my_function",
         "description": "Dummy function.",
@@ -338,8 +331,6 @@ fn test_convert_to_openai_function_strict_union_of_objects_arg_type() {
     let actual = convert_to_openai_function(&schema, Some(true));
     assert_eq!(actual, expected);
 }
-
-// Tests for schemas without description
 
 fn json_schema_no_description_no_params() -> Value {
     json!({
@@ -563,7 +554,6 @@ fn test_function_no_params() {
 #[test]
 
 fn test_convert_union_type() {
-    // Schema representing a function with union type: int | str
     let schema = json!({
         "title": "magic_function",
         "description": "Compute a magic function.",
@@ -617,11 +607,6 @@ fn test_convert_to_openai_function_no_args() {
 
 #[test]
 fn test_convert_to_openai_function_nested_strict_2() {
-    // Note: In Python, this test has version-dependent behavior:
-    // - Pydantic >= 2.11: adds `additionalProperties: false` to bare `object` types
-    // - Pydantic < 2.11: does NOT add `additionalProperties: false` to bare `object` types
-    // The Rust implementation follows the Pydantic < 2.11 behavior for bare object types
-    // (only adds `additionalProperties: false` to objects with defined properties).
     let schema = json!({
         "title": "my_function",
         "description": "Dummy function.",
@@ -638,9 +623,6 @@ fn test_convert_to_openai_function_nested_strict_2() {
         "required": ["arg1", "arg2"],
     });
 
-    // Expected output follows Pydantic < 2.11 behavior:
-    // - Bare object types (without `properties`) do NOT get `additionalProperties: false`
-    // - Only the top-level parameters object gets `additionalProperties: false`
     let expected = json!({
         "name": "my_function",
         "description": "Dummy function.",
@@ -691,13 +673,8 @@ fn test_convert_to_openai_function_strict_required() {
         .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
         .unwrap_or_default();
 
-    // With strict=true, all fields should be required
     assert_eq!(required, vec!["arg1", "arg2"]);
 }
-
-// =============================================================================
-// TESTS: tool_example_to_messages
-// =============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct FakeCall {
@@ -752,7 +729,6 @@ fn test_multiple_tool_calls() {
     assert!(matches!(&messages[3], BaseMessage::Tool(_)));
     assert!(matches!(&messages[4], BaseMessage::Tool(_)));
 
-    // Verify AI message has correct tool_calls structure
     if let BaseMessage::AI(ai_msg) = &messages[1] {
         let tool_calls = ai_msg
             .additional_kwargs
@@ -762,7 +738,6 @@ fn test_multiple_tool_calls() {
 
         assert_eq!(tool_calls.len(), 3);
 
-        // Check first tool call
         let first_call = &tool_calls[0];
         assert_eq!(first_call.get("type").unwrap(), "function");
         let function = first_call.get("function").unwrap();
@@ -819,7 +794,6 @@ fn test_tool_outputs_with_ai_response() {
 
     if let BaseMessage::AI(response) = &messages[3] {
         assert_eq!(response.content, "The output is Output1");
-        // Final AI response should not have tool calls
         let tool_calls = response
             .additional_kwargs
             .get("tool_calls")
@@ -828,16 +802,8 @@ fn test_tool_outputs_with_ai_response() {
     }
 }
 
-// =============================================================================
-// TESTS: convert_typed_dict_to_openai_function
-// =============================================================================
-
 #[test]
 fn test_convert_typed_dict_to_openai_function() {
-    // In Rust, TypedDict is represented as a struct with typed fields.
-    // We use JSON schema representation for testing.
-
-    // The schema that would be generated from a TypedDict-like struct
     let typed_dict_schema = json!({
         "title": "Tool",
         "description": "Docstring.",
@@ -920,10 +886,6 @@ fn test_convert_typed_dict_to_openai_function() {
     assert_eq!(actual, expected);
 }
 
-// =============================================================================
-// TESTS: convert_to_json_schema
-// =============================================================================
-
 #[test]
 
 fn test_convert_to_json_schema_from_json_schema() {
@@ -964,14 +926,9 @@ fn test_convert_to_json_schema_from_openai_function() {
     assert_eq!(actual, expected);
 }
 
-// =============================================================================
-// TESTS: Tool conversions
-// =============================================================================
-
 #[test]
 
 fn test_convert_to_openai_function_from_structured_tool() {
-    // Create a StructuredTool with the same schema as dummy_function
     let args_schema = json!({
         "type": "object",
         "properties": {
@@ -1049,13 +1006,8 @@ fn test_convert_to_openai_function_from_simple_tool() {
     assert_eq!(actual, expected);
 }
 
-// =============================================================================
-// FunctionDescription and ToolDescription type definitions tests
-// =============================================================================
-
 #[test]
 fn test_function_description_structure() {
-    // Verify the FunctionDescription structure matches Python's TypedDict
     let func_desc = FunctionDescription {
         name: "test_function".to_string(),
         description: "A test function.".to_string(),
@@ -1078,7 +1030,6 @@ fn test_function_description_structure() {
 
 #[test]
 fn test_tool_description_structure() {
-    // Verify the ToolDescription structure matches Python's TypedDict
     let tool_desc = ToolDescription {
         r#type: "function".to_string(),
         function: FunctionDescription {
@@ -1095,25 +1046,16 @@ fn test_tool_description_structure() {
     assert_eq!(tool_desc.function.name, "test_function");
 }
 
-// =============================================================================
-// COMPREHENSIVE TESTS: test_convert_to_openai_function (matches Python parametrized test)
-// =============================================================================
-
 /// Test convert_to_openai_function with all fixture types.
 /// This matches the Python test that iterates over multiple input formats.
 #[test]
 fn test_convert_to_openai_function_comprehensive() {
     let expected = expected_openai_function();
 
-    // List of all input formats that should produce the same output
     let test_inputs = vec![
-        // JSON schema format (like pydantic model output)
         ("json_schema", expected_json_schema()),
-        // Anthropic tool format
         ("anthropic_tool", anthropic_tool()),
-        // Bedrock Converse tool format
         ("bedrock_converse_tool", bedrock_converse_tool()),
-        // Already OpenAI function format
         ("openai_function", expected_openai_function()),
     ];
 
@@ -1126,7 +1068,6 @@ fn test_convert_to_openai_function_comprehensive() {
 /// Test for TypedDict with annotations - matches Python's dummy_typing_typed_dict
 #[test]
 fn test_convert_to_openai_function_from_typing_typed_dict() {
-    // Represents Python's TypedDict with Annotated fields
     let typed_dict_schema = json!({
         "title": "dummy_function",
         "description": "Dummy function.",
@@ -1150,7 +1091,6 @@ fn test_convert_to_openai_function_from_typing_typed_dict() {
 /// Test for TypedDict with docstring annotations - matches Python's dummy_typing_typed_dict_docstring
 #[test]
 fn test_convert_to_openai_function_from_typing_typed_dict_docstring() {
-    // Represents Python's TypedDict with docstring-based arg descriptions
     let typed_dict_schema = json!({
         "title": "dummy_function",
         "description": "Dummy function.",
@@ -1174,7 +1114,6 @@ fn test_convert_to_openai_function_from_typing_typed_dict_docstring() {
 /// Test for extensions TypedDict - matches Python's dummy_extensions_typed_dict
 #[test]
 fn test_convert_to_openai_function_from_extensions_typed_dict() {
-    // Represents Python's typing_extensions.TypedDict with Annotated fields
     let typed_dict_schema = json!({
         "title": "dummy_function",
         "description": "Dummy function.",
@@ -1198,7 +1137,6 @@ fn test_convert_to_openai_function_from_extensions_typed_dict() {
 /// Test for extensions TypedDict with docstring - matches Python's dummy_extensions_typed_dict_docstring
 #[test]
 fn test_convert_to_openai_function_from_extensions_typed_dict_docstring() {
-    // Represents Python's typing_extensions.TypedDict with docstring-based arg descriptions
     let typed_dict_schema = json!({
         "title": "dummy_function",
         "description": "Dummy function.",
@@ -1219,11 +1157,6 @@ fn test_convert_to_openai_function_from_extensions_typed_dict_docstring() {
     assert_eq!(actual, expected);
 }
 
-// =============================================================================
-// COMPREHENSIVE TESTS: test__convert_typed_dict_to_openai_function
-// Full test with all argument types from Python
-// =============================================================================
-
 /// Full test for convert_typed_dict_to_openai_function with all arg types.
 /// Matches Python's test__convert_typed_dict_to_openai_function with:
 /// - arg1: str (required)
@@ -1243,7 +1176,6 @@ fn test_convert_to_openai_function_from_extensions_typed_dict_docstring() {
 /// - arg15: bool with default False
 #[test]
 fn test_convert_typed_dict_to_openai_function_full() {
-    // SubTool schema used in multiple args
     let subtool_schema = json!({
         "description": "Subtool docstring.",
         "type": "object",
@@ -1270,7 +1202,6 @@ fn test_convert_typed_dict_to_openai_function_full() {
         },
     });
 
-    // Full TypedDict schema matching Python test
     let typed_dict_schema = json!({
         "title": "Tool",
         "description": "Docstring.",
@@ -1467,32 +1398,21 @@ fn test_convert_typed_dict_to_openai_function_full() {
 /// In Rust, we test that invalid schemas fail appropriately.
 #[test]
 fn test_convert_typed_dict_to_openai_function_fail() {
-    // Schema with an unsupported/invalid type
-    // Note: The Python test uses MutableSet which Pydantic v1 doesn't support.
-    // In Rust, we test that invalid schemas are handled gracefully.
     let invalid_schema = json!({
         "title": "Tool",
         "type": "object",
         "properties": {
             "arg1": {
-                // Invalid type that should cause issues
                 "type": "unsupported_type",
             },
         },
     });
 
-    // The function should still produce output (it may just pass through the invalid type)
-    // since JSON schema allows custom types
     let result = convert_typed_dict_to_openai_function(&invalid_schema);
 
-    // Verify it produces some output rather than panicking
     assert!(result.get("name").is_some());
     assert_eq!(result.get("name").unwrap(), "Tool");
 }
-
-// =============================================================================
-// COMPREHENSIVE TESTS: test_convert_to_json_schema (matches Python parametrized test)
-// =============================================================================
 
 /// Test convert_to_json_schema with all fixture types.
 /// This matches the Python test that iterates over multiple input formats.
@@ -1500,15 +1420,10 @@ fn test_convert_typed_dict_to_openai_function_fail() {
 fn test_convert_to_json_schema_comprehensive() {
     let expected = expected_json_schema();
 
-    // List of all input formats that should produce the same output
     let test_inputs = vec![
-        // JSON schema format (like pydantic model output)
         ("json_schema", expected_json_schema()),
-        // Anthropic tool format
         ("anthropic_tool", anthropic_tool()),
-        // Bedrock Converse tool format
         ("bedrock_converse_tool", bedrock_converse_tool()),
-        // OpenAI function format
         ("openai_function", expected_openai_function()),
     ];
 
@@ -1518,20 +1433,12 @@ fn test_convert_to_json_schema_comprehensive() {
     }
 }
 
-// =============================================================================
-// XFAIL TESTS: Tests that are expected to fail (marked as xfail in Python)
-// =============================================================================
-
 /// Test for nested pydantic v2 models.
 /// Marked as xfail in Python: "Direct pydantic v2 models not yet supported"
 /// In Rust, we note this limitation.
 #[test]
 #[ignore = "Direct pydantic v2 models not yet supported - matches Python xfail"]
-fn test_convert_to_openai_function_nested_v2() {
-    // This test is ignored to match Python's @pytest.mark.xfail behavior
-    // The functionality would involve direct conversion of pydantic v2 models
-    // which is not yet supported.
-}
+fn test_convert_to_openai_function_nested_v2() {}
 
 /// Test for optional param handling.
 /// Marked as xfail in Python: "Pydantic converts str | None to str in .model_json_schema()"
@@ -1539,11 +1446,6 @@ fn test_convert_to_openai_function_nested_v2() {
 #[test]
 #[ignore = "Pydantic converts str | None to str in .model_json_schema() - matches Python xfail"]
 fn test_function_optional_param() {
-    // This test is ignored to match Python's @pytest.mark.xfail behavior
-    // The functionality involves proper handling of Optional types
-    // which Pydantic doesn't preserve in the JSON schema.
-
-    // The schema would look like:
     let _schema = json!({
         "title": "func5",
         "description": "A test function.",
@@ -1558,22 +1460,12 @@ fn test_function_optional_param() {
         },
         "required": ["b"],  // Only b should be required
     });
-
-    // The test would verify that only "b" is in required
-    // but this doesn't work due to Pydantic's handling of Optional
 }
-
-// =============================================================================
-// ADDITIONAL TESTS: Runnable conversion (matches Python test)
-// =============================================================================
 
 /// Test convert_to_openai_function with a runnable-like tool.
 /// Matches Python test for runnable.as_tool() conversion.
 #[test]
 fn test_convert_to_openai_function_from_runnable_tool() {
-    // When converting a runnable to a tool, descriptions may not be preserved
-    // in the parameters if they come from TypedDict annotations rather than
-    // Pydantic Field descriptions.
     let runnable_tool_schema = json!({
         "title": "dummy_function",
         "description": "Dummy function.",

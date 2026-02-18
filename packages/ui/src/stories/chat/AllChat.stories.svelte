@@ -11,7 +11,7 @@
 			docs: {
 				description: {
 					component:
-						'A comprehensive showcase of chat interface variants demonstrating scrolling behavior, different chat lengths, presence of sources, and interactive features. The chat component serves as a container for message components, supporting various conversation scenarios.',
+						'A comprehensive showcase of chat interface variants demonstrating scrolling behavior, different chat lengths, presence of sources, and interactive features. The chat component serves as a container for message components, supporting various thread scenarios.',
 				},
 			},
 			controls: { disable: true },
@@ -31,7 +31,7 @@
 	}
 
 	// Sample message data for different scenarios
-	const shortConversationMessages = [
+	const shortThreadMessages = [
 		{
 			role: 'user' as const,
 			content: 'Hi! Can you help me with Svelte?',
@@ -53,7 +53,7 @@
 		},
 	];
 
-	const mediumConversationMessages = [
+	const mediumThreadMessages = [
 		{
 			role: 'user' as const,
 			content:
@@ -115,7 +115,7 @@ export function addTask(task) {
 		},
 	];
 
-	const longConversationMessages = [
+	const longThreadMessages = [
 		{
 			role: 'user' as const,
 			content:
@@ -368,16 +368,16 @@ function handleScroll() {
 	import { StorybookContainer } from '$lib/custom-components/storybook-container/index.js';
 </script>
 
-<Story name="Short Conversation">
+<Story name="Short Thread">
 	<StorybookContainer class="p-0">
 		{#snippet children()}
 			<div class="h-[600px] w-full">
 				<div class="h-full p-6">
 					<h2 class="text-lg font-semibold mb-4 text-white">
-						Short Conversation (3-4 messages)
+						Short Thread (3-4 messages)
 					</h2>
 					<Chat.Root class="h-[500px]">
-						{#each shortConversationMessages as message}
+						{#each shortThreadMessages as message}
 							<Chat.Message
 								variant={message.role === 'user' ? 'default' : 'assistant'}
 								finishRendering={() => {}}
@@ -401,16 +401,16 @@ function handleScroll() {
 	</StorybookContainer>
 </Story>
 
-<Story name="Medium Conversation">
+<Story name="Medium Thread">
 	<StorybookContainer class="p-0">
 		{#snippet children()}
 			<div class="h-[600px] w-full">
 				<div class="h-full p-6">
 					<h2 class="text-lg font-semibold mb-4 text-white">
-						Medium Conversation (8-10 messages)
+						Medium Thread (8-10 messages)
 					</h2>
 					<Chat.Root class="h-[500px]">
-						{#each mediumConversationMessages as message}
+						{#each mediumThreadMessages as message}
 							<Chat.Message
 								variant={message.role === 'user' ? 'default' : 'assistant'}
 								finishRendering={() => {}}
@@ -434,16 +434,16 @@ function handleScroll() {
 	</StorybookContainer>
 </Story>
 
-<Story name="Long Conversation with Scrolling">
+<Story name="Long Thread with Scrolling">
 	<StorybookContainer class="p-0">
 		{#snippet children()}
 			<div class="h-[600px] w-full">
 				<div class="h-full p-6">
 					<h2 class="text-lg font-semibold mb-4 text-white">
-						Long Conversation (15+ messages with scrolling)
+						Long Thread (15+ messages with scrolling)
 					</h2>
 					<Chat.Root class="h-[500px]">
-						{#each longConversationMessages as message}
+						{#each longThreadMessages as message}
 							<Chat.Message
 								variant={message.role === 'user' ? 'default' : 'assistant'}
 								finishRendering={() => {}}

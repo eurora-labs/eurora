@@ -80,7 +80,6 @@ where
             }
         };
 
-        // Check if we have a buffered item first.
         if let Some(item) = guard.buffers[this.index].pop_front() {
             return Poll::Ready(Some(item));
         }
@@ -89,10 +88,8 @@ where
             return Poll::Ready(None);
         }
 
-        // Try to get the next item from the source stream.
         match guard.source.as_mut().poll_next(context) {
             Poll::Ready(Some(item)) => {
-                // Push to all other peer buffers.
                 for (i, buffer) in guard.buffers.iter_mut().enumerate() {
                     if i != this.index {
                         buffer.push_back(item.clone());
@@ -148,7 +145,6 @@ impl<S> AClosing<S> {
 
 impl<S> Drop for AClosing<S> {
     fn drop(&mut self) {
-        // The stream is dropped here, which closes it.
         self.stream.take();
     }
 }

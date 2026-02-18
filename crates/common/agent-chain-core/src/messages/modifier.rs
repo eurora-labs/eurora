@@ -13,7 +13,7 @@ use super::content::ContentBlock;
 
 /// Message responsible for deleting other messages.
 ///
-/// This is used to remove messages from a conversation history by their ID.
+/// This is used to remove messages from a thread history by their ID.
 /// This corresponds to `RemoveMessage` in LangChain Python.
 ///
 /// # Example

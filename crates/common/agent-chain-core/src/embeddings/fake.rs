@@ -135,9 +135,7 @@ mod tests {
         let result = embeddings.embed_documents(texts).unwrap();
         assert_eq!(result.len(), 3);
         assert_eq!(result[0].len(), 8);
-        // Same text should produce same embedding
         assert_eq!(result[0], result[2]);
-        // Different texts should produce different embeddings
         assert_ne!(result[0], result[1]);
     }
 }

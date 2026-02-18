@@ -161,8 +161,6 @@ impl DeprecationParams {
         if self.pending && self.removal.is_some() {
             return Err("A pending deprecation cannot have a scheduled removal".to_string());
         }
-        // Non-pending deprecations must have a removal version specified
-        // This matches Python's NotImplementedError behavior
         if !self.pending && self.removal.is_none() && self.message.is_none() {
             return Err(
                 "Need to determine which default deprecation schedule to use. \
@@ -265,7 +263,6 @@ pub fn handle_renamed_parameter<T>(
             func_name, params.new
         )),
         (Some(old), None) => {
-            // Emit deprecation warning for using old parameter
             warn_deprecated(
                 DeprecationParams::new(&params.since)
                     .with_message(format!(
@@ -312,12 +309,10 @@ pub fn handle_renamed_parameter<T>(
 /// );
 /// ```
 pub fn warn_deprecated(params: DeprecationParams, caller_module: &str) {
-    // Skip if caller is internal
     if is_caller_internal(caller_module) {
         return;
     }
 
-    // Validate parameters
     if let Err(err) = params.validate() {
         tracing::error!(target: "agent_chain_core::deprecation", %err, "Invalid deprecation parameters");
         return;
@@ -520,42 +515,35 @@ mod tests {
 
     #[test]
     fn test_deprecation_params_validation() {
-        // Valid params with removal
         let params = DeprecationParams::new("0.1.0")
             .with_name("test")
             .with_removal("0.2.0");
         assert!(params.validate().is_ok());
 
-        // Valid pending params without removal
         let params = DeprecationParams::new("0.1.0")
             .with_name("test")
             .with_pending(true);
         assert!(params.validate().is_ok());
 
-        // Valid params with custom message (doesn't require removal)
         let params = DeprecationParams::new("0.1.0")
             .with_name("test")
             .with_message("Custom deprecation message");
         assert!(params.validate().is_ok());
 
-        // Pending with removal is invalid
         let params = DeprecationParams::new("0.1.0")
             .with_pending(true)
             .with_removal("0.2.0");
         assert!(params.validate().is_err());
 
-        // Non-pending without removal is invalid (matches Python's NotImplementedError)
         let params = DeprecationParams::new("0.1.0").with_name("test");
         assert!(params.validate().is_err());
 
-        // Both alternative and alternative_import is invalid
         let params = DeprecationParams::new("0.1.0")
             .with_alternative("new_thing")
             .with_alternative_import("some::path::NewThing")
             .with_removal("0.2.0");
         assert!(params.validate().is_err());
 
-        // alternative_import without :: is invalid
         let params = DeprecationParams::new("0.1.0")
             .with_alternative_import("InvalidPath")
             .with_removal("0.2.0");
@@ -575,7 +563,6 @@ mod tests {
     fn test_handle_renamed_parameter_new_only() {
         let params = RenameParameterParams::new("0.1.0", "0.2.0", "old_param", "new_param");
 
-        // Only new parameter provided - should return the new value
         let result = handle_renamed_parameter(
             &params,
             None::<String>,
@@ -591,7 +578,6 @@ mod tests {
     fn test_handle_renamed_parameter_old_only() {
         let params = RenameParameterParams::new("0.1.0", "0.2.0", "old_param", "new_param");
 
-        // Only old parameter provided - should return the old value (with warning)
         let result = handle_renamed_parameter(
             &params,
             Some("old_value".to_string()),
@@ -607,7 +593,6 @@ mod tests {
     fn test_handle_renamed_parameter_both_provided() {
         let params = RenameParameterParams::new("0.1.0", "0.2.0", "old_param", "new_param");
 
-        // Both parameters provided - should return error
         let result = handle_renamed_parameter(
             &params,
             Some("old_value".to_string()),
@@ -627,7 +612,6 @@ mod tests {
     fn test_handle_renamed_parameter_none() {
         let params = RenameParameterParams::new("0.1.0", "0.2.0", "old_param", "new_param");
 
-        // Neither parameter provided - should return None
         let result = handle_renamed_parameter(
             &params,
             None::<String>,

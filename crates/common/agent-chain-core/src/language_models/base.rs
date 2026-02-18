@@ -379,7 +379,6 @@ pub trait BaseLanguageModel: Send + Sync {
     fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
         let mut params = LangSmithParams::new();
 
-        // Try to determine provider from class name
         let llm_type = self.llm_type();
         let provider = if llm_type.starts_with("Chat") {
             llm_type
@@ -429,8 +428,6 @@ pub trait BaseLanguageModel: Send + Sync {
     ///
     /// A list of token IDs.
     fn get_token_ids(&self, text: &str) -> Vec<u32> {
-        // Default implementation: rough estimate based on whitespace
-        // Actual implementations should use proper tokenizers
         text.split_whitespace()
             .enumerate()
             .map(|(i, _)| i as u32)
@@ -467,7 +464,6 @@ pub trait BaseLanguageModel: Send + Sync {
         messages
             .iter()
             .map(|m| {
-                // Add some tokens for the message role/type
                 let role_tokens = 4; // Approximate overhead for role
                 let content_tokens = self.get_num_tokens(&m.text());
                 role_tokens + content_tokens

@@ -52,7 +52,6 @@ use crate::checkpoint::InMemorySaver;
 use crate::stream::{StreamChunk, StreamMode};
 use crate::types::{CachePolicy, RetryPolicy};
 
-// Re-export the macros from agent-graph-macros
 pub use agent_graph_macros::{entrypoint, task};
 
 /// A future that can be awaited or have its result retrieved synchronously.
@@ -208,8 +207,6 @@ where
         let (sender, receiver) = oneshot::channel();
 
         tokio::spawn(async move {
-            // Execute the function directly
-            // Retry logic would require Args: Clone and Result return type
             let result = (func)(args).await;
             let _ = sender.send(result);
         });
@@ -404,9 +401,6 @@ where
     /// Note: Full checkpointing requires the output type to implement Serialize/Deserialize.
     /// Use `invoke_with_config_serde` for full checkpoint support.
     pub async fn invoke_with_config(&self, input: I, _config: RunConfig) -> O {
-        // Execute the function
-        // Note: Checkpointing is not enabled for non-serde types
-        // For full checkpoint support, use invoke_with_config_serde
         (self.func)(input).await
     }
 

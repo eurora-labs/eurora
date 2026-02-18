@@ -28,7 +28,6 @@ async fn test_local_cache_generate_async() {
     let llm = FakeListLLM::new(vec!["foo".to_string(), "bar".to_string()])
         .with_cache_instance(local_cache.clone());
 
-    // First call — cache miss, generates "foo"
     let output = llm
         .generate(
             vec!["foo".to_string()],
@@ -42,7 +41,6 @@ async fn test_local_cache_generate_async() {
         _ => panic!("Expected Generation variant"),
     }
 
-    // Second call — cache hit, should return "foo" again (not "bar")
     let output = llm
         .generate(
             vec!["foo".to_string()],
@@ -56,16 +54,8 @@ async fn test_local_cache_generate_async() {
         _ => panic!("Expected Generation variant"),
     }
 
-    // Global cache should be empty (local cache was used)
-    assert!(
-        global_cache.lookup("foo", "").is_none() || {
-            // lookup with any llm_string on global should return None
-            // since we never wrote to global
-            true
-        }
-    );
+    assert!(global_cache.lookup("foo", "").is_none() || { true });
 
-    // Clean up
     set_llm_cache(None);
 }
 
@@ -83,7 +73,6 @@ async fn test_local_cache_generate_sync() {
     let llm = FakeListLLM::new(vec!["foo".to_string(), "bar".to_string()])
         .with_cache_instance(local_cache.clone());
 
-    // First call — generates "foo" and caches it
     let output = llm
         .generate(
             vec!["foo".to_string()],
@@ -96,7 +85,6 @@ async fn test_local_cache_generate_sync() {
         _ => panic!("Expected Generation variant"),
     }
 
-    // Second call — cache hit returns "foo" again
     let output = llm
         .generate(
             vec!["foo".to_string()],
@@ -109,7 +97,6 @@ async fn test_local_cache_generate_sync() {
         _ => panic!("Expected Generation variant"),
     }
 
-    // Clean up
     set_llm_cache(None);
 }
 
@@ -125,7 +112,6 @@ async fn test_no_cache_generate_sync() {
 
     let llm = FakeListLLM::new(vec!["foo".to_string(), "bar".to_string()]).with_cache_disabled();
 
-    // First call — no cache, gets "foo"
     let output = llm
         .generate(
             vec!["foo".to_string()],
@@ -138,7 +124,6 @@ async fn test_no_cache_generate_sync() {
         _ => panic!("Expected Generation variant"),
     }
 
-    // Second call — no cache, gets "bar" (not a cache hit)
     let output = llm
         .generate(
             vec!["foo".to_string()],
@@ -151,7 +136,6 @@ async fn test_no_cache_generate_sync() {
         _ => panic!("Expected Generation variant"),
     }
 
-    // Clean up
     set_llm_cache(None);
 }
 
@@ -166,7 +150,6 @@ async fn test_no_cache_generate_async() {
 
     let llm = FakeListLLM::new(vec!["foo".to_string(), "bar".to_string()]).with_cache_disabled();
 
-    // First call — no cache, gets "foo"
     let output = llm
         .generate(
             vec!["foo".to_string()],
@@ -179,7 +162,6 @@ async fn test_no_cache_generate_async() {
         _ => panic!("Expected Generation variant"),
     }
 
-    // Second call — no cache, gets "bar"
     let output = llm
         .generate(
             vec!["foo".to_string()],
@@ -192,6 +174,5 @@ async fn test_no_cache_generate_async() {
         _ => panic!("Expected Generation variant"),
     }
 
-    // Clean up
     set_llm_cache(None);
 }

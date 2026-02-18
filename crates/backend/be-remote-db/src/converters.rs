@@ -1,5 +1,5 @@
 use crate::error::DbError;
-use crate::types::{Conversation, Message, MessageType};
+use crate::types::{Message, MessageType, Thread};
 use chrono::DateTime;
 use prost_types::Timestamp;
 use proto_gen::agent_chain::{
@@ -9,10 +9,10 @@ use proto_gen::agent_chain::{
 };
 use uuid::Uuid;
 
-impl TryFrom<proto_gen::conversation::Conversation> for Conversation {
+impl TryFrom<proto_gen::thread::Thread> for Thread {
     type Error = DbError;
 
-    fn try_from(value: proto_gen::conversation::Conversation) -> Result<Self, Self::Error> {
+    fn try_from(value: proto_gen::thread::Thread) -> Result<Self, Self::Error> {
         let id = Uuid::parse_str(&value.id).map_err(|e| DbError::Internal(e.to_string()))?;
         let user_id =
             Uuid::parse_str(&value.user_id).map_err(|e| DbError::Internal(e.to_string()))?;
@@ -28,7 +28,7 @@ impl TryFrom<proto_gen::conversation::Conversation> for Conversation {
         let updated_at = DateTime::from_timestamp(updated_at.seconds, updated_at.nanos as u32)
             .ok_or_else(|| DbError::Internal("Invalid timestamp".to_string()))?;
 
-        Ok(Conversation {
+        Ok(Thread {
             id,
             user_id,
             title: Some(value.title),
@@ -38,15 +38,15 @@ impl TryFrom<proto_gen::conversation::Conversation> for Conversation {
     }
 }
 
-impl TryInto<proto_gen::conversation::Conversation> for Conversation {
+impl TryInto<proto_gen::thread::Thread> for Thread {
     type Error = DbError;
 
-    fn try_into(self) -> Result<proto_gen::conversation::Conversation, Self::Error> {
+    fn try_into(self) -> Result<proto_gen::thread::Thread, Self::Error> {
         let id = self.id.to_string();
         let user_id = self.user_id.to_string();
         let title = self.title.unwrap_or_default();
 
-        Ok(proto_gen::conversation::Conversation {
+        Ok(proto_gen::thread::Thread {
             id,
             user_id,
             title,

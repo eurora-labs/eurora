@@ -15,8 +15,6 @@ use agent_chain_core::runnables::config::get_callback_manager_for_config;
 use agent_chain_core::runnables::{RunnableConfig, RunnableLambdaWithConfig};
 use std::sync::Arc;
 
-// -- FakeHandler --
-
 #[derive(Debug, Default)]
 struct FakeHandler;
 
@@ -33,8 +31,6 @@ impl BaseCallbackHandler for FakeHandler {
     }
 }
 
-// -- Tests --
-
 /// Ported from `test_custom_event_root_dispatch`.
 ///
 /// Dispatching a custom event without a parent_run_id should fail.
@@ -43,10 +39,8 @@ fn test_custom_event_root_dispatch() {
     let manager = CallbackManager::new();
     let result = dispatch_custom_event("event1", &serde_json::json!({"x": 1}), &manager);
 
-    // With no handlers, the function short-circuits to Ok (no work to do)
     assert!(result.is_ok());
 
-    // With a handler but no parent_run_id, it should fail
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
@@ -64,10 +58,8 @@ async fn test_async_custom_event_root_dispatch() {
     let manager = AsyncCallbackManager::new();
     let result = adispatch_custom_event("event1", &serde_json::json!({"x": 1}), &manager).await;
 
-    // With no handlers, the function short-circuits to Ok
     assert!(result.is_ok());
 
-    // With a handler but no parent_run_id, it should fail
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
@@ -126,7 +118,6 @@ async fn test_async_callback_manager() {
         ..Default::default()
     };
 
-    // ainvoke falls back to sync func since no afunc is set
     let result = runnable.ainvoke(1, Some(config)).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), 1);
@@ -146,7 +137,6 @@ fn test_runnable_lambda_callback_lifecycle() {
         ..Default::default()
     };
 
-    // Should succeed and fire on_chain_start/on_chain_end callbacks
     let result = runnable.invoke(1, Some(config));
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), 2);
@@ -168,7 +158,6 @@ fn test_runnable_lambda_callback_error_lifecycle() {
         ..Default::default()
     };
 
-    // Should fail and fire on_chain_start/on_chain_error callbacks
     let result = runnable.invoke(1, Some(config));
     assert!(result.is_err());
 }

@@ -116,10 +116,10 @@
 						<li>Technical information about your device and connection</li>
 					</ul>
 
-					<h4 class="mb-1 mt-3 font-medium">2.3 Conversation Data</h4>
+					<h4 class="mb-1 mt-3 font-medium">2.3 Thread Data</h4>
 					<p>
-						To provide our AI services, we process the content of your conversations
-						with Eurora. This includes:
+						To provide our AI services, we process the content of your threads with
+						Eurora. This includes:
 					</p>
 					<ul class="mt-1 list-disc pl-5">
 						<li>Text of your queries</li>

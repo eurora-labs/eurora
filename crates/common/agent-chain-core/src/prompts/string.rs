@@ -88,17 +88,12 @@ impl<'de> serde::Deserialize<'de> for PromptTemplateFormat {
 ///
 /// The formatted string, or an error if formatting fails.
 pub fn jinja2_formatter(template: &str, kwargs: &HashMap<String, String>) -> Result<String> {
-    // Note: In Rust, we don't have a direct jinja2 equivalent.
-    // We'll implement a basic version using string replacement for now.
-    // For full jinja2 support, consider using the `minijinja` crate.
     let mut result = template.to_string();
 
     for (key, value) in kwargs {
-        // Replace {{ key }} patterns
         let pattern = format!("{{{{ {} }}}}", key);
         result = result.replace(&pattern, value);
 
-        // Also replace {{key}} without spaces
         let pattern_no_space = format!("{{{{{}}}}}", key);
         result = result.replace(&pattern_no_space, value);
     }
@@ -164,12 +159,10 @@ fn get_jinja2_variables(template: &str) -> HashSet<String> {
         if c == '{' && chars.peek() == Some(&'{') {
             chars.next(); // consume second '{'
 
-            // Skip whitespace
             while chars.peek() == Some(&' ') {
                 chars.next();
             }
 
-            // Collect variable name
             let mut var_name = String::new();
             while let Some(&c) = chars.peek() {
                 if c == '}' || c == ' ' || c == '|' || c == '.' {
@@ -201,13 +194,11 @@ pub fn mustache_template_vars(template: &str) -> HashSet<String> {
         if c == '{' && chars.peek() == Some(&'{') {
             chars.next(); // consume second '{'
 
-            // Check for special tags
             let first_char = chars.peek().cloned();
 
             match first_char {
                 Some('#') | Some('^') => {
                     section_depth += 1;
-                    // Skip to end of tag
                     while let Some(&c) = chars.peek() {
                         if c == '}' {
                             break;
@@ -217,7 +208,6 @@ pub fn mustache_template_vars(template: &str) -> HashSet<String> {
                 }
                 Some('/') => {
                     section_depth -= 1;
-                    // Skip to end of tag
                     while let Some(&c) = chars.peek() {
                         if c == '}' {
                             break;
@@ -226,7 +216,6 @@ pub fn mustache_template_vars(template: &str) -> HashSet<String> {
                     }
                 }
                 Some('!') | Some('>') => {
-                    // Comment or partial - skip
                     while let Some(&c) = chars.peek() {
                         if c == '}' {
                             break;
@@ -235,7 +224,6 @@ pub fn mustache_template_vars(template: &str) -> HashSet<String> {
                     }
                 }
                 Some('{') => {
-                    // Triple mustache (no escape)
                     chars.next();
                     let mut var_name = String::new();
                     while let Some(&c) = chars.peek() {
@@ -252,7 +240,6 @@ pub fn mustache_template_vars(template: &str) -> HashSet<String> {
                     }
                 }
                 Some('&') => {
-                    // Unescaped variable
                     chars.next();
                     let mut var_name = String::new();
                     while let Some(&c) = chars.peek() {
@@ -269,7 +256,6 @@ pub fn mustache_template_vars(template: &str) -> HashSet<String> {
                     }
                 }
                 _ => {
-                    // Regular variable
                     let mut var_name = String::new();
                     while let Some(&c) = chars.peek() {
                         if c == '}' {
@@ -320,10 +306,7 @@ pub fn check_valid_template(
                 }
             }),
         PromptTemplateFormat::Jinja2 => validate_jinja2(template, input_variables),
-        PromptTemplateFormat::Mustache => {
-            // Mustache templates cannot be validated in the same way
-            Ok(())
-        }
+        PromptTemplateFormat::Mustache => Ok(()),
     }
 }
 
@@ -344,7 +327,6 @@ pub fn get_template_variables(
     let variables: HashSet<String> = match template_format {
         PromptTemplateFormat::FString => {
             let placeholders = FORMATTER.extract_placeholders(template);
-            // Validate that variables don't contain dots, brackets, or are all digits
             for var in &placeholders {
                 if var.contains('.') || var.contains('[') || var.contains(']') {
                     return Err(Error::InvalidConfig(format!(

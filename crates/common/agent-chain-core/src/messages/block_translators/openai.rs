@@ -103,8 +103,6 @@ pub fn convert_to_openai_data_block(block: &Value, api: OpenAiApi) -> Result<Val
                 || block.get("base64").is_some();
 
             if is_base64 {
-                // Handle v0 format (Base64CB): {"source_type": "base64", "data": "...", ...}
-                // Handle v1 format (IDCB): {"base64": "...", ...}
                 let base64_data = if block.get("source_type").is_some() {
                     block.get("data").and_then(|v| v.as_str()).unwrap_or("")
                 } else {
@@ -120,7 +118,6 @@ pub fn convert_to_openai_data_block(block: &Value, api: OpenAiApi) -> Result<Val
                     "file_data": format!("data:{};base64,{}", mime_type, base64_data)
                 });
 
-                // Try to get filename from various locations
                 if let Some(filename) = block.get("filename").and_then(|v| v.as_str()) {
                     file["filename"] = json!(filename);
                 } else if let Some(extras) = block.get("extras").and_then(|v| v.as_object()) {
@@ -128,7 +125,6 @@ pub fn convert_to_openai_data_block(block: &Value, api: OpenAiApi) -> Result<Val
                         file["filename"] = json!(filename);
                     }
                 } else if let Some(metadata) = block.get("metadata").and_then(|v| v.as_object()) {
-                    // Backward compat
                     if let Some(filename) = metadata.get("filename").and_then(|v| v.as_str()) {
                         file["filename"] = json!(filename);
                     }
@@ -157,8 +153,6 @@ pub fn convert_to_openai_data_block(block: &Value, api: OpenAiApi) -> Result<Val
             } else if block.get("source_type").and_then(|v| v.as_str()) == Some("id")
                 || block.get("file_id").is_some()
             {
-                // Handle v0 format (IDContentBlock): {"source_type": "id", "id": "...", ...}
-                // Handle v1 format (IDCB): {"file_id": "...", ...}
                 let file_id = if block.get("source_type").is_some() {
                     block.get("id").and_then(|v| v.as_str()).unwrap_or("")
                 } else {
@@ -179,11 +173,9 @@ pub fn convert_to_openai_data_block(block: &Value, api: OpenAiApi) -> Result<Val
                     Ok(formatted_block)
                 }
             } else if block.get("url").is_some() {
-                // Intentionally do not check for source_type="url"
                 if api == OpenAiApi::ChatCompletions {
                     return Err("OpenAI Chat Completions does not support file URLs.".to_string());
                 }
-                // Only supported by Responses API; return in that format
                 let url = block.get("url").and_then(|v| v.as_str()).unwrap_or("");
                 Ok(json!({
                     "type": "input_file",
@@ -199,8 +191,6 @@ pub fn convert_to_openai_data_block(block: &Value, api: OpenAiApi) -> Result<Val
                 || block.get("source_type").and_then(|v| v.as_str()) == Some("base64");
 
             if is_base64 {
-                // Handle v0 format: {"source_type": "base64", "data": "...", ...}
-                // Handle v1 format: {"base64": "...", ...}
                 let base64_data = if block.get("source_type").is_some() {
                     block.get("data").and_then(|v| v.as_str()).unwrap_or("")
                 } else {
@@ -249,7 +239,6 @@ fn extract_extras(block: &Value, known_keys: &HashSet<&str>) -> Value {
 pub fn convert_openai_format_to_data_block(block: &Value) -> Value {
     let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
-    // base64-style image block
     if block_type == "image_url"
         && let Some(image_url) = block.get("image_url").and_then(|v| v.as_object())
         && let Some(url) = image_url.get("url").and_then(|v| v.as_str())
@@ -258,7 +247,6 @@ pub fn convert_openai_format_to_data_block(block: &Value) -> Value {
             let known_keys: HashSet<&str> = ["type", "image_url"].iter().copied().collect();
             let extras = extract_extras(block, &known_keys);
 
-            // Also extract extras from nested image_url dict
             let image_url_known_keys: HashSet<&str> = ["url"].iter().copied().collect();
             let image_url_extras = extract_extras(&json!(image_url), &image_url_known_keys);
 
@@ -285,7 +273,6 @@ pub fn convert_openai_format_to_data_block(block: &Value) -> Value {
 
             return result;
         } else {
-            // url-style image block
             let known_keys: HashSet<&str> = ["type", "image_url"].iter().copied().collect();
             let extras = extract_extras(block, &known_keys);
 
@@ -316,7 +303,6 @@ pub fn convert_openai_format_to_data_block(block: &Value) -> Value {
         }
     }
 
-    // base64-style audio block
     if block_type == "input_audio"
         && let Some(input_audio) = block.get("input_audio").and_then(|v| v.as_object())
     {
@@ -355,7 +341,6 @@ pub fn convert_openai_format_to_data_block(block: &Value) -> Value {
         return result;
     }
 
-    // id-style file block
     if block_type == "file"
         && let Some(file) = block.get("file").and_then(|v| v.as_object())
     {
@@ -387,7 +372,6 @@ pub fn convert_openai_format_to_data_block(block: &Value) -> Value {
             return result;
         }
 
-        // base64-style file block
         if let Some(file_data) = file.get("file_data").and_then(|v| v.as_str())
             && let Some(parsed) = parse_data_uri(file_data)
         {
@@ -405,7 +389,6 @@ pub fn convert_openai_format_to_data_block(block: &Value) -> Value {
                 }
             }
 
-            // Add filename to extras if present
             if let Some(filename) = file.get("filename") {
                 all_extras.insert("filename".to_string(), filename.clone());
             }
@@ -424,7 +407,6 @@ pub fn convert_openai_format_to_data_block(block: &Value) -> Value {
         }
     }
 
-    // Escape hatch - return block unchanged
     block.clone()
 }
 
@@ -504,7 +486,6 @@ fn convert_annotation_to_v1(annotation: &Value) -> Value {
         return document_citation;
     }
 
-    // Non-standard annotation
     json!({
         "type": "non_standard_annotation",
         "value": annotation.clone()
@@ -524,7 +505,6 @@ fn explode_reasoning(block: &Value) -> Vec<Value> {
 
     let mut block = block.clone();
 
-    // Extract unknown fields to extras
     let unknown_fields: Vec<String> = block
         .as_object()
         .map(|obj| {
@@ -542,7 +522,6 @@ fn explode_reasoning(block: &Value) -> Vec<Value> {
                 block["extras"][field] = value;
             }
         }
-        // Remove the fields from the main block
         if let Some(obj) = block.as_object_mut() {
             for field in &unknown_fields {
                 obj.remove(field);
@@ -550,13 +529,11 @@ fn explode_reasoning(block: &Value) -> Vec<Value> {
         }
     }
 
-    // Clone the summary array to avoid borrow issues
     let summary_clone = block.get("summary").and_then(|v| v.as_array()).cloned();
 
     let summary = match summary_clone {
         Some(ref s) if !s.is_empty() => s,
         _ => {
-            // [{'id': 'rs_...', 'summary': [], 'type': 'reasoning', 'index': 0}]
             let mut result = json!({});
             if let Some(obj) = block.as_object() {
                 for (k, v) in obj {
@@ -575,7 +552,6 @@ fn explode_reasoning(block: &Value) -> Vec<Value> {
         }
     };
 
-    // Common part for every exploded line, except 'summary'
     let mut common = json!({});
     if let Some(obj) = block.as_object() {
         for (k, v) in obj {
@@ -585,7 +561,6 @@ fn explode_reasoning(block: &Value) -> Vec<Value> {
         }
     }
 
-    // Optional keys that must appear only in the first exploded item
     let first_only = block.get("extras").cloned();
 
     let mut results = Vec::new();
@@ -667,7 +642,6 @@ pub fn convert_to_standard_blocks_with_context(
     is_chunk: bool,
     context: Option<&OpenAiContext>,
 ) -> Vec<Value> {
-    // First, check if this is v0.3 format and needs conversion
     let processed_content = if let Some(ctx) = context
         && is_v03_format(content, ctx)
     {
@@ -676,7 +650,6 @@ pub fn convert_to_standard_blocks_with_context(
         content.to_vec()
     };
 
-    // Now convert the Responses API blocks to v1 format
     convert_to_v1_from_responses(&processed_content, is_chunk, context)
 }
 
@@ -689,7 +662,6 @@ pub fn convert_to_standard_blocks_with_context(
 /// - `__openai_function_call_ids__` in `additional_kwargs`
 /// - Message ID starts with "msg_" and response ID starts with "resp_"
 fn is_v03_format(content: &[Value], context: &OpenAiContext) -> bool {
-    // Check for v0.3-specific additional_kwargs
     let has_v03_kwargs = [
         "reasoning",
         "tool_outputs",
@@ -703,13 +675,11 @@ fn is_v03_format(content: &[Value], context: &OpenAiContext) -> bool {
         return true;
     }
 
-    // Check for v0.3 ID pattern
     if let Some(msg_id) = &context.message_id
         && msg_id.starts_with("msg_")
         && let Some(resp_id) = context.response_metadata.get("id").and_then(|v| v.as_str())
         && resp_id.starts_with("resp_")
     {
-        // Also check that content is all dicts
         let all_dicts = content.iter().all(|v| v.is_object());
         if all_dicts {
             return true;
@@ -748,7 +718,6 @@ fn convert_from_v03_format(
         content_order.iter().map(|k| (*k, Vec::new())).collect();
     let mut unknown_blocks = Vec::new();
 
-    // Reasoning
     if let Some(reasoning) = context.additional_kwargs.get("reasoning") {
         if is_chunk && context.chunk_position.as_deref() != Some("last") {
             let mut reasoning_with_type = reasoning.clone();
@@ -767,7 +736,6 @@ fn convert_from_v03_format(
         }
     }
 
-    // Refusal
     if let Some(refusal) = context.additional_kwargs.get("refusal") {
         buckets.entry("refusal").or_default().push(json!({
             "type": "refusal",
@@ -775,7 +743,6 @@ fn convert_from_v03_format(
         }));
     }
 
-    // Text blocks
     for block in content {
         if let Some(obj) = block.as_object()
             && obj.get("type").and_then(|t| t.as_str()) == Some("text")
@@ -792,7 +759,6 @@ fn convert_from_v03_format(
         }
     }
 
-    // Function calls (tool_calls)
     let function_call_ids = context
         .additional_kwargs
         .get(FUNCTION_CALL_IDS_MAP_KEY)
@@ -802,7 +768,6 @@ fn convert_from_v03_format(
         && context.tool_call_chunks.len() == 1
         && context.chunk_position.as_deref() != Some("last")
     {
-        // Isolated chunk
         if let Some(tool_call_chunk) = context.tool_call_chunks.first() {
             let mut function_call = json!({
                 "type": "function_call",
@@ -852,7 +817,6 @@ fn convert_from_v03_format(
         }
     }
 
-    // Tool outputs
     if let Some(tool_outputs) = context.additional_kwargs.get("tool_outputs")
         && let Some(outputs_array) = tool_outputs.as_array()
     {
@@ -868,7 +832,6 @@ fn convert_from_v03_format(
         }
     }
 
-    // Re-assemble in canonical order
     let mut new_content = Vec::new();
     for key in content_order {
         new_content.extend(buckets.remove(key).unwrap_or_default());
@@ -983,7 +946,6 @@ fn convert_to_v1_from_responses(
                     tc["type"] = json!("tool_call_chunk");
                     Some(tc)
                 } else if !call_id.is_empty() {
-                    // Look for matching tool call
                     let mut found = None;
 
                     if let Some(ctx) = context {
@@ -1072,7 +1034,6 @@ fn convert_to_v1_from_responses(
 
                 result.push(web_search_call);
 
-                // Check if .content already has web_search_result
                 let has_web_search_result = content.iter().any(|other_block| {
                     other_block.get("type").and_then(|v| v.as_str()) == Some("web_search_result")
                         && other_block.get("id").and_then(|v| v.as_str()) == Some(id)
@@ -1434,7 +1395,6 @@ fn convert_to_v1_from_responses(
 pub fn convert_to_v1_from_chat_completions_input(content: &[Value]) -> Vec<Value> {
     let mut converted_blocks = Vec::new();
 
-    // Unpack non_standard blocks
     let unpacked_blocks: Vec<Value> = content
         .iter()
         .map(|block| {
@@ -1720,13 +1680,11 @@ mod tests {
         let result = convert_to_standard_blocks(&content, false);
         assert_eq!(result.len(), 2);
 
-        // First block is the call
         assert_eq!(result[0]["type"], "server_tool_call");
         assert_eq!(result[0]["name"], "web_search");
         assert_eq!(result[0]["id"], "ws_123");
         assert_eq!(result[0]["args"]["query"], "test query");
 
-        // Second block is the result
         assert_eq!(result[1]["type"], "server_tool_result");
         assert_eq!(result[1]["tool_call_id"], "ws_123");
         assert_eq!(result[1]["status"], "success");

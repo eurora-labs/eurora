@@ -8,7 +8,7 @@
 //! Language models that use a sequence of messages as inputs and return chat messages
 //! as outputs (as opposed to using plain text).
 //!
-//! Chat models support the assignment of distinct roles to conversation messages, helping
+//! Chat models support the assignment of distinct roles to thread messages, helping
 //! to distinguish messages from the AI, users, and instructions such as system messages.
 //!
 //! The key abstraction for chat models is [`BaseChatModel`]. Implementations should
@@ -47,13 +47,11 @@ mod llms;
 mod model_profile;
 mod utils;
 
-// Re-export base types
 pub use base::{
     BaseLanguageModel, CustomGetTokenIds, LangSmithParams, LanguageModelConfig, LanguageModelInput,
     LanguageModelLike, LanguageModelOutput,
 };
 
-// Re-export chat model types
 pub use chat_models::{
     AIMessageChunkStream, BaseChatModel, ChatChunk, ChatGenerationStream, ChatModelConfig,
     ChatModelRunnable, ChatStream, DisableStreaming, GenerateConfig, SimpleChatModel,
@@ -63,17 +61,14 @@ pub use chat_models::{
     generate_response_from_error,
 };
 
-// Re-export UsageMetadata from messages (where it's canonically defined)
 pub use crate::messages::UsageMetadata;
 
-// Re-export LLM types
 pub use llms::{
     BaseLLM, CacheValue, LLM, LLMConfig, LLMGenerateConfig, RunIdInput, aget_prompts_from_cache,
     aupdate_cache, create_base_retry, get_prompts_from_cache, get_run_ids_list, resolve_cache,
     save_llm, update_cache,
 };
 
-// Re-export fake implementations for testing
 pub use fake::{FakeListLLM, FakeListLLMError, FakeStreamingListLLM};
 
 pub use fake_chat_models::{
@@ -81,10 +76,8 @@ pub use fake_chat_models::{
     GenericFakeChatModel, ParrotFakeChatModel,
 };
 
-// Re-export model profile types
 pub use model_profile::{ModelProfile, ModelProfileRegistry};
 
-// Re-export utility functions
 pub use utils::{
     DataBlockFilter as OpenAiDataBlockFilter, ParsedDataUri, convert_legacy_v0_content_block_to_v1,
     convert_openai_format_to_data_block, estimate_token_count, get_token_ids_default,

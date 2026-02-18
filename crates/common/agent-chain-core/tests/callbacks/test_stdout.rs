@@ -16,10 +16,6 @@ use agent_chain_core::callbacks::streaming_stdout::StreamingStdOutCallbackHandle
 use std::collections::HashMap;
 use uuid::Uuid;
 
-// ====================================================================
-// Handler creation and configuration
-// ====================================================================
-
 /// Ported from `test_stdout_callback_handler_no_color`.
 #[test]
 fn test_stdout_handler_no_color() {
@@ -34,10 +30,6 @@ fn test_stdout_handler_with_color() {
     let handler = StdOutCallbackHandler::with_color("blue");
     assert_eq!(handler.color, Some("blue".to_string()));
 }
-
-// ====================================================================
-// Chain start name resolution
-// ====================================================================
 
 /// Ported from `test_stdout_callback_handler_chain_start`.
 ///
@@ -112,10 +104,6 @@ fn test_chain_start_unknown_name() {
     );
 }
 
-// ====================================================================
-// Chain end
-// ====================================================================
-
 /// Ported from `test_stdout_callback_handler_chain_end`.
 #[test]
 fn test_chain_end() {
@@ -126,10 +114,6 @@ fn test_chain_end() {
         None,
     );
 }
-
-// ====================================================================
-// Agent action and finish
-// ====================================================================
 
 /// Ported from `test_stdout_callback_handler_agent_action`.
 #[test]
@@ -166,10 +150,6 @@ fn test_agent_finish() {
     handler.on_agent_finish(&finish, Uuid::new_v4(), None, None);
 }
 
-// ====================================================================
-// Tool end
-// ====================================================================
-
 /// Ported from `test_stdout_callback_handler_tool_end`.
 #[test]
 fn test_tool_end() {
@@ -198,10 +178,6 @@ fn test_tool_end_with_color_override() {
     handler.on_tool_end("Result", Uuid::new_v4(), None, Some("red"), None, None);
 }
 
-// ====================================================================
-// Text output
-// ====================================================================
-
 /// Ported from `test_stdout_callback_handler_on_text`.
 #[test]
 fn test_on_text() {
@@ -217,10 +193,6 @@ fn test_on_text_with_end() {
     handler.on_text("Line 2", Uuid::new_v4(), None, None, "");
 }
 
-// ====================================================================
-// StreamingStdOutCallbackHandler
-// ====================================================================
-
 /// Verify StreamingStdOutCallbackHandler creation and name.
 #[test]
 fn test_streaming_handler_creation() {
@@ -235,10 +207,6 @@ fn test_streaming_handler_on_llm_new_token() {
     handler.on_llm_new_token("Hello", Uuid::new_v4(), None, None);
     handler.on_llm_new_token(" World", Uuid::new_v4(), None, None);
 }
-
-// ====================================================================
-// Color module
-// ====================================================================
 
 /// Verify color constants are non-empty ANSI escape sequences.
 #[test]

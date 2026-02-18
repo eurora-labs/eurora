@@ -16,10 +16,6 @@ use agent_chain_core::runnables::config::{
     merge_configs, patch_config,
 };
 
-// ---------------------------------------------------------------------------
-// Tests for ensure_config
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_ensure_config_none_returns_defaults() {
     let config = ensure_config(None);
@@ -68,17 +64,11 @@ fn test_ensure_config_copies_tags_metadata_configurable() {
 
     let ensured = ensure_config(Some(config));
 
-    // Values should be equal
     assert_eq!(ensured.tags, original_tags);
     assert_eq!(ensured.configurable, original_configurable);
-    // ensure_config copies primitive configurable values into metadata
     assert_eq!(ensured.metadata["k"], serde_json::json!("v"));
     assert_eq!(ensured.metadata["x"], serde_json::json!("y"));
 }
-
-// ---------------------------------------------------------------------------
-// Tests for get_config_list
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_get_config_list_single_config_replicated() {
@@ -144,10 +134,6 @@ fn test_get_config_list_run_id_single_no_issue() {
     assert_eq!(configs[0].run_id, Some(run_id));
 }
 
-// ---------------------------------------------------------------------------
-// Tests for patch_config
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_patch_config_none_input() {
     let config = patch_config(None, None, None, None, None, None);
@@ -205,10 +191,6 @@ fn test_patch_config_callbacks_clears_run_name_and_run_id() {
     assert!(patched.run_id.is_none());
     assert!(patched.callbacks.is_some());
 }
-
-// ---------------------------------------------------------------------------
-// Tests for merge_configs (non-callback scenarios)
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_merge_configs_tags_are_deduplicated_and_sorted() {
@@ -308,10 +290,6 @@ fn test_merge_configs_empty() {
     assert_eq!(merged.recursion_limit, 25);
 }
 
-// ---------------------------------------------------------------------------
-// Tests for merge_configs (callback scenarios)
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_merge_config_callbacks_handler_lists() {
     let handler1: Arc<dyn BaseCallbackHandler> = Arc::new(StdOutCallbackHandler::new());
@@ -407,16 +385,11 @@ fn test_merge_config_callbacks_handlers_with_manager() {
     let merged = merge_configs(vec![Some(c1), Some(c2)]);
     match &merged.callbacks {
         Some(Callbacks::Manager(base_mgr)) => {
-            // When merging handlers into a manager, the manager's handlers + the list handlers
             assert!(!base_mgr.handlers.is_empty());
         }
         _ => panic!("Expected Callbacks::Manager"),
     }
 }
-
-// ---------------------------------------------------------------------------
-// Tests for call_func_with_variable_args / acall_func_with_variable_args
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_call_func_with_variable_args_simple() {
@@ -454,15 +427,10 @@ async fn test_acall_func_with_variable_args_with_config() {
     assert_eq!(result, "val25");
 }
 
-// ---------------------------------------------------------------------------
-// Tests for get_callback_manager_for_config / get_async_callback_manager_for_config
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_get_callback_manager_for_config_basic() {
     let config = ensure_config(None);
     let mgr = get_callback_manager_for_config(&config);
-    // Should return a valid CallbackManager (no panic)
     let _ = mgr;
 }
 
@@ -483,7 +451,6 @@ fn test_get_callback_manager_for_config_with_tags_and_metadata() {
 fn test_get_async_callback_manager_for_config_basic() {
     let config = ensure_config(None);
     let mgr = get_async_callback_manager_for_config(&config);
-    // Should return a valid AsyncCallbackManager (no panic)
     let _ = mgr;
 }
 
@@ -494,14 +461,8 @@ fn test_get_async_callback_manager_for_config_with_tags_and_metadata() {
         .with_metadata(HashMap::from([("k".to_string(), serde_json::json!("v"))]));
     let mgr = get_async_callback_manager_for_config(&config);
 
-    // The async manager delegates to the sync manager's configure,
-    // which stores tags and metadata as inheritable
     let _ = mgr;
 }
-
-// ---------------------------------------------------------------------------
-// Tests for RunnableConfig builder pattern
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_runnable_config_with_run_id() {
@@ -525,10 +486,6 @@ fn test_runnable_config_with_configurable() {
     let config = RunnableConfig::new().with_configurable(configurable);
     assert_eq!(config.configurable["model"], serde_json::json!("gpt-4"));
 }
-
-// ---------------------------------------------------------------------------
-// Tests for ConfigOrList
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_config_or_list_from_single() {
@@ -557,10 +514,6 @@ fn test_config_or_list_from_vec() {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Tests for serialization
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_runnable_config_serialization_roundtrip() {
     let config = RunnableConfig::new()
@@ -577,7 +530,6 @@ fn test_runnable_config_serialization_roundtrip() {
     assert_eq!(deserialized.run_name, Some("test_run".to_string()));
     assert_eq!(deserialized.max_concurrency, Some(4));
     assert_eq!(deserialized.recursion_limit, 10);
-    // Callbacks are skipped in serialization, so they should be None
     assert!(deserialized.callbacks.is_none());
 }
 
@@ -591,10 +543,6 @@ fn test_runnable_config_deserialization_defaults() {
     assert_eq!(config.recursion_limit, 25);
     assert!(config.configurable.is_empty());
 }
-
-// ---------------------------------------------------------------------------
-// Tests for merge_configs edge cases
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_merge_configs_max_concurrency_last_wins() {
@@ -621,10 +569,6 @@ fn test_merge_configs_all_none() {
     assert_eq!(merged.recursion_limit, 25);
 }
 
-// ---------------------------------------------------------------------------
-// Tests for patch_config edge cases
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_patch_config_preserves_existing_tags() {
     let config = RunnableConfig::new().with_tags(vec!["existing".into()]);
@@ -642,15 +586,10 @@ fn test_patch_config_preserves_callbacks_when_not_replaced() {
 
     let patched = patch_config(Some(config), None, None, None, Some(99), None);
 
-    // run_name and run_id should be preserved since callbacks weren't replaced
     assert_eq!(patched.run_name, Some("keep_me".to_string()));
     assert!(patched.run_id.is_some());
     assert_eq!(patched.recursion_limit, 99);
 }
-
-// ---------------------------------------------------------------------------
-// Tests for get_config_list edge cases
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_get_config_list_single_with_length_one() {

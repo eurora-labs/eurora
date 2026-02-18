@@ -406,7 +406,6 @@ impl Runnable for RunnableAssign {
     fn get_output_schema(&self, config: Option<&RunnableConfig>) -> serde_json::Value {
         let input_schema = self.mapper.get_input_schema(config);
         let output_schema = self.mapper.get_output_schema(config);
-        // Merge input and output properties into a combined schema
         let mut properties = serde_json::Map::new();
         if let Some(props) = input_schema.get("properties").and_then(|v| v.as_object()) {
             for (k, v) in props {

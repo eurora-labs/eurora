@@ -75,7 +75,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Focused: {}",
                 window.window_title.as_deref().unwrap_or("Unknown"));
 
-            // Perform async operations here
             some_async_function().await?;
 
             Ok(())
