@@ -1077,22 +1077,6 @@ impl DatabaseManager {
         Ok(())
     }
 
-    pub async fn get_billing_state_for_user(
-        &self,
-        user_id: Uuid,
-    ) -> DbResult<Option<crate::AccountBillingState>> {
-        let result = sqlx::query_as::<_, crate::AccountBillingState>(
-            "SELECT abs.*
-             FROM account_billing_state abs
-             JOIN accounts a ON a.id = abs.account_id
-             WHERE a.owner_user_id = $1",
-        )
-        .bind(user_id)
-        .fetch_optional(&self.pool)
-        .await?;
-        Ok(result)
-    }
-
     /// If `email` matches an existing user, `app_user_id` is set automatically.
     pub async fn upsert_stripe_customer<'e, E>(
         &self,
@@ -1335,5 +1319,103 @@ impl DatabaseManager {
         }
 
         Ok(())
+    }
+
+    // =========================================================================
+    // Plan / Account Methods
+    // =========================================================================
+
+    /// Creates an account for the user with the given plan.
+    /// On conflict (user already has an account), only upgrades the plan — never downgrades.
+    pub async fn ensure_account_for_user_with_plan<'e, E>(
+        &self,
+        executor: E,
+        user_id: Uuid,
+        plan_id: &str,
+    ) -> DbResult<Uuid>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        let now = Utc::now();
+
+        let account_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO accounts (owner_user_id, name, plan_id, created_at, updated_at)
+            SELECT $1, u.username, $2, $3, $4
+            FROM users u WHERE u.id = $1
+            ON CONFLICT (owner_user_id) DO UPDATE
+            SET plan_id = CASE
+                    WHEN (SELECT rank FROM (VALUES ('free',0),('tier1',1)) AS r(id,rank) WHERE r.id = EXCLUDED.plan_id)
+                       > (SELECT rank FROM (VALUES ('free',0),('tier1',1)) AS r(id,rank) WHERE r.id = accounts.plan_id)
+                    THEN EXCLUDED.plan_id
+                    ELSE accounts.plan_id
+                END,
+                updated_at = EXCLUDED.updated_at
+            RETURNING id
+            "#,
+        )
+        .bind(user_id)
+        .bind(plan_id)
+        .bind(now)
+        .bind(now)
+        .fetch_one(executor)
+        .await?;
+
+        Ok(account_id)
+    }
+
+    /// Returns the plan_id for the user's account, or None if no account exists.
+    pub async fn get_plan_id_for_user(&self, user_id: Uuid) -> DbResult<Option<String>> {
+        let result: Option<String> =
+            sqlx::query_scalar("SELECT plan_id FROM accounts WHERE owner_user_id = $1")
+                .bind(user_id)
+                .fetch_optional(&self.pool)
+                .await?;
+        Ok(result)
+    }
+
+    /// Updates the plan for an account identified by its Stripe customer ID.
+    pub async fn update_account_plan_by_stripe_customer<'e, E>(
+        &self,
+        executor: E,
+        stripe_customer_id: &str,
+        plan_id: &str,
+    ) -> DbResult<()>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        let now = Utc::now();
+
+        sqlx::query(
+            r#"
+            UPDATE accounts
+            SET plan_id = $2, updated_at = $3
+            WHERE stripe_customer_id = $1
+            "#,
+        )
+        .bind(stripe_customer_id)
+        .bind(plan_id)
+        .bind(now)
+        .execute(executor)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Resolves the application plan for a given Stripe price ID via the plan_prices junction table.
+    pub async fn resolve_plan_for_stripe_price<'e, E>(
+        &self,
+        executor: E,
+        price_id: &str,
+    ) -> DbResult<Option<String>>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        let result: Option<String> =
+            sqlx::query_scalar("SELECT plan_id FROM plan_prices WHERE stripe_price_id = $1")
+                .bind(price_id)
+                .fetch_optional(executor)
+                .await?;
+        Ok(result)
     }
 }

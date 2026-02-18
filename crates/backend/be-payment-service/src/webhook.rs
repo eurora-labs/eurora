@@ -6,7 +6,6 @@ use tracing::{info, warn};
 
 use crate::error::PaymentError;
 
-/// Extract subscription items as tuples suitable for DB sync.
 fn extract_subscription_items(
     sub: &Subscription,
 ) -> Vec<(String, String, Option<i64>, serde_json::Value)> {
@@ -33,6 +32,10 @@ fn extract_period(sub: &Subscription) -> (i64, i64) {
         .first()
         .map(|item| (item.current_period_start, item.current_period_end))
         .unwrap_or((0, 0))
+}
+
+fn extract_first_price_id(sub: &Subscription) -> Option<String> {
+    sub.items.data.first().map(|item| item.price.id.to_string())
 }
 
 pub async fn on_checkout_completed(
@@ -71,7 +74,6 @@ pub async fn on_checkout_completed(
         Err(e) => return Err(anyhow::anyhow!("lookup user by email: {e}").into()),
     };
 
-    // Run all provisioning inside a single transaction
     let mut tx = db
         .pool
         .begin()
@@ -113,12 +115,21 @@ pub async fn on_checkout_completed(
             .await
             .map_err(|e| anyhow::anyhow!("upsert subscription: {e}"))?;
 
-        // Sync subscription items so the account_billing_state view works
         if let Some(sub) = subscription {
             let items = extract_subscription_items(sub);
             db.sync_stripe_subscription_items(&mut *tx, sub_id, &items)
                 .await
                 .map_err(|e| anyhow::anyhow!("sync subscription items: {e}"))?;
+
+            if let Some(price_id) = extract_first_price_id(sub) {
+                if let Ok(Some(plan_id)) =
+                    db.resolve_plan_for_stripe_price(&mut *tx, &price_id).await
+                {
+                    db.update_account_plan_by_stripe_customer(&mut *tx, &customer_id, &plan_id)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("update account plan: {e}"))?;
+                }
+            }
         }
     } else {
         warn!(
@@ -181,6 +192,24 @@ pub async fn on_subscription_updated(
         .await
         .map_err(|e| anyhow::anyhow!("sync subscription items: {e}"))?;
 
+    let plan_id = if matches!(status.as_str(), "active" | "trialing") {
+        let resolved = if let Some(price_id) = extract_first_price_id(sub) {
+            db.resolve_plan_for_stripe_price(&mut *tx, &price_id)
+                .await
+                .ok()
+                .flatten()
+        } else {
+            None
+        };
+        resolved.unwrap_or_else(|| "free".to_string())
+    } else {
+        "free".to_string()
+    };
+
+    db.update_account_plan_by_stripe_customer(&mut *tx, &customer_id, &plan_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("update account plan: {e}"))?;
+
     tx.commit()
         .await
         .map_err(|e| anyhow::anyhow!("commit tx: {e}"))?;
@@ -194,6 +223,7 @@ pub async fn on_subscription_deleted(
     _raw_data: &serde_json::Value,
 ) -> Result<(), PaymentError> {
     let subscription_id = sub.id.to_string();
+    let customer_id = sub.customer.id().to_string();
     let canceled_at = sub.canceled_at;
 
     info!(
@@ -212,6 +242,10 @@ pub async fn on_subscription_deleted(
     )
     .await
     .map_err(|e| anyhow::anyhow!("update subscription status: {e}"))?;
+
+    db.update_account_plan_by_stripe_customer(&db.pool, &customer_id, "free")
+        .await
+        .map_err(|e| anyhow::anyhow!("reset account plan: {e}"))?;
 
     Ok(())
 }
@@ -232,10 +266,6 @@ pub async fn on_invoice_paid(
         subscription_id = ?subscription_id,
         "Invoice paid — subscription renewal confirmed"
     );
-
-    // The subscription.updated event (which Stripe also fires) will handle
-    // the actual period update. This handler is here for observability and
-    // as a hook for future logic (e.g., sending receipts).
 
     Ok(())
 }
@@ -258,10 +288,6 @@ pub async fn on_invoice_payment_failed(
         attempt_count,
         "Invoice payment failed"
     );
-
-    // The subscription status change (to past_due) will be handled by the
-    // subscription.updated webhook. This handler is here for observability
-    // and as a hook for future dunning/notification logic.
 
     Ok(())
 }

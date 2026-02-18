@@ -12,6 +12,7 @@
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import LogoutIcon from '@lucide/svelte/icons/log-out';
 	import PowerIcon from '@lucide/svelte/icons/power';
+	import { Spinner } from '@eurora/ui/components/spinner/index';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -21,6 +22,7 @@
 	let timelineItems: TimelineAppEvent[] = $state([]);
 
 	let sidebarState: ReturnType<typeof useSidebar> | undefined = $state(undefined);
+	let chatsLoading = $state(true);
 	let quitDialogOpen = $state(false);
 	let username = $state('');
 
@@ -51,12 +53,16 @@
 		taurpc.auth
 			.is_authenticated()
 			.then((isAuthenticated) => {
-				if (!isAuthenticated) return;
+				if (!isAuthenticated) {
+					chatsLoading = false;
+					return;
+				}
 				taurpc.auth.get_username().then((name) => {
 					username = name;
 				});
 				taurpc.conversation.list(10, 0).then((res) => {
 					conversations = res;
+					chatsLoading = false;
 				});
 
 				unlistenPromises.push(
@@ -78,6 +84,7 @@
 				);
 			})
 			.catch((error) => {
+				chatsLoading = false;
 				goto('/onboarding');
 
 				console.error('Failed to check authentication:', error);
@@ -150,28 +157,38 @@
 				</Sidebar.Menu>
 			</Sidebar.GroupContent>
 		</Sidebar.Group>
-		{#if conversations.length > 0 && sidebarState?.open}
+		{#if sidebarState?.open}
 			<Sidebar.Group>
 				<Sidebar.GroupLabel>Chats</Sidebar.GroupLabel>
 
 				<Sidebar.GroupContent>
-					<Sidebar.Menu>
-						{#each conversations as item (item.id)}
-							<Sidebar.MenuItem>
-								<Sidebar.MenuButton
-									onclick={() => {
-										switchConversation(item.id ?? '');
-									}}
-								>
-									{#snippet child({ props })}
-										<a {...props}>
-											<span>{item.title ?? 'New Conversation'}</span>
-										</a>
-									{/snippet}
-								</Sidebar.MenuButton>
-							</Sidebar.MenuItem>
-						{/each}
-					</Sidebar.Menu>
+					{#if chatsLoading}
+						<div class="flex items-center justify-center py-4">
+							<Spinner />
+						</div>
+					{:else if conversations.length === 0}
+						<p class="px-3 py-4 text-sm text-muted-foreground text-center">
+							No Chats Yet
+						</p>
+					{:else}
+						<Sidebar.Menu>
+							{#each conversations as item (item.id)}
+								<Sidebar.MenuItem>
+									<Sidebar.MenuButton
+										onclick={() => {
+											switchConversation(item.id ?? '');
+										}}
+									>
+										{#snippet child({ props })}
+											<a {...props}>
+												<span>{item.title ?? 'New Conversation'}</span>
+											</a>
+										{/snippet}
+									</Sidebar.MenuButton>
+								</Sidebar.MenuItem>
+							{/each}
+						</Sidebar.Menu>
+					{/if}
 				</Sidebar.GroupContent>
 			</Sidebar.Group>
 		{/if}
