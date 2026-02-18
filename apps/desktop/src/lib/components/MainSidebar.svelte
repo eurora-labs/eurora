@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { type ConversationView } from '$lib/bindings/bindings.js';
+	import { type ConversationView, type TimelineAppEvent } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
@@ -8,6 +8,7 @@
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
 	import { useSidebar } from '@eurora/ui/components/sidebar/index';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
+	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import CircleUserRoundIcon from '@lucide/svelte/icons/circle-user-round';
@@ -20,12 +21,30 @@
 
 	const taurpc = inject(TAURPC_SERVICE);
 	let conversations: ConversationView[] = $state([]);
+	let timelineItems: TimelineAppEvent[] = $state([]);
 
 	let sidebarState: ReturnType<typeof useSidebar> | undefined = $state(undefined);
 	let quitDialogOpen = $state(false);
 
+	let visibleTimelineItems = $derived.by(() => {
+		const limit = sidebarState?.open ? 3 : 1;
+		return timelineItems.slice(-limit);
+	});
+
+	function getFirstLetterAndCapitalize(name: string) {
+		if (!name) return '';
+		return name.charAt(0).toUpperCase();
+	}
+
 	onMount(() => {
 		sidebarState = useSidebar();
+
+		taurpc.timeline.new_app_event.on((e) => {
+			if (timelineItems.length >= 5) {
+				timelineItems.shift();
+			}
+			timelineItems.push(e);
+		});
 
 		taurpc.auth
 			.is_authenticated()
@@ -142,6 +161,29 @@
 			</Sidebar.Group>
 		{/if}
 	</Sidebar.Content>
+	{#if visibleTimelineItems.length > 0}
+		<div class="px-2 py-2">
+			<Timeline.Root class="w-full" defaultOpen={false}>
+				{#each visibleTimelineItems as item}
+					<Timeline.Item color={item.color}>
+						{#if item.icon_base64}
+							<img
+								src={item.icon_base64}
+								alt={item.name}
+								class="w-8 h-8 bg-white rounded-full drop-shadow p-1"
+							/>
+						{:else}
+							<div
+								class="w-8 h-8 bg-white rounded-full drop-shadow p-1 flex items-center justify-center"
+							>
+								{getFirstLetterAndCapitalize(item.name)}
+							</div>
+						{/if}
+					</Timeline.Item>
+				{/each}
+			</Timeline.Root>
+		</div>
+	{/if}
 	<Sidebar.Footer>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
