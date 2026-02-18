@@ -12,7 +12,7 @@ use super::base::{get_msg_title_repr, is_interactive_env, merge_content};
 use super::content::{ContentBlock, ContentPart, KNOWN_BLOCK_TYPES, MessageContent};
 use crate::utils::merge::{merge_dicts, merge_lists};
 
-/// A system message in the conversation.
+/// A system message in the thread.
 ///
 /// The system message is usually passed in as the first of a sequence
 /// of input messages. It's used to prime AI behavior with instructions.

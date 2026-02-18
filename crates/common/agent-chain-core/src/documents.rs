@@ -16,7 +16,7 @@
 //!     - Text chunking, embedding, and semantic search
 //!     - Example: Chunks of a PDF stored in a vector database
 //!
-//! - **Content Blocks** (`messages::content`): For **LLM conversational I/O**
+//! - **Content Blocks** (`messages::content`): For **LLM threadal I/O**
 //!     - Multimodal message content sent to/from models
 //!     - Tool calls, reasoning, citations within chat
 //!     - Example: An image sent to a vision model in a chat message

@@ -121,14 +121,13 @@ pub async fn on_checkout_completed(
                 .await
                 .map_err(|e| anyhow::anyhow!("sync subscription items: {e}"))?;
 
-            if let Some(price_id) = extract_first_price_id(sub) {
-                if let Ok(Some(plan_id)) =
+            if let Some(price_id) = extract_first_price_id(sub)
+                && let Ok(Some(plan_id)) =
                     db.resolve_plan_for_stripe_price(&mut *tx, &price_id).await
-                {
-                    db.update_account_plan_by_stripe_customer(&mut *tx, &customer_id, &plan_id)
-                        .await
-                        .map_err(|e| anyhow::anyhow!("update account plan: {e}"))?;
-                }
+            {
+                db.update_account_plan_by_stripe_customer(&mut *tx, &customer_id, &plan_id)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("update account plan: {e}"))?;
             }
         }
     } else {

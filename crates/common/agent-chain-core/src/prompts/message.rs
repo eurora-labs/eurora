@@ -12,7 +12,7 @@ use crate::utils::interactive_env::is_interactive_env;
 /// Base trait for message prompt templates.
 ///
 /// Message prompt templates format into a list of messages rather than a single string.
-/// They are used in chat-based models where conversations consist of multiple messages.
+/// They are used in chat-based models where threads consist of multiple messages.
 pub trait BaseMessagePromptTemplate: Send + Sync {
     /// Get the input variables for this template.
     ///

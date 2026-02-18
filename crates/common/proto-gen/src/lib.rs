@@ -26,8 +26,8 @@ mod proto {
         pub use super::*;
     }
 
-    pub mod conversation {
-        tonic::include_proto!("conversation_service");
+    pub mod thread {
+        tonic::include_proto!("thread_service");
         pub use super::*;
     }
 

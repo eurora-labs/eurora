@@ -1,4 +1,4 @@
-//! Error types for the Conversation Service.
+//! Error types for the Thread Service.
 //!
 //! This module provides structured error handling with automatic
 //! conversion to gRPC status codes.
@@ -7,7 +7,7 @@ use thiserror::Error;
 use tonic::{Code, Status};
 
 #[derive(Error, Debug)]
-pub enum ConversationServiceError {
+pub enum ThreadServiceError {
     #[error("Authentication failed: {0}")]
     Unauthenticated(String),
 
@@ -34,7 +34,7 @@ pub enum ConversationServiceError {
     Internal(String),
 }
 
-impl ConversationServiceError {
+impl ThreadServiceError {
     pub fn unauthenticated(msg: impl Into<String>) -> Self {
         Self::Unauthenticated(msg.into())
     }
@@ -79,41 +79,41 @@ impl ConversationServiceError {
     }
 }
 
-impl From<be_remote_db::DbError> for ConversationServiceError {
+impl From<be_remote_db::DbError> for ThreadServiceError {
     fn from(err: be_remote_db::DbError) -> Self {
         Self::Database(err)
     }
 }
 
-impl From<ConversationServiceError> for Status {
-    fn from(err: ConversationServiceError) -> Self {
+impl From<ThreadServiceError> for Status {
+    fn from(err: ThreadServiceError) -> Self {
         let code = err.code();
         let message = err.to_string();
 
         match &err {
-            ConversationServiceError::Unauthenticated(_) => {
+            ThreadServiceError::Unauthenticated(_) => {
                 tracing::warn!("Authentication error: {}", message);
             }
-            ConversationServiceError::InvalidArgument(_)
-            | ConversationServiceError::InvalidUuid { .. }
-            | ConversationServiceError::InvalidTimestamp(_) => {
+            ThreadServiceError::InvalidArgument(_)
+            | ThreadServiceError::InvalidUuid { .. }
+            | ThreadServiceError::InvalidTimestamp(_) => {
                 tracing::debug!("Client error: {}", message);
             }
-            ConversationServiceError::NotFound(_) => {
+            ThreadServiceError::NotFound(_) => {
                 tracing::debug!("Resource not found: {}", message);
             }
-            ConversationServiceError::Database(e) => {
+            ThreadServiceError::Database(e) => {
                 tracing::error!("Database error: {} (source: {:?})", message, e);
             }
-            ConversationServiceError::Internal(_) => {
+            ThreadServiceError::Internal(_) => {
                 tracing::error!("Internal error: {}", message);
             }
         }
 
         // For internal errors, don't expose implementation details to clients
         let client_message = match err {
-            ConversationServiceError::Database(_) => "Database operation failed".to_string(),
-            ConversationServiceError::Internal(_) => "Internal server error".to_string(),
+            ThreadServiceError::Database(_) => "Database operation failed".to_string(),
+            ThreadServiceError::Internal(_) => "Internal server error".to_string(),
             _ => message,
         };
 
@@ -121,7 +121,7 @@ impl From<ConversationServiceError> for Status {
     }
 }
 
-pub type ConversationServiceResult<T> = std::result::Result<T, ConversationServiceError>;
+pub type ThreadServiceResult<T> = std::result::Result<T, ThreadServiceError>;
 
 #[cfg(test)]
 mod tests {
@@ -129,7 +129,7 @@ mod tests {
 
     #[test]
     fn test_error_creation() {
-        let auth_err = ConversationServiceError::unauthenticated("Missing claims");
+        let auth_err = ThreadServiceError::unauthenticated("Missing claims");
         assert!(auth_err.is_unauthenticated());
         assert_eq!(auth_err.code(), Code::Unauthenticated);
         assert_eq!(
@@ -137,36 +137,36 @@ mod tests {
             "Authentication failed: Missing claims"
         );
 
-        let not_found = ConversationServiceError::not_found("Conversation 123");
+        let not_found = ThreadServiceError::not_found("Thread 123");
         assert!(not_found.is_not_found());
         assert_eq!(not_found.code(), Code::NotFound);
 
-        let invalid_arg = ConversationServiceError::invalid_argument("title is required");
+        let invalid_arg = ThreadServiceError::invalid_argument("title is required");
         assert_eq!(invalid_arg.code(), Code::InvalidArgument);
     }
 
     #[test]
     fn test_uuid_error() {
         let uuid_err = uuid::Uuid::parse_str("invalid").unwrap_err();
-        let err = ConversationServiceError::invalid_uuid("conversation_id", uuid_err);
+        let err = ThreadServiceError::invalid_uuid("thread_id", uuid_err);
         assert_eq!(err.code(), Code::InvalidArgument);
-        assert!(err.to_string().contains("conversation_id"));
+        assert!(err.to_string().contains("thread_id"));
     }
 
     #[test]
     fn test_timestamp_error() {
-        let err = ConversationServiceError::invalid_timestamp("created_at");
+        let err = ThreadServiceError::invalid_timestamp("created_at");
         assert_eq!(err.code(), Code::InvalidArgument);
         assert!(err.to_string().contains("created_at"));
     }
 
     #[test]
     fn test_status_conversion() {
-        let err = ConversationServiceError::not_found("Conversation not found");
+        let err = ThreadServiceError::not_found("Thread not found");
         let status: Status = err.into();
         assert_eq!(status.code(), Code::NotFound);
 
-        let err = ConversationServiceError::unauthenticated("No token");
+        let err = ThreadServiceError::unauthenticated("No token");
         let status: Status = err.into();
         assert_eq!(status.code(), Code::Unauthenticated);
     }

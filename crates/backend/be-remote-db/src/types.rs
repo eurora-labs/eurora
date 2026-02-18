@@ -233,11 +233,11 @@ pub struct Activity {
 }
 
 // =============================================================================
-// Conversation Types
+// Thread Types
 // =============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct Conversation {
+pub struct Thread {
     pub id: Uuid,
     pub user_id: Uuid,
     pub title: Option<String>,
@@ -273,7 +273,7 @@ impl std::fmt::Display for MessageType {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Message {
     pub id: Uuid,
-    pub conversation_id: Uuid,
+    pub thread_id: Uuid,
     pub user_id: Uuid,
     pub message_type: MessageType,
     pub content: serde_json::Value,
@@ -285,12 +285,12 @@ pub struct Message {
 }
 
 // =============================================================================
-// Junction Types (Activity-Conversation)
+// Junction Types (Activity-Thread)
 // =============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct ActivityConversation {
+pub struct ActivityThread {
     pub activity_id: Uuid,
-    pub conversation_id: Uuid,
+    pub thread_id: Uuid,
     pub created_at: DateTime<Utc>,
 }

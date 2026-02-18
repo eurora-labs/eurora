@@ -1,7 +1,7 @@
 //! Agent Chain - A Rust implementation of LangChain-style components.
 //!
 //! This crate provides:
-//! - Message types for LLM conversations (human, AI, system, tool)
+//! - Message types for LLM threads (human, AI, system, tool)
 //! - Tool trait and `#[tool]` macro for function calling
 //! - Chat model abstractions and provider integrations
 //! - Support for multiple providers (Anthropic, OpenAI, etc.)
@@ -12,7 +12,7 @@
 //!
 //! - **Core layer** ([`chat_model`]): Base `ChatModel` trait that all providers implement
 //! - **Provider layer** ([`providers`]): Provider-specific implementations (ChatAnthropic, ChatOpenAI)
-//! - **Message layer** ([`messages`]): Message types for conversations
+//! - **Message layer** ([`messages`]): Message types for threads
 //! - **Tools layer** ([`tools`]): Tool definitions and the `#[tool]` macro
 //!
 //! # Quick Start

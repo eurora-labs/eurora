@@ -6,8 +6,7 @@ use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 
 use crate::{
-    procedures::conversation_procedures::TauRpcConversationApiEventTrigger,
-    shared_types::SharedConversationManager,
+    procedures::thread_procedures::TauRpcThreadApiEventTrigger, shared_types::SharedThreadManager,
 };
 
 #[taurpc::ipc_type]
@@ -25,7 +24,7 @@ pub struct Query {
 pub trait ChatApi {
     async fn send_query<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
-        conversation_id: Option<String>,
+        thread_id: Option<String>,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String>;
@@ -39,11 +38,11 @@ impl ChatApi for ChatApiImpl {
     async fn send_query<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
-        conversation_id: Option<String>,
+        thread_id: Option<String>,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String> {
-        let mut conversation_id = conversation_id;
+        let mut thread_id = thread_id;
 
         let event = posthog_rs::Event::new_anon("send_query");
         tauri::async_runtime::spawn(async move {
@@ -55,18 +54,18 @@ impl ChatApi for ChatApiImpl {
         {
             let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle.state();
             let timeline = timeline_state.lock().await;
-            let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
-            let mut conversation_manager = conversation_state.lock().await;
+            let thread_state: tauri::State<SharedThreadManager> = app_handle.state();
+            let mut thread_manager = thread_state.lock().await;
 
-            if conversation_id.is_none() {
-                let conversation = conversation_manager
-                    .ensure_remote_conversation()
+            if thread_id.is_none() {
+                let thread = thread_manager
+                    .ensure_remote_thread()
                     .await
-                    .expect("Failed to ensure remote conversation");
-                conversation_id = Some(conversation.id().unwrap().to_string());
-                TauRpcConversationApiEventTrigger::new(app_handle.clone())
-                    .new_conversation_added(conversation.into())
-                    .expect("Failed to trigger new conversation added event");
+                    .expect("Failed to ensure remote thread");
+                thread_id = Some(thread.id().unwrap().to_string());
+                TauRpcThreadApiEventTrigger::new(app_handle.clone())
+                    .new_thread_added(thread.into())
+                    .expect("Failed to trigger new thread added event");
             }
 
             if timeline.save_current_activity_to_service().await.is_ok() {
@@ -92,10 +91,10 @@ impl ChatApi for ChatApiImpl {
                     for message in messages {
                         match &message {
                             BaseMessage::System(m) => {
-                                let _ = conversation_manager.add_system_message(m).await;
+                                let _ = thread_manager.add_system_message(m).await;
                             }
                             BaseMessage::Human(m) => {
-                                let _ = conversation_manager.add_hidden_human_message(m).await;
+                                let _ = thread_manager.add_hidden_human_message(m).await;
                             }
                             _ => todo!(),
                         }
@@ -105,21 +104,20 @@ impl ChatApi for ChatApiImpl {
         }
         let title_app_handle = app_handle.clone();
         let content = query.text.clone();
-        let conversation_id_for_title = conversation_id.clone();
-        if let Some(id) = conversation_id_for_title {
+        let thread_id_for_title = thread_id.clone();
+        if let Some(id) = thread_id_for_title {
             tokio::spawn(async move {
                 let app_handle = title_app_handle.clone();
-                let conversation_state: tauri::State<SharedConversationManager> =
-                    app_handle.state();
-                let conversation_manager = conversation_state.lock().await;
-                let conversation = conversation_manager
-                    .generate_conversation_title(id, content)
+                let thread_state: tauri::State<SharedThreadManager> = app_handle.state();
+                let thread_manager = thread_state.lock().await;
+                let thread = thread_manager
+                    .generate_thread_title(id, content)
                     .await
-                    .map_err(|e| format!("Failed to generate conversation title: {e}"));
-                if let Ok(conversation) = conversation {
-                    TauRpcConversationApiEventTrigger::new(title_app_handle)
-                        .conversation_title_changed(conversation.into())
-                        .expect("Failed to send conversation title");
+                    .map_err(|e| format!("Failed to generate thread title: {e}"));
+                if let Ok(thread) = thread {
+                    TauRpcThreadApiEventTrigger::new(title_app_handle)
+                        .thread_title_changed(thread.into())
+                        .expect("Failed to send thread title");
                 }
             });
         }
@@ -134,9 +132,9 @@ impl ChatApi for ChatApiImpl {
 
         debug!("Sending chat stream");
         let stream_result = {
-            let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
-            let mut conversation_manager = conversation_state.lock().await;
-            conversation_manager.chat_stream(query.text.clone()).await
+            let thread_state: tauri::State<SharedThreadManager> = app_handle.state();
+            let mut thread_manager = thread_state.lock().await;
+            thread_manager.chat_stream(query.text.clone()).await
         };
 
         match stream_result {

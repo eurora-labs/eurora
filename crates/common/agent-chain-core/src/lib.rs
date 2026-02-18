@@ -2,7 +2,7 @@
 //! Agent Chain Core - A Rust implementation of LangChain core library.
 //!
 //! This crate provides:
-//! - Message types for LLM conversations (human, AI, system, tool)
+//! - Message types for LLM threads (human, AI, system, tool)
 //! - Tool trait and `#[tool]` macro for function calling
 //! - Chat model abstractions
 //! - Callback system for tracking and monitoring operations
@@ -14,7 +14,7 @@
 //! The architecture follows LangChain's pattern:
 //!
 //! - **Core layer** ([`chat_models`]): Base `ChatModel` trait that all providers implement
-//! - **Message layer** ([`messages`]): Message types for conversations
+//! - **Message layer** ([`messages`]): Message types for threads
 //! - **Prompts layer** ([`prompts`]): Prompt templates for constructing prompts
 //! - **Tools layer** ([`tools`]): Tool definitions and the `#[tool]` macro
 //! - **Callbacks layer** ([`callbacks`]): Callback handlers and managers for monitoring

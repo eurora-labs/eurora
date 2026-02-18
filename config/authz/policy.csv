@@ -5,18 +5,18 @@ g, Tier1, Free
 # Resource = short service name (Proto prefix stripped), Action = RPC method name.
 
 # Free: read-only gRPC endpoints
-p, Free, ConversationService, ListConversations
-p, Free, ConversationService, GetConversation
-p, Free, ConversationService, GetMessages
+p, Free, ThreadService, ListThreads
+p, Free, ThreadService, GetThread
+p, Free, ThreadService, GetMessages
 p, Free, ActivityService, ListActivities
 
 # Tier1: paid gRPC features
-p, Tier1, ConversationService, CreateConversation
-p, Tier1, ConversationService, AddHumanMessage
-p, Tier1, ConversationService, AddHiddenHumanMessage
-p, Tier1, ConversationService, AddSystemMessage
-p, Tier1, ConversationService, ChatStream
-p, Tier1, ConversationService, GenerateConversationTitle
+p, Tier1, ThreadService, CreateThread
+p, Tier1, ThreadService, AddHumanMessage
+p, Tier1, ThreadService, AddHiddenHumanMessage
+p, Tier1, ThreadService, AddSystemMessage
+p, Tier1, ThreadService, ChatStream
+p, Tier1, ThreadService, GenerateThreadTitle
 p, Tier1, ActivityService, InsertActivity
 p, Tier1, AssetService, CreateAsset
 
