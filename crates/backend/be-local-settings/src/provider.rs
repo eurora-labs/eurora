@@ -1,3 +1,4 @@
+mod nebul;
 mod ollama;
 mod openai;
 
@@ -5,13 +6,15 @@ use crate::{
     error::{Error, Result},
     proto,
 };
+pub use nebul::NebulConfig;
 pub use ollama::OllamaConfig;
 pub use openai::OpenAIConfig;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum ProviderSettings {
     Ollama(OllamaConfig),
     OpenAI(OpenAIConfig),
+    Nebul(NebulConfig),
 }
 
 impl From<OllamaConfig> for ProviderSettings {
@@ -37,6 +40,7 @@ impl TryFrom<proto::ProviderSettings> for ProviderSettings {
         match provider {
             Provider::Ollama(p) => Ok(Self::Ollama(p.try_into()?)),
             Provider::Openai(p) => Ok(Self::OpenAI(p.try_into()?)),
+            Provider::Nebul(p) => Ok(Self::Nebul(p.try_into()?)),
         }
     }
 }
@@ -52,9 +56,14 @@ impl From<&ProviderSettings> for proto::ProviderSettings {
             }),
             ProviderSettings::OpenAI(c) => Provider::Openai(proto::OpenAiSettings {
                 base_url: c.base_url.to_string(),
-                api_key: c.api_key.masked(),
+                api_key: c.api_key.0.clone(),
                 model: c.model.clone(),
                 title_model: c.title_model.clone().unwrap_or_default(),
+            }),
+            ProviderSettings::Nebul(c) => Provider::Nebul(proto::NebulSettings {
+                model: c.model.clone(),
+                api_key: c.api_key.0.clone(),
+                title_model: c.title_model.clone(),
             }),
         };
         proto::ProviderSettings {
