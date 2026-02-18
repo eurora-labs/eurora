@@ -165,8 +165,11 @@
 	{#if visibleTimelineItems.length > 0}
 		<div class="px-2 py-2">
 			<Timeline.Root class="w-full" defaultOpen={false}>
-				{#each visibleTimelineItems as item}
-					<Timeline.Item color={item.color}>
+				{#each visibleTimelineItems as item, i}
+					<Timeline.Item
+						color={item.color}
+						highlighted={i === visibleTimelineItems.length - 1}
+					>
 						{#if item.icon_base64}
 							<img
 								src={item.icon_base64}
