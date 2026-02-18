@@ -6,6 +6,11 @@ service ProtoLocalSettingsService {
   rpc SetProviderSettings(SetProviderSettingsRequest) returns (SetProviderSettingsResponse);
 }
 
+message NebulSettings {
+  string base_url = 1;
+  string model = 2;
+}
+
 message OllamaSettings {
   string base_url = 1;
   string model = 2;
@@ -28,8 +33,9 @@ message SetEncryptionKeyResponse {
 
 message ProviderSettings {
   oneof provider {
-    OllamaSettings ollama = 1;
-    OpenAISettings openai = 2;
+    NebulSettings nebul = 1;
+    OllamaSettings ollama = 2;
+    OpenAISettings openai = 3;
   }
 }
 
