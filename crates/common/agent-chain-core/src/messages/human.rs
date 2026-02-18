@@ -14,7 +14,7 @@ use super::system::SystemMessageChunk;
 use crate::load::Serializable;
 use crate::utils::merge::{merge_dicts, merge_lists};
 
-/// A human message in the conversation.
+/// A human message in the thread.
 ///
 /// Human messages support both simple text content and multimodal content
 /// with images. Use [`HumanMessage::builder()`] to construct messages.

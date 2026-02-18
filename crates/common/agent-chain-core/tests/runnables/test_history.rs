@@ -188,7 +188,7 @@ fn test_input_messages_output_message() {
 
 /// Mirrors `test_using_custom_config_specs` in Python.
 ///
-/// Uses a session factory that takes `user_id` and `conversation_id`.
+/// Uses a session factory that takes `user_id` and `thread_id`.
 #[test]
 fn test_using_custom_config_specs() {
     #[allow(clippy::type_complexity)]
@@ -199,8 +199,8 @@ fn test_using_custom_config_specs() {
         let store = store.clone();
         Arc::new(move |params: &HashMap<String, String>| {
             let user_id = params.get("user_id").cloned().unwrap_or_default();
-            let conversation_id = params.get("conversation_id").cloned().unwrap_or_default();
-            let key = (user_id, conversation_id);
+            let thread_id = params.get("thread_id").cloned().unwrap_or_default();
+            let key = (user_id, thread_id);
             let mut guard = store.lock().unwrap();
             let entry = guard
                 .entry(key)
@@ -226,10 +226,10 @@ fn test_using_custom_config_specs() {
                 dependencies: None,
             },
             ConfigurableFieldSpec {
-                id: "conversation_id".into(),
+                id: "thread_id".into(),
                 annotation: "str".into(),
-                name: Some("Conversation ID".into()),
-                description: Some("Unique identifier for the conversation.".into()),
+                name: Some("Thread ID".into()),
+                description: Some("Unique identifier for the thread.".into()),
                 default: None,
                 is_shared: true,
                 dependencies: None,
@@ -237,8 +237,8 @@ fn test_using_custom_config_specs() {
         ]),
     );
 
-    // user1, conversation 1: "hello"
-    let cfg1 = config_with(&[("user_id", "user1"), ("conversation_id", "1")]);
+    // user1, thread 1: "hello"
+    let cfg1 = config_with(&[("user_id", "user1"), ("thread_id", "1")]);
     let result = with_history
         .invoke_messages(vec![human("hello")], Some(cfg1.clone()))
         .unwrap();
@@ -256,7 +256,7 @@ fn test_using_custom_config_specs() {
         assert_eq!(hist.messages().len(), 2);
     }
 
-    // user1, conversation 1: "goodbye" — history now includes prior messages
+    // user1, thread 1: "goodbye" — history now includes prior messages
     let result = with_history
         .invoke_messages(vec![human("goodbye")], Some(cfg1.clone()))
         .unwrap();
@@ -273,8 +273,8 @@ fn test_using_custom_config_specs() {
         assert_eq!(hist.messages().len(), 4);
     }
 
-    // user2, conversation 1: "meow"
-    let cfg2 = config_with(&[("user_id", "user2"), ("conversation_id", "1")]);
+    // user2, thread 1: "meow"
+    let cfg2 = config_with(&[("user_id", "user2"), ("thread_id", "1")]);
     let result = with_history
         .invoke_messages(vec![human("meow")], Some(cfg2))
         .unwrap();

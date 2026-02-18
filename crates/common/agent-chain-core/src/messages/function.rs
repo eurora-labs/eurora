@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use super::base::merge_content;
 use super::content::MessageContent;
 
-/// A function message in the conversation.
+/// A function message in the thread.
 ///
 /// `FunctionMessage` objects are an older version of the `ToolMessage` schema, and
 /// do not contain the `tool_call_id` field.

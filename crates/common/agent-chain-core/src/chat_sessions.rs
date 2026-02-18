@@ -1,7 +1,7 @@
 //! **Chat Sessions** are a collection of messages and function calls.
 //!
 //! This module provides the [`ChatSession`] type for representing a single
-//! conversation, channel, or other group of messages.
+//! thread, channel, or other group of messages.
 //!
 //! Mirrors `langchain_core.chat_sessions`.
 
@@ -11,7 +11,7 @@ use crate::messages::BaseMessage;
 
 /// Chat Session.
 ///
-/// A Chat Session represents a single conversation, channel, or other group of messages.
+/// A Chat Session represents a single thread, channel, or other group of messages.
 ///
 /// # Example
 ///

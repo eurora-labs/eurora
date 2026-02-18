@@ -13,12 +13,12 @@ be-asset-service = { workspace = true }
 be-auth-core = { workspace = true }
 be-auth-service = { workspace = true }
 be-authz = { workspace = true }
-be-conversation-service = { workspace = true }
 be-local-settings = { workspace = true }
 be-local-settings-service = { workspace = true }
 be-payment-service = { workspace = true }
 be-remote-db = { workspace = true }
 be-storage = { workspace = true, features = ["encryption"] }
+be-thread-service = { workspace = true }
 be-update-service = { workspace = true }
 dotenv = { workspace = true }
 prost = { workspace = true }

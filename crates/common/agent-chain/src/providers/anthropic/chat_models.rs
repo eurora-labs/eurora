@@ -195,7 +195,7 @@ impl ChatAnthropic {
         messages: &[BaseMessage],
     ) -> (Option<String>, Vec<serde_json::Value>) {
         let mut system_message = None;
-        let mut conversation = Vec::new();
+        let mut thread = Vec::new();
 
         for msg in messages {
             match msg {
@@ -203,7 +203,7 @@ impl ChatAnthropic {
                     system_message = Some(m.content.as_text().to_string());
                 }
                 BaseMessage::Human(m) => {
-                    conversation.push(serde_json::json!({
+                    thread.push(serde_json::json!({
                         "role": "user",
                         "content": m.content.as_text()
                     }));
@@ -227,13 +227,13 @@ impl ChatAnthropic {
                         }));
                     }
 
-                    conversation.push(serde_json::json!({
+                    thread.push(serde_json::json!({
                         "role": "assistant",
                         "content": content
                     }));
                 }
                 BaseMessage::Tool(m) => {
-                    conversation.push(serde_json::json!({
+                    thread.push(serde_json::json!({
                         "role": "user",
                         "content": [{
                             "type": "tool_result",
@@ -249,14 +249,14 @@ impl ChatAnthropic {
                         "assistant" | "ai" => "assistant",
                         _ => "user", // Default to user for unknown roles
                     };
-                    conversation.push(serde_json::json!({
+                    thread.push(serde_json::json!({
                         "role": role,
                         "content": m.content
                     }));
                 }
                 BaseMessage::Function(m) => {
                     // Function messages are legacy, treat like tool results
-                    conversation.push(serde_json::json!({
+                    thread.push(serde_json::json!({
                         "role": "user",
                         "content": [{
                             "type": "tool_result",
@@ -272,7 +272,7 @@ impl ChatAnthropic {
             }
         }
 
-        (system_message, conversation)
+        (system_message, thread)
     }
 
     /// Build the request payload.
@@ -282,12 +282,12 @@ impl ChatAnthropic {
         stop: Option<Vec<String>>,
         tools: Option<&[serde_json::Value]>,
     ) -> serde_json::Value {
-        let (system_message, conversation_messages) = self.format_messages(messages);
+        let (system_message, thread_messages) = self.format_messages(messages);
 
         let mut payload = serde_json::json!({
             "model": self.model,
             "max_tokens": self.max_tokens,
-            "messages": conversation_messages
+            "messages": thread_messages
         });
 
         if let Some(system) = system_message {

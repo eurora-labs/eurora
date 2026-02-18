@@ -1,4 +1,4 @@
-//! Chat models for conversational AI.
+//! Chat models for threadal AI.
 //!
 //! This module provides the base abstraction for chat models,
 //! following the LangChain pattern of having a common interface
@@ -1279,7 +1279,7 @@ pub trait BaseChatModel: BaseLanguageModel {
     ///
     /// # Arguments
     ///
-    /// * `messages` - The conversation history.
+    /// * `messages` - The thread history.
     /// * `tools` - Tool definitions for the model to use.
     /// * `tool_choice` - Optional configuration for tool selection.
     /// * `stop` - Optional stop sequences.
@@ -1787,7 +1787,7 @@ pub trait BaseChatModel: BaseLanguageModel {
     ///
     /// # Arguments
     ///
-    /// * `messages` - The conversation history.
+    /// * `messages` - The thread history.
     /// * `stop` - Optional stop sequences.
     /// * `run_manager` - Optional callback manager for the run.
     ///

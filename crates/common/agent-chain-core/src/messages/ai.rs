@@ -131,7 +131,7 @@ impl UsageMetadata {
     }
 }
 
-/// An AI message in the conversation.
+/// An AI message in the thread.
 ///
 /// An `AIMessage` is returned from a chat model as a response to a prompt.
 /// This message represents the output of the model and consists of both

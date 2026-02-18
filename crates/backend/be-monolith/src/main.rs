@@ -5,10 +5,10 @@ use be_asset_service::{AssetService, ProtoAssetServiceServer};
 use be_auth_core::JwtConfig;
 use be_auth_service::AuthService;
 use be_authz::{AuthzState, CasbinAuthz, GrpcAuthzLayer, authz_middleware};
-use be_conversation_service::{ConversationService, ProtoConversationServiceServer};
 use be_payment_service::init_payment_service;
 use be_remote_db::DatabaseManager;
 use be_storage::StorageService;
+use be_thread_service::{ProtoThreadServiceServer, ThreadService};
 use be_update_service::init_update_service;
 use dotenv::dotenv;
 use proto_gen::auth::proto_auth_service_server::ProtoAuthServiceServer;
@@ -108,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let assets_service = AssetService::new(db_manager.clone(), storage.clone());
     let (settings_tx, settings_rx) = be_local_settings::settings_channel();
 
-    let conversation_service = ConversationService::new(db_manager.clone(), settings_rx);
+    let thread_service = ThreadService::new(db_manager.clone(), settings_rx);
 
     info!("Starting gRPC server at {}", grpc_addr);
     info!("Starting HTTP server at {}", http_addr);
@@ -160,7 +160,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_service(ProtoAuthServiceServer::new(auth_service))
         .add_service(ProtoActivityServiceServer::new(activity_service))
         .add_service(ProtoAssetServiceServer::new(assets_service))
-        .add_service(ProtoConversationServiceServer::new(conversation_service));
+        .add_service(ProtoThreadServiceServer::new(thread_service));
 
     if local_mode {
         let local_settings =

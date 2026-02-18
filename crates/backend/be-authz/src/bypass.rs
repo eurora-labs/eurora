@@ -134,9 +134,7 @@ mod tests {
 
     #[test]
     fn grpc_bypass_rejects_non_matching() {
-        assert!(!is_grpc_bypass(
-            "conversation_service.ProtoConversationService"
-        ));
+        assert!(!is_grpc_bypass("thread_service.ProtoThreadService"));
         assert!(!is_grpc_bypass("ProtoAuthService"));
         assert!(!is_grpc_bypass(""));
     }

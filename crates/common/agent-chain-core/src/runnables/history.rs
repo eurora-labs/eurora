@@ -459,7 +459,7 @@ impl RunnableWithMessageHistory {
     ///
     /// When `history_messages_key` is `None`, the returned list contains
     /// history messages followed by input messages (the runnable sees the
-    /// full conversation). When `history_messages_key` is `Some`, only
+    /// full thread). When `history_messages_key` is `Some`, only
     /// the history messages are returned (they will be injected into the
     /// dict under that key).
     pub fn enter_history(

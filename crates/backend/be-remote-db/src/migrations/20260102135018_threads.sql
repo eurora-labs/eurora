@@ -1,13 +1,13 @@
 CREATE TYPE message_type AS ENUM ('human', 'system', 'ai', 'tool');
 
-CREATE TABLE conversations (
+CREATE TABLE threads (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL,
     title VARCHAR(500),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
 
-    CONSTRAINT fk_conversations_user_id
+    CONSTRAINT fk_threads_user_id
         FOREIGN KEY (user_id)
         REFERENCES users(id)
         ON DELETE CASCADE
@@ -15,7 +15,7 @@ CREATE TABLE conversations (
 
 CREATE TABLE messages (
     id UUID PRIMARY KEY,
-    conversation_id UUID NOT NULL,
+    thread_id UUID NOT NULL,
     user_id UUID NOT NULL,
     message_type message_type NOT NULL,
     content JSONB NOT NULL,
@@ -25,9 +25,9 @@ CREATE TABLE messages (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
 
-    CONSTRAINT fk_messages_conversation_id
-        FOREIGN KEY (conversation_id)
-        REFERENCES conversations(id)
+    CONSTRAINT fk_messages_thread_id
+        FOREIGN KEY (thread_id)
+        REFERENCES threads(id)
         ON DELETE CASCADE,
 
     CONSTRAINT fk_messages_user_id
@@ -87,21 +87,21 @@ CREATE TABLE activities (
         ON DELETE SET NULL
 );
 
-CREATE TABLE activity_conversations (
+CREATE TABLE activity_threads (
     activity_id UUID NOT NULL,
-    conversation_id UUID NOT NULL,
+    thread_id UUID NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
 
-    PRIMARY KEY (activity_id, conversation_id),
+    PRIMARY KEY (activity_id, thread_id),
 
-    CONSTRAINT fk_activity_conversations_activity_id
+    CONSTRAINT fk_activity_threads_activity_id
         FOREIGN KEY (activity_id)
         REFERENCES activities(id)
         ON DELETE CASCADE,
 
-    CONSTRAINT fk_activity_conversations_conversation_id
-        FOREIGN KEY (conversation_id)
-        REFERENCES conversations(id)
+    CONSTRAINT fk_activity_threads_thread_id
+        FOREIGN KEY (thread_id)
+        REFERENCES threads(id)
         ON DELETE CASCADE
 );
 
@@ -141,11 +141,11 @@ CREATE TABLE message_assets (
         ON DELETE CASCADE
 );
 
-CREATE INDEX idx_conversations_user_id ON conversations(user_id);
-CREATE INDEX idx_conversations_updated_at ON conversations(updated_at DESC);
-CREATE INDEX idx_conversations_user_updated ON conversations(user_id, updated_at DESC);
+CREATE INDEX idx_threads_user_id ON threads(user_id);
+CREATE INDEX idx_threads_updated_at ON threads(updated_at DESC);
+CREATE INDEX idx_threads_user_updated ON threads(user_id, updated_at DESC);
 
-CREATE INDEX idx_messages_conversation_id ON messages(conversation_id);
+CREATE INDEX idx_messages_thread_id ON messages(thread_id);
 CREATE INDEX idx_messages_user_id ON messages(user_id);
 CREATE INDEX idx_messages_type ON messages(message_type);
 CREATE INDEX idx_messages_content ON messages USING GIN (content jsonb_path_ops);
@@ -155,14 +155,14 @@ CREATE INDEX idx_activities_started_at ON activities(started_at DESC);
 CREATE INDEX idx_activities_user_started ON activities(user_id, started_at DESC);
 CREATE INDEX idx_activities_ended_at ON activities(ended_at) WHERE ended_at IS NULL;
 
-CREATE INDEX idx_activity_conversations_conversation_id ON activity_conversations(conversation_id);
+CREATE INDEX idx_activity_threads_thread_id ON activity_threads(thread_id);
 CREATE INDEX idx_activity_assets_asset_id ON activity_assets(asset_id);
 CREATE INDEX idx_assets_user_id ON assets(user_id);
 CREATE INDEX idx_assets_storage_uri ON assets(storage_uri);
 CREATE INDEX idx_message_assets_asset_id ON message_assets(asset_id);
 
-CREATE TRIGGER update_conversations_updated_at
-    BEFORE UPDATE ON conversations
+CREATE TRIGGER update_threads_updated_at
+    BEFORE UPDATE ON threads
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
