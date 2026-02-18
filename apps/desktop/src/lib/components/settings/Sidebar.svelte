@@ -25,9 +25,13 @@
 	let contactDialogOpen = $state(false);
 	const email = 'contact@eurora-labs.com';
 
-	function copyEmail() {
-		navigator.clipboard.writeText(email);
-		toast.success('Email copied to clipboard');
+	async function copyEmail() {
+		try {
+			await navigator.clipboard.writeText(email);
+			toast.success('Email copied to clipboard');
+		} catch {
+			toast.error('Failed to copy email');
+		}
 	}
 
 	const socials = [
@@ -123,6 +127,7 @@
 					variant="outline"
 					href={social.href}
 					target="_blank"
+					rel="noopener noreferrer"
 					aria-label={social.name}
 					class="size-12"
 				>

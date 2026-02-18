@@ -37,12 +37,16 @@
 	onMount(() => {
 		sidebarState = useSidebar();
 
-		taurpc.timeline.new_app_event.on((e) => {
-			if (timelineItems.length >= 5) {
-				timelineItems.shift();
-			}
-			timelineItems.push(e);
-		});
+		const unlistenPromises: Promise<() => void>[] = [];
+
+		unlistenPromises.push(
+			taurpc.timeline.new_app_event.on((e) => {
+				if (timelineItems.length >= 5) {
+					timelineItems.shift();
+				}
+				timelineItems.push(e);
+			}),
+		);
 
 		taurpc.auth
 			.is_authenticated()
@@ -55,25 +59,35 @@
 					conversations = res;
 				});
 
-				taurpc.conversation.new_conversation_added.on((conversation) => {
-					if (!conversations.some((c) => c.id === conversation.id)) {
-						conversations = [conversation, ...conversations];
-					}
-				});
-
-				taurpc.conversation.conversation_title_changed.on((conversation) => {
-					for (const c of conversations) {
-						if (c.id === conversation.id) {
-							c.title = conversation.title;
+				unlistenPromises.push(
+					taurpc.conversation.new_conversation_added.on((conversation) => {
+						if (!conversations.some((c) => c.id === conversation.id)) {
+							conversations = [conversation, ...conversations];
 						}
-					}
-				});
+					}),
+				);
+
+				unlistenPromises.push(
+					taurpc.conversation.conversation_title_changed.on((conversation) => {
+						for (const c of conversations) {
+							if (c.id === conversation.id) {
+								c.title = conversation.title;
+							}
+						}
+					}),
+				);
 			})
 			.catch((error) => {
 				goto('/onboarding');
 
 				console.error('Failed to check authentication:', error);
 			});
+
+		return () => {
+			for (const p of unlistenPromises) {
+				p.then((unlisten) => unlisten());
+			}
+		};
 	});
 
 	async function createChat() {
