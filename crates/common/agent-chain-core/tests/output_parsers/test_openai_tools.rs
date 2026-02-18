@@ -12,7 +12,6 @@ use agent_chain_core::outputs::ChatGeneration;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-
 /// Create a ChatGeneration with tool calls in additional_kwargs (legacy path).
 fn make_additional_kwargs_generation(tool_calls: Value) -> ChatGeneration {
     let mut additional_kwargs = HashMap::new();
@@ -46,7 +45,6 @@ fn make_tool_call(id: &str, name: &str, args: Value) -> agent_chain_core::messag
         call_type: None,
     }
 }
-
 
 /// Ported from: test_json_output_key_tools_parser_multiple_tools_first_only
 /// (additional_kwargs variant)
@@ -103,7 +101,6 @@ fn test_json_output_tools_parser_return_id_additional_kwargs() {
     assert_eq!(result, expected);
 }
 
-
 #[test]
 fn test_json_output_tools_parser_tool_calls() {
     let tool_calls = vec![make_tool_call(
@@ -149,7 +146,6 @@ fn test_json_output_tools_parser_return_id_tool_calls() {
     assert_eq!(result, expected);
 }
 
-
 /// Ported from: test_partial_json_output_key_parser (additional_kwargs variant)
 #[test]
 fn test_json_output_key_tools_parser_additional_kwargs() {
@@ -194,7 +190,6 @@ fn test_json_output_key_tools_parser_first_only_additional_kwargs() {
     assert_eq!(result, expected);
 }
 
-
 #[test]
 fn test_json_output_key_tools_parser_tool_calls() {
     let tool_calls = vec![make_tool_call(
@@ -226,7 +221,6 @@ fn test_json_output_key_tools_parser_first_only_tool_calls() {
     let expected = json!({"names": ["suzy"]});
     assert_eq!(result, expected);
 }
-
 
 fn run_multiple_tools_first_only_test(use_tool_calls: bool) {
     let generation = if use_tool_calls {
@@ -279,7 +273,6 @@ fn test_json_output_key_tools_parser_multiple_tools_first_only_tool_calls() {
     run_multiple_tools_first_only_test(true);
 }
 
-
 fn run_multiple_tools_no_match_test(use_tool_calls: bool) {
     let generation = if use_tool_calls {
         make_tool_calls_generation(vec![
@@ -325,7 +318,6 @@ fn test_json_output_key_tools_parser_multiple_tools_no_match_additional_kwargs()
 fn test_json_output_key_tools_parser_multiple_tools_no_match_tool_calls() {
     run_multiple_tools_no_match_test(true);
 }
-
 
 fn run_multiple_matching_tools_test(use_tool_calls: bool) {
     let generation = if use_tool_calls {
@@ -386,7 +378,6 @@ fn test_json_output_key_tools_parser_multiple_matching_tools_tool_calls() {
     run_multiple_matching_tools_test(true);
 }
 
-
 fn run_empty_results_test(use_tool_calls: bool) {
     let generation = if use_tool_calls {
         make_tool_calls_generation(vec![])
@@ -418,7 +409,6 @@ fn test_json_output_key_tools_parser_empty_results_additional_kwargs() {
 fn test_json_output_key_tools_parser_empty_results_tool_calls() {
     run_empty_results_test(true);
 }
-
 
 fn run_parameter_combinations_test(use_tool_calls: bool) {
     let generation = if use_tool_calls {
@@ -489,7 +479,6 @@ fn test_json_output_key_tools_parser_parameter_combinations_additional_kwargs() 
 fn test_json_output_key_tools_parser_parameter_combinations_tool_calls() {
     run_parameter_combinations_test(true);
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 struct Person {
@@ -952,7 +941,6 @@ fn test_pydantic_tools_parser_nested_models_mixed_in_one_message() {
     assert!((location.coordinates.latitude - 37.8199).abs() < 0.0001);
 }
 
-
 /// Ported from: test_parse_tool_call_with_none_arguments
 #[test]
 fn test_parse_tool_call_with_none_arguments() {
@@ -1077,7 +1065,6 @@ fn test_parse_tool_call_partial_mode_with_partial_json() {
     let _ = result;
 }
 
-
 /// Ported from: test_partial_pydantic_output_parser (non-streaming version)
 #[test]
 fn test_pydantic_tools_parser_first_tool_only() {
@@ -1125,7 +1112,6 @@ fn test_pydantic_tools_parser_empty_list() {
     assert_eq!(result, json!([]));
 }
 
-
 #[test]
 fn test_json_output_tools_parser_first_tool_only() {
     let parser = JsonOutputToolsParser::new().with_first_tool_only(true);
@@ -1152,7 +1138,6 @@ fn test_json_output_tools_parser_first_tool_only_empty() {
     assert!(result.is_null());
 }
 
-
 #[test]
 fn test_json_output_tools_parser_no_tool_calls_no_kwargs() {
     let message = AIMessage::builder().content("Hello").build();
@@ -1163,7 +1148,6 @@ fn test_json_output_tools_parser_no_tool_calls_no_kwargs() {
 
     assert_eq!(result, json!([]));
 }
-
 
 #[test]
 fn test_parse_tool_calls_multiple() {

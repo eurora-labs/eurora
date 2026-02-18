@@ -101,10 +101,8 @@ impl BaseOutputParser for JsonOutputParser {
         if partial {
             match parse_json_markdown(text) {
                 Ok(value) => Ok(value),
-                Err(_) => {
-                    parse_partial_json(text, false)
-                        .map_err(|e| Error::Other(format!("Partial parse failed: {}", e)))
-                }
+                Err(_) => parse_partial_json(text, false)
+                    .map_err(|e| Error::Other(format!("Partial parse failed: {}", e))),
             }
         } else {
             match parse_json_markdown(text) {

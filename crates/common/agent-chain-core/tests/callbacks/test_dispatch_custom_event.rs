@@ -15,7 +15,6 @@ use agent_chain_core::runnables::config::get_callback_manager_for_config;
 use agent_chain_core::runnables::{RunnableConfig, RunnableLambdaWithConfig};
 use std::sync::Arc;
 
-
 #[derive(Debug, Default)]
 struct FakeHandler;
 
@@ -31,7 +30,6 @@ impl BaseCallbackHandler for FakeHandler {
         "FakeHandler"
     }
 }
-
 
 /// Ported from `test_custom_event_root_dispatch`.
 ///

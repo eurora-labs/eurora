@@ -12,7 +12,6 @@ use agent_chain_core::error::Error;
 use agent_chain_core::runnables::base::{Runnable, RunnableLambda};
 use agent_chain_core::runnables::config::{ConfigOrList, RunnableConfig};
 
-
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn test_abatch_concurrency() {
     let running_tasks = Arc::new(AtomicUsize::new(0));
@@ -90,7 +89,6 @@ async fn test_abatch_as_completed_concurrency() {
     assert!(max_running_tasks.load(Ordering::SeqCst) <= max_concurrency);
 }
 
-
 #[test]
 fn test_batch_concurrency() {
     let running_tasks = Arc::new(AtomicUsize::new(0));
@@ -160,7 +158,6 @@ fn test_batch_as_completed_concurrency() {
     }
     assert!(max_running_tasks.load(Ordering::SeqCst) <= max_concurrency);
 }
-
 
 #[test]
 fn test_batch_empty_input() {

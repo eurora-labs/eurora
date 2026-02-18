@@ -10,7 +10,6 @@ use agent_chain_core::runnables::graph::{
 use agent_chain_core::runnables::graph_mermaid::{generate_mermaid_graph_styles, to_safe_id};
 use serde_json::Value;
 
-
 fn make_node(id: &str, name: &str) -> Node {
     Node::new(id, name)
 }
@@ -18,7 +17,6 @@ fn make_node(id: &str, name: &str) -> Node {
 fn make_node_with_metadata(id: &str, name: &str, metadata: HashMap<String, Value>) -> Node {
     Node::new(id, name).with_metadata(metadata)
 }
-
 
 #[test]
 fn test_to_safe_id_alphanumeric() {
@@ -77,7 +75,6 @@ fn test_to_safe_id_escapes_punctuation() {
     assert_eq!(to_safe_id("node,"), "node\\2c");
 }
 
-
 #[test]
 fn test_generate_mermaid_graph_styles() {
     let styles = NodeStyles::default();
@@ -102,7 +99,6 @@ fn test_generate_mermaid_graph_styles_custom() {
     assert!(result.contains("fill:#00ff00"));
     assert!(result.contains("fill:#0000ff"));
 }
-
 
 #[test]
 fn test_draw_mermaid_simple_graph() {

@@ -11,7 +11,6 @@ use agent_chain_core::callbacks::base::{
     RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
 };
 
-
 #[derive(Debug)]
 struct SnapshotHandler;
 
@@ -157,7 +156,6 @@ fn test_async_handler_has_methods() {
 
     fn assert_is_async_handler<T: AsyncCallbackHandler>() {}
     assert_is_async_handler::<SnapshotHandler>();
-
 }
 
 #[async_trait::async_trait]

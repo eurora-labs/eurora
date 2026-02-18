@@ -38,7 +38,6 @@ use std::sync::LazyLock;
 
 use crate::utils::base::ensure_id;
 
-
 /// Image detail level for vision models.
 ///
 /// This controls how the model processes the image:
@@ -304,7 +303,6 @@ impl MessageContent {
         }
     }
 }
-
 
 /// Index type that can be either an integer or string.
 /// Used during streaming for block ordering.
@@ -1116,7 +1114,6 @@ impl NonStandardContentBlock {
     }
 }
 
-
 /// A union of all defined multimodal data ContentBlock types.
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -1186,7 +1183,6 @@ pub enum ContentBlock {
     ServerToolResult(ServerToolResult),
 }
 
-
 /// These are block types known to langchain-core>=1.0.0.
 ///
 /// If a block has a type not in this set, it is considered to be provider-specific.
@@ -1216,7 +1212,6 @@ const DATA_CONTENT_BLOCK_TYPES: &[&str] = &["image", "video", "audio", "text-pla
 pub fn get_data_content_block_types() -> &'static [&'static str] {
     DATA_CONTENT_BLOCK_TYPES
 }
-
 
 /// Check if the provided content block is a data content block.
 ///
@@ -1257,7 +1252,6 @@ pub fn is_data_content_block(block: &serde_json::Value) -> bool {
 
     false
 }
-
 
 /// Create a `TextContentBlock`.
 ///

@@ -821,7 +821,6 @@ pub trait TracerCore: Send + Sync + Debug {
         Ok(run.clone())
     }
 
-
     /// Called when a run is created.
     fn on_run_create(&mut self, _run: &Run) {}
 

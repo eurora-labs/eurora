@@ -15,7 +15,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
-
 #[derive(Debug, Default)]
 struct TestHandler;
 
@@ -31,7 +30,6 @@ impl BaseCallbackHandler for TestHandler {
         "TestHandler"
     }
 }
-
 
 /// Ported from `test_base_run_manager_initialization`.
 #[test]
@@ -80,7 +78,6 @@ fn test_base_run_manager_get_noop_manager() {
     assert!(manager.inheritable_handlers.is_empty());
 }
 
-
 /// Ported from `test_run_manager_on_text`.
 #[test]
 fn test_run_manager_on_text() {
@@ -100,7 +97,6 @@ fn test_run_manager_empty_handlers() {
 
     manager.on_text("test");
 }
-
 
 /// Ported from `test_parent_run_manager_get_child`.
 #[test]
@@ -147,7 +143,6 @@ fn test_parent_run_manager_get_child_with_tag() {
     assert!(child.tags.contains(&"child_tag".to_string()));
     assert!(!child.inheritable_tags.contains(&"child_tag".to_string()));
 }
-
 
 /// Ported from `test_callback_manager_for_llm_run_on_llm_new_token`.
 #[test]
@@ -207,7 +202,6 @@ fn test_callback_manager_for_llm_run_on_llm_error() {
     manager.on_llm_error(&error);
 }
 
-
 /// Ported from `test_async_callback_manager_for_llm_run_get_sync`.
 #[test]
 fn test_async_callback_manager_for_llm_run_get_sync() {
@@ -232,7 +226,6 @@ fn test_async_callback_manager_for_llm_run_get_sync() {
     assert_eq!(sync_back.handlers().len(), 1);
     assert!(sync_back.tags().contains(&"test".to_string()));
 }
-
 
 /// Ported from `test_callback_manager_for_chain_run_on_chain_end`.
 #[test]
@@ -274,7 +267,6 @@ fn test_callback_manager_for_chain_run_on_chain_error() {
     manager.on_chain_error(&error);
 }
 
-
 /// Ported from `test_callback_manager_for_tool_run_on_tool_end`.
 #[test]
 fn test_callback_manager_for_tool_run_on_tool_end() {
@@ -312,7 +304,6 @@ fn test_callback_manager_for_tool_run_on_tool_error() {
     manager.on_tool_error(&error);
 }
 
-
 /// Ported from `test_callback_manager_for_retriever_run_on_retriever_end`.
 #[test]
 fn test_callback_manager_for_retriever_run_on_retriever_end() {
@@ -349,7 +340,6 @@ fn test_callback_manager_for_retriever_run_on_retriever_error() {
     let error = std::io::Error::other("Retriever failed");
     manager.on_retriever_error(&error);
 }
-
 
 /// Ported from `test_callback_manager_on_llm_start_single_prompt`.
 #[test]
@@ -427,7 +417,6 @@ fn test_callback_manager_on_retriever_start() {
 
     assert!(!run_manager.run_id().is_nil());
 }
-
 
 /// Ported from `test_async_callback_manager_is_async`.
 #[test]

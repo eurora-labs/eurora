@@ -166,8 +166,7 @@ fn event_mode_focus_switch() {
                 info!("Received focus event: {:?}", event.window_title);
                 events.push(event);
             }
-            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                 info!("Focus event channel disconnected");
                 break;

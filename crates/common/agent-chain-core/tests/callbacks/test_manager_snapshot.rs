@@ -24,7 +24,6 @@ use uuid::Uuid;
 
 use std::sync::Mutex;
 
-
 #[derive(Debug, Default)]
 struct TestHandler;
 
@@ -39,7 +38,6 @@ impl BaseCallbackHandler for TestHandler {
         "TestHandler"
     }
 }
-
 
 #[derive(Debug)]
 struct RecordingHandler {
@@ -264,7 +262,6 @@ impl BaseCallbackHandler for RecordingHandler {
     }
 }
 
-
 #[derive(Debug)]
 struct IgnoreLLMHandler;
 impl LLMManagerMixin for IgnoreLLMHandler {}
@@ -281,7 +278,6 @@ impl BaseCallbackHandler for IgnoreLLMHandler {
         true
     }
 }
-
 
 #[derive(Debug)]
 struct IgnoreChainHandler;
@@ -300,7 +296,6 @@ impl BaseCallbackHandler for IgnoreChainHandler {
     }
 }
 
-
 #[derive(Debug)]
 struct IgnoreAgentHandler;
 impl LLMManagerMixin for IgnoreAgentHandler {}
@@ -318,7 +313,6 @@ impl BaseCallbackHandler for IgnoreAgentHandler {
     }
 }
 
-
 #[derive(Debug)]
 struct IgnoreRetrieverHandler;
 impl LLMManagerMixin for IgnoreRetrieverHandler {}
@@ -335,7 +329,6 @@ impl BaseCallbackHandler for IgnoreRetrieverHandler {
         true
     }
 }
-
 
 /// Ported from `TestHandleEvent::test_empty_handlers_no_error`.
 #[test]
@@ -387,7 +380,6 @@ fn test_handle_event_ignore_condition_none_always_dispatches() {
     assert_eq!(count, 1);
 }
 
-
 /// Ported from `TestRunManager::test_on_text_empty_handlers_no_error`.
 #[test]
 fn test_run_manager_on_text_empty_handlers_no_error() {
@@ -401,7 +393,6 @@ fn test_run_manager_on_retry_empty_handlers_no_error() {
     let mgr = RunManager::new(Uuid::new_v4(), vec![], vec![], None, None, None, None, None);
     mgr.on_retry(&serde_json::json!(null));
 }
-
 
 /// Ported from `TestParentRunManager::test_get_child_inherits_handlers`.
 #[test]
@@ -449,7 +440,6 @@ fn test_parent_run_manager_get_child_without_tag() {
     let _child = mgr.get_child(None);
 }
 
-
 /// Ported from `TestCallbackManagerForLLMRun::test_empty_handlers_noop`.
 #[test]
 fn test_llm_run_empty_handlers_noop() {
@@ -476,7 +466,6 @@ fn test_llm_run_on_llm_new_token_with_chunk() {
     );
     mgr.on_llm_new_token("tok", None);
 }
-
 
 /// Ported from `TestCallbackManagerForChainRun::test_empty_handlers_noop`.
 #[test]
@@ -513,7 +502,6 @@ fn test_chain_run_is_parent_run_manager() {
     let _child = mgr.get_child(None);
 }
 
-
 /// Ported from `TestCallbackManagerForToolRun::test_empty_handlers_noop`.
 #[test]
 fn test_tool_run_empty_handlers_noop() {
@@ -531,7 +519,6 @@ fn test_tool_run_empty_handlers_noop() {
     mgr.on_tool_error(&std::io::Error::other("err"));
 }
 
-
 /// Ported from `TestCallbackManagerForRetrieverRun::test_empty_handlers_noop`.
 #[test]
 fn test_retriever_run_empty_handlers_noop() {
@@ -548,7 +535,6 @@ fn test_retriever_run_empty_handlers_noop() {
     mgr.on_retriever_end(&[]);
     mgr.on_retriever_error(&std::io::Error::other("err"));
 }
-
 
 /// Ported from `TestCallbackManager::test_on_llm_start_returns_managers_per_prompt`.
 #[test]
@@ -735,7 +721,6 @@ fn test_callback_manager_run_managers_inherit_tags_and_metadata() {
     assert!(rm.tags().contains(&"t1".to_string()));
 }
 
-
 fn make_sync_chain_group() -> (CallbackManagerForChainGroup, CallbackManagerForChainRun) {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
     let parent_rm = CallbackManagerForChainRun::new(
@@ -796,7 +781,6 @@ fn test_chain_group_merge_preserves_parent_run_manager() {
     assert!(merged.tags().contains(&"extra".to_string()));
 }
 
-
 /// Ported from `TestBaseRunManager::test_get_noop_manager`.
 #[test]
 fn test_base_run_manager_get_noop_manager() {
@@ -820,7 +804,6 @@ fn test_base_run_manager_initialization_defaults() {
     assert!(mgr.metadata.is_empty());
     assert!(mgr.inheritable_metadata.is_empty());
 }
-
 
 /// Ported from `TestAsyncRunManagerGetSync::test_async_llm_run_get_sync`.
 #[test]
@@ -885,7 +868,6 @@ fn test_async_retriever_run_get_sync() {
     let back = async_mgr.get_sync();
     assert_eq!(back.run_id(), rid);
 }
-
 
 /// Ported from `TestAsyncCallbackManager::test_is_async_true`.
 #[test]
@@ -999,7 +981,6 @@ async fn test_async_callback_manager_on_custom_event_empty_handlers_noop() {
         .await;
 }
 
-
 /// Ported from `TestAsyncCallbackManagerForLLMRun::test_empty_handlers_noop`.
 #[tokio::test]
 async fn test_async_llm_run_empty_handlers_noop() {
@@ -1010,7 +991,6 @@ async fn test_async_llm_run_empty_handlers_noop() {
     mgr.on_llm_end(&ChatResult::default()).await;
     mgr.on_llm_error(&std::io::Error::other("err")).await;
 }
-
 
 /// Ported from `TestAsyncCallbackManagerForChainRun::test_empty_handlers_noop`.
 #[tokio::test]
@@ -1051,7 +1031,6 @@ async fn test_async_chain_run_get_child_returns_async_manager() {
     assert_eq!(child.parent_run_id(), Some(mgr.run_id()));
 }
 
-
 /// Ported from `TestAsyncCallbackManagerForToolRun::test_empty_handlers_noop`.
 #[tokio::test]
 async fn test_async_tool_run_empty_handlers_noop() {
@@ -1070,7 +1049,6 @@ async fn test_async_tool_run_empty_handlers_noop() {
     mgr.on_tool_error(&std::io::Error::other("err")).await;
 }
 
-
 /// Ported from `TestAsyncCallbackManagerForRetrieverRun::test_empty_handlers_noop`.
 #[tokio::test]
 async fn test_async_retriever_run_empty_handlers_noop() {
@@ -1088,7 +1066,6 @@ async fn test_async_retriever_run_empty_handlers_noop() {
     mgr.on_retriever_end(&[]).await;
     mgr.on_retriever_error(&std::io::Error::other("err")).await;
 }
-
 
 fn make_async_chain_group() -> (
     AsyncCallbackManagerForChainGroup,
@@ -1144,7 +1121,6 @@ async fn test_async_chain_group_copy_preserves_parent_run_manager() {
     assert_eq!(cp.parent_run_id(), parent_rm.parent_run_id());
 }
 
-
 /// Ported from `TestAsyncParentRunManager::test_get_child_returns_async_callback_manager`.
 #[tokio::test]
 async fn test_async_parent_run_manager_get_child_returns_async_callback_manager() {
@@ -1187,7 +1163,6 @@ async fn test_async_parent_run_manager_get_child_with_tag() {
             .contains(&"local".to_string())
     );
 }
-
 
 /// Ported from `TestHandleEvent::test_dispatches_to_handler`.
 #[test]

@@ -101,7 +101,6 @@ impl ExampleSelector for StaticExampleSelector {
     }
 }
 
-
 /// Prompt template that contains few shot examples.
 ///
 /// Direct port of `langchain_core.prompts.few_shot.FewShotPromptTemplate`.
@@ -418,7 +417,6 @@ impl StringPromptTemplate for FewShotPromptTemplate {
         )
     }
 }
-
 
 /// Chat prompt template that supports few-shot examples.
 ///

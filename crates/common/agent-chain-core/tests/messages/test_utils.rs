@@ -12,7 +12,6 @@ use agent_chain_core::messages::{
     trim_messages,
 };
 
-
 #[test]
 fn test_merge_message_runs_str_human() {
     let messages = vec![
@@ -60,7 +59,6 @@ fn test_merge_message_runs_str_system() {
     assert_eq!(actual, expected);
     assert_eq!(messages, messages_copy);
 }
-
 
 #[test]
 fn test_merge_message_runs_str_with_specified_separator_human() {
@@ -114,7 +112,6 @@ fn test_merge_message_runs_str_with_specified_separator_system() {
     assert_eq!(messages, messages_copy);
 }
 
-
 #[test]
 fn test_merge_message_runs_str_without_separator_human() {
     let messages = vec![
@@ -163,7 +160,6 @@ fn test_merge_message_runs_str_without_separator_system() {
     assert_eq!(messages, messages_copy);
 }
 
-
 #[test]
 fn test_merge_message_runs_response_metadata() {
     let messages = vec![
@@ -191,7 +187,6 @@ fn test_merge_message_runs_response_metadata() {
     assert_eq!(actual[0].content(), expected[0].content());
 }
 
-
 #[test]
 fn test_merge_messages_tool_messages() {
     let messages = vec![
@@ -213,7 +208,6 @@ fn test_merge_messages_tool_messages() {
     assert_eq!(actual, messages);
     assert_eq!(messages, messages_copy);
 }
-
 
 #[test]
 fn test_filter_message_include_names() {
@@ -435,7 +429,6 @@ fn test_filter_message_combined() {
     assert_eq!(messages, messages_copy);
 }
 
-
 #[test]
 fn test_convert_to_messages_string() {
     let message_like = vec![serde_json::json!("14.1")];
@@ -504,7 +497,6 @@ fn test_convert_to_messages_role_assistant() {
     assert_eq!(expected, actual);
 }
 
-
 #[test]
 fn test_get_buffer_string_empty_input() {
     assert_eq!(get_buffer_string(&[], "Human", "AI"), "");
@@ -552,7 +544,6 @@ fn test_get_buffer_string_multiple_msg() {
 
     assert_eq!(get_buffer_string(&messages, "Human", "AI"), expected_output);
 }
-
 
 /// Dummy token counter for testing.
 /// Treat each message like it adds 3 default tokens at the beginning
@@ -744,7 +735,6 @@ fn test_trim_messages_last_30_include_system() {
     assert_eq!(messages, messages_copy);
 }
 
-
 #[test]
 fn test_convert_to_openai_messages_single_message() {
     let messages = vec![BaseMessage::Human(
@@ -818,7 +808,6 @@ fn test_convert_to_openai_messages_empty_list() {
     assert!(result.is_empty());
 }
 
-
 #[test]
 fn test_count_tokens_approximately_empty_messages() {
     let messages: Vec<BaseMessage> = vec![];
@@ -887,8 +876,6 @@ fn test_count_tokens_approximately_custom_token_length() {
     assert_eq!(count_tokens_approximately(&messages, &config2), 22);
 }
 
-
-
 #[test]
 fn test_merge_message_runs_alternating_types_no_merge() {
     let messages = vec![
@@ -906,7 +893,6 @@ fn test_merge_message_runs_alternating_types_no_merge() {
     assert_eq!(actual[3].content(), "good");
     assert_eq!(messages, messages_copy);
 }
-
 
 #[test]
 fn test_merge_message_runs_preserves_tool_calls() {
@@ -943,7 +929,6 @@ fn test_merge_message_runs_preserves_tool_calls() {
     assert_eq!(actual[0].tool_calls()[1].name, "tool_b");
 }
 
-
 #[test]
 fn test_convert_to_messages_unsupported_role_raises() {
     let message_like = vec![serde_json::json!(["tool", "hello"])];
@@ -956,7 +941,6 @@ fn test_convert_to_messages_unsupported_role_raises() {
         err
     );
 }
-
 
 #[test]
 fn test_convert_to_openai_messages_developer() {
@@ -977,7 +961,6 @@ fn test_convert_to_openai_messages_developer() {
     assert_eq!(result[0]["content"], "Be helpful");
 }
 
-
 #[test]
 fn test_convert_to_openai_messages_empty_content() {
     let messages = vec![BaseMessage::AI(AIMessage::builder().content("").build())];
@@ -986,7 +969,6 @@ fn test_convert_to_openai_messages_empty_content() {
     assert_eq!(result[0]["role"], "assistant");
     assert_eq!(result[0]["content"], "");
 }
-
 
 #[test]
 fn test_convert_to_openai_messages_ai_with_tool_calls() {
@@ -1012,7 +994,6 @@ fn test_convert_to_openai_messages_ai_with_tool_calls() {
     assert_eq!(tool_calls[0]["function"]["name"], "get_weather");
 }
 
-
 #[test]
 fn test_get_buffer_string_custom_human_and_ai_prefix() {
     let messages = vec![
@@ -1022,7 +1003,6 @@ fn test_get_buffer_string_custom_human_and_ai_prefix() {
     let result = get_buffer_string(&messages, "User", "Bot");
     assert_eq!(result, "User: hi\nBot: hello");
 }
-
 
 #[test]
 fn test_get_buffer_string_with_tool_messages() {
@@ -1036,7 +1016,6 @@ fn test_get_buffer_string_with_tool_messages() {
     assert_eq!(result, "Tool: result from tool");
 }
 
-
 #[test]
 fn test_get_buffer_string_with_function_messages() {
     let messages = vec![BaseMessage::Function(
@@ -1049,7 +1028,6 @@ fn test_get_buffer_string_with_function_messages() {
     assert_eq!(result, "Function: function output");
 }
 
-
 #[test]
 fn test_get_buffer_string_with_empty_content() {
     let messages = vec![BaseMessage::Human(
@@ -1059,7 +1037,6 @@ fn test_get_buffer_string_with_empty_content() {
     assert_eq!(result, "Human: ");
 }
 
-
 #[test]
 fn test_message_chunk_to_message_ai() {
     let chunk = BaseMessageChunk::AI(AIMessageChunk::builder().content("hello from ai").build());
@@ -1067,7 +1044,6 @@ fn test_message_chunk_to_message_ai() {
     assert!(matches!(msg, BaseMessage::AI(_)));
     assert_eq!(msg.content(), "hello from ai");
 }
-
 
 #[test]
 fn test_message_chunk_to_message_human() {
@@ -1081,7 +1057,6 @@ fn test_message_chunk_to_message_human() {
     assert_eq!(msg.content(), "hello from human");
 }
 
-
 #[test]
 fn test_message_chunk_to_message_system() {
     let chunk = BaseMessageChunk::System(
@@ -1093,7 +1068,6 @@ fn test_message_chunk_to_message_system() {
     assert!(matches!(msg, BaseMessage::System(_)));
     assert_eq!(msg.content(), "system prompt");
 }
-
 
 #[test]
 fn test_message_chunk_to_message_tool() {
@@ -1113,7 +1087,6 @@ fn test_message_chunk_to_message_tool() {
     }
 }
 
-
 #[test]
 fn test_message_chunk_to_message_function() {
     let chunk = BaseMessageChunk::Function(
@@ -1132,7 +1105,6 @@ fn test_message_chunk_to_message_function() {
     }
 }
 
-
 #[test]
 fn test_message_chunk_to_message_chat() {
     let chunk = BaseMessageChunk::Chat(
@@ -1150,7 +1122,6 @@ fn test_message_chunk_to_message_chat() {
         panic!("Expected BaseMessage::Chat");
     }
 }
-
 
 #[test]
 fn test_messages_from_dict_round_trip() {
@@ -1208,7 +1179,6 @@ fn test_messages_from_dict_round_trip() {
     }
 }
 
-
 #[test]
 fn test_count_tokens_approximately_tool_calls() {
     let config = CountTokensConfig::default();
@@ -1239,7 +1209,6 @@ fn test_count_tokens_approximately_tool_calls() {
     );
 }
 
-
 #[test]
 fn test_count_tokens_approximately_large_content() {
     let large_content = "a".repeat(10_000);
@@ -1250,7 +1219,6 @@ fn test_count_tokens_approximately_large_content() {
     let tokens = count_tokens_approximately(&messages, &config);
     assert_eq!(tokens, 2504);
 }
-
 
 #[test]
 fn test_count_tokens_approximately_large_number_of_messages() {
@@ -1269,7 +1237,6 @@ fn test_count_tokens_approximately_large_number_of_messages() {
     assert!(tokens > 5000);
     assert!(tokens < 15000);
 }
-
 
 #[test]
 fn test_count_tokens_approximately_mixed_content_types() {
@@ -1301,7 +1268,6 @@ fn test_count_tokens_approximately_mixed_content_types() {
     assert_eq!(tool_tokens, 7);
 }
 
-
 #[test]
 fn test_count_tokens_approximately_tool_message_includes_tool_call_id() {
     let config = CountTokensConfig::default();
@@ -1330,7 +1296,6 @@ fn test_count_tokens_approximately_tool_message_includes_tool_call_id() {
     );
 }
 
-
 #[test]
 fn test_trim_messages_empty_messages() {
     let messages: Vec<BaseMessage> = vec![];
@@ -1339,7 +1304,6 @@ fn test_trim_messages_empty_messages() {
     let actual = trim_messages(&messages, &config);
     assert!(actual.is_empty());
 }
-
 
 #[test]
 fn test_trim_messages_exact_token_boundary() {
@@ -1356,7 +1320,6 @@ fn test_trim_messages_exact_token_boundary() {
     assert_eq!(actual[0].content(), "msg1");
     assert_eq!(actual[1].content(), "msg2");
 }
-
 
 #[test]
 fn test_trim_messages_last_without_include_system() {
@@ -1375,7 +1338,6 @@ fn test_trim_messages_last_without_include_system() {
     assert_eq!(actual[0].content(), "ai1");
     assert_eq!(actual[1].content(), "human2");
 }
-
 
 #[test]
 fn test_filter_messages_include_types_and_include_names_combined() {
@@ -1421,7 +1383,6 @@ fn test_filter_messages_include_types_and_include_names_combined() {
     assert_eq!(actual[1].content(), "ai1");
 }
 
-
 #[test]
 fn test_convert_to_messages_multiple_formats() {
     let message_like = vec![
@@ -1445,7 +1406,6 @@ fn test_convert_to_messages_multiple_formats() {
     assert!(matches!(actual[3], BaseMessage::Human(_)));
     assert_eq!(actual[3].content(), "thanks");
 }
-
 
 #[test]
 fn test_filter_message_exclude_tool_calls_all() {
@@ -1548,7 +1508,6 @@ fn test_filter_message_exclude_tool_calls_all() {
     assert_eq!(messages, messages_copy);
 }
 
-
 #[test]
 fn test_trim_messages_first_30_allow_partial_end_on_human() {
     let messages = vec![
@@ -1598,7 +1557,6 @@ fn test_trim_messages_first_30_allow_partial_end_on_human() {
     assert_eq!(messages, messages_copy);
 }
 
-
 #[test]
 fn test_trim_messages_last_40_include_system_allow_partial() {
     let messages = vec![
@@ -1646,7 +1604,6 @@ fn test_trim_messages_last_40_include_system_allow_partial() {
     assert_eq!(actual[0].content(), "This is a 4 token text.");
     assert_eq!(messages, messages_copy);
 }
-
 
 #[test]
 fn test_trim_messages_last_30_include_system_allow_partial_end_on_human() {
@@ -1696,7 +1653,6 @@ fn test_trim_messages_last_30_include_system_allow_partial_end_on_human() {
     assert!(matches!(actual.last().unwrap(), BaseMessage::Human(_)));
     assert_eq!(messages, messages_copy);
 }
-
 
 #[test]
 fn test_trim_messages_last_40_include_system_allow_partial_start_on_human() {
@@ -1748,7 +1704,6 @@ fn test_trim_messages_last_40_include_system_allow_partial_start_on_human() {
     assert_eq!(messages, messages_copy);
 }
 
-
 #[test]
 fn test_trim_messages_allow_partial_one_message() {
     let messages = vec![BaseMessage::Human(
@@ -1771,7 +1726,6 @@ fn test_trim_messages_allow_partial_one_message() {
     assert_eq!(actual[0].content(), "Th");
 }
 
-
 #[test]
 fn test_trim_messages_last_allow_partial_one_message() {
     let messages = vec![BaseMessage::Human(
@@ -1793,7 +1747,6 @@ fn test_trim_messages_last_allow_partial_one_message() {
     assert_eq!(actual.len(), 1);
     assert_eq!(actual[0].content(), "t.");
 }
-
 
 #[test]
 fn test_trim_messages_allow_partial_text_splitter() {
@@ -1831,11 +1784,7 @@ fn test_trim_messages_allow_partial_text_splitter() {
     let messages_copy = messages.clone();
 
     fn count_words(msgs: &[BaseMessage]) -> usize {
-        msgs.iter()
-            .map(|m| {
-                m.text().split(' ').count()
-            })
-            .sum()
+        msgs.iter().map(|m| m.text().split(' ').count()).sum()
     }
 
     fn split_on_space(text: &str) -> Vec<String> {
@@ -1860,7 +1809,6 @@ fn test_trim_messages_allow_partial_text_splitter() {
     assert_eq!(actual[1].content(), "This is a 4 token text.");
     assert_eq!(messages, messages_copy);
 }
-
 
 #[test]
 fn test_trim_messages_partial_text_splitting() {
@@ -1890,7 +1838,6 @@ fn test_trim_messages_partial_text_splitting() {
     assert_eq!(actual[0].content(), "This is a ");
     assert_eq!(messages, messages_copy);
 }
-
 
 #[test]
 fn test_trim_messages_mixed_content_with_partial() {
@@ -1943,7 +1890,6 @@ fn test_trim_messages_mixed_content_with_partial() {
     assert_eq!(messages, messages_copy);
 }
 
-
 #[test]
 fn test_trim_messages_start_on_with_allow_partial() {
     let messages = vec![
@@ -1973,7 +1919,6 @@ fn test_trim_messages_start_on_with_allow_partial() {
     assert_eq!(messages, messages_copy);
 }
 
-
 #[test]
 fn test_trim_messages_include_system_strategy_last_empty_messages() {
     let messages: Vec<BaseMessage> = vec![];
@@ -1984,7 +1929,6 @@ fn test_trim_messages_include_system_strategy_last_empty_messages() {
     let actual = trim_messages(&messages, &config);
     assert!(actual.is_empty());
 }
-
 
 #[test]
 fn test_convert_to_openai_messages_openai_string() {
@@ -2017,7 +1961,6 @@ fn test_convert_to_openai_messages_openai_string() {
     assert_eq!(result[1]["content"], "Hi\nthere");
 }
 
-
 #[test]
 fn test_convert_to_openai_messages_openai_block() {
     let messages = vec![
@@ -2037,7 +1980,6 @@ fn test_convert_to_openai_messages_openai_block() {
     assert_eq!(ai_content[0]["type"], "text");
     assert_eq!(ai_content[0]["text"], "Hi there");
 }
-
 
 #[test]
 fn test_convert_to_openai_messages_openai_image() {
@@ -2062,7 +2004,6 @@ fn test_convert_to_openai_messages_openai_image() {
     assert_eq!(blocks[1]["image_url"]["url"], base64_image);
 }
 
-
 #[test]
 fn test_convert_to_openai_messages_tool_use() {
     let content = serde_json::json!([
@@ -2085,7 +2026,6 @@ fn test_convert_to_openai_messages_tool_use() {
     assert_eq!(args, serde_json::json!({"a": "b"}));
 }
 
-
 #[test]
 fn test_convert_to_openai_messages_tool_use_unicode() {
     let content = serde_json::json!([
@@ -2107,7 +2047,6 @@ fn test_convert_to_openai_messages_tool_use_unicode() {
     assert!(!arguments_str.contains("\\u4f60"));
 }
 
-
 #[test]
 fn test_convert_to_openai_messages_json() {
     let json_data = serde_json::json!({"key": "value"});
@@ -2124,7 +2063,6 @@ fn test_convert_to_openai_messages_json() {
     assert!(!blocks.is_empty());
 }
 
-
 #[test]
 fn test_convert_to_openai_messages_empty_message() {
     let messages = vec![BaseMessage::Human(
@@ -2135,7 +2073,6 @@ fn test_convert_to_openai_messages_empty_message() {
     assert_eq!(result[0]["role"], "user");
     assert_eq!(result[0]["content"], "");
 }
-
 
 #[test]
 fn test_convert_to_openai_messages_include_id() {
@@ -2164,7 +2101,6 @@ fn test_convert_to_openai_messages_include_id() {
     assert_eq!(result_human[0]["content"], "Hello");
 }
 
-
 #[test]
 fn test_convert_to_openai_messages_mixed_content_types() {
     let base64_image = "data:image/jpeg;base64,/9j/4AAQSkZJRg==";
@@ -2183,7 +2119,6 @@ fn test_convert_to_openai_messages_mixed_content_types() {
     let blocks = result[0]["content"].as_array().unwrap();
     assert_eq!(blocks.len(), 3);
 }
-
 
 #[test]
 fn test_convert_to_openai_messages_ai_with_tool_calls_and_content() {
@@ -2210,7 +2145,6 @@ fn test_convert_to_openai_messages_ai_with_tool_calls_and_content() {
     assert_eq!(tool_calls[0]["function"]["name"], "get_weather");
 }
 
-
 #[test]
 fn test_convert_to_openai_messages_anthropic_tool_use_in_content() {
     let content = serde_json::json!([
@@ -2235,7 +2169,6 @@ fn test_convert_to_openai_messages_anthropic_tool_use_in_content() {
     assert_eq!(args, serde_json::json!({"bar": "baz"}));
 }
 
-
 #[test]
 fn test_convert_to_openai_messages_developer_role() {
     let mut additional_kwargs = std::collections::HashMap::new();
@@ -2254,7 +2187,6 @@ fn test_convert_to_openai_messages_developer_role() {
     assert_eq!(result[0]["content"], "Be helpful");
 }
 
-
 #[test]
 fn test_get_buffer_string_with_structured_content() {
     let messages = vec![
@@ -2266,7 +2198,6 @@ fn test_get_buffer_string_with_structured_content() {
     let actual = get_buffer_string(&messages, "Human", "AI");
     assert_eq!(actual, expected);
 }
-
 
 #[test]
 fn test_get_buffer_string_with_mixed_content() {
@@ -2283,7 +2214,6 @@ fn test_get_buffer_string_with_mixed_content() {
     let actual = get_buffer_string(&messages, "Human", "AI");
     assert_eq!(actual, expected);
 }
-
 
 #[test]
 fn test_get_buffer_string_with_function_call() {
@@ -2306,7 +2236,6 @@ fn test_get_buffer_string_with_function_call() {
     assert!(actual.contains("test_function"));
 }
 
-
 #[test]
 fn test_get_buffer_string_with_empty_list_content() {
     let messages = vec![
@@ -2318,7 +2247,6 @@ fn test_get_buffer_string_with_empty_list_content() {
     let actual = get_buffer_string(&messages, "Human", "AI");
     assert_eq!(actual, expected);
 }
-
 
 #[test]
 fn test_count_tokens_approximately_tool_message_includes_tool_call_id_and_name() {
@@ -2361,7 +2289,6 @@ fn test_count_tokens_approximately_tool_message_includes_tool_call_id_and_name()
     );
 }
 
-
 #[test]
 fn test_convert_to_messages_role_tool() {
     let message_like =
@@ -2375,7 +2302,6 @@ fn test_convert_to_messages_role_tool() {
     }
 }
 
-
 #[test]
 fn test_convert_to_messages_role_developer() {
     let message_like = vec![serde_json::json!({"role": "developer", "content": "6.1"})];
@@ -2385,7 +2311,6 @@ fn test_convert_to_messages_role_developer() {
     assert_eq!(actual[0].content(), "6.1");
 }
 
-
 #[test]
 fn test_convert_to_messages_tuple_developer() {
     let message_like = vec![serde_json::json!(["developer", "11.2"])];
@@ -2394,7 +2319,6 @@ fn test_convert_to_messages_tuple_developer() {
     assert!(matches!(actual[0], BaseMessage::System(_)));
     assert_eq!(actual[0].content(), "11.2");
 }
-
 
 #[test]
 fn test_convert_to_messages_role_assistant_with_tool_calls() {
@@ -2422,7 +2346,6 @@ fn test_convert_to_messages_role_assistant_with_tool_calls() {
     }
 }
 
-
 #[test]
 fn test_convert_to_messages_langchain_dict_with_tool_calls() {
     let message_like = vec![serde_json::json!({
@@ -2440,7 +2363,6 @@ fn test_convert_to_messages_langchain_dict_with_tool_calls() {
         assert_eq!(ai_msg.tool_calls[0].id, Some("15.5".to_string()));
     }
 }
-
 
 #[test]
 fn test_convert_to_openai_messages_reasoning_content() {
@@ -2497,7 +2419,6 @@ fn test_convert_to_openai_messages_reasoning_content() {
     assert_eq!(blocks3[0]["text"], "Regular response");
     assert_eq!(blocks3[1]["type"], "reasoning");
 }
-
 
 #[test]
 fn test_convert_to_openai_messages_thinking_blocks() {

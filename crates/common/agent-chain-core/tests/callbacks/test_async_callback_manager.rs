@@ -9,7 +9,6 @@ use agent_chain_core::outputs::ChatResult;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-
 #[derive(Debug, Default)]
 struct FakeHandler;
 
@@ -25,7 +24,6 @@ impl BaseCallbackHandler for FakeHandler {
         "FakeHandler"
     }
 }
-
 
 /// Ported from `test_async_callback_manager_on_llm_start`.
 #[tokio::test]

@@ -485,7 +485,6 @@ impl Runnable for PromptTemplate {
     }
 }
 
-
 use crate::load::Serializable;
 use serde_json::Value;
 

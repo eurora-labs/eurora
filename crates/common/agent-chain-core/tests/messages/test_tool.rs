@@ -9,7 +9,6 @@ use agent_chain_core::messages::{
 use serde_json::json;
 use uuid::Uuid;
 
-
 #[test]
 fn test_init_basic() {
     let msg = ToolMessage::builder()
@@ -137,7 +136,6 @@ fn test_text_property() {
         .build();
     assert_eq!(msg.text(), "Hello world");
 }
-
 
 #[test]
 fn test_chunk_init_basic() {
@@ -276,7 +274,6 @@ fn test_chunk_serialization_roundtrip() {
     assert_eq!(deserialized.id, Some("chunk-123".to_string()));
 }
 
-
 #[test]
 fn test_basic_tool_call() {
     let tc = tool_call(
@@ -316,7 +313,6 @@ fn test_tool_call_with_complex_args() {
     );
     assert_eq!(tc.args, complex_args);
 }
-
 
 #[test]
 fn test_basic_tool_call_chunk() {
@@ -363,7 +359,6 @@ fn test_tool_call_chunk_partial_args() {
     assert_eq!(tc2.args, Some(r#""value"}"#.to_string()));
 }
 
-
 #[test]
 fn test_basic_invalid_tool_call() {
     let itc = invalid_tool_call(
@@ -395,7 +390,6 @@ fn test_invalid_tool_call_defaults() {
     assert_eq!(itc.id, None);
     assert_eq!(itc.error, None);
 }
-
 
 #[test]
 fn test_parse_valid_tool_calls() {
@@ -512,7 +506,6 @@ fn test_parse_mixed_valid_and_invalid() {
     assert_eq!(invalid_calls[0].name, Some("invalid_tool".to_string()));
 }
 
-
 #[test]
 fn test_parse_tool_call_chunks() {
     let raw_calls = vec![
@@ -565,7 +558,6 @@ fn test_chunk_parse_empty_list() {
     assert_eq!(chunks.len(), 0);
 }
 
-
 #[test]
 fn test_tool_message_is_tool_output_mixin() {
     let msg = ToolMessage::builder()
@@ -575,7 +567,6 @@ fn test_tool_message_is_tool_output_mixin() {
     fn assert_tool_output(_: &impl ToolOutputMixin) {}
     assert_tool_output(&msg);
 }
-
 
 #[test]
 fn test_merge_status_success_plus_success() {
@@ -641,7 +632,6 @@ fn test_merge_status_error_plus_error() {
     assert_eq!(result.status, ToolStatus::Error);
 }
 
-
 #[test]
 fn test_empty_string_content() {
     let msg = ToolMessage::builder()
@@ -653,7 +643,6 @@ fn test_empty_string_content() {
     assert_eq!(msg.status, ToolStatus::Success);
     assert_eq!(msg.message_type(), "tool");
 }
-
 
 #[test]
 fn test_serialization_roundtrip_with_artifact_and_error_status() {
@@ -678,7 +667,6 @@ fn test_serialization_roundtrip_with_artifact_and_error_status() {
     assert_eq!(deserialized.status, ToolStatus::Error);
     assert_eq!(deserialized.id, Some("msg-600".to_string()));
 }
-
 
 #[test]
 fn test_both_success_statuses_result_in_success() {
@@ -713,7 +701,6 @@ fn test_tool_call_id_preserved_from_first_chunk() {
     assert_eq!(result.tool_call_id, "call-800");
     assert_eq!(result.id, Some("chunk-first".to_string()));
 }
-
 
 #[test]
 fn test_tool_call_with_no_id_field() {
@@ -765,7 +752,6 @@ fn test_null_function_args() {
     assert_eq!(tool_calls[0].id, Some("call-b".to_string()));
 }
 
-
 #[test]
 fn test_tool_calls_with_function_name_none() {
     let raw_calls = vec![json!({
@@ -783,7 +769,6 @@ fn test_tool_calls_with_function_name_none() {
     assert_eq!(chunks[0].id, None);
     assert_eq!(chunks[0].index, Some(0));
 }
-
 
 #[test]
 fn test_additional_kwargs_default_is_empty_dict() {
@@ -824,7 +809,6 @@ fn test_additional_kwargs_and_response_metadata_with_values() {
     assert_eq!(msg.response_metadata.get("meta").unwrap(), &json!("data"));
 }
 
-
 #[test]
 fn test_pretty_repr_includes_tool_name() {
     let msg = ToolMessage::builder()
@@ -864,7 +848,6 @@ fn test_pretty_repr_with_error_content() {
     assert!(result.contains("Error: division by zero"));
 }
 
-
 #[test]
 fn test_tool_call_structure() {
     let tc = tool_call(
@@ -882,7 +865,6 @@ fn test_tool_call_with_type() {
     let tc = tool_call("test_tool", json!({}), Some("call-123".to_string()));
     assert_eq!(tc.call_type, Some("tool_call".to_string()));
 }
-
 
 #[test]
 fn test_tool_call_chunk_structure() {

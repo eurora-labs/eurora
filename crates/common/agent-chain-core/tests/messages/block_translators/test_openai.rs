@@ -92,7 +92,6 @@ fn remove_id_from_block(block: &ContentBlock) -> ContentBlock {
     }
 }
 
-
 /// Test conversion of OpenAI Responses API content to v1 format.
 ///
 /// This test verifies that various OpenAI-specific content block types
@@ -326,7 +325,6 @@ fn test_convert_to_v1_from_responses() {
     );
 }
 
-
 /// Test conversion of OpenAI Responses API streaming chunks to v1 format.
 ///
 /// This test verifies that streaming chunks from OpenAI Responses API are correctly
@@ -500,7 +498,6 @@ fn test_convert_to_v1_from_responses_chunk() {
     assert_eq!(full.content_blocks(), expected_merged_content_blocks);
 }
 
-
 /// Test conversion of OpenAI Chat Completions input content (HumanMessage) to v1 format.
 ///
 /// This test verifies that OpenAI-specific input content blocks
@@ -609,7 +606,6 @@ fn test_convert_to_v1_from_openai_input() {
         &expected
     ));
 }
-
 
 /// Test compatibility with v0.3 legacy message format.
 ///
@@ -889,7 +885,6 @@ fn test_compat_responses_v03() {
     })];
     assert_eq!(merged_reasoning.content_blocks(), expected_merged_reasoning);
 }
-
 
 /// Test conversion of standard data blocks to OpenAI format.
 ///

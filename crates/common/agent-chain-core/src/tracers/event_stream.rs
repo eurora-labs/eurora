@@ -728,8 +728,6 @@ impl AstreamEventsCallbackHandler {
     }
 }
 
-
-
 impl LLMManagerMixin for AstreamEventsCallbackHandler {
     fn on_llm_new_token(
         &self,
@@ -968,7 +966,6 @@ impl std::fmt::Debug for AstreamEventsCallbackHandler {
     }
 }
 
-
 impl StreamingCallbackHandler<crate::error::Result<Value>> for AstreamEventsCallbackHandler {
     fn tap_output_aiter(
         &self,
@@ -1040,7 +1037,6 @@ impl StreamingCallbackHandler<crate::error::Result<Value>> for AstreamEventsCall
         output
     }
 }
-
 
 /// Implementation of the astream_events API for V2 runnables.
 ///

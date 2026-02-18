@@ -692,7 +692,6 @@ where
             .map(|opt| opt.unwrap_or_else(|| Err(Error::other("No result"))))
             .collect()
     }
-
 }
 
 /// Extension trait to add retry configuration method to any Runnable.

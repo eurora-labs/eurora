@@ -18,7 +18,6 @@ use agent_chain_core::messages::{AIMessage, InputTokenDetails, OutputTokenDetail
 use agent_chain_core::outputs::{ChatGeneration, ChatResult};
 use uuid::Uuid;
 
-
 fn usage1() -> UsageMetadata {
     UsageMetadata {
         input_tokens: 1,
@@ -91,7 +90,6 @@ fn create_chat_result(content: &str, model_name: &str, usage: &UsageMetadata) ->
         llm_output: None,
     }
 }
-
 
 /// Ported from `test_usage_callback` — context manager section.
 ///

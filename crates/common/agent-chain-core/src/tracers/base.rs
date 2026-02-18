@@ -614,7 +614,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         Ok(retrieval_run)
     }
 
-
     /// Called when a run is created (async).
     async fn on_run_create_async(&mut self, _run: &Run) {}
 

@@ -10,7 +10,6 @@ use agent_chain_core::runnables::schema::{
 };
 use serde_json::json;
 
-
 /// Mirrors `test_event_data_structure`.
 #[test]
 fn test_event_data_structure() {
@@ -145,7 +144,6 @@ fn test_event_with_multiple_chunks() {
     assert_eq!(accumulated, "Hello World!");
 }
 
-
 /// Mirrors `test_base_stream_event_structure`.
 #[test]
 fn test_base_stream_event_structure() {
@@ -203,7 +201,6 @@ fn test_event_run_id_format() {
     assert_eq!(event.run_id, run_id);
     assert!(uuid::Uuid::parse_str(&event.run_id).is_ok());
 }
-
 
 /// Mirrors `test_standard_stream_event_structure`.
 #[test]
@@ -422,7 +419,6 @@ fn test_event_tags_inherited_from_parent() {
     assert!(child.base.tags.contains(&"child-tag".to_string()));
 }
 
-
 /// Mirrors `test_custom_stream_event_structure`.
 #[test]
 fn test_custom_stream_event_structure() {
@@ -492,7 +488,6 @@ fn test_custom_event_data_field_required() {
     let event = CustomStreamEvent::new("id", "test", json!({"info": "required"}));
     assert_eq!(event.data["info"], json!("required"));
 }
-
 
 /// Mirrors `test_stream_event_union_type`.
 #[test]

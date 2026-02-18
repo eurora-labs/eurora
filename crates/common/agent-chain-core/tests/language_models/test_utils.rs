@@ -12,7 +12,6 @@ use agent_chain_core::language_models::{
 };
 use serde_json::json;
 
-
 /// Ported from `test_image_url_block_valid`.
 #[test]
 fn test_image_url_block_valid() {
@@ -114,7 +113,6 @@ fn test_image_url_block_extra_keys() {
     assert!(!is_openai_data_block(&block, None));
 }
 
-
 /// Ported from `test_input_audio_block_valid`.
 #[test]
 fn test_input_audio_block_valid() {
@@ -200,7 +198,6 @@ fn test_input_audio_block_input_audio_not_dict() {
     });
     assert!(!is_openai_data_block(&block, None));
 }
-
 
 /// Ported from `test_file_block_with_file_data`.
 #[test]
@@ -288,7 +285,6 @@ fn test_file_block_file_not_dict() {
     assert!(!is_openai_data_block(&block, None));
 }
 
-
 /// Ported from `test_unknown_type`.
 #[test]
 fn test_unknown_type() {
@@ -324,7 +320,6 @@ fn test_empty_block() {
     let block = json!({});
     assert!(!is_openai_data_block(&block, None));
 }
-
 
 /// Ported from `test_valid_data_uri_image_jpeg`.
 #[test]
@@ -407,7 +402,6 @@ fn test_empty_string() {
     let uri = "";
     assert!(parse_data_uri(uri).is_none());
 }
-
 
 use agent_chain_core::language_models::update_message_content_to_blocks;
 use agent_chain_core::messages::AIMessage;

@@ -14,7 +14,6 @@ use agent_chain_core::load::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct TestSerializableModel {
     value: i32,
@@ -52,7 +51,6 @@ impl Serializable for SecretModel {
         map
     }
 }
-
 
 #[test]
 fn test_reviver_init_default() {
@@ -417,7 +415,6 @@ fn test_reviver_passthrough_non_lc_dict() {
     }
 }
 
-
 #[test]
 fn test_loads_basic_constructor() {
     let json_str = json!({
@@ -532,7 +529,6 @@ fn test_loads_nested_structure() {
     assert!(result.get("data").unwrap().is_object());
     assert_eq!(result.get("list").unwrap(), &json!([1, 2, 3]));
 }
-
 
 #[test]
 fn test_load_basic() {
@@ -735,7 +731,6 @@ fn test_load_with_empty_env_string() {
     unsafe { std::env::remove_var(key) };
 }
 
-
 #[test]
 fn test_round_trip_basic() {
     let original = TestSerializableModel {
@@ -770,7 +765,6 @@ fn test_round_trip_with_loads_dumps() {
     assert!(loaded.is_object());
 }
 
-
 #[test]
 fn test_default_namespaces_exact_snapshot() {
     let expected = vec![
@@ -799,7 +793,6 @@ fn test_disallow_load_from_path_exact_snapshot() {
         &["langchain_community", "langchain"]
     );
 }
-
 
 #[test]
 fn test_reviver_non_lc_versioned_dict_passthrough() {
@@ -1067,7 +1060,6 @@ fn test_reviver_langchain_core_direct_namespace() {
     }
 }
 
-
 #[test]
 fn test_loads_invalid_json_raises_error() {
     let result = loads("not valid json{{{", None);
@@ -1135,7 +1127,6 @@ fn test_loads_with_secrets_from_env_false() {
 
     unsafe { std::env::remove_var(key) };
 }
-
 
 #[test]
 fn test_load_deeply_nested_mixed() {
@@ -1237,7 +1228,6 @@ fn test_load_list_with_mixed_types() {
     assert!(arr[4].is_object());
 }
 
-
 #[test]
 fn test_round_trip_preserves_all_fields() {
     let original = TestSerializableModel {
@@ -1307,7 +1297,6 @@ fn test_round_trip_with_secrets() {
     );
 }
 
-
 #[test]
 fn test_loads_with_secrets_convenience() {
     let json_str = json!({
@@ -1338,7 +1327,6 @@ fn test_loads_with_namespaces_convenience() {
     assert!(result.is_object());
 }
 
-
 #[test]
 fn test_revived_value_to_value() {
     let rv = RevivedValue::Value(json!({"key": "value"}));
@@ -1368,7 +1356,6 @@ fn test_revived_value_is_none() {
     assert!(!RevivedValue::String("".to_string()).is_none());
 }
 
-
 #[test]
 fn test_reviver_config_builder_chain() {
     let mut secrets = HashMap::new();
@@ -1390,7 +1377,6 @@ fn test_reviver_config_builder_chain() {
     assert_eq!(config.additional_import_mappings, mappings);
     assert!(config.ignore_unserializable_fields);
 }
-
 
 #[test]
 fn test_reviver_constructor_empty_id_raises_error() {
@@ -1469,7 +1455,6 @@ fn test_load_recursive_processes_kwargs_secrets() {
     unsafe { std::env::remove_var(key) };
 }
 
-
 #[test]
 fn test_all_serializable_mappings_contains_all_sources() {
     let combined = get_all_serializable_mappings();
@@ -1496,7 +1481,6 @@ fn test_disallow_load_from_path_contents() {
     assert!(DISALLOW_LOAD_FROM_PATH.contains(&"langchain"));
     assert!(!DISALLOW_LOAD_FROM_PATH.contains(&"langchain_core"));
 }
-
 
 #[test]
 fn test_round_trip_document() {
@@ -1679,7 +1663,6 @@ fn test_round_trip_unknown_type_falls_back_to_constructor_info() {
         Some("constructor")
     );
 }
-
 
 #[test]
 fn test_round_trip_chat_prompt_template() {

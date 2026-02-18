@@ -12,7 +12,6 @@ use agent_chain_core::runnables::base::{Runnable, RunnableLambda};
 use agent_chain_core::runnables::fallbacks::{ExceptionInserter, RunnableWithFallbacks};
 use serde_json::Value;
 
-
 /// Create an exception inserter for HashMap<String, Value> inputs.
 fn hashmap_exception_inserter() -> ExceptionInserter<HashMap<String, Value>> {
     Arc::new(|input: &HashMap<String, Value>, key: &str, error: &Error| {
@@ -33,7 +32,6 @@ fn bar_runnable() -> RunnableLambda<impl Fn(String) -> Result<String> + Send + S
 {
     RunnableLambda::new(|_x: String| -> Result<String> { Ok("bar".to_string()) })
 }
-
 
 #[test]
 fn test_fallbacks_invoke() {
@@ -83,7 +81,6 @@ fn test_fallbacks_multi_invoke() {
     assert_eq!(rwf.invoke("hello".to_string(), None).unwrap(), "bar");
 }
 
-
 #[tokio::test]
 async fn test_fallbacks_ainvoke() {
     let primary = failing_runnable();
@@ -109,7 +106,6 @@ async fn test_fallbacks_abatch() {
         assert_eq!(result.as_ref().unwrap(), "bar");
     }
 }
-
 
 /// Mirrors Python's _runnable function: behavior depends on input["text"]
 /// and whether input["exception"] is present.
@@ -190,7 +186,6 @@ async fn test_ainvoke_with_exception_key() {
     assert_eq!(result, "second");
 }
 
-
 #[test]
 fn test_batch_with_exception_key() {
     let runnable = dict_runnable();
@@ -254,7 +249,6 @@ async fn test_abatch_with_exception_key() {
     assert_eq!(results[2].as_ref().unwrap(), "third");
 }
 
-
 #[test]
 fn test_runnables_property() {
     let main_r = RunnableLambda::new(|x: String| -> Result<String> { Ok(x) });
@@ -266,7 +260,6 @@ fn test_runnables_property() {
     assert_eq!(count, 3);
 }
 
-
 #[test]
 fn test_config_specs_merged() {
     let main_r = RunnableLambda::new(|x: String| -> Result<String> { Ok(x) });
@@ -275,7 +268,6 @@ fn test_config_specs_merged() {
     let specs = rwf.config_specs().unwrap();
     assert!(specs.is_empty()); // No configurable fields on lambdas
 }
-
 
 #[test]
 fn test_custom_error_predicate() {
@@ -315,7 +307,6 @@ fn test_custom_error_predicate_non_matching_error_propagates() {
     assert!(result.unwrap_err().to_string().contains("type error"));
 }
 
-
 #[test]
 fn test_fallbacks_empty_batch() {
     let main_r = RunnableLambda::new(|x: String| -> Result<String> { Ok(x) });
@@ -331,7 +322,6 @@ async fn test_fallbacks_empty_abatch() {
     let rwf = main_r.with_fallbacks(vec![Arc::new(fb)]);
     assert!(rwf.abatch(vec![], None, false).await.is_empty());
 }
-
 
 #[test]
 fn test_fallbacks_all_succeed_uses_first() {
@@ -355,7 +345,6 @@ fn test_fallbacks_all_succeed_uses_first() {
     assert_eq!(*call_log.lock().unwrap(), vec!["main"]);
 }
 
-
 #[test]
 fn test_fallbacks_chain_of_failures() {
     let main_r =
@@ -371,7 +360,6 @@ fn test_fallbacks_chain_of_failures() {
         "Should preserve the first error"
     );
 }
-
 
 #[test]
 fn test_fallbacks_stream_immediate_error_triggers_fallback() {
@@ -392,7 +380,6 @@ fn test_fallbacks_stream_immediate_error_triggers_fallback() {
     assert_eq!(chunks[0].as_ref().unwrap(), "recovered");
 }
 
-
 #[tokio::test]
 async fn test_fallbacks_astream_immediate_error_triggers_fallback() {
     let primary = RunnableLambda::new(|_x: String| -> Result<String> {
@@ -408,7 +395,6 @@ async fn test_fallbacks_astream_immediate_error_triggers_fallback() {
     assert_eq!(chunks.len(), 1);
     assert_eq!(chunks[0].as_ref().unwrap(), "recovered");
 }
-
 
 #[test]
 fn test_batch_return_exceptions() {
@@ -458,7 +444,6 @@ async fn test_abatch_return_exceptions() {
     assert!(results[2].is_err());
 }
 
-
 #[test]
 fn test_batch_with_error_predicate() {
     let runnable = RunnableLambda::new(|inputs: HashMap<String, Value>| -> Result<String> {
@@ -492,7 +477,6 @@ fn test_batch_with_error_predicate() {
     assert_eq!(results[1].as_ref().unwrap(), "recovered_bar");
     assert!(results[2].is_err());
 }
-
 
 #[test]
 fn test_stream_with_exception_key() {

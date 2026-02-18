@@ -7,7 +7,6 @@ use agent_chain_core::outputs::Generation;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 struct SimpleModel {
     name: String,
@@ -112,7 +111,6 @@ struct UnicodeModel {
     author: String,
 }
 
-
 fn simple_model_parser() -> PydanticOutputParser<SimpleModel> {
     PydanticOutputParser::new(
         "SimpleModel",
@@ -139,7 +137,6 @@ fn simple_model_schema() -> Value {
         "required": ["name", "age"]
     })
 }
-
 
 #[test]
 fn test_parse_simple_model() {
@@ -324,7 +321,6 @@ fn test_parse_deeply_nested() {
     assert_eq!(result.level1.level2.level3, "deep_value");
 }
 
-
 #[test]
 fn test_invalid_json_raises() {
     let parser = simple_model_parser();
@@ -425,7 +421,6 @@ fn test_parser_exception_contains_llm_output() {
     );
 }
 
-
 #[test]
 fn test_parse_result_valid() {
     let parser = simple_model_parser();
@@ -458,7 +453,6 @@ fn test_parse_result_non_partial_invalid_raises() {
     assert!(result.is_err());
 }
 
-
 #[test]
 fn test_parse_obj_valid() {
     let parser = simple_model_parser();
@@ -481,7 +475,6 @@ fn test_parse_obj_invalid_raises() {
     );
 }
 
-
 #[test]
 fn test_parser_exception_message() {
     let parser = simple_model_parser();
@@ -500,7 +493,6 @@ fn test_parser_exception_message() {
         err_msg
     );
 }
-
 
 #[test]
 fn test_contains_schema_fields() {
@@ -588,7 +580,6 @@ fn test_does_not_alter_original_schema() {
         "get_format_instructions should not alter the stored schema"
     );
 }
-
 
 #[test]
 fn test_type_property() {

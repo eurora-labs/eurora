@@ -4,7 +4,6 @@
 
 use agent_chain_core::messages::{FunctionMessage, FunctionMessageChunk};
 
-
 #[test]
 fn test_init_basic() {
     let msg = FunctionMessage::builder()
@@ -103,7 +102,6 @@ fn test_content_property() {
         .build();
     assert_eq!(msg.content, "Hello world");
 }
-
 
 #[test]
 fn test_chunk_init_basic() {
@@ -293,7 +291,6 @@ fn test_chunk_content_property() {
         .build();
     assert_eq!(chunk.content, "Hello world");
 }
-
 
 #[test]
 fn test_function_message_vs_tool_message() {

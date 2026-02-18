@@ -15,7 +15,6 @@ use agent_chain_core::runnables::history::{
 use agent_chain_core::runnables::utils::ConfigurableFieldSpec;
 use serde_json::Value;
 
-
 /// Build a `RunnableConfig` with the given configurable key-value pairs.
 fn config_with(pairs: &[(&str, &str)]) -> RunnableConfig {
     let mut cfg = RunnableConfig::default();
@@ -54,7 +53,6 @@ fn system(content: &str) -> BaseMessage {
     BaseMessage::System(SystemMessage::builder().content(content).build())
 }
 
-
 /// A runnable that concatenates human-message contents, prefixed with "you said: ".
 /// Returns a single AIMessage.
 ///
@@ -86,7 +84,6 @@ fn length_runnable() -> HistoryRunnable {
         )])
     })
 }
-
 
 /// Mirrors `test_interfaces` in Python.
 #[test]
@@ -351,7 +348,6 @@ fn test_multiple_sessions() {
     assert_eq!(hist_b.messages().len(), 2);
 }
 
-
 /// Mirrors `test_get_input_schema_input_messages`.
 #[test]
 fn test_get_input_schema_input_messages() {
@@ -393,7 +389,6 @@ fn test_get_output_schema() {
     assert_eq!(schema["title"], "RunnableWithChatHistoryOutput");
     assert_eq!(schema["type"], "array");
 }
-
 
 fn human_as_value(content: &str) -> Value {
     serde_json::to_value(human(content)).expect("human message serialization should not fail")

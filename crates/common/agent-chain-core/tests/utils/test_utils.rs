@@ -11,7 +11,6 @@ use agent_chain_core::outputs::GenerationChunk;
 use agent_chain_core::utils::base::{EnvError, from_env, secret_from_env};
 use agent_chain_core::utils::merge::{MergeError, merge_dicts};
 
-
 /// Test case parameters for merge_dicts tests
 struct MergeDictsTestCase {
     left: serde_json::Value,
@@ -136,10 +135,8 @@ fn test_merge_dicts() {
             (Ok(actual), Ok(expected)) => {
                 assert_eq!(actual, expected, "Test case {} failed", i);
             }
-            (Err(MergeError::TypeMismatch { .. }), Err("TypeMismatch")) => {
-            }
-            (Err(MergeError::UnsupportedType { .. }), Err("UnsupportedType")) => {
-            }
+            (Err(MergeError::TypeMismatch { .. }), Err("TypeMismatch")) => {}
+            (Err(MergeError::UnsupportedType { .. }), Err("UnsupportedType")) => {}
             (result, expected) => {
                 panic!(
                     "Test case {} - unexpected result. Got {:?}, expected {:?}",
@@ -160,7 +157,6 @@ fn test_merge_dicts() {
         );
     }
 }
-
 
 #[test]
 fn test_from_env_with_env_variable() {
@@ -236,7 +232,6 @@ fn test_from_env_with_default_error_message() {
         _ => panic!("Expected NotFound error"),
     }
 }
-
 
 #[test]
 fn test_secret_from_env_with_env_variable() {
@@ -314,7 +309,6 @@ fn test_secret_from_env_with_custom_error_message() {
         _ => panic!("Expected Custom error"),
     }
 }
-
 
 #[test]
 fn test_generation_chunk_addition_combines_metadata() {

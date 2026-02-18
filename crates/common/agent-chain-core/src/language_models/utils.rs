@@ -388,43 +388,40 @@ fn normalize_single_message(mut message: BaseMessage) -> BaseMessage {
     let mut modified = false;
     let new_parts: Vec<ContentPart> = parts
         .into_iter()
-        .map(|part| {
-            match &part {
-                ContentPart::Other(value) => {
-                    let block_type = value.get("type").and_then(|t| t.as_str());
+        .map(|part| match &part {
+            ContentPart::Other(value) => {
+                let block_type = value.get("type").and_then(|t| t.as_str());
 
-                    if matches!(block_type, Some("input_audio") | Some("file"))
-                        && is_openai_data_block(value, None)
-                    {
-                        modified = true;
-                        let converted = convert_openai_format_to_data_block(value);
+                if matches!(block_type, Some("input_audio") | Some("file"))
+                    && is_openai_data_block(value, None)
+                {
+                    modified = true;
+                    let converted = convert_openai_format_to_data_block(value);
+                    let value = serde_json::to_value(converted).unwrap_or_else(|_| value.clone());
+                    return ContentPart::Other(value);
+                }
+
+                let source_type = value.get("source_type").and_then(|s| s.as_str());
+                if matches!(block_type, Some("image") | Some("audio") | Some("file"))
+                    && matches!(
+                        source_type,
+                        Some("url") | Some("base64") | Some("id") | Some("text")
+                    )
+                {
+                    modified = true;
+                    if let Some(obj) = value.as_object() {
+                        let block_map: HashMap<String, serde_json::Value> =
+                            obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                        let converted = convert_legacy_v0_content_block_to_v1(&block_map);
                         let value =
                             serde_json::to_value(converted).unwrap_or_else(|_| value.clone());
                         return ContentPart::Other(value);
                     }
-
-                    let source_type = value.get("source_type").and_then(|s| s.as_str());
-                    if matches!(block_type, Some("image") | Some("audio") | Some("file"))
-                        && matches!(
-                            source_type,
-                            Some("url") | Some("base64") | Some("id") | Some("text")
-                        )
-                    {
-                        modified = true;
-                        if let Some(obj) = value.as_object() {
-                            let block_map: HashMap<String, serde_json::Value> =
-                                obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-                            let converted = convert_legacy_v0_content_block_to_v1(&block_map);
-                            let value =
-                                serde_json::to_value(converted).unwrap_or_else(|_| value.clone());
-                            return ContentPart::Other(value);
-                        }
-                    }
-
-                    part
                 }
-                _ => part,
+
+                part
             }
+            _ => part,
         })
         .collect();
 
@@ -443,7 +440,6 @@ fn normalize_single_message(mut message: BaseMessage) -> BaseMessage {
 
     message
 }
-
 
 /// Update an AIMessageChunk's content to use content blocks format.
 ///

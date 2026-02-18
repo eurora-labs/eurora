@@ -68,7 +68,6 @@ mod run_info_tests {
         assert_ne!(run_info1, run_info2);
     }
 
-
     /// Test serialization of RunInfo to dictionary (via serde_json).
     #[test]
     fn test_serialization_to_dict() {

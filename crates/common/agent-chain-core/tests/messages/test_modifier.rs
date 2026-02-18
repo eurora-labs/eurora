@@ -4,7 +4,6 @@
 
 use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage, RemoveMessage};
 
-
 #[test]
 fn test_init_basic() {
     let msg = RemoveMessage::builder().id("msg-to-remove").build();
@@ -98,7 +97,6 @@ fn test_multiple_remove_messages() {
     assert_eq!(msg3.content(), "");
 }
 
-
 #[test]
 fn test_remove_message_in_list() {
     let messages = [
@@ -168,7 +166,6 @@ fn test_remove_message_does_not_modify_content() {
     assert!(msg.content_blocks().is_empty());
 }
 
-
 #[test]
 fn test_text_property_is_empty() {
     let msg = RemoveMessage::builder().id("msg-123").build();
@@ -197,7 +194,6 @@ fn test_pretty_repr_html() {
     assert!(result.contains("\x1b[1m"));
 }
 
-
 #[test]
 fn test_model_dump_snapshot() {
     let msg = RemoveMessage::builder().id("msg-dump-1").build();
@@ -225,7 +221,6 @@ fn test_model_dump_with_name() {
     let obj = dumped.as_object().unwrap();
     assert_eq!(obj["name"].as_str().unwrap(), "marker");
 }
-
 
 #[test]
 fn test_same_id_equal() {

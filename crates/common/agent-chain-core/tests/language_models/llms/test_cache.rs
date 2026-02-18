@@ -54,11 +54,7 @@ async fn test_local_cache_generate_async() {
         _ => panic!("Expected Generation variant"),
     }
 
-    assert!(
-        global_cache.lookup("foo", "").is_none() || {
-            true
-        }
-    );
+    assert!(global_cache.lookup("foo", "").is_none() || { true });
 
     set_llm_cache(None);
 }

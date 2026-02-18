@@ -28,7 +28,6 @@ fn sha256_config() -> IndexConfig {
     }
 }
 
-
 #[test]
 fn test_record_manager_update_and_exists() {
     let manager = make_record_manager();
@@ -131,7 +130,6 @@ async fn test_record_manager_async_list_and_delete() {
     assert_eq!(listed, vec!["k2".to_string()]);
 }
 
-
 #[test]
 fn test_sha1_deterministic_hash() {
     use agent_chain_core::indexing::get_document_with_hash;
@@ -189,7 +187,6 @@ fn test_custom_key_encoder() {
     let hashed = get_document_with_hash(&doc, &encoder).unwrap();
     assert_eq!(hashed.id.as_deref(), Some("custom-11"));
 }
-
 
 #[test]
 fn test_indexing_same_content() {
@@ -464,7 +461,6 @@ fn test_index_into_document_index() {
     assert_eq!(result.num_added, 0);
     assert_eq!(result.num_skipped, 2);
 }
-
 
 #[test]
 fn test_document_index_upsert_and_get() {

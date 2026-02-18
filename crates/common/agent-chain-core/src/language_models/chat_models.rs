@@ -1040,8 +1040,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                     }
                     return Ok(chat_result);
                 }
-                Err(Error::NotImplemented(_)) => {
-                }
+                Err(Error::NotImplemented(_)) => {}
                 Err(e) => return Err(e),
             }
         }
@@ -1139,8 +1138,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                     }
                     return Ok(chat_result);
                 }
-                Err(Error::NotImplemented(_)) => {
-                }
+                Err(Error::NotImplemented(_)) => {}
                 Err(e) => return Err(e),
             }
         }

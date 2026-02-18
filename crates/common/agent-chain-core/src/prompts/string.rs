@@ -306,9 +306,7 @@ pub fn check_valid_template(
                 }
             }),
         PromptTemplateFormat::Jinja2 => validate_jinja2(template, input_variables),
-        PromptTemplateFormat::Mustache => {
-            Ok(())
-        }
+        PromptTemplateFormat::Mustache => Ok(()),
     }
 }
 

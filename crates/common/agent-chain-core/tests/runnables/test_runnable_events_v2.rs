@@ -16,7 +16,6 @@ use agent_chain_core::runnables::schema::{
 use agent_chain_core::runnables::utils::RootEventFilter;
 use serde_json::json;
 
-
 #[test]
 fn test_event_data_default() {
     let data = EventData::new();
@@ -90,7 +89,6 @@ fn test_event_data_serialization_roundtrip() {
     assert!(deserialized.error.is_none());
 }
 
-
 #[test]
 fn test_base_stream_event_new() {
     let event = BaseStreamEvent::new("on_chain_start", "run-123");
@@ -122,7 +120,6 @@ fn test_base_stream_event_with_parent_ids() {
         .with_parent_ids(vec!["run-root".into(), "run-parent".into()]);
     assert_eq!(event.parent_ids, vec!["run-root", "run-parent"]);
 }
-
 
 /// Mirrors the event structure from `test_event_stream_with_single_lambda`:
 /// on_chain_start → on_chain_stream → on_chain_end.
@@ -207,7 +204,6 @@ fn test_standard_event_serialization_roundtrip() {
     );
 }
 
-
 #[test]
 fn test_custom_event_type_constant() {
     assert_eq!(CUSTOM_EVENT_TYPE, "on_custom_event");
@@ -262,7 +258,6 @@ fn test_custom_event_serialization_roundtrip() {
     assert_eq!(deserialized.base.tags, vec!["t1"]);
 }
 
-
 #[test]
 fn test_stream_event_standard_variant() {
     let inner = StandardStreamEvent::new("on_chain_end", "run-1", "chain");
@@ -316,7 +311,6 @@ fn test_stream_event_with_parent_ids() {
 
     assert_eq!(event.parent_ids(), &["run-root"]);
 }
-
 
 #[test]
 fn test_filter_default_includes_all() {
@@ -459,7 +453,6 @@ fn test_filter_empty_tags_list() {
     let empty_tags: Vec<String> = vec![];
     assert!(!filter.include_event("foo", &empty_tags, "chain"));
 }
-
 
 #[test]
 fn test_event_type_naming_conventions() {

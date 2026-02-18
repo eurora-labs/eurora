@@ -223,7 +223,6 @@ pub async fn aadd<T: Addable>(addables: impl Stream<Item = T> + Unpin) -> Option
     final_value
 }
 
-
 impl Addable for String {
     fn add(self, other: Self) -> Self {
         self + &other
@@ -576,7 +575,6 @@ impl Default for RootEventFilter {
         Self::new()
     }
 }
-
 
 /// Check if a function is an async generator.
 ///

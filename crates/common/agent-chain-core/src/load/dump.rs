@@ -7,7 +7,6 @@ use serde_json::Value;
 
 use super::serializable::{Serializable, to_json_not_implemented_value};
 
-
 /// Return a JSON string representation of a Serializable object.
 ///
 /// Mirrors Python's `dumps(obj, *, pretty=False)`. If serialization of the

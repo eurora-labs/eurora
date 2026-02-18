@@ -16,7 +16,6 @@ use agent_chain_core::runnables::config::{
     merge_configs, patch_config,
 };
 
-
 #[test]
 fn test_ensure_config_none_returns_defaults() {
     let config = ensure_config(None);
@@ -70,7 +69,6 @@ fn test_ensure_config_copies_tags_metadata_configurable() {
     assert_eq!(ensured.metadata["k"], serde_json::json!("v"));
     assert_eq!(ensured.metadata["x"], serde_json::json!("y"));
 }
-
 
 #[test]
 fn test_get_config_list_single_config_replicated() {
@@ -136,7 +134,6 @@ fn test_get_config_list_run_id_single_no_issue() {
     assert_eq!(configs[0].run_id, Some(run_id));
 }
 
-
 #[test]
 fn test_patch_config_none_input() {
     let config = patch_config(None, None, None, None, None, None);
@@ -194,7 +191,6 @@ fn test_patch_config_callbacks_clears_run_name_and_run_id() {
     assert!(patched.run_id.is_none());
     assert!(patched.callbacks.is_some());
 }
-
 
 #[test]
 fn test_merge_configs_tags_are_deduplicated_and_sorted() {
@@ -293,7 +289,6 @@ fn test_merge_configs_empty() {
     assert!(merged.configurable.is_empty());
     assert_eq!(merged.recursion_limit, 25);
 }
-
 
 #[test]
 fn test_merge_config_callbacks_handler_lists() {
@@ -396,7 +391,6 @@ fn test_merge_config_callbacks_handlers_with_manager() {
     }
 }
 
-
 #[test]
 fn test_call_func_with_variable_args_simple() {
     let func = VariableArgsFn::InputOnly(Box::new(|x: String| x.to_uppercase()));
@@ -432,7 +426,6 @@ async fn test_acall_func_with_variable_args_with_config() {
         acall_func_with_variable_args(&func, "val".to_string(), &ensure_config(None)).await;
     assert_eq!(result, "val25");
 }
-
 
 #[test]
 fn test_get_callback_manager_for_config_basic() {
@@ -471,7 +464,6 @@ fn test_get_async_callback_manager_for_config_with_tags_and_metadata() {
     let _ = mgr;
 }
 
-
 #[test]
 fn test_runnable_config_with_run_id() {
     let run_id = uuid::Uuid::new_v4();
@@ -494,7 +486,6 @@ fn test_runnable_config_with_configurable() {
     let config = RunnableConfig::new().with_configurable(configurable);
     assert_eq!(config.configurable["model"], serde_json::json!("gpt-4"));
 }
-
 
 #[test]
 fn test_config_or_list_from_single() {
@@ -522,7 +513,6 @@ fn test_config_or_list_from_vec() {
         _ => panic!("Expected List"),
     }
 }
-
 
 #[test]
 fn test_runnable_config_serialization_roundtrip() {
@@ -554,7 +544,6 @@ fn test_runnable_config_deserialization_defaults() {
     assert!(config.configurable.is_empty());
 }
 
-
 #[test]
 fn test_merge_configs_max_concurrency_last_wins() {
     let c1 = RunnableConfig::new().with_max_concurrency(2);
@@ -580,7 +569,6 @@ fn test_merge_configs_all_none() {
     assert_eq!(merged.recursion_limit, 25);
 }
 
-
 #[test]
 fn test_patch_config_preserves_existing_tags() {
     let config = RunnableConfig::new().with_tags(vec!["existing".into()]);
@@ -602,7 +590,6 @@ fn test_patch_config_preserves_callbacks_when_not_replaced() {
     assert!(patched.run_id.is_some());
     assert_eq!(patched.recursion_limit, 99);
 }
-
 
 #[test]
 fn test_get_config_list_single_with_length_one() {

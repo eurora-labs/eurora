@@ -12,7 +12,6 @@ use agent_chain_core::utils::json::{
 use futures::StreamExt;
 use serde_json::{Value, json};
 
-
 const GOOD_JSON: &str = r#"```json
 {
     "foo": "bar"
@@ -61,7 +60,6 @@ const WITH_END_TICK: &str =
     "Here is a response formatted as schema:\n\n```json\n{\n  \"foo\": \"bar\"\n}\n```\n";
 
 const WITH_END_TEXT: &str = "Here is a response formatted as schema:\n\n```\n{\n  \"foo\": \"bar\"\n\n```\nThis should do the trick\n";
-
 
 fn assert_parse_json_foo_bar(json_string: &str) {
     let parsed = parse_json_markdown(json_string).expect("should parse JSON");
@@ -142,13 +140,11 @@ fn test_parse_json_with_end_text() {
     assert_parse_json_foo_bar(WITH_END_TEXT);
 }
 
-
 #[test]
 fn test_parse_json_with_code_blocks() {
     let parsed = parse_json_markdown(JSON_WITH_MARKDOWN_CODE_BLOCK).expect("should parse JSON");
     assert_eq!(parsed, json!({"foo": "```bar```"}));
 }
-
 
 #[test]
 fn test_parse_json_with_part_code_blocks() {
@@ -159,7 +155,6 @@ fn test_parse_json_with_part_code_blocks() {
         json!({"valid_json": "hey ```print(hello world!)``` hey"})
     );
 }
-
 
 #[test]
 fn test_parse_json_with_code_blocks_and_newlines() {
@@ -174,7 +169,6 @@ fn test_parse_json_with_code_blocks_and_newlines() {
     );
 }
 
-
 #[test]
 fn test_parse_non_dict_json_output() {
     let text = "```json\n1\n```";
@@ -186,7 +180,6 @@ fn test_parse_non_dict_json_output() {
         "Error should mention expected dict, got: {err_msg}"
     );
 }
-
 
 #[test]
 fn test_parse_nested_json_with_escaped_quotes() {
@@ -201,7 +194,6 @@ fn test_parse_nested_json_with_escaped_quotes() {
     );
 }
 
-
 #[test]
 fn test_parse_json_with_python_dict() {
     let parsed = parse_json_markdown(JSON_WITH_PYTHON_DICT).expect("should parse JSON");
@@ -213,7 +205,6 @@ fn test_parse_json_with_python_dict() {
         })
     );
 }
-
 
 #[test]
 fn test_parse_partial_json_complete_object() {
@@ -268,7 +259,6 @@ fn test_parse_partial_json_trailing_backslash() {
     let parsed = parse_partial_json(r#"{"foo":"bar\"#, false).unwrap();
     assert_eq!(parsed, json!({"foo": "bar"}));
 }
-
 
 fn streamed_tokens() -> Vec<&'static str> {
     vec![
@@ -398,7 +388,6 @@ fn expected_streamed_json_diff() -> Vec<Value> {
     ]
 }
 
-
 #[tokio::test]
 async fn test_partial_text_json_output_parser() {
     let parser = SimpleJsonOutputParser::new();
@@ -424,7 +413,6 @@ async fn test_partial_text_json_output_parser() {
         assert_eq!(got, want, "Mismatch at index {i}");
     }
 }
-
 
 #[tokio::test]
 async fn test_partial_text_json_output_parser_diff() {
@@ -452,7 +440,6 @@ async fn test_partial_text_json_output_parser_diff() {
     }
 }
 
-
 #[tokio::test]
 async fn test_partial_text_json_output_parser_async() {
     let parser = SimpleJsonOutputParser::new();
@@ -472,7 +459,6 @@ async fn test_partial_text_json_output_parser_async() {
         assert_eq!(got, want, "Async mismatch at index {i}");
     }
 }
-
 
 #[tokio::test]
 async fn test_partial_text_json_output_parser_diff_async() {
@@ -494,14 +480,12 @@ async fn test_partial_text_json_output_parser_diff_async() {
     }
 }
 
-
 #[test]
 fn test_raises_error() {
     let parser = SimpleJsonOutputParser::new();
     let result = parser.parse("hi");
     assert!(result.is_err(), "Parsing 'hi' should produce an error");
 }
-
 
 #[tokio::test]
 async fn test_partial_text_json_output_parser_with_json_code_block() {
@@ -568,7 +552,6 @@ async fn test_partial_text_json_output_parser_with_json_code_block() {
         assert_eq!(got, want, "Code block mismatch at index {i}");
     }
 }
-
 
 #[test]
 fn test_unicode_handling() {

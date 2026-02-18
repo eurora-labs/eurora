@@ -1334,7 +1334,6 @@ pub trait RunnableSerializable: Runnable + Serializable {
     }
 }
 
-
 /// A Runnable that wraps a function.
 ///
 /// `RunnableLambda` converts a callable into a `Runnable`.
@@ -1541,7 +1540,6 @@ where
 {
     RunnableLambda::new(func)
 }
-
 
 /// A config-aware version of `RunnableLambda` that supports functions which
 /// receive `RunnableConfig`, as well as async functions.
@@ -1801,7 +1799,6 @@ where
         }
     }
 }
-
 
 /// A sequence of Runnables that are executed one after another.
 ///
@@ -2080,7 +2077,6 @@ where
 {
     RunnableSequence::new(first, second)
 }
-
 
 /// A Runnable that runs multiple Runnables in parallel.
 ///
@@ -2446,7 +2442,6 @@ where
     }
 }
 
-
 /// A Runnable that binds arguments or config to another Runnable.
 pub struct RunnableBinding<R>
 where
@@ -2583,7 +2578,6 @@ where
     }
 }
 
-
 /// A Runnable that maps over a list of inputs.
 pub struct RunnableEach<R>
 where
@@ -2686,7 +2680,6 @@ where
         }
     }
 }
-
 
 /// Type alias for a transform function that takes an input stream and produces
 /// an output stream.
@@ -2857,7 +2850,6 @@ where
     }
 }
 
-
 /// A type-erased Runnable that can be stored in collections.
 pub type DynRunnable<I, O> = Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>;
 
@@ -2868,7 +2860,6 @@ where
 {
     Arc::new(runnable)
 }
-
 
 /// Coerce a function into a Runnable.
 pub fn coerce_to_runnable<F, I, O>(func: F) -> RunnableLambda<F, I, O>
@@ -3022,7 +3013,6 @@ mod tests {
         let result = sequence.ainvoke(1, None).await.unwrap();
         assert_eq!(result, 4);
     }
-
 
     #[tokio::test]
     async fn test_runnable_generator_stream() {

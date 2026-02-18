@@ -190,7 +190,6 @@ impl From<OutputParserError> for Error {
     }
 }
 
-
 /// Adapter that wraps a BaseOutputParser as a Runnable.
 ///
 /// Mirrors Python where BaseOutputParser extends RunnableSerializable,

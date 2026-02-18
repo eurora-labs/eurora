@@ -129,7 +129,6 @@ pub trait VectorStore: Send + Sync {
         self.get_by_ids(ids)
     }
 
-
     /// Return docs most similar to query.
     fn similarity_search(
         &self,
@@ -219,7 +218,6 @@ pub trait VectorStore: Send + Sync {
         self.max_marginal_relevance_search_by_vector(embedding, k, fetch_k, lambda_mult, None)
     }
 
-
     /// Return docs most similar to query using a specified search type.
     fn search(&self, query: &str, search_type: &SearchType, k: usize) -> Result<Vec<Document>> {
         match search_type {
@@ -241,7 +239,6 @@ pub trait VectorStore: Send + Sync {
     ) -> Result<Vec<Document>> {
         self.search(query, search_type, k)
     }
-
 
     /// Select the relevance score function for this vector store.
     ///
@@ -324,7 +321,6 @@ pub trait VectorStore: Send + Sync {
         self.similarity_search_with_relevance_scores(query, k, score_threshold, None)
     }
 
-
     /// Euclidean relevance score on a scale [0, 1].
     fn euclidean_relevance_score(distance: f32) -> f32
     where
@@ -354,7 +350,6 @@ pub trait VectorStore: Send + Sync {
     }
 }
 
-
 /// Factory trait for creating vector stores from texts or documents.
 ///
 /// This is separate from `VectorStore` because Rust trait objects cannot have
@@ -378,7 +373,6 @@ pub trait VectorStoreFactory: VectorStore + Sized {
         Self::from_texts(&texts, embedding, Some(metadatas), ids)
     }
 }
-
 
 /// Configuration for a VectorStoreRetriever.
 pub struct VectorStoreRetrieverConfig {
@@ -454,7 +448,6 @@ fn validate_retriever_config(config: &VectorStoreRetrieverConfig) -> Result<()> 
     }
     Ok(())
 }
-
 
 /// Retriever class for VectorStore.
 ///
@@ -621,7 +614,6 @@ impl BaseRetriever for VectorStoreRetriever {
     }
 }
 
-
 /// Extension trait providing `into_retriever()` for `Arc<dyn VectorStore>`.
 pub trait VectorStoreRetrieverExt {
     /// Create a VectorStoreRetriever from this vector store.
@@ -633,7 +625,6 @@ impl VectorStoreRetrieverExt for Arc<dyn VectorStore> {
         VectorStoreRetriever::new(self, config)
     }
 }
-
 
 #[cfg(test)]
 mod tests {

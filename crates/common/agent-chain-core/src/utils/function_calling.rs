@@ -254,8 +254,7 @@ impl ConvertibleToOpenAI for Value {
                 result.insert("description".to_string(), desc.clone());
             }
             oai_function = Value::Object(result);
-        }
-        else if self.is_object()
+        } else if self.is_object()
             && let Some(tool_spec) = self.get("toolSpec")
         {
             let mut result = Map::new();
@@ -275,8 +274,7 @@ impl ConvertibleToOpenAI for Value {
                 result.insert("description".to_string(), desc.clone());
             }
             oai_function = Value::Object(result);
-        }
-        else if self.is_object() && self.get("name").is_some() {
+        } else if self.is_object() && self.get("name").is_some() {
             let mut result = Map::new();
             if let Some(obj) = self.as_object() {
                 for (k, v) in obj {
@@ -286,8 +284,7 @@ impl ConvertibleToOpenAI for Value {
                 }
             }
             oai_function = Value::Object(result);
-        }
-        else if self.is_object() && self.get("title").is_some() {
+        } else if self.is_object() && self.get("title").is_some() {
             let mut function_copy = self.clone();
             let mut result = Map::new();
 
@@ -303,8 +300,7 @@ impl ConvertibleToOpenAI for Value {
                 }
             }
             oai_function = Value::Object(result);
-        }
-        else {
+        } else {
             oai_function = serde_json::json!({
                 "name": "unknown",
                 "description": "",

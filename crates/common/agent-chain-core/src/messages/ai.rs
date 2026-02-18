@@ -325,9 +325,7 @@ impl AIMessage {
                 };
                 openai_convert(&raw_content, false, Some(&context))
             }
-            _ => {
-                raw_content
-            }
+            _ => raw_content,
         };
 
         use super::content::{
@@ -1537,7 +1535,6 @@ pub fn backwards_compat_tool_calls(
 
     (tool_calls, invalid_tool_calls, tool_call_chunks)
 }
-
 
 use crate::load::Serializable;
 

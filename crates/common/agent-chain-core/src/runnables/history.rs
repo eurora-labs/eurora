@@ -23,7 +23,6 @@ use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
 use crate::runnables::utils::ConfigurableFieldSpec;
 
-
 /// Closure type for the inner runnable: takes Value input and optional config,
 /// returns Value output.
 ///
@@ -46,7 +45,6 @@ pub type HistoryAInvokeFn = Arc<
 /// Mirrors Python's `GetSessionHistoryCallable`.
 pub type GetSessionHistoryFn =
     Arc<dyn Fn(&HashMap<String, String>) -> Arc<Mutex<dyn BaseChatMessageHistory>> + Send + Sync>;
-
 
 /// Legacy inner runnable type that operates on `Vec<BaseMessage>` directly.
 ///
@@ -94,7 +92,6 @@ impl fmt::Debug for HistoryRunnable {
         }
     }
 }
-
 
 /// Wraps another runnable and manages chat message history.
 ///
@@ -315,7 +312,6 @@ impl RunnableWithMessageHistory {
         })
     }
 
-
     /// Extract input messages from the input value.
     ///
     /// Mirrors Python's `_get_input_messages`.
@@ -515,7 +511,6 @@ impl RunnableWithMessageHistory {
             .map(|s| s.id.as_str())
             .collect();
 
-
         let mut params = HashMap::new();
         for key in &expected_keys {
             if let Some(val) = config.configurable.get(*key) {
@@ -656,7 +651,6 @@ impl RunnableWithMessageHistory {
             .map_err(|e| Error::Other(format!("Failed to deserialize output messages: {}", e)))
     }
 }
-
 
 #[async_trait]
 impl Runnable for RunnableWithMessageHistory {
