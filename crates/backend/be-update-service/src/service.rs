@@ -681,7 +681,7 @@ fn extract_last_modified(object: &Object) -> Result<DateTime<Utc>, UpdateService
         UpdateServiceError::S3Error("Object missing last_modified timestamp".to_owned())
     })?;
 
-    let nanos = smithy_dt.subsec_nanos().clamp(0, 999_999_999) as u32;
+    let nanos = smithy_dt.subsec_nanos().clamp(0, 999_999_999);
 
     DateTime::from_timestamp(smithy_dt.secs(), nanos).ok_or_else(|| {
         UpdateServiceError::S3Error(format!(
