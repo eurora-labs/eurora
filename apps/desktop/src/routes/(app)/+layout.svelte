@@ -22,7 +22,7 @@
 			.get_role()
 			.then((role) => {
 				if (role === 'Free') {
-					goto('/onboarding/no-access');
+					goto('/no-access');
 				} else {
 					roleChecked = true;
 				}
