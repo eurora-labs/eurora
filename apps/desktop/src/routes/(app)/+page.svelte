@@ -143,7 +143,7 @@
 	}
 </script>
 
-<div class="relative w-full h-full">
+<div class="w-full h-full">
 	{#if messages.length > 0}
 		<ScrollArea class="h-full w-full px-6">
 			<Chat.Root
@@ -174,12 +174,14 @@
 
 	<div
 		class={[
-			'absolute left-0 right-0 flex justify-center pointer-events-none transition-all duration-300',
-			messages.length > 0 ? 'bottom-4' : 'top-1/2 -translate-y-1/2',
+			'flex justify-center',
+			messages.length > 0
+				? 'fixed bottom-4 left-[var(--sidebar-width)] right-0 z-10'
+				: 'h-full items-center',
 		]}
 	>
 		<Launcher.Root
-			class="pointer-events-auto h-fit rounded-2xl shadow-none flex flex-col p-4 w-[90%] bg-card text-card-foreground border border-border"
+			class="h-fit rounded-2xl shadow-none flex flex-col p-4 w-[90%] bg-card text-card-foreground border border-border"
 		>
 			<Launcher.Input
 				placeholder="What can I help you with?"
