@@ -9,26 +9,21 @@ use serde_json::json;
 
 #[test]
 fn test_sanitize_for_postgres() {
-    // Test with NUL bytes
     let text_with_nul = "Hello\x00world\x00test";
     let expected = "Helloworldtest";
     assert_eq!(sanitize_for_postgres(text_with_nul, ""), expected);
 
-    // Test with replacement character
     let expected_with_replacement = "Hello world test";
     assert_eq!(
         sanitize_for_postgres(text_with_nul, " "),
         expected_with_replacement
     );
 
-    // Test with text without NUL bytes
     let clean_text = "Hello world";
     assert_eq!(sanitize_for_postgres(clean_text, ""), clean_text);
 
-    // Test empty string
     assert!(sanitize_for_postgres("", "").is_empty());
 
-    // Test with multiple consecutive NUL bytes
     let text_with_multiple_nuls = "Hello\x00\x00\x00world";
     assert_eq!(
         sanitize_for_postgres(text_with_multiple_nuls, ""),
@@ -42,19 +37,15 @@ fn test_sanitize_for_postgres() {
 
 #[test]
 fn test_existing_string_functions() {
-    // Test comma_list with numbers as strings
     let nums = vec!["1".to_string(), "2".to_string(), "3".to_string()];
     assert_eq!(comma_list(&nums), "1, 2, 3");
 
-    // Test comma_list with strings
     let items = vec!["a".to_string(), "b".to_string(), "c".to_string()];
     assert_eq!(comma_list(&items), "a, b, c");
 
-    // Test stringify_value
     assert_eq!(stringify_value(&json!("hello")), "hello");
     assert_eq!(stringify_value(&json!(42)), "42");
 
-    // Test stringify_dict
     let mut data = std::collections::HashMap::new();
     data.insert("key".to_string(), "value".to_string());
     data.insert("number".to_string(), "123".to_string());
@@ -65,7 +56,6 @@ fn test_existing_string_functions() {
 
 #[test]
 fn test_stringify_value_nested_structures() {
-    // Test nested dict in list
     let nested_data = json!({
         "users": [
             {"name": "Alice", "age": 25},
@@ -76,7 +66,6 @@ fn test_stringify_value_nested_structures() {
 
     let result = stringify_value(&nested_data);
 
-    // Should contain all the nested values
     assert!(
         result.contains("users:"),
         "Result should contain 'users:': {}",
@@ -108,7 +97,6 @@ fn test_stringify_value_nested_structures() {
         result
     );
 
-    // Test list of mixed types
     let mixed_list = json!(["string", 42, {"key": "value"}, ["nested", "list"]]);
     let result = stringify_value(&mixed_list);
 

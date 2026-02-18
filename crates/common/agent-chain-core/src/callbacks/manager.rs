@@ -79,7 +79,6 @@ pub async fn ahandle_event<F, Fut>(
     F: Fn(&Arc<dyn BaseCallbackHandler>) -> Fut + Send + Sync,
     Fut: Future<Output = ()> + Send,
 {
-    // First, run inline handlers sequentially
     for handler in handlers.iter().filter(|h| h.run_inline()) {
         if let Some(ignore_fn) = ignore_condition
             && ignore_fn(handler.as_ref())
@@ -89,7 +88,6 @@ pub async fn ahandle_event<F, Fut>(
         event_fn(handler).await;
     }
 
-    // Then, run non-inline handlers concurrently
     let non_inline_futures: Vec<_> = handlers
         .iter()
         .filter(|h| !h.run_inline())
@@ -1356,15 +1354,10 @@ fn _configure(
     inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
     local_metadata: Option<HashMap<String, serde_json::Value>>,
 ) -> CallbackManager {
-    // Step 1: Tracing context
-    // In Python this calls langsmith's get_tracing_context() to obtain
-    // parent run tree, metadata, and tags from the LangSmith context.
-    // Full LangSmith run-tree integration is a future phase.
     let tracing_metadata: HashMap<String, serde_json::Value> = HashMap::new();
     let tracing_tags: Vec<String> = Vec::new();
     let parent_run_id: Option<Uuid> = None;
 
-    // Step 2: Merge inheritable/local callbacks
     let mut callback_manager = CallbackManager::new();
     callback_manager.parent_run_id = parent_run_id;
 
@@ -1401,7 +1394,6 @@ fn _configure(
         }
     }
 
-    // Step 3: Merge tags and metadata
     if let Some(tags) = inheritable_tags {
         callback_manager.add_tags(tags, true);
     }
@@ -1422,7 +1414,6 @@ fn _configure(
         callback_manager.add_tags(tracing_tags, true);
     }
 
-    // Step 4: V1 tracing guard
     let v1_tracing_enabled =
         env_var_is_set("LANGCHAIN_TRACING") || env_var_is_set("LANGCHAIN_HANDLER");
     let tracing_v2_enabled = tracing_v2_is_enabled();
@@ -1433,7 +1424,6 @@ fn _configure(
         );
     }
 
-    // Step 5: Auto-add verbose/debug/tracing handlers
     let debug = get_debug();
 
     if verbose || debug || tracing_v2_enabled {
@@ -1476,7 +1466,6 @@ fn _configure(
         }
     }
 
-    // Step 6: Process configure hooks
     if let Ok(registry) = get_configure_hooks().lock() {
         for hook in registry.hooks() {
             let create_from_env = hook.env_var.as_ref().is_some_and(|var| env_var_is_set(var))
@@ -2056,7 +2045,6 @@ mod tests {
 
     #[test]
     fn test_configure_with_verbose() {
-        // Reset debug to false
         crate::globals::set_debug(false);
 
         let manager = CallbackManager::configure(None, None, true, None, None, None, None);
@@ -2069,21 +2057,8 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_configure_with_debug() {
-    //     crate::globals::set_debug(true);
 
-    //     let manager = CallbackManager::configure(None, None, false, None, None, None, None);
-    //     assert!(
-    //         manager
-    //             .handlers
-    //             .iter()
-    //             .any(|h| h.name() == "ConsoleCallbackHandler"),
-    //         "ConsoleCallbackHandler should be added when debug=true"
-    //     );
 
-    //     crate::globals::set_debug(false);
-    // }
 
     #[test]
     fn test_configure_verbose_not_added_when_debug() {
@@ -2201,7 +2176,6 @@ impl CallbackManagerForChainGroup {
     pub fn merge(&self, other: &CallbackManager) -> Self {
         let mut merged_inner = self.inner.clone();
 
-        // Merge tags (deduplicated)
         for tag in &other.tags {
             if !merged_inner.tags.contains(tag) {
                 merged_inner.tags.push(tag.clone());
@@ -2213,10 +2187,8 @@ impl CallbackManagerForChainGroup {
             }
         }
 
-        // Merge metadata
         merged_inner.metadata.extend(other.metadata.clone());
 
-        // Merge handlers
         for handler in &other.handlers {
             merged_inner.add_handler(handler.clone(), false);
         }
@@ -2390,7 +2362,6 @@ impl AsyncCallbackManagerForChainGroup {
     pub fn merge(&self, other: &CallbackManager) -> Self {
         let mut inner_sync = self.inner.inner.clone();
 
-        // Merge tags (deduplicated)
         for tag in &other.tags {
             if !inner_sync.tags.contains(tag) {
                 inner_sync.tags.push(tag.clone());
@@ -2402,10 +2373,8 @@ impl AsyncCallbackManagerForChainGroup {
             }
         }
 
-        // Merge metadata
         inner_sync.metadata.extend(other.metadata.clone());
 
-        // Merge handlers
         for handler in &other.handlers {
             inner_sync.add_handler(handler.clone(), false);
         }

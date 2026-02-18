@@ -373,7 +373,6 @@ where
         let config = ensure_config(config);
         let callback_manager = get_callback_manager_for_config(&config);
 
-        // Start the chain run
         let run_manager = callback_manager
             .on_chain_start()
             .serialized(&std::collections::HashMap::new())
@@ -399,7 +398,6 @@ where
                     }
                     last_error = Some(e);
 
-                    // Wait before next attempt
                     if self.config.wait_exponential_jitter
                         && attempt < self.config.max_attempt_number
                     {
@@ -426,7 +424,6 @@ where
         let config = ensure_config(config);
         let callback_manager = get_callback_manager_for_config(&config);
 
-        // Start the chain run
         let run_manager = callback_manager
             .on_chain_start()
             .serialized(&std::collections::HashMap::new())
@@ -456,7 +453,6 @@ where
                     }
                     last_error = Some(e);
 
-                    // Wait before next attempt
                     if self.config.wait_exponential_jitter
                         && attempt < self.config.max_attempt_number
                     {
@@ -488,7 +484,6 @@ where
         let configs = get_config_list(config, inputs.len());
         let n = inputs.len();
 
-        // Create callback managers and start chain runs for each input
         let run_managers: Vec<CallbackManagerForChainRun> = configs
             .iter()
             .map(|config| {
@@ -502,10 +497,8 @@ where
             })
             .collect();
 
-        // Track results: None means not yet successful
         let mut results: Vec<Option<Result<Self::Output>>> = (0..n).map(|_| None).collect();
 
-        // Track which inputs still need to be processed
         let mut remaining: Vec<usize> = (0..n).collect();
 
         for attempt in 1..=self.config.max_attempt_number {
@@ -515,7 +508,6 @@ where
 
             let retry_state = RetryCallState::new(attempt);
 
-            // Prepare inputs and configs for remaining items
             let pending_inputs: Vec<Self::Input> =
                 remaining.iter().map(|&i| inputs[i].clone()).collect();
             let pending_configs: Vec<RunnableConfig> =
@@ -529,14 +521,12 @@ where
                 &retry_state,
             );
 
-            // Invoke the batch on remaining items
             let batch_results = self.bound.batch(
                 pending_inputs,
                 Some(ConfigOrList::List(patched_configs)),
                 true, // Always return exceptions to handle ourselves
             );
 
-            // Process results
             let mut next_remaining = Vec::new();
             let mut first_non_retryable_error: Option<Error> = None;
 
@@ -549,26 +539,21 @@ where
                     }
                     Err(e) => {
                         if self.should_retry(&e) && attempt < self.config.max_attempt_number {
-                            // Will retry this one
                             results[orig_idx] = Some(Err(e));
                             next_remaining.push(orig_idx);
                         } else if !self.should_retry(&e) && !return_exceptions {
-                            // Non-retryable error and we're not returning exceptions
                             if first_non_retryable_error.is_none() {
                                 first_non_retryable_error = Some(e);
                             }
                             results[orig_idx] = Some(Err(Error::other("Batch aborted")));
                         } else {
-                            // Final attempt or returning exceptions
                             results[orig_idx] = Some(Err(e));
                         }
                     }
                 }
             }
 
-            // If we had a non-retryable error and we're not returning exceptions, abort
             if first_non_retryable_error.is_some() && !return_exceptions {
-                // Fill remaining results with errors
                 for result in results.iter_mut().take(n) {
                     if result.is_none() {
                         *result = Some(Err(Error::other("Batch aborted due to error")));
@@ -579,7 +564,6 @@ where
 
             remaining = next_remaining;
 
-            // Wait before next attempt if there are remaining items
             if !remaining.is_empty()
                 && self.config.wait_exponential_jitter
                 && attempt < self.config.max_attempt_number
@@ -589,7 +573,6 @@ where
             }
         }
 
-        // Convert results, using error for any None values
         results
             .into_iter()
             .map(|opt| opt.unwrap_or_else(|| Err(Error::other("No result"))))
@@ -612,7 +595,6 @@ where
         let configs = get_config_list(config, inputs.len());
         let n = inputs.len();
 
-        // Create callback managers and start chain runs for each input
         let run_managers: Vec<CallbackManagerForChainRun> = configs
             .iter()
             .map(|config| {
@@ -626,10 +608,8 @@ where
             })
             .collect();
 
-        // Track results: None means not yet successful
         let mut results: Vec<Option<Result<Self::Output>>> = (0..n).map(|_| None).collect();
 
-        // Track which inputs still need to be processed
         let mut remaining: Vec<usize> = (0..n).collect();
 
         for attempt in 1..=self.config.max_attempt_number {
@@ -639,7 +619,6 @@ where
 
             let retry_state = RetryCallState::new(attempt);
 
-            // Prepare inputs and configs for remaining items
             let pending_inputs: Vec<Self::Input> =
                 remaining.iter().map(|&i| inputs[i].clone()).collect();
             let pending_configs: Vec<RunnableConfig> =
@@ -653,7 +632,6 @@ where
                 &retry_state,
             );
 
-            // Invoke the batch on remaining items
             let batch_results = self
                 .bound
                 .abatch(
@@ -663,7 +641,6 @@ where
                 )
                 .await;
 
-            // Process results
             let mut next_remaining = Vec::new();
             let mut first_non_retryable_error: Option<Error> = None;
 
@@ -676,26 +653,21 @@ where
                     }
                     Err(e) => {
                         if self.should_retry(&e) && attempt < self.config.max_attempt_number {
-                            // Will retry this one
                             results[orig_idx] = Some(Err(e));
                             next_remaining.push(orig_idx);
                         } else if !self.should_retry(&e) && !return_exceptions {
-                            // Non-retryable error and we're not returning exceptions
                             if first_non_retryable_error.is_none() {
                                 first_non_retryable_error = Some(e);
                             }
                             results[orig_idx] = Some(Err(Error::other("Batch aborted")));
                         } else {
-                            // Final attempt or returning exceptions
                             results[orig_idx] = Some(Err(e));
                         }
                     }
                 }
             }
 
-            // If we had a non-retryable error and we're not returning exceptions, abort
             if first_non_retryable_error.is_some() && !return_exceptions {
-                // Fill remaining results with errors
                 for result in results.iter_mut().take(n) {
                     if result.is_none() {
                         *result = Some(Err(Error::other("Batch aborted due to error")));
@@ -706,7 +678,6 @@ where
 
             remaining = next_remaining;
 
-            // Wait before next attempt if there are remaining items
             if !remaining.is_empty()
                 && self.config.wait_exponential_jitter
                 && attempt < self.config.max_attempt_number
@@ -716,15 +687,12 @@ where
             }
         }
 
-        // Convert results, using error for any None values
         results
             .into_iter()
             .map(|opt| opt.unwrap_or_else(|| Err(Error::other("No result"))))
             .collect()
     }
 
-    // Note: stream() and transform() are not retried because retrying a stream
-    // is not very intuitive, matching the Python implementation.
 }
 
 /// Extension trait to add retry configuration method to any Runnable.
@@ -744,7 +712,6 @@ pub trait RunnableRetryExt: Runnable {
     }
 }
 
-// Implement the extension trait for all Runnables
 impl<R: Runnable> RunnableRetryExt for R {}
 
 #[cfg(test)]
@@ -815,7 +782,6 @@ mod tests {
         let counter = Arc::new(AtomicUsize::new(0));
         let counter_clone = counter.clone();
 
-        // This will not retry because it's not an HTTP error
         let runnable = RunnableLambda::new(move |_x: i32| {
             counter_clone.fetch_add(1, Ordering::SeqCst);
             Err::<i32, _>(Error::other("not an HTTP error"))
@@ -829,7 +795,6 @@ mod tests {
 
         let result = retry.invoke(1, None);
         assert!(result.is_err());
-        // Should only try once since it's not an HTTP error
         assert_eq!(counter.load(Ordering::SeqCst), 1);
     }
 
@@ -841,15 +806,12 @@ mod tests {
             .with_exp_base(2.0)
             .with_jitter(0.0);
 
-        // Attempt 1: 0.1 * 2^0 = 0.1
         let wait1 = params.calculate_wait(1);
         assert!(wait1.as_secs_f64() >= 0.1 && wait1.as_secs_f64() < 0.2);
 
-        // Attempt 2: 0.1 * 2^1 = 0.2
         let wait2 = params.calculate_wait(2);
         assert!(wait2.as_secs_f64() >= 0.2 && wait2.as_secs_f64() < 0.3);
 
-        // Attempt 3: 0.1 * 2^2 = 0.4
         let wait3 = params.calculate_wait(3);
         assert!(wait3.as_secs_f64() >= 0.4 && wait3.as_secs_f64() < 0.5);
     }
@@ -862,7 +824,6 @@ mod tests {
             .with_exp_base(10.0)
             .with_jitter(0.0);
 
-        // Large attempt should be capped at max
         let wait = params.calculate_wait(10);
         assert!(wait.as_secs_f64() >= 2.0 && wait.as_secs_f64() < 2.1);
     }
@@ -891,7 +852,6 @@ mod tests {
         let counter = Arc::new(AtomicUsize::new(0));
         let counter_clone = counter.clone();
 
-        // Fails for negative numbers on first two attempts
         let runnable = RunnableLambda::new(move |x: i32| {
             let count = counter_clone.fetch_add(1, Ordering::SeqCst);
             if x < 0 && count < 4 {
@@ -908,11 +868,8 @@ mod tests {
 
         let results = retry.batch(vec![1, -1, 2], None, true);
 
-        // 1 and 2 should succeed on first try
-        // -1 should fail first 2 times, then succeed
         assert!(results[0].is_ok());
         assert!(results[2].is_ok());
-        // -1 might succeed or fail depending on retry order
     }
 
     #[tokio::test]

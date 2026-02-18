@@ -38,9 +38,6 @@ use std::sync::LazyLock;
 
 use crate::utils::base::ensure_id;
 
-// =============================================================================
-// Legacy types (kept for backwards compatibility)
-// =============================================================================
 
 /// Image detail level for vision models.
 ///
@@ -308,9 +305,6 @@ impl MessageContent {
     }
 }
 
-// =============================================================================
-// Standard Content Block Types (matching Python langchain_core.messages.content)
-// =============================================================================
 
 /// Index type that can be either an integer or string.
 /// Used during streaming for block ordering.
@@ -1122,9 +1116,6 @@ impl NonStandardContentBlock {
     }
 }
 
-// =============================================================================
-// Union Types
-// =============================================================================
 
 /// A union of all defined multimodal data ContentBlock types.
 
@@ -1195,34 +1186,25 @@ pub enum ContentBlock {
     ServerToolResult(ServerToolResult),
 }
 
-// =============================================================================
-// Constants
-// =============================================================================
 
 /// These are block types known to langchain-core>=1.0.0.
 ///
 /// If a block has a type not in this set, it is considered to be provider-specific.
 pub const KNOWN_BLOCK_TYPES: &[&str] = &[
-    // Text output
     "text",
     "reasoning",
-    // Tools
     "tool_call",
     "invalid_tool_call",
     "tool_call_chunk",
-    // Multimodal data
     "image",
     "audio",
     "file",
     "text-plain",
     "video",
-    // Server-side tool calls
     "server_tool_call",
     "server_tool_call_chunk",
     "server_tool_result",
-    // Catch-all
     "non_standard",
-    // citation and non_standard_annotation intentionally omitted
 ];
 
 /// Data content block type literals.
@@ -1235,9 +1217,6 @@ pub fn get_data_content_block_types() -> &'static [&'static str] {
     DATA_CONTENT_BLOCK_TYPES
 }
 
-// =============================================================================
-// Helper Functions
-// =============================================================================
 
 /// Check if the provided content block is a data content block.
 ///
@@ -1252,22 +1231,17 @@ pub fn is_data_content_block(block: &serde_json::Value) -> bool {
         return false;
     }
 
-    // Check for new-style data fields
     if block.get("url").is_some()
         || block.get("base64").is_some()
         || block.get("file_id").is_some()
         || block.get("text").is_some()
     {
-        // 'text' is checked to support v0 PlainTextContentBlock types
-        // We must guard against new style TextContentBlock which also has 'text' type
-        // by ensuring the presence of source_type
         if block_type == "text" && block.get("source_type").is_none() {
             return false;
         }
         return true;
     }
 
-    // Old-style content blocks had possible types of 'image', 'audio', and 'file'
     if let Some(source_type) = block.get("source_type").and_then(|s| s.as_str()) {
         if (source_type == "url" && block.get("url").is_some())
             || (source_type == "base64" && block.get("data").is_some())
@@ -1284,9 +1258,6 @@ pub fn is_data_content_block(block: &serde_json::Value) -> bool {
     false
 }
 
-// =============================================================================
-// Factory Functions
-// =============================================================================
 
 /// Create a `TextContentBlock`.
 ///
@@ -1730,7 +1701,6 @@ mod tests {
 
     #[test]
     fn test_annotation_citation_serialization() {
-        // Test that Citation serializes with "type": "citation"
         let citation = Annotation::Citation {
             id: Some("test_id".to_string()),
             url: Some("https://example.com".to_string()),
@@ -1753,7 +1723,6 @@ mod tests {
 
     #[test]
     fn test_annotation_non_standard_serialization() {
-        // Test that NonStandardAnnotation serializes with "type": "non_standard_annotation"
         let mut value = HashMap::new();
         value.insert(
             "bar".to_string(),
@@ -1772,7 +1741,6 @@ mod tests {
 
     #[test]
     fn test_annotation_deserialization() {
-        // Test deserializing a Citation from JSON (matching Python format)
         let json_str = r#"{
             "type": "citation",
             "id": "lc_123",
@@ -1808,7 +1776,6 @@ mod tests {
 
     #[test]
     fn test_text_block_with_annotations() {
-        // Test TextContentBlock with annotations (matching Python test format)
         let mut extras = HashMap::new();
         extras.insert(
             "source".to_string(),
@@ -1852,13 +1819,11 @@ mod tests {
         let annotations = json["annotations"].as_array().unwrap();
         assert_eq!(annotations.len(), 2);
 
-        // Check first annotation (Citation)
         assert_eq!(annotations[0]["type"], "citation");
         assert_eq!(annotations[0]["title"], "Document Title");
         assert_eq!(annotations[0]["cited_text"], "The weather is sunny.");
         assert_eq!(annotations[0]["extras"]["source"], "source_123");
 
-        // Check second annotation (NonStandardAnnotation)
         assert_eq!(annotations[1]["type"], "non_standard_annotation");
         assert_eq!(annotations[1]["value"]["bar"], "baz");
     }

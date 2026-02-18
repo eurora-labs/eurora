@@ -12,9 +12,6 @@ use agent_chain_core::runnables::base::{Runnable, RunnableLambda};
 use agent_chain_core::runnables::fallbacks::{ExceptionInserter, RunnableWithFallbacks};
 use serde_json::Value;
 
-// ---------------------------------------------------------------------------
-// Test helpers
-// ---------------------------------------------------------------------------
 
 /// Create an exception inserter for HashMap<String, Value> inputs.
 fn hashmap_exception_inserter() -> ExceptionInserter<HashMap<String, Value>> {
@@ -37,9 +34,6 @@ fn bar_runnable() -> RunnableLambda<impl Fn(String) -> Result<String> + Send + S
     RunnableLambda::new(|_x: String| -> Result<String> { Ok("bar".to_string()) })
 }
 
-// ===========================================================================
-// Tests for basic fallback behavior (mirrors test_fallbacks parametrized)
-// ===========================================================================
 
 #[test]
 fn test_fallbacks_invoke() {
@@ -89,9 +83,6 @@ fn test_fallbacks_multi_invoke() {
     assert_eq!(rwf.invoke("hello".to_string(), None).unwrap(), "bar");
 }
 
-// ===========================================================================
-// Async tests (mirrors test_fallbacks_async)
-// ===========================================================================
 
 #[tokio::test]
 async fn test_fallbacks_ainvoke() {
@@ -119,9 +110,6 @@ async fn test_fallbacks_abatch() {
     }
 }
 
-// ===========================================================================
-// Tests for exception_key (mirrors test_invoke_with_exception_key etc.)
-// ===========================================================================
 
 /// Mirrors Python's _runnable function: behavior depends on input["text"]
 /// and whether input["exception"] is present.
@@ -143,10 +131,6 @@ fn dict_runnable() -> RunnableLambda<
         if text == "bar" {
             return Ok("second".to_string());
         }
-        // For "baz" with an exception already set, the Python version checks
-        // if the exception is a ValueError and raises RuntimeError.
-        // We simplify: if text is not "foo" or "bar" and exception exists,
-        // return "third".
         Ok("third".to_string())
     })
 }
@@ -165,13 +149,6 @@ fn test_invoke_with_exception_key_single_fallback() {
     let rwf = RunnableWithFallbacks::new(runnable, vec![Arc::new(fallback)])
         .with_exception_key("exception", hashmap_exception_inserter());
 
-    // text="baz" — first call: no exception key, fails with "missing exception"
-    // second call (fallback): exception key injected, text="baz" → no "foo" or "bar"
-    // but exception is present → returns "third"
-    // Wait — with single fallback, text="baz":
-    // - Main: text="baz", no "exception" key → Err("missing exception")
-    // - Fallback: text="baz", "exception" = "missing exception" → returns "third"
-    // But Python says single fallback with text="bar" should return "second"
     let result = rwf.invoke(make_input("bar"), None).unwrap();
     assert_eq!(result, "second");
 }
@@ -185,7 +162,6 @@ fn test_invoke_with_exception_key_double_fallback() {
     let rwf = RunnableWithFallbacks::new(runnable, vec![Arc::new(fallback1), Arc::new(fallback2)])
         .with_exception_key("exception", hashmap_exception_inserter());
 
-    // text="baz": main fails, fallback1 gets exception → returns "third"
     let result = rwf.invoke(make_input("baz"), None).unwrap();
     assert_eq!(result, "third");
 }
@@ -198,7 +174,6 @@ fn test_invoke_with_exception_key_foo_succeeds() {
     let rwf = RunnableWithFallbacks::new(runnable, vec![Arc::new(fallback)])
         .with_exception_key("exception", hashmap_exception_inserter());
 
-    // text="foo" always succeeds on first try
     let result = rwf.invoke(make_input("foo"), None).unwrap();
     assert_eq!(result, "first");
 }
@@ -215,9 +190,6 @@ async fn test_ainvoke_with_exception_key() {
     assert_eq!(result, "second");
 }
 
-// ===========================================================================
-// Tests for batch with exception_key (mirrors test_batch)
-// ===========================================================================
 
 #[test]
 fn test_batch_with_exception_key() {
@@ -282,9 +254,6 @@ async fn test_abatch_with_exception_key() {
     assert_eq!(results[2].as_ref().unwrap(), "third");
 }
 
-// ===========================================================================
-// Tests for runnables property (mirrors test_runnables_property)
-// ===========================================================================
 
 #[test]
 fn test_runnables_property() {
@@ -297,9 +266,6 @@ fn test_runnables_property() {
     assert_eq!(count, 3);
 }
 
-// ===========================================================================
-// Tests for config_specs (mirrors test_config_specs_merged)
-// ===========================================================================
 
 #[test]
 fn test_config_specs_merged() {
@@ -310,13 +276,9 @@ fn test_config_specs_merged() {
     assert!(specs.is_empty()); // No configurable fields on lambdas
 }
 
-// ===========================================================================
-// Tests for custom error predicate (mirrors test_custom_exceptions_to_handle)
-// ===========================================================================
 
 #[test]
 fn test_custom_error_predicate() {
-    // Only handle "value" errors, not "type" errors
     let call_count = Arc::new(AtomicUsize::new(0));
 
     let count_clone = call_count.clone();
@@ -328,7 +290,6 @@ fn test_custom_error_predicate() {
     let fb =
         RunnableLambda::new(|_x: String| -> Result<String> { Ok("fallback_result".to_string()) });
 
-    // Error predicate that only handles errors containing "value"
     let rwf = RunnableWithFallbacks::new(main_r, vec![Arc::new(fb)])
         .with_error_predicate(Arc::new(|e: &Error| e.to_string().contains("value")));
 
@@ -346,7 +307,6 @@ fn test_custom_error_predicate_non_matching_error_propagates() {
     let fb =
         RunnableLambda::new(|_x: String| -> Result<String> { Ok("fallback_result".to_string()) });
 
-    // Only handle errors containing "value" — "type error" should NOT trigger fallback
     let rwf = RunnableWithFallbacks::new(main_r, vec![Arc::new(fb)])
         .with_error_predicate(Arc::new(|e: &Error| e.to_string().contains("value")));
 
@@ -355,9 +315,6 @@ fn test_custom_error_predicate_non_matching_error_propagates() {
     assert!(result.unwrap_err().to_string().contains("type error"));
 }
 
-// ===========================================================================
-// Tests for empty batch (mirrors test_fallbacks_empty_batch)
-// ===========================================================================
 
 #[test]
 fn test_fallbacks_empty_batch() {
@@ -375,9 +332,6 @@ async fn test_fallbacks_empty_abatch() {
     assert!(rwf.abatch(vec![], None, false).await.is_empty());
 }
 
-// ===========================================================================
-// Tests for success uses first (mirrors test_fallbacks_all_succeed_uses_first)
-// ===========================================================================
 
 #[test]
 fn test_fallbacks_all_succeed_uses_first() {
@@ -401,9 +355,6 @@ fn test_fallbacks_all_succeed_uses_first() {
     assert_eq!(*call_log.lock().unwrap(), vec!["main"]);
 }
 
-// ===========================================================================
-// Tests for chain of failures (mirrors test_fallbacks_chain_of_failures)
-// ===========================================================================
 
 #[test]
 fn test_fallbacks_chain_of_failures() {
@@ -415,20 +366,15 @@ fn test_fallbacks_chain_of_failures() {
     let rwf = main_r.with_fallbacks(vec![Arc::new(fb)]);
     let result = rwf.invoke("test".to_string(), None);
     assert!(result.is_err());
-    // First error should be preserved
     assert!(
         result.unwrap_err().to_string().contains("error1"),
         "Should preserve the first error"
     );
 }
 
-// ===========================================================================
-// Tests for stream with immediate/delayed errors (mirrors test_fallbacks_stream)
-// ===========================================================================
 
 #[test]
 fn test_fallbacks_stream_immediate_error_triggers_fallback() {
-    // Primary fails immediately, fallback succeeds
     let primary = RunnableLambda::new(|_x: String| -> Result<String> {
         Err(Error::other("immediate error"))
     });
@@ -446,9 +392,6 @@ fn test_fallbacks_stream_immediate_error_triggers_fallback() {
     assert_eq!(chunks[0].as_ref().unwrap(), "recovered");
 }
 
-// ===========================================================================
-// Tests for astream (mirrors test_fallbacks_astream)
-// ===========================================================================
 
 #[tokio::test]
 async fn test_fallbacks_astream_immediate_error_triggers_fallback() {
@@ -466,9 +409,6 @@ async fn test_fallbacks_astream_immediate_error_triggers_fallback() {
     assert_eq!(chunks[0].as_ref().unwrap(), "recovered");
 }
 
-// ===========================================================================
-// Tests for batch return_exceptions (mirrors test_batch partial)
-// ===========================================================================
 
 #[test]
 fn test_batch_return_exceptions() {
@@ -518,13 +458,9 @@ async fn test_abatch_return_exceptions() {
     assert!(results[2].is_err());
 }
 
-// ===========================================================================
-// Tests for batch with error predicate (mirrors test_batch with exceptions_to_handle)
-// ===========================================================================
 
 #[test]
 fn test_batch_with_error_predicate() {
-    // A runnable that fails differently based on input
     let runnable = RunnableLambda::new(|inputs: HashMap<String, Value>| -> Result<String> {
         let text = inputs.get("text").and_then(|v| v.as_str()).unwrap_or("");
         match text {
@@ -542,7 +478,6 @@ fn test_batch_with_error_predicate() {
         }
     });
 
-    // Only handle errors whose message contains "value_error"
     let rwf = RunnableWithFallbacks::new(runnable, vec![Arc::new(fallback)])
         .with_error_predicate(Arc::new(|e: &Error| e.to_string().contains("value_error")));
 
@@ -555,14 +490,9 @@ fn test_batch_with_error_predicate() {
     assert_eq!(results.len(), 3);
     assert_eq!(results[0].as_ref().unwrap(), "first");
     assert_eq!(results[1].as_ref().unwrap(), "recovered_bar");
-    // "baz" errors with InvalidConfig which doesn't match the predicate,
-    // so it's not retried
     assert!(results[2].is_err());
 }
 
-// ===========================================================================
-// Tests for exception_key with stream (mirrors chain_pass_exceptions)
-// ===========================================================================
 
 #[test]
 fn test_stream_with_exception_key() {

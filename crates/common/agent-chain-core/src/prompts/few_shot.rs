@@ -101,9 +101,6 @@ impl ExampleSelector for StaticExampleSelector {
     }
 }
 
-// ---------------------------------------------------------------------------
-// FewShotPromptTemplate
-// ---------------------------------------------------------------------------
 
 /// Prompt template that contains few shot examples.
 ///
@@ -422,9 +419,6 @@ impl StringPromptTemplate for FewShotPromptTemplate {
     }
 }
 
-// ---------------------------------------------------------------------------
-// FewShotChatMessagePromptTemplate
-// ---------------------------------------------------------------------------
 
 /// Chat prompt template that supports few-shot examples.
 ///

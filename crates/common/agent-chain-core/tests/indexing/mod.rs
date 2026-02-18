@@ -28,7 +28,6 @@ fn sha256_config() -> IndexConfig {
     }
 }
 
-// ---- RecordManager tests ----
 
 #[test]
 fn test_record_manager_update_and_exists() {
@@ -83,15 +82,12 @@ fn test_record_manager_list_keys_filtering() {
     manager.set_time_override(Some(3.0));
     manager.update(&["k3".to_string()], None, None).unwrap();
 
-    // before=2.0 should return k1 (updated_at=1.0 < 2.0)
     let before = manager.list_keys(Some(2.0), None, None, None).unwrap();
     assert_eq!(before, vec!["k1".to_string()]);
 
-    // after=1.0 should return k2, k3 (updated_at > 1.0)
     let after = manager.list_keys(None, Some(1.0), None, None).unwrap();
     assert_eq!(after, vec!["k2".to_string(), "k3".to_string()]);
 
-    // limit
     let limited = manager.list_keys(None, None, None, Some(2)).unwrap();
     assert_eq!(limited.len(), 2);
 }
@@ -135,7 +131,6 @@ async fn test_record_manager_async_list_and_delete() {
     assert_eq!(listed, vec!["k2".to_string()]);
 }
 
-// ---- Hashing tests ----
 
 #[test]
 fn test_sha1_deterministic_hash() {
@@ -195,7 +190,6 @@ fn test_custom_key_encoder() {
     assert_eq!(hashed.id.as_deref(), Some("custom-11"));
 }
 
-// ---- Index function tests ----
 
 #[test]
 fn test_indexing_same_content() {
@@ -221,7 +215,6 @@ fn test_indexing_same_content() {
     );
     assert_eq!(store.len().unwrap(), 2);
 
-    // Index again -- should skip all
     for _ in 0..2 {
         let result = index(docs.clone(), &manager, &dest, &config).unwrap();
         assert_eq!(
@@ -281,12 +274,10 @@ fn test_index_simple_delete_full() {
     let result = index(docs.clone(), &manager, &dest, &config).unwrap();
     assert_eq!(result.num_added, 2);
 
-    // Index same content again at same time -- all skipped
     let result = index(docs, &manager, &dest, &config).unwrap();
     assert_eq!(result.num_skipped, 2);
     assert_eq!(result.num_deleted, 0);
 
-    // Mutate one document
     let docs2 = vec![
         Document::new("mutated document 1"),
         Document::new("This is another document."),
@@ -298,7 +289,6 @@ fn test_index_simple_delete_full() {
     assert_eq!(result.num_skipped, 1);
     assert_eq!(result.num_deleted, 1);
 
-    // Verify store contents
     let store_keys = store.store_keys().unwrap();
     assert_eq!(store_keys.len(), 2);
 
@@ -308,7 +298,6 @@ fn test_index_simple_delete_full() {
     assert!(texts.contains("mutated document 1"));
     assert!(texts.contains("This is another document."));
 
-    // Index again -- nothing changes
     let result = index(docs2, &manager, &dest, &config).unwrap();
     assert_eq!(result.num_added, 0);
     assert_eq!(result.num_deleted, 0);
@@ -321,7 +310,6 @@ fn test_incremental_fails_with_bad_source_ids() {
     let store = make_vector_store();
     let dest = IndexDestination::VectorStore(&store);
 
-    // No source_id_key with incremental -> error
     let config = IndexConfig {
         cleanup: Some(CleanupMode::Incremental),
         key_encoder: KeyEncoder::Algorithm(HashAlgorithm::Sha256),
@@ -332,7 +320,6 @@ fn test_incremental_fails_with_bad_source_ids() {
     let err = result.unwrap_err().to_string();
     assert!(err.contains("Source id key is required"));
 
-    // source_id_key set but document has None source -> error
     let docs = vec![
         Document::new("test").with_metadata(HashMap::from([("source".to_string(), json!("1"))])),
         Document::new("test2").with_metadata(HashMap::from([("source".to_string(), json!(null))])),
@@ -373,12 +360,10 @@ fn test_index_simple_delete_scoped_full() {
     let result = index(docs.clone(), &manager, &dest, &config).unwrap();
     assert_eq!(result.num_added, 4);
 
-    // Re-index same -- all skipped
     manager.set_time_override(Some(2.0));
     let result = index(docs, &manager, &dest, &config).unwrap();
     assert_eq!(result.num_skipped, 4);
 
-    // Remove some source=1 docs, keep source=2 untouched
     let docs2 = vec![
         Document::new("mutated doc")
             .with_metadata(HashMap::from([("source".to_string(), json!("1"))])),
@@ -390,10 +375,8 @@ fn test_index_simple_delete_scoped_full() {
     assert_eq!(result.num_skipped, 1);
     assert_eq!(result.num_deleted, 2); // doc1 and doc3 from source=1 deleted
 
-    // source=2 doc still exists
     assert_eq!(store.len().unwrap(), 3); // mutated_doc + doc2 + doc_other
 
-    // Re-index -- nothing changes
     manager.set_time_override(Some(4.0));
     let result = index(docs2, &manager, &dest, &config).unwrap();
     assert_eq!(result.num_added, 0);
@@ -427,7 +410,6 @@ fn test_deduplication() {
     let dest = IndexDestination::VectorStore(&store);
     let config = sha256_config();
 
-    // Same document repeated in batch
     let docs = vec![
         Document::new("duplicate content"),
         Document::new("duplicate content"),
@@ -452,11 +434,9 @@ fn test_indexing_force_update() {
     let result = index(docs.clone(), &manager, &dest, &config).unwrap();
     assert_eq!(result.num_added, 1);
 
-    // Without force_update -- skipped
     let result = index(docs.clone(), &manager, &dest, &config).unwrap();
     assert_eq!(result.num_skipped, 1);
 
-    // With force_update -- updated
     let config = IndexConfig {
         force_update: true,
         key_encoder: KeyEncoder::Algorithm(HashAlgorithm::Sha256),
@@ -480,13 +460,11 @@ fn test_index_into_document_index() {
     assert_eq!(result.num_added, 2);
     assert_eq!(doc_index.len().unwrap(), 2);
 
-    // Index again
     let result = index(docs, &manager, &dest, &config).unwrap();
     assert_eq!(result.num_added, 0);
     assert_eq!(result.num_skipped, 2);
 }
 
-// ---- InMemoryDocumentIndex tests ----
 
 #[test]
 fn test_document_index_upsert_and_get() {
@@ -503,12 +481,10 @@ fn test_document_index_upsert_and_get() {
     assert_eq!(response.succeeded[0], "id1");
     assert!(response.failed.is_empty());
 
-    // Get by known ID
     let retrieved = index.get(&["id1".to_string()]).unwrap();
     assert_eq!(retrieved.len(), 1);
     assert_eq!(retrieved[0].page_content, "hello world");
 
-    // Get by generated ID
     let retrieved = index.get(&[response.succeeded[1].clone()]).unwrap();
     assert_eq!(retrieved.len(), 1);
     assert_eq!(retrieved[0].page_content, "foo bar");
@@ -551,7 +527,6 @@ fn test_document_index_retriever_ordering() {
 
     let results = idx.invoke("the", None).unwrap();
     assert_eq!(results.len(), 2);
-    // "the the the the the" has count=5, "the cat sat on the mat" has count=2
     assert_eq!(results[0].page_content, "the the the the the");
     assert_eq!(results[1].page_content, "the cat sat on the mat");
 }
@@ -577,7 +552,6 @@ fn test_scoped_full_empty_loader() {
     let result = index(docs, &manager, &dest, &config).unwrap();
     assert_eq!(result.num_added, 2);
 
-    // Empty loader -- no source IDs seen, so nothing should be deleted
     manager.set_time_override(Some(2.0));
     let result = index(Vec::<Document>::new(), &manager, &dest, &config).unwrap();
     assert_eq!(result.num_added, 0);

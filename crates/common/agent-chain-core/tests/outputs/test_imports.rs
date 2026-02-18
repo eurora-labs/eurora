@@ -24,40 +24,28 @@ const EXPECTED_ALL: &[&str] = &[
 /// If any of these types were not exported, this code would fail to compile.
 #[test]
 fn test_all_imports() {
-    // Verify each expected type is accessible from the outputs module
-    // This is a compile-time check - if any type is not exported, compilation fails.
 
-    // We create instances to prove the types are usable
     use agent_chain_core::messages::AIMessage;
     use uuid::Uuid;
 
-    // ChatGeneration
     let _: outputs::ChatGeneration =
         outputs::ChatGeneration::new(AIMessage::builder().content("test").build().into());
 
-    // ChatGenerationChunk
     let _: outputs::ChatGenerationChunk =
         outputs::ChatGenerationChunk::new(AIMessage::builder().content("test").build().into());
 
-    // ChatResult
     let cg = outputs::ChatGeneration::new(AIMessage::builder().content("test").build().into());
     let _: outputs::ChatResult = outputs::ChatResult::new(vec![cg]);
 
-    // Generation
     let _: outputs::Generation = outputs::Generation::new("test");
 
-    // GenerationChunk
     let _: outputs::GenerationChunk = outputs::GenerationChunk::new("test");
 
-    // LLMResult
     let generation = outputs::Generation::new("test");
     let _: outputs::LLMResult = outputs::LLMResult::new(vec![vec![generation.into()]]);
 
-    // RunInfo
     let _: outputs::RunInfo = outputs::RunInfo::new(Uuid::new_v4());
 
-    // Verify the expected exports list matches what Python expects
-    // Note: In Rust, this is documentation - actual exports are verified by the code above
     assert_eq!(EXPECTED_ALL.len(), 7);
     assert!(EXPECTED_ALL.contains(&"ChatGeneration"));
     assert!(EXPECTED_ALL.contains(&"ChatGenerationChunk"));
@@ -72,7 +60,6 @@ fn test_all_imports() {
 /// This mirrors how Python users typically import from langchain_core.outputs.
 #[test]
 fn test_imports_from_crate_root() {
-    // These imports verify the types are also re-exported from the crate root
     use agent_chain_core::messages::AIMessage;
     use agent_chain_core::{
         ChatGeneration, ChatGenerationChunk, ChatResult, Generation, GenerationChunk, LLMResult,
@@ -80,7 +67,6 @@ fn test_imports_from_crate_root() {
     };
     use uuid::Uuid;
 
-    // Verify each type is usable
     let _ = Generation::new("test");
     let _ = GenerationChunk::new("test");
     let _ = ChatGeneration::new(AIMessage::builder().content("test").build().into());
@@ -99,7 +85,6 @@ fn test_merge_function_export() {
     use agent_chain_core::messages::AIMessage;
     use agent_chain_core::outputs::merge_chat_generation_chunks;
 
-    // Verify the function is accessible and works
     let chunks = vec![
         agent_chain_core::outputs::ChatGenerationChunk::new(
             AIMessage::builder().content("Hello ").build().into(),
@@ -122,7 +107,6 @@ fn test_generation_type_export() {
     let generation = agent_chain_core::outputs::Generation::new("test");
     let generation_type: GenerationType = generation.into();
 
-    // Verify we can match on the enum
     match generation_type {
         GenerationType::Generation(g) => assert_eq!(g.text, "test"),
         _ => panic!("Expected Generation variant"),

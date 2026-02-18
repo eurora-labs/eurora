@@ -136,12 +136,10 @@ fn contains_control_chars(s: &str) -> bool {
 /// assert!(result.is_ok());
 /// ```
 pub fn parse_json_markdown(json_string: &str) -> Result<Value, JsonParseError> {
-    // Try to parse directly first
     if let Ok(value) = parse_json_inner(json_string) {
         return Ok(value);
     }
 
-    // Try to find JSON string within triple backticks (with (?s) for DOTALL)
     let re = Regex::new(r"(?s)```(?:json)?(.*)").expect("Invalid regex");
 
     let json_str = if let Some(caps) = re.captures(json_string) {
@@ -164,7 +162,6 @@ fn parse_json_inner(json_str: &str) -> Result<Value, JsonParseError> {
 }
 
 fn custom_parser(multiline_string: &str) -> String {
-    // Use (?s) flag to make . match newlines (DOTALL mode)
     let re = Regex::new(r#"(?s)("action_input"\s*:\s*")(.*?)(")"#).expect("Invalid regex");
     re.replace_all(multiline_string, |caps: &regex::Captures| {
         let prefix = caps.get(1).map_or("", |m| m.as_str());
@@ -174,7 +171,6 @@ fn custom_parser(multiline_string: &str) -> String {
         let value = value.replace('\n', "\\n");
         let value = value.replace('\r', "\\r");
         let value = value.replace('\t', "\\t");
-        // Escape unescaped quotes within the value
         let value = escape_unescaped_quotes(&value);
 
         format!("{}{}{}", prefix, value, suffix)

@@ -247,7 +247,6 @@ where
 
     drop(rx);
 
-    // The blocking thread checks the stop signal every poll_interval (~100ms).
     let shutdown_timeout = std::time::Duration::from_secs(3);
 
     match tokio::time::timeout(shutdown_timeout, blocking_handle).await {
@@ -862,7 +861,6 @@ fn get_wm_class<C: Connection>(conn: &C, window: u32) -> Option<(String, String)
         return None;
     }
 
-    // WM_CLASS is two null-terminated strings: "instance\0class\0"
     let raw = &reply.value;
     let parts: Vec<&str> = std::str::from_utf8(raw)
         .ok()?

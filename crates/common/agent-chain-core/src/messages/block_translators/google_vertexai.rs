@@ -50,7 +50,6 @@ mod tests {
 
     #[test]
     fn test_delegates_input_to_genai() {
-        // Input format uses type-less Google Parts
         let content = vec![json!({
             "text": "User message"
         })];

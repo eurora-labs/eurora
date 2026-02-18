@@ -77,7 +77,6 @@ impl StreamingParser {
     fn parse(&mut self, chunk: &str) -> Vec<AddableDict> {
         self.buffer.push_str(chunk);
 
-        // If XML hasn't started yet, scan for an opening tag
         if !self.xml_started {
             if let Some(m) = self.xml_start_re.find(&self.buffer) {
                 self.buffer = self.buffer[m.start()..].to_string();
@@ -87,7 +86,6 @@ impl StreamingParser {
             }
         }
 
-        // Re-parse the full buffer from scratch
         let mut reader = quick_xml::Reader::from_str(&self.buffer);
         reader.config_mut().trim_text(false);
 
@@ -142,8 +140,6 @@ impl StreamingParser {
                 }
                 Ok(quick_xml::events::Event::Eof) => break,
                 Err(_) => {
-                    // Incomplete XML — stop parsing, keep buffer for next chunk.
-                    // If path is empty, this is trailing junk; clear the buffer.
                     if path.is_empty() {
                         self.buffer.clear();
                         self.xml_started = false;
@@ -154,14 +150,12 @@ impl StreamingParser {
             }
         }
 
-        // Update persistent state from the re-parse
         self.current_path = path;
         self.current_path_has_children = path_has_children;
         if self.current_path.is_empty() && !all_results.is_empty() {
             self.xml_started = false;
         }
 
-        // Only return newly yielded results (skip already-yielded ones)
         let new_results = if self.yielded_count < all_results.len() {
             all_results[self.yielded_count..].to_vec()
         } else {
@@ -231,7 +225,6 @@ impl XMLOutputParser {
     ///
     /// Mirrors Python's `XMLOutputParser._root_to_dict()`.
     fn read_root(&self, reader: &mut quick_xml::Reader<&[u8]>) -> Result<Value> {
-        // Find the first Start event (skip processing instructions, whitespace, etc.)
         loop {
             match reader.read_event() {
                 Ok(quick_xml::events::Event::Start(ref e)) => {
@@ -257,7 +250,6 @@ impl XMLOutputParser {
                     )));
                 }
                 _ => {
-                    // Skip comments, processing instructions, text before root element
                     continue;
                 }
             }
@@ -332,7 +324,6 @@ impl XMLOutputParser {
     fn preprocess_xml(&self, text: &str) -> String {
         let mut text = text.to_string();
 
-        // Try to find XML string within triple backticks (with (?s) dotall mode)
         let re = Regex::new(r"(?s)```(?:xml)?(.*?)```").expect("Invalid regex");
         if let Some(caps) = re.captures(&text)
             && let Some(m) = caps.get(1)
@@ -340,7 +331,6 @@ impl XMLOutputParser {
             text = m.as_str().to_string();
         }
 
-        // Remove encoding declaration if present
         if let Some(caps) = self.encoding_matcher.captures(&text)
             && let Some(m) = caps.get(2)
         {
@@ -436,7 +426,6 @@ pub fn nested_element(path: &[String], tag: &str, text: Option<&str>) -> Addable
     let mut inner = AddableDict::new();
     inner.0.insert(tag.to_string(), inner_value);
 
-    // Build nested structure from path
     let mut result = inner;
     for key in path.iter().rev() {
         let mut wrapper = AddableDict::new();
@@ -541,7 +530,6 @@ mod tests {
         assert!(result["root"].is_array());
     }
 
-    // StreamingParser tests
 
     #[test]
     fn test_streaming_parser_basic() {
@@ -592,9 +580,7 @@ mod tests {
     fn test_streaming_parser_nested_only_yields_leaves() {
         let mut parser = StreamingParser::new();
         let results = parser.parse("<root><parent><child>val</child></parent></root>");
-        // Should only yield the leaf element (child), not parent or root
         assert_eq!(results.len(), 1);
-        // The result should be nested: root -> parent -> [{ child: val }]
         let result = &results[0];
         assert!(result.0.contains_key("root"));
     }
@@ -611,7 +597,6 @@ mod tests {
         let mut parser = StreamingParser::new();
         parser.parse("<root><item>partial");
         parser.close();
-        // Should not panic
     }
 
     #[tokio::test]

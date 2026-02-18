@@ -97,9 +97,6 @@ fn test_merge_preserves_handler_distinction() {
 
     let merged = m1.merge(&m2);
 
-    // Current behavior (matches Python bug): inheritable handlers also
-    // appear in handlers, so handlers contains h1, h2, ih1, ih2.
-    // Ideal behavior would be: handlers = {h1, h2}, inheritable_handlers = {ih1, ih2}
     assert_eq!(
         merged.handlers.len(),
         4,
@@ -111,7 +108,6 @@ fn test_merge_preserves_handler_distinction() {
         "inheritable_handlers should contain ih1 and ih2"
     );
 
-    // Verify the inheritable_handlers are correct
     let ih_names: Vec<&str> = merged
         .inheritable_handlers
         .iter()

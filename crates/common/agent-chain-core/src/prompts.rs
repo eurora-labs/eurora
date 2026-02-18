@@ -46,42 +46,31 @@ mod prompt;
 mod string;
 mod structured;
 
-// Re-export from base
 pub use base::{BasePromptTemplate, FormatOutputType, aformat_document, format_document};
 
-// Re-export from string
 pub use string::{
     PromptTemplateFormat, StringPromptTemplate, check_valid_template, get_template_variables,
     jinja2_formatter, mustache_formatter, validate_jinja2,
 };
 
-// Re-export from prompt
 pub use prompt::PromptTemplate;
 
-// Re-export from message
 pub use message::BaseMessagePromptTemplate;
 
-// Re-export from chat
 pub use chat::{
     AIMessagePromptTemplate, BaseChatPromptTemplate, BaseStringMessagePromptTemplate,
     ChatMessagePromptTemplate, ChatPromptTemplate, HumanMessagePromptTemplate, MessageLike,
     MessageLikeRepresentation, MessagesPlaceholder, SystemMessagePromptTemplate,
 };
 
-// Re-export from dict
 pub use dict::DictPromptTemplate;
 
-// Re-export from image
 pub use image::ImagePromptTemplate;
 
-// Re-export from few_shot
 pub use few_shot::{FewShotChatMessagePromptTemplate, FewShotPromptTemplate};
 
-// Re-export from few_shot_with_templates
 pub use few_shot_with_templates::FewShotPromptWithTemplates;
 
-// Re-export from structured
 pub use structured::StructuredPrompt;
 
-// Re-export from loading
 pub use loading::load_prompt;

@@ -237,11 +237,9 @@ impl BaseCache for InMemoryCache {
             return;
         };
 
-        // If key already exists, remove it from the order list (it will be added at the end)
         if cache.contains_key(&key) {
             key_order.retain(|k| k != &key);
         } else if let Some(maxsize) = self.maxsize {
-            // If at capacity, remove the oldest item
             if cache.len() >= maxsize
                 && let Some(oldest_key) = key_order.first().cloned()
             {
@@ -357,7 +355,6 @@ mod tests {
         assert!(cache.lookup("prompt1", "llm").is_some());
         assert!(cache.lookup("prompt2", "llm").is_some());
 
-        // Adding third item should evict the first (oldest)
         cache.update("prompt3", "llm", vec![Generation::new("3")]);
 
         assert!(cache.lookup("prompt1", "llm").is_none()); // Evicted
@@ -434,10 +431,8 @@ mod tests {
         cache.update("prompt1", "llm", vec![Generation::new("1")]);
         cache.update("prompt2", "llm", vec![Generation::new("2")]);
 
-        // Update prompt1 - should move it to the end of the queue
         cache.update("prompt1", "llm", vec![Generation::new("1 updated")]);
 
-        // Adding prompt3 should evict prompt2 (now oldest) instead of prompt1
         cache.update("prompt3", "llm", vec![Generation::new("3")]);
 
         assert!(cache.lookup("prompt1", "llm").is_some()); // Still present

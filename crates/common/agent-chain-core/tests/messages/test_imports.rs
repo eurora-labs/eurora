@@ -2,11 +2,9 @@
 //!
 //! Converted from `langchain/libs/core/tests/unit_tests/messages/test_imports.py`
 
-// Test that all expected public exports are available from the messages module
 #[test]
 #[allow(unused_imports)]
 fn test_all_imports() {
-    // Message types
     use agent_chain_core::messages::AIMessage;
     use agent_chain_core::messages::AIMessageChunk;
     use agent_chain_core::messages::BaseMessage;
@@ -22,17 +20,14 @@ fn test_all_imports() {
     use agent_chain_core::messages::ToolMessage;
     use agent_chain_core::messages::ToolMessageChunk;
 
-    // Tool call types
     use agent_chain_core::messages::InvalidToolCall;
     use agent_chain_core::messages::ToolCall;
     use agent_chain_core::messages::ToolCallChunk;
 
-    // Usage metadata types
     use agent_chain_core::messages::InputTokenDetails;
     use agent_chain_core::messages::OutputTokenDetails;
     use agent_chain_core::messages::UsageMetadata;
 
-    // Utility functions
     use agent_chain_core::messages::convert_to_messages;
     use agent_chain_core::messages::convert_to_openai_messages;
     use agent_chain_core::messages::filter_messages;
@@ -46,15 +41,12 @@ fn test_all_imports() {
     use agent_chain_core::messages::messages_to_dict;
     use agent_chain_core::messages::trim_messages;
 
-    // Factory functions
     use agent_chain_core::messages::invalid_tool_call;
     use agent_chain_core::messages::tool_call;
     use agent_chain_core::messages::tool_call_chunk;
 
-    // Constants
     use agent_chain_core::messages::KNOWN_BLOCK_TYPES;
 
-    // Verify they're not just imported but usable
     let _ = AIMessage::builder().content("test").build();
     let _ = HumanMessage::builder().content("test").build();
     let _ = SystemMessage::builder().content("test").build();
@@ -110,7 +102,6 @@ fn test_base_message_variants() {
         SystemMessage, ToolMessage,
     };
 
-    // Test that all BaseMessage variants are accessible
     let _human = BaseMessage::Human(HumanMessage::builder().content("test").build());
     let _ai = BaseMessage::AI(AIMessage::builder().content("test").build());
     let _system = BaseMessage::System(SystemMessage::builder().content("test").build());
@@ -133,7 +124,6 @@ fn test_base_message_variants() {
 #[test]
 #[allow(unused_imports)]
 fn test_trait_imports() {
-    // Verify trait is accessible and provides expected methods
     let msg = agent_chain_core::messages::HumanMessage::builder()
         .content("test")
         .build();

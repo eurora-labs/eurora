@@ -10,9 +10,6 @@ use agent_chain_core::messages::{
 };
 use serde_json::json;
 
-// ============================================================================
-// TestBaseMessageText - Tests for the .text / as_text() behavior
-// ============================================================================
 
 #[test]
 fn test_text_property_string_content() {
@@ -22,8 +19,6 @@ fn test_text_property_string_content() {
 
 #[test]
 fn test_text_property_list_content_with_text_blocks() {
-    // Test .text property with list content containing text blocks.
-    // In Rust, multipart content with text parts joins them with spaces.
     let msg = HumanMessage::builder()
         .content(MessageContent::Parts(vec![
             ContentPart::Text {
@@ -39,8 +34,6 @@ fn test_text_property_list_content_with_text_blocks() {
 
 #[test]
 fn test_text_property_list_content_with_mixed_blocks() {
-    // Test .text property with mixed content blocks (text + image).
-    // Non-text blocks are filtered out when extracting text.
     let msg = HumanMessage::builder()
         .content(MessageContent::Parts(vec![
             ContentPart::Text {
@@ -76,7 +69,6 @@ fn test_text_property_empty_list_content() {
 
 #[test]
 fn test_text_property_no_text_blocks() {
-    // Test .text property when there are no text blocks returns empty string.
     let msg = HumanMessage::builder()
         .content(MessageContent::Parts(vec![ContentPart::Image {
             source: agent_chain_core::messages::ImageSource::Url {
@@ -88,9 +80,6 @@ fn test_text_property_no_text_blocks() {
     assert_eq!(msg.content.as_text(), "");
 }
 
-// ============================================================================
-// TestMergeContent - Tests for merge_content and merge_content_complex
-// ============================================================================
 
 #[test]
 fn test_merge_two_strings() {
@@ -100,7 +89,6 @@ fn test_merge_two_strings() {
 
 #[test]
 fn test_merge_string_and_list() {
-    // Test merging a string with a list (via merge_content_complex).
     let result = merge_content_complex(
         MergeableContent::Text("Hello".to_string()),
         vec![MergeableContent::List(vec![
@@ -119,7 +107,6 @@ fn test_merge_string_and_list() {
 
 #[test]
 fn test_merge_list_and_string() {
-    // Test merging a list with a string (via merge_content_complex).
     let result = merge_content_complex(
         MergeableContent::List(vec![json!({"type": "text", "text": "Hello"})]),
         vec![MergeableContent::Text(" world".to_string())],
@@ -136,7 +123,6 @@ fn test_merge_list_and_string() {
 
 #[test]
 fn test_merge_two_lists() {
-    // Test merging two list contents. Without an 'index' key, items are appended.
     let result = merge_content_complex(
         MergeableContent::List(vec![json!({"type": "text", "text": "Hello"})]),
         vec![MergeableContent::List(vec![
@@ -155,8 +141,6 @@ fn test_merge_two_lists() {
 
 #[test]
 fn test_merge_two_lists_with_index() {
-    // Test merging two list contents with matching index keys.
-    // Items with same 'index' key should be merged.
     let result = merge_content_complex(
         MergeableContent::List(vec![json!({"type": "text", "text": "Hello", "index": 0})]),
         vec![MergeableContent::List(vec![
@@ -195,7 +179,6 @@ fn test_merge_empty_string_second() {
 
 #[test]
 fn test_merge_list_with_empty_string() {
-    // Test merging a list with an empty string is a no-op.
     let result = merge_content_complex(
         MergeableContent::List(vec![json!({"type": "text", "text": "Hello"})]),
         vec![MergeableContent::Text(String::new())],
@@ -209,13 +192,9 @@ fn test_merge_list_with_empty_string() {
     }
 }
 
-// ============================================================================
-// TestMergeContentAdditional - Additional edge cases
-// ============================================================================
 
 #[test]
 fn test_merge_list_plus_list_last_element_string_concatenates() {
-    // When merging list+string and last element is a string, they concatenate.
     let result = merge_content_complex(
         MergeableContent::List(vec![json!("Hello")]),
         vec![MergeableContent::Text(" world".to_string())],
@@ -231,7 +210,6 @@ fn test_merge_list_plus_list_last_element_string_concatenates() {
 
 #[test]
 fn test_merge_list_plus_string_last_element_dict_appends() {
-    // When last element is a dict, string is appended as new element.
     let result = merge_content_complex(
         MergeableContent::List(vec![json!({"type": "text", "text": "Hello"})]),
         vec![MergeableContent::Text(" world".to_string())],
@@ -248,7 +226,6 @@ fn test_merge_list_plus_string_last_element_dict_appends() {
 
 #[test]
 fn test_merge_list_string_last_plus_empty_string() {
-    // Merging list (last element string) + empty string is a no-op.
     let result = merge_content_complex(
         MergeableContent::List(vec![json!("Hello")]),
         vec![MergeableContent::Text(String::new())],
@@ -264,7 +241,6 @@ fn test_merge_list_string_last_plus_empty_string() {
 
 #[test]
 fn test_merge_list_plus_empty_string_no_op() {
-    // Merging list (last is dict) + empty string is a no-op.
     let result = merge_content_complex(
         MergeableContent::List(vec![json!({"type": "text", "text": "Hello"})]),
         vec![MergeableContent::Text(String::new())],
@@ -278,9 +254,6 @@ fn test_merge_list_plus_empty_string_no_op() {
     }
 }
 
-// ============================================================================
-// TestMessageToDict - Tests for message_to_dict and messages_to_dict
-// ============================================================================
 
 #[test]
 fn test_message_to_dict_human_message() {
@@ -422,9 +395,6 @@ fn test_messages_to_dict_empty_list() {
     assert!(result.is_empty());
 }
 
-// ============================================================================
-// TestBaseMessageContentBlocks - Tests for the content_blocks method
-// ============================================================================
 
 #[test]
 fn test_content_blocks_string_content() {
@@ -449,7 +419,6 @@ fn test_content_blocks_empty_string() {
 
 #[test]
 fn test_content_blocks_list_with_string() {
-    // Test content_blocks with list containing plain strings.
     let msg = HumanMessage::builder()
         .content(MessageContent::Parts(vec![
             ContentPart::Text {
@@ -478,7 +447,6 @@ fn test_content_blocks_list_with_string() {
 
 #[test]
 fn test_content_blocks_standard_text_block() {
-    // Test content_blocks with standard text block as Other ContentPart.
     let msg = HumanMessage::builder()
         .content(MessageContent::Parts(vec![ContentPart::Other(
             json!({"type": "text", "text": "Hello"}),
@@ -496,7 +464,6 @@ fn test_content_blocks_standard_text_block() {
 
 #[test]
 fn test_content_blocks_non_standard_block() {
-    // Test content_blocks with non-standard block type produces non_standard wrapper.
     let msg = HumanMessage::builder()
         .content(MessageContent::Parts(vec![ContentPart::Other(
             json!({"type": "custom_type", "data": "value"}),
@@ -518,7 +485,6 @@ fn test_content_blocks_non_standard_block() {
 
 #[test]
 fn test_content_blocks_mixed_content() {
-    // Test content_blocks with mixed content types.
     let msg = HumanMessage::builder()
         .content(MessageContent::Parts(vec![
             ContentPart::Text {
@@ -544,13 +510,9 @@ fn test_content_blocks_mixed_content() {
     }
 }
 
-// ============================================================================
-// TestContentBlocksNonStandard - Non-standard block type tests
-// ============================================================================
 
 #[test]
 fn test_dict_with_type_not_in_known_block_types() {
-    // Dict items with unknown type produce non_standard type.
     let msg = HumanMessage::builder()
         .content(MessageContent::Parts(vec![ContentPart::Other(
             json!({"type": "completely_unknown_type_xyz", "payload": {"key": "value"}}),
@@ -572,17 +534,12 @@ fn test_dict_with_type_not_in_known_block_types() {
 
 #[test]
 fn test_dict_with_no_type_key() {
-    // Dict items with no type key produce non_standard type.
-    // Note: In Rust, ContentPart::Other wraps a Value, so the lack of "type"
-    // means it won't match any known block types and will be treated as
-    // non-standard (or skipped depending on serialization).
     let msg = HumanMessage::builder()
         .content(MessageContent::Parts(vec![ContentPart::Other(
             json!({"data": "some data", "format": "raw"}),
         )]))
         .build();
     let blocks = msg.content_blocks();
-    // Without a "type" key, the block should be classified as non_standard
     assert_eq!(blocks.len(), 1);
     match &blocks[0] {
         ContentBlock::NonStandard(ns) => {
@@ -592,9 +549,6 @@ fn test_dict_with_no_type_key() {
     }
 }
 
-// ============================================================================
-// TestBaseMessageChunkAdd - Tests for chunk addition
-// ============================================================================
 
 #[test]
 fn test_add_human_message_chunks() {
@@ -674,7 +628,6 @@ fn test_add_chunks_with_response_metadata() {
 
 #[test]
 fn test_add_chunk_list_content() {
-    // Test adding chunks with list content. Without 'index', items are appended.
     let chunk1 = HumanMessageChunk::builder()
         .content(MessageContent::Parts(vec![ContentPart::Other(
             json!({"type": "text", "text": "Hello"}),
@@ -694,13 +647,9 @@ fn test_add_chunk_list_content() {
     }
 }
 
-// ============================================================================
-// TestBaseMessageChunkAddMixed - Adding lists of chunks
-// ============================================================================
 
 #[test]
 fn test_add_list_of_mixed_message_chunks() {
-    // Test adding multiple chunks via iteration (simulating list add).
     let chunk1 = HumanMessageChunk::builder()
         .content("Start")
         .id("main".to_string())
@@ -716,7 +665,6 @@ fn test_add_list_of_mixed_message_chunks() {
 
 #[test]
 fn test_add_list_of_chunks_with_metadata() {
-    // Test adding a list of chunks merges additional_kwargs and metadata.
     let mut kwargs1 = std::collections::HashMap::new();
     kwargs1.insert("key1".to_string(), json!("val1"));
     let mut meta1 = std::collections::HashMap::new();
@@ -785,7 +733,6 @@ fn test_add_list_of_chunks_with_metadata() {
 
 #[test]
 fn test_add_single_element_list() {
-    // Test adding a single-element list of chunks.
     let chunk1 = HumanMessageChunk::builder()
         .content("Hello")
         .id("x".to_string())
@@ -796,9 +743,6 @@ fn test_add_single_element_list() {
     assert_eq!(result.id, Some("x".to_string()));
 }
 
-// ============================================================================
-// TestBaseMessagePrettyRepr - Tests for pretty_repr method
-// ============================================================================
 
 #[test]
 fn test_pretty_repr_basic() {
@@ -825,9 +769,6 @@ fn test_pretty_repr_html_mode() {
     assert!(result.contains("Human Message"));
 }
 
-// ============================================================================
-// TestBaseMessagePrettyPrint - Tests for pretty_print method
-// ============================================================================
 
 #[test]
 fn test_pretty_print_does_not_raise_human() {
@@ -842,7 +783,6 @@ fn test_pretty_print_does_not_raise_ai() {
     let msg = AIMessage::builder()
         .content("I'm doing well, thanks!")
         .build();
-    // AIMessage pretty_print is on the BaseMessage level
     let base = BaseMessage::AI(msg);
     base.pretty_print(); // Should not panic
 }
@@ -880,9 +820,6 @@ fn test_pretty_print_does_not_raise_list_content() {
     msg.pretty_print(); // Should not panic
 }
 
-// ============================================================================
-// TestGetMsgTitleRepr - Tests for get_msg_title_repr function
-// ============================================================================
 
 #[test]
 fn test_get_msg_title_repr_basic() {
@@ -899,7 +836,6 @@ fn test_get_msg_title_repr_bold() {
 
 #[test]
 fn test_get_msg_title_repr_long_title() {
-    // When title exceeds 78 chars, separators become empty but no panic occurs.
     let long_title = "A".repeat(100);
     let result = get_msg_title_repr(&long_title, false);
     assert!(result.contains(&long_title));
@@ -907,21 +843,14 @@ fn test_get_msg_title_repr_long_title() {
 
 #[test]
 fn test_get_msg_title_repr_moderate_title() {
-    // A title that fits within the 80-char line.
     let title = "A".repeat(40);
     let result = get_msg_title_repr(&title, false);
     assert!(result.contains(&title));
 }
 
-// ============================================================================
-// TestGetMsgTitleReprPadding - Padding symmetry tests
-// ============================================================================
 
 #[test]
 fn test_even_length_title_symmetric_padding() {
-    // "AB" -> padded = " AB " (4 chars) -> sep_len = (80-4)//2 = 38
-    // len(padded) = 4 -> even -> second_sep = sep (same)
-    // total = 38 + 4 + 38 = 80
     let result = get_msg_title_repr("AB", false);
     assert!(result.contains("AB"));
     assert_eq!(result.len(), 80);
@@ -933,8 +862,6 @@ fn test_even_length_title_symmetric_padding() {
 
 #[test]
 fn test_odd_length_title_asymmetric_padding() {
-    // "ABC" -> padded = " ABC " (5 chars) -> sep_len = (80-5)//2 = 37
-    // len(padded) = 5 -> odd -> second_sep = sep + "=" = 38
     let result = get_msg_title_repr("ABC", false);
     assert!(result.contains("ABC"));
     let left_sep = result.split(" ABC ").next().unwrap();
@@ -946,8 +873,6 @@ fn test_odd_length_title_asymmetric_padding() {
 
 #[test]
 fn test_single_char_title() {
-    // "X" -> padded = " X " (3 chars) -> sep_len = (80-3)//2 = 38
-    // len(padded) = 3 -> odd -> second_sep = sep + "=" = 39
     let result = get_msg_title_repr("X", false);
     assert!(result.contains(" X "));
     let left_sep = result.split(" X ").next().unwrap();
@@ -959,8 +884,6 @@ fn test_single_char_title() {
 
 #[test]
 fn test_empty_title() {
-    // "" -> padded = "  " (2 chars) -> sep_len = (80-2)//2 = 39
-    // len(padded) = 2 -> even -> second_sep = sep
     let result = get_msg_title_repr("", false);
     assert_eq!(result.len(), 80);
 }
@@ -973,9 +896,6 @@ fn test_bold_does_not_change_content() {
 
 #[test]
 fn test_known_title_exact_output() {
-    // "Human Message" -> padded = " Human Message " (15 chars)
-    // sep_len = (80-15)//2 = 32
-    // len(padded) = 15 -> odd -> second_sep = 32 + 1 = 33
     let result = get_msg_title_repr("Human Message", false);
     let expected_left = "=".repeat(32);
     let expected_right = "=".repeat(33);
@@ -986,13 +906,9 @@ fn test_known_title_exact_output() {
     assert_eq!(result.len(), 80);
 }
 
-// ============================================================================
-// TestBaseMessageInit - Tests for message initialization
-// ============================================================================
 
 #[test]
 fn test_init_with_content_blocks() {
-    // Test initializing with content_blocks parameter.
     let blocks = vec![
         ContentBlock::Text(TextContentBlock::new("Hello")),
         ContentBlock::Image(agent_chain_core::messages::ImageContentBlock::from_url(
@@ -1003,7 +919,6 @@ fn test_init_with_content_blocks() {
         .content("")
         .content_blocks(blocks)
         .build();
-    // When content_blocks is provided, content is converted to Parts
     match &msg.content {
         MessageContent::Parts(parts) => {
             assert_eq!(parts.len(), 2);
@@ -1079,9 +994,6 @@ fn test_init_with_response_metadata() {
     assert_eq!(msg.response_metadata.get("tokens").unwrap(), &json!(10));
 }
 
-// ============================================================================
-// TestBaseMessageSerialization
-// ============================================================================
 
 #[test]
 fn test_message_types_have_consistent_types() {
@@ -1094,9 +1006,6 @@ fn test_message_types_have_consistent_types() {
     assert_eq!(system_msg.message_type(), "system");
 }
 
-// ============================================================================
-// TestExtractReasoningFromAdditionalKwargs
-// ============================================================================
 
 #[test]
 fn test_string_reasoning_content_returns_reasoning_block() {
@@ -1122,7 +1031,6 @@ fn test_none_reasoning_content_returns_none() {
 
 #[test]
 fn test_non_string_reasoning_content_returns_none() {
-    // Non-string reasoning_content (e.g. dict/object) returns None.
     let mut additional_kwargs = std::collections::HashMap::new();
     additional_kwargs.insert(
         "reasoning_content".to_string(),

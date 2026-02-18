@@ -250,7 +250,6 @@ impl From<Value> for ToolInput {
         match v {
             Value::String(s) => ToolInput::String(s),
             Value::Object(obj) => {
-                // Check if this is a tool call
                 if obj.get("type").and_then(|t| t.as_str()) == Some("tool_call")
                     && let (Some(id), Some(name), Some(args)) = (
                         obj.get("id").and_then(|i| i.as_str()),
@@ -450,7 +449,6 @@ pub trait BaseTool: Send + Sync + Debug {
     ) -> Result<ToolOutput> {
         let config = ensure_config(config);
 
-        // Configure callback manager
         let callback_manager = CallbackManager::configure(
             config.callbacks.clone(),
             self.callbacks().cloned(),
@@ -461,7 +459,6 @@ pub trait BaseTool: Send + Sync + Debug {
             self.metadata().cloned(),
         );
 
-        // Build serialized info and input string for callbacks
         let mut serialized = HashMap::new();
         serialized.insert(
             "name".to_string(),
@@ -481,7 +478,6 @@ pub trait BaseTool: Send + Sync + Debug {
         let run_manager =
             callback_manager.on_tool_start(&serialized, &input_str, config.run_id, None);
 
-        // Create child config with run manager's child callback manager
         let child_config = patch_config(
             Some(config.clone()),
             Some(run_manager.get_child(None)),
@@ -491,16 +487,12 @@ pub trait BaseTool: Send + Sync + Debug {
             None,
         );
 
-        // Execute tool
         let result = self.tool_run(input, Some(&run_manager), &child_config);
 
-        // Handle result with error recovery and callback dispatch
         match result {
             Ok(output) => {
                 let (content, artifact) = match self.response_format() {
                     ResponseFormat::ContentAndArtifact => {
-                        // tool_run() returns raw values; for content_and_artifact
-                        // we expect a JSON array [content, artifact]
                         match output {
                             ToolOutput::Json(Value::Array(ref arr)) if arr.len() == 2 => {
                                 let content = match &arr[0] {
@@ -538,7 +530,6 @@ pub trait BaseTool: Send + Sync + Debug {
                 Ok(formatted)
             }
             Err(e) => {
-                // Check if this is a ToolException
                 if let Some(tool_err_msg) = e.as_tool_exception() {
                     let exc = ToolException::new(tool_err_msg);
                     if let Some(handled) = handle_tool_error_impl(&exc, self.handle_tool_error()) {
@@ -553,7 +544,6 @@ pub trait BaseTool: Send + Sync + Debug {
                         return Ok(formatted);
                     }
                 }
-                // Check if this is a validation error
                 if let Some(validation_msg) = e.as_validation_error()
                     && let Some(handled) =
                         handle_validation_error_impl(validation_msg, self.handle_validation_error())
@@ -568,7 +558,6 @@ pub trait BaseTool: Send + Sync + Debug {
                     run_manager.on_tool_end(&handled);
                     return Ok(formatted);
                 }
-                // Unhandled error
                 run_manager.on_tool_error(&e);
                 Err(e)
             }
@@ -587,7 +576,6 @@ pub trait BaseTool: Send + Sync + Debug {
     ) -> Result<ToolOutput> {
         let config = ensure_config(config);
 
-        // Configure async callback manager
         let async_callback_manager = AsyncCallbackManager::configure(
             config.callbacks.clone(),
             self.callbacks().cloned(),
@@ -598,7 +586,6 @@ pub trait BaseTool: Send + Sync + Debug {
             self.metadata().cloned(),
         );
 
-        // Build serialized info and input string for callbacks
         let mut serialized = HashMap::new();
         serialized.insert(
             "name".to_string(),
@@ -619,7 +606,6 @@ pub trait BaseTool: Send + Sync + Debug {
             .on_tool_start(&serialized, &input_str, config.run_id, None)
             .await;
 
-        // Create child config using the sync child from the async run manager
         let child_config = patch_config(
             Some(config.clone()),
             Some(run_manager.get_sync().get_child(None)),
@@ -629,12 +615,10 @@ pub trait BaseTool: Send + Sync + Debug {
             None,
         );
 
-        // Execute tool (async)
         let result = self
             .tool_arun(input, Some(&run_manager), &child_config)
             .await;
 
-        // Handle result with error recovery and callback dispatch
         match result {
             Ok(output) => {
                 let (content, artifact) = match self.response_format() {
@@ -674,7 +658,6 @@ pub trait BaseTool: Send + Sync + Debug {
                 Ok(formatted)
             }
             Err(e) => {
-                // Check if this is a ToolException
                 if let Some(tool_err_msg) = e.as_tool_exception() {
                     let exc = ToolException::new(tool_err_msg);
                     if let Some(handled) = handle_tool_error_impl(&exc, self.handle_tool_error()) {
@@ -689,7 +672,6 @@ pub trait BaseTool: Send + Sync + Debug {
                         return Ok(formatted);
                     }
                 }
-                // Check if this is a validation error
                 if let Some(validation_msg) = e.as_validation_error()
                     && let Some(handled) =
                         handle_validation_error_impl(validation_msg, self.handle_validation_error())
@@ -704,7 +686,6 @@ pub trait BaseTool: Send + Sync + Debug {
                     run_manager.on_tool_end(&handled).await;
                     return Ok(formatted);
                 }
-                // Unhandled error
                 run_manager.get_sync().on_tool_error(&e);
                 Err(e)
             }
@@ -886,14 +867,12 @@ pub fn format_output(
     name: &str,
     status: &str,
 ) -> ToolOutput {
-    // If content is already a ToolMessage or tool_call_id is None, return content directly
     if matches!(content, ToolOutput::Message(_)) || tool_call_id.is_none() {
         return content;
     }
 
     let tool_call_id = tool_call_id.expect("tool_call_id should be Some at this point");
 
-    // Convert content to string, using stringify if not already a valid message content type
     let content_str = match &content {
         ToolOutput::String(s) => s.clone(),
         ToolOutput::Json(v) => stringify(v),

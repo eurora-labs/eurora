@@ -51,11 +51,9 @@ const WELL_KNOWN_OPENAI_TOOLS: &[&str] = &[
 /// Check if a JSON Value represents a well-known OpenAI tool that should be returned unchanged.
 fn is_well_known_openai_tool(tool: &Value) -> bool {
     if let Some(tool_type) = tool.get("type").and_then(|v| v.as_str()) {
-        // Check exact match against well-known tools
         if WELL_KNOWN_OPENAI_TOOLS.contains(&tool_type) {
             return true;
         }
-        // As of 03.12.25 can be "web_search_preview" or "web_search_preview_2025_03_11"
         if tool_type.starts_with("web_search_preview") {
             return true;
         }
@@ -69,8 +67,6 @@ fn is_well_known_openai_tool(tool: &Value) -> bool {
 /// to any object schemas that have `required` fields or empty properties.
 fn recursive_set_additional_properties_false(schema: &mut Value) {
     if let Value::Object(map) = schema {
-        // Check if 'required' is a key at the current level or if the schema is empty,
-        // in which case additionalProperties still needs to be specified.
         let has_required = map.contains_key("required");
         let has_empty_properties = map
             .get("properties")
@@ -83,21 +79,18 @@ fn recursive_set_additional_properties_false(schema: &mut Value) {
             map.insert("additionalProperties".to_string(), Value::Bool(false));
         }
 
-        // Recursively check 'anyOf' if it exists
         if let Some(Value::Array(any_of)) = map.get_mut("anyOf") {
             for sub_schema in any_of {
                 recursive_set_additional_properties_false(sub_schema);
             }
         }
 
-        // Recursively check 'properties' if they exist
         if let Some(Value::Object(properties)) = map.get_mut("properties") {
             for sub_schema in properties.values_mut() {
                 recursive_set_additional_properties_false(sub_schema);
             }
         }
 
-        // Recursively check 'items' if it exists
         if let Some(items) = map.get_mut("items") {
             recursive_set_additional_properties_false(items);
         }
@@ -154,16 +147,13 @@ fn convert_json_schema_to_openai_function(
     description: Option<&str>,
     rm_titles: bool,
 ) -> FunctionDescription {
-    // Dereference refs first
     let mut schema = dereference_refs(schema, None, None);
 
-    // Remove definitions/defs if present
     if let Value::Object(ref mut map) = schema {
         map.remove("definitions"); // pydantic 1
         map.remove("$defs"); // pydantic 2
     }
 
-    // Extract title and description from schema
     let title = schema
         .as_object()
         .and_then(|m| m.get("title"))
@@ -178,13 +168,11 @@ fn convert_json_schema_to_openai_function(
         .unwrap_or("")
         .to_string();
 
-    // Remove title and description from schema for parameters
     if let Value::Object(ref mut map) = schema {
         map.remove("title");
         map.remove("description");
     }
 
-    // Apply rm_titles if needed
     let parameters = if rm_titles {
         remove_titles(&schema)
     } else {
@@ -252,7 +240,6 @@ impl ConvertibleToOpenAI for Value {
     fn convert_to_openai_function_impl(&self, strict: Option<bool>) -> Value {
         let oai_function: Value;
 
-        // Check for Anthropic format tool (has 'name' and 'input_schema')
         if self.is_object() && self.get("name").is_some() && self.get("input_schema").is_some() {
             let mut result = Map::new();
             result.insert(
@@ -268,7 +255,6 @@ impl ConvertibleToOpenAI for Value {
             }
             oai_function = Value::Object(result);
         }
-        // Check for Amazon Bedrock Converse format tool (has 'toolSpec')
         else if self.is_object()
             && let Some(tool_spec) = self.get("toolSpec")
         {
@@ -290,7 +276,6 @@ impl ConvertibleToOpenAI for Value {
             }
             oai_function = Value::Object(result);
         }
-        // Already in OpenAI function format (has 'name')
         else if self.is_object() && self.get("name").is_some() {
             let mut result = Map::new();
             if let Some(obj) = self.as_object() {
@@ -302,12 +287,10 @@ impl ConvertibleToOpenAI for Value {
             }
             oai_function = Value::Object(result);
         }
-        // JSON schema with title and description
         else if self.is_object() && self.get("title").is_some() {
             let mut function_copy = self.clone();
             let mut result = Map::new();
 
-            // Extract title as name
             if let Value::Object(ref mut map) = function_copy {
                 if let Some(title) = map.remove("title") {
                     result.insert("name".to_string(), title);
@@ -315,14 +298,12 @@ impl ConvertibleToOpenAI for Value {
                 if let Some(description) = map.remove("description") {
                     result.insert("description".to_string(), description);
                 }
-                // If there are properties left, use as parameters
                 if !map.is_empty() && map.contains_key("properties") {
                     result.insert("parameters".to_string(), function_copy);
                 }
             }
             oai_function = Value::Object(result);
         }
-        // Unsupported format
         else {
             oai_function = serde_json::json!({
                 "name": "unknown",
@@ -331,10 +312,8 @@ impl ConvertibleToOpenAI for Value {
             });
         }
 
-        // Handle strict mode
         let mut oai_function = oai_function;
         if let Some(strict_val) = strict {
-            // Check for conflict with existing strict value
             if let Value::Object(ref existing) = oai_function
                 && let Some(existing_strict) = existing.get("strict")
                 && existing_strict.as_bool() != Some(strict_val)
@@ -345,17 +324,14 @@ impl ConvertibleToOpenAI for Value {
                 );
             }
 
-            // Add strict field to the result
             if let Value::Object(ref mut map) = oai_function {
                 map.insert("strict".to_string(), Value::Bool(strict_val));
 
-                // If strict is true, apply additional properties and required handling
                 if strict_val && let Some(Value::Object(params)) = map.get_mut("parameters") {
                     let mut params_value = Value::Object(params.clone());
                     recursive_set_additional_properties_false(&mut params_value);
                     *params = params_value.as_object().cloned().unwrap_or_default();
 
-                    // All fields must be required
                     if let Some(properties) = params.get("properties").cloned()
                         && let Some(props_obj) = properties.as_object()
                         && !props_obj.is_empty()
@@ -374,10 +350,8 @@ impl ConvertibleToOpenAI for Value {
 
 impl<T: BaseTool + ?Sized> ConvertibleToOpenAI for T {
     fn convert_to_openai_function_impl(&self, strict: Option<bool>) -> Value {
-        // Get the tool's args schema
         let args_schema = self.args_schema();
 
-        // Check if this is a simple tool without args_schema
         let is_simple_tool = args_schema.is_none();
 
         if !is_simple_tool && let Some(schema) = args_schema {
@@ -395,7 +369,6 @@ impl<T: BaseTool + ?Sized> ConvertibleToOpenAI for T {
                 "parameters": func_desc.parameters
             });
 
-            // Handle strict mode
             if let Some(strict_val) = strict
                 && let Value::Object(ref mut map) = result
             {
@@ -406,7 +379,6 @@ impl<T: BaseTool + ?Sized> ConvertibleToOpenAI for T {
                     recursive_set_additional_properties_false(&mut params_value);
                     *params = params_value.as_object().cloned().unwrap_or_default();
 
-                    // All fields must be required
                     if let Some(properties) = params.get("properties").cloned()
                         && let Some(props_obj) = properties.as_object()
                         && !props_obj.is_empty()
@@ -421,7 +393,6 @@ impl<T: BaseTool + ?Sized> ConvertibleToOpenAI for T {
             return result;
         }
 
-        // For simple tools without args_schema, return a default schema
         let mut result = serde_json::json!({
             "name": self.name(),
             "description": self.description(),
@@ -434,7 +405,6 @@ impl<T: BaseTool + ?Sized> ConvertibleToOpenAI for T {
             }
         });
 
-        // Handle strict mode
         if let Some(strict_val) = strict
             && let Value::Object(ref mut map) = result
         {
@@ -485,7 +455,6 @@ pub trait ConvertibleToOpenAITool {
 
 impl ConvertibleToOpenAITool for Value {
     fn convert_to_openai_tool_impl(&self, strict: Option<bool>) -> Value {
-        // Check if this is a well-known OpenAI tool that should be returned unchanged
         if self.is_object() && is_well_known_openai_tool(self) {
             return self.clone();
         }
@@ -531,7 +500,6 @@ where
 {
     let openai_tool = convert_to_openai_tool(schema, strict);
 
-    // Validate and extract function
     let function = openai_tool.get("function").ok_or_else(|| {
         crate::Error::InvalidConfig("Input must be a valid OpenAI-format tool".to_string())
     })?;
@@ -598,7 +566,6 @@ pub fn tool_example_to_messages<T: Serialize>(
     let mut messages: Vec<BaseMessage> =
         vec![HumanMessage::builder().content(input).build().into()];
 
-    // Build OpenAI-style tool calls
     let openai_tool_calls: Vec<Value> = tool_calls
         .iter()
         .map(|tc| {
@@ -620,7 +587,6 @@ pub fn tool_example_to_messages<T: Serialize>(
         })
         .collect();
 
-    // Create AI message with tool calls
     let mut additional_kwargs = std::collections::HashMap::new();
     additional_kwargs.insert(
         "tool_calls".to_string(),
@@ -633,7 +599,6 @@ pub fn tool_example_to_messages<T: Serialize>(
         .build();
     messages.push(ai_msg.into());
 
-    // Add tool messages
     let outputs = tool_outputs.unwrap_or_else(|| {
         vec!["You have correctly called this tool.".to_string(); openai_tool_calls.len()]
     });
@@ -652,7 +617,6 @@ pub fn tool_example_to_messages<T: Serialize>(
         );
     }
 
-    // Add final AI response if provided
     if let Some(response) = ai_response {
         messages.push(AIMessage::builder().content(response).build().into());
     }

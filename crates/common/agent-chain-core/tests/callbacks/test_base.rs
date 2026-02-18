@@ -11,7 +11,6 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-// -- Handler that overrides on_llm_end --
 
 #[derive(Debug)]
 struct LlmEndHandler;
@@ -32,7 +31,6 @@ impl BaseCallbackHandler for LlmEndHandler {
     }
 }
 
-// -- Handler that overrides on_chat_model_start --
 
 #[derive(Debug)]
 struct ChatModelStartHandler;
@@ -62,7 +60,6 @@ impl BaseCallbackHandler for ChatModelStartHandler {
     }
 }
 
-// -- Async handler that overrides on_llm_end_async --
 
 #[derive(Debug)]
 struct AsyncLlmEndHandler;
@@ -92,7 +89,6 @@ impl AsyncCallbackHandler for AsyncLlmEndHandler {
     }
 }
 
-// -- Async handler that overrides on_chat_model_start_async --
 
 #[derive(Debug)]
 struct AsyncChatModelStartHandler;
@@ -124,7 +120,6 @@ impl AsyncCallbackHandler for AsyncChatModelStartHandler {
     }
 }
 
-// -- Tests --
 
 /// Ported from `test_on_llm_end_is_defined`.
 ///

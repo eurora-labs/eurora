@@ -8,9 +8,6 @@ use agent_chain_core::runnables::graph::{Edge, Graph, MermaidOptions, Node};
 use agent_chain_core::runnables::graph_mermaid::to_safe_id;
 use serde_json::Value;
 
-// ===========================================================================
-// Helpers
-// ===========================================================================
 
 fn make_node(id: &str, name: &str) -> Node {
     Node::new(id, name)
@@ -20,9 +17,6 @@ fn make_node_with_metadata(id: &str, name: &str, metadata: HashMap<String, Value
     Node::new(id, name).with_metadata(metadata)
 }
 
-// ===========================================================================
-// Tests for _to_safe_id (mirrors test_graph_mermaid_to_safe_id)
-// ===========================================================================
 
 #[test]
 fn test_to_safe_id_plain() {
@@ -44,9 +38,6 @@ fn test_to_safe_id_special_chars() {
     assert_eq!(to_safe_id("#foo*&!"), "\\23foo\\2a\\26\\21");
 }
 
-// ===========================================================================
-// Tests for Graph trim (mirrors test_trim)
-// ===========================================================================
 
 #[test]
 fn test_trim() {
@@ -64,7 +55,6 @@ fn test_trim() {
     assert_eq!(graph.first_node().unwrap().id, "__start__");
     assert_eq!(graph.last_node().unwrap().id, "__end__");
 
-    // Can't trim __start__ or __end__ nodes
     graph.trim_first_node();
     assert_eq!(graph.first_node().unwrap().id, "__start__");
 
@@ -74,7 +64,6 @@ fn test_trim() {
 
 #[test]
 fn test_trim_basic() {
-    // A simple 3-node graph where start/end can't be trimmed (named nodes)
     let mut graph = Graph::new();
     let start = graph.add_node_named("__start__", Some("__start__"));
     let middle = graph.add_node_named("process", Some("process"));
@@ -104,13 +93,11 @@ fn test_trim_json_output() {
 
     let json = graph.to_json();
 
-    // Verify structure
     assert!(json.get("nodes").unwrap().is_array());
     assert!(json.get("edges").unwrap().is_array());
     assert_eq!(json["nodes"].as_array().unwrap().len(), 4);
     assert_eq!(json["edges"].as_array().unwrap().len(), 4);
 
-    // Verify conditional edges are marked
     let edges = json["edges"].as_array().unwrap();
     let conditional_edges: Vec<_> = edges
         .iter()
@@ -123,9 +110,6 @@ fn test_trim_json_output() {
     assert_eq!(conditional_edges.len(), 2);
 }
 
-// ===========================================================================
-// Tests for trim_multi_edge (mirrors test_trim_multi_edge)
-// ===========================================================================
 
 #[test]
 fn test_trim_multi_edge() {
@@ -138,18 +122,13 @@ fn test_trim_multi_edge() {
     graph.add_edge(&a, &last, None, false);
     graph.add_edge(&start, &last, None, false);
 
-    // trim_first_node should not remove __start__ since it has 2 outgoing edges
     graph.trim_first_node();
     assert_eq!(graph.first_node().unwrap().id, "__start__");
 
-    // trim_last_node should not remove __end__ since it has 2 incoming edges
     graph.trim_last_node();
     assert_eq!(graph.last_node().unwrap().id, "__end__");
 }
 
-// ===========================================================================
-// Tests for parallel subgraph Mermaid (mirrors test_parallel_subgraph_mermaid)
-// ===========================================================================
 
 #[test]
 fn test_parallel_subgraph_mermaid() {
@@ -194,7 +173,6 @@ fn test_parallel_subgraph_mermaid() {
     let graph = Graph::from_parts(nodes, edges);
     let mermaid = graph.draw_mermaid(None).unwrap();
 
-    // Verify key structural elements
     assert!(mermaid.contains("graph TD;"));
     assert!(mermaid.contains("subgraph inner_1"));
     assert!(mermaid.contains("subgraph inner_2"));
@@ -204,9 +182,6 @@ fn test_parallel_subgraph_mermaid() {
     assert!(mermaid.contains("end"));
 }
 
-// ===========================================================================
-// Tests for double nested subgraph (mirrors test_double_nested_subgraph_mermaid)
-// ===========================================================================
 
 #[test]
 fn test_double_nested_subgraph_mermaid() {
@@ -254,9 +229,6 @@ fn test_double_nested_subgraph_mermaid() {
     assert!(mermaid.contains("end"));
 }
 
-// ===========================================================================
-// Tests for triple nested subgraph (mirrors test_triple_nested_subgraph_mermaid)
-// ===========================================================================
 
 #[test]
 fn test_triple_nested_subgraph_mermaid() {
@@ -314,9 +286,6 @@ fn test_triple_nested_subgraph_mermaid() {
     assert!(mermaid.contains("subgraph child_1"));
 }
 
-// ===========================================================================
-// Tests for single node subgraph (mirrors test_single_node_subgraph_mermaid)
-// ===========================================================================
 
 #[test]
 fn test_single_node_subgraph_mermaid() {
@@ -339,9 +308,6 @@ fn test_single_node_subgraph_mermaid() {
     assert!(mermaid.contains("end"));
 }
 
-// ===========================================================================
-// Tests for frontmatter config (mirrors test_graph_mermaid_frontmatter_config)
-// ===========================================================================
 
 #[test]
 fn test_graph_mermaid_frontmatter_config() {
@@ -374,7 +340,6 @@ fn test_graph_mermaid_frontmatter_config() {
         }))
         .unwrap();
 
-    // Verify frontmatter is present
     assert!(mermaid.starts_with("---\n"));
     assert!(mermaid.contains("theme: neutral"));
     assert!(mermaid.contains("handDrawn"));
@@ -382,15 +347,11 @@ fn test_graph_mermaid_frontmatter_config() {
     assert!(mermaid.contains("graph TD;"));
 }
 
-// ===========================================================================
-// Tests for special characters (mirrors test_graph_mermaid_special_chars)
-// ===========================================================================
 
 #[test]
 fn test_graph_mermaid_special_chars() {
     let mut nodes = HashMap::new();
     nodes.insert("__start__".to_string(), make_node("__start__", "__start__"));
-    // Chinese characters
     nodes.insert("开始".to_string(), make_node("开始", "开始"));
     nodes.insert("结束".to_string(), make_node("结束", "结束"));
     nodes.insert("__end__".to_string(), make_node("__end__", "__end__"));
@@ -405,16 +366,11 @@ fn test_graph_mermaid_special_chars() {
     let mermaid = graph.draw_mermaid(None).unwrap();
 
     assert!(mermaid.contains("graph TD;"));
-    // Chinese characters should be escaped to safe ids
     assert!(mermaid.contains("\\"));
-    // The node labels should still contain the Chinese characters
     assert!(mermaid.contains("开始"));
     assert!(mermaid.contains("结束"));
 }
 
-// ===========================================================================
-// Tests for draw_mermaid without styles (mirrors with_styles=False usage)
-// ===========================================================================
 
 #[test]
 fn test_draw_mermaid_without_styles() {
@@ -436,15 +392,11 @@ fn test_draw_mermaid_without_styles() {
         }))
         .unwrap();
 
-    // Without styles: no frontmatter, no classDef
     assert!(mermaid.starts_with("graph TD;\n"));
     assert!(!mermaid.contains("---"));
     assert!(!mermaid.contains("classDef"));
 }
 
-// ===========================================================================
-// Tests for Graph API basics
-// ===========================================================================
 
 #[test]
 fn test_graph_add_node() {
@@ -513,7 +465,6 @@ fn test_graph_no_first_node_with_multiple_roots() {
     graph.add_edge(&a, &c, None, false);
     graph.add_edge(&b, &c, None, false);
 
-    // Both a and b are roots — no single first node
     assert!(graph.first_node().is_none());
     assert_eq!(graph.last_node().unwrap().id, "c");
 }
@@ -521,7 +472,6 @@ fn test_graph_no_first_node_with_multiple_roots() {
 #[test]
 fn test_graph_reid() {
     let mut graph = Graph::new();
-    // Use UUID-like ids
     let a = graph.add_node_named("alpha", None);
     let b = graph.add_node_named("beta", None);
     graph.add_edge(&a, &b, None, false);
@@ -585,9 +535,6 @@ fn test_node_with_metadata_renders_in_mermaid() {
     assert!(mermaid.contains("before"));
 }
 
-// ===========================================================================
-// Tests for Graph.extend() (mirrors Python's graph.extend)
-// ===========================================================================
 
 #[test]
 fn test_graph_extend_basic() {
@@ -624,7 +571,6 @@ fn test_graph_extend_with_prefix() {
     assert_eq!(last.as_ref().unwrap().id, "sub:c");
     assert!(graph.nodes.contains_key("sub:b"));
     assert!(graph.nodes.contains_key("sub:c"));
-    // Edge should also be prefixed
     assert_eq!(graph.edges.last().unwrap().source, "sub:b");
     assert_eq!(graph.edges.last().unwrap().target, "sub:c");
 }
@@ -634,12 +580,10 @@ fn test_graph_extend_uuid_nodes_ignore_prefix() {
     let mut graph = Graph::new();
 
     let mut other = Graph::new();
-    // add_node with None id generates UUID
     let b = other.add_node_named("b", None);
     let c = other.add_node_named("c", None);
     other.add_edge(&b, &c, None, false);
 
-    // All nodes have UUID ids, so prefix should be ignored
     let (first, last) = graph.extend(other, "should_be_ignored");
     let first = first.unwrap();
     let last = last.unwrap();
@@ -676,9 +620,6 @@ fn test_graph_extend_returns_correct_first_last() {
     assert_eq!(last.unwrap().id, "z");
 }
 
-// ===========================================================================
-// Tests for Runnable.get_graph()
-// ===========================================================================
 
 use agent_chain_core::runnables::base::{Runnable, runnable_lambda};
 
@@ -687,11 +628,9 @@ fn test_get_graph_base_runnable() {
     let r = runnable_lambda(|x: String| Ok(x.len()));
     let graph = r.get_graph(None).unwrap();
 
-    // Default: 3 nodes (Input, Runnable, Output) and 2 edges
     assert_eq!(graph.nodes.len(), 3);
     assert_eq!(graph.edges.len(), 2);
 
-    // Should have valid first and last
     assert!(graph.first_node().is_some());
     assert!(graph.last_node().is_some());
 }
@@ -702,7 +641,6 @@ fn test_get_graph_base_runnable_names() {
     let graph = r.get_graph(None).unwrap();
     let reided = graph.reid();
 
-    // Verify node names contain Input and Output suffixes
     let names: Vec<&str> = reided.nodes.values().map(|n| n.name.as_str()).collect();
     assert!(
         names.iter().any(|n| n.contains("Input")),
@@ -725,11 +663,6 @@ fn test_get_graph_sequence() {
     let seq = pipe(a, b);
     let graph = seq.get_graph(None).unwrap();
 
-    // Sequence trims intermediate nodes:
-    // first step: Input + Lambda (trimmed Output)
-    // last step: (trimmed Input) + Lambda + Output
-    // Connected by edge between them
-    // Total: 4 nodes, 3 edges
     assert!(
         graph.nodes.len() >= 3,
         "Expected >= 3 nodes, got {}",
@@ -741,7 +674,6 @@ fn test_get_graph_sequence() {
         graph.edges.len()
     );
 
-    // Should still have valid first and last
     assert!(graph.first_node().is_some());
     assert!(graph.last_node().is_some());
 }
@@ -778,15 +710,12 @@ fn test_get_graph_parallel() {
 
     let graph = par.get_graph(None).unwrap();
 
-    // Parallel: shared Input + Output nodes, plus the runnable nodes from each branch
-    // Each branch contributes 1 middle node (lambda), so total = 2 + 2 = 4 nodes
     assert!(
         graph.nodes.len() >= 4,
         "Expected >= 4 nodes, got {}",
         graph.nodes.len()
     );
 
-    // Edges: 2 fan-out + 2 fan-in = 4
     assert!(
         graph.edges.len() >= 4,
         "Expected >= 4 edges, got {}",
@@ -825,14 +754,10 @@ fn test_get_graph_binding_delegates() {
     let binding = r.bind(HashMap::new());
     let graph = binding.get_graph(None).unwrap();
 
-    // Binding delegates: same structure as base (3 nodes, 2 edges)
     assert_eq!(graph.nodes.len(), 3);
     assert_eq!(graph.edges.len(), 2);
 }
 
-// ===========================================================================
-// Tests for NodeData, node_data_str, node_data_json
-// ===========================================================================
 
 use agent_chain_core::runnables::graph::{NodeData, node_data_json, node_data_str};
 
@@ -851,7 +776,6 @@ fn test_node_data_str_with_uuid_and_runnable() {
         name: "RunnableLambda".to_string(),
     };
     let uuid_id = "550e8400-e29b-41d4-a716-446655440000";
-    // Strips "Runnable" prefix
     assert_eq!(node_data_str(uuid_id, Some(&data)), "Lambda");
 }
 
@@ -861,7 +785,6 @@ fn test_node_data_str_with_uuid_and_no_prefix() {
         name: "ChatOpenAI".to_string(),
     };
     let uuid_id = "550e8400-e29b-41d4-a716-446655440000";
-    // No "Runnable" prefix — kept as-is
     assert_eq!(node_data_str(uuid_id, Some(&data)), "ChatOpenAI");
 }
 
@@ -918,7 +841,6 @@ fn test_node_data_json_none() {
         metadata: None,
     };
     let json = node_data_json(&node);
-    // None data produces empty object
     assert!(
         json.as_object().unwrap().is_empty() || !json.as_object().unwrap().contains_key("type")
     );
@@ -941,9 +863,6 @@ fn test_node_data_json_with_metadata() {
     assert_eq!(json["metadata"]["key"], "value");
 }
 
-// ===========================================================================
-// Tests for Graph.add_node with NodeData
-// ===========================================================================
 
 #[test]
 fn test_add_node_with_schema_data() {
@@ -955,7 +874,6 @@ fn test_add_node_with_schema_data() {
         None,
         None,
     );
-    // UUID-based ID, name derived from data
     assert_eq!(node.name, "MyInput");
     assert!(node.data.is_some());
 }
@@ -970,7 +888,6 @@ fn test_add_node_with_runnable_data() {
         None,
         None,
     );
-    // Strips "Runnable" prefix for display name
     assert_eq!(node.name, "Lambda");
 }
 
@@ -978,14 +895,10 @@ fn test_add_node_with_runnable_data() {
 fn test_add_node_with_no_data() {
     let mut graph = Graph::new();
     let node = graph.add_node(None, Some("my_id"), None);
-    // Non-UUID id, no data: name = id
     assert_eq!(node.name, "my_id");
     assert!(node.data.is_none());
 }
 
-// ===========================================================================
-// Tests for Graph.to_json with NodeData
-// ===========================================================================
 
 #[test]
 fn test_to_json_includes_node_data_type() {
@@ -1020,15 +933,11 @@ fn test_to_json_includes_node_data_type() {
     assert!(runnable_node.is_some(), "Should have a runnable node");
 }
 
-// ===========================================================================
-// Tests for RunnableLambda with deps
-// ===========================================================================
 
 #[test]
 fn test_lambda_no_deps_default_graph() {
     let r = runnable_lambda(|x: String| Ok(x.len()));
     let graph = r.get_graph(None).unwrap();
-    // Default: 3 nodes, 2 edges
     assert_eq!(graph.nodes.len(), 3);
     assert_eq!(graph.edges.len(), 2);
 }
@@ -1042,9 +951,6 @@ fn test_lambda_with_deps_graph() {
     let r = runnable_lambda(|x: String| Ok(x.len())).with_dep(Arc::new(RunnableGraphProvider(dep)));
 
     let graph = r.get_graph(None).unwrap();
-    // With 1 dep: Input + dep's runnable node + Output = 3 nodes
-    // (dep's input/output are trimmed, its runnable node remains)
-    // Edges: input->dep_runnable, dep_runnable->output = 2
     assert!(
         graph.nodes.len() >= 3,
         "Expected >= 3 nodes, got {}",
@@ -1056,7 +962,6 @@ fn test_lambda_with_deps_graph() {
         graph.edges.len()
     );
 
-    // Should have valid first and last nodes
     assert!(graph.first_node().is_some());
     assert!(graph.last_node().is_some());
 }
@@ -1074,13 +979,11 @@ fn test_lambda_with_multiple_deps_graph() {
     ]);
 
     let graph = r.get_graph(None).unwrap();
-    // With 2 deps: Input + 2 dep runnable nodes + Output = 4 nodes
     assert!(
         graph.nodes.len() >= 4,
         "Expected >= 4 nodes, got {}",
         graph.nodes.len()
     );
-    // Edges: 2 fan-out + 2 fan-in = 4
     assert!(
         graph.edges.len() >= 4,
         "Expected >= 4 edges, got {}",

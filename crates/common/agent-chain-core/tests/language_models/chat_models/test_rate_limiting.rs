@@ -38,7 +38,6 @@ async fn test_rate_limit_invoke() {
         10.0,
     );
 
-    // First call — token bucket starts empty, must wait
     let tic = Instant::now();
     let _ = model
         .invoke(LanguageModelInput::from("foo"), None)
@@ -51,7 +50,6 @@ async fn test_rate_limit_invoke() {
         elapsed
     );
 
-    // Second call — should have a token available
     let tic = Instant::now();
     let _ = model
         .invoke(LanguageModelInput::from("foo"), None)
@@ -95,7 +93,6 @@ async fn test_rate_limit_ainvoke() {
     let elapsed = tic.elapsed();
     assert!(elapsed < Duration::from_millis(100));
 
-    // Third call — needs to wait again
     let tic = Instant::now();
     let _ = model
         .ainvoke(LanguageModelInput::from("foo"), None)
@@ -127,7 +124,6 @@ async fn test_rate_limit_skips_cache() {
     ])
     .with_config(config);
 
-    // First call — rate limited (cache miss)
     let tic = Instant::now();
     let _ = model
         .invoke(LanguageModelInput::from("foo"), None)
@@ -140,7 +136,6 @@ async fn test_rate_limit_skips_cache() {
         elapsed
     );
 
-    // Second and third calls — cache hits, no rate limiting
     for i in 0..2 {
         let tic = Instant::now();
         let _ = model
@@ -174,7 +169,6 @@ async fn test_rate_limit_stream() {
         10.0,
     );
 
-    // First stream — must wait for rate limiter
     let tic = Instant::now();
     let result = model
         .invoke(LanguageModelInput::from("foo"), None)
@@ -188,7 +182,6 @@ async fn test_rate_limit_stream() {
         elapsed
     );
 
-    // Second invoke — token available, should be fast
     let tic = Instant::now();
     let _ = model
         .invoke(LanguageModelInput::from("bar"), None)
@@ -201,7 +194,6 @@ async fn test_rate_limit_stream() {
         elapsed
     );
 
-    // Third invoke — needs to wait again
     let tic = Instant::now();
     let _ = model
         .invoke(LanguageModelInput::from("baz"), None)
@@ -232,7 +224,6 @@ async fn test_rate_limit_astream() {
         10.0,
     );
 
-    // First call — rate limited
     let tic = Instant::now();
     let _ = model
         .ainvoke(LanguageModelInput::from("foo"), None)
@@ -241,7 +232,6 @@ async fn test_rate_limit_astream() {
     let elapsed = tic.elapsed();
     assert!(elapsed >= Duration::from_millis(100));
 
-    // Second — token available
     let tic = Instant::now();
     let _ = model
         .ainvoke(LanguageModelInput::from("bar"), None)
@@ -250,7 +240,6 @@ async fn test_rate_limit_astream() {
     let elapsed = tic.elapsed();
     assert!(elapsed < Duration::from_millis(100));
 
-    // Third — rate limited again
     let tic = Instant::now();
     let _ = model
         .ainvoke(LanguageModelInput::from("baz"), None)
@@ -285,7 +274,6 @@ async fn test_rate_limit_skips_cache_async() {
     ])
     .with_config(config);
 
-    // First call — rate limited (cache miss)
     let tic = Instant::now();
     let _ = model
         .ainvoke(LanguageModelInput::from("foo"), None)
@@ -298,7 +286,6 @@ async fn test_rate_limit_skips_cache_async() {
         elapsed
     );
 
-    // Cache hits should be fast (no rate limiting)
     for i in 0..2 {
         let tic = Instant::now();
         let _ = model

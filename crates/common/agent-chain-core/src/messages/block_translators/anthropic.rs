@@ -169,7 +169,6 @@ pub fn convert_to_standard_blocks_with_context(
 
     for block in content {
         if !block.is_object() {
-            // If it's a string, wrap it in a text block
             if let Some(s) = block.as_str() {
                 result.push(json!({"type": "text", "text": s}));
             }
@@ -218,8 +217,6 @@ pub fn convert_to_standard_blocks_with_context(
             }
 
             "tool_use" => {
-                // For isolated streaming chunks with exactly one tool_call_chunk,
-                // return tool_call_chunk using data from the message's tool_call_chunks
                 if is_chunk
                     && context
                         .map(|c| c.tool_call_chunks.len() == 1)
@@ -242,7 +239,6 @@ pub fn convert_to_standard_blocks_with_context(
 
                     result.push(tool_call_chunk);
                 } else {
-                    // Non-streaming or final chunk: convert to tool_call
                     let mut tool_call_block = json!({
                         "type": "tool_call",
                         "name": block.get("name").and_then(|v| v.as_str()).unwrap_or(""),
@@ -263,7 +259,6 @@ pub fn convert_to_standard_blocks_with_context(
             }
 
             "input_json_delta" => {
-                // This is a streaming chunk for tool input
                 let mut tool_call_chunk = json!({
                     "type": "tool_call_chunk",
                     "name": Value::Null,
@@ -286,14 +281,12 @@ pub fn convert_to_standard_blocks_with_context(
                     name
                 };
 
-                // Check if this is a streaming chunk (empty input, no partial_json)
                 let input = block.get("input");
                 let has_partial_json = block.get("partial_json").is_some();
                 let is_empty_input =
                     input.map(|v| v == &json!({})).unwrap_or(true) && !has_partial_json;
 
                 if is_chunk && is_empty_input {
-                    // First chunk in a stream
                     let mut server_tool_call_chunk = json!({
                         "type": "server_tool_call_chunk",
                         "name": server_tool_use_name,
@@ -315,7 +308,6 @@ pub fn convert_to_standard_blocks_with_context(
                 } else {
                     let mut args = block.get("input").cloned().unwrap_or(json!({}));
 
-                    // Try to parse partial_json if input is empty
                     if args == json!({})
                         && let Some(partial_json) =
                             block.get("partial_json").and_then(|v| v.as_str())
@@ -354,7 +346,6 @@ pub fn convert_to_standard_blocks_with_context(
                     input.map(|v| v == &json!({})).unwrap_or(true) && !has_partial_json;
 
                 if is_chunk && is_empty_input {
-                    // First chunk in a stream
                     let mut server_tool_call_chunk = json!({
                         "type": "server_tool_call_chunk",
                         "name": "remote_mcp",
@@ -380,7 +371,6 @@ pub fn convert_to_standard_blocks_with_context(
                 } else {
                     let mut args = block.get("input").cloned().unwrap_or(json!({}));
 
-                    // Try to parse partial_json if input is empty
                     if args == json!({})
                         && let Some(partial_json) =
                             block.get("partial_json").and_then(|v| v.as_str())
@@ -427,7 +417,6 @@ pub fn convert_to_standard_blocks_with_context(
                 if let Some(output) = block.get("content") {
                     server_tool_result["output"] = output.clone();
 
-                    // Check for error
                     if let Some(output_obj) = output.as_object()
                         && output_obj.contains_key("error_code")
                     {
@@ -454,17 +443,14 @@ pub fn convert_to_standard_blocks_with_context(
             }
 
             _ => {
-                // Check if it's a known block type
                 if KNOWN_BLOCK_TYPES.contains(&block_type) {
                     result.push(block.clone());
                 } else {
-                    // Wrap in non_standard
                     let mut non_standard = json!({
                         "type": "non_standard",
                         "value": block.clone(),
                     });
 
-                    // Move index to top level if present
                     if let Some(index) = block.get("index") {
                         non_standard["index"] = index.clone();
                         if let Some(value) = non_standard.get_mut("value")
@@ -491,7 +477,6 @@ pub fn convert_to_standard_blocks_with_context(
 pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
     let mut result = Vec::new();
 
-    // Unpack non_standard blocks to get at the original provider-specific block
     let unpacked_blocks: Vec<Value> = content
         .iter()
         .map(|block| {
@@ -620,7 +605,6 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
                         }
                     }
                 } else {
-                    // No source, might be a standard image block already
                     if KNOWN_BLOCK_TYPES.contains(&block_type) {
                         result.push(block.clone());
                     } else {

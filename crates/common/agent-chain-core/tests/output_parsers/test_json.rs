@@ -12,7 +12,6 @@ use agent_chain_core::utils::json::{
 use futures::StreamExt;
 use serde_json::{Value, json};
 
-// --- Test data constants matching the Python test file ---
 
 const GOOD_JSON: &str = r#"```json
 {
@@ -34,14 +33,10 @@ const JSON_WITH_MARKDOWN_CODE_BLOCK: &str = "```json\n{\n    \"foo\": \"```bar``
 const JSON_WITH_PART_MARKDOWN_CODE_BLOCK: &str =
     "\n{\"valid_json\": \"hey ```print(hello world!)``` hey\"}\n";
 
-// In the Python source, \n and \t within the action_input value are actual
-// newline/tab characters, and \\" is a single backslash followed by a quote.
-// The _custom_parser is what converts these actual newlines/tabs to \n/\t escapes.
 const JSON_WITH_MARKDOWN_CODE_BLOCK_AND_NEWLINES: &str = "```json\n{\n    \"action\": \"Final Answer\",\n    \"action_input\": \"```bar\n<div id=\\\"1\\\" class=\\\"value\\\">\n\ttext\n</div>```\"\n}\n```";
 
 const JSON_WITH_PYTHON_DICT: &str = "```json\n{\n    \"action\": \"Final Answer\",\n    \"action_input\": {\"foo\": \"bar\", \"bar\": \"foo\"}\n}\n```";
 
-// In Python \\" in triple-quotes = single backslash + quote = JSON escape for literal quote.
 const JSON_WITH_ESCAPED_DOUBLE_QUOTES_IN_NESTED_JSON: &str = "```json\n{\n    \"action\": \"Final Answer\",\n    \"action_input\": \"{\\\"foo\\\": \\\"bar\\\", \\\"bar\\\": \\\"foo\\\"}\"\n}\n```";
 
 const NO_TICKS: &str = "{\n    \"foo\": \"bar\"\n}";
@@ -67,7 +62,6 @@ const WITH_END_TICK: &str =
 
 const WITH_END_TEXT: &str = "Here is a response formatted as schema:\n\n```\n{\n  \"foo\": \"bar\"\n\n```\nThis should do the trick\n";
 
-// --- test_parse_json (parametrized over TEST_CASES) ---
 
 fn assert_parse_json_foo_bar(json_string: &str) {
     let parsed = parse_json_markdown(json_string).expect("should parse JSON");
@@ -148,7 +142,6 @@ fn test_parse_json_with_end_text() {
     assert_parse_json_foo_bar(WITH_END_TEXT);
 }
 
-// --- test_parse_json_with_code_blocks ---
 
 #[test]
 fn test_parse_json_with_code_blocks() {
@@ -156,7 +149,6 @@ fn test_parse_json_with_code_blocks() {
     assert_eq!(parsed, json!({"foo": "```bar```"}));
 }
 
-// --- test_parse_json_with_part_code_blocks ---
 
 #[test]
 fn test_parse_json_with_part_code_blocks() {
@@ -168,7 +160,6 @@ fn test_parse_json_with_part_code_blocks() {
     );
 }
 
-// --- test_parse_json_with_code_blocks_and_newlines ---
 
 #[test]
 fn test_parse_json_with_code_blocks_and_newlines() {
@@ -183,7 +174,6 @@ fn test_parse_json_with_code_blocks_and_newlines() {
     );
 }
 
-// --- test_parse_non_dict_json_output ---
 
 #[test]
 fn test_parse_non_dict_json_output() {
@@ -197,7 +187,6 @@ fn test_parse_non_dict_json_output() {
     );
 }
 
-// --- test_parse_nested_json_with_escaped_quotes ---
 
 #[test]
 fn test_parse_nested_json_with_escaped_quotes() {
@@ -212,7 +201,6 @@ fn test_parse_nested_json_with_escaped_quotes() {
     );
 }
 
-// --- test_parse_json_with_python_dict ---
 
 #[test]
 fn test_parse_json_with_python_dict() {
@@ -226,7 +214,6 @@ fn test_parse_json_with_python_dict() {
     );
 }
 
-// --- test_parse_partial_json (parametrized) ---
 
 #[test]
 fn test_parse_partial_json_complete_object() {
@@ -282,11 +269,8 @@ fn test_parse_partial_json_trailing_backslash() {
     assert_eq!(parsed, json!({"foo": "bar"}));
 }
 
-// --- Streaming token data ---
 
 fn streamed_tokens() -> Vec<&'static str> {
-    // Matches Python STREAMED_TOKENS.splitlines() exactly:
-    // each line of the multiline string becomes one token.
     vec![
         "",
         "{",
@@ -414,7 +398,6 @@ fn expected_streamed_json_diff() -> Vec<Value> {
     ]
 }
 
-// --- test_partial_text_json_output_parser (sync streaming) ---
 
 #[tokio::test]
 async fn test_partial_text_json_output_parser() {
@@ -442,7 +425,6 @@ async fn test_partial_text_json_output_parser() {
     }
 }
 
-// --- test_partial_text_json_output_parser_diff ---
 
 #[tokio::test]
 async fn test_partial_text_json_output_parser_diff() {
@@ -470,7 +452,6 @@ async fn test_partial_text_json_output_parser_diff() {
     }
 }
 
-// --- test_partial_text_json_output_parser_async ---
 
 #[tokio::test]
 async fn test_partial_text_json_output_parser_async() {
@@ -492,7 +473,6 @@ async fn test_partial_text_json_output_parser_async() {
     }
 }
 
-// --- test_partial_text_json_output_parser_diff_async ---
 
 #[tokio::test]
 async fn test_partial_text_json_output_parser_diff_async() {
@@ -514,7 +494,6 @@ async fn test_partial_text_json_output_parser_diff_async() {
     }
 }
 
-// --- test_raises_error ---
 
 #[test]
 fn test_raises_error() {
@@ -523,7 +502,6 @@ fn test_raises_error() {
     assert!(result.is_err(), "Parsing 'hi' should produce an error");
 }
 
-// --- test_partial_text_json_output_parser_with_json_code_block ---
 
 #[tokio::test]
 async fn test_partial_text_json_output_parser_with_json_code_block() {
@@ -591,7 +569,6 @@ async fn test_partial_text_json_output_parser_with_json_code_block() {
     }
 }
 
-// --- test_unicode_handling ---
 
 #[test]
 fn test_unicode_handling() {

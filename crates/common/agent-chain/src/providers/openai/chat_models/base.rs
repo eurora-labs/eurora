@@ -148,7 +148,6 @@ pub enum ContentBlock {
 /// Returns true if the model name indicates an o-series reasoning model.
 fn is_o_series_model(model: &str) -> bool {
     let lower = model.to_lowercase();
-    // Matches o1, o3, o4-mini, etc. but not "gpt-4o"
     lower.starts_with("o1") || lower.starts_with("o3") || lower.starts_with("o4")
 }
 
@@ -237,25 +236,21 @@ impl ChatOpenAI {
         let model_name = model.into();
         let model_lower = model_name.to_lowercase();
 
-        // Validate temperature for o1 models (match Python validate_temperature)
         let temperature = if model_lower.starts_with("o1") {
             Some(1.0)
         } else {
             None
         };
 
-        // Resolve organization from environment
         let organization = env::var("OPENAI_ORG_ID")
             .ok()
             .or_else(|| env::var("OPENAI_ORGANIZATION").ok());
 
-        // Resolve api_base from environment
         let api_base = env::var("OPENAI_API_BASE")
             .ok()
             .or_else(|| env::var("OPENAI_BASE_URL").ok())
             .unwrap_or_else(|| DEFAULT_API_BASE.to_string());
 
-        // Enable stream_usage by default when using the default base URL
         let stream_usage = if api_base == DEFAULT_API_BASE {
             Some(true)
         } else {
@@ -303,7 +298,6 @@ impl ChatOpenAI {
         }
     }
 
-    // ── Builder methods ──────────────────────────────────────────────
 
     pub fn temperature(mut self, temp: f64) -> Self {
         self.temperature = Some(temp);
@@ -463,7 +457,6 @@ impl ChatOpenAI {
         self
     }
 
-    // ── Internal helpers ─────────────────────────────────────────────
 
     /// Filter out disabled parameters from a payload.
     /// Matches Python `_filter_disabled_params`: supports both `None` (remove entirely)
@@ -475,11 +468,9 @@ impl ChatOpenAI {
             for (key, default_or_list) in disabled {
                 match default_or_list {
                     None => {
-                        // Param is fully disabled — remove it
                         obj.remove(key);
                     }
                     Some(serde_json::Value::Array(disabled_values)) => {
-                        // Param disabled only for specific values
                         if let Some(current) = obj.get(key)
                             && disabled_values.contains(current)
                         {
@@ -487,7 +478,6 @@ impl ChatOpenAI {
                         }
                     }
                     Some(default) => {
-                        // Replace with default value
                         obj.insert(key.clone(), default.clone());
                     }
                 }
@@ -498,12 +488,10 @@ impl ChatOpenAI {
     /// Determine if Responses API should be used.
     /// Matches Python's `BaseChatOpenAI._use_responses_api` + module-level `_use_responses_api`.
     pub fn should_use_responses_api(&self, payload: Option<&serde_json::Value>) -> bool {
-        // Explicit setting takes precedence
         if let Some(use_api) = self.use_responses_api {
             return use_api;
         }
 
-        // Instance-level checks
         if !self.builtin_tools.is_empty()
             || self.reasoning.is_some()
             || self.verbosity.is_some()
@@ -522,7 +510,6 @@ impl ChatOpenAI {
             return true;
         }
 
-        // Payload-level checks (matches Python module-level _use_responses_api)
         if let Some(p) = payload
             && payload_requires_responses_api(p)
         {
@@ -580,7 +567,6 @@ impl ChatOpenAI {
         }
     }
 
-    // ── Message formatting ───────────────────────────────────────────
 
     /// Format message content, filtering out block types not supported by OpenAI.
     /// Matches Python `_format_message_content`.
@@ -589,7 +575,6 @@ impl ChatOpenAI {
             let filtered: Vec<serde_json::Value> = arr
                 .iter()
                 .filter(|block| {
-                    // Remove block types that OpenAI doesn't accept
                     let block_type = block.get("type").and_then(|t| t.as_str()).unwrap_or("");
                     !matches!(block_type, "tool_use" | "thinking" | "reasoning_content")
                 })
@@ -614,7 +599,6 @@ impl ChatOpenAI {
     fn convert_message_to_dict(&self, msg: &BaseMessage) -> Option<serde_json::Value> {
         match msg {
             BaseMessage::System(m) => {
-                // Respect __openai_role__ override (e.g. "developer")
                 let role = m
                     .additional_kwargs
                     .get("__openai_role__")
@@ -673,7 +657,6 @@ impl ChatOpenAI {
             BaseMessage::AI(m) => {
                 let mut message = serde_json::json!({"role": "assistant"});
 
-                // Build tool_calls array from both valid and invalid tool calls
                 let mut all_tool_calls: Vec<serde_json::Value> = m
                     .tool_calls
                     .iter()
@@ -704,7 +687,6 @@ impl ChatOpenAI {
                     message["tool_calls"] = serde_json::Value::Array(all_tool_calls);
                 }
 
-                // When tool_calls are present, content must be null (not empty string)
                 let has_tool_calls = message.get("tool_calls").is_some();
                 if has_tool_calls {
                     let content_str = m.text();
@@ -724,7 +706,6 @@ impl ChatOpenAI {
                 Some(message)
             }
             BaseMessage::Tool(m) => {
-                // Only include supported keys: content, role, tool_call_id
                 Some(serde_json::json!({
                     "role": "tool",
                     "tool_call_id": m.tool_call_id,
@@ -811,7 +792,6 @@ impl ChatOpenAI {
                     input.push(serde_json::json!({"role": "user", "content": content}));
                 }
                 BaseMessage::AI(m) => {
-                    // Add message content as output_text block
                     if !m.content.is_empty() || m.tool_calls.is_empty() {
                         input.push(serde_json::json!({
                             "type": "message",
@@ -824,7 +804,6 @@ impl ChatOpenAI {
                         }));
                     }
 
-                    // Add function calls as separate items
                     for tc in &m.tool_calls {
                         input.push(serde_json::json!({
                             "type": "function_call",
@@ -861,7 +840,6 @@ impl ChatOpenAI {
         input
     }
 
-    // ── Payload construction ─────────────────────────────────────────
 
     /// Build the request payload for the Chat Completions API.
     /// Matches Python `ChatOpenAI._get_request_payload`.
@@ -874,7 +852,6 @@ impl ChatOpenAI {
     ) -> serde_json::Value {
         let mut formatted_messages = self.format_messages(messages);
 
-        // Mutate system message role to "developer" for o-series models
         if is_o_series_model(&self.model) {
             for message in &mut formatted_messages {
                 if message.get("role").and_then(|r| r.as_str()) == Some("system") {
@@ -888,7 +865,6 @@ impl ChatOpenAI {
             "messages": formatted_messages
         });
 
-        // max_tokens -> max_completion_tokens (deprecated rename since Sept 2024)
         if let Some(max_tokens) = self.max_tokens {
             payload["max_completion_tokens"] = serde_json::json!(max_tokens);
         }
@@ -959,14 +935,12 @@ impl ChatOpenAI {
             payload["store"] = serde_json::json!(store);
         }
 
-        // Merge model_kwargs
         if let Some(obj) = payload.as_object_mut() {
             for (k, v) in &self.model_kwargs {
                 obj.insert(k.clone(), v.clone());
             }
         }
 
-        // Merge extra_body
         if let Some(ref extra) = self.extra_body
             && let Some(obj) = payload.as_object_mut()
         {
@@ -999,7 +973,6 @@ impl ChatOpenAI {
             payload["max_output_tokens"] = serde_json::json!(max_tokens);
         }
 
-        // gpt-5 (non-chat) temperature restriction
         if let Some(temp) = self.effective_temperature() {
             payload["temperature"] = serde_json::json!(temp);
         }
@@ -1013,7 +986,6 @@ impl ChatOpenAI {
             payload["stop"] = serde_json::json!(stop);
         }
 
-        // Collect all tools: built-in + function tools
         let mut all_tools: Vec<serde_json::Value> = self
             .builtin_tools
             .iter()
@@ -1022,9 +994,6 @@ impl ChatOpenAI {
 
         if let Some(tools) = tools {
             for tool in tools {
-                // Convert Chat Completions format -> Responses API format
-                // chat: {"type": "function", "function": {"name": ..., "description": ..., "parameters": ...}}
-                // responses: {"type": "function", "name": ..., "description": ..., "parameters": ...}
                 if let Some(function) = tool.get("function") {
                     let mut flat = serde_json::json!({"type": "function"});
                     if let Some(name) = function.get("name") {
@@ -1054,14 +1023,12 @@ impl ChatOpenAI {
             payload["stream"] = serde_json::json!(true);
         }
 
-        // Reasoning parameters
         if let Some(ref reasoning) = self.reasoning {
             payload["reasoning"] = serde_json::json!(reasoning);
         } else if let Some(ref effort) = self.reasoning_effort {
             payload["reasoning"] = serde_json::json!({"effort": effort});
         }
 
-        // Verbosity goes inside "text" object
         if let Some(ref verbosity) = self.verbosity {
             if let Some(text_obj) = payload.get_mut("text").and_then(|t| t.as_object_mut()) {
                 text_obj.insert("verbosity".to_string(), serde_json::json!(verbosity));
@@ -1086,14 +1053,12 @@ impl ChatOpenAI {
             payload["store"] = serde_json::json!(store);
         }
 
-        // Merge model_kwargs
         if let Some(obj) = payload.as_object_mut() {
             for (k, v) in &self.model_kwargs {
                 obj.insert(k.clone(), v.clone());
             }
         }
 
-        // Merge extra_body
         if let Some(ref extra) = self.extra_body
             && let Some(obj) = payload.as_object_mut()
         {
@@ -1106,7 +1071,6 @@ impl ChatOpenAI {
         payload
     }
 
-    // ── Streaming ────────────────────────────────────────────────────
 
     /// Stream responses using the Responses API.
     async fn stream_responses_api(
@@ -1188,10 +1152,8 @@ impl ChatOpenAI {
                                             }
                                         }
                                         "response.output_text.annotation.added" => {
-                                            // Annotations are captured in non-streaming response
                                         }
                                         "response.function_call_arguments.delta" => {
-                                            // Accumulate function call argument deltas
                                             if let Some(delta) = event.delta && let Some(call_id) = event.call_id.as_ref().or(event.item_id.as_ref()) {
                                                     let entry = tool_call_acc
                                                         .entry(call_id.clone())
@@ -1200,7 +1162,6 @@ impl ChatOpenAI {
                                             }
                                         }
                                         "response.output_item.added" => {
-                                            // Capture function call name when the item is first added
                                             if let Some(ref item) = event.item && item.get("type").and_then(|t| t.as_str()) == Some("function_call") && let (Some(call_id), Some(name)) = (
                                                         item.get("call_id").and_then(|v| v.as_str()),
                                                         item.get("name").and_then(|v| v.as_str()),
@@ -1261,12 +1222,10 @@ impl ChatOpenAI {
         Ok(Box::pin(stream) as Pin<Box<dyn Stream<Item = Result<ChatChunk>> + Send>>)
     }
 
-    // ── Response parsing ─────────────────────────────────────────────
 
     /// Parse a Chat Completions API response.
     /// Matches Python `_create_chat_result`.
     fn parse_response(&self, response: OpenAIResponse) -> Result<ChatResult> {
-        // Check for error in response
         if let Some(ref error) = response.error {
             return Err(Error::api(0, error.to_string()));
         }
@@ -1277,7 +1236,6 @@ impl ChatOpenAI {
         for choice in &response.choices {
             let content = choice.message.content.clone().unwrap_or_default();
 
-            // Parse tool_calls, creating InvalidToolCall on JSON parse failure
             let mut tool_calls = Vec::new();
             let mut invalid_tool_calls = Vec::new();
 
@@ -1440,7 +1398,6 @@ impl ChatOpenAI {
         Ok(ChatResult::new(vec![generation]))
     }
 
-    // ── HTTP helpers ─────────────────────────────────────────────────
 
     /// Send an HTTP request and deserialize the JSON response.
     async fn send_json_request<T: serde::de::DeserializeOwned>(
@@ -1721,7 +1678,6 @@ impl ChatOpenAI {
     }
 }
 
-// ── Trait implementations ────────────────────────────────────────────
 
 #[async_trait]
 impl BaseLanguageModel for ChatOpenAI {
@@ -1985,7 +1941,6 @@ impl ChatOpenAI {
         if let Some(choice) = tool_choice {
             let choice_json = match choice {
                 ToolChoice::String(s) => {
-                    // "any" -> "required" for OpenAI compatibility
                     if s == "any" {
                         serde_json::json!("required")
                     } else if WELL_KNOWN_TOOLS.contains(&s.as_str()) {
@@ -2018,7 +1973,6 @@ impl ChatOpenAI {
     }
 }
 
-// ── API response types ───────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
 struct OpenAIResponse {
@@ -2071,7 +2025,6 @@ struct TokenDetails {
     reasoning_tokens: Option<u32>,
 }
 
-// ── Streaming chunk types ────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
 struct OpenAIStreamChunk {
@@ -2104,7 +2057,6 @@ struct OpenAIStreamFunction {
     arguments: Option<String>,
 }
 
-// ── Responses API types ──────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
 struct ResponsesApiResponse {
@@ -2178,7 +2130,6 @@ struct ResponsesStreamResponse {
     status: Option<String>,
 }
 
-// ── Tests ────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -2302,7 +2253,6 @@ mod tests {
             .temperature(0.5)
             .disabled_params(disabled);
         let payload = model.build_request_payload(&[], None, None, false);
-        // 0.5 is in the disabled list, so it should be removed
         assert!(payload.get("temperature").is_none());
     }
 

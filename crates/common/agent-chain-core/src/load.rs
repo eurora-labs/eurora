@@ -39,23 +39,19 @@ mod loader;
 mod mapping;
 mod serializable;
 
-// Re-export serializable types
 pub use serializable::{
     BaseSerialized, LC_VERSION, Serializable, Serialized, SerializedConstructor,
     SerializedConstructorData, SerializedNotImplemented, SerializedNotImplementedData,
     SerializedSecret, SerializedSecretData, to_json_not_implemented, to_json_not_implemented_value,
 };
 
-// Re-export dump functions
 pub use dump::{dumpd, dumps};
 
-// Re-export load functions and types
 pub use loader::{
     ConstructorInfo, RevivedValue, Reviver, ReviverConfig, load, loads, loads_with_namespaces,
     loads_with_secrets, lookup_constructor,
 };
 
-// Re-export mapping types and constants
 pub use mapping::{
     DEFAULT_NAMESPACES, DISALLOW_LOAD_FROM_PATH, JS_SERIALIZABLE_MAPPING, NamespaceMapping,
     OG_SERIALIZABLE_MAPPING, OLD_CORE_NAMESPACES_MAPPING, SERIALIZABLE_MAPPING,
@@ -92,7 +88,6 @@ mod tests {
         assert!(json.contains("constructor"));
         assert!(json.contains("Hello, World!"));
 
-        // Load with default config - langchain_core is a valid namespace
         let loaded = loads(&json, None).unwrap();
         assert!(loaded.is_object());
     }
@@ -117,7 +112,6 @@ mod tests {
         let obj = CustomSerializable { value: 42 };
         let json = dumps(&obj, false).unwrap();
 
-        // Load with custom namespace allowed
         let config =
             ReviverConfig::new().with_valid_namespaces(vec!["custom_namespace".to_string()]);
         let loaded = loads(&json, Some(config)).unwrap();

@@ -18,8 +18,6 @@ fn uuid_v7_ms(uuid_obj: &Uuid) -> u64 {
 
 #[test]
 fn test_uuid7() {
-    // Some simple tests.
-    // Note the sequence value increments by 1 between each of these uuid7(...) calls
     let ns = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards")
@@ -27,14 +25,12 @@ fn test_uuid7() {
     let ms = ns / 1_000_000;
     let out1 = uuid7(Some(ns));
 
-    // Verify that the timestamp part matches
     let out1_ms = uuid_v7_ms(&out1);
     assert_eq!(out1_ms, ms);
 }
 
 #[test]
 fn test_monotonicity() {
-    // Test that UUIDs are monotonically increasing.
     let mut last = String::new();
     for n in 0..100_000 {
         let i = uuid7(None).to_string();

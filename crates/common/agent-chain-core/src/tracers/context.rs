@@ -12,7 +12,6 @@ use crate::tracers::run_collector::RunCollectorCallbackHandler;
 use crate::tracers::schemas::Run;
 use crate::utils::env::env_var_is_set;
 
-// Thread-local storage for the tracing callback handler.
 thread_local! {
     static TRACING_V2_CALLBACK: RefCell<Option<Arc<dyn TracingCallback>>> = const { RefCell::new(None) };
     static RUN_COLLECTOR: RefCell<Option<Arc<std::sync::Mutex<RunCollectorCallbackHandler>>>> = const { RefCell::new(None) };
@@ -264,46 +263,15 @@ pub fn get_configure_hooks() -> &'static std::sync::LazyLock<std::sync::Mutex<Co
 mod tests {
     use super::*;
 
-    // struct TestCallback {
-    //     project: String,
-    // }
 
-    // impl TracingCallback for TestCallback {
-    //     fn project_name(&self) -> Option<&str> {
-    //         Some(&self.project)
-    //     }
 
-    //     fn example_id(&self) -> Option<Uuid> {
-    //         None
-    //     }
 
-    //     fn latest_run(&self) -> Option<&Run> {
-    //         None
-    //     }
 
-    //     fn get_run_url(&self) -> Option<String> {
-    //         None
-    //     }
-    // }
 
-    // #[test]
-    // fn test_tracing_v2_enabled() {
-    //     assert!(!tracing_v2_is_enabled());
 
-    //     let callback = Arc::new(TestCallback {
-    //         project: "test".to_string(),
-    //     });
 
-    //     {
-    //         let _guard = tracing_v2_enabled(callback.clone());
-    //         assert!(tracing_v2_is_enabled());
 
-    //         let cb = get_tracing_callback().unwrap();
-    //         assert_eq!(cb.project_name(), Some("test"));
-    //     }
 
-    //     assert!(!tracing_v2_is_enabled());
-    // }
 
     #[test]
     fn test_collect_runs() {
@@ -315,7 +283,6 @@ mod tests {
             let current = get_run_collector();
             assert!(current.is_some());
 
-            // Verify it's the same collector
             let collector_locked = collector_arc.lock().unwrap();
             assert!(collector_locked.is_empty());
         }
@@ -340,12 +307,10 @@ mod tests {
 
     #[test]
     fn test_tracing_v2_is_enabled_env_vars() {
-        // Start clean
         assert!(
             !tracing_v2_is_enabled() || TRACING_V2_CALLBACK.with(|cell| cell.borrow().is_some())
         );
 
-        // Test LANGCHAIN_TRACING_V2
         unsafe {
             std::env::set_var("LANGCHAIN_TRACING_V2", "true");
         }
@@ -354,7 +319,6 @@ mod tests {
             std::env::remove_var("LANGCHAIN_TRACING_V2");
         }
 
-        // Test LANGSMITH_TRACING
         unsafe {
             std::env::set_var("LANGSMITH_TRACING", "true");
         }
@@ -366,7 +330,6 @@ mod tests {
 
     #[test]
     fn test_get_tracer_project() {
-        // Clean env
         unsafe {
             std::env::remove_var("HOSTED_LANGSERVE_PROJECT_NAME");
             std::env::remove_var("LANGSMITH_PROJECT");

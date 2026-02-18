@@ -12,9 +12,6 @@ use agent_chain_core::error::Error;
 use agent_chain_core::runnables::base::{Runnable, RunnableLambda};
 use agent_chain_core::runnables::config::{ConfigOrList, RunnableConfig};
 
-// ============================================================================
-// Async batch concurrency tests
-// ============================================================================
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn test_abatch_concurrency() {
@@ -93,9 +90,6 @@ async fn test_abatch_as_completed_concurrency() {
     assert!(max_running_tasks.load(Ordering::SeqCst) <= max_concurrency);
 }
 
-// ============================================================================
-// Sync batch concurrency tests
-// ============================================================================
 
 #[test]
 fn test_batch_concurrency() {
@@ -167,9 +161,6 @@ fn test_batch_as_completed_concurrency() {
     assert!(max_running_tasks.load(Ordering::SeqCst) <= max_concurrency);
 }
 
-// ============================================================================
-// Extended concurrency tests
-// ============================================================================
 
 #[test]
 fn test_batch_empty_input() {
@@ -196,7 +187,6 @@ fn test_batch_single_item_no_threading() {
 #[test]
 fn test_batch_preserves_order() {
     let runnable = RunnableLambda::new(|x: i32| {
-        // Reverse sleep so later items finish first
         std::thread::sleep(std::time::Duration::from_millis((10 - x) as u64));
         Ok(x)
     });
@@ -283,7 +273,6 @@ fn test_batch_concurrency_of_one() {
 
     let output: Vec<i32> = results.into_iter().map(|r| r.unwrap()).collect();
     assert_eq!(output, (0..5).collect::<Vec<i32>>());
-    // With concurrency of 1, order should be sequential
     assert_eq!(*order.lock().unwrap(), (0..5).collect::<Vec<i32>>());
 }
 

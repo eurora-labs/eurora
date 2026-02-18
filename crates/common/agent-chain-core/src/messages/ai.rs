@@ -178,7 +178,6 @@ impl Serialize for AIMessage {
         if self.usage_metadata.is_some() {
             field_count += 1;
         }
-        // Add 1 for additional type field
         field_count += 1;
 
         let mut map = serializer.serialize_map(Some(field_count))?;
@@ -305,7 +304,6 @@ impl AIMessage {
         let blocks_json = match provider {
             "anthropic" => anthropic_convert(&raw_content, false),
             "openai" => {
-                // Create context with tool_calls and other message data for OpenAI translation
                 let context = OpenAiContext {
                     tool_calls: self
                         .tool_calls
@@ -328,15 +326,10 @@ impl AIMessage {
                 openai_convert(&raw_content, false, Some(&context))
             }
             _ => {
-                // Default: return content as-is or wrap string in text block
                 raw_content
             }
         };
 
-        // Deserialize JSON blocks into ContentBlock structs
-        // We can't use direct serde deserialization because the enum has #[serde(tag = "type")]
-        // which expects externally tagged format, but our JSON has type as a field inside.
-        // So we need to manually deserialize based on the type field.
         use super::content::{
             AudioContentBlock, FileContentBlock, ImageContentBlock, InvalidToolCallBlock,
             NonStandardContentBlock, PlainTextContentBlock, ReasoningContentBlock, ServerToolCall,
@@ -382,7 +375,6 @@ impl AIMessage {
                     "non_standard" => serde_json::from_value::<NonStandardContentBlock>(v.clone())
                         .map(ContentBlock::NonStandard),
                     _ => {
-                        // Unknown type, wrap as non_standard
                         tracing::warn!(
                             block_type = %block_type,
                             json = %v,
@@ -400,7 +392,6 @@ impl AIMessage {
                         json = %v,
                         "Failed to deserialize ContentBlock in AIMessage::content_blocks, wrapping as non_standard"
                     );
-                    // Wrap the malformed block as NonStandardContentBlock with error info
                     let mut error_value = std::collections::HashMap::new();
                     error_value.insert(
                         "original_json".to_string(),
@@ -432,7 +423,6 @@ impl AIMessage {
     /// This corresponds to `pretty_repr` in LangChain Python.
     /// Calls the base message `pretty_repr` logic, then appends tool call info.
     pub fn pretty_repr(&self, html: bool) -> String {
-        // Build the base representation (matches BaseMessage.pretty_repr in Python)
         let title = get_msg_title_repr("Ai Message", html);
         let name_line = if let Some(name) = &self.name {
             format!("\nName: {}", name)
@@ -441,7 +431,6 @@ impl AIMessage {
         };
         let base = format!("{}{}\n\n{}", title, name_line, self.content.as_text());
 
-        // Append tool call formatting
         let mut lines = Vec::new();
         format_tool_calls_repr(&self.tool_calls, &self.invalid_tool_calls, &mut lines);
 
@@ -604,7 +593,6 @@ impl Serialize for AIMessageChunk {
         if self.chunk_position.is_some() {
             field_count += 1;
         }
-        // Add 1 for additional type field
         field_count += 1;
 
         let mut map = serializer.serialize_map(Some(field_count))?;
@@ -740,7 +728,6 @@ impl AIMessageChunk {
 
         let blocks_json = match provider {
             "anthropic" => {
-                // Create context with tool_call_chunks for proper translation
                 let context = AnthropicChunkContext {
                     tool_call_chunks: self
                         .tool_call_chunks
@@ -751,7 +738,6 @@ impl AIMessageChunk {
                 anthropic_convert(&raw_content, !is_last, Some(&context))
             }
             "openai" => {
-                // Create context with tool_call_chunks and other message data for OpenAI translation
                 let chunk_position = if is_last {
                     Some("last".to_string())
                 } else {
@@ -783,11 +769,8 @@ impl AIMessageChunk {
                 openai_convert(&raw_content, !is_last, Some(&context))
             }
             _ => {
-                // Default: return content as-is or wrap string in text block
-                // Also include tool_call_chunks if present
                 let mut blocks = raw_content;
 
-                // Add tool_call_chunks to content_blocks for default case
                 for tc in &self.tool_call_chunks {
                     if let Ok(mut chunk_value) = serde_json::to_value(tc) {
                         chunk_value["type"] =
@@ -800,10 +783,6 @@ impl AIMessageChunk {
             }
         };
 
-        // Deserialize JSON blocks into ContentBlock structs
-        // We can't use direct serde deserialization because the enum has #[serde(tag = "type")]
-        // which expects externally tagged format, but our JSON has type as a field inside.
-        // So we need to manually deserialize based on the type field.
         use super::content::{
             AudioContentBlock, FileContentBlock, ImageContentBlock, InvalidToolCallBlock,
             NonStandardContentBlock, PlainTextContentBlock, ReasoningContentBlock, ServerToolCall,
@@ -849,7 +828,6 @@ impl AIMessageChunk {
                     "non_standard" => serde_json::from_value::<NonStandardContentBlock>(v.clone())
                         .map(ContentBlock::NonStandard),
                     _ => {
-                        // Unknown type, wrap as non_standard
                         tracing::warn!(
                             block_type = %block_type,
                             json = %v,
@@ -867,7 +845,6 @@ impl AIMessageChunk {
                         json = %v,
                         "Failed to deserialize ContentBlock in AIMessageChunk::content_blocks, wrapping as non_standard"
                     );
-                    // Wrap the malformed block as NonStandardContentBlock with error info
                     let mut error_value = std::collections::HashMap::new();
                     error_value.insert(
                         "original_json".to_string(),
@@ -992,9 +969,6 @@ impl AIMessageChunk {
         self.tool_calls = new_tool_calls;
         self.invalid_tool_calls = new_invalid_tool_calls;
 
-        // When chunk_position is "last" and output_version is "v1" and content is a list,
-        // replace tool_call_chunk blocks in content with full tool_call blocks.
-        // This corresponds to the end of Python's init_tool_calls validator.
         if self.chunk_position == Some(ChunkPosition::Last)
             && !self.tool_call_chunks.is_empty()
             && self
@@ -1008,7 +982,6 @@ impl AIMessageChunk {
                 MessageContent::Text(s) => serde_json::from_str(s).ok(),
             };
             if let Some(mut content_list) = content_list_opt {
-                // Build a map of id -> tool_call for replacement
                 let id_to_tc: HashMap<String, serde_json::Value> = self
                     .tool_calls
                     .iter()
@@ -1036,7 +1009,6 @@ impl AIMessageChunk {
                         && let Some(tc) = id_to_tc.get(call_id)
                     {
                         let mut replacement = tc.clone();
-                        // Preserve "extras" from the original block
                         if let Some(extras) = block.get("extras") {
                             replacement["extras"] = extras.clone();
                         }
@@ -1125,7 +1097,6 @@ impl AIMessageChunk {
     /// This corresponds to `pretty_repr` in LangChain Python.
     /// Calls the base message `pretty_repr` logic, then appends tool call info.
     pub fn pretty_repr(&self, html: bool) -> String {
-        // Build the base representation (matches BaseMessage.pretty_repr in Python)
         let title = get_msg_title_repr("Aimessagechunk Message", html);
         let name_line = if let Some(name) = &self.name {
             format!("\nName: {}", name)
@@ -1134,7 +1105,6 @@ impl AIMessageChunk {
         };
         let base = format!("{}{}\n\n{}", title, name_line, self.content.as_text());
 
-        // Append tool call formatting
         let mut lines = Vec::new();
         format_tool_calls_repr(&self.tool_calls, &self.invalid_tool_calls, &mut lines);
 
@@ -1215,13 +1185,11 @@ fn merge_message_content(first: &MessageContent, others: &[&MessageContent]) -> 
 ///
 /// The resulting AIMessageChunk.
 pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) -> AIMessageChunk {
-    // Merge content using merge_content logic from Python
     let content = merge_message_content(
         &left.content,
         &others.iter().map(|o| &o.content).collect::<Vec<_>>(),
     );
 
-    // Merge additional_kwargs using merge_dicts
     let additional_kwargs = {
         let left_val = serde_json::to_value(&left.additional_kwargs).unwrap_or_default();
         let other_vals: Vec<serde_json::Value> = others
@@ -1234,7 +1202,6 @@ pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) 
         }
     };
 
-    // Merge response_metadata using merge_dicts
     let response_metadata = {
         let left_val = serde_json::to_value(&left.response_metadata).unwrap_or_default();
         let other_vals: Vec<serde_json::Value> = others
@@ -1247,7 +1214,6 @@ pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) 
         }
     };
 
-    // Merge tool_call_chunks using merge_lists
     let tool_call_chunks = {
         let left_chunks: Vec<serde_json::Value> = left
             .tool_call_chunks
@@ -1293,7 +1259,6 @@ pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) 
         }
     };
 
-    // Merge usage metadata
     let usage_metadata =
         if left.usage_metadata.is_some() || others.iter().any(|o| o.usage_metadata.is_some()) {
             let mut result = left.usage_metadata.clone();
@@ -1305,12 +1270,10 @@ pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) 
             None
         };
 
-    // Select ID with priority: provider-assigned > lc_run-* > lc_*
     let chunk_id = {
         let mut candidates = vec![left.id.as_deref()];
         candidates.extend(others.iter().map(|o| o.id.as_deref()));
 
-        // First pass: pick the first provider-assigned id (non-run-* and non-lc_*)
         let mut selected_id: Option<&str> = None;
         for id_str in candidates.iter().flatten() {
             if !id_str.starts_with(LC_ID_PREFIX) && !id_str.starts_with(LC_AUTO_PREFIX) {
@@ -1319,7 +1282,6 @@ pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) 
             }
         }
 
-        // Second pass: prefer lc_run-* IDs over lc_* IDs
         if selected_id.is_none() {
             for id_str in candidates.iter().flatten() {
                 if id_str.starts_with(LC_ID_PREFIX) {
@@ -1329,7 +1291,6 @@ pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) 
             }
         }
 
-        // Third pass: take any remaining ID (auto-generated lc_* IDs)
         if selected_id.is_none()
             && let Some(id_str) = candidates.iter().flatten().next()
         {
@@ -1339,7 +1300,6 @@ pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) 
         selected_id.map(String::from)
     };
 
-    // Determine chunk_position: if any chunk has "last", result is "last"
     let chunk_position = if left.chunk_position == Some(ChunkPosition::Last)
         || others
             .iter()
@@ -1366,7 +1326,6 @@ pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) 
         chunk_position,
     };
 
-    // Initialize tool calls from chunks if this is the last chunk
     if result.chunk_position == Some(ChunkPosition::Last) {
         result.init_tool_calls();
         result.init_server_tool_calls();
@@ -1579,7 +1538,6 @@ pub fn backwards_compat_tool_calls(
     (tool_calls, invalid_tool_calls, tool_call_chunks)
 }
 
-// --- Serializable impls ---
 
 use crate::load::Serializable;
 
@@ -1661,18 +1619,15 @@ mod tests {
     fn test_add_usage_none_cases() {
         let usage = UsageMetadata::new(10, 20);
 
-        // Both None
         let result = add_usage(None, None);
         assert_eq!(result.input_tokens, 0);
         assert_eq!(result.output_tokens, 0);
         assert_eq!(result.total_tokens, 0);
 
-        // Left Some, Right None
         let result = add_usage(Some(&usage), None);
         assert_eq!(result.input_tokens, 10);
         assert_eq!(result.output_tokens, 20);
 
-        // Left None, Right Some
         let result = add_usage(None, Some(&usage));
         assert_eq!(result.input_tokens, 10);
         assert_eq!(result.output_tokens, 20);
@@ -1707,13 +1662,11 @@ mod tests {
         assert_eq!(result.input_tokens, 2);
         assert_eq!(result.output_tokens, 2);
         assert_eq!(result.total_tokens, 4);
-        // cache_read should remain 4 (4 - 0 = 4)
         assert!(result.input_token_details.is_some());
         assert_eq!(
             result.input_token_details.as_ref().unwrap().cache_read,
             Some(4)
         );
-        // reasoning should be 0 (0 - 4 = -4, floored to 0)
         assert!(result.output_token_details.is_some());
         assert_eq!(
             result.output_token_details.as_ref().unwrap().reasoning,
@@ -1728,7 +1681,6 @@ mod tests {
 
         let result = subtract_usage(Some(&left), Some(&right));
 
-        // Should floor at 0, not go negative
         assert_eq!(result.input_tokens, 0);
         assert_eq!(result.output_tokens, 0);
         assert_eq!(result.total_tokens, 0);
@@ -1738,16 +1690,13 @@ mod tests {
     fn test_subtract_usage_none_cases() {
         let usage = UsageMetadata::new(10, 20);
 
-        // Both None
         let result = subtract_usage(None, None);
         assert_eq!(result.input_tokens, 0);
 
-        // Left Some, Right None - should return left unchanged
         let result = subtract_usage(Some(&usage), None);
         assert_eq!(result.input_tokens, 10);
         assert_eq!(result.output_tokens, 20);
 
-        // Left None, Right Some - should return right (matches Python: `left or right`)
         let result = subtract_usage(None, Some(&usage));
         assert_eq!(result.input_tokens, 10);
         assert_eq!(result.output_tokens, 20);
@@ -1836,7 +1785,6 @@ mod tests {
         let (tool_calls, invalid_tool_calls, _tool_call_chunks) =
             backwards_compat_tool_calls(&additional_kwargs, false);
 
-        // Should be invalid because the JSON is malformed
         assert!(tool_calls.is_empty());
         assert_eq!(invalid_tool_calls.len(), 1);
         assert_eq!(invalid_tool_calls[0].name, Some("get_weather".to_string()));
@@ -1885,7 +1833,6 @@ mod tests {
 
     #[test]
     fn test_add_ai_message_chunks_id_priority() {
-        // Provider-assigned ID should take priority
         let chunk1 = AIMessageChunk::builder()
             .id("lc_auto123".to_string())
             .content("")
@@ -1901,13 +1848,11 @@ mod tests {
 
         let result = add_ai_message_chunks(chunk1, vec![chunk2, chunk3]);
 
-        // Provider ID should be selected (not lc_* or lc_run-*)
         assert_eq!(result.id, Some("provider_id_456".to_string()));
     }
 
     #[test]
     fn test_add_ai_message_chunks_lc_run_priority() {
-        // lc_run-* should take priority over lc_*
         let chunk1 = AIMessageChunk::builder()
             .id("lc_auto123".to_string())
             .content("")

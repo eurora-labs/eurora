@@ -18,19 +18,7 @@ use crate::error::{Error, Result};
 pub const SUPPORTED_PROVIDERS: &[&str] = &[
     "anthropic",
     "openai",
-    // "azure_openai",
-    // "google_vertexai",
-    // "google_genai",
-    // "cohere",
-    // "fireworks",
     "ollama",
-    // "mistralai",
-    // "groq",
-    // "together",
-    // "bedrock",
-    // "deepseek",
-    // "xai",
-    // "perplexity",
 ];
 
 /// Attempt to infer the provider from a model name.
@@ -50,59 +38,24 @@ pub const SUPPORTED_PROVIDERS: &[&str] = &[
 ///
 /// assert_eq!(infer_provider("gpt-4"), Some("openai"));
 /// assert_eq!(infer_provider("claude-3-opus"), Some("anthropic"));
-//  assert_eq!(infer_provider("gemini-pro"), Some("google_vertexai"));
 /// assert_eq!(infer_provider("unknown-model"), None);
 /// ```
 pub fn infer_provider(model: &str) -> Option<&'static str> {
-    // OpenAI models
     if model.starts_with("gpt-") || model.starts_with("o1") || model.starts_with("o3") {
         return Some("openai");
     }
 
-    // Anthropic models
     if model.starts_with("claude") {
         return Some("anthropic");
     }
 
-    // Google models
-    // if model.starts_with("gemini") {
-    //     return Some("google_vertexai");
-    // }
 
-    // Cohere models
-    // if model.starts_with("command") {
-    //     return Some("cohere");
-    // }
 
-    // Fireworks models
-    // if model.starts_with("accounts/fireworks") {
-    //     return Some("fireworks");
-    // }
 
-    // AWS Bedrock models
-    // if model.starts_with("amazon.") {
-    //     return Some("bedrock");
-    // }
 
-    // Mistral models
-    // if model.starts_with("mistral") {
-    //     return Some("mistralai");
-    // }
 
-    // DeepSeek models
-    // if model.starts_with("deepseek") {
-    //     return Some("deepseek");
-    // }
 
-    // xAI models
-    // if model.starts_with("grok") {
-    //     return Some("xai");
-    // }
 
-    // Perplexity models
-    // if model.starts_with("sonar") {
-    //     return Some("perplexity");
-    // }
 
     None
 }
@@ -125,13 +78,11 @@ pub fn parse_model(model: &str, model_provider: Option<&str>) -> Result<(String,
         let prefix = parts[0];
         let suffix = parts[1];
 
-        // Check if prefix is a known provider
         if SUPPORTED_PROVIDERS.contains(&prefix) {
             (suffix.to_string(), prefix.to_string())
         } else if let Some(inferred) = infer_provider(prefix) {
             (suffix.to_string(), inferred.to_string())
         } else {
-            // Not a provider prefix, use the whole string as model
             let inferred =
                 infer_provider(model).ok_or_else(|| Error::unable_to_infer_provider(model))?;
             (model.to_string(), inferred.to_string())
@@ -159,12 +110,6 @@ mod tests {
         assert_eq!(infer_provider("o3-mini"), Some("openai"));
         assert_eq!(infer_provider("claude-3-opus"), Some("anthropic"));
         assert_eq!(infer_provider("claude-sonnet-4-5"), Some("anthropic"));
-        // assert_eq!(infer_provider("gemini-pro"), Some("google_vertexai"));
-        // assert_eq!(infer_provider("command-r"), Some("cohere"));
-        // assert_eq!(infer_provider("mistral-large"), Some("mistralai"));
-        // assert_eq!(infer_provider("deepseek-chat"), Some("deepseek"));
-        // assert_eq!(infer_provider("grok-1"), Some("xai"));
-        // assert_eq!(infer_provider("sonar-small"), Some("perplexity"));
         assert_eq!(infer_provider("unknown"), None);
     }
 

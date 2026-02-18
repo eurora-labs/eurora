@@ -151,7 +151,6 @@ impl BaseChatModel for FakeMessagesListChatModel {
             .cloned()
             .unwrap_or_else(|| BaseMessage::AI(AIMessage::builder().content("").build()));
 
-        // Update index
         let next_i = if i < self.responses.len() - 1 {
             i + 1
         } else {
@@ -159,7 +158,6 @@ impl BaseChatModel for FakeMessagesListChatModel {
         };
         self.index.store(next_i, Ordering::SeqCst);
 
-        // Create ChatGeneration with the original message type preserved
         let generation = ChatGeneration::new(response);
         Ok(ChatResult::new(vec![generation]))
     }
@@ -398,12 +396,10 @@ impl BaseChatModel for FakeListChatModel {
 
         let stream = async_stream::stream! {
             for (i_c, c) in response.chars().enumerate() {
-                // Sleep first if configured
                 if let Some(duration) = sleep {
                     tokio::time::sleep(duration).await;
                 }
 
-                // Check if we should error on this chunk
                 if let Some(error_chunk) = error_on_chunk
                     && i_c == error_chunk
                 {
@@ -413,7 +409,6 @@ impl BaseChatModel for FakeListChatModel {
                     return;
                 }
 
-                // Create chunk with proper chunk_position
                 let chunk_position = if i_c == response_len - 1 {
                     Some(ChunkPosition::Last)
                 } else {
@@ -697,9 +692,6 @@ impl BaseChatModel for GenericFakeChatModel {
         let message_id = message.id;
         let additional_kwargs = message.additional_kwargs.clone();
 
-        // Extract callback data from run_manager so we can call on_llm_new_token
-        // inside the stream. We clone the Arc handlers (cheap) so the stream
-        // can own them without borrowing run_manager.
         let callback_handlers: Vec<
             std::sync::Arc<dyn crate::callbacks::base::BaseCallbackHandler>,
         > = run_manager
@@ -710,12 +702,9 @@ impl BaseChatModel for GenericFakeChatModel {
 
         let stream = async_stream::stream! {
             if !content.is_empty() {
-                // Use a regular expression to split on whitespace with a capture group
-                // so that we can preserve the whitespace in the output.
                 let re = Regex::new(r"(\s)")
                     .map_err(|e| crate::error::Error::Other(format!("Regex error: {}", e)))?;
 
-                // Split content preserving whitespace using regex
                 let all_parts: Vec<String> = {
                     let mut parts = Vec::new();
                     let mut last = 0;
@@ -737,19 +726,16 @@ impl BaseChatModel for GenericFakeChatModel {
                 for (idx, token) in all_parts.into_iter().enumerate() {
                     let mut chunk_msg = AIMessageChunk::builder().content(&token).build();
 
-                    // Set message ID if available
                     if let Some(ref id) = message_id {
                         chunk_msg = AIMessageChunk::builder().id(id.clone()).content(&token).build();
                     }
 
-                    // Set chunk_position on the last chunk if no additional_kwargs
                     if idx == num_chunks - 1 && additional_kwargs.is_empty() {
                         chunk_msg.set_chunk_position(Some(ChunkPosition::Last));
                     }
 
                     let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
 
-                    // Invoke on_llm_new_token on each handler
                     if let Some(run_id) = callback_run_id {
                         for handler in &callback_handlers {
                             handler.on_llm_new_token(&token, run_id, callback_parent_run_id, None);
@@ -760,15 +746,12 @@ impl BaseChatModel for GenericFakeChatModel {
                 }
             }
 
-            // Handle additional_kwargs
             if !additional_kwargs.is_empty() {
                 for (key, value) in additional_kwargs.iter() {
                     if key == "function_call" {
                         if let Some(obj) = value.as_object() {
                             for (fkey, fvalue) in obj.iter() {
                                 if let Some(fvalue_str) = fvalue.as_str() {
-                                    // Break function call by `,` preserving the delimiter
-                                    // Python: re.split(r"(,)", fvalue) -> ["a", ",", "b"]
                                     let fvalue_parts: Vec<String> = {
                                         let mut parts = Vec::new();
                                         let segments: Vec<&str> = fvalue_str.split(',').collect();
@@ -937,7 +920,6 @@ impl BaseChatModel for ParrotFakeChatModel {
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
-        // Return the last message as-is, preserving its type
         let last_message = messages
             .last()
             .cloned()
@@ -966,7 +948,6 @@ mod tests {
         let result = llm._generate(vec![], None, None).await.unwrap();
         assert_eq!(result.generations[0].message.content(), "Response 2");
 
-        // Cycles back
         let result = llm._generate(vec![], None, None).await.unwrap();
         assert_eq!(result.generations[0].message.content(), "Response 1");
     }
@@ -1030,7 +1011,6 @@ mod tests {
         )];
 
         let result = llm._generate(messages, None, None).await.unwrap();
-        // ParrotFakeChatModel should return the last message as-is
         assert_eq!(result.generations[0].message.content(), "Hello, parrot!");
     }
 

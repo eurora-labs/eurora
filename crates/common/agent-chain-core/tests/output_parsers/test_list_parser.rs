@@ -89,7 +89,6 @@ fn single_chunk(text: &str) -> Vec<BaseMessage> {
     vec![BaseMessage::from(text)]
 }
 
-// ===== CommaSeparatedListOutputParser tests =====
 
 #[tokio::test]
 async fn test_single_item_parse() {
@@ -272,7 +271,6 @@ async fn test_multiple_items_with_comma_transform_list_single_chunk() {
     assert_eq!(result, vec![vec!["foo, foo2"], vec!["bar"], vec!["baz"]]);
 }
 
-// ===== NumberedListOutputParser tests =====
 
 #[tokio::test]
 async fn test_numbered_list_text1_parse() {
@@ -426,7 +424,6 @@ async fn test_numbered_list_text3_no_items_transform_list_single_chunk() {
     assert_eq!(result, empty);
 }
 
-// ===== MarkdownListOutputParser tests =====
 
 #[tokio::test]
 async fn test_markdown_list_text1_parse() {
@@ -586,7 +583,6 @@ async fn test_markdown_list_text3_no_items_transform_list_single_chunk() {
     assert_eq!(result, empty);
 }
 
-// ===== Async parse tests (aparse / aparse_result) =====
 
 #[tokio::test]
 async fn test_comma_aparse_single_item() {

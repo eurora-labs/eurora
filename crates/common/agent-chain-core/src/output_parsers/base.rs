@@ -190,9 +190,6 @@ impl From<OutputParserError> for Error {
     }
 }
 
-// ---------------------------------------------------------------------------
-// RunnableOutputParser adapter
-// ---------------------------------------------------------------------------
 
 /// Adapter that wraps a BaseOutputParser as a Runnable.
 ///

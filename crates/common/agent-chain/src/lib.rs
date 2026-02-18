@@ -50,21 +50,17 @@
 
 pub mod providers;
 
-// Re-export providers
 pub use providers::*;
 
-// Re-export async_trait for use in generated code
 pub use async_trait::async_trait;
 
 use std::sync::Arc;
 
 pub use agent_chain_core::*;
 
-// Re-export agent_chain_core as a module for macro-generated code
 #[doc(hidden)]
 pub use agent_chain_core as _core;
 
-// Re-export the tool macro
 pub mod tools {
     //! Tool types and macros for defining tools.
     //!
@@ -73,7 +69,6 @@ pub mod tools {
 
     pub use agent_chain_core::tools::*;
 
-    // Re-export the tool attribute macro
     pub use agent_chain_macros::tool;
 }
 

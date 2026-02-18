@@ -289,7 +289,6 @@ pub trait TracerCore: Send + Sync + Debug {
             .get_mut(&run_id.to_string())
             .ok_or(TracerError::RunNotFound(run_id))?;
 
-        // Check run type
         if run.run_type != "llm" && run.run_type != "chat_model" {
             return Err(TracerError::WrongRunType {
                 run_id,
@@ -345,7 +344,6 @@ pub trait TracerCore: Send + Sync + Debug {
             .get_mut(&run_id.to_string())
             .ok_or(TracerError::RunNotFound(run_id))?;
 
-        // Check run type
         if run.run_type != "llm" && run.run_type != "chat_model" {
             return Err(TracerError::WrongRunType {
                 run_id,
@@ -394,7 +392,6 @@ pub trait TracerCore: Send + Sync + Debug {
             .get_mut(&run_id.to_string())
             .ok_or(TracerError::RunNotFound(run_id))?;
 
-        // Check run type
         if run.run_type != "llm" && run.run_type != "chat_model" {
             return Err(TracerError::WrongRunType {
                 run_id,
@@ -824,7 +821,6 @@ pub trait TracerCore: Send + Sync + Debug {
         Ok(run.clone())
     }
 
-    // Hook methods (to be overridden by subclasses)
 
     /// Called when a run is created.
     fn on_run_create(&mut self, _run: &Run) {}

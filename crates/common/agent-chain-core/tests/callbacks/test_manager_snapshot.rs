@@ -24,7 +24,6 @@ use uuid::Uuid;
 
 use std::sync::Mutex;
 
-// -- Minimal handler --
 
 #[derive(Debug, Default)]
 struct TestHandler;
@@ -41,7 +40,6 @@ impl BaseCallbackHandler for TestHandler {
     }
 }
 
-// -- Recording handler that tracks all events --
 
 #[derive(Debug)]
 struct RecordingHandler {
@@ -266,7 +264,6 @@ impl BaseCallbackHandler for RecordingHandler {
     }
 }
 
-// -- Handler with ignore_llm --
 
 #[derive(Debug)]
 struct IgnoreLLMHandler;
@@ -285,7 +282,6 @@ impl BaseCallbackHandler for IgnoreLLMHandler {
     }
 }
 
-// -- Handler with ignore_chain --
 
 #[derive(Debug)]
 struct IgnoreChainHandler;
@@ -304,7 +300,6 @@ impl BaseCallbackHandler for IgnoreChainHandler {
     }
 }
 
-// -- Handler with ignore_agent --
 
 #[derive(Debug)]
 struct IgnoreAgentHandler;
@@ -323,7 +318,6 @@ impl BaseCallbackHandler for IgnoreAgentHandler {
     }
 }
 
-// -- Handler with ignore_retriever --
 
 #[derive(Debug)]
 struct IgnoreRetrieverHandler;
@@ -342,9 +336,6 @@ impl BaseCallbackHandler for IgnoreRetrieverHandler {
     }
 }
 
-// ====================================================================
-// handle_event tests
-// ====================================================================
 
 /// Ported from `TestHandleEvent::test_empty_handlers_no_error`.
 #[test]
@@ -396,9 +387,6 @@ fn test_handle_event_ignore_condition_none_always_dispatches() {
     assert_eq!(count, 1);
 }
 
-// ====================================================================
-// RunManager tests
-// ====================================================================
 
 /// Ported from `TestRunManager::test_on_text_empty_handlers_no_error`.
 #[test]
@@ -414,9 +402,6 @@ fn test_run_manager_on_retry_empty_handlers_no_error() {
     mgr.on_retry(&serde_json::json!(null));
 }
 
-// ====================================================================
-// ParentRunManager tests
-// ====================================================================
 
 /// Ported from `TestParentRunManager::test_get_child_inherits_handlers`.
 #[test]
@@ -464,9 +449,6 @@ fn test_parent_run_manager_get_child_without_tag() {
     let _child = mgr.get_child(None);
 }
 
-// ====================================================================
-// CallbackManagerForLLMRun tests
-// ====================================================================
 
 /// Ported from `TestCallbackManagerForLLMRun::test_empty_handlers_noop`.
 #[test]
@@ -495,9 +477,6 @@ fn test_llm_run_on_llm_new_token_with_chunk() {
     mgr.on_llm_new_token("tok", None);
 }
 
-// ====================================================================
-// CallbackManagerForChainRun tests
-// ====================================================================
 
 /// Ported from `TestCallbackManagerForChainRun::test_empty_handlers_noop`.
 #[test]
@@ -534,9 +513,6 @@ fn test_chain_run_is_parent_run_manager() {
     let _child = mgr.get_child(None);
 }
 
-// ====================================================================
-// CallbackManagerForToolRun tests
-// ====================================================================
 
 /// Ported from `TestCallbackManagerForToolRun::test_empty_handlers_noop`.
 #[test]
@@ -555,9 +531,6 @@ fn test_tool_run_empty_handlers_noop() {
     mgr.on_tool_error(&std::io::Error::other("err"));
 }
 
-// ====================================================================
-// CallbackManagerForRetrieverRun tests
-// ====================================================================
 
 /// Ported from `TestCallbackManagerForRetrieverRun::test_empty_handlers_noop`.
 #[test]
@@ -576,9 +549,6 @@ fn test_retriever_run_empty_handlers_noop() {
     mgr.on_retriever_error(&std::io::Error::other("err"));
 }
 
-// ====================================================================
-// CallbackManager tests
-// ====================================================================
 
 /// Ported from `TestCallbackManager::test_on_llm_start_returns_managers_per_prompt`.
 #[test]
@@ -765,9 +735,6 @@ fn test_callback_manager_run_managers_inherit_tags_and_metadata() {
     assert!(rm.tags().contains(&"t1".to_string()));
 }
 
-// ====================================================================
-// CallbackManagerForChainGroup tests
-// ====================================================================
 
 fn make_sync_chain_group() -> (CallbackManagerForChainGroup, CallbackManagerForChainRun) {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -829,9 +796,6 @@ fn test_chain_group_merge_preserves_parent_run_manager() {
     assert!(merged.tags().contains(&"extra".to_string()));
 }
 
-// ====================================================================
-// BaseRunManager tests
-// ====================================================================
 
 /// Ported from `TestBaseRunManager::test_get_noop_manager`.
 #[test]
@@ -857,9 +821,6 @@ fn test_base_run_manager_initialization_defaults() {
     assert!(mgr.inheritable_metadata.is_empty());
 }
 
-// ====================================================================
-// Async get_sync tests
-// ====================================================================
 
 /// Ported from `TestAsyncRunManagerGetSync::test_async_llm_run_get_sync`.
 #[test]
@@ -925,9 +886,6 @@ fn test_async_retriever_run_get_sync() {
     assert_eq!(back.run_id(), rid);
 }
 
-// ====================================================================
-// AsyncCallbackManager tests
-// ====================================================================
 
 /// Ported from `TestAsyncCallbackManager::test_is_async_true`.
 #[test]
@@ -1041,9 +999,6 @@ async fn test_async_callback_manager_on_custom_event_empty_handlers_noop() {
         .await;
 }
 
-// ====================================================================
-// Async LLM run manager tests
-// ====================================================================
 
 /// Ported from `TestAsyncCallbackManagerForLLMRun::test_empty_handlers_noop`.
 #[tokio::test]
@@ -1056,9 +1011,6 @@ async fn test_async_llm_run_empty_handlers_noop() {
     mgr.on_llm_error(&std::io::Error::other("err")).await;
 }
 
-// ====================================================================
-// Async chain run manager tests
-// ====================================================================
 
 /// Ported from `TestAsyncCallbackManagerForChainRun::test_empty_handlers_noop`.
 #[tokio::test]
@@ -1099,9 +1051,6 @@ async fn test_async_chain_run_get_child_returns_async_manager() {
     assert_eq!(child.parent_run_id(), Some(mgr.run_id()));
 }
 
-// ====================================================================
-// Async tool run manager tests
-// ====================================================================
 
 /// Ported from `TestAsyncCallbackManagerForToolRun::test_empty_handlers_noop`.
 #[tokio::test]
@@ -1121,9 +1070,6 @@ async fn test_async_tool_run_empty_handlers_noop() {
     mgr.on_tool_error(&std::io::Error::other("err")).await;
 }
 
-// ====================================================================
-// Async retriever run manager tests
-// ====================================================================
 
 /// Ported from `TestAsyncCallbackManagerForRetrieverRun::test_empty_handlers_noop`.
 #[tokio::test]
@@ -1143,9 +1089,6 @@ async fn test_async_retriever_run_empty_handlers_noop() {
     mgr.on_retriever_error(&std::io::Error::other("err")).await;
 }
 
-// ====================================================================
-// AsyncCallbackManagerForChainGroup tests
-// ====================================================================
 
 fn make_async_chain_group() -> (
     AsyncCallbackManagerForChainGroup,
@@ -1201,9 +1144,6 @@ async fn test_async_chain_group_copy_preserves_parent_run_manager() {
     assert_eq!(cp.parent_run_id(), parent_rm.parent_run_id());
 }
 
-// ====================================================================
-// AsyncParentRunManager tests
-// ====================================================================
 
 /// Ported from `TestAsyncParentRunManager::test_get_child_returns_async_callback_manager`.
 #[tokio::test]
@@ -1240,7 +1180,6 @@ async fn test_async_parent_run_manager_get_child_with_tag() {
     );
     let mgr = AsyncCallbackManagerForChainRun::from_sync(sync_mgr);
     let child = mgr.get_child(Some("local"));
-    // The child's inner CallbackManager should have the tag
     assert!(
         child
             .to_callback_manager()
@@ -1249,9 +1188,6 @@ async fn test_async_parent_run_manager_get_child_with_tag() {
     );
 }
 
-// ====================================================================
-// Tests that verify handler methods are actually called
-// ====================================================================
 
 /// Ported from `TestHandleEvent::test_dispatches_to_handler`.
 #[test]
@@ -1280,7 +1216,6 @@ fn test_llm_run_on_llm_new_token_respects_ignore_llm() {
         None,
         None,
     );
-    // Does not panic; the handler is skipped due to ignore_llm
     mgr.on_llm_new_token("tok", None);
 }
 

@@ -58,7 +58,6 @@ pub mod tracers;
 pub mod utils;
 pub mod vectorstores;
 
-// Keep chat_models as a backward-compatible re-export
 pub mod chat_models {
     //! Re-export of language_models types for backward compatibility.
     //!
@@ -72,24 +71,17 @@ pub mod chat_models {
         ToolChoice, UsageMetadata,
     };
 
-    // Re-export ChatResult from outputs for backward compatibility
     pub use crate::outputs::ChatResult;
 }
 
-// Re-export env types
 pub use env::{VERSION, get_runtime_environment};
 
-// Re-export error types
 pub use error::{Error, Result};
 
-// Re-export core language model types
 pub use language_models::{
-    // Chat model types
     AIMessageChunkStream,
     BaseChatModel,
-    // LLM types
     BaseLLM,
-    // Base types
     BaseLanguageModel,
     ChatChunk,
     ChatGenerationStream,
@@ -99,7 +91,6 @@ pub use language_models::{
     FakeChatModel,
     FakeListChatModel,
     FakeListChatModelError,
-    // Fake implementations for testing
     FakeListLLM,
     FakeListLLMError,
     FakeMessagesListChatModel,
@@ -112,7 +103,6 @@ pub use language_models::{
     LanguageModelInput,
     LanguageModelOutput,
 
-    // Model profile types
     ModelProfile,
     ModelProfileRegistry,
 
@@ -128,38 +118,29 @@ pub use language_models::{
     generate_from_stream,
 
     get_prompts_from_cache,
-    // Utility functions
     is_openai_data_block,
     parse_data_uri,
     update_cache,
 };
 
-// Re-export message types
 pub use messages::{
     AIMessage, AnyMessage, BaseMessage, ContentPart, HasId, HumanMessage, ImageDetail, ImageSource,
     MergeableContent, MessageContent, SystemMessage, ToolCall, ToolMessage, convert_to_message,
     convert_to_messages,
 };
 
-// Re-export tool types
 pub use tools::{BaseTool, Tool, ToolDefinition};
 
-// Re-export chat history types
 pub use chat_history::{BaseChatMessageHistory, InMemoryChatMessageHistory};
 
-// Re-export chat session types
 pub use chat_sessions::ChatSession;
 
-// Re-export chat loader types
 pub use chat_loaders::BaseChatLoader;
 
-// Re-export cache types
 pub use caches::{BaseCache, CacheReturnValue, InMemoryCache};
 
-// Re-export global functions
 pub use globals::{get_debug, get_llm_cache, get_verbose, set_debug, set_llm_cache, set_verbose};
 
-// Re-export output parser types
 pub use output_parsers::{
     BaseCumulativeTransformOutputParser, BaseLLMOutputParser, BaseOutputParser,
     BaseTransformOutputParser, CommaSeparatedListOutputParser, JsonOutputParser, ListOutputParser,
@@ -167,13 +148,11 @@ pub use output_parsers::{
     PydanticOutputParser, SimpleJsonOutputParser, StrOutputParser, XMLOutputParser, drop_last_n,
 };
 
-// Re-export output types
 pub use outputs::{
     ChatGeneration, ChatGenerationChunk, ChatResult, Generation, GenerationChunk, GenerationType,
     LLMResult, RunInfo, merge_chat_generation_chunks,
 };
 
-// Re-export callback types
 pub use callbacks::{
     AsyncCallbackHandler, AsyncCallbackManager, AsyncCallbackManagerForChainRun,
     AsyncCallbackManagerForLLMRun, BaseCallbackHandler, BaseCallbackManager, CallbackManager,
@@ -181,7 +160,6 @@ pub use callbacks::{
     StreamingStdOutCallbackHandler, UsageMetadataCallbackHandler,
 };
 
-// Re-export prompt types
 pub use prompts::{
     AIMessagePromptTemplate, BaseChatPromptTemplate, BaseMessagePromptTemplate, BasePromptTemplate,
     ChatMessagePromptTemplate, ChatPromptTemplate, DictPromptTemplate,
@@ -190,20 +168,17 @@ pub use prompts::{
     PromptTemplateFormat, StringPromptTemplate, SystemMessagePromptTemplate, load_prompt,
 };
 
-// Re-export load types
 pub use load::{
     ConstructorInfo, RevivedValue, Reviver, ReviverConfig, Serializable, Serialized,
     SerializedConstructor, SerializedNotImplemented, SerializedSecret, dumpd, dumps,
     load as load_json, loads,
 };
 
-// Re-export prompt value types
 pub use prompt_values::{
     ChatPromptValue, ChatPromptValueConcrete, ImageDetailLevel, ImagePromptValue, ImageURL,
     PromptValue, StringPromptValue,
 };
 
-// Re-export tracer types
 pub use tracers::{
     AsyncBaseTracer, AsyncListener, AsyncRootListenersTracer, BaseTracer, ConsoleCallbackHandler,
     FunctionCallbackHandler, Listener, PassthroughStreamingHandler, RootListenersTracer, Run,
@@ -211,35 +186,27 @@ pub use tracers::{
     TracerCore, TracerCoreConfig, TracerError,
 };
 
-// Re-export rate limiter types
 pub use rate_limiters::{BaseRateLimiter, InMemoryRateLimiter, InMemoryRateLimiterConfig};
 
-// Re-export agent types
 pub use agents::{AgentAction, AgentActionMessageLog, AgentFinish, AgentStep, ToolInput};
 
-// Re-export document loader types
 pub use document_loaders::{
     BaseBlobParser, BaseLoader as BaseDocumentLoader, BlobLoader, PathLike,
 };
 
-// Re-export document types
 pub use documents::{
     BaseDocumentCompressor, BaseDocumentTransformer, BaseMedia, Blob, BlobBuilder, BlobData,
     Document,
 };
 
-// Re-export text splitter types
 pub use text_splitters::TextSplitter;
 
-// Re-export retriever types
 pub use retrievers::{BaseRetriever, LangSmithRetrieverParams, RetrieverInput, RetrieverOutput};
 
-// Re-export store types
 pub use stores::{
     BaseStore, InMemoryBaseStore, InMemoryByteStore, InMemoryStore, InvalidKeyException,
 };
 
-// Re-export runnable types
 pub use runnables::{
     AddableDict, BaseStreamEvent, CUSTOM_EVENT_TYPE, ConfigOrList, CustomStreamEvent,
     DynRouterRunnable, DynRunnable, EventData, PickKeys, RouterInput, RouterRunnable, Runnable,
@@ -250,29 +217,23 @@ pub use runnables::{
     patch_config, pipe, runnable_lambda, to_dyn,
 };
 
-// Re-export structured query types
 pub use structured_query::{
     Comparator, Comparison, Expr, FilterDirective, FilterDirectiveEnum, Operation, Operator,
     OperatorOrComparator, StructuredQuery, Visitor,
 };
 
-// Re-export sys_info types
 pub use sys_info::{PackageInfo, SystemInfo, get_sys_info, get_sys_info_map, print_sys_info};
 
-// Re-export async_trait for use in generated code
 pub use async_trait::async_trait;
 
-// Re-export embedding types
 pub use embeddings::{DeterministicFakeEmbedding, Embeddings, FakeEmbeddings};
 
-// Re-export vector store types
 pub use vectorstores::{
     InMemoryVectorStore, SearchType, VectorStore, VectorStoreFactory, VectorStoreRetriever,
     VectorStoreRetrieverConfig, VectorStoreRetrieverExt, cosine_similarity,
     maximal_marginal_relevance,
 };
 
-// Re-export example selector types
 pub use example_selectors::{
     BaseExampleSelector, LengthBasedExampleSelector, MaxMarginalRelevanceExampleSelector,
     SemanticSimilarityExampleSelector, sorted_values,
