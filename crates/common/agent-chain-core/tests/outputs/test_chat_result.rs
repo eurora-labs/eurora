@@ -129,7 +129,6 @@ mod chat_result_tests {
         let chat_gen = ChatGeneration::new(msg.clone().into());
         let result = ChatResult::new(vec![chat_gen]);
         assert_eq!(result.generations[0].text, "Test response");
-        // Access the message from the generation
         if let agent_chain_core::BaseMessage::AI(ai_msg) = &result.generations[0].message {
             assert_eq!(
                 ai_msg.additional_kwargs.get("function_call"),
@@ -167,7 +166,6 @@ mod chat_result_tests {
     /// Test ChatResult with multiple candidate generations for same prompt.
     #[test]
     fn test_multiple_candidate_generations() {
-        // Simulates n>1 parameter in API calls
         let candidates = vec![
             ChatGeneration::new(AIMessage::builder().content("Candidate 1").build().into()),
             ChatGeneration::new(AIMessage::builder().content("Candidate 2").build().into()),

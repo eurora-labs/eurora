@@ -454,7 +454,6 @@ fn icon_handle_to_image(
         return Err(FocusTrackerError::platform("failed to get bitmap bits"));
     }
 
-    // Convert BGRA → RGBA in-place
     for i in (0..pixels.len()).step_by(4) {
         pixels.swap(i, i + 2);
     }

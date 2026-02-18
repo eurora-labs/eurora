@@ -11,7 +11,6 @@ use agent_chain_core::callbacks::base::{
     RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
 };
 
-// -- Minimal handler impl for testing trait methods --
 
 #[derive(Debug)]
 struct SnapshotHandler;
@@ -40,7 +39,6 @@ impl BaseCallbackHandler for SnapshotHandler {
 fn test_sync_handler_has_methods() {
     let handler = SnapshotHandler;
 
-    // LLMManagerMixin
     LLMManagerMixin::on_llm_new_token(&handler, "", uuid::Uuid::nil(), None, None);
     LLMManagerMixin::on_llm_end(&handler, &Default::default(), uuid::Uuid::nil(), None);
     LLMManagerMixin::on_llm_error(
@@ -50,7 +48,6 @@ fn test_sync_handler_has_methods() {
         None,
     );
 
-    // CallbackManagerMixin
     CallbackManagerMixin::on_llm_start(
         &handler,
         &Default::default(),
@@ -100,7 +97,6 @@ fn test_sync_handler_has_methods() {
         None,
     );
 
-    // ChainManagerMixin
     ChainManagerMixin::on_chain_end(&handler, &Default::default(), uuid::Uuid::nil(), None);
     ChainManagerMixin::on_chain_error(
         &handler,
@@ -123,7 +119,6 @@ fn test_sync_handler_has_methods() {
         None,
     );
 
-    // ToolManagerMixin
     ToolManagerMixin::on_tool_end(&handler, "", uuid::Uuid::nil(), None, None, None, None);
     ToolManagerMixin::on_tool_error(
         &handler,
@@ -132,7 +127,6 @@ fn test_sync_handler_has_methods() {
         None,
     );
 
-    // RetrieverManagerMixin
     RetrieverManagerMixin::on_retriever_end(&handler, &[], uuid::Uuid::nil(), None);
     RetrieverManagerMixin::on_retriever_error(
         &handler,
@@ -141,7 +135,6 @@ fn test_sync_handler_has_methods() {
         None,
     );
 
-    // RunManagerMixin
     RunManagerMixin::on_text(&handler, "", uuid::Uuid::nil(), None, None, "");
     RunManagerMixin::on_retry(&handler, &() as &dyn std::any::Any, uuid::Uuid::nil(), None);
     RunManagerMixin::on_custom_event(
@@ -162,18 +155,9 @@ fn test_sync_handler_has_methods() {
 fn test_async_handler_has_methods() {
     use agent_chain_core::callbacks::base::AsyncCallbackHandler;
 
-    // Verify the trait requires BaseCallbackHandler as a supertrait
     fn assert_is_async_handler<T: AsyncCallbackHandler>() {}
     assert_is_async_handler::<SnapshotHandler>();
 
-    // The async methods are verified at compile time by the trait bound above.
-    // AsyncCallbackHandler has default implementations for all of:
-    //   on_llm_start_async, on_chat_model_start_async, on_llm_new_token_async,
-    //   on_llm_end_async, on_llm_error_async, on_chain_start_async,
-    //   on_chain_end_async, on_chain_error_async, on_tool_start_async,
-    //   on_tool_end_async, on_tool_error_async, on_text_async, on_retry_async,
-    //   on_agent_action_async, on_agent_finish_async, on_retriever_start_async,
-    //   on_retriever_end_async, on_retriever_error_async, on_custom_event_async
 }
 
 #[async_trait::async_trait]
@@ -204,9 +188,6 @@ fn test_base_callback_handler_attributes() {
 /// BaseCallbackHandler (since it is a supertrait), and they default to `false`.
 #[test]
 fn test_async_callback_handler_attributes() {
-    // AsyncCallbackHandler requires BaseCallbackHandler, so all ignore_*
-    // methods are available. We verify them on the same handler that
-    // implements both traits.
     let handler = SnapshotHandler;
 
     assert!(!handler.ignore_llm());

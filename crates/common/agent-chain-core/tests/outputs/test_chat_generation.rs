@@ -24,9 +24,6 @@ use std::collections::HashMap;
 mod chat_generation_tests {
     use super::*;
 
-    // -- test_msg_with_text (parametrized in Python) --
-    // Python tests various content formats: string, list with string, list with dict blocks.
-    // In Rust, AIMessage content is always a String. We test the string case directly.
 
     /// Test that text is extracted correctly from string content.
     #[test]
@@ -121,7 +118,6 @@ mod test_chat_generation_chunk {
         let info = result.generation_info.unwrap();
         assert_eq!(info.get("key1"), Some(&json!("value1")));
         assert_eq!(info.get("key2"), Some(&json!("value2")));
-        // String values are concatenated in merge_dicts
         assert_eq!(info.get("shared"), Some(&json!("firstsecond")));
     }
 
@@ -199,18 +195,12 @@ mod test_chat_generation_chunk {
     #[test]
     fn test_add_empty_list() {
         let chunk = ChatGenerationChunk::new(AIMessage::builder().content("test").build().into());
-        // Merging a vec with just one chunk is the equivalent of chunk + []
         let result = merge_chat_generation_chunks(vec![chunk]);
         assert!(result.is_some());
         assert_eq!(result.unwrap().text, "test");
     }
 
-    // Note: test_add_with_invalid_type_raises_error is not applicable in Rust.
-    // The type system prevents adding incompatible types at compile time.
 
-    // Note: test_add_with_chat_generation_raises_error is not applicable in Rust.
-    // In Rust, ChatGenerationChunk + ChatGeneration would be a compile error since
-    // the Add trait is only implemented for ChatGenerationChunk + ChatGenerationChunk.
 
     /// Test that ChatGenerationChunk can be converted to/from ChatGeneration.
     /// This is the Rust equivalent of Python's inheritance test.
@@ -218,11 +208,9 @@ mod test_chat_generation_chunk {
     fn test_conversion_to_chat_generation() {
         let msg = AIMessage::builder().content("test").build();
         let chunk = ChatGenerationChunk::new(msg.into());
-        // Convert to ChatGeneration
         let chat_gen: ChatGeneration = chunk.clone().into();
         assert_eq!(chat_gen.text, "test");
         assert_eq!(chat_gen.generation_type, "ChatGeneration");
-        // Convert back to chunk
         let converted_chunk: ChatGenerationChunk = chat_gen.into();
         assert_eq!(converted_chunk.text, "test");
     }
@@ -348,7 +336,6 @@ mod test_chat_generation_inheritance {
     #[test]
     fn test_chat_generation_shares_generation_interface() {
         let chat_gen = ChatGeneration::new(AIMessage::builder().content("test").build().into());
-        // Generation also has text and generation_info fields
         let generation = Generation::new("test");
         assert_eq!(chat_gen.text, generation.text);
         assert_eq!(chat_gen.generation_info, generation.generation_info);
@@ -376,15 +363,12 @@ mod test_chat_generation_inheritance {
     #[test]
     fn test_chat_generation_chunk_shares_generation_interface() {
         let chunk = ChatGenerationChunk::new(AIMessage::builder().content("test").build().into());
-        // Verify fields match Generation interface
         assert_eq!(chunk.text, "test");
         assert!(chunk.generation_info.is_none());
 
-        // Can convert to ChatGeneration (equivalent of isinstance check)
         let chat_gen: ChatGeneration = chunk.clone().into();
         assert_eq!(chat_gen.text, "test");
 
-        // ChatGenerationChunk maintains its own type
         assert_eq!(chunk.generation_type, "ChatGenerationChunk");
     }
 }
@@ -408,7 +392,6 @@ mod test_chat_generation_text_extraction {
     fn test_text_derived_from_message_content() {
         let msg = AIMessage::builder().content("from_message").build();
         let chat_gen = ChatGeneration::new(msg.into());
-        // Text is always extracted from the message
         assert_eq!(chat_gen.text, "from_message");
     }
 
@@ -538,8 +521,6 @@ mod test_chat_generation_chunk_merging_edge_cases {
         assert!(result.generation_info.is_none());
     }
 
-    // Note: test_add_with_none_raises_error and test_add_with_int_raises_error are not applicable
-    // in Rust. The type system prevents adding incompatible types at compile time.
 
     /// Test that addition returns ChatGenerationChunk type.
     #[test]

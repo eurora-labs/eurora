@@ -15,7 +15,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
-// -- Minimal handler --
 
 #[derive(Debug, Default)]
 struct TestHandler;
@@ -33,7 +32,6 @@ impl BaseCallbackHandler for TestHandler {
     }
 }
 
-// ---- BaseRunManager tests ----
 
 /// Ported from `test_base_run_manager_initialization`.
 #[test]
@@ -82,7 +80,6 @@ fn test_base_run_manager_get_noop_manager() {
     assert!(manager.inheritable_handlers.is_empty());
 }
 
-// ---- RunManager tests ----
 
 /// Ported from `test_run_manager_on_text`.
 #[test]
@@ -92,7 +89,6 @@ fn test_run_manager_on_text() {
 
     let manager = RunManager::new(run_id, vec![handler], vec![], None, None, None, None, None);
 
-    // Should not panic with handler present
     manager.on_text("Hello");
     manager.on_text("World");
 }
@@ -102,11 +98,9 @@ fn test_run_manager_on_text() {
 fn test_run_manager_empty_handlers() {
     let manager = RunManager::new(Uuid::new_v4(), vec![], vec![], None, None, None, None, None);
 
-    // Should not panic
     manager.on_text("test");
 }
 
-// ---- ParentRunManager tests ----
 
 /// Ported from `test_parent_run_manager_get_child`.
 #[test]
@@ -151,11 +145,9 @@ fn test_parent_run_manager_get_child_with_tag() {
     let child = parent.get_child(Some("child_tag"));
 
     assert!(child.tags.contains(&"child_tag".to_string()));
-    // Child tag should not be inheritable
     assert!(!child.inheritable_tags.contains(&"child_tag".to_string()));
 }
 
-// ---- CallbackManagerForLLMRun tests ----
 
 /// Ported from `test_callback_manager_for_llm_run_on_llm_new_token`.
 #[test]
@@ -172,7 +164,6 @@ fn test_callback_manager_for_llm_run_on_llm_new_token() {
         None,
     );
 
-    // Should not panic
     manager.on_llm_new_token("Hello", None);
     manager.on_llm_new_token(" ", None);
     manager.on_llm_new_token("World", None);
@@ -216,7 +207,6 @@ fn test_callback_manager_for_llm_run_on_llm_error() {
     manager.on_llm_error(&error);
 }
 
-// ---- AsyncCallbackManagerForLLMRun tests ----
 
 /// Ported from `test_async_callback_manager_for_llm_run_get_sync`.
 #[test]
@@ -243,7 +233,6 @@ fn test_async_callback_manager_for_llm_run_get_sync() {
     assert!(sync_back.tags().contains(&"test".to_string()));
 }
 
-// ---- CallbackManagerForChainRun tests ----
 
 /// Ported from `test_callback_manager_for_chain_run_on_chain_end`.
 #[test]
@@ -285,7 +274,6 @@ fn test_callback_manager_for_chain_run_on_chain_error() {
     manager.on_chain_error(&error);
 }
 
-// ---- CallbackManagerForToolRun tests ----
 
 /// Ported from `test_callback_manager_for_tool_run_on_tool_end`.
 #[test]
@@ -324,7 +312,6 @@ fn test_callback_manager_for_tool_run_on_tool_error() {
     manager.on_tool_error(&error);
 }
 
-// ---- CallbackManagerForRetrieverRun tests ----
 
 /// Ported from `test_callback_manager_for_retriever_run_on_retriever_end`.
 #[test]
@@ -363,7 +350,6 @@ fn test_callback_manager_for_retriever_run_on_retriever_error() {
     manager.on_retriever_error(&error);
 }
 
-// ---- CallbackManager start tests ----
 
 /// Ported from `test_callback_manager_on_llm_start_single_prompt`.
 #[test]
@@ -442,7 +428,6 @@ fn test_callback_manager_on_retriever_start() {
     assert!(!run_manager.run_id().is_nil());
 }
 
-// ---- AsyncCallbackManager tests ----
 
 /// Ported from `test_async_callback_manager_is_async`.
 #[test]
@@ -498,7 +483,6 @@ async fn test_async_run_manager_on_text() {
         None,
     );
 
-    // Should not panic
     manager.on_text("Hello").await;
     manager.on_text("World").await;
 }

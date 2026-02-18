@@ -441,7 +441,6 @@ pub trait Runnable: Send + Sync + Debug {
     where
         Self: 'static,
     {
-        // Default implementation: run invoke in a blocking context
         self.invoke(input, config)
     }
 
@@ -464,7 +463,6 @@ pub trait Runnable: Send + Sync + Debug {
 
         let configs = get_config_list(config, inputs.len());
 
-        // For single input, just invoke directly
         if inputs.len() == 1 {
             let input = inputs.into_iter().next().expect("checked len == 1");
             let config = configs.into_iter().next().expect("checked len == 1");
@@ -541,7 +539,6 @@ pub trait Runnable: Send + Sync + Debug {
         if return_exceptions {
             collected
         } else {
-            // When not returning exceptions, propagate the first error
             if let Some(first_err_idx) = collected.iter().position(|r| r.is_err()) {
                 return collected
                     .into_iter()
@@ -677,7 +674,6 @@ pub trait Runnable: Send + Sync + Debug {
                 });
             }
 
-            // Drop the original sender so the receiver will terminate
             drop(sender);
         });
 
@@ -884,8 +880,6 @@ pub trait Runnable: Send + Sync + Debug {
 
             while let Some(ichunk) = input.next().await {
                 if let Some(ref mut current) = final_input {
-                    // Try to combine inputs if possible
-                    // For now, just take the last one
                     *current = ichunk;
                 } else {
                     final_input = Some(ichunk);
@@ -1317,9 +1311,7 @@ impl<R: Runnable> GraphProvider for RunnableGraphProvider<R> {
 /// the class name (e.g. "RunnableLambda") rather than the full module path.
 /// Strips module paths and generic parameters.
 fn short_type_name(full_name: &str) -> String {
-    // Strip generic parameters: take everything before first '<'
     let base = full_name.split('<').next().unwrap_or(full_name);
-    // Take the last segment after "::"
     base.rsplit("::").next().unwrap_or(base).to_string()
 }
 
@@ -1342,9 +1334,6 @@ pub trait RunnableSerializable: Runnable + Serializable {
     }
 }
 
-// =============================================================================
-// RunnableLambda
-// =============================================================================
 
 /// A Runnable that wraps a function.
 ///
@@ -1466,7 +1455,6 @@ where
 
     fn get_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph> {
         if self.deps.is_empty() {
-            // No deps: fall back to the default 3-node graph
             use super::graph::NodeData;
             let mut graph = super::graph::Graph::new();
 
@@ -1503,7 +1491,6 @@ where
 
             Ok(graph)
         } else {
-            // Has deps: embed each dep's graph between input and output nodes
             use super::graph::NodeData;
             let mut graph = super::graph::Graph::new();
 
@@ -1555,9 +1542,6 @@ where
     RunnableLambda::new(func)
 }
 
-// =============================================================================
-// RunnableLambdaWithConfig
-// =============================================================================
 
 /// A config-aware version of `RunnableLambda` that supports functions which
 /// receive `RunnableConfig`, as well as async functions.
@@ -1807,7 +1791,6 @@ where
                 config,
             )
         } else if self.func.is_some() {
-            // Fall back to sync transform
             self.transform(input, config)
         } else {
             Box::pin(futures::stream::once(async {
@@ -1819,9 +1802,6 @@ where
     }
 }
 
-// =============================================================================
-// RunnableSequence
-// =============================================================================
 
 /// A sequence of Runnables that are executed one after another.
 ///
@@ -1901,7 +1881,6 @@ where
         let config = ensure_config(config);
         let callback_manager = get_callback_manager_for_config(&config);
 
-        // Start the chain run
         let run_manager = callback_manager
             .on_chain_start()
             .serialized(&HashMap::new())
@@ -1909,7 +1888,6 @@ where
             .maybe_run_id(config.run_id)
             .call();
 
-        // Invoke first step
         let first_config = patch_config(
             Some(config.clone()),
             Some(run_manager.get_child(Some("seq:step:1"))),
@@ -1926,7 +1904,6 @@ where
             }
         };
 
-        // Invoke second step
         let last_config = patch_config(
             Some(config),
             Some(run_manager.get_child(Some("seq:step:2"))),
@@ -1961,7 +1938,6 @@ where
             .on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id, None)
             .await;
 
-        // Invoke first step
         let first_config = patch_config(
             Some(config.clone()),
             Some(
@@ -1982,7 +1958,6 @@ where
             }
         };
 
-        // Invoke second step
         let last_config = patch_config(
             Some(config),
             Some(
@@ -2024,11 +1999,8 @@ where
         Box::pin(async_stream::stream! {
             let config = ensure_config(config);
 
-            // Transform through first step
             let first_output = self.first.transform(input, Some(config.clone()));
 
-            // Feed Ok values from first step into second step's transform.
-            // On error, yield it and stop.
             let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
             let mut first_stream = std::pin::pin!(first_output);
 
@@ -2077,7 +2049,6 @@ where
     fn get_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph> {
         let mut graph = super::graph::Graph::new();
 
-        // First step: keep its input node, trim its output node
         let mut first_graph = self.first.get_graph(config)?;
         first_graph.trim_last_node();
         let (step_first, _) = graph.extend(first_graph, "");
@@ -2087,7 +2058,6 @@ where
             ));
         }
 
-        // Last step: trim its input node, keep its output node
         let mut last_graph = self.last.get_graph(config)?;
         last_graph.trim_first_node();
         let current_last = graph.last_node().cloned();
@@ -2111,9 +2081,6 @@ where
     RunnableSequence::new(first, second)
 }
 
-// =============================================================================
-// RunnableParallel
-// =============================================================================
 
 /// A Runnable that runs multiple Runnables in parallel.
 ///
@@ -2359,7 +2326,6 @@ where
         Box::pin(async_stream::stream! {
             let config = ensure_config(config);
 
-            // Create a stream for each step, all receiving the same input
             let mut tagged_streams: futures::stream::SelectAll<
                 BoxStream<'_, Result<(String, Value)>>
             > = futures::stream::SelectAll::new();
@@ -2367,14 +2333,12 @@ where
             for (name, step) in &self.steps {
                 let name = name.clone();
                 let step_stream = step.stream(input.clone(), Some(config.clone()));
-                // Tag each output with its step name
                 let named_stream = step_stream.map(move |result| {
                     result.map(|value| (name.clone(), value))
                 });
                 tagged_streams.push(Box::pin(named_stream));
             }
 
-            // Yield single-key HashMaps as chunks arrive
             while let Some(result) = tagged_streams.next().await {
                 match result {
                     Ok((key, value)) => {
@@ -2400,22 +2364,17 @@ where
             return Box::pin(futures::stream::empty());
         }
 
-        // Tee the input stream: collect all chunks into a shared buffer,
-        // then replay them to each branch via separate streams.
         Box::pin(async_stream::stream! {
             let config = ensure_config(config);
 
-            // Collect the full input into a Vec for replay to each branch
             let input_chunks: Vec<Self::Input> = input.collect().await;
 
-            // Create a tagged SelectAll over each branch's transform output
             let mut tagged_streams: futures::stream::SelectAll<
                 BoxStream<'_, Result<(String, Value)>>
             > = futures::stream::SelectAll::new();
 
             for (name, step) in &self.steps {
                 let name = name.clone();
-                // Replay the collected input chunks as a fresh stream for this branch
                 let branch_input: BoxStream<'_, Self::Input> =
                     Box::pin(futures::stream::iter(input_chunks.clone()));
                 let branch_config = patch_config(
@@ -2433,7 +2392,6 @@ where
                 tagged_streams.push(Box::pin(named_stream));
             }
 
-            // Yield single-key HashMaps as chunks arrive
             while let Some(result) = tagged_streams.next().await {
                 match result {
                     Ok((key, value)) => {
@@ -2488,9 +2446,6 @@ where
     }
 }
 
-// =============================================================================
-// RunnableBinding
-// =============================================================================
 
 /// A Runnable that binds arguments or config to another Runnable.
 pub struct RunnableBinding<R>
@@ -2628,9 +2583,6 @@ where
     }
 }
 
-// =============================================================================
-// RunnableEach
-// =============================================================================
 
 /// A Runnable that maps over a list of inputs.
 pub struct RunnableEach<R>
@@ -2735,9 +2687,6 @@ where
     }
 }
 
-// =============================================================================
-// RunnableGenerator
-// =============================================================================
 
 /// Type alias for a transform function that takes an input stream and produces
 /// an output stream.
@@ -2908,9 +2857,6 @@ where
     }
 }
 
-// =============================================================================
-// DynRunnable - Type-erased Runnable
-// =============================================================================
 
 /// A type-erased Runnable that can be stored in collections.
 pub type DynRunnable<I, O> = Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>;
@@ -2923,9 +2869,6 @@ where
     Arc::new(runnable)
 }
 
-// =============================================================================
-// Helper functions
-// =============================================================================
 
 /// Coerce a function into a Runnable.
 pub fn coerce_to_runnable<F, I, O>(func: F) -> RunnableLambda<F, I, O>
@@ -3031,7 +2974,6 @@ mod tests {
 
     #[test]
     fn test_runnable_retry() {
-        // Test that retry works with a successful function
         use crate::runnables::retry::RunnableRetry;
 
         let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -3081,9 +3023,6 @@ mod tests {
         assert_eq!(result, 4);
     }
 
-    // =========================================================================
-    // Streaming tests
-    // =========================================================================
 
     #[tokio::test]
     async fn test_runnable_generator_stream() {
@@ -3141,7 +3080,6 @@ mod tests {
         });
 
         let result = generator.ainvoke("input".to_string(), None).await.unwrap();
-        // Addable accumulation: "Have" + " a nice day" = "Have a nice day"
         assert_eq!(result, "Have a nice day");
     }
 
@@ -3160,7 +3098,6 @@ mod tests {
         let input = Box::pin(futures::stream::iter(vec![1, 2, 3]));
         let chunks: Vec<_> = runnable.transform(input, None).collect::<Vec<_>>().await;
 
-        // transform buffers all input (keeps last), then yields single result
         assert_eq!(chunks.len(), 1);
         assert_eq!(*chunks[0].as_ref().unwrap(), 30); // 3 * 10
     }
@@ -3226,10 +3163,8 @@ mod tests {
             .collect::<Vec<_>>()
             .await;
 
-        // Each branch yields one chunk, so we get 2 single-key HashMaps
         assert_eq!(chunks.len(), 2);
 
-        // Collect all chunks into one map
         let mut combined = HashMap::new();
         for chunk in chunks {
             let map = chunk.unwrap();

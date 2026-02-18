@@ -722,7 +722,6 @@ impl BaseCallbackManager {
     /// Note: This matches Python's behavior which does NOT merge inheritable_metadata
     /// (this appears to be a bug in the Python implementation, but we match it for compatibility).
     pub fn merge(&self, other: &BaseCallbackManager) -> Self {
-        // Use a set-like deduplication for tags (matching Python's list(set(...)))
         let mut tags_set: std::collections::HashSet<String> = self.tags.iter().cloned().collect();
         tags_set.extend(other.tags.iter().cloned());
         let tags: Vec<String> = tags_set.into_iter().collect();
@@ -732,12 +731,9 @@ impl BaseCallbackManager {
         inheritable_tags_set.extend(other.inheritable_tags.iter().cloned());
         let inheritable_tags: Vec<String> = inheritable_tags_set.into_iter().collect();
 
-        // Merge metadata
         let mut metadata = self.metadata.clone();
         metadata.extend(other.metadata.clone());
 
-        // Create manager with merged values
-        // Note: Python does NOT include inheritable_metadata in the constructor
         let mut manager = Self {
             handlers: Vec::new(),
             inheritable_handlers: Vec::new(),
@@ -748,7 +744,6 @@ impl BaseCallbackManager {
             inheritable_metadata: HashMap::new(), // Python doesn't merge this
         };
 
-        // Merge handlers
         let handlers: Vec<_> = self
             .handlers
             .iter()

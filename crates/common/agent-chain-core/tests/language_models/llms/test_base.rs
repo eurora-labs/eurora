@@ -13,9 +13,6 @@ use agent_chain_core::outputs::{Generation, GenerationType, LLMResult};
 use futures::StreamExt;
 use serde_json::json;
 
-// ====================================================================
-// test_batch / test_abatch
-// ====================================================================
 
 /// Ported from `test_batch`.
 #[tokio::test]
@@ -69,9 +66,6 @@ async fn test_abatch_empty_inputs_returns_empty_list() {
     assert!(result.is_empty());
 }
 
-// ====================================================================
-// test_convert_input
-// ====================================================================
 
 /// Ported from `test_convert_string_input`.
 #[test]
@@ -106,13 +100,9 @@ fn test_convert_message_sequence_input() {
     let result = llm
         .convert_input(LanguageModelInput::from(messages))
         .unwrap();
-    // Messages get formatted as "human: hi"
     assert!(result.contains("hi"));
 }
 
-// ====================================================================
-// test_generate (via generate_prompts)
-// ====================================================================
 
 /// Ported from `test_generate_single_prompt`.
 #[tokio::test]
@@ -159,9 +149,6 @@ async fn test_generate_empty_prompts() {
     assert_eq!(result.generations.len(), 0);
 }
 
-// ====================================================================
-// test_agenerate
-// ====================================================================
 
 /// Ported from `test_agenerate_single_prompt`.
 #[tokio::test]
@@ -195,9 +182,6 @@ async fn test_agenerate_multiple_prompts() {
     }
 }
 
-// ====================================================================
-// test_astream_fallback_to_ainvoke
-// ====================================================================
 
 /// Ported from `test_astream_fallback_to_ainvoke`.
 ///
@@ -238,9 +222,6 @@ async fn test_astream_implementation_uses_stream() {
     assert_eq!(chunks, vec!["a", "b"]);
 }
 
-// ====================================================================
-// test_get_ls_params
-// ====================================================================
 
 /// Ported from `test_get_ls_params`.
 #[test]
@@ -252,14 +233,10 @@ fn test_get_ls_params() {
     assert!(params.ls_provider.is_some());
     assert!(params.ls_model_name.is_some());
 
-    // With stop words
     let params = llm.get_llm_ls_params(Some(&["stop".to_string()]));
     assert_eq!(params.ls_stop, Some(vec!["stop".to_string()]));
 }
 
-// ====================================================================
-// test_get_prompts_from_cache
-// ====================================================================
 
 /// Ported from `test_no_cache_returns_all_missing`.
 #[test]
@@ -321,9 +298,6 @@ fn test_get_prompts_with_cache_all_hit() {
     assert!(missing.is_empty());
 }
 
-// ====================================================================
-// test_update_cache
-// ====================================================================
 
 /// Ported from `test_update_cache_stores_results`.
 #[test]
@@ -373,13 +347,9 @@ fn test_update_cache_with_none_does_not_store() {
         &["p1".to_string()],
     );
 
-    // existing_prompts should not be populated when cache is None
     assert!(existing.is_empty());
 }
 
-// ====================================================================
-// test_generate_prompt (via BaseLanguageModel trait)
-// ====================================================================
 
 /// Ported from `test_generate_prompt_converts_prompt_values`.
 #[tokio::test]
@@ -442,9 +412,6 @@ async fn test_generate_prompt_with_message_input() {
     }
 }
 
-// ====================================================================
-// test_str_representation / test_dict_contains_type
-// ====================================================================
 
 /// Ported from `test_str_representation`.
 #[test]
@@ -465,9 +432,6 @@ fn test_dict_contains_type_and_identifying_params() {
     assert_eq!(params["responses"], json!(["a", "b"]));
 }
 
-// ====================================================================
-// test_invoke / test_call
-// ====================================================================
 
 /// Ported from `test_invoke` (via FakeListLLM).
 #[tokio::test]
@@ -488,11 +452,7 @@ async fn test_call_method() {
     assert_eq!(result, "direct");
 }
 
-// ====================================================================
-// Previously skipped tests — now implemented
-// ====================================================================
 
-// ---- _get_run_ids_list ----
 
 /// Ported from `test_none_run_id`.
 #[test]
@@ -549,7 +509,6 @@ fn test_get_run_ids_list_single_prompt_with_uuid() {
     assert_eq!(result, vec![Some(uid)]);
 }
 
-// ---- _resolve_cache ----
 
 /// Ported from `test_cache_is_base_cache_instance`.
 #[test]
@@ -575,7 +534,6 @@ fn test_resolve_cache_none_returns_global() {
     let result = resolve_cache(None).unwrap();
     assert!(result.is_some());
 
-    // Clean up global state
     set_llm_cache(None);
 }
 
@@ -631,7 +589,6 @@ fn test_resolve_cache_false() {
     assert!(result.is_none());
 }
 
-// ---- batch with return_exceptions ----
 
 /// Ported from `test_batch_return_exceptions_true`.
 #[tokio::test]
@@ -655,7 +612,6 @@ async fn test_batch_with_exceptions() {
     assert_eq!(results[2].as_ref().unwrap(), "r3");
 }
 
-// ---- save_llm ----
 
 /// Ported from `test_save_json`.
 #[test]
@@ -700,7 +656,6 @@ fn test_save_invalid_extension_raises() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
-// ---- create_base_retry ----
 
 /// Ported from `test_retries_on_specified_error`.
 #[test]

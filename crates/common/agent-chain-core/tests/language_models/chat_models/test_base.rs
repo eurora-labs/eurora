@@ -48,9 +48,6 @@ fn create_messages_2() -> Vec<BaseMessage> {
     ]
 }
 
-// =============================================================================
-// Streaming Fallback Tests
-// =============================================================================
 
 /// A model that only implements `_generate` (no streaming).
 struct ModelWithGenerateOnly {
@@ -129,14 +126,9 @@ impl BaseChatModel for ModelWithGenerateOnly {
 
 #[tokio::test]
 async fn test_astream_fallback_to_ainvoke() {
-    // Test `astream()` uses appropriate implementation.
-    // When streaming is not implemented, it should fall back to invoke
-    // and return the result as a single chunk.
-    // Python equivalent: test_astream_fallback_to_ainvoke()
 
     let model = ModelWithGenerateOnly::new();
 
-    // Test sync stream
     let chunks: Vec<BaseMessage> = {
         let result = model
             ._generate(vec![], None, None)
@@ -148,7 +140,6 @@ async fn test_astream_fallback_to_ainvoke() {
     assert_eq!(chunks.len(), 1);
     assert_eq!(chunks[0].content(), "hello");
 
-    // Test that model does NOT have stream implementation
     assert!(!model.has_stream_impl());
 }
 
@@ -232,12 +223,9 @@ impl BaseChatModel for ModelWithSyncStream {
 
 #[tokio::test]
 async fn test_astream_implementation_fallback_to_stream() {
-    // Test astream falls back to sync stream implementation.
-    // Python equivalent: test_astream_implementation_fallback_to_stream()
 
     let model = ModelWithSyncStream::new();
 
-    // Collect stream chunks
     let mut stream = model
         ._stream(vec![], None, None)
         .expect("stream should work");
@@ -250,7 +238,6 @@ async fn test_astream_implementation_fallback_to_stream() {
     assert_eq!(chunks[0].message.content(), "a");
     assert_eq!(chunks[1].message.content(), "b");
 
-    // Verify that model has sync stream but not async stream
     assert!(model.has_stream_impl());
     assert!(!model.has_astream_impl());
 }
@@ -335,12 +322,9 @@ impl BaseChatModel for ModelWithAsyncStream {
 
 #[tokio::test]
 async fn test_astream_implementation_uses_astream() {
-    // Test that astream uses the async implementation when available.
-    // Python equivalent: test_astream_implementation_uses_astream()
 
     let model = ModelWithAsyncStream::new();
 
-    // Collect astream chunks
     let mut stream = model
         ._astream(vec![], None, None)
         .await
@@ -354,13 +338,9 @@ async fn test_astream_implementation_uses_astream() {
     assert_eq!(chunks[0].message.content(), "a");
     assert_eq!(chunks[1].message.content(), "b");
 
-    // Verify model has async stream
     assert!(model.has_astream_impl());
 }
 
-// =============================================================================
-// Disable Streaming Tests
-// =============================================================================
 
 /// A model without streaming support.
 struct NoStreamingModel {
@@ -556,24 +536,18 @@ impl BaseChatModel for StreamingModel {
 
 #[test]
 fn test_disable_streaming_bool_true() {
-    // Test disable_streaming with Bool(true) always disables.
-    // Python equivalent: test_disable_streaming() with disable_streaming=True
 
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::Bool(true));
 
-    // _should_stream should return false when disable_streaming is true
     assert!(!model._should_stream(false, false, None, None));
     assert!(!model._should_stream(false, true, None, None)); // with tools
 }
 
 #[test]
 fn test_disable_streaming_bool_false() {
-    // Test disable_streaming with Bool(false) never disables.
-    // Python equivalent: test_disable_streaming() with disable_streaming=False
 
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::Bool(false));
 
-    // _should_stream should return true when streaming is implemented and handlers present
     let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::base::BaseCallbackHandler>> =
         vec![std::sync::Arc::new(
             agent_chain_core::callbacks::StdOutCallbackHandler::new(),
@@ -584,8 +558,6 @@ fn test_disable_streaming_bool_false() {
 
 #[test]
 fn test_disable_streaming_tool_calling() {
-    // Test disable_streaming with ToolCalling disables only when tools present.
-    // Python equivalent: test_disable_streaming() with disable_streaming="tool_calling"
 
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::ToolCalling);
 
@@ -594,24 +566,19 @@ fn test_disable_streaming_tool_calling() {
             agent_chain_core::callbacks::StdOutCallbackHandler::new(),
         )];
 
-    // Without tools, streaming should work
     assert!(model._should_stream(false, false, None, Some(&handlers)));
 
-    // With tools, streaming should be disabled
     assert!(!model._should_stream(false, true, None, Some(&handlers)));
 }
 
 #[tokio::test]
 async fn test_disable_streaming_async() {
-    // Test disable_streaming async variants.
-    // Python equivalent: test_disable_streaming_async()
 
     let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::base::BaseCallbackHandler>> =
         vec![std::sync::Arc::new(
             agent_chain_core::callbacks::StdOutCallbackHandler::new(),
         )];
 
-    // Test Bool(true)
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::Bool(true));
     let result = model
         .invoke(LanguageModelInput::Messages(vec![]), None)
@@ -619,11 +586,9 @@ async fn test_disable_streaming_async() {
     assert!(result.is_ok());
     assert_eq!(result.unwrap().content, "invoke");
 
-    // Test Bool(false) - streaming works with handlers
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::Bool(false));
     assert!(model._should_stream(true, false, None, Some(&handlers)));
 
-    // Test ToolCalling
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::ToolCalling);
     assert!(model._should_stream(true, false, None, Some(&handlers))); // no tools
     assert!(!model._should_stream(true, true, None, Some(&handlers))); // with tools
@@ -631,8 +596,6 @@ async fn test_disable_streaming_async() {
 
 #[tokio::test]
 async fn test_disable_streaming_no_streaming_model() {
-    // Test disable_streaming on models without streaming support.
-    // Python equivalent: test_disable_streaming_no_streaming_model()
 
     let model = NoStreamingModel::new().with_disable_streaming(DisableStreaming::Bool(true));
     let result = model
@@ -641,15 +604,12 @@ async fn test_disable_streaming_no_streaming_model() {
     assert!(result.is_ok());
     assert_eq!(result.unwrap().content, "invoke");
 
-    // Even with Bool(false), _should_stream returns false because no stream impl
     let model = NoStreamingModel::new().with_disable_streaming(DisableStreaming::Bool(false));
     assert!(!model._should_stream(false, false, None, None));
 }
 
 #[tokio::test]
 async fn test_disable_streaming_no_streaming_model_async() {
-    // Test async disable_streaming on non-streaming models.
-    // Python equivalent: test_disable_streaming_no_streaming_model_async()
 
     for disable in [
         DisableStreaming::Bool(true),
@@ -665,9 +625,6 @@ async fn test_disable_streaming_no_streaming_model_async() {
     }
 }
 
-// =============================================================================
-// LangSmith Params Tests
-// =============================================================================
 
 /// A model for testing _get_ls_params.
 struct LSParamsModel {
@@ -753,12 +710,9 @@ impl BaseChatModel for LSParamsModel {
 
 #[test]
 fn test_get_ls_params() {
-    // Test LangSmith parameter extraction.
-    // Python equivalent: test_get_ls_params()
 
     let llm = LSParamsModel::new();
 
-    // Test standard tracing params
     let ls_params = llm.get_ls_params(None);
     assert_eq!(ls_params.ls_provider, Some("lsparamsmodel".to_string()));
     assert_eq!(ls_params.ls_model_type, Some("chat".to_string()));
@@ -766,24 +720,17 @@ fn test_get_ls_params() {
     assert_eq!(ls_params.ls_temperature, Some(0.1));
     assert_eq!(ls_params.ls_max_tokens, Some(1024));
 
-    // Test with stop words
     let ls_params = llm.get_ls_params(Some(&["stop".to_string()]));
     assert_eq!(ls_params.ls_stop, Some(vec!["stop".to_string()]));
 }
 
-// =============================================================================
-// Model Profiles Tests
-// =============================================================================
 
 #[test]
 fn test_model_profiles() {
-    // Test model profile functionality.
-    // Python equivalent: test_model_profiles()
 
     let model = GenericFakeChatModel::from_strings(vec!["test".to_string()]);
     assert!(model.profile().is_none());
 
-    // Create model with profile
     let profile = ModelProfile {
         max_input_tokens: Some(100),
         ..Default::default()
@@ -797,196 +744,111 @@ fn test_model_profiles() {
     assert_eq!(retrieved_profile.unwrap().max_input_tokens, Some(100));
 }
 
-// =============================================================================
-// Batch Size Tests (placeholder - requires callback infrastructure)
-// =============================================================================
 
 #[test]
 fn test_batch_size() {
-    // Test batch size tracking for chat models.
-    // Python equivalent: test_batch_size()
-    // Note: Full implementation requires callback/tracer infrastructure.
 
     let _messages = create_messages();
     let _messages_2 = create_messages_2();
     let _llm = FakeListChatModel::new((0..100).map(|i| i.to_string()).collect());
 
-    // Without collect_runs implementation, we verify the model can be created
-    // and that the test structure is in place
 }
 
 #[tokio::test]
 async fn test_async_batch_size() {
-    // Test async batch size tracking.
-    // Python equivalent: test_async_batch_size()
-    // Note: Full implementation requires callback/tracer infrastructure.
 
     let _messages = create_messages();
     let _messages_2 = create_messages_2();
     let _llm = FakeListChatModel::new((0..100).map(|i| i.to_string()).collect());
 
-    // Test basic async operation works
     let llm = FakeListChatModel::new(vec!["test".to_string()]);
     let result = llm.invoke(LanguageModelInput::Messages(vec![]), None).await;
     assert!(result.is_ok());
 }
 
-// =============================================================================
-// Run ID Tests (placeholder - requires callback infrastructure)
-// =============================================================================
 
 #[test]
 fn test_pass_run_id() {
-    // Test that run_id is correctly passed through callbacks.
-    // Python equivalent: test_pass_run_id()
-    // Note: Full implementation requires callback/tracer infrastructure.
 
     let _llm = FakeListChatModel::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
 
-    // Without full tracer implementation, verify test structure
 }
 
 #[tokio::test]
 async fn test_async_pass_run_id() {
-    // Test async run_id passing.
-    // Python equivalent: test_async_pass_run_id()
-    // Note: Full implementation requires callback/tracer infrastructure.
 
     let _llm = FakeListChatModel::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
 }
 
-// =============================================================================
-// Streaming Attribute Tests
-// =============================================================================
 
 #[tokio::test]
 async fn test_streaming_attribute_overrides_streaming_callback() {
-    // Test that streaming attribute takes precedence.
-    // Python equivalent: test_streaming_attribute_overrides_streaming_callback()
 
-    // When model has streaming=false, even with streaming callbacks,
-    // it should not use streaming
     let model = StreamingModel::new().with_streaming(false);
 
-    // has_streaming_field returns None when streaming is false (not explicitly set)
-    // This means the callback check will be used
     assert!(model.has_streaming_field().is_none());
 }
 
-// =============================================================================
-// Content Block Tests (placeholder - requires content block infrastructure)
-// =============================================================================
 
 #[test]
 fn test_trace_images_in_openai_format() {
-    // Test that images are traced in OpenAI Chat Completions format.
-    // Python equivalent: test_trace_images_in_openai_format()
-    // Note: Requires content block transformation infrastructure.
 
-    // Placeholder - verify test structure
 }
 
 #[test]
 fn test_trace_pdfs() {
-    // Test PDF content block tracing.
-    // Python equivalent: test_trace_pdfs()
-    // Note: Requires content block transformation infrastructure.
 }
 
 #[test]
 fn test_content_block_transformation_v0_to_v1_image() {
-    // Test v0 to v1 content block transformation for images.
-    // Python equivalent: test_content_block_transformation_v0_to_v1_image()
-    // Note: Requires content block versioning infrastructure.
 }
 
 #[test]
 fn test_trace_content_blocks_with_no_type_key() {
-    // Test content blocks without explicit type key.
-    // Python equivalent: test_trace_content_blocks_with_no_type_key()
-    // Note: Requires content block handling infrastructure.
 }
 
 #[test]
 fn test_extend_support_to_openai_multimodal_formats() {
-    // Test normalization of OpenAI audio, image, and file inputs.
-    // Python equivalent: test_extend_support_to_openai_multimodal_formats()
-    // Note: Requires multimodal support infrastructure.
 }
 
 #[test]
 fn test_normalize_messages_edge_cases() {
-    // Test edge cases in message normalization.
-    // Python equivalent: test_normalize_messages_edge_cases()
-    // Note: Requires message normalization infrastructure.
 }
 
 #[test]
 fn test_normalize_messages_v1_content_blocks_unchanged() {
-    // Test that v1 content blocks pass through unchanged.
-    // Python equivalent: test_normalize_messages_v1_content_blocks_unchanged()
-    // Note: Requires message normalization infrastructure.
 }
 
-// =============================================================================
-// Output Version Tests (placeholder - requires output versioning)
-// =============================================================================
 
 #[test]
 fn test_output_version_invoke() {
-    // Test output_version parameter in invoke.
-    // Python equivalent: test_output_version_invoke()
-    // Note: Requires output versioning infrastructure.
 }
 
 #[tokio::test]
 async fn test_output_version_ainvoke() {
-    // Test output_version in async invoke.
-    // Python equivalent: test_output_version_ainvoke()
-    // Note: Requires output versioning infrastructure.
 }
 
 #[test]
 fn test_output_version_stream() {
-    // Test output_version in streaming.
-    // Python equivalent: test_output_version_stream()
-    // Note: Requires output versioning infrastructure.
 }
 
 #[tokio::test]
 async fn test_output_version_astream() {
-    // Test output_version in async streaming.
-    // Python equivalent: test_output_version_astream()
-    // Note: Requires output versioning infrastructure.
 }
 
-// =============================================================================
-// Error Response Tests (placeholder - requires error response infrastructure)
-// =============================================================================
 
 #[test]
 fn test_generate_response_from_error_with_valid_json() {
-    // Test error response generation with JSON.
-    // Python equivalent: test_generate_response_from_error_with_valid_json()
-    // Note: Requires _generate_response_from_error implementation.
 }
 
 #[test]
 fn test_generate_response_from_error_handles_streaming_response_failure() {
-    // Test error handling for streaming response failures.
-    // Python equivalent: test_generate_response_from_error_handles_streaming_response_failure()
-    // Note: Requires _generate_response_from_error implementation.
 }
 
-// =============================================================================
-// Additional Helper Tests
-// =============================================================================
 
 #[test]
 fn test_disable_streaming_enum() {
-    // Test DisableStreaming enum functionality.
 
-    // Test Bool variant
     let disable_true = DisableStreaming::Bool(true);
     assert!(disable_true.should_disable(false));
     assert!(disable_true.should_disable(true));
@@ -995,12 +857,10 @@ fn test_disable_streaming_enum() {
     assert!(!disable_false.should_disable(false));
     assert!(!disable_false.should_disable(true));
 
-    // Test ToolCalling variant
     let tool_calling = DisableStreaming::ToolCalling;
     assert!(!tool_calling.should_disable(false)); // no tools
     assert!(tool_calling.should_disable(true)); // with tools
 
-    // Test From<bool>
     let from_true: DisableStreaming = true.into();
     assert_eq!(from_true, DisableStreaming::Bool(true));
 
@@ -1010,7 +870,6 @@ fn test_disable_streaming_enum() {
 
 #[test]
 fn test_chat_model_config_builder() {
-    // Test ChatModelConfig builder pattern.
 
     let config = ChatModelConfig::new()
         .with_cache(true)
@@ -1021,7 +880,6 @@ fn test_chat_model_config_builder() {
     assert_eq!(config.disable_streaming, DisableStreaming::Bool(true));
     assert_eq!(config.output_version, Some("v1".to_string()));
 
-    // Test with profile
     let profile = ModelProfile {
         max_input_tokens: Some(1000),
         ..Default::default()
@@ -1036,7 +894,6 @@ fn test_chat_model_config_builder() {
 
 #[tokio::test]
 async fn test_invoke_basic() {
-    // Test basic invoke functionality.
 
     let model = FakeListChatModel::new(vec!["hello world".to_string()]);
     let result = model
@@ -1049,7 +906,6 @@ async fn test_invoke_basic() {
 
 #[tokio::test]
 async fn test_ainvoke_basic() {
-    // Test basic ainvoke functionality.
 
     let model = FakeListChatModel::new(vec!["async hello".to_string()]);
     let result = model
@@ -1062,7 +918,6 @@ async fn test_ainvoke_basic() {
 
 #[tokio::test]
 async fn test_stream_basic() {
-    // Test basic stream functionality.
 
     let model = FakeListChatModel::new(vec!["hello".to_string()]);
     let mut stream = model
@@ -1076,7 +931,6 @@ async fn test_stream_basic() {
         }
     }
 
-    // FakeListChatModel streams character by character
     assert_eq!(chunks.len(), 5);
     let text: String = chunks.iter().map(|c| c.text.as_str()).collect();
     assert_eq!(text, "hello");
@@ -1084,7 +938,6 @@ async fn test_stream_basic() {
 
 #[tokio::test]
 async fn test_generate_basic() {
-    // Test basic generate functionality.
 
     let model = FakeListChatModel::new(vec!["gen1".to_string(), "gen2".to_string()]);
     let messages1 = vec![BaseMessage::Human(
@@ -1103,11 +956,7 @@ async fn test_generate_basic() {
     assert_eq!(llm_result.generations.len(), 2);
 }
 
-// ====================================================================
-// Previously missing tests — now implemented
-// ====================================================================
 
-// ---- TestGenerateFromStream ----
 
 /// Ported from `TestGenerateFromStream::test_accumulates_chunks`.
 #[test]
@@ -1151,7 +1000,6 @@ fn test_generate_from_stream_empty_raises_error() {
     assert!(result.is_err());
 }
 
-// ---- TestAGenerateFromStream ----
 
 /// Ported from `TestAGenerateFromStream::test_accumulates_chunks`.
 #[tokio::test]
@@ -1182,7 +1030,6 @@ async fn test_agenerate_from_stream_empty_raises_error() {
     assert!(result.is_err());
 }
 
-// ---- TestCombineLlmOutputs ----
 
 /// Ported from `TestCombineLlmOutputs::test_returns_empty_dict_by_default`.
 #[test]
@@ -1200,7 +1047,6 @@ fn test_combine_llm_outputs_returns_empty_dict_with_empty_list() {
     assert!(result.is_empty());
 }
 
-// ---- TestConvertCachedGenerations ----
 
 /// Ported from `TestConvertCachedGenerations::test_with_chat_generation_objects`.
 #[test]
@@ -1248,13 +1094,11 @@ fn test_convert_cached_generations_mixed() {
     assert_eq!(result[2].message.content(), "c");
 }
 
-// ---- TestShouldStream ----
 
 /// Ported from `TestShouldStream::test_no_stream_implemented_returns_false`.
 #[test]
 fn test_should_stream_no_stream_returns_false() {
     let model = agent_chain_core::FakeChatModel::new();
-    // FakeChatModel doesn't implement _stream, so should return false
     assert!(!model._should_stream(false, false, None, None));
 }
 
@@ -1270,7 +1114,6 @@ fn test_should_stream_no_astream_returns_false() {
 fn test_should_stream_disabled_returns_false() {
     let config = ChatModelConfig::new().with_disable_streaming(true);
     let model = FakeListChatModel::new(vec!["test".to_string()]).with_config(config);
-    // Even with stream impl, disabled should return false
     assert!(!model._should_stream(false, false, None, None));
 }
 
@@ -1278,7 +1121,6 @@ fn test_should_stream_disabled_returns_false() {
 #[test]
 fn test_should_stream_kwarg_true() {
     let model = FakeListChatModel::new(vec!["test".to_string()]);
-    // FakeListChatModel has _stream impl, kwarg=true forces streaming
     assert!(model._should_stream(false, false, Some(true), None));
 }
 
@@ -1293,14 +1135,11 @@ fn test_should_stream_kwarg_false() {
 #[test]
 fn test_should_stream_no_handlers() {
     let model = FakeListChatModel::new(vec!["test".to_string()]);
-    // With has_stream_impl=true, no disable, no kwarg, no streaming field,
-    // and empty handlers list — should return true (default when stream is available)
     let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::base::BaseCallbackHandler>> =
         vec![];
     assert!(!model._should_stream(false, false, None, Some(&handlers)));
 }
 
-// ---- TestConvertInput ----
 
 /// Ported from `TestConvertInput::test_convert_input_from_string`.
 #[test]
@@ -1328,7 +1167,6 @@ fn test_convert_input_from_message_sequence() {
     assert_eq!(result[0].content(), "hi");
 }
 
-// ---- TestGenerateMethod ----
 
 /// Ported from `TestGenerateMethod::test_single_message_list`.
 #[tokio::test]
@@ -1384,7 +1222,6 @@ async fn test_generate_returns_chat_result() {
         .await
         .unwrap();
     assert_eq!(result.generations.len(), 1);
-    // Verify it's a ChatGeneration inside
     match &result.generations[0][0] {
         agent_chain_core::outputs::GenerationType::ChatGeneration(cg) => {
             assert_eq!(cg.message.content(), "hello");
@@ -1393,7 +1230,6 @@ async fn test_generate_returns_chat_result() {
     }
 }
 
-// ---- TestAGenerateMethod ----
 
 /// Ported from `TestAGenerateMethod::test_single_message_list`.
 #[tokio::test]
@@ -1448,7 +1284,6 @@ async fn test_agenerate_returns_chat_result() {
     assert_eq!(result.generations.len(), 1);
 }
 
-// ---- TestBindTools / TestWithStructuredOutput ----
 
 /// Ported from `TestBindTools::test_raises_not_implemented_by_default`.
 #[test]
@@ -1466,7 +1301,6 @@ fn test_with_structured_output_raises_not_implemented() {
     assert!(result.is_err());
 }
 
-// ---- TestSimpleChatModelGenerate ----
 
 /// Ported from `TestSimpleChatModelGenerate::test_generate_wraps_call_output`.
 #[tokio::test]
@@ -1522,7 +1356,6 @@ async fn test_simple_fake_chat_agenerate_returns_chat_result() {
     assert_eq!(result.generations[0].message.content(), "fake response");
 }
 
-// ---- TestGenInfoAndMsgMetadata ----
 
 /// Ported from `TestGenInfoAndMsgMetadata::test_merges_generation_info_with_response_metadata`.
 #[test]
@@ -1603,7 +1436,6 @@ fn test_gen_info_response_metadata_overrides() {
     );
 
     let result = _gen_info_and_msg_metadata(Some(&generation_info), &response_metadata);
-    // response_metadata values win (same as Python dict merge order)
     assert_eq!(
         result.get("key").and_then(|v| v.as_str()),
         Some("from_metadata")
@@ -1630,10 +1462,8 @@ async fn test_stream_injects_response_metadata() {
         }
     }
 
-    // Should have content chunks + final empty chunk
     assert!(chunks.len() >= 2);
 
-    // Last chunk should have chunk_position="last"
     let last = chunks.last().unwrap();
     assert_eq!(
         last.chunk_position,
@@ -1704,7 +1534,6 @@ async fn test_stream_callback_receives_chunk_data() {
     while stream.next().await.is_some() {}
 
     let recorded = recorder.chunks_received.lock().unwrap();
-    // on_llm_new_token should have been called at least once with Some(chunk_json)
     let non_none_chunks: Vec<_> = recorded.iter().filter(|c| c.is_some()).collect();
     assert!(
         !non_none_chunks.is_empty(),
@@ -1714,7 +1543,6 @@ async fn test_stream_callback_receives_chunk_data() {
     );
 }
 
-// ---- StructuredOutputWithRaw tests ----
 
 /// Test that StructuredOutputWithRaw returns raw + parsed + null error on successful parse.
 #[tokio::test]
@@ -1763,7 +1591,6 @@ async fn test_structured_output_with_raw_no_matching_tool() {
     use agent_chain_core::runnables::Runnable;
     use std::sync::Arc;
 
-    // AIMessage with no tool calls — parser returns Ok(Null)
     let ai_msg = AIMessage::builder().content("plain text").build();
 
     let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
@@ -1776,7 +1603,6 @@ async fn test_structured_output_with_raw_no_matching_tool() {
         .await
         .unwrap();
 
-    // No matching tool call means parsed is null, but no error occurred
     assert_eq!(result["parsed"], serde_json::Value::Null);
     assert_eq!(result["parsing_error"], serde_json::Value::Null);
     assert!(result.get("raw").is_some());
@@ -1793,8 +1619,6 @@ async fn test_structured_output_with_raw_parse_error() {
     use agent_chain_core::runnables::Runnable;
     use std::sync::Arc;
 
-    // AIMessage with malformed tool call in additional_kwargs (not in tool_calls)
-    // triggers parse_tool_calls() error path in strict mode
     let ai_msg = AIMessage::builder()
         .content("")
         .additional_kwargs(std::collections::HashMap::from([(
@@ -1851,7 +1675,6 @@ async fn test_structured_output_with_raw_serializes_message() {
         .await
         .unwrap();
 
-    // The raw field should be a serialized AIMessage with the content preserved
     let raw = &result["raw"];
     assert_eq!(raw["content"], "some content");
     assert_eq!(raw["type"], "ai");

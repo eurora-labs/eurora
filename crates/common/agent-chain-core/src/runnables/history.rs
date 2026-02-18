@@ -23,9 +23,6 @@ use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
 use crate::runnables::utils::ConfigurableFieldSpec;
 
-// ---------------------------------------------------------------------------
-// Type aliases
-// ---------------------------------------------------------------------------
 
 /// Closure type for the inner runnable: takes Value input and optional config,
 /// returns Value output.
@@ -50,9 +47,6 @@ pub type HistoryAInvokeFn = Arc<
 pub type GetSessionHistoryFn =
     Arc<dyn Fn(&HashMap<String, String>) -> Arc<Mutex<dyn BaseChatMessageHistory>> + Send + Sync>;
 
-// ---------------------------------------------------------------------------
-// HistoryRunnable (kept for backwards compatibility with existing tests)
-// ---------------------------------------------------------------------------
 
 /// Legacy inner runnable type that operates on `Vec<BaseMessage>` directly.
 ///
@@ -101,9 +95,6 @@ impl fmt::Debug for HistoryRunnable {
     }
 }
 
-// ---------------------------------------------------------------------------
-// RunnableWithMessageHistory
-// ---------------------------------------------------------------------------
 
 /// Wraps another runnable and manages chat message history.
 ///
@@ -324,9 +315,6 @@ impl RunnableWithMessageHistory {
         })
     }
 
-    // -----------------------------------------------------------------------
-    // Python method ports
-    // -----------------------------------------------------------------------
 
     /// Extract input messages from the input value.
     ///
@@ -360,8 +348,6 @@ impl RunnableWithMessageHistory {
             if arr.is_empty() {
                 return Ok(Vec::new());
             }
-            // If the first element is itself an array, unwrap one level
-            // (mirrors Python's handling of batched inputs)
             if arr.first().is_some_and(|v| v.is_array()) {
                 if arr.len() != 1 {
                     return Err(Error::Other(format!(
@@ -381,7 +367,6 @@ impl RunnableWithMessageHistory {
                 .map_err(|e| Error::Other(format!("Failed to deserialize input messages: {}", e)));
         }
 
-        // Single object — try to deserialize as a single BaseMessage
         serde_json::from_value::<BaseMessage>(value.clone())
             .map(|m| vec![m])
             .map_err(|e| {
@@ -409,7 +394,6 @@ impl RunnableWithMessageHistory {
             if let Some(val) = obj.get(key) {
                 val
             } else if let Some(generations) = obj.get("generations") {
-                // Handle the special "generations" format from chat models
                 generations
                     .get(0)
                     .and_then(|g| g.get(0))
@@ -441,7 +425,6 @@ impl RunnableWithMessageHistory {
             );
         }
 
-        // Single object — try to deserialize as a single BaseMessage
         serde_json::from_value::<BaseMessage>(value.clone())
             .map(|m| vec![m])
             .map_err(|e| {
@@ -532,10 +515,6 @@ impl RunnableWithMessageHistory {
             .map(|s| s.id.as_str())
             .collect();
 
-        // In Python, this error is only raised when the callable has named
-        // parameters (checked via inspect.signature). Since we cannot introspect
-        // Rust closures, we skip validation of missing keys and pass whatever
-        // is available. The factory is responsible for handling absent keys.
 
         let mut params = HashMap::new();
         for key in &expected_keys {
@@ -678,9 +657,6 @@ impl RunnableWithMessageHistory {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Runnable trait implementation
-// ---------------------------------------------------------------------------
 
 #[async_trait]
 impl Runnable for RunnableWithMessageHistory {

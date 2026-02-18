@@ -7,7 +7,6 @@ use agent_chain_core::outputs::Generation;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-// --- Test models ---
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 struct SimpleModel {
@@ -113,7 +112,6 @@ struct UnicodeModel {
     author: String,
 }
 
-// --- Helpers ---
 
 fn simple_model_parser() -> PydanticOutputParser<SimpleModel> {
     PydanticOutputParser::new(
@@ -142,7 +140,6 @@ fn simple_model_schema() -> Value {
     })
 }
 
-// --- TestPydanticOutputParserParse ---
 
 #[test]
 fn test_parse_simple_model() {
@@ -327,7 +324,6 @@ fn test_parse_deeply_nested() {
     assert_eq!(result.level1.level2.level3, "deep_value");
 }
 
-// --- TestPydanticOutputParserErrors ---
 
 #[test]
 fn test_invalid_json_raises() {
@@ -421,7 +417,6 @@ fn test_parser_exception_contains_llm_output() {
     let parser = simple_model_parser();
     let result = parser.parse(r#"{"name": 123, "age": "bad"}"#);
     assert!(result.is_err());
-    // The error message should contain the JSON output in the error string
     let err_msg = format!("{}", result.unwrap_err());
     assert!(
         err_msg.contains("Failed to parse SimpleModel"),
@@ -430,7 +425,6 @@ fn test_parser_exception_contains_llm_output() {
     );
 }
 
-// --- TestPydanticOutputParserParseResult ---
 
 #[test]
 fn test_parse_result_valid() {
@@ -450,8 +444,6 @@ fn test_parse_result_partial_valid() {
 
 #[test]
 fn test_parse_result_partial_invalid_returns_err() {
-    // In Python, partial=True with invalid JSON returns None.
-    // In Rust, since our Output type is T (not Option<T>), we return Err instead.
     let parser = simple_model_parser();
     let generation = Generation::new("not json");
     let result = parser.parse_result(&[generation], true);
@@ -466,7 +458,6 @@ fn test_parse_result_non_partial_invalid_raises() {
     assert!(result.is_err());
 }
 
-// --- TestPydanticOutputParserParseObj ---
 
 #[test]
 fn test_parse_obj_valid() {
@@ -490,7 +481,6 @@ fn test_parse_obj_invalid_raises() {
     );
 }
 
-// --- TestPydanticOutputParserParserException ---
 
 #[test]
 fn test_parser_exception_message() {
@@ -511,7 +501,6 @@ fn test_parser_exception_message() {
     );
 }
 
-// --- TestPydanticOutputParserFormatInstructions ---
 
 #[test]
 fn test_contains_schema_fields() {
@@ -531,7 +520,6 @@ fn test_contains_schema_fields() {
 fn test_does_not_contain_title() {
     let parser = simple_model_parser();
     let instructions = parser.get_format_instructions().unwrap();
-    // Extract the JSON part from within the code block
     if let Some(start) = instructions.find("```\n") {
         let after_ticks = &instructions[start + 4..];
         if let Some(end) = after_ticks.find("\n```") {
@@ -601,7 +589,6 @@ fn test_does_not_alter_original_schema() {
     );
 }
 
-// --- TestPydanticOutputParserProperties ---
 
 #[test]
 fn test_type_property() {

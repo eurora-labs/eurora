@@ -10,7 +10,6 @@ use agent_chain_core::output_parsers::{BaseLLMOutputParser, BaseOutputParser, Ou
 use agent_chain_core::outputs::{ChatGeneration, Generation};
 use agent_chain_core::prompt_values::StringPromptValue;
 
-// --- Concrete parser implementations for testing ---
 
 /// Parses string to i64.
 #[derive(Debug)]
@@ -91,7 +90,6 @@ impl BaseOutputParser for NoTypeParser {
     }
 }
 
-// --- BaseOutputParser parse tests ---
 
 #[test]
 fn test_parse_valid_int() {
@@ -169,7 +167,6 @@ fn test_bool_parser_invalid() {
     assert!(err.contains("Expected"), "Error was: {}", err);
 }
 
-// --- BaseOutputParser invoke tests ---
 
 #[test]
 fn test_invoke_with_ai_message() {
@@ -185,7 +182,6 @@ fn test_invoke_with_human_message() {
     assert_eq!(parser.invoke(message, None).unwrap(), 42);
 }
 
-// --- BaseOutputParser async tests ---
 
 #[tokio::test]
 async fn test_ainvoke_message() {
@@ -222,7 +218,6 @@ async fn test_aparse_result_partial_flag() {
     assert_eq!(result, 42);
 }
 
-// --- BaseOutputParser parse_with_prompt tests ---
 
 #[test]
 fn test_parse_with_prompt_ignores_prompt() {
@@ -232,7 +227,6 @@ fn test_parse_with_prompt_ignores_prompt() {
     assert_eq!(result, 42);
 }
 
-// --- BaseOutputParser get_format_instructions tests ---
 
 #[test]
 fn test_get_format_instructions_returns_error() {
@@ -241,7 +235,6 @@ fn test_get_format_instructions_returns_error() {
     assert!(result.is_err());
 }
 
-// --- BaseOutputParser parser_type tests ---
 
 #[test]
 fn test_parser_type_returns_value() {
@@ -270,7 +263,6 @@ fn test_no_type_parser_get_format_instructions_returns_not_implemented() {
     assert!(err.contains("not implemented"), "Error was: {}", err);
 }
 
-// --- BaseLLMOutputParser tests ---
 
 #[derive(Debug)]
 struct SimpleParser;

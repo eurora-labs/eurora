@@ -8,7 +8,6 @@ use agent_chain_core::output_parsers::{
 use agent_chain_core::outputs::Generation;
 use serde_json::json;
 
-// --- JsonOutputParser.parse() tests ---
 
 #[test]
 fn test_parse_valid_json() {
@@ -112,7 +111,6 @@ fn test_parse_json_numeric_values() {
     assert_eq!(result, json!({"int": 42, "float": 3.15, "negative": -1}));
 }
 
-// --- JsonOutputParser.parse_result() tests ---
 
 #[test]
 fn test_parse_result_full() {
@@ -132,9 +130,6 @@ fn test_parse_result_partial_valid() {
 
 #[test]
 fn test_parse_result_partial_returns_err_for_unparseable() {
-    // In Python, partial parsing of unparseable text returns None.
-    // In Rust, the idiomatic equivalent is returning Err, which the streaming
-    // infrastructure uses to skip unparseable intermediate states.
     let parser = JsonOutputParser::new();
     let generation = Generation::new("not json");
     let result = parser.parse_result(&[generation], true);
@@ -149,7 +144,6 @@ fn test_parse_result_non_partial_raises_on_invalid() {
     assert!(result.is_err());
 }
 
-// --- JsonOutputParser.get_format_instructions() tests ---
 
 #[test]
 fn test_format_instructions_no_schema() {
@@ -231,7 +225,6 @@ fn test_format_instructions_do_not_alter_schema() {
     let initial_schema = schema.clone();
     let parser = JsonOutputParser::with_schema(schema);
     let _ = parser.get_format_instructions().unwrap();
-    // The original schema stored in the parser should not be mutated
     assert_eq!(
         parser.get_schema().unwrap(),
         &initial_schema,
@@ -239,7 +232,6 @@ fn test_format_instructions_do_not_alter_schema() {
     );
 }
 
-// --- JsonOutputParser parser_type() tests ---
 
 #[test]
 fn test_parser_type() {
@@ -247,7 +239,6 @@ fn test_parser_type() {
     assert_eq!(parser.parser_type(), "simple_json_output_parser");
 }
 
-// --- JsonOutputParser.get_schema() tests ---
 
 #[test]
 fn test_get_schema_with_properties() {
@@ -272,7 +263,6 @@ fn test_get_schema_with_properties() {
     assert!(retrieved["properties"].get("punchline").is_some());
 }
 
-// --- SimpleJsonOutputParser alias tests ---
 
 #[test]
 fn test_simple_json_output_parser_parse() {
@@ -283,8 +273,6 @@ fn test_simple_json_output_parser_parse() {
 
 #[test]
 fn test_simple_json_output_parser_is_same_type() {
-    // SimpleJsonOutputParser is a type alias for JsonOutputParser in Rust.
-    // Verify they have the same behavior.
     let json_parser = JsonOutputParser::new();
     let simple_parser = SimpleJsonOutputParser::new();
 
@@ -296,7 +284,6 @@ fn test_simple_json_output_parser_is_same_type() {
     assert_eq!(json_parser.parser_type(), simple_parser.parser_type());
 }
 
-// --- JsonOutputParser diff tests ---
 
 #[test]
 fn test_diff_add_key() {

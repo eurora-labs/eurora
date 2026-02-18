@@ -7,9 +7,6 @@ use agent_chain_core::messages::{
     SystemMessageChunk, TextContentBlock,
 };
 
-// ============================================================================
-// TestSystemMessage
-// ============================================================================
 
 #[test]
 fn test_init_basic() {
@@ -131,9 +128,6 @@ fn test_developer_role_via_additional_kwargs() {
     );
 }
 
-// ============================================================================
-// TestSystemMessageChunk
-// ============================================================================
 
 #[test]
 fn test_chunk_init_basic() {
@@ -277,11 +271,9 @@ fn test_chunk_add_different_chunk_type() {
         .build();
     let chunk2 = HumanMessageChunk::builder().content(" world").build();
 
-    // Convert to messages and verify content
     let msg1 = chunk1.to_message();
     let msg2: HumanMessage = chunk2.into();
 
-    // Verify both messages have their content
     let content1 = match &msg1.content {
         MessageContent::Text(s) => s.as_str(),
         MessageContent::Parts(_) => "",
@@ -293,7 +285,6 @@ fn test_chunk_add_different_chunk_type() {
     assert_eq!(content1, "Hello");
     assert_eq!(content2, " world");
 
-    // We can concatenate content strings manually
     let combined_content = format!("{}{}", content1, content2);
     assert_eq!(combined_content, "Hello world");
 }
@@ -304,9 +295,6 @@ fn test_chunk_text_content() {
     assert!(matches!(&chunk.content, MessageContent::Text(s) if s == "Hello world"));
 }
 
-// ============================================================================
-// TestSystemMessageDeveloperRole
-// ============================================================================
 
 #[test]
 fn test_developer_role_preserved_in_serialization() {
@@ -359,9 +347,6 @@ fn test_multiple_system_messages_with_different_roles() {
     );
 }
 
-// ============================================================================
-// TestSystemMessage — list content
-// ============================================================================
 
 #[test]
 fn test_init_with_list_content() {
@@ -393,7 +378,6 @@ fn test_init_with_content_blocks() {
         .content("")
         .content_blocks(blocks)
         .build();
-    // When content_blocks is provided, content is Parts (not Text)
     assert!(matches!(&msg.content, MessageContent::Parts(_)));
 }
 
@@ -408,9 +392,6 @@ fn test_empty_list_content() {
     }
 }
 
-// ============================================================================
-// TestSystemMessage — text() method
-// ============================================================================
 
 #[test]
 fn test_text_method() {
@@ -431,7 +412,6 @@ fn test_text_method_list_content() {
     let msg = SystemMessage::builder()
         .content(MessageContent::Parts(parts))
         .build();
-    // Rust joins text parts with spaces
     assert_eq!(msg.text(), "Part 1 Part 2");
 }
 
@@ -449,9 +429,6 @@ fn test_text_method_empty_list_content() {
     assert_eq!(msg.text(), "");
 }
 
-// ============================================================================
-// TestSystemMessage — content_blocks() property
-// ============================================================================
 
 #[test]
 fn test_content_blocks_property() {
@@ -483,9 +460,6 @@ fn test_content_blocks_empty_list() {
     assert!(blocks.is_empty());
 }
 
-// ============================================================================
-// TestSystemMessage — pretty_repr
-// ============================================================================
 
 #[test]
 fn test_pretty_repr() {
@@ -514,9 +488,6 @@ fn test_pretty_repr_with_name() {
     );
 }
 
-// ============================================================================
-// TestSystemMessage — content_blocks init
-// ============================================================================
 
 #[test]
 fn test_init_with_content_blocks_sets_content() {
@@ -528,7 +499,6 @@ fn test_init_with_content_blocks_sets_content() {
         .content("")
         .content_blocks(blocks)
         .build();
-    // content should be Parts, not Text
     assert!(matches!(&msg.content, MessageContent::Parts(_)));
 }
 
@@ -554,9 +524,6 @@ fn test_content_blocks_roundtrip() {
     }
 }
 
-// ============================================================================
-// TestSystemMessage — model_dump snapshot
-// ============================================================================
 
 #[test]
 fn test_model_dump_exact_keys_and_values() {
@@ -586,9 +553,6 @@ fn test_model_dump_default_values() {
     assert_eq!(dumped["response_metadata"], serde_json::json!({}));
 }
 
-// ============================================================================
-// TestSystemMessage — equality
-// ============================================================================
 
 #[test]
 fn test_same_content_messages_are_equal() {
@@ -632,9 +596,6 @@ fn test_same_content_and_metadata_are_equal() {
     assert_eq!(msg1, msg2);
 }
 
-// ============================================================================
-// TestSystemMessageChunk — list content addition
-// ============================================================================
 
 #[test]
 fn test_chunk_add_with_list_content() {
@@ -651,7 +612,6 @@ fn test_chunk_add_with_list_content() {
     let result = chunk1 + chunk2;
     match &result.content {
         MessageContent::Parts(parts) => {
-            // Parts are appended (not merged) when there is no index key
             assert_eq!(parts.len(), 2);
             match &parts[0] {
                 ContentPart::Text { text } => assert_eq!(text, "Hello"),
@@ -668,8 +628,6 @@ fn test_chunk_add_with_list_content() {
 
 #[test]
 fn test_chunk_add_with_list_content_with_index() {
-    // Parts with matching "index" keys should be merged (text concatenated),
-    // not appended as separate items. This matches Python's merge_lists behavior.
     let chunk1 = SystemMessageChunk::builder()
         .content(MessageContent::Parts(vec![ContentPart::Other(
             serde_json::json!({"type": "text", "text": "Hello", "index": 0}),
@@ -683,16 +641,12 @@ fn test_chunk_add_with_list_content_with_index() {
     let result = chunk1 + chunk2;
     match &result.content {
         MessageContent::Parts(parts) => {
-            // Items with same "index" key are merged, not appended
             assert_eq!(
                 parts.len(),
                 1,
                 "expected 1 merged part, got {}",
                 parts.len()
             );
-            // The merge produces {"type":"text","text":"Hello world","index":0}.
-            // When deserialized back to ContentPart, this matches the Text variant
-            // (the index field is a streaming artifact consumed during merging).
             match &parts[0] {
                 ContentPart::Text { text } => assert_eq!(text, "Hello world"),
                 ContentPart::Other(v) => assert_eq!(v["text"], "Hello world"),
@@ -711,7 +665,6 @@ fn test_chunk_add_list_of_chunks() {
         .build();
     let chunk2 = SystemMessageChunk::builder().content("b").build();
     let chunk3 = SystemMessageChunk::builder().content("c").build();
-    // Equivalent to Python's `chunk1 + [chunk2, chunk3]` using fold
     let result = vec![chunk2, chunk3]
         .into_iter()
         .fold(chunk1, |acc, c| acc + c);
@@ -719,14 +672,9 @@ fn test_chunk_add_list_of_chunks() {
     assert_eq!(result.id, Some("1".to_string()));
 }
 
-// ============================================================================
-// TestSystemMessageChunk — content_blocks property (via to_message)
-// ============================================================================
 
 #[test]
 fn test_chunk_content_blocks_property() {
-    // SystemMessageChunk doesn't have content_blocks() directly, but we can
-    // convert to SystemMessage and test content_blocks there
     let chunk = SystemMessageChunk::builder()
         .content("Instructions")
         .build();
@@ -760,9 +708,6 @@ fn test_chunk_content_blocks_empty_list() {
     assert!(blocks.is_empty());
 }
 
-// ============================================================================
-// TestSystemMessageChunk — text property (via content)
-// ============================================================================
 
 #[test]
 fn test_chunk_text_method() {

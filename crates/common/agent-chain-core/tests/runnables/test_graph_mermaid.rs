@@ -10,9 +10,6 @@ use agent_chain_core::runnables::graph::{
 use agent_chain_core::runnables::graph_mermaid::{generate_mermaid_graph_styles, to_safe_id};
 use serde_json::Value;
 
-// ===========================================================================
-// Helpers
-// ===========================================================================
 
 fn make_node(id: &str, name: &str) -> Node {
     Node::new(id, name)
@@ -22,9 +19,6 @@ fn make_node_with_metadata(id: &str, name: &str, metadata: HashMap<String, Value
     Node::new(id, name).with_metadata(metadata)
 }
 
-// ===========================================================================
-// Tests for to_safe_id
-// ===========================================================================
 
 #[test]
 fn test_to_safe_id_alphanumeric() {
@@ -83,9 +77,6 @@ fn test_to_safe_id_escapes_punctuation() {
     assert_eq!(to_safe_id("node,"), "node\\2c");
 }
 
-// ===========================================================================
-// Tests for generate_mermaid_graph_styles
-// ===========================================================================
 
 #[test]
 fn test_generate_mermaid_graph_styles() {
@@ -112,9 +103,6 @@ fn test_generate_mermaid_graph_styles_custom() {
     assert!(result.contains("fill:#0000ff"));
 }
 
-// ===========================================================================
-// Tests for draw_mermaid (standalone function via Graph)
-// ===========================================================================
 
 #[test]
 fn test_draw_mermaid_simple_graph() {
@@ -488,7 +476,6 @@ fn test_mermaid_duplicate_subgraph_name_error() {
     ];
     let graph = Graph::from_parts(nodes, edges);
 
-    // Should not crash — may or may not raise depending on structure
     let result = graph.draw_mermaid(None).unwrap();
     assert!(result.contains("subgraph"));
 }
@@ -835,14 +822,12 @@ fn test_mermaid_with_all_features() {
 #[test]
 fn test_graph_reid_with_duplicate_names() {
     let mut graph = Graph::new();
-    // Use auto-generated UUID ids (None) to match Python behavior with BaseModel
     let node1 = graph.add_node_named("BaseModel", None);
     let node2 = graph.add_node_named("BaseModel", None);
     graph.add_edge(&node1, &node2, None, false);
 
     let reided_graph = graph.reid();
 
-    // reid renames UUID-based node IDs to readable, disambiguated keys
     let node_ids: Vec<&str> = reided_graph.nodes.keys().map(|k| k.as_str()).collect();
     let unique_count = {
         let mut seen = std::collections::HashSet::new();
@@ -854,7 +839,6 @@ fn test_graph_reid_with_duplicate_names() {
         "Node IDs should be unique after reid"
     );
 
-    // Duplicate names should get suffixed IDs like "BaseModel_1", "BaseModel_2"
     let mut sorted_ids: Vec<String> = reided_graph.nodes.keys().cloned().collect();
     sorted_ids.sort();
     assert_eq!(sorted_ids, vec!["BaseModel_1", "BaseModel_2"]);

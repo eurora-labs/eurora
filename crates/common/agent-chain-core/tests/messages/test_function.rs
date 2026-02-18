@@ -4,9 +4,6 @@
 
 use agent_chain_core::messages::{FunctionMessage, FunctionMessageChunk};
 
-// ============================================================================
-// TestFunctionMessage
-// ============================================================================
 
 #[test]
 fn test_init_basic() {
@@ -107,9 +104,6 @@ fn test_content_property() {
     assert_eq!(msg.content, "Hello world");
 }
 
-// ============================================================================
-// TestFunctionMessageChunk
-// ============================================================================
 
 #[test]
 fn test_chunk_init_basic() {
@@ -300,9 +294,6 @@ fn test_chunk_content_property() {
     assert_eq!(chunk.content, "Hello world");
 }
 
-// ============================================================================
-// TestFunctionMessageDeprecation
-// ============================================================================
 
 #[test]
 fn test_function_message_vs_tool_message() {
@@ -317,9 +308,7 @@ fn test_function_message_vs_tool_message() {
         .tool_call_id("call-123")
         .build();
 
-    // FunctionMessage has name field
     assert_eq!(func_msg.name, "func");
-    // ToolMessage has tool_call_id field
     assert_eq!(tool_msg.tool_call_id, "call-123");
 }
 

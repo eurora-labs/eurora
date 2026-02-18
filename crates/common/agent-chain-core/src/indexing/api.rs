@@ -165,9 +165,6 @@ impl serde_json::ser::Formatter for PythonJsonFormatter {
 /// Serialize metadata with sorted keys for deterministic hashing.
 fn sorted_json_string(metadata: &std::collections::HashMap<String, Value>) -> Result<String> {
     let sorted: BTreeMap<&String, &Value> = metadata.iter().collect();
-    // Python's json.dumps uses ", " and ": " as separators by default.
-    // serde_json::to_string uses "," and ":" (no spaces).
-    // We must match Python's format for hash compatibility.
     let mut buf = Vec::new();
     let mut serializer = serde_json::Serializer::with_formatter(&mut buf, PythonJsonFormatter);
     sorted.serialize(&mut serializer).map_err(|e| {

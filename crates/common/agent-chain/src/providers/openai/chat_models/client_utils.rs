@@ -26,13 +26,9 @@ pub fn create_chat_model_messages(messages: Vec<serde_json::Value>) -> Vec<serde
                         && let Some(image_url) = block.get_mut("image_url")
                         && let Some(url_obj) = image_url.as_object_mut()
                     {
-                        // In Python this decodes bytes -> str.
-                        // In Rust, serde_json::Value strings are already UTF-8,
-                        // so this branch exists purely for structural parity.
                         if let Some(url_val) = url_obj.get("url")
                             && url_val.is_string()
                         {
-                            // Already a valid string — nothing to fix.
                         }
                     }
                 }

@@ -7,10 +7,6 @@ use serde_json::Value;
 
 use super::serializable::{Serializable, to_json_not_implemented_value};
 
-// Note: Python's `_dump_pydantic_models()` converts Pydantic models found in
-// `ChatGeneration.message.additional_kwargs["parsed"]` to dicts. In Rust,
-// `additional_kwargs` values are already `serde_json::Value`, so no conversion
-// is needed.
 
 /// Return a JSON string representation of a Serializable object.
 ///

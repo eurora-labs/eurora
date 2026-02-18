@@ -20,7 +20,6 @@ use std::time::Duration;
 #[cfg(feature = "async")]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize logging
     tracing_subscriber::fmt::init();
 
     println!("🚀 Starting async focus tracker example with stop signal...");
@@ -30,10 +29,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let tracker = FocusTracker::new();
 
-    // Create a stop signal
     let stop_signal = Arc::new(AtomicBool::new(false));
 
-    // Set up automatic timeout after 10 seconds
     let stop_signal_timeout = Arc::clone(&stop_signal);
     tokio::spawn(async move {
         tokio::time::sleep(Duration::from_secs(10)).await;
@@ -41,8 +38,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         stop_signal_timeout.store(true, Ordering::Release);
     });
 
-    // Use the async focus tracking method with stop signal
-    // This demonstrates how you can stop the async tracker from another task
     tracker
         .track_focus_async_with_stop(
             |window| async move {
@@ -53,7 +48,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 println!("   📱 Process: {}", window.process_name);
 
-                // Check if icon is available
                 let icon_status = if window.icon.is_some() {
                     "✅ Has icon"
                 } else {
@@ -61,11 +55,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 };
                 println!("   Icon: {}", icon_status);
 
-                // Example 1: Simulate async processing with delays
                 println!("   ⏳ Performing async processing...");
                 simulate_async_processing(&window).await?;
 
-                // Example 2: Async data processing
                 println!("   🔢 Processing window data asynchronously...");
                 process_window_data(&window).await?;
 
@@ -86,7 +78,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn simulate_async_processing(
     window: &focus_tracker::FocusedWindow,
 ) -> FocusTrackerResult<()> {
-    // Simulate some async work
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     println!(
@@ -100,7 +91,6 @@ async fn simulate_async_processing(
 /// Simulate async data processing
 #[cfg(feature = "async")]
 async fn process_window_data(window: &focus_tracker::FocusedWindow) -> FocusTrackerResult<()> {
-    // Simulate some computation that benefits from async
     tokio::time::sleep(Duration::from_millis(30)).await;
 
     let title_length = window.window_title.as_ref().map(|t| t.len()).unwrap_or(0);

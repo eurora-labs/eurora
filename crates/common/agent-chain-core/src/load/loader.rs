@@ -137,7 +137,6 @@ impl Reviver {
         let type_ = obj.get("type").and_then(|v| v.as_str());
         let id = obj.get("id").and_then(|v| v.as_array());
 
-        // Check if this is a LangChain serialized object
         if lc != Some(LC_VERSION as i64) || id.is_none() {
             return Ok(RevivedValue::Value(value.clone()));
         }
@@ -164,12 +163,10 @@ impl Reviver {
 
         let key = &id[0];
 
-        // First check the secrets map
         if let Some(secret) = self.config.secrets_map.get(key) {
             return Ok(RevivedValue::String(secret.clone()));
         }
 
-        // Then check the environment
         if self.config.secrets_from_env
             && let Ok(value) = env::var(key)
             && !value.is_empty()
@@ -205,10 +202,8 @@ impl Reviver {
         let namespace: Vec<String> = id[..id.len() - 1].to_vec();
         let name = id.last().expect("checked non-empty above").clone();
 
-        // Validate namespace
         let root_namespace = namespace.first().map(|s| s.as_str()).unwrap_or("");
 
-        // The root namespace ["langchain"] alone is not valid
         if namespace == vec!["langchain".to_string()] {
             return Err(Error::Other(format!("Invalid namespace: {:?}", id)));
         }
@@ -222,7 +217,6 @@ impl Reviver {
             return Err(Error::Other(format!("Invalid namespace: {:?}", id)));
         }
 
-        // Check for explicit import path
         let mapping_key: Vec<String> = id.to_vec();
         let resolved_path = if let Some(import_path) = self.import_mappings.get(&mapping_key) {
             import_path.clone()
@@ -236,7 +230,6 @@ impl Reviver {
             id.to_vec()
         };
 
-        // Get kwargs
         let kwargs = obj
             .get("kwargs")
             .and_then(|v| v.as_object())
@@ -245,12 +238,6 @@ impl Reviver {
 
         let kwargs_value = Value::Object(kwargs);
 
-        // Try to instantiate via the constructor registry.
-        // Look up by both the original id and the resolved (mapped) path,
-        // since the registry keys are based on lc_id() which uses the
-        // original namespace (e.g. "langchain:schema:document:Document"),
-        // while the resolved path may be the mapped form
-        // (e.g. "langchain_core:documents:base:Document").
         let constructor = lookup_constructor(id).or_else(|| lookup_constructor(&resolved_path));
         if let Some(constructor) = constructor
             && let Ok(value) = constructor(&kwargs_value)
@@ -258,7 +245,6 @@ impl Reviver {
             return Ok(RevivedValue::Value(value));
         }
 
-        // Fallback: return constructor info for unknown types
         Ok(RevivedValue::Constructor(ConstructorInfo {
             path: resolved_path,
             name,
@@ -370,13 +356,11 @@ pub fn load(obj: Value, config: Option<ReviverConfig>) -> Result<Value> {
 fn load_recursive(obj: &Value, reviver: &Reviver) -> Result<Value> {
     match obj {
         Value::Object(map) => {
-            // First recursively load all nested values
             let mut loaded_obj = serde_json::Map::new();
             for (k, v) in map {
                 loaded_obj.insert(k.clone(), load_recursive(v, reviver)?);
             }
 
-            // Then revive this node
             let loaded_value = Value::Object(loaded_obj);
             let revived = reviver.revive(&loaded_value)?;
             Ok(revived.to_value())
@@ -424,11 +408,6 @@ pub fn loads_with_namespaces(text: &str, namespaces: Vec<String>) -> Result<Valu
     loads(text, Some(config))
 }
 
-// --- Constructor Registry ---
-//
-// In Python, the Reviver uses `importlib.import_module` to dynamically
-// import and instantiate classes from their lc_id paths. In Rust, we use
-// a static registry mapping lc_id path strings to constructor functions.
 
 use std::sync::LazyLock;
 
@@ -610,8 +589,6 @@ mod tests {
         let result = reviver.revive(&value).unwrap();
         match result {
             RevivedValue::Value(v) => {
-                // AIMessage is in the constructor registry, so it gets
-                // instantiated directly as a Value.
                 assert_eq!(
                     v.get("content").and_then(|v| v.as_str()),
                     Some("Hello, world!")
@@ -630,7 +607,6 @@ mod tests {
     fn test_revive_constructor_with_mapping() {
         let reviver = Reviver::with_defaults();
 
-        // Old langchain.schema path should be mapped to langchain_core
         let value = serde_json::json!({
             "lc": 1,
             "type": "constructor",
@@ -643,8 +619,6 @@ mod tests {
         let result = reviver.revive(&value).unwrap();
         match result {
             RevivedValue::Value(v) => {
-                // AIMessage is in the constructor registry, so it gets
-                // instantiated directly as a Value.
                 assert_eq!(v.get("content").and_then(|v| v.as_str()), Some("Hello!"));
                 assert_eq!(v.get("type").and_then(|v| v.as_str()), Some("ai"));
             }

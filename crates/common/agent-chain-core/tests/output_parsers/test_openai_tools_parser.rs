@@ -21,9 +21,6 @@ use agent_chain_core::outputs::ChatGeneration;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-// ---------------------------------------------------------------------------
-// Helpers (mirrors Python _tool_call_msg / _raw_tool_call_msg)
-// ---------------------------------------------------------------------------
 
 fn tool_call_generation(
     tool_calls: Vec<ToolCall>,
@@ -57,9 +54,6 @@ fn make_tool_call(id: &str, name: &str, args: Value) -> ToolCall {
     }
 }
 
-// ===========================================================================
-// TestParseToolCall
-// ===========================================================================
 
 #[test]
 fn test_parse_tool_call_valid_arguments() {
@@ -184,9 +178,6 @@ fn test_parse_tool_call_empty_function_name() {
     assert_eq!(result["name"], "");
 }
 
-// ===========================================================================
-// TestMakeInvalidToolCall
-// ===========================================================================
 
 #[test]
 fn test_make_invalid_tool_call_creates_invalid_tool_call() {
@@ -221,9 +212,6 @@ fn test_make_invalid_tool_call_missing_id() {
     assert!(result.id.is_none());
 }
 
-// ===========================================================================
-// TestParseToolCalls
-// ===========================================================================
 
 #[test]
 fn test_parse_tool_calls_multiple_valid() {
@@ -289,9 +277,6 @@ fn test_parse_tool_calls_no_function_key_skipped() {
     assert_eq!(result[0]["name"], "fn");
 }
 
-// ===========================================================================
-// TestJsonOutputToolsParser
-// ===========================================================================
 
 #[test]
 fn test_json_output_tools_parser_parses_tool_calls() {
@@ -371,7 +356,6 @@ fn test_json_output_tools_parser_first_tool_only_empty() {
     let generation = tool_call_generation(vec![], "", HashMap::new());
     let parser = JsonOutputToolsParser::new().with_first_tool_only(true);
     let result = parser.parse_result(&[generation], false).unwrap();
-    // When tool_calls is empty, first_tool_only returns null
     assert!(result.is_null());
 }
 
@@ -409,9 +393,6 @@ fn test_json_output_tools_parser_no_tool_calls_or_kwargs_returns_empty() {
     assert_eq!(result, json!([]));
 }
 
-// ===========================================================================
-// TestJsonOutputKeyToolsParser
-// ===========================================================================
 
 #[test]
 fn test_json_output_key_tools_parser_filters_by_key_name() {
@@ -515,9 +496,6 @@ fn test_json_output_key_tools_parser_empty_tool_calls_returns_empty_list() {
     assert_eq!(result, json!([]));
 }
 
-// ===========================================================================
-// TestPydanticToolsParser
-// ===========================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 struct MyTool {
@@ -679,7 +657,6 @@ fn test_pydantic_custom_title_model() {
         val: i64,
     }
 
-    // Register with a custom name (equivalent to Pydantic model_config title)
     let parser = PydanticToolsParser::new(vec![], false).with_tool::<CustomTool>("MyCustomName");
     let generation = tool_call_generation(
         vec![make_tool_call("c1", "MyCustomName", json!({"val": 99}))],

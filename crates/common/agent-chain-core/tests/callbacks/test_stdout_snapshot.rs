@@ -58,9 +58,6 @@ fn create_test_handler_with_color(color: &str) -> (StdOutCallbackHandler, TestWr
     (handler, writer)
 }
 
-// ====================================================================
-// TestStdOutCallbackHandlerInit
-// ====================================================================
 
 /// Ported from `test_default_color_is_none`.
 #[test]
@@ -91,9 +88,6 @@ fn test_default_flags() {
     assert!(!handler.run_inline());
 }
 
-// ====================================================================
-// TestOnChainStart
-// ====================================================================
 
 /// Ported from `test_uses_name_from_kwargs`.
 ///
@@ -263,9 +257,6 @@ fn test_chain_start_serialized_none_uses_unknown() {
     );
 }
 
-// ====================================================================
-// TestOnChainEnd
-// ====================================================================
 
 /// Ported from `test_outputs_finished_chain`.
 #[test]
@@ -311,9 +302,6 @@ fn test_chain_end_outputs_start_with_newline() {
     );
 }
 
-// ====================================================================
-// TestOnAgentAction
-// ====================================================================
 
 /// Ported from `test_outputs_action_log`.
 #[test]
@@ -369,9 +357,6 @@ fn test_agent_action_uses_default_color_when_no_override() {
     );
 }
 
-// ====================================================================
-// TestOnToolEnd
-// ====================================================================
 
 /// Ported from `test_outputs_tool_result`.
 #[test]
@@ -495,9 +480,6 @@ fn test_tool_end_color_override() {
     );
 }
 
-// ====================================================================
-// TestOnText
-// ====================================================================
 
 /// Ported from `test_outputs_text`.
 #[test]
@@ -546,13 +528,9 @@ fn test_on_text_default_end_is_empty() {
 #[test]
 fn test_on_text_empty_text() {
     let (handler, _writer) = create_test_handler();
-    // Should not panic
     handler.on_text("", Uuid::new_v4(), None, None, "");
 }
 
-// ====================================================================
-// TestOnAgentFinish
-// ====================================================================
 
 /// Ported from `test_outputs_finish_log`.
 #[test]

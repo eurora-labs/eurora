@@ -41,21 +41,17 @@ pub mod retriever;
 pub mod simple;
 pub mod structured;
 
-// Re-export from base
 pub use base::{
-    // Core types
     ArgsSchema,
     BaseTool,
     BaseToolkit,
     DynTool,
-    // Constants
     FILTERED_ARGS,
     HandleToolError,
     HandleValidationError,
     InjectedToolArg,
     InjectedToolCallId,
     ResponseFormat,
-    // Error types
     SchemaAnnotationError,
     TOOL_MESSAGE_BLOCK_TYPES,
     ToolDefinition,
@@ -63,7 +59,6 @@ pub use base::{
     ToolInput,
     ToolOutput,
     ToolRunnable,
-    // Utility functions
     format_output,
     handle_tool_error_impl,
     handle_validation_error_impl,
@@ -74,32 +69,25 @@ pub use base::{
     stringify_content,
 };
 
-// Re-export from simple
 pub use simple::{AsyncToolFunc, Tool, ToolFunc};
 
-// Re-export from structured
 pub use structured::{
     AsyncStructuredToolFunc, StructuredTool, StructuredToolFunc, create_args_schema,
 };
 
-// Re-export from convert
 pub use convert::{
     ToolConfig, convert_runnable_to_tool, create_simple_tool, create_simple_tool_async,
     create_structured_tool, create_structured_tool_async, create_tool_with_config,
     get_description_from_runnable, tool_from_schema,
 };
 
-// Re-export from render
 pub use render::{ToolsRenderer, render_text_description, render_text_description_and_args};
 
-// Re-export from retriever
 pub use retriever::{
     RetrieverInput, RetrieverToolBuilder, create_async_retriever_tool, create_retriever_tool,
     create_retriever_tool_with_options,
 };
 
-// Legacy re-export for backward compatibility with the old tools.rs
-// The old Tool trait is now BaseTool
 pub use base::BaseTool as LegacyTool;
 
 #[cfg(test)]
@@ -110,7 +98,6 @@ mod tests {
 
     #[test]
     fn test_module_exports() {
-        // Test that key types are accessible
         let _: fn() -> ArgsSchema = ArgsSchema::default;
         let _: fn() -> ResponseFormat = ResponseFormat::default;
     }

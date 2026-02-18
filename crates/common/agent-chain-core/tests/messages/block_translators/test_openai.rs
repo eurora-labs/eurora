@@ -30,7 +30,6 @@ fn content_blocks_equal_ignore_id(actual: &[ContentBlock], expected: &[ContentBl
     }
 
     for (actual_block, expected_block) in actual.iter().zip(expected.iter()) {
-        // Compare blocks, ignoring the id field
         let actual_without_id = remove_id_from_block(actual_block);
         let expected_without_id = remove_id_from_block(expected_block);
 
@@ -89,14 +88,10 @@ fn remove_id_from_block(block: &ContentBlock) -> ContentBlock {
                 ..non_standard.clone()
             })
         }
-        // For other block types, return as-is
         other => other.clone(),
     }
 }
 
-// ============================================================================
-// test_convert_to_v1_from_responses
-// ============================================================================
 
 /// Test conversion of OpenAI Responses API content to v1 format.
 ///
@@ -105,7 +100,6 @@ fn remove_id_from_block(block: &ContentBlock) -> ContentBlock {
 /// file_search_call, etc.) are correctly translated to standard v1 content blocks.
 #[test]
 fn test_convert_to_v1_from_responses() {
-    // Create an AIMessage with OpenAI Responses API-style content blocks
     let content = vec![
         json!({"type": "reasoning", "id": "abc123", "summary": []}),
         json!({
@@ -178,9 +172,7 @@ fn test_convert_to_v1_from_responses() {
         .tool_calls(tool_calls)
         .build();
 
-    // Expected v1 content blocks after translation
     let expected_content: Vec<ContentBlock> = vec![
-        // reasoning with empty summary
         ContentBlock::Reasoning(ReasoningContentBlock {
             block_type: "reasoning".to_string(),
             id: Some("abc123".to_string()),
@@ -188,7 +180,6 @@ fn test_convert_to_v1_from_responses() {
             index: None,
             extras: None,
         }),
-        // reasoning with summary -> exploded into multiple blocks
         ContentBlock::Reasoning(ReasoningContentBlock {
             block_type: "reasoning".to_string(),
             id: Some("abc234".to_string()),
@@ -203,7 +194,6 @@ fn test_convert_to_v1_from_responses() {
             index: None,
             extras: None,
         }),
-        // function_call -> tool_call
         ContentBlock::ToolCall(ToolCallBlock {
             block_type: "tool_call".to_string(),
             id: Some("call_123".to_string()),
@@ -216,7 +206,6 @@ fn test_convert_to_v1_from_responses() {
             index: None,
             extras: None,
         }),
-        // function_call with id -> tool_call with extras
         ContentBlock::ToolCall(ToolCallBlock {
             block_type: "tool_call".to_string(),
             id: Some("call_234".to_string()),
@@ -233,7 +222,6 @@ fn test_convert_to_v1_from_responses() {
                 extras
             }),
         }),
-        // text -> text
         ContentBlock::Text(TextContentBlock {
             block_type: "text".to_string(),
             id: None,
@@ -242,7 +230,6 @@ fn test_convert_to_v1_from_responses() {
             index: None,
             extras: None,
         }),
-        // text with annotations -> text with converted annotations
         ContentBlock::Text(TextContentBlock {
             block_type: "text".to_string(),
             id: None,
@@ -283,7 +270,6 @@ fn test_convert_to_v1_from_responses() {
             index: None,
             extras: None,
         }),
-        // image_generation_call -> image
         ContentBlock::Image(ImageContentBlock {
             block_type: "image".to_string(),
             id: Some("ig_123".to_string()),
@@ -294,7 +280,6 @@ fn test_convert_to_v1_from_responses() {
             base64: Some("...".to_string()),
             extras: None,
         }),
-        // file_search_call -> server_tool_call + server_tool_result
         ContentBlock::ServerToolCall(ServerToolCall {
             block_type: "server_tool_call".to_string(),
             id: "fs_123".to_string(),
@@ -316,7 +301,6 @@ fn test_convert_to_v1_from_responses() {
             index: None,
             extras: None,
         }),
-        // something_else -> non_standard
         ContentBlock::NonStandard(NonStandardContentBlock {
             block_type: "non_standard".to_string(),
             id: None,
@@ -330,11 +314,9 @@ fn test_convert_to_v1_from_responses() {
         }),
     ];
 
-    // Get content_blocks from message (this calls the translator)
     let content_blocks = message.content_blocks();
     assert_eq!(content_blocks, expected_content);
 
-    // Check no mutation - original content should be unchanged
     assert_ne!(
         message.content_list(),
         expected_content
@@ -344,9 +326,6 @@ fn test_convert_to_v1_from_responses() {
     );
 }
 
-// ============================================================================
-// test_convert_to_v1_from_responses_chunk
-// ============================================================================
 
 /// Test conversion of OpenAI Responses API streaming chunks to v1 format.
 ///
@@ -358,7 +337,6 @@ fn test_convert_to_v1_from_responses_chunk() {
     let mut response_metadata = HashMap::new();
     response_metadata.insert("model_provider".to_string(), json!("openai"));
 
-    // Create streaming chunks as they would come from OpenAI Responses API
     let chunks = vec![
         {
             let content = serde_json::to_string(&vec![
@@ -417,7 +395,6 @@ fn test_convert_to_v1_from_responses_chunk() {
         },
     ];
 
-    // Expected content_blocks for each chunk
     let expected_chunks = [
         {
             let content = serde_json::to_string(&vec![
@@ -470,12 +447,10 @@ fn test_convert_to_v1_from_responses_chunk() {
         },
     ];
 
-    // Verify each chunk's content_blocks
     for (chunk, expected) in chunks.iter().zip(expected_chunks.iter()) {
         assert_eq!(chunk.content_blocks(), expected.content_blocks());
     }
 
-    // Merge all chunks
     let mut full: Option<AIMessageChunk> = None;
     for chunk in chunks {
         full = Some(match full {
@@ -485,7 +460,6 @@ fn test_convert_to_v1_from_responses_chunk() {
     }
     let full = full.unwrap();
 
-    // Expected merged content
     let expected_merged_content = vec![
         json!({"type": "reasoning", "id": "abc123", "summary": [], "index": 0}),
         json!({
@@ -500,7 +474,6 @@ fn test_convert_to_v1_from_responses_chunk() {
     ];
     assert_eq!(full.content_list(), expected_merged_content);
 
-    // Expected merged content_blocks
     let expected_merged_content_blocks = vec![
         ContentBlock::Reasoning(ReasoningContentBlock {
             block_type: "reasoning".to_string(),
@@ -527,9 +500,6 @@ fn test_convert_to_v1_from_responses_chunk() {
     assert_eq!(full.content_blocks(), expected_merged_content_blocks);
 }
 
-// ============================================================================
-// test_convert_to_v1_from_openai_input
-// ============================================================================
 
 /// Test conversion of OpenAI Chat Completions input content (HumanMessage) to v1 format.
 ///
@@ -577,9 +547,7 @@ fn test_convert_to_v1_from_openai_input() {
         .build();
 
     let expected: Vec<ContentBlock> = vec![
-        // text -> text
         ContentBlock::Text(TextContentBlock::new("Hello")),
-        // image_url with url -> image
         ContentBlock::Image(ImageContentBlock {
             block_type: "image".to_string(),
             id: None,
@@ -590,7 +558,6 @@ fn test_convert_to_v1_from_openai_input() {
             base64: None,
             extras: None,
         }),
-        // image_url with data URI -> image with base64
         ContentBlock::Image(ImageContentBlock {
             block_type: "image".to_string(),
             id: None,
@@ -601,7 +568,6 @@ fn test_convert_to_v1_from_openai_input() {
             base64: Some("/9j/4AAQSkZJRg...".to_string()),
             extras: None,
         }),
-        // input_audio -> audio
         ContentBlock::Audio(AudioContentBlock {
             block_type: "audio".to_string(),
             id: None,
@@ -612,7 +578,6 @@ fn test_convert_to_v1_from_openai_input() {
             base64: Some("<base64 string>".to_string()),
             extras: None,
         }),
-        // file with file_data -> file with base64
         ContentBlock::File(FileContentBlock {
             block_type: "file".to_string(),
             id: None,
@@ -627,7 +592,6 @@ fn test_convert_to_v1_from_openai_input() {
                 extras
             }),
         }),
-        // file with file_id -> file
         ContentBlock::File(FileContentBlock {
             block_type: "file".to_string(),
             id: None,
@@ -646,9 +610,6 @@ fn test_convert_to_v1_from_openai_input() {
     ));
 }
 
-// ============================================================================
-// test_compat_responses_v03
-// ============================================================================
 
 /// Test compatibility with v0.3 legacy message format.
 ///
@@ -657,7 +618,6 @@ fn test_convert_to_v1_from_openai_input() {
 /// to v1 content blocks.
 #[test]
 fn test_compat_responses_v03() {
-    // Create a v0.3 style message
     let content = vec![json!({
         "type": "text",
         "text": "Hello, world!",
@@ -709,9 +669,7 @@ fn test_compat_responses_v03() {
         .id("msg_123".to_string())
         .build();
 
-    // Expected v1 content blocks
     let expected_content: Vec<ContentBlock> = vec![
-        // reasoning from additional_kwargs -> reasoning blocks
         ContentBlock::Reasoning(ReasoningContentBlock {
             block_type: "reasoning".to_string(),
             id: Some("rs_123".to_string()),
@@ -726,7 +684,6 @@ fn test_compat_responses_v03() {
             index: None,
             extras: None,
         }),
-        // text with annotations
         ContentBlock::Text(TextContentBlock {
             block_type: "text".to_string(),
             id: Some("msg_123".to_string()),
@@ -742,7 +699,6 @@ fn test_compat_responses_v03() {
             index: None,
             extras: None,
         }),
-        // refusal -> non_standard
         ContentBlock::NonStandard(NonStandardContentBlock {
             block_type: "non_standard".to_string(),
             id: None,
@@ -754,7 +710,6 @@ fn test_compat_responses_v03() {
             },
             index: None,
         }),
-        // tool_call with function_call_id mapping
         ContentBlock::ToolCall(ToolCallBlock {
             block_type: "tool_call".to_string(),
             id: Some("call_abc".to_string()),
@@ -771,7 +726,6 @@ fn test_compat_responses_v03() {
                 extras
             }),
         }),
-        // web_search_call from tool_outputs -> server_tool_call + server_tool_result
         ContentBlock::ServerToolCall(ServerToolCall {
             block_type: "server_tool_call".to_string(),
             id: "websearch_123".to_string(),
@@ -793,7 +747,6 @@ fn test_compat_responses_v03() {
 
     assert_eq!(message.content_blocks(), expected_content);
 
-    // Test chunks with tool calls
     let mut additional_kwargs_chunk1 = HashMap::new();
     additional_kwargs_chunk1.insert(
         "__openai_function_call_ids__".to_string(),
@@ -831,7 +784,6 @@ fn test_compat_responses_v03() {
     )];
     assert_eq!(chunk_1.content_blocks(), expected_chunk1_content);
 
-    // Test chunk 2 without function call ids
     let mut additional_kwargs_chunk2 = HashMap::new();
     additional_kwargs_chunk2.insert("__openai_function_call_ids__".to_string(), json!({}));
 
@@ -858,7 +810,6 @@ fn test_compat_responses_v03() {
     )];
     assert_eq!(chunk_2.content_blocks(), expected_chunk2_content);
 
-    // Test merged chunk
     let merged_chunk = chunk_1 + chunk_2;
     let expected_merged_content = vec![ContentBlock::ToolCallChunk(
         agent_chain_core::messages::ToolCallChunkBlock {
@@ -876,7 +827,6 @@ fn test_compat_responses_v03() {
     )];
     assert_eq!(merged_chunk.content_blocks(), expected_merged_content);
 
-    // Test reasoning chunks
     let mut additional_kwargs_reasoning1 = HashMap::new();
     additional_kwargs_reasoning1.insert(
         "reasoning".to_string(),
@@ -929,7 +879,6 @@ fn test_compat_responses_v03() {
         expected_reasoning2_content
     );
 
-    // Test merged reasoning chunks
     let merged_reasoning = reasoning_chunk_1 + reasoning_chunk_2;
     let expected_merged_reasoning = vec![ContentBlock::Reasoning(ReasoningContentBlock {
         block_type: "reasoning".to_string(),
@@ -941,9 +890,6 @@ fn test_compat_responses_v03() {
     assert_eq!(merged_reasoning.content_blocks(), expected_merged_reasoning);
 }
 
-// ============================================================================
-// test_convert_to_openai_data_block
-// ============================================================================
 
 /// Test conversion of standard data blocks to OpenAI format.
 ///
@@ -951,7 +897,6 @@ fn test_compat_responses_v03() {
 /// are correctly converted to OpenAI Chat Completions and Responses API formats.
 #[test]
 fn test_convert_to_openai_data_block() {
-    // Chat completions - Image / url
     let block = json!({
         "type": "image",
         "url": "https://example.com/test.png"
@@ -963,7 +908,6 @@ fn test_convert_to_openai_data_block() {
     let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions).unwrap();
     assert_eq!(result, expected);
 
-    // Chat completions - Image / base64
     let block = json!({
         "type": "image",
         "base64": "<base64 string>",
@@ -976,7 +920,6 @@ fn test_convert_to_openai_data_block() {
     let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions).unwrap();
     assert_eq!(result, expected);
 
-    // Chat completions - File / url (should fail)
     let block = json!({
         "type": "file",
         "url": "https://example.com/test.pdf"
@@ -985,7 +928,6 @@ fn test_convert_to_openai_data_block() {
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("does not support"));
 
-    // Chat completions - File / base64
     let block = json!({
         "type": "file",
         "base64": "<base64 string>",
@@ -1002,7 +944,6 @@ fn test_convert_to_openai_data_block() {
     let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions).unwrap();
     assert_eq!(result, expected);
 
-    // Chat completions - File / file ID
     let block = json!({
         "type": "file",
         "file_id": "file-abc123"
@@ -1011,7 +952,6 @@ fn test_convert_to_openai_data_block() {
     let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions).unwrap();
     assert_eq!(result, expected);
 
-    // Chat completions - Audio / base64
     let block = json!({
         "type": "audio",
         "base64": "<base64 string>",
@@ -1024,7 +964,6 @@ fn test_convert_to_openai_data_block() {
     let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions).unwrap();
     assert_eq!(result, expected);
 
-    // Responses API - Image / url
     let block = json!({
         "type": "image",
         "url": "https://example.com/test.png"
@@ -1033,7 +972,6 @@ fn test_convert_to_openai_data_block() {
     let result = convert_to_openai_data_block(&block, OpenAiApi::Responses).unwrap();
     assert_eq!(result, expected);
 
-    // Responses API - Image / base64
     let block = json!({
         "type": "image",
         "base64": "<base64 string>",
@@ -1046,7 +984,6 @@ fn test_convert_to_openai_data_block() {
     let result = convert_to_openai_data_block(&block, OpenAiApi::Responses).unwrap();
     assert_eq!(result, expected);
 
-    // Responses API - File / url
     let block = json!({
         "type": "file",
         "url": "https://example.com/test.pdf"
@@ -1055,7 +992,6 @@ fn test_convert_to_openai_data_block() {
     let result = convert_to_openai_data_block(&block, OpenAiApi::Responses).unwrap();
     assert_eq!(result, expected);
 
-    // Responses API - File / base64
     let block = json!({
         "type": "file",
         "base64": "<base64 string>",
@@ -1070,7 +1006,6 @@ fn test_convert_to_openai_data_block() {
     let result = convert_to_openai_data_block(&block, OpenAiApi::Responses).unwrap();
     assert_eq!(result, expected);
 
-    // Responses API - File / file ID
     let block = json!({
         "type": "file",
         "file_id": "file-abc123"

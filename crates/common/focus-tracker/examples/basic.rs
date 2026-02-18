@@ -9,7 +9,6 @@ use focus_tracker::subscribe_focus_changes;
 use std::time::Duration;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize logging to see what's happening
     tracing_subscriber::fmt::init();
 
     println!("🔍 Starting basic focus tracking example...");
@@ -17,10 +16,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Press Ctrl+C to exit.");
     println!();
 
-    // This is the simplest way to get focus changes - just one function call!
     let subscription = subscribe_focus_changes()?;
 
-    // Set up Ctrl+C handler for graceful shutdown
     let running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
     let r = running.clone();
     ctrlc::set_handler(move || {
@@ -28,7 +25,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         r.store(false, std::sync::atomic::Ordering::SeqCst);
     })?;
 
-    // Listen for focus changes in a simple loop
     let mut event_count = 0;
     while running.load(std::sync::atomic::Ordering::SeqCst) {
         match subscription
@@ -45,7 +41,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 println!("   Process: {}", &focused_window.process_name);
 
-                // Check if icon is available
                 let icon_status = if focused_window.icon.is_some() {
                     "✅ Has icon"
                 } else {
@@ -55,7 +50,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!();
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                // Continue waiting - this is normal
             }
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                 println!("📡 Focus tracking channel disconnected");

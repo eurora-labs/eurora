@@ -113,7 +113,6 @@ where
     let separator_clone = separator.clone();
     let response_format_clone = response_format;
 
-    // Sync function
     let func = {
         let _retriever = retriever_clone.clone();
         let separator = separator_clone.clone();
@@ -124,8 +123,6 @@ where
                 .unwrap_or("")
                 .to_string();
 
-            // Note: In a real implementation, we'd call the retriever synchronously
-            // For now, we return a placeholder since retrievers are typically async
             let docs: Vec<Document> = Vec::new();
             let content = format_documents(&docs, &separator);
 
@@ -179,8 +176,6 @@ where
     let _retriever_clone = retriever.clone();
     let _retrieve_fn = Arc::new(retrieve_fn);
 
-    // Async version - wrapped as a sync function that returns a placeholder
-    // In practice, you'd use the async invoke
     let func = move |args: HashMap<String, Value>| -> Result<Value> {
         let query = args
             .get("query")
@@ -188,7 +183,6 @@ where
             .unwrap_or("")
             .to_string();
 
-        // Return the query as placeholder - actual retrieval happens async
         Ok(Value::String(format!(
             "Retrieval for query '{}' (use async invoke for actual results)",
             query

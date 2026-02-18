@@ -147,8 +147,6 @@ impl TracerCore for RootListenersTracer {
 
 impl BaseTracer for RootListenersTracer {
     fn persist_run_impl(&mut self, _run: &Run) {
-        // This is a legacy method only called once for an entire run tree
-        // therefore not useful here
     }
 }
 
@@ -259,8 +257,6 @@ impl TracerCore for AsyncRootListenersTracer {
 #[async_trait]
 impl AsyncBaseTracer for AsyncRootListenersTracer {
     async fn persist_run_async(&mut self, _run: &Run) {
-        // This is a legacy method only called once for an entire run tree
-        // therefore not useful here
     }
 
     async fn on_run_create_async(&mut self, run: &Run) {

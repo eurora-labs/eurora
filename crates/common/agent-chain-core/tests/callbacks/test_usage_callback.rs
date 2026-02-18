@@ -18,7 +18,6 @@ use agent_chain_core::messages::{AIMessage, InputTokenDetails, OutputTokenDetail
 use agent_chain_core::outputs::{ChatGeneration, ChatResult};
 use uuid::Uuid;
 
-// -- Test data matching Python test fixtures --
 
 fn usage1() -> UsageMetadata {
     UsageMetadata {
@@ -93,9 +92,6 @@ fn create_chat_result(content: &str, model_name: &str, usage: &UsageMetadata) ->
     }
 }
 
-// ====================================================================
-// Ported from test_usage_callback (sync portion)
-// ====================================================================
 
 /// Ported from `test_usage_callback` — context manager section.
 ///
@@ -106,15 +102,12 @@ fn test_usage_callback_accumulation() {
     let callback = get_usage_metadata_callback();
     let handler = callback.handler();
 
-    // Simulate: llm.invoke("Message 1") -> Response 1 with usage1
     let result1 = create_chat_result("Response 1", "test_model", &usage1());
     handler.on_llm_end(&result1, Uuid::new_v4(), None);
 
-    // Simulate: llm.invoke("Message 2") -> Response 2 with usage2
     let result2 = create_chat_result("Response 2", "test_model", &usage2());
     handler.on_llm_end(&result2, Uuid::new_v4(), None);
 
-    // Check intermediate state: usage1 + usage2
     let total_1_2 = usage1().add(&usage2());
     let metadata = callback.usage_metadata();
     assert_eq!(metadata.len(), 1);
@@ -124,15 +117,12 @@ fn test_usage_callback_accumulation() {
         "After 2 invocations, usage should be sum of usage1 and usage2"
     );
 
-    // Simulate: llm.invoke("Message 3") -> Response 3 with usage3
     let result3 = create_chat_result("Response 3", "test_model", &usage3());
     handler.on_llm_end(&result3, Uuid::new_v4(), None);
 
-    // Simulate: llm.invoke("Message 4") -> Response 4 with usage4
     let result4 = create_chat_result("Response 4", "test_model", &usage4());
     handler.on_llm_end(&result4, Uuid::new_v4(), None);
 
-    // Check final state: usage1 + usage2 + usage3 + usage4
     let total_3_4 = usage3().add(&usage4());
     let expected = total_1_2.add(&total_3_4);
     let metadata = callback.usage_metadata();
@@ -151,7 +141,6 @@ fn test_usage_callback_accumulation() {
 fn test_usage_callback_via_handler() {
     let callback = UsageMetadataCallbackHandler::new();
 
-    // Simulate batch of 2 messages
     let result1 = create_chat_result("Response 1", "test_model", &usage1());
     let result2 = create_chat_result("Response 2", "test_model", &usage2());
     callback.on_llm_end(&result1, Uuid::new_v4(), None);
@@ -171,13 +160,11 @@ fn test_usage_callback_via_handler() {
 fn test_usage_callback_multiple_models() {
     let callback = UsageMetadataCallbackHandler::new();
 
-    // Model 1 batch
     let result1 = create_chat_result("Response 1", "test_model_1", &usage1());
     let result2 = create_chat_result("Response 2", "test_model_1", &usage2());
     callback.on_llm_end(&result1, Uuid::new_v4(), None);
     callback.on_llm_end(&result2, Uuid::new_v4(), None);
 
-    // Model 2 batch
     let result3 = create_chat_result("Response 3", "test_model_2", &usage3());
     let result4 = create_chat_result("Response 4", "test_model_2", &usage4());
     callback.on_llm_end(&result3, Uuid::new_v4(), None);
@@ -214,16 +201,13 @@ fn test_usage_callback_token_details_accumulation() {
     let metadata = callback.usage_metadata();
     let usage = metadata.get("test_model").unwrap();
 
-    // usage3 + usage4
     assert_eq!(usage.input_tokens, 15);
     assert_eq!(usage.output_tokens, 30);
     assert_eq!(usage.total_tokens, 45);
 
-    // input_token_details: audio 5 + 3 = 8
     let input_details = usage.input_token_details.as_ref().unwrap();
     assert_eq!(input_details.audio, Some(8));
 
-    // output_token_details: reasoning 10 + 5 = 15
     let output_details = usage.output_token_details.as_ref().unwrap();
     assert_eq!(output_details.reasoning, Some(15));
 }
@@ -233,10 +217,8 @@ fn test_usage_callback_token_details_accumulation() {
 fn test_get_usage_metadata_callback_guard() {
     let guard = get_usage_metadata_callback();
 
-    // Guard should start empty
     assert!(guard.usage_metadata().is_empty());
 
-    // Can use as_arc_handler for callback managers
     let arc_handler = guard.as_arc_handler();
     assert_eq!(arc_handler.name(), "UsageMetadataCallbackHandler");
 }
@@ -246,7 +228,6 @@ fn test_get_usage_metadata_callback_guard() {
 fn test_usage_callback_no_model_name() {
     let callback = UsageMetadataCallbackHandler::new();
 
-    // Create a result without model_name in response_metadata
     let ai_msg = AIMessage::builder()
         .content("Response")
         .usage_metadata(usage1())
@@ -259,7 +240,6 @@ fn test_usage_callback_no_model_name() {
 
     callback.on_llm_end(&result, Uuid::new_v4(), None);
 
-    // Without model name, usage should not be recorded
     assert!(callback.usage_metadata().is_empty());
 }
 
@@ -283,6 +263,5 @@ fn test_usage_callback_no_usage_metadata() {
 
     callback.on_llm_end(&result, Uuid::new_v4(), None);
 
-    // Without usage metadata, nothing should be recorded
     assert!(callback.usage_metadata().is_empty());
 }

@@ -68,9 +68,6 @@ fn load_template(var_name: &str, config: &mut serde_json::Map<String, serde_json
 
     if let Some(path_value) = config.remove(&path_key) {
         if config.contains_key(var_name) {
-            // Both path and value provided — Python raises ValueError.
-            // We'll set an error marker that callers can check, but for simplicity
-            // we just log and skip since Python also continues with the value.
             warn!("Both '{}' and '{}' cannot be provided.", path_key, var_name);
             return;
         }
@@ -209,7 +206,6 @@ fn load_few_shot_prompt(
             Error::InvalidConfig("example_prompt_path must be a string".to_string())
         })?;
         let loaded = load_prompt(path_str)?;
-        // Extract the template from the loaded prompt
         let dict = loaded.to_dict();
         let template_str = dict
             .get("template")

@@ -201,11 +201,9 @@ impl StructuredTool {
     fn extract_args(&self, input: ToolInput) -> Result<HashMap<String, Value>> {
         match input {
             ToolInput::String(s) => {
-                // Try to parse as JSON
                 if let Ok(Value::Object(obj)) = serde_json::from_str(&s) {
                     Ok(obj.into_iter().collect())
                 } else {
-                    // Use as single argument if schema has one field
                     let props = self.args_schema.properties();
                     if props.len() == 1 {
                         let key = props.keys().next().expect("checked len == 1").clone();
@@ -302,7 +300,6 @@ impl BaseTool for StructuredTool {
 
         if let Some(ref func) = self.func {
             let result = func(filtered_args)?;
-            // Return raw result — response_format handling is in BaseTool::run()
             match result {
                 Value::String(s) => Ok(ToolOutput::String(s)),
                 other => Ok(ToolOutput::Json(other)),
@@ -325,13 +322,11 @@ impl BaseTool for StructuredTool {
 
         if let Some(ref coroutine) = self.coroutine {
             let result = coroutine(filtered_args).await?;
-            // Return raw result — response_format handling is in BaseTool::arun()
             match result {
                 Value::String(s) => Ok(ToolOutput::String(s)),
                 other => Ok(ToolOutput::Json(other)),
             }
         } else {
-            // Fall back to sync implementation
             let sync_manager = _run_manager.map(|rm| rm.get_sync());
             self.tool_run(input, sync_manager.as_ref(), _config)
         }

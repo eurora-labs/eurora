@@ -276,7 +276,6 @@ mod tests {
         let parser = person_parser();
         let generations = vec![Generation::new(r#"{"name": "Alice"#)];
         let result = parser.parse_result(&generations, true);
-        // Partial JSON should parse but fail validation (missing "age")
         assert!(result.is_err());
     }
 
@@ -325,7 +324,6 @@ mod tests {
                 results.push(person);
             }
         }
-        // Should eventually yield the complete Person
         assert!(!results.is_empty());
         let last = results.last().unwrap();
         assert_eq!(last.name, "Alice");

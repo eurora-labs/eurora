@@ -44,11 +44,8 @@ pub mod base;
 pub mod compressor;
 pub mod transformers;
 
-// Re-export base types
 pub use base::{BaseMedia, Blob, BlobBuilder, BlobData, Document};
 
-// Re-export compressor types
 pub use compressor::BaseDocumentCompressor;
 
-// Re-export transformer types
 pub use transformers::BaseDocumentTransformer;

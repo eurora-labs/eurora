@@ -9,9 +9,6 @@ use agent_chain_core::messages::{
 };
 use std::collections::HashMap;
 
-// ====================================================================
-// Model Configuration Tests
-// ====================================================================
 
 /// Ported from `test_openai_model_param`.
 #[test]
@@ -27,7 +24,6 @@ fn test_openai_model_param() {
 #[test]
 fn test_openai_o1_temperature() {
     let llm = ChatOpenAI::new("o1-preview");
-    // o1 models should default to temperature=1
     let params = llm.get_ls_params(None);
     assert_eq!(params.ls_temperature, Some(1.0));
 
@@ -39,20 +35,15 @@ fn test_openai_o1_temperature() {
 /// Ported from `test_init_o1`.
 #[test]
 fn test_init_o1() {
-    // Should not panic
     let _llm = ChatOpenAI::new("o1").reasoning_effort("medium");
 }
 
 /// Ported from `test_init_minimal_reasoning_effort`.
 #[test]
 fn test_init_minimal_reasoning_effort() {
-    // Should not panic
     let _llm = ChatOpenAI::new("gpt-5").reasoning_effort("minimal");
 }
 
-// ====================================================================
-// Payload Construction Tests
-// ====================================================================
 
 /// Ported from `test__get_request_payload` (basic case).
 #[test]
@@ -65,7 +56,6 @@ fn test_get_request_payload_basic() {
     let payload = llm.build_request_payload(&messages, None, None, false);
 
     assert_eq!(payload["model"], "gpt-4o-2024-08-06");
-    // Messages should be formatted
     let msgs = payload["messages"].as_array().unwrap();
     assert_eq!(msgs[0]["role"], "system");
     assert_eq!(msgs[0]["content"], "hello");
@@ -102,10 +92,8 @@ fn test_minimal_reasoning_effort_payload_responses_api() {
     )];
     let payload = llm.build_responses_api_payload(&messages, None, None, false);
 
-    // Reasoning effort should be nested under reasoning.effort
     assert!(payload.get("reasoning").is_some());
     assert_eq!(payload["reasoning"]["effort"], "minimal");
-    // max_tokens becomes max_output_tokens
     assert_eq!(payload["max_output_tokens"], 100);
 }
 
@@ -176,7 +164,6 @@ fn test_extra_body_with_model_kwargs() {
     let llm = ChatOpenAI::new("gpt-4o-mini")
         .temperature(0.5)
         .extra_body(extra);
-    // model_kwargs need to be set via the struct field - for now test extra_body works
     let messages = vec![BaseMessage::Human(
         HumanMessage::builder().content("Hello").build(),
     )];
@@ -186,9 +173,6 @@ fn test_extra_body_with_model_kwargs() {
     assert_eq!(payload["temperature"], 0.5);
 }
 
-// ====================================================================
-// Usage Metadata Tests
-// ====================================================================
 
 /// Ported from `test__create_usage_metadata`.
 #[test]
@@ -200,7 +184,6 @@ fn test_create_usage_metadata_basic() {
     )
     .unwrap();
 
-    // Simulate what parse_response does
     let metadata = UsageMetadata::new(
         usage["prompt_tokens"].as_i64().unwrap(),
         usage["completion_tokens"].as_i64().unwrap(),
@@ -222,9 +205,6 @@ fn test_create_usage_metadata_responses() {
     assert_eq!(metadata.total_tokens, 150);
 }
 
-// ====================================================================
-// should_use_responses_api Tests
-// ====================================================================
 
 /// Ported from `test_model_prefers_responses_api`.
 #[test]
@@ -239,50 +219,39 @@ fn test_model_prefers_responses_api() {
 /// Tests that should_use_responses_api returns true for various conditions.
 #[test]
 fn test_should_use_responses_api_conditions() {
-    // Explicit setting
     let llm = ChatOpenAI::new("gpt-4o").with_responses_api(true);
     assert!(llm.should_use_responses_api(None));
 
     let llm = ChatOpenAI::new("gpt-4o").with_responses_api(false);
     assert!(!llm.should_use_responses_api(None));
 
-    // Has builtin tools
     assert!(
         ChatOpenAI::new("gpt-4o")
             .with_builtin_tools(vec![agent_chain::providers::openai::BuiltinTool::WebSearch])
             .should_use_responses_api(None)
     );
 
-    // Reasoning params
     let mut reasoning = HashMap::new();
     reasoning.insert("effort".to_string(), serde_json::json!("high"));
     let llm = ChatOpenAI::new("gpt-4o").reasoning(reasoning);
     assert!(llm.should_use_responses_api(None));
 
-    // Verbosity
     let llm = ChatOpenAI::new("gpt-4o").verbosity("high");
     assert!(llm.should_use_responses_api(None));
 
-    // Truncation
     let llm = ChatOpenAI::new("gpt-4o").truncation("auto");
     assert!(llm.should_use_responses_api(None));
 
-    // Include
     let llm = ChatOpenAI::new("gpt-4o").include(vec!["reasoning".to_string()]);
     assert!(llm.should_use_responses_api(None));
 
-    // output_version
     let llm = ChatOpenAI::new("gpt-4o").output_version("responses/v1");
     assert!(llm.should_use_responses_api(None));
 
-    // Default (no special params)
     let llm = ChatOpenAI::new("gpt-4o");
     assert!(!llm.should_use_responses_api(None));
 }
 
-// ====================================================================
-// LangSmith Params Tests
-// ====================================================================
 
 /// Tests get_ls_params returns correct values.
 #[test]
@@ -299,9 +268,6 @@ fn test_get_ls_params() {
     assert_eq!(params.ls_stop, Some(vec!["stop1".to_string()]));
 }
 
-// ====================================================================
-// Message Formatting Tests
-// ====================================================================
 
 /// Tests format_messages produces correct OpenAI API format.
 #[test]
@@ -367,9 +333,6 @@ fn test_format_messages_tool_message() {
     assert_eq!(formatted[0]["content"], "sunny");
 }
 
-// ====================================================================
-// Responses API Input Formatting Tests
-// ====================================================================
 
 /// Ported from `test__construct_responses_api_input_tool_message_conversion`.
 #[test]
@@ -410,7 +373,6 @@ fn test_format_messages_for_responses_api_ai_with_tool_calls() {
 
     let result = llm.format_messages_for_responses_api(&[BaseMessage::AI(ai_msg)]);
 
-    // Should have function_call output
     assert!(!result.is_empty());
     let function_call = result.iter().find(|r| r["type"] == "function_call");
     assert!(function_call.is_some());
@@ -456,20 +418,14 @@ fn test_format_messages_for_responses_api_multiple_types() {
 
     let result = llm.format_messages_for_responses_api(&messages);
 
-    // System message
     assert_eq!(result[0]["role"], "system");
-    // Human message
     assert_eq!(result[1]["role"], "user");
-    // Should have function_call and function_call_output
     let has_function_call = result.iter().any(|r| r["type"] == "function_call");
     let has_function_output = result.iter().any(|r| r["type"] == "function_call_output");
     assert!(has_function_call);
     assert!(has_function_output);
 }
 
-// ====================================================================
-// Builder Tests
-// ====================================================================
 
 /// Tests all builder methods work without panicking.
 #[test]

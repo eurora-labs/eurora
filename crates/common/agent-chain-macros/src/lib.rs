@@ -36,7 +36,6 @@ pub fn tool(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let _fn_asyncness = &input.sig.asyncness;
     let fn_return_type = &input.sig.output;
 
-    // Extract parameters
     let params: Vec<_> = input
         .sig
         .inputs
@@ -57,7 +56,6 @@ pub fn tool(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let param_types: Vec<_> = params.iter().map(|(_, ty)| ty.clone()).collect();
     let param_names_str: Vec<_> = params.iter().map(|(name, _)| name.to_string()).collect();
 
-    // Generate JSON schema properties for parameters
     let schema_properties: Vec<_> = params
         .iter()
         .map(|(name, ty)| {
@@ -69,7 +67,6 @@ pub fn tool(_attr: TokenStream, item: TokenStream) -> TokenStream {
         })
         .collect();
 
-    // Get the return type without the `-> `
     let actual_return_type = match fn_return_type {
         ReturnType::Default => quote! { () },
         ReturnType::Type(_, ty) => quote! { #ty },
@@ -123,7 +120,6 @@ pub fn tool(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     _run_manager: Option<&::agent_chain::_core::callbacks::manager::CallbackManagerForToolRun>,
                     _config: &::agent_chain::_core::runnables::RunnableConfig,
                 ) -> ::agent_chain::_core::error::Result<::agent_chain::_core::tools::ToolOutput> {
-                    // For generated tools, we always use async version
                     Err(::agent_chain::_core::error::Error::NotImplemented("Use async invoke instead".into()))
                 }
 

@@ -24,9 +24,6 @@ use super::message::{BaseMessagePromptTemplate, get_msg_title_repr};
 use super::prompt::PromptTemplate;
 use super::string::{PromptTemplateFormat, StringPromptTemplate};
 
-// ---------------------------------------------------------------------------
-// MessagesPlaceholder
-// ---------------------------------------------------------------------------
 
 /// Prompt template that assumes variable is already a list of messages.
 ///
@@ -131,9 +128,6 @@ impl BaseMessagePromptTemplate for MessagesPlaceholder {
     }
 }
 
-// ---------------------------------------------------------------------------
-// BaseStringMessagePromptTemplate trait
-// ---------------------------------------------------------------------------
 
 /// Base class for message prompt templates that use a string prompt template.
 ///
@@ -162,9 +156,6 @@ pub trait BaseStringMessagePromptTemplate: BaseMessagePromptTemplate {
     }
 }
 
-// ---------------------------------------------------------------------------
-// ChatMessagePromptTemplate
-// ---------------------------------------------------------------------------
 
 /// Chat message prompt template with a specific role.
 ///
@@ -238,9 +229,6 @@ impl BaseStringMessagePromptTemplate for ChatMessagePromptTemplate {
     }
 }
 
-// ---------------------------------------------------------------------------
-// HumanMessagePromptTemplate
-// ---------------------------------------------------------------------------
 
 /// Human message prompt template.
 ///
@@ -313,9 +301,6 @@ impl BaseStringMessagePromptTemplate for HumanMessagePromptTemplate {
     }
 }
 
-// ---------------------------------------------------------------------------
-// AIMessagePromptTemplate
-// ---------------------------------------------------------------------------
 
 /// AI message prompt template.
 ///
@@ -386,9 +371,6 @@ impl BaseStringMessagePromptTemplate for AIMessagePromptTemplate {
     }
 }
 
-// ---------------------------------------------------------------------------
-// SystemMessagePromptTemplate
-// ---------------------------------------------------------------------------
 
 /// System message prompt template.
 ///
@@ -461,9 +443,6 @@ impl BaseStringMessagePromptTemplate for SystemMessagePromptTemplate {
     }
 }
 
-// ---------------------------------------------------------------------------
-// MessageLike / MessageLikeRepresentation
-// ---------------------------------------------------------------------------
 
 /// A message-like type that can be part of a chat prompt.
 ///
@@ -589,9 +568,6 @@ impl std::fmt::Debug for MessageLikeRepresentation {
     }
 }
 
-// ---------------------------------------------------------------------------
-// BaseChatPromptTemplate trait
-// ---------------------------------------------------------------------------
 
 /// Base trait for chat prompt templates.
 ///
@@ -635,9 +611,6 @@ pub trait BaseChatPromptTemplate: BasePromptTemplate {
     }
 }
 
-// ---------------------------------------------------------------------------
-// ChatPromptTemplate
-// ---------------------------------------------------------------------------
 
 /// A message in a chat prompt template.
 ///
@@ -929,9 +902,6 @@ impl Runnable for ChatPromptTemplate {
     }
 }
 
-// ---------------------------------------------------------------------------
-// _create_template_from_message_type (internal)
-// ---------------------------------------------------------------------------
 
 /// Create a message prompt template from a message type string and template.
 ///
@@ -974,9 +944,6 @@ fn create_template_from_message_type(
     }
 }
 
-// ---------------------------------------------------------------------------
-// _convert_to_message_template (internal)
-// ---------------------------------------------------------------------------
 
 /// Instantiate a ChatPromptMessage from a MessageLikeRepresentation.
 ///
@@ -1001,9 +968,6 @@ fn convert_to_message_template(
             Ok(ChatPromptMessage::Placeholder(placeholder))
         }
         MessageLikeRepresentation::Template(_t) => {
-            // Trait object templates should be passed as concrete ChatPromptMessage
-            // variants. This path exists for API completeness but in practice
-            // callers use Tuple, Message, or String variants.
             Err(Error::InvalidConfig(
                 "Template variant should be passed as a concrete ChatPromptMessage.                  Use Tuple, Message, or String variants instead.".into(),
             ))
@@ -1011,9 +975,6 @@ fn convert_to_message_template(
     }
 }
 
-// ---------------------------------------------------------------------------
-// BasePromptTemplate impl for ChatPromptTemplate
-// ---------------------------------------------------------------------------
 
 /// Implements `BasePromptTemplate` for `ChatPromptTemplate`, matching
 /// Python's inheritance chain where `BaseChatPromptTemplate` extends
@@ -1058,9 +1019,6 @@ impl BasePromptTemplate for ChatPromptTemplate {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Add operator
-// ---------------------------------------------------------------------------
 
 impl std::ops::Add for ChatPromptTemplate {
     type Output = ChatPromptTemplate;
@@ -1102,7 +1060,6 @@ impl std::ops::Add for ChatPromptTemplate {
     }
 }
 
-// --- Serializable impls ---
 
 use crate::load::Serializable;
 use serde_json::Value;
@@ -1200,9 +1157,6 @@ impl Serializable for ChatPromptTemplate {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

@@ -225,9 +225,6 @@ pub enum PngDrawError {
     Io(#[from] std::io::Error),
 }
 
-// ---------------------------------------------------------------------------
-// Internal helper – poor-man's itertools::group_by that works on sorted data.
-// ---------------------------------------------------------------------------
 
 mod itertools_substitute {
     /// Group a sorted slice of `Vec<String>` by popping the first element as key.

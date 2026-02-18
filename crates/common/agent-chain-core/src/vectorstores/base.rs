@@ -129,9 +129,6 @@ pub trait VectorStore: Send + Sync {
         self.get_by_ids(ids)
     }
 
-    // -----------------------------------------------------------------------
-    // Search methods
-    // -----------------------------------------------------------------------
 
     /// Return docs most similar to query.
     fn similarity_search(
@@ -222,9 +219,6 @@ pub trait VectorStore: Send + Sync {
         self.max_marginal_relevance_search_by_vector(embedding, k, fetch_k, lambda_mult, None)
     }
 
-    // -----------------------------------------------------------------------
-    // Search dispatch
-    // -----------------------------------------------------------------------
 
     /// Return docs most similar to query using a specified search type.
     fn search(&self, query: &str, search_type: &SearchType, k: usize) -> Result<Vec<Document>> {
@@ -248,9 +242,6 @@ pub trait VectorStore: Send + Sync {
         self.search(query, search_type, k)
     }
 
-    // -----------------------------------------------------------------------
-    // Relevance score methods
-    // -----------------------------------------------------------------------
 
     /// Select the relevance score function for this vector store.
     ///
@@ -333,9 +324,6 @@ pub trait VectorStore: Send + Sync {
         self.similarity_search_with_relevance_scores(query, k, score_threshold, None)
     }
 
-    // -----------------------------------------------------------------------
-    // Static relevance score functions
-    // -----------------------------------------------------------------------
 
     /// Euclidean relevance score on a scale [0, 1].
     fn euclidean_relevance_score(distance: f32) -> f32
@@ -366,9 +354,6 @@ pub trait VectorStore: Send + Sync {
     }
 }
 
-// ---------------------------------------------------------------------------
-// VectorStoreFactory
-// ---------------------------------------------------------------------------
 
 /// Factory trait for creating vector stores from texts or documents.
 ///
@@ -394,9 +379,6 @@ pub trait VectorStoreFactory: VectorStore + Sized {
     }
 }
 
-// ---------------------------------------------------------------------------
-// VectorStoreRetrieverConfig
-// ---------------------------------------------------------------------------
 
 /// Configuration for a VectorStoreRetriever.
 pub struct VectorStoreRetrieverConfig {
@@ -473,9 +455,6 @@ fn validate_retriever_config(config: &VectorStoreRetrieverConfig) -> Result<()> 
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// VectorStoreRetriever
-// ---------------------------------------------------------------------------
 
 /// Retriever class for VectorStore.
 ///
@@ -642,9 +621,6 @@ impl BaseRetriever for VectorStoreRetriever {
     }
 }
 
-// ---------------------------------------------------------------------------
-// as_retriever extension
-// ---------------------------------------------------------------------------
 
 /// Extension trait providing `into_retriever()` for `Arc<dyn VectorStore>`.
 pub trait VectorStoreRetrieverExt {
@@ -658,9 +634,6 @@ impl VectorStoreRetrieverExt for Arc<dyn VectorStore> {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -737,25 +710,20 @@ mod tests {
 
     #[test]
     fn test_relevance_score_functions() {
-        // Euclidean: 0 distance = 1.0, sqrt(2) distance = 0.0
         let score = InMemoryTestHelper::euclidean_relevance_score(0.0);
         assert!((score - 1.0).abs() < f32::EPSILON);
 
-        // Cosine: 0 distance = 1.0, 1 distance = 0.0
         let score = InMemoryTestHelper::cosine_relevance_score(0.0);
         assert!((score - 1.0).abs() < f32::EPSILON);
         let score = InMemoryTestHelper::cosine_relevance_score(1.0);
         assert!(score.abs() < f32::EPSILON);
 
-        // Max inner product: positive distance
         let score = InMemoryTestHelper::max_inner_product_relevance_score(0.5);
         assert!((score - 0.5).abs() < f32::EPSILON);
-        // Negative distance
         let score = InMemoryTestHelper::max_inner_product_relevance_score(-0.5);
         assert!((score - 0.5).abs() < f32::EPSILON);
     }
 
-    // Minimal type to access the static relevance score functions
     struct InMemoryTestHelper;
     #[async_trait]
     impl VectorStore for InMemoryTestHelper {
