@@ -7,8 +7,9 @@ service ProtoLocalSettingsService {
 }
 
 message NebulSettings {
-  string base_url = 1;
-  string model = 2;
+  string model = 1;
+  string api_key = 2;
+  string title_model = 3;
 }
 
 message OllamaSettings {

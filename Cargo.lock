@@ -1594,6 +1594,7 @@ dependencies = [
 name = "be-local-settings"
 version = "0.0.0"
 dependencies = [
+ "co-utils",
  "proto-gen",
  "thiserror 2.0.18",
  "tokio",
@@ -2234,6 +2235,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75443c44cd6b379beb8c5b45d85d0773baf31cce901fe7bb252f4eff3008ef7d"
 dependencies = [
  "cc",
+]
+
+[[package]]
+name = "co-utils"
+version = "0.0.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -3716,8 +3724,8 @@ name = "euro-secret"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "co-utils",
  "keyring",
- "serde",
 ]
 
 [[package]]
