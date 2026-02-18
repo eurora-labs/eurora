@@ -14,10 +14,6 @@ use agent_chain_core::load::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-// ---------------------------------------------------------------------------
-// Test helpers – serializable types mirroring the Python test fixtures
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct TestSerializableModel {
     value: i32,
@@ -56,15 +52,10 @@ impl Serializable for SecretModel {
     }
 }
 
-// ---------------------------------------------------------------------------
-// TestReviver – mirrors Python TestReviver
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_reviver_init_default() {
     let reviver = Reviver::with_defaults();
     let config = &reviver;
-    // The reviver should have been created successfully with defaults
     let result = reviver.revive(&json!({"key": "value"})).unwrap();
     match result {
         RevivedValue::Value(v) => {
@@ -72,7 +63,6 @@ fn test_reviver_init_default() {
         }
         _ => panic!("Expected Value variant"),
     }
-    // Verify defaults exist (checked via behavior since config is private)
     let _ = config;
 }
 
@@ -97,7 +87,6 @@ fn test_reviver_init_custom_namespaces() {
         ReviverConfig::new().with_valid_namespaces(vec!["tests".to_string(), "custom".to_string()]);
     let reviver = Reviver::new(config);
 
-    // "langchain" should still be present from defaults
     let test_langchain = json!({
         "lc": 1,
         "type": "constructor",
@@ -105,13 +94,11 @@ fn test_reviver_init_custom_namespaces() {
         "kwargs": {"content": "hello"}
     });
     let result = reviver.revive(&test_langchain).unwrap();
-    // AIMessage is in the constructor registry, so it may be instantiated as a Value
     assert!(matches!(
         result,
         RevivedValue::Value(_) | RevivedValue::Constructor(_)
     ));
 
-    // "tests" should be valid as a custom namespace
     let test_custom = json!({
         "lc": 1,
         "type": "constructor",
@@ -204,7 +191,6 @@ fn test_reviver_secret_from_map() {
 
 #[test]
 fn test_reviver_secret_from_env() {
-    // Use a unique env var name to avoid test interference
     let key = "TEST_REVIVER_SECRET_FROM_ENV_KEY";
     unsafe { std::env::set_var(key, "env_secret_value") };
 
@@ -227,7 +213,6 @@ fn test_reviver_secret_from_env() {
 
 #[test]
 fn test_reviver_secret_not_in_env_returns_none() {
-    // Make sure the key doesn't exist
     let key = "REVIVER_TEST_DEFINITELY_MISSING_KEY";
     unsafe { std::env::remove_var(key) };
 
@@ -388,7 +373,6 @@ fn test_reviver_with_import_mapping() {
     let result = reviver.revive(&value).unwrap();
     match result {
         RevivedValue::Value(v) => {
-            // Resolved to AIMessage which is in the constructor registry
             assert_eq!(v.get("content").and_then(|v| v.as_str()), Some("hello"));
             assert_eq!(v.get("type").and_then(|v| v.as_str()), Some("ai"));
         }
@@ -404,7 +388,6 @@ fn test_reviver_with_import_mapping() {
 fn test_reviver_disallow_load_from_path() {
     let reviver = Reviver::with_defaults();
 
-    // langchain_community is in DISALLOW_LOAD_FROM_PATH
     let value = json!({
         "lc": 1,
         "type": "constructor",
@@ -432,10 +415,6 @@ fn test_reviver_passthrough_non_lc_dict() {
     }
 }
 
-// ---------------------------------------------------------------------------
-// TestLoads – mirrors Python TestLoads
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_loads_basic_constructor() {
     let json_str = json!({
@@ -447,8 +426,6 @@ fn test_loads_basic_constructor() {
     .to_string();
 
     let result = loads(&json_str, None).unwrap();
-    // In Rust, constructors are returned as structured JSON since we can't
-    // dynamically instantiate types like Python. The reviver resolves it.
     assert!(result.is_object());
 }
 
@@ -552,10 +529,6 @@ fn test_loads_nested_structure() {
     assert!(result.get("data").unwrap().is_object());
     assert_eq!(result.get("list").unwrap(), &json!([1, 2, 3]));
 }
-
-// ---------------------------------------------------------------------------
-// TestLoad – mirrors Python TestLoad
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_load_basic() {
@@ -693,16 +666,12 @@ fn test_load_nested_list_structure() {
 
 #[test]
 fn test_load_primitive_types() {
-    // String
     assert_eq!(load(json!("test"), None).unwrap(), json!("test"));
 
-    // Number
     assert_eq!(load(json!(42), None).unwrap(), json!(42));
 
-    // Boolean
     assert_eq!(load(json!(true), None).unwrap(), json!(true));
 
-    // Null
     assert_eq!(load(json!(null), None).unwrap(), json!(null));
 }
 
@@ -757,15 +726,10 @@ fn test_load_with_empty_env_string() {
 
     let config = ReviverConfig::new().with_secrets_from_env(true);
     let result = load(obj, Some(config)).unwrap();
-    // Empty string env var should return null (same as Python returning None)
     assert!(result.is_null());
 
     unsafe { std::env::remove_var(key) };
 }
-
-// ---------------------------------------------------------------------------
-// TestRoundTrip – mirrors Python TestRoundTrip
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_round_trip_basic() {
@@ -801,10 +765,6 @@ fn test_round_trip_with_loads_dumps() {
     assert!(loaded.is_object());
 }
 
-// ---------------------------------------------------------------------------
-// TestDefaultNamespacesSnapshot – mirrors Python snapshot tests
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_default_namespaces_exact_snapshot() {
     let expected = vec![
@@ -834,15 +794,10 @@ fn test_disallow_load_from_path_exact_snapshot() {
     );
 }
 
-// ---------------------------------------------------------------------------
-// TestReviverSnapshot – mirrors Python TestReviverSnapshot edge cases
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_reviver_non_lc_versioned_dict_passthrough() {
     let reviver = Reviver::with_defaults();
 
-    // lc != 1 should pass through unchanged
     let value = json!({"lc": 2, "type": "constructor", "id": ["a"], "kwargs": {}});
     let result = reviver.revive(&value).unwrap();
     match result {
@@ -914,7 +869,6 @@ fn test_reviver_constructor_missing_kwargs_key() {
     let config = ReviverConfig::new().with_valid_namespaces(vec!["langchain_core".to_string()]);
     let reviver = Reviver::new(config);
 
-    // Constructor without the "kwargs" key should still work (defaults to empty)
     let value = json!({
         "lc": 1,
         "type": "constructor",
@@ -961,7 +915,6 @@ fn test_reviver_secret_map_takes_priority_over_env() {
 fn test_reviver_valid_namespaces_merged_with_defaults() {
     let config = ReviverConfig::new().with_valid_namespaces(vec!["my_custom_ns".to_string()]);
 
-    // Default namespaces should still be present
     for ns in DEFAULT_NAMESPACES {
         assert!(
             config.valid_namespaces.iter().any(|n| n == ns),
@@ -969,7 +922,6 @@ fn test_reviver_valid_namespaces_merged_with_defaults() {
             ns
         );
     }
-    // Custom namespace should also be present
     assert!(config.valid_namespaces.iter().any(|n| n == "my_custom_ns"));
 }
 
@@ -1002,7 +954,6 @@ fn test_reviver_additional_import_mappings_override() {
         .with_additional_import_mappings(custom_mapping);
     let reviver = Reviver::new(config);
 
-    // When we revive with the old key, it should use the custom mapping
     let value = json!({
         "lc": 1,
         "type": "constructor",
@@ -1013,8 +964,6 @@ fn test_reviver_additional_import_mappings_override() {
     let result = reviver.revive(&value).unwrap();
     match result {
         RevivedValue::Value(v) => {
-            // The original id matches AIMessage in the registry, so it gets
-            // instantiated even though the mapping points elsewhere.
             assert_eq!(v.get("content").and_then(|v| v.as_str()), Some("hello"));
         }
         RevivedValue::Constructor(info) => {
@@ -1029,7 +978,6 @@ fn test_reviver_import_mappings_without_additional() {
     let all_mappings = get_all_serializable_mappings();
     let reviver = Reviver::with_defaults();
 
-    // A key that exists in the default mappings should resolve
     let key = vec![
         "langchain".to_string(),
         "schema".to_string(),
@@ -1047,7 +995,6 @@ fn test_reviver_import_mappings_without_additional() {
     let result = reviver.revive(&value).unwrap();
     match result {
         RevivedValue::Value(v) => {
-            // AIMessage is in the registry, so it gets instantiated
             assert_eq!(v.get("content").and_then(|v| v.as_str()), Some("hello"));
         }
         RevivedValue::Constructor(info) => {
@@ -1092,7 +1039,6 @@ fn test_reviver_unknown_type_passthrough() {
 fn test_reviver_langchain_core_direct_namespace() {
     let reviver = Reviver::with_defaults();
 
-    // langchain_core is in DEFAULT_NAMESPACES and NOT in DISALLOW_LOAD_FROM_PATH
     let value = json!({
         "lc": 1,
         "type": "constructor",
@@ -1113,10 +1059,6 @@ fn test_reviver_langchain_core_direct_namespace() {
         _ => panic!("Expected Value or Constructor for langchain_core namespace"),
     }
 }
-
-// ---------------------------------------------------------------------------
-// TestLoadsSnapshot – mirrors Python TestLoadsSnapshot edge cases
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_loads_invalid_json_raises_error() {
@@ -1186,10 +1128,6 @@ fn test_loads_with_secrets_from_env_false() {
     unsafe { std::env::remove_var(key) };
 }
 
-// ---------------------------------------------------------------------------
-// TestLoadSnapshot – mirrors Python TestLoadSnapshot edge cases
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_load_deeply_nested_mixed() {
     let obj = json!({
@@ -1258,8 +1196,6 @@ fn test_load_nested_secrets() {
 
     let config = ReviverConfig::new().with_secrets_from_env(true);
     let result = load(obj, Some(config)).unwrap();
-    // AIMessage is in the constructor registry, so the secret is resolved
-    // and then the type is instantiated as a Value.
     assert_eq!(
         result.get("content").and_then(|v| v.as_str()),
         Some("nested_secret_value")
@@ -1292,10 +1228,6 @@ fn test_load_list_with_mixed_types() {
     assert!(arr[4].is_object());
 }
 
-// ---------------------------------------------------------------------------
-// TestRoundTripSnapshot – mirrors Python TestRoundTripSnapshot
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_round_trip_preserves_all_fields() {
     let original = TestSerializableModel {
@@ -1318,7 +1250,6 @@ fn test_round_trip_preserves_all_fields() {
         Some("round_trip_test")
     );
 
-    // Verify we can load it back
     let config = ReviverConfig::new().with_valid_namespaces(vec!["tests".to_string()]);
     let loaded = load(serialized, Some(config)).unwrap();
     assert!(loaded.is_object());
@@ -1333,7 +1264,6 @@ fn test_round_trip_with_secrets() {
 
     let serialized = dumpd(&original).unwrap();
 
-    // The secret should be masked in serialized form
     let kwargs = serialized.get("kwargs").unwrap();
     let api_key_value = kwargs.get("api_key").unwrap();
     assert_eq!(
@@ -1348,7 +1278,6 @@ fn test_round_trip_with_secrets() {
         Some(vec!["MY_API_KEY"])
     );
 
-    // Deserialize with secrets_map
     let mut secrets = HashMap::new();
     secrets.insert("MY_API_KEY".to_string(), "secret123".to_string());
     let config = ReviverConfig::new()
@@ -1357,7 +1286,6 @@ fn test_round_trip_with_secrets() {
     let loaded = load(serialized, Some(config)).unwrap();
     assert!(loaded.is_object());
 
-    // The secret should have been resolved
     let loaded_kwargs = loaded.get("kwargs").unwrap();
     assert_eq!(
         loaded_kwargs.get("api_key").and_then(|v| v.as_str()),
@@ -1368,10 +1296,6 @@ fn test_round_trip_with_secrets() {
         Some("test")
     );
 }
-
-// ---------------------------------------------------------------------------
-// Convenience function tests
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_loads_with_secrets_convenience() {
@@ -1403,25 +1327,17 @@ fn test_loads_with_namespaces_convenience() {
     assert!(result.is_object());
 }
 
-// ---------------------------------------------------------------------------
-// RevivedValue tests
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_revived_value_to_value() {
-    // Value variant
     let rv = RevivedValue::Value(json!({"key": "value"}));
     assert_eq!(rv.to_value(), json!({"key": "value"}));
 
-    // String variant
     let rv = RevivedValue::String("hello".to_string());
     assert_eq!(rv.to_value(), json!("hello"));
 
-    // None variant
     let rv = RevivedValue::None;
     assert!(rv.to_value().is_null());
 
-    // Constructor variant
     let rv = RevivedValue::Constructor(ConstructorInfo {
         path: vec!["langchain_core".to_string(), "AIMessage".to_string()],
         name: "AIMessage".to_string(),
@@ -1439,10 +1355,6 @@ fn test_revived_value_is_none() {
     assert!(!RevivedValue::Value(json!(null)).is_none());
     assert!(!RevivedValue::String("".to_string()).is_none());
 }
-
-// ---------------------------------------------------------------------------
-// ReviverConfig builder tests
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_reviver_config_builder_chain() {
@@ -1466,10 +1378,6 @@ fn test_reviver_config_builder_chain() {
     assert!(config.ignore_unserializable_fields);
 }
 
-// ---------------------------------------------------------------------------
-// Constructor edge cases
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_reviver_constructor_empty_id_raises_error() {
     let reviver = Reviver::with_defaults();
@@ -1489,7 +1397,6 @@ fn test_reviver_constructor_empty_id_raises_error() {
 fn test_reviver_constructor_with_mapping_old_schema() {
     let reviver = Reviver::with_defaults();
 
-    // Old langchain.schema path should be mapped to langchain_core
     let value = json!({
         "lc": 1,
         "type": "constructor",
@@ -1539,13 +1446,7 @@ fn test_load_recursive_processes_kwargs_secrets() {
     let result = loads(&json_str, Some(config)).unwrap();
 
     let wrapper = result.get("wrapper").unwrap();
-    // AIMessage is in the constructor registry, so it gets instantiated.
-    // The secret in metadata should have been resolved before instantiation.
     let _metadata = wrapper.get("response_metadata").unwrap();
-    // The secret was inside kwargs.metadata.secret and was resolved by
-    // load_recursive before the constructor was called. After deserialization
-    // and re-serialization through AIMessage, the metadata ends up in
-    // additional_kwargs or is merged differently. Check content is preserved.
     assert_eq!(
         wrapper.get("content").and_then(|v| v.as_str()),
         Some("hello")
@@ -1554,15 +1455,10 @@ fn test_load_recursive_processes_kwargs_secrets() {
     unsafe { std::env::remove_var(key) };
 }
 
-// ---------------------------------------------------------------------------
-// Mapping-specific tests
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_all_serializable_mappings_contains_all_sources() {
     let combined = get_all_serializable_mappings();
 
-    // The AI message mapping should exist from SERIALIZABLE_MAPPING
     let key = vec![
         "langchain".to_string(),
         "schema".to_string(),
@@ -1586,10 +1482,6 @@ fn test_disallow_load_from_path_contents() {
     assert!(!DISALLOW_LOAD_FROM_PATH.contains(&"langchain_core"));
 }
 
-// ---------------------------------------------------------------------------
-// Constructor registry round-trip tests
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_round_trip_document() {
     use agent_chain_core::documents::Document;
@@ -1598,8 +1490,6 @@ fn test_round_trip_document() {
     let serialized = dumps(&doc, false).unwrap();
     let loaded = loads(&serialized, None).unwrap();
 
-    // With the constructor registry, load() should produce the actual object
-    // as a Value, not a {"_type": "constructor", ...} wrapper.
     assert_eq!(
         loaded.get("page_content").and_then(|v| v.as_str()),
         Some("Hello, World!")
@@ -1731,15 +1621,12 @@ fn test_round_trip_str_output_parser() {
     let serialized = dumpd(&parser).unwrap();
     let loaded = load(serialized, None).unwrap();
 
-    // StrOutputParser has no fields, so the loaded value should be an object
     assert!(loaded.is_object());
     assert!(loaded.get("_type").is_none());
 }
 
 #[test]
 fn test_round_trip_old_namespace_mapping() {
-    // Verify that serialized data using old langchain.schema paths
-    // can be loaded via the mapping table and constructor registry.
     let serialized = json!({
         "lc": 1,
         "type": "constructor",
@@ -1760,7 +1647,6 @@ fn test_round_trip_old_namespace_mapping() {
 
 #[test]
 fn test_round_trip_unknown_type_falls_back_to_constructor_info() {
-    // Unknown types should still return constructor info (graceful fallback)
     let serialized = json!({
         "lc": 1,
         "type": "constructor",
@@ -1772,16 +1658,11 @@ fn test_round_trip_unknown_type_falls_back_to_constructor_info() {
 
     let loaded = load(serialized, None).unwrap();
 
-    // Should fall back to constructor info format
     assert_eq!(
         loaded.get("_type").and_then(|v| v.as_str()),
         Some("constructor")
     );
 }
-
-// ---------------------------------------------------------------------------
-// ChatPromptTemplate round-trip tests
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_round_trip_chat_prompt_template() {
@@ -1795,7 +1676,6 @@ fn test_round_trip_chat_prompt_template() {
 
     let serialized = dumpd(&template).unwrap();
 
-    // Verify serialized structure
     assert_eq!(serialized.get("lc").and_then(|v| v.as_i64()), Some(1));
     assert_eq!(
         serialized.get("type").and_then(|v| v.as_str()),
@@ -1810,12 +1690,10 @@ fn test_round_trip_chat_prompt_template() {
         .unwrap_or_default();
     assert_eq!(input_vars, vec!["question"]);
 
-    // Round-trip through load
     let loaded = load(serialized, None).unwrap();
     assert!(loaded.is_object());
     assert!(loaded.get("_type").is_none());
 
-    // Verify messages are preserved
     let messages = loaded.get("messages").and_then(|v| v.as_array());
     assert!(messages.is_some());
     assert_eq!(messages.unwrap().len(), 2);
@@ -1851,7 +1729,6 @@ fn test_round_trip_human_message_prompt_template() {
 
     assert!(loaded.is_object());
     assert!(loaded.get("_type").is_none());
-    // The inner prompt should be preserved
     let prompt = loaded.get("prompt");
     assert!(prompt.is_some());
 }

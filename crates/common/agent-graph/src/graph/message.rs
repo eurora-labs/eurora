@@ -4,7 +4,6 @@
 
 use std::collections::HashMap;
 
-// Re-export HasId from agent-chain
 pub use agent_chain_core::messages::HasId;
 
 /// Merges two lists of messages, updating existing messages by ID.
@@ -34,7 +33,6 @@ pub use agent_chain_core::messages::HasId;
 /// // merged contains both messages
 /// ```
 pub fn add_messages<T: Clone + HasId>(mut left: Vec<T>, right: Vec<T>) -> Vec<T> {
-    // Build index of existing messages by ID
     let mut id_to_idx: HashMap<String, usize> = HashMap::new();
     for (idx, msg) in left.iter().enumerate() {
         if let Some(id) = msg.get_id() {
@@ -42,19 +40,15 @@ pub fn add_messages<T: Clone + HasId>(mut left: Vec<T>, right: Vec<T>) -> Vec<T>
         }
     }
 
-    // Merge right into left
     for msg in right {
         if let Some(id) = msg.get_id() {
             if let Some(&existing_idx) = id_to_idx.get(&id) {
-                // Replace existing message
                 left[existing_idx] = msg;
             } else {
-                // Add new message
                 id_to_idx.insert(id.to_string(), left.len());
                 left.push(msg);
             }
         } else {
-            // No ID, just append
             left.push(msg);
         }
     }

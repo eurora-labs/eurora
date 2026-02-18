@@ -137,7 +137,6 @@ pub fn draw_ascii(vertices: &HashMap<String, String>, edges: &[Edge]) -> Result<
         return Ok(String::new());
     }
 
-    // Map string vertex IDs to u32 for rust-sugiyama
     let id_list: Vec<&String> = vertices.keys().collect();
     let id_to_idx: HashMap<&String, u32> = id_list
         .iter()
@@ -150,7 +149,6 @@ pub fn draw_ascii(vertices: &HashMap<String, String>, edges: &[Edge]) -> Result<
         .map(|(i, id)| (i as u32, *id))
         .collect();
 
-    // Build vertex dimensions: (id, (width, height))
     let sugiyama_vertices: Vec<(u32, (f64, f64))> = vertices
         .iter()
         .map(|(id, label)| {
@@ -161,7 +159,6 @@ pub fn draw_ascii(vertices: &HashMap<String, String>, edges: &[Edge]) -> Result<
         })
         .collect();
 
-    // Build edges as (source_idx, target_idx)
     let sugiyama_edges: Vec<(u32, u32)> = edges
         .iter()
         .filter_map(|edge| {
@@ -171,7 +168,6 @@ pub fn draw_ascii(vertices: &HashMap<String, String>, edges: &[Edge]) -> Result<
         })
         .collect();
 
-    // Store conditional status per edge for drawing character
     let edge_conditional: HashMap<(u32, u32), bool> = edges
         .iter()
         .filter_map(|edge| {
@@ -189,13 +185,11 @@ pub fn draw_ascii(vertices: &HashMap<String, String>, edges: &[Edge]) -> Result<
         return Ok(String::new());
     }
 
-    // Combine all subgraph layouts
     let mut all_positions: Vec<(usize, (f64, f64))> = Vec::new();
     for (layout, _width, _height) in &layouts {
         all_positions.extend_from_slice(layout);
     }
 
-    // Compute bounding box
     let mut min_x = f64::MAX;
     let mut min_y = f64::MAX;
     let mut max_x = f64::MIN;
@@ -219,13 +213,11 @@ pub fn draw_ascii(vertices: &HashMap<String, String>, edges: &[Edge]) -> Result<
     let canvas_cols = (max_x - min_x).ceil() as usize + 1;
     let canvas_lines = (max_y - min_y).ceil() as usize + 1;
 
-    // Ensure minimum canvas dimensions
     let canvas_cols = canvas_cols.max(2);
     let canvas_lines = canvas_lines.max(2);
 
     let mut canvas = AsciiCanvas::new(canvas_cols, canvas_lines)?;
 
-    // Build position lookup for edges: idx -> (center_x, center_y, width, height)
     let mut vertex_positions: HashMap<usize, (f64, f64, f64, f64)> = HashMap::new();
     for &(idx, (x, y)) in &all_positions {
         let id = idx_to_id[&(idx as u32)];
@@ -236,7 +228,6 @@ pub fn draw_ascii(vertices: &HashMap<String, String>, edges: &[Edge]) -> Result<
         vertex_positions.insert(idx, (x, y, w, h));
     }
 
-    // Draw edges first so node boxes can overwrite them
     for edge in &sugiyama_edges {
         let source_idx = edge.0 as usize;
         let target_idx = edge.1 as usize;
@@ -245,7 +236,6 @@ pub fn draw_ascii(vertices: &HashMap<String, String>, edges: &[Edge]) -> Result<
             vertex_positions.get(&source_idx),
             vertex_positions.get(&target_idx),
         ) {
-            // Edge goes from bottom-center of source to top-center of target
             let start_x = (sx - min_x).round() as i32;
             let start_y = (sy + sh - min_y).round() as i32;
             let end_x = (tx - min_x).round() as i32;
@@ -261,7 +251,6 @@ pub fn draw_ascii(vertices: &HashMap<String, String>, edges: &[Edge]) -> Result<
         }
     }
 
-    // Draw vertex boxes
     for &(idx, (x, y)) in &all_positions {
         let id = idx_to_id[&(idx as u32)];
         let label = &vertices[id];
@@ -383,7 +372,6 @@ mod tests {
         ];
 
         let result = draw_ascii(&vertices, &edges).unwrap();
-        // Should draw all 4 vertices
         for label in &["1", "2", "3", "4"] {
             assert!(
                 result.contains(label),
@@ -410,7 +398,6 @@ mod tests {
         let result = draw_ascii(&vertices, &edges).unwrap();
         assert!(result.contains('A'), "Should contain vertex A: {}", result);
         assert!(result.contains('B'), "Should contain vertex B: {}", result);
-        // Conditional edges use '.' character
         assert!(
             result.contains('.'),
             "Should contain conditional edge dots: {}",

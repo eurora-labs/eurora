@@ -223,10 +223,6 @@ pub async fn aadd<T: Addable>(addables: impl Stream<Item = T> + Unpin) -> Option
     final_value
 }
 
-// ---------------------------------------------------------------------------
-// Addable implementations
-// ---------------------------------------------------------------------------
-
 impl Addable for String {
     fn add(self, other: Self) -> Self {
         self + &other
@@ -579,31 +575,6 @@ impl Default for RootEventFilter {
         Self::new()
     }
 }
-
-// ============================================================================
-// Python-specific functions that cannot be directly ported to Rust
-// ============================================================================
-//
-// The following functions from Python's utils.py rely on Python's runtime
-// introspection capabilities and cannot be directly implemented in Rust:
-//
-// - `accepts_run_manager(callable)` - Checks if a function has a `run_manager` parameter
-// - `accepts_config(callable)` - Checks if a function has a `config` parameter
-// - `accepts_context(callable)` - Checks if a function has a `context` parameter
-// - `asyncio_accepts_context()` - Python version check for asyncio context support
-// - `coro_with_context(coro, context)` - Creates a coroutine with a specific context
-// - `get_function_first_arg_dict_keys(func)` - Inspects function source to find dict keys
-// - `get_lambda_source(func)` - Gets the source code of a lambda function
-// - `get_function_nonlocals(func)` - Gets nonlocal variables accessed by a function
-//
-// In Rust, these capabilities are typically handled through:
-// - Trait bounds (instead of runtime signature inspection)
-// - Compile-time type checking
-// - Explicit parameter passing
-//
-// The AST visitor classes (IsLocalDict, IsFunctionArgDict, NonLocals,
-// FunctionNonLocals, GetLambdaSource) are also Python-specific and used
-// for source code introspection at runtime.
 
 /// Check if a function is an async generator.
 ///

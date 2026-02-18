@@ -15,10 +15,6 @@ use agent_chain_core::runnables::history::{
 use agent_chain_core::runnables::utils::ConfigurableFieldSpec;
 use serde_json::Value;
 
-// ===========================================================================
-// Helpers
-// ===========================================================================
-
 /// Build a `RunnableConfig` with the given configurable key-value pairs.
 fn config_with(pairs: &[(&str, &str)]) -> RunnableConfig {
     let mut cfg = RunnableConfig::default();
@@ -57,10 +53,6 @@ fn system(content: &str) -> BaseMessage {
     BaseMessage::System(SystemMessage::builder().content(content).build())
 }
 
-// ---------------------------------------------------------------------------
-// Runnable factories
-// ---------------------------------------------------------------------------
-
 /// A runnable that concatenates human-message contents, prefixed with "you said: ".
 /// Returns a single AIMessage.
 ///
@@ -92,10 +84,6 @@ fn length_runnable() -> HistoryRunnable {
         )])
     })
 }
-
-// ===========================================================================
-// Tests
-// ===========================================================================
 
 /// Mirrors `test_interfaces` in Python.
 #[test]
@@ -129,21 +117,18 @@ fn test_input_messages() {
 
     let cfg = config_with(&[("session_id", "1")]);
 
-    // First invocation
     let output = with_history
         .invoke_messages(vec![human("hello")], Some(cfg.clone()))
         .unwrap();
     assert_eq!(output.len(), 1);
     assert_eq!(output[0].content(), "you said: hello");
 
-    // Second invocation — history should include previous messages
     let output = with_history
         .invoke_messages(vec![human("good bye")], Some(cfg.clone()))
         .unwrap();
     assert_eq!(output.len(), 1);
     assert_eq!(output[0].content(), "you said: hello\ngood bye");
 
-    // Verify stored history
     let guard = store.lock().unwrap();
     let hist = guard.get("1").unwrap().lock().unwrap();
     let msgs = hist.messages();
@@ -188,7 +173,7 @@ fn test_input_messages_output_message() {
 
 /// Mirrors `test_using_custom_config_specs` in Python.
 ///
-/// Uses a session factory that takes `user_id` and `conversation_id`.
+/// Uses a session factory that takes `user_id` and `thread_id`.
 #[test]
 fn test_using_custom_config_specs() {
     #[allow(clippy::type_complexity)]
@@ -199,8 +184,8 @@ fn test_using_custom_config_specs() {
         let store = store.clone();
         Arc::new(move |params: &HashMap<String, String>| {
             let user_id = params.get("user_id").cloned().unwrap_or_default();
-            let conversation_id = params.get("conversation_id").cloned().unwrap_or_default();
-            let key = (user_id, conversation_id);
+            let thread_id = params.get("thread_id").cloned().unwrap_or_default();
+            let key = (user_id, thread_id);
             let mut guard = store.lock().unwrap();
             let entry = guard
                 .entry(key)
@@ -226,10 +211,10 @@ fn test_using_custom_config_specs() {
                 dependencies: None,
             },
             ConfigurableFieldSpec {
-                id: "conversation_id".into(),
+                id: "thread_id".into(),
                 annotation: "str".into(),
-                name: Some("Conversation ID".into()),
-                description: Some("Unique identifier for the conversation.".into()),
+                name: Some("Thread ID".into()),
+                description: Some("Unique identifier for the thread.".into()),
                 default: None,
                 is_shared: true,
                 dependencies: None,
@@ -237,15 +222,13 @@ fn test_using_custom_config_specs() {
         ]),
     );
 
-    // user1, conversation 1: "hello"
-    let cfg1 = config_with(&[("user_id", "user1"), ("conversation_id", "1")]);
+    let cfg1 = config_with(&[("user_id", "user1"), ("thread_id", "1")]);
     let result = with_history
         .invoke_messages(vec![human("hello")], Some(cfg1.clone()))
         .unwrap();
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].content(), "you said: hello");
 
-    // Verify store has the messages
     {
         let guard = store.lock().unwrap();
         let hist = guard
@@ -256,7 +239,6 @@ fn test_using_custom_config_specs() {
         assert_eq!(hist.messages().len(), 2);
     }
 
-    // user1, conversation 1: "goodbye" — history now includes prior messages
     let result = with_history
         .invoke_messages(vec![human("goodbye")], Some(cfg1.clone()))
         .unwrap();
@@ -273,15 +255,13 @@ fn test_using_custom_config_specs() {
         assert_eq!(hist.messages().len(), 4);
     }
 
-    // user2, conversation 1: "meow"
-    let cfg2 = config_with(&[("user_id", "user2"), ("conversation_id", "1")]);
+    let cfg2 = config_with(&[("user_id", "user2"), ("thread_id", "1")]);
     let result = with_history
         .invoke_messages(vec![human("meow")], Some(cfg2))
         .unwrap();
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].content(), "you said: meow");
 
-    // Verify store sizes
     {
         let guard = store.lock().unwrap();
         assert_eq!(guard.len(), 2);
@@ -320,7 +300,6 @@ fn test_ignore_session_id() {
         None,
     );
 
-    // Invoke without meaningful config
     let _ = with_history
         .invoke_messages(vec![human("hello")], None)
         .unwrap();
@@ -365,15 +344,9 @@ fn test_multiple_sessions() {
     let hist_a = guard.get("a").unwrap().lock().unwrap();
     let hist_b = guard.get("b").unwrap().lock().unwrap();
 
-    // Session A: 4 messages (A1, AI response, A2, AI response)
     assert_eq!(hist_a.messages().len(), 4);
-    // Session B: 2 messages (B1, AI response)
     assert_eq!(hist_b.messages().len(), 2);
 }
-
-// ===========================================================================
-// Schema tests
-// ===========================================================================
 
 /// Mirrors `test_get_input_schema_input_messages`.
 #[test]
@@ -416,10 +389,6 @@ fn test_get_output_schema() {
     assert_eq!(schema["title"], "RunnableWithChatHistoryOutput");
     assert_eq!(schema["type"], "array");
 }
-
-// ===========================================================================
-// Dict input / output tests
-// ===========================================================================
 
 fn human_as_value(content: &str) -> Value {
     serde_json::to_value(human(content)).expect("human message serialization should not fail")
@@ -480,7 +449,6 @@ fn test_dict_input_with_history_messages_key() {
 
     let cfg = config_with(&[("session_id", "dict1")]);
 
-    // First invocation: no history yet
     let output = with_history
         .invoke(
             serde_json::json!({"question": [human_as_value("What is 2+2?")], "ability": "math"}),
@@ -501,7 +469,6 @@ fn test_dict_input_with_history_messages_key() {
         messages[0].content()
     );
 
-    // Second invocation: should have history from first call
     let output = with_history
         .invoke(
             serde_json::json!({"question": [human_as_value("What is its inverse?")], "ability": "math"}),
@@ -511,7 +478,6 @@ fn test_dict_input_with_history_messages_key() {
 
     let messages: Vec<BaseMessage> =
         serde_json::from_value(output).expect("output should deserialize to messages");
-    // History should contain 1 human input + 1 AI output from first call = 2 messages
     assert!(
         messages[0].content().contains("history=2"),
         "second call should see 2 history messages, got: {}",
@@ -575,14 +541,12 @@ fn test_dict_input_with_output_messages_key() {
         .invoke(input, Some(cfg.clone()))
         .expect("invoke should succeed");
 
-    // Output should be a dict with "answer" key
     assert!(
         output.get("answer").is_some(),
         "output should contain 'answer' key, got: {}",
         output
     );
 
-    // History should have the human input + the AI answer
     let guard = store.lock().expect("store lock should not be poisoned");
     let hist = guard
         .get("out1")
@@ -615,7 +579,6 @@ fn test_get_input_messages_normalization() {
     let factory = make_session_factory(store);
     let dummy_runnable: HistoryInvokeFn = Arc::new(|_input, _config| Ok(Value::Array(vec![])));
 
-    // No input_messages_key: string input -> HumanMessage
     let rwmh = RunnableWithMessageHistory::new(
         dummy_runnable.clone(),
         None,
@@ -636,7 +599,6 @@ fn test_get_input_messages_normalization() {
         "string input should become HumanMessage"
     );
 
-    // No input_messages_key: array input -> Vec<BaseMessage>
     let arr = serde_json::to_value(vec![human("a"), human("b")])
         .expect("array serialization should not fail");
     let msgs = rwmh
@@ -646,7 +608,6 @@ fn test_get_input_messages_normalization() {
     assert_eq!(msgs[0].content(), "a");
     assert_eq!(msgs[1].content(), "b");
 
-    // With input_messages_key: extracts from the specified key in a dict
     let rwmh2 = RunnableWithMessageHistory::new(
         dummy_runnable.clone(),
         None,
@@ -677,7 +638,6 @@ fn test_get_output_messages_normalization() {
     let factory = make_session_factory(store);
     let dummy: HistoryInvokeFn = Arc::new(|_input, _config| Ok(Value::Array(vec![])));
 
-    // No output_messages_key: string output -> AIMessage
     let rwmh = RunnableWithMessageHistory::new(
         dummy.clone(),
         None,
@@ -698,7 +658,6 @@ fn test_get_output_messages_normalization() {
         "string output should become AIMessage"
     );
 
-    // Array output -> Vec<BaseMessage>
     let arr = serde_json::to_value(vec![ai("first"), ai("second")])
         .expect("array serialization should not fail");
     let msgs = rwmh
@@ -708,7 +667,6 @@ fn test_get_output_messages_normalization() {
     assert_eq!(msgs[0].content(), "first");
     assert_eq!(msgs[1].content(), "second");
 
-    // With output_messages_key: extracts from the specified key in a dict
     let rwmh2 = RunnableWithMessageHistory::new(
         dummy.clone(),
         None,

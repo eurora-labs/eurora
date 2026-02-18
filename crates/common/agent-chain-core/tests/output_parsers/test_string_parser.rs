@@ -15,7 +15,6 @@ use futures::StreamExt;
 
 #[test]
 fn test_str_output_parser_parse() {
-    // Test StrOutputParser.parse() returns input unchanged
     let parser = StrOutputParser::new();
     let text = "Hello, world!";
     assert_eq!(parser.parse(text).unwrap(), text);
@@ -23,14 +22,12 @@ fn test_str_output_parser_parse() {
 
 #[test]
 fn test_str_output_parser_parse_empty_string() {
-    // Test StrOutputParser.parse() with empty string
     let parser = StrOutputParser::new();
     assert_eq!(parser.parse("").unwrap(), "");
 }
 
 #[test]
 fn test_str_output_parser_parse_multiline() {
-    // Test StrOutputParser.parse() with multiline text
     let parser = StrOutputParser::new();
     let text = "Line 1\nLine 2\nLine 3";
     assert_eq!(parser.parse(text).unwrap(), text);
@@ -38,7 +35,6 @@ fn test_str_output_parser_parse_multiline() {
 
 #[test]
 fn test_str_output_parser_parse_special_chars() {
-    // Test StrOutputParser.parse() with special characters
     let parser = StrOutputParser::new();
     let text = "Special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?";
     assert_eq!(parser.parse(text).unwrap(), text);
@@ -46,7 +42,6 @@ fn test_str_output_parser_parse_special_chars() {
 
 #[test]
 fn test_str_output_parser_parse_unicode() {
-    // Test StrOutputParser.parse() with unicode characters
     let parser = StrOutputParser::new();
     let text = "Unicode: 你好, こんにちは, नमस्ते, 🎉";
     assert_eq!(parser.parse(text).unwrap(), text);
@@ -54,7 +49,6 @@ fn test_str_output_parser_parse_unicode() {
 
 #[test]
 fn test_str_output_parser_invoke_with_message() {
-    // Test StrOutputParser.invoke() with AIMessage input
     let parser = StrOutputParser::new();
     let message = AIMessage::builder().content("Hello from AI").build();
     let result = parser.invoke(BaseMessage::AI(message), None).unwrap();
@@ -63,7 +57,6 @@ fn test_str_output_parser_invoke_with_message() {
 
 #[test]
 fn test_str_output_parser_invoke_with_human_message() {
-    // Test StrOutputParser.invoke() with HumanMessage input
     let parser = StrOutputParser::new();
     let message = HumanMessage::builder().content("Hello from human").build();
     let result = parser.invoke(BaseMessage::Human(message), None).unwrap();
@@ -72,7 +65,6 @@ fn test_str_output_parser_invoke_with_human_message() {
 
 #[tokio::test]
 async fn test_str_output_parser_ainvoke_with_message() {
-    // Test StrOutputParser.ainvoke() with AIMessage input
     let parser = StrOutputParser::new();
     let message = AIMessage::builder().content("Async hello from AI").build();
     let result = parser
@@ -84,7 +76,6 @@ async fn test_str_output_parser_ainvoke_with_message() {
 
 #[test]
 fn test_str_output_parser_parse_result_with_generation() {
-    // Test StrOutputParser.parse_result() with Generation
     let parser = StrOutputParser::new();
     let generation = Generation::new("Generated text");
     let result = parser.parse_result(&[generation], false).unwrap();
@@ -93,11 +84,9 @@ fn test_str_output_parser_parse_result_with_generation() {
 
 #[test]
 fn test_str_output_parser_parse_result_with_chat_generation() {
-    // Test StrOutputParser.parse_result() with ChatGeneration
     let parser = StrOutputParser::new();
     let message = AIMessage::builder().content("Chat generated text").build();
     let chat_generation = ChatGeneration::new(BaseMessage::AI(message));
-    // ChatGeneration has a `text` field that holds the content
     let generation = Generation::new(&chat_generation.text);
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result, "Chat generated text");
@@ -105,7 +94,6 @@ fn test_str_output_parser_parse_result_with_chat_generation() {
 
 #[tokio::test]
 async fn test_str_output_parser_transform_string_chunks() {
-    // Test StrOutputParser.transform() with string chunks
     let parser = StrOutputParser::new();
     let chunks = vec!["Hello", " ", "world", "!"];
 
@@ -122,7 +110,6 @@ async fn test_str_output_parser_transform_string_chunks() {
 
 #[tokio::test]
 async fn test_str_output_parser_transform_message_chunks() {
-    // Test StrOutputParser.transform() with message chunks
     let parser = StrOutputParser::new();
     let chunks = vec![
         BaseMessageChunk::AI(AIMessageChunk::builder().content("Hello").build()),
@@ -143,7 +130,6 @@ async fn test_str_output_parser_transform_message_chunks() {
 
 #[tokio::test]
 async fn test_str_output_parser_atransform_string_chunks() {
-    // Test StrOutputParser.atransform() with string chunks
     let parser = StrOutputParser::new();
     let chunks = vec!["Async", " ", "test"];
 
@@ -159,7 +145,6 @@ async fn test_str_output_parser_atransform_string_chunks() {
 
 #[tokio::test]
 async fn test_str_output_parser_atransform_message_chunks() {
-    // Test StrOutputParser.atransform() with message chunks
     let parser = StrOutputParser::new();
     let chunks = vec![
         BaseMessageChunk::AI(AIMessageChunk::builder().content("Async").build()),
@@ -179,12 +164,10 @@ async fn test_str_output_parser_atransform_message_chunks() {
 
 #[tokio::test]
 async fn test_str_output_parser_with_model_chain() {
-    // Test StrOutputParser chained with a model
     let model =
         GenericFakeChatModel::from_vec(vec![AIMessage::builder().content("Model output").build()]);
     let parser = StrOutputParser::new();
 
-    // Simulate chaining: model | parser
     let model_output = model
         ._generate(
             vec![BaseMessage::Human(
@@ -204,13 +187,11 @@ async fn test_str_output_parser_with_model_chain() {
 
 #[tokio::test]
 async fn test_str_output_parser_with_model_stream() {
-    // Test StrOutputParser streaming with a model
     let model = GenericFakeChatModel::from_vec(vec![
         AIMessage::builder().content("Streaming output").build(),
     ]);
     let parser = StrOutputParser::new();
 
-    // Simulate streaming: model.stream() | parser
     let stream = model
         ._stream(
             vec![BaseMessage::Human(
@@ -221,7 +202,6 @@ async fn test_str_output_parser_with_model_stream() {
         )
         .unwrap();
 
-    // The model splits by whitespace
     let chunks: Vec<String> = stream
         .filter_map(|chunk| async {
             chunk
@@ -236,7 +216,6 @@ async fn test_str_output_parser_with_model_stream() {
 
 #[test]
 fn test_str_output_parser_with_empty_content() {
-    // Test StrOutputParser with message containing empty content
     let parser = StrOutputParser::new();
     let message = AIMessage::builder().content("").build();
     let result = parser.invoke(BaseMessage::AI(message), None).unwrap();
@@ -245,7 +224,6 @@ fn test_str_output_parser_with_empty_content() {
 
 #[test]
 fn test_str_output_parser_with_whitespace_only() {
-    // Test StrOutputParser with whitespace-only content
     let parser = StrOutputParser::new();
     let text = "   \n\t  ";
     assert_eq!(parser.parse(text).unwrap(), text);
@@ -253,7 +231,6 @@ fn test_str_output_parser_with_whitespace_only() {
 
 #[test]
 fn test_str_output_parser_preserves_formatting() {
-    // Test StrOutputParser preserves text formatting
     let parser = StrOutputParser::new();
     let text = "
     This is a formatted text
@@ -265,7 +242,6 @@ fn test_str_output_parser_preserves_formatting() {
 
 #[test]
 fn test_str_output_parser_with_code_block() {
-    // Test StrOutputParser with code block content
     let parser = StrOutputParser::new();
     let text = "```python
 def hello():
@@ -276,39 +252,32 @@ def hello():
 
 #[test]
 fn test_str_output_parser_with_json_string() {
-    // Test StrOutputParser with JSON string (should not parse it)
     let parser = StrOutputParser::new();
     let text = r#"{"key": "value", "number": 42}"#;
-    // StrOutputParser should return the string as-is, not parse JSON
     assert_eq!(parser.parse(text).unwrap(), text);
 }
 
 #[test]
 fn test_str_output_parser_with_xml_string() {
-    // Test StrOutputParser with XML string (should not parse it)
     let parser = StrOutputParser::new();
     let text = "<root><child>value</child></root>";
-    // StrOutputParser should return the string as-is, not parse XML
     assert_eq!(parser.parse(text).unwrap(), text);
 }
 
 #[test]
 fn test_str_output_parser_multiple_generations() {
-    // Test StrOutputParser.parse_result() uses only first generation
     let parser = StrOutputParser::new();
     let generations = vec![
         Generation::new("First generation"),
         Generation::new("Second generation"),
         Generation::new("Third generation"),
     ];
-    // Should only use the first generation
     let result = parser.parse_result(&generations, false).unwrap();
     assert_eq!(result, "First generation");
 }
 
 #[tokio::test]
 async fn test_str_output_parser_aparse() {
-    // Test StrOutputParser.aparse() method
     let parser = StrOutputParser::new();
     let text = "Async parse test";
     let result = parser.aparse(text).await.unwrap();
@@ -317,7 +286,6 @@ async fn test_str_output_parser_aparse() {
 
 #[test]
 fn test_str_output_parser_with_long_text() {
-    // Test StrOutputParser with long text
     let parser = StrOutputParser::new();
     let text = "A".repeat(10000); // 10k characters
     assert_eq!(parser.parse(&text).unwrap(), text);
@@ -326,7 +294,6 @@ fn test_str_output_parser_with_long_text() {
 
 #[tokio::test]
 async fn test_str_output_parser_transform_empty_iterator() {
-    // Test StrOutputParser.transform() with empty iterator
     let parser = StrOutputParser::new();
 
     let input_stream = futures::stream::iter(Vec::<BaseMessage>::new());
@@ -341,7 +308,6 @@ async fn test_str_output_parser_transform_empty_iterator() {
 
 #[tokio::test]
 async fn test_str_output_parser_atransform_empty_iterator() {
-    // Test StrOutputParser.atransform() with empty iterator
     let parser = StrOutputParser::new();
 
     let input_stream = futures::stream::iter(Vec::<BaseMessage>::new());

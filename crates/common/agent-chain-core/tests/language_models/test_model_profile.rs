@@ -10,7 +10,6 @@ mod model_profile_tests {
     #[test]
     fn test_model_profile_all_fields() {
         let profile = ModelProfile {
-            // Input constraints
             max_input_tokens: Some(128000),
             image_inputs: Some(true),
             image_url_inputs: Some(true),
@@ -20,18 +19,15 @@ mod model_profile_tests {
             image_tool_message: Some(true),
             pdf_tool_message: Some(false),
 
-            // Output constraints
             max_output_tokens: Some(4096),
             reasoning_output: Some(true),
             image_outputs: Some(false),
             audio_outputs: Some(true),
             video_outputs: Some(false),
 
-            // Tool calling
             tool_calling: Some(true),
             tool_choice: Some(true),
 
-            // Structured output
             structured_output: Some(true),
         };
 
@@ -297,16 +293,13 @@ mod test_model_profile_registry {
             },
         );
 
-        // Test get with existing key
         let profile = registry.get("model-a");
         assert!(profile.is_some());
         assert_eq!(profile.unwrap().max_input_tokens, Some(1000));
 
-        // Test get with missing key
         let missing = registry.get("model-c");
         assert!(missing.is_none());
 
-        // Test get with default value
         let default_profile = ModelProfile {
             max_input_tokens: Some(0),
             ..Default::default()
@@ -368,7 +361,6 @@ mod test_model_profile_registry {
             },
         );
 
-        // Add new model
         registry.insert(
             "model-b".to_string(),
             ModelProfile {
@@ -380,7 +372,6 @@ mod test_model_profile_registry {
         assert_eq!(registry.len(), 2);
         assert_eq!(registry.get("model-b").unwrap().tool_calling, Some(true));
 
-        // Update existing model
         registry.insert(
             "model-a".to_string(),
             ModelProfile {

@@ -93,7 +93,6 @@ impl ImagePromptTemplate {
     ///
     /// A new ImagePromptTemplate, or an error if validation fails.
     pub fn new(template: HashMap<String, String>, input_variables: Vec<String>) -> Result<Self> {
-        // Validate that input_variables don't contain reserved names
         let reserved = ["url", "path", "detail"];
         let overlap: Vec<_> = input_variables
             .iter()
@@ -153,14 +152,12 @@ impl ImagePromptTemplate {
             formatted.insert(key.clone(), formatted_value);
         }
 
-        // Get or apply URL from kwargs
         let url = merged_kwargs
             .get("url")
             .cloned()
             .or_else(|| formatted.get("url").cloned())
             .ok_or_else(|| Error::InvalidConfig("Must provide url.".to_string()))?;
 
-        // Get detail if present
         let detail = merged_kwargs
             .get("detail")
             .cloned()

@@ -12,10 +12,6 @@ use agent_chain_core::outputs::ChatGeneration;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /// Create a ChatGeneration with tool calls in additional_kwargs (legacy path).
 fn make_additional_kwargs_generation(tool_calls: Value) -> ChatGeneration {
     let mut additional_kwargs = HashMap::new();
@@ -49,10 +45,6 @@ fn make_tool_call(id: &str, name: &str, args: Value) -> agent_chain_core::messag
         call_type: None,
     }
 }
-
-// ---------------------------------------------------------------------------
-// Test: JsonOutputToolsParser parse_result with additional_kwargs
-// ---------------------------------------------------------------------------
 
 /// Ported from: test_json_output_key_tools_parser_multiple_tools_first_only
 /// (additional_kwargs variant)
@@ -109,10 +101,6 @@ fn test_json_output_tools_parser_return_id_additional_kwargs() {
     assert_eq!(result, expected);
 }
 
-// ---------------------------------------------------------------------------
-// Test: JsonOutputToolsParser parse_result with tool_calls
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_json_output_tools_parser_tool_calls() {
     let tool_calls = vec![make_tool_call(
@@ -158,10 +146,6 @@ fn test_json_output_tools_parser_return_id_tool_calls() {
     assert_eq!(result, expected);
 }
 
-// ---------------------------------------------------------------------------
-// Test: JsonOutputKeyToolsParser (additional_kwargs variant)
-// ---------------------------------------------------------------------------
-
 /// Ported from: test_partial_json_output_key_parser (additional_kwargs variant)
 #[test]
 fn test_json_output_key_tools_parser_additional_kwargs() {
@@ -206,10 +190,6 @@ fn test_json_output_key_tools_parser_first_only_additional_kwargs() {
     assert_eq!(result, expected);
 }
 
-// ---------------------------------------------------------------------------
-// Test: JsonOutputKeyToolsParser (tool_calls variant)
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_json_output_key_tools_parser_tool_calls() {
     let tool_calls = vec![make_tool_call(
@@ -242,11 +222,6 @@ fn test_json_output_key_tools_parser_first_only_tool_calls() {
     assert_eq!(result, expected);
 }
 
-// ---------------------------------------------------------------------------
-// Test: test_json_output_key_tools_parser_multiple_tools_first_only
-// Ported from Python test of the same name.
-// ---------------------------------------------------------------------------
-
 fn run_multiple_tools_first_only_test(use_tool_calls: bool) {
     let generation = if use_tool_calls {
         make_tool_calls_generation(vec![
@@ -270,7 +245,6 @@ fn run_multiple_tools_first_only_test(use_tool_calls: bool) {
 
     let result = vec![generation];
 
-    // Test with return_id=true
     let parser = JsonOutputKeyToolsParser::new("func")
         .with_first_tool_only(true)
         .with_return_id(true);
@@ -281,7 +255,6 @@ fn run_multiple_tools_first_only_test(use_tool_calls: bool) {
     assert_eq!(output["args"], json!({"a": 1}));
     assert!(output.get("id").is_some());
 
-    // Test with return_id=false
     let parser_no_id = JsonOutputKeyToolsParser::new("func")
         .with_first_tool_only(true)
         .with_return_id(false);
@@ -299,10 +272,6 @@ fn test_json_output_key_tools_parser_multiple_tools_first_only_additional_kwargs
 fn test_json_output_key_tools_parser_multiple_tools_first_only_tool_calls() {
     run_multiple_tools_first_only_test(true);
 }
-
-// ---------------------------------------------------------------------------
-// Test: test_json_output_key_tools_parser_multiple_tools_no_match
-// ---------------------------------------------------------------------------
 
 fn run_multiple_tools_no_match_test(use_tool_calls: bool) {
     let generation = if use_tool_calls {
@@ -327,14 +296,12 @@ fn run_multiple_tools_no_match_test(use_tool_calls: bool) {
 
     let result = vec![generation];
 
-    // Test with return_id=true, first_tool_only=true
     let parser = JsonOutputKeyToolsParser::new("nonexistent")
         .with_first_tool_only(true)
         .with_return_id(true);
     let output = parser.parse_result(&result, false).unwrap();
     assert!(output.is_null());
 
-    // Test with return_id=false, first_tool_only=true
     let parser_no_id = JsonOutputKeyToolsParser::new("nonexistent")
         .with_first_tool_only(true)
         .with_return_id(false);
@@ -351,10 +318,6 @@ fn test_json_output_key_tools_parser_multiple_tools_no_match_additional_kwargs()
 fn test_json_output_key_tools_parser_multiple_tools_no_match_tool_calls() {
     run_multiple_tools_no_match_test(true);
 }
-
-// ---------------------------------------------------------------------------
-// Test: test_json_output_key_tools_parser_multiple_matching_tools
-// ---------------------------------------------------------------------------
 
 fn run_multiple_matching_tools_test(use_tool_calls: bool) {
     let generation = if use_tool_calls {
@@ -385,7 +348,6 @@ fn run_multiple_matching_tools_test(use_tool_calls: bool) {
 
     let result = vec![generation];
 
-    // Test with first_tool_only=true - should return first matching
     let parser = JsonOutputKeyToolsParser::new("func")
         .with_first_tool_only(true)
         .with_return_id(true);
@@ -395,7 +357,6 @@ fn run_multiple_matching_tools_test(use_tool_calls: bool) {
     assert_eq!(output["type"], "func");
     assert_eq!(output["args"], json!({"a": 1}));
 
-    // Test with first_tool_only=false - should return all matching
     let parser_all = JsonOutputKeyToolsParser::new("func")
         .with_first_tool_only(false)
         .with_return_id(true);
@@ -417,10 +378,6 @@ fn test_json_output_key_tools_parser_multiple_matching_tools_tool_calls() {
     run_multiple_matching_tools_test(true);
 }
 
-// ---------------------------------------------------------------------------
-// Test: test_json_output_key_tools_parser_empty_results
-// ---------------------------------------------------------------------------
-
 fn run_empty_results_test(use_tool_calls: bool) {
     let generation = if use_tool_calls {
         make_tool_calls_generation(vec![])
@@ -430,14 +387,12 @@ fn run_empty_results_test(use_tool_calls: bool) {
 
     let result = vec![generation];
 
-    // Test with first_tool_only=true
     let parser = JsonOutputKeyToolsParser::new("func")
         .with_first_tool_only(true)
         .with_return_id(true);
     let output = parser.parse_result(&result, false).unwrap();
     assert!(output.is_null());
 
-    // Test with first_tool_only=false
     let parser_all = JsonOutputKeyToolsParser::new("func")
         .with_first_tool_only(false)
         .with_return_id(true);
@@ -454,10 +409,6 @@ fn test_json_output_key_tools_parser_empty_results_additional_kwargs() {
 fn test_json_output_key_tools_parser_empty_results_tool_calls() {
     run_empty_results_test(true);
 }
-
-// ---------------------------------------------------------------------------
-// Test: test_json_output_key_tools_parser_parameter_combinations
-// ---------------------------------------------------------------------------
 
 fn run_parameter_combinations_test(use_tool_calls: bool) {
     let generation = if use_tool_calls {
@@ -488,7 +439,6 @@ fn run_parameter_combinations_test(use_tool_calls: bool) {
 
     let result = vec![generation];
 
-    // Test: first_tool_only=true, return_id=true
     let parser1 = JsonOutputKeyToolsParser::new("func")
         .with_first_tool_only(true)
         .with_return_id(true);
@@ -497,14 +447,12 @@ fn run_parameter_combinations_test(use_tool_calls: bool) {
     assert_eq!(output1["args"], json!({"a": 1}));
     assert!(output1.get("id").is_some());
 
-    // Test: first_tool_only=true, return_id=false
     let parser2 = JsonOutputKeyToolsParser::new("func")
         .with_first_tool_only(true)
         .with_return_id(false);
     let output2 = parser2.parse_result(&result, false).unwrap();
     assert_eq!(output2, json!({"a": 1}));
 
-    // Test: first_tool_only=false, return_id=true
     let parser3 = JsonOutputKeyToolsParser::new("func")
         .with_first_tool_only(false)
         .with_return_id(true);
@@ -515,7 +463,6 @@ fn run_parameter_combinations_test(use_tool_calls: bool) {
     assert_eq!(arr3[0]["args"], json!({"a": 1}));
     assert_eq!(arr3[1]["args"], json!({"a": 3}));
 
-    // Test: first_tool_only=false, return_id=false
     let parser4 = JsonOutputKeyToolsParser::new("func")
         .with_first_tool_only(false)
         .with_return_id(false);
@@ -532,10 +479,6 @@ fn test_json_output_key_tools_parser_parameter_combinations_additional_kwargs() 
 fn test_json_output_key_tools_parser_parameter_combinations_tool_calls() {
     run_parameter_combinations_test(true);
 }
-
-// ---------------------------------------------------------------------------
-// Test: PydanticToolsParser
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 struct Person {
@@ -668,7 +611,6 @@ fn run_pydantic_optional_fields_test(use_tool_calls: bool) {
 
     let parser = PydanticToolsParser::new(vec![], false).with_tool::<User>("User");
 
-    // Test with all fields provided
     let generation_full = if use_tool_calls {
         make_tool_calls_generation(vec![make_tool_call(
             "call_user_full",
@@ -701,7 +643,6 @@ fn run_pydantic_optional_fields_test(use_tool_calls: bool) {
     assert_eq!(user.bio, Some("Software developer".to_string()));
     assert_eq!(user.age, Some(28));
 
-    // Test with only required fields
     let generation_minimal = if use_tool_calls {
         make_tool_calls_generation(vec![make_tool_call(
             "call_user_minimal",
@@ -759,7 +700,6 @@ fn run_pydantic_mixed_tools_test(use_tool_calls: bool) {
         .with_tool::<Weather>("Weather")
         .with_tool::<Location>("Location");
 
-    // Test with Weather
     let generation_weather = if use_tool_calls {
         make_tool_calls_generation(vec![make_tool_call(
             "call_weather",
@@ -784,7 +724,6 @@ fn run_pydantic_mixed_tools_test(use_tool_calls: bool) {
     assert_eq!(weather.temperature, 25);
     assert_eq!(weather.conditions, "sunny");
 
-    // Test with Location
     let generation_location = if use_tool_calls {
         make_tool_calls_generation(vec![make_tool_call(
             "call_location",
@@ -809,7 +748,6 @@ fn run_pydantic_mixed_tools_test(use_tool_calls: bool) {
     assert_eq!(location.city, "Paris");
     assert_eq!(location.country, "France");
 
-    // Test with both in one message
     let generation_mixed = if use_tool_calls {
         make_tool_calls_generation(vec![
             make_tool_call(
@@ -899,7 +837,6 @@ fn test_pydantic_tools_parser_with_custom_title() {
         description: String,
     }
 
-    // Register with a custom name (equivalent to model_config title)
     let parser =
         PydanticToolsParser::new(vec![], false).with_tool::<CustomTitleTool>("MyCustomToolName");
 
@@ -924,7 +861,6 @@ fn test_pydantic_tools_parser_with_custom_title() {
 fn test_pydantic_tools_parser_validation_error() {
     let parser = PydanticToolsParser::new(vec![], true).with_tool::<NameCollector>("NameCollector");
 
-    // Missing required "person" field - should fail validation
     let generation = make_tool_calls_generation(vec![make_tool_call(
         "call_OwL7f5PE",
         "NameCollector",
@@ -1005,10 +941,6 @@ fn test_pydantic_tools_parser_nested_models_mixed_in_one_message() {
     assert!((location.coordinates.latitude - 37.8199).abs() < 0.0001);
 }
 
-// ---------------------------------------------------------------------------
-// Test: parse_tool_call function
-// ---------------------------------------------------------------------------
-
 /// Ported from: test_parse_tool_call_with_none_arguments
 #[test]
 fn test_parse_tool_call_with_none_arguments() {
@@ -1077,7 +1009,6 @@ fn test_parse_tool_call_partial_mode_with_none_arguments() {
 
     let result = parse_tool_call(&raw_tool_call, true, false, true).unwrap();
 
-    // In partial mode, None arguments returns None (incomplete tool call)
     assert!(result.is_none());
 }
 
@@ -1131,16 +1062,8 @@ fn test_parse_tool_call_partial_mode_with_partial_json() {
     });
 
     let result = parse_tool_call(&raw_tool_call, true, false, true).unwrap();
-    // Partial JSON should be parseable by parse_partial_json
-    // "{\"na" may or may not parse depending on the partial parser
-    // The important thing is it doesn't error
-    // The result may be None or Some depending on parse_partial_json behavior
     let _ = result;
 }
-
-// ---------------------------------------------------------------------------
-// Test: PydanticToolsParser first_tool_only
-// ---------------------------------------------------------------------------
 
 /// Ported from: test_partial_pydantic_output_parser (non-streaming version)
 #[test]
@@ -1158,7 +1081,6 @@ fn test_pydantic_tools_parser_first_tool_only() {
 
     let result = parser.parse_result(&[generation], false).unwrap();
 
-    // first_tool_only returns a single object, not an array
     assert!(result.is_object());
 
     let collector: NameCollector = serde_json::from_value(result).unwrap();
@@ -1190,10 +1112,6 @@ fn test_pydantic_tools_parser_empty_list() {
     assert_eq!(result, json!([]));
 }
 
-// ---------------------------------------------------------------------------
-// Test: JsonOutputToolsParser first_tool_only
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_json_output_tools_parser_first_tool_only() {
     let parser = JsonOutputToolsParser::new().with_first_tool_only(true);
@@ -1220,10 +1138,6 @@ fn test_json_output_tools_parser_first_tool_only_empty() {
     assert!(result.is_null());
 }
 
-// ---------------------------------------------------------------------------
-// Test: JsonOutputToolsParser with no tool_calls and no additional_kwargs
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_json_output_tools_parser_no_tool_calls_no_kwargs() {
     let message = AIMessage::builder().content("Hello").build();
@@ -1234,10 +1148,6 @@ fn test_json_output_tools_parser_no_tool_calls_no_kwargs() {
 
     assert_eq!(result, json!([]));
 }
-
-// ---------------------------------------------------------------------------
-// Test: parse_tool_calls (list version)
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_parse_tool_calls_multiple() {

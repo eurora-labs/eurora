@@ -29,10 +29,8 @@ pub fn convert_from_v1_to_ollama(content: &[serde_json::Value]) -> Vec<serde_jso
                     }));
                 }
             }
-            // Ollama doesn't take reasoning back in
             "reasoning" => {}
             "image" => {
-                // Already handled in _get_image_from_data_content_block
                 new_content.push(block.clone());
             }
             "non_standard" => {
@@ -45,7 +43,6 @@ pub fn convert_from_v1_to_ollama(content: &[serde_json::Value]) -> Vec<serde_jso
                     "text": value,
                 }));
             }
-            // TODO: AudioContentBlock, FileContentBlock once models support
             _ => {}
         }
     }

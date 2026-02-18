@@ -26,7 +26,6 @@ fn polling_focus_switch() {
 
     info!("Starting polling focus switch test");
 
-    // Spawn first window
     let win_a = match spawn_window("WinA") {
         Ok(child) => child,
         Err(e) => {
@@ -35,7 +34,6 @@ fn polling_focus_switch() {
         }
     };
 
-    // Focus the first window
     let mut win_a_mut = win_a;
     if let Err(e) = focus_window(&mut win_a_mut) {
         info!("Failed to focus WinA: {}", e);
@@ -43,7 +41,6 @@ fn polling_focus_switch() {
         return;
     }
 
-    // Wait for focus to settle and verify
     std::thread::sleep(Duration::from_millis(500));
     let focused = get_focused_window();
     info!(
@@ -51,7 +48,6 @@ fn polling_focus_switch() {
         focused.window_title
     );
 
-    // Check if WinA is focused (allowing for partial matches)
     let win_a_focused = focused
         .window_title
         .as_deref()
@@ -62,7 +58,6 @@ fn polling_focus_switch() {
         info!("WinA not focused as expected, but continuing test");
     }
 
-    // Spawn second window
     let win_b = match spawn_window("WinB") {
         Ok(child) => child,
         Err(e) => {
@@ -72,7 +67,6 @@ fn polling_focus_switch() {
         }
     };
 
-    // Focus the second window
     let mut win_b_mut = win_b;
     if let Err(e) = focus_window(&mut win_b_mut) {
         info!("Failed to focus WinB: {}", e);
@@ -81,14 +75,12 @@ fn polling_focus_switch() {
         return;
     }
 
-    // Wait for focus change and verify
     let found_focus = wait_for_focus("WinB", Duration::from_secs(2));
     info!("Found expected focus for WinB: {}", found_focus);
 
     let final_focused = get_focused_window();
     info!("Final focused window: {:?}", final_focused.window_title);
 
-    // Verify final state
     let win_b_focused = final_focused
         .window_title
         .as_deref()
@@ -101,7 +93,6 @@ fn polling_focus_switch() {
         info!("⚠ Polling focus switch test: WinB not focused as expected");
     }
 
-    // Cleanup
     cleanup(win_a_mut, win_b_mut);
 }
 
@@ -129,10 +120,8 @@ fn event_mode_focus_switch() {
     };
     let receiver = subscription.receiver();
 
-    // Give the subscription time to start
     std::thread::sleep(Duration::from_millis(500));
 
-    // Spawn first window
     let win_a = match spawn_window("EventWinA") {
         Ok(child) => child,
         Err(e) => {
@@ -141,7 +130,6 @@ fn event_mode_focus_switch() {
         }
     };
 
-    // Focus the first window
     let mut win_a_mut = win_a;
     if let Err(e) = focus_window(&mut win_a_mut) {
         info!("Failed to focus EventWinA: {}", e);
@@ -149,10 +137,8 @@ fn event_mode_focus_switch() {
         return;
     }
 
-    // Wait for first focus event
     std::thread::sleep(Duration::from_millis(500));
 
-    // Spawn second window
     let win_b = match spawn_window("EventWinB") {
         Ok(child) => child,
         Err(e) => {
@@ -162,7 +148,6 @@ fn event_mode_focus_switch() {
         }
     };
 
-    // Focus the second window
     let mut win_b_mut = win_b;
     if let Err(e) = focus_window(&mut win_b_mut) {
         info!("Failed to focus EventWinB: {}", e);
@@ -171,7 +156,6 @@ fn event_mode_focus_switch() {
         return;
     }
 
-    // Collect focus events with timeout
     let mut events = Vec::new();
     let timeout = Duration::from_secs(3);
     let start = std::time::Instant::now();
@@ -182,9 +166,7 @@ fn event_mode_focus_switch() {
                 info!("Received focus event: {:?}", event.window_title);
                 events.push(event);
             }
-            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                // Continue waiting
-            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                 info!("Focus event channel disconnected");
                 break;
@@ -194,7 +176,6 @@ fn event_mode_focus_switch() {
 
     info!("Collected {} focus events", events.len());
 
-    // Check if we got events for both windows
     let has_win_a = events.iter().any(|e| {
         e.window_title
             .as_deref()
@@ -209,7 +190,6 @@ fn event_mode_focus_switch() {
             .unwrap_or(false)
     });
 
-    // Find the final event with EventWinB
     let final_event_is_win_b = events
         .iter()
         .rev()
@@ -236,7 +216,6 @@ fn event_mode_focus_switch() {
         );
     }
 
-    // Cleanup
     cleanup(win_a_mut, win_b_mut);
 }
 
@@ -255,7 +234,6 @@ fn stress_focus_switch() {
 
     info!("Starting stress focus switch test");
 
-    // Spawn two windows
     let win_a = match spawn_window("StressWinA") {
         Ok(child) => child,
         Err(e) => {
@@ -276,26 +254,21 @@ fn stress_focus_switch() {
     let mut win_a_mut = win_a;
     let mut win_b_mut = win_b;
 
-    // Perform 10 focus switches
     let mut successful_switches = 0;
     for i in 0..10 {
         info!("Focus switch iteration {}", i + 1);
 
-        // Focus window A
         if focus_window(&mut win_a_mut).is_ok() {
             std::thread::sleep(Duration::from_millis(100));
 
-            // Check if focus switched to A
             if wait_for_focus("StressWinA", Duration::from_millis(500)) {
                 successful_switches += 1;
             }
         }
 
-        // Focus window B
         if focus_window(&mut win_b_mut).is_ok() {
             std::thread::sleep(Duration::from_millis(100));
 
-            // Check if focus switched to B
             if wait_for_focus("StressWinB", Duration::from_millis(500)) {
                 successful_switches += 1;
             }
@@ -304,7 +277,6 @@ fn stress_focus_switch() {
 
     info!("Successful focus switches: {}/20", successful_switches);
 
-    // Verify final state - should be StressWinB
     let final_focused = get_focused_window();
     let final_is_correct = final_focused
         .window_title
@@ -322,6 +294,5 @@ fn stress_focus_switch() {
         );
     }
 
-    // Cleanup
     cleanup(win_a_mut, win_b_mut);
 }

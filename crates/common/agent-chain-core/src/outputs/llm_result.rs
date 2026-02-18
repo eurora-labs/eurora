@@ -137,7 +137,6 @@ impl LLMResult {
         let mut llm_results = Vec::new();
 
         for (i, gen_list) in self.generations.iter().enumerate() {
-            // Avoid double counting tokens in OpenAICallback
             if i == 0 {
                 llm_results.push(LLMResult {
                     generations: vec![gen_list.clone()],
@@ -222,7 +221,6 @@ mod tests {
         let flattened = result.flatten();
         assert_eq!(flattened.len(), 2);
 
-        // First result should have the original llm_output
         assert!(flattened[0].llm_output.is_some());
         let first_output = flattened[0].llm_output.as_ref().unwrap();
         assert_eq!(
@@ -230,7 +228,6 @@ mod tests {
             Some(&json!({"total": 100}))
         );
 
-        // Second result should have empty token_usage
         assert!(flattened[1].llm_output.is_some());
         let second_output = flattened[1].llm_output.as_ref().unwrap();
         assert_eq!(second_output.get("token_usage"), Some(&json!({})));

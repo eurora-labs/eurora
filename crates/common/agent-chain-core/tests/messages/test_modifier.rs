@@ -4,10 +4,6 @@
 
 use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage, RemoveMessage};
 
-// ============================================================================
-// TestRemoveMessage
-// ============================================================================
-
 #[test]
 fn test_init_basic() {
     let msg = RemoveMessage::builder().id("msg-to-remove").build();
@@ -96,15 +92,10 @@ fn test_multiple_remove_messages() {
     assert_eq!(msg2.id, "msg-2");
     assert_eq!(msg3.id, "msg-3");
 
-    // All should have empty content
     assert_eq!(msg1.content(), "");
     assert_eq!(msg2.content(), "");
     assert_eq!(msg3.content(), "");
 }
-
-// ============================================================================
-// TestRemoveMessageUseCases
-// ============================================================================
 
 #[test]
 fn test_remove_message_in_list() {
@@ -141,7 +132,6 @@ fn test_remove_message_serialization_in_list() {
         BaseMessage::Remove(RemoveMessage::builder().id("human-1").build()),
     ];
 
-    // Serialize both messages
     let serialized: Vec<serde_json::Value> = messages
         .iter()
         .map(|m| serde_json::to_value(m).unwrap())
@@ -157,7 +147,6 @@ fn test_remove_message_serialization_in_list() {
         "remove"
     );
 
-    // Deserialize both messages
     let deserialized: Vec<BaseMessage> = serialized
         .into_iter()
         .map(|s| serde_json::from_value(s).unwrap())
@@ -172,16 +161,10 @@ fn test_remove_message_serialization_in_list() {
 fn test_remove_message_does_not_modify_content() {
     let msg = RemoveMessage::builder().id("msg-123").build();
 
-    // Content should always be empty string
     assert_eq!(msg.content(), "");
 
-    // content_blocks should be empty
     assert!(msg.content_blocks().is_empty());
 }
-
-// ============================================================================
-// TestRemoveMessage – text, content_blocks, pretty_repr
-// ============================================================================
 
 #[test]
 fn test_text_property_is_empty() {
@@ -207,15 +190,9 @@ fn test_pretty_repr() {
 fn test_pretty_repr_html() {
     let msg = RemoveMessage::builder().id("html-test").build();
     let result = msg.pretty_repr(true);
-    // Should contain the message role header
     assert!(result.contains("Remove Message"));
-    // HTML mode wraps in ANSI bold codes
     assert!(result.contains("\x1b[1m"));
 }
-
-// ============================================================================
-// TestRemoveMessageModelDump (serialization snapshot)
-// ============================================================================
 
 #[test]
 fn test_model_dump_snapshot() {
@@ -223,7 +200,6 @@ fn test_model_dump_snapshot() {
     let dumped = serde_json::to_value(&msg).unwrap();
     let obj = dumped.as_object().unwrap();
 
-    // Verify expected keys are present
     assert!(obj.contains_key("content"));
     assert!(obj.contains_key("id"));
     assert!(obj.contains_key("type"));
@@ -245,10 +221,6 @@ fn test_model_dump_with_name() {
     let obj = dumped.as_object().unwrap();
     assert_eq!(obj["name"].as_str().unwrap(), "marker");
 }
-
-// ============================================================================
-// TestRemoveMessageEquality
-// ============================================================================
 
 #[test]
 fn test_same_id_equal() {

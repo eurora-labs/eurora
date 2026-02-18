@@ -3,7 +3,7 @@ syntax = "proto3";
 package agent_chain;
 
 message ProtoChatRequest {
-  string conversation_id = 1;
+  string thread_id = 1;
   repeated ProtoBaseMessage messages = 2;
   ProtoParameters parameters = 3;
 }

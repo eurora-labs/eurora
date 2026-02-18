@@ -6,10 +6,6 @@ use agent_chain_core::messages::{
     ChatMessage, ChatMessageChunk, ContentBlock, ContentPart, HumanMessageChunk, MessageContent,
 };
 
-// ============================================================================
-// TestChatMessage
-// ============================================================================
-
 #[test]
 fn test_init_basic() {
     let msg = ChatMessage::builder().content("Hello").role("user").build();
@@ -147,7 +143,6 @@ fn test_text_property_list_content() {
         ]))
         .role("user")
         .build();
-    // Rust as_text() joins text parts with spaces (matching existing convention)
     assert_eq!(msg.text(), "Part 1 Part 2");
 }
 
@@ -170,10 +165,6 @@ fn test_pretty_repr() {
     assert!(result.contains("Chat Message"));
     assert!(result.contains("Hello"));
 }
-
-// ============================================================================
-// TestChatMessageChunk
-// ============================================================================
 
 #[test]
 fn test_chunk_init_basic() {
@@ -301,7 +292,6 @@ fn test_chunk_add_with_list_content() {
         .role("user")
         .build();
     let result = chunk1 + chunk2;
-    // Items without 'index' key are appended, not merged
     if let MessageContent::Parts(parts) = &result.content {
         assert_eq!(parts.len(), 2);
     } else {
@@ -324,13 +314,9 @@ fn test_chunk_add_with_list_content_with_index() {
         .role("user")
         .build();
     let result = chunk1 + chunk2;
-    // Items with same 'index' key are merged
     if let MessageContent::Parts(parts) = &result.content {
         assert_eq!(parts.len(), 1);
         let part_value = serde_json::to_value(&parts[0]).unwrap();
-        // The merged result may be wrapped in a JSON object or may be the
-        // ContentPart::Other variant. Extract the text from whatever structure
-        // the serialized part has.
         let text = part_value
             .get("text")
             .or_else(|| part_value.get("Other").and_then(|o| o.get("text")))
@@ -446,10 +432,6 @@ fn test_chunk_content_blocks_property() {
     }
 }
 
-// ============================================================================
-// TestChatMessageContentBlocksMixedTypes
-// ============================================================================
-
 #[test]
 fn test_content_blocks_with_mixed_list_content() {
     let content = MessageContent::Parts(vec![
@@ -467,15 +449,10 @@ fn test_content_blocks_with_mixed_list_content() {
         panic!("Expected ContentBlock::Text for first block");
     }
     if let ContentBlock::Image(_) = &blocks[1] {
-        // image block parsed correctly
     } else {
         panic!("Expected ContentBlock::Image for second block");
     }
 }
-
-// ============================================================================
-// TestChatMessageModelDump
-// ============================================================================
 
 #[test]
 fn test_model_dump_includes_role() {
@@ -533,10 +510,6 @@ fn test_model_dump_all_fields() {
         "data"
     );
 }
-
-// ============================================================================
-// TestChatMessageChunkAddMultiple
-// ============================================================================
 
 #[test]
 fn test_add_multiple_chat_chunks_chained() {
@@ -622,17 +595,12 @@ fn test_add_accumulates_additional_kwargs() {
     );
 }
 
-// ============================================================================
-// TestChatMessagePrettyReprHtml
-// ============================================================================
-
 #[test]
 fn test_pretty_repr_html_true() {
     let msg = ChatMessage::builder().content("Hello").role("user").build();
     let result = msg.pretty_repr(true);
     assert!(result.contains("Chat Message"));
     assert!(result.contains("Hello"));
-    // When html=true, bold=true is passed, which wraps title in ANSI bold codes
     assert!(result.contains("\x1b[1m"));
 }
 
@@ -643,13 +611,8 @@ fn test_pretty_repr_html_false() {
     let result_plain = msg.pretty_repr(false);
     assert!(result_html.contains("Hello"));
     assert!(result_plain.contains("Hello"));
-    // Plain text version should NOT contain ANSI bold codes
     assert!(!result_plain.contains("\x1b[1m"));
 }
-
-// ============================================================================
-// TestChatMessageContentBlocksInit
-// ============================================================================
 
 #[test]
 fn test_init_with_content_blocks() {
@@ -676,9 +639,7 @@ fn test_init_with_content_blocks() {
         .content_blocks(blocks)
         .role("user")
         .build();
-    // When content_blocks is provided, it overrides content
     if let MessageContent::Parts(_) = &msg.content {
-        // content_blocks are serialized into Parts
     } else {
         panic!("Expected MessageContent::Parts when content_blocks provided");
     }

@@ -103,7 +103,6 @@ pub fn parse_url_with_auth(url: Option<&str>) -> (Option<String>, Option<HashMap
 
     let password = parsed.password().unwrap_or("");
 
-    // Decode percent-encoding
     let username = percent_encoding::percent_decode_str(username)
         .decode_utf8()
         .map(|s| s.into_owned())
@@ -121,7 +120,6 @@ pub fn parse_url_with_auth(url: Option<&str>) -> (Option<String>, Option<HashMap
         format!("Basic {}", encoded_credentials),
     );
 
-    // Rebuild URL without credentials
     let host = parsed.host_str().unwrap_or("");
     let mut cleaned_url = format!("{}://{}", parsed.scheme(), host);
     if let Some(port) = parsed.port() {

@@ -19,14 +19,12 @@ fn save_icon_to_file(
     icon_data: &image::RgbaImage,
     filename: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Save as PNG
     icon_data.save(filename)?;
     println!("💾 Icon saved: {}", filename);
     Ok(())
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize detailed logging
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG)
         .init();
@@ -51,20 +49,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!();
 
-    // Create focus tracker with custom config
     let tracker = FocusTracker::with_config(config);
 
-    // Create stop signal for controlled shutdown
     let stop_signal = Arc::new(AtomicBool::new(false));
     let stop_signal_clone = stop_signal.clone();
 
-    // Set up Ctrl+C handler
     ctrlc::set_handler(move || {
         println!("\n🛑 Interrupt signal received, initiating graceful shutdown...");
         stop_signal_clone.store(true, Ordering::SeqCst);
     })?;
 
-    // Statistics tracking
     let mut event_count = 0;
     let mut icons_saved = 0;
     let mut unique_processes = std::collections::HashSet::new();
@@ -73,16 +67,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🎯 Focus tracking active! Switch between applications...");
     println!();
 
-    // Start advanced focus tracking with full control
     let result = tracker.track_focus_with_stop(
         |window: FocusedWindow| -> FocusTrackerResult<()> {
             event_count += 1;
 
-            // Extract window information
             let window_title = window.window_title.as_deref().unwrap_or("Unknown");
             let process_name = window.process_name;
 
-            // Track unique processes
             unique_processes.insert(process_name.to_string());
 
             println!("🔄 Focus Event #{}", event_count);
@@ -92,12 +83,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 process_name, window.process_id
             );
 
-            // Advanced icon handling
             if let Some(icon) = window.icon {
                 let (width, height) = (icon.width(), icon.height());
                 println!("   🖼️  Icon: {}x{} pixels", width, height);
 
-                // Save icon with detailed naming
                 icons_saved += 1;
                 let filename = format!(
                     "examples/recorded_icons/advanced_{:03}_{}.png",
@@ -121,7 +110,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &stop_signal,
     );
 
-    // Handle results and show statistics
     match result {
         Ok(_) => println!("✅ Focus tracking completed successfully"),
         Err(e) => println!("❌ Focus tracking error: {}", e),

@@ -551,12 +551,10 @@ fn compute_json_diff(path: &str, prev: &Value, next: &Value, ops: &mut Vec<Value
 /// default. This function preprocesses the input to escape unescaped control
 /// characters inside JSON string values before parsing.
 fn parse_json_lenient(input: &str) -> std::result::Result<Value, String> {
-    // First try standard parsing
     if let Ok(value) = serde_json::from_str::<Value>(input) {
         return Ok(value);
     }
 
-    // If that fails, try escaping control characters inside string values
     let mut result = String::with_capacity(input.len());
     let mut in_string = false;
     let mut prev_was_backslash = false;
@@ -587,7 +585,6 @@ fn parse_json_lenient(input: &str) -> std::result::Result<Value, String> {
                 '\r' => result.push_str("\\r"),
                 '\t' => result.push_str("\\t"),
                 c => {
-                    // Escape other control characters as \uXXXX
                     result.push_str(&format!("\\u{:04x}", c as u32));
                 }
             }
@@ -599,8 +596,6 @@ fn parse_json_lenient(input: &str) -> std::result::Result<Value, String> {
 
     serde_json::from_str::<Value>(&result).map_err(|e| format!("JSON parse error: {}", e))
 }
-
-// --- Trait implementations to integrate with the base parser architecture ---
 
 #[async_trait]
 impl BaseLLMOutputParser for OutputFunctionsParser {

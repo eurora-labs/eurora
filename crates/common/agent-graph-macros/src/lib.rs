@@ -40,13 +40,11 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let _fn_inputs = &input.sig.inputs;
     let fn_return_type = &input.sig.output;
 
-    // Get the actual return type
     let actual_return_type = match fn_return_type {
         ReturnType::Default => quote! { () },
         ReturnType::Type(_, ty) => quote! { #ty },
     };
 
-    // Extract parameter names and types for the wrapper function
     let params: Vec<_> = input
         .sig
         .inputs
@@ -66,7 +64,6 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let param_names: Vec<_> = params.iter().map(|(name, _)| name.clone()).collect();
     let param_types: Vec<_> = params.iter().map(|(_, ty)| ty.clone()).collect();
 
-    // Generate the wrapper that returns TaskFuture
     let expanded = quote! {
         #fn_vis fn #fn_name(#(#param_names: #param_types),*) -> agent_graph::func::TaskFuture<#actual_return_type>
         where
@@ -120,13 +117,11 @@ pub fn entrypoint(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_inputs = &input.sig.inputs;
     let fn_return_type = &input.sig.output;
 
-    // Get the actual return type
     let actual_return_type = match fn_return_type {
         ReturnType::Default => quote! { () },
         ReturnType::Type(_, ty) => quote! { #ty },
     };
 
-    // Extract the first parameter (the input)
     let first_param = input.sig.inputs.first();
     let (input_name, input_type) = if let Some(FnArg::Typed(pat_type)) = first_param {
         if let Pat::Ident(pat_ident) = pat_type.pat.as_ref() {
@@ -140,7 +135,6 @@ pub fn entrypoint(_attr: TokenStream, item: TokenStream) -> TokenStream {
         (quote! { input }, quote! { () })
     };
 
-    // Extract additional parameters (for context/tools)
     let additional_params: Vec<_> = input
         .sig
         .inputs
@@ -165,7 +159,6 @@ pub fn entrypoint(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let additional_param_types: Vec<_> =
         additional_params.iter().map(|(_, ty)| ty.clone()).collect();
 
-    // Generate tuple type for context if there are additional parameters
     let context_type = if additional_params.is_empty() {
         quote! { () }
     } else if additional_params.len() == 1 {
@@ -175,7 +168,6 @@ pub fn entrypoint(_attr: TokenStream, item: TokenStream) -> TokenStream {
         quote! { (#(#additional_param_types),*) }
     };
 
-    // Generate context extraction
     let context_extraction = if additional_params.is_empty() {
         quote! {}
     } else if additional_params.len() == 1 {
@@ -209,7 +201,6 @@ pub fn entrypoint(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     #context_extraction
 
                     let result: #actual_return_type = {
-                        // Re-bind the input parameter for use in the block, preserving mutability
                         let mut #input_name = #input_name;
                         #fn_block
                     };

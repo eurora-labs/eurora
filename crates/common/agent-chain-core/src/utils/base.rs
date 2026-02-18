@@ -418,7 +418,6 @@ pub fn build_model_kwargs(
 ) {
     let mut extra_kwargs = HashMap::new();
 
-    // Extract any existing model_kwargs
     if let Some(existing_extra) = values.remove("model_kwargs")
         && let Some(obj) = existing_extra.as_object()
     {
@@ -427,7 +426,6 @@ pub fn build_model_kwargs(
         }
     }
 
-    // Move unknown fields to extra_kwargs
     let keys: Vec<String> = values.keys().cloned().collect();
     for key in keys {
         if !known_fields.contains(&key)
@@ -492,8 +490,6 @@ impl MockTime {
         minute: u32,
         second: u32,
     ) -> Self {
-        // Simplified calculation - doesn't handle leap years perfectly
-        // This is primarily for testing purposes
         let days_before_month: [u32; 12] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
 
         let year_days = (year - 1970) as u64 * 365
@@ -533,7 +529,6 @@ impl MockTime {
 
 impl Default for MockTime {
     fn default() -> Self {
-        // Default to actual current time
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards");
@@ -719,11 +714,9 @@ mod tests {
         let secs = now_secs();
         let millis = now_millis();
 
-        // Sanity check - timestamp should be reasonable (after 2020)
         assert!(secs > 1577836800);
         assert!(millis > 1577836800000);
 
-        // Millis should be roughly 1000x secs (within a second of drift)
         assert!(millis >= secs * 1000);
         assert!(millis < (secs + 2) * 1000);
     }

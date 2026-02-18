@@ -200,7 +200,6 @@ where
     let runnable_clone = runnable.clone();
     let func = move |args: HashMap<String, Value>| runnable_clone.invoke(args, None);
 
-    // Create a simple schema based on what we know
     let schema = ArgsSchema::JsonSchema(serde_json::json!({
         "type": "object",
         "properties": {},

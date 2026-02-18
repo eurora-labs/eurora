@@ -12,20 +12,12 @@ use agent_chain_core::runnables::passthrough::{RunnableAssign, RunnablePassthrou
 use futures::StreamExt;
 use serde_json::{Value, json};
 
-// ===========================================================================
-// Helper
-// ===========================================================================
-
 fn make_input(pairs: &[(&str, Value)]) -> HashMap<String, Value> {
     pairs
         .iter()
         .map(|(k, v)| (k.to_string(), v.clone()))
         .collect()
 }
-
-// ===========================================================================
-// RunnablePassthrough Tests
-// ===========================================================================
 
 /// Mirrors `test_passthrough_identity`.
 #[test]
@@ -230,7 +222,6 @@ fn test_passthrough_repr() {
 /// Mirrors `test_passthrough_with_none_func`.
 #[test]
 fn test_passthrough_with_none_func() {
-    // RunnablePassthrough::new() creates one without func (equivalent to func=None)
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
     let result = passthrough.invoke(42, None).unwrap();
     assert_eq!(result, 42);
@@ -269,15 +260,10 @@ async fn test_passthrough_transform_with_func() {
         .await;
 
     assert_eq!(result, vec![1, 2, 3]);
-    // func is called once with the last chunk value
     let recorded = calls.lock().unwrap();
     assert_eq!(recorded.len(), 1);
     assert_eq!(recorded[0], 3);
 }
-
-// ===========================================================================
-// RunnableAssign Tests
-// ===========================================================================
 
 /// Mirrors `test_assign_basic`.
 #[test]
@@ -439,7 +425,6 @@ async fn test_assign_stream() {
         .collect()
         .await;
 
-    // Accumulate all chunks
     let mut final_result: HashMap<String, Value> = HashMap::new();
     for chunk in chunks {
         final_result.extend(chunk);
@@ -603,7 +588,6 @@ fn test_assign_direct_instantiation() {
 /// Two sequential assigns: first adds `step1`, second uses `step1` to compute `step2`.
 #[test]
 fn test_assign_nested() {
-    // Step 1: add step1 = value + 1
     let mapper1 = RunnableParallel::<HashMap<String, Value>>::new().add(
         "step1",
         RunnableLambda::new(|x: HashMap<String, Value>| {
@@ -613,7 +597,6 @@ fn test_assign_nested() {
     );
     let assign1 = RunnableAssign::new(mapper1);
 
-    // Step 2: add step2 = step1 * 2
     let mapper2 = RunnableParallel::<HashMap<String, Value>>::new().add(
         "step2",
         RunnableLambda::new(|x: HashMap<String, Value>| {
@@ -659,10 +642,6 @@ fn test_assign_with_parallel() {
     assert_eq!(result["doubled"], json!(10));
     assert_eq!(result["tripled"], json!(15));
 }
-
-// ===========================================================================
-// RunnablePick Tests
-// ===========================================================================
 
 /// Mirrors `test_pick_single_key`.
 #[test]
@@ -872,19 +851,13 @@ fn test_pick_empty_dict() {
     assert!(result.is_err());
 }
 
-// ===========================================================================
-// Integration Tests
-// ===========================================================================
-
 /// Mirrors `test_passthrough_assign_pick_combination`.
 ///
 /// Pipeline: passthrough → assign (add doubled, tripled) → pick (value, doubled).
 #[test]
 fn test_passthrough_assign_pick_combination() {
-    // Step 1: passthrough (identity on HashMap)
     let passthrough: RunnablePassthrough<HashMap<String, Value>> = RunnablePassthrough::new();
 
-    // Step 2: assign doubled and tripled
     let mapper = RunnableParallel::<HashMap<String, Value>>::new()
         .add(
             "doubled",
@@ -902,10 +875,8 @@ fn test_passthrough_assign_pick_combination() {
         );
     let assign = RunnableAssign::new(mapper);
 
-    // Step 3: pick value and doubled
     let pick = RunnablePick::new_multi(vec!["value", "doubled"]);
 
-    // Execute pipeline manually
     let input = make_input(&[("value", json!(5))]);
     let step1 = passthrough.invoke(input, None).unwrap();
     let step2 = assign.invoke(step1, None).unwrap();
@@ -1020,9 +991,7 @@ fn test_assign_mapper_accessor() {
         );
     let assign = RunnableAssign::new(mapper);
 
-    // mapper() should return a reference to the underlying parallel
     let _mapper_ref = assign.mapper();
-    // Just verify it doesn't panic
 }
 
 /// Test Default impl for RunnablePassthrough.
@@ -1048,10 +1017,6 @@ fn test_graph_passthrough() {
     assert_eq!(pt.invoke("hello".into(), None).unwrap(), "hello");
 }
 
-// ===========================================================================
-// Schema tests
-// ===========================================================================
-
 /// Mirrors `test_assign_input_output_schema`.
 ///
 /// Verifies that RunnableAssign produces a merged output schema containing
@@ -1068,11 +1033,9 @@ fn test_assign_input_output_schema() {
     let assign = RunnableAssign::new(mapper);
 
     let input_schema = assign.get_input_schema(None);
-    // Input schema should be an object
     assert_eq!(input_schema["type"], "object");
 
     let output_schema = assign.get_output_schema(None);
-    // Output schema should be an object
     assert_eq!(output_schema["type"], "object");
     assert_eq!(output_schema["title"], "RunnableAssignOutput");
 }
@@ -1107,9 +1070,7 @@ fn test_assign_graph_structure() {
     );
     let assign = RunnableAssign::new(mapper);
 
-    // The assign has a mapper (parallel) that defines the structure
     let _mapper = assign.mapper();
-    // Doesn't panic — structure is accessible
 }
 
 /// Mirrors `test_passthrough_serialization`.
@@ -1120,7 +1081,6 @@ fn test_assign_graph_structure() {
 #[test]
 fn test_passthrough_serialization() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
-    // Should be Debug-printable
     let debug = format!("{:?}", passthrough);
     assert!(debug.contains("RunnablePassthrough"));
 }

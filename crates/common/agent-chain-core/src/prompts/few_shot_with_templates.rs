@@ -350,8 +350,6 @@ impl BasePromptTemplate for FewShotPromptWithTemplates {
                 "Saving an example selector is not currently supported".to_string(),
             ));
         }
-        // Note: Cannot call default save implementation due to recursion.
-        // The save functionality for few-shot prompts with templates is not fully supported.
         Err(Error::InvalidConfig(
             "Saving few-shot prompts with templates is not currently supported".to_string(),
         ))

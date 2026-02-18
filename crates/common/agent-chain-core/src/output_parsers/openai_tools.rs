@@ -63,8 +63,6 @@ pub fn parse_tool_call(
                 )))
             })?
         } else {
-            // Non-strict mode: allow control characters (newlines, tabs, etc.)
-            // inside strings, matching Python's json.loads(s, strict=False).
             parse_partial_json(args_str, false).map_err(|e| {
                 Error::from(OutputParserError::new(format!(
                     "Function {} arguments:\n\n{}\n\nare not valid JSON. Received JSONDecodeError {:?}",
@@ -217,7 +215,6 @@ impl JsonOutputToolsParser {
             }
         };
 
-        // For backwards compatibility: rename "name" to "type"
         let tool_calls: Vec<Value> = tool_calls
             .into_iter()
             .map(|mut tc| {
@@ -329,7 +326,6 @@ impl JsonOutputKeyToolsParser {
             }
         };
 
-        // For backwards compatibility: rename "name" to "type"
         let parsed_tool_calls: Vec<Value> = parsed_tool_calls
             .into_iter()
             .map(|mut tc| {

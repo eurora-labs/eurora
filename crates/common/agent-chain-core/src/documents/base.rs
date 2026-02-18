@@ -7,7 +7,7 @@
 //! - [`Document`]: Text content for retrieval (RAG, vector stores, semantic search)
 //!
 //! These structs are for data processing pipelines, not LLM I/O. For multimodal
-//! content in chat messages (images, audio in conversations), see the `messages`
+//! content in chat messages (images, audio in threads), see the `messages`
 //! module content blocks instead.
 
 use std::collections::HashMap;
@@ -406,7 +406,7 @@ fn guess_mime_type(path: &Path) -> Option<String> {
 /// Class for storing a piece of text and associated metadata.
 ///
 /// [`Document`] is for **retrieval workflows**, not chat I/O. For sending text
-/// to an LLM in a conversation, use message types from the `messages` module.
+/// to an LLM in a thread, use message types from the `messages` module.
 ///
 /// # Example
 ///

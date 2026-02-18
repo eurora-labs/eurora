@@ -1,8 +1,12 @@
 use agent_chain::SystemMessage;
 use agent_chain::openai::BuiltinTool;
 use agent_chain::{
-    BaseChatModel, BaseMessage, HumanMessage, ollama::ChatOllama, openai::ChatOpenAI,
+    AIMessage, BaseChatModel, BaseMessage, BaseTool, HumanMessage, language_models::ToolLike,
+    messages::ToolCall, ollama::ChatOllama, openai::ChatOpenAI,
 };
+use std::collections::HashMap;
+
+use crate::tools::firecrawl_search_tool;
 use be_authz::{extract_claims, parse_user_id};
 use be_local_settings::{OllamaConfig, OpenAIConfig, ProviderSettings, SettingsReceiver};
 use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
@@ -33,23 +37,24 @@ fn resolve_host_url(url: &str) -> String {
         url.to_string()
     }
 }
-use crate::error::ConversationServiceError;
+use crate::error::ThreadServiceError;
 
-use proto_gen::conversation::{
+use proto_gen::thread::{
     AddHiddenHumanMessageRequest, AddHiddenHumanMessageResponse, AddHumanMessageRequest,
     AddHumanMessageResponse, AddSystemMessageRequest, AddSystemMessageResponse, ChatStreamRequest,
-    ChatStreamResponse, Conversation, CreateConversationRequest, CreateConversationResponse,
-    GenerateConversationTitleRequest, GenerateConversationTitleResponse, GetConversationResponse,
-    GetMessagesRequest, GetMessagesResponse, ListConversationsRequest, ListConversationsResponse,
+    ChatStreamResponse, CreateThreadRequest, CreateThreadResponse, GenerateThreadTitleRequest,
+    GenerateThreadTitleResponse, GetMessagesRequest, GetMessagesResponse, GetThreadResponse,
+    ListThreadsRequest, ListThreadsResponse, Thread,
 };
 
-pub use proto_gen::conversation::proto_conversation_service_server::{
-    ProtoConversationService, ProtoConversationServiceServer,
+pub use proto_gen::thread::proto_thread_service_server::{
+    ProtoThreadService, ProtoThreadServiceServer,
 };
 
 struct Providers {
     chat: Arc<dyn BaseChatModel + Send + Sync>,
     title: Arc<dyn BaseChatModel + Send + Sync>,
+    tools: HashMap<String, Arc<dyn BaseTool>>,
 }
 
 fn build_ollama(
@@ -93,6 +98,12 @@ fn build_title_provider_from(settings: &ProviderSettings) -> Box<dyn BaseChatMod
     }
 }
 
+fn build_tool_map() -> HashMap<String, Arc<dyn BaseTool>> {
+    let tool = firecrawl_search_tool();
+    let name = tool.name().to_string();
+    HashMap::from([(name, tool)])
+}
+
 fn build_env_fallback() -> Option<Providers> {
     let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
         .map(|v| v.eq_ignore_ascii_case("true"))
@@ -106,13 +117,21 @@ fn build_env_fallback() -> Option<Providers> {
             Arc::new(ChatOllama::new(&model).base_url(&host));
         let title: Arc<dyn BaseChatModel + Send + Sync> =
             Arc::new(ChatOllama::new(&model).base_url(&host));
-        Some(Providers { chat, title })
+        Some(Providers {
+            chat,
+            title,
+            tools: HashMap::new(),
+        })
     } else {
-        let chat = Arc::new(
+        let chat_model =
             ChatOpenAI::new(std::env::var("NEBUL_MODEL").expect("Nebul model should be set"))
                 .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"))
-                .api_base(BASE_NEBUL_URL), // .with_builtin_tools(vec![BuiltinTool::WebSearch]),
-        );
+                .api_base(BASE_NEBUL_URL);
+        let bound = chat_model
+            .bind_tools(&[ToolLike::Tool(firecrawl_search_tool())], None)
+            .expect("Failed to bind firecrawl_search tool");
+        let chat: Arc<dyn BaseChatModel + Send + Sync> =
+            Arc::from(bound as Box<dyn BaseChatModel + Send + Sync>);
 
         let title = Arc::new(
             ChatOpenAI::new(
@@ -122,20 +141,24 @@ fn build_env_fallback() -> Option<Providers> {
             .api_base(BASE_NEBUL_URL),
         );
 
-        Some(Providers { chat, title })
+        Some(Providers {
+            chat,
+            title,
+            tools: build_tool_map(),
+        })
     }
 }
 
-pub struct ConversationService {
+pub struct ThreadService {
     db: Arc<DatabaseManager>,
     providers: Arc<RwLock<Option<Providers>>>,
 }
 
-impl ConversationService {
+impl ThreadService {
     pub fn new(db: Arc<DatabaseManager>, mut settings_rx: SettingsReceiver) -> Self {
         let env_fallback = build_env_fallback();
         info!(
-            "Creating new ConversationService instance (env fallback: {})",
+            "Creating new ThreadService instance (env fallback: {})",
             env_fallback.is_some()
         );
 
@@ -144,6 +167,7 @@ impl ConversationService {
             .map(|s| Providers {
                 chat: build_chat_provider_from(&s).into(),
                 title: build_title_provider_from(&s).into(),
+                tools: build_tool_map(),
             })
             .or(env_fallback);
 
@@ -162,6 +186,7 @@ impl ConversationService {
                     Providers {
                         chat: build_chat_provider_from(&s).into(),
                         title: build_title_provider_from(&s).into(),
+                        tools: build_tool_map(),
                     }
                 });
                 let mut lock = providers_handle.write().unwrap_or_else(|e| e.into_inner());
@@ -190,13 +215,18 @@ impl ConversationService {
         })
     }
 
-    fn db_conversation_to_proto(conversation: be_remote_db::Conversation) -> Conversation {
-        Conversation {
-            id: conversation.id.to_string(),
-            user_id: conversation.user_id.to_string(),
-            title: conversation.title.clone().unwrap_or_default(),
-            created_at: Some(datetime_to_timestamp(conversation.created_at)),
-            updated_at: Some(datetime_to_timestamp(conversation.updated_at)),
+    fn get_tools(&self) -> HashMap<String, Arc<dyn BaseTool>> {
+        let lock = self.providers.read().unwrap_or_else(|e| e.into_inner());
+        lock.as_ref().map(|p| p.tools.clone()).unwrap_or_default()
+    }
+
+    fn db_thread_to_proto(thread: be_remote_db::Thread) -> Thread {
+        Thread {
+            id: thread.id.to_string(),
+            user_id: thread.user_id.to_string(),
+            title: thread.title.clone().unwrap_or_default(),
+            created_at: Some(datetime_to_timestamp(thread.created_at)),
+            updated_at: Some(datetime_to_timestamp(thread.updated_at)),
         }
     }
 }
@@ -212,14 +242,14 @@ type ChatResult<T> = Result<Response<T>, Status>;
 type ChatStreamResult = Pin<Box<dyn Stream<Item = Result<ChatStreamResponse, Status>> + Send>>;
 
 #[tonic::async_trait]
-impl ProtoConversationService for ConversationService {
+impl ProtoThreadService for ThreadService {
     type ChatStreamStream = ChatStreamResult;
 
-    async fn create_conversation(
+    async fn create_thread(
         &self,
-        request: Request<CreateConversationRequest>,
-    ) -> Result<Response<CreateConversationResponse>, Status> {
-        info!("CreateConversation request received");
+        request: Request<CreateThreadRequest>,
+    ) -> Result<Response<CreateThreadResponse>, Status> {
+        info!("CreateThread request received");
 
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
@@ -232,39 +262,36 @@ impl ProtoConversationService for ConversationService {
             req.title
         };
 
-        let conversation = self
+        let thread = self
             .db
-            .create_conversation()
+            .create_thread()
             .user_id(user_id)
             .title(title)
             .call()
             .await
-            .map_err(ConversationServiceError::from)?;
+            .map_err(ThreadServiceError::from)?;
 
-        info!(
-            "Created conversation {} for user {}",
-            conversation.id, user_id
-        );
+        info!("Created thread {} for user {}", thread.id, user_id);
 
-        Ok(Response::new(CreateConversationResponse {
-            conversation: Some(Self::db_conversation_to_proto(conversation)),
+        Ok(Response::new(CreateThreadResponse {
+            thread: Some(Self::db_thread_to_proto(thread)),
         }))
     }
 
-    async fn list_conversations(
+    async fn list_threads(
         &self,
-        request: Request<ListConversationsRequest>,
-    ) -> Result<Response<ListConversationsResponse>, Status> {
-        info!("ListConversations request received");
+        request: Request<ListThreadsRequest>,
+    ) -> Result<Response<ListThreadsResponse>, Status> {
+        info!("ListThreads request received");
 
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
 
-        let conversations = self
+        let threads = self
             .db
-            .list_conversations()
+            .list_threads()
             .user_id(user_id)
             .params(PaginationParams::new(
                 req.offset,
@@ -273,19 +300,12 @@ impl ProtoConversationService for ConversationService {
             ))
             .call()
             .await
-            .map_err(ConversationServiceError::from)?;
+            .map_err(ThreadServiceError::from)?;
 
-        info!(
-            "Listed {} conversations for user {}",
-            conversations.len(),
-            user_id
-        );
+        info!("Listed {} threads for user {}", threads.len(), user_id);
 
-        Ok(Response::new(ListConversationsResponse {
-            conversations: conversations
-                .into_iter()
-                .map(Self::db_conversation_to_proto)
-                .collect(),
+        Ok(Response::new(ListThreadsResponse {
+            threads: threads.into_iter().map(Self::db_thread_to_proto).collect(),
         }))
     }
 
@@ -299,12 +319,11 @@ impl ProtoConversationService for ConversationService {
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
-        let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
-            ConversationServiceError::InvalidUuid {
-                field: "conversation_id",
+        let thread_id =
+            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
+                field: "thread_id",
                 source: e,
-            }
-        })?;
+            })?;
 
         let proto_message = req
             .message
@@ -313,26 +332,23 @@ impl ProtoConversationService for ConversationService {
         let human_message: HumanMessage = proto_message.into();
 
         let content = serde_json::to_value(&human_message.content).map_err(|e| {
-            ConversationServiceError::Internal(format!(
-                "Failed to serialize message content: {}",
-                e
-            ))
+            ThreadServiceError::Internal(format!("Failed to serialize message content: {}", e))
         })?;
 
         let message = self
             .db
             .create_message()
-            .conversation_id(conversation_id)
+            .thread_id(thread_id)
             .user_id(user_id)
             .message_type(MessageType::Human)
             .content(content)
             .call()
             .await
-            .map_err(ConversationServiceError::from)?;
+            .map_err(ThreadServiceError::from)?;
 
         info!(
-            "Added human message to conversation {} for user {}",
-            conversation_id, user_id
+            "Added human message to thread {} for user {}",
+            thread_id, user_id
         );
 
         Ok(Response::new(AddHumanMessageResponse {
@@ -350,12 +366,11 @@ impl ProtoConversationService for ConversationService {
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
-        let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
-            ConversationServiceError::InvalidUuid {
-                field: "conversation_id",
+        let thread_id =
+            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
+                field: "thread_id",
                 source: e,
-            }
-        })?;
+            })?;
 
         let proto_message = req
             .message
@@ -364,27 +379,24 @@ impl ProtoConversationService for ConversationService {
         let human_message: HumanMessage = proto_message.into();
 
         let content = serde_json::to_value(&human_message.content).map_err(|e| {
-            ConversationServiceError::Internal(format!(
-                "Failed to serialize message content: {}",
-                e
-            ))
+            ThreadServiceError::Internal(format!("Failed to serialize message content: {}", e))
         })?;
 
         let message = self
             .db
             .create_message()
-            .conversation_id(conversation_id)
+            .thread_id(thread_id)
             .user_id(user_id)
             .message_type(MessageType::Human)
             .content(content)
             .hidden_from_ui(true)
             .call()
             .await
-            .map_err(ConversationServiceError::from)?;
+            .map_err(ThreadServiceError::from)?;
 
         info!(
-            "Added hidden human message to conversation {} for user {}",
-            conversation_id, user_id
+            "Added hidden human message to thread {} for user {}",
+            thread_id, user_id
         );
 
         Ok(Response::new(AddHiddenHumanMessageResponse {
@@ -402,12 +414,11 @@ impl ProtoConversationService for ConversationService {
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
-        let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
-            ConversationServiceError::InvalidUuid {
-                field: "conversation_id",
+        let thread_id =
+            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
+                field: "thread_id",
                 source: e,
-            }
-        })?;
+            })?;
 
         let proto_message = req
             .message
@@ -416,26 +427,23 @@ impl ProtoConversationService for ConversationService {
         let system_message: SystemMessage = proto_message.into();
 
         let content = serde_json::to_value(&system_message.content).map_err(|e| {
-            ConversationServiceError::Internal(format!(
-                "Failed to serialize message content: {}",
-                e
-            ))
+            ThreadServiceError::Internal(format!("Failed to serialize message content: {}", e))
         })?;
 
         let message = self
             .db
             .create_message()
-            .conversation_id(conversation_id)
+            .thread_id(thread_id)
             .user_id(user_id)
             .message_type(MessageType::System)
             .content(content)
             .call()
             .await
-            .map_err(ConversationServiceError::from)?;
+            .map_err(ThreadServiceError::from)?;
 
         info!(
-            "Added system message to conversation {} for user {}",
-            conversation_id, user_id
+            "Added system message to thread {} for user {}",
+            thread_id, user_id
         );
 
         Ok(Response::new(AddSystemMessageResponse {
@@ -453,27 +461,26 @@ impl ProtoConversationService for ConversationService {
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
-        let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
-            ConversationServiceError::InvalidUuid {
-                field: "conversation_id",
+        let thread_id =
+            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
+                field: "thread_id",
                 source: e,
-            }
-        })?;
+            })?;
 
         debug!(
-            "ChatStream: user_id = {}, conversation_id = {}",
-            user_id, conversation_id
+            "ChatStream: user_id = {}, thread_id = {}",
+            user_id, thread_id
         );
 
         let db_messages = self
             .db
             .list_messages()
-            .conversation_id(conversation_id)
+            .thread_id(thread_id)
             .user_id(user_id)
             .params(PaginationParams::new(0, 5, "DESC".to_string()))
             .call()
             .await
-            .map_err(ConversationServiceError::from)?;
+            .map_err(ThreadServiceError::from)?;
 
         let mut messages: Vec<BaseMessage> = db_messages
             .into_iter()
@@ -485,58 +492,102 @@ impl ProtoConversationService for ConversationService {
         messages.push(human_message.clone().into());
 
         let content = serde_json::to_value(&human_message.content).map_err(|e| {
-            ConversationServiceError::Internal(format!(
-                "Failed to serialize message content: {}",
-                e
-            ))
+            ThreadServiceError::Internal(format!("Failed to serialize message content: {}", e))
         })?;
 
         let _message = self
             .db
             .create_message()
-            .conversation_id(conversation_id)
+            .thread_id(thread_id)
             .user_id(user_id)
             .message_type(MessageType::Human)
             .content(content)
             .call()
             .await
-            .map_err(ConversationServiceError::from)?;
+            .map_err(ThreadServiceError::from)?;
 
         let chat_provider = self.get_chat_provider()?;
-        let provider_stream = chat_provider
-            .astream(messages.into(), None, None)
-            .await
-            .map_err(|e| {
-                debug!("Error in chat_stream: {}", e);
-                Status::internal(e.to_string())
-            })?;
+        let tools = self.get_tools();
 
         let db = self.db.clone();
         let output_stream = async_stream::try_stream! {
-            tokio::pin!(provider_stream);
             let mut full_content = String::new();
+            const MAX_TOOL_ROUNDS: usize = 5;
 
-            while let Some(result) = provider_stream.next().await {
-                match result {
-                    Ok(chunk) => {
-                        let content = chunk.content.to_string();
-                        full_content.push_str(&content);
-                        // TODO: Don't rely on empty string for finality
-                        let is_final = content.is_empty();
+            for round in 0..=MAX_TOOL_ROUNDS {
+                let provider_stream = chat_provider
+                    .astream(messages.clone().into(), None, None)
+                    .await
+                    .map_err(|e| {
+                        error!("Error in chat_stream: {}", e);
+                        Status::internal(e.to_string())
+                    })?;
 
-                        yield ChatStreamResponse {
-                            chunk: content,
-                            is_final,
-                        };
+                tokio::pin!(provider_stream);
+                let mut round_content = String::new();
+                let mut tool_calls: Vec<ToolCall> = Vec::new();
+
+                while let Some(result) = provider_stream.next().await {
+                    match result {
+                        Ok(chunk) => {
+                            let content = chunk.content.to_string();
+                            if !content.is_empty() {
+                                round_content.push_str(&content);
+                                yield ChatStreamResponse {
+                                    chunk: content,
+                                    is_final: false,
+                                };
+                            }
+                            if !chunk.tool_calls.is_empty() {
+                                tool_calls.extend(chunk.tool_calls);
+                            }
+                        }
+                        Err(e) => {
+                            Err(Status::internal(e.to_string()))?;
+                        }
                     }
-                    Err(e) => {
-                        Err(Status::internal(e.to_string()))?;
-                    }
+                }
+
+                full_content.push_str(&round_content);
+
+                if tool_calls.is_empty() || round == MAX_TOOL_ROUNDS {
+                    break;
+                }
+
+                messages.push(
+                    AIMessage::builder()
+                        .content(&round_content)
+                        .tool_calls(tool_calls.clone())
+                        .build()
+                        .into(),
+                );
+
+                // Execute each tool call and append results
+                for tc in tool_calls {
+                    let tool_name = tc.name.clone();
+                    let result_msg = if let Some(tool) = tools.get(&tool_name) {
+                        tool.invoke_tool_call(tc).await
+                    } else {
+                        error!("Unknown tool: {}", tool_name);
+                        agent_chain::messages::ToolMessage::builder()
+                            .content(format!("Error: unknown tool '{}'", tool_name))
+                            .tool_call_id("")
+                            .status(agent_chain::messages::ToolStatus::Error)
+                            .build()
+                            .into()
+                    };
+                    messages.push(result_msg);
                 }
             }
 
+            // Final empty chunk to signal completion
+            yield ChatStreamResponse {
+                chunk: String::new(),
+                is_final: true,
+            };
+
             if !full_content.is_empty() && let Err(e) = db
-                    .create_message().conversation_id(conversation_id)
+                    .create_message().thread_id(thread_id)
                     .user_id(user_id)
                     .message_type(MessageType::Ai)
                     .content(serde_json::json!(full_content))
@@ -561,17 +612,16 @@ impl ProtoConversationService for ConversationService {
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
-        let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
-            ConversationServiceError::InvalidUuid {
-                field: "conversation_id",
+        let thread_id =
+            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
+                field: "thread_id",
                 source: e,
-            }
-        })?;
+            })?;
 
         let messages = self
             .db
             .list_messages()
-            .conversation_id(conversation_id)
+            .thread_id(thread_id)
             .user_id(user_id)
             .params(PaginationParams::new(
                 req.offset,
@@ -581,58 +631,56 @@ impl ProtoConversationService for ConversationService {
             .only_visible(true)
             .call()
             .await
-            .map_err(ConversationServiceError::from)?;
+            .map_err(ThreadServiceError::from)?;
 
         Ok(Response::new(GetMessagesResponse {
             messages: messages.into_iter().map(|m| m.into()).collect(),
         }))
     }
 
-    async fn get_conversation(
+    async fn get_thread(
         &self,
-        request: tonic::Request<proto_gen::conversation::GetConversationRequest>,
-    ) -> Result<Response<GetConversationResponse>, Status> {
-        info!("Get conversation request received");
+        request: tonic::Request<proto_gen::thread::GetThreadRequest>,
+    ) -> Result<Response<GetThreadResponse>, Status> {
+        info!("Get thread request received");
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
-        let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
-            ConversationServiceError::InvalidUuid {
-                field: "conversation_id",
+        let thread_id =
+            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
+                field: "thread_id",
                 source: e,
-            }
-        })?;
+            })?;
 
-        let conversation = self
+        let thread = self
             .db
-            .get_conversation()
-            .id(conversation_id)
+            .get_thread()
+            .id(thread_id)
             .user_id(user_id)
             .call()
             .await
-            .map_err(ConversationServiceError::from)?;
+            .map_err(ThreadServiceError::from)?;
 
-        Ok(Response::new(GetConversationResponse {
-            conversation: conversation.try_into().ok(),
+        Ok(Response::new(GetThreadResponse {
+            thread: thread.try_into().ok(),
         }))
     }
 
-    async fn generate_conversation_title(
+    async fn generate_thread_title(
         &self,
-        request: tonic::Request<GenerateConversationTitleRequest>,
-    ) -> Result<Response<GenerateConversationTitleResponse>, Status> {
-        info!("Generate conversation title request received");
+        request: tonic::Request<GenerateThreadTitleRequest>,
+    ) -> Result<Response<GenerateThreadTitleResponse>, Status> {
+        info!("Generate thread title request received");
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
-        let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
-            ConversationServiceError::InvalidUuid {
-                field: "conversation_id",
+        let thread_id =
+            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
+                field: "thread_id",
                 source: e,
-            }
-        })?;
+            })?;
 
         let mut messages: Vec<BaseMessage> =
             vec![HumanMessage::builder().content(req.content).build().into()];
@@ -640,7 +688,7 @@ impl ProtoConversationService for ConversationService {
         messages.push(
             SystemMessage::builder()
                 .content(
-                    "Generate a title for the past conversation. Your task is:
+                    "Generate a title for the past thread. Your task is:
                 - Return a concise title, max 6 words.
                 - No quotation marks.
                 - Use sentence case.
@@ -675,18 +723,18 @@ impl ProtoConversationService for ConversationService {
             title = first.to_uppercase().collect::<String>() + rest;
         }
 
-        let conversation = self
+        let thread = self
             .db
-            .update_conversation()
-            .id(conversation_id)
+            .update_thread()
+            .id(thread_id)
             .user_id(user_id)
             .title(title.clone())
             .call()
             .await
-            .map_err(ConversationServiceError::from)?;
+            .map_err(ThreadServiceError::from)?;
 
-        Ok(Response::new(GenerateConversationTitleResponse {
-            conversation: Some(Self::db_conversation_to_proto(conversation)),
+        Ok(Response::new(GenerateThreadTitleResponse {
+            thread: Some(Self::db_thread_to_proto(thread)),
         }))
     }
 }

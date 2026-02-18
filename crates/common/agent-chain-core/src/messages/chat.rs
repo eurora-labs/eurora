@@ -69,7 +69,6 @@ impl Serialize for ChatMessage {
         if self.name.is_some() {
             field_count += 1;
         }
-        // Add 1 for additional type field
         field_count += 1;
 
         let mut map = serializer.serialize_map(Some(field_count))?;
@@ -362,7 +361,6 @@ impl Serialize for ChatMessageChunk {
         if self.name.is_some() {
             field_count += 1;
         }
-        // Add 1 for additional type field
         field_count += 1;
 
         let mut map = serializer.serialize_map(Some(field_count))?;
@@ -374,7 +372,6 @@ impl Serialize for ChatMessageChunk {
             map.serialize_entry("name", name)?;
         }
 
-        // Merge the type into additional_kwargs during serialization
         let additional_kwargs_with_type = self.additional_kwargs.clone();
         map.serialize_entry("additional_kwargs", &additional_kwargs_with_type)?;
 
@@ -490,7 +487,6 @@ impl ChatMessageChunk {
             }
         };
 
-        // Merge additional_kwargs using merge_dicts (recursive deep merge)
         let additional_kwargs = {
             let left_val = serde_json::to_value(&self.additional_kwargs).unwrap_or_default();
             let right_val = serde_json::to_value(&other.additional_kwargs).unwrap_or_default();
@@ -500,7 +496,6 @@ impl ChatMessageChunk {
             }
         };
 
-        // Merge response_metadata using merge_dicts (recursive deep merge)
         let response_metadata = {
             let left_val = serde_json::to_value(&self.response_metadata).unwrap_or_default();
             let right_val = serde_json::to_value(&other.response_metadata).unwrap_or_default();

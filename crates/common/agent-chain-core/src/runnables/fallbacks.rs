@@ -210,7 +210,6 @@ where
         let config = ensure_config(config);
         let callback_manager = get_callback_manager_for_config(&config);
 
-        // Start the root run
         let run_manager = callback_manager
             .on_chain_start()
             .serialized(&std::collections::HashMap::new())
@@ -223,7 +222,6 @@ where
         let mut current_input = input;
 
         for runnable in self.runnables() {
-            // If exception_key is set, inject the last error into the input
             if let (Some(key), Some(inserter), Some(err)) =
                 (&self.exception_key, &self.exception_inserter, &last_error)
             {
@@ -279,7 +277,6 @@ where
         let mut current_input = input;
 
         for runnable in self.runnables() {
-            // If exception_key is set, inject the last error into the input
             if let (Some(key), Some(inserter), Some(err)) =
                 (&self.exception_key, &self.exception_inserter, &last_error)
             {
@@ -325,7 +322,6 @@ where
         let configs = get_config_list(config, inputs.len());
         let n = inputs.len();
 
-        // Track which inputs still need to be processed
         let mut to_return: Vec<Option<Result<Self::Output>>> = (0..n).map(|_| None).collect();
         let mut run_again: Vec<(usize, Self::Input)> = inputs.into_iter().enumerate().collect();
         let mut handled_exception_indices: Vec<usize> = Vec::new();
@@ -336,7 +332,6 @@ where
                 break;
             }
 
-            // Get inputs and configs for items that need to be run again
             let batch_inputs: Vec<Self::Input> =
                 run_again.iter().map(|(_, inp)| inp.clone()).collect();
             let batch_configs: Vec<RunnableConfig> =
@@ -361,7 +356,6 @@ where
                             if !handled_exception_indices.contains(i) {
                                 handled_exception_indices.push(*i);
                             }
-                            // If exception_key is set, inject exception into the input
                             let next_input = if let (Some(key), Some(inserter)) =
                                 (&self.exception_key, &self.exception_inserter)
                             {
@@ -381,7 +375,6 @@ where
             }
 
             if first_to_raise.is_some() {
-                // Return early with the first non-fallback error
                 let mut results = Vec::with_capacity(to_return.len());
                 let mut error_consumed = false;
                 for opt in to_return {
@@ -405,12 +398,6 @@ where
             run_again = next_run_again;
         }
 
-        // All fallbacks exhausted - errors are already stored in to_return
-        if !return_exceptions && !handled_exception_indices.is_empty() {
-            // Return all results as-is, errors from the last fallback attempt are stored
-        }
-
-        // Return results, filling in errors for items that never had any result
         to_return
             .into_iter()
             .map(|opt| opt.unwrap_or_else(|| Err(Error::other("No result for index"))))
@@ -433,7 +420,6 @@ where
         let configs = get_config_list(config, inputs.len());
         let n = inputs.len();
 
-        // Track which inputs still need to be processed
         let mut to_return: Vec<Option<Result<Self::Output>>> = (0..n).map(|_| None).collect();
         let mut run_again: Vec<(usize, Self::Input)> = inputs.into_iter().enumerate().collect();
         let mut handled_exception_indices: Vec<usize> = Vec::new();
@@ -444,7 +430,6 @@ where
                 break;
             }
 
-            // Get inputs and configs for items that need to be run again
             let batch_inputs: Vec<Self::Input> =
                 run_again.iter().map(|(_, inp)| inp.clone()).collect();
             let batch_configs: Vec<RunnableConfig> =
@@ -471,7 +456,6 @@ where
                             if !handled_exception_indices.contains(i) {
                                 handled_exception_indices.push(*i);
                             }
-                            // If exception_key is set, inject exception into the input
                             let next_input = if let (Some(key), Some(inserter)) =
                                 (&self.exception_key, &self.exception_inserter)
                             {
@@ -491,7 +475,6 @@ where
             }
 
             if first_to_raise.is_some() {
-                // Return early with the first non-fallback error
                 let mut results = Vec::with_capacity(to_return.len());
                 let mut error_consumed = false;
                 for opt in to_return {
@@ -515,12 +498,6 @@ where
             run_again = next_run_again;
         }
 
-        // All fallbacks exhausted - errors are already stored in to_return
-        if !return_exceptions && !handled_exception_indices.is_empty() {
-            // Return all results as-is, errors from the last fallback attempt are stored
-        }
-
-        // Return results, filling in errors for items that never had any result
         to_return
             .into_iter()
             .map(|opt| opt.unwrap_or_else(|| Err(Error::other("No result for index"))))
@@ -540,22 +517,18 @@ where
             let mut current_input = input;
 
             for runnable in self.runnables() {
-                // If exception_key is set, inject the last error into the input
                 if let (Some(key), Some(inserter), Some(err)) =
                     (&self.exception_key, &self.exception_inserter, &last_error)
                 {
                     current_input = inserter(&current_input, key, err);
                 }
 
-                // Try to get the first chunk from this runnable's stream
                 let mut stream = runnable.stream(current_input.clone(), Some(config.clone()));
 
                 match stream.next().await {
                     Some(Ok(chunk)) => {
-                        // Success! Yield this chunk and continue streaming
                         yield Ok(chunk);
 
-                        // Stream remaining chunks
                         while let Some(result) = stream.next().await {
                             yield result;
                         }
@@ -573,7 +546,6 @@ where
                         }
                     }
                     None => {
-                        // Empty stream, try next fallback
                         if first_error.is_none() {
                             first_error = Some(Error::other("Empty stream from runnable"));
                         }
@@ -581,7 +553,6 @@ where
                 }
             }
 
-            // All fallbacks exhausted
             yield Err(first_error.unwrap_or_else(|| Error::other("No error stored at end of fallbacks.")));
         })
     }
@@ -602,22 +573,18 @@ where
             let mut current_input = input;
 
             for runnable in self.runnables() {
-                // If exception_key is set, inject the last error into the input
                 if let (Some(key), Some(inserter), Some(err)) =
                     (&self.exception_key, &self.exception_inserter, &last_error)
                 {
                     current_input = inserter(&current_input, key, err);
                 }
 
-                // Try to get the first chunk from this runnable's stream
                 let mut stream = runnable.astream(current_input.clone(), Some(config.clone()));
 
                 match stream.next().await {
                     Some(Ok(chunk)) => {
-                        // Success! Yield this chunk and continue streaming
                         yield Ok(chunk);
 
-                        // Stream remaining chunks
                         while let Some(result) = stream.next().await {
                             yield result;
                         }
@@ -635,7 +602,6 @@ where
                         }
                     }
                     None => {
-                        // Empty stream, try next fallback
                         if first_error.is_none() {
                             first_error = Some(Error::other("Empty stream from runnable"));
                         }
@@ -643,7 +609,6 @@ where
                 }
             }
 
-            // All fallbacks exhausted
             yield Err(first_error.unwrap_or_else(|| Error::other("No error stored at end of fallbacks.")));
         })
     }
@@ -752,9 +717,6 @@ mod tests {
 
         let results = with_fallbacks.batch(vec![3, 10, 5], None, false);
 
-        // 3 -> primary succeeds -> 4
-        // 10 -> primary fails, fallback succeeds -> 20
-        // 5 -> primary succeeds -> 6
         assert_eq!(results[0].as_ref().unwrap(), &4);
         assert_eq!(results[1].as_ref().unwrap(), &20);
         assert_eq!(results[2].as_ref().unwrap(), &6);

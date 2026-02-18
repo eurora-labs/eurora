@@ -22,7 +22,6 @@ pub fn spawn_test_window(title: &str) -> Result<Child, Box<dyn std::error::Error
 
     let child = cmd.spawn()?;
 
-    // Give the window time to appear
     std::thread::sleep(Duration::from_millis(500));
 
     Ok(child)
@@ -58,16 +57,13 @@ pub fn focus_window(child: &mut Child) -> Result<(), Box<dyn std::error::Error>>
 fn focus_window_linux(child: &mut Child) -> Result<(), Box<dyn std::error::Error>> {
     use std::process::Command;
 
-    // Get the PID of the spawned window
     let pid = child.id();
 
-    // Use wmctrl to focus the window by PID if available
     if Command::new("wmctrl").arg("-l").output().is_ok() {
         let output = Command::new("wmctrl").args(["-l", "-p"]).output()?;
 
         let output_str = String::from_utf8_lossy(&output.stdout);
 
-        // Find the window ID for our PID
         for line in output_str.lines() {
             let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.len() >= 3
@@ -75,7 +71,6 @@ fn focus_window_linux(child: &mut Child) -> Result<(), Box<dyn std::error::Error
                 && window_pid == pid
             {
                 let window_id = parts[0];
-                // Focus the window
                 Command::new("wmctrl")
                     .args(["-i", "-a", window_id])
                     .output()?;
@@ -83,7 +78,6 @@ fn focus_window_linux(child: &mut Child) -> Result<(), Box<dyn std::error::Error
             }
         }
     }
-    // Fallback: use xdotool if available
     if Command::new("xdotool").arg("--version").status()?.success() {
         let ids = Command::new("xdotool")
             .args(["search", "--pid", &pid.to_string()])
@@ -105,9 +99,6 @@ fn focus_window_linux(child: &mut Child) -> Result<(), Box<dyn std::error::Error
 
 #[cfg(target_os = "windows")]
 fn focus_window_windows(_child: &mut Child) -> Result<(), Box<dyn std::error::Error>> {
-    // Windows-specific window focusing implementation
-    // This would use Windows API calls to find and focus the window
-    // For now, we'll implement a basic version
     Ok(())
 }
 
@@ -127,7 +118,6 @@ fn focus_window_macos(child: &mut Child) -> Result<(), Box<dyn std::error::Error
         return Err(format!("osascript failed to focus window (pid {pid}): {stderr}").into());
     }
 
-    // Give the system a moment to complete the focus switch
     std::thread::sleep(Duration::from_millis(200));
 
     Ok(())
@@ -198,7 +188,6 @@ fn get_focused_window_macos() -> Result<focus_tracker::FocusedWindow, Box<dyn st
 fn get_focused_window_linux() -> Result<focus_tracker::FocusedWindow, Box<dyn std::error::Error>> {
     use std::process::Command;
 
-    // Try to get the focused window using xdotool
     if let Ok(output) = Command::new("xdotool")
         .args(["getwindowfocus", "getwindowname"])
         .output()
@@ -212,7 +201,6 @@ fn get_focused_window_linux() -> Result<focus_tracker::FocusedWindow, Box<dyn st
         });
     }
 
-    // Fallback
     Ok(focus_tracker::FocusedWindow {
         process_id: 0,
         process_name: "unknown".to_string(),
@@ -224,8 +212,6 @@ fn get_focused_window_linux() -> Result<focus_tracker::FocusedWindow, Box<dyn st
 #[cfg(target_os = "windows")]
 fn get_focused_window_windows() -> Result<focus_tracker::FocusedWindow, Box<dyn std::error::Error>>
 {
-    // Placeholder – a full implementation would use the Windows API to query
-    // the foreground window title.
     Ok(focus_tracker::FocusedWindow {
         process_id: 0,
         process_name: "unknown".to_string(),
@@ -282,12 +268,10 @@ pub fn setup_test_environment() -> Result<(), Box<dyn std::error::Error>> {
 /// Cleanup function to terminate child processes
 #[allow(dead_code)]
 pub fn cleanup_child_process(mut child: Child) -> Result<(), Box<dyn std::error::Error>> {
-    // Try to terminate gracefully first
     if child.kill().is_err() {
         // If kill fails, the process might have already exited
     }
 
-    // Wait for the process to exit
     let _ = child.wait();
 
     Ok(())
@@ -323,7 +307,6 @@ mod tests {
 
     #[test]
     fn test_environment_flags() {
-        // Test environment flag detection
         unsafe {
             env::set_var("INTEGRATION_TEST", "1");
             assert!(should_run_integration_tests());
@@ -334,7 +317,6 @@ mod tests {
             env::set_var("X11", "1");
             assert!(should_use_x11());
 
-            // Cleanup
             env::remove_var("INTEGRATION_TEST");
             env::remove_var("WAYLAND");
             env::remove_var("X11");

@@ -67,7 +67,6 @@ impl SystemInfo {
 /// In Rust, dependencies are determined at compile time, so this function
 /// returns a predefined list of common dependencies used by the agent-chain crates.
 fn get_sub_deps(packages: &[Cow<'static, str>]) -> Vec<PackageInfo> {
-    // Common dependencies used by agent-chain crates
     let all_deps = [
         ("async-trait", option_env!("DEP_ASYNC_TRAIT_VERSION")),
         ("futures", option_env!("DEP_FUTURES_VERSION")),
@@ -92,7 +91,6 @@ fn get_sub_deps(packages: &[Cow<'static, str>]) -> Vec<PackageInfo> {
 ///
 /// Returns a list of package information for all agent-chain related crates.
 pub fn get_package_info() -> Vec<PackageInfo> {
-    // Core packages in priority order (matching Python's order_by)
     let mut packages = vec![
         PackageInfo::new_static("agent-chain-core", Some(VERSION)),
         PackageInfo::new_static("agent-chain", option_env!("DEP_AGENT_CHAIN_VERSION")),
@@ -107,7 +105,6 @@ pub fn get_package_info() -> Vec<PackageInfo> {
         ),
     ];
 
-    // Sort remaining packages alphabetically (excluding the first one which is agent-chain-core)
     if packages.len() > 1 {
         packages[1..].sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     }
@@ -122,7 +119,6 @@ pub fn get_sys_info(additional_pkgs: &[&str]) -> (SystemInfo, Vec<PackageInfo>, 
     let system_info = SystemInfo::current();
     let mut packages = get_package_info();
 
-    // Add additional packages
     for pkg in additional_pkgs {
         packages.push(PackageInfo::new_owned((*pkg).to_string(), None));
     }
@@ -160,7 +156,6 @@ pub fn print_sys_info(additional_pkgs: &[&str]) {
 pub fn print_sys_info_to<W: Write>(writer: &mut W, additional_pkgs: &[&str]) {
     let (system_info, packages, sub_deps) = get_sys_info(additional_pkgs);
 
-    // Print system information
     writeln!(writer).ok();
     writeln!(writer, "System Information").ok();
     writeln!(writer, "------------------").ok();
@@ -169,7 +164,6 @@ pub fn print_sys_info_to<W: Write>(writer: &mut W, additional_pkgs: &[&str]) {
     writeln!(writer, "> Architecture:  {}", system_info.arch).ok();
     writeln!(writer, "> Rust Version:  {}", system_info.rust_version).ok();
 
-    // Print package information
     writeln!(writer).ok();
     writeln!(writer, "Package Information").ok();
     writeln!(writer, "-------------------").ok();
@@ -187,7 +181,6 @@ pub fn print_sys_info_to<W: Write>(writer: &mut W, additional_pkgs: &[&str]) {
         }
     }
 
-    // Print packages without version information
     if !not_installed.is_empty() {
         writeln!(writer).ok();
         writeln!(writer, "Optional packages not installed").ok();
@@ -197,7 +190,6 @@ pub fn print_sys_info_to<W: Write>(writer: &mut W, additional_pkgs: &[&str]) {
         }
     }
 
-    // Print sub-dependencies
     let deps_with_version: Vec<_> = sub_deps.iter().filter(|d| d.version.is_some()).collect();
 
     if !deps_with_version.is_empty() {
@@ -247,7 +239,6 @@ mod tests {
     fn test_system_info_current() {
         let info = SystemInfo::current();
 
-        // These should not be empty
         assert!(!info.os.is_empty());
         assert!(!info.os_family.is_empty());
         assert!(!info.arch.is_empty());
@@ -258,10 +249,8 @@ mod tests {
     fn test_get_package_info() {
         let packages = get_package_info();
 
-        // Should have at least agent-chain-core
         assert!(!packages.is_empty());
 
-        // First package should be agent-chain-core
         assert_eq!(packages[0].name, "agent-chain-core");
         assert!(packages[0].version.is_some());
     }
@@ -278,7 +267,6 @@ mod tests {
     fn test_get_sys_info_with_additional_pkgs() {
         let (_, packages, _) = get_sys_info(&["custom-package"]);
 
-        // Should include the additional package
         let has_custom = packages.iter().any(|p| p.name == "custom-package");
         assert!(has_custom);
     }
@@ -290,7 +278,6 @@ mod tests {
 
         let output = String::from_utf8(buffer).unwrap();
 
-        // Should contain expected sections
         assert!(output.contains("System Information"));
         assert!(output.contains("Package Information"));
         assert!(output.contains("agent-chain-core"));

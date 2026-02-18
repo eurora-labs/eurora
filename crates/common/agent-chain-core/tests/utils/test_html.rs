@@ -52,7 +52,6 @@ fn test_find_all_links_ignore_suffix() {
         );
     }
 
-    // Don't ignore if pattern doesn't occur at end of link
     for suffix in SUFFIXES_TO_IGNORE {
         let html = format!(r#"href="foobar{}more""#, suffix);
         let actual = find_all_links(&html, None);
@@ -78,9 +77,7 @@ fn test_find_all_links_ignore_prefix() {
         );
     }
 
-    // Don't ignore if pattern doesn't occur at beginning of link
     for prefix in PREFIXES_TO_IGNORE {
-        // Pound signs are split on when not prefixes
         if *prefix == "#" {
             continue;
         }
@@ -183,7 +180,6 @@ fn test_extract_sub_links_exclude() {
 
 #[test]
 fn test_prevent_outside() {
-    // Test that prevent outside compares against full base URL
     let html = r#"<a href="https://foobar.comic.com">BAD</a><a href="https://foobar.comic:9999">BAD</a><a href="https://foobar.com:9999">BAD</a><a href="http://foobar.com:9999/">BAD</a><a href="https://foobar.com/OK">OK</a><a href="http://foobar.com/BAD">BAD</a>"#;
 
     let mut expected = vec!["https://foobar.com/OK"];

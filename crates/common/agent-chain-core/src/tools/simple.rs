@@ -201,8 +201,6 @@ impl Tool {
         match input {
             ToolInput::String(s) => Ok(s),
             ToolInput::Dict(d) => {
-                // For backwards compatibility, if run_input is a dict,
-                // extract the single value
                 let all_args: Vec<_> = d.values().collect();
                 if all_args.len() != 1 {
                     return Err(Error::ToolInvocation(format!(
@@ -290,8 +288,6 @@ impl BaseTool for Tool {
     }
 
     fn args(&self) -> HashMap<String, Value> {
-        // For backwards compatibility, if the function signature is ambiguous,
-        // assume it takes a single string input.
         if let Some(args_schema) = &self.args_schema {
             return args_schema.properties();
         }
@@ -333,7 +329,6 @@ impl BaseTool for Tool {
             let result = coroutine(string_input).await?;
             Ok(ToolOutput::String(result))
         } else {
-            // Fall back to sync implementation
             let sync_manager = _run_manager.map(|rm| rm.get_sync());
             self.tool_run(input, sync_manager.as_ref(), _config)
         }
@@ -407,7 +402,6 @@ mod tests {
             "A sync tool",
         );
 
-        // Should fall back to sync implementation
         let result = tool
             .arun(ToolInput::String("test".to_string()), None, None)
             .await

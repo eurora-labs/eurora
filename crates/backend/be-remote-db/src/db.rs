@@ -2,8 +2,8 @@ use crate::{
     MessageType, PaginationParams,
     error::{DbError, DbResult},
     types::{
-        Activity, ActivityAsset, Asset, AssetStatus, Conversation, LoginToken, Message,
-        OAuthCredentials, OAuthProvider, OAuthState, PasswordCredentials, RefreshToken, User,
+        Activity, ActivityAsset, Asset, AssetStatus, LoginToken, Message, OAuthCredentials,
+        OAuthProvider, OAuthState, PasswordCredentials, RefreshToken, Thread, User,
     },
 };
 use bon::bon;
@@ -828,22 +828,22 @@ impl DatabaseManager {
     }
 
     // =========================================================================
-    // Conversation Management Methods
+    // Thread Management Methods
     // =========================================================================
 
     #[builder]
-    pub async fn create_conversation(
+    pub async fn create_thread(
         &self,
         id: Option<Uuid>,
         user_id: Uuid,
         title: String,
-    ) -> DbResult<Conversation> {
+    ) -> DbResult<Thread> {
         let id = id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
 
-        let conversation = sqlx::query_as::<_, Conversation>(
+        let thread = sqlx::query_as::<_, Thread>(
             r#"
-            INSERT INTO conversations (id, user_id, title, created_at, updated_at)
+            INSERT INTO threads (id, user_id, title, created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING id, user_id, title, created_at, updated_at
             "#,
@@ -856,15 +856,15 @@ impl DatabaseManager {
         .fetch_one(&self.pool)
         .await?;
 
-        Ok(conversation)
+        Ok(thread)
     }
 
     #[builder]
-    pub async fn get_conversation(&self, id: Uuid, user_id: Uuid) -> DbResult<Conversation> {
-        let conversation = sqlx::query_as::<_, Conversation>(
+    pub async fn get_thread(&self, id: Uuid, user_id: Uuid) -> DbResult<Thread> {
+        let thread = sqlx::query_as::<_, Thread>(
             r#"
             SELECT id, user_id, title, created_at, updated_at
-            FROM conversations
+            FROM threads
             WHERE id = $1 AND user_id = $2
             "#,
         )
@@ -873,21 +873,16 @@ impl DatabaseManager {
         .fetch_one(&self.pool)
         .await?;
 
-        Ok(conversation)
+        Ok(thread)
     }
 
     #[builder]
-    pub async fn update_conversation(
-        &self,
-        id: Uuid,
-        user_id: Uuid,
-        title: String,
-    ) -> DbResult<Conversation> {
+    pub async fn update_thread(&self, id: Uuid, user_id: Uuid, title: String) -> DbResult<Thread> {
         let now = Utc::now();
 
-        let conversation = sqlx::query_as::<_, Conversation>(
+        let thread = sqlx::query_as::<_, Thread>(
             r#"
-            UPDATE conversations
+            UPDATE threads
             SET title = $1, updated_at = $2
             WHERE id = $3 AND user_id = $4
             RETURNING id, user_id, title, created_at, updated_at
@@ -900,19 +895,19 @@ impl DatabaseManager {
         .fetch_one(&self.pool)
         .await?;
 
-        Ok(conversation)
+        Ok(thread)
     }
 
     #[builder]
-    pub async fn list_conversations(
+    pub async fn list_threads(
         &self,
         user_id: Uuid,
         params: PaginationParams,
-    ) -> DbResult<Vec<Conversation>> {
+    ) -> DbResult<Vec<Thread>> {
         let query = format!(
             r#"
             SELECT id, user_id, title, created_at, updated_at
-            FROM conversations
+            FROM threads
             WHERE user_id = $1
             ORDER BY id {}
             LIMIT $2 OFFSET $3
@@ -920,14 +915,14 @@ impl DatabaseManager {
             params.order()
         );
 
-        let conversations = sqlx::query_as::<_, Conversation>(&query)
+        let threads = sqlx::query_as::<_, Thread>(&query)
             .bind(user_id)
             .bind(params.limit())
             .bind(params.offset())
             .fetch_all(&self.pool)
             .await?;
 
-        Ok(conversations)
+        Ok(threads)
     }
 
     // =========================================================================
@@ -938,7 +933,7 @@ impl DatabaseManager {
     pub async fn create_message(
         &self,
         id: Option<Uuid>,
-        conversation_id: Uuid,
+        thread_id: Uuid,
         user_id: Uuid,
         message_type: MessageType,
         content: serde_json::Value,
@@ -954,27 +949,27 @@ impl DatabaseManager {
 
         let message = sqlx::query_as::<_, Message>(
             r#"
-            WITH verified_conversation AS (
-                SELECT id FROM conversations
+            WITH verified_thread AS (
+                SELECT id FROM threads
                 WHERE id = $2 AND user_id = $3
             ),
-            updated_conversation AS (
-                UPDATE conversations
+            updated_thread AS (
+                UPDATE threads
                 SET updated_at = $10
-                WHERE id = (SELECT id FROM verified_conversation)
+                WHERE id = (SELECT id FROM verified_thread)
                 RETURNING id
             ),
             inserted_message AS (
-                INSERT INTO messages (id, conversation_id, user_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, hidden_from_ui, created_at, updated_at)
+                INSERT INTO messages (id, thread_id, user_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, hidden_from_ui, created_at, updated_at)
                 SELECT $1, vc.id, $3, $4, $5, $6, $7, $8, $9, $10, $11
-                FROM verified_conversation vc
-                RETURNING id, conversation_id, user_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, hidden_from_ui, created_at, updated_at
+                FROM verified_thread vc
+                RETURNING id, thread_id, user_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, hidden_from_ui, created_at, updated_at
             )
             SELECT * FROM inserted_message
             "#,
         )
         .bind(id)
-        .bind(conversation_id)
+        .bind(thread_id)
         .bind(user_id)
         .bind(message_type)
         .bind(&content)
@@ -994,7 +989,7 @@ impl DatabaseManager {
     /// `only_visible`: `None` = all, `Some(true)` = visible only, `Some(false)` = hidden only.
     pub async fn list_messages(
         &self,
-        conversation_id: Uuid,
+        thread_id: Uuid,
         user_id: Uuid,
         params: Option<PaginationParams>,
         only_visible: Option<bool>,
@@ -1006,16 +1001,16 @@ impl DatabaseManager {
                 let hidden_from_ui = !visible;
                 let query = format!(
                     r#"
-                    SELECT m.id, m.conversation_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.hidden_from_ui, m.created_at, m.updated_at
+                    SELECT m.id, m.thread_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.hidden_from_ui, m.created_at, m.updated_at
                     FROM messages m
-                    WHERE m.conversation_id = $1 AND m.user_id = $2 AND m.hidden_from_ui = $3
+                    WHERE m.thread_id = $1 AND m.user_id = $2 AND m.hidden_from_ui = $3
                     ORDER BY m.id {}
                     LIMIT $4 OFFSET $5
                     "#,
                     params.order()
                 );
                 sqlx::query_as::<_, Message>(&query)
-                    .bind(conversation_id)
+                    .bind(thread_id)
                     .bind(user_id)
                     .bind(hidden_from_ui)
                     .bind(params.limit())
@@ -1026,16 +1021,16 @@ impl DatabaseManager {
             None => {
                 let query = format!(
                     r#"
-                    SELECT m.id, m.conversation_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.hidden_from_ui, m.created_at, m.updated_at
+                    SELECT m.id, m.thread_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.hidden_from_ui, m.created_at, m.updated_at
                     FROM messages m
-                    WHERE m.conversation_id = $1 AND m.user_id = $2
+                    WHERE m.thread_id = $1 AND m.user_id = $2
                     ORDER BY m.id {}
                     LIMIT $3 OFFSET $4
                     "#,
                     params.order()
                 );
                 sqlx::query_as::<_, Message>(&query)
-                    .bind(conversation_id)
+                    .bind(thread_id)
                     .bind(user_id)
                     .bind(params.limit())
                     .bind(params.offset())
@@ -1075,22 +1070,6 @@ impl DatabaseManager {
         .await?;
 
         Ok(())
-    }
-
-    pub async fn get_billing_state_for_user(
-        &self,
-        user_id: Uuid,
-    ) -> DbResult<Option<crate::AccountBillingState>> {
-        let result = sqlx::query_as::<_, crate::AccountBillingState>(
-            "SELECT abs.*
-             FROM account_billing_state abs
-             JOIN accounts a ON a.id = abs.account_id
-             WHERE a.owner_user_id = $1",
-        )
-        .bind(user_id)
-        .fetch_optional(&self.pool)
-        .await?;
-        Ok(result)
     }
 
     /// If `email` matches an existing user, `app_user_id` is set automatically.
@@ -1335,5 +1314,103 @@ impl DatabaseManager {
         }
 
         Ok(())
+    }
+
+    // =========================================================================
+    // Plan / Account Methods
+    // =========================================================================
+
+    /// Creates an account for the user with the given plan.
+    /// On conflict (user already has an account), only upgrades the plan — never downgrades.
+    pub async fn ensure_account_for_user_with_plan<'e, E>(
+        &self,
+        executor: E,
+        user_id: Uuid,
+        plan_id: &str,
+    ) -> DbResult<Uuid>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        let now = Utc::now();
+
+        let account_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO accounts (owner_user_id, name, plan_id, created_at, updated_at)
+            SELECT $1, u.username, $2, $3, $4
+            FROM users u WHERE u.id = $1
+            ON CONFLICT (owner_user_id) DO UPDATE
+            SET plan_id = CASE
+                    WHEN (SELECT rank FROM (VALUES ('free',0),('tier1',1)) AS r(id,rank) WHERE r.id = EXCLUDED.plan_id)
+                       > (SELECT rank FROM (VALUES ('free',0),('tier1',1)) AS r(id,rank) WHERE r.id = accounts.plan_id)
+                    THEN EXCLUDED.plan_id
+                    ELSE accounts.plan_id
+                END,
+                updated_at = EXCLUDED.updated_at
+            RETURNING id
+            "#,
+        )
+        .bind(user_id)
+        .bind(plan_id)
+        .bind(now)
+        .bind(now)
+        .fetch_one(executor)
+        .await?;
+
+        Ok(account_id)
+    }
+
+    /// Returns the plan_id for the user's account, or None if no account exists.
+    pub async fn get_plan_id_for_user(&self, user_id: Uuid) -> DbResult<Option<String>> {
+        let result: Option<String> =
+            sqlx::query_scalar("SELECT plan_id FROM accounts WHERE owner_user_id = $1")
+                .bind(user_id)
+                .fetch_optional(&self.pool)
+                .await?;
+        Ok(result)
+    }
+
+    /// Updates the plan for an account identified by its Stripe customer ID.
+    pub async fn update_account_plan_by_stripe_customer<'e, E>(
+        &self,
+        executor: E,
+        stripe_customer_id: &str,
+        plan_id: &str,
+    ) -> DbResult<()>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        let now = Utc::now();
+
+        sqlx::query(
+            r#"
+            UPDATE accounts
+            SET plan_id = $2, updated_at = $3
+            WHERE stripe_customer_id = $1
+            "#,
+        )
+        .bind(stripe_customer_id)
+        .bind(plan_id)
+        .bind(now)
+        .execute(executor)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Resolves the application plan for a given Stripe price ID via the plan_prices junction table.
+    pub async fn resolve_plan_for_stripe_price<'e, E>(
+        &self,
+        executor: E,
+        price_id: &str,
+    ) -> DbResult<Option<String>>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        let result: Option<String> =
+            sqlx::query_scalar("SELECT plan_id FROM plan_prices WHERE stripe_price_id = $1")
+                .bind(price_id)
+                .fetch_optional(executor)
+                .await?;
+        Ok(result)
     }
 }

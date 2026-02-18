@@ -160,7 +160,6 @@ impl AstreamEventsCallbackHandler {
             run_id = *parent_id;
         }
 
-        // Return in reverse order: root first, immediate parent last.
         parent_ids.reverse();
         parent_ids
     }
@@ -371,7 +370,6 @@ impl AstreamEventsCallbackHandler {
             .with_parent_ids(parent_ids)
             .with_data(EventData::new().with_chunk(chunk_value));
 
-        // Release lock before sending (send only needs &self)
         let run_type = run_info.run_type.clone();
         drop(state);
 
@@ -485,7 +483,6 @@ impl AstreamEventsCallbackHandler {
         let mut data = EventData::new();
         let mut stored_inputs = None;
 
-        // Work-around: Runnable core code sometimes doesn't send input.
         let is_empty_placeholder =
             inputs.len() == 1 && inputs.get("input") == Some(&Value::String(String::new()));
         if !is_empty_placeholder {
@@ -731,14 +728,6 @@ impl AstreamEventsCallbackHandler {
     }
 }
 
-// =============================================================================
-// BaseCallbackHandler implementation
-// =============================================================================
-
-// Bridge from the BaseCallbackHandler mixin trait signatures to the handler's
-// internal methods. The mixin traits use `&self` while the handler uses
-// interior mutability via Mutex.
-
 impl LLMManagerMixin for AstreamEventsCallbackHandler {
     fn on_llm_new_token(
         &self,
@@ -753,7 +742,6 @@ impl LLMManagerMixin for AstreamEventsCallbackHandler {
     }
 
     fn on_llm_end(&self, response: &ChatResult, run_id: Uuid, _parent_run_id: Option<Uuid>) {
-        // Convert ChatResult to LLMResult for the internal handler
         let llm_result = LLMResult {
             generations: vec![
                 response
@@ -942,7 +930,6 @@ impl RunManagerMixin for AstreamEventsCallbackHandler {
         tags: Option<&[String]>,
         metadata: Option<&HashMap<String, serde_json::Value>>,
     ) {
-        // Try to downcast to Value for serialization
         let value = if let Some(v) = data.downcast_ref::<serde_json::Value>() {
             v.clone()
         } else {
@@ -979,17 +966,12 @@ impl std::fmt::Debug for AstreamEventsCallbackHandler {
     }
 }
 
-// =============================================================================
-// StreamingCallbackHandler implementation
-// =============================================================================
-
 impl StreamingCallbackHandler<crate::error::Result<Value>> for AstreamEventsCallbackHandler {
     fn tap_output_aiter(
         &self,
         run_id: Uuid,
         output: Pin<Box<dyn futures::Stream<Item = crate::error::Result<Value>> + Send>>,
     ) -> Pin<Box<dyn futures::Stream<Item = crate::error::Result<Value>> + Send>> {
-        // Atomic check-and-set: if already tapped, pass through
         {
             let mut state = self.state.lock().expect("state lock poisoned");
             if state.is_tapped.contains_key(&run_id) {
@@ -1001,14 +983,12 @@ impl StreamingCallbackHandler<crate::error::Result<Value>> for AstreamEventsCall
         let send_stream = self.send_stream.clone();
         let root_event_filter = self.root_event_filter.clone();
 
-        // Snapshot the state we need for the stream closure
         let state_mutex = &self.state;
         let run_info_snapshot = {
             let state = state_mutex.lock().expect("state lock poisoned");
             state.run_map.get(&run_id).cloned()
         };
 
-        // If there's no run info yet (run hasn't started), just pass through
         let Some(run_info) = run_info_snapshot else {
             return output;
         };
@@ -1046,7 +1026,6 @@ impl StreamingCallbackHandler<crate::error::Result<Value>> for AstreamEventsCall
         run_id: Uuid,
         output: Box<dyn Iterator<Item = crate::error::Result<Value>> + Send>,
     ) -> Box<dyn Iterator<Item = crate::error::Result<Value>> + Send> {
-        // Atomic check-and-set: if already tapped, pass through
         {
             let mut state = self.state.lock().expect("state lock poisoned");
             if state.is_tapped.contains_key(&run_id) {
@@ -1055,15 +1034,9 @@ impl StreamingCallbackHandler<crate::error::Result<Value>> for AstreamEventsCall
             state.is_tapped.insert(run_id, true);
         }
 
-        // Sync iteration — just pass through for now
-        // (astream_events is an async API; sync tap is rarely used)
         output
     }
 }
-
-// =============================================================================
-// astream_events_implementation (free function)
-// =============================================================================
 
 /// Implementation of the astream_events API for V2 runnables.
 ///
@@ -1104,11 +1077,9 @@ where
 
     let mut config = ensure_config(config);
 
-    // Assign a run_id if not already set
     let run_id = config.run_id.unwrap_or_else(|| uuid7(None));
     config.run_id = Some(run_id);
 
-    // Inject the event streamer into callbacks
     let handler: Arc<dyn BaseCallbackHandler> = event_streamer.clone();
     match &mut config.callbacks {
         None => {
@@ -1122,7 +1093,6 @@ where
         }
     }
 
-    // Take the receive stream before starting
     let receive_stream = event_streamer
         .take_receive_stream()
         .expect("receive stream should be available");
@@ -1130,18 +1100,11 @@ where
     let send_stream = event_streamer.get_send_stream();
 
     Box::pin(async_stream::stream! {
-        // Consume the astream output. Callbacks fire synchronously during
-        // each poll of the stream, pushing events into the unbounded channel.
-        // After the stream finishes, close the send stream so the receive
-        // stream terminates.
         let mut astream = std::pin::pin!(runnable.astream(input, Some(config)));
         while let Some(_chunk) = astream.next().await {
-            // Chunks are consumed to drive the runnable forward.
-            // All events are produced via callbacks into the channel.
         }
         if let Err(e) = send_stream.close() { tracing::warn!("Failed to close stream: {e}"); }
 
-        // Now drain all buffered events from the receive stream.
         let mut first_event_sent = false;
         let mut first_event_run_id: Option<String> = None;
 
@@ -1149,7 +1112,6 @@ where
         while let Some(mut event) = event_stream.next().await {
             if !first_event_sent {
                 first_event_sent = true;
-                // Store the run_id of the first event
                 first_event_run_id = match &event {
                     StreamEvent::Standard(e) => Some(e.base.run_id.clone()),
                     StreamEvent::Custom(e) => Some(e.base.run_id.clone()),
@@ -1158,8 +1120,6 @@ where
                 continue;
             }
 
-            // If it's the end event corresponding to the root runnable,
-            // remove the input from data since it was in the first event.
             if let StreamEvent::Standard(ref mut e) = event
                 && Some(&e.base.run_id) == first_event_run_id.as_ref()
                     && e.base.event.ends_with("_end")
@@ -1238,7 +1198,6 @@ mod tests {
         let parent_ids =
             AstreamEventsCallbackHandler::get_parent_ids(&state.parent_map, grandchild_id);
         assert_eq!(parent_ids.len(), 2);
-        // Root first, immediate parent last
         assert_eq!(parent_ids[0], root_id.to_string());
         assert_eq!(parent_ids[1], child_id.to_string());
     }
@@ -1397,17 +1356,14 @@ mod tests {
     fn test_take_receive_stream() {
         let handler = AstreamEventsCallbackHandler::new(None, None, None, None, None, None);
 
-        // First take should succeed
         assert!(handler.take_receive_stream().is_some());
 
-        // Second take should return None
         assert!(handler.take_receive_stream().is_none());
     }
 
     #[test]
     fn test_handler_implements_base_callback_handler() {
         let handler = AstreamEventsCallbackHandler::new(None, None, None, None, None, None);
-        // Verify it can be used as a BaseCallbackHandler
         let _handler_ref: &dyn BaseCallbackHandler = &handler;
         assert_eq!(handler.name(), "AstreamEventsCallbackHandler");
         assert!(handler.run_inline());

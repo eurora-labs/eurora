@@ -9,8 +9,6 @@ use agent_chain_core::outputs::ChatResult;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-// -- FakeHandler to track callback counts --
-
 #[derive(Debug, Default)]
 struct FakeHandler;
 
@@ -26,8 +24,6 @@ impl BaseCallbackHandler for FakeHandler {
         "FakeHandler"
     }
 }
-
-// -- Tests --
 
 /// Ported from `test_async_callback_manager_on_llm_start`.
 #[tokio::test]
@@ -294,7 +290,6 @@ async fn test_async_callback_manager_ignore_llm() {
         .on_llm_start(&HashMap::new(), &["prompt".to_string()], None)
         .await;
 
-    // The run manager is still created (it just won't dispatch to ignored handlers)
     assert_eq!(run_managers.len(), 1);
 }
 
@@ -328,7 +323,6 @@ async fn test_async_callback_manager_ignore_chain() {
         .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
         .await;
 
-    // Run manager created, but the handler's on_chain_start was skipped via ignore
     assert!(!run_manager.run_id().is_nil());
 }
 
@@ -354,7 +348,6 @@ async fn test_async_callback_manager_chain_child_managers() {
         .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
         .await;
 
-    // Child LLM run
     let child_llm_runs = chain_run
         .get_child(None)
         .on_llm_start(&HashMap::new(), &["prompt".to_string()], None)
@@ -362,14 +355,12 @@ async fn test_async_callback_manager_chain_child_managers() {
     assert_eq!(child_llm_runs.len(), 1);
     assert!(!child_llm_runs[0].run_id().is_nil());
 
-    // Child chain run
     let child_chain_run = chain_run
         .get_child(None)
         .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
         .await;
     assert!(!child_chain_run.run_id().is_nil());
 
-    // Child tool run
     let child_tool_run = chain_run
         .get_child(None)
         .on_tool_start(&HashMap::new(), "test", None, None)
@@ -426,8 +417,6 @@ async fn test_async_callback_manager_tags() {
         .await;
 
     assert_eq!(run_managers.len(), 1);
-    // Tags should be propagated to the run manager's inner state
-    // (verified by checking the run manager was created successfully)
     assert!(!run_managers[0].run_id().is_nil());
 }
 
@@ -496,11 +485,9 @@ async fn test_async_callback_manager_concurrent_runs() {
     assert_eq!(runs2.len(), 1);
     assert_eq!(runs3.len(), 1);
 
-    // Each run has a unique ID
     assert_ne!(runs1[0].run_id(), runs2[0].run_id());
     assert_ne!(runs2[0].run_id(), runs3[0].run_id());
 
-    // End all runs
     let result = ChatResult::default();
     tokio::join!(
         runs1[0].on_llm_end(&result),
@@ -516,32 +503,26 @@ async fn test_async_callback_manager_full_lifecycle() {
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
 
-    // Start chain
     let chain_run = manager
         .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
         .await;
 
-    // Start LLM inside chain
     let child_manager = chain_run.get_child(None);
     let llm_runs = child_manager
         .on_llm_start(&HashMap::new(), &["prompt".to_string()], None)
         .await;
     assert_eq!(llm_runs.len(), 1);
 
-    // LLM produces tokens
     llm_runs[0].on_llm_new_token("Hello", None).await;
     llm_runs[0].on_llm_new_token(" World", None).await;
 
-    // LLM ends
     llm_runs[0].on_llm_end(&ChatResult::default()).await;
 
-    // Tool call inside chain
     let child_manager2 = chain_run.get_child(None);
     let tool_run = child_manager2
         .on_tool_start(&HashMap::new(), "test", None, None)
         .await;
     tool_run.on_tool_end("result").await;
 
-    // Chain ends
     chain_run.on_chain_end(&HashMap::new()).await;
 }

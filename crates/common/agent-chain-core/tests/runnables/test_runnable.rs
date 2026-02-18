@@ -16,20 +16,12 @@ use agent_chain_core::runnables::passthrough::{RunnableAssign, RunnablePassthrou
 use futures::StreamExt;
 use serde_json::{Value, json};
 
-// ===========================================================================
-// Helpers
-// ===========================================================================
-
 fn make_input(pairs: &[(&str, Value)]) -> HashMap<String, Value> {
     pairs
         .iter()
         .map(|(k, v)| (k.to_string(), v.clone()))
         .collect()
 }
-
-// ===========================================================================
-// RunnableLambda basic
-// ===========================================================================
 
 /// Test basic RunnableLambda invoke.
 #[test]
@@ -79,10 +71,6 @@ async fn test_runnable_lambda_astream() {
     assert_eq!(output, vec![6]);
 }
 
-// ===========================================================================
-// RunnableSequence (pipe)
-// ===========================================================================
-
 /// Test basic sequence: first | second.
 #[test]
 fn test_sequence_invoke() {
@@ -90,7 +78,6 @@ fn test_sequence_invoke() {
     let double = RunnableLambda::new(|x: i32| Ok(x * 2));
     let seq = pipe(add_one, double);
 
-    // (5 + 1) * 2 = 12
     assert_eq!(seq.invoke(5, None).unwrap(), 12);
 }
 
@@ -112,7 +99,6 @@ fn test_sequence_three_steps() {
     let step3 = RunnableLambda::new(|x: i32| Ok(x - 3));
     let seq = pipe(pipe(step1, step2), step3);
 
-    // ((5 + 1) * 2) - 3 = 9
     assert_eq!(seq.invoke(5, None).unwrap(), 9);
 }
 
@@ -169,7 +155,6 @@ async fn test_runnable_sequence_transform() {
         .collect()
         .await;
 
-    // (5 + 1) * 2 = 12
     assert_eq!(result, vec![12]);
 }
 
@@ -200,10 +185,6 @@ fn test_sequence_name() {
     assert_eq!(seq.name(), Some("my_seq".to_string()));
 }
 
-// ===========================================================================
-// RunnableBinding (with_config, bind)
-// ===========================================================================
-
 /// Mirrors `test_with_config_with_config` (simplified — no LLM, just config merging).
 #[test]
 fn test_with_config_with_config() {
@@ -215,7 +196,6 @@ fn test_with_config_with_config() {
     let mut config2 = RunnableConfig::default();
     config2.tags.push("a-tag".into());
 
-    // Chain with_config calls
     let bound = runnable.with_config(config1).with_config(config2);
     let result = bound.invoke(5, None).unwrap();
     assert_eq!(result, 6);
@@ -231,7 +211,6 @@ fn test_bind_creates_binding() {
         ("one".into(), json!("two")),
     ]);
     let bound = runnable.bind(kwargs);
-    // Should still invoke correctly
     assert_eq!(bound.invoke(5, None).unwrap(), 6);
 }
 
@@ -273,10 +252,6 @@ fn test_with_config_merge_at_invoke() {
     let result = bound.invoke(5, Some(invoke_config)).unwrap();
     assert_eq!(result, 6);
 }
-
-// ===========================================================================
-// RunnableParallel
-// ===========================================================================
 
 /// Test basic parallel execution.
 #[test]
@@ -328,10 +303,6 @@ fn test_parallel_error_in_branch() {
     let result = parallel.invoke(5, None);
     assert!(result.is_err());
 }
-
-// ===========================================================================
-// RunnableEach (map)
-// ===========================================================================
 
 /// Mirrors `test_each_simple`.
 #[test]
@@ -389,10 +360,6 @@ fn test_each_name() {
     assert_eq!(each.name(), Some("RunnableEach<identity>".to_string()));
 }
 
-// ===========================================================================
-// Sequence + Parallel composition
-// ===========================================================================
-
 /// Mirrors `test_combining_sequences` (simplified — no prompts).
 ///
 /// Tests: int → parallel(doubled, tripled) → pick one.
@@ -409,10 +376,6 @@ fn test_combining_sequences() {
     let chain = pipe(parallel, pick);
     assert_eq!(chain.invoke(5, None).unwrap(), 10);
 }
-
-// ===========================================================================
-// Transform with dicts
-// ===========================================================================
 
 /// Mirrors `test_transform_of_runnable_lambda_with_dicts`.
 #[tokio::test]
@@ -478,10 +441,6 @@ async fn test_passthrough_transform_with_dicts() {
     assert_eq!(result[1]["foo"], json!("n"));
 }
 
-// ===========================================================================
-// Batch
-// ===========================================================================
-
 /// Test RunnableLambda batch.
 #[test]
 fn test_lambda_batch() {
@@ -532,10 +491,6 @@ fn test_empty_batch() {
     assert!(results.is_empty());
 }
 
-// ===========================================================================
-// Async batch
-// ===========================================================================
-
 /// Test async lambda batch.
 #[tokio::test]
 async fn test_lambda_abatch() {
@@ -557,10 +512,6 @@ async fn test_sequence_abatch() {
     assert_eq!(values, vec![4, 6, 8]);
 }
 
-// ===========================================================================
-// RunnableAssign
-// ===========================================================================
-
 /// Mirrors `test_runnable_assign`.
 #[test]
 fn test_runnable_assign() {
@@ -579,10 +530,6 @@ fn test_runnable_assign() {
     assert_eq!(result["input"], json!(5));
     assert_eq!(result["add_step"], json!({"added": 15}));
 }
-
-// ===========================================================================
-// Representation / Debug
-// ===========================================================================
 
 /// Mirrors `test_representation_of_runnables`.
 #[test]
@@ -613,10 +560,6 @@ fn test_representation_of_runnables() {
     assert!(repr.contains("RunnableEach"));
 }
 
-// ===========================================================================
-// Default method implementations
-// ===========================================================================
-
 /// Mirrors `test_default_method_implementations`.
 ///
 /// All runnables should support invoke, batch, and stream via defaults.
@@ -624,10 +567,8 @@ fn test_representation_of_runnables() {
 fn test_default_method_implementations() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
 
-    // invoke
     assert_eq!(runnable.invoke(5, None).unwrap(), 6);
 
-    // batch
     let results = runnable.batch(vec![1, 2, 3], None, false);
     let values: Vec<i32> = results.into_iter().map(|r| r.unwrap()).collect();
     assert_eq!(values, vec![2, 3, 4]);
@@ -638,15 +579,12 @@ fn test_default_method_implementations() {
 async fn test_default_method_implementations_async() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
 
-    // ainvoke
     assert_eq!(runnable.ainvoke(5, None).await.unwrap(), 6);
 
-    // abatch
     let results = runnable.abatch(vec![1, 2, 3], None, false).await;
     let values: Vec<i32> = results.into_iter().map(|r| r.unwrap()).collect();
     assert_eq!(values, vec![2, 3, 4]);
 
-    // astream
     let output: Vec<i32> = runnable
         .astream(5, None)
         .filter_map(|r| async { r.ok() })
@@ -654,10 +592,6 @@ async fn test_default_method_implementations_async() {
         .await;
     assert_eq!(output, vec![6]);
 }
-
-// ===========================================================================
-// Schema delegation in sequences and parallels
-// ===========================================================================
 
 /// Test schema on sequence.
 #[test]
@@ -689,17 +623,12 @@ fn test_binding_schema_delegation() {
     let inner = RunnableLambda::new(|x: i32| Ok(x + 1)).with_name("inner");
     let bound = inner.with_config(RunnableConfig::default());
 
-    // Schema should delegate to inner runnable
     let inner_schema = RunnableLambda::new(|x: i32| Ok(x + 1))
         .with_name("inner")
         .get_input_schema(None);
 
     assert_eq!(bound.get_input_schema(None), inner_schema);
 }
-
-// ===========================================================================
-// get_name
-// ===========================================================================
 
 /// Test get_name with suffix.
 #[test]
@@ -724,10 +653,6 @@ fn test_get_name_override() {
     let name = runnable.get_name(None, Some("override"));
     assert_eq!(name, "override");
 }
-
-// ===========================================================================
-// Misc
-// ===========================================================================
 
 /// Test that invoke call count is exactly 1 for each input in each.
 #[test]
@@ -810,7 +735,6 @@ fn test_type_name() {
 #[test]
 fn test_parallel_default() {
     let parallel = RunnableParallel::<i32>::default();
-    // Empty parallel should return empty HashMap
     let result = parallel.invoke(5, None).unwrap();
     assert!(result.is_empty());
 }
@@ -824,10 +748,6 @@ fn test_binding_debug() {
     assert!(debug.contains("RunnableBinding"));
     assert!(debug.contains("key"));
 }
-
-// =============================================================================
-// Tests for Runnable convenience methods (Phase 39)
-// =============================================================================
 
 /// Test pick() convenience method with a single key.
 #[test]

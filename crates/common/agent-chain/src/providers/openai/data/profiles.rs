@@ -231,7 +231,6 @@ fn build_profiles() -> ModelProfileRegistry {
         },
     );
 
-    // gpt-3.5-turbo has specific overrides from profile_augmentations.toml
     registry.insert(
         "gpt-3.5-turbo".to_string(),
         ModelProfile {

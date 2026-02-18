@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 /// - Structured output support
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ModelProfile {
-    // --- Input constraints ---
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_input_tokens: Option<u32>,
 
@@ -38,7 +37,6 @@ pub struct ModelProfile {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pdf_tool_message: Option<bool>,
 
-    // --- Output constraints ---
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_output_tokens: Option<u32>,
 
@@ -54,14 +52,12 @@ pub struct ModelProfile {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub video_outputs: Option<bool>,
 
-    // --- Tool calling ---
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calling: Option<bool>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<bool>,
 
-    // --- Structured output ---
     #[serde(skip_serializing_if = "Option::is_none")]
     pub structured_output: Option<bool>,
 }

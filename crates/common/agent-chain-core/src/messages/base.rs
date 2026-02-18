@@ -663,18 +663,15 @@ pub fn merge_content_complex(
 
     for content in contents {
         merged = match (merged, content) {
-            // String + String → concatenation
             (MergeableContent::Text(mut left), MergeableContent::Text(right)) => {
                 left.push_str(&right);
                 MergeableContent::Text(left)
             }
-            // String + List → prepend string to list
             (MergeableContent::Text(left), MergeableContent::List(right)) => {
                 let mut new_list = vec![Value::String(left)];
                 new_list.extend(right);
                 MergeableContent::List(new_list)
             }
-            // List + List → merge_lists
             (MergeableContent::List(left), MergeableContent::List(right)) => {
                 match merge_lists(Some(left.clone()), vec![Some(right.clone())]) {
                     Ok(Some(merged_list)) => MergeableContent::List(merged_list),
@@ -685,21 +682,14 @@ pub fn merge_content_complex(
                     }
                 }
             }
-            // List + String → append to last string element or add new
             (MergeableContent::List(mut left), MergeableContent::Text(right)) => {
-                if right.is_empty() {
-                    // Empty string is a no-op
-                } else if left.is_empty() {
-                    // Empty list, do nothing (matches Python: `elif merged:`)
-                } else if let Some(last) = left.last_mut()
-                    && last.is_string()
-                {
-                    // Last element is a string, append to it
-                    if let Value::String(s) = last {
+                if !left.is_empty() && left.last().is_some_and(|v| v.is_string()) {
+                    if let Some(Value::String(s)) = left.last_mut() {
                         s.push_str(&right);
                     }
-                } else {
-                    // Last element is not a string, add as new element
+                } else if right.is_empty() {
+                    // no-op
+                } else if !left.is_empty() {
                     left.push(Value::String(right));
                 }
                 MergeableContent::List(left)
@@ -723,13 +713,10 @@ pub fn merge_content_vec(first: Vec<Value>, second: Vec<Value>) -> Vec<Value> {
 /// The dict will have a `type` key with the message type and a `data` key
 /// with the message data as a dict (all fields serialized).
 pub fn message_to_dict(message: &BaseMessage) -> Value {
-    // Serialize the message using serde - this includes the "type" field
     let mut data = serde_json::to_value(message).unwrap_or_default();
 
-    // Extract the type from the serialized data (it's included by the Serialize impl)
     let msg_type = message.message_type();
 
-    // Remove the "type" field from data since we'll put it at the top level
     if let Some(obj) = data.as_object_mut() {
         obj.remove("type");
     }

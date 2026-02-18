@@ -39,7 +39,6 @@ mod llm_result_tests {
             vec![gen3.into()],
         ]);
         assert_eq!(result.generations.len(), 3);
-        // Check text of each generation
         if let GenerationType::Generation(g) = &result.generations[0][0] {
             assert_eq!(g.text, "Response 1");
         }
@@ -186,7 +185,6 @@ mod llm_result_tests {
         ]);
         let flattened = result.flatten();
         assert_eq!(flattened.len(), 3);
-        // Each flattened result should have one generation list
         for f in &flattened {
             assert_eq!(f.generations.len(), 1);
         }
@@ -230,12 +228,10 @@ mod llm_result_tests {
             LLMResult::with_llm_output(vec![vec![gen1.into()], vec![gen2.into()]], llm_output);
         let flattened = result.flatten();
         assert!(flattened[1].llm_output.is_some());
-        // token_usage should be empty for subsequent results
         assert_eq!(
             flattened[1].llm_output.as_ref().unwrap().get("token_usage"),
             Some(&json!({}))
         );
-        // Other fields should be preserved
         assert_eq!(
             flattened[1].llm_output.as_ref().unwrap().get("model"),
             Some(&json!("gpt-4"))
@@ -346,12 +342,10 @@ mod llm_result_tests {
         let chat_gen = ChatGeneration::new(AIMessage::builder().content("Chat").build().into());
         let result = LLMResult::new(vec![vec![generation.into()], vec![chat_gen.into()]]);
         assert_eq!(result.generations.len(), 2);
-        // First should be Generation
         assert!(matches!(
             result.generations[0][0],
             GenerationType::Generation(_)
         ));
-        // Second should be ChatGeneration
         assert!(matches!(
             result.generations[1][0],
             GenerationType::ChatGeneration(_)
@@ -421,18 +415,15 @@ mod llm_result_flatten_tests {
         let result =
             LLMResult::with_llm_output(vec![vec![gen1.into()], vec![gen2.into()]], llm_output);
         let mut flattened = result.flatten();
-        // Mutate the second flattened result's llm_output
         flattened[1]
             .llm_output
             .as_mut()
             .unwrap()
             .insert("model".to_string(), json!("modified"));
-        // Original should not be affected
         assert_eq!(
             result.llm_output.as_ref().unwrap().get("model"),
             Some(&json!("gpt-4"))
         );
-        // First flattened result should not be affected
         assert_eq!(
             flattened[0].llm_output.as_ref().unwrap().get("model"),
             Some(&json!("gpt-4"))

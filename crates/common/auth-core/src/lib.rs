@@ -8,7 +8,6 @@ use specta::Type;
 pub enum Role {
     Free,
     Tier1,
-    Enterprise,
 }
 
 impl Role {
@@ -16,7 +15,6 @@ impl Role {
         match self {
             Role::Free => 0,
             Role::Tier1 => 1,
-            Role::Enterprise => 2,
         }
     }
 }
@@ -26,7 +24,6 @@ impl std::fmt::Display for Role {
         match self {
             Role::Free => write!(f, "Free"),
             Role::Tier1 => write!(f, "Tier1"),
-            Role::Enterprise => write!(f, "Enterprise"),
         }
     }
 }

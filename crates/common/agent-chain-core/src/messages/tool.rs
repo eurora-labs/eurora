@@ -205,7 +205,6 @@ impl Serialize for ToolMessage {
         if self.artifact.is_some() {
             field_count += 1;
         }
-        // Add 1 for additional type field
         field_count += 1;
 
         let mut map = serializer.serialize_map(Some(field_count))?;
@@ -381,7 +380,6 @@ impl Serialize for ToolMessageChunk {
         if self.artifact.is_some() {
             field_count += 1;
         }
-        // Add 1 for additional type field
         field_count += 1;
 
         let mut map = serializer.serialize_map(Some(field_count))?;
@@ -450,7 +448,6 @@ impl ToolMessageChunk {
 
         let content = merge_content(self.content.as_text_ref(), other.content.as_text_ref()).into();
 
-        // Merge artifact using merge_obj (matching Python)
         let artifact = match (&self.artifact, &other.artifact) {
             (Some(left), Some(right)) => merge_obj(left.clone(), right.clone()).ok(),
             (Some(left), None) => Some(left.clone()),
@@ -458,7 +455,6 @@ impl ToolMessageChunk {
             (None, None) => None,
         };
 
-        // Merge additional_kwargs using merge_dicts (matching Python BaseMessageChunk.__add__)
         let additional_kwargs = {
             let left_val = serde_json::to_value(&self.additional_kwargs).unwrap_or_default();
             let right_val = serde_json::to_value(&other.additional_kwargs).unwrap_or_default();
@@ -468,7 +464,6 @@ impl ToolMessageChunk {
             }
         };
 
-        // Merge response_metadata using merge_dicts (matching Python BaseMessageChunk.__add__)
         let response_metadata = {
             let left_val = serde_json::to_value(&self.response_metadata).unwrap_or_default();
             let right_val = serde_json::to_value(&other.response_metadata).unwrap_or_default();
@@ -620,7 +615,6 @@ pub fn default_tool_parser(
 
         match serde_json::from_str::<serde_json::Value>(arguments_str) {
             Ok(args) => {
-                // Matches Python: `function_args or {}` — falsy values become empty dict
                 let args = if args.is_object() {
                     args
                 } else {
@@ -676,8 +670,6 @@ pub fn default_tool_chunk_parser(raw_tool_calls: &[serde_json::Value]) -> Vec<To
 
     chunks
 }
-
-// --- Serializable impls ---
 
 use crate::load::Serializable;
 

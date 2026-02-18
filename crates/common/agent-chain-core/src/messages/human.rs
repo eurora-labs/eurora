@@ -14,7 +14,7 @@ use super::system::SystemMessageChunk;
 use crate::load::Serializable;
 use crate::utils::merge::{merge_dicts, merge_lists};
 
-/// A human message in the conversation.
+/// A human message in the thread.
 ///
 /// Human messages support both simple text content and multimodal content
 /// with images. Use [`HumanMessage::builder()`] to construct messages.
@@ -116,8 +116,6 @@ impl HumanMessage {
         #[builder(default)] response_metadata: HashMap<String, serde_json::Value>,
     ) -> Self {
         let resolved_content = if let Some(blocks) = content_blocks {
-            // Convert ContentBlock list to Parts, matching Python behavior
-            // where content_blocks is passed as content to BaseMessage.__init__
             let parts: Vec<ContentPart> = blocks
                 .into_iter()
                 .filter_map(|block| serde_json::to_value(&block).ok().map(ContentPart::Other))
@@ -217,10 +215,8 @@ impl HumanMessage {
         use crate::messages::block_translators::anthropic::convert_input_to_standard_blocks as anthropic_convert;
         use crate::messages::block_translators::openai::convert_to_v1_from_chat_completions_input;
 
-        // First pass: classify content items (mirrors Python BaseMessage.content_blocks)
         let mut blocks: Vec<serde_json::Value> = Vec::new();
 
-        // Normalize content to a list of items
         let items: Vec<serde_json::Value> = match &self.content {
             MessageContent::Text(s) => {
                 if s.is_empty() {
@@ -237,35 +233,21 @@ impl HumanMessage {
 
         for item in items {
             if let Some(s) = item.as_str() {
-                // Plain string content is treated as a text block
                 blocks.push(serde_json::json!({"type": "text", "text": s}));
             } else if item.is_object() {
                 let item_type = item.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
-                if !KNOWN_BLOCK_TYPES.contains(&item_type) {
-                    // Unknown type: wrap as non_standard
-                    blocks.push(serde_json::json!({"type": "non_standard", "value": item}));
-                } else if item.get("source_type").is_some() {
-                    // Guard against v0 blocks that share the same `type` keys
+                if !KNOWN_BLOCK_TYPES.contains(&item_type) || item.get("source_type").is_some() {
                     blocks.push(serde_json::json!({"type": "non_standard", "value": item}));
                 } else {
-                    // Known v1 block type
                     blocks.push(item);
                 }
             }
         }
 
-        // Second pass: sequentially apply input converters to unpack non_standard blocks
-        // Mirrors the parsing steps in Python BaseMessage.content_blocks:
-        //   _convert_v0_multimodal_input_to_v1  (not yet implemented in Rust)
-        //   _convert_to_v1_from_chat_completions_input
-        //   _convert_to_v1_from_anthropic_input
-        //   _convert_to_v1_from_genai_input  (not yet implemented in Rust)
-        //   _convert_to_v1_from_converse_input  (not yet implemented in Rust)
         blocks = convert_to_v1_from_chat_completions_input(&blocks);
         blocks = anthropic_convert(&blocks);
 
-        // Deserialize JSON blocks into ContentBlock enum variants
         blocks
             .into_iter()
             .map(|v| {
@@ -441,7 +423,6 @@ impl HumanMessageChunk {
                 MessageContent::Text(merge_content(a, b))
             }
             (MessageContent::Parts(a), MessageContent::Parts(b)) => {
-                // Serialize parts to JSON Values for index-aware merging
                 let left: Vec<serde_json::Value> = a
                     .iter()
                     .filter_map(|p| serde_json::to_value(p).ok())
@@ -450,7 +431,6 @@ impl HumanMessageChunk {
                     .iter()
                     .filter_map(|p| serde_json::to_value(p).ok())
                     .collect();
-                // Use merge_lists for index-aware merging (matching Python behavior)
                 match merge_lists(Some(left.clone()), vec![Some(right.clone())]) {
                     Ok(Some(merged)) => {
                         let parts: Vec<ContentPart> = merged
@@ -460,7 +440,6 @@ impl HumanMessageChunk {
                         MessageContent::Parts(parts)
                     }
                     _ => {
-                        // Fallback: simple extend
                         let mut parts = a.clone();
                         parts.extend(b.clone());
                         MessageContent::Parts(parts)
@@ -479,7 +458,6 @@ impl HumanMessageChunk {
             }
         };
 
-        // Merge additional_kwargs using merge_dicts (recursive deep merge)
         let additional_kwargs = {
             let left_val = serde_json::to_value(&self.additional_kwargs).unwrap_or_default();
             let right_val = serde_json::to_value(&other.additional_kwargs).unwrap_or_default();
@@ -489,7 +467,6 @@ impl HumanMessageChunk {
             }
         };
 
-        // Merge response_metadata using merge_dicts (recursive deep merge)
         let response_metadata = {
             let left_val = serde_json::to_value(&self.response_metadata).unwrap_or_default();
             let right_val = serde_json::to_value(&other.response_metadata).unwrap_or_default();

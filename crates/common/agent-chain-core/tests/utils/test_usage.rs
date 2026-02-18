@@ -35,7 +35,6 @@ fn test_dict_int_op_max_depth_exceeded() {
     let right = json!({"a": {"b": {"c": 2}}});
     let result = dict_int_op(&left, &right, |x, y| x + y, 0, 2);
     assert!(matches!(result, Err(UsageError::MaxDepthExceeded(2))));
-    // Verify the error message
     if let Err(e) = result {
         assert!(
             e.to_string().contains("max_depth=2 exceeded"),
@@ -51,7 +50,6 @@ fn test_dict_int_op_invalid_types() {
     let right = json!({"a": 2, "b": 3});
     let result = dict_int_op(&left, &right, |x, y| x + y, 0, 100);
     assert!(matches!(result, Err(UsageError::TypeMismatch { .. })));
-    // Verify the error message
     if let Err(e) = result {
         assert!(
             e.to_string()

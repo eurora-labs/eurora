@@ -14,16 +14,16 @@ use euro_tauri::{
         auth_procedures::{AuthApi, AuthApiImpl},
         chat_procedures::{ChatApi, ChatApiImpl},
         context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
-        conversation_procedures::{ConversationApi, ConversationApiImpl},
         monitor_procedures::{MonitorApi, MonitorApiImpl},
         onboarding_procedures::{OnboardingApi, OnboardingApiImpl},
         prompt_procedures::{PromptApi, PromptApiImpl},
         settings_procedures::{SettingsApi, SettingsApiImpl},
         system_procedures::{SystemApi, SystemApiImpl},
         third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
+        thread_procedures::{ThreadApi, ThreadApiImpl},
         timeline_procedures::{TauRpcTimelineApiEventTrigger, TimelineApi, TimelineApiImpl},
     },
-    shared_types::SharedConversationManager,
+    shared_types::SharedThreadManager,
 };
 use euro_timeline::TimelineManager;
 use tauri::{
@@ -395,13 +395,11 @@ fn main() {
                         .build(tauri_app)
                         .expect("Failed to create tray icon");
 
-                    let conversation_handle = app_handle.clone();
-                    let conversation_channel_rx = endpoint_manager.subscribe();
+                    let thread_handle = app_handle.clone();
+                    let thread_channel_rx = endpoint_manager.subscribe();
                     tauri::async_runtime::spawn(async move {
-                        let conversation_manager =
-                            euro_conversation::ConversationManager::new(conversation_channel_rx);
-                        conversation_handle
-                            .manage(SharedConversationManager::new(conversation_manager));
+                        let thread_manager = euro_thread::ThreadManager::new(thread_channel_rx);
+                        thread_handle.manage(SharedThreadManager::new(thread_manager));
                     });
 
                     let timeline_handle = app_handle.clone();
@@ -553,7 +551,7 @@ fn main() {
                 )
                 .merge(AuthApiImpl.into_handler())
                 .merge(TimelineApiImpl.into_handler())
-                .merge(ConversationApiImpl.into_handler())
+                .merge(ThreadApiImpl.into_handler())
                 .merge(SettingsApiImpl.into_handler())
                 .merge(ThirdPartyApiImpl.into_handler())
                 .merge(MonitorApiImpl.into_handler())

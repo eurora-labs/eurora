@@ -64,7 +64,6 @@ pub fn convert_to_standard_blocks_with_message_context(
 ) -> Vec<Value> {
     let mut content_blocks: Vec<Value> = Vec::new();
 
-    // Extract reasoning from additional_kwargs
     if let Some(reasoning) = extract_reasoning_from_additional_kwargs(additional_kwargs) {
         content_blocks.push(json!({
             "type": "reasoning",
@@ -72,13 +71,11 @@ pub fn convert_to_standard_blocks_with_message_context(
         }));
     }
 
-    // Process executed tools from additional_kwargs
     if let Some(Value::Array(executed_tools)) = additional_kwargs.get("executed_tools") {
         for (idx, executed_tool) in executed_tools.iter().enumerate() {
             let mut args: Option<Value> = None;
 
             if let Some(arguments) = executed_tool.get("arguments").and_then(|a| a.as_str()) {
-                // Try parsing as JSON first
                 match serde_json::from_str::<Value>(arguments) {
                     Ok(parsed) if parsed.is_object() => {
                         args = Some(parsed);
@@ -96,10 +93,8 @@ pub fn convert_to_standard_blocks_with_message_context(
                         if tool_type == "python" {
                             args = parse_code_json(arguments);
                         } else if tool_type == "function" && tool_name == "python" {
-                            // GPT-OSS
                             args = Some(json!({"code": arguments}));
                         }
-                        // If none matched, skip this tool
                     }
                 }
             }
@@ -153,9 +148,7 @@ pub fn convert_to_standard_blocks_with_message_context(
         }
     }
 
-    // Add text content
     if content.is_empty() {
-        // Content is a string, not blocks
         if let Some(text) = text_content
             && !text.is_empty()
         {
@@ -165,7 +158,6 @@ pub fn convert_to_standard_blocks_with_message_context(
             }));
         }
     } else {
-        // Content is blocks — pass through text blocks
         for block in content {
             if let Some(block_type) = block.get("type").and_then(|v| v.as_str()) {
                 if block_type == "text" {
@@ -182,7 +174,6 @@ pub fn convert_to_standard_blocks_with_message_context(
         }
     }
 
-    // Add tool calls from message.tool_calls
     for tool_call in tool_calls {
         content_blocks.push(json!({
             "type": "tool_call",
@@ -388,12 +379,10 @@ mod tests {
             &[],
             None,
         );
-        // server_tool_call + server_tool_result
         assert_eq!(result.len(), 2);
         let tool_result = &result[1];
         assert_eq!(tool_result["type"], "server_tool_result");
         assert_eq!(tool_result["extras"]["custom_field"], "custom_value");
-        // "name" is an extra field since it's not in known_fields
         assert_eq!(tool_result["extras"].get("type"), None);
     }
 
@@ -404,7 +393,6 @@ mod tests {
             json!({"type": "image", "url": "http://example.com/img.png"}),
         ];
         let result = convert_to_standard_blocks(&content, false);
-        // Only text blocks are passed through in groq
         assert_eq!(result.len(), 1);
         assert_eq!(result[0]["type"], "text");
         assert_eq!(result[0]["text"], "Hello");
@@ -449,7 +437,6 @@ mod tests {
             Some("The answer is 4"),
         );
 
-        // reasoning + server_tool_call + server_tool_result + text + tool_call
         assert_eq!(result.len(), 5);
         assert_eq!(result[0]["type"], "reasoning");
         assert_eq!(result[1]["type"], "server_tool_call");

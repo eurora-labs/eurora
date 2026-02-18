@@ -16,10 +16,6 @@ use agent_chain_core::runnables::schema::{
 use agent_chain_core::runnables::utils::RootEventFilter;
 use serde_json::json;
 
-// ===========================================================================
-// EventData
-// ===========================================================================
-
 #[test]
 fn test_event_data_default() {
     let data = EventData::new();
@@ -93,10 +89,6 @@ fn test_event_data_serialization_roundtrip() {
     assert!(deserialized.error.is_none());
 }
 
-// ===========================================================================
-// BaseStreamEvent
-// ===========================================================================
-
 #[test]
 fn test_base_stream_event_new() {
     let event = BaseStreamEvent::new("on_chain_start", "run-123");
@@ -129,10 +121,6 @@ fn test_base_stream_event_with_parent_ids() {
     assert_eq!(event.parent_ids, vec!["run-root", "run-parent"]);
 }
 
-// ===========================================================================
-// StandardStreamEvent — lifecycle patterns
-// ===========================================================================
-
 /// Mirrors the event structure from `test_event_stream_with_single_lambda`:
 /// on_chain_start → on_chain_stream → on_chain_end.
 #[test]
@@ -140,7 +128,6 @@ fn test_standard_event_chain_lifecycle() {
     let run_id = "run-abc";
     let name = "reverse";
 
-    // Start event
     let start = StandardStreamEvent::new("on_chain_start", run_id, name)
         .with_tags(vec!["seq:step:1".into()])
         .with_data(EventData::new().with_input(json!("hello")));
@@ -148,14 +135,12 @@ fn test_standard_event_chain_lifecycle() {
     assert_eq!(start.name, "reverse");
     assert_eq!(start.data.input, Some(json!("hello")));
 
-    // Stream event
     let stream = StandardStreamEvent::new("on_chain_stream", run_id, name)
         .with_tags(vec!["seq:step:1".into()])
         .with_data(EventData::new().with_chunk(json!("olleh")));
     assert_eq!(stream.base.event, "on_chain_stream");
     assert_eq!(stream.data.chunk, Some(json!("olleh")));
 
-    // End event
     let end = StandardStreamEvent::new("on_chain_end", run_id, name)
         .with_tags(vec!["seq:step:1".into()])
         .with_data(
@@ -219,10 +204,6 @@ fn test_standard_event_serialization_roundtrip() {
     );
 }
 
-// ===========================================================================
-// CustomStreamEvent — mirrors test_custom_event / test_custom_event_nested
-// ===========================================================================
-
 #[test]
 fn test_custom_event_type_constant() {
     assert_eq!(CUSTOM_EVENT_TYPE, "on_custom_event");
@@ -276,10 +257,6 @@ fn test_custom_event_serialization_roundtrip() {
     assert_eq!(deserialized.data, json!({"custom": "data"}));
     assert_eq!(deserialized.base.tags, vec!["t1"]);
 }
-
-// ===========================================================================
-// StreamEvent enum
-// ===========================================================================
 
 #[test]
 fn test_stream_event_standard_variant() {
@@ -335,10 +312,6 @@ fn test_stream_event_with_parent_ids() {
     assert_eq!(event.parent_ids(), &["run-root"]);
 }
 
-// ===========================================================================
-// RootEventFilter — mirrors test_event_stream_with_triple_lambda_test_filtering
-// ===========================================================================
-
 #[test]
 fn test_filter_default_includes_all() {
     let filter = RootEventFilter::new();
@@ -387,11 +360,8 @@ fn test_filter_include_tags_exclude_names() {
     let tagged_3 = vec!["my_tag".into(), "seq:step:3".into()];
     let untagged = vec!["seq:step:1".into()];
 
-    // Name "2" is excluded even though it has the tag
     assert!(!filter.include_event("2", &tagged_2, "chain"));
-    // Name "3" has the tag and is not excluded
     assert!(filter.include_event("3", &tagged_3, "chain"));
-    // Name "1" doesn't have the tag
     assert!(!filter.include_event("1", &untagged, "chain"));
 }
 
@@ -468,7 +438,6 @@ fn test_filter_include_names_and_types() {
         ..Default::default()
     };
 
-    // Either name OR type match should include
     assert!(filter.include_event("specific_name", &[], "chain"));
     assert!(filter.include_event("any_name", &[], "llm"));
     assert!(!filter.include_event("other_name", &[], "chain"));
@@ -485,13 +454,8 @@ fn test_filter_empty_tags_list() {
     assert!(!filter.include_event("foo", &empty_tags, "chain"));
 }
 
-// ===========================================================================
-// Event type string patterns (mirrors Python event name conventions)
-// ===========================================================================
-
 #[test]
 fn test_event_type_naming_conventions() {
-    // Verify the naming conventions used in events
     let event_types = [
         "on_chain_start",
         "on_chain_stream",
@@ -520,19 +484,16 @@ fn test_event_type_naming_conventions() {
 /// stream events carry chunks.
 #[test]
 fn test_event_data_conventions() {
-    // Start event: has input
     let start_data = EventData::new().with_input(json!("hello"));
     assert!(start_data.input.is_some());
     assert!(start_data.output.is_none());
     assert!(start_data.chunk.is_none());
 
-    // Stream event: has chunk
     let stream_data = EventData::new().with_chunk(json!("partial"));
     assert!(stream_data.input.is_none());
     assert!(stream_data.output.is_none());
     assert!(stream_data.chunk.is_some());
 
-    // End event: has input + output
     let end_data = EventData::new()
         .with_input(json!("hello"))
         .with_output(json!("olleh"));
@@ -540,7 +501,6 @@ fn test_event_data_conventions() {
     assert!(end_data.output.is_some());
     assert!(end_data.chunk.is_none());
 
-    // Error event: has error
     let error_data = EventData::new().with_error("ValueError: x is too large");
     assert!(error_data.error.is_some());
 }

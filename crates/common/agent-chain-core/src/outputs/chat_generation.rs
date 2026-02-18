@@ -100,7 +100,6 @@ impl ChatGeneration {
 fn extract_text_from_message(message: &BaseMessage) -> String {
     let content = message.content();
 
-    // Get content blocks for Parts content or JSON-encoded Text content
     let blocks: Option<Vec<Value>> = match content {
         crate::messages::content::MessageContent::Parts(_) => Some(content.as_json_values()),
         crate::messages::content::MessageContent::Text(s) => serde_json::from_str(s).ok(),

@@ -131,15 +131,12 @@ fn test_dereference_refs_nested_refs_no_skip() {
             },
         },
     });
-    // Empty skip_keys means no keys are skipped
     let actual = dereference_refs(&schema, None, Some(&[]));
     assert_eq!(actual, expected);
 }
 
 #[test]
 fn test_dereference_refs_missing_ref() {
-    // In the Python implementation, missing refs raise KeyError.
-    // In the Rust implementation, missing refs return null.
     let schema = json!({
         "type": "object",
         "properties": {
@@ -148,14 +145,11 @@ fn test_dereference_refs_missing_ref() {
         "$defs": {},
     });
     let actual = dereference_refs(&schema, None, None);
-    // The resolved reference should be null since "name" doesn't exist in $defs
     assert!(actual["properties"]["first_name"].is_null());
 }
 
 #[test]
 fn test_dereference_refs_remote_ref() {
-    // In the Python implementation, remote refs raise ValueError.
-    // In the Rust implementation, remote refs return null since they don't start with "#".
     let schema = json!({
         "type": "object",
         "properties": {
@@ -163,14 +157,11 @@ fn test_dereference_refs_remote_ref() {
         },
     });
     let actual = dereference_refs(&schema, None, None);
-    // Remote refs are not resolved, should return null
     assert!(actual["properties"]["first_name"].is_null());
 }
 
 #[test]
 fn test_dereference_refs_integer_ref() {
-    // In Python, $defs can have integer keys. In Rust with serde_json,
-    // JSON object keys are always strings, so we use "400" as a string key.
     let schema = json!({
         "type": "object",
         "properties": {
@@ -289,8 +280,6 @@ fn test_dereference_refs_cyclical_refs() {
 
 #[test]
 fn test_dereference_refs_list_index() {
-    // Test dereferencing refs that use list indices (e.g., anyOf/1).
-    // Test case from the issue report - anyOf array with numeric index reference
     let schema = json!({
         "type": "object",
         "properties": {
@@ -352,7 +341,6 @@ fn test_dereference_refs_list_index() {
 
 #[test]
 fn test_dereference_refs_list_index_oneof() {
-    // Test oneOf array with numeric index reference
     let schema_oneof = json!({
         "type": "object",
         "properties": {
@@ -388,7 +376,6 @@ fn test_dereference_refs_list_index_oneof() {
 
 #[test]
 fn test_dereference_refs_list_index_allof() {
-    // Test allOf array with numeric index reference
     let schema_allof = json!({
         "type": "object",
         "allOf": [
@@ -413,7 +400,6 @@ fn test_dereference_refs_list_index_allof() {
 
 #[test]
 fn test_dereference_refs_list_index_out_of_bounds() {
-    // Test edge case: out-of-bounds index should return null
     let schema_invalid = json!({
         "type": "object",
         "properties": {
@@ -423,13 +409,11 @@ fn test_dereference_refs_list_index_out_of_bounds() {
     });
 
     let actual = dereference_refs(&schema_invalid, None, None);
-    // Out of bounds should resolve to null
     assert!(actual["properties"]["invalid"].is_null());
 }
 
 #[test]
 fn test_dereference_refs_list_index_negative() {
-    // Test edge case: negative index should return null
     let schema_negative = json!({
         "type": "object",
         "properties": {
@@ -439,13 +423,11 @@ fn test_dereference_refs_list_index_negative() {
     });
 
     let actual = dereference_refs(&schema_negative, None, None);
-    // Negative index should return null (not supported)
     assert!(actual["properties"]["invalid"].is_null());
 }
 
 #[test]
 fn test_dereference_refs_mixed_ref_with_properties() {
-    // Test dereferencing refs that have $ref plus other properties.
     let schema = json!({
         "type": "object",
         "properties": {
@@ -477,7 +459,6 @@ fn test_dereference_refs_mixed_ref_with_properties() {
 
 #[test]
 fn test_dereference_refs_complex_pattern() {
-    // Test pattern that caused infinite recursion in MCP server schemas.
     let schema = json!({
         "type": "object",
         "properties": {
@@ -502,7 +483,6 @@ fn test_dereference_refs_complex_pattern() {
         },
     });
 
-    // This should not cause infinite recursion
     let actual = dereference_refs(&schema, None, None);
 
     let expected = json!({
@@ -550,7 +530,6 @@ fn test_dereference_refs_complex_pattern() {
 
 #[test]
 fn test_dereference_refs_cyclical_mixed_refs() {
-    // Test cyclical references with mixed $ref properties don't cause loops.
     let schema = json!({
         "type": "object",
         "properties": {"node": {"$ref": "#/$defs/Node"}},
@@ -566,7 +545,6 @@ fn test_dereference_refs_cyclical_mixed_refs() {
         },
     });
 
-    // This should handle cycles gracefully
     let actual = dereference_refs(&schema, None, None);
 
     assert_eq!(
@@ -599,7 +577,6 @@ fn test_dereference_refs_cyclical_mixed_refs() {
 
 #[test]
 fn test_dereference_refs_empty_mixed_ref() {
-    // Test mixed $ref with empty other properties.
     let schema = json!({
         "type": "object",
         "properties": {"data": {"$ref": "#/$defs/Base"}},
@@ -618,7 +595,6 @@ fn test_dereference_refs_empty_mixed_ref() {
 
 #[test]
 fn test_dereference_refs_nested_mixed_refs() {
-    // Test nested objects with mixed $ref properties.
     let schema = json!({
         "type": "object",
         "properties": {
@@ -651,7 +627,6 @@ fn test_dereference_refs_nested_mixed_refs() {
 
 #[test]
 fn test_dereference_refs_array_with_mixed_refs() {
-    // Test arrays containing mixed $ref objects.
     let schema = json!({
         "type": "object",
         "properties": {
@@ -684,7 +659,6 @@ fn test_dereference_refs_array_with_mixed_refs() {
 
 #[test]
 fn test_dereference_refs_mixed_ref_overrides_property() {
-    // Test that mixed $ref properties override resolved properties correctly.
     let schema = json!({
         "type": "object",
         "properties": {
@@ -714,7 +688,6 @@ fn test_dereference_refs_mixed_ref_overrides_property() {
 
 #[test]
 fn test_dereference_refs_mixed_ref_cyclical_with_properties() {
-    // Test cyclical mixed $refs preserve non-ref properties correctly.
     let schema = json!({
         "type": "object",
         "properties": {"root": {"$ref": "#/$defs/Node", "required": true}},
@@ -758,7 +731,6 @@ fn test_dereference_refs_mixed_ref_cyclical_with_properties() {
 
 #[test]
 fn test_dereference_refs_non_dict_ref_target() {
-    // Test $ref that resolves to non-dict values.
     let schema = json!({
         "type": "object",
         "properties": {

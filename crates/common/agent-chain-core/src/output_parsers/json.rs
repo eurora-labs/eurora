@@ -101,11 +101,8 @@ impl BaseOutputParser for JsonOutputParser {
         if partial {
             match parse_json_markdown(text) {
                 Ok(value) => Ok(value),
-                Err(_) => {
-                    // For partial parsing, try to parse what we have
-                    parse_partial_json(text, false)
-                        .map_err(|e| Error::Other(format!("Partial parse failed: {}", e)))
-                }
+                Err(_) => parse_partial_json(text, false)
+                    .map_err(|e| Error::Other(format!("Partial parse failed: {}", e))),
             }
         } else {
             match parse_json_markdown(text) {
@@ -122,10 +119,8 @@ impl BaseOutputParser for JsonOutputParser {
     fn get_format_instructions(&self) -> Result<String> {
         match self.get_schema() {
             Some(schema) => {
-                // Copy schema to avoid altering original
                 let mut schema_copy = schema.clone();
 
-                // Remove extraneous fields
                 if let Value::Object(ref mut map) = schema_copy {
                     map.remove("title");
                     map.remove("type");

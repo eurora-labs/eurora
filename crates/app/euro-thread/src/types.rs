@@ -1,13 +1,13 @@
 use agent_chain::BaseMessage;
 use chrono::{DateTime, TimeZone, Utc};
-use proto_gen::conversation::Conversation as ProtoConversation;
+use proto_gen::thread::Thread as ProtoThread;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::{Error, Result};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Conversation {
+pub struct Thread {
     id: Option<Uuid>,
     title: String,
     messages: Vec<BaseMessage>,
@@ -15,7 +15,7 @@ pub struct Conversation {
     updated_at: DateTime<Utc>,
 }
 
-impl Conversation {
+impl Thread {
     pub fn id(&self) -> Option<Uuid> {
         self.id
     }
@@ -29,7 +29,7 @@ impl Conversation {
             self.id = Some(id);
             return Ok(());
         }
-        Err(Error::SetId("Conversation ID is already set".to_string()))
+        Err(Error::SetId("Thread ID is already set".to_string()))
     }
 
     pub fn messages(&self) -> &Vec<BaseMessage> {
@@ -37,7 +37,7 @@ impl Conversation {
     }
 }
 
-impl Default for Conversation {
+impl Default for Thread {
     fn default() -> Self {
         let title = "New Chat".to_string();
         let created_at = Utc::now();
@@ -54,13 +54,13 @@ impl Default for Conversation {
 }
 
 #[derive(Debug, Clone)]
-pub enum ConversationEvent {
-    NewConversation { id: Option<Uuid>, title: String },
+pub enum ThreadEvent {
+    NewThread { id: Option<Uuid>, title: String },
 }
 
-impl From<ProtoConversation> for Conversation {
-    fn from(c: ProtoConversation) -> Self {
-        let id = Some(Uuid::parse_str(&c.id).expect("Conversation id is not a valid uuid"));
+impl From<ProtoThread> for Thread {
+    fn from(c: ProtoThread) -> Self {
+        let id = Some(Uuid::parse_str(&c.id).expect("Thread id is not a valid uuid"));
         let title = c.title;
         let created_at = c.created_at.expect("created_at is required");
         let created_at: DateTime<Utc> = Utc

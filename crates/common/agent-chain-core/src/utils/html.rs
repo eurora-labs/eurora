@@ -16,8 +16,6 @@ pub const SUFFIXES_TO_IGNORE: &[&str] = &[
 /// Default regex pattern for extracting links from HTML.
 /// This captures all href values, filtering is done in Rust code.
 pub fn default_link_regex() -> Regex {
-    // Simple pattern to match href values - filtering is done afterwards
-    // since Rust regex doesn't support look-around assertions
     Regex::new(r#"href=["']([^"'#]+)["'#]"#).expect("Failed to compile default link regex")
 }
 
@@ -155,7 +153,6 @@ pub fn extract_sub_links(
                 Err(_) => continue,
             };
 
-            // Compare full netloc (host + port) like Python's urlparse().netloc
             let base_netloc = format!(
                 "{}{}",
                 parsed_base_url.host_str().unwrap_or(""),

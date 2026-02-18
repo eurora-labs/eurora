@@ -71,14 +71,12 @@ pub fn as_import_path<P: AsRef<Path>, B: AsRef<Path>>(
 
     let path = PathBuf::from(&relative_path);
 
-    // Remove file extension if it's a file
     let without_extension = if path.extension().is_some() {
         path.with_extension("")
     } else {
         path
     };
 
-    // Convert path separators to `::`
     let import_path = without_extension
         .to_string_lossy()
         .replace([std::path::MAIN_SEPARATOR, '/', '\\'], "::");

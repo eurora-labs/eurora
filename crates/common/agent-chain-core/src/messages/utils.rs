@@ -21,10 +21,6 @@ pub type AnyMessage = BaseMessage;
 /// This corresponds to `MessageLikeRepresentation` in LangChain Python.
 pub type MessageLikeRepresentation = serde_json::Value;
 
-// ============================================================================
-// msg_to_chunk / chunk_to_msg
-// ============================================================================
-
 /// Convert a `BaseMessage` to the corresponding `BaseMessageChunk`.
 ///
 /// This corresponds to `_msg_to_chunk` in LangChain Python.
@@ -50,7 +46,6 @@ pub(crate) fn msg_to_chunk(message: &BaseMessage) -> BaseMessageChunk {
                 .additional_kwargs(m.additional_kwargs.clone())
                 .response_metadata(m.response_metadata.clone())
                 .build();
-            // Populate tool_call_chunks from tool_calls so they merge properly
             chunk.init_tool_calls();
             BaseMessageChunk::AI(chunk)
         }
@@ -107,10 +102,6 @@ pub(crate) fn chunk_to_msg(chunk: &BaseMessageChunk) -> BaseMessage {
     chunk.to_message()
 }
 
-// ============================================================================
-// get_buffer_string
-// ============================================================================
-
 /// Convert a sequence of messages to a buffer string.
 ///
 /// This concatenates messages with role prefixes for display.
@@ -155,13 +146,10 @@ pub fn get_buffer_string(messages: &[BaseMessage], human_prefix: &str, ai_prefix
 /// The dict will have a `type` key with the message type and a `data` key
 /// with the message data as a dict (all fields serialized).
 pub fn message_to_dict(message: &BaseMessage) -> serde_json::Value {
-    // Serialize the message using serde - this includes the "type" field
     let mut data = serde_json::to_value(message).unwrap_or_default();
 
-    // Extract the type from the serialized data (it's included by the Serialize impl)
     let msg_type = message.message_type();
 
-    // Remove the "type" field from data since we'll put it at the top level
     if let Some(obj) = data.as_object_mut() {
         obj.remove("type");
     }
@@ -192,8 +180,6 @@ pub fn message_from_dict(message: &serde_json::Value) -> Result<BaseMessage, Str
         .get("data")
         .ok_or_else(|| "Message dict must contain 'data' key".to_string())?;
 
-    // Merge the type field into the data for deserialization
-    // The BaseMessage deserializer expects the type field to be present
     let mut merged_data = data.clone();
     if let Some(obj) = merged_data.as_object_mut() {
         obj.insert(
@@ -202,7 +188,6 @@ pub fn message_from_dict(message: &serde_json::Value) -> Result<BaseMessage, Str
         );
     }
 
-    // Use serde deserialization
     serde_json::from_value(merged_data).map_err(|e| {
         format!(
             "Failed to deserialize message of type '{}': {}",
@@ -217,10 +202,6 @@ pub fn message_from_dict(message: &serde_json::Value) -> Result<BaseMessage, Str
 pub fn messages_from_dict(messages: &[serde_json::Value]) -> Result<Vec<BaseMessage>, String> {
     messages.iter().map(message_from_dict).collect()
 }
-
-// ============================================================================
-// convert_to_messages / convert_to_message
-// ============================================================================
 
 /// Convert message-like representations to messages.
 ///
@@ -243,11 +224,9 @@ pub fn convert_to_messages(messages: &[serde_json::Value]) -> Result<Vec<BaseMes
 
 pub fn convert_to_message(message: &serde_json::Value) -> Result<BaseMessage, String> {
     if let Some(_msg_type) = message.get("type").and_then(|t| t.as_str()) {
-        // Check if it has a "data" key — if so it's a serialized message dict
         if message.get("data").is_some() {
             return message_from_dict(message);
         }
-        // Otherwise treat it like a role-based dict (type acts like role)
         let msg_kwargs = message.as_object().ok_or("Expected object")?;
         let msg_type = msg_kwargs
             .get("type")
@@ -265,7 +244,6 @@ pub fn convert_to_message(message: &serde_json::Value) -> Result<BaseMessage, St
     }
 
     if let Some(obj) = message.as_object() {
-        // Dict with "role" and "content" keys
         let msg_type = obj
             .get("role")
             .and_then(|r| r.as_str())
@@ -282,14 +260,12 @@ pub fn convert_to_message(message: &serde_json::Value) -> Result<BaseMessage, St
     }
 
     if let Some(s) = message.as_str() {
-        // Plain string -> HumanMessage
         return Ok(BaseMessage::Human(
             HumanMessage::builder().content(s).build(),
         ));
     }
 
     if let Some(arr) = message.as_array() {
-        // 2-tuple: [role, content]
         if arr.len() == 2 {
             let role = arr[0].as_str().ok_or("First element must be role string")?;
             let content = arr[1]
@@ -304,10 +280,6 @@ pub fn convert_to_message(message: &serde_json::Value) -> Result<BaseMessage, St
     Err(format!("Cannot convert to message: {:?}", message))
 }
 
-// ============================================================================
-// create_message_from_role
-// ============================================================================
-
 /// Create a message from a message type string and content.
 ///
 /// This corresponds to `_create_message_from_message_type` in LangChain Python.
@@ -319,7 +291,6 @@ fn create_message_from_role(
     tool_calls: Option<&Vec<serde_json::Value>>,
     id: Option<&str>,
 ) -> Result<BaseMessage, String> {
-    // Parse tool_calls from OpenAI format to ToolCall structs
     let parsed_tool_calls: Vec<ToolCall> = if let Some(tcs) = tool_calls {
         tcs.iter()
             .filter_map(|tc| {
@@ -341,7 +312,6 @@ fn create_message_from_role(
                         call_type: Some("tool_call".to_string()),
                     })
                 } else {
-                    // Already in LangChain format
                     serde_json::from_value::<ToolCall>(tc.clone()).ok()
                 }
             })
@@ -423,10 +393,6 @@ fn create_message_from_role(
     }
 }
 
-// ============================================================================
-// filter_messages
-// ============================================================================
-
 /// Options for excluding tool calls from filtered messages.
 ///
 /// This corresponds to the `exclude_tool_calls` parameter in LangChain Python's
@@ -458,7 +424,6 @@ pub fn filter_messages(
     let mut filtered: Vec<BaseMessage> = Vec::new();
 
     for msg in messages {
-        // Check exclusions first
         if let Some(exclude_names) = exclude_names
             && let Some(name) = msg.name()
             && exclude_names.contains(&name.as_str())
@@ -479,7 +444,6 @@ pub fn filter_messages(
             continue;
         }
 
-        // Handle exclude_tool_calls
         let mut msg = msg.clone();
         match exclude_tool_calls {
             Some(ExcludeToolCalls::All) => {
@@ -529,7 +493,6 @@ pub fn filter_messages(
             None => {}
         }
 
-        // Check inclusions (default to including if no criteria given)
         let no_include_criteria =
             include_names.is_none() && include_types.is_none() && include_ids.is_none();
 
@@ -555,10 +518,6 @@ pub fn filter_messages(
 
     filtered
 }
-
-// ============================================================================
-// merge_message_runs
-// ============================================================================
 
 /// Merge consecutive messages of the same type.
 ///
@@ -586,19 +545,15 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
             continue;
         };
 
-        // Don't merge ToolMessages or messages of different types
         if matches!(msg, BaseMessage::Tool(_))
             || std::mem::discriminant(&last) != std::mem::discriminant(msg)
         {
             merged.push(last);
             merged.push(msg.clone());
         } else {
-            // Same type — use chunk-based merging
             let last_chunk = msg_to_chunk(&last);
             let mut curr_chunk = msg_to_chunk(msg);
 
-            // Clear response_metadata on the current chunk before merge
-            // (matching Python behavior)
             match &mut curr_chunk {
                 BaseMessageChunk::AI(c) => c.response_metadata.clear(),
                 BaseMessageChunk::Human(c) => c.response_metadata.clear(),
@@ -608,7 +563,6 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
                 BaseMessageChunk::Function(c) => c.response_metadata.clear(),
             }
 
-            // Insert chunk_separator between string contents when both are non-empty
             if !chunk_separator.is_empty() {
                 let last_content = last_chunk.content();
                 let curr_content = curr_chunk.content();
@@ -618,7 +572,6 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
                     let curr_is_str =
                         matches!(curr_content, super::content::MessageContent::Text(_));
                     if last_is_str && curr_is_str {
-                        // Append separator to the last chunk's content before merge
                         match &mut curr_chunk {
                             BaseMessageChunk::AI(c) => {
                                 if let super::content::MessageContent::Text(ref mut s) = c.content {
@@ -657,8 +610,6 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
 
             let mut merged_chunk = last_chunk + curr_chunk;
 
-            // For AI chunks, re-parse tool_call_chunks into tool_calls
-            // (matching Python where init_tool_calls runs on every construction)
             if let BaseMessageChunk::AI(ref mut ai_chunk) = merged_chunk {
                 ai_chunk.init_tool_calls();
             }
@@ -676,10 +627,6 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
 pub fn message_chunk_to_message(chunk: &BaseMessageChunk) -> BaseMessage {
     chunk.to_message()
 }
-
-// ============================================================================
-// count_tokens_approximately
-// ============================================================================
 
 /// Configuration for approximate token counting.
 #[derive(Debug, Clone)]
@@ -725,10 +672,8 @@ pub fn count_tokens_approximately(messages: &[BaseMessage], config: &CountTokens
     for message in messages {
         let mut message_chars: usize = 0;
 
-        // Count content characters
         message_chars += message.text().len();
 
-        // For AI messages, also count tool calls if present
         if let BaseMessage::AI(ai_msg) = message
             && !ai_msg.tool_calls.is_empty()
         {
@@ -736,31 +681,24 @@ pub fn count_tokens_approximately(messages: &[BaseMessage], config: &CountTokens
             message_chars += tool_calls_str.len();
         }
 
-        // For tool messages, also count the tool call ID
         if let BaseMessage::Tool(tool_msg) = message {
             message_chars += tool_msg.tool_call_id.len();
         }
 
-        // Add role characters
         let role = get_message_openai_role(message);
         message_chars += role.len();
 
-        // Add name if present and config says to count it
         if config.count_name
             && let Some(name) = message.name()
         {
             message_chars += name.len();
         }
 
-        // Round up per message to ensure individual message token counts
-        // add up to the total count for a list of messages
         token_count += (message_chars as f64 / config.chars_per_token).ceil();
 
-        // Add extra tokens per message
         token_count += config.extra_tokens_per_message;
     }
 
-    // Round up one more time in case extra_tokens_per_message is a float
     token_count.ceil() as usize
 }
 
@@ -783,24 +721,17 @@ fn get_message_openai_role(message: &BaseMessage) -> &'static str {
             }
         }
         BaseMessage::Function(_) => "function",
-        BaseMessage::Chat(c) => {
-            // Return static strings for common roles, otherwise return a generic one
-            match c.role.as_str() {
-                "user" => "user",
-                "assistant" => "assistant",
-                "system" => "system",
-                "function" => "function",
-                "tool" => "tool",
-                _ => "user",
-            }
-        }
+        BaseMessage::Chat(c) => match c.role.as_str() {
+            "user" => "user",
+            "assistant" => "assistant",
+            "system" => "system",
+            "function" => "function",
+            "tool" => "tool",
+            _ => "user",
+        },
         BaseMessage::Remove(_) => "remove",
     }
 }
-
-// ============================================================================
-// convert_to_openai_messages
-// ============================================================================
 
 /// Text format options for OpenAI message conversion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -856,37 +787,30 @@ fn convert_single_to_openai_message(
     let role = get_message_openai_role(message);
     let mut oai_msg = serde_json::json!({ "role": role });
 
-    // Add name if present
     if let Some(name) = message.name() {
         oai_msg["name"] = serde_json::json!(name);
     }
 
-    // Add tool_call_id for tool messages
     if let BaseMessage::Tool(tool_msg) = message {
         oai_msg["tool_call_id"] = serde_json::json!(tool_msg.tool_call_id);
     }
 
-    // Add tool_calls for AI messages
     if let BaseMessage::AI(ai_msg) = message
         && !ai_msg.tool_calls.is_empty()
     {
         oai_msg["tool_calls"] = serde_json::json!(convert_to_openai_tool_calls(&ai_msg.tool_calls));
     }
 
-    // Add refusal from additional_kwargs if present
     if let Some(additional_kwargs) = message.additional_kwargs()
         && let Some(refusal) = additional_kwargs.get("refusal")
     {
         oai_msg["refusal"] = refusal.clone();
     }
 
-    // Add message ID if requested
     if include_id && let Some(id) = message.id() {
         oai_msg["id"] = serde_json::json!(id);
     }
 
-    // Handle content
-    // Try to get content as list (for multimodal messages)
     let raw_content = message.content();
     let content_list: Option<Vec<serde_json::Value>> = match raw_content {
         super::content::MessageContent::Parts(_) => Some(raw_content.as_json_values()),
@@ -896,7 +820,6 @@ fn convert_single_to_openai_message(
     let mut tool_messages: Vec<serde_json::Value> = Vec::new();
 
     if let Some(blocks) = content_list {
-        // Content is a list of blocks — process each block
         let mut content_blocks: Vec<serde_json::Value> = Vec::new();
 
         for block in &blocks {
@@ -919,8 +842,6 @@ fn convert_single_to_openai_message(
                     content_blocks.push(block.clone());
                 }
                 "tool_use" => {
-                    // Anthropic tool_use block — convert to OpenAI tool_call if not
-                    // already in tool_calls
                     if let BaseMessage::AI(ai_msg) = message {
                         let block_id = block.get("id").and_then(|i| i.as_str()).unwrap_or("");
                         let already_in_tool_calls = ai_msg
@@ -949,7 +870,6 @@ fn convert_single_to_openai_message(
                     }
                 }
                 "tool_result" => {
-                    // Anthropic tool_result — convert to ToolMessage
                     let tool_use_id = block
                         .get("tool_use_id")
                         .and_then(|t| t.as_str())
@@ -965,7 +885,6 @@ fn convert_single_to_openai_message(
                         .tool_call_id(tool_use_id)
                         .status(super::tool::ToolStatus::from(status.to_string()))
                         .build();
-                    // Recursively convert tool message to OpenAI format
                     tool_messages.extend(convert_single_to_openai_message(
                         &BaseMessage::Tool(tool_msg),
                         text_format,
@@ -973,7 +892,6 @@ fn convert_single_to_openai_message(
                     ));
                 }
                 "image" | "source" => {
-                    // Anthropic image format
                     if let Some(source) = block.get("source") {
                         let media_type = source
                             .get("media_type")
@@ -993,7 +911,6 @@ fn convert_single_to_openai_message(
                     content_blocks.push(block.clone());
                 }
                 _ => {
-                    // Pass through unknown blocks
                     if let Some(s) = block.as_str() {
                         content_blocks.push(serde_json::json!({"type": "text", "text": s}));
                     } else {
@@ -1003,14 +920,12 @@ fn convert_single_to_openai_message(
             }
         }
 
-        // Apply text_format to the result
         match text_format {
             TextFormat::String => {
                 if content_blocks
                     .iter()
                     .all(|b| b.get("type").and_then(|t| t.as_str()) == Some("text"))
                 {
-                    // All text blocks — join into a single string
                     let joined: String = content_blocks
                         .iter()
                         .filter_map(|b| b.get("text").and_then(|t| t.as_str()))
@@ -1026,7 +941,6 @@ fn convert_single_to_openai_message(
             }
         }
     } else {
-        // Content is a plain string
         match text_format {
             TextFormat::String => {
                 oai_msg["content"] = serde_json::json!(raw_content);
@@ -1042,7 +956,6 @@ fn convert_single_to_openai_message(
         }
     }
 
-    // If content is non-empty or there are no tool_messages, include the main message
     let has_content = oai_msg.get("content").is_some_and(|c| {
         if let Some(s) = c.as_str() {
             !s.is_empty()
@@ -1079,10 +992,6 @@ fn convert_to_openai_tool_calls(tool_calls: &[ToolCall]) -> Vec<serde_json::Valu
         .collect()
 }
 
-// ============================================================================
-// _is_message_type / _default_text_splitter
-// ============================================================================
-
 /// Check if a message matches any of the given type strings.
 ///
 /// This corresponds to `_is_message_type` in LangChain Python.
@@ -1105,10 +1014,6 @@ fn default_text_splitter(text: &str) -> Vec<String> {
     result.push(splits.last().unwrap_or(&"").to_string());
     result
 }
-
-// ============================================================================
-// trim_messages
-// ============================================================================
 
 /// Strategy for trimming messages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -1242,7 +1147,6 @@ where
         return Vec::new();
     }
 
-    // Validate arguments
     if config.start_on.is_some() && config.strategy == TrimStrategy::First {
         panic!("start_on parameter is only valid with strategy='last'");
     }
@@ -1276,9 +1180,7 @@ where
         return messages;
     }
 
-    // Check if all messages already fit
     if (config.token_counter)(&messages) <= config.max_tokens {
-        // When all messages fit, only apply end_on filtering if needed
         if let Some(ref end_on) = config.end_on {
             while !messages.is_empty()
                 && !is_message_type(messages.last().expect("checked non-empty"), end_on)
@@ -1289,7 +1191,6 @@ where
         return messages;
     }
 
-    // Binary search to find maximum number of complete messages
     let mut left = 0;
     let mut right = messages.len();
 
@@ -1304,11 +1205,9 @@ where
 
     let mut idx = left;
 
-    // Handle partial messages if allowed
     if config.allow_partial && idx < messages.len() {
         let mut included_partial = false;
 
-        // First try list content (multimodal blocks or JSON-encoded arrays in Text)
         let excluded_content = messages[idx].content();
         let content_blocks_opt: Option<Vec<serde_json::Value>> = match excluded_content {
             super::content::MessageContent::Parts(_) => Some(excluded_content.as_json_values()),
@@ -1339,7 +1238,6 @@ where
             }
         }
 
-        // Then try text splitting
         if !included_partial {
             let content_str = messages[idx].text();
             if !content_str.is_empty() {
@@ -1352,7 +1250,6 @@ where
                     if reverse_partial {
                         split_texts.reverse();
                     }
-                    // Binary search for max splits
                     let mut s_left = 0;
                     let mut s_right = split_texts.len();
                     while s_left < s_right {
@@ -1386,7 +1283,6 @@ where
         }
     }
 
-    // Apply end_on filtering
     if let Some(ref end_on) = config.end_on {
         while idx > 0 && !is_message_type(&messages[idx - 1], end_on) {
             idx -= 1;
@@ -1411,7 +1307,6 @@ where
         return messages;
     }
 
-    // Apply end_on filtering first (for "last" strategy, done before trimming)
     if let Some(ref end_on) = config.end_on {
         while !messages.is_empty()
             && !is_message_type(messages.last().expect("checked non-empty"), end_on)
@@ -1420,7 +1315,6 @@ where
         }
     }
 
-    // Handle system message preservation
     let system_message = if config.include_system
         && !messages.is_empty()
         && matches!(messages.first(), Some(BaseMessage::System(_)))
@@ -1430,7 +1324,6 @@ where
         None
     };
 
-    // Calculate remaining tokens after system message
     let remaining_tokens = if let Some(ref sys_msg) = system_message {
         let sys_tokens = (config.token_counter)(std::slice::from_ref(sys_msg));
         config.max_tokens.saturating_sub(sys_tokens)
@@ -1438,12 +1331,8 @@ where
         config.max_tokens
     };
 
-    // Reverse and use first strategy logic
     messages.reverse();
 
-    // Build a temporary config for first-strategy on reversed messages
-    // Pass start_on as end_on (since we reversed)
-    // Wrap the text_splitter reference in a closure so it fits the generic param
     #[allow(clippy::type_complexity)]
     let splitter_wrapper: Option<Box<dyn Fn(&str) -> Vec<String> + '_>> = config
         .text_splitter
@@ -1462,10 +1351,8 @@ where
 
     let mut result = trim_messages_first(&messages, &reverse_config, true);
 
-    // Reverse back
     result.reverse();
 
-    // Add system message back
     if let Some(sys_msg) = system_message {
         result.insert(0, sys_msg);
     }
@@ -1516,19 +1403,9 @@ fn create_message_with_content(original: &BaseMessage, content: &str) -> BaseMes
                 .maybe_id(m.id.clone())
                 .build(),
         ),
-        BaseMessage::Remove(m) => {
-            // RemoveMessage preserves the same id (which is the target id to remove)
-            BaseMessage::Remove(RemoveMessage::builder().id(&m.id).build())
-        }
+        BaseMessage::Remove(m) => BaseMessage::Remove(RemoveMessage::builder().id(&m.id).build()),
     }
 }
-
-// ============================================================================
-// Runnable variants of message utility functions
-// ============================================================================
-// In Python, the @_runnable_support decorator makes filter_messages,
-// merge_message_runs, and trim_messages return a RunnableLambda when called
-// without messages. In Rust, we provide separate *_runnable() functions.
 
 use crate::runnables::base::RunnableLambdaWithConfig;
 use std::sync::Arc;

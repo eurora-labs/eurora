@@ -37,10 +37,8 @@ fn populate_extras(standard_block: &mut Value, block: &Value, known_fields: &Has
 /// Convert bytes (as a JSON value) to a base64 string.
 fn bytes_to_b64_str(bytes_value: &Value) -> String {
     if let Some(s) = bytes_value.as_str() {
-        // Already a string (could be pre-encoded)
         s.to_string()
     } else if let Some(arr) = bytes_value.as_array() {
-        // Array of byte values
         let bytes: Vec<u8> = arr
             .iter()
             .filter_map(|v| v.as_u64().map(|n| n as u8))
@@ -59,7 +57,6 @@ fn bytes_to_b64_str(bytes_value: &Value) -> String {
 pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
     let mut result = Vec::new();
 
-    // Unpack non_standard blocks
     let blocks: Vec<Value> = content
         .iter()
         .map(|block| {
@@ -79,7 +76,6 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
 
         let num_keys = obj.len();
 
-        // {"text": "..."} -> TextContentBlock
         if num_keys == 1
             && let Some(text) = obj.get("text").and_then(|v| v.as_str())
         {
@@ -87,7 +83,6 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
             continue;
         }
 
-        // {"document": {"format": "pdf", "source": {"bytes": ...}}} -> FileContentBlock
         if num_keys == 1
             && let Some(document) = obj.get("document").and_then(|v| v.as_object())
             && let Some(format) = document.get("format").and_then(|v| v.as_str())
@@ -137,7 +132,6 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
             continue;
         }
 
-        // {"image": {"format": "png", "source": {"bytes": ...}}} -> ImageContentBlock
         if num_keys == 1
             && let Some(image) = obj.get("image").and_then(|v| v.as_object())
             && let Some(format) = image.get("format").and_then(|v| v.as_str())
@@ -161,7 +155,6 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
             continue;
         }
 
-        // Known v1 block type — pass through
         if let Some(block_type) = obj.get("type").and_then(|v| v.as_str())
             && KNOWN_BLOCK_TYPES.contains(&block_type)
         {
@@ -169,7 +162,6 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
             continue;
         }
 
-        // Unknown — wrap as non_standard
         result.push(json!({"type": "non_standard", "value": block}));
     }
 
@@ -184,7 +176,6 @@ fn convert_citation_to_v1(citation: &Value) -> Value {
         standard_citation["title"] = json!(title);
     }
 
-    // source_content is a list of dicts with "text" keys
     if let Some(source_content) = citation.get("source_content").and_then(|v| v.as_array()) {
         let cited_text: String = source_content
             .iter()

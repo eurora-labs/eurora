@@ -81,7 +81,6 @@ fn test_get_from_dict_or_env_error_message() {
     let error = result.unwrap_err();
     let error_msg = error.to_string();
 
-    // The error message should contain the key and env_key names
     assert!(error_msg.contains("not exists"));
     assert!(error_msg.contains("__SOME_KEY_IN_ENV"));
     assert!(error_msg.contains("Did not find"));
@@ -172,7 +171,6 @@ fn test_env_var_is_set_false_titlecase() {
 fn test_env_var_is_set_nonexistent() {
     let _guard = ENV_MUTEX.lock().unwrap();
 
-    // Make sure the variable doesn't exist
     unsafe {
         env::remove_var("NONEXISTENT_TEST_VAR_12345");
     }
@@ -202,7 +200,6 @@ fn test_get_from_env_success() {
 fn test_get_from_env_with_default() {
     let _guard = ENV_MUTEX.lock().unwrap();
 
-    // Make sure the variable doesn't exist
     unsafe {
         env::remove_var("NONEXISTENT_VAR_FOR_DEFAULT");
     }
@@ -220,7 +217,6 @@ fn test_get_from_env_with_default() {
 fn test_get_from_env_error() {
     let _guard = ENV_MUTEX.lock().unwrap();
 
-    // Make sure the variable doesn't exist
     unsafe {
         env::remove_var("NONEXISTENT_VAR_FOR_ERROR");
     }
@@ -304,6 +300,5 @@ fn test_env_error_is_error() {
         env_key: "TEST".to_string(),
     });
 
-    // Just verify we can use it as a dyn Error
     let _ = error.to_string();
 }

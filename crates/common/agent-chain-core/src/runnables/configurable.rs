@@ -278,7 +278,6 @@ where
         let merged = merge_configs(vec![self.config.clone(), config]);
         let config = ensure_config(Some(merged));
 
-        // Build a map from spec ID to field name
         let specs_by_id: HashMap<String, (&str, &AnyConfigurableField)> = self
             .fields
             .iter()
@@ -292,7 +291,6 @@ where
             })
             .collect();
 
-        // Extract configurable values from config
         let mut configurable_fields: HashMap<String, Value> = HashMap::new();
 
         for (key, value) in config.configurable.iter() {
@@ -302,7 +300,6 @@ where
                         configurable_fields.insert(field_name.to_string(), value.clone());
                     }
                     AnyConfigurableField::SingleOption(opt) => {
-                        // Get the value from options map
                         if let Some(selected_key) = value.as_str()
                             && let Some(option_value) = opt.options.get(selected_key)
                         {
@@ -311,7 +308,6 @@ where
                         }
                     }
                     AnyConfigurableField::MultiOption(opt) => {
-                        // Get multiple values from options map
                         if let Some(selected_keys) = value.as_array() {
                             let values: Vec<Value> = selected_keys
                                 .iter()
@@ -326,12 +322,10 @@ where
             }
         }
 
-        // If no configuration changes, return the default
         if configurable_fields.is_empty() {
             return (Arc::clone(&self.default), config);
         }
 
-        // Try to reconfigure the default runnable with the new field values
         if let Some(reconfigure_fn) = &self.reconfigure_fn
             && let Some(reconfigured) = reconfigure_fn(self.default.as_ref(), &configurable_fields)
         {
@@ -419,7 +413,6 @@ where
             .map(|c| self.prepare_internal(Some(c.clone())))
             .collect();
 
-        // Check if all prepared runnables are the same as default
         let all_default = prepared.iter().all(|(r, _)| Arc::ptr_eq(r, &self.default));
 
         if all_default {
@@ -431,7 +424,6 @@ where
             );
         }
 
-        // Otherwise, invoke each individually
         inputs
             .into_iter()
             .zip(prepared)
@@ -458,7 +450,6 @@ where
             .map(|c| self.prepare_internal(Some(c.clone())))
             .collect();
 
-        // Check if all prepared runnables are the same as default
         let all_default = prepared.iter().all(|(r, _)| Arc::ptr_eq(r, &self.default));
 
         if all_default {
@@ -473,7 +464,6 @@ where
                 .await;
         }
 
-        // Otherwise, invoke each individually with concurrency
         let max_concurrency = configs.first().and_then(|c| c.max_concurrency);
 
         let futures: Vec<_> = inputs
@@ -655,7 +645,6 @@ where
         let merged = merge_configs(vec![self.config.clone(), config]);
         let config = ensure_config(Some(merged));
 
-        // Get which alternative to use
         let which = config
             .configurable
             .get(&self.which.id)
@@ -663,7 +652,6 @@ where
             .map(|s| s.to_string())
             .unwrap_or_else(|| self.default_key.clone());
 
-        // Remap configurable keys if prefix_keys is enabled
         let config = if self.prefix_keys {
             let prefix = format!("{}=={}/", self.which.id, which);
             let new_configurable: HashMap<String, Value> = config
@@ -679,7 +667,6 @@ where
             config
         };
 
-        // Return the chosen alternative
         if which == self.default_key {
             return Ok((Arc::clone(&self.default), config));
         }
@@ -763,7 +750,6 @@ where
             .map(|c| self.prepare_internal(Some(c.clone())))
             .collect();
 
-        // Check if all prepared runnables are the same as default
         let all_default = prepared.iter().all(|r| {
             r.as_ref()
                 .map(|(runnable, _)| Arc::ptr_eq(runnable, &self.default))
@@ -783,7 +769,6 @@ where
             );
         }
 
-        // Otherwise, invoke each individually
         inputs
             .into_iter()
             .zip(prepared)
@@ -813,7 +798,6 @@ where
             .map(|c| self.prepare_internal(Some(c.clone())))
             .collect();
 
-        // Check if all prepared runnables are the same as default
         let all_default = prepared.iter().all(|r| {
             r.as_ref()
                 .map(|(runnable, _)| Arc::ptr_eq(runnable, &self.default))
@@ -836,7 +820,6 @@ where
                 .await;
         }
 
-        // Otherwise, invoke each individually
         let mut results = Vec::with_capacity(inputs.len());
         for (input, prepared_result) in inputs.into_iter().zip(prepared) {
             let result = match prepared_result {
@@ -1016,7 +999,6 @@ pub trait ConfigurableRunnable: Runnable + Sized {
     }
 }
 
-// Implement ConfigurableRunnable for all Runnables
 impl<R> ConfigurableRunnable for R where R: Runnable + Sized {}
 
 #[cfg(test)]
@@ -1039,7 +1021,6 @@ mod tests {
         let prefixed = prefix_config_spec(&spec, "model==gpt4");
         assert_eq!(prefixed.id, "model==gpt4/temperature");
 
-        // Shared specs should not be prefixed
         let shared_spec = ConfigurableFieldSpec {
             is_shared: true,
             ..spec.clone()
@@ -1112,11 +1093,9 @@ mod tests {
             false,
         );
 
-        // Default behavior
         let result = configurable.invoke(5, None).unwrap();
         assert_eq!(result, 10);
 
-        // With alternative selected
         let mut config = RunnableConfig::default();
         config.configurable.insert(
             "multiplier".to_string(),

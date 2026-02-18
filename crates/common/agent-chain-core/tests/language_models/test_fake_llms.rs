@@ -12,10 +12,6 @@ use agent_chain_core::messages::{BaseMessage, HumanMessage};
 use agent_chain_core::outputs::GenerationType;
 use futures::StreamExt;
 
-// ====================================================================
-// TestFakeListLLM
-// ====================================================================
-
 /// Ported from `test_initialization`.
 #[test]
 fn test_fake_list_llm_initialization() {
@@ -27,7 +23,6 @@ fn test_fake_list_llm_initialization() {
 #[test]
 fn test_fake_list_llm_initialization_with_sleep() {
     let llm = FakeListLLM::new(vec!["response".to_string()]).with_sleep(Duration::from_millis(100));
-    // Sleep is stored but doesn't affect base class call behavior
     assert_eq!(llm.current_index(), 0);
 }
 
@@ -152,10 +147,6 @@ async fn test_fake_list_llm_acall_method() {
     assert_eq!(result, "async direct call");
 }
 
-// ====================================================================
-// TestFakeListLLMError
-// ====================================================================
-
 /// Ported from `test_error_can_be_raised`.
 #[test]
 fn test_fake_list_llm_error_can_be_raised() {
@@ -169,10 +160,6 @@ fn test_fake_list_llm_error_is_exception() {
     let error = FakeListLLMError;
     let _: &dyn std::error::Error = &error;
 }
-
-// ====================================================================
-// TestFakeStreamingListLLM
-// ====================================================================
 
 /// Ported from `test_initialization`.
 #[test]
@@ -209,7 +196,6 @@ async fn test_fake_streaming_stream_yields_characters() {
 async fn test_fake_streaming_stream_cycles_through_responses() {
     let llm = FakeStreamingListLLM::new(vec!["ab".to_string(), "cd".to_string()]);
 
-    // First stream
     let mut stream = llm
         .stream_prompt("p1".to_string(), None, None)
         .await
@@ -220,7 +206,6 @@ async fn test_fake_streaming_stream_cycles_through_responses() {
     }
     assert_eq!(chunks1, vec!["a", "b"]);
 
-    // Second stream
     let mut stream = llm
         .stream_prompt("p2".to_string(), None, None)
         .await
@@ -231,7 +216,6 @@ async fn test_fake_streaming_stream_cycles_through_responses() {
     }
     assert_eq!(chunks2, vec!["c", "d"]);
 
-    // Third stream — cycles back
     let mut stream = llm
         .stream_prompt("p3".to_string(), None, None)
         .await
@@ -257,7 +241,6 @@ async fn test_fake_streaming_stream_error_on_chunk() {
     assert_eq!(chunk0.text, "h");
     let chunk1 = stream.next().await.unwrap().unwrap();
     assert_eq!(chunk1.text, "e");
-    // Third chunk should be an error
     let chunk2 = stream.next().await.unwrap();
     assert!(chunk2.is_err());
 }
@@ -355,10 +338,6 @@ async fn test_fake_streaming_stream_with_newlines() {
     assert_eq!(chunks, vec!["a", "\n", "b"]);
 }
 
-// ====================================================================
-// TestFakeListLLMGenerateMultiplePrompts
-// ====================================================================
-
 /// Ported from `test_generate_with_multiple_prompts`.
 #[tokio::test]
 async fn test_generate_with_multiple_prompts() {
@@ -419,10 +398,6 @@ async fn test_generate_with_more_prompts_than_responses() {
     }
 }
 
-// ====================================================================
-// TestFakeListLLMBatchCycling / Counter state
-// ====================================================================
-
 /// Ported from `test_two_responses_exact_counter_state`.
 #[tokio::test]
 async fn test_two_responses_exact_counter_state() {
@@ -456,10 +431,6 @@ async fn test_call_resets_counter_at_end() {
     assert_eq!(result, "only_one");
     assert_eq!(llm.current_index(), 0);
 }
-
-// ====================================================================
-// TestFakeListLLMGenerateLLMResultStructure
-// ====================================================================
 
 /// Ported from `test_generate_returns_proper_llm_result_structure`.
 #[tokio::test]
@@ -504,10 +475,6 @@ async fn test_generate_single_prompt_structure() {
         _ => panic!("Expected Generation variant"),
     }
 }
-
-// ====================================================================
-// TestFakeStreamingListLLM — single char, error on last chunk
-// ====================================================================
 
 /// Ported from `test_stream_single_character`.
 #[tokio::test]
@@ -564,16 +531,11 @@ async fn test_stream_error_on_last_chunk_single_char() {
     assert!(chunks.is_empty());
 }
 
-// ====================================================================
-// TestFakeStreamingListLLM — counter advancement, identifying params
-// ====================================================================
-
 /// Ported from `test_stream_advances_counter`.
 #[tokio::test]
 async fn test_stream_advances_counter() {
     let llm = FakeStreamingListLLM::new(vec!["ab".to_string(), "cd".to_string(), "ef".to_string()]);
 
-    // Stream first response
     let mut stream = llm
         .stream_prompt("p1".to_string(), None, None)
         .await
@@ -585,7 +547,6 @@ async fn test_stream_advances_counter() {
     assert_eq!(chunks, vec!["a", "b"]);
     assert_eq!(llm.current_index(), 1);
 
-    // Stream second response
     let mut stream = llm
         .stream_prompt("p2".to_string(), None, None)
         .await
@@ -597,7 +558,6 @@ async fn test_stream_advances_counter() {
     assert_eq!(chunks, vec!["c", "d"]);
     assert_eq!(llm.current_index(), 2);
 
-    // Stream third response — counter cycles
     let mut stream = llm
         .stream_prompt("p3".to_string(), None, None)
         .await
@@ -621,10 +581,6 @@ fn test_streaming_identifying_params_inherited() {
     );
 }
 
-// ====================================================================
-// TestFakeListLLMInvokeWithMessageInput
-// ====================================================================
-
 /// Ported from `test_invoke_with_human_message_list`.
 #[tokio::test]
 async fn test_invoke_with_human_message_list() {
@@ -636,10 +592,6 @@ async fn test_invoke_with_human_message_list() {
     let result = llm.invoke(input, None).await.unwrap();
     assert_eq!(result, "message response");
 }
-
-// ====================================================================
-// TestFakeStreamingListLLMSpecialCharacters
-// ====================================================================
 
 /// Ported from `test_stream_with_tabs`.
 #[tokio::test]
@@ -705,10 +657,6 @@ async fn test_stream_with_emoji() {
     assert_eq!(chunks, vec!["h", "i", "\u{1f600}"]);
 }
 
-// ====================================================================
-// TestFakeListLLMSleepParameter
-// ====================================================================
-
 /// Ported from `test_sleep_stored_but_does_not_affect_call`.
 #[tokio::test]
 async fn test_sleep_stored_but_does_not_affect_call() {
@@ -742,10 +690,6 @@ async fn test_stream_with_sleep() {
     assert_eq!(chunks, vec!["a", "b"]);
     assert!(elapsed >= Duration::from_millis(20));
 }
-
-// ====================================================================
-// Previously skipped tests — now implemented
-// ====================================================================
 
 /// Ported from `test_batch_processing`.
 #[tokio::test]
@@ -818,7 +762,6 @@ async fn test_batch_partial_cycle_updates_counter() {
 #[tokio::test]
 async fn test_call_resets_counter_at_end_multiple_responses() {
     let llm = FakeListLLM::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
-    // Advance to last response
     let _ = llm.call("p".to_string(), None, None).await;
     let _ = llm.call("p".to_string(), None, None).await;
     assert_eq!(llm.current_index(), 2);

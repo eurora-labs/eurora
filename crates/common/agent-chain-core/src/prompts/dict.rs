@@ -110,7 +110,6 @@ fn get_input_variables(
         _ => {}
     }
 
-    // Remove duplicates while preserving order
     let mut seen = std::collections::HashSet::new();
     input_variables.retain(|v| seen.insert(v.clone()));
 
@@ -132,7 +131,6 @@ fn insert_input_variables(
             let mut formatted = serde_json::Map::new();
 
             for (key, value) in map {
-                // Security warning for image_url paths
                 if key == "image_url"
                     && let serde_json::Value::Object(inner) = value
                     && inner.contains_key("path")
@@ -159,7 +157,6 @@ fn insert_input_variables(
 
             Ok(serde_json::Value::Array(formatted))
         }
-        // For non-string primitives, return as-is
         _ => Ok(template.clone()),
     }
 }

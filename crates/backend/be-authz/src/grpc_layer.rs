@@ -151,8 +151,8 @@ fn parse_grpc_path(path: &str) -> Option<(String, String)> {
 /// service path.
 ///
 /// Convention: proto services are named `Proto{Name}` (e.g.
-/// `ProtoConversationService`). This function strips the package prefix and the
-/// `Proto` prefix so the policy CSV can use the short form (`ConversationService`).
+/// `ProtoThreadService`). This function strips the package prefix and the
+/// `Proto` prefix so the policy CSV can use the short form (`ThreadService`).
 ///
 /// The bypass list in [`crate::bypass`] uses *full* qualified names (e.g.
 /// `auth_service.ProtoAuthService`) because bypass checks happen before this
@@ -160,7 +160,7 @@ fn parse_grpc_path(path: &str) -> Option<(String, String)> {
 ///
 /// # Examples
 ///
-/// - `conversation_service.ProtoConversationService` -> `ConversationService`
+/// - `thread_service.ProtoThreadService` -> `ThreadService`
 /// - `grpc.health.v1.Health` -> `Health`
 /// - `ProtoFoo` -> `Foo`
 /// - `MyService` -> `MyService`
@@ -175,11 +175,11 @@ mod tests {
 
     #[test]
     fn parse_grpc_path_valid() {
-        let result = parse_grpc_path("/conversation_service.ProtoConversationService/ChatStream");
+        let result = parse_grpc_path("/thread_service.ProtoThreadService/ChatStream");
         assert_eq!(
             result,
             Some((
-                "conversation_service.ProtoConversationService".to_string(),
+                "thread_service.ProtoThreadService".to_string(),
                 "ChatStream".to_string()
             ))
         );
@@ -217,8 +217,8 @@ mod tests {
     #[test]
     fn extract_service_name_strips_proto_prefix() {
         assert_eq!(
-            extract_service_name("conversation_service.ProtoConversationService"),
-            "ConversationService"
+            extract_service_name("thread_service.ProtoThreadService"),
+            "ThreadService"
         );
     }
 

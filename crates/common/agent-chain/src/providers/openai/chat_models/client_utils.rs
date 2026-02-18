@@ -4,44 +4,6 @@
 
 use std::collections::HashMap;
 
-/// Fix message content blocks that contain bytes image URLs.
-///
-/// In Rust this handles the edge case where an `image_url` content block
-/// might contain a raw bytes URL that needs to be interpreted as UTF-8.
-/// Since Rust strings are always UTF-8, this is largely a no-op validation
-/// pass, but it mirrors the Python `create_chat_model_messages` function
-/// for structural parity.
-///
-/// Matches Python `create_chat_model_messages`.
-pub fn create_chat_model_messages(messages: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
-    messages
-        .into_iter()
-        .map(|mut message| {
-            if let Some(content) = message.get_mut("content")
-                && let Some(blocks) = content.as_array_mut()
-            {
-                for block in blocks.iter_mut() {
-                    if let Some(block_type) = block.get("type")
-                        && block_type == "image_url"
-                        && let Some(image_url) = block.get_mut("image_url")
-                        && let Some(url_obj) = image_url.as_object_mut()
-                    {
-                        // In Python this decodes bytes -> str.
-                        // In Rust, serde_json::Value strings are already UTF-8,
-                        // so this branch exists purely for structural parity.
-                        if let Some(url_val) = url_obj.get("url")
-                            && url_val.is_string()
-                        {
-                            // Already a valid string — nothing to fix.
-                        }
-                    }
-                }
-            }
-            message
-        })
-        .collect()
-}
-
 /// Build the default parameter map for an OpenAI API request.
 ///
 /// Filters out `None` values so only explicitly-set parameters are included.
@@ -68,29 +30,6 @@ pub fn default_params(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_create_chat_model_messages_passthrough() {
-        let messages = vec![
-            serde_json::json!({"role": "user", "content": "hello"}),
-            serde_json::json!({"role": "assistant", "content": "hi"}),
-        ];
-        let result = create_chat_model_messages(messages.clone());
-        assert_eq!(result, messages);
-    }
-
-    #[test]
-    fn test_create_chat_model_messages_with_image_url() {
-        let messages = vec![serde_json::json!({
-            "role": "user",
-            "content": [
-                {"type": "text", "text": "What is this?"},
-                {"type": "image_url", "image_url": {"url": "https://example.com/img.png"}}
-            ]
-        })];
-        let result = create_chat_model_messages(messages.clone());
-        assert_eq!(result, messages);
-    }
 
     #[test]
     fn test_default_params_basic() {
