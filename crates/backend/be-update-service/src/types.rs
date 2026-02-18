@@ -119,6 +119,19 @@ impl std::fmt::Display for ExtensionChannel {
 }
 
 #[derive(Deserialize, Debug)]
+pub struct DownloadParams {
+    pub channel: String,
+    pub target_arch: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct DownloadWithBundleTypeParams {
+    pub channel: String,
+    pub target_arch: String,
+    pub bundle_type: String,
+}
+
+#[derive(Deserialize, Debug)]
 pub struct ExtensionReleaseParams {
     pub channel: String,
 }
