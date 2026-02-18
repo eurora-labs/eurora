@@ -17,7 +17,6 @@ mod test_lang_smith_params {
 
     #[test]
     fn test_langsmith_params_all_fields() {
-
         let params = LangSmithParams::new()
             .with_provider("openai")
             .with_model_name("gpt-4")
@@ -39,7 +38,6 @@ mod test_lang_smith_params {
 
     #[test]
     fn test_langsmith_params_partial() {
-
         let params = LangSmithParams::new()
             .with_provider("anthropic")
             .with_model_type("chat");
@@ -51,7 +49,6 @@ mod test_lang_smith_params {
 
     #[test]
     fn test_langsmith_params_empty() {
-
         let params = LangSmithParams::default();
 
         assert_eq!(params.ls_provider, None);
@@ -64,7 +61,6 @@ mod test_lang_smith_params {
 
     #[test]
     fn test_langsmith_params_model_type_values() {
-
         let chat_params = LangSmithParams::new().with_model_type("chat");
         let llm_params = LangSmithParams::new().with_model_type("llm");
 
@@ -114,7 +110,6 @@ mod test_get_token_ids_default_method {
 
     #[test]
     fn test_get_token_ids_default_method() {
-
         let text = "hello world test";
         let token_ids = get_token_ids_default(text);
 
@@ -211,7 +206,6 @@ mod test_language_model_input {
 
     #[test]
     fn test_language_model_input_accepts_string() {
-
         let input: LanguageModelInput = "test string".into();
         match input {
             LanguageModelInput::Text(s) => assert_eq!(s, "test string"),
@@ -230,7 +224,6 @@ mod test_language_model_input {
 
     #[test]
     fn test_language_model_input_accepts_prompt_value() {
-
         let prompt = StringPromptValue::new("test prompt");
         let input: LanguageModelInput = prompt.into();
 
@@ -244,7 +237,6 @@ mod test_language_model_input {
 
     #[test]
     fn test_language_model_input_accepts_message_sequence() {
-
         let messages = vec![BaseMessage::Human(
             HumanMessage::builder().content("Hello").build(),
         )];
@@ -286,14 +278,12 @@ mod test_language_model_output {
 
     #[test]
     fn test_language_model_output_accepts_string() {
-
         let output: LanguageModelOutput = "test output".to_string().into();
         assert_eq!(output.text(), "test output");
     }
 
     #[test]
     fn test_language_model_output_accepts_ai_message() {
-
         let message = AIMessage::builder().content("test message").build();
         let output: LanguageModelOutput = message.into();
         assert_eq!(output.text(), "test message");
@@ -405,7 +395,6 @@ mod test_custom_get_token_ids {
 
     #[test]
     fn test_custom_get_token_ids_field() {
-
         let config = LanguageModelConfig::new().with_custom_get_token_ids(simple_char_tokenizer);
 
         assert!(config.custom_get_token_ids.is_some());
@@ -420,7 +409,6 @@ mod test_custom_get_token_ids {
 
     #[test]
     fn test_custom_tokenizer_function_execution() {
-
         let config = LanguageModelConfig::new().with_custom_get_token_ids(fixed_tokenizer);
 
         let tokenizer = config.custom_get_token_ids.unwrap();
@@ -440,7 +428,6 @@ mod test_custom_get_token_ids {
 
     #[test]
     fn test_custom_get_token_ids_excluded_from_serialization() {
-
         let config = LanguageModelConfig::new().with_custom_get_token_ids(simple_char_tokenizer);
 
         let json = serde_json::to_string(&config).unwrap();
@@ -455,7 +442,6 @@ mod test_base_language_model_trait {
 
     #[test]
     fn test_get_num_tokens() {
-
         let model = FakeListLLM::new(vec!["response".to_string()]);
 
         let result = model.get_num_tokens("hello world test foo bar");
@@ -480,7 +466,6 @@ mod test_base_language_model_trait {
 
     #[test]
     fn test_get_num_tokens_from_messages() {
-
         let model = FakeListLLM::new(vec!["response".to_string()]);
 
         let messages = vec![
@@ -506,7 +491,6 @@ mod test_base_language_model_trait {
 
     #[test]
     fn test_identifying_params() {
-
         let model = FakeListLLM::new(vec!["response".to_string()]);
 
         let params = model.identifying_params();
@@ -538,7 +522,6 @@ mod test_base_language_model_trait {
 
     #[test]
     fn test_get_token_ids() {
-
         let model = FakeListLLM::new(vec!["response".to_string()]);
 
         let result = model.get_token_ids("hello world");
@@ -572,7 +555,6 @@ mod test_base_language_model_trait {
         assert_eq!(params.ls_stop, None);
     }
 }
-
 
 #[cfg(test)]
 mod test_get_num_tokens_edge_cases {
@@ -703,7 +685,6 @@ mod test_agenerate_prompt {
         assert_eq!(result.generations.len(), 0);
     }
 }
-
 
 #[cfg(test)]
 mod test_callbacks_config {

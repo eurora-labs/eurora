@@ -569,15 +569,12 @@ impl ChatAnthropic {
 
         if let Some(choice) = tool_choice {
             match choice {
-                ToolChoice::String(s) => {
-                    match s.as_str() {
-                        "auto" => payload["tool_choice"] = serde_json::json!({"type": "auto"}),
-                        "any" => payload["tool_choice"] = serde_json::json!({"type": "any"}),
-                        "none" => {
-                        }
-                        _ => payload["tool_choice"] = serde_json::json!({"type": "auto"}),
-                    }
-                }
+                ToolChoice::String(s) => match s.as_str() {
+                    "auto" => payload["tool_choice"] = serde_json::json!({"type": "auto"}),
+                    "any" => payload["tool_choice"] = serde_json::json!({"type": "any"}),
+                    "none" => {}
+                    _ => payload["tool_choice"] = serde_json::json!({"type": "auto"}),
+                },
                 ToolChoice::Structured { choice_type, name } => {
                     if (choice_type == "tool" || choice_type == "function")
                         && let Some(tool_name) = name

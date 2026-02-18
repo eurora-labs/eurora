@@ -12,7 +12,6 @@ use agent_chain_core::messages::{BaseMessage, HumanMessage};
 use agent_chain_core::outputs::GenerationType;
 use futures::StreamExt;
 
-
 /// Ported from `test_initialization`.
 #[test]
 fn test_fake_list_llm_initialization() {
@@ -148,7 +147,6 @@ async fn test_fake_list_llm_acall_method() {
     assert_eq!(result, "async direct call");
 }
 
-
 /// Ported from `test_error_can_be_raised`.
 #[test]
 fn test_fake_list_llm_error_can_be_raised() {
@@ -162,7 +160,6 @@ fn test_fake_list_llm_error_is_exception() {
     let error = FakeListLLMError;
     let _: &dyn std::error::Error = &error;
 }
-
 
 /// Ported from `test_initialization`.
 #[test]
@@ -341,7 +338,6 @@ async fn test_fake_streaming_stream_with_newlines() {
     assert_eq!(chunks, vec!["a", "\n", "b"]);
 }
 
-
 /// Ported from `test_generate_with_multiple_prompts`.
 #[tokio::test]
 async fn test_generate_with_multiple_prompts() {
@@ -402,7 +398,6 @@ async fn test_generate_with_more_prompts_than_responses() {
     }
 }
 
-
 /// Ported from `test_two_responses_exact_counter_state`.
 #[tokio::test]
 async fn test_two_responses_exact_counter_state() {
@@ -436,7 +431,6 @@ async fn test_call_resets_counter_at_end() {
     assert_eq!(result, "only_one");
     assert_eq!(llm.current_index(), 0);
 }
-
 
 /// Ported from `test_generate_returns_proper_llm_result_structure`.
 #[tokio::test]
@@ -481,7 +475,6 @@ async fn test_generate_single_prompt_structure() {
         _ => panic!("Expected Generation variant"),
     }
 }
-
 
 /// Ported from `test_stream_single_character`.
 #[tokio::test]
@@ -538,7 +531,6 @@ async fn test_stream_error_on_last_chunk_single_char() {
     assert!(chunks.is_empty());
 }
 
-
 /// Ported from `test_stream_advances_counter`.
 #[tokio::test]
 async fn test_stream_advances_counter() {
@@ -589,7 +581,6 @@ fn test_streaming_identifying_params_inherited() {
     );
 }
 
-
 /// Ported from `test_invoke_with_human_message_list`.
 #[tokio::test]
 async fn test_invoke_with_human_message_list() {
@@ -601,7 +592,6 @@ async fn test_invoke_with_human_message_list() {
     let result = llm.invoke(input, None).await.unwrap();
     assert_eq!(result, "message response");
 }
-
 
 /// Ported from `test_stream_with_tabs`.
 #[tokio::test]
@@ -667,7 +657,6 @@ async fn test_stream_with_emoji() {
     assert_eq!(chunks, vec!["h", "i", "\u{1f600}"]);
 }
 
-
 /// Ported from `test_sleep_stored_but_does_not_affect_call`.
 #[tokio::test]
 async fn test_sleep_stored_but_does_not_affect_call() {
@@ -701,7 +690,6 @@ async fn test_stream_with_sleep() {
     assert_eq!(chunks, vec!["a", "b"]);
     assert!(elapsed >= Duration::from_millis(20));
 }
-
 
 /// Ported from `test_batch_processing`.
 #[tokio::test]

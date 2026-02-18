@@ -11,7 +11,6 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-
 #[derive(Debug)]
 struct LlmEndHandler;
 
@@ -30,7 +29,6 @@ impl BaseCallbackHandler for LlmEndHandler {
         "LlmEndHandler"
     }
 }
-
 
 #[derive(Debug)]
 struct ChatModelStartHandler;
@@ -60,7 +58,6 @@ impl BaseCallbackHandler for ChatModelStartHandler {
     }
 }
 
-
 #[derive(Debug)]
 struct AsyncLlmEndHandler;
 
@@ -88,7 +85,6 @@ impl AsyncCallbackHandler for AsyncLlmEndHandler {
     ) {
     }
 }
-
 
 #[derive(Debug)]
 struct AsyncChatModelStartHandler;
@@ -119,7 +115,6 @@ impl AsyncCallbackHandler for AsyncChatModelStartHandler {
     ) {
     }
 }
-
 
 /// Ported from `test_on_llm_end_is_defined`.
 ///

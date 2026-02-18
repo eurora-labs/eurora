@@ -263,16 +263,6 @@ pub fn get_configure_hooks() -> &'static std::sync::LazyLock<std::sync::Mutex<Co
 mod tests {
     use super::*;
 
-
-
-
-
-
-
-
-
-
-
     #[test]
     fn test_collect_runs() {
         let collector = RunCollectorCallbackHandler::new(None);

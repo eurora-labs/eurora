@@ -9,7 +9,6 @@ use agent_chain_core::messages::{
 };
 use std::collections::HashMap;
 
-
 /// Ported from `test_openai_model_param`.
 #[test]
 fn test_openai_model_param() {
@@ -43,7 +42,6 @@ fn test_init_o1() {
 fn test_init_minimal_reasoning_effort() {
     let _llm = ChatOpenAI::new("gpt-5").reasoning_effort("minimal");
 }
-
 
 /// Ported from `test__get_request_payload` (basic case).
 #[test]
@@ -173,7 +171,6 @@ fn test_extra_body_with_model_kwargs() {
     assert_eq!(payload["temperature"], 0.5);
 }
 
-
 /// Ported from `test__create_usage_metadata`.
 #[test]
 fn test_create_usage_metadata_basic() {
@@ -204,7 +201,6 @@ fn test_create_usage_metadata_responses() {
     assert_eq!(metadata.output_tokens, 50);
     assert_eq!(metadata.total_tokens, 150);
 }
-
 
 /// Ported from `test_model_prefers_responses_api`.
 #[test]
@@ -252,7 +248,6 @@ fn test_should_use_responses_api_conditions() {
     assert!(!llm.should_use_responses_api(None));
 }
 
-
 /// Tests get_ls_params returns correct values.
 #[test]
 fn test_get_ls_params() {
@@ -267,7 +262,6 @@ fn test_get_ls_params() {
     assert_eq!(params.ls_max_tokens, Some(100));
     assert_eq!(params.ls_stop, Some(vec!["stop1".to_string()]));
 }
-
 
 /// Tests format_messages produces correct OpenAI API format.
 #[test]
@@ -332,7 +326,6 @@ fn test_format_messages_tool_message() {
     assert_eq!(formatted[0]["tool_call_id"], "call_123");
     assert_eq!(formatted[0]["content"], "sunny");
 }
-
 
 /// Ported from `test__construct_responses_api_input_tool_message_conversion`.
 #[test]
@@ -425,7 +418,6 @@ fn test_format_messages_for_responses_api_multiple_types() {
     assert!(has_function_call);
     assert!(has_function_output);
 }
-
 
 /// Tests all builder methods work without panicking.
 #[test]

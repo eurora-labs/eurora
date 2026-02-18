@@ -101,7 +101,6 @@ const EXPECTED_EXPORTS: &[&str] = &[
 /// verifies that at least the expected items are available.
 #[test]
 fn test_all_imports() {
-
     use agent_chain_core::utils::StrictFormatter;
     let _ = StrictFormatter::new();
     use agent_chain_core::utils::FORMATTER;
@@ -209,5 +208,4 @@ fn test_all_imports() {
         !expected.is_empty(),
         "Expected exports list should not be empty"
     );
-
 }

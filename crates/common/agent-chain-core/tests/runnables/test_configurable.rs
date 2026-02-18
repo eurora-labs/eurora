@@ -20,7 +20,6 @@ use agent_chain_core::runnables::utils::{
 use async_trait::async_trait;
 use serde_json::Value;
 
-
 /// A simple reconfigurable runnable that appends `my_property` to the input.
 #[derive(Debug, Clone)]
 struct MyRunnable {
@@ -84,7 +83,6 @@ impl Runnable for MyOtherRunnable {
     }
 }
 
-
 fn make_my_property_field(id: &str) -> HashMap<String, AnyConfigurableField> {
     let mut fields = HashMap::new();
     fields.insert(
@@ -106,9 +104,6 @@ fn make_configurable_my_runnable(
     let fields = make_my_property_field(field_id);
     runnable.configurable_fields_reconfigurable(fields)
 }
-
-
-
 
 #[test]
 fn test_prefix_config_spec_non_shared() {
@@ -148,7 +143,6 @@ fn test_prefix_config_spec_shared_unchanged() {
     let result = prefix_config_spec(&spec, "model==gpt4");
     assert_eq!(result.id, "global_setting");
 }
-
 
 #[test]
 fn test_make_options_spec_single_option() {
@@ -215,7 +209,6 @@ fn test_make_options_spec_multi_option() {
         Some(Value::Array(vec![Value::String("search".to_string())]))
     );
 }
-
 
 #[test]
 fn test_configurable_alternatives_invoke_default() {
@@ -372,7 +365,6 @@ fn test_configurable_alternatives_with_prefix_keys() {
     assert!(spec_ids.contains(&"which"));
 }
 
-
 #[test]
 fn test_dynamic_runnable_with_config() {
     let configurable = make_configurable_my_runnable("a", "my_property");
@@ -387,7 +379,6 @@ fn test_dynamic_runnable_with_config() {
             .contains(&"test_tag".to_string())
     );
 }
-
 
 #[test]
 fn test_configurable_fields_config_specs() {
@@ -499,7 +490,6 @@ fn test_configurable_fields_chained_configurable_fields() {
     let result = chained.invoke("x".to_string(), Some(config)).unwrap();
     assert_eq!(result, "xc");
 }
-
 
 #[tokio::test]
 async fn test_configurable_fields_ainvoke_with_override() {

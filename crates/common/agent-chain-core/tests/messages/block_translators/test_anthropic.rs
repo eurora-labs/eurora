@@ -10,30 +10,13 @@
 //! for what needs to be implemented.
 
 use agent_chain_core::messages::{
-    AIMessage,
-    AIMessageChunk,
-    Annotation,
-    BlockIndex,
-    ChunkPosition,
-    ContentBlock,
-    FileContentBlock,
-    HumanMessage,
-    ImageContentBlock,
-    MessageContent,
-    NonStandardContentBlock,
-    PlainTextContentBlock,
-    ReasoningContentBlock,
-    ServerToolCall,
-    ServerToolResult,
-    ServerToolStatus,
-    TextContentBlock,
-    ToolCallBlock,
-    ToolCallChunkBlock,
-    tool_call_chunk,
+    AIMessage, AIMessageChunk, Annotation, BlockIndex, ChunkPosition, ContentBlock,
+    FileContentBlock, HumanMessage, ImageContentBlock, MessageContent, NonStandardContentBlock,
+    PlainTextContentBlock, ReasoningContentBlock, ServerToolCall, ServerToolResult,
+    ServerToolStatus, TextContentBlock, ToolCallBlock, ToolCallChunkBlock, tool_call_chunk,
 };
 use serde_json::json;
 use std::collections::HashMap;
-
 
 /// Test conversion of Anthropic AI message content to v1 format.
 ///
@@ -332,7 +315,6 @@ fn test_convert_to_v1_from_anthropic() {
     assert_ne!(message2.content, "");
 }
 
-
 /// Test conversion of Anthropic AI message chunks to v1 format.
 ///
 /// This test verifies that streaming chunks from Anthropic are correctly
@@ -614,7 +596,6 @@ fn test_convert_to_v1_from_anthropic_chunk() {
     ];
     assert_eq!(full_server.content_blocks(), expected_server_content_blocks);
 }
-
 
 /// Test conversion of Anthropic input content (HumanMessage) to v1 format.
 ///

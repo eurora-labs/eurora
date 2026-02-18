@@ -7,7 +7,6 @@ use agent_chain_core::messages::{
     SystemMessageChunk, TextContentBlock,
 };
 
-
 #[test]
 fn test_init_basic() {
     let msg = SystemMessage::builder()
@@ -127,7 +126,6 @@ fn test_developer_role_via_additional_kwargs() {
         &serde_json::json!("developer")
     );
 }
-
 
 #[test]
 fn test_chunk_init_basic() {
@@ -295,7 +293,6 @@ fn test_chunk_text_content() {
     assert!(matches!(&chunk.content, MessageContent::Text(s) if s == "Hello world"));
 }
 
-
 #[test]
 fn test_developer_role_preserved_in_serialization() {
     let mut additional_kwargs = std::collections::HashMap::new();
@@ -347,7 +344,6 @@ fn test_multiple_system_messages_with_different_roles() {
     );
 }
 
-
 #[test]
 fn test_init_with_list_content() {
     let parts = vec![ContentPart::Text {
@@ -392,7 +388,6 @@ fn test_empty_list_content() {
     }
 }
 
-
 #[test]
 fn test_text_method() {
     let msg = SystemMessage::builder().content("Hello world").build();
@@ -429,7 +424,6 @@ fn test_text_method_empty_list_content() {
     assert_eq!(msg.text(), "");
 }
 
-
 #[test]
 fn test_content_blocks_property() {
     let msg = SystemMessage::builder().content("Instructions").build();
@@ -460,7 +454,6 @@ fn test_content_blocks_empty_list() {
     assert!(blocks.is_empty());
 }
 
-
 #[test]
 fn test_pretty_repr() {
     let msg = SystemMessage::builder().content("Instructions").build();
@@ -487,7 +480,6 @@ fn test_pretty_repr_with_name() {
         "expected 'Name: sys_prompt' in pretty_repr, got: {result}"
     );
 }
-
 
 #[test]
 fn test_init_with_content_blocks_sets_content() {
@@ -524,7 +516,6 @@ fn test_content_blocks_roundtrip() {
     }
 }
 
-
 #[test]
 fn test_model_dump_exact_keys_and_values() {
     let msg = SystemMessage::builder()
@@ -552,7 +543,6 @@ fn test_model_dump_default_values() {
     assert_eq!(dumped["additional_kwargs"], serde_json::json!({}));
     assert_eq!(dumped["response_metadata"], serde_json::json!({}));
 }
-
 
 #[test]
 fn test_same_content_messages_are_equal() {
@@ -595,7 +585,6 @@ fn test_same_content_and_metadata_are_equal() {
         .build();
     assert_eq!(msg1, msg2);
 }
-
 
 #[test]
 fn test_chunk_add_with_list_content() {
@@ -672,7 +661,6 @@ fn test_chunk_add_list_of_chunks() {
     assert_eq!(result.id, Some("1".to_string()));
 }
 
-
 #[test]
 fn test_chunk_content_blocks_property() {
     let chunk = SystemMessageChunk::builder()
@@ -707,7 +695,6 @@ fn test_chunk_content_blocks_empty_list() {
     let blocks = msg.content_blocks();
     assert!(blocks.is_empty());
 }
-
 
 #[test]
 fn test_chunk_text_method() {

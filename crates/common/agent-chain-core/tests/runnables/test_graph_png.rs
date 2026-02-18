@@ -7,7 +7,6 @@ use std::collections::HashMap;
 use agent_chain_core::runnables::graph::{Graph, LabelsDict};
 use agent_chain_core::runnables::graph_png::{PngDrawError, PngDrawer};
 
-
 #[test]
 fn test_png_drawer_initialization() {
     let drawer = PngDrawer::default();
@@ -28,7 +27,6 @@ fn test_png_drawer_initialization_custom() {
     assert_eq!(drawer.labels.edges["edge1"], "CustomEdge1");
 }
 
-
 #[test]
 fn test_png_drawer_get_node_label_default() {
     let drawer = PngDrawer::default();
@@ -46,7 +44,6 @@ fn test_png_drawer_get_node_label_custom() {
     let label = drawer.get_node_label("test_node");
     assert!(label.contains("<B>Custom Label</B>"));
 }
-
 
 #[test]
 fn test_png_drawer_get_edge_label_default() {
@@ -66,7 +63,6 @@ fn test_png_drawer_get_edge_label_custom() {
     assert!(label.contains("<U>Custom Edge</U>"));
 }
 
-
 #[test]
 fn test_graph_draw_png_returns_missing_dependency_error() {
     let mut graph = Graph::new();
@@ -83,7 +79,6 @@ fn test_graph_draw_png_returns_missing_dependency_error() {
         other => panic!("expected MissingDependency, got: {other}"),
     }
 }
-
 
 #[test]
 fn test_png_drawer_add_node_structure() {
@@ -111,7 +106,6 @@ fn test_png_drawer_draw_method() {
     assert!(result.is_err());
 }
 
-
 #[test]
 fn test_png_drawer_with_empty_labels() {
     let labels = LabelsDict::default();
@@ -120,7 +114,6 @@ fn test_png_drawer_with_empty_labels() {
     assert_eq!(drawer.get_node_label("test"), "<<B>test</B>>");
     assert_eq!(drawer.get_edge_label("test"), "<<U>test</U>>");
 }
-
 
 #[test]
 fn test_png_drawer_labels_dict_structure() {
@@ -134,7 +127,6 @@ fn test_png_drawer_labels_dict_structure() {
     assert_eq!(labels.nodes["n1"], "Node1");
     assert_eq!(labels.edges["e1"], "Edge1");
 }
-
 
 #[test]
 fn test_graph_draw_png_with_labels() {
@@ -155,7 +147,6 @@ fn test_graph_draw_png_with_labels() {
     assert!(matches!(result, Err(PngDrawError::MissingDependency(_))));
 }
 
-
 #[test]
 fn test_graph_draw_png_with_fontname() {
     let mut graph = Graph::new();
@@ -166,7 +157,6 @@ fn test_graph_draw_png_with_fontname() {
     let result = graph.draw_png(None, Some("courier"), None);
     assert!(matches!(result, Err(PngDrawError::MissingDependency(_))));
 }
-
 
 #[test]
 fn test_png_drawer_add_nodes_method() {
@@ -192,7 +182,6 @@ fn test_png_drawer_add_edges_method() {
     assert_eq!(edges.len(), 1);
 }
 
-
 #[test]
 fn test_png_drawer_update_styles_method() {
     let drawer = PngDrawer::default();
@@ -205,7 +194,6 @@ fn test_png_drawer_update_styles_method() {
     assert_eq!(first.as_deref(), Some("a"));
     assert_eq!(last.as_deref(), Some("b"));
 }
-
 
 #[test]
 fn test_png_drawer_add_subgraph_method() {
@@ -220,14 +208,12 @@ fn test_png_drawer_add_subgraph_method() {
     assert!(subgraphs[0].0.starts_with("cluster_"));
 }
 
-
 #[test]
 fn test_labels_dict_can_be_empty() {
     let labels = LabelsDict::default();
     assert!(labels.nodes.is_empty());
     assert!(labels.edges.is_empty());
 }
-
 
 #[test]
 fn test_labels_dict_nodes_only() {
@@ -242,7 +228,6 @@ fn test_labels_dict_nodes_only() {
     assert!(labels.edges.is_empty());
 }
 
-
 #[test]
 fn test_labels_dict_edges_only() {
     let labels = LabelsDict {
@@ -255,7 +240,6 @@ fn test_labels_dict_edges_only() {
     assert!(labels.nodes.is_empty());
     assert_eq!(labels.edges.len(), 2);
 }
-
 
 #[test]
 fn test_png_drawer_multiple_custom_labels() {
@@ -277,7 +261,6 @@ fn test_png_drawer_multiple_custom_labels() {
     assert_eq!(drawer.get_edge_label("e1"), "<<U>Edge One</U>>");
 }
 
-
 #[test]
 fn test_graph_draw_png_returns_error_when_no_path() {
     let mut graph = Graph::new();
@@ -289,7 +272,6 @@ fn test_graph_draw_png_returns_error_when_no_path() {
     assert!(result.is_err());
 }
 
-
 #[test]
 fn test_png_drawer_font_names() {
     let fonts = ["arial", "helvetica", "courier", "times"];
@@ -298,7 +280,6 @@ fn test_png_drawer_font_names() {
         assert_eq!(drawer.fontname, *font);
     }
 }
-
 
 #[test]
 fn test_png_drawer_special_node_names() {
@@ -310,7 +291,6 @@ fn test_png_drawer_special_node_names() {
     let end_label = drawer.get_node_label("__end__");
     assert!(end_label.contains("<B>__end__</B>"));
 }
-
 
 #[test]
 fn test_png_drawer_html_formatting() {
@@ -327,14 +307,12 @@ fn test_png_drawer_html_formatting() {
     assert!(edge_label.contains("<U>"));
 }
 
-
 #[test]
 fn test_labels_dict_type_definition() {
     let labels = LabelsDict::default();
     assert!(labels.nodes.is_empty());
     assert!(labels.edges.is_empty());
 }
-
 
 #[test]
 fn test_png_drawer_labels_with_special_chars() {
@@ -354,7 +332,6 @@ fn test_png_drawer_labels_with_special_chars() {
     assert!(label2.contains("Edge"));
 }
 
-
 #[test]
 fn test_graph_first_last_node_styling() {
     let mut graph = Graph::new();
@@ -371,7 +348,6 @@ fn test_graph_first_last_node_styling() {
     assert_eq!(last_id, Some("last".to_string()));
 }
 
-
 #[test]
 fn test_png_drawer_conditional_edges() {
     let drawer = PngDrawer::default();
@@ -382,7 +358,6 @@ fn test_png_drawer_conditional_edges() {
     let dotted_attrs = drawer.edge_attrs(None, true);
     assert_eq!(dotted_attrs["style"], "dotted");
 }
-
 
 #[test]
 fn test_graph_draw_png_complex_structure() {
@@ -404,7 +379,6 @@ fn test_graph_draw_png_complex_structure() {
     assert!(matches!(result, Err(PngDrawError::MissingDependency(_))));
 }
 
-
 #[test]
 fn test_png_drawer_with_subgraphs() {
     let mut graph = Graph::new();
@@ -419,7 +393,6 @@ fn test_png_drawer_with_subgraphs() {
     assert!(matches!(result, Err(PngDrawError::MissingDependency(_))));
 }
 
-
 #[test]
 fn test_png_drawer_empty_graph() {
     let drawer = PngDrawer::default();
@@ -428,7 +401,6 @@ fn test_png_drawer_empty_graph() {
     let result = drawer.draw(&graph, None);
     assert!(result.is_err());
 }
-
 
 #[test]
 fn test_labels_dict_partial_labels() {
@@ -442,7 +414,6 @@ fn test_labels_dict_partial_labels() {
     assert!(drawer.get_node_label("node2").contains("node2"));
 }
 
-
 #[test]
 fn test_png_drawer_fontname_used() {
     let fonts = ["arial", "helvetica", "times", "courier", "verdana"];
@@ -451,7 +422,6 @@ fn test_png_drawer_fontname_used() {
         assert_eq!(drawer.fontname, *font);
     }
 }
-
 
 #[test]
 fn test_graph_draw_png_with_conditional_edges() {
@@ -467,7 +437,6 @@ fn test_graph_draw_png_with_conditional_edges() {
     assert!(matches!(result, Err(PngDrawError::MissingDependency(_))));
 }
 
-
 #[test]
 fn test_png_drawer_edge_with_data() {
     let mut graph = Graph::new();
@@ -479,7 +448,6 @@ fn test_png_drawer_edge_with_data() {
     let result = graph.draw_png(None, None, None);
     assert!(matches!(result, Err(PngDrawError::MissingDependency(_))));
 }
-
 
 #[test]
 fn test_labels_dict_preserves_all_entries() {
@@ -499,13 +467,11 @@ fn test_labels_dict_preserves_all_entries() {
     assert_eq!(labels.edges.len(), 10);
 }
 
-
 #[test]
 fn test_png_drawer_default_font() {
     let drawer = PngDrawer::default();
     assert_eq!(drawer.fontname, "arial");
 }
-
 
 #[test]
 fn test_png_drawer_labels_immutable_default() {
@@ -514,7 +480,6 @@ fn test_png_drawer_labels_immutable_default() {
 
     assert_eq!(drawer1.labels, drawer2.labels);
 }
-
 
 #[test]
 fn test_graph_draw_png_returns_error_when_path_specified() {
@@ -531,7 +496,6 @@ fn test_graph_draw_png_returns_error_when_path_specified() {
     assert!(matches!(result, Err(PngDrawError::MissingDependency(_))));
 }
 
-
 #[test]
 fn test_png_drawer_handles_none_data() {
     let mut graph = Graph::new();
@@ -543,7 +507,6 @@ fn test_png_drawer_handles_none_data() {
     let result = drawer.draw(&graph, None);
     assert!(result.is_err());
 }
-
 
 #[test]
 fn test_graph_draw_png_overload_signatures() {
@@ -559,7 +522,6 @@ fn test_graph_draw_png_overload_signatures() {
     assert!(result2.is_err());
 }
 
-
 #[test]
 fn test_png_drawer_labels_dict_typed_correctly() {
     let labels = LabelsDict {
@@ -570,7 +532,6 @@ fn test_png_drawer_labels_dict_typed_correctly() {
     assert!(!labels.nodes.is_empty());
     assert!(!labels.edges.is_empty());
 }
-
 
 #[test]
 fn test_graph_draw_png_with_metadata() {
@@ -585,7 +546,6 @@ fn test_graph_draw_png_with_metadata() {
     let result = graph.draw_png(None, None, None);
     assert!(matches!(result, Err(PngDrawError::MissingDependency(_))));
 }
-
 
 #[test]
 fn test_png_drawer_preserves_graph_structure() {
@@ -609,7 +569,6 @@ fn test_png_drawer_preserves_graph_structure() {
     assert_eq!(edge_list.len(), 3);
 }
 
-
 #[test]
 fn test_png_drawer_edge_attrs_with_label() {
     let drawer = PngDrawer::default();
@@ -624,7 +583,6 @@ fn test_png_drawer_edge_attrs_without_label() {
     assert_eq!(attrs["label"], "");
 }
 
-
 #[test]
 fn test_png_drawer_node_attrs_label() {
     let custom_labels = LabelsDict {
@@ -635,7 +593,6 @@ fn test_png_drawer_node_attrs_label() {
     let attrs = drawer.node_attrs("x");
     assert_eq!(attrs["label"], "<<B>CustomX</B>>");
 }
-
 
 #[test]
 fn test_collect_subgraphs_no_shared_prefix() {
@@ -657,7 +614,6 @@ fn test_collect_subgraphs_shared_prefix() {
     assert_eq!(subgraphs[0].0, "cluster_parent");
     assert_eq!(subgraphs[0].1.len(), 2);
 }
-
 
 #[test]
 fn test_png_drawer_add_edges_conditional() {

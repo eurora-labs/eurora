@@ -156,7 +156,6 @@ impl From<Vec<RunnableConfig>> for ConfigOrList {
     }
 }
 
-
 thread_local! {
     static VAR_CHILD_RUNNABLE_CONFIG: RefCell<Option<RunnableConfig>> = const { RefCell::new(None) };
 }
@@ -187,7 +186,6 @@ pub fn set_config_context(config: RunnableConfig) -> ConfigContextGuard {
 pub fn get_child_runnable_config() -> Option<RunnableConfig> {
     VAR_CHILD_RUNNABLE_CONFIG.with(|cell| cell.borrow().clone())
 }
-
 
 /// Ensure that a config has all keys present with defaults.
 ///
@@ -253,7 +251,6 @@ fn merge_into_config(target: &mut RunnableConfig, source: &RunnableConfig) {
     }
 }
 
-
 /// Get a list of configs from either a single config or a list.
 ///
 /// If a single config is provided, it will be cloned `length` times.
@@ -294,7 +291,6 @@ pub fn get_config_list(config: Option<ConfigOrList>, length: usize) -> Vec<Runna
         None => (0..length).map(|_| ensure_config(None)).collect(),
     }
 }
-
 
 /// Patch a config with updates.
 ///
@@ -338,7 +334,6 @@ pub fn patch_config(
 
     config
 }
-
 
 /// Merge multiple configs into one.
 ///
@@ -416,7 +411,6 @@ pub fn merge_configs(configs: Vec<Option<RunnableConfig>>) -> RunnableConfig {
     base
 }
 
-
 /// A callable that takes input and optionally a config.
 ///
 /// This enum mirrors the Python `call_func_with_variable_args` pattern,
@@ -468,7 +462,6 @@ pub async fn acall_func_with_variable_args<I, O>(
     }
 }
 
-
 /// Get a callback manager configured from the given RunnableConfig.
 pub fn get_callback_manager_for_config(config: &RunnableConfig) -> CallbackManager {
     CallbackManager::configure(
@@ -494,7 +487,6 @@ pub fn get_async_callback_manager_for_config(config: &RunnableConfig) -> AsyncCa
         None,
     )
 }
-
 
 /// Run a synchronous function on a blocking thread.
 ///

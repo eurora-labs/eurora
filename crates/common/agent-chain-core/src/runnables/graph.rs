@@ -734,7 +734,6 @@ impl MermaidDrawMethod {
     }
 }
 
-
 fn first_node_impl<'a>(graph: &'a Graph, exclude: &[&str]) -> Option<&'a Node> {
     let targets: std::collections::HashSet<&str> = graph
         .edges

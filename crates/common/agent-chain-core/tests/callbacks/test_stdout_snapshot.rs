@@ -58,7 +58,6 @@ fn create_test_handler_with_color(color: &str) -> (StdOutCallbackHandler, TestWr
     (handler, writer)
 }
 
-
 /// Ported from `test_default_color_is_none`.
 #[test]
 fn test_default_color_is_none() {
@@ -87,7 +86,6 @@ fn test_default_flags() {
     assert!(!handler.raise_error());
     assert!(!handler.run_inline());
 }
-
 
 /// Ported from `test_uses_name_from_kwargs`.
 ///
@@ -257,7 +255,6 @@ fn test_chain_start_serialized_none_uses_unknown() {
     );
 }
 
-
 /// Ported from `test_outputs_finished_chain`.
 #[test]
 fn test_chain_end_outputs_finished_chain() {
@@ -301,7 +298,6 @@ fn test_chain_end_outputs_start_with_newline() {
         output
     );
 }
-
 
 /// Ported from `test_outputs_action_log`.
 #[test]
@@ -356,7 +352,6 @@ fn test_agent_action_uses_default_color_when_no_override() {
         output
     );
 }
-
 
 /// Ported from `test_outputs_tool_result`.
 #[test]
@@ -480,7 +475,6 @@ fn test_tool_end_color_override() {
     );
 }
 
-
 /// Ported from `test_outputs_text`.
 #[test]
 fn test_on_text_outputs_text() {
@@ -530,7 +524,6 @@ fn test_on_text_empty_text() {
     let (handler, _writer) = create_test_handler();
     handler.on_text("", Uuid::new_v4(), None, None, "");
 }
-
 
 /// Ported from `test_outputs_finish_log`.
 #[test]

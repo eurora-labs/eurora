@@ -9,7 +9,6 @@ use agent_chain_core::messages::{
 };
 use serde_json::json;
 
-
 #[test]
 fn test_serdes_message() {
     let msg = AIMessage::builder()
@@ -61,7 +60,6 @@ fn test_serdes_message() {
         Some("foobad".to_string())
     );
 }
-
 
 #[test]
 fn test_serdes_message_chunk() {
@@ -116,7 +114,6 @@ fn test_serdes_message_chunk() {
     );
 }
 
-
 #[test]
 fn test_add_usage_both_none() {
     let result = add_usage(None, None);
@@ -124,7 +121,6 @@ fn test_add_usage_both_none() {
     assert_eq!(result.output_tokens, 0);
     assert_eq!(result.total_tokens, 0);
 }
-
 
 #[test]
 fn test_add_usage_one_none() {
@@ -135,7 +131,6 @@ fn test_add_usage_one_none() {
     assert_eq!(result.total_tokens, 30);
 }
 
-
 #[test]
 fn test_add_usage_both_present() {
     let usage1 = UsageMetadata::new(10, 20);
@@ -145,7 +140,6 @@ fn test_add_usage_both_present() {
     assert_eq!(result.output_tokens, 30);
     assert_eq!(result.total_tokens, 45);
 }
-
 
 #[test]
 fn test_add_usage_with_details() {
@@ -186,7 +180,6 @@ fn test_add_usage_with_details() {
     );
 }
 
-
 #[test]
 fn test_subtract_usage_both_none() {
     let result = subtract_usage(None, None);
@@ -194,7 +187,6 @@ fn test_subtract_usage_both_none() {
     assert_eq!(result.output_tokens, 0);
     assert_eq!(result.total_tokens, 0);
 }
-
 
 #[test]
 fn test_subtract_usage_one_none() {
@@ -204,7 +196,6 @@ fn test_subtract_usage_one_none() {
     assert_eq!(result.output_tokens, 20);
     assert_eq!(result.total_tokens, 30);
 }
-
 
 #[test]
 fn test_subtract_usage_both_present() {
@@ -216,7 +207,6 @@ fn test_subtract_usage_both_present() {
     assert_eq!(result.total_tokens, 15);
 }
 
-
 #[test]
 fn test_subtract_usage_with_negative_result() {
     let usage1 = UsageMetadata::new(5, 10);
@@ -226,7 +216,6 @@ fn test_subtract_usage_with_negative_result() {
     assert_eq!(result.output_tokens, 0);
     assert_eq!(result.total_tokens, 0);
 }
-
 
 #[test]
 fn test_add_ai_message_chunks_usage() {
@@ -274,7 +263,6 @@ fn test_add_ai_message_chunks_usage() {
     );
 }
 
-
 #[test]
 fn test_init_tool_calls() {
     let msg = AIMessage::builder()
@@ -288,7 +276,6 @@ fn test_init_tool_calls() {
     assert_eq!(msg.tool_calls.len(), 1);
     assert_eq!(msg.tool_calls[0].name, "foo");
 }
-
 
 #[test]
 fn test_content_blocks() {
@@ -355,7 +342,6 @@ fn test_content_blocks() {
     assert!(!merged.tool_calls.is_empty() || !merged.tool_call_chunks.is_empty());
 }
 
-
 #[test]
 fn test_content_blocks_reasoning_extraction() {
     let mut additional_kwargs = std::collections::HashMap::new();
@@ -391,7 +377,6 @@ fn test_content_blocks_reasoning_extraction() {
 
     assert!(!message2.additional_kwargs.contains_key("reasoning_content"));
 }
-
 
 #[test]
 fn test_ai_message_basic() {
@@ -557,7 +542,6 @@ fn test_ai_message_chunk_init_tool_calls_invalid_json() {
     );
 }
 
-
 #[test]
 fn test_ai_message_type_field() {
     let msg = AIMessage::builder().content("hello").build();
@@ -569,7 +553,6 @@ fn test_ai_message_type_field() {
         .build();
     assert_eq!(msg_with_tools.message_type(), "ai");
 }
-
 
 #[test]
 fn test_ai_message_pretty_repr_with_tool_calls() {
@@ -588,7 +571,6 @@ fn test_ai_message_pretty_repr_with_tool_calls() {
     assert!(result.contains("Args:"));
     assert!(result.contains("city"));
 }
-
 
 #[test]
 fn test_ai_message_pretty_repr_with_invalid_tool_calls() {
@@ -610,7 +592,6 @@ fn test_ai_message_pretty_repr_with_invalid_tool_calls() {
     assert!(result.contains("not json"));
 }
 
-
 #[test]
 fn test_ai_message_pretty_repr_with_string_args() {
     let msg = AIMessage::builder()
@@ -626,7 +607,6 @@ fn test_ai_message_pretty_repr_with_string_args() {
     assert!(result.contains("Invalid Tool Calls:"));
     assert!(result.contains("raw string args"));
 }
-
 
 #[test]
 fn test_ai_message_init_with_usage_metadata() {
@@ -644,7 +624,6 @@ fn test_ai_message_init_with_usage_metadata() {
     let msg_no_usage = AIMessage::builder().content("hi").build();
     assert!(msg_no_usage.usage_metadata.is_none());
 }
-
 
 #[test]
 fn test_ai_message_serdes_with_usage_metadata() {
@@ -696,7 +675,6 @@ fn test_ai_message_serdes_with_usage_metadata() {
     assert_eq!(loaded.content, "result");
 }
 
-
 #[test]
 fn test_backwards_compat_tool_calls_from_additional_kwargs() {
     use agent_chain_core::messages::backwards_compat_tool_calls;
@@ -726,7 +704,6 @@ fn test_backwards_compat_tool_calls_from_additional_kwargs() {
     assert_eq!(tool_calls[0].call_type, Some("tool_call".to_string()));
     assert!(invalid_tool_calls.is_empty());
 }
-
 
 #[test]
 fn test_backwards_compat_invalid_json_becomes_invalid_tool_calls() {
@@ -764,7 +741,6 @@ fn test_backwards_compat_invalid_json_becomes_invalid_tool_calls() {
     );
 }
 
-
 #[test]
 fn test_ai_message_chunk_type_field() {
     let chunk = AIMessageChunk::builder().content("hi").build();
@@ -774,7 +750,6 @@ fn test_ai_message_chunk_type_field() {
         "AIMessageChunk"
     );
 }
-
 
 #[test]
 fn test_ai_message_chunk_chunk_position_field() {
@@ -787,7 +762,6 @@ fn test_ai_message_chunk_chunk_position_field() {
     let chunk_none = AIMessageChunk::builder().content("partial").build();
     assert!(chunk_none.chunk_position.is_none());
 }
-
 
 #[test]
 fn test_init_tool_calls_populates_tool_call_chunks_from_tool_calls() {
@@ -816,7 +790,6 @@ fn test_init_tool_calls_populates_tool_call_chunks_from_tool_calls() {
     );
 }
 
-
 #[test]
 fn test_init_tool_calls_populates_tool_call_chunks_from_invalid_tool_calls() {
     let mut chunk = AIMessageChunk::builder()
@@ -842,7 +815,6 @@ fn test_init_tool_calls_populates_tool_call_chunks_from_invalid_tool_calls() {
     );
 }
 
-
 #[test]
 fn test_ai_message_chunk_add_with_list_of_chunks() {
     let base = AIMessageChunk::builder().content("Hello").build();
@@ -853,7 +825,6 @@ fn test_ai_message_chunk_add_with_list_of_chunks() {
     let result = add_ai_message_chunks(base, others);
     assert_eq!(result.content, "Hello world!");
 }
-
 
 #[test]
 fn test_add_ai_message_chunks_id_priority_full() {
@@ -888,7 +859,6 @@ fn test_add_ai_message_chunks_id_priority_full() {
     assert_eq!(result3.id.as_deref(), Some(auto_id));
 }
 
-
 #[test]
 fn test_add_ai_message_chunks_chunk_position_propagation() {
     let chunk1 = AIMessageChunk::builder().content("a").build();
@@ -904,7 +874,6 @@ fn test_add_ai_message_chunks_chunk_position_propagation() {
     let result_no_last = add_ai_message_chunks(chunk1, vec![chunk2]);
     assert!(result_no_last.chunk_position.is_none());
 }
-
 
 #[test]
 fn test_subtract_usage_with_details() {
@@ -952,7 +921,6 @@ fn test_subtract_usage_with_details() {
     );
 }
 
-
 #[test]
 fn test_subtract_usage_right_none_returns_left() {
     let usage = UsageMetadata {
@@ -977,7 +945,6 @@ fn test_subtract_usage_right_none_returns_left() {
     );
 }
 
-
 #[test]
 fn test_ai_message_chunk_content_blocks_reasoning_from_additional_kwargs() {
     use agent_chain_core::messages::extract_reasoning_from_additional_kwargs;
@@ -997,7 +964,6 @@ fn test_ai_message_chunk_content_blocks_reasoning_from_additional_kwargs() {
     let no_reasoning = extract_reasoning_from_additional_kwargs(&other_kwargs);
     assert!(no_reasoning.is_none());
 }
-
 
 #[test]
 fn test_ai_message_chunk_content_blocks_with_output_version_v1() {

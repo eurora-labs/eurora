@@ -24,7 +24,6 @@ const EXPECTED_ALL: &[&str] = &[
 /// If any of these types were not exported, this code would fail to compile.
 #[test]
 fn test_all_imports() {
-
     use agent_chain_core::messages::AIMessage;
     use uuid::Uuid;
 

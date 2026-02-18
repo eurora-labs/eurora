@@ -145,8 +145,6 @@ mod test_generation_chunk {
         assert_eq!(result.text, "ABC");
     }
 
-
-
     /// Test that GenerationChunk can be created from Generation via From trait.
     /// In Python this would test inheritance; in Rust we use the From trait.
     #[test]
@@ -330,8 +328,6 @@ mod test_generation_chunk_merging {
         let result = chunk1 + chunk2;
         let _: GenerationChunk = result;
     }
-
-
 
     /// Test that sequential adds properly accumulate generation_info.
     #[test]

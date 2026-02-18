@@ -16,14 +16,12 @@ use agent_chain_core::runnables::passthrough::{RunnableAssign, RunnablePassthrou
 use futures::StreamExt;
 use serde_json::{Value, json};
 
-
 fn make_input(pairs: &[(&str, Value)]) -> HashMap<String, Value> {
     pairs
         .iter()
         .map(|(k, v)| (k.to_string(), v.clone()))
         .collect()
 }
-
 
 /// Test basic RunnableLambda invoke.
 #[test]
@@ -72,7 +70,6 @@ async fn test_runnable_lambda_astream() {
         .await;
     assert_eq!(output, vec![6]);
 }
-
 
 /// Test basic sequence: first | second.
 #[test]
@@ -188,7 +185,6 @@ fn test_sequence_name() {
     assert_eq!(seq.name(), Some("my_seq".to_string()));
 }
 
-
 /// Mirrors `test_with_config_with_config` (simplified — no LLM, just config merging).
 #[test]
 fn test_with_config_with_config() {
@@ -257,7 +253,6 @@ fn test_with_config_merge_at_invoke() {
     assert_eq!(result, 6);
 }
 
-
 /// Test basic parallel execution.
 #[test]
 fn test_parallel_invoke() {
@@ -308,7 +303,6 @@ fn test_parallel_error_in_branch() {
     let result = parallel.invoke(5, None);
     assert!(result.is_err());
 }
-
 
 /// Mirrors `test_each_simple`.
 #[test]
@@ -366,7 +360,6 @@ fn test_each_name() {
     assert_eq!(each.name(), Some("RunnableEach<identity>".to_string()));
 }
 
-
 /// Mirrors `test_combining_sequences` (simplified — no prompts).
 ///
 /// Tests: int → parallel(doubled, tripled) → pick one.
@@ -383,7 +376,6 @@ fn test_combining_sequences() {
     let chain = pipe(parallel, pick);
     assert_eq!(chain.invoke(5, None).unwrap(), 10);
 }
-
 
 /// Mirrors `test_transform_of_runnable_lambda_with_dicts`.
 #[tokio::test]
@@ -449,7 +441,6 @@ async fn test_passthrough_transform_with_dicts() {
     assert_eq!(result[1]["foo"], json!("n"));
 }
 
-
 /// Test RunnableLambda batch.
 #[test]
 fn test_lambda_batch() {
@@ -500,7 +491,6 @@ fn test_empty_batch() {
     assert!(results.is_empty());
 }
 
-
 /// Test async lambda batch.
 #[tokio::test]
 async fn test_lambda_abatch() {
@@ -522,7 +512,6 @@ async fn test_sequence_abatch() {
     assert_eq!(values, vec![4, 6, 8]);
 }
 
-
 /// Mirrors `test_runnable_assign`.
 #[test]
 fn test_runnable_assign() {
@@ -541,7 +530,6 @@ fn test_runnable_assign() {
     assert_eq!(result["input"], json!(5));
     assert_eq!(result["add_step"], json!({"added": 15}));
 }
-
 
 /// Mirrors `test_representation_of_runnables`.
 #[test]
@@ -571,7 +559,6 @@ fn test_representation_of_runnables() {
     let repr = format!("{:?}", each);
     assert!(repr.contains("RunnableEach"));
 }
-
 
 /// Mirrors `test_default_method_implementations`.
 ///
@@ -605,7 +592,6 @@ async fn test_default_method_implementations_async() {
         .await;
     assert_eq!(output, vec![6]);
 }
-
 
 /// Test schema on sequence.
 #[test]
@@ -644,7 +630,6 @@ fn test_binding_schema_delegation() {
     assert_eq!(bound.get_input_schema(None), inner_schema);
 }
 
-
 /// Test get_name with suffix.
 #[test]
 fn test_get_name_with_suffix() {
@@ -668,7 +653,6 @@ fn test_get_name_override() {
     let name = runnable.get_name(None, Some("override"));
     assert_eq!(name, "override");
 }
-
 
 /// Test that invoke call count is exactly 1 for each input in each.
 #[test]
@@ -764,7 +748,6 @@ fn test_binding_debug() {
     assert!(debug.contains("RunnableBinding"));
     assert!(debug.contains("key"));
 }
-
 
 /// Test pick() convenience method with a single key.
 #[test]

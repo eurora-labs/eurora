@@ -671,7 +671,6 @@ pub fn default_tool_chunk_parser(raw_tool_calls: &[serde_json::Value]) -> Vec<To
     chunks
 }
 
-
 use crate::load::Serializable;
 
 impl Serializable for ToolMessage {

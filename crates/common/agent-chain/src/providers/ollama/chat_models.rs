@@ -1235,7 +1235,6 @@ impl ChatOllama {
     }
 }
 
-
 /// A streaming chunk from Ollama that carries both the standard `ChatChunk`
 /// and Ollama-specific metadata like reasoning content and generation info.
 struct OllamaStreamChunk {
@@ -1243,7 +1242,6 @@ struct OllamaStreamChunk {
     reasoning_content: Option<String>,
     generation_info: Option<HashMap<String, serde_json::Value>>,
 }
-
 
 /// Ollama API response structure.
 #[derive(Debug, Deserialize)]
@@ -1290,7 +1288,6 @@ struct OllamaFunction {
     name: String,
     arguments: Option<serde_json::Value>,
 }
-
 
 /// Convert a LangChain ToolCall to OpenAI tool call format.
 fn lc_tool_call_to_openai_tool_call(tc: &ToolCall) -> serde_json::Value {
@@ -1435,10 +1432,8 @@ fn extract_content_and_images(content: &MessageContent) -> (String, Vec<String>)
                                     images.push(image_data);
                                 }
                             }
-                            Some("tool_use") => {
-                            }
-                            _ => {
-                            }
+                            Some("tool_use") => {}
+                            _ => {}
                         }
                     }
                 }
@@ -1491,7 +1486,6 @@ fn extract_image_url_data(value: &serde_json::Value) -> Option<String> {
         Some(url)
     }
 }
-
 
 /// A ChatOllama instance with bound tools.
 ///

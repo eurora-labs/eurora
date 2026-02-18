@@ -111,7 +111,6 @@ fn bedrock_converse_tool() -> Value {
     })
 }
 
-
 #[test]
 
 fn test_convert_to_openai_function_from_json_schema() {
@@ -332,7 +331,6 @@ fn test_convert_to_openai_function_strict_union_of_objects_arg_type() {
     let actual = convert_to_openai_function(&schema, Some(true));
     assert_eq!(actual, expected);
 }
-
 
 fn json_schema_no_description_no_params() -> Value {
     json!({
@@ -678,7 +676,6 @@ fn test_convert_to_openai_function_strict_required() {
     assert_eq!(required, vec!["arg1", "arg2"]);
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct FakeCall {
     data: String,
@@ -805,10 +802,8 @@ fn test_tool_outputs_with_ai_response() {
     }
 }
 
-
 #[test]
 fn test_convert_typed_dict_to_openai_function() {
-
     let typed_dict_schema = json!({
         "title": "Tool",
         "description": "Docstring.",
@@ -891,7 +886,6 @@ fn test_convert_typed_dict_to_openai_function() {
     assert_eq!(actual, expected);
 }
 
-
 #[test]
 
 fn test_convert_to_json_schema_from_json_schema() {
@@ -931,7 +925,6 @@ fn test_convert_to_json_schema_from_openai_function() {
 
     assert_eq!(actual, expected);
 }
-
 
 #[test]
 
@@ -1013,7 +1006,6 @@ fn test_convert_to_openai_function_from_simple_tool() {
     assert_eq!(actual, expected);
 }
 
-
 #[test]
 fn test_function_description_structure() {
     let func_desc = FunctionDescription {
@@ -1053,7 +1045,6 @@ fn test_tool_description_structure() {
     assert_eq!(tool_desc.r#type, "function");
     assert_eq!(tool_desc.function.name, "test_function");
 }
-
 
 /// Test convert_to_openai_function with all fixture types.
 /// This matches the Python test that iterates over multiple input formats.
@@ -1165,7 +1156,6 @@ fn test_convert_to_openai_function_from_extensions_typed_dict_docstring() {
     let actual = convert_to_openai_function(&typed_dict_schema, None);
     assert_eq!(actual, expected);
 }
-
 
 /// Full test for convert_typed_dict_to_openai_function with all arg types.
 /// Matches Python's test__convert_typed_dict_to_openai_function with:
@@ -1424,7 +1414,6 @@ fn test_convert_typed_dict_to_openai_function_fail() {
     assert_eq!(result.get("name").unwrap(), "Tool");
 }
 
-
 /// Test convert_to_json_schema with all fixture types.
 /// This matches the Python test that iterates over multiple input formats.
 #[test]
@@ -1444,14 +1433,12 @@ fn test_convert_to_json_schema_comprehensive() {
     }
 }
 
-
 /// Test for nested pydantic v2 models.
 /// Marked as xfail in Python: "Direct pydantic v2 models not yet supported"
 /// In Rust, we note this limitation.
 #[test]
 #[ignore = "Direct pydantic v2 models not yet supported - matches Python xfail"]
-fn test_convert_to_openai_function_nested_v2() {
-}
+fn test_convert_to_openai_function_nested_v2() {}
 
 /// Test for optional param handling.
 /// Marked as xfail in Python: "Pydantic converts str | None to str in .model_json_schema()"
@@ -1459,7 +1446,6 @@ fn test_convert_to_openai_function_nested_v2() {
 #[test]
 #[ignore = "Pydantic converts str | None to str in .model_json_schema() - matches Python xfail"]
 fn test_function_optional_param() {
-
     let _schema = json!({
         "title": "func5",
         "description": "A test function.",
@@ -1474,9 +1460,7 @@ fn test_function_optional_param() {
         },
         "required": ["b"],  // Only b should be required
     });
-
 }
-
 
 /// Test convert_to_openai_function with a runnable-like tool.
 /// Matches Python test for runnable.as_tool() conversion.

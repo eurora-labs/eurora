@@ -8,7 +8,6 @@ use agent_chain_core::runnables::graph::{Edge, Graph, MermaidOptions, Node};
 use agent_chain_core::runnables::graph_mermaid::to_safe_id;
 use serde_json::Value;
 
-
 fn make_node(id: &str, name: &str) -> Node {
     Node::new(id, name)
 }
@@ -16,7 +15,6 @@ fn make_node(id: &str, name: &str) -> Node {
 fn make_node_with_metadata(id: &str, name: &str, metadata: HashMap<String, Value>) -> Node {
     Node::new(id, name).with_metadata(metadata)
 }
-
 
 #[test]
 fn test_to_safe_id_plain() {
@@ -37,7 +35,6 @@ fn test_to_safe_id_with_underscore_and_digit() {
 fn test_to_safe_id_special_chars() {
     assert_eq!(to_safe_id("#foo*&!"), "\\23foo\\2a\\26\\21");
 }
-
 
 #[test]
 fn test_trim() {
@@ -110,7 +107,6 @@ fn test_trim_json_output() {
     assert_eq!(conditional_edges.len(), 2);
 }
 
-
 #[test]
 fn test_trim_multi_edge() {
     let mut graph = Graph::new();
@@ -128,7 +124,6 @@ fn test_trim_multi_edge() {
     graph.trim_last_node();
     assert_eq!(graph.last_node().unwrap().id, "__end__");
 }
-
 
 #[test]
 fn test_parallel_subgraph_mermaid() {
@@ -182,7 +177,6 @@ fn test_parallel_subgraph_mermaid() {
     assert!(mermaid.contains("end"));
 }
 
-
 #[test]
 fn test_double_nested_subgraph_mermaid() {
     let mut nodes = HashMap::new();
@@ -228,7 +222,6 @@ fn test_double_nested_subgraph_mermaid() {
     );
     assert!(mermaid.contains("end"));
 }
-
 
 #[test]
 fn test_triple_nested_subgraph_mermaid() {
@@ -286,7 +279,6 @@ fn test_triple_nested_subgraph_mermaid() {
     assert!(mermaid.contains("subgraph child_1"));
 }
 
-
 #[test]
 fn test_single_node_subgraph_mermaid() {
     let mut nodes = HashMap::new();
@@ -307,7 +299,6 @@ fn test_single_node_subgraph_mermaid() {
     assert!(mermaid.contains("meow"));
     assert!(mermaid.contains("end"));
 }
-
 
 #[test]
 fn test_graph_mermaid_frontmatter_config() {
@@ -347,7 +338,6 @@ fn test_graph_mermaid_frontmatter_config() {
     assert!(mermaid.contains("graph TD;"));
 }
 
-
 #[test]
 fn test_graph_mermaid_special_chars() {
     let mut nodes = HashMap::new();
@@ -370,7 +360,6 @@ fn test_graph_mermaid_special_chars() {
     assert!(mermaid.contains("开始"));
     assert!(mermaid.contains("结束"));
 }
-
 
 #[test]
 fn test_draw_mermaid_without_styles() {
@@ -396,7 +385,6 @@ fn test_draw_mermaid_without_styles() {
     assert!(!mermaid.contains("---"));
     assert!(!mermaid.contains("classDef"));
 }
-
 
 #[test]
 fn test_graph_add_node() {
@@ -535,7 +523,6 @@ fn test_node_with_metadata_renders_in_mermaid() {
     assert!(mermaid.contains("before"));
 }
 
-
 #[test]
 fn test_graph_extend_basic() {
     let mut graph = Graph::new();
@@ -619,7 +606,6 @@ fn test_graph_extend_returns_correct_first_last() {
     assert_eq!(first.unwrap().id, "x");
     assert_eq!(last.unwrap().id, "z");
 }
-
 
 use agent_chain_core::runnables::base::{Runnable, runnable_lambda};
 
@@ -758,7 +744,6 @@ fn test_get_graph_binding_delegates() {
     assert_eq!(graph.edges.len(), 2);
 }
 
-
 use agent_chain_core::runnables::graph::{NodeData, node_data_json, node_data_str};
 
 #[test]
@@ -863,7 +848,6 @@ fn test_node_data_json_with_metadata() {
     assert_eq!(json["metadata"]["key"], "value");
 }
 
-
 #[test]
 fn test_add_node_with_schema_data() {
     let mut graph = Graph::new();
@@ -899,7 +883,6 @@ fn test_add_node_with_no_data() {
     assert!(node.data.is_none());
 }
 
-
 #[test]
 fn test_to_json_includes_node_data_type() {
     let mut graph = Graph::new();
@@ -932,7 +915,6 @@ fn test_to_json_includes_node_data_type() {
         .find(|n| n.get("type").and_then(|t| t.as_str()) == Some("runnable"));
     assert!(runnable_node.is_some(), "Should have a runnable node");
 }
-
 
 #[test]
 fn test_lambda_no_deps_default_graph() {

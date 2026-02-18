@@ -12,14 +12,12 @@ use agent_chain_core::runnables::passthrough::{RunnableAssign, RunnablePassthrou
 use futures::StreamExt;
 use serde_json::{Value, json};
 
-
 fn make_input(pairs: &[(&str, Value)]) -> HashMap<String, Value> {
     pairs
         .iter()
         .map(|(k, v)| (k.to_string(), v.clone()))
         .collect()
 }
-
 
 /// Mirrors `test_passthrough_identity`.
 #[test]
@@ -266,7 +264,6 @@ async fn test_passthrough_transform_with_func() {
     assert_eq!(recorded.len(), 1);
     assert_eq!(recorded[0], 3);
 }
-
 
 /// Mirrors `test_assign_basic`.
 #[test]
@@ -646,7 +643,6 @@ fn test_assign_with_parallel() {
     assert_eq!(result["tripled"], json!(15));
 }
 
-
 /// Mirrors `test_pick_single_key`.
 #[test]
 fn test_pick_single_key() {
@@ -855,7 +851,6 @@ fn test_pick_empty_dict() {
     assert!(result.is_err());
 }
 
-
 /// Mirrors `test_passthrough_assign_pick_combination`.
 ///
 /// Pipeline: passthrough → assign (add doubled, tripled) → pick (value, doubled).
@@ -1021,7 +1016,6 @@ fn test_graph_passthrough() {
     let pt: RunnablePassthrough<String> = graph_passthrough();
     assert_eq!(pt.invoke("hello".into(), None).unwrap(), "hello");
 }
-
 
 /// Mirrors `test_assign_input_output_schema`.
 ///

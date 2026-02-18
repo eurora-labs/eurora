@@ -83,7 +83,6 @@ fn test_macos_accessibility_no_permission_mock() {
 
     info!("Testing macOS Accessibility mock permission denial");
 
-
     let tracker = FocusTracker::new();
     info!("FocusTracker created successfully: {:?}", tracker);
 
@@ -123,7 +122,6 @@ fn test_wayland_unsupported_compositor() {
     }
 
     info!("Testing Wayland unsupported compositor handling");
-
 
     let tracker = FocusTracker::new();
     let stop_signal = AtomicBool::new(false);
@@ -245,7 +243,6 @@ fn test_windows_service_context_mock() {
     }
 
     info!("Testing Windows service context handling (mock)");
-
 
     let tracker = FocusTracker::new();
     let stop_signal = AtomicBool::new(false);

@@ -21,7 +21,6 @@ pub type AnyMessage = BaseMessage;
 /// This corresponds to `MessageLikeRepresentation` in LangChain Python.
 pub type MessageLikeRepresentation = serde_json::Value;
 
-
 /// Convert a `BaseMessage` to the corresponding `BaseMessageChunk`.
 ///
 /// This corresponds to `_msg_to_chunk` in LangChain Python.
@@ -102,7 +101,6 @@ pub(crate) fn msg_to_chunk(message: &BaseMessage) -> BaseMessageChunk {
 pub(crate) fn chunk_to_msg(chunk: &BaseMessageChunk) -> BaseMessage {
     chunk.to_message()
 }
-
 
 /// Convert a sequence of messages to a buffer string.
 ///
@@ -205,7 +203,6 @@ pub fn messages_from_dict(messages: &[serde_json::Value]) -> Result<Vec<BaseMess
     messages.iter().map(message_from_dict).collect()
 }
 
-
 /// Convert message-like representations to messages.
 ///
 /// This function can convert from:
@@ -282,7 +279,6 @@ pub fn convert_to_message(message: &serde_json::Value) -> Result<BaseMessage, St
 
     Err(format!("Cannot convert to message: {:?}", message))
 }
-
 
 /// Create a message from a message type string and content.
 ///
@@ -396,7 +392,6 @@ fn create_message_from_role(
         )),
     }
 }
-
 
 /// Options for excluding tool calls from filtered messages.
 ///
@@ -524,7 +519,6 @@ pub fn filter_messages(
     filtered
 }
 
-
 /// Merge consecutive messages of the same type.
 ///
 /// Note: ToolMessages are not merged, as each has a distinct tool call ID.
@@ -634,7 +628,6 @@ pub fn message_chunk_to_message(chunk: &BaseMessageChunk) -> BaseMessage {
     chunk.to_message()
 }
 
-
 /// Configuration for approximate token counting.
 #[derive(Debug, Clone)]
 pub struct CountTokensConfig {
@@ -728,20 +721,17 @@ fn get_message_openai_role(message: &BaseMessage) -> &'static str {
             }
         }
         BaseMessage::Function(_) => "function",
-        BaseMessage::Chat(c) => {
-            match c.role.as_str() {
-                "user" => "user",
-                "assistant" => "assistant",
-                "system" => "system",
-                "function" => "function",
-                "tool" => "tool",
-                _ => "user",
-            }
-        }
+        BaseMessage::Chat(c) => match c.role.as_str() {
+            "user" => "user",
+            "assistant" => "assistant",
+            "system" => "system",
+            "function" => "function",
+            "tool" => "tool",
+            _ => "user",
+        },
         BaseMessage::Remove(_) => "remove",
     }
 }
-
 
 /// Text format options for OpenAI message conversion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -1002,7 +992,6 @@ fn convert_to_openai_tool_calls(tool_calls: &[ToolCall]) -> Vec<serde_json::Valu
         .collect()
 }
 
-
 /// Check if a message matches any of the given type strings.
 ///
 /// This corresponds to `_is_message_type` in LangChain Python.
@@ -1025,7 +1014,6 @@ fn default_text_splitter(text: &str) -> Vec<String> {
     result.push(splits.last().unwrap_or(&"").to_string());
     result
 }
-
 
 /// Strategy for trimming messages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -1415,12 +1403,9 @@ fn create_message_with_content(original: &BaseMessage, content: &str) -> BaseMes
                 .maybe_id(m.id.clone())
                 .build(),
         ),
-        BaseMessage::Remove(m) => {
-            BaseMessage::Remove(RemoveMessage::builder().id(&m.id).build())
-        }
+        BaseMessage::Remove(m) => BaseMessage::Remove(RemoveMessage::builder().id(&m.id).build()),
     }
 }
-
 
 use crate::runnables::base::RunnableLambdaWithConfig;
 use std::sync::Arc;

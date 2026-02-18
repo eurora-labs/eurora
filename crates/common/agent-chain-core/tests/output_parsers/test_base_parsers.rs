@@ -27,7 +27,6 @@ fn swap_case(s: &str) -> String {
         .collect()
 }
 
-
 /// A parser that inverts the case of the characters in the message.
 /// Implements BaseGenerationOutputParser (via BaseLLMOutputParser + BaseGenerationOutputParser).
 #[derive(Debug)]
@@ -70,7 +69,6 @@ async fn test_base_generation_parser() {
 
     assert_eq!(result, "HeLLO");
 }
-
 
 /// A parser that inverts the case of the characters in the message.
 /// Implements BaseTransformOutputParser (via BaseOutputParser + BaseTransformOutputParser).

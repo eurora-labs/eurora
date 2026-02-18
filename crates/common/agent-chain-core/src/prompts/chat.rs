@@ -24,7 +24,6 @@ use super::message::{BaseMessagePromptTemplate, get_msg_title_repr};
 use super::prompt::PromptTemplate;
 use super::string::{PromptTemplateFormat, StringPromptTemplate};
 
-
 /// Prompt template that assumes variable is already a list of messages.
 ///
 /// A placeholder which can be used to pass in a list of messages.
@@ -128,7 +127,6 @@ impl BaseMessagePromptTemplate for MessagesPlaceholder {
     }
 }
 
-
 /// Base class for message prompt templates that use a string prompt template.
 ///
 /// Direct port of `langchain_core.prompts.chat.BaseStringMessagePromptTemplate`.
@@ -155,7 +153,6 @@ pub trait BaseStringMessagePromptTemplate: BaseMessagePromptTemplate {
         Box::pin(async move { result })
     }
 }
-
 
 /// Chat message prompt template with a specific role.
 ///
@@ -229,7 +226,6 @@ impl BaseStringMessagePromptTemplate for ChatMessagePromptTemplate {
     }
 }
 
-
 /// Human message prompt template.
 ///
 /// Direct port of `langchain_core.prompts.chat.HumanMessagePromptTemplate`.
@@ -301,7 +297,6 @@ impl BaseStringMessagePromptTemplate for HumanMessagePromptTemplate {
     }
 }
 
-
 /// AI message prompt template.
 ///
 /// Direct port of `langchain_core.prompts.chat.AIMessagePromptTemplate`.
@@ -370,7 +365,6 @@ impl BaseStringMessagePromptTemplate for AIMessagePromptTemplate {
         Ok(BaseMessage::AI(AIMessage::builder().content(text).build()))
     }
 }
-
 
 /// System message prompt template.
 ///
@@ -442,7 +436,6 @@ impl BaseStringMessagePromptTemplate for SystemMessagePromptTemplate {
         ))
     }
 }
-
 
 /// A message-like type that can be part of a chat prompt.
 ///
@@ -568,7 +561,6 @@ impl std::fmt::Debug for MessageLikeRepresentation {
     }
 }
 
-
 /// Base trait for chat prompt templates.
 ///
 /// Direct port of `langchain_core.prompts.chat.BaseChatPromptTemplate`.
@@ -610,7 +602,6 @@ pub trait BaseChatPromptTemplate: BasePromptTemplate {
         println!("{}", self.pretty_repr(is_interactive_env()));
     }
 }
-
 
 /// A message in a chat prompt template.
 ///
@@ -902,7 +893,6 @@ impl Runnable for ChatPromptTemplate {
     }
 }
 
-
 /// Create a message prompt template from a message type string and template.
 ///
 /// Direct port of Python `_create_template_from_message_type`.
@@ -944,7 +934,6 @@ fn create_template_from_message_type(
     }
 }
 
-
 /// Instantiate a ChatPromptMessage from a MessageLikeRepresentation.
 ///
 /// Direct port of Python `_convert_to_message_template`.
@@ -974,7 +963,6 @@ fn convert_to_message_template(
         }
     }
 }
-
 
 /// Implements `BasePromptTemplate` for `ChatPromptTemplate`, matching
 /// Python's inheritance chain where `BaseChatPromptTemplate` extends
@@ -1019,7 +1007,6 @@ impl BasePromptTemplate for ChatPromptTemplate {
     }
 }
 
-
 impl std::ops::Add for ChatPromptTemplate {
     type Output = ChatPromptTemplate;
 
@@ -1059,7 +1046,6 @@ impl std::ops::Add for ChatPromptTemplate {
         }
     }
 }
-
 
 use crate::load::Serializable;
 use serde_json::Value;
@@ -1156,7 +1142,6 @@ impl Serializable for ChatPromptTemplate {
         attrs
     }
 }
-
 
 #[cfg(test)]
 mod tests {

@@ -13,7 +13,6 @@ use agent_chain_core::runnables::retry::{
     RunnableRetryExt,
 };
 
-
 /// Mirrors `test_retry_initialization`.
 #[test]
 fn test_retry_initialization() {
@@ -48,7 +47,6 @@ fn test_retry_initialization_custom() {
     assert_eq!(result, 6);
 }
 
-
 /// Mirrors `test_retry_invoke_success_no_retry`.
 #[test]
 fn test_retry_invoke_success_no_retry() {
@@ -71,7 +69,6 @@ fn test_retry_invoke_success_no_retry() {
     assert_eq!(result, 10);
     assert_eq!(call_count.load(Ordering::SeqCst), 1);
 }
-
 
 /// Mirrors `test_retry_invoke_with_retryable_exception`.
 #[test]
@@ -100,7 +97,6 @@ fn test_retry_invoke_with_retryable_exception() {
     assert_eq!(call_count.load(Ordering::SeqCst), 3);
 }
 
-
 /// Mirrors `test_retry_invoke_exhausts_retries`.
 #[test]
 fn test_retry_invoke_exhausts_retries() {
@@ -124,7 +120,6 @@ fn test_retry_invoke_exhausts_retries() {
     assert!(result.unwrap_err().to_string().contains("Always fails"));
     assert_eq!(call_count.load(Ordering::SeqCst), 2);
 }
-
 
 /// Mirrors `test_retry_invoke_non_retryable_exception`.
 #[test]
@@ -150,7 +145,6 @@ fn test_retry_invoke_non_retryable_exception() {
     assert!(result.unwrap_err().to_string().contains("Runtime error"));
     assert_eq!(call_count.load(Ordering::SeqCst), 1);
 }
-
 
 /// Mirrors `test_retry_ainvoke_success_no_retry`.
 #[tokio::test]
@@ -218,7 +212,6 @@ async fn test_retry_ainvoke_exhausts_retries() {
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("Always fails"));
 }
-
 
 /// Mirrors `test_retry_batch_partial_failures`.
 #[test]
@@ -289,7 +282,6 @@ fn test_retry_batch_with_return_exceptions() {
     assert_eq!(*results[2].as_ref().unwrap(), 4);
 }
 
-
 /// Mirrors `test_retry_abatch_partial_failures`.
 #[tokio::test]
 async fn test_retry_abatch_partial_failures() {
@@ -345,7 +337,6 @@ async fn test_retry_abatch_with_return_exceptions() {
     assert!(results[1].is_err());
     assert_eq!(*results[2].as_ref().unwrap(), 4);
 }
-
 
 /// Mirrors `test_retry_with_exponential_jitter`.
 #[test]
@@ -413,7 +404,6 @@ async fn test_retry_async_with_exponential_jitter() {
     assert_eq!(call_count.load(Ordering::SeqCst), 2);
 }
 
-
 /// Mirrors `test_retry_with_config`.
 #[test]
 fn test_retry_with_config() {
@@ -468,7 +458,6 @@ fn test_retry_config_propagation() {
     assert_eq!(call_count.load(Ordering::SeqCst), 2);
 }
 
-
 /// Mirrors `test_retry_multiple_exception_types`.
 ///
 /// Uses a custom predicate that matches multiple error variants.
@@ -502,7 +491,6 @@ fn test_retry_multiple_exception_types() {
     assert_eq!(result, 10);
     assert_eq!(call_count.load(Ordering::SeqCst), 3);
 }
-
 
 /// Mirrors `test_retry_batch_preserves_order`.
 #[test]
@@ -564,7 +552,6 @@ async fn test_retry_abatch_preserves_order() {
     assert_eq!(*results[2].as_ref().unwrap(), 2);
 }
 
-
 /// Mirrors `test_retry_batch_all_fail`.
 #[test]
 fn test_retry_batch_all_fail() {
@@ -580,7 +567,6 @@ fn test_retry_batch_all_fail() {
     let results = retry.batch(vec![1, 2, 3], None, true);
     assert!(results.iter().all(|r| r.is_err()));
 }
-
 
 /// Mirrors `test_retry_batch_empty_input`.
 #[test]
@@ -603,7 +589,6 @@ async fn test_retry_abatch_empty_input() {
     let results = retry.abatch(vec![], None, false).await;
     assert!(results.is_empty());
 }
-
 
 /// Mirrors `test_retry_stream_and_transform_not_retried`.
 ///
@@ -639,7 +624,6 @@ async fn test_retry_stream_uses_invoke_with_retries() {
     assert_eq!(call_count.load(Ordering::SeqCst), 2);
 }
 
-
 /// Mirrors `test_retry_chain_composition`.
 ///
 /// Tests retry in a sequential pipeline by manually chaining runnables.
@@ -674,7 +658,6 @@ fn test_retry_chain_composition() {
     assert_eq!(final_result, 13);
     assert_eq!(call_count.load(Ordering::SeqCst), 2);
 }
-
 
 /// Mirrors `test_retry_batch_individual_tracking`.
 #[test]
@@ -719,7 +702,6 @@ fn test_retry_batch_individual_tracking() {
     assert_eq!(map[&2].len(), 1); // Succeeded immediately
 }
 
-
 /// Test exponential jitter parameter calculations.
 #[test]
 fn test_exponential_jitter_params_calculation() {
@@ -762,7 +744,6 @@ fn test_exponential_jitter_defaults() {
     assert_eq!(params.jitter, 1.0);
 }
 
-
 /// Test the RunnableRetryExt trait.
 #[test]
 fn test_retry_ext_trait() {
@@ -803,7 +784,6 @@ fn test_retry_name_propagation() {
 
     assert_eq!(retry.name(), Some("my_step".to_string()));
 }
-
 
 /// Mirrors `test_retry_preserves_schemas`.
 ///

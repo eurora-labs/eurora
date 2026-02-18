@@ -2057,9 +2057,6 @@ mod tests {
         );
     }
 
-
-
-
     #[test]
     fn test_configure_verbose_not_added_when_debug() {
         crate::globals::set_debug(true);

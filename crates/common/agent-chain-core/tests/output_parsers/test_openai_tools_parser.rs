@@ -21,7 +21,6 @@ use agent_chain_core::outputs::ChatGeneration;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-
 fn tool_call_generation(
     tool_calls: Vec<ToolCall>,
     content: &str,
@@ -53,7 +52,6 @@ fn make_tool_call(id: &str, name: &str, args: Value) -> ToolCall {
         call_type: None,
     }
 }
-
 
 #[test]
 fn test_parse_tool_call_valid_arguments() {
@@ -178,7 +176,6 @@ fn test_parse_tool_call_empty_function_name() {
     assert_eq!(result["name"], "");
 }
 
-
 #[test]
 fn test_make_invalid_tool_call_creates_invalid_tool_call() {
     let raw = json!({
@@ -211,7 +208,6 @@ fn test_make_invalid_tool_call_missing_id() {
     let result = make_invalid_tool_call(&raw, Some("error"));
     assert!(result.id.is_none());
 }
-
 
 #[test]
 fn test_parse_tool_calls_multiple_valid() {
@@ -276,7 +272,6 @@ fn test_parse_tool_calls_no_function_key_skipped() {
     assert_eq!(result.len(), 1);
     assert_eq!(result[0]["name"], "fn");
 }
-
 
 #[test]
 fn test_json_output_tools_parser_parses_tool_calls() {
@@ -393,7 +388,6 @@ fn test_json_output_tools_parser_no_tool_calls_or_kwargs_returns_empty() {
     assert_eq!(result, json!([]));
 }
 
-
 #[test]
 fn test_json_output_key_tools_parser_filters_by_key_name() {
     let generation = tool_call_generation(
@@ -495,7 +489,6 @@ fn test_json_output_key_tools_parser_empty_tool_calls_returns_empty_list() {
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result, json!([]));
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 struct MyTool {

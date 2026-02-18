@@ -10,7 +10,6 @@ use agent_chain_core::messages::{
 };
 use serde_json::json;
 
-
 #[test]
 fn test_text_property_string_content() {
     let msg = HumanMessage::builder().content("Hello, world!").build();
@@ -79,7 +78,6 @@ fn test_text_property_no_text_blocks() {
         .build();
     assert_eq!(msg.content.as_text(), "");
 }
-
 
 #[test]
 fn test_merge_two_strings() {
@@ -192,7 +190,6 @@ fn test_merge_list_with_empty_string() {
     }
 }
 
-
 #[test]
 fn test_merge_list_plus_list_last_element_string_concatenates() {
     let result = merge_content_complex(
@@ -253,7 +250,6 @@ fn test_merge_list_plus_empty_string_no_op() {
         other => panic!("Expected List, got {:?}", other),
     }
 }
-
 
 #[test]
 fn test_message_to_dict_human_message() {
@@ -395,7 +391,6 @@ fn test_messages_to_dict_empty_list() {
     assert!(result.is_empty());
 }
 
-
 #[test]
 fn test_content_blocks_string_content() {
     let msg = HumanMessage::builder().content("Hello").build();
@@ -510,7 +505,6 @@ fn test_content_blocks_mixed_content() {
     }
 }
 
-
 #[test]
 fn test_dict_with_type_not_in_known_block_types() {
     let msg = HumanMessage::builder()
@@ -548,7 +542,6 @@ fn test_dict_with_no_type_key() {
         other => panic!("Expected NonStandard block, got {:?}", other),
     }
 }
-
 
 #[test]
 fn test_add_human_message_chunks() {
@@ -647,7 +640,6 @@ fn test_add_chunk_list_content() {
     }
 }
 
-
 #[test]
 fn test_add_list_of_mixed_message_chunks() {
     let chunk1 = HumanMessageChunk::builder()
@@ -743,7 +735,6 @@ fn test_add_single_element_list() {
     assert_eq!(result.id, Some("x".to_string()));
 }
 
-
 #[test]
 fn test_pretty_repr_basic() {
     let msg = HumanMessage::builder().content("Hello").build();
@@ -768,7 +759,6 @@ fn test_pretty_repr_html_mode() {
     let result = msg.pretty_repr(true);
     assert!(result.contains("Human Message"));
 }
-
 
 #[test]
 fn test_pretty_print_does_not_raise_human() {
@@ -820,7 +810,6 @@ fn test_pretty_print_does_not_raise_list_content() {
     msg.pretty_print(); // Should not panic
 }
 
-
 #[test]
 fn test_get_msg_title_repr_basic() {
     let result = get_msg_title_repr("Test Title", false);
@@ -847,7 +836,6 @@ fn test_get_msg_title_repr_moderate_title() {
     let result = get_msg_title_repr(&title, false);
     assert!(result.contains(&title));
 }
-
 
 #[test]
 fn test_even_length_title_symmetric_padding() {
@@ -905,7 +893,6 @@ fn test_known_title_exact_output() {
     );
     assert_eq!(result.len(), 80);
 }
-
 
 #[test]
 fn test_init_with_content_blocks() {
@@ -994,7 +981,6 @@ fn test_init_with_response_metadata() {
     assert_eq!(msg.response_metadata.get("tokens").unwrap(), &json!(10));
 }
 
-
 #[test]
 fn test_message_types_have_consistent_types() {
     let human_msg = HumanMessage::builder().content("Hello").build();
@@ -1005,7 +991,6 @@ fn test_message_types_have_consistent_types() {
     assert_eq!(ai_msg.message_type(), "ai");
     assert_eq!(system_msg.message_type(), "system");
 }
-
 
 #[test]
 fn test_string_reasoning_content_returns_reasoning_block() {

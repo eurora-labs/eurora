@@ -408,7 +408,6 @@ pub fn loads_with_namespaces(text: &str, namespaces: Vec<String>) -> Result<Valu
     loads(text, Some(config))
 }
 
-
 use std::sync::LazyLock;
 
 use crate::agents::{AgentAction, AgentFinish};

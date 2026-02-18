@@ -49,8 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("   Icon: {}", icon_status);
                 println!();
             }
-            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                 println!("📡 Focus tracking channel disconnected");
                 break;

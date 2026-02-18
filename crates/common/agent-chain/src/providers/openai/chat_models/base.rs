@@ -298,7 +298,6 @@ impl ChatOpenAI {
         }
     }
 
-
     pub fn temperature(mut self, temp: f64) -> Self {
         self.temperature = Some(temp);
         self
@@ -457,7 +456,6 @@ impl ChatOpenAI {
         self
     }
 
-
     /// Filter out disabled parameters from a payload.
     /// Matches Python `_filter_disabled_params`: supports both `None` (remove entirely)
     /// and a list of disabled values.
@@ -566,7 +564,6 @@ impl ChatOpenAI {
             self.temperature
         }
     }
-
 
     /// Format message content, filtering out block types not supported by OpenAI.
     /// Matches Python `_format_message_content`.
@@ -705,13 +702,11 @@ impl ChatOpenAI {
 
                 Some(message)
             }
-            BaseMessage::Tool(m) => {
-                Some(serde_json::json!({
-                    "role": "tool",
-                    "tool_call_id": m.tool_call_id,
-                    "content": m.content
-                }))
-            }
+            BaseMessage::Tool(m) => Some(serde_json::json!({
+                "role": "tool",
+                "tool_call_id": m.tool_call_id,
+                "content": m.content
+            })),
             BaseMessage::Remove(_) => None,
             BaseMessage::Chat(m) => {
                 let mut message = serde_json::json!({
@@ -839,7 +834,6 @@ impl ChatOpenAI {
 
         input
     }
-
 
     /// Build the request payload for the Chat Completions API.
     /// Matches Python `ChatOpenAI._get_request_payload`.
@@ -1071,7 +1065,6 @@ impl ChatOpenAI {
         payload
     }
 
-
     /// Stream responses using the Responses API.
     async fn stream_responses_api(
         &self,
@@ -1221,7 +1214,6 @@ impl ChatOpenAI {
 
         Ok(Box::pin(stream) as Pin<Box<dyn Stream<Item = Result<ChatChunk>> + Send>>)
     }
-
 
     /// Parse a Chat Completions API response.
     /// Matches Python `_create_chat_result`.
@@ -1397,7 +1389,6 @@ impl ChatOpenAI {
         let generation = ChatGeneration::new(BaseMessage::AI(ai_message));
         Ok(ChatResult::new(vec![generation]))
     }
-
 
     /// Send an HTTP request and deserialize the JSON response.
     async fn send_json_request<T: serde::de::DeserializeOwned>(
@@ -1677,7 +1668,6 @@ impl ChatOpenAI {
         Ok(Box::pin(stream) as Pin<Box<dyn Stream<Item = Result<ChatChunk>> + Send>>)
     }
 }
-
 
 #[async_trait]
 impl BaseLanguageModel for ChatOpenAI {
@@ -1973,7 +1963,6 @@ impl ChatOpenAI {
     }
 }
 
-
 #[derive(Debug, Deserialize)]
 struct OpenAIResponse {
     id: Option<String>,
@@ -2025,7 +2014,6 @@ struct TokenDetails {
     reasoning_tokens: Option<u32>,
 }
 
-
 #[derive(Debug, Deserialize)]
 struct OpenAIStreamChunk {
     choices: Vec<OpenAIStreamChoice>,
@@ -2056,7 +2044,6 @@ struct OpenAIStreamFunction {
     name: Option<String>,
     arguments: Option<String>,
 }
-
 
 #[derive(Debug, Deserialize)]
 struct ResponsesApiResponse {
@@ -2129,7 +2116,6 @@ struct ResponsesStreamResponse {
     usage: Option<ResponsesUsage>,
     status: Option<String>,
 }
-
 
 #[cfg(test)]
 mod tests {

@@ -13,7 +13,6 @@ use agent_chain_core::outputs::{Generation, GenerationType, LLMResult};
 use futures::StreamExt;
 use serde_json::json;
 
-
 /// Ported from `test_batch`.
 #[tokio::test]
 async fn test_batch() {
@@ -66,7 +65,6 @@ async fn test_abatch_empty_inputs_returns_empty_list() {
     assert!(result.is_empty());
 }
 
-
 /// Ported from `test_convert_string_input`.
 #[test]
 fn test_convert_string_input() {
@@ -102,7 +100,6 @@ fn test_convert_message_sequence_input() {
         .unwrap();
     assert!(result.contains("hi"));
 }
-
 
 /// Ported from `test_generate_single_prompt`.
 #[tokio::test]
@@ -149,7 +146,6 @@ async fn test_generate_empty_prompts() {
     assert_eq!(result.generations.len(), 0);
 }
 
-
 /// Ported from `test_agenerate_single_prompt`.
 #[tokio::test]
 async fn test_agenerate_single_prompt() {
@@ -181,7 +177,6 @@ async fn test_agenerate_multiple_prompts() {
         }
     }
 }
-
 
 /// Ported from `test_astream_fallback_to_ainvoke`.
 ///
@@ -222,7 +217,6 @@ async fn test_astream_implementation_uses_stream() {
     assert_eq!(chunks, vec!["a", "b"]);
 }
 
-
 /// Ported from `test_get_ls_params`.
 #[test]
 fn test_get_ls_params() {
@@ -236,7 +230,6 @@ fn test_get_ls_params() {
     let params = llm.get_llm_ls_params(Some(&["stop".to_string()]));
     assert_eq!(params.ls_stop, Some(vec!["stop".to_string()]));
 }
-
 
 /// Ported from `test_no_cache_returns_all_missing`.
 #[test]
@@ -298,7 +291,6 @@ fn test_get_prompts_with_cache_all_hit() {
     assert!(missing.is_empty());
 }
 
-
 /// Ported from `test_update_cache_stores_results`.
 #[test]
 fn test_update_cache_stores_results() {
@@ -349,7 +341,6 @@ fn test_update_cache_with_none_does_not_store() {
 
     assert!(existing.is_empty());
 }
-
 
 /// Ported from `test_generate_prompt_converts_prompt_values`.
 #[tokio::test]
@@ -412,7 +403,6 @@ async fn test_generate_prompt_with_message_input() {
     }
 }
 
-
 /// Ported from `test_str_representation`.
 #[test]
 fn test_str_representation() {
@@ -432,7 +422,6 @@ fn test_dict_contains_type_and_identifying_params() {
     assert_eq!(params["responses"], json!(["a", "b"]));
 }
 
-
 /// Ported from `test_invoke` (via FakeListLLM).
 #[tokio::test]
 async fn test_invoke() {
@@ -451,8 +440,6 @@ async fn test_call_method() {
     let result = llm.call("prompt".to_string(), None, None).await.unwrap();
     assert_eq!(result, "direct");
 }
-
-
 
 /// Ported from `test_none_run_id`.
 #[test]
@@ -508,7 +495,6 @@ fn test_get_run_ids_list_single_prompt_with_uuid() {
     let result = get_run_ids_list(RunIdInput::Single(uid), 1).unwrap();
     assert_eq!(result, vec![Some(uid)]);
 }
-
 
 /// Ported from `test_cache_is_base_cache_instance`.
 #[test]
@@ -589,7 +575,6 @@ fn test_resolve_cache_false() {
     assert!(result.is_none());
 }
 
-
 /// Ported from `test_batch_return_exceptions_true`.
 #[tokio::test]
 async fn test_batch_with_exceptions() {
@@ -611,7 +596,6 @@ async fn test_batch_with_exceptions() {
     assert_eq!(results[1].as_ref().unwrap(), "r2");
     assert_eq!(results[2].as_ref().unwrap(), "r3");
 }
-
 
 /// Ported from `test_save_json`.
 #[test]
@@ -655,7 +639,6 @@ fn test_save_invalid_extension_raises() {
 
     std::fs::remove_dir_all(&dir).unwrap();
 }
-
 
 /// Ported from `test_retries_on_specified_error`.
 #[test]

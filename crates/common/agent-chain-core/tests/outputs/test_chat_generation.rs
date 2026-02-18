@@ -24,7 +24,6 @@ use std::collections::HashMap;
 mod chat_generation_tests {
     use super::*;
 
-
     /// Test that text is extracted correctly from string content.
     #[test]
     fn test_msg_with_text() {
@@ -199,8 +198,6 @@ mod test_chat_generation_chunk {
         assert!(result.is_some());
         assert_eq!(result.unwrap().text, "test");
     }
-
-
 
     /// Test that ChatGenerationChunk can be converted to/from ChatGeneration.
     /// This is the Rust equivalent of Python's inheritance test.
@@ -520,7 +517,6 @@ mod test_chat_generation_chunk_merging_edge_cases {
         assert_eq!(result.text, "ABC");
         assert!(result.generation_info.is_none());
     }
-
 
     /// Test that addition returns ChatGenerationChunk type.
     #[test]

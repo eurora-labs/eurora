@@ -231,7 +231,6 @@ async fn test_cache_with_generation_objects() {
         .unwrap();
     assert_eq!(result.content, "hello");
 
-
     let result = model
         .invoke(LanguageModelInput::from("test prompt"), None)
         .await

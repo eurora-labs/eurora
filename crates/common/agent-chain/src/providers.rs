@@ -15,11 +15,7 @@ pub mod openai;
 use crate::error::{Error, Result};
 
 /// Supported provider names.
-pub const SUPPORTED_PROVIDERS: &[&str] = &[
-    "anthropic",
-    "openai",
-    "ollama",
-];
+pub const SUPPORTED_PROVIDERS: &[&str] = &["anthropic", "openai", "ollama"];
 
 /// Attempt to infer the provider from a model name.
 ///
@@ -48,14 +44,6 @@ pub fn infer_provider(model: &str) -> Option<&'static str> {
     if model.starts_with("claude") {
         return Some("anthropic");
     }
-
-
-
-
-
-
-
-
 
     None
 }

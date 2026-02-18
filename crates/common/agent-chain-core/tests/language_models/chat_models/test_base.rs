@@ -48,7 +48,6 @@ fn create_messages_2() -> Vec<BaseMessage> {
     ]
 }
 
-
 /// A model that only implements `_generate` (no streaming).
 struct ModelWithGenerateOnly {
     config: ChatModelConfig,
@@ -126,7 +125,6 @@ impl BaseChatModel for ModelWithGenerateOnly {
 
 #[tokio::test]
 async fn test_astream_fallback_to_ainvoke() {
-
     let model = ModelWithGenerateOnly::new();
 
     let chunks: Vec<BaseMessage> = {
@@ -223,7 +221,6 @@ impl BaseChatModel for ModelWithSyncStream {
 
 #[tokio::test]
 async fn test_astream_implementation_fallback_to_stream() {
-
     let model = ModelWithSyncStream::new();
 
     let mut stream = model
@@ -322,7 +319,6 @@ impl BaseChatModel for ModelWithAsyncStream {
 
 #[tokio::test]
 async fn test_astream_implementation_uses_astream() {
-
     let model = ModelWithAsyncStream::new();
 
     let mut stream = model
@@ -340,7 +336,6 @@ async fn test_astream_implementation_uses_astream() {
 
     assert!(model.has_astream_impl());
 }
-
 
 /// A model without streaming support.
 struct NoStreamingModel {
@@ -536,7 +531,6 @@ impl BaseChatModel for StreamingModel {
 
 #[test]
 fn test_disable_streaming_bool_true() {
-
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::Bool(true));
 
     assert!(!model._should_stream(false, false, None, None));
@@ -545,7 +539,6 @@ fn test_disable_streaming_bool_true() {
 
 #[test]
 fn test_disable_streaming_bool_false() {
-
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::Bool(false));
 
     let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::base::BaseCallbackHandler>> =
@@ -558,7 +551,6 @@ fn test_disable_streaming_bool_false() {
 
 #[test]
 fn test_disable_streaming_tool_calling() {
-
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::ToolCalling);
 
     let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::base::BaseCallbackHandler>> =
@@ -573,7 +565,6 @@ fn test_disable_streaming_tool_calling() {
 
 #[tokio::test]
 async fn test_disable_streaming_async() {
-
     let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::base::BaseCallbackHandler>> =
         vec![std::sync::Arc::new(
             agent_chain_core::callbacks::StdOutCallbackHandler::new(),
@@ -596,7 +587,6 @@ async fn test_disable_streaming_async() {
 
 #[tokio::test]
 async fn test_disable_streaming_no_streaming_model() {
-
     let model = NoStreamingModel::new().with_disable_streaming(DisableStreaming::Bool(true));
     let result = model
         .invoke(LanguageModelInput::Messages(vec![]), None)
@@ -610,7 +600,6 @@ async fn test_disable_streaming_no_streaming_model() {
 
 #[tokio::test]
 async fn test_disable_streaming_no_streaming_model_async() {
-
     for disable in [
         DisableStreaming::Bool(true),
         DisableStreaming::Bool(false),
@@ -624,7 +613,6 @@ async fn test_disable_streaming_no_streaming_model_async() {
         assert_eq!(result.unwrap().content, "invoke");
     }
 }
-
 
 /// A model for testing _get_ls_params.
 struct LSParamsModel {
@@ -710,7 +698,6 @@ impl BaseChatModel for LSParamsModel {
 
 #[test]
 fn test_get_ls_params() {
-
     let llm = LSParamsModel::new();
 
     let ls_params = llm.get_ls_params(None);
@@ -724,10 +711,8 @@ fn test_get_ls_params() {
     assert_eq!(ls_params.ls_stop, Some(vec!["stop".to_string()]));
 }
 
-
 #[test]
 fn test_model_profiles() {
-
     let model = GenericFakeChatModel::from_strings(vec!["test".to_string()]);
     assert!(model.profile().is_none());
 
@@ -744,19 +729,15 @@ fn test_model_profiles() {
     assert_eq!(retrieved_profile.unwrap().max_input_tokens, Some(100));
 }
 
-
 #[test]
 fn test_batch_size() {
-
     let _messages = create_messages();
     let _messages_2 = create_messages_2();
     let _llm = FakeListChatModel::new((0..100).map(|i| i.to_string()).collect());
-
 }
 
 #[tokio::test]
 async fn test_async_batch_size() {
-
     let _messages = create_messages();
     let _messages_2 = create_messages_2();
     let _llm = FakeListChatModel::new((0..100).map(|i| i.to_string()).collect());
@@ -766,89 +747,64 @@ async fn test_async_batch_size() {
     assert!(result.is_ok());
 }
 
-
 #[test]
 fn test_pass_run_id() {
-
     let _llm = FakeListChatModel::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
-
 }
 
 #[tokio::test]
 async fn test_async_pass_run_id() {
-
     let _llm = FakeListChatModel::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
 }
 
-
 #[tokio::test]
 async fn test_streaming_attribute_overrides_streaming_callback() {
-
     let model = StreamingModel::new().with_streaming(false);
 
     assert!(model.has_streaming_field().is_none());
 }
 
+#[test]
+fn test_trace_images_in_openai_format() {}
 
 #[test]
-fn test_trace_images_in_openai_format() {
-
-}
+fn test_trace_pdfs() {}
 
 #[test]
-fn test_trace_pdfs() {
-}
+fn test_content_block_transformation_v0_to_v1_image() {}
 
 #[test]
-fn test_content_block_transformation_v0_to_v1_image() {
-}
+fn test_trace_content_blocks_with_no_type_key() {}
 
 #[test]
-fn test_trace_content_blocks_with_no_type_key() {
-}
+fn test_extend_support_to_openai_multimodal_formats() {}
 
 #[test]
-fn test_extend_support_to_openai_multimodal_formats() {
-}
+fn test_normalize_messages_edge_cases() {}
 
 #[test]
-fn test_normalize_messages_edge_cases() {
-}
+fn test_normalize_messages_v1_content_blocks_unchanged() {}
 
 #[test]
-fn test_normalize_messages_v1_content_blocks_unchanged() {
-}
-
-
-#[test]
-fn test_output_version_invoke() {
-}
+fn test_output_version_invoke() {}
 
 #[tokio::test]
-async fn test_output_version_ainvoke() {
-}
+async fn test_output_version_ainvoke() {}
 
 #[test]
-fn test_output_version_stream() {
-}
+fn test_output_version_stream() {}
 
 #[tokio::test]
-async fn test_output_version_astream() {
-}
-
+async fn test_output_version_astream() {}
 
 #[test]
-fn test_generate_response_from_error_with_valid_json() {
-}
+fn test_generate_response_from_error_with_valid_json() {}
 
 #[test]
-fn test_generate_response_from_error_handles_streaming_response_failure() {
-}
-
+fn test_generate_response_from_error_handles_streaming_response_failure() {}
 
 #[test]
 fn test_disable_streaming_enum() {
-
     let disable_true = DisableStreaming::Bool(true);
     assert!(disable_true.should_disable(false));
     assert!(disable_true.should_disable(true));
@@ -870,7 +826,6 @@ fn test_disable_streaming_enum() {
 
 #[test]
 fn test_chat_model_config_builder() {
-
     let config = ChatModelConfig::new()
         .with_cache(true)
         .with_disable_streaming(true)
@@ -894,7 +849,6 @@ fn test_chat_model_config_builder() {
 
 #[tokio::test]
 async fn test_invoke_basic() {
-
     let model = FakeListChatModel::new(vec!["hello world".to_string()]);
     let result = model
         .invoke(LanguageModelInput::Text("test".to_string()), None)
@@ -906,7 +860,6 @@ async fn test_invoke_basic() {
 
 #[tokio::test]
 async fn test_ainvoke_basic() {
-
     let model = FakeListChatModel::new(vec!["async hello".to_string()]);
     let result = model
         .ainvoke(LanguageModelInput::Text("test".to_string()), None)
@@ -918,7 +871,6 @@ async fn test_ainvoke_basic() {
 
 #[tokio::test]
 async fn test_stream_basic() {
-
     let model = FakeListChatModel::new(vec!["hello".to_string()]);
     let mut stream = model
         ._stream(vec![], None, None)
@@ -938,7 +890,6 @@ async fn test_stream_basic() {
 
 #[tokio::test]
 async fn test_generate_basic() {
-
     let model = FakeListChatModel::new(vec!["gen1".to_string(), "gen2".to_string()]);
     let messages1 = vec![BaseMessage::Human(
         HumanMessage::builder().content("test1").build(),
@@ -955,8 +906,6 @@ async fn test_generate_basic() {
     let llm_result = result.unwrap();
     assert_eq!(llm_result.generations.len(), 2);
 }
-
-
 
 /// Ported from `TestGenerateFromStream::test_accumulates_chunks`.
 #[test]
@@ -1000,7 +949,6 @@ fn test_generate_from_stream_empty_raises_error() {
     assert!(result.is_err());
 }
 
-
 /// Ported from `TestAGenerateFromStream::test_accumulates_chunks`.
 #[tokio::test]
 async fn test_agenerate_from_stream_accumulates_chunks() {
@@ -1030,7 +978,6 @@ async fn test_agenerate_from_stream_empty_raises_error() {
     assert!(result.is_err());
 }
 
-
 /// Ported from `TestCombineLlmOutputs::test_returns_empty_dict_by_default`.
 #[test]
 fn test_combine_llm_outputs_returns_empty_dict() {
@@ -1046,7 +993,6 @@ fn test_combine_llm_outputs_returns_empty_dict_with_empty_list() {
     let result = model._combine_llm_outputs(&[None, None]);
     assert!(result.is_empty());
 }
-
 
 /// Ported from `TestConvertCachedGenerations::test_with_chat_generation_objects`.
 #[test]
@@ -1094,7 +1040,6 @@ fn test_convert_cached_generations_mixed() {
     assert_eq!(result[2].message.content(), "c");
 }
 
-
 /// Ported from `TestShouldStream::test_no_stream_implemented_returns_false`.
 #[test]
 fn test_should_stream_no_stream_returns_false() {
@@ -1140,7 +1085,6 @@ fn test_should_stream_no_handlers() {
     assert!(!model._should_stream(false, false, None, Some(&handlers)));
 }
 
-
 /// Ported from `TestConvertInput::test_convert_input_from_string`.
 #[test]
 fn test_convert_input_from_string() {
@@ -1166,7 +1110,6 @@ fn test_convert_input_from_message_sequence() {
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].content(), "hi");
 }
-
 
 /// Ported from `TestGenerateMethod::test_single_message_list`.
 #[tokio::test]
@@ -1230,7 +1173,6 @@ async fn test_generate_returns_chat_result() {
     }
 }
 
-
 /// Ported from `TestAGenerateMethod::test_single_message_list`.
 #[tokio::test]
 async fn test_agenerate_single_message_list() {
@@ -1284,7 +1226,6 @@ async fn test_agenerate_returns_chat_result() {
     assert_eq!(result.generations.len(), 1);
 }
 
-
 /// Ported from `TestBindTools::test_raises_not_implemented_by_default`.
 #[test]
 fn test_bind_tools_raises_not_implemented() {
@@ -1300,7 +1241,6 @@ fn test_with_structured_output_raises_not_implemented() {
     let result = model.with_structured_output(serde_json::json!({}), false);
     assert!(result.is_err());
 }
-
 
 /// Ported from `TestSimpleChatModelGenerate::test_generate_wraps_call_output`.
 #[tokio::test]
@@ -1355,7 +1295,6 @@ async fn test_simple_fake_chat_agenerate_returns_chat_result() {
     assert_eq!(result.generations.len(), 1);
     assert_eq!(result.generations[0].message.content(), "fake response");
 }
-
 
 /// Ported from `TestGenInfoAndMsgMetadata::test_merges_generation_info_with_response_metadata`.
 #[test]
@@ -1542,7 +1481,6 @@ async fn test_stream_callback_receives_chunk_data() {
         recorded.iter().map(|c| c.is_some()).collect::<Vec<_>>()
     );
 }
-
 
 /// Test that StructuredOutputWithRaw returns raw + parsed + null error on successful parse.
 #[tokio::test]

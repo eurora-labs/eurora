@@ -6,7 +6,6 @@ use agent_chain_core::messages::{
     ChatMessage, ChatMessageChunk, ContentBlock, ContentPart, HumanMessageChunk, MessageContent,
 };
 
-
 #[test]
 fn test_init_basic() {
     let msg = ChatMessage::builder().content("Hello").role("user").build();
@@ -166,7 +165,6 @@ fn test_pretty_repr() {
     assert!(result.contains("Chat Message"));
     assert!(result.contains("Hello"));
 }
-
 
 #[test]
 fn test_chunk_init_basic() {
@@ -434,7 +432,6 @@ fn test_chunk_content_blocks_property() {
     }
 }
 
-
 #[test]
 fn test_content_blocks_with_mixed_list_content() {
     let content = MessageContent::Parts(vec![
@@ -456,7 +453,6 @@ fn test_content_blocks_with_mixed_list_content() {
         panic!("Expected ContentBlock::Image for second block");
     }
 }
-
 
 #[test]
 fn test_model_dump_includes_role() {
@@ -514,7 +510,6 @@ fn test_model_dump_all_fields() {
         "data"
     );
 }
-
 
 #[test]
 fn test_add_multiple_chat_chunks_chained() {
@@ -600,7 +595,6 @@ fn test_add_accumulates_additional_kwargs() {
     );
 }
 
-
 #[test]
 fn test_pretty_repr_html_true() {
     let msg = ChatMessage::builder().content("Hello").role("user").build();
@@ -619,7 +613,6 @@ fn test_pretty_repr_html_false() {
     assert!(result_plain.contains("Hello"));
     assert!(!result_plain.contains("\x1b[1m"));
 }
-
 
 #[test]
 fn test_init_with_content_blocks() {

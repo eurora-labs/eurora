@@ -597,7 +597,6 @@ fn parse_json_lenient(input: &str) -> std::result::Result<Value, String> {
     serde_json::from_str::<Value>(&result).map_err(|e| format!("JSON parse error: {}", e))
 }
 
-
 #[async_trait]
 impl BaseLLMOutputParser for OutputFunctionsParser {
     type Output = Value;

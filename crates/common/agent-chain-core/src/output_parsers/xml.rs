@@ -530,7 +530,6 @@ mod tests {
         assert!(result["root"].is_array());
     }
 
-
     #[test]
     fn test_streaming_parser_basic() {
         let mut parser = StreamingParser::new();
