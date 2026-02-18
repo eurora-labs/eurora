@@ -1542,13 +1542,68 @@ impl ChatOpenAI {
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
     ) -> Result<ChatStream> {
+        self.stream_internal_with_tools(messages, stop, None, None)
+            .await
+    }
+
+    async fn stream_internal_with_tools(
+        &self,
+        messages: Vec<BaseMessage>,
+        stop: Option<Vec<String>>,
+        tools: Option<&[ToolDefinition]>,
+        tool_choice: Option<&ToolChoice>,
+    ) -> Result<ChatStream> {
         if self.should_use_responses_api(None) {
             return self.stream_responses_api(messages, stop).await;
         }
 
         let api_key = self.get_api_key()?;
         let client = self.build_client()?;
-        let payload = self.build_request_payload(&messages, stop, None, true);
+
+        let openai_tools: Option<Vec<serde_json::Value>> =
+            tools.filter(|t| !t.is_empty()).map(|tools| {
+                tools
+                    .iter()
+                    .map(|t| {
+                        serde_json::json!({
+                            "type": "function",
+                            "function": {
+                                "name": t.name,
+                                "description": t.description,
+                                "parameters": t.parameters
+                            }
+                        })
+                    })
+                    .collect()
+            });
+
+        let mut payload =
+            self.build_request_payload(&messages, stop, openai_tools.as_deref(), true);
+
+        if let Some(choice) = tool_choice {
+            let choice_json = match choice {
+                ToolChoice::String(s) => {
+                    if s == "any" {
+                        serde_json::json!("required")
+                    } else if WELL_KNOWN_TOOLS.contains(&s.as_str()) {
+                        serde_json::json!({"type": s})
+                    } else {
+                        serde_json::json!(s)
+                    }
+                }
+                ToolChoice::Structured { choice_type, name } => {
+                    if choice_type == "tool" || choice_type == "function" {
+                        serde_json::json!({
+                            "type": "function",
+                            "function": {"name": name}
+                        })
+                    } else {
+                        serde_json::json!(choice_type)
+                    }
+                }
+            };
+            payload["tool_choice"] = choice_json;
+        }
 
         let mut request = client
             .post(format!("{}/chat/completions", self.api_base))
@@ -1611,38 +1666,43 @@ impl ChatOpenAI {
                                         continue;
                                     }
 
-                                    if let Ok(chunk) = serde_json::from_str::<OpenAIStreamChunk>(data) {
-                                        if let Some(choice) = chunk.choices.first() {
-                                            if let Some(ref content) = choice.delta.content {
-                                                yield Ok(ChatChunk::new(content.clone()));
-                                            }
-                                            if let Some(ref tcs) = choice.delta.tool_calls {
-                                                for tc in tcs {
-                                                    let entry = tool_call_acc
-                                                        .entry(tc.index)
-                                                        .or_insert_with(|| (String::new(), String::new(), String::new()));
-                                                    if let Some(ref id) = tc.id {
-                                                        entry.0 = id.clone();
-                                                    }
-                                                    if let Some(ref func) = tc.function {
-                                                        if let Some(ref name) = func.name {
-                                                            entry.1 = name.clone();
+                                    match serde_json::from_str::<OpenAIStreamChunk>(data) {
+                                        Ok(chunk) => {
+                                            if let Some(choice) = chunk.choices.first() {
+                                                if let Some(ref content) = choice.delta.content {
+                                                    yield Ok(ChatChunk::new(content.clone()));
+                                                }
+                                                if let Some(ref tcs) = choice.delta.tool_calls {
+                                                    for tc in tcs {
+                                                        let entry = tool_call_acc
+                                                            .entry(tc.index)
+                                                            .or_insert_with(|| (String::new(), String::new(), String::new()));
+                                                        if let Some(ref id) = tc.id {
+                                                            entry.0 = id.clone();
                                                         }
-                                                        if let Some(ref args) = func.arguments {
-                                                            entry.2.push_str(args);
+                                                        if let Some(ref func) = tc.function {
+                                                            if let Some(ref name) = func.name {
+                                                                entry.1 = name.clone();
+                                                            }
+                                                            if let Some(ref args) = func.arguments {
+                                                                entry.2.push_str(args);
+                                                            }
                                                         }
                                                     }
                                                 }
+                                                if let Some(ref reason) = choice.finish_reason {
+                                                    finish_reason = Some(reason.clone());
+                                                }
                                             }
-                                            if let Some(ref reason) = choice.finish_reason {
-                                                finish_reason = Some(reason.clone());
+                                            if let Some(ref u) = chunk.usage {
+                                                usage = Some(UsageMetadata::new(
+                                                    u.prompt_tokens as i64,
+                                                    u.completion_tokens as i64,
+                                                ));
                                             }
                                         }
-                                        if let Some(ref u) = chunk.usage {
-                                            usage = Some(UsageMetadata::new(
-                                                u.prompt_tokens as i64,
-                                                u.completion_tokens as i64,
-                                            ));
+                                        Err(e) => {
+                                            tracing::warn!("Failed to parse SSE chunk: {e}, data: {data}");
                                         }
                                     }
                                 }
@@ -1763,24 +1823,17 @@ impl BaseChatModel for ChatOpenAI {
         stop: Option<Vec<String>>,
         _run_manager: Option<&AsyncCallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
-        // When tools are bound, fall back to non-streaming generation
-        // since stream_internal doesn't support tool parameters yet.
-        if !self.bound_tools.is_empty() {
-            let ai_message = self
-                .generate_with_tools_internal(
-                    messages,
-                    &self.bound_tools,
-                    self.bound_tool_choice.as_ref(),
-                    stop,
-                )
-                .await?;
-            let chunk = ChatGenerationChunk::new(ai_message.into());
-            return Ok(
-                Box::pin(futures::stream::once(async move { Ok(chunk) })) as ChatGenerationStream
-            );
-        }
-
-        let chat_stream = self.stream_internal(messages, stop).await?;
+        let chat_stream = if !self.bound_tools.is_empty() {
+            self.stream_internal_with_tools(
+                messages,
+                stop,
+                Some(&self.bound_tools),
+                self.bound_tool_choice.as_ref(),
+            )
+            .await?
+        } else {
+            self.stream_internal(messages, stop).await?
+        };
 
         let generation_stream = async_stream::stream! {
             use futures::StreamExt;

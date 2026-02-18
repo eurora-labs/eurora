@@ -1529,7 +1529,10 @@ pub trait BaseChatModel: BaseLanguageModel {
                 match result {
                     Ok(generation_chunk) => {
                         let mut ai_chunk = match &generation_chunk.message {
-                            BaseMessage::AI(ai_msg) => AIMessageChunk::builder().content(ai_msg.content.clone()).build(),
+                            BaseMessage::AI(ai_msg) => AIMessageChunk::builder()
+                                .content(ai_msg.content.clone())
+                                .tool_calls(ai_msg.tool_calls.clone())
+                                .build(),
                             other => AIMessageChunk::builder().content(other.text()).build(),
                         };
 
@@ -1703,7 +1706,10 @@ pub trait BaseChatModel: BaseLanguageModel {
                 match result {
                     Ok(generation_chunk) => {
                         let mut ai_chunk = match &generation_chunk.message {
-                            BaseMessage::AI(ai_msg) => AIMessageChunk::builder().content(ai_msg.content.clone()).build(),
+                            BaseMessage::AI(ai_msg) => AIMessageChunk::builder()
+                                .content(ai_msg.content.clone())
+                                .tool_calls(ai_msg.tool_calls.clone())
+                                .build(),
                             other => AIMessageChunk::builder().content(other.text()).build(),
                         };
 

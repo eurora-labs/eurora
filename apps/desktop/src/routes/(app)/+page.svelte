@@ -159,7 +159,7 @@
 							finishRendering={() => {}}
 						>
 							<Chat.MessageContent>
-								{#if content.length > 0}
+								{#if content.trim().length > 0}
 									<Katex math={content} />
 								{:else}
 									<Thinking class="text-primary/60" />

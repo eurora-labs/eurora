@@ -1,8 +1,12 @@
 use agent_chain::SystemMessage;
 use agent_chain::openai::BuiltinTool;
 use agent_chain::{
-    BaseChatModel, BaseMessage, HumanMessage, ollama::ChatOllama, openai::ChatOpenAI,
+    AIMessage, BaseChatModel, BaseMessage, BaseTool, HumanMessage, language_models::ToolLike,
+    messages::ToolCall, ollama::ChatOllama, openai::ChatOpenAI,
 };
+use std::collections::HashMap;
+
+use crate::tools::firecrawl_search_tool;
 use be_authz::{extract_claims, parse_user_id};
 use be_local_settings::{OllamaConfig, OpenAIConfig, ProviderSettings, SettingsReceiver};
 use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
@@ -50,6 +54,7 @@ pub use proto_gen::thread::proto_thread_service_server::{
 struct Providers {
     chat: Arc<dyn BaseChatModel + Send + Sync>,
     title: Arc<dyn BaseChatModel + Send + Sync>,
+    tools: HashMap<String, Arc<dyn BaseTool>>,
 }
 
 fn build_ollama(
@@ -93,6 +98,12 @@ fn build_title_provider_from(settings: &ProviderSettings) -> Box<dyn BaseChatMod
     }
 }
 
+fn build_tool_map() -> HashMap<String, Arc<dyn BaseTool>> {
+    let tool = firecrawl_search_tool();
+    let name = tool.name().to_string();
+    HashMap::from([(name, tool)])
+}
+
 fn build_env_fallback() -> Option<Providers> {
     let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
         .map(|v| v.eq_ignore_ascii_case("true"))
@@ -106,13 +117,21 @@ fn build_env_fallback() -> Option<Providers> {
             Arc::new(ChatOllama::new(&model).base_url(&host));
         let title: Arc<dyn BaseChatModel + Send + Sync> =
             Arc::new(ChatOllama::new(&model).base_url(&host));
-        Some(Providers { chat, title })
+        Some(Providers {
+            chat,
+            title,
+            tools: HashMap::new(),
+        })
     } else {
-        let chat = Arc::new(
+        let chat_model =
             ChatOpenAI::new(std::env::var("NEBUL_MODEL").expect("Nebul model should be set"))
                 .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"))
-                .api_base(BASE_NEBUL_URL), // .with_builtin_tools(vec![BuiltinTool::WebSearch]),
-        );
+                .api_base(BASE_NEBUL_URL);
+        let bound = chat_model
+            .bind_tools(&[ToolLike::Tool(firecrawl_search_tool())], None)
+            .expect("Failed to bind firecrawl_search tool");
+        let chat: Arc<dyn BaseChatModel + Send + Sync> =
+            Arc::from(bound as Box<dyn BaseChatModel + Send + Sync>);
 
         let title = Arc::new(
             ChatOpenAI::new(
@@ -122,7 +141,11 @@ fn build_env_fallback() -> Option<Providers> {
             .api_base(BASE_NEBUL_URL),
         );
 
-        Some(Providers { chat, title })
+        Some(Providers {
+            chat,
+            title,
+            tools: build_tool_map(),
+        })
     }
 }
 
@@ -144,6 +167,7 @@ impl ThreadService {
             .map(|s| Providers {
                 chat: build_chat_provider_from(&s).into(),
                 title: build_title_provider_from(&s).into(),
+                tools: build_tool_map(),
             })
             .or(env_fallback);
 
@@ -162,6 +186,7 @@ impl ThreadService {
                     Providers {
                         chat: build_chat_provider_from(&s).into(),
                         title: build_title_provider_from(&s).into(),
+                        tools: build_tool_map(),
                     }
                 });
                 let mut lock = providers_handle.write().unwrap_or_else(|e| e.into_inner());
@@ -188,6 +213,11 @@ impl ThreadService {
                 "No provider settings configured and no environment fallback available",
             )
         })
+    }
+
+    fn get_tools(&self) -> HashMap<String, Arc<dyn BaseTool>> {
+        let lock = self.providers.read().unwrap_or_else(|e| e.into_inner());
+        lock.as_ref().map(|p| p.tools.clone()).unwrap_or_default()
     }
 
     fn db_thread_to_proto(thread: be_remote_db::Thread) -> Thread {
@@ -477,37 +507,84 @@ impl ProtoThreadService for ThreadService {
             .map_err(ThreadServiceError::from)?;
 
         let chat_provider = self.get_chat_provider()?;
-        let provider_stream = chat_provider
-            .astream(messages.into(), None, None)
-            .await
-            .map_err(|e| {
-                debug!("Error in chat_stream: {}", e);
-                Status::internal(e.to_string())
-            })?;
+        let tools = self.get_tools();
 
         let db = self.db.clone();
         let output_stream = async_stream::try_stream! {
-            tokio::pin!(provider_stream);
             let mut full_content = String::new();
+            const MAX_TOOL_ROUNDS: usize = 5;
 
-            while let Some(result) = provider_stream.next().await {
-                match result {
-                    Ok(chunk) => {
-                        let content = chunk.content.to_string();
-                        full_content.push_str(&content);
-                        // TODO: Don't rely on empty string for finality
-                        let is_final = content.is_empty();
+            for round in 0..=MAX_TOOL_ROUNDS {
+                let provider_stream = chat_provider
+                    .astream(messages.clone().into(), None, None)
+                    .await
+                    .map_err(|e| {
+                        error!("Error in chat_stream: {}", e);
+                        Status::internal(e.to_string())
+                    })?;
 
-                        yield ChatStreamResponse {
-                            chunk: content,
-                            is_final,
-                        };
-                    }
-                    Err(e) => {
-                        Err(Status::internal(e.to_string()))?;
+                tokio::pin!(provider_stream);
+                let mut round_content = String::new();
+                let mut tool_calls: Vec<ToolCall> = Vec::new();
+
+                while let Some(result) = provider_stream.next().await {
+                    match result {
+                        Ok(chunk) => {
+                            let content = chunk.content.to_string();
+                            if !content.is_empty() {
+                                round_content.push_str(&content);
+                                yield ChatStreamResponse {
+                                    chunk: content,
+                                    is_final: false,
+                                };
+                            }
+                            if !chunk.tool_calls.is_empty() {
+                                tool_calls.extend(chunk.tool_calls);
+                            }
+                        }
+                        Err(e) => {
+                            Err(Status::internal(e.to_string()))?;
+                        }
                     }
                 }
+
+                full_content.push_str(&round_content);
+
+                if tool_calls.is_empty() || round == MAX_TOOL_ROUNDS {
+                    break;
+                }
+
+                messages.push(
+                    AIMessage::builder()
+                        .content(&round_content)
+                        .tool_calls(tool_calls.clone())
+                        .build()
+                        .into(),
+                );
+
+                // Execute each tool call and append results
+                for tc in tool_calls {
+                    let tool_name = tc.name.clone();
+                    let result_msg = if let Some(tool) = tools.get(&tool_name) {
+                        tool.invoke_tool_call(tc).await
+                    } else {
+                        error!("Unknown tool: {}", tool_name);
+                        agent_chain::messages::ToolMessage::builder()
+                            .content(format!("Error: unknown tool '{}'", tool_name))
+                            .tool_call_id("")
+                            .status(agent_chain::messages::ToolStatus::Error)
+                            .build()
+                            .into()
+                    };
+                    messages.push(result_msg);
+                }
             }
+
+            // Final empty chunk to signal completion
+            yield ChatStreamResponse {
+                chunk: String::new(),
+                is_final: true,
+            };
 
             if !full_content.is_empty() && let Err(e) = db
                     .create_message().thread_id(thread_id)
