@@ -1552,30 +1552,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "be-conversation-service"
-version = "0.0.0"
-dependencies = [
- "agent-chain",
- "async-stream",
- "be-authz",
- "be-local-settings",
- "be-remote-db",
- "chrono",
- "prost",
- "prost-types",
- "proto-gen",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "tokio-stream",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "be-encrypt"
 version = "0.0.0"
 dependencies = [
@@ -1625,12 +1601,12 @@ dependencies = [
  "be-auth-core",
  "be-auth-service",
  "be-authz",
- "be-conversation-service",
  "be-local-settings",
  "be-local-settings-service",
  "be-payment-service",
  "be-remote-db",
  "be-storage",
+ "be-thread-service",
  "be-update-service",
  "dotenv",
  "prost",
@@ -1698,6 +1674,31 @@ dependencies = [
  "opendal",
  "sha2",
  "thiserror 2.0.18",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "be-thread-service"
+version = "0.0.0"
+dependencies = [
+ "agent-chain",
+ "async-stream",
+ "be-authz",
+ "be-local-settings",
+ "be-remote-db",
+ "chrono",
+ "prost",
+ "prost-types",
+ "proto-gen",
+ "reqwest 0.12.28",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
  "tracing",
  "uuid",
 ]
@@ -3619,26 +3620,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-conversation"
-version = "0.0.0"
-dependencies = [
- "agent-chain",
- "chrono",
- "euro-auth",
- "prost",
- "prost-types",
- "proto-gen",
- "serde",
- "thiserror 2.0.18",
- "tokio",
- "tokio-stream",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
- "uuid",
-]
-
-[[package]]
 name = "euro-debug"
 version = "0.0.0"
 
@@ -3768,11 +3749,11 @@ dependencies = [
  "dirs 6.0.0",
  "dotenv",
  "euro-activity",
- "euro-conversation",
  "euro-encrypt",
  "euro-endpoint",
  "euro-secret",
  "euro-settings",
+ "euro-thread",
  "euro-timeline",
  "euro-user",
  "euro-vision",
@@ -3808,6 +3789,26 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+]
+
+[[package]]
+name = "euro-thread"
+version = "0.0.0"
+dependencies = [
+ "agent-chain",
+ "chrono",
+ "euro-auth",
+ "prost",
+ "prost-types",
+ "proto-gen",
+ "serde",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "uuid",
 ]
 
 [[package]]

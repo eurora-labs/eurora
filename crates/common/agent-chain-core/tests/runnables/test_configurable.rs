@@ -20,10 +20,6 @@ use agent_chain_core::runnables::utils::{
 use async_trait::async_trait;
 use serde_json::Value;
 
-// ---------------------------------------------------------------------------
-// Test helpers — mirrors Python's MyRunnable / MyOtherRunnable
-// ---------------------------------------------------------------------------
-
 /// A simple reconfigurable runnable that appends `my_property` to the input.
 #[derive(Debug, Clone)]
 struct MyRunnable {
@@ -87,10 +83,6 @@ impl Runnable for MyOtherRunnable {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Helpers for building configurable fields
-// ---------------------------------------------------------------------------
-
 fn make_my_property_field(id: &str) -> HashMap<String, AnyConfigurableField> {
     let mut fields = HashMap::new();
     fields.insert(
@@ -112,19 +104,6 @@ fn make_configurable_my_runnable(
     let fields = make_my_property_field(field_id);
     runnable.configurable_fields_reconfigurable(fields)
 }
-
-// ===========================================================================
-// Tests for str_remove_prefix (mirrors test_strremoveprefix_*)
-// ===========================================================================
-
-// The str_remove_prefix function is private in configurable.rs. It is tested
-// indirectly via RunnableConfigurableAlternatives with prefix_keys=true.
-// The inline unit tests in configurable.rs already cover the basic cases.
-// Here we test the behavior end-to-end through the public API.
-
-// ===========================================================================
-// Tests for prefix_config_spec
-// ===========================================================================
 
 #[test]
 fn test_prefix_config_spec_non_shared() {
@@ -164,10 +143,6 @@ fn test_prefix_config_spec_shared_unchanged() {
     let result = prefix_config_spec(&spec, "model==gpt4");
     assert_eq!(result.id, "global_setting");
 }
-
-// ===========================================================================
-// Tests for make_options_spec
-// ===========================================================================
 
 #[test]
 fn test_make_options_spec_single_option() {
@@ -234,10 +209,6 @@ fn test_make_options_spec_multi_option() {
         Some(Value::Array(vec![Value::String("search".to_string())]))
     );
 }
-
-// ===========================================================================
-// Tests for RunnableConfigurableAlternatives
-// ===========================================================================
 
 #[test]
 fn test_configurable_alternatives_invoke_default() {
@@ -394,10 +365,6 @@ fn test_configurable_alternatives_with_prefix_keys() {
     assert!(spec_ids.contains(&"which"));
 }
 
-// ===========================================================================
-// Tests for DynamicRunnable / RunnableConfigurableFields with_config
-// ===========================================================================
-
 #[test]
 fn test_dynamic_runnable_with_config() {
     let configurable = make_configurable_my_runnable("a", "my_property");
@@ -412,10 +379,6 @@ fn test_dynamic_runnable_with_config() {
             .contains(&"test_tag".to_string())
     );
 }
-
-// ===========================================================================
-// Tests for RunnableConfigurableFields
-// ===========================================================================
 
 #[test]
 fn test_configurable_fields_config_specs() {
@@ -516,7 +479,6 @@ fn test_configurable_fields_stream() {
 #[test]
 fn test_configurable_fields_chained_configurable_fields() {
     let configurable = make_configurable_my_runnable("a", "my_property");
-    // Calling configurable_fields again on a RunnableConfigurableFields should still work
     let chained = configurable.configurable_fields(HashMap::new());
 
     let config = RunnableConfig::default().with_configurable({
@@ -525,16 +487,9 @@ fn test_configurable_fields_chained_configurable_fields() {
         c
     });
 
-    // The inner configurable should still receive and process the config
     let result = chained.invoke("x".to_string(), Some(config)).unwrap();
-    // The outer wrapper passes config through to the inner RunnableConfigurableFields
-    // which handles the reconfiguration
     assert_eq!(result, "xc");
 }
-
-// ===========================================================================
-// Async tests
-// ===========================================================================
 
 #[tokio::test]
 async fn test_configurable_fields_ainvoke_with_override() {

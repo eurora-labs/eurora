@@ -209,8 +209,6 @@ where
     }
 
     fn get_input_schema(&self, config: Option<&RunnableConfig>) -> serde_json::Value {
-        // Collect all runnables: default + branch targets + branch conditions
-        // Return the first schema that has a valid "type" field
         let schema = self.default.get_input_schema(config);
         if schema.get("type").is_some() {
             return schema;

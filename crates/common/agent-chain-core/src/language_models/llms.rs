@@ -206,7 +206,6 @@ pub trait BaseLLM: BaseLanguageModel {
             .generate_prompts(vec![prompt], stop, run_manager)
             .await?;
 
-        // Get the first generation
         if let Some(generations) = result.generations.first()
             && let Some(generation) = generations.first()
         {
@@ -215,7 +214,6 @@ pub trait BaseLLM: BaseLanguageModel {
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
-        // Empty result
         Ok(Box::pin(futures::stream::empty()))
     }
 
@@ -225,7 +223,6 @@ pub trait BaseLLM: BaseLanguageModel {
             LanguageModelInput::Text(s) => Ok(s),
             LanguageModelInput::StringPrompt(p) => Ok(p.to_string()),
             LanguageModelInput::ChatPrompt(p) => {
-                // Convert chat prompt to string representation
                 let messages = p.to_messages();
                 let parts: Vec<String> = messages
                     .iter()
@@ -235,7 +232,6 @@ pub trait BaseLLM: BaseLanguageModel {
             }
             LanguageModelInput::ImagePrompt(p) => Ok(p.image_url.url.clone().unwrap_or_default()),
             LanguageModelInput::Messages(m) => {
-                // Convert messages to a string representation
                 let parts: Vec<String> = m
                     .iter()
                     .map(|msg| format!("{}: {}", msg.message_type(), msg.text()))
@@ -264,7 +260,6 @@ pub trait BaseLLM: BaseLanguageModel {
 
         let result = self.generate(vec![prompt], generate_config).await?;
 
-        // Get the first generation's text
         if let Some(generations) = result.generations.first()
             && let Some(generation) = generations.first()
         {
@@ -299,7 +294,6 @@ pub trait BaseLLM: BaseLanguageModel {
 
         let params = self.identifying_params();
 
-        // Build inheritable metadata with LangSmith params
         let mut inheritable_metadata = metadata.clone().unwrap_or_default();
         let ls_params = self.get_llm_ls_params(stop.as_deref());
         if let Some(provider) = ls_params.ls_provider {
@@ -312,7 +306,6 @@ pub trait BaseLLM: BaseLanguageModel {
             inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
         }
 
-        // Configure callback manager
         let callback_manager = CallbackManager::configure(
             callbacks,
             self.callbacks().cloned(),
@@ -323,7 +316,6 @@ pub trait BaseLLM: BaseLanguageModel {
             self.config().metadata.clone(),
         );
 
-        // Resolve which cache to use
         let cache_config = self.llm_config().base.cache;
         let cache_instance = self.llm_config().cache_instance.clone();
 
@@ -337,12 +329,10 @@ pub trait BaseLLM: BaseLanguageModel {
             };
 
         if let Some(cache) = &resolved_cache {
-            // Cache is available — look up existing results
             let (mut existing, llm_string, missing_idxs, missing_prompts) =
                 get_prompts_from_cache(&params, &prompts, Some(cache.as_ref()));
 
             if missing_prompts.is_empty() {
-                // All prompts were cached — no callbacks needed
                 let generations = (0..prompts.len())
                     .map(|i| {
                         existing
@@ -356,15 +346,12 @@ pub trait BaseLLM: BaseLanguageModel {
                 return Ok(LLMResult::new(generations));
             }
 
-            // Fire on_llm_start only for missing prompts
             let run_managers = callback_manager.on_llm_start(&params, &missing_prompts, run_id);
 
-            // Generate only for misses
             let new_results = self
                 ._generate_helper(missing_prompts, stop, &run_managers)
                 .await?;
 
-            // Update cache
             update_cache(
                 Some(cache.as_ref()),
                 &mut existing,
@@ -374,7 +361,6 @@ pub trait BaseLLM: BaseLanguageModel {
                 &prompts,
             );
 
-            // Reconstruct full result in order
             let generations = (0..prompts.len())
                 .map(|i| {
                     existing
@@ -388,7 +374,6 @@ pub trait BaseLLM: BaseLanguageModel {
 
             let mut output = LLMResult::new(generations);
 
-            // Attach run info
             if !run_managers.is_empty() {
                 output.run = Some(
                     run_managers
@@ -400,12 +385,10 @@ pub trait BaseLLM: BaseLanguageModel {
 
             Ok(output)
         } else {
-            // No cache — fire on_llm_start for all prompts
             let run_managers = callback_manager.on_llm_start(&params, &prompts, run_id);
 
             let mut output = self._generate_helper(prompts, stop, &run_managers).await?;
 
-            // Attach run info
             if !run_managers.is_empty() {
                 output.run = Some(
                     run_managers
@@ -433,7 +416,6 @@ pub trait BaseLLM: BaseLanguageModel {
             .await
         {
             Ok(output) => {
-                // Fire on_llm_end for each run manager with flattened output
                 let flattened = output.flatten();
                 for (run_manager, flattened_output) in run_managers.iter().zip(flattened.iter()) {
                     let chat_result = llm_result_to_chat_result(flattened_output);
@@ -518,7 +500,6 @@ pub trait BaseLLM: BaseLanguageModel {
     ) -> Result<LLMStream> {
         let prompt = self.convert_input(input)?;
 
-        // Extract config fields
         let (callbacks, tags, metadata, _run_name, run_id) = if let Some(cfg) = config {
             (
                 cfg.callbacks.clone(),
@@ -533,7 +514,6 @@ pub trait BaseLLM: BaseLanguageModel {
 
         let params = self.identifying_params();
 
-        // Build inheritable metadata with LangSmith params
         let mut inheritable_metadata = metadata.unwrap_or_default();
         let ls_params = self.get_llm_ls_params(stop.as_deref());
         if let Some(provider) = ls_params.ls_provider {
@@ -546,7 +526,6 @@ pub trait BaseLLM: BaseLanguageModel {
             inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
         }
 
-        // Configure callback manager
         let callback_manager = crate::callbacks::CallbackManager::configure(
             callbacks,
             self.callbacks().cloned(),
@@ -557,12 +536,10 @@ pub trait BaseLLM: BaseLanguageModel {
             self.config().metadata.clone(),
         );
 
-        // Fire on_llm_start
         let run_managers =
             callback_manager.on_llm_start(&params, std::slice::from_ref(&prompt), run_id);
         let run_manager = run_managers.into_iter().next();
 
-        // Get the inner stream
         let generation_stream = self
             .stream_prompt(prompt, stop, run_manager.as_ref())
             .await?;
@@ -576,7 +553,6 @@ pub trait BaseLLM: BaseLanguageModel {
             while let Some(result) = pinned_stream.next().await {
                 match result {
                     Ok(chunk) => {
-                        // Fire on_llm_new_token callback
                         if let Some(ref rm) = run_manager {
                             rm.on_llm_new_token(&chunk.text, None);
                         }
@@ -593,7 +569,6 @@ pub trait BaseLLM: BaseLanguageModel {
                 }
             }
 
-            // Fire on_llm_end with merged generation
             if let Some(ref rm) = run_manager
                 && let Some(merged) = crate::outputs::merge_generation_chunks(chunks) {
                     let generation: Generation = merged.into();
@@ -619,7 +594,6 @@ pub trait BaseLLM: BaseLanguageModel {
     ) -> Result<LLMStream> {
         let prompt = self.convert_input(input)?;
 
-        // Extract config fields
         let (callbacks, tags, metadata, _run_name, run_id) = if let Some(cfg) = config {
             (
                 cfg.callbacks.clone(),
@@ -634,7 +608,6 @@ pub trait BaseLLM: BaseLanguageModel {
 
         let params = self.identifying_params();
 
-        // Build inheritable metadata with LangSmith params
         let mut inheritable_metadata = metadata.unwrap_or_default();
         let ls_params = self.get_llm_ls_params(stop.as_deref());
         if let Some(provider) = ls_params.ls_provider {
@@ -647,7 +620,6 @@ pub trait BaseLLM: BaseLanguageModel {
             inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
         }
 
-        // Configure async callback manager
         let callback_manager = crate::callbacks::AsyncCallbackManager::configure(
             callbacks,
             self.callbacks().cloned(),
@@ -658,13 +630,11 @@ pub trait BaseLLM: BaseLanguageModel {
             self.config().metadata.clone(),
         );
 
-        // Fire on_llm_start
         let run_managers = callback_manager
             .on_llm_start(&params, std::slice::from_ref(&prompt), run_id)
             .await;
         let run_manager = run_managers.into_iter().next();
 
-        // Get the inner stream
         let generation_stream = self
             .stream_prompt(
                 prompt,
@@ -682,7 +652,6 @@ pub trait BaseLLM: BaseLanguageModel {
             while let Some(result) = pinned_stream.next().await {
                 match result {
                     Ok(chunk) => {
-                        // Fire on_llm_new_token callback
                         if let Some(ref rm) = run_manager {
                             rm.on_llm_new_token(&chunk.text, None).await;
                         }
@@ -699,7 +668,6 @@ pub trait BaseLLM: BaseLanguageModel {
                 }
             }
 
-            // Fire on_llm_end with merged generation
             if let Some(ref rm) = run_manager
                 && let Some(merged) = crate::outputs::merge_generation_chunks(chunks) {
                     let generation: Generation = merged.into();
@@ -765,7 +733,6 @@ pub trait BaseLLM: BaseLanguageModel {
 
         let params = self.identifying_params();
 
-        // Build inheritable metadata with LangSmith params
         let mut inheritable_metadata = metadata.clone().unwrap_or_default();
         let ls_params = self.get_llm_ls_params(stop.as_deref());
         if let Some(provider) = ls_params.ls_provider {
@@ -778,7 +745,6 @@ pub trait BaseLLM: BaseLanguageModel {
             inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
         }
 
-        // Configure async callback manager
         let callback_manager = AsyncCallbackManager::configure(
             callbacks,
             self.callbacks().cloned(),
@@ -789,7 +755,6 @@ pub trait BaseLLM: BaseLanguageModel {
             self.config().metadata.clone(),
         );
 
-        // Resolve which cache to use
         let cache_config = self.llm_config().base.cache;
         let cache_instance = self.llm_config().cache_instance.clone();
 
@@ -803,7 +768,6 @@ pub trait BaseLLM: BaseLanguageModel {
             };
 
         if let Some(cache) = &resolved_cache {
-            // Cache is available — async lookup
             let (mut existing, llm_string, missing_idxs, missing_prompts) =
                 aget_prompts_from_cache(&params, &prompts, Some(cache.as_ref())).await;
 
@@ -821,17 +785,14 @@ pub trait BaseLLM: BaseLanguageModel {
                 return Ok(LLMResult::new(generations));
             }
 
-            // Fire on_llm_start only for missing prompts (async)
             let run_managers = callback_manager
                 .on_llm_start(&params, &missing_prompts, run_id)
                 .await;
 
-            // Generate only for misses
             let new_results = self
                 ._agenerate_helper(missing_prompts, stop, &run_managers)
                 .await?;
 
-            // Async cache update
             aupdate_cache(
                 Some(cache.as_ref()),
                 &mut existing,
@@ -842,7 +803,6 @@ pub trait BaseLLM: BaseLanguageModel {
             )
             .await;
 
-            // Reconstruct full result in order
             let generations = (0..prompts.len())
                 .map(|i| {
                     existing
@@ -867,7 +827,6 @@ pub trait BaseLLM: BaseLanguageModel {
 
             Ok(output)
         } else {
-            // No cache — fire on_llm_start for all prompts (async)
             let run_managers = callback_manager
                 .on_llm_start(&params, &prompts, run_id)
                 .await;
@@ -1020,7 +979,6 @@ pub fn get_prompts_from_cache(
     Vec<usize>,
     Vec<String>,
 ) {
-    // Use BTreeMap for deterministic key ordering in the cache key
     let sorted: std::collections::BTreeMap<_, _> = params.iter().collect();
     let llm_string = serde_json::to_string(&sorted).unwrap_or_default();
     let mut existing_prompts = HashMap::new();
@@ -1037,7 +995,6 @@ pub fn get_prompts_from_cache(
             }
         }
     } else {
-        // No cache, all prompts are missing
         for (i, prompt) in prompts.iter().enumerate() {
             missing_prompts.push(prompt.clone());
             missing_prompt_idxs.push(i);

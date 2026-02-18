@@ -458,11 +458,9 @@ mod tests {
         let temp_dir = std::env::temp_dir().join("agent_chain_test_vectorstore");
         let path = temp_dir.join("test_store.json");
 
-        // Dump
         store.dump(&path).unwrap();
         assert!(path.exists());
 
-        // Load
         let loaded_store =
             InMemoryVectorStore::load(&path, Box::new(DeterministicFakeEmbedding::new(10)))
                 .unwrap();
@@ -483,7 +481,6 @@ mod tests {
             .unwrap();
         assert_eq!(doc2.page_content, "goodbye world");
 
-        // Cleanup
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
 

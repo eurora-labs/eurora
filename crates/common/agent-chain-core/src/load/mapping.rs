@@ -21,7 +21,6 @@ pub type NamespaceMapping = HashMap<Vec<String>, Vec<String>>;
 pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
     let mut map = HashMap::new();
 
-    // Message types
     map.insert(
         vec![
             "langchain".into(),
@@ -163,7 +162,6 @@ pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
         ],
     );
 
-    // Agent types
     map.insert(
         vec![
             "langchain".into(),
@@ -191,7 +189,6 @@ pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
         ],
     );
 
-    // Prompt types
     map.insert(
         vec![
             "langchain".into(),
@@ -332,7 +329,6 @@ pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
         ],
     );
 
-    // Output types
     map.insert(
         vec![
             "langchain".into(),
@@ -390,7 +386,6 @@ pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
         ],
     );
 
-    // Document types
     map.insert(
         vec![
             "langchain".into(),
@@ -406,7 +401,6 @@ pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
         ],
     );
 
-    // Runnable types
     map.insert(
         vec![
             "langchain".into(),
@@ -575,7 +569,6 @@ pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
         ],
     );
 
-    // Output parser types
     map.insert(
         vec![
             "langchain".into(),
@@ -605,7 +598,6 @@ pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
         ],
     );
 
-    // Message chunk types
     map.insert(
         vec![
             "langchain".into(),
@@ -677,7 +669,6 @@ pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
         ],
     );
 
-    // Prompt value types
     map.insert(
         vec![
             "langchain".into(),
@@ -732,7 +723,6 @@ pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
         ],
     );
 
-    // Chat prompt types
     map.insert(
         vec![
             "langchain".into(),
@@ -790,7 +780,6 @@ pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
         ],
     );
 
-    // Structured prompt
     map.insert(
         vec![
             "langchain_core".into(),
@@ -806,7 +795,6 @@ pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
         ],
     );
 
-    // Dict prompt template
     map.insert(
         vec![
             "langchain_core".into(),
@@ -900,7 +888,6 @@ pub static OG_SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|
 pub static OLD_CORE_NAMESPACES_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
     let mut map = HashMap::new();
 
-    // Message types with langchain_core prefix
     map.insert(
         vec![
             "langchain_core".into(),
@@ -1028,7 +1015,6 @@ pub static OLD_CORE_NAMESPACES_MAPPING: LazyLock<NamespaceMapping> = LazyLock::n
         ],
     );
 
-    // Agent types
     map.insert(
         vec![
             "langchain_core".into(),
@@ -1066,7 +1052,6 @@ pub static OLD_CORE_NAMESPACES_MAPPING: LazyLock<NamespaceMapping> = LazyLock::n
         ],
     );
 
-    // Prompt types
     map.insert(
         vec![
             "langchain_core".into(),
@@ -1250,7 +1235,6 @@ pub static OLD_CORE_NAMESPACES_MAPPING: LazyLock<NamespaceMapping> = LazyLock::n
         ],
     );
 
-    // Output types
     map.insert(
         vec![
             "langchain_core".into(),
@@ -1308,7 +1292,6 @@ pub static OLD_CORE_NAMESPACES_MAPPING: LazyLock<NamespaceMapping> = LazyLock::n
         ],
     );
 
-    // Document types
     map.insert(
         vec![
             "langchain_core".into(),
@@ -1324,7 +1307,6 @@ pub static OLD_CORE_NAMESPACES_MAPPING: LazyLock<NamespaceMapping> = LazyLock::n
         ],
     );
 
-    // Prompt value types
     map.insert(
         vec![
             "langchain_core".into(),
@@ -1374,7 +1356,6 @@ pub static OLD_CORE_NAMESPACES_MAPPING: LazyLock<NamespaceMapping> = LazyLock::n
         ],
     );
 
-    // Runnable types
     map.insert(
         vec![
             "langchain_core".into(),
@@ -1600,7 +1581,6 @@ pub static OLD_CORE_NAMESPACES_MAPPING: LazyLock<NamespaceMapping> = LazyLock::n
         ],
     );
 
-    // Output parser types
     map.insert(
         vec![
             "langchain_core".into(),
@@ -1630,7 +1610,6 @@ pub static OLD_CORE_NAMESPACES_MAPPING: LazyLock<NamespaceMapping> = LazyLock::n
         ],
     );
 
-    // Message chunk types
     map.insert(
         vec![
             "langchain_core".into(),
@@ -1709,7 +1688,6 @@ pub static OLD_CORE_NAMESPACES_MAPPING: LazyLock<NamespaceMapping> = LazyLock::n
 pub static JS_SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
     let mut map = HashMap::new();
 
-    // Message types (JS often serializes without the submodule)
     map.insert(
         vec![
             "langchain_core".into(),

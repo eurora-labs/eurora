@@ -13,8 +13,6 @@ use agent_chain_core::outputs::ChatGeneration;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-// --- Test helpers ---
-
 fn make_fn_message(name: &str, arguments: &str, content: &str) -> AIMessage {
     let mut additional_kwargs = HashMap::new();
     additional_kwargs.insert(
@@ -38,8 +36,6 @@ fn make_fn_message_default(name: &str, arguments: &str) -> AIMessage {
 fn make_chat_gen(message: AIMessage) -> ChatGeneration {
     ChatGeneration::new(message.into())
 }
-
-// --- OutputFunctionsParser tests ---
 
 #[test]
 fn test_output_functions_parser_args_only_returns_arguments_string() {
@@ -84,8 +80,6 @@ fn test_output_functions_parser_does_not_modify_original_message() {
     parser.parse_result(&[generation]).unwrap();
     assert_eq!(msg.additional_kwargs, original_kwargs);
 }
-
-// --- JsonOutputFunctionsParser tests ---
 
 #[test]
 fn test_json_output_functions_parser_args_only_parses_json() {
@@ -264,8 +258,6 @@ fn test_json_output_functions_parser_diff_method() {
     assert!(diff.iter().any(|op| op["op"] == "add"));
 }
 
-// --- JsonKeyOutputFunctionsParser tests ---
-
 #[test]
 fn test_json_key_output_functions_parser_extracts_key() {
     let msg = make_fn_message_default("fn", r#"{"key1": "val1", "key2": "val2"}"#);
@@ -322,8 +314,6 @@ fn test_json_key_output_functions_parser_partial_with_no_function_call_returns_n
         .unwrap();
     assert!(result.is_none());
 }
-
-// --- PydanticOutputFunctionsParser tests ---
 
 #[test]
 fn test_pydantic_output_functions_parser_single_schema_parses() {
@@ -410,8 +400,6 @@ fn test_pydantic_output_functions_parser_validation_error_raises() {
     let result = parser.parse_result(&[make_chat_gen(msg)]);
     assert!(result.is_err());
 }
-
-// --- PydanticAttrOutputFunctionsParser tests ---
 
 #[test]
 fn test_pydantic_attr_output_functions_parser_extracts_attribute() {

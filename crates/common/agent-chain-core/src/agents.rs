@@ -103,7 +103,7 @@ impl From<HashMap<String, Value>> for ToolInput {
 ///
 /// This is similar to [`AgentAction`], but includes a message log consisting of
 /// chat messages. This is useful when working with ChatModels, and is used to
-/// reconstruct conversation history from the agent's perspective.
+/// reconstruct thread history from the agent's perspective.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AgentActionMessageLog {
     /// The name of the Tool to execute.

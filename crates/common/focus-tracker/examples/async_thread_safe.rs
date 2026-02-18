@@ -8,7 +8,6 @@ use tokio::sync::Mutex;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize tracing for logging
     tracing_subscriber::fmt::init();
 
     println!("Starting async thread-safe focus tracker example...");
@@ -22,12 +21,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let tracker = FocusTracker::with_config(config);
 
-    // Use Arc<Mutex<>> to share state between tasks
     let focus_count = Arc::new(Mutex::new(0u32));
     let focus_count_clone = Arc::clone(&focus_count);
 
-    // This is the critical test: spawning the tracker in tokio::spawn
-    // This would previously fail with: `*mut c_void` cannot be sent between threads safely
     let handle = tokio::spawn(async move {
         tracker
             .track_focus_async(move |window| {
@@ -55,14 +51,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await
     });
 
-    // Wait for a bit to show it's working
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
-    // In a real application, you'd have a graceful shutdown mechanism
     println!("Example completed successfully!");
     println!("The focus tracker is now Send-safe and works in tokio::spawn!");
 
-    // Abort the handle since we're done
     handle.abort();
 
     Ok(())

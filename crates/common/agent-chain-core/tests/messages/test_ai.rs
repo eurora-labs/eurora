@@ -9,10 +9,6 @@ use agent_chain_core::messages::{
 };
 use serde_json::json;
 
-// ============================================================================
-// test_serdes_message
-// ============================================================================
-
 #[test]
 fn test_serdes_message() {
     let msg = AIMessage::builder()
@@ -30,37 +26,12 @@ fn test_serdes_message() {
         )])
         .build();
 
-    // For now, test that we can serialize/deserialize using serde_json
-    // Python test expects:
-    // {
-    //     "lc": 1,
-    //     "type": "constructor",
-    //     "id": ["langchain", "schema", "messages", "AIMessage"],
-    //     "kwargs": {
-    //         "type": "ai",
-    //         "content": [{"text": "blah", "type": "text"}],
-    //         "tool_calls": [
-    //             {"name": "foo", "args": {"bar": 1}, "id": "baz", "type": "tool_call"}
-    //         ],
-    //         "invalid_tool_calls": [
-    //             {
-    //                 "name": "foobad",
-    //                 "args": "blah",
-    //                 "id": "booz",
-    //                 "error": "bad",
-    //                 "type": "invalid_tool_call",
-    //             }
-    //         ],
-    //     },
-    // }
     let serialized = serde_json::to_value(&msg).unwrap();
 
-    // Check tool_calls
     let tool_calls = serialized.get("tool_calls").unwrap().as_array().unwrap();
     assert_eq!(tool_calls.len(), 1);
     assert_eq!(tool_calls[0].get("name").unwrap().as_str().unwrap(), "foo");
 
-    // Check invalid_tool_calls
     let invalid_tool_calls = serialized
         .get("invalid_tool_calls")
         .unwrap()
@@ -80,7 +51,6 @@ fn test_serdes_message() {
         "bad"
     );
 
-    // Test roundtrip
     let deserialized: AIMessage = serde_json::from_value(serialized).unwrap();
     assert_eq!(deserialized.tool_calls.len(), 1);
     assert_eq!(deserialized.tool_calls[0].name, "foo");
@@ -90,10 +60,6 @@ fn test_serdes_message() {
         Some("foobad".to_string())
     );
 }
-
-// ============================================================================
-// test_serdes_message_chunk
-// ============================================================================
 
 #[test]
 fn test_serdes_message_chunk() {
@@ -115,10 +81,8 @@ fn test_serdes_message_chunk() {
         ])
         .build();
 
-    // Serialize and check structure
     let serialized = serde_json::to_value(&chunk).unwrap();
 
-    // Check tool_call_chunks
     let tool_call_chunks = serialized
         .get("tool_call_chunks")
         .unwrap()
@@ -142,7 +106,6 @@ fn test_serdes_message_chunk() {
         1
     );
 
-    // Test roundtrip
     let deserialized: AIMessageChunk = serde_json::from_value(serialized).unwrap();
     assert_eq!(deserialized.tool_call_chunks.len(), 2);
     assert_eq!(
@@ -151,10 +114,6 @@ fn test_serdes_message_chunk() {
     );
 }
 
-// ============================================================================
-// test_add_usage_both_none
-// ============================================================================
-
 #[test]
 fn test_add_usage_both_none() {
     let result = add_usage(None, None);
@@ -162,10 +121,6 @@ fn test_add_usage_both_none() {
     assert_eq!(result.output_tokens, 0);
     assert_eq!(result.total_tokens, 0);
 }
-
-// ============================================================================
-// test_add_usage_one_none
-// ============================================================================
 
 #[test]
 fn test_add_usage_one_none() {
@@ -176,10 +131,6 @@ fn test_add_usage_one_none() {
     assert_eq!(result.total_tokens, 30);
 }
 
-// ============================================================================
-// test_add_usage_both_present
-// ============================================================================
-
 #[test]
 fn test_add_usage_both_present() {
     let usage1 = UsageMetadata::new(10, 20);
@@ -189,10 +140,6 @@ fn test_add_usage_both_present() {
     assert_eq!(result.output_tokens, 30);
     assert_eq!(result.total_tokens, 45);
 }
-
-// ============================================================================
-// test_add_usage_with_details
-// ============================================================================
 
 #[test]
 fn test_add_usage_with_details() {
@@ -233,10 +180,6 @@ fn test_add_usage_with_details() {
     );
 }
 
-// ============================================================================
-// test_subtract_usage_both_none
-// ============================================================================
-
 #[test]
 fn test_subtract_usage_both_none() {
     let result = subtract_usage(None, None);
@@ -244,10 +187,6 @@ fn test_subtract_usage_both_none() {
     assert_eq!(result.output_tokens, 0);
     assert_eq!(result.total_tokens, 0);
 }
-
-// ============================================================================
-// test_subtract_usage_one_none
-// ============================================================================
 
 #[test]
 fn test_subtract_usage_one_none() {
@@ -257,10 +196,6 @@ fn test_subtract_usage_one_none() {
     assert_eq!(result.output_tokens, 20);
     assert_eq!(result.total_tokens, 30);
 }
-
-// ============================================================================
-// test_subtract_usage_both_present
-// ============================================================================
 
 #[test]
 fn test_subtract_usage_both_present() {
@@ -272,29 +207,19 @@ fn test_subtract_usage_both_present() {
     assert_eq!(result.total_tokens, 15);
 }
 
-// ============================================================================
-// test_subtract_usage_with_negative_result
-// ============================================================================
-
 #[test]
 fn test_subtract_usage_with_negative_result() {
     let usage1 = UsageMetadata::new(5, 10);
     let usage2 = UsageMetadata::new(10, 20);
     let result = subtract_usage(Some(&usage1), Some(&usage2));
-    // Results should be floored at 0
     assert_eq!(result.input_tokens, 0);
     assert_eq!(result.output_tokens, 0);
     assert_eq!(result.total_tokens, 0);
 }
 
-// ============================================================================
-// test_add_ai_message_chunks_usage
-// ============================================================================
-
 #[test]
 fn test_add_ai_message_chunks_usage() {
     let chunk1 = AIMessageChunk::builder().content("").build();
-    // chunk1 has no usage_metadata
 
     let chunk2 = AIMessageChunk::builder()
         .content("")
@@ -338,13 +263,8 @@ fn test_add_ai_message_chunks_usage() {
     );
 }
 
-// ============================================================================
-// test_init_tool_calls
-// ============================================================================
-
 #[test]
 fn test_init_tool_calls() {
-    // Test we can create AIMessage with tool_calls (Python test adds "type" key on init)
     let msg = AIMessage::builder()
         .content("")
         .tool_calls(vec![tool_call(
@@ -354,17 +274,11 @@ fn test_init_tool_calls() {
         )])
         .build();
     assert_eq!(msg.tool_calls.len(), 1);
-    // In Rust, tool_call helper creates a ToolCall struct which has consistent type
     assert_eq!(msg.tool_calls[0].name, "foo");
 }
 
-// ============================================================================
-// test_content_blocks
-// ============================================================================
-
 #[test]
 fn test_content_blocks() {
-    // Test AIMessage with tool_calls
     let message = AIMessage::builder()
         .content("")
         .tool_calls(vec![tool_call(
@@ -376,7 +290,6 @@ fn test_content_blocks() {
     assert_eq!(message.tool_calls.len(), 1);
     assert_eq!(message.content, "");
 
-    // Test AIMessage with content and tool_calls
     let message2 = AIMessage::builder()
         .content("foo")
         .tool_calls(vec![tool_call(
@@ -388,7 +301,6 @@ fn test_content_blocks() {
     assert_eq!(message2.content, "foo");
     assert_eq!(message2.tool_calls.len(), 1);
 
-    // Test AIMessageChunk with tool_call_chunks
     let chunk = AIMessageChunk::builder()
         .content("")
         .tool_call_chunks(vec![tool_call_chunk(
@@ -401,7 +313,6 @@ fn test_content_blocks() {
     assert_eq!(chunk.tool_call_chunks.len(), 1);
     assert_eq!(chunk.content, "");
 
-    // Test merging tool call chunks
     let chunk_1 = AIMessageChunk::builder()
         .content("")
         .tool_call_chunks(vec![tool_call_chunk(
@@ -428,18 +339,11 @@ fn test_content_blocks() {
     let merged = add_ai_message_chunks(chunk_1, vec![chunk_2, chunk_3]);
     assert_eq!(merged.content, "");
 
-    // With chunk_position=Last, tool_call_chunks should be parsed into tool_calls
     assert!(!merged.tool_calls.is_empty() || !merged.tool_call_chunks.is_empty());
 }
 
-// ============================================================================
-// test_content_blocks_reasoning_extraction
-// ============================================================================
-
 #[test]
 fn test_content_blocks_reasoning_extraction() {
-    // Test best-effort reasoning extraction from `additional_kwargs`
-    // Python test adds reasoning_content to additional_kwargs
     let mut additional_kwargs = std::collections::HashMap::new();
     additional_kwargs.insert(
         "reasoning_content".to_string(),
@@ -452,8 +356,6 @@ fn test_content_blocks_reasoning_extraction() {
         .build();
 
     assert_eq!(message.content, "The answer is 42.");
-    // In Python, content_blocks property extracts reasoning from additional_kwargs
-    // For now, we verify the additional_kwargs is set correctly
     assert!(message.additional_kwargs.contains_key("reasoning_content"));
     assert_eq!(
         message
@@ -465,7 +367,6 @@ fn test_content_blocks_reasoning_extraction() {
         "Let me think about this problem..."
     );
 
-    // Test no reasoning extraction when no reasoning content
     let mut additional_kwargs2 = std::collections::HashMap::new();
     additional_kwargs2.insert("other_field".to_string(), json!("some value"));
 
@@ -476,10 +377,6 @@ fn test_content_blocks_reasoning_extraction() {
 
     assert!(!message2.additional_kwargs.contains_key("reasoning_content"));
 }
-
-// ============================================================================
-// Additional tests for AIMessage/AIMessageChunk
-// ============================================================================
 
 #[test]
 fn test_ai_message_basic() {
@@ -572,7 +469,6 @@ fn test_ai_message_chunk_to_message() {
 
 #[test]
 fn test_ai_message_chunk_id_priority() {
-    // Provider-assigned ID should take priority over lc_* IDs
     let chunk1 = AIMessageChunk::builder()
         .content("")
         .id("lc_auto123".to_string())
@@ -592,7 +488,6 @@ fn test_ai_message_chunk_id_priority() {
 
 #[test]
 fn test_ai_message_chunk_lc_run_priority() {
-    // lc_run-* should take priority over lc_* (auto-generated)
     let chunk1 = AIMessageChunk::builder()
         .content("")
         .id("lc_auto123".to_string())
@@ -608,7 +503,6 @@ fn test_ai_message_chunk_lc_run_priority() {
 
 #[test]
 fn test_ai_message_chunk_init_tool_calls() {
-    // Test that tool_call_chunks are parsed into tool_calls when chunk_position is Last
     let mut chunk = AIMessageChunk::builder()
         .content("")
         .tool_call_chunks(vec![tool_call_chunk(
@@ -628,7 +522,6 @@ fn test_ai_message_chunk_init_tool_calls() {
 
 #[test]
 fn test_ai_message_chunk_init_tool_calls_invalid_json() {
-    // Test that invalid JSON in tool_call_chunks creates invalid_tool_calls
     let mut chunk = AIMessageChunk::builder()
         .content("")
         .tool_call_chunks(vec![tool_call_chunk(
@@ -649,10 +542,6 @@ fn test_ai_message_chunk_init_tool_calls_invalid_json() {
     );
 }
 
-// ============================================================================
-// Tests ported from Python: test_ai_message_type_field
-// ============================================================================
-
 #[test]
 fn test_ai_message_type_field() {
     let msg = AIMessage::builder().content("hello").build();
@@ -664,10 +553,6 @@ fn test_ai_message_type_field() {
         .build();
     assert_eq!(msg_with_tools.message_type(), "ai");
 }
-
-// ============================================================================
-// Tests ported from Python: test_ai_message_pretty_repr_with_tool_calls
-// ============================================================================
 
 #[test]
 fn test_ai_message_pretty_repr_with_tool_calls() {
@@ -686,10 +571,6 @@ fn test_ai_message_pretty_repr_with_tool_calls() {
     assert!(result.contains("Args:"));
     assert!(result.contains("city"));
 }
-
-// ============================================================================
-// Tests ported from Python: test_ai_message_pretty_repr_with_invalid_tool_calls
-// ============================================================================
 
 #[test]
 fn test_ai_message_pretty_repr_with_invalid_tool_calls() {
@@ -711,10 +592,6 @@ fn test_ai_message_pretty_repr_with_invalid_tool_calls() {
     assert!(result.contains("not json"));
 }
 
-// ============================================================================
-// Tests ported from Python: test_ai_message_pretty_repr_with_string_args
-// ============================================================================
-
 #[test]
 fn test_ai_message_pretty_repr_with_string_args() {
     let msg = AIMessage::builder()
@@ -731,10 +608,6 @@ fn test_ai_message_pretty_repr_with_string_args() {
     assert!(result.contains("raw string args"));
 }
 
-// ============================================================================
-// Tests ported from Python: test_ai_message_init_with_usage_metadata
-// ============================================================================
-
 #[test]
 fn test_ai_message_init_with_usage_metadata() {
     let usage = UsageMetadata::new(10, 5);
@@ -748,14 +621,9 @@ fn test_ai_message_init_with_usage_metadata() {
     assert_eq!(um.output_tokens, 5);
     assert_eq!(um.total_tokens, 15);
 
-    // None by default
     let msg_no_usage = AIMessage::builder().content("hi").build();
     assert!(msg_no_usage.usage_metadata.is_none());
 }
-
-// ============================================================================
-// Tests ported from Python: test_ai_message_serdes_with_usage_metadata
-// ============================================================================
 
 #[test]
 fn test_ai_message_serdes_with_usage_metadata() {
@@ -807,10 +675,6 @@ fn test_ai_message_serdes_with_usage_metadata() {
     assert_eq!(loaded.content, "result");
 }
 
-// ============================================================================
-// Tests ported from Python: test_backwards_compat_tool_calls_from_additional_kwargs
-// ============================================================================
-
 #[test]
 fn test_backwards_compat_tool_calls_from_additional_kwargs() {
     use agent_chain_core::messages::backwards_compat_tool_calls;
@@ -840,10 +704,6 @@ fn test_backwards_compat_tool_calls_from_additional_kwargs() {
     assert_eq!(tool_calls[0].call_type, Some("tool_call".to_string()));
     assert!(invalid_tool_calls.is_empty());
 }
-
-// ============================================================================
-// Tests ported from Python: test_backwards_compat_invalid_json_becomes_invalid_tool_calls
-// ============================================================================
 
 #[test]
 fn test_backwards_compat_invalid_json_becomes_invalid_tool_calls() {
@@ -881,25 +741,15 @@ fn test_backwards_compat_invalid_json_becomes_invalid_tool_calls() {
     );
 }
 
-// ============================================================================
-// Tests ported from Python: test_ai_message_chunk_type_field
-// ============================================================================
-
 #[test]
 fn test_ai_message_chunk_type_field() {
     let chunk = AIMessageChunk::builder().content("hi").build();
-    // In Python, AIMessageChunk.type is "AIMessageChunk".
-    // In Rust, the serialized "type" field is "AIMessageChunk".
     let serialized = serde_json::to_value(&chunk).unwrap();
     assert_eq!(
         serialized.get("type").unwrap().as_str().unwrap(),
         "AIMessageChunk"
     );
 }
-
-// ============================================================================
-// Tests ported from Python: test_ai_message_chunk_chunk_position_field
-// ============================================================================
 
 #[test]
 fn test_ai_message_chunk_chunk_position_field() {
@@ -913,10 +763,6 @@ fn test_ai_message_chunk_chunk_position_field() {
     assert!(chunk_none.chunk_position.is_none());
 }
 
-// ============================================================================
-// Tests ported from Python: test_init_tool_calls_populates_tool_call_chunks_from_tool_calls
-// ============================================================================
-
 #[test]
 fn test_init_tool_calls_populates_tool_call_chunks_from_tool_calls() {
     let mut chunk = AIMessageChunk::builder()
@@ -928,8 +774,6 @@ fn test_init_tool_calls_populates_tool_call_chunks_from_tool_calls() {
         )])
         .build();
 
-    // When tool_call_chunks is empty but tool_calls is set, init_tool_calls
-    // should populate tool_call_chunks from the tool_calls.
     chunk.init_tool_calls();
 
     assert_eq!(chunk.tool_call_chunks.len(), 1);
@@ -945,10 +789,6 @@ fn test_init_tool_calls_populates_tool_call_chunks_from_tool_calls() {
         Some("tool_call_chunk".to_string())
     );
 }
-
-// ============================================================================
-// Tests ported from Python: test_init_tool_calls_populates_tool_call_chunks_from_invalid_tool_calls
-// ============================================================================
 
 #[test]
 fn test_init_tool_calls_populates_tool_call_chunks_from_invalid_tool_calls() {
@@ -975,10 +815,6 @@ fn test_init_tool_calls_populates_tool_call_chunks_from_invalid_tool_calls() {
     );
 }
 
-// ============================================================================
-// Tests ported from Python: test_ai_message_chunk_add_with_list_of_chunks
-// ============================================================================
-
 #[test]
 fn test_ai_message_chunk_add_with_list_of_chunks() {
     let base = AIMessageChunk::builder().content("Hello").build();
@@ -990,17 +826,12 @@ fn test_ai_message_chunk_add_with_list_of_chunks() {
     assert_eq!(result.content, "Hello world!");
 }
 
-// ============================================================================
-// Tests ported from Python: test_add_ai_message_chunks_id_priority (full 3-way)
-// ============================================================================
-
 #[test]
 fn test_add_ai_message_chunks_id_priority_full() {
     let provider_id = "chatcmpl-abc123";
     let run_id = "lc_run-some-uuid";
     let auto_id = "lc_auto-generated-uuid";
 
-    // Provider-assigned wins over lc_run and lc_ auto
     let chunk_auto = AIMessageChunk::builder()
         .content("a")
         .id(auto_id.to_string())
@@ -1017,11 +848,9 @@ fn test_add_ai_message_chunks_id_priority_full() {
     let result = add_ai_message_chunks(chunk_auto.clone(), vec![chunk_run.clone(), chunk_provider]);
     assert_eq!(result.id.as_deref(), Some(provider_id));
 
-    // lc_run wins over lc_ auto
     let result2 = add_ai_message_chunks(chunk_auto.clone(), vec![chunk_run]);
     assert_eq!(result2.id.as_deref(), Some(run_id));
 
-    // Only auto IDs: first one is picked
     let chunk_auto2 = AIMessageChunk::builder()
         .content("d")
         .id("lc_other-uuid".to_string())
@@ -1029,10 +858,6 @@ fn test_add_ai_message_chunks_id_priority_full() {
     let result3 = add_ai_message_chunks(chunk_auto, vec![chunk_auto2]);
     assert_eq!(result3.id.as_deref(), Some(auto_id));
 }
-
-// ============================================================================
-// Tests ported from Python: test_add_ai_message_chunks_chunk_position_propagation
-// ============================================================================
 
 #[test]
 fn test_add_ai_message_chunks_chunk_position_propagation() {
@@ -1046,14 +871,9 @@ fn test_add_ai_message_chunks_chunk_position_propagation() {
     let result = add_ai_message_chunks(chunk1.clone(), vec![chunk2.clone(), chunk3]);
     assert_eq!(result.chunk_position, Some(ChunkPosition::Last));
 
-    // Without any 'last', result is None
     let result_no_last = add_ai_message_chunks(chunk1, vec![chunk2]);
     assert!(result_no_last.chunk_position.is_none());
 }
-
-// ============================================================================
-// Tests ported from Python: test_subtract_usage_with_details
-// ============================================================================
 
 #[test]
 fn test_subtract_usage_with_details() {
@@ -1101,10 +921,6 @@ fn test_subtract_usage_with_details() {
     );
 }
 
-// ============================================================================
-// Tests ported from Python: test_subtract_usage_right_none_returns_left
-// ============================================================================
-
 #[test]
 fn test_subtract_usage_right_none_returns_left() {
     let usage = UsageMetadata {
@@ -1129,15 +945,10 @@ fn test_subtract_usage_right_none_returns_left() {
     );
 }
 
-// ============================================================================
-// Tests ported from Python: test_ai_message_chunk_content_blocks_reasoning_from_additional_kwargs
-// ============================================================================
-
 #[test]
 fn test_ai_message_chunk_content_blocks_reasoning_from_additional_kwargs() {
     use agent_chain_core::messages::extract_reasoning_from_additional_kwargs;
 
-    // Test that reasoning is extracted from additional_kwargs
     let mut additional_kwargs = std::collections::HashMap::new();
     additional_kwargs.insert(
         "reasoning_content".to_string(),
@@ -1147,7 +958,6 @@ fn test_ai_message_chunk_content_blocks_reasoning_from_additional_kwargs() {
     let reasoning = extract_reasoning_from_additional_kwargs(&additional_kwargs);
     assert!(reasoning.is_some());
 
-    // No reasoning key -> no reasoning block
     let mut other_kwargs = std::collections::HashMap::new();
     other_kwargs.insert("something_else".to_string(), json!("value"));
 
@@ -1155,14 +965,8 @@ fn test_ai_message_chunk_content_blocks_reasoning_from_additional_kwargs() {
     assert!(no_reasoning.is_none());
 }
 
-// ============================================================================
-// Tests ported from Python: test_ai_message_chunk_content_blocks_with_output_version_v1
-// ============================================================================
-
 #[test]
 fn test_ai_message_chunk_content_blocks_with_output_version_v1() {
-    // When output_version=v1 and content is a JSON list, content_blocks
-    // should return the content as structured blocks.
     let content_list = json!([
         {"type": "text", "text": "hello"},
         {"type": "tool_call", "name": "foo", "args": {"a": 1}, "id": "tc1"}
@@ -1178,14 +982,12 @@ fn test_ai_message_chunk_content_blocks_with_output_version_v1() {
 
     let blocks = chunk.content_blocks();
     assert_eq!(blocks.len(), 2);
-    // First block should be text
     match &blocks[0] {
         agent_chain_core::messages::ContentBlock::Text(t) => {
             assert_eq!(t.text, "hello");
         }
         _ => panic!("Expected Text content block"),
     }
-    // Second block should be a tool call
     match &blocks[1] {
         agent_chain_core::messages::ContentBlock::ToolCall(tc) => {
             assert_eq!(tc.name, "foo");

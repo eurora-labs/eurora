@@ -342,7 +342,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
             extra,
         )?;
 
-        // Run start_trace and on_chat_model_start concurrently
         self.start_trace_async(&mut chat_model_run).await;
         self.on_chat_model_start_async(&chat_model_run).await;
 
@@ -414,7 +413,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
     ) -> Result<Run, TracerError> {
         let llm_run = self.complete_llm_run(response, run_id)?;
 
-        // Run on_llm_end and end_trace concurrently
         self.on_llm_end_async(&llm_run).await;
         self.end_trace_async(&llm_run).await;
 
@@ -616,8 +614,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         Ok(retrieval_run)
     }
 
-    // Async hook methods (to be overridden)
-
     /// Called when a run is created (async).
     async fn on_run_create_async(&mut self, _run: &Run) {}
 
@@ -735,7 +731,6 @@ mod tests {
     fn test_base_tracer_chain_lifecycle() {
         let mut tracer = TestBaseTracer::new();
 
-        // Start a chain
         let run = tracer.handle_chain_start(
             HashMap::new(),
             HashMap::new(),
@@ -752,7 +747,6 @@ mod tests {
         assert_eq!(run.run_type, "chain");
         assert!(tracer.run_map.contains_key(&run.id.to_string()));
 
-        // End the chain
         let run_id = run.id;
         let result = tracer.handle_chain_end(
             [("output".to_string(), Value::String("result".to_string()))]
@@ -773,7 +767,6 @@ mod tests {
     fn test_base_tracer_tool_lifecycle() {
         let mut tracer = TestBaseTracer::new();
 
-        // Start a tool
         let run = tracer.handle_tool_start(
             HashMap::new(),
             "test input",
@@ -789,7 +782,6 @@ mod tests {
         assert_eq!(run.name, "test_tool");
         assert_eq!(run.run_type, "tool");
 
-        // End the tool
         let result = tracer.handle_tool_end(Value::String("output".to_string()), run.id);
 
         assert!(result.is_ok());
@@ -799,7 +791,6 @@ mod tests {
     fn test_base_tracer_error_handling() {
         let mut tracer = TestBaseTracer::new();
 
-        // Start a chain
         let run = tracer.handle_chain_start(
             HashMap::new(),
             HashMap::new(),
@@ -812,7 +803,6 @@ mod tests {
             HashMap::new(),
         );
 
-        // Error the chain
         let error = std::io::Error::other("test error");
         let result = tracer.handle_chain_error(&error, run.id, None);
 

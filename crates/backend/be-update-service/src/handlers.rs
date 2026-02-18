@@ -3,13 +3,16 @@ use std::sync::Arc;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    response::{IntoResponse, Json, Response},
+    response::{IntoResponse, Json, Redirect, Response},
 };
 use tracing::{debug, instrument, warn};
 
 use crate::{
     service::AppState,
-    types::{ExtensionReleaseParams, ReleaseParams, UpdateParams, UpdateWithBundleTypeParams},
+    types::{
+        DownloadParams, DownloadWithBundleTypeParams, ExtensionReleaseParams, ReleaseParams,
+        UpdateParams, UpdateWithBundleTypeParams,
+    },
 };
 
 #[instrument(skip(state), fields(
@@ -128,6 +131,65 @@ pub async fn get_extension_release_handler(
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(e) => {
             warn!("Extension release request failed: {}", e);
+            e.into_response()
+        }
+    }
+}
+
+/// Redirects to a presigned S3 URL for the latest release artifact.
+/// Used by website download buttons.
+#[instrument(skip(state), fields(
+    channel = %params.channel,
+    target_arch = %params.target_arch
+))]
+pub async fn download_handler(
+    State(state): State<Arc<AppState>>,
+    Path(params): Path<DownloadParams>,
+) -> Response {
+    match state
+        .get_download_url(&params.channel, &params.target_arch, None)
+        .await
+    {
+        Ok(url) => {
+            debug!("Redirecting download for {}", params.target_arch);
+            Redirect::temporary(&url).into_response()
+        }
+        Err(e) => {
+            warn!("Download failed: {}", e);
+            e.into_response()
+        }
+    }
+}
+
+/// Redirects to a presigned S3 URL for a specific bundle type (e.g. deb, rpm, dmg).
+#[instrument(skip(state), fields(
+    channel = %params.channel,
+    target_arch = %params.target_arch,
+    bundle_type = %params.bundle_type
+))]
+pub async fn download_with_bundle_type_handler(
+    State(state): State<Arc<AppState>>,
+    Path(params): Path<DownloadWithBundleTypeParams>,
+) -> Response {
+    let bundle_type = if params.bundle_type.is_empty() || params.bundle_type == "unknown" {
+        None
+    } else {
+        Some(params.bundle_type.as_str())
+    };
+
+    match state
+        .get_download_url(&params.channel, &params.target_arch, bundle_type)
+        .await
+    {
+        Ok(url) => {
+            debug!(
+                "Redirecting download for {} ({})",
+                params.target_arch, params.bundle_type
+            );
+            Redirect::temporary(&url).into_response()
+        }
+        Err(e) => {
+            warn!("Download failed: {}", e);
             e.into_response()
         }
     }

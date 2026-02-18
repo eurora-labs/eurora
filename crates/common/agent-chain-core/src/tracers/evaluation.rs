@@ -50,8 +50,6 @@ pub trait RunEvaluator: Send + Sync {
     fn evaluate_run(&self, run: &Run) -> crate::error::Result<Vec<EvaluationResult>>;
 }
 
-// Global registry of weak references to evaluator handlers, mirroring
-// Python's `_TRACERS: weakref.WeakSet[EvaluatorCallbackHandler]`.
 static EVALUATOR_TRACERS: std::sync::LazyLock<Mutex<Vec<Weak<Mutex<EvaluatorCallbackHandler>>>>> =
     std::sync::LazyLock::new(|| Mutex::new(Vec::new()));
 
@@ -579,7 +577,6 @@ mod tests {
                 Value::String("result".to_string()),
             )])),
         );
-        // Should not panic - errors are logged
         handler.persist_run_impl(&run);
         assert!(handler.get_results().is_empty());
     }
@@ -592,7 +589,6 @@ mod tests {
 
     #[test]
     fn test_wait_for_all_evaluators() {
-        // Verify it doesn't panic when called
         wait_for_all_evaluators();
     }
 

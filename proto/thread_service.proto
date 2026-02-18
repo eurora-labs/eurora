@@ -1,14 +1,14 @@
 syntax = "proto3";
 
-package conversation_service;
+package thread_service;
 
 import "agent_chain.proto";
 import "google/protobuf/timestamp.proto";
 
-service ProtoConversationService {
-  rpc CreateConversation(CreateConversationRequest) returns (CreateConversationResponse);
-  rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
-  rpc GetConversation(GetConversationRequest) returns (GetConversationResponse);
+service ProtoThreadService {
+  rpc CreateThread(CreateThreadRequest) returns (CreateThreadResponse);
+  rpc ListThreads(ListThreadsRequest) returns (ListThreadsResponse);
+  rpc GetThread(GetThreadRequest) returns (GetThreadResponse);
 
   rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse);
   rpc AddHiddenHumanMessage(AddHiddenHumanMessageRequest) returns (AddHiddenHumanMessageResponse);
@@ -16,14 +16,14 @@ service ProtoConversationService {
   rpc AddSystemMessage(AddSystemMessageRequest) returns (AddSystemMessageResponse);
 
   rpc ChatStream(ChatStreamRequest) returns (stream ChatStreamResponse);
-  rpc GenerateConversationTitle(GenerateConversationTitleRequest) returns (GenerateConversationTitleResponse);
+  rpc GenerateThreadTitle(GenerateThreadTitleRequest) returns (GenerateThreadTitleResponse);
 }
 
-message CreateConversationRequest {
+message CreateThreadRequest {
   string title = 1;
 }
 
-message Conversation {
+message Thread {
   string id = 1;
   string user_id = 2;
   string title = 3;
@@ -31,21 +31,21 @@ message Conversation {
   google.protobuf.Timestamp updated_at = 5;
 }
 
-message CreateConversationResponse {
-  Conversation conversation = 1;
+message CreateThreadResponse {
+  Thread thread = 1;
 }
 
-message ListConversationsRequest {
+message ListThreadsRequest {
   uint32 limit = 1;
   uint32 offset = 2;
 }
 
-message ListConversationsResponse {
-  repeated Conversation conversations = 1;
+message ListThreadsResponse {
+  repeated Thread threads = 1;
 }
 
 message ChatStreamRequest {
-  string conversation_id = 1;
+  string thread_id = 1;
   string content = 2;
 }
 
@@ -55,7 +55,7 @@ message ChatStreamResponse {
 }
 
 message AddHumanMessageRequest {
-  string conversation_id = 1;
+  string thread_id = 1;
   agent_chain.ProtoHumanMessage message = 2;
 }
 
@@ -64,7 +64,7 @@ message AddHumanMessageResponse {
 }
 
 message AddHiddenHumanMessageRequest {
-  string conversation_id = 1;
+  string thread_id = 1;
   agent_chain.ProtoHumanMessage message = 2;
 }
 
@@ -73,7 +73,7 @@ message AddHiddenHumanMessageResponse {
 }
 
 message GetMessagesRequest {
-  string conversation_id = 1;
+  string thread_id = 1;
   uint32 limit = 2;
   uint32 offset = 3;
 }
@@ -82,16 +82,16 @@ message GetMessagesResponse {
   repeated agent_chain.ProtoBaseMessage messages = 1;
 }
 
-message GetConversationRequest {
-  string conversation_id = 1;
+message GetThreadRequest {
+  string thread_id = 1;
 }
 
-message GetConversationResponse {
-  Conversation conversation = 1;
+message GetThreadResponse {
+  Thread thread = 1;
 }
 
 message AddSystemMessageRequest {
-  string conversation_id = 1;
+  string thread_id = 1;
   agent_chain.ProtoSystemMessage message = 2;
 }
 
@@ -99,11 +99,11 @@ message AddSystemMessageResponse {
   agent_chain.ProtoBaseMessage message = 1;
 }
 
-message GenerateConversationTitleRequest {
-  string conversation_id = 1;
+message GenerateThreadTitleRequest {
+  string thread_id = 1;
   string content = 2;
 }
 
-message GenerateConversationTitleResponse {
-  Conversation conversation = 1;
+message GenerateThreadTitleResponse {
+  Thread thread = 1;
 }

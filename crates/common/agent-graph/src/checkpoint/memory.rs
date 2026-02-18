@@ -11,7 +11,7 @@ use serde::{Serialize, de::DeserializeOwned};
 /// In-memory checkpoint saver for persisting agent state.
 ///
 /// This checkpoint saver stores checkpoints in memory using a `HashMap`.
-/// Each thread (conversation) has its own checkpoint history.
+/// Each thread (thread) has its own checkpoint history.
 ///
 /// Note: Only use `InMemorySaver` for debugging or testing purposes.
 /// For production use cases, consider implementing a persistent store.
@@ -54,7 +54,7 @@ impl InMemorySaver {
     ///
     /// # Arguments
     ///
-    /// * `thread_id` - The thread identifier (e.g., conversation ID).
+    /// * `thread_id` - The thread identifier (e.g., thread ID).
     /// * `key` - The checkpoint key (e.g., "messages", "state").
     /// * `value` - The value to store (must implement Serialize).
     ///

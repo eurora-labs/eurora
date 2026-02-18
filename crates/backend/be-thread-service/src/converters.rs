@@ -3,7 +3,7 @@ use agent_chain::{
 };
 use be_remote_db::{Message, MessageType};
 
-use crate::{ConversationServiceError, ConversationServiceResult};
+use crate::{ThreadServiceError, ThreadServiceResult};
 
 /// Convert a database message to a BaseMessage.
 ///
@@ -12,9 +12,7 @@ use crate::{ConversationServiceError, ConversationServiceResult};
 /// - A MessageContent object: `{"Text": "..."}` or `{"Parts": [...]}` -> `MessageContent`
 ///
 /// This function handles all message types: Human, System, AI, and Tool.
-pub fn convert_db_message_to_base_message(
-    db_message: Message,
-) -> ConversationServiceResult<BaseMessage> {
+pub fn convert_db_message_to_base_message(db_message: Message) -> ThreadServiceResult<BaseMessage> {
     let id = db_message.id.to_string();
 
     match db_message.message_type {
@@ -46,7 +44,7 @@ pub fn convert_db_message_to_base_message(
         MessageType::Tool => {
             let content = parse_ai_content(&db_message.content)?;
             let tool_call_id = db_message.tool_call_id.ok_or_else(|| {
-                ConversationServiceError::Internal("Tool message missing tool_call_id".to_string())
+                ThreadServiceError::Internal("Tool message missing tool_call_id".to_string())
             })?;
             let message = ToolMessage::builder()
                 .id(id)
@@ -63,13 +61,13 @@ pub fn convert_db_message_to_base_message(
 /// Handles two formats:
 /// 1. A plain JSON string: `"hello"` -> `MessageContent::Text("hello")`
 /// 2. A serialized MessageContent: `{"Text": "..."}` or `{"Parts": [...]}`
-fn parse_message_content(content: &serde_json::Value) -> ConversationServiceResult<MessageContent> {
+fn parse_message_content(content: &serde_json::Value) -> ThreadServiceResult<MessageContent> {
     if let Some(text) = content.as_str() {
         return Ok(MessageContent::Text(text.to_string()));
     }
 
     serde_json::from_value(content.clone()).map_err(|e| {
-        ConversationServiceError::Internal(format!("Failed to parse message content: {}", e))
+        ThreadServiceError::Internal(format!("Failed to parse message content: {}", e))
     })
 }
 
@@ -79,7 +77,7 @@ fn parse_message_content(content: &serde_json::Value) -> ConversationServiceResu
 /// Handles two formats:
 /// 1. A plain JSON string: `"hello"` -> `"hello"`
 /// 2. Any other JSON value: serialized to string
-fn parse_ai_content(content: &serde_json::Value) -> ConversationServiceResult<String> {
+fn parse_ai_content(content: &serde_json::Value) -> ThreadServiceResult<String> {
     if let Some(text) = content.as_str() {
         return Ok(text.to_string());
     }
@@ -90,14 +88,12 @@ fn parse_ai_content(content: &serde_json::Value) -> ConversationServiceResult<St
 /// Parse tool calls from an optional JSON value.
 ///
 /// The database stores tool_calls as a JSON array of ToolCall objects.
-fn parse_tool_calls(
-    tool_calls: &Option<serde_json::Value>,
-) -> ConversationServiceResult<Vec<ToolCall>> {
+fn parse_tool_calls(tool_calls: &Option<serde_json::Value>) -> ThreadServiceResult<Vec<ToolCall>> {
     match tool_calls {
         None => Ok(Vec::new()),
         Some(serde_json::Value::Null) => Ok(Vec::new()),
         Some(value) => serde_json::from_value(value.clone()).map_err(|e| {
-            ConversationServiceError::Internal(format!("Failed to parse tool calls: {}", e))
+            ThreadServiceError::Internal(format!("Failed to parse tool calls: {}", e))
         }),
     }
 }

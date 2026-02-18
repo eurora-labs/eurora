@@ -8,10 +8,6 @@ use agent_chain_core::messages::{
     MessageContent, SystemMessageChunk, TextContentBlock,
 };
 
-// ============================================================================
-// TestHumanMessage
-// ============================================================================
-
 #[test]
 fn test_init_basic() {
     let msg = HumanMessage::builder()
@@ -111,10 +107,6 @@ fn test_empty_content() {
     let msg = HumanMessage::builder().content("").build();
     assert_eq!(msg.content.as_text(), "");
 }
-
-// ============================================================================
-// TestHumanMessageChunk
-// ============================================================================
 
 #[test]
 fn test_chunk_init_basic() {
@@ -276,10 +268,6 @@ fn test_chunk_sum() {
     assert_eq!(result.content.as_text(), "Hello beautiful world!");
 }
 
-// ============================================================================
-// TestHumanMessage — list / multimodal content
-// ============================================================================
-
 #[test]
 fn test_init_with_list_content() {
     let parts = vec![ContentPart::Text {
@@ -336,7 +324,6 @@ fn test_init_with_content_blocks() {
         .content("")
         .content_blocks(blocks)
         .build();
-    // When content_blocks is provided, content is Parts (not Text)
     assert!(matches!(&msg.content, MessageContent::Parts(_)));
 }
 
@@ -359,7 +346,6 @@ fn test_text_method_list_content() {
     let msg = HumanMessage::builder()
         .content(MessageContent::Parts(parts))
         .build();
-    // Rust joins text parts with spaces
     assert_eq!(msg.text(), "Part 1 Part 2");
 }
 
@@ -382,7 +368,6 @@ fn test_text_method_multimodal_content() {
     let msg = HumanMessage::builder()
         .content(MessageContent::Parts(parts))
         .build();
-    // Non-text parts are filtered out; text parts joined with spaces
     assert_eq!(msg.text(), "Hello world");
 }
 
@@ -419,14 +404,7 @@ fn test_content_blocks_multimodal() {
     let blocks = msg.content_blocks();
     assert!(blocks.len() >= 2);
     assert!(matches!(&blocks[0], ContentBlock::Text(_)));
-    // The image part may be translated to Image or NonStandard depending on
-    // how the block translator handles the legacy ContentPart::Image format.
-    // The important thing is it is preserved.
 }
-
-// ============================================================================
-// TestHumanMessage — pretty_repr
-// ============================================================================
 
 #[test]
 fn test_pretty_repr() {
@@ -455,10 +433,6 @@ fn test_pretty_repr_with_name() {
     );
 }
 
-// ============================================================================
-// TestHumanMessage — empty list content
-// ============================================================================
-
 #[test]
 fn test_empty_list_content() {
     let msg = HumanMessage::builder()
@@ -470,10 +444,6 @@ fn test_empty_list_content() {
     }
     assert_eq!(msg.text(), "");
 }
-
-// ============================================================================
-// TestHumanMessageModelDumpSnapshot (serialization snapshots)
-// ============================================================================
 
 #[test]
 fn test_model_dump_exact_keys_and_values() {
@@ -500,13 +470,8 @@ fn test_model_dump_default_values() {
     assert!(dumped["id"].is_null());
     assert_eq!(dumped["additional_kwargs"], serde_json::json!({}));
     assert_eq!(dumped["response_metadata"], serde_json::json!({}));
-    // name is skipped when None (skip_serializing_if)
     assert!(dumped.get("name").is_none() || dumped["name"].is_null());
 }
-
-// ============================================================================
-// TestHumanMessageEquality
-// ============================================================================
 
 #[test]
 fn test_same_content_messages_are_equal() {
@@ -550,10 +515,6 @@ fn test_same_content_and_metadata_are_equal() {
     assert_eq!(msg1, msg2);
 }
 
-// ============================================================================
-// TestHumanMessageContentBlocksInit
-// ============================================================================
-
 #[test]
 fn test_init_with_content_blocks_sets_content() {
     let blocks = vec![
@@ -564,7 +525,6 @@ fn test_init_with_content_blocks_sets_content() {
         .content("")
         .content_blocks(blocks)
         .build();
-    // content should be Parts (from the content_blocks parameter)
     assert!(matches!(&msg.content, MessageContent::Parts(_)));
 }
 
@@ -579,15 +539,8 @@ fn test_content_blocks_roundtrip() {
         .content_blocks(blocks)
         .build();
     let result_blocks = msg.content_blocks();
-    // The content_blocks() method should produce text blocks that contain
-    // the original text values (possibly nested within non_standard wrappers
-    // depending on serialization).
     assert!(result_blocks.len() >= 2);
 }
-
-// ============================================================================
-// TestHumanMessageChunk — list content addition
-// ============================================================================
 
 #[test]
 fn test_chunk_add_with_list_content() {
@@ -604,7 +557,6 @@ fn test_chunk_add_with_list_content() {
     let result = chunk1 + chunk2;
     match &result.content {
         MessageContent::Parts(parts) => {
-            // Parts are appended (not merged) when there is no index key
             assert_eq!(parts.len(), 2);
             match &parts[0] {
                 ContentPart::Text { text } => assert_eq!(text, "Hello"),
@@ -627,7 +579,6 @@ fn test_chunk_add_list_of_chunks() {
         .build();
     let chunk2 = HumanMessageChunk::builder().content("b").build();
     let chunk3 = HumanMessageChunk::builder().content("c").build();
-    // Equivalent to Python's `chunk1 + [chunk2, chunk3]` using fold
     let result = vec![chunk2, chunk3]
         .into_iter()
         .fold(chunk1, |acc, c| acc + c);
@@ -635,14 +586,8 @@ fn test_chunk_add_list_of_chunks() {
     assert_eq!(result.id, Some("1".to_string()));
 }
 
-// ============================================================================
-// TestHumanMessageChunk — content_blocks property
-// ============================================================================
-
 #[test]
 fn test_chunk_content_blocks_property() {
-    // HumanMessageChunk doesn't have content_blocks() directly, but we can
-    // convert to HumanMessage and test content_blocks there
     let chunk = HumanMessageChunk::builder().content("Hello").build();
     let msg: HumanMessage = chunk.into();
     let blocks = msg.content_blocks();
@@ -678,10 +623,6 @@ fn test_chunk_content_blocks_multimodal() {
     assert!(matches!(&blocks[0], ContentBlock::Text(_)));
 }
 
-// ============================================================================
-// TestHumanMessageChunkContentBlocksEmpty
-// ============================================================================
-
 #[test]
 fn test_chunk_content_blocks_empty_string() {
     let chunk = HumanMessageChunk::builder().content("").build();
@@ -700,10 +641,6 @@ fn test_chunk_content_blocks_empty_list() {
     assert!(blocks.is_empty());
 }
 
-// ============================================================================
-// TestHumanMessageChunk — list content with index-based merging
-// ============================================================================
-
 #[test]
 fn test_chunk_add_with_list_content_with_index() {
     let chunk1 = HumanMessageChunk::builder()
@@ -719,16 +656,12 @@ fn test_chunk_add_with_list_content_with_index() {
     let result = chunk1 + chunk2;
     match &result.content {
         MessageContent::Parts(parts) => {
-            // Items with same 'index' key are merged into a single part
             assert_eq!(
                 parts.len(),
                 1,
                 "expected 1 merged part, got {}",
                 parts.len()
             );
-            // The merge produces {"type":"text","text":"Hello world","index":0}.
-            // When deserialized back to ContentPart, this matches the Text variant
-            // (the index field is a streaming artifact consumed during merging).
             match &parts[0] {
                 ContentPart::Text { text } => assert_eq!(text, "Hello world"),
                 ContentPart::Other(v) => assert_eq!(v["text"], "Hello world"),
@@ -738,10 +671,6 @@ fn test_chunk_add_with_list_content_with_index() {
         other => panic!("expected Parts content, got {:?}", other),
     }
 }
-
-// ============================================================================
-// TestHumanMessageChunk — cross-type chunk addition
-// ============================================================================
 
 #[test]
 fn test_chunk_add_different_chunk_type() {
@@ -757,10 +686,6 @@ fn test_chunk_add_different_chunk_type() {
     );
     assert_eq!(result.content.as_text(), "Hello world");
 }
-
-// ============================================================================
-// TestHumanMessageSerializableNamespace
-// ============================================================================
 
 #[test]
 fn test_is_lc_serializable() {

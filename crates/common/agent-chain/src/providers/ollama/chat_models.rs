@@ -480,7 +480,6 @@ impl ChatOllama {
     /// Pre-processes v1-format AIMessages by converting their content blocks
     /// via `convert_from_v1_to_ollama`.
     fn format_messages(&self, messages: &[BaseMessage]) -> Result<Vec<serde_json::Value>> {
-        // Pre-process: handle v1-format AIMessages
         let messages: Vec<std::borrow::Cow<'_, BaseMessage>> = messages
             .iter()
             .map(|msg| {
@@ -1095,8 +1094,6 @@ impl ChatOllama {
 
         let generation_info = final_chunk.generation_info.clone();
 
-        // Extract fields from the aggregated chunk message to build the final AIMessage,
-        // matching Python's pattern of constructing AIMessage from final_chunk fields.
         let (content, usage_metadata, tool_calls, chunk_additional_kwargs) =
             match &final_chunk.message {
                 BaseMessage::AI(ai) => (
@@ -1181,8 +1178,6 @@ impl ChatOllama {
 
                 let is_done = stream_resp.done.unwrap_or(false);
 
-                // Skip responses with done_reason='load' and empty content.
-                // These indicate the model was loaded but no actual generation occurred.
                 if is_done
                     && stream_resp.done_reason.as_deref() == Some("load")
                     && content.trim().is_empty()
@@ -1240,10 +1235,6 @@ impl ChatOllama {
     }
 }
 
-// ============================================================================
-// Ollama-specific stream chunk (carries metadata beyond ChatChunk)
-// ============================================================================
-
 /// A streaming chunk from Ollama that carries both the standard `ChatChunk`
 /// and Ollama-specific metadata like reasoning content and generation info.
 struct OllamaStreamChunk {
@@ -1251,10 +1242,6 @@ struct OllamaStreamChunk {
     reasoning_content: Option<String>,
     generation_info: Option<HashMap<String, serde_json::Value>>,
 }
-
-// ============================================================================
-// Ollama API response structures
-// ============================================================================
 
 /// Ollama API response structure.
 #[derive(Debug, Deserialize)]
@@ -1301,10 +1288,6 @@ struct OllamaFunction {
     name: String,
     arguments: Option<serde_json::Value>,
 }
-
-// ============================================================================
-// Helper functions
-// ============================================================================
 
 /// Convert a LangChain ToolCall to OpenAI tool call format.
 fn lc_tool_call_to_openai_tool_call(tc: &ToolCall) -> serde_json::Value {
@@ -1360,7 +1343,6 @@ fn parse_tool_call_arguments(
         serde_json::Value::Object(map) => {
             let mut parsed = serde_json::Map::new();
             for (key, value) in map {
-                // Filter out metadata fields like 'functionName' that echo function name
                 if key == "functionName"
                     && let serde_json::Value::String(v) = value
                     && v == function_name
@@ -1369,7 +1351,6 @@ fn parse_tool_call_arguments(
                 }
                 match value {
                     serde_json::Value::String(s) => {
-                        // Try to parse string values that might be JSON
                         if let Ok(parsed_value) = serde_json::from_str::<serde_json::Value>(s)
                             && (parsed_value.is_object() || parsed_value.is_array())
                         {
@@ -1396,13 +1377,11 @@ fn get_image_from_data_content_block(block: &serde_json::Value) -> Result<String
     let block_type = block.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
     if block_type == "image" {
-        // v0 style: source_type == "base64"
         if block.get("source_type").and_then(|s| s.as_str()) == Some("base64")
             && let Some(data) = block.get("data").and_then(|d| d.as_str())
         {
             return Ok(data.to_string());
         }
-        // v1 content blocks
         if let Some(base64_data) = block.get("base64").and_then(|b| b.as_str()) {
             return Ok(base64_data.to_string());
         }
@@ -1449,17 +1428,12 @@ fn extract_content_and_images(content: &MessageContent) -> (String, Vec<String>)
                                 }
                             }
                             Some("image") => {
-                                // Handle v1 data content blocks
                                 if let Ok(image_data) = get_image_from_data_content_block(value) {
                                     images.push(image_data);
                                 }
                             }
-                            Some("tool_use") => {
-                                // Skip tool_use blocks (matching Python)
-                            }
-                            _ => {
-                                // Skip unknown types
-                            }
+                            Some("tool_use") => {}
+                            _ => {}
                         }
                     }
                 }
@@ -1468,7 +1442,6 @@ fn extract_content_and_images(content: &MessageContent) -> (String, Vec<String>)
             let combined_content = if text_parts.is_empty() {
                 String::new()
             } else {
-                // Match Python's `content += f"\n{part}"` which prepends newline to each part
                 let mut result = String::new();
                 for part in &text_parts {
                     result.push('\n');
@@ -1486,7 +1459,6 @@ fn extract_image_data(source: &ImageSource) -> Option<String> {
     match source {
         ImageSource::Base64 { data, .. } => Some(data.clone()),
         ImageSource::Url { url } => {
-            // Support data:image/jpeg;base64,<data> format and plain base64 strings
             if let Some((_prefix, data)) = url.split_once(',') {
                 Some(data.to_string())
             } else {
@@ -1508,17 +1480,12 @@ fn extract_image_url_data(value: &serde_json::Value) -> Option<String> {
         return None;
     };
 
-    // Strip data URI prefix
     if let Some((_prefix, data)) = url.split_once(',') {
         Some(data.to_string())
     } else {
         Some(url)
     }
 }
-
-// ============================================================================
-// BoundChatOllama - Chat model with bound tools
-// ============================================================================
 
 /// A ChatOllama instance with bound tools.
 ///
@@ -1775,11 +1742,8 @@ mod tests {
 
     #[test]
     fn test_get_base_url_default() {
-        // With no base_url set, should fall back to DEFAULT_API_BASE
-        // (assuming OLLAMA_HOST env var is not set in test environment)
         let model = ChatOllama::new("llama3.1");
         let url = model.get_base_url();
-        // Just verify it returns some URL (can't control env in tests)
         assert!(url.starts_with("http"));
     }
 

@@ -103,7 +103,6 @@ impl BetaParams {
 /// );
 /// ```
 pub fn warn_beta(params: BetaParams, caller_module: &str) {
-    // Skip if caller is internal
     if is_caller_internal(caller_module) {
         return;
     }

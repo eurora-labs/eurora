@@ -195,7 +195,7 @@ impl ChatAnthropic {
         messages: &[BaseMessage],
     ) -> (Option<String>, Vec<serde_json::Value>) {
         let mut system_message = None;
-        let mut conversation = Vec::new();
+        let mut thread = Vec::new();
 
         for msg in messages {
             match msg {
@@ -203,7 +203,7 @@ impl ChatAnthropic {
                     system_message = Some(m.content.as_text().to_string());
                 }
                 BaseMessage::Human(m) => {
-                    conversation.push(serde_json::json!({
+                    thread.push(serde_json::json!({
                         "role": "user",
                         "content": m.content.as_text()
                     }));
@@ -227,13 +227,13 @@ impl ChatAnthropic {
                         }));
                     }
 
-                    conversation.push(serde_json::json!({
+                    thread.push(serde_json::json!({
                         "role": "assistant",
                         "content": content
                     }));
                 }
                 BaseMessage::Tool(m) => {
-                    conversation.push(serde_json::json!({
+                    thread.push(serde_json::json!({
                         "role": "user",
                         "content": [{
                             "type": "tool_result",
@@ -243,20 +243,18 @@ impl ChatAnthropic {
                     }));
                 }
                 BaseMessage::Chat(m) => {
-                    // Map chat messages based on role
                     let role = match m.role.as_str() {
                         "user" | "human" => "user",
                         "assistant" | "ai" => "assistant",
                         _ => "user", // Default to user for unknown roles
                     };
-                    conversation.push(serde_json::json!({
+                    thread.push(serde_json::json!({
                         "role": role,
                         "content": m.content
                     }));
                 }
                 BaseMessage::Function(m) => {
-                    // Function messages are legacy, treat like tool results
-                    conversation.push(serde_json::json!({
+                    thread.push(serde_json::json!({
                         "role": "user",
                         "content": [{
                             "type": "tool_result",
@@ -266,13 +264,12 @@ impl ChatAnthropic {
                     }));
                 }
                 BaseMessage::Remove(_) => {
-                    // RemoveMessage is used for message management, not sent to API
                     continue;
                 }
             }
         }
 
-        (system_message, conversation)
+        (system_message, thread)
     }
 
     /// Build the request payload.
@@ -282,12 +279,12 @@ impl ChatAnthropic {
         stop: Option<Vec<String>>,
         tools: Option<&[serde_json::Value]>,
     ) -> serde_json::Value {
-        let (system_message, conversation_messages) = self.format_messages(messages);
+        let (system_message, thread_messages) = self.format_messages(messages);
 
         let mut payload = serde_json::json!({
             "model": self.model,
             "max_tokens": self.max_tokens,
-            "messages": conversation_messages
+            "messages": thread_messages
         });
 
         if let Some(system) = system_message {
@@ -317,7 +314,6 @@ impl ChatAnthropic {
             payload["tools"] = serde_json::Value::Array(tools.to_vec());
         }
 
-        // Add any additional model kwargs
         if let serde_json::Value::Object(ref mut obj) = payload {
             for (k, v) in &self.model_kwargs {
                 obj.insert(k.clone(), v.clone());
@@ -553,7 +549,6 @@ impl ChatAnthropic {
         tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,
     ) -> Result<AIMessage> {
-        // Convert tool definitions to Anthropic format
         let anthropic_tools: Vec<serde_json::Value> = tools
             .iter()
             .map(|t| {
@@ -572,19 +567,14 @@ impl ChatAnthropic {
         };
         let mut payload = self.build_request_payload(&messages, stop, tools_option);
 
-        // Add tool_choice if specified
         if let Some(choice) = tool_choice {
             match choice {
-                ToolChoice::String(s) => {
-                    match s.as_str() {
-                        "auto" => payload["tool_choice"] = serde_json::json!({"type": "auto"}),
-                        "any" => payload["tool_choice"] = serde_json::json!({"type": "any"}),
-                        "none" => {
-                            // Don't send tool_choice for None
-                        }
-                        _ => payload["tool_choice"] = serde_json::json!({"type": "auto"}),
-                    }
-                }
+                ToolChoice::String(s) => match s.as_str() {
+                    "auto" => payload["tool_choice"] = serde_json::json!({"type": "auto"}),
+                    "any" => payload["tool_choice"] = serde_json::json!({"type": "any"}),
+                    "none" => {}
+                    _ => payload["tool_choice"] = serde_json::json!({"type": "auto"}),
+                },
                 ToolChoice::Structured { choice_type, name } => {
                     if (choice_type == "tool" || choice_type == "function")
                         && let Some(tool_name) = name
@@ -616,7 +606,6 @@ impl ChatAnthropic {
         let client = self.build_client();
         let mut payload = self.build_request_payload(&messages, stop, None);
 
-        // Enable streaming
         payload["stream"] = serde_json::json!(true);
 
         let response = client
@@ -635,7 +624,6 @@ impl ChatAnthropic {
             return Err(Error::api(status, error_text));
         }
 
-        // Create a stream from the SSE response
         let stream = async_stream::stream! {
             let mut bytes_stream = response.bytes_stream();
             let mut buffer = String::new();
@@ -649,12 +637,10 @@ impl ChatAnthropic {
                     Ok(bytes) => {
                         buffer.push_str(&String::from_utf8_lossy(&bytes));
 
-                        // Process complete SSE events
                         while let Some(event_end) = buffer.find("\n\n") {
                             let event_data = buffer[..event_end].to_string();
                             buffer = buffer[event_end + 2..].to_string();
 
-                            // Parse SSE event
                             for line in event_data.lines() {
                                 if let Some(data) = line.strip_prefix("data: ") {
                                     if data == "[DONE]" {

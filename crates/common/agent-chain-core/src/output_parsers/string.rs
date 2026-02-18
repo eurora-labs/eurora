@@ -119,7 +119,6 @@ impl<'de> serde::Deserialize<'de> for StrOutputParser {
     where
         D: serde::Deserializer<'de>,
     {
-        // Accept any map/struct (including empty) and return a default instance
         let _ = serde_json::Value::deserialize(deserializer)?;
         Ok(Self::new())
     }

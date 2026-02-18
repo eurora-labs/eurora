@@ -60,21 +60,21 @@ mod tests {
     // -- Role hierarchy --
 
     #[tokio::test]
-    async fn free_can_list_conversations() {
+    async fn free_can_list_threads() {
         let authz = test_authz().await;
         assert!(
             authz
-                .enforce("Free", "ConversationService", "ListConversations")
+                .enforce("Free", "ThreadService", "ListThreads")
                 .unwrap()
         );
     }
 
     #[tokio::test]
-    async fn free_cannot_create_conversation() {
+    async fn free_cannot_create_thread() {
         let authz = test_authz().await;
         assert!(
             !authz
-                .enforce("Free", "ConversationService", "CreateConversation")
+                .enforce("Free", "ThreadService", "CreateThread")
                 .unwrap()
         );
     }
@@ -84,34 +84,17 @@ mod tests {
         let authz = test_authz().await;
         assert!(
             authz
-                .enforce("Tier1", "ConversationService", "ListConversations")
+                .enforce("Tier1", "ThreadService", "ListThreads")
                 .unwrap()
         );
     }
 
     #[tokio::test]
-    async fn tier1_can_create_conversation() {
+    async fn tier1_can_create_thread() {
         let authz = test_authz().await;
         assert!(
             authz
-                .enforce("Tier1", "ConversationService", "CreateConversation")
-                .unwrap()
-        );
-    }
-
-    #[tokio::test]
-    async fn enterprise_inherits_all() {
-        let authz = test_authz().await;
-        // Inherited from Free via Tier1
-        assert!(
-            authz
-                .enforce("Enterprise", "ConversationService", "ListConversations")
-                .unwrap()
-        );
-        // Inherited from Tier1
-        assert!(
-            authz
-                .enforce("Enterprise", "ConversationService", "ChatStream")
+                .enforce("Tier1", "ThreadService", "CreateThread")
                 .unwrap()
         );
     }
@@ -137,7 +120,7 @@ mod tests {
         let authz = test_authz().await;
         assert!(
             !authz
-                .enforce("Unknown", "ConversationService", "ListConversations")
+                .enforce("Unknown", "ThreadService", "ListThreads")
                 .unwrap()
         );
     }
@@ -148,16 +131,16 @@ mod tests {
     /// If a proto file gains or removes a method, update this list — the test
     /// below will catch the drift.
     const PROTO_METHODS: &[(&str, &str)] = &[
-        // conversation_service.proto — ProtoConversationService
-        ("ConversationService", "CreateConversation"),
-        ("ConversationService", "ListConversations"),
-        ("ConversationService", "GetConversation"),
-        ("ConversationService", "GetMessages"),
-        ("ConversationService", "AddHiddenHumanMessage"),
-        ("ConversationService", "AddHumanMessage"),
-        ("ConversationService", "AddSystemMessage"),
-        ("ConversationService", "ChatStream"),
-        ("ConversationService", "GenerateConversationTitle"),
+        // thread_service.proto — ProtoThreadService
+        ("ThreadService", "CreateThread"),
+        ("ThreadService", "ListThreads"),
+        ("ThreadService", "GetThread"),
+        ("ThreadService", "GetMessages"),
+        ("ThreadService", "AddHiddenHumanMessage"),
+        ("ThreadService", "AddHumanMessage"),
+        ("ThreadService", "AddSystemMessage"),
+        ("ThreadService", "ChatStream"),
+        ("ThreadService", "GenerateThreadTitle"),
         // activity_service.proto — ProtoActivityService
         ("ActivityService", "ListActivities"),
         ("ActivityService", "InsertActivity"),

@@ -191,12 +191,10 @@ impl ToolManagerMixin for FileCallbackHandler {
         observation_prefix: Option<&str>,
         llm_prefix: Option<&str>,
     ) {
-        // Write observation prefix if provided
         if let Some(prefix) = observation_prefix {
             self.write(&format!("\n{}", prefix), "");
         }
         self.write(output, "");
-        // Write LLM prefix if provided
         if let Some(prefix) = llm_prefix {
             self.write(&format!("\n{}", prefix), "");
         }
@@ -316,23 +314,19 @@ mod tests {
         let dir = tempdir().unwrap();
         let file_path = dir.path().join("test_mode.txt");
 
-        // Test write mode
         let handler = FileCallbackHandler::with_mode(&file_path, "w");
         assert!(handler.is_ok());
         let handler = handler.unwrap();
         assert_eq!(handler.mode(), "w");
 
-        // Test append mode
         let handler = FileCallbackHandler::with_mode(&file_path, "a");
         assert!(handler.is_ok());
         let handler = handler.unwrap();
         assert_eq!(handler.mode(), "a");
 
-        // Test exclusive create mode (should fail since file exists)
         let handler = FileCallbackHandler::with_mode(&file_path, "x");
         assert!(handler.is_err());
 
-        // Test invalid mode
         let handler = FileCallbackHandler::with_mode(&file_path, "r");
         assert!(handler.is_err());
     }
@@ -393,13 +387,10 @@ mod tests {
         let handler = FileCallbackHandler::new(&file_path, false).unwrap();
         handler.write("Before close", "\n");
 
-        // Close explicitly
         handler.close();
 
-        // Writing after close should be a no-op (file is None)
         handler.write("After close", "\n");
 
-        // Close is safe to call multiple times
         handler.close();
 
         let content = fs::read_to_string(&file_path).unwrap();
@@ -440,7 +431,6 @@ mod tests {
             let handler = FileCallbackHandler::new(&file_path, false).unwrap();
             let run_id = Uuid::new_v4();
 
-            // Test on_agent_action
             let action = serde_json::json!({
                 "log": "Agent thinking...",
                 "tool": "search",
@@ -448,7 +438,6 @@ mod tests {
             });
             handler.on_agent_action(&action, run_id, None, None);
 
-            // Test on_agent_finish
             let finish = serde_json::json!({
                 "log": "Agent finished.",
                 "return_values": {"output": "result"}
@@ -472,10 +461,8 @@ mod tests {
             let handler = FileCallbackHandler::new(&file_path, false).unwrap();
             let run_id = Uuid::new_v4();
 
-            // Test on_tool_end
             handler.on_tool_end("Tool output here", run_id, None, None, None, None);
 
-            // Test on_text
             handler.on_text("Some text output", run_id, None, None, "");
 
             handler.flush().unwrap();

@@ -87,18 +87,15 @@ impl fmt::Display for UsageMetadataCallbackHandler {
 
 impl LLMManagerMixin for UsageMetadataCallbackHandler {
     fn on_llm_end(&self, response: &ChatResult, _run_id: Uuid, _parent_run_id: Option<Uuid>) {
-        // Extract usage metadata from the first generation's message
         let first_generation = response.generations.first();
 
         let (usage_metadata, model_name) = match first_generation {
             Some(generation) => {
-                // Try to get usage from the AIMessage
                 let usage = match &generation.message {
                     BaseMessage::AI(ai_msg) => ai_msg.usage_metadata.clone(),
                     _ => None,
                 };
 
-                // Get model name from response_metadata
                 let model = generation
                     .message
                     .response_metadata()
@@ -111,7 +108,6 @@ impl LLMManagerMixin for UsageMetadataCallbackHandler {
             None => (None, None),
         };
 
-        // Update shared state behind lock
         if let (Some(usage), Some(model)) = (usage_metadata, model_name) {
             let mut guard = self
                 .usage_metadata
@@ -346,7 +342,6 @@ mod tests {
 
         handler1.on_llm_end(&result, Uuid::new_v4(), None);
 
-        // Both handlers should see the same usage data
         assert_eq!(handler1.usage_metadata(), handler2.usage_metadata());
     }
 }

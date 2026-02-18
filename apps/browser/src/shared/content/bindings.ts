@@ -2,26 +2,9 @@
 
 export type CancelFrame = { id: number };
 
-export type ErrorFrame = {
-	id: number;
-	code: number;
-	message: string;
-	/**
-	 * JSON string
-	 */
-	details: string | null;
-};
+export type ErrorFrame = { id: number; code: number; message: string; details: string | null };
 
-/**
- * Event doesn't have an id because it doesn't expect a response
- */
-export type EventFrame = {
-	action: string;
-	/**
-	 * JSON string
-	 */
-	payload: string | null;
-};
+export type EventFrame = { action: string; payload: string | null };
 
 export type Frame = { kind: Kind | null };
 
@@ -78,20 +61,6 @@ export type NativeYoutubeSnapshot = {
 
 export type RegisterFrame = { host_pid: number; browser_pid: number };
 
-export type RequestFrame = {
-	id: number;
-	action: string;
-	/**
-	 * JSON string
-	 */
-	payload: string | null;
-};
+export type RequestFrame = { id: number; action: string; payload: string | null };
 
-export type ResponseFrame = {
-	id: number;
-	action: string;
-	/**
-	 * JSON string
-	 */
-	payload: string | null;
-};
+export type ResponseFrame = { id: number; action: string; payload: string | null };
