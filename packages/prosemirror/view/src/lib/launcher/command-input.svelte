@@ -34,7 +34,7 @@
 	style="min-height: inherit"
 >
 	<div class="flex items-center justify-center max-h-25">
-		<SearchIcon class="opacity-30 shrink-0 text-white/80" size={iconSize} />
+		<SearchIcon class="shrink-0 text-muted-foreground" size={iconSize} />
 	</div>
 	<div class="mr-2 w-2 shrink-0"></div>
 	<div

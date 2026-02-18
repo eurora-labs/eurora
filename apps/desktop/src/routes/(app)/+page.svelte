@@ -172,9 +172,14 @@
 		</ScrollArea>
 	{/if}
 
-	<div class="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none">
+	<div
+		class={[
+			'absolute left-0 right-0 flex justify-center pointer-events-none transition-all duration-300',
+			messages.length > 0 ? 'bottom-4' : 'top-1/2 -translate-y-1/2',
+		]}
+	>
 		<Launcher.Root
-			class="pointer-events-auto h-fit rounded-2xl shadow-none flex flex-col p-4 w-[90%] bg-gray-700"
+			class="pointer-events-auto h-fit rounded-2xl shadow-none flex flex-col p-4 w-[90%] bg-card text-card-foreground border border-border"
 		>
 			<Launcher.Input
 				placeholder="What can I help you with?"

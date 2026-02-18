@@ -215,31 +215,33 @@
 					</DropdownMenu.Item>
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>
-			<DropdownMenu.Root>
-				<DropdownMenu.Trigger>
-					{#snippet child({ props })}
-						<Button {...props} variant="ghost" size="icon" class="size-7 shrink-0">
-							<PowerIcon class="size-4" />
-						</Button>
-					{/snippet}
-				</DropdownMenu.Trigger>
-				<DropdownMenu.Content side="top" align="end">
-					<DropdownMenu.Item
-						onclick={() => {
-							taurpc.auth.logout().then(() => {
-								goto('/onboarding');
-							});
-						}}
-					>
-						<LogoutIcon />
-						<span>Log Out</span>
-					</DropdownMenu.Item>
-					<DropdownMenu.Item onclick={() => (quitDialogOpen = true)}>
-						<PowerIcon />
-						<span>Quit</span>
-					</DropdownMenu.Item>
-				</DropdownMenu.Content>
-			</DropdownMenu.Root>
+			{#if sidebarState?.open}
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger>
+						{#snippet child({ props })}
+							<Button {...props} variant="ghost" size="icon" class="size-7 shrink-0">
+								<PowerIcon class="size-4" />
+							</Button>
+						{/snippet}
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content side="top" align="end">
+						<DropdownMenu.Item
+							onclick={() => {
+								taurpc.auth.logout().then(() => {
+									goto('/onboarding');
+								});
+							}}
+						>
+							<LogoutIcon />
+							<span>Log Out</span>
+						</DropdownMenu.Item>
+						<DropdownMenu.Item onclick={() => (quitDialogOpen = true)}>
+							<PowerIcon />
+							<span>Quit</span>
+						</DropdownMenu.Item>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
+			{/if}
 		</div>
 	</Sidebar.Footer>
 </Sidebar.Root>
