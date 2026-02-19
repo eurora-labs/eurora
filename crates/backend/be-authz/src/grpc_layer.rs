@@ -14,7 +14,6 @@ use tracing::{debug, warn};
 use crate::CasbinAuthz;
 use crate::bypass::is_grpc_bypass;
 
-/// Tower layer that combines JWT authentication and casbin authorization for gRPC.
 #[derive(Clone)]
 pub struct GrpcAuthzLayer {
     authz: CasbinAuthz,
@@ -42,7 +41,6 @@ impl<S> Layer<S> for GrpcAuthzLayer {
     }
 }
 
-/// Tower service that enforces JWT + casbin policies on gRPC requests.
 #[derive(Clone)]
 pub struct GrpcAuthzService<S> {
     inner: S,
@@ -116,7 +114,6 @@ where
     }
 }
 
-/// Extract and validate JWT claims from the request's authorization header.
 fn extract_jwt_claims<B>(req: &Request<B>, jwt_config: &JwtConfig) -> Result<Claims, Status> {
     let auth_header = req
         .headers()
@@ -135,7 +132,6 @@ fn extract_jwt_claims<B>(req: &Request<B>, jwt_config: &JwtConfig) -> Result<Cla
     })
 }
 
-/// Parse a gRPC path `/package.ServiceName/MethodName` into `(full_service, method)`.
 fn parse_grpc_path(path: &str) -> Option<(String, String)> {
     let path = path.strip_prefix('/')?;
     let slash_idx = path.find('/')?;
@@ -147,23 +143,6 @@ fn parse_grpc_path(path: &str) -> Option<(String, String)> {
     Some((service.to_string(), method.to_string()))
 }
 
-/// Extract the short service name used for policy matching from the full gRPC
-/// service path.
-///
-/// Convention: proto services are named `Proto{Name}` (e.g.
-/// `ProtoThreadService`). This function strips the package prefix and the
-/// `Proto` prefix so the policy CSV can use the short form (`ThreadService`).
-///
-/// The bypass list in [`crate::bypass`] uses *full* qualified names (e.g.
-/// `auth_service.ProtoAuthService`) because bypass checks happen before this
-/// extraction step.
-///
-/// # Examples
-///
-/// - `thread_service.ProtoThreadService` -> `ThreadService`
-/// - `grpc.health.v1.Health` -> `Health`
-/// - `ProtoFoo` -> `Foo`
-/// - `MyService` -> `MyService`
 fn extract_service_name(full_service: &str) -> String {
     let name = full_service.rsplit('.').next().unwrap_or(full_service);
     name.strip_prefix("Proto").unwrap_or(name).to_string()

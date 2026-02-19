@@ -10,7 +10,6 @@ use tracing::{debug, warn};
 use crate::CasbinAuthz;
 use crate::bypass::is_rest_bypass;
 
-/// Shared state for the axum authz middleware.
 pub struct AuthzState {
     pub authz: CasbinAuthz,
     pub jwt_config: JwtConfig,
@@ -22,7 +21,6 @@ impl AuthzState {
     }
 }
 
-/// Axum middleware that validates JWT and enforces casbin policy on REST routes.
 pub async fn authz_middleware(
     axum::extract::State(state): axum::extract::State<Arc<AuthzState>>,
     mut req: Request,
@@ -36,9 +34,6 @@ pub async fn authz_middleware(
         return next.run(req).await;
     }
 
-    // Use the route template (e.g. "/payment/checkout") for policy matching instead
-    // of the concrete path (e.g. "/payment/subscription/sub_123"). This ensures
-    // routes with path parameters match their policy entries correctly.
     let policy_path = match req.extensions().get::<MatchedPath>() {
         Some(m) => m.as_str().to_string(),
         None => {
