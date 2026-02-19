@@ -1,8 +1,8 @@
-import Content from '$lib/components/carousel/carousel-content.svelte';
-import Item from '$lib/components/carousel/carousel-item.svelte';
-import Next from '$lib/components/carousel/carousel-next.svelte';
-import Previous from '$lib/components/carousel/carousel-previous.svelte';
-import Root from '$lib/components/carousel/carousel.svelte';
+import Root from './carousel.svelte';
+import Content from './carousel-content.svelte';
+import Item from './carousel-item.svelte';
+import Previous from './carousel-previous.svelte';
+import Next from './carousel-next.svelte';
 
 export {
 	Root,
