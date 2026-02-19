@@ -1,4 +1,4 @@
-import Root from '$lib/components/textarea/textarea.svelte';
+import Root from './textarea.svelte';
 
 export {
 	Root,

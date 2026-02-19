@@ -6,20 +6,67 @@
 </script>
 
 <script lang="ts">
-	import { ScrollArea } from '$lib/components/scroll-area/index.js';
+	import { cn } from '$lib/utils.js';
+	import { onMount, tick } from 'svelte';
 	let { class: className, children }: ChatProps = $props();
 
-	let scrollAreaRef = $state<HTMLDivElement>();
-	let bottomRef = $state<HTMLDivElement>();
+	let viewportRef = $state<HTMLDivElement>();
+	let userScrolledUp = $state(false);
+	const BOTTOM_THRESHOLD = 70;
 
-	export function scrollToBottom() {
-		bottomRef?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+	function isNearBottom(el: HTMLElement): boolean {
+		return el.scrollHeight - el.scrollTop - el.clientHeight <= BOTTOM_THRESHOLD;
+	}
+
+	onMount(() => {
+		if (!viewportRef) return;
+		const el = viewportRef;
+
+		const onWheel = (e: WheelEvent) => {
+			if (e.deltaY < 0) {
+				userScrolledUp = true;
+			}
+		};
+
+		let touchStartY = 0;
+		const onTouchStart = (e: TouchEvent) => {
+			touchStartY = e.touches[0].clientY;
+		};
+		const onTouchMove = (e: TouchEvent) => {
+			if (e.touches[0].clientY > touchStartY) {
+				userScrolledUp = true;
+			}
+		};
+
+		const onScroll = () => {
+			if (userScrolledUp && isNearBottom(el)) {
+				userScrolledUp = false;
+			}
+		};
+
+		el.addEventListener('wheel', onWheel, { passive: true });
+		el.addEventListener('touchstart', onTouchStart, { passive: true });
+		el.addEventListener('touchmove', onTouchMove, { passive: true });
+		el.addEventListener('scroll', onScroll, { passive: true });
+
+		return () => {
+			el.removeEventListener('wheel', onWheel);
+			el.removeEventListener('touchstart', onTouchStart);
+			el.removeEventListener('touchmove', onTouchMove);
+			el.removeEventListener('scroll', onScroll);
+		};
+	});
+
+	export async function scrollToBottom() {
+		if (userScrolledUp) return;
+		await tick();
+		if (!viewportRef) return;
+		viewportRef.scrollTop = viewportRef.scrollHeight;
 	}
 </script>
 
-<ScrollArea ref={scrollAreaRef} class="w-full {className}">
+<div bind:this={viewportRef} class={cn('overflow-y-auto', className)}>
 	<div class="space-y-4 p-4 pb-0 flex flex-col">
 		{@render children?.()}
 	</div>
-	<div class="h-4 w-0" bind:this={bottomRef}></div>
-</ScrollArea>
+</div>
