@@ -26,6 +26,10 @@ pub async fn authz_middleware(
     mut req: Request,
     next: Next,
 ) -> Response {
+    if req.method() == axum::http::Method::OPTIONS {
+        return next.run(req).await;
+    }
+
     let raw_path = req.uri().path().to_string();
     let method = req.method().to_string();
 
