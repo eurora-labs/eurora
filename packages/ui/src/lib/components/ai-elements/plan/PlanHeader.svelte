@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CardHeader } from '$lib/components/ui/card/index.js';
+	import { CardHeader } from '$lib/components/card/index.js';
 	import { cn } from '$lib/utils';
 	import type { PlanHeaderProps } from './types.js';
 

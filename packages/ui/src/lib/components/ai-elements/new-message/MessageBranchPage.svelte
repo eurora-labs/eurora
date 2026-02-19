@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
 	import { getMessageBranchContext } from './message-context.svelte.js';
-	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
+	import * as ButtonGroup from '$lib/components/button-group/index.js';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import type { Snippet } from 'svelte';
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
-	import { CollapsibleTrigger } from '$lib/components/ui/collapsible/index.js';
+	import { CollapsibleTrigger } from '$lib/components/collapsible/index.js';
 	import { getReasoningContext } from './reasoning-context.svelte.js';
 	import BrainIcon from '@lucide/svelte/icons/brain';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
-	import { Button } from '$lib/components/ui/button';
-	import type { ButtonProps } from '$lib/components/ui/button/index.js';
+	import { Button } from '$lib/components/button';
+	import type { ButtonProps } from '$lib/components/button/index.js';
 	import type { ChatStatus } from './attachments-context.svelte.js';
 	import SendIcon from './SendIcon.svelte';
 	import Loader2Icon from './Loader2Icon.svelte';

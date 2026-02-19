@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { Button, type ButtonProps } from '$lib/components/ui/button/index.js';
+	import { Button, type ButtonProps } from '$lib/components/button/index.js';
 	import {
 		Tooltip,
 		TooltipContent,
 		TooltipProvider,
 		TooltipTrigger,
-	} from '$lib/components/ui/tooltip/index.js';
+	} from '$lib/components/tooltip/index.js';
 	import { cn } from '$lib/utils';
 	import { type Icon as IconType } from '@lucide/svelte';
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Button, type ButtonProps } from '$lib/components/ui/button/index.js';
+	import { Button, type ButtonProps } from '$lib/components/button/index.js';
 	import { cn } from '$lib/utils';
 	import type { Snippet } from 'svelte';
 

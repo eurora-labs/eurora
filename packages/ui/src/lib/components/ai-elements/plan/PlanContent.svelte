@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { CollapsibleContent } from '$lib/components/ui/collapsible/index.js';
-	import { CardContent } from '$lib/components/ui/card/index.js';
+	import { CollapsibleContent } from '$lib/components/collapsible/index.js';
+	import { CardContent } from '$lib/components/card/index.js';
 	import type { PlanContentProps } from './types.js';
 
 	let { children, ...restProps }: PlanContentProps = $props();

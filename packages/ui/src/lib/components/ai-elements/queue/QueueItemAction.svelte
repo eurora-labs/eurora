@@ -1,7 +1,7 @@
 <script lang="ts" module>
 	import { cn, type WithElementRef } from '$lib/utils';
 	import type { Snippet } from 'svelte';
-	import type { ButtonProps } from '$lib/components/ui/button/index.js';
+	import type { ButtonProps } from '$lib/components/button/index.js';
 
 	export interface QueueItemActionProps extends Omit<ButtonProps, 'variant' | 'size'> {
 		children?: Snippet;
@@ -9,7 +9,7 @@
 </script>
 
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button/index.js';
+	import { Button } from '$lib/components/button/index.js';
 
 	let {
 		class: className,

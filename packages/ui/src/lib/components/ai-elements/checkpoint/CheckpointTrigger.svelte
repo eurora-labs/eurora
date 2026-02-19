@@ -13,13 +13,13 @@
 </script>
 
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '$lib/components/button';
 	import {
 		Tooltip,
 		TooltipContent,
 		TooltipProvider,
 		TooltipTrigger,
-	} from '$lib/components/ui/tooltip';
+	} from '$lib/components/tooltip';
 
 	let {
 		children,

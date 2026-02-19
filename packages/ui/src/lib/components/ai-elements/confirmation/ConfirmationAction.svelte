@@ -1,11 +1,11 @@
 <script lang="ts" module>
-	import type { ButtonProps } from '$lib/components/ui/button/button.svelte';
+	import type { ButtonProps } from '$lib/components/button/button.svelte';
 
 	export interface ConfirmationActionProps extends ButtonProps {}
 </script>
 
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button/index.js';
+	import { Button } from '$lib/components/button/index.js';
 	import { cn } from '$lib/utils';
 
 	let {

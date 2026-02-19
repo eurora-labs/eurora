@@ -14,7 +14,7 @@
 </script>
 
 <script lang="ts">
-	import CollapsibleContent from '$lib/components/ui/collapsible/collapsible-content.svelte';
+	import CollapsibleContent from '$lib/components/collapsible/collapsible-content.svelte';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 
 	let {

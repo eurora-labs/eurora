@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
-	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { Badge } from '$lib/components/badge/index.js';
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 

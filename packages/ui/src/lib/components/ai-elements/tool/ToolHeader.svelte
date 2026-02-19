@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { CollapsibleTrigger } from '$lib/components/ui/collapsible/index.js';
-	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { CollapsibleTrigger } from '$lib/components/collapsible/index.js';
+	import { Badge } from '$lib/components/badge/index.js';
 	import { cn } from '$lib/utils';
 	import {
 		CheckCircleIcon,

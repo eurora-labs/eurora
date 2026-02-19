@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
 	import { watch } from 'runed';
-	import { Collapsible } from '$lib/components/ui/collapsible/index.js';
+	import { Collapsible } from '$lib/components/collapsible/index.js';
 	import { ReasoningContext, setReasoningContext } from './reasoning-context.svelte';
 
 	interface Props {

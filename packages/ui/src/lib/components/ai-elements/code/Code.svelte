@@ -33,7 +33,7 @@
 </div>
 
 <style>
-	@reference '../../../../app.css';
+	@reference '../../../../styles/main.css';
 
 	/* Scoped global styles - only affect elements within .ai-code-wrapper */
 	/* Dark mode: check dark class on parent, then scope to wrapper */

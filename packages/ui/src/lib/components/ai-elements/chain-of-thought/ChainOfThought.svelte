@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
-	import { Collapsible } from '$lib/components/ui/collapsible/index.js';
+	import { Collapsible } from '$lib/components/collapsible/index.js';
 	import {
 		ChainOfThoughtContext,
 		setChainOfThoughtContext,
