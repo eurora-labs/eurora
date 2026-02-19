@@ -1,5 +1,6 @@
 use std::{net::SocketAddr, sync::Arc};
 
+use axum::http::HeaderValue;
 use be_activity_service::{ActivityService, ProtoActivityServiceServer};
 use be_asset_service::{AssetService, ProtoAssetServiceServer};
 use be_auth_core::JwtConfig;
@@ -14,12 +15,32 @@ use dotenv::dotenv;
 use proto_gen::auth::proto_auth_service_server::ProtoAuthServiceServer;
 use tonic::transport::Server;
 use tonic_web::GrpcWebLayer;
-use tower_http::cors::CorsLayer;
-use tracing::{debug, error, info, warn};
+use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer};
+use tracing::{error, info, warn};
 use tracing_subscriber::Layer;
 use tracing_subscriber::filter::{EnvFilter, LevelFilter};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+
+fn build_cors() -> CorsLayer {
+    let allowed: Vec<HeaderValue> = std::env::var("CORS_ALLOWED_ORIGINS")
+        .unwrap_or_else(|_| "https://www.eurora-labs.com,https://api.eurora-labs.com".into())
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                return None;
+            }
+            s.parse::<HeaderValue>().ok()
+        })
+        .collect();
+
+    CorsLayer::new()
+        .allow_origin(AllowOrigin::list(allowed))
+        .allow_methods(AllowMethods::mirror_request())
+        .allow_headers(AllowHeaders::mirror_request())
+        .allow_credentials(true)
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -30,14 +51,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .ok()
             .filter(|s| !s.is_empty())
             .map(|sentry_dsn| {
+                let send_pii = std::env::var("SENTRY_SEND_PII")
+                    .map(|v| v.eq_ignore_ascii_case("true"))
+                    .unwrap_or(false);
+                let sentry_debug = std::env::var("SENTRY_DEBUG")
+                    .map(|v| v.eq_ignore_ascii_case("true"))
+                    .unwrap_or(false);
+
                 sentry::init((
                     sentry_dsn,
                     sentry::ClientOptions {
                         release: sentry::release_name!(),
                         traces_sample_rate: 0.0,
                         enable_logs: true,
-                        send_default_pii: true, // during closed beta all metrics are non-anonymous
-                        debug: true,
+                        send_default_pii: send_pii,
+                        debug: sentry_debug,
                         ..Default::default()
                     },
                 ))
@@ -113,7 +141,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Starting gRPC server at {}", grpc_addr);
     info!("Starting HTTP server at {}", http_addr);
 
-    let cors = CorsLayer::permissive();
+    let cors = build_cors();
 
     let bucket_name =
         std::env::var("S3_BUCKET_NAME").unwrap_or_else(|_| "eurora-releases".to_string());
@@ -142,12 +170,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let shutdown_signal = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to install CTRL+C signal handler");
-        debug!("Shutting down gracefully...");
-    };
+    let shutdown = tokio::signal::ctrl_c();
 
     let grpc_authz_layer = GrpcAuthzLayer::new(authz.clone(), jwt_config.clone());
 
@@ -169,38 +192,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("Local mode: registered LocalSettingsService (encryption key will be set by client)");
     }
 
-    let grpc_server = grpc_router.serve_with_shutdown(grpc_addr, shutdown_signal);
-
     let authz_state = Arc::new(AuthzState::new(authz, jwt_config));
-    let http_cors = CorsLayer::permissive();
-    let http_router = update_router.merge(payment_router).layer(http_cors).layer(
-        axum::middleware::from_fn_with_state(authz_state, authz_middleware),
+    let http_cors = build_cors();
+
+    let health_route = axum::Router::new().route(
+        "/health",
+        axum::routing::get(|| async { axum::http::StatusCode::OK }),
     );
+
+    let http_router = update_router
+        .merge(payment_router)
+        .merge(health_route)
+        .layer(http_cors)
+        .layer(axum::middleware::from_fn_with_state(
+            authz_state,
+            authz_middleware,
+        ));
 
     let http_listener = tokio::net::TcpListener::bind(http_addr).await?;
     let http_server = axum::serve(
         http_listener,
         http_router.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .with_graceful_shutdown(async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to install CTRL+C signal handler");
-    });
+    );
 
-    tokio::select! {
-        result = grpc_server => {
-            if let Err(e) = result {
-                error!("gRPC server error: {}", e);
-                return Err(e.into());
-            }
+    let (grpc_result, http_result, _) = tokio::join!(
+        grpc_router.serve(grpc_addr),
+        http_server.into_future(),
+        async {
+            shutdown
+                .await
+                .expect("Failed to install CTRL+C signal handler");
+            info!("Shutdown signal received");
         }
-        result = http_server => {
-            if let Err(e) = result {
-                error!("HTTP server error: {}", e);
-                return Err(e.into());
-            }
-        }
+    );
+
+    if let Err(e) = grpc_result {
+        error!("gRPC server error: {}", e);
+    }
+    if let Err(e) = http_result {
+        error!("HTTP server error: {}", e);
     }
 
     Ok(())
