@@ -13,7 +13,7 @@ use be_thread_service::{ProtoThreadServiceServer, ThreadService};
 use be_update_service::init_update_service;
 use dotenv::dotenv;
 use proto_gen::auth::proto_auth_service_server::ProtoAuthServiceServer;
-use tonic::transport::Server;
+use tonic::service::Routes;
 use tonic_web::GrpcWebLayer;
 use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer};
 use tracing::{debug, error, info, warn};
@@ -93,15 +93,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("REMOTE_DATABASE_URL environment variable must be set");
     let db_manager = Arc::new(DatabaseManager::new(&database_url).await?);
 
-    let grpc_addr = std::env::var("MONOLITH_ADDR")
+    let addr: SocketAddr = std::env::var("MONOLITH_ADDR")
         .unwrap_or_else(|_| "0.0.0.0:50051".to_string())
         .parse()
         .expect("Invalid MONOLITH_ADDR format");
-
-    let http_addr: SocketAddr = std::env::var("HTTP_ADDR")
-        .unwrap_or_else(|_| "0.0.0.0:3000".to_string())
-        .parse()
-        .expect("Invalid HTTP_ADDR format");
 
     let jwt_config = JwtConfig::default();
 
@@ -138,8 +133,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let thread_service = ThreadService::new(db_manager.clone(), settings_rx);
 
-    info!("Starting gRPC server at {}", grpc_addr);
-    info!("Starting HTTP server at {}", http_addr);
+    info!("Starting server at {}", addr);
 
     let bucket_name =
         std::env::var("S3_BUCKET_NAME").unwrap_or_else(|_| "eurora-releases".to_string());
@@ -168,22 +162,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let shutdown_signal = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to install CTRL+C signal handler");
-        debug!("Shutting down gracefully...");
-    };
-
-    let cors = CorsLayer::permissive();
-    let grpc_authz_layer = GrpcAuthzLayer::new(authz.clone(), jwt_config.clone());
-
-    let mut grpc_builder = Server::builder()
-        .accept_http1(true)
-        .layer(cors)
-        .layer(GrpcWebLayer::new())
-        .layer(grpc_authz_layer)
-        .add_service(health_service)
+    let mut grpc_routes = Routes::new(health_service)
         .add_service(ProtoAuthServiceServer::new(auth_service))
         .add_service(ProtoActivityServiceServer::new(activity_service))
         .add_service(ProtoAssetServiceServer::new(assets_service))
@@ -192,14 +171,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if local_mode {
         let local_settings =
             be_local_settings_service::LocalSettingsService::new(storage.clone(), settings_tx);
-        grpc_builder = grpc_builder.add_service(local_settings.into_server());
+        grpc_routes = grpc_routes.add_service(local_settings.into_server());
         info!("Local mode: registered LocalSettingsService (encryption key will be set by client)");
     }
 
-    let grpc_server = grpc_builder.serve_with_shutdown(grpc_addr, shutdown_signal);
+    let grpc_authz_layer = GrpcAuthzLayer::new(authz.clone(), jwt_config.clone());
+
+    let grpc_router = grpc_routes
+        .into_axum_router()
+        .layer(GrpcWebLayer::new())
+        .layer(grpc_authz_layer);
 
     let authz_state = Arc::new(AuthzState::new(authz, jwt_config));
-    let http_cors = build_cors();
 
     let health_route = axum::Router::new().route(
         "/health",
@@ -209,36 +192,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let http_router = update_router
         .merge(payment_router)
         .merge(health_route)
-        .layer(http_cors)
         .layer(axum::middleware::from_fn_with_state(
             authz_state,
             authz_middleware,
         ));
 
-    let http_listener = tokio::net::TcpListener::bind(http_addr).await?;
-    let http_server = axum::serve(
-        http_listener,
-        http_router.into_make_service_with_connect_info::<SocketAddr>(),
+    let app = grpc_router
+        .fallback_service(http_router)
+        .layer(build_cors());
+
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    let server = axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
     )
     .with_graceful_shutdown(async {
         tokio::signal::ctrl_c()
             .await
             .expect("Failed to install CTRL+C signal handler");
+        debug!("Shutting down gracefully...");
     });
 
-    tokio::select! {
-        result = grpc_server => {
-            if let Err(e) = result {
-                error!("gRPC server error: {}", e);
-                return Err(e.into());
-            }
-        }
-        result = http_server => {
-            if let Err(e) = result {
-                error!("HTTP server error: {}", e);
-                return Err(e.into());
-            }
-        }
+    if let Err(e) = server.await {
+        error!("Server error: {}", e);
+        return Err(e.into());
     }
 
     Ok(())

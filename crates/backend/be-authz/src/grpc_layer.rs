@@ -7,7 +7,6 @@ use auth_core::Claims;
 use be_auth_core::JwtConfig;
 use http::Request;
 use tonic::Status;
-use tonic::body::Body;
 use tower::{Layer, Service};
 use tracing::{debug, warn};
 
@@ -48,12 +47,13 @@ pub struct GrpcAuthzService<S> {
     jwt_config: Arc<JwtConfig>,
 }
 
-impl<S, ReqBody> Service<Request<ReqBody>> for GrpcAuthzService<S>
+impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for GrpcAuthzService<S>
 where
-    S: Service<Request<ReqBody>, Response = http::Response<Body>> + Clone + Send + 'static,
+    S: Service<Request<ReqBody>, Response = http::Response<ResBody>> + Clone + Send + 'static,
     S::Future: Send + 'static,
     S::Error: Send + 'static,
     ReqBody: Send + 'static,
+    ResBody: Default + Send + 'static,
 {
     type Response = S::Response;
     type Error = S::Error;
