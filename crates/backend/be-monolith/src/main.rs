@@ -81,9 +81,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .set_serving::<ProtoAuthServiceServer<AuthService>>()
         .await;
 
-    let filter = EnvFilter::builder()
-        .with_default_directive(LevelFilter::WARN.into())
-        .parse_lossy("be_=debug,agent_chain=debug,hyper=off,tokio=off");
+    let filter = if cfg!(debug_assertions) {
+        EnvFilter::builder()
+            .with_default_directive(LevelFilter::WARN.into())
+            .parse_lossy("be_=debug,agent_chain=debug,hyper=off,tokio=off")
+    } else {
+        EnvFilter::builder()
+            .with_default_directive(LevelFilter::WARN.into())
+            .parse_lossy("hyper=off,tokio=off")
+    };
 
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_filter(filter.clone()))
@@ -175,10 +181,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let grpc_authz_layer =
         GrpcAuthzLayer::new(authz.clone(), jwt_config.clone(), auth_rate_limiter.clone());
 
-    let grpc_cors = CorsLayer::permissive();
     let mut grpc_server = Server::builder()
         .accept_http1(true)
-        .layer(grpc_cors)
+        .layer(build_cors())
         .layer(GrpcWebLayer::new())
         .layer(grpc_authz_layer)
         .add_service(health_service)
