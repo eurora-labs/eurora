@@ -145,9 +145,9 @@
 	}
 </script>
 
-<Conversation class="w-full h-full">
+<Conversation>
 	{#if messages.length > 0}
-		<ConversationContent class="px-6 pb-28 space-y-4">
+		<ConversationContent>
 			{#each messages as message}
 				{@const content = getMessageContent(message)}
 				{@const isUser = isUserMessage(message)}
