@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { Button, type Props } from '$lib/components/button/index.js';
-	import { getEmblaContext } from '$lib/components/carousel/context.js';
-	import { cn } from '$lib/utils.js';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import type { WithoutChildren } from 'bits-ui';
+	import { getEmblaContext } from './context.js';
+	import { cn } from '$lib/utils.js';
+	import { Button, type Props } from '$lib/components/button/index.js';
 
 	let {
 		ref = $bindable(null),
@@ -20,14 +20,14 @@
 	data-slot="carousel-previous"
 	{variant}
 	{size}
+	aria-disabled={!emblaCtx.canScrollPrev}
 	class={cn(
 		'absolute size-8 rounded-full',
 		emblaCtx.orientation === 'horizontal'
-			? '-left-12 top-1/2 -translate-y-1/2'
-			: '-top-12 left-1/2 -translate-x-1/2 rotate-90',
+			? '-start-12 top-1/2 -translate-y-1/2'
+			: 'start-1/2 -top-12 -translate-x-1/2 rotate-90',
 		className,
 	)}
-	disabled={!emblaCtx.canScrollPrev}
 	onclick={emblaCtx.scrollPrev}
 	onkeydown={emblaCtx.handleKeyDown}
 	{...restProps}
