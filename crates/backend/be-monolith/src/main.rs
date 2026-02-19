@@ -201,9 +201,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let http_router = update_router
+        .layer(http_cors)
         .merge(payment_router)
         .merge(health_route)
-        .layer(http_cors)
         .layer(axum::middleware::from_fn_with_state(
             authz_state,
             authz_middleware,
