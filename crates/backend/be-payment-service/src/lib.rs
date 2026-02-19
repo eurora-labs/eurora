@@ -11,10 +11,7 @@ use tower::ServiceBuilder;
 use tower_governor::{
     GovernorLayer, governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor,
 };
-use tower_http::{
-    cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer},
-    trace::TraceLayer,
-};
+use tower_http::trace::TraceLayer;
 use tracing::debug;
 
 pub mod auth;
@@ -28,20 +25,6 @@ pub mod webhook;
 use service::AppState;
 
 pub fn create_router(state: Arc<AppState>) -> Router {
-    // FRONTEND_URL is validated during PaymentConfig::from_env(), so this
-    // parse cannot fail at runtime.
-    let origin = state
-        .config
-        .frontend_url
-        .parse()
-        .expect("FRONTEND_URL was validated during config loading");
-
-    let cors = CorsLayer::new()
-        .allow_origin(AllowOrigin::exact(origin))
-        .allow_methods(AllowMethods::mirror_request())
-        .allow_headers(AllowHeaders::mirror_request())
-        .allow_credentials(true);
-
     let checkout_governor = GovernorConfigBuilder::default()
         .per_second(6)
         .burst_size(10)
@@ -70,11 +53,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .merge(authed_routes)
         .merge(webhook_route)
         .layer(DefaultBodyLimit::max(1024 * 1024))
-        .layer(
-            ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http())
-                .layer(cors),
-        )
+        .layer(ServiceBuilder::new().layer(TraceLayer::new_for_http()))
         .with_state(state)
 }
 

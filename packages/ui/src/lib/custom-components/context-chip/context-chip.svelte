@@ -3,10 +3,10 @@
 	import { type VariantProps, tv } from 'tailwind-variants';
 
 	export const contextChipVariants = tv({
-		base: 'context-chip inline-flex w-fit items-center gap-2 my-2 p-2 bg-transparent rounded-2xl backdrop-blur-sm text-black/70 [&_svg:not([class*="size-"])]:size-10 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+		base: 'context-chip inline-flex w-fit items-center gap-2 my-2 p-2 bg-transparent rounded-2xl backdrop-blur-sm text-foreground/70 [&_svg:not([class*="size-"])]:size-10 [&_svg]:pointer-events-none [&_svg]:shrink-0',
 		variants: {
 			variant: {
-				default: 'bg-white/30',
+				default: 'bg-muted/50',
 				primary: 'bg-primary/30 text-primary-foreground',
 				secondary: 'bg-secondary/30 text-secondary-foreground',
 				destructive: 'bg-destructive/30 text-destructive-foreground',
@@ -71,9 +71,9 @@
 {/if}
 
 <style lang="postcss">
-	@reference 'tailwindcss';
-	/* Apply solid background for Linux desktop app */
 	:global(body.linux-app .context-chip) {
-		@apply bg-black/20 backdrop-blur-none blur-none;
+		backdrop-filter: none;
+		background-color: oklch(from var(--foreground) l c h / 10%);
+		filter: none;
 	}
 </style>
