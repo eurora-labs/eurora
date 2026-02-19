@@ -172,13 +172,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let grpc_server = grpc_router.serve_with_shutdown(grpc_addr, shutdown_signal);
 
     let authz_state = Arc::new(AuthzState::new(authz, jwt_config));
-    let http_router =
-        update_router
-            .merge(payment_router)
-            .layer(axum::middleware::from_fn_with_state(
-                authz_state,
-                authz_middleware,
-            ));
+    let http_cors = CorsLayer::permissive();
+    let http_router = update_router.merge(payment_router).layer(http_cors).layer(
+        axum::middleware::from_fn_with_state(authz_state, authz_middleware),
+    );
 
     let http_listener = tokio::net::TcpListener::bind(http_addr).await?;
     let http_server = axum::serve(
