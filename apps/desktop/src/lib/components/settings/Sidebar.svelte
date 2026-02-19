@@ -70,7 +70,7 @@
 	);
 </script>
 
-<Sidebar.Root>
+<Sidebar.Root class="border-none">
 	<Sidebar.Content>
 		<div class="flex items-center gap-2 pt-2">
 			<Button
