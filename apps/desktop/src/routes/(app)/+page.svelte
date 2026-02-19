@@ -146,24 +146,25 @@
 </script>
 
 <Conversation class="w-full h-full">
-	<ConversationContent class={messages.length > 0 ? 'px-6 pb-28 space-y-4' : 'hidden'}>
-		{#each messages as message}
-			{@const content = getMessageContent(message)}
-			{@const isUser = isUserMessage(message)}
-			{#if content.length > 0 || !isUser}
-				<Message from={isUser ? 'user' : 'assistant'}>
-					<MessageContent>
-						{#if content.trim().length > 0}
-							<MessageResponse {content} />
-						{:else}
-							<Shimmer>Thinking</Shimmer>
-						{/if}
-					</MessageContent>
-				</Message>
-			{/if}
-		{/each}
-	</ConversationContent>
-
+	{#if messages.length > 0}
+		<ConversationContent class="px-6 pb-28 space-y-4">
+			{#each messages as message}
+				{@const content = getMessageContent(message)}
+				{@const isUser = isUserMessage(message)}
+				{#if content.length > 0 || !isUser}
+					<Message from={isUser ? 'user' : 'assistant'}>
+						<MessageContent>
+							{#if content.trim().length > 0}
+								<MessageResponse {content} />
+							{:else}
+								<Shimmer>Thinking</Shimmer>
+							{/if}
+						</MessageContent>
+					</Message>
+				{/if}
+			{/each}
+		</ConversationContent>
+	{/if}
 	<div
 		class={[
 			'flex justify-center',
