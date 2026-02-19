@@ -1,16 +1,14 @@
-import Dialog from '$lib/components/command/command-dialog.svelte';
-import Empty from '$lib/components/command/command-empty.svelte';
-import Group from '$lib/components/command/command-group.svelte';
-import Input from '$lib/components/command/command-input.svelte';
-import Item from '$lib/components/command/command-item.svelte';
-import LinkItem from '$lib/components/command/command-link-item.svelte';
-import List from '$lib/components/command/command-list.svelte';
-import Separator from '$lib/components/command/command-separator.svelte';
-import Shortcut from '$lib/components/command/command-shortcut.svelte';
-import Root from '$lib/components/command/command.svelte';
-import { Command as CommandPrimitive } from 'bits-ui';
-
-const Loading = CommandPrimitive.Loading;
+import Root from './command.svelte';
+import Loading from './command-loading.svelte';
+import Dialog from './command-dialog.svelte';
+import Empty from './command-empty.svelte';
+import Group from './command-group.svelte';
+import Item from './command-item.svelte';
+import Input from './command-input.svelte';
+import List from './command-list.svelte';
+import Separator from './command-separator.svelte';
+import Shortcut from './command-shortcut.svelte';
+import LinkItem from './command-link-item.svelte';
 
 export {
 	Root,

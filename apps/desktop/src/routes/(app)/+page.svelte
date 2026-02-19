@@ -1,5 +1,4 @@
 <script lang="ts">
-	import 'katex/dist/katex.min.css';
 	import {
 		type ResponseChunk,
 		type Query,
@@ -8,7 +7,6 @@
 	} from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { executeCommand } from '$lib/commands.js';
-	import Katex from '$lib/components/katex.svelte';
 	import {
 		Editor as ProsemirrorEditor,
 		type SveltePMExtension,
@@ -22,9 +20,16 @@
 	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory/index';
 	import * as Launcher from '@eurora/prosemirror-view/launcher';
 	import { inject } from '@eurora/shared/context';
-	import { ScrollArea } from '@eurora/ui/components/scroll-area/index';
-	import * as Chat from '@eurora/ui/custom-components/chat/index';
-	import { Thinking } from '@eurora/ui/custom-components/thinking/index';
+	import {
+		Message,
+		MessageContent,
+		MessageResponse,
+	} from '@eurora/ui/components/ai-elements/new-message/index';
+	import {
+		Conversation,
+		ConversationContent,
+	} from '@eurora/ui/components/ai-elements/conversation/index';
+	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
 	import { onMount } from 'svelte';
 
 	let thread = $state<ThreadView | null>(null);
@@ -32,7 +37,6 @@
 	let taurpc = inject(TAURPC_SERVICE);
 
 	let editorRef: ProsemirrorEditor | undefined = $state();
-	let chatRef = $state<Chat.Root | null>(null);
 
 	registerCoreExtensions();
 	let searchQuery = $state({
@@ -132,8 +136,6 @@
 				if (agentMessage && agentMessage.role === 'ai') {
 					agentMessage.content += response.chunk;
 				}
-
-				chatRef?.scrollToBottom();
 			}
 
 			await taurpc.chat.send_query(thread?.id ?? null, onEvent, tauRpcQuery);
@@ -143,35 +145,26 @@
 	}
 </script>
 
-<div class="w-full h-full">
+<Conversation>
 	{#if messages.length > 0}
-		<ScrollArea class="h-full w-full px-6">
-			<Chat.Root
-				bind:this={chatRef}
-				class="w-full h-full flex flex-col gap-4 overflow-hidden pb-28"
-			>
-				{#each messages as message}
-					{@const content = getMessageContent(message)}
-					{@const isUser = isUserMessage(message)}
-					{#if content.length > 0 || !isUser}
-						<Chat.Message
-							variant={isUser ? 'default' : 'assistant'}
-							finishRendering={() => {}}
-						>
-							<Chat.MessageContent>
-								{#if content.trim().length > 0}
-									<Katex math={content} />
-								{:else}
-									<Thinking class="text-primary/60" />
-								{/if}
-							</Chat.MessageContent>
-						</Chat.Message>
-					{/if}
-				{/each}
-			</Chat.Root>
-		</ScrollArea>
+		<ConversationContent>
+			{#each messages as message}
+				{@const content = getMessageContent(message)}
+				{@const isUser = isUserMessage(message)}
+				{#if content.length > 0 || !isUser}
+					<Message from={isUser ? 'user' : 'assistant'}>
+						<MessageContent>
+							{#if content.trim().length > 0}
+								<MessageResponse {content} />
+							{:else}
+								<Shimmer>Thinking</Shimmer>
+							{/if}
+						</MessageContent>
+					</Message>
+				{/if}
+			{/each}
+		</ConversationContent>
 	{/if}
-
 	<div
 		class={[
 			'flex justify-center',
@@ -192,4 +185,4 @@
 			/>
 		</Launcher.Root>
 	</div>
-</div>
+</Conversation>
