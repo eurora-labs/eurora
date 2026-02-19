@@ -85,6 +85,7 @@ focus-tracker = { path = "crates/common/focus-tracker" }
 focus-tracker-core = { path = "crates/common/focus-tracker-core", version = "0.0.2" }
 futures = "0.3.31"
 futures-util = "0.3"
+governor = "0.10"
 hex = "0.4.3"
 humantime-serde = "1.1.1"
 image = "0.25.9"

@@ -131,10 +131,6 @@ impl AuthService {
     }
 
     async fn resolve_role(&self, user_id: Uuid) -> Role {
-        if cfg!(debug_assertions) {
-            return Role::Tier1;
-        }
-
         let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
             .map(|v| v.eq_ignore_ascii_case("true"))
             .unwrap_or(false);
@@ -149,22 +145,22 @@ impl AuthService {
         }
     }
 
-    async fn ensure_account_and_resolve_role(&self, user_id: Uuid, email: &str) -> Role {
+    async fn ensure_account_and_resolve_role(
+        &self,
+        user_id: Uuid,
+        email: &str,
+    ) -> Result<Role, AuthError> {
         let plan_id = if self.is_approved_email(email) {
             "tier1"
         } else {
             "free"
         };
 
-        if let Err(e) = self
-            .db
+        self.db
             .ensure_account_for_user_with_plan(&self.db.pool, user_id, plan_id)
-            .await
-        {
-            error!("Failed to ensure account for user {}: {}", user_id, e);
-        }
+            .await?;
 
-        self.resolve_role(user_id).await
+        Ok(self.resolve_role(user_id).await)
     }
 
     async fn generate_tokens(
@@ -322,7 +318,7 @@ impl AuthService {
 
         let role = self
             .ensure_account_and_resolve_role(user.id, &user.email)
-            .await;
+            .await?;
         let (access_token, refresh_token) = self
             .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
             .await?;
@@ -340,19 +336,17 @@ impl AuthService {
     ) -> Result<TokenResponse, AuthError> {
         let token_hash = self.hash_refresh_token(refresh_token);
 
-        let stored_token = self
+        let revoked_token = self
             .db
-            .get_refresh_token_by_hash(&token_hash)
+            .revoke_refresh_token(&token_hash)
             .await
             .map_err(|_| AuthError::InvalidToken)?;
 
-        let user = self.db.get_user_by_id(stored_token.user_id).await?;
-
-        self.db.revoke_refresh_token(&token_hash).await?;
+        let user = self.db.get_user_by_id(revoked_token.user_id).await?;
 
         let role = self
             .ensure_account_and_resolve_role(user.id, &user.email)
-            .await;
+            .await?;
         let (access_token, new_refresh_token) = self
             .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
             .await?;
@@ -549,7 +543,7 @@ impl AuthService {
 
         let role = self
             .ensure_account_and_resolve_role(user.id, &user.email)
-            .await;
+            .await?;
         let (access_token, refresh_token) = self
             .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
             .await?;
@@ -756,7 +750,8 @@ impl ProtoAuthService for AuthService {
 
         let role = self
             .ensure_account_and_resolve_role(user.id, &user.email)
-            .await;
+            .await
+            .map_err(Status::from)?;
         let (access_token, refresh_token) = self
             .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
             .await
@@ -816,7 +811,7 @@ impl AuthService {
 
         let role = self
             .ensure_account_and_resolve_role(user.id, &user.email)
-            .await;
+            .await?;
         let (access_token, refresh_token) = self
             .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
             .await?;
