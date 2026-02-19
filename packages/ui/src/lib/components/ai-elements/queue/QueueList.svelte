@@ -12,7 +12,7 @@
 </script>
 
 <script lang="ts">
-	import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
+	import { ScrollArea } from '$lib/components/scroll-area/index.js';
 
 	let {
 		class: className,

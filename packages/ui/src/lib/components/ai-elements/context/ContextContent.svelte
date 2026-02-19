@@ -1,5 +1,5 @@
 <script lang="ts">
-	import HoverCardContent from '$lib/components/ui/hover-card/hover-card-content.svelte';
+	import HoverCardContent from '$lib/components/hover-card/hover-card-content.svelte';
 	import { cn } from '$lib/utils';
 
 	interface Props {

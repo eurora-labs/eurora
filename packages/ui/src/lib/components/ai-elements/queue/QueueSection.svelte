@@ -9,7 +9,7 @@
 </script>
 
 <script lang="ts">
-	import { Collapsible } from '$lib/components/ui/collapsible/index.js';
+	import { Collapsible } from '$lib/components/collapsible/index.js';
 
 	let {
 		class: className,

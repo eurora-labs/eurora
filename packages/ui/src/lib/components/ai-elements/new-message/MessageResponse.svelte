@@ -1,13 +1,34 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
-	import { Streamdown, type StreamdownProps } from 'svelte-streamdown';
-	import Code from 'svelte-streamdown/code'; // Shiki syntax highlighting
+	import { Streamdown, type StreamdownProps, type Extension } from 'svelte-streamdown';
+	import Code from 'svelte-streamdown/code';
+	import Math from 'svelte-streamdown/math';
 	import { mode } from 'mode-watcher';
 	import type { HTMLAttributes } from 'svelte/elements';
 
-	// Import Shiki themes
 	import githubLightDefault from '@shikijs/themes/github-light-default';
 	import githubDarkDefault from '@shikijs/themes/github-dark-default';
+
+	const blockMathRule = /^(\$\$)(?:\n((?:\\[\s\S]|[^\\])+?)\n\1(?:\n|$)|([^$\n]+?)\1(?=\s|$|$))/;
+
+	const mathBlockExtension: Extension = {
+		name: 'math',
+		level: 'block',
+		applyInBlockParsing: true,
+		tokenizer(src) {
+			const match = src.match(blockMathRule);
+			if (match) {
+				const content = (match[2] || match[3]).trim();
+				return {
+					type: 'math',
+					isInline: false,
+					displayMode: true,
+					raw: match[0],
+					text: content,
+				};
+			}
+		},
+	};
 
 	type Props = {
 		content: string;
@@ -26,7 +47,8 @@
 		{content}
 		shikiTheme={currentTheme}
 		baseTheme="shadcn"
-		components={{ code: Code }}
+		components={{ code: Code, math: Math }}
+		extensions={[mathBlockExtension]}
 		shikiThemes={{
 			'github-light-default': githubLightDefault,
 			'github-dark-default': githubDarkDefault,

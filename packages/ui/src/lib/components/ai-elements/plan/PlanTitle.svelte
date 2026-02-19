@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CardTitle } from '$lib/components/ui/card/index.js';
+	import { CardTitle } from '$lib/components/card/index.js';
 	import { Shimmer } from '$lib/components/ai-elements/shimmer/index.js';
 	import { getPlanContext } from './plan-context.svelte.js';
 	import type { PlanTitleProps } from './types.js';

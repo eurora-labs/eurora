@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import HoverCardTrigger from '$lib/components/ui/hover-card/hover-card-trigger.svelte';
+	import { Button } from '$lib/components/button';
+	import HoverCardTrigger from '$lib/components/hover-card/hover-card-trigger.svelte';
 	import ContextIcon from './ContextIcon.svelte';
 	import { getContextValue } from './context-context.svelte';
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CollapsibleContent } from '$lib/components/ui/collapsible/index.js';
+	import { CollapsibleContent } from '$lib/components/collapsible/index.js';
 	import { cn } from '$lib/utils';
 	import type { Snippet } from 'svelte';
 

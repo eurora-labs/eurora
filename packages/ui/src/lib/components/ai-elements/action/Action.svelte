@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
-	import { Button, type ButtonProps } from '$lib/components/ui/button/index.js';
+	import { Button, type ButtonProps } from '$lib/components/button/index.js';
 	import {
 		Tooltip,
 		TooltipContent,
 		TooltipProvider,
 		TooltipTrigger,
-	} from '$lib/components/ui/tooltip/index.js';
+	} from '$lib/components/tooltip/index.js';
 
 	export type ActionProps = ButtonProps & {
 		tooltip?: string;

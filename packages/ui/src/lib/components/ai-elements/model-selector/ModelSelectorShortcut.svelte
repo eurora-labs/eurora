@@ -1,5 +1,5 @@
 <script lang="ts">
-	import * as Command from '$lib/components/ui/command/index.js';
+	import * as Command from '$lib/components/command/index.js';
 	import type { WithElementRef } from '$lib/utils.js';
 	import type { HTMLAttributes } from 'svelte/elements';
 

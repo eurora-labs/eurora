@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
-	import * as Carousel from '$lib/components/ui/carousel/index.js';
+	import * as Carousel from '$lib/components/carousel/index.js';
 	import type { Snippet } from 'svelte';
 
 	type Props = {

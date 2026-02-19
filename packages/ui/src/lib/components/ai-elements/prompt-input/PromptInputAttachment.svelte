@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
-	import { Button } from '$lib/components/ui/button';
-	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import { Button } from '$lib/components/button';
+	import * as Tooltip from '$lib/components/tooltip/index.js';
 	import { getAttachmentsContext, type FileWithId } from './attachments-context.svelte.js';
 	import PaperclipIcon from './PaperclipIcon.svelte';
 	import XIcon from './XIcon.svelte';

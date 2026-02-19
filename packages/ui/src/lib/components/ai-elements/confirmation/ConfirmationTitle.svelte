@@ -9,7 +9,7 @@
 </script>
 
 <script lang="ts">
-	import { AlertDescription } from '$lib/components/ui/alert/index.js';
+	import { AlertDescription } from '$lib/components/alert/index.js';
 
 	let {
 		class: className,

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
-	import { Badge } from '$lib/components/ui/badge/index.js';
-	import * as HoverCard from '$lib/components/ui/hover-card/index.js';
+	import { Badge } from '$lib/components/badge/index.js';
+	import * as HoverCard from '$lib/components/hover-card/index.js';
 	import type { Snippet } from 'svelte';
 
 	type Props = {

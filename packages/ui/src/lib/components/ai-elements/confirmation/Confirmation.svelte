@@ -12,7 +12,7 @@
 </script>
 
 <script lang="ts">
-	import { Alert } from '$lib/components/ui/alert/index.js';
+	import { Alert } from '$lib/components/alert/index.js';
 	import { setConfirmationContext } from './confirmation-context.svelte.js';
 	import { watch } from 'runed';
 

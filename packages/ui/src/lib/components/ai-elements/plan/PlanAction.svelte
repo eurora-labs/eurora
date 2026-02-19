@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CardAction } from '$lib/components/ui/card/index.js';
+	import { CardAction } from '$lib/components/card/index.js';
 	import type { PlanActionProps } from './types.js';
 
 	let { children, ...restProps }: PlanActionProps = $props();

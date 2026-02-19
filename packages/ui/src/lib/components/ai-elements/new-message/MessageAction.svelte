@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
-	import { Button, type ButtonProps } from '$lib/components/ui/button/index.js';
-	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import { Button, type ButtonProps } from '$lib/components/button/index.js';
+	import * as Tooltip from '$lib/components/tooltip/index.js';
 	import type { Snippet } from 'svelte';
 
 	interface Props extends Omit<ButtonProps, 'children'> {
