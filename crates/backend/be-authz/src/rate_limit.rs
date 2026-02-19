@@ -7,6 +7,6 @@ pub type AuthFailureRateLimiter =
 
 pub fn new_auth_failure_rate_limiter() -> AuthFailureRateLimiter {
     Arc::new(RateLimiter::keyed(
-        Quota::per_minute(NonZeroU32::new(20).unwrap()).allow_burst(NonZeroU32::new(5).unwrap()),
+        Quota::per_minute(NonZeroU32::new(50).unwrap()).allow_burst(NonZeroU32::new(20).unwrap()),
     ))
 }

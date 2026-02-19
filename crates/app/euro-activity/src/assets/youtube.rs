@@ -69,7 +69,7 @@ impl AssetFunctionality for YoutubeAsset {
     }
 
     fn construct_messages(&self) -> Vec<BaseMessage> {
-        let content = format!(
+        let transcript_content = format!(
             "The user is watching a YouTube video titled '{}'. \
              Here's the transcript of the video: \n {}",
             self.title,
@@ -79,7 +79,36 @@ impl AssetFunctionality for YoutubeAsset {
                 .collect::<Vec<_>>()
                 .join("\n")
         );
-        vec![HumanMessage::builder().content(content).build().into()]
+
+        let recent_words: Vec<&str> = self
+            .transcript
+            .iter()
+            .filter(|line| line.start + line.duration <= self.current_time)
+            .flat_map(|line| line.text.split_whitespace())
+            .collect();
+        let last_20: String = recent_words
+            .iter()
+            .rev()
+            .take(20)
+            .copied()
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        let recent_content = format!("The professor just said this: {}", last_20);
+
+        vec![
+            HumanMessage::builder()
+                .content(transcript_content)
+                .build()
+                .into(),
+            HumanMessage::builder()
+                .content(recent_content)
+                .build()
+                .into(),
+        ]
     }
 
     fn get_context_chip(&self) -> Option<ContextChip> {
@@ -187,9 +216,10 @@ mod tests {
             0.0,
         );
         let messages = AssetFunctionality::construct_messages(&asset);
-        let msg = messages[0].clone();
+        assert_eq!(messages.len(), 2);
+        assert!(matches!(messages[0], BaseMessage::Human(_)));
+        assert!(matches!(messages[1], BaseMessage::Human(_)));
         let chip = AssetFunctionality::get_context_chip(&asset);
-        assert!(matches!(msg, BaseMessage::Human(_)));
         assert!(chip.is_some());
     }
 }
