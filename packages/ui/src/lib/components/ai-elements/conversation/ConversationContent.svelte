@@ -30,7 +30,7 @@
 			if (element) {
 				context.setElement(element);
 				// Initial scroll to bottom
-				context.scrollToBottom('smooth');
+				context.scrollToBottom('auto');
 			}
 		},
 	);
