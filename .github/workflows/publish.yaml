@@ -89,7 +89,7 @@ jobs:
                   RELEASE_CHANNEL: ${{ env.channel }}
                   BUMP_TYPE: ${{ env.bump }}
               run: |
-                  CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/releases/${RELEASE_CHANNEL}" | jq -r '.version')"
+                  CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/releases/${RELEASE_CHANNEL}" | jq -r '.version' | tr -d '\r')"
                   NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${BUMP_TYPE}")
                   {
                     echo 'version<<EOF'
@@ -246,7 +246,7 @@ jobs:
                   RELEASE_CHANNEL: ${{ env.channel }}
                   BUMP_TYPE: ${{ env.bump }}
               run: |
-                  CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/releases/${RELEASE_CHANNEL}" | jq -r '.version')"
+                  CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/releases/${RELEASE_CHANNEL}" | jq -r '.version' | tr -d '\r')"
                   NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${BUMP_TYPE}")
                   {
                     echo 'version<<EOF'
@@ -412,7 +412,7 @@ jobs:
                   RELEASE_CHANNEL: ${{ env.channel }}
                   BUMP_TYPE: ${{ env.bump }}
               run: |
-                  CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/releases/${RELEASE_CHANNEL}" | jq -r '.version')"
+                  CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/releases/${RELEASE_CHANNEL}" | jq -r '.version' | tr -d '\r')"
                   NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${BUMP_TYPE}")
                   {
                     echo 'version<<EOF'

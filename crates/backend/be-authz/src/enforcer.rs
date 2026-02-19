@@ -5,16 +5,12 @@ use tracing::info;
 
 use crate::AuthzError;
 
-/// Shared casbin enforcer wrapped for concurrent access.
-///
-/// The enforcer is read-only after initialization — no lock is needed.
 #[derive(Clone)]
 pub struct CasbinAuthz {
     enforcer: Arc<Enforcer>,
 }
 
 impl CasbinAuthz {
-    /// Initialize from model and policy file paths.
     pub async fn new(model_path: &str, policy_path: &str) -> Result<Self, AuthzError> {
         let model = DefaultModel::from_file(model_path)
             .await
@@ -34,7 +30,6 @@ impl CasbinAuthz {
         })
     }
 
-    /// Check if a role is allowed to perform an action on a resource.
     #[must_use = "authorization result must be checked"]
     pub fn enforce(&self, role: &str, resource: &str, action: &str) -> Result<bool, AuthzError> {
         self.enforcer
@@ -56,8 +51,6 @@ mod tests {
             .await
             .expect("failed to init enforcer")
     }
-
-    // -- Role hierarchy --
 
     #[tokio::test]
     async fn free_can_list_threads() {
@@ -99,8 +92,6 @@ mod tests {
         );
     }
 
-    // -- REST policies --
-
     #[tokio::test]
     async fn free_can_post_checkout() {
         let authz = test_authz().await;
@@ -113,8 +104,6 @@ mod tests {
         assert!(!authz.enforce("Free", "/admin/users", "GET").unwrap());
     }
 
-    // -- Unknown role --
-
     #[tokio::test]
     async fn unknown_role_denied() {
         let authz = test_authz().await;
@@ -125,13 +114,7 @@ mod tests {
         );
     }
 
-    // -- Policy ↔ Proto validation --
-
-    /// Exhaustive list of RPC methods defined in proto service definitions.
-    /// If a proto file gains or removes a method, update this list — the test
-    /// below will catch the drift.
     const PROTO_METHODS: &[(&str, &str)] = &[
-        // thread_service.proto — ProtoThreadService
         ("ThreadService", "CreateThread"),
         ("ThreadService", "ListThreads"),
         ("ThreadService", "GetThread"),
@@ -141,10 +124,8 @@ mod tests {
         ("ThreadService", "AddSystemMessage"),
         ("ThreadService", "ChatStream"),
         ("ThreadService", "GenerateThreadTitle"),
-        // activity_service.proto — ProtoActivityService
         ("ActivityService", "ListActivities"),
         ("ActivityService", "InsertActivity"),
-        // asset_service.proto — ProtoAssetService
         ("AssetService", "CreateAsset"),
     ];
 
@@ -173,7 +154,6 @@ mod tests {
             let resource = parts[2];
             let action = parts[3];
 
-            // Skip REST policies (paths start with '/')
             if resource.starts_with('/') {
                 continue;
             }

@@ -41,6 +41,7 @@ impl Default for JwtConfig {
                 .unwrap_or_default()
                 .split(',')
                 .map(|s| s.trim().to_lowercase().to_string())
+                .filter(|s| !s.is_empty())
                 .collect::<Vec<_>>(),
         }
     }

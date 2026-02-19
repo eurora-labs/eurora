@@ -1,6 +1,7 @@
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
-use axum::extract::{MatchedPath, Request};
+use axum::extract::{ConnectInfo, MatchedPath, Request};
 use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
@@ -9,25 +10,52 @@ use tracing::{debug, warn};
 
 use crate::CasbinAuthz;
 use crate::bypass::is_rest_bypass;
+use crate::rate_limit::AuthFailureRateLimiter;
 
-/// Shared state for the axum authz middleware.
 pub struct AuthzState {
     pub authz: CasbinAuthz,
     pub jwt_config: JwtConfig,
+    pub rate_limiter: AuthFailureRateLimiter,
 }
 
 impl AuthzState {
-    pub fn new(authz: CasbinAuthz, jwt_config: JwtConfig) -> Self {
-        Self { authz, jwt_config }
+    pub fn new(
+        authz: CasbinAuthz,
+        jwt_config: JwtConfig,
+        rate_limiter: AuthFailureRateLimiter,
+    ) -> Self {
+        Self {
+            authz,
+            jwt_config,
+            rate_limiter,
+        }
     }
 }
 
-/// Axum middleware that validates JWT and enforces casbin policy on REST routes.
+fn extract_client_ip(req: &Request) -> IpAddr {
+    req.extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|ci| ci.0.ip())
+        .unwrap_or(IpAddr::from([127, 0, 0, 1]))
+}
+
+fn too_many_requests_response() -> Response {
+    (
+        StatusCode::TOO_MANY_REQUESTS,
+        axum::Json(serde_json::json!({"error": "Too many failed requests. Try again later."})),
+    )
+        .into_response()
+}
+
 pub async fn authz_middleware(
     axum::extract::State(state): axum::extract::State<Arc<AuthzState>>,
     mut req: Request,
     next: Next,
 ) -> Response {
+    if req.method() == axum::http::Method::OPTIONS {
+        return next.run(req).await;
+    }
+
     let raw_path = req.uri().path().to_string();
     let method = req.method().to_string();
 
@@ -36,9 +64,13 @@ pub async fn authz_middleware(
         return next.run(req).await;
     }
 
-    // Use the route template (e.g. "/payment/checkout") for policy matching instead
-    // of the concrete path (e.g. "/payment/subscription/sub_123"). This ensures
-    // routes with path parameters match their policy entries correctly.
+    let client_ip = extract_client_ip(&req);
+
+    if state.rate_limiter.check_key(&client_ip).is_err() {
+        warn!(ip = %client_ip, "Rate limited — too many auth failures");
+        return too_many_requests_response();
+    }
+
     let policy_path = match req.extensions().get::<MatchedPath>() {
         Some(m) => m.as_str().to_string(),
         None => {
@@ -58,6 +90,7 @@ pub async fn authz_middleware(
     {
         Some(h) => h.to_string(),
         None => {
+            let _ = state.rate_limiter.check_key(&client_ip);
             return (
                 StatusCode::UNAUTHORIZED,
                 axum::Json(serde_json::json!({"error": "Missing authorization header"})),
@@ -69,6 +102,7 @@ pub async fn authz_middleware(
     let token = match auth_header.strip_prefix("Bearer ") {
         Some(t) => t,
         None => {
+            let _ = state.rate_limiter.check_key(&client_ip);
             return (
                 StatusCode::UNAUTHORIZED,
                 axum::Json(
@@ -82,6 +116,7 @@ pub async fn authz_middleware(
     let claims = match state.jwt_config.validate_access_token(token) {
         Ok(c) => c,
         Err(e) => {
+            let _ = state.rate_limiter.check_key(&client_ip);
             warn!(error = %e, "JWT validation failed");
             return (
                 StatusCode::UNAUTHORIZED,
@@ -100,6 +135,7 @@ pub async fn authz_middleware(
             next.run(req).await
         }
         Ok(false) => {
+            let _ = state.rate_limiter.check_key(&client_ip);
             warn!(role = %role, path = %raw_path, method = %method, "REST authorization denied");
             (
                 StatusCode::FORBIDDEN,

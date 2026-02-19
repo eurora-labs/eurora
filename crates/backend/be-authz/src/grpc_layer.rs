@@ -1,31 +1,38 @@
 use std::future::Future;
+use std::net::{IpAddr, SocketAddr};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use auth_core::Claims;
+use axum::extract::ConnectInfo;
 use be_auth_core::JwtConfig;
 use http::Request;
 use tonic::Status;
-use tonic::body::Body;
 use tower::{Layer, Service};
 use tracing::{debug, warn};
 
 use crate::CasbinAuthz;
 use crate::bypass::is_grpc_bypass;
+use crate::rate_limit::AuthFailureRateLimiter;
 
-/// Tower layer that combines JWT authentication and casbin authorization for gRPC.
 #[derive(Clone)]
 pub struct GrpcAuthzLayer {
     authz: CasbinAuthz,
     jwt_config: Arc<JwtConfig>,
+    rate_limiter: AuthFailureRateLimiter,
 }
 
 impl GrpcAuthzLayer {
-    pub fn new(authz: CasbinAuthz, jwt_config: JwtConfig) -> Self {
+    pub fn new(
+        authz: CasbinAuthz,
+        jwt_config: JwtConfig,
+        rate_limiter: AuthFailureRateLimiter,
+    ) -> Self {
         Self {
             authz,
             jwt_config: Arc::new(jwt_config),
+            rate_limiter,
         }
     }
 }
@@ -38,24 +45,33 @@ impl<S> Layer<S> for GrpcAuthzLayer {
             inner,
             authz: self.authz.clone(),
             jwt_config: Arc::clone(&self.jwt_config),
+            rate_limiter: Arc::clone(&self.rate_limiter),
         }
     }
 }
 
-/// Tower service that enforces JWT + casbin policies on gRPC requests.
 #[derive(Clone)]
 pub struct GrpcAuthzService<S> {
     inner: S,
     authz: CasbinAuthz,
     jwt_config: Arc<JwtConfig>,
+    rate_limiter: AuthFailureRateLimiter,
 }
 
-impl<S, ReqBody> Service<Request<ReqBody>> for GrpcAuthzService<S>
+fn extract_client_ip<B>(req: &Request<B>) -> IpAddr {
+    req.extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|ci| ci.0.ip())
+        .unwrap_or(IpAddr::from([127, 0, 0, 1]))
+}
+
+impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for GrpcAuthzService<S>
 where
-    S: Service<Request<ReqBody>, Response = http::Response<Body>> + Clone + Send + 'static,
+    S: Service<Request<ReqBody>, Response = http::Response<ResBody>> + Clone + Send + 'static,
     S::Future: Send + 'static,
     S::Error: Send + 'static,
     ReqBody: Send + 'static,
+    ResBody: Default + Send + 'static,
 {
     type Response = S::Response;
     type Error = S::Error;
@@ -69,10 +85,16 @@ where
         let path = req.uri().path().to_string();
         let authz = self.authz.clone();
         let jwt_config = Arc::clone(&self.jwt_config);
+        let rate_limiter = Arc::clone(&self.rate_limiter);
+        let client_ip = extract_client_ip(&req);
         let inner = self.inner.clone();
         let mut inner = std::mem::replace(&mut self.inner, inner);
 
         Box::pin(async move {
+            if req.method() == http::Method::OPTIONS {
+                return inner.call(req).await;
+            }
+
             let (service_full, method) = match parse_grpc_path(&path) {
                 Some(parts) => parts,
                 None => {
@@ -86,9 +108,20 @@ where
                 return inner.call(req).await;
             }
 
+            if rate_limiter.check_key(&client_ip).is_err() {
+                warn!(ip = %client_ip, "Rate limited — too many auth failures");
+                return Ok(Status::resource_exhausted(
+                    "Too many failed requests. Try again later.",
+                )
+                .into_http());
+            }
+
             let claims = match extract_jwt_claims(&req, &jwt_config) {
                 Ok(claims) => claims,
-                Err(status) => return Ok(status.into_http()),
+                Err(status) => {
+                    let _ = rate_limiter.check_key(&client_ip);
+                    return Ok(status.into_http());
+                }
             };
 
             let service_name = extract_service_name(&service_full);
@@ -101,6 +134,7 @@ where
                     inner.call(req).await
                 }
                 Ok(false) => {
+                    let _ = rate_limiter.check_key(&client_ip);
                     warn!(role = %role, service = %service_name, method = %method, "gRPC authorization denied");
                     Ok(Status::permission_denied(
                         "Insufficient permissions. Please upgrade your plan.",
@@ -116,7 +150,6 @@ where
     }
 }
 
-/// Extract and validate JWT claims from the request's authorization header.
 fn extract_jwt_claims<B>(req: &Request<B>, jwt_config: &JwtConfig) -> Result<Claims, Status> {
     let auth_header = req
         .headers()
@@ -135,7 +168,6 @@ fn extract_jwt_claims<B>(req: &Request<B>, jwt_config: &JwtConfig) -> Result<Cla
     })
 }
 
-/// Parse a gRPC path `/package.ServiceName/MethodName` into `(full_service, method)`.
 fn parse_grpc_path(path: &str) -> Option<(String, String)> {
     let path = path.strip_prefix('/')?;
     let slash_idx = path.find('/')?;
@@ -147,23 +179,6 @@ fn parse_grpc_path(path: &str) -> Option<(String, String)> {
     Some((service.to_string(), method.to_string()))
 }
 
-/// Extract the short service name used for policy matching from the full gRPC
-/// service path.
-///
-/// Convention: proto services are named `Proto{Name}` (e.g.
-/// `ProtoThreadService`). This function strips the package prefix and the
-/// `Proto` prefix so the policy CSV can use the short form (`ThreadService`).
-///
-/// The bypass list in [`crate::bypass`] uses *full* qualified names (e.g.
-/// `auth_service.ProtoAuthService`) because bypass checks happen before this
-/// extraction step.
-///
-/// # Examples
-///
-/// - `thread_service.ProtoThreadService` -> `ThreadService`
-/// - `grpc.health.v1.Health` -> `Health`
-/// - `ProtoFoo` -> `Foo`
-/// - `MyService` -> `MyService`
 fn extract_service_name(full_service: &str) -> String {
     let name = full_service.rsplit('.').next().unwrap_or(full_service);
     name.strip_prefix("Proto").unwrap_or(name).to_string()
