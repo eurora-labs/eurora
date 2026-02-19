@@ -29,9 +29,6 @@ fn normalize_path(path: &str) -> String {
     format!("/{}", segments.join("/"))
 }
 
-/// Returns `true` if the given REST path should skip authorization.
-///
-/// The path is normalized before checking to prevent traversal-based bypasses.
 pub fn is_rest_bypass(path: &str) -> bool {
     let normalized = normalize_path(path);
     REST_BYPASS_PREFIXES
