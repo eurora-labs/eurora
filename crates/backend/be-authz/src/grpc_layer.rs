@@ -71,6 +71,10 @@ where
         let mut inner = std::mem::replace(&mut self.inner, inner);
 
         Box::pin(async move {
+            if req.method() == http::Method::OPTIONS {
+                return inner.call(req).await;
+            }
+
             let (service_full, method) = match parse_grpc_path(&path) {
                 Some(parts) => parts,
                 None => {
