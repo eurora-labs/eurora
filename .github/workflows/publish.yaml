@@ -189,17 +189,6 @@ jobs:
                   persist-credentials: false
                   lfs: true
 
-            - name: Fetch current version
-              shell: pwsh
-              if: runner.os == 'Windows'
-              env:
-                  RELEASE_CHANNEL: ${{ env.channel }}
-              run: |
-                  # Windows curl (Schannel) lacks HTTP/2 and the ALB rejects HTTP/1.1 with 464.
-                  # PowerShell 7 uses .NET HttpClient which negotiates HTTP/2 over TLS.
-                  $version = (Invoke-RestMethod -Uri "https://api.eurora-labs.com/releases/$env:RELEASE_CHANNEL" -HttpVersion 2.0).version
-                  "current_version=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-
             - name: Set Cargo build target
               shell: bash
               if: matrix.target != ''
@@ -250,6 +239,17 @@ jobs:
                     echo "$INPUT_BUMP"
                     echo 'EOF'
                   } >> "$GITHUB_ENV"
+
+            - name: Fetch current version
+              shell: pwsh
+              if: runner.os == 'Windows'
+              env:
+                  RELEASE_CHANNEL: ${{ env.channel }}
+              run: |
+                  # Windows curl (Schannel) lacks HTTP/2 and the ALB rejects HTTP/1.1 with 464.
+                  # PowerShell 7 uses .NET HttpClient which negotiates HTTP/2 over TLS.
+                  $version = (Invoke-RestMethod -Uri "https://api.eurora-labs.com/releases/$env:RELEASE_CHANNEL").version
+                  "current_version=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
             - name: Calculate next version
               shell: bash
