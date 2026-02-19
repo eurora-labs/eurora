@@ -11,7 +11,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use axum::{Router, routing::get};
 use tower::ServiceBuilder;
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tower_http::trace::TraceLayer;
 use tracing::debug;
 
 pub mod error;
@@ -45,11 +45,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             "/extensions/{channel}",
             get(handlers::get_extension_release_handler),
         )
-        .layer(
-            ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http())
-                .layer(CorsLayer::permissive()),
-        )
+        .layer(ServiceBuilder::new().layer(TraceLayer::new_for_http()))
         .with_state(state)
 }
 

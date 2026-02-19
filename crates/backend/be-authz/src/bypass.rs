@@ -1,10 +1,5 @@
-/// REST path prefixes that bypass authorization (public/unauthenticated routes).
-pub(crate) const REST_BYPASS_PREFIXES: &[&str] = &["/releases/", "/extensions/"];
-
-/// REST paths that bypass authorization via exact match.
-pub(crate) const REST_BYPASS_EXACT: &[&str] = &["/payment/webhook"];
-
-/// gRPC fully-qualified service names that bypass authorization.
+pub(crate) const REST_BYPASS_PREFIXES: &[&str] = &["/releases/", "/extensions/", "/download/"];
+pub(crate) const REST_BYPASS_EXACT: &[&str] = &["/payment/webhook", "/health"];
 pub(crate) const GRPC_BYPASS_SERVICES: &[&str] = &[
     "auth_service.ProtoAuthService",
     "grpc.health.v1.Health",
@@ -17,7 +12,6 @@ pub(crate) const GRPC_BYPASS_SERVICES: &[&str] = &[
 fn normalize_path(path: &str) -> String {
     use percent_encoding::percent_decode_str;
 
-    // Strip query string and fragment before normalizing segments.
     let path = path.split('?').next().unwrap_or(path);
     let path = path.split('#').next().unwrap_or(path);
 
@@ -46,7 +40,6 @@ pub fn is_rest_bypass(path: &str) -> bool {
         || REST_BYPASS_EXACT.iter().any(|&exact| normalized == exact)
 }
 
-/// Returns `true` if the given gRPC service should skip authorization.
 pub fn is_grpc_bypass(service: &str) -> bool {
     GRPC_BYPASS_SERVICES.contains(&service)
 }
@@ -71,12 +64,11 @@ mod tests {
     fn rest_bypass_rejects_non_matching() {
         assert!(!is_rest_bypass("/payment/checkout"));
         assert!(!is_rest_bypass("/api/users"));
-        assert!(!is_rest_bypass("/releases")); // no trailing slash
+        assert!(!is_rest_bypass("/releases"));
     }
 
     #[test]
     fn rest_bypass_rejects_traversal_attacks() {
-        // Path traversal must not trick the prefix check
         assert!(!is_rest_bypass("/releases/../payment/checkout"));
         assert!(!is_rest_bypass("/extensions/../admin/users"));
         assert!(!is_rest_bypass("/releases/../../etc/passwd"));
