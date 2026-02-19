@@ -1,6 +1,7 @@
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
-use axum::extract::{MatchedPath, Request};
+use axum::extract::{ConnectInfo, MatchedPath, Request};
 use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
@@ -9,16 +10,41 @@ use tracing::{debug, warn};
 
 use crate::CasbinAuthz;
 use crate::bypass::is_rest_bypass;
+use crate::rate_limit::AuthFailureRateLimiter;
 
 pub struct AuthzState {
     pub authz: CasbinAuthz,
     pub jwt_config: JwtConfig,
+    pub rate_limiter: AuthFailureRateLimiter,
 }
 
 impl AuthzState {
-    pub fn new(authz: CasbinAuthz, jwt_config: JwtConfig) -> Self {
-        Self { authz, jwt_config }
+    pub fn new(
+        authz: CasbinAuthz,
+        jwt_config: JwtConfig,
+        rate_limiter: AuthFailureRateLimiter,
+    ) -> Self {
+        Self {
+            authz,
+            jwt_config,
+            rate_limiter,
+        }
     }
+}
+
+fn extract_client_ip(req: &Request) -> IpAddr {
+    req.extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|ci| ci.0.ip())
+        .unwrap_or(IpAddr::from([127, 0, 0, 1]))
+}
+
+fn too_many_requests_response() -> Response {
+    (
+        StatusCode::TOO_MANY_REQUESTS,
+        axum::Json(serde_json::json!({"error": "Too many failed requests. Try again later."})),
+    )
+        .into_response()
 }
 
 pub async fn authz_middleware(
@@ -36,6 +62,13 @@ pub async fn authz_middleware(
     if is_rest_bypass(&raw_path) {
         debug!(path = %raw_path, "Bypassing authorization for public route");
         return next.run(req).await;
+    }
+
+    let client_ip = extract_client_ip(&req);
+
+    if state.rate_limiter.check_key(&client_ip).is_err() {
+        warn!(ip = %client_ip, "Rate limited — too many auth failures");
+        return too_many_requests_response();
     }
 
     let policy_path = match req.extensions().get::<MatchedPath>() {
@@ -57,6 +90,7 @@ pub async fn authz_middleware(
     {
         Some(h) => h.to_string(),
         None => {
+            let _ = state.rate_limiter.check_key(&client_ip);
             return (
                 StatusCode::UNAUTHORIZED,
                 axum::Json(serde_json::json!({"error": "Missing authorization header"})),
@@ -68,6 +102,7 @@ pub async fn authz_middleware(
     let token = match auth_header.strip_prefix("Bearer ") {
         Some(t) => t,
         None => {
+            let _ = state.rate_limiter.check_key(&client_ip);
             return (
                 StatusCode::UNAUTHORIZED,
                 axum::Json(
@@ -81,6 +116,7 @@ pub async fn authz_middleware(
     let claims = match state.jwt_config.validate_access_token(token) {
         Ok(c) => c,
         Err(e) => {
+            let _ = state.rate_limiter.check_key(&client_ip);
             warn!(error = %e, "JWT validation failed");
             return (
                 StatusCode::UNAUTHORIZED,
@@ -99,6 +135,7 @@ pub async fn authz_middleware(
             next.run(req).await
         }
         Ok(false) => {
+            let _ = state.rate_limiter.check_key(&client_ip);
             warn!(role = %role, path = %raw_path, method = %method, "REST authorization denied");
             (
                 StatusCode::FORBIDDEN,

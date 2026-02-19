@@ -1539,6 +1539,7 @@ dependencies = [
  "axum",
  "be-auth-core",
  "casbin",
+ "governor",
  "http 1.4.0",
  "percent-encoding",
  "serde_json",
