@@ -7,6 +7,6 @@ RUN chmod 755 /usr/local/bin/be-monolith
 USER eurora
 ENV AUTHZ_MODEL_PATH=/etc/eurora/authz/model.conf
 ENV AUTHZ_POLICY_PATH=/etc/eurora/authz/policy.csv
-EXPOSE 8000 3000
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD timeout 3s bash -c "</dev/tcp/localhost/8000 && </dev/tcp/localhost/3000" || exit 1
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD timeout 3s bash -c "</dev/tcp/localhost/8000" || exit 1
 CMD ["/usr/local/bin/be-monolith"]

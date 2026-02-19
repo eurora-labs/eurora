@@ -1,9 +1,11 @@
 use std::future::Future;
+use std::net::{IpAddr, SocketAddr};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use auth_core::Claims;
+use axum::extract::ConnectInfo;
 use be_auth_core::JwtConfig;
 use http::Request;
 use tonic::Status;
@@ -12,18 +14,25 @@ use tracing::{debug, warn};
 
 use crate::CasbinAuthz;
 use crate::bypass::is_grpc_bypass;
+use crate::rate_limit::AuthFailureRateLimiter;
 
 #[derive(Clone)]
 pub struct GrpcAuthzLayer {
     authz: CasbinAuthz,
     jwt_config: Arc<JwtConfig>,
+    rate_limiter: AuthFailureRateLimiter,
 }
 
 impl GrpcAuthzLayer {
-    pub fn new(authz: CasbinAuthz, jwt_config: JwtConfig) -> Self {
+    pub fn new(
+        authz: CasbinAuthz,
+        jwt_config: JwtConfig,
+        rate_limiter: AuthFailureRateLimiter,
+    ) -> Self {
         Self {
             authz,
             jwt_config: Arc::new(jwt_config),
+            rate_limiter,
         }
     }
 }
@@ -36,6 +45,7 @@ impl<S> Layer<S> for GrpcAuthzLayer {
             inner,
             authz: self.authz.clone(),
             jwt_config: Arc::clone(&self.jwt_config),
+            rate_limiter: Arc::clone(&self.rate_limiter),
         }
     }
 }
@@ -45,6 +55,14 @@ pub struct GrpcAuthzService<S> {
     inner: S,
     authz: CasbinAuthz,
     jwt_config: Arc<JwtConfig>,
+    rate_limiter: AuthFailureRateLimiter,
+}
+
+fn extract_client_ip<B>(req: &Request<B>) -> IpAddr {
+    req.extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|ci| ci.0.ip())
+        .unwrap_or(IpAddr::from([127, 0, 0, 1]))
 }
 
 impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for GrpcAuthzService<S>
@@ -67,6 +85,8 @@ where
         let path = req.uri().path().to_string();
         let authz = self.authz.clone();
         let jwt_config = Arc::clone(&self.jwt_config);
+        let rate_limiter = Arc::clone(&self.rate_limiter);
+        let client_ip = extract_client_ip(&req);
         let inner = self.inner.clone();
         let mut inner = std::mem::replace(&mut self.inner, inner);
 
@@ -88,9 +108,20 @@ where
                 return inner.call(req).await;
             }
 
+            if rate_limiter.check_key(&client_ip).is_err() {
+                warn!(ip = %client_ip, "Rate limited — too many auth failures");
+                return Ok(Status::resource_exhausted(
+                    "Too many failed requests. Try again later.",
+                )
+                .into_http());
+            }
+
             let claims = match extract_jwt_claims(&req, &jwt_config) {
                 Ok(claims) => claims,
-                Err(status) => return Ok(status.into_http()),
+                Err(status) => {
+                    let _ = rate_limiter.check_key(&client_ip);
+                    return Ok(status.into_http());
+                }
             };
 
             let service_name = extract_service_name(&service_full);
@@ -103,6 +134,7 @@ where
                     inner.call(req).await
                 }
                 Ok(false) => {
+                    let _ = rate_limiter.check_key(&client_ip);
                     warn!(role = %role, service = %service_name, method = %method, "gRPC authorization denied");
                     Ok(Status::permission_denied(
                         "Insufficient permissions. Please upgrade your plan.",
