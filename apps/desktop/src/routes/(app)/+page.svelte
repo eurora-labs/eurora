@@ -22,7 +22,6 @@
 	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory/index';
 	import * as Launcher from '@eurora/prosemirror-view/launcher';
 	import { inject } from '@eurora/shared/context';
-	import { ScrollArea } from '@eurora/ui/components/scroll-area/index';
 	import * as Chat from '@eurora/ui/custom-components/chat/index';
 	import { Thinking } from '@eurora/ui/custom-components/thinking/index';
 	import { onMount } from 'svelte';
@@ -145,31 +144,26 @@
 
 <div class="w-full h-full">
 	{#if messages.length > 0}
-		<ScrollArea class="h-full w-full px-6">
-			<Chat.Root
-				bind:this={chatRef}
-				class="w-full h-full flex flex-col gap-4 overflow-hidden pb-28"
-			>
-				{#each messages as message}
-					{@const content = getMessageContent(message)}
-					{@const isUser = isUserMessage(message)}
-					{#if content.length > 0 || !isUser}
-						<Chat.Message
-							variant={isUser ? 'default' : 'assistant'}
-							finishRendering={() => {}}
-						>
-							<Chat.MessageContent>
-								{#if content.trim().length > 0}
-									<Katex math={content} />
-								{:else}
-									<Thinking class="text-primary/60" />
-								{/if}
-							</Chat.MessageContent>
-						</Chat.Message>
-					{/if}
-				{/each}
-			</Chat.Root>
-		</ScrollArea>
+		<Chat.Root bind:this={chatRef} class="h-full w-full px-6 flex flex-col gap-4 pb-28">
+			{#each messages as message}
+				{@const content = getMessageContent(message)}
+				{@const isUser = isUserMessage(message)}
+				{#if content.length > 0 || !isUser}
+					<Chat.Message
+						variant={isUser ? 'default' : 'assistant'}
+						finishRendering={() => {}}
+					>
+						<Chat.MessageContent>
+							{#if content.trim().length > 0}
+								<Katex math={content} />
+							{:else}
+								<Thinking class="text-primary/60" />
+							{/if}
+						</Chat.MessageContent>
+					</Chat.Message>
+				{/if}
+			{/each}
+		</Chat.Root>
 	{/if}
 
 	<div
