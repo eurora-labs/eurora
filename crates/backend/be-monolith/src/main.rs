@@ -23,8 +23,14 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
 fn build_cors() -> CorsLayer {
-    let allowed: Vec<HeaderValue> = std::env::var("CORS_ALLOWED_ORIGINS")
-        .unwrap_or_else(|_| "https://www.eurora-labs.com,https://api.eurora-labs.com".into())
+    let raw = std::env::var("CORS_ALLOWED_ORIGINS")
+        .unwrap_or_else(|_| "https://www.eurora-labs.com,https://api.eurora-labs.com".into());
+
+    if raw.trim() == "*" {
+        return CorsLayer::permissive();
+    }
+
+    let allowed: Vec<HeaderValue> = raw
         .split(',')
         .filter_map(|s| {
             let s = s.trim();
@@ -141,8 +147,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Starting gRPC server at {}", grpc_addr);
     info!("Starting HTTP server at {}", http_addr);
 
-    let cors = build_cors();
-
     let bucket_name =
         std::env::var("S3_BUCKET_NAME").unwrap_or_else(|_| "eurora-releases".to_string());
 
@@ -170,13 +174,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let shutdown = tokio::signal::ctrl_c();
-
+    // -- gRPC server (tonic) --
+    // Layer order in tonic: first .layer() = innermost. The old working config
+    // was .layer(cors).layer(GrpcWebLayer) — GrpcWeb outermost, CORS inner.
+    // let grpc_cors = build_cors();
     let grpc_authz_layer = GrpcAuthzLayer::new(authz.clone(), jwt_config.clone());
+    let grpc_cors = CorsLayer::permissive();
 
     let mut grpc_router = Server::builder()
         .accept_http1(true)
-        .layer(cors)
+        .layer(grpc_cors)
         .layer(GrpcWebLayer::new())
         .layer(grpc_authz_layer)
         .add_service(health_service)
@@ -192,6 +199,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("Local mode: registered LocalSettingsService (encryption key will be set by client)");
     }
 
+    let grpc_shutdown = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to install CTRL+C signal handler");
+    };
+    let grpc_server = grpc_router.serve_with_shutdown(grpc_addr, grpc_shutdown);
+
+    // -- HTTP server (axum) --
     let authz_state = Arc::new(AuthzState::new(authz, jwt_config));
     let http_cors = build_cors();
 
@@ -201,9 +216,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let http_router = update_router
-        .layer(http_cors)
         .merge(payment_router)
         .merge(health_route)
+        .layer(http_cors)
         .layer(axum::middleware::from_fn_with_state(
             authz_state,
             authz_middleware,
@@ -213,24 +228,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let http_server = axum::serve(
         http_listener,
         http_router.into_make_service_with_connect_info::<SocketAddr>(),
-    );
+    )
+    .with_graceful_shutdown(async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to install CTRL+C signal handler");
+    });
 
-    let (grpc_result, http_result, _) = tokio::join!(
-        grpc_router.serve(grpc_addr),
-        http_server.into_future(),
-        async {
-            shutdown
-                .await
-                .expect("Failed to install CTRL+C signal handler");
-            info!("Shutdown signal received");
+    tokio::select! {
+        result = grpc_server => {
+            if let Err(e) = result {
+                error!("gRPC server error: {}", e);
+                return Err(e.into());
+            }
         }
-    );
-
-    if let Err(e) = grpc_result {
-        error!("gRPC server error: {}", e);
-    }
-    if let Err(e) = http_result {
-        error!("HTTP server error: {}", e);
+        result = http_server => {
+            if let Err(e) = result {
+                error!("HTTP server error: {}", e);
+                return Err(e.into());
+            }
+        }
     }
 
     Ok(())
