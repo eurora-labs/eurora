@@ -6,6 +6,16 @@ use tracing::{info, warn};
 
 use crate::error::PaymentError;
 
+fn serialize_or_null(value: &impl serde::Serialize, context: &str) -> serde_json::Value {
+    match serde_json::to_value(value) {
+        Ok(v) => v,
+        Err(e) => {
+            warn!(error = %e, context, "Failed to serialize Stripe object, storing null");
+            serde_json::Value::Null
+        }
+    }
+}
+
 fn extract_subscription_items(
     sub: &Subscription,
 ) -> Vec<(String, String, Option<i64>, serde_json::Value)> {
@@ -13,7 +23,7 @@ fn extract_subscription_items(
         .data
         .iter()
         .map(|item| {
-            let raw = serde_json::to_value(item).unwrap_or_default();
+            let raw = serialize_or_null(item, "subscription_item");
             (
                 item.id.to_string(),
                 item.price.id.to_string(),
@@ -98,8 +108,8 @@ pub async fn on_checkout_completed(
             .unwrap_or(false);
 
         let sub_raw = subscription
-            .and_then(|s| serde_json::to_value(s).ok())
-            .unwrap_or_default();
+            .map(|s| serialize_or_null(s, "checkout_subscription"))
+            .unwrap_or(serde_json::Value::Null);
 
         db.upsert_stripe_subscription()
             .executor(&mut *tx)
@@ -164,7 +174,7 @@ pub async fn on_subscription_updated(
         "Subscription updated — syncing status"
     );
 
-    let sub_raw = serde_json::to_value(sub).unwrap_or_default();
+    let sub_raw = serialize_or_null(sub, "subscription_updated");
 
     let mut tx = db
         .pool
@@ -246,9 +256,16 @@ pub async fn on_subscription_deleted(
         "Subscription deleted — revoking"
     );
 
-    let sub_raw = serde_json::to_value(sub).unwrap_or_default();
+    let sub_raw = serialize_or_null(sub, "subscription_deleted");
 
-    db.update_stripe_subscription_status(
+    let mut tx = db
+        .pool
+        .begin()
+        .await
+        .map_err(|e| anyhow::anyhow!("begin tx: {e}"))?;
+
+    db.update_stripe_subscription_status_with_executor(
+        &mut *tx,
         &subscription_id,
         "canceled",
         false,
@@ -258,9 +275,13 @@ pub async fn on_subscription_deleted(
     .await
     .map_err(|e| anyhow::anyhow!("update subscription status: {e}"))?;
 
-    db.update_account_plan_by_stripe_customer(&db.pool, &customer_id, "free")
+    db.update_account_plan_by_stripe_customer(&mut *tx, &customer_id, "free")
         .await
         .map_err(|e| anyhow::anyhow!("reset account plan: {e}"))?;
+
+    tx.commit()
+        .await
+        .map_err(|e| anyhow::anyhow!("commit tx: {e}"))?;
 
     Ok(())
 }
