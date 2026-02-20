@@ -1,26 +1,16 @@
-//! Print information about the system and agent-chain packages for debugging purposes.
-//!
-//! This module provides utilities for printing system and package information,
-//! useful for debugging and support purposes. It is a Rust adaptation of
-//! langchain_core's sys_info.py module.
-
 use crate::env::VERSION;
 use rustc_version_runtime::version;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::{self, Write};
 
-/// Information about a package/crate.
 #[derive(Debug, Clone)]
 pub struct PackageInfo {
-    /// The package name.
     pub name: Cow<'static, str>,
-    /// The package version, if available.
     pub version: Option<&'static str>,
 }
 
 impl PackageInfo {
-    /// Create a new PackageInfo with a static name.
     pub fn new_static(name: &'static str, version: Option<&'static str>) -> Self {
         Self {
             name: Cow::Borrowed(name),
@@ -28,7 +18,6 @@ impl PackageInfo {
         }
     }
 
-    /// Create a new PackageInfo with an owned name.
     pub fn new_owned(name: String, version: Option<&'static str>) -> Self {
         Self {
             name: Cow::Owned(name),
@@ -37,21 +26,15 @@ impl PackageInfo {
     }
 }
 
-/// System information for debugging.
 #[derive(Debug, Clone)]
 pub struct SystemInfo {
-    /// Operating system name (e.g., "linux", "macos", "windows").
     pub os: &'static str,
-    /// Operating system family (e.g., "unix", "windows").
     pub os_family: &'static str,
-    /// CPU architecture (e.g., "x86_64", "aarch64").
     pub arch: &'static str,
-    /// Rust version used to compile.
     pub rust_version: String,
 }
 
 impl SystemInfo {
-    /// Get the current system information.
     pub fn current() -> Self {
         Self {
             os: std::env::consts::OS,
@@ -62,10 +45,6 @@ impl SystemInfo {
     }
 }
 
-/// Get sub-dependencies that are not in the main package list.
-///
-/// In Rust, dependencies are determined at compile time, so this function
-/// returns a predefined list of common dependencies used by the agent-chain crates.
 fn get_sub_deps(packages: &[Cow<'static, str>]) -> Vec<PackageInfo> {
     let all_deps = [
         ("async-trait", option_env!("DEP_ASYNC_TRAIT_VERSION")),
@@ -87,9 +66,6 @@ fn get_sub_deps(packages: &[Cow<'static, str>]) -> Vec<PackageInfo> {
         .collect()
 }
 
-/// Get information about agent-chain packages.
-///
-/// Returns a list of package information for all agent-chain related crates.
 pub fn get_package_info() -> Vec<PackageInfo> {
     let mut packages = vec![
         PackageInfo::new_static("agent-chain-core", Some(VERSION)),
@@ -112,9 +88,6 @@ pub fn get_package_info() -> Vec<PackageInfo> {
     packages
 }
 
-/// Get all system and package information as structured data.
-///
-/// Returns a tuple of (system_info, packages, sub_dependencies).
 pub fn get_sys_info(additional_pkgs: &[&str]) -> (SystemInfo, Vec<PackageInfo>, Vec<PackageInfo>) {
     let system_info = SystemInfo::current();
     let mut packages = get_package_info();
@@ -129,30 +102,11 @@ pub fn get_sys_info(additional_pkgs: &[&str]) -> (SystemInfo, Vec<PackageInfo>, 
     (system_info, packages, sub_deps)
 }
 
-/// Print information about the environment for debugging purposes.
-///
-/// This function prints system information, package versions, and dependencies
-/// to stdout. It is useful for debugging and support purposes.
-///
-/// # Arguments
-///
-/// * `additional_pkgs` - Additional package names to include in the output.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::sys_info::print_sys_info;
-///
-/// print_sys_info(&[]);
-/// ```
 pub fn print_sys_info(additional_pkgs: &[&str]) {
     let mut stdout = io::stdout();
     print_sys_info_to(&mut stdout, additional_pkgs);
 }
 
-/// Print system information to a specific writer.
-///
-/// This is useful for testing or redirecting output.
 pub fn print_sys_info_to<W: Write>(writer: &mut W, additional_pkgs: &[&str]) {
     let (system_info, packages, sub_deps) = get_sys_info(additional_pkgs);
 
@@ -205,7 +159,6 @@ pub fn print_sys_info_to<W: Write>(writer: &mut W, additional_pkgs: &[&str]) {
     }
 }
 
-/// Get system information as a HashMap (for compatibility with env module).
 pub fn get_sys_info_map() -> HashMap<String, String> {
     let system_info = SystemInfo::current();
     let packages = get_package_info();

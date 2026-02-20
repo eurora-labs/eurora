@@ -1,17 +1,8 @@
-//! Dump objects to JSON.
-//!
-//! Mirrors `langchain_core.load.dump`.
-
 use serde::Serialize;
 use serde_json::Value;
 
 use super::serializable::{Serializable, to_json_not_implemented_value};
 
-/// Return a JSON string representation of a Serializable object.
-///
-/// Mirrors Python's `dumps(obj, *, pretty=False)`. If serialization of the
-/// `to_json()` output fails, falls back to a `SerializedNotImplemented`
-/// representation (matching Python's `except TypeError` branch).
 pub fn dumps<T: Serializable + Serialize>(obj: &T, pretty: bool) -> crate::Result<String> {
     let serialized = obj.to_json();
     let result = if pretty {
@@ -32,10 +23,6 @@ pub fn dumps<T: Serializable + Serialize>(obj: &T, pretty: bool) -> crate::Resul
     }
 }
 
-/// Return a dict-like representation of a Serializable object.
-///
-/// Mirrors Python's `dumpd(obj)` -- roundtrips through `dumps` then parses
-/// back into a `Value`.
 pub fn dumpd<T: Serializable + Serialize>(obj: &T) -> crate::Result<Value> {
     let json_string = dumps(obj, false)?;
     serde_json::from_str(&json_string).map_err(crate::Error::from)

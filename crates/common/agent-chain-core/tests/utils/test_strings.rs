@@ -1,7 +1,3 @@
-//! Unit tests for string utilities.
-//!
-//! Converted from langchain/libs/core/tests/unit_tests/utils/test_strings.py
-
 use agent_chain_core::utils::strings::{
     comma_list, sanitize_for_postgres, stringify_dict, stringify_value,
 };

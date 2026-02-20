@@ -1,7 +1,3 @@
-//! Tests for ToolMessage and tool-related functions.
-//!
-//! Converted from `langchain/libs/core/tests/unit_tests/messages/test_tool.py`
-
 use agent_chain_core::messages::{
     ToolMessage, ToolMessageChunk, ToolOutputMixin, ToolStatus, default_tool_chunk_parser,
     default_tool_parser, invalid_tool_call, tool_call, tool_call_chunk,

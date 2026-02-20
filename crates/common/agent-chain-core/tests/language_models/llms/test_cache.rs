@@ -1,12 +1,3 @@
-//! Cache interaction tests for LLMs.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/language_models/llms/test_cache.py`
-//!
-//! Tests the interaction between LLMs and caching abstraction, focusing on:
-//! - Local cache vs global cache
-//! - Sync and async generate operations with caching
-//! - Cache bypass with cache=false
-
 use std::sync::Arc;
 
 use agent_chain_core::caches::{BaseCache, InMemoryCache};
@@ -14,10 +5,6 @@ use agent_chain_core::language_models::{BaseLLM, FakeListLLM};
 use agent_chain_core::outputs::GenerationType;
 use agent_chain_core::set_llm_cache;
 
-/// Ported from `test_local_cache_generate_async`.
-///
-/// Verifies that when a local cache instance is set on the LLM, it is used
-/// instead of the global cache. On cache hit, the same result is returned.
 #[tokio::test]
 async fn test_local_cache_generate_async() {
     let global_cache = Arc::new(InMemoryCache::unbounded());
@@ -59,10 +46,6 @@ async fn test_local_cache_generate_async() {
     set_llm_cache(None);
 }
 
-/// Ported from `test_local_cache_generate_sync`.
-///
-/// Same as async version but exercises the same generate path (which is
-/// async in Rust but called from a sync-like test context).
 #[tokio::test]
 async fn test_local_cache_generate_sync() {
     let global_cache = Arc::new(InMemoryCache::unbounded());
@@ -100,10 +83,6 @@ async fn test_local_cache_generate_sync() {
     set_llm_cache(None);
 }
 
-/// Ported from `test_no_cache_generate_sync`.
-///
-/// When cache=false, the global cache is bypassed entirely. Each call
-/// produces a fresh response from the LLM.
 #[tokio::test]
 async fn test_no_cache_generate_sync() {
     let global_cache = Arc::new(InMemoryCache::unbounded());
@@ -139,9 +118,6 @@ async fn test_no_cache_generate_sync() {
     set_llm_cache(None);
 }
 
-/// Ported from `test_no_cache_generate_async`.
-///
-/// Async version of test_no_cache_generate_sync.
 #[tokio::test]
 async fn test_no_cache_generate_async() {
     let global_cache = Arc::new(InMemoryCache::unbounded());

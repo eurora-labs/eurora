@@ -1,8 +1,3 @@
-//! Retriever tool.
-//!
-//! This module provides utilities for creating tools from retrievers,
-//! mirroring `langchain_core.tools.retriever`.
-
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
@@ -17,15 +12,12 @@ use crate::retrievers::BaseRetriever;
 use super::base::{ArgsSchema, ResponseFormat};
 use super::structured::StructuredTool;
 
-/// Input schema for retriever tools.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetrieverInput {
-    /// The query to look up in the retriever.
     pub query: String,
 }
 
 impl RetrieverInput {
-    /// Create a new RetrieverInput.
     pub fn new(query: impl Into<String>) -> Self {
         Self {
             query: query.into(),
@@ -33,7 +25,6 @@ impl RetrieverInput {
     }
 }
 
-/// Get the default args schema for retriever tools.
 fn retriever_args_schema() -> ArgsSchema {
     ArgsSchema::JsonSchema(serde_json::json!({
         "type": "object",
@@ -49,19 +40,6 @@ fn retriever_args_schema() -> ArgsSchema {
     }))
 }
 
-/// Create a tool to do retrieval of documents.
-///
-/// # Arguments
-///
-/// * `retriever` - The retriever to use for the retrieval.
-/// * `name` - The name for the tool. This will be passed to the language model,
-///   so should be unique and somewhat descriptive.
-/// * `description` - The description for the tool. This will be passed to the
-///   language model, so should be descriptive.
-///
-/// # Returns
-///
-/// A StructuredTool configured for document retrieval.
 pub fn create_retriever_tool<R>(
     retriever: Arc<R>,
     name: impl Into<String>,
@@ -80,20 +58,6 @@ where
     )
 }
 
-/// Create a retriever tool with additional options.
-///
-/// # Arguments
-///
-/// * `retriever` - The retriever to use.
-/// * `name` - The tool name.
-/// * `description` - The tool description.
-/// * `document_prompt` - Optional template for formatting documents.
-/// * `document_separator` - Separator between documents (default: "\n\n").
-/// * `response_format` - The tool response format.
-///
-/// # Returns
-///
-/// A StructuredTool configured for document retrieval.
 pub fn create_retriever_tool_with_options<R>(
     retriever: Arc<R>,
     name: impl Into<String>,
@@ -148,7 +112,6 @@ where
         .with_response_format(response_format)
 }
 
-/// Format documents into a single string.
 fn format_documents(docs: &[Document], separator: &str) -> String {
     docs.iter()
         .map(|doc| doc.page_content.clone())
@@ -156,9 +119,6 @@ fn format_documents(docs: &[Document], separator: &str) -> String {
         .join(separator)
 }
 
-/// Create a retriever tool with async support.
-///
-/// This version properly supports async retrieval.
 pub fn create_async_retriever_tool<R, F, Fut>(
     retriever: Arc<R>,
     retrieve_fn: F,
@@ -192,7 +152,6 @@ where
     StructuredTool::from_function(func, name, description, retriever_args_schema())
 }
 
-/// Builder for creating retriever tools with full configuration.
 pub struct RetrieverToolBuilder<R>
 where
     R: BaseRetriever + Send + Sync + 'static,
@@ -209,7 +168,6 @@ impl<R> RetrieverToolBuilder<R>
 where
     R: BaseRetriever + Send + Sync + 'static,
 {
-    /// Create a new RetrieverToolBuilder.
     pub fn new(retriever: Arc<R>) -> Self {
         Self {
             retriever,
@@ -221,37 +179,31 @@ where
         }
     }
 
-    /// Set the tool name.
     pub fn name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
     }
 
-    /// Set the tool description.
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
     }
 
-    /// Set the document prompt template.
     pub fn document_prompt(mut self, prompt: impl Into<String>) -> Self {
         self.document_prompt = Some(prompt.into());
         self
     }
 
-    /// Set the document separator.
     pub fn document_separator(mut self, separator: impl Into<String>) -> Self {
         self.document_separator = separator.into();
         self
     }
 
-    /// Set the response format.
     pub fn response_format(mut self, format: ResponseFormat) -> Self {
         self.response_format = format;
         self
     }
 
-    /// Build the retriever tool.
     pub fn build(self) -> Result<StructuredTool> {
         let name = self.name.ok_or_else(|| {
             crate::error::Error::InvalidConfig("Retriever tool name is required".to_string())

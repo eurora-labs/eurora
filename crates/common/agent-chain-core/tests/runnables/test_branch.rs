@@ -1,7 +1,3 @@
-//! Tests for RunnableBranch functionality.
-//!
-//! Converted from `langchain/libs/core/tests/unit_tests/runnables/test_branch.py`
-
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 

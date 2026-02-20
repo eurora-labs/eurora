@@ -1,7 +1,3 @@
-//! Comprehensive tests for RouterRunnable functionality.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/runnables/test_router.py`
-
 use std::collections::HashMap;
 
 use agent_chain_core::error::{Error, Result};
@@ -11,7 +7,6 @@ use agent_chain_core::runnables::router::{RouterInput, RouterRunnable};
 use futures::StreamExt;
 use serde_json::Value;
 
-/// Mirrors `test_router_initialization`.
 #[test]
 fn test_router_initialization() {
     let router = RouterRunnable::<i32, i32>::new()
@@ -23,7 +18,6 @@ fn test_router_initialization() {
     assert!(debug_str.contains("multiply"));
 }
 
-/// Mirrors `test_router_initialization_with_runnables`.
 #[test]
 fn test_router_initialization_with_runnables() {
     let add_runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -42,7 +36,6 @@ fn test_router_initialization_with_runnables() {
     );
 }
 
-/// Mirrors `test_router_invoke`.
 #[test]
 fn test_router_invoke() {
     let router = RouterRunnable::new()
@@ -58,7 +51,6 @@ fn test_router_invoke() {
     );
 }
 
-/// Mirrors `test_router_invoke_invalid_key`.
 #[test]
 fn test_router_invoke_invalid_key() {
     let router = RouterRunnable::new().add("add", RunnableLambda::new(|x: i32| Ok(x + 1)));
@@ -73,7 +65,6 @@ fn test_router_invoke_invalid_key() {
     );
 }
 
-/// Mirrors `test_router_invoke_with_spy`.
 #[test]
 fn test_router_invoke_with_spy() {
     let router = RouterRunnable::new()
@@ -84,7 +75,6 @@ fn test_router_invoke_with_spy() {
     assert_eq!(router.invoke(RouterInput::new("b", 5), None).unwrap(), 25);
 }
 
-/// Mirrors `test_router_ainvoke`.
 #[tokio::test]
 async fn test_router_ainvoke() {
     let router = RouterRunnable::new()
@@ -107,7 +97,6 @@ async fn test_router_ainvoke() {
     );
 }
 
-/// Mirrors `test_router_ainvoke_invalid_key`.
 #[tokio::test]
 async fn test_router_ainvoke_invalid_key() {
     let router = RouterRunnable::new().add("add", RunnableLambda::new(|x: i32| Ok(x + 1)));
@@ -122,7 +111,6 @@ async fn test_router_ainvoke_invalid_key() {
     );
 }
 
-/// Mirrors `test_router_batch`.
 #[test]
 fn test_router_batch() {
     let router = RouterRunnable::new()
@@ -141,7 +129,6 @@ fn test_router_batch() {
     assert_eq!(*results[2].as_ref().unwrap(), 4);
 }
 
-/// Mirrors `test_router_batch_invalid_key`.
 #[test]
 fn test_router_batch_invalid_key() {
     let router = RouterRunnable::new().add("add", RunnableLambda::new(|x: i32| Ok(x + 1)));
@@ -159,7 +146,6 @@ fn test_router_batch_invalid_key() {
     );
 }
 
-/// Mirrors `test_router_batch_all_same_key`.
 #[test]
 fn test_router_batch_all_same_key() {
     let router = RouterRunnable::new().add("add", RunnableLambda::new(|x: i32| Ok(x + 1)));
@@ -176,7 +162,6 @@ fn test_router_batch_all_same_key() {
     assert_eq!(*results[2].as_ref().unwrap(), 4);
 }
 
-/// Mirrors `test_router_batch_different_keys`.
 #[test]
 fn test_router_batch_different_keys() {
     let router = RouterRunnable::new()
@@ -198,7 +183,6 @@ fn test_router_batch_different_keys() {
     assert_eq!(*results[3].as_ref().unwrap(), 5);
 }
 
-/// Mirrors `test_router_batch_return_exceptions`.
 #[test]
 fn test_router_batch_return_exceptions() {
     let router = RouterRunnable::new()
@@ -227,7 +211,6 @@ fn test_router_batch_return_exceptions() {
     assert_eq!(*results[2].as_ref().unwrap(), 4);
 }
 
-/// Mirrors `test_router_empty_batch`.
 #[test]
 fn test_router_empty_batch() {
     let router = RouterRunnable::new().add("add", RunnableLambda::new(|x: i32| Ok(x + 1)));
@@ -236,7 +219,6 @@ fn test_router_empty_batch() {
     assert!(results.is_empty());
 }
 
-/// Mirrors `test_router_batch_with_configs`.
 #[test]
 fn test_router_batch_with_configs() {
     let router = RouterRunnable::new().add("add", RunnableLambda::new(|x: i32| Ok(x + 1)));
@@ -253,7 +235,6 @@ fn test_router_batch_with_configs() {
     assert_eq!(*results[2].as_ref().unwrap(), 4);
 }
 
-/// Mirrors `test_router_abatch`.
 #[tokio::test]
 async fn test_router_abatch() {
     let router = RouterRunnable::new()
@@ -272,7 +253,6 @@ async fn test_router_abatch() {
     assert_eq!(*results[2].as_ref().unwrap(), 4);
 }
 
-/// Mirrors `test_router_abatch_invalid_key`.
 #[tokio::test]
 async fn test_router_abatch_invalid_key() {
     let router = RouterRunnable::new().add("add", RunnableLambda::new(|x: i32| Ok(x + 1)));
@@ -283,7 +263,6 @@ async fn test_router_abatch_invalid_key() {
     assert!(results.iter().any(|r| r.is_err()));
 }
 
-/// Mirrors `test_router_abatch_return_exceptions`.
 #[tokio::test]
 async fn test_router_abatch_return_exceptions() {
     let router = RouterRunnable::new()
@@ -305,7 +284,6 @@ async fn test_router_abatch_return_exceptions() {
     assert_eq!(*results[2].as_ref().unwrap(), 4);
 }
 
-/// Mirrors `test_router_empty_abatch`.
 #[tokio::test]
 async fn test_router_empty_abatch() {
     let router = RouterRunnable::new().add("add", RunnableLambda::new(|x: i32| Ok(x + 1)));
@@ -314,7 +292,6 @@ async fn test_router_empty_abatch() {
     assert!(results.is_empty());
 }
 
-/// Mirrors `test_router_abatch_different_keys`.
 #[tokio::test]
 async fn test_router_abatch_different_keys() {
     let router = RouterRunnable::new()
@@ -333,7 +310,6 @@ async fn test_router_abatch_different_keys() {
     assert_eq!(*results[2].as_ref().unwrap(), 4);
 }
 
-/// Mirrors `test_router_stream`.
 #[tokio::test]
 async fn test_router_stream() {
     let router = RouterRunnable::new().add("gen", RunnableLambda::new(|x: i32| Ok(x + 1)));
@@ -347,7 +323,6 @@ async fn test_router_stream() {
     assert_eq!(result, vec![6]);
 }
 
-/// Mirrors `test_router_stream_invalid_key`.
 #[tokio::test]
 async fn test_router_stream_invalid_key() {
     let router = RouterRunnable::new().add("gen", RunnableLambda::new(|x: i32| Ok(x + 1)));
@@ -368,7 +343,6 @@ async fn test_router_stream_invalid_key() {
     );
 }
 
-/// Mirrors `test_router_astream`.
 #[tokio::test]
 async fn test_router_astream() {
     let router = RouterRunnable::new().add("gen", RunnableLambda::new(|x: i32| Ok(x + 1)));
@@ -382,7 +356,6 @@ async fn test_router_astream() {
     assert_eq!(result, vec![6]);
 }
 
-/// Mirrors `test_router_astream_invalid_key`.
 #[tokio::test]
 async fn test_router_astream_invalid_key() {
     let router = RouterRunnable::new().add("gen", RunnableLambda::new(|x: i32| Ok(x + 1)));
@@ -396,7 +369,6 @@ async fn test_router_astream_invalid_key() {
     assert!(results[0].is_err());
 }
 
-/// Mirrors `test_router_stream_sync`.
 #[tokio::test]
 async fn test_router_stream_sync() {
     let router = RouterRunnable::new().add("id", RunnableLambda::new(|x: String| Ok(x)));
@@ -410,7 +382,6 @@ async fn test_router_stream_sync() {
     assert_eq!(result, vec!["test".to_string()]);
 }
 
-/// Mirrors `test_router_with_config`.
 #[test]
 fn test_router_with_config() {
     let router = RouterRunnable::new().add("add", RunnableLambda::new(|x: i32| Ok(x + 1)));
@@ -424,9 +395,6 @@ fn test_router_with_config() {
     assert_eq!(result, 6);
 }
 
-/// Mirrors `test_router_with_different_input_types`.
-///
-/// Uses Value as the common type to handle heterogeneous inputs.
 #[test]
 fn test_router_with_different_input_types() {
     let router = RouterRunnable::<Value, Value>::new()
@@ -459,7 +427,6 @@ fn test_router_with_different_input_types() {
     assert_eq!(result, serde_json::json!(10));
 }
 
-/// Mirrors `test_router_with_dict_input`.
 #[test]
 fn test_router_with_dict_input() {
     let router = RouterRunnable::<Value, String>::new().add(
@@ -480,7 +447,6 @@ fn test_router_with_dict_input() {
     assert_eq!(result, "Alice is 30 years old");
 }
 
-/// Mirrors `test_router_complex_routing_logic`.
 #[test]
 fn test_router_complex_routing_logic() {
     let router = RouterRunnable::<Value, String>::new()
@@ -523,7 +489,6 @@ fn test_router_complex_routing_logic() {
     }
 }
 
-/// Mirrors `test_router_single_route`.
 #[test]
 fn test_router_single_route() {
     let router = RouterRunnable::new().add("only", RunnableLambda::new(|x: i32| Ok(x * 3)));
@@ -532,7 +497,6 @@ fn test_router_single_route() {
     assert_eq!(result, 12);
 }
 
-/// Mirrors `test_router_input_type`.
 #[test]
 fn test_router_input_type() {
     let input = RouterInput::new("test", 42);
@@ -540,7 +504,6 @@ fn test_router_input_type() {
     assert_eq!(input.input, 42);
 }
 
-/// Mirrors `test_router_serialization` / `test_router_namespace`.
 #[test]
 fn test_router_serialization() {
     use agent_chain_core::load::Serializable;
@@ -551,7 +514,6 @@ fn test_router_serialization() {
     );
 }
 
-/// Test Debug formatting.
 #[test]
 fn test_router_debug() {
     let router = RouterRunnable::new().add("add", RunnableLambda::new(|x: i32| Ok(x + 1)));
@@ -560,7 +522,6 @@ fn test_router_debug() {
     assert!(debug.contains("add"));
 }
 
-/// Test name with and without explicit name.
 #[test]
 fn test_router_name() {
     let router = RouterRunnable::new()
@@ -578,7 +539,6 @@ fn test_router_name() {
     assert_eq!(named.name(), Some("my_router".to_string()));
 }
 
-/// Test config_specs aggregation.
 #[test]
 fn test_router_config_specs() {
     let router = RouterRunnable::new().add("add", RunnableLambda::new(|x: i32| Ok(x + 1)));
@@ -587,7 +547,6 @@ fn test_router_config_specs() {
     assert!(specs.is_empty());
 }
 
-/// Test Default impl.
 #[test]
 fn test_router_default() {
     let router = RouterRunnable::<i32, i32>::default();
@@ -595,7 +554,6 @@ fn test_router_default() {
     assert!(result.is_err()); // No routes registered
 }
 
-/// Test from_runnables constructor.
 #[test]
 fn test_router_from_runnables() {
     use std::sync::Arc;

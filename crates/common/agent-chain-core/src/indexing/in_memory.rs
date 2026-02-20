@@ -16,9 +16,6 @@ use crate::retrievers::BaseRetriever;
 use crate::retrievers::LangSmithRetrieverParams;
 use crate::runnables::config::RunnableConfig;
 
-/// In-memory document index with simple word-count-based search.
-///
-/// Mirrors `langchain_core.indexing.in_memory.InMemoryDocumentIndex`.
 pub struct InMemoryDocumentIndex {
     store: RwLock<HashMap<String, Document>>,
     top_k: usize,
@@ -42,7 +39,6 @@ impl InMemoryDocumentIndex {
         }
     }
 
-    /// Get the number of documents in the store.
     pub fn len(&self) -> Result<usize> {
         let store = self
             .store
@@ -51,7 +47,6 @@ impl InMemoryDocumentIndex {
         Ok(store.len())
     }
 
-    /// Check if the store is empty.
     pub fn is_empty(&self) -> Result<bool> {
         Ok(self.len()? == 0)
     }

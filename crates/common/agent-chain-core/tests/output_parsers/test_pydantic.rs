@@ -1,7 +1,3 @@
-//! Tests for PydanticOutputParser.
-//!
-//! Ported from langchain/libs/core/tests/unit_tests/output_parsers/test_pydantic.py
-
 use agent_chain_core::output_parsers::{BaseOutputParser, PydanticOutputParser};
 use agent_chain_core::outputs::Generation;
 use serde::{Deserialize, Serialize};

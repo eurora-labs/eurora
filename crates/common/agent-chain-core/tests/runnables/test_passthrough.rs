@@ -1,7 +1,3 @@
-//! Comprehensive tests for RunnablePassthrough, RunnableAssign, and RunnablePick.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/runnables/test_passthrough.py`
-
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, Mutex};
@@ -19,7 +15,6 @@ fn make_input(pairs: &[(&str, Value)]) -> HashMap<String, Value> {
         .collect()
 }
 
-/// Mirrors `test_passthrough_identity`.
 #[test]
 fn test_passthrough_identity() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
@@ -42,7 +37,6 @@ fn test_passthrough_identity() {
     assert_eq!(passthrough_map.invoke(input.clone(), None).unwrap(), input);
 }
 
-/// Mirrors `test_passthrough_identity_async`.
 #[tokio::test]
 async fn test_passthrough_identity_async() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
@@ -65,7 +59,6 @@ async fn test_passthrough_identity_async() {
     );
 }
 
-/// Mirrors `test_passthrough_with_func`.
 #[test]
 fn test_passthrough_with_func() {
     let calls: Arc<Mutex<Vec<i32>>> = Arc::new(Mutex::new(Vec::new()));
@@ -85,7 +78,6 @@ fn test_passthrough_with_func() {
     assert_eq!(*calls.lock().unwrap(), vec![5, 10]);
 }
 
-/// Mirrors `test_passthrough_with_afunc`.
 #[tokio::test]
 async fn test_passthrough_with_afunc() {
     let calls: Arc<Mutex<Vec<i32>>> = Arc::new(Mutex::new(Vec::new()));
@@ -105,7 +97,6 @@ async fn test_passthrough_with_afunc() {
     assert_eq!(*calls.lock().unwrap(), vec![5]);
 }
 
-/// Mirrors `test_passthrough_stream`.
 #[tokio::test]
 async fn test_passthrough_stream() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
@@ -117,7 +108,6 @@ async fn test_passthrough_stream() {
     assert_eq!(result, vec![42]);
 }
 
-/// Mirrors `test_passthrough_astream` (same as stream in Rust).
 #[tokio::test]
 async fn test_passthrough_astream() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
@@ -129,7 +119,6 @@ async fn test_passthrough_astream() {
     assert_eq!(result, vec![42]);
 }
 
-/// Mirrors `test_passthrough_batch`.
 #[test]
 fn test_passthrough_batch() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
@@ -141,7 +130,6 @@ fn test_passthrough_batch() {
     assert_eq!(results, vec![1, 2, 3, 4, 5]);
 }
 
-/// Mirrors `test_passthrough_transform`.
 #[tokio::test]
 async fn test_passthrough_transform() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
@@ -154,7 +142,6 @@ async fn test_passthrough_transform() {
     assert_eq!(result, vec![1, 2, 3]);
 }
 
-/// Mirrors `test_passthrough_atransform`.
 #[tokio::test]
 async fn test_passthrough_atransform() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
@@ -167,7 +154,6 @@ async fn test_passthrough_atransform() {
     assert_eq!(result, vec![1, 2, 3]);
 }
 
-/// Mirrors `test_passthrough_with_func_and_config`.
 #[test]
 fn test_passthrough_with_func_and_config() {
     let tags_seen: Arc<Mutex<Vec<Vec<String>>>> = Arc::new(Mutex::new(Vec::new()));
@@ -189,7 +175,6 @@ fn test_passthrough_with_func_and_config() {
     assert!(seen[0].contains(&"test-tag".to_string()));
 }
 
-/// Mirrors `test_passthrough_with_side_effect_batch`.
 #[test]
 fn test_passthrough_with_side_effect_batch() {
     let calls: Arc<Mutex<Vec<i32>>> = Arc::new(Mutex::new(Vec::new()));
@@ -211,7 +196,6 @@ fn test_passthrough_with_side_effect_batch() {
     assert_eq!(recorded, vec![1, 2, 3]);
 }
 
-/// Mirrors `test_passthrough_repr`.
 #[test]
 fn test_passthrough_repr() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
@@ -219,7 +203,6 @@ fn test_passthrough_repr() {
     assert!(repr_str.contains("RunnablePassthrough"));
 }
 
-/// Mirrors `test_passthrough_with_none_func`.
 #[test]
 fn test_passthrough_with_none_func() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
@@ -227,7 +210,6 @@ fn test_passthrough_with_none_func() {
     assert_eq!(result, 42);
 }
 
-/// Mirrors `test_passthrough_in_parallel`.
 #[test]
 fn test_passthrough_in_parallel() {
     let parallel = RunnableParallel::<i32>::new()
@@ -239,9 +221,6 @@ fn test_passthrough_in_parallel() {
     assert_eq!(result["modified"], json!(6));
 }
 
-/// Mirrors `test_passthrough_transform_with_func`.
-///
-/// When transform is used with a func, the func receives the last chunk.
 #[tokio::test]
 async fn test_passthrough_transform_with_func() {
     let calls: Arc<Mutex<Vec<i32>>> = Arc::new(Mutex::new(Vec::new()));
@@ -265,7 +244,6 @@ async fn test_passthrough_transform_with_func() {
     assert_eq!(recorded[0], 3);
 }
 
-/// Mirrors `test_assign_basic`.
 #[test]
 fn test_assign_basic() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
@@ -284,7 +262,6 @@ fn test_assign_basic() {
     assert_eq!(result["new_key"], json!(10));
 }
 
-/// Mirrors `test_assign_basic_async`.
 #[tokio::test]
 async fn test_assign_basic_async() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
@@ -303,7 +280,6 @@ async fn test_assign_basic_async() {
     assert_eq!(result["new_key"], json!(10));
 }
 
-/// Mirrors `test_assign_multiple_keys`.
 #[test]
 fn test_assign_multiple_keys() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new()
@@ -339,7 +315,6 @@ fn test_assign_multiple_keys() {
     assert_eq!(result["quadrupled"], json!(20));
 }
 
-/// Mirrors `test_assign_overwrite_existing`.
 #[test]
 fn test_assign_overwrite_existing() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
@@ -358,7 +333,6 @@ fn test_assign_overwrite_existing() {
     assert_eq!(result["other"], json!("data"));
 }
 
-/// Mirrors `test_assign_with_runnable`.
 #[test]
 fn test_assign_with_runnable() {
     let double = RunnableLambda::new(|x: HashMap<String, Value>| {
@@ -375,7 +349,6 @@ fn test_assign_with_runnable() {
     assert_eq!(result["new_key"], json!(10));
 }
 
-/// Mirrors `test_assign_batch`.
 #[test]
 fn test_assign_batch() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
@@ -406,7 +379,6 @@ fn test_assign_batch() {
     assert_eq!(results[2]["new_key"], json!(6));
 }
 
-/// Mirrors `test_assign_stream`.
 #[tokio::test]
 async fn test_assign_stream() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
@@ -434,7 +406,6 @@ async fn test_assign_stream() {
     assert_eq!(final_result["doubled"], json!(10));
 }
 
-/// Mirrors `test_assign_transform`.
 #[tokio::test]
 async fn test_assign_transform() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
@@ -462,7 +433,6 @@ async fn test_assign_transform() {
     assert_eq!(final_result["doubled"], json!(10));
 }
 
-/// Mirrors `test_assign_empty_dict`.
 #[test]
 fn test_assign_empty_dict() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
@@ -475,7 +445,6 @@ fn test_assign_empty_dict() {
     assert_eq!(result["new_key"], json!(42));
 }
 
-/// Mirrors `test_assign_preserves_original_order`.
 #[test]
 fn test_assign_preserves_original_order() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
@@ -497,7 +466,6 @@ fn test_assign_preserves_original_order() {
     assert_eq!(result["z"], json!(3));
 }
 
-/// Mirrors `test_assign_with_config_propagation`.
 #[test]
 fn test_assign_with_config_propagation() {
     let configs_seen = Arc::new(AtomicI32::new(0));
@@ -524,7 +492,6 @@ fn test_assign_with_config_propagation() {
     assert_eq!(configs_seen.load(Ordering::SeqCst), 1);
 }
 
-/// Mirrors `test_assign_with_multiple_parallel_ops`.
 #[test]
 fn test_assign_with_multiple_parallel_ops() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new()
@@ -564,7 +531,6 @@ fn test_assign_with_multiple_parallel_ops() {
     assert_eq!(result["difference"], json!(7));
 }
 
-/// Mirrors `test_assign_direct_instantiation`.
 #[test]
 fn test_assign_direct_instantiation() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
@@ -583,9 +549,6 @@ fn test_assign_direct_instantiation() {
     assert_eq!(result["new_field"], json!(10));
 }
 
-/// Mirrors `test_assign_nested`.
-///
-/// Two sequential assigns: first adds `step1`, second uses `step1` to compute `step2`.
 #[test]
 fn test_assign_nested() {
     let mapper1 = RunnableParallel::<HashMap<String, Value>>::new().add(
@@ -615,7 +578,6 @@ fn test_assign_nested() {
     assert_eq!(result["step2"], json!(12));
 }
 
-/// Mirrors `test_assign_with_parallel`.
 #[test]
 fn test_assign_with_parallel() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new()
@@ -643,7 +605,6 @@ fn test_assign_with_parallel() {
     assert_eq!(result["tripled"], json!(15));
 }
 
-/// Mirrors `test_pick_single_key`.
 #[test]
 fn test_pick_single_key() {
     let pick = RunnablePick::new_single("name");
@@ -658,7 +619,6 @@ fn test_pick_single_key() {
     assert_eq!(result, json!("Alice"));
 }
 
-/// Mirrors `test_pick_multiple_keys`.
 #[test]
 fn test_pick_multiple_keys() {
     let pick = RunnablePick::new_multi(vec!["name", "age"]);
@@ -676,7 +636,6 @@ fn test_pick_multiple_keys() {
     assert_eq!(result_map["age"], json!(30));
 }
 
-/// Mirrors `test_pick_single_key_async`.
 #[tokio::test]
 async fn test_pick_single_key_async() {
     let pick = RunnablePick::new_single("name");
@@ -686,7 +645,6 @@ async fn test_pick_single_key_async() {
     assert_eq!(result, json!("Alice"));
 }
 
-/// Mirrors `test_pick_multiple_keys_async`.
 #[tokio::test]
 async fn test_pick_multiple_keys_async() {
     let pick = RunnablePick::new_multi(vec!["name", "age"]);
@@ -703,9 +661,6 @@ async fn test_pick_multiple_keys_async() {
     assert_eq!(result_map["age"], json!(30));
 }
 
-/// Mirrors `test_pick_missing_key`.
-///
-/// In Rust, pick returns Err when no matching keys found (Python returns None).
 #[test]
 fn test_pick_missing_key() {
     let pick = RunnablePick::new_single("missing");
@@ -715,7 +670,6 @@ fn test_pick_missing_key() {
     assert!(result.is_err());
 }
 
-/// Mirrors `test_pick_partial_keys`.
 #[test]
 fn test_pick_partial_keys() {
     let pick = RunnablePick::new_multi(vec!["name", "missing"]);
@@ -728,9 +682,6 @@ fn test_pick_partial_keys() {
     assert_eq!(result_map["name"], json!("Alice"));
 }
 
-/// Mirrors `test_pick_all_missing_keys`.
-///
-/// In Rust, returns Err when no keys match (Python returns None).
 #[test]
 fn test_pick_all_missing_keys() {
     let pick = RunnablePick::new_multi(vec!["missing1", "missing2"]);
@@ -740,7 +691,6 @@ fn test_pick_all_missing_keys() {
     assert!(result.is_err());
 }
 
-/// Mirrors `test_pick_batch`.
 #[test]
 fn test_pick_batch() {
     let pick = RunnablePick::new_single("name");
@@ -762,7 +712,6 @@ fn test_pick_batch() {
     );
 }
 
-/// Mirrors `test_pick_stream`.
 #[tokio::test]
 async fn test_pick_stream() {
     let pick = RunnablePick::new_single("value");
@@ -777,7 +726,6 @@ async fn test_pick_stream() {
     assert_eq!(result, vec![json!(42)]);
 }
 
-/// Mirrors `test_pick_transform`.
 #[tokio::test]
 async fn test_pick_transform() {
     let pick = RunnablePick::new_single("value");
@@ -797,7 +745,6 @@ async fn test_pick_transform() {
     assert_eq!(result, vec![json!(1), json!(2)]);
 }
 
-/// Mirrors `test_pick_get_name`.
 #[test]
 fn test_pick_get_name() {
     let pick_single = RunnablePick::new_single("key");
@@ -810,7 +757,6 @@ fn test_pick_get_name() {
     );
 }
 
-/// Mirrors `test_pick_maintains_types`.
 #[test]
 fn test_pick_maintains_types() {
     let pick = RunnablePick::new_multi(vec!["int_val", "str_val", "list_val"]);
@@ -831,7 +777,6 @@ fn test_pick_maintains_types() {
     assert!(!result_map.contains_key("extra"));
 }
 
-/// Mirrors `test_pick_direct_instantiation`.
 #[test]
 fn test_pick_direct_instantiation() {
     let pick = RunnablePick::new_single("selected");
@@ -841,9 +786,6 @@ fn test_pick_direct_instantiation() {
     assert_eq!(result, json!("yes"));
 }
 
-/// Mirrors `test_pick_empty_dict`.
-///
-/// In Rust, returns Err when input has no matching keys (Python returns None).
 #[test]
 fn test_pick_empty_dict() {
     let pick = RunnablePick::new_multi(vec!["key1", "key2"]);
@@ -851,9 +793,6 @@ fn test_pick_empty_dict() {
     assert!(result.is_err());
 }
 
-/// Mirrors `test_passthrough_assign_pick_combination`.
-///
-/// Pipeline: passthrough → assign (add doubled, tripled) → pick (value, doubled).
 #[test]
 fn test_passthrough_assign_pick_combination() {
     let passthrough: RunnablePassthrough<HashMap<String, Value>> = RunnablePassthrough::new();
@@ -888,9 +827,6 @@ fn test_passthrough_assign_pick_combination() {
     assert!(!result_map.contains_key("tripled"));
 }
 
-/// Mirrors `test_assign_with_dependencies`.
-///
-/// Two sequential assigns where the second depends on the first's output.
 #[test]
 fn test_assign_with_dependencies() {
     let mapper1 = RunnableParallel::<HashMap<String, Value>>::new().add(
@@ -920,7 +856,6 @@ fn test_assign_with_dependencies() {
     assert_eq!(result["step2"], json!(12));
 }
 
-/// Mirrors `test_pick_transform_filters_each_chunk`.
 #[tokio::test]
 async fn test_pick_transform_filters_each_chunk() {
     let pick = RunnablePick::new_single("wanted");
@@ -940,7 +875,6 @@ async fn test_pick_transform_filters_each_chunk() {
     assert_eq!(result, vec![json!(1), json!(2)]);
 }
 
-/// Test that the builder API works.
 #[test]
 fn test_assign_builder() {
     let assign = RunnablePassthrough::<HashMap<String, Value>>::assign()
@@ -959,7 +893,6 @@ fn test_assign_builder() {
     assert_eq!(result["new_key"], json!(10));
 }
 
-/// Test RunnableAssign with_name.
 #[test]
 fn test_assign_with_name() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
@@ -970,14 +903,12 @@ fn test_assign_with_name() {
     assert_eq!(assign.name(), Some("my_assign".to_string()));
 }
 
-/// Test RunnablePick with_name.
 #[test]
 fn test_pick_with_name() {
     let pick = RunnablePick::new_single("key").with_name("my_pick");
     assert_eq!(pick.name(), Some("my_pick".to_string()));
 }
 
-/// Test RunnableAssign mapper accessor.
 #[test]
 fn test_assign_mapper_accessor() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new()
@@ -994,14 +925,12 @@ fn test_assign_mapper_accessor() {
     let _mapper_ref = assign.mapper();
 }
 
-/// Test Default impl for RunnablePassthrough.
 #[test]
 fn test_passthrough_default() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::default();
     assert_eq!(passthrough.invoke(99, None).unwrap(), 99);
 }
 
-/// Test Clone impl for RunnablePassthrough.
 #[test]
 fn test_passthrough_clone() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
@@ -1009,7 +938,6 @@ fn test_passthrough_clone() {
     assert_eq!(cloned.invoke(42, None).unwrap(), 42);
 }
 
-/// Test graph_passthrough helper.
 #[test]
 fn test_graph_passthrough() {
     use agent_chain_core::runnables::passthrough::graph_passthrough;
@@ -1017,10 +945,6 @@ fn test_graph_passthrough() {
     assert_eq!(pt.invoke("hello".into(), None).unwrap(), "hello");
 }
 
-/// Mirrors `test_assign_input_output_schema`.
-///
-/// Verifies that RunnableAssign produces a merged output schema containing
-/// both the original input fields and the new mapper output fields.
 #[test]
 fn test_assign_input_output_schema() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
@@ -1040,7 +964,6 @@ fn test_assign_input_output_schema() {
     assert_eq!(output_schema["title"], "RunnableAssignOutput");
 }
 
-/// Mirrors `test_assign_get_name`.
 #[test]
 fn test_assign_get_name() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new()
@@ -1058,10 +981,6 @@ fn test_assign_get_name() {
     assert_eq!(name, "RunnableAssign");
 }
 
-/// Mirrors `test_assign_graph_structure`.
-///
-/// In Rust, we verify that the mapper accessor exists and the underlying
-/// parallel runnable is accessible.
 #[test]
 fn test_assign_graph_structure() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
@@ -1073,11 +992,6 @@ fn test_assign_graph_structure() {
     let _mapper = assign.mapper();
 }
 
-/// Mirrors `test_passthrough_serialization`.
-///
-/// In Rust, serialization metadata (is_lc_serializable, get_lc_namespace)
-/// is not yet ported. We test that the passthrough is Debug-printable and
-/// has a name, which is the Rust equivalent.
 #[test]
 fn test_passthrough_serialization() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
@@ -1085,7 +999,6 @@ fn test_passthrough_serialization() {
     assert!(debug.contains("RunnablePassthrough"));
 }
 
-/// Mirrors `test_assign_serialization`.
 #[test]
 fn test_assign_serialization() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
@@ -1097,7 +1010,6 @@ fn test_assign_serialization() {
     assert!(debug.contains("RunnableAssign"));
 }
 
-/// Mirrors `test_pick_serialization`.
 #[test]
 fn test_pick_serialization() {
     let pick = RunnablePick::new_single("key");
@@ -1105,7 +1017,6 @@ fn test_pick_serialization() {
     assert!(debug.contains("RunnablePick"));
 }
 
-/// Test schema delegation: RunnablePassthrough input and output schemas match.
 #[test]
 fn test_passthrough_schema_identity() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
@@ -1115,7 +1026,6 @@ fn test_passthrough_schema_identity() {
     assert_eq!(output_schema["type"], "object");
 }
 
-/// Test schema delegation: RunnablePick output schema reflects picked keys.
 #[test]
 fn test_pick_output_schema() {
     let pick = RunnablePick::new_multi(vec!["name", "age"]);

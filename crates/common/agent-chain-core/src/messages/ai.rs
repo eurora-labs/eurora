@@ -1,8 +1,3 @@
-//! AI message type.
-//!
-//! This module contains the `AIMessage` and `AIMessageChunk` types which represent
-//! messages from an AI model. Mirrors `langchain_core.messages.ai`.
-
 use bon::bon;
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
@@ -19,59 +14,35 @@ use crate::utils::json::parse_partial_json;
 use crate::utils::merge::{merge_dicts, merge_lists};
 use crate::utils::usage::dict_int_op;
 
-/// Breakdown of input token counts.
-///
-/// Does *not* need to sum to full input token count. Does *not* need to have all keys.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct InputTokenDetails {
-    /// Audio input tokens.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audio: Option<i64>,
-    /// Input tokens that were cached and there was a cache miss.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_creation: Option<i64>,
-    /// Input tokens that were cached and there was a cache hit.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_read: Option<i64>,
-    /// Extra provider-specific token detail fields (e.g. service-tier-prefixed keys).
     #[serde(flatten, default, skip_serializing_if = "HashMap::is_empty")]
     pub extra: HashMap<String, i64>,
 }
-
-/// Breakdown of output token counts.
-///
-/// Does *not* need to sum to full output token count. Does *not* need to have all keys.
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct OutputTokenDetails {
-    /// Audio output tokens.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audio: Option<i64>,
-    /// Reasoning output tokens.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<i64>,
-    /// Extra provider-specific token detail fields (e.g. service-tier-prefixed keys).
     #[serde(flatten, default, skip_serializing_if = "HashMap::is_empty")]
     pub extra: HashMap<String, i64>,
 }
 
-/// Usage metadata for a message, such as token counts.
-///
-/// This is a standard representation of token usage that is consistent across models.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct UsageMetadata {
-    /// Count of input (or prompt) tokens. Sum of all input token types.
     pub input_tokens: i64,
-    /// Count of output (or completion) tokens. Sum of all output token types.
     pub output_tokens: i64,
-    /// Total token count. Sum of `input_tokens` + `output_tokens`.
     pub total_tokens: i64,
-    /// Breakdown of input token counts.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_token_details: Option<InputTokenDetails>,
-    /// Breakdown of output token counts.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_token_details: Option<OutputTokenDetails>,
 }
@@ -85,7 +56,6 @@ fn merge_extra_maps(a: &HashMap<String, i64>, b: &HashMap<String, i64>) -> HashM
 }
 
 impl UsageMetadata {
-    /// Create a new usage metadata with the given token counts.
     pub fn new(input_tokens: i64, output_tokens: i64) -> Self {
         Self {
             input_tokens,
@@ -96,7 +66,6 @@ impl UsageMetadata {
         }
     }
 
-    /// Add another UsageMetadata to this one.
     pub fn add(&self, other: &UsageMetadata) -> Self {
         Self {
             input_tokens: self.input_tokens + other.input_tokens,
@@ -147,37 +116,20 @@ impl UsageMetadata {
     }
 }
 
-/// An AI message in the thread.
-///
-/// An `AIMessage` is returned from a chat model as a response to a prompt.
-/// This message represents the output of the model and consists of both
-/// the raw output as returned by the model and standardized fields
-/// (e.g., tool calls, usage metadata).
-///
-/// This corresponds to `AIMessage` in LangChain Python.
-
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct AIMessage {
-    /// The message content
     pub content: MessageContent,
-    /// Optional unique identifier
     pub id: Option<String>,
-    /// Optional name for the message
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    /// Tool calls made by the AI
     #[serde(default)]
     pub tool_calls: Vec<ToolCall>,
-    /// Tool calls with parsing errors associated with the message
     #[serde(default)]
     pub invalid_tool_calls: Vec<InvalidToolCall>,
-    /// If present, usage metadata for a message, such as token counts.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage_metadata: Option<UsageMetadata>,
-    /// Additional metadata
     #[serde(default)]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
-    /// Response metadata (e.g., response headers, logprobs, token counts, model name)
     #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
@@ -218,25 +170,6 @@ impl Serialize for AIMessage {
 
 #[bon]
 impl AIMessage {
-    /// Create a new AI message with named parameters using the builder pattern.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use agent_chain_core::messages::AIMessage;
-    ///
-    /// // Simple message with just content
-    /// let msg = AIMessage::builder()
-    ///     .content("Hello!")
-    ///     .build();
-    ///
-    /// // Message with ID and tool calls
-    /// let msg = AIMessage::builder()
-    ///     .content("Calling tool...")
-    ///     .maybe_id(Some("msg-123".to_string()))
-    ///     .tool_calls(vec![])
-    ///     .build();
-    /// ```
     #[builder]
     pub fn new(
         content: impl Into<MessageContent>,
@@ -260,29 +193,19 @@ impl AIMessage {
         }
     }
 
-    /// Create a new AIMessage with a list of content blocks.
-    ///
-    /// This is a convenience method for creating messages with structured content.
     pub fn with_content_list(content_list: Vec<serde_json::Value>) -> Self {
         let content: MessageContent = content_list.into();
         Self::builder().content(content).build()
     }
 
-    /// Set the message ID.
     pub fn set_id(&mut self, id: String) {
         self.id = Some(id);
     }
 
-    /// Get the text content of the message.
     pub fn text(&self) -> String {
         self.content.as_text()
     }
 
-    /// Get the raw content as a list of JSON values.
-    ///
-    /// For Text content that is a JSON array, parses and returns the array.
-    /// For Parts content, serializes each part.
-    /// Otherwise wraps the text in a text block.
     pub fn content_list(&self) -> Vec<serde_json::Value> {
         match &self.content {
             MessageContent::Text(s) => {
@@ -296,13 +219,6 @@ impl AIMessage {
         }
     }
 
-    /// Get the content blocks translated to the standard format.
-    ///
-    /// This method translates provider-specific content blocks to the
-    /// standardized LangChain content block format. The translation is
-    /// based on the `model_provider` field in `response_metadata`.
-    ///
-    /// This corresponds to `content_blocks` property in LangChain Python.
     pub fn content_blocks(&self) -> Vec<ContentBlock> {
         use crate::messages::block_translators::anthropic::convert_to_standard_blocks as anthropic_convert;
         use crate::messages::block_translators::openai::{
@@ -432,10 +348,6 @@ impl AIMessage {
             .collect()
     }
 
-    /// Get a pretty representation of the message.
-    ///
-    /// This corresponds to `pretty_repr` in LangChain Python.
-    /// Calls the base message `pretty_repr` logic, then appends tool call info.
     pub fn pretty_repr(&self, html: bool) -> String {
         let title = get_msg_title_repr("Ai Message", html);
         let name_line = if let Some(name) = &self.name {
@@ -457,16 +369,11 @@ impl AIMessage {
         }
     }
 
-    /// Get the message type as a string.
     pub fn message_type(&self) -> &'static str {
         "ai"
     }
 }
 
-/// Helper function to format tool calls for pretty_repr.
-///
-/// This matches Python's `_format_tool_args` function which is shared
-/// between `tool_calls` and `invalid_tool_calls` formatting.
 fn format_tool_args(
     name: &str,
     id: Option<&str>,
@@ -538,56 +445,30 @@ fn format_tool_calls_repr(
     }
 }
 
-/// Position indicator for an aggregated AIMessageChunk.
-///
-/// If a chunk with `chunk_position="last"` is aggregated into a stream,
-/// `tool_call_chunks` in message content will be parsed into `tool_calls`.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ChunkPosition {
-    /// This is the last chunk in the stream
     Last,
 }
 
-/// AI message chunk (yielded when streaming).
-///
-/// This is returned from a chat model during streaming to incrementally
-/// build up a complete AIMessage.
-///
-/// This corresponds to `AIMessageChunk` in LangChain Python.
-
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct AIMessageChunk {
-    /// The message content (may be partial during streaming)
     pub content: MessageContent,
-    /// Optional unique identifier
     pub id: Option<String>,
-    /// Optional name for the message
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    /// Tool calls made by the AI
     #[serde(default)]
     pub tool_calls: Vec<ToolCall>,
-    /// Tool calls with parsing errors
     #[serde(default)]
     pub invalid_tool_calls: Vec<InvalidToolCall>,
-    /// Tool call chunks (for streaming tool calls)
     #[serde(default)]
     pub tool_call_chunks: Vec<ToolCallChunk>,
-    /// If present, usage metadata for a message
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage_metadata: Option<UsageMetadata>,
-    /// Additional metadata
     #[serde(default)]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
-    /// Response metadata
     #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
-    /// Optional span represented by an aggregated AIMessageChunk.
-    ///
-    /// If a chunk with `chunk_position=Some(ChunkPosition::Last)` is aggregated into a stream,
-    /// `tool_call_chunks` in message content will be parsed into `tool_calls`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chunk_position: Option<ChunkPosition>,
 }
@@ -635,25 +516,6 @@ impl Serialize for AIMessageChunk {
 
 #[bon]
 impl AIMessageChunk {
-    /// Create a new AI message chunk with named parameters.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use agent_chain_core::messages::AIMessageChunk;
-    ///
-    /// // Simple chunk with just content
-    /// let chunk = AIMessageChunk::builder()
-    ///     .content("Hello")
-    ///     .build();
-    ///
-    /// // Chunk with ID and tool call chunks
-    /// let chunk = AIMessageChunk::builder()
-    ///     .content("")
-    ///     .maybe_id(Some("chunk-123".to_string()))
-    ///     .tool_call_chunks(vec![])
-    ///     .build();
-    /// ```
     #[builder]
     pub fn new(
         content: impl Into<MessageContent>,
@@ -681,24 +543,15 @@ impl AIMessageChunk {
         }
     }
 
-    /// Create a new AIMessageChunk with a list of content blocks.
-    ///
-    /// This is a convenience method for creating chunks with structured content.
     pub fn with_content_list(content_list: Vec<serde_json::Value>) -> Self {
         let content: MessageContent = content_list.into();
         Self::builder().content(content).build()
     }
 
-    /// Get the text content of the message.
     pub fn text(&self) -> String {
         self.content.as_text()
     }
 
-    /// Get the raw content as a list of JSON values.
-    ///
-    /// For Text content that is a JSON array, parses and returns the array.
-    /// For Parts content, serializes each part.
-    /// Otherwise wraps the text in a text block.
     pub fn content_list(&self) -> Vec<serde_json::Value> {
         match &self.content {
             MessageContent::Text(s) => {
@@ -712,16 +565,6 @@ impl AIMessageChunk {
         }
     }
 
-    /// Get the content blocks translated to the standard format.
-    ///
-    /// This method translates provider-specific content blocks to the
-    /// standardized LangChain content block format. The translation is
-    /// based on the `model_provider` field in `response_metadata`.
-    ///
-    /// For chunks, this uses the chunk-specific translation which handles
-    /// streaming content like `tool_call_chunk` and `input_json_delta`.
-    ///
-    /// This corresponds to `content_blocks` property in LangChain Python.
     pub fn content_blocks(&self) -> Vec<ContentBlock> {
         use crate::messages::block_translators::anthropic::{
             ChunkContext as AnthropicChunkContext,
@@ -885,40 +728,30 @@ impl AIMessageChunk {
             .collect()
     }
 
-    /// Get chunk position.
     pub fn chunk_position(&self) -> Option<&ChunkPosition> {
         self.chunk_position.as_ref()
     }
 
-    /// Set chunk position.
     pub fn set_chunk_position(&mut self, position: Option<ChunkPosition>) {
         self.chunk_position = position;
     }
 
-    /// Set usage metadata.
     pub fn set_usage_metadata(&mut self, usage_metadata: Option<UsageMetadata>) {
         self.usage_metadata = usage_metadata;
     }
 
-    /// Set tool calls.
     pub fn set_tool_calls(&mut self, tool_calls: Vec<ToolCall>) {
         self.tool_calls = tool_calls;
     }
 
-    /// Set invalid tool calls.
     pub fn set_invalid_tool_calls(&mut self, invalid_tool_calls: Vec<InvalidToolCall>) {
         self.invalid_tool_calls = invalid_tool_calls;
     }
 
-    /// Set tool call chunks.
     pub fn set_tool_call_chunks(&mut self, tool_call_chunks: Vec<ToolCallChunk>) {
         self.tool_call_chunks = tool_call_chunks;
     }
 
-    /// Initialize tool calls from tool call chunks.
-    ///
-    /// This parses the tool_call_chunks and populates tool_calls and invalid_tool_calls.
-    /// This corresponds to `init_tool_calls` model validator in Python.
     pub fn init_tool_calls(&mut self) {
         if self.tool_call_chunks.is_empty() {
             if !self.tool_calls.is_empty() {
@@ -1038,13 +871,6 @@ impl AIMessageChunk {
         }
     }
 
-    /// Parse server tool call chunks when aggregation is complete.
-    ///
-    /// When `chunk_position` is "last" and `output_version` is "v1",
-    /// this parses `server_tool_call_chunk` blocks that have string args
-    /// into proper `server_tool_call` blocks with parsed JSON args.
-    ///
-    /// This corresponds to `init_server_tool_calls` model validator in Python.
     pub fn init_server_tool_calls(&mut self) {
         if self.chunk_position != Some(ChunkPosition::Last) {
             return;
@@ -1084,15 +910,10 @@ impl AIMessageChunk {
         }
     }
 
-    /// Concatenate this chunk with another chunk.
-    ///
-    /// This merges content, tool_call_chunks, and metadata.
-    /// For more sophisticated merging of multiple chunks, use `add_ai_message_chunks`.
     pub fn concat(&self, other: &AIMessageChunk) -> AIMessageChunk {
         add_ai_message_chunks(self.clone(), vec![other.clone()])
     }
 
-    /// Convert this chunk to a complete AIMessage.
     pub fn to_message(&self) -> AIMessage {
         AIMessage {
             content: self.content.clone(),
@@ -1106,10 +927,6 @@ impl AIMessageChunk {
         }
     }
 
-    /// Get a pretty representation of the message.
-    ///
-    /// This corresponds to `pretty_repr` in LangChain Python.
-    /// Calls the base message `pretty_repr` logic, then appends tool call info.
     pub fn pretty_repr(&self, html: bool) -> String {
         let title = get_msg_title_repr("Aimessagechunk Message", html);
         let name_line = if let Some(name) = &self.name {
@@ -1132,25 +949,6 @@ impl AIMessageChunk {
     }
 }
 
-/// Merge message content from multiple chunks.
-///
-/// This corresponds to `merge_content` in LangChain Python.
-/// Content can be either a plain string or a JSON array of content blocks.
-///
-/// The merge logic is:
-/// - String + String → String concatenation
-/// - String + List → Prepend string to list
-/// - List + List → Use `merge_lists` (which merges by index)
-/// - List + String → Append string to last element if it's a string, otherwise add as new element
-///
-/// # Arguments
-///
-/// * `first` - The first content string (may be plain text or JSON array)
-/// * `others` - Other content strings to merge
-///
-/// # Returns
-///
-/// The merged content as a string (either plain text or JSON array)
 fn merge_message_content(first: &MessageContent, others: &[&MessageContent]) -> MessageContent {
     let to_mergeable = |mc: &MessageContent| -> MergeableContent {
         match mc {
@@ -1186,18 +984,6 @@ fn merge_message_content(first: &MessageContent, others: &[&MessageContent]) -> 
     }
 }
 
-/// Add multiple AIMessageChunks together.
-///
-/// This corresponds to `add_ai_message_chunks` in LangChain Python.
-///
-/// # Arguments
-///
-/// * `left` - The first AIMessageChunk.
-/// * `others` - Other AIMessageChunks to add.
-///
-/// # Returns
-///
-/// The resulting AIMessageChunk.
 pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) -> AIMessageChunk {
     let content = merge_message_content(
         &left.content,
@@ -1369,41 +1155,6 @@ impl std::iter::Sum for AIMessageChunk {
     }
 }
 
-/// Add two UsageMetadata objects together.
-///
-/// This function recursively adds the token counts from both UsageMetadata objects.
-/// Uses the generic `_dict_int_op` pattern from Python.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::messages::{add_usage, UsageMetadata, InputTokenDetails};
-///
-/// let left = UsageMetadata {
-///     input_tokens: 5,
-///     output_tokens: 0,
-///     total_tokens: 5,
-///     input_token_details: Some(InputTokenDetails {
-///         audio: None,
-///         cache_creation: None,
-///         cache_read: Some(3),
-///         ..Default::default()
-///     }),
-///     output_token_details: None,
-/// };
-/// let right = UsageMetadata {
-///     input_tokens: 0,
-///     output_tokens: 10,
-///     total_tokens: 10,
-///     input_token_details: None,
-///     output_token_details: None,
-/// };
-///
-/// let result = add_usage(Some(&left), Some(&right));
-/// assert_eq!(result.input_tokens, 5);
-/// assert_eq!(result.output_tokens, 10);
-/// assert_eq!(result.total_tokens, 15);
-/// ```
 pub fn add_usage(left: Option<&UsageMetadata>, right: Option<&UsageMetadata>) -> UsageMetadata {
     match (left, right) {
         (None, None) => UsageMetadata::default(),
@@ -1421,41 +1172,6 @@ pub fn add_usage(left: Option<&UsageMetadata>, right: Option<&UsageMetadata>) ->
     }
 }
 
-/// Subtract two UsageMetadata objects.
-///
-/// Token counts cannot be negative so the actual operation is `max(left - right, 0)`.
-/// Uses the generic `_dict_int_op` pattern from Python.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::messages::{subtract_usage, UsageMetadata, InputTokenDetails};
-///
-/// let left = UsageMetadata {
-///     input_tokens: 5,
-///     output_tokens: 10,
-///     total_tokens: 15,
-///     input_token_details: Some(InputTokenDetails {
-///         audio: None,
-///         cache_creation: None,
-///         cache_read: Some(4),
-///         ..Default::default()
-///     }),
-///     output_token_details: None,
-/// };
-/// let right = UsageMetadata {
-///     input_tokens: 3,
-///     output_tokens: 8,
-///     total_tokens: 11,
-///     input_token_details: None,
-///     output_token_details: None,
-/// };
-///
-/// let result = subtract_usage(Some(&left), Some(&right));
-/// assert_eq!(result.input_tokens, 2);
-/// assert_eq!(result.output_tokens, 2);
-/// assert_eq!(result.total_tokens, 4);
-/// ```
 pub fn subtract_usage(
     left: Option<&UsageMetadata>,
     right: Option<&UsageMetadata>,
@@ -1487,7 +1203,6 @@ fn subtract_extra_maps(a: &HashMap<String, i64>, b: &HashMap<String, i64>) -> Ha
     result
 }
 
-/// Manual subtraction fallback for UsageMetadata.
 fn subtract_manual(l: &UsageMetadata, r: &UsageMetadata) -> UsageMetadata {
     UsageMetadata {
         input_tokens: (l.input_tokens - r.input_tokens).max(0),
@@ -1528,22 +1243,6 @@ fn subtract_manual(l: &UsageMetadata, r: &UsageMetadata) -> UsageMetadata {
     }
 }
 
-/// Parse tool calls from additional_kwargs for backwards compatibility.
-///
-/// This corresponds to `_backwards_compat_tool_calls` in LangChain Python.
-/// It checks `additional_kwargs["tool_calls"]` and parses them into
-/// either `tool_calls`/`invalid_tool_calls` (for AIMessage) or
-/// `tool_call_chunks` (for AIMessageChunk).
-///
-/// # Arguments
-///
-/// * `additional_kwargs` - The additional_kwargs HashMap to check
-/// * `is_chunk` - Whether this is for an AIMessageChunk (uses chunk parser) or AIMessage
-///
-/// # Returns
-///
-/// A tuple of (tool_calls, invalid_tool_calls, tool_call_chunks) where only
-/// the appropriate fields are populated based on `is_chunk`.
 pub fn backwards_compat_tool_calls(
     additional_kwargs: &HashMap<String, serde_json::Value>,
     is_chunk: bool,

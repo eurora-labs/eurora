@@ -1,11 +1,3 @@
-//! Snapshot tests for callback managers and event handling.
-//!
-//! These tests capture the current behavior of the manager module to detect
-//! unintended changes in event dispatching, ignore conditions, error handling,
-//! run manager lifecycles, and chain group managers.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/callbacks/test_manager_snapshot.py`
-
 use agent_chain_core::callbacks::base::{
     BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
     RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
@@ -330,14 +322,12 @@ impl BaseCallbackHandler for IgnoreRetrieverHandler {
     }
 }
 
-/// Ported from `TestHandleEvent::test_empty_handlers_no_error`.
 #[test]
 fn test_handle_event_empty_handlers_no_error() {
     use agent_chain_core::callbacks::manager::handle_event;
     handle_event(&[], None, |_handler| {});
 }
 
-/// Ported from `TestHandleEvent::test_multiple_handlers`.
 #[test]
 fn test_handle_event_multiple_handlers() {
     use agent_chain_core::callbacks::manager::handle_event;
@@ -351,7 +341,6 @@ fn test_handle_event_multiple_handlers() {
     assert_eq!(count, 2);
 }
 
-/// Ported from `TestHandleEvent::test_respects_ignore_condition`.
 #[test]
 fn test_handle_event_respects_ignore_condition() {
     use agent_chain_core::callbacks::manager::handle_event;
@@ -368,7 +357,6 @@ fn test_handle_event_respects_ignore_condition() {
     assert_eq!(count, 0);
 }
 
-/// Ported from `TestHandleEvent::test_ignore_condition_none_always_dispatches`.
 #[test]
 fn test_handle_event_ignore_condition_none_always_dispatches() {
     use agent_chain_core::callbacks::manager::handle_event;
@@ -380,21 +368,18 @@ fn test_handle_event_ignore_condition_none_always_dispatches() {
     assert_eq!(count, 1);
 }
 
-/// Ported from `TestRunManager::test_on_text_empty_handlers_no_error`.
 #[test]
 fn test_run_manager_on_text_empty_handlers_no_error() {
     let mgr = RunManager::new(Uuid::new_v4(), vec![], vec![], None, None, None, None, None);
     mgr.on_text("test");
 }
 
-/// Ported from `TestRunManager::test_on_retry_empty_handlers_no_error`.
 #[test]
 fn test_run_manager_on_retry_empty_handlers_no_error() {
     let mgr = RunManager::new(Uuid::new_v4(), vec![], vec![], None, None, None, None, None);
     mgr.on_retry(&serde_json::json!(null));
 }
 
-/// Ported from `TestParentRunManager::test_get_child_inherits_handlers`.
 #[test]
 fn test_parent_run_manager_get_child_inherits_handlers() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -415,7 +400,6 @@ fn test_parent_run_manager_get_child_inherits_handlers() {
     assert_eq!(child.metadata["ik"], serde_json::json!("iv"));
 }
 
-/// Ported from `TestParentRunManager::test_get_child_sets_parent_run_id`.
 #[test]
 fn test_parent_run_manager_get_child_sets_parent_run_id() {
     let run_id = Uuid::new_v4();
@@ -424,7 +408,6 @@ fn test_parent_run_manager_get_child_sets_parent_run_id() {
     assert_eq!(child.parent_run_id, Some(run_id));
 }
 
-/// Ported from `TestParentRunManager::test_get_child_tag_not_inheritable`.
 #[test]
 fn test_parent_run_manager_get_child_tag_not_inheritable() {
     let mgr = ParentRunManager::new(Uuid::new_v4(), vec![], vec![], None, None, None, None, None);
@@ -433,14 +416,12 @@ fn test_parent_run_manager_get_child_tag_not_inheritable() {
     assert!(!child.inheritable_tags.contains(&"local".to_string()));
 }
 
-/// Ported from `TestParentRunManager::test_get_child_without_tag`.
 #[test]
 fn test_parent_run_manager_get_child_without_tag() {
     let mgr = ParentRunManager::new(Uuid::new_v4(), vec![], vec![], None, None, None, None, None);
     let _child = mgr.get_child(None);
 }
 
-/// Ported from `TestCallbackManagerForLLMRun::test_empty_handlers_noop`.
 #[test]
 fn test_llm_run_empty_handlers_noop() {
     let mgr =
@@ -450,7 +431,6 @@ fn test_llm_run_empty_handlers_noop() {
     mgr.on_llm_error(&std::io::Error::other("err"));
 }
 
-/// Ported from `TestCallbackManagerForLLMRun::test_on_llm_new_token_with_chunk`.
 #[test]
 fn test_llm_run_on_llm_new_token_with_chunk() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -467,7 +447,6 @@ fn test_llm_run_on_llm_new_token_with_chunk() {
     mgr.on_llm_new_token("tok", None);
 }
 
-/// Ported from `TestCallbackManagerForChainRun::test_empty_handlers_noop`.
 #[test]
 fn test_chain_run_empty_handlers_noop() {
     let mgr = CallbackManagerForChainRun::new(
@@ -486,7 +465,6 @@ fn test_chain_run_empty_handlers_noop() {
     mgr.on_agent_finish(&serde_json::json!({"return_values": {}, "log": "d"}));
 }
 
-/// Ported from `TestCallbackManagerForChainRun::test_is_parent_run_manager`.
 #[test]
 fn test_chain_run_is_parent_run_manager() {
     let mgr = CallbackManagerForChainRun::new(
@@ -502,7 +480,6 @@ fn test_chain_run_is_parent_run_manager() {
     let _child = mgr.get_child(None);
 }
 
-/// Ported from `TestCallbackManagerForToolRun::test_empty_handlers_noop`.
 #[test]
 fn test_tool_run_empty_handlers_noop() {
     let mgr = CallbackManagerForToolRun::new(
@@ -519,7 +496,6 @@ fn test_tool_run_empty_handlers_noop() {
     mgr.on_tool_error(&std::io::Error::other("err"));
 }
 
-/// Ported from `TestCallbackManagerForRetrieverRun::test_empty_handlers_noop`.
 #[test]
 fn test_retriever_run_empty_handlers_noop() {
     let mgr = CallbackManagerForRetrieverRun::new(
@@ -536,7 +512,6 @@ fn test_retriever_run_empty_handlers_noop() {
     mgr.on_retriever_error(&std::io::Error::other("err"));
 }
 
-/// Ported from `TestCallbackManager::test_on_llm_start_returns_managers_per_prompt`.
 #[test]
 fn test_callback_manager_on_llm_start_returns_managers_per_prompt() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -550,7 +525,6 @@ fn test_callback_manager_on_llm_start_returns_managers_per_prompt() {
     assert_eq!(managers.len(), 3);
 }
 
-/// Ported from `TestCallbackManager::test_on_llm_start_uses_provided_run_id_for_first`.
 #[test]
 fn test_callback_manager_on_llm_start_uses_provided_run_id_for_first() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -566,7 +540,6 @@ fn test_callback_manager_on_llm_start_uses_provided_run_id_for_first() {
     assert_ne!(managers[1].run_id(), rid);
 }
 
-/// Ported from `TestCallbackManager::test_on_llm_start_generates_run_id_when_none`.
 #[test]
 fn test_callback_manager_on_llm_start_generates_run_id_when_none() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -576,7 +549,6 @@ fn test_callback_manager_on_llm_start_generates_run_id_when_none() {
     assert!(!managers[0].run_id().is_nil());
 }
 
-/// Ported from `TestCallbackManager::test_on_chat_model_start_returns_managers_per_message_list`.
 #[test]
 fn test_callback_manager_on_chat_model_start_returns_managers_per_message_list() {
     use agent_chain_core::messages::HumanMessage;
@@ -591,7 +563,6 @@ fn test_callback_manager_on_chat_model_start_returns_managers_per_message_list()
     assert_eq!(managers.len(), 2);
 }
 
-/// Ported from `TestCallbackManager::test_on_chat_model_start_uses_provided_run_id_for_first`.
 #[test]
 fn test_callback_manager_on_chat_model_start_uses_provided_run_id_for_first() {
     use agent_chain_core::messages::HumanMessage;
@@ -608,7 +579,6 @@ fn test_callback_manager_on_chat_model_start_uses_provided_run_id_for_first() {
     assert_ne!(managers[1].run_id(), rid);
 }
 
-/// Ported from `TestCallbackManager::test_on_chain_start_returns_chain_run_manager`.
 #[test]
 fn test_callback_manager_on_chain_start_returns_chain_run_manager() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -622,7 +592,6 @@ fn test_callback_manager_on_chain_start_returns_chain_run_manager() {
     assert!(!rm.run_id().is_nil());
 }
 
-/// Ported from `TestCallbackManager::test_on_chain_start_uses_provided_run_id`.
 #[test]
 fn test_callback_manager_on_chain_start_uses_provided_run_id() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -638,7 +607,6 @@ fn test_callback_manager_on_chain_start_uses_provided_run_id() {
     assert_eq!(rm.run_id(), rid);
 }
 
-/// Ported from `TestCallbackManager::test_on_tool_start_returns_tool_run_manager`.
 #[test]
 fn test_callback_manager_on_tool_start_returns_tool_run_manager() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -648,7 +616,6 @@ fn test_callback_manager_on_tool_start_returns_tool_run_manager() {
     assert!(!rm.run_id().is_nil());
 }
 
-/// Ported from `TestCallbackManager::test_on_tool_start_uses_provided_run_id`.
 #[test]
 fn test_callback_manager_on_tool_start_uses_provided_run_id() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -659,7 +626,6 @@ fn test_callback_manager_on_tool_start_uses_provided_run_id() {
     assert_eq!(rm.run_id(), rid);
 }
 
-/// Ported from `TestCallbackManager::test_on_retriever_start_returns_retriever_run_manager`.
 #[test]
 fn test_callback_manager_on_retriever_start_returns_retriever_run_manager() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -673,7 +639,6 @@ fn test_callback_manager_on_retriever_start_returns_retriever_run_manager() {
     assert!(!rm.run_id().is_nil());
 }
 
-/// Ported from `TestCallbackManager::test_on_retriever_start_uses_provided_run_id`.
 #[test]
 fn test_callback_manager_on_retriever_start_uses_provided_run_id() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -689,14 +654,12 @@ fn test_callback_manager_on_retriever_start_uses_provided_run_id() {
     assert_eq!(rm.run_id(), rid);
 }
 
-/// Ported from `TestCallbackManager::test_on_custom_event_empty_handlers_noop`.
 #[test]
 fn test_callback_manager_on_custom_event_empty_handlers_noop() {
     let mgr = CallbackManager::new();
     mgr.on_custom_event("evt", &serde_json::json!({}), None);
 }
 
-/// Ported from `TestCallbackManager::test_run_managers_inherit_tags_and_metadata`.
 #[test]
 fn test_callback_manager_run_managers_inherit_tags_and_metadata() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -746,7 +709,6 @@ fn make_sync_chain_group() -> (CallbackManagerForChainGroup, CallbackManagerForC
     (group, parent_rm)
 }
 
-/// Ported from `TestCallbackManagerForChainGroup::test_on_chain_end_sets_ended`.
 #[test]
 fn test_chain_group_on_chain_end_sets_ended() {
     let (mut group, _) = make_sync_chain_group();
@@ -755,7 +717,6 @@ fn test_chain_group_on_chain_end_sets_ended() {
     assert!(group.ended);
 }
 
-/// Ported from `TestCallbackManagerForChainGroup::test_on_chain_error_sets_ended`.
 #[test]
 fn test_chain_group_on_chain_error_sets_ended() {
     let (mut group, _) = make_sync_chain_group();
@@ -763,7 +724,6 @@ fn test_chain_group_on_chain_error_sets_ended() {
     assert!(group.ended);
 }
 
-/// Ported from `TestCallbackManagerForChainGroup::test_copy_preserves_parent_run_manager`.
 #[test]
 fn test_chain_group_copy_preserves_parent_run_manager() {
     let (group, parent_rm) = make_sync_chain_group();
@@ -771,7 +731,6 @@ fn test_chain_group_copy_preserves_parent_run_manager() {
     assert_eq!(cp.parent_run_id(), parent_rm.parent_run_id());
 }
 
-/// Ported from `TestCallbackManagerForChainGroup::test_merge_preserves_parent_run_manager`.
 #[test]
 fn test_chain_group_merge_preserves_parent_run_manager() {
     let (group, _) = make_sync_chain_group();
@@ -781,7 +740,6 @@ fn test_chain_group_merge_preserves_parent_run_manager() {
     assert!(merged.tags().contains(&"extra".to_string()));
 }
 
-/// Ported from `TestBaseRunManager::test_get_noop_manager`.
 #[test]
 fn test_base_run_manager_get_noop_manager() {
     let mgr = BaseRunManager::get_noop_manager();
@@ -792,7 +750,6 @@ fn test_base_run_manager_get_noop_manager() {
     assert!(mgr.metadata.is_empty());
 }
 
-/// Ported from `TestBaseRunManager::test_initialization_defaults`.
 #[test]
 fn test_base_run_manager_initialization_defaults() {
     let rid = Uuid::new_v4();
@@ -805,7 +762,6 @@ fn test_base_run_manager_initialization_defaults() {
     assert!(mgr.inheritable_metadata.is_empty());
 }
 
-/// Ported from `TestAsyncRunManagerGetSync::test_async_llm_run_get_sync`.
 #[test]
 fn test_async_llm_run_get_sync() {
     let rid = Uuid::new_v4();
@@ -827,7 +783,6 @@ fn test_async_llm_run_get_sync() {
     assert!(back.tags().contains(&"t".to_string()));
 }
 
-/// Ported from `TestAsyncRunManagerGetSync::test_async_chain_run_get_sync`.
 #[test]
 fn test_async_chain_run_get_sync() {
     let rid = Uuid::new_v4();
@@ -847,7 +802,6 @@ fn test_async_chain_run_get_sync() {
     assert_eq!(back.run_id(), rid);
 }
 
-/// Ported from `TestAsyncRunManagerGetSync::test_async_tool_run_get_sync`.
 #[test]
 fn test_async_tool_run_get_sync() {
     let rid = Uuid::new_v4();
@@ -858,7 +812,6 @@ fn test_async_tool_run_get_sync() {
     assert_eq!(back.run_id(), rid);
 }
 
-/// Ported from `TestAsyncRunManagerGetSync::test_async_retriever_run_get_sync`.
 #[test]
 fn test_async_retriever_run_get_sync() {
     let rid = Uuid::new_v4();
@@ -869,14 +822,12 @@ fn test_async_retriever_run_get_sync() {
     assert_eq!(back.run_id(), rid);
 }
 
-/// Ported from `TestAsyncCallbackManager::test_is_async_true`.
 #[test]
 fn test_async_callback_manager_is_async_true() {
     let mgr = AsyncCallbackManager::new();
     assert!(mgr.is_async());
 }
 
-/// Ported from `TestAsyncCallbackManager::test_on_llm_start_returns_async_managers`.
 #[tokio::test]
 async fn test_async_callback_manager_on_llm_start_returns_async_managers() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -888,7 +839,6 @@ async fn test_async_callback_manager_on_llm_start_returns_async_managers() {
     assert_eq!(managers.len(), 2);
 }
 
-/// Ported from `TestAsyncCallbackManager::test_on_llm_start_uses_provided_run_id`.
 #[tokio::test]
 async fn test_async_callback_manager_on_llm_start_uses_provided_run_id() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -906,7 +856,6 @@ async fn test_async_callback_manager_on_llm_start_uses_provided_run_id() {
     assert_ne!(managers[1].run_id(), rid);
 }
 
-/// Ported from `TestAsyncCallbackManager::test_on_chat_model_start_returns_async_managers`.
 #[tokio::test]
 async fn test_async_callback_manager_on_chat_model_start_returns_async_managers() {
     use agent_chain_core::messages::HumanMessage;
@@ -921,7 +870,6 @@ async fn test_async_callback_manager_on_chat_model_start_returns_async_managers(
     assert_eq!(managers.len(), 2);
 }
 
-/// Ported from `TestAsyncCallbackManager::test_on_chain_start_returns_async_chain_manager`.
 #[tokio::test]
 async fn test_async_callback_manager_on_chain_start_returns_async_chain_manager() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -933,7 +881,6 @@ async fn test_async_callback_manager_on_chain_start_returns_async_chain_manager(
     assert!(!rm.run_id().is_nil());
 }
 
-/// Ported from `TestAsyncCallbackManager::test_on_chain_start_uses_provided_run_id`.
 #[tokio::test]
 async fn test_async_callback_manager_on_chain_start_uses_provided_run_id() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -946,7 +893,6 @@ async fn test_async_callback_manager_on_chain_start_uses_provided_run_id() {
     assert_eq!(rm.run_id(), rid);
 }
 
-/// Ported from `TestAsyncCallbackManager::test_on_tool_start_returns_async_tool_manager`.
 #[tokio::test]
 async fn test_async_callback_manager_on_tool_start_returns_async_tool_manager() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -958,7 +904,6 @@ async fn test_async_callback_manager_on_tool_start_returns_async_tool_manager() 
     assert!(!rm.run_id().is_nil());
 }
 
-/// Ported from `TestAsyncCallbackManager::test_on_retriever_start_returns_async_retriever_manager`.
 #[tokio::test]
 async fn test_async_callback_manager_on_retriever_start_returns_async_retriever_manager() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -973,7 +918,6 @@ async fn test_async_callback_manager_on_retriever_start_returns_async_retriever_
     assert!(!rm.run_id().is_nil());
 }
 
-/// Ported from `TestAsyncCallbackManager::test_on_custom_event_empty_handlers_noop`.
 #[tokio::test]
 async fn test_async_callback_manager_on_custom_event_empty_handlers_noop() {
     let mgr = AsyncCallbackManager::new();
@@ -981,7 +925,6 @@ async fn test_async_callback_manager_on_custom_event_empty_handlers_noop() {
         .await;
 }
 
-/// Ported from `TestAsyncCallbackManagerForLLMRun::test_empty_handlers_noop`.
 #[tokio::test]
 async fn test_async_llm_run_empty_handlers_noop() {
     let sync_mgr =
@@ -992,7 +935,6 @@ async fn test_async_llm_run_empty_handlers_noop() {
     mgr.on_llm_error(&std::io::Error::other("err")).await;
 }
 
-/// Ported from `TestAsyncCallbackManagerForChainRun::test_empty_handlers_noop`.
 #[tokio::test]
 async fn test_async_chain_run_empty_handlers_noop() {
     let sync_mgr = CallbackManagerForChainRun::new(
@@ -1013,7 +955,6 @@ async fn test_async_chain_run_empty_handlers_noop() {
         .await;
 }
 
-/// Ported from `TestAsyncCallbackManagerForChainRun::test_get_child_returns_async_manager`.
 #[tokio::test]
 async fn test_async_chain_run_get_child_returns_async_manager() {
     let sync_mgr = CallbackManagerForChainRun::new(
@@ -1031,7 +972,6 @@ async fn test_async_chain_run_get_child_returns_async_manager() {
     assert_eq!(child.parent_run_id(), Some(mgr.run_id()));
 }
 
-/// Ported from `TestAsyncCallbackManagerForToolRun::test_empty_handlers_noop`.
 #[tokio::test]
 async fn test_async_tool_run_empty_handlers_noop() {
     let sync_mgr = CallbackManagerForToolRun::new(
@@ -1049,7 +989,6 @@ async fn test_async_tool_run_empty_handlers_noop() {
     mgr.on_tool_error(&std::io::Error::other("err")).await;
 }
 
-/// Ported from `TestAsyncCallbackManagerForRetrieverRun::test_empty_handlers_noop`.
 #[tokio::test]
 async fn test_async_retriever_run_empty_handlers_noop() {
     let sync_mgr = CallbackManagerForRetrieverRun::new(
@@ -1096,7 +1035,6 @@ fn make_async_chain_group() -> (
     (group, parent_rm)
 }
 
-/// Ported from `TestAsyncCallbackManagerForChainGroup::test_on_chain_end_sets_ended`.
 #[tokio::test]
 async fn test_async_chain_group_on_chain_end_sets_ended() {
     let (mut group, _) = make_async_chain_group();
@@ -1105,7 +1043,6 @@ async fn test_async_chain_group_on_chain_end_sets_ended() {
     assert!(group.ended);
 }
 
-/// Ported from `TestAsyncCallbackManagerForChainGroup::test_on_chain_error_sets_ended`.
 #[tokio::test]
 async fn test_async_chain_group_on_chain_error_sets_ended() {
     let (mut group, _) = make_async_chain_group();
@@ -1113,7 +1050,6 @@ async fn test_async_chain_group_on_chain_error_sets_ended() {
     assert!(group.ended);
 }
 
-/// Ported from `TestAsyncCallbackManagerForChainGroup::test_copy_preserves_parent_run_manager`.
 #[tokio::test]
 async fn test_async_chain_group_copy_preserves_parent_run_manager() {
     let (group, parent_rm) = make_async_chain_group();
@@ -1121,7 +1057,6 @@ async fn test_async_chain_group_copy_preserves_parent_run_manager() {
     assert_eq!(cp.parent_run_id(), parent_rm.parent_run_id());
 }
 
-/// Ported from `TestAsyncParentRunManager::test_get_child_returns_async_callback_manager`.
 #[tokio::test]
 async fn test_async_parent_run_manager_get_child_returns_async_callback_manager() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -1141,7 +1076,6 @@ async fn test_async_parent_run_manager_get_child_returns_async_callback_manager(
     assert_eq!(child.handlers().len(), 1);
 }
 
-/// Ported from `TestAsyncParentRunManager::test_get_child_with_tag`.
 #[tokio::test]
 async fn test_async_parent_run_manager_get_child_with_tag() {
     let sync_mgr = CallbackManagerForChainRun::new(
@@ -1164,7 +1098,6 @@ async fn test_async_parent_run_manager_get_child_with_tag() {
     );
 }
 
-/// Ported from `TestHandleEvent::test_dispatches_to_handler`.
 #[test]
 fn test_handle_event_dispatches_to_handler() {
     use agent_chain_core::callbacks::manager::handle_event;
@@ -1177,7 +1110,6 @@ fn test_handle_event_dispatches_to_handler() {
     assert!(rec.has_event("on_text"));
 }
 
-/// Ported from `TestCallbackManagerForLLMRun::test_on_llm_new_token_respects_ignore_llm`.
 #[test]
 fn test_llm_run_on_llm_new_token_respects_ignore_llm() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(IgnoreLLMHandler);
@@ -1194,7 +1126,6 @@ fn test_llm_run_on_llm_new_token_respects_ignore_llm() {
     mgr.on_llm_new_token("tok", None);
 }
 
-/// Ported from `TestCallbackManagerForLLMRun::test_on_llm_end_respects_ignore_llm`.
 #[test]
 fn test_llm_run_on_llm_end_respects_ignore_llm() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(IgnoreLLMHandler);
@@ -1211,7 +1142,6 @@ fn test_llm_run_on_llm_end_respects_ignore_llm() {
     mgr.on_llm_end(&ChatResult::default());
 }
 
-/// Ported from `TestCallbackManagerForLLMRun::test_on_llm_error_respects_ignore_llm`.
 #[test]
 fn test_llm_run_on_llm_error_respects_ignore_llm() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(IgnoreLLMHandler);
@@ -1228,7 +1158,6 @@ fn test_llm_run_on_llm_error_respects_ignore_llm() {
     mgr.on_llm_error(&std::io::Error::other("err"));
 }
 
-/// Verify on_llm_new_token dispatches to recording handler.
 #[test]
 fn test_llm_run_on_llm_new_token_dispatches() {
     let rec = Arc::new(RecordingHandler::new());
@@ -1246,7 +1175,6 @@ fn test_llm_run_on_llm_new_token_dispatches() {
     assert!(rec.has_event("on_llm_new_token"));
 }
 
-/// Verify on_llm_end dispatches to recording handler.
 #[test]
 fn test_llm_run_on_llm_end_dispatches() {
     let rec = Arc::new(RecordingHandler::new());
@@ -1264,7 +1192,6 @@ fn test_llm_run_on_llm_end_dispatches() {
     assert!(rec.has_event("on_llm_end"));
 }
 
-/// Verify on_llm_error dispatches to recording handler.
 #[test]
 fn test_llm_run_on_llm_error_dispatches() {
     let rec = Arc::new(RecordingHandler::new());
@@ -1282,7 +1209,6 @@ fn test_llm_run_on_llm_error_dispatches() {
     assert!(rec.has_event("on_llm_error"));
 }
 
-/// Ported from `TestCallbackManagerForChainRun::test_on_chain_end_respects_ignore_chain`.
 #[test]
 fn test_chain_run_on_chain_end_respects_ignore_chain() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(IgnoreChainHandler);
@@ -1299,7 +1225,6 @@ fn test_chain_run_on_chain_end_respects_ignore_chain() {
     mgr.on_chain_end(&HashMap::new());
 }
 
-/// Ported from `TestCallbackManagerForChainRun::test_on_agent_action_dispatches`.
 #[test]
 fn test_chain_run_on_agent_action_dispatches() {
     let rec = Arc::new(RecordingHandler::new());
@@ -1317,7 +1242,6 @@ fn test_chain_run_on_agent_action_dispatches() {
     assert!(rec.has_event("on_agent_action"));
 }
 
-/// Ported from `TestCallbackManagerForChainRun::test_on_agent_finish_dispatches`.
 #[test]
 fn test_chain_run_on_agent_finish_dispatches() {
     let rec = Arc::new(RecordingHandler::new());
@@ -1335,7 +1259,6 @@ fn test_chain_run_on_agent_finish_dispatches() {
     assert!(rec.has_event("on_agent_finish"));
 }
 
-/// Ported from `TestCallbackManagerForToolRun::test_on_tool_end_respects_ignore_agent`.
 #[test]
 fn test_tool_run_on_tool_end_respects_ignore_agent() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(IgnoreAgentHandler);
@@ -1352,7 +1275,6 @@ fn test_tool_run_on_tool_end_respects_ignore_agent() {
     mgr.on_tool_end("output");
 }
 
-/// Ported from `TestCallbackManagerForRetrieverRun::test_on_retriever_end_respects_ignore_retriever`.
 #[test]
 fn test_retriever_run_on_retriever_end_respects_ignore_retriever() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(IgnoreRetrieverHandler);
@@ -1369,7 +1291,6 @@ fn test_retriever_run_on_retriever_end_respects_ignore_retriever() {
     mgr.on_retriever_end(&[]);
 }
 
-/// Ported from `TestCallbackManager::test_on_llm_start_propagates_tags_metadata`.
 #[test]
 fn test_callback_manager_on_llm_start_dispatches() {
     let rec = Arc::new(RecordingHandler::new());
@@ -1379,7 +1300,6 @@ fn test_callback_manager_on_llm_start_dispatches() {
     assert!(rec.has_event("on_llm_start"));
 }
 
-/// Ported from `TestCallbackManager::test_on_custom_event_dispatches`.
 #[test]
 fn test_callback_manager_on_custom_event_dispatches() {
     let rec = Arc::new(RecordingHandler::new());
@@ -1389,7 +1309,6 @@ fn test_callback_manager_on_custom_event_dispatches() {
     assert!(rec.has_event("on_custom_event"));
 }
 
-/// Ported from `TestCallbackManager::test_on_custom_event_respects_ignore_custom_event`.
 #[test]
 fn test_callback_manager_on_custom_event_respects_ignore() {
     #[derive(Debug)]
@@ -1415,7 +1334,6 @@ fn test_callback_manager_on_custom_event_respects_ignore() {
     mgr.on_custom_event("evt", &serde_json::json!({}), None);
 }
 
-/// Ported from `TestRunManager::test_on_text_passes_run_id_and_parent_run_id`.
 #[test]
 fn test_run_manager_on_text_dispatches() {
     let rec = Arc::new(RecordingHandler::new());
@@ -1433,7 +1351,6 @@ fn test_run_manager_on_text_dispatches() {
     assert!(rec.has_event("on_text"));
 }
 
-/// Verify on_chain_end dispatches to recording handler.
 #[test]
 fn test_chain_run_on_chain_end_dispatches() {
     let rec = Arc::new(RecordingHandler::new());
@@ -1454,7 +1371,6 @@ fn test_chain_run_on_chain_end_dispatches() {
     assert!(rec.has_event("on_chain_end"));
 }
 
-/// Verify on_chain_error dispatches to recording handler.
 #[test]
 fn test_chain_run_on_chain_error_dispatches() {
     let rec = Arc::new(RecordingHandler::new());
@@ -1472,7 +1388,6 @@ fn test_chain_run_on_chain_error_dispatches() {
     assert!(rec.has_event("on_chain_error"));
 }
 
-/// Verify on_tool_end dispatches.
 #[test]
 fn test_tool_run_on_tool_end_dispatches() {
     let rec = Arc::new(RecordingHandler::new());
@@ -1490,7 +1405,6 @@ fn test_tool_run_on_tool_end_dispatches() {
     assert!(rec.has_event("on_tool_end"));
 }
 
-/// Verify on_tool_error dispatches.
 #[test]
 fn test_tool_run_on_tool_error_dispatches() {
     let rec = Arc::new(RecordingHandler::new());
@@ -1508,7 +1422,6 @@ fn test_tool_run_on_tool_error_dispatches() {
     assert!(rec.has_event("on_tool_error"));
 }
 
-/// Verify on_retriever_end dispatches.
 #[test]
 fn test_retriever_run_on_retriever_end_dispatches() {
     let rec = Arc::new(RecordingHandler::new());
@@ -1526,7 +1439,6 @@ fn test_retriever_run_on_retriever_end_dispatches() {
     assert!(rec.has_event("on_retriever_end"));
 }
 
-/// Verify on_retriever_error dispatches.
 #[test]
 fn test_retriever_run_on_retriever_error_dispatches() {
     let rec = Arc::new(RecordingHandler::new());
@@ -1544,7 +1456,6 @@ fn test_retriever_run_on_retriever_error_dispatches() {
     assert!(rec.has_event("on_retriever_error"));
 }
 
-/// Ported from `TestCallbackManagerForChainGroup::test_on_chain_end_delegates_to_parent`.
 #[test]
 fn test_chain_group_on_chain_end_delegates_to_parent() {
     let rec = Arc::new(RecordingHandler::new());
@@ -1575,7 +1486,6 @@ fn test_chain_group_on_chain_end_delegates_to_parent() {
     assert!(rec.has_event("on_chain_end"));
 }
 
-/// Ported from `TestCallbackManagerForChainGroup::test_on_chain_error_delegates_to_parent`.
 #[test]
 fn test_chain_group_on_chain_error_delegates_to_parent() {
     let rec = Arc::new(RecordingHandler::new());

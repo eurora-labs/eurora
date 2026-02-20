@@ -1,7 +1,3 @@
-//! Tests for message module imports.
-//!
-//! Converted from `langchain/libs/core/tests/unit_tests/messages/test_imports.py`
-
 #[test]
 #[allow(unused_imports)]
 fn test_all_imports() {

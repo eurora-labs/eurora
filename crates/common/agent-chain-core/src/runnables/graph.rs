@@ -1,40 +1,24 @@
-//! Graph data structure for representing runnable compositions.
-//!
-//! This module provides the core `Graph`, `Node`, and `Edge` types,
-//! mirroring `langchain_core.runnables.graph`.
-
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-/// Dictionary of labels for nodes and edges in a graph.
-///
-/// Mirrors Python's `LabelsDict` `TypedDict` from `langchain_core.runnables.graph`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LabelsDict {
-    /// Labels for nodes, mapping node ID to display label.
     pub nodes: HashMap<String, String>,
-    /// Labels for edges, mapping edge name to display label.
     pub edges: HashMap<String, String>,
 }
 
-/// Edge in a graph.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Edge {
-    /// The source node id.
     pub source: String,
-    /// The target node id.
     pub target: String,
-    /// Optional data associated with the edge.
     pub data: Option<String>,
-    /// Whether the edge is conditional.
     pub conditional: bool,
 }
 
 impl Edge {
-    /// Create a new edge.
     pub fn new(source: impl Into<String>, target: impl Into<String>) -> Self {
         Self {
             source: source.into(),
@@ -44,7 +28,6 @@ impl Edge {
         }
     }
 
-    /// Create a new conditional edge.
     pub fn conditional(source: impl Into<String>, target: impl Into<String>) -> Self {
         Self {
             source: source.into(),
@@ -54,7 +37,6 @@ impl Edge {
         }
     }
 
-    /// Return a copy of the edge with optional new source and target.
     pub fn copy(&self, source: Option<&str>, target: Option<&str>) -> Self {
         Self {
             source: source.unwrap_or(&self.source).to_string(),
@@ -65,22 +47,12 @@ impl Edge {
     }
 }
 
-/// The data associated with a node in the graph.
-///
-/// Mirrors Python's `type[BaseModel] | RunnableType | None` union for `Node.data`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NodeData {
-    /// A schema node (input/output type). Stores the schema name.
     Schema { name: String },
-    /// A runnable node. Stores the runnable's name.
     Runnable { name: String },
 }
 
-/// Convert node data to a display string.
-///
-/// Mirrors Python's `node_data_str()` from `langchain_core.runnables.graph`.
-/// If the node ID is not a UUID or data is None, returns the ID.
-/// For Runnables, strips the "Runnable" prefix if present.
 pub fn node_data_str(id: &str, data: Option<&NodeData>) -> String {
     let data = match data {
         Some(d) if is_uuid(id) => d,
@@ -96,9 +68,6 @@ pub fn node_data_str(id: &str, data: Option<&NodeData>) -> String {
     }
 }
 
-/// Convert node data to a JSON-serializable format.
-///
-/// Mirrors Python's `node_data_json()` from `langchain_core.runnables.graph`.
 pub fn node_data_json(node: &Node) -> Value {
     let mut json = serde_json::Map::new();
 
@@ -139,21 +108,15 @@ pub fn node_data_json(node: &Node) -> Value {
     Value::Object(json)
 }
 
-/// Node in a graph.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Node {
-    /// The unique identifier of the node.
     pub id: String,
-    /// The name of the node.
     pub name: String,
-    /// The data associated with this node.
     pub data: Option<NodeData>,
-    /// Optional metadata for the node.
     pub metadata: Option<HashMap<String, Value>>,
 }
 
 impl Node {
-    /// Create a new node.
     pub fn new(id: impl Into<String>, name: impl Into<String>) -> Self {
         let id = id.into();
         let name = name.into();
@@ -165,19 +128,16 @@ impl Node {
         }
     }
 
-    /// Set the data for this node.
     pub fn with_data(mut self, data: NodeData) -> Self {
         self.data = Some(data);
         self
     }
 
-    /// Create a new node with metadata.
     pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
         self.metadata = Some(metadata);
         self
     }
 
-    /// Return a copy of the node with optional new id and name.
     pub fn copy(&self, id: Option<&str>, name: Option<&str>) -> Self {
         Self {
             id: id.unwrap_or(&self.id).to_string(),
@@ -188,24 +148,17 @@ impl Node {
     }
 }
 
-/// Check if a string is a valid UUID.
 pub fn is_uuid(value: &str) -> bool {
     Uuid::parse_str(value).is_ok()
 }
 
-/// Graph of nodes and edges.
-///
-/// This mirrors Python's `Graph` dataclass from `langchain_core.runnables.graph`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Graph {
-    /// Dictionary of nodes in the graph, keyed by node id.
     pub nodes: HashMap<String, Node>,
-    /// List of edges in the graph.
     pub edges: Vec<Edge>,
 }
 
 impl Graph {
-    /// Create a new empty graph.
     pub fn new() -> Self {
         Self {
             nodes: HashMap::new(),
@@ -213,23 +166,14 @@ impl Graph {
         }
     }
 
-    /// Create a graph from existing nodes and edges.
     pub fn from_parts(nodes: HashMap<String, Node>, edges: Vec<Edge>) -> Self {
         Self { nodes, edges }
     }
 
-    /// Return a new unique node identifier.
     pub fn next_id(&self) -> String {
         Uuid::new_v4().to_string()
     }
 
-    /// Add a node to the graph and return it.
-    ///
-    /// If `id` is not provided, a new UUID is generated.
-    /// If `data` is provided, the node name is derived from it via `node_data_str()`.
-    /// Otherwise, the `name` parameter is used as the node name.
-    ///
-    /// Mirrors Python's `Graph.add_node()`.
     pub fn add_node(
         &mut self,
         data: Option<NodeData>,
@@ -248,11 +192,6 @@ impl Graph {
         node
     }
 
-    /// Add a node with an explicit name (no NodeData).
-    ///
-    /// Convenience method for constructing graphs manually where the node
-    /// name is known directly. If `id` is not provided, a new UUID is
-    /// generated and the name is used as the display name.
     pub fn add_node_named(&mut self, name: impl Into<String>, id: Option<&str>) -> Node {
         let name = name.into();
         let id = id.map(|s| s.to_string()).unwrap_or_else(|| self.next_id());
@@ -266,9 +205,6 @@ impl Graph {
         node
     }
 
-    /// Add a named node with metadata (no NodeData).
-    ///
-    /// Convenience method for constructing graphs manually with metadata.
     pub fn add_node_named_with_metadata(
         &mut self,
         name: impl Into<String>,
@@ -287,14 +223,12 @@ impl Graph {
         node
     }
 
-    /// Remove a node and all edges connected to it.
     pub fn remove_node(&mut self, node: &Node) {
         self.nodes.remove(&node.id);
         self.edges
             .retain(|e| e.source != node.id && e.target != node.id);
     }
 
-    /// Add an edge to the graph.
     pub fn add_edge(
         &mut self,
         source: &Node,
@@ -312,18 +246,14 @@ impl Graph {
         edge
     }
 
-    /// Find the single node that is not a target of any edge.
     pub fn first_node(&self) -> Option<&Node> {
         first_node_impl(self, &[])
     }
 
-    /// Find the single node that is not a source of any edge.
     pub fn last_node(&self) -> Option<&Node> {
         last_node_impl(self, &[])
     }
 
-    /// Remove the first node if it has a single outgoing edge and
-    /// removing it would still leave a valid first node.
     pub fn trim_first_node(&mut self) {
         let first = match self.first_node() {
             Some(n) => n.clone(),
@@ -338,8 +268,6 @@ impl Graph {
         }
     }
 
-    /// Remove the last node if it has a single incoming edge and
-    /// removing it would still leave a valid last node.
     pub fn trim_last_node(&mut self) {
         let last = match self.last_node() {
             Some(n) => n.clone(),
@@ -354,9 +282,6 @@ impl Graph {
         }
     }
 
-    /// Convert the graph to a JSON-serializable format.
-    ///
-    /// Mirrors Python's `Graph.to_json()`.
     pub fn to_json(&self) -> Value {
         let stable_ids: HashMap<&str, Value> = self
             .nodes
@@ -414,7 +339,6 @@ impl Graph {
         })
     }
 
-    /// Re-identify all nodes using their readable names where possible.
     pub fn reid(&self) -> Graph {
         use std::collections::BTreeMap;
 
@@ -467,14 +391,6 @@ impl Graph {
         }
     }
 
-    /// Draw the graph as a PNG image.
-    ///
-    /// * `output_file_path` – path to save the PNG file. If `None`, PNG bytes
-    ///   are returned.
-    /// * `fontname` – font for labels (defaults to `"arial"`).
-    /// * `labels` – optional label overrides for nodes and edges.
-    ///
-    /// Mirrors `Graph.draw_png()` from `langchain_core.runnables.graph`.
     pub fn draw_png(
         &self,
         output_file_path: Option<&std::path::Path>,
@@ -507,10 +423,6 @@ impl Graph {
         drawer.draw(self, output_file_path)
     }
 
-    /// Add all nodes and edges from another graph.
-    ///
-    /// Note this doesn't check for duplicates, nor does it connect the graphs.
-    /// Returns (first_node, last_node) of the merged subgraph.
     pub fn extend(&mut self, graph: Graph, prefix: &str) -> (Option<Node>, Option<Node>) {
         let prefix = if graph.nodes.values().all(|n| is_uuid(&n.id)) {
             ""
@@ -549,7 +461,6 @@ impl Graph {
         (first, last)
     }
 
-    /// Draw the graph as a Mermaid syntax string.
     pub fn draw_mermaid(&self, options: Option<MermaidOptions>) -> crate::error::Result<String> {
         let opts = options.unwrap_or_default();
         let graph = self.reid();
@@ -569,9 +480,6 @@ impl Graph {
         )
     }
 
-    /// Draw the graph as a PNG image using Mermaid.
-    ///
-    /// Mirrors `Graph.draw_mermaid_png()` from `langchain_core.runnables.graph`.
     pub async fn draw_mermaid_png(
         &self,
         options: Option<MermaidOptions>,
@@ -595,7 +503,6 @@ impl Graph {
         .await
     }
 
-    /// Draw the graph as an ASCII art string.
     pub fn draw_ascii(&self) -> Result<String, String> {
         let vertices: std::collections::HashMap<String, String> = self
             .nodes
@@ -605,7 +512,6 @@ impl Graph {
         super::graph_ascii::draw_ascii(&vertices, &self.edges)
     }
 
-    /// Print the graph as an ASCII art string.
     pub fn print_ascii(&self) {
         match self.draw_ascii() {
             Ok(ascii) => println!("{}", ascii),
@@ -614,7 +520,6 @@ impl Graph {
     }
 }
 
-/// Options for Mermaid rendering.
 pub struct MermaidOptions {
     pub with_styles: bool,
     pub curve_style: CurveStyle,
@@ -635,18 +540,12 @@ impl Default for MermaidOptions {
     }
 }
 
-/// Branch in a graph.
-///
-/// Mirrors `Branch` from `langchain_core.runnables.graph`.
 #[derive(Debug, Clone)]
 pub struct Branch {
-    /// A string representation of the condition.
     pub condition: String,
-    /// Optional dictionary of end node IDs for the branches.
     pub ends: Option<HashMap<String, String>>,
 }
 
-/// Enum for different curve styles supported by Mermaid.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CurveStyle {
     Basis,
@@ -664,7 +563,6 @@ pub enum CurveStyle {
 }
 
 impl CurveStyle {
-    /// All curve style variants.
     pub const ALL: [CurveStyle; 12] = [
         CurveStyle::Basis,
         CurveStyle::BumpX,
@@ -680,7 +578,6 @@ impl CurveStyle {
         CurveStyle::StepBefore,
     ];
 
-    /// Get the Mermaid value string for this curve style.
     pub fn value(&self) -> &'static str {
         match self {
             CurveStyle::Basis => "basis",
@@ -699,7 +596,6 @@ impl CurveStyle {
     }
 }
 
-/// Hexadecimal color codes for different node types.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NodeStyles {
     pub default: String,
@@ -717,7 +613,6 @@ impl Default for NodeStyles {
     }
 }
 
-/// Enum for different draw methods supported by Mermaid.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MermaidDrawMethod {
     Pyppeteer,
@@ -725,7 +620,6 @@ pub enum MermaidDrawMethod {
 }
 
 impl MermaidDrawMethod {
-    /// Get the string value for this draw method.
     pub fn value(&self) -> &'static str {
         match self {
             MermaidDrawMethod::Pyppeteer => "pyppeteer",

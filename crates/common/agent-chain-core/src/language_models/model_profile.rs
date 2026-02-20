@@ -2,15 +2,6 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-/// Model profile providing information about chat model capabilities.
-///
-/// This is a beta feature and the format may be subject to change.
-///
-/// Provides information about:
-/// - Input constraints (context window, supported modalities)
-/// - Output constraints (max output tokens, supported outputs)
-/// - Tool calling capabilities
-/// - Structured output support
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ModelProfile {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -68,7 +59,6 @@ impl ModelProfile {
     }
 }
 
-/// Registry mapping model identifiers or names to their ModelProfile.
 pub type ModelProfileRegistry = HashMap<String, ModelProfile>;
 
 #[cfg(test)]

@@ -1,52 +1,5 @@
-//! Tests for utils module imports.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/utils/test_imports.py`
-//!
-//! In Python, this test checks `__all__` exports:
-//! ```python
-//! from langchain_core.utils import __all__
-//!
-//! EXPECTED_ALL = [
-//!     "StrictFormatter",
-//!     "check_package_version",
-//!     "convert_to_secret_str",
-//!     "formatter",
-//!     "get_bolded_text",
-//!     "abatch_iterate",
-//!     "batch_iterate",
-//!     "get_color_mapping",
-//!     "get_colored_text",
-//!     "get_pydantic_field_names",
-//!     "guard_import",
-//!     "mock_now",
-//!     "print_text",
-//!     "raise_for_status_with_text",
-//!     "xor_args",
-//!     "image",
-//!     "build_extra_kwargs",
-//!     "get_from_dict_or_env",
-//!     "get_from_env",
-//!     "stringify_dict",
-//!     "comma_list",
-//!     "stringify_value",
-//!     "pre_init",
-//!     "from_env",
-//!     "secret_from_env",
-//!     "sanitize_for_postgres",
-//! ]
-//!
-//! def test_all_imports() -> None:
-//!     assert set(__all__) == set(EXPECTED_ALL)
-//! ```
-//!
-//! In Rust, we verify that the expected items are publicly exported by importing them.
-
 use std::collections::HashSet;
 
-/// List of items that are currently exported from `agent_chain_core::utils`.
-///
-/// This list should be kept in sync with the actual exports in the utils module.
-/// Items from Python's `__all__` that don't have Rust equivalents yet are noted in comments.
 const EXPECTED_EXPORTS: &[&str] = &[
     "StrictFormatter",
     "FORMATTER", // equivalent to Python's "formatter"
@@ -94,11 +47,6 @@ const EXPECTED_EXPORTS: &[&str] = &[
     "dict_int_op",
 ];
 
-/// Test that all expected items are exported from the utils module.
-///
-/// This test verifies that the utils module has the expected public API.
-/// Unlike Python's `__all__` test which checks exact equality, this test
-/// verifies that at least the expected items are available.
 #[test]
 fn test_all_imports() {
     use agent_chain_core::utils::StrictFormatter;

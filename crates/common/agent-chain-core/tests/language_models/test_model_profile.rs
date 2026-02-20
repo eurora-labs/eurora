@@ -1,5 +1,3 @@
-//! Tests for model_profile module.
-
 use agent_chain_core::{ModelProfile, ModelProfileRegistry};
 use std::collections::HashMap;
 

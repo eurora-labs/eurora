@@ -1,7 +1,3 @@
-//! Tests for PNG graph drawing functionality.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/runnables/test_graph_png.py`
-
 use std::collections::HashMap;
 
 use agent_chain_core::runnables::graph::{Graph, LabelsDict};

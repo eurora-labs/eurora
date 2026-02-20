@@ -1,8 +1,3 @@
-//! Runnable that routes to a set of Runnables.
-//!
-//! This module provides `RouterRunnable` which routes to different Runnables
-//! based on a key in the input, mirroring `langchain_core.runnables.router`.
-
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -20,20 +15,13 @@ use super::base::{DynRunnable, Runnable, RunnableSerializable};
 use super::config::{ConfigOrList, RunnableConfig, get_config_list};
 use super::utils::gather_with_concurrency;
 
-/// Router input.
-///
-/// This struct represents the input to a RouterRunnable, containing
-/// the key to route on and the actual input to pass to the selected Runnable.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RouterInput<I> {
-    /// The key to route on.
     pub key: String,
-    /// The input to pass to the selected `Runnable`.
     pub input: I,
 }
 
 impl<I> RouterInput<I> {
-    /// Create a new RouterInput.
     pub fn new(key: impl Into<String>, input: I) -> Self {
         Self {
             key: key.into(),
@@ -42,33 +30,12 @@ impl<I> RouterInput<I> {
     }
 }
 
-/// A `Runnable` that routes to a set of `Runnable` based on `Input['key']`.
-///
-/// Returns the output of the selected Runnable.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::runnables::{RouterRunnable, RunnableLambda, RouterInput};
-///
-/// let add = RunnableLambda::new(|x: i32| Ok(x + 1));
-/// let square = RunnableLambda::new(|x: i32| Ok(x * x));
-///
-/// let router = RouterRunnable::new()
-///     .add("add", add)
-///     .add("square", square);
-///
-/// let result = router.invoke(RouterInput::new("square", 3), None)?;
-/// assert_eq!(result, 9);
-/// ```
 pub struct RouterRunnable<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    /// The mapping of keys to Runnables.
     runnables: HashMap<String, DynRunnable<I, O>>,
-    /// Optional name for this router.
     name: Option<String>,
 }
 
@@ -90,7 +57,6 @@ where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    /// Create a new empty RouterRunnable.
     pub fn new() -> Self {
         Self {
             runnables: HashMap::new(),
@@ -98,7 +64,6 @@ where
         }
     }
 
-    /// Create a new RouterRunnable from a HashMap of runnables.
     pub fn from_runnables(runnables: HashMap<String, DynRunnable<I, O>>) -> Self {
         Self {
             runnables,
@@ -106,7 +71,6 @@ where
         }
     }
 
-    /// Add a runnable to the router.
     pub fn add<R>(mut self, key: impl Into<String>, runnable: R) -> Self
     where
         R: Runnable<Input = I, Output = O> + Send + Sync + 'static,
@@ -115,7 +79,6 @@ where
         self
     }
 
-    /// Set the name of this router.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
@@ -363,9 +326,6 @@ where
 {
 }
 
-/// Type alias for a RouterRunnable with Value input and output.
-///
-/// This is useful when the types are not known at compile time.
 pub type DynRouterRunnable = RouterRunnable<Value, Value>;
 
 #[cfg(test)]

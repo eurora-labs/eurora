@@ -1,8 +1,3 @@
-//! Message utility types and functions.
-//!
-//! This module contains utility types like `AnyMessage` and helper functions
-//! for working with messages. Mirrors `langchain_core.messages.utils`.
-
 use super::ai::{AIMessage, AIMessageChunk};
 use super::base::{BaseMessage, BaseMessageChunk};
 use super::chat::{ChatMessage, ChatMessageChunk};
@@ -12,18 +7,10 @@ use super::modifier::RemoveMessage;
 use super::system::{SystemMessage, SystemMessageChunk};
 use super::tool::{ToolCall, ToolMessage, ToolMessageChunk};
 
-/// Type alias for any message type, matching LangChain's AnyMessage.
-/// This is equivalent to BaseMessage but provides naming consistency with Python.
 pub type AnyMessage = BaseMessage;
 
-/// A type representing the various ways a message can be represented.
-///
-/// This corresponds to `MessageLikeRepresentation` in LangChain Python.
 pub type MessageLikeRepresentation = serde_json::Value;
 
-/// Convert a `BaseMessage` to the corresponding `BaseMessageChunk`.
-///
-/// This corresponds to `_msg_to_chunk` in LangChain Python.
 pub(crate) fn msg_to_chunk(message: &BaseMessage) -> BaseMessageChunk {
     match message {
         BaseMessage::Human(m) => BaseMessageChunk::Human(
@@ -95,26 +82,10 @@ pub(crate) fn msg_to_chunk(message: &BaseMessage) -> BaseMessageChunk {
     }
 }
 
-/// Convert a `BaseMessageChunk` to the corresponding `BaseMessage`.
-///
-/// This corresponds to `_chunk_to_msg` in LangChain Python.
 pub(crate) fn chunk_to_msg(chunk: &BaseMessageChunk) -> BaseMessage {
     chunk.to_message()
 }
 
-/// Convert a sequence of messages to a buffer string.
-///
-/// This concatenates messages with role prefixes for display.
-///
-/// # Arguments
-///
-/// * `messages` - The messages to convert.
-/// * `human_prefix` - The prefix to prepend to human messages (default: "Human").
-/// * `ai_prefix` - The prefix to prepend to AI messages (default: "AI").
-///
-/// # Returns
-///
-/// A single string concatenation of all input messages.
 pub fn get_buffer_string(messages: &[BaseMessage], human_prefix: &str, ai_prefix: &str) -> String {
     messages
         .iter()
@@ -140,11 +111,6 @@ pub fn get_buffer_string(messages: &[BaseMessage], human_prefix: &str, ai_prefix
         .join("\n")
 }
 
-/// Convert a message to a dictionary representation.
-///
-/// This corresponds to `message_to_dict` in LangChain Python.
-/// The dict will have a `type` key with the message type and a `data` key
-/// with the message data as a dict (all fields serialized).
 pub fn message_to_dict(message: &BaseMessage) -> serde_json::Value {
     let mut data = serde_json::to_value(message).unwrap_or_default();
 
@@ -160,16 +126,10 @@ pub fn message_to_dict(message: &BaseMessage) -> serde_json::Value {
     })
 }
 
-/// Convert a sequence of messages to a list of dictionaries.
-///
-/// This corresponds to `messages_to_dict` in LangChain Python.
 pub fn messages_to_dict(messages: &[BaseMessage]) -> Vec<serde_json::Value> {
     messages.iter().map(message_to_dict).collect()
 }
 
-/// Convert a dictionary to a message.
-///
-/// This corresponds to `_message_from_dict` in LangChain Python.
 pub fn message_from_dict(message: &serde_json::Value) -> Result<BaseMessage, String> {
     let msg_type = message
         .get("type")
@@ -196,22 +156,10 @@ pub fn message_from_dict(message: &serde_json::Value) -> Result<BaseMessage, Str
     })
 }
 
-/// Convert a sequence of message dicts to messages.
-///
-/// This corresponds to `messages_from_dict` in LangChain Python.
 pub fn messages_from_dict(messages: &[serde_json::Value]) -> Result<Vec<BaseMessage>, String> {
     messages.iter().map(message_from_dict).collect()
 }
 
-/// Convert message-like representations to messages.
-///
-/// This function can convert from:
-/// - BaseMessage (returned as-is)
-/// - 2-tuple of (role, content) as serde_json::Value
-/// - dict with "role"/"type" and "content" keys
-/// - string (converted to HumanMessage)
-///
-/// This corresponds to `convert_to_messages` in LangChain Python.
 pub fn convert_to_messages(messages: &[serde_json::Value]) -> Result<Vec<BaseMessage>, String> {
     let mut result = Vec::new();
 
@@ -280,9 +228,6 @@ pub fn convert_to_message(message: &serde_json::Value) -> Result<BaseMessage, St
     Err(format!("Cannot convert to message: {:?}", message))
 }
 
-/// Create a message from a message type string and content.
-///
-/// This corresponds to `_create_message_from_message_type` in LangChain Python.
 fn create_message_from_role(
     role: &str,
     content: &str,
@@ -393,23 +338,12 @@ fn create_message_from_role(
     }
 }
 
-/// Options for excluding tool calls from filtered messages.
-///
-/// This corresponds to the `exclude_tool_calls` parameter in LangChain Python's
-/// `filter_messages`.
 #[derive(Debug, Clone)]
 pub enum ExcludeToolCalls {
-    /// Exclude all AIMessages with tool calls and all ToolMessages.
     All,
-    /// Exclude ToolMessages with matching tool_call_ids and filter matching
-    /// tool_calls from AIMessages (excluding the whole AIMessage if no
-    /// tool_calls remain).
     Ids(Vec<String>),
 }
 
-/// Filter messages based on name, type, or ID.
-///
-/// This corresponds to `filter_messages` in LangChain Python.
 #[allow(clippy::too_many_arguments)]
 pub fn filter_messages(
     messages: &[BaseMessage],
@@ -519,13 +453,6 @@ pub fn filter_messages(
     filtered
 }
 
-/// Merge consecutive messages of the same type.
-///
-/// Note: ToolMessages are not merged, as each has a distinct tool call ID.
-///
-/// This corresponds to `merge_message_runs` in LangChain Python.
-/// Uses chunk-based merging to properly merge tool_calls, response_metadata,
-/// additional_kwargs, and content blocks (not just string concatenation).
 pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Vec<BaseMessage> {
     if messages.is_empty() {
         return Vec::new();
@@ -621,22 +548,14 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
     merged
 }
 
-/// Convert a message chunk to a complete message.
-///
-/// This corresponds to `message_chunk_to_message` in LangChain Python.
 pub fn message_chunk_to_message(chunk: &BaseMessageChunk) -> BaseMessage {
     chunk.to_message()
 }
 
-/// Configuration for approximate token counting.
 #[derive(Debug, Clone)]
 pub struct CountTokensConfig {
-    /// Number of characters per token to use for the approximation.
-    /// One token corresponds to ~4 chars for common English text.
     pub chars_per_token: f64,
-    /// Number of extra tokens to add per message, e.g. special tokens.
     pub extra_tokens_per_message: f64,
-    /// Whether to include message names in the count.
     pub count_name: bool,
 }
 
@@ -650,22 +569,6 @@ impl Default for CountTokensConfig {
     }
 }
 
-/// Approximate the total number of tokens in messages.
-///
-/// The token count includes stringified message content, role, and (optionally) name.
-/// - For AI messages, the token count also includes stringified tool calls.
-/// - For tool messages, the token count also includes the tool call ID.
-///
-/// # Arguments
-///
-/// * `messages` - Slice of messages to count tokens for.
-/// * `config` - Configuration for token counting (use `CountTokensConfig::default()` for defaults).
-///
-/// # Returns
-///
-/// Approximate number of tokens in the messages.
-///
-/// This corresponds to `count_tokens_approximately` in LangChain Python.
 pub fn count_tokens_approximately(messages: &[BaseMessage], config: &CountTokensConfig) -> usize {
     let mut token_count: f64 = 0.0;
 
@@ -702,7 +605,6 @@ pub fn count_tokens_approximately(messages: &[BaseMessage], config: &CountTokens
     token_count.ceil() as usize
 }
 
-/// Get the OpenAI role string for a message.
 fn get_message_openai_role(message: &BaseMessage) -> &'static str {
     match message {
         BaseMessage::AI(_) => "assistant",
@@ -733,32 +635,13 @@ fn get_message_openai_role(message: &BaseMessage) -> &'static str {
     }
 }
 
-/// Text format options for OpenAI message conversion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TextFormat {
-    /// If a message has a string content, this is left as a string.
-    /// If a message has content blocks that are all of type 'text', these
-    /// are joined with a newline to make a single string.
     #[default]
     String,
-    /// If a message has a string content, this is turned into a list
-    /// with a single content block of type 'text'.
     Block,
 }
 
-/// Convert LangChain messages into OpenAI message dicts.
-///
-/// # Arguments
-///
-/// * `messages` - Slice of messages to convert.
-/// * `text_format` - How to format string or text block contents.
-/// * `include_id` - Whether to include message IDs in the output.
-///
-/// # Returns
-///
-/// A list of OpenAI message dicts as JSON Values.
-///
-/// This corresponds to `convert_to_openai_messages` in LangChain Python.
 pub fn convert_to_openai_messages(
     messages: &[BaseMessage],
     text_format: TextFormat,
@@ -775,10 +658,6 @@ pub fn convert_to_openai_messages(
     oai_messages
 }
 
-/// Convert a single message to OpenAI format.
-///
-/// Returns a Vec because some content blocks (tool_result) can produce
-/// additional ToolMessages that need to be appended.
 fn convert_single_to_openai_message(
     message: &BaseMessage,
     text_format: TextFormat,
@@ -975,7 +854,6 @@ fn convert_single_to_openai_message(
     }
 }
 
-/// Convert ToolCall list to OpenAI tool_calls format.
 fn convert_to_openai_tool_calls(tool_calls: &[ToolCall]) -> Vec<serde_json::Value> {
     tool_calls
         .iter()
@@ -992,16 +870,10 @@ fn convert_to_openai_tool_calls(tool_calls: &[ToolCall]) -> Vec<serde_json::Valu
         .collect()
 }
 
-/// Check if a message matches any of the given type strings.
-///
-/// This corresponds to `_is_message_type` in LangChain Python.
 fn is_message_type(message: &BaseMessage, types: &[String]) -> bool {
     types.iter().any(|t| t == message.message_type())
 }
 
-/// Default text splitter that splits on newlines, keeping the separator.
-///
-/// This corresponds to `_default_text_splitter` in LangChain Python.
 fn default_text_splitter(text: &str) -> Vec<String> {
     let splits: Vec<&str> = text.split('\n').collect();
     if splits.len() <= 1 {
@@ -1015,45 +887,26 @@ fn default_text_splitter(text: &str) -> Vec<String> {
     result
 }
 
-/// Strategy for trimming messages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TrimStrategy {
-    /// Keep the first `<= max_tokens` tokens of the messages.
     First,
-    /// Keep the last `<= max_tokens` tokens of the messages.
     #[default]
     Last,
 }
 
-/// Configuration for trimming messages.
 #[derive(Debug, Clone)]
 pub struct TrimMessagesConfig<F, S = fn(&str) -> Vec<String>>
 where
     F: Fn(&[BaseMessage]) -> usize,
     S: Fn(&str) -> Vec<String>,
 {
-    /// Maximum token count of trimmed messages.
     pub max_tokens: usize,
-    /// Function for counting tokens in a list of messages.
     pub token_counter: F,
-    /// Strategy for trimming.
     pub strategy: TrimStrategy,
-    /// Whether to split a message if only part can be included.
     pub allow_partial: bool,
-    /// Whether to keep the SystemMessage if there is one at index 0.
-    /// Only valid with strategy="last".
     pub include_system: bool,
-    /// The message type(s) to end on. If specified, every message after the last
-    /// occurrence of this type is ignored. Can be specified as string names
-    /// (e.g. "system", "human", "ai", ...).
     pub end_on: Option<Vec<String>>,
-    /// The message type(s) to start on. Should only be specified if
-    /// strategy="last". If specified, every message before the first occurrence
-    /// of this type is ignored (after trimming to max_tokens).
     pub start_on: Option<Vec<String>>,
-    /// Custom text splitter function for partial message splitting.
-    /// When `allow_partial` is true, this function is used to split text content
-    /// into chunks. Defaults to splitting on newlines.
     pub text_splitter: Option<S>,
 }
 
@@ -1061,7 +914,6 @@ impl<F> TrimMessagesConfig<F>
 where
     F: Fn(&[BaseMessage]) -> usize,
 {
-    /// Create a new config with required parameters.
     pub fn new(max_tokens: usize, token_counter: F) -> Self {
         Self {
             max_tokens,
@@ -1075,37 +927,31 @@ where
         }
     }
 
-    /// Set the trimming strategy.
     pub fn with_strategy(mut self, strategy: TrimStrategy) -> Self {
         self.strategy = strategy;
         self
     }
 
-    /// Set whether to allow partial messages.
     pub fn with_allow_partial(mut self, allow_partial: bool) -> Self {
         self.allow_partial = allow_partial;
         self
     }
 
-    /// Set whether to include the system message.
     pub fn with_include_system(mut self, include_system: bool) -> Self {
         self.include_system = include_system;
         self
     }
 
-    /// Set the message type(s) to end on.
     pub fn with_end_on(mut self, end_on: Vec<String>) -> Self {
         self.end_on = Some(end_on);
         self
     }
 
-    /// Set the message type(s) to start on.
     pub fn with_start_on(mut self, start_on: Vec<String>) -> Self {
         self.start_on = Some(start_on);
         self
     }
 
-    /// Set a custom text splitter function for partial message splitting.
     pub fn with_text_splitter<S2: Fn(&str) -> Vec<String>>(
         self,
         text_splitter: S2,
@@ -1123,18 +969,6 @@ where
     }
 }
 
-/// Trim messages to be below a token count.
-///
-/// # Arguments
-///
-/// * `messages` - Slice of messages to trim.
-/// * `config` - Configuration for trimming.
-///
-/// # Returns
-///
-/// List of trimmed messages.
-///
-/// This corresponds to `trim_messages` in LangChain Python.
 pub fn trim_messages<F, S>(
     messages: &[BaseMessage],
     config: &TrimMessagesConfig<F, S>,
@@ -1160,11 +994,6 @@ where
     }
 }
 
-/// Trim messages from the beginning (strategy="first").
-///
-/// When `reverse_partial` is true, partial content is taken from the end
-/// of the content (used when the overall strategy is "last" and messages
-/// have been reversed).
 fn trim_messages_first<F, S>(
     messages: &[BaseMessage],
     config: &TrimMessagesConfig<F, S>,
@@ -1292,7 +1121,6 @@ where
     messages[..idx].to_vec()
 }
 
-/// Trim messages from the end (strategy="last").
 fn trim_messages_last<F, S>(
     messages: &[BaseMessage],
     config: &TrimMessagesConfig<F, S>,
@@ -1360,7 +1188,6 @@ where
     result
 }
 
-/// Create a message of the same type with different content.
 fn create_message_with_content(original: &BaseMessage, content: &str) -> BaseMessage {
     match original {
         BaseMessage::Human(m) => BaseMessage::Human(
@@ -1410,11 +1237,6 @@ fn create_message_with_content(original: &BaseMessage, content: &str) -> BaseMes
 use crate::runnables::base::RunnableLambdaWithConfig;
 use std::sync::Arc;
 
-/// Create a [`RunnableLambdaWithConfig`] that filters messages.
-///
-/// This is the runnable counterpart to [`filter_messages`], matching Python's
-/// `filter_messages()` called without messages (which returns a `RunnableLambda`
-/// via the `@_runnable_support` decorator).
 pub fn filter_messages_runnable(
     include_names: Option<Vec<String>>,
     exclude_names: Option<Vec<String>>,
@@ -1458,10 +1280,6 @@ pub fn filter_messages_runnable(
     .with_name("filter_messages")
 }
 
-/// Create a [`RunnableLambdaWithConfig`] that merges consecutive message runs.
-///
-/// This is the runnable counterpart to [`merge_message_runs`], matching Python's
-/// `merge_message_runs()` called without messages.
 pub fn merge_message_runs_runnable(
     chunk_separator: Option<String>,
 ) -> RunnableLambdaWithConfig<Vec<BaseMessage>, Vec<BaseMessage>> {
@@ -1472,10 +1290,6 @@ pub fn merge_message_runs_runnable(
     .with_name("merge_message_runs")
 }
 
-/// Create a [`RunnableLambdaWithConfig`] that trims messages to a token budget.
-///
-/// This is the runnable counterpart to [`trim_messages`], matching Python's
-/// `trim_messages()` called without messages.
 pub fn trim_messages_runnable<F, S>(
     config: TrimMessagesConfig<F, S>,
 ) -> RunnableLambdaWithConfig<Vec<BaseMessage>, Vec<BaseMessage>>

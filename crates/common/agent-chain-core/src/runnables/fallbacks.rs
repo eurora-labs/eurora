@@ -1,9 +1,3 @@
-//! Runnable that can fallback to other Runnables if it fails.
-//!
-//! This module provides `RunnableWithFallbacks`, a Runnable that tries a primary
-//! runnable first and falls back to alternative runnables if the primary fails.
-//! This mirrors `langchain_core.runnables.fallbacks`.
-
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -19,49 +13,8 @@ use super::config::{
     patch_config,
 };
 
-/// A `Runnable` that can fallback to other `Runnable`s if it fails.
-///
-/// External APIs (e.g., APIs for a language model) may at times experience
-/// degraded performance or even downtime.
-///
-/// In these cases, it can be useful to have a fallback `Runnable` that can be
-/// used in place of the original `Runnable` (e.g., fallback to another LLM provider).
-///
-/// Fallbacks can be defined at the level of a single `Runnable`, or at the level
-/// of a chain of `Runnable`s. Fallbacks are tried in order until one succeeds or
-/// all fail.
-///
-/// While you can instantiate a `RunnableWithFallbacks` directly, it is usually
-/// more convenient to use the `with_fallbacks` method on a `Runnable`.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::runnables::{RunnableLambda, RunnableWithFallbacks};
-///
-/// // Create a primary runnable that might fail
-/// let primary = RunnableLambda::new(|x: i32| {
-///     if x > 5 { Err(Error::other("too large")) }
-///     else { Ok(x * 2) }
-/// });
-///
-/// // Create a fallback runnable
-/// let fallback = RunnableLambda::new(|x: i32| Ok(x));
-///
-/// // Combine them with fallbacks
-/// let with_fallbacks = RunnableWithFallbacks::new(primary, vec![fallback]);
-///
-/// // Will use primary for x <= 5, fallback for x > 5
-/// assert_eq!(with_fallbacks.invoke(3, None).unwrap(), 6);
-/// assert_eq!(with_fallbacks.invoke(10, None).unwrap(), 10);
-/// ```
-/// Predicate for determining whether a fallback should be attempted for a given error.
 pub type FallbackErrorPredicate = Arc<dyn Fn(&Error) -> bool + Send + Sync>;
 
-/// Type alias for a function that inserts an exception into an input.
-///
-/// When `exception_key` is set, this function is called to create a modified
-/// input that includes the exception information under the specified key.
 pub type ExceptionInserter<I> = Arc<dyn Fn(&I, &str, &Error) -> I + Send + Sync>;
 
 pub struct RunnableWithFallbacks<I, O>
@@ -69,19 +22,11 @@ where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    /// The `Runnable` to run first.
     pub runnable: DynRunnable<I, O>,
-    /// A sequence of fallbacks to try.
     pub fallbacks: Vec<DynRunnable<I, O>>,
-    /// Predicate to determine which errors should trigger a fallback.
-    /// If None, all errors trigger fallback (equivalent to Python's default `(Exception,)`).
     pub error_predicate: Option<FallbackErrorPredicate>,
-    /// If set, handled exceptions will be passed to fallbacks as part of the input
-    /// under the specified key. The input must be a dict-like type.
     pub exception_key: Option<String>,
-    /// Function to insert an exception into the input when `exception_key` is set.
     exception_inserter: Option<ExceptionInserter<I>>,
-    /// Optional name for this runnable.
     name: Option<String>,
 }
 
@@ -109,11 +54,6 @@ where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    /// Create a new RunnableWithFallbacks.
-    ///
-    /// # Arguments
-    /// * `runnable` - The primary runnable to try first
-    /// * `fallbacks` - A list of fallback runnables to try if the primary fails
     pub fn new<R>(runnable: R, fallbacks: Vec<DynRunnable<I, O>>) -> Self
     where
         R: Runnable<Input = I, Output = O> + Send + Sync + 'static,
@@ -128,7 +68,6 @@ where
         }
     }
 
-    /// Create a new RunnableWithFallbacks from a DynRunnable.
     pub fn from_dyn(runnable: DynRunnable<I, O>, fallbacks: Vec<DynRunnable<I, O>>) -> Self {
         Self {
             runnable,
@@ -140,21 +79,11 @@ where
         }
     }
 
-    /// Set a predicate to determine which errors should trigger fallback.
-    ///
-    /// If the predicate returns true for an error, fallback is attempted.
-    /// If it returns false, the error is raised immediately.
-    /// If no predicate is set, all errors trigger fallback.
     pub fn with_error_predicate(mut self, predicate: FallbackErrorPredicate) -> Self {
         self.error_predicate = Some(predicate);
         self
     }
 
-    /// Set the exception key with an inserter function.
-    ///
-    /// When set, handled exceptions are passed to fallback runnables as part of
-    /// the input under the specified key. The `inserter` function defines how
-    /// to create a new input with the exception value inserted.
     pub fn with_exception_key(
         mut self,
         key: impl Into<String>,
@@ -165,18 +94,15 @@ where
         self
     }
 
-    /// Set the name of this runnable.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
     }
 
-    /// Get an iterator over all runnables (primary + fallbacks).
     pub fn runnables(&self) -> impl Iterator<Item = &DynRunnable<I, O>> {
         std::iter::once(&self.runnable).chain(self.fallbacks.iter())
     }
 
-    /// Check if an error should trigger a fallback.
     fn should_fallback(&self, error: &Error) -> bool {
         match &self.error_predicate {
             Some(predicate) => predicate(error),

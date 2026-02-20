@@ -1,73 +1,8 @@
-//! **Chat loaders** are used to load chat sessions from various sources.
-//!
-//! This module provides the [`BaseChatLoader`] trait for implementing chat
-//! session loaders that can lazily or eagerly load chat sessions.
-//!
-//! Mirrors `langchain_core.chat_loaders`.
-
 use crate::chat_sessions::ChatSession;
 
-/// Base trait for chat loaders.
-///
-/// Chat loaders are responsible for loading chat sessions from various sources
-/// (files, databases, APIs, etc.). Implementations must provide a [`lazy_load`](BaseChatLoader::lazy_load)
-/// method that returns an iterator of chat sessions.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::chat_loaders::BaseChatLoader;
-/// use agent_chain_core::chat_sessions::ChatSession;
-/// use agent_chain_core::messages::{BaseMessage, HumanMessage, AIMessage};
-///
-/// struct MyLoader {
-///     sessions: Vec<ChatSession>,
-/// }
-///
-/// impl BaseChatLoader for MyLoader {
-///     fn lazy_load(&self) -> Box<dyn Iterator<Item = ChatSession> + '_> {
-///         Box::new(self.sessions.iter().cloned())
-///     }
-/// }
-///
-/// let loader = MyLoader {
-///     sessions: vec![
-///         ChatSession::with_messages(vec![
-///             BaseMessage::Human(HumanMessage::builder().content("Hello").build()),
-///             BaseMessage::AI(AIMessage::builder().content("Hi there!").build()),
-///         ]),
-///     ],
-/// };
-///
-/// // Lazy iteration
-/// for session in loader.lazy_load() {
-///     println!("Session has {} messages", session.messages().len());
-/// }
-///
-/// // Eager loading
-/// let all_sessions = loader.load();
-/// println!("Loaded {} sessions", all_sessions.len());
-/// ```
 pub trait BaseChatLoader {
-    /// Lazy load the chat sessions.
-    ///
-    /// Returns an iterator of chat sessions. This allows for memory-efficient
-    /// processing of large datasets where not all sessions need to be loaded
-    /// into memory at once.
-    ///
-    /// # Returns
-    ///
-    /// An iterator of chat sessions.
     fn lazy_load(&self) -> Box<dyn Iterator<Item = ChatSession> + '_>;
 
-    /// Eagerly load the chat sessions into memory.
-    ///
-    /// This is a convenience method that collects all chat sessions from
-    /// [`lazy_load`](BaseChatLoader::lazy_load) into a vector.
-    ///
-    /// # Returns
-    ///
-    /// A vector of chat sessions.
     fn load(&self) -> Vec<ChatSession> {
         self.lazy_load().collect()
     }
@@ -78,7 +13,6 @@ mod tests {
     use super::*;
     use crate::messages::{AIMessage, BaseMessage, HumanMessage};
 
-    /// A simple in-memory chat loader for testing.
     struct InMemoryChatLoader {
         sessions: Vec<ChatSession>,
     }

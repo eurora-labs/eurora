@@ -1,8 +1,3 @@
-//! System message type.
-//!
-//! This module contains the `SystemMessage` and `SystemMessageChunk` types which represent
-//! system instructions for priming AI behavior. Mirrors `langchain_core.messages.system`.
-
 use bon::bon;
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
@@ -12,44 +7,14 @@ use super::base::{get_msg_title_repr, is_interactive_env, merge_content};
 use super::content::{ContentBlock, ContentPart, KNOWN_BLOCK_TYPES, MessageContent};
 use crate::utils::merge::{merge_dicts, merge_lists};
 
-/// A system message in the thread.
-///
-/// The system message is usually passed in as the first of a sequence
-/// of input messages. It's used to prime AI behavior with instructions.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::messages::SystemMessage;
-///
-/// // Simple text message
-/// let msg = SystemMessage::builder()
-///     .content("You are a helpful assistant.")
-///     .build();
-///
-/// // Message with ID and name
-/// let msg = SystemMessage::builder()
-///     .content("You are a helpful assistant.")
-///     .maybe_id(Some("msg-123".to_string()))
-///     .maybe_name(Some("system".to_string()))
-///     .build();
-/// ```
-///
-/// This corresponds to `SystemMessage` in LangChain Python.
-
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct SystemMessage {
-    /// The message content (text or multipart)
     pub content: MessageContent,
-    /// Optional unique identifier
     pub id: Option<String>,
-    /// Optional name for the message
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    /// Additional metadata
     #[serde(default)]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
-    /// Response metadata
     #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
@@ -81,32 +46,9 @@ impl Serialize for SystemMessage {
 
 #[bon]
 impl SystemMessage {
-    /// Create a new system message with named parameters using the builder pattern.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use agent_chain_core::messages::{SystemMessage, MessageContent};
-    ///
-    /// // Simple message with just content
-    /// let msg = SystemMessage::builder()
-    ///     .content("You are a helpful assistant.")
-    ///     .build();
-    ///
-    /// // Message with ID and name
-    /// let msg = SystemMessage::builder()
-    ///     .content("You are a helpful assistant.")
-    ///     .maybe_id(Some("msg-123".to_string()))
-    ///     .maybe_name(Some("system".to_string()))
-    ///     .build();
-    /// ```
     #[builder]
     pub fn new(
         content: impl Into<MessageContent>,
-        /// Optional typed standard content blocks. When provided, these are
-        /// serialized and used as the message content instead of `content`.
-        /// Corresponds to the `content_blocks` parameter in Python's
-        /// `SystemMessage.__init__`.
         content_blocks: Option<Vec<ContentBlock>>,
         id: Option<String>,
         name: Option<String>,
@@ -132,20 +74,14 @@ impl SystemMessage {
         }
     }
 
-    /// Set the message ID.
     pub fn set_id(&mut self, id: String) {
         self.id = Some(id);
     }
 
-    /// Get the message type as a string.
     pub fn message_type(&self) -> &'static str {
         "system"
     }
 
-    /// Get the raw content as a list of JSON values.
-    ///
-    /// If the content is a Parts list, it serializes each part to JSON.
-    /// If the content is a string, it returns a single text block.
     pub fn content_list(&self) -> Vec<serde_json::Value> {
         match &self.content {
             MessageContent::Text(s) => {
@@ -158,18 +94,10 @@ impl SystemMessage {
         }
     }
 
-    /// Get the text content of the message as a string.
-    ///
-    /// This extracts text from both simple string content and list content
-    /// (filtering for text blocks). Corresponds to the `text` property
-    /// on `BaseMessage` in LangChain Python.
     pub fn text(&self) -> String {
         self.content.as_text()
     }
 
-    /// Get a pretty representation of the message.
-    ///
-    /// Corresponds to `BaseMessage.pretty_repr` in LangChain Python.
     pub fn pretty_repr(&self, html: bool) -> String {
         let title = get_msg_title_repr("System Message", html);
         let name_line = if let Some(name) = &self.name {
@@ -180,24 +108,10 @@ impl SystemMessage {
         format!("{}{}\n\n{}", title, name_line, self.content.as_text_ref())
     }
 
-    /// Pretty print the message to stdout.
-    ///
-    /// Corresponds to `BaseMessage.pretty_print` in LangChain Python.
     pub fn pretty_print(&self) {
         println!("{}", self.pretty_repr(is_interactive_env()));
     }
 
-    /// Get the content blocks translated to the standard format.
-    ///
-    /// Translates provider-specific content blocks to the standardized
-    /// LangChain content block format using a multi-pass approach:
-    ///
-    /// 1. First pass: classify each content item as a text block, known v1 block,
-    ///    or non-standard wrapper (guarding v0 blocks by `source_type` field).
-    /// 2. Second pass: sequentially apply input converters to unpack non-standard blocks.
-    ///
-    /// This corresponds to the `content_blocks` property on `BaseMessage`
-    /// in LangChain Python.
     pub fn content_blocks(&self) -> Vec<ContentBlock> {
         use super::content::{
             AudioContentBlock, FileContentBlock, ImageContentBlock, InvalidToolCallBlock,
@@ -318,23 +232,14 @@ impl SystemMessage {
     }
 }
 
-/// System message chunk (yielded when streaming).
-///
-/// This corresponds to `SystemMessageChunk` in LangChain Python.
-
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct SystemMessageChunk {
-    /// The message content (may be partial during streaming)
     pub content: MessageContent,
-    /// Optional unique identifier
     pub id: Option<String>,
-    /// Optional name for the message
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    /// Additional metadata
     #[serde(default)]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
-    /// Response metadata
     #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
@@ -366,24 +271,6 @@ impl Serialize for SystemMessageChunk {
 
 #[bon]
 impl SystemMessageChunk {
-    /// Create a new system message chunk with named parameters using the builder pattern.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use agent_chain_core::messages::SystemMessageChunk;
-    ///
-    /// // Simple chunk with just content
-    /// let chunk = SystemMessageChunk::builder()
-    ///     .content("You are")
-    ///     .build();
-    ///
-    /// // Chunk with ID
-    /// let chunk = SystemMessageChunk::builder()
-    ///     .content("You are")
-    ///     .maybe_id(Some("chunk-123".to_string()))
-    ///     .build();
-    /// ```
     #[builder]
     pub fn new(
         content: impl Into<MessageContent>,
@@ -401,15 +288,10 @@ impl SystemMessageChunk {
         }
     }
 
-    /// Get the message type as a string.
     pub fn message_type(&self) -> &'static str {
         "SystemMessageChunk"
     }
 
-    /// Concatenate this chunk with another chunk.
-    ///
-    /// Uses `merge_dicts` for `additional_kwargs` and `response_metadata`,
-    /// matching the behavior of `BaseMessageChunk.__add__` in LangChain Python.
     pub fn concat(&self, other: &SystemMessageChunk) -> SystemMessageChunk {
         let content = match (&self.content, &other.content) {
             (MessageContent::Text(a), MessageContent::Text(b)) => {
@@ -478,7 +360,6 @@ impl SystemMessageChunk {
         }
     }
 
-    /// Convert this chunk to a complete SystemMessage.
     pub fn to_message(&self) -> SystemMessage {
         SystemMessage {
             content: self.content.clone(),

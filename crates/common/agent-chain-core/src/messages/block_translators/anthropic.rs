@@ -1,13 +1,6 @@
-//! Anthropic block translator.
-//!
-//! Converts Anthropic-specific content blocks to the standard LangChain format.
-//!
-//! This corresponds to `langchain_core/messages/block_translators/anthropic.py` in Python.
-
 use serde_json::{Value, json};
 use std::collections::HashSet;
 
-/// Known block types in the standard format.
 const KNOWN_BLOCK_TYPES: &[&str] = &[
     "text",
     "image",
@@ -27,7 +20,6 @@ const KNOWN_BLOCK_TYPES: &[&str] = &[
     "non_standard_annotation",
 ];
 
-/// Populate extras field with unknown fields from the original block.
 fn populate_extras(standard_block: &mut Value, block: &Value, known_fields: &HashSet<&str>) {
     if standard_block.get("type").and_then(|v| v.as_str()) == Some("non_standard") {
         return;
@@ -47,7 +39,6 @@ fn populate_extras(standard_block: &mut Value, block: &Value, known_fields: &Has
     }
 }
 
-/// Convert a citation to the standard v1 format.
 fn convert_citation_to_v1(citation: &Value) -> Value {
     let citation_type = citation.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
@@ -132,34 +123,15 @@ fn convert_citation_to_v1(citation: &Value) -> Value {
     })
 }
 
-/// Context for chunk translation, containing tool_call_chunks from the message.
 #[derive(Default)]
 pub struct ChunkContext {
-    /// Tool call chunks from the message (used for tool_use block translation)
     pub tool_call_chunks: Vec<Value>,
 }
 
-/// Convert Anthropic content blocks to standard format.
-///
-/// # Arguments
-/// * `content` - The raw content blocks from Anthropic
-/// * `is_chunk` - Whether this is a streaming chunk (affects tool_use handling)
-///
-/// # Returns
-/// A vector of standardized content blocks.
 pub fn convert_to_standard_blocks(content: &[Value], is_chunk: bool) -> Vec<Value> {
     convert_to_standard_blocks_with_context(content, is_chunk, None)
 }
 
-/// Convert Anthropic content blocks to standard format with additional context.
-///
-/// # Arguments
-/// * `content` - The raw content blocks from Anthropic
-/// * `is_chunk` - Whether this is a streaming chunk (affects tool_use handling)
-/// * `context` - Optional context containing tool_call_chunks for chunk translation
-///
-/// # Returns
-/// A vector of standardized content blocks.
 pub fn convert_to_standard_blocks_with_context(
     content: &[Value],
     is_chunk: bool,
@@ -469,11 +441,6 @@ pub fn convert_to_standard_blocks_with_context(
     result
 }
 
-/// Convert Anthropic input content blocks (for HumanMessage) to standard format.
-///
-/// During the `content_blocks` parsing process, blocks not recognized as v1 are
-/// wrapped as `non_standard` with the original block in the `value` field. This
-/// function unpacks those blocks before attempting Anthropic-specific conversion.
 pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
     let mut result = Vec::new();
 

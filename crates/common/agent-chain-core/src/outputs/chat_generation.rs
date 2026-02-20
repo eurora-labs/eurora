@@ -1,9 +1,3 @@
-//! Chat generation output classes.
-//!
-//! This module contains the `ChatGeneration` and `ChatGenerationChunk` types
-//! which represent chat message generation outputs from chat models.
-//! Mirrors `langchain_core.outputs.chat_generation`.
-
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -12,37 +6,16 @@ use std::ops::Add;
 use crate::messages::BaseMessage;
 use crate::utils::merge::merge_dicts;
 
-/// A single chat generation output.
-///
-/// A subclass of `Generation` that represents the response from a chat model
-/// that generates chat messages.
-///
-/// The `message` attribute is a structured representation of the chat message.
-/// Most of the time, the message will be of type `AIMessage`.
-///
-/// Users working with chat models will usually access information via either
-/// `AIMessage` (returned from runnable interfaces) or `LLMResult` (available
-/// via callbacks).
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChatGeneration {
-    /// The text contents of the output message.
-    ///
-    /// **Warning:** This field is automatically set from the message content
-    /// and should not be set directly!
     #[serde(default)]
     pub text: String,
 
-    /// The message output by the chat model.
     pub message: BaseMessage,
 
-    /// Raw response from the provider.
-    ///
-    /// May include things like the reason for finishing or token log probabilities.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub generation_info: Option<HashMap<String, Value>>,
 
-    /// Type is used exclusively for serialization purposes.
     #[serde(rename = "type", default = "default_chat_generation_type")]
     pub generation_type: String,
 }
@@ -52,9 +25,6 @@ fn default_chat_generation_type() -> String {
 }
 
 impl ChatGeneration {
-    /// Create a new ChatGeneration from a message.
-    ///
-    /// The text field is automatically set from the message content.
     pub fn new(message: BaseMessage) -> Self {
         let text = extract_text_from_message(&message);
         Self {
@@ -65,7 +35,6 @@ impl ChatGeneration {
         }
     }
 
-    /// Create a new ChatGeneration with generation info.
     pub fn with_info(message: BaseMessage, generation_info: HashMap<String, Value>) -> Self {
         let text = extract_text_from_message(&message);
         Self {
@@ -76,27 +45,15 @@ impl ChatGeneration {
         }
     }
 
-    /// Returns `true` as this class is serializable.
-    ///
-    /// Inherited from Generation in Python.
     pub fn is_lc_serializable() -> bool {
         true
     }
 
-    /// Get the namespace of the LangChain object.
-    ///
-    /// Returns `["langchain", "schema", "output"]`.
-    /// Inherited from Generation in Python.
     pub fn get_lc_namespace() -> Vec<&'static str> {
         vec!["langchain", "schema", "output"]
     }
 }
 
-/// Extract text from a message.
-///
-/// This corresponds to the `set_text` model validator in Python which
-/// extracts the text content from the message. When the content is a JSON
-/// array (OpenAI-style content blocks), the first text block is used.
 fn extract_text_from_message(message: &BaseMessage) -> String {
     let content = message.content();
 
@@ -122,24 +79,16 @@ fn extract_text_from_message(message: &BaseMessage) -> String {
     content.to_string()
 }
 
-/// `ChatGeneration` chunk.
-///
-/// `ChatGeneration` chunks can be concatenated with other `ChatGeneration` chunks.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChatGenerationChunk {
-    /// The text contents of the output message.
     #[serde(default)]
     pub text: String,
 
-    /// The message chunk output by the chat model.
     pub message: BaseMessage,
 
-    /// Raw response from the provider.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub generation_info: Option<HashMap<String, Value>>,
 
-    /// Type is used exclusively for serialization purposes.
     #[serde(rename = "type", default = "default_chat_generation_chunk_type")]
     pub generation_type: String,
 }
@@ -149,7 +98,6 @@ fn default_chat_generation_chunk_type() -> String {
 }
 
 impl ChatGenerationChunk {
-    /// Create a new ChatGenerationChunk from a message.
     pub fn new(message: BaseMessage) -> Self {
         let text = extract_text_from_message(&message);
         Self {
@@ -160,7 +108,6 @@ impl ChatGenerationChunk {
         }
     }
 
-    /// Create a new ChatGenerationChunk with generation info.
     pub fn with_info(message: BaseMessage, generation_info: HashMap<String, Value>) -> Self {
         let text = extract_text_from_message(&message);
         Self {
@@ -175,10 +122,6 @@ impl ChatGenerationChunk {
 impl Add for ChatGenerationChunk {
     type Output = ChatGenerationChunk;
 
-    /// Concatenate two `ChatGenerationChunk`s.
-    ///
-    /// Uses proper message chunk merging to preserve metadata, tool calls,
-    /// and other message attributes.
     fn add(self, other: ChatGenerationChunk) -> Self::Output {
         let generation_info = merge_generation_info(self.generation_info, other.generation_info);
 
@@ -197,7 +140,6 @@ impl Add for ChatGenerationChunk {
     }
 }
 
-/// Merge generation info from two chunks.
 fn merge_generation_info(
     left: Option<HashMap<String, Value>>,
     right: Option<HashMap<String, Value>>,
@@ -247,9 +189,6 @@ impl From<ChatGenerationChunk> for ChatGeneration {
     }
 }
 
-/// Merge a list of `ChatGenerationChunk`s into a single `ChatGenerationChunk`.
-///
-/// Returns `None` if the input list is empty.
 pub fn merge_chat_generation_chunks(
     chunks: Vec<ChatGenerationChunk>,
 ) -> Option<ChatGenerationChunk> {

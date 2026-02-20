@@ -1,9 +1,3 @@
-//! Generation output schema.
-//!
-//! This module contains the `Generation` and `GenerationChunk` types
-//! which represent text generation outputs from LLMs.
-//! Mirrors `langchain_core.outputs.generation`.
-
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -11,33 +5,13 @@ use std::ops::Add;
 
 use crate::utils::merge::merge_dicts;
 
-/// A single text generation output.
-///
-/// Generation represents the response from an "old-fashioned" LLM (string-in,
-/// string-out) that generates regular text (not chat messages).
-///
-/// This model is used internally by chat model and will eventually
-/// be mapped to a more general `LLMResult` object, and then projected into
-/// an `AIMessage` object.
-///
-/// LangChain users working with chat models will usually access information via
-/// `AIMessage` (returned from runnable interfaces) or `LLMResult` (available
-/// via callbacks). Please refer to `AIMessage` and `LLMResult` for more information.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Generation {
-    /// Generated text output.
     pub text: String,
 
-    /// Raw response from the provider.
-    ///
-    /// May include things like the reason for finishing or token log probabilities.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub generation_info: Option<HashMap<String, Value>>,
 
-    /// Type is used exclusively for serialization purposes.
-    ///
-    /// Set to "Generation" for this class.
     #[serde(rename = "type", default = "default_generation_type")]
     pub generation_type: String,
 }
@@ -47,7 +21,6 @@ fn default_generation_type() -> String {
 }
 
 impl Generation {
-    /// Create a new Generation with the given text.
     pub fn new(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
@@ -56,7 +29,6 @@ impl Generation {
         }
     }
 
-    /// Create a new Generation with text and generation info.
     pub fn with_info(text: impl Into<String>, generation_info: HashMap<String, Value>) -> Self {
         Self {
             text: text.into(),
@@ -65,14 +37,10 @@ impl Generation {
         }
     }
 
-    /// Returns `true` as this class is serializable.
     pub fn is_lc_serializable() -> bool {
         true
     }
 
-    /// Get the namespace of the LangChain object.
-    ///
-    /// Returns `["langchain", "schema", "output"]`
     pub fn get_lc_namespace() -> Vec<&'static str> {
         vec!["langchain", "schema", "output"]
     }
@@ -88,28 +56,18 @@ impl Default for Generation {
     }
 }
 
-/// `GenerationChunk`, which can be concatenated with other Generation chunks.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GenerationChunk {
-    /// Generated text output.
     pub text: String,
 
-    /// Raw response from the provider.
-    ///
-    /// May include things like the reason for finishing or token log probabilities.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub generation_info: Option<HashMap<String, Value>>,
 
-    /// Type is used exclusively for serialization purposes.
-    ///
-    /// Set to "Generation" for this class (inherited from Generation in Python).
     #[serde(rename = "type", default = "default_generation_type")]
     pub generation_type: String,
 }
 
 impl GenerationChunk {
-    /// Create a new GenerationChunk with the given text.
     pub fn new(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
@@ -118,7 +76,6 @@ impl GenerationChunk {
         }
     }
 
-    /// Create a new GenerationChunk with text and generation info.
     pub fn with_info(text: impl Into<String>, generation_info: HashMap<String, Value>) -> Self {
         Self {
             text: text.into(),
@@ -141,9 +98,6 @@ impl Default for GenerationChunk {
 impl Add for GenerationChunk {
     type Output = GenerationChunk;
 
-    /// Concatenate two `GenerationChunk`s.
-    ///
-    /// Returns a new `GenerationChunk` concatenated from self and other.
     fn add(self, other: GenerationChunk) -> Self::Output {
         let generation_info = match (self.generation_info, other.generation_info) {
             (Some(left), Some(right)) => {
@@ -195,10 +149,6 @@ impl From<GenerationChunk> for Generation {
     }
 }
 
-/// Merge a list of `GenerationChunk`s into a single chunk.
-///
-/// Analogous to `merge_chat_generation_chunks` for chat models.
-/// Uses the `Add` implementation to concatenate text and merge generation_info.
 pub fn merge_generation_chunks(chunks: Vec<GenerationChunk>) -> Option<GenerationChunk> {
     if chunks.is_empty() {
         return None;

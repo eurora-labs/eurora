@@ -1,49 +1,8 @@
-//! Standard, multimodal content blocks for Large Language Model I/O.
-//!
-//! This module provides standardized data structures for representing inputs to and
-//! outputs from LLMs. The core abstraction is the **Content Block**, a struct with
-//! a `type` field for discrimination.
-//!
-//! Mirrors `langchain_core.messages.content` from Python.
-//!
-//! # Rationale
-//!
-//! Different LLM providers use distinct and incompatible API schemas. This module
-//! provides a unified, provider-agnostic format to facilitate these interactions. A
-//! message to or from a model is simply a list of content blocks, allowing for the natural
-//! interleaving of text, images, and other content in a single ordered sequence.
-//!
-//! # Key Block Types
-//!
-//! - [`TextContentBlock`]: Standard text output.
-//! - [`Citation`]: For annotations that link text output to a source document.
-//! - [`ReasoningContentBlock`]: To capture a model's thought process.
-//! - Multimodal data:
-//!     - [`ImageContentBlock`]
-//!     - [`AudioContentBlock`]
-//!     - [`VideoContentBlock`]
-//!     - [`PlainTextContentBlock`] (e.g. .txt or .md files)
-//!     - [`FileContentBlock`] (e.g. PDFs, etc.)
-//! - Tool calls:
-//!     - [`ToolCallBlock`]
-//!     - [`ToolCallChunkBlock`]
-//!     - [`InvalidToolCallBlock`]
-//!     - [`ServerToolCall`]
-//!     - [`ServerToolCallChunk`]
-//!     - [`ServerToolResult`]
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
 use crate::utils::base::ensure_id;
-
-/// Image detail level for vision models.
-///
-/// This controls how the model processes the image:
-/// - `Low`: Faster, lower token cost, suitable for simple images
-/// - `High`: More detailed analysis, higher token cost
-/// - `Auto`: Let the model decide based on image size
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
@@ -54,46 +13,33 @@ pub enum ImageDetail {
     Auto,
 }
 
-/// Source of an image for multimodal messages.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ImageSource {
-    /// Image from a URL.
-    Url { url: String },
-    /// Base64-encoded image data.
+    Url {
+        url: String,
+    },
     Base64 {
-        /// MIME type (e.g., "image/jpeg", "image/png", "image/gif", "image/webp")
         media_type: String,
-        /// Base64-encoded image data (without the data URL prefix)
         data: String,
     },
-    /// Image from a file ID (e.g., from a file storage system).
     #[serde(rename = "file")]
     FileId {
-        /// The file ID
         file_id: String,
     },
 }
 
-/// A content part in a multimodal message.
-///
-/// Messages can contain multiple content parts, allowing for mixed text and images.
-/// This corresponds to content blocks in LangChain Python's `langchain_core.messages.content`.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentPart {
-    /// Text content.
-    Text { text: String },
-    /// Image content.
+    Text {
+        text: String,
+    },
     Image {
         source: ImageSource,
-        /// Detail level for image processing (optional, defaults to Auto)
         #[serde(skip_serializing_if = "Option::is_none")]
         detail: Option<ImageDetail>,
     },
-    /// Other/unknown content type (for provider-specific content).
     #[serde(untagged)]
     Other(serde_json::Value),
 }
@@ -112,17 +58,10 @@ impl From<String> for ContentPart {
     }
 }
 
-/// Message content that can be either simple text or multipart.
-///
-/// This represents the content field of messages and can be either
-/// a simple string or a list of content parts for multimodal messages.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum MessageContent {
-    /// Simple text content.
     Text(String),
-    /// Multiple content parts (for multimodal messages).
     Parts(Vec<ContentPart>),
 }
 
@@ -130,11 +69,9 @@ static EMPTY_MESSAGE_CONTENT: LazyLock<MessageContent> =
     LazyLock::new(|| MessageContent::Text(String::new()));
 
 impl MessageContent {
-    /// A static reference to an empty MessageContent.
     pub fn empty() -> &'static MessageContent {
         &EMPTY_MESSAGE_CONTENT
     }
-    /// Get the text content, concatenating text parts if multipart.
     pub fn as_text(&self) -> String {
         match self {
             MessageContent::Text(s) => s.clone(),
@@ -149,10 +86,6 @@ impl MessageContent {
         }
     }
 
-    /// Get the text content as a reference.
-    ///
-    /// For simple text content, returns a reference to the string.
-    /// For multipart content, returns an empty string reference.
     pub fn as_text_ref(&self) -> &str {
         match self {
             MessageContent::Text(s) => s,
@@ -160,7 +93,6 @@ impl MessageContent {
         }
     }
 
-    /// Check if this content has any images.
     pub fn has_images(&self) -> bool {
         match self {
             MessageContent::Text(_) => false,
@@ -170,7 +102,6 @@ impl MessageContent {
         }
     }
 
-    /// Get content parts, converting simple text to a single text part if needed.
     pub fn parts(&self) -> Vec<ContentPart> {
         match self {
             MessageContent::Text(s) => vec![ContentPart::Text { text: s.clone() }],
@@ -178,7 +109,6 @@ impl MessageContent {
         }
     }
 
-    /// Check if the content is empty.
     pub fn len(&self) -> usize {
         match self {
             MessageContent::Text(s) => s.len(),
@@ -193,10 +123,6 @@ impl MessageContent {
         }
     }
 
-    /// Convert to a list of JSON values.
-    ///
-    /// For Text content, returns a single-element vec with a text block.
-    /// For Parts content, serializes each part to a JSON value.
     pub fn as_json_values(&self) -> Vec<serde_json::Value> {
         match self {
             MessageContent::Text(s) => {
@@ -304,9 +230,6 @@ impl MessageContent {
     }
 }
 
-/// Index type that can be either an integer or string.
-/// Used during streaming for block ordering.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum BlockIndex {
@@ -344,52 +267,35 @@ impl From<&str> for BlockIndex {
     }
 }
 
-/// A union of all defined Annotation types.
-///
-/// In Python this is: `Annotation = Citation | NonStandardAnnotation`
-/// where each variant is a TypedDict with a `type` literal field for discrimination.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum Annotation {
-    /// Citation annotation for citing data from a document.
     #[serde(rename = "citation")]
     Citation {
-        /// Content block identifier.
         #[serde(skip_serializing_if = "Option::is_none")]
         id: Option<String>,
-        /// URL of the document source.
         #[serde(skip_serializing_if = "Option::is_none")]
         url: Option<String>,
-        /// Source document title.
         #[serde(skip_serializing_if = "Option::is_none")]
         title: Option<String>,
-        /// Start index of the response text.
         #[serde(skip_serializing_if = "Option::is_none")]
         start_index: Option<i64>,
-        /// End index of the response text.
         #[serde(skip_serializing_if = "Option::is_none")]
         end_index: Option<i64>,
-        /// Excerpt of source text being cited.
         #[serde(skip_serializing_if = "Option::is_none")]
         cited_text: Option<String>,
-        /// Provider-specific metadata.
         #[serde(skip_serializing_if = "Option::is_none")]
         extras: Option<HashMap<String, serde_json::Value>>,
     },
-    /// Provider-specific annotation format.
     #[serde(rename = "non_standard_annotation")]
     NonStandardAnnotation {
-        /// Content block identifier.
         #[serde(skip_serializing_if = "Option::is_none")]
         id: Option<String>,
-        /// Provider-specific annotation data.
         value: HashMap<String, serde_json::Value>,
     },
 }
 
 impl Annotation {
-    /// Create a new Citation annotation.
     pub fn citation() -> Self {
         Self::Citation {
             id: None,
@@ -402,47 +308,31 @@ impl Annotation {
         }
     }
 
-    /// Create a new NonStandardAnnotation.
     pub fn non_standard(value: HashMap<String, serde_json::Value>) -> Self {
         Self::NonStandardAnnotation { id: None, value }
     }
 }
 
-/// Type alias for Citation (matches Python's Citation TypedDict).
-/// This is a convenience type that serializes with `type: "citation"`.
 pub type Citation = Annotation;
 
-/// Type alias for NonStandardAnnotation (matches Python's NonStandardAnnotation TypedDict).
-/// This is a convenience type that serializes with `type: "non_standard_annotation"`.
 pub type NonStandardAnnotation = Annotation;
-
-/// Text output from a LLM.
-///
-/// This typically represents the main text content of a message.
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TextContentBlock {
-    /// Type of the content block. Always "text".
     #[serde(rename = "type")]
     pub block_type: String,
-    /// Content block identifier.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// Block text.
     pub text: String,
-    /// Citations and other annotations.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Vec<Annotation>>,
-    /// Index of block in aggregate response. Used during streaming.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<BlockIndex>,
-    /// Provider-specific metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl TextContentBlock {
-    /// Create a new TextContentBlock with the given text.
     pub fn new(text: impl Into<String>) -> Self {
         Self {
             block_type: "text".to_string(),
@@ -455,32 +345,20 @@ impl TextContentBlock {
     }
 }
 
-/// Represents an AI's request to call a tool (content block version).
-///
-/// This version includes a `type` field for discrimination and is used
-/// as part of content blocks.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolCallBlock {
-    /// Type of the content block. Always "tool_call".
     #[serde(rename = "type")]
     pub block_type: String,
-    /// An identifier associated with the tool call.
     pub id: Option<String>,
-    /// The name of the tool to be called.
     pub name: String,
-    /// The arguments to the tool call.
     pub args: HashMap<String, serde_json::Value>,
-    /// Index of block in aggregate response. Used during streaming.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<BlockIndex>,
-    /// Provider-specific metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl ToolCallBlock {
-    /// Create a new ToolCallBlock.
     pub fn new(name: impl Into<String>, args: HashMap<String, serde_json::Value>) -> Self {
         Self {
             block_type: "tool_call".to_string(),
@@ -493,29 +371,20 @@ impl ToolCallBlock {
     }
 }
 
-/// A chunk of a tool call (yielded when streaming, content block version).
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolCallChunkBlock {
-    /// Type of the content block. Always "tool_call_chunk".
     #[serde(rename = "type")]
     pub block_type: String,
-    /// An identifier associated with the tool call.
     pub id: Option<String>,
-    /// The name of the tool to be called.
     pub name: Option<String>,
-    /// The arguments to the tool call (as a string, since it may be partial JSON).
     pub args: Option<String>,
-    /// The index of the tool call in a sequence.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<BlockIndex>,
-    /// Provider-specific metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl ToolCallChunkBlock {
-    /// Create a new ToolCallChunkBlock.
     pub fn new() -> Self {
         Self {
             block_type: "tool_call_chunk".to_string(),
@@ -534,33 +403,21 @@ impl Default for ToolCallChunkBlock {
     }
 }
 
-/// Allowance for errors made by LLM (content block version).
-///
-/// Here we add an `error` key to surface errors made during generation.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct InvalidToolCallBlock {
-    /// Type of the content block. Always "invalid_tool_call".
     #[serde(rename = "type")]
     pub block_type: String,
-    /// An identifier associated with the tool call.
     pub id: Option<String>,
-    /// The name of the tool to be called.
     pub name: Option<String>,
-    /// The arguments to the tool call.
     pub args: Option<String>,
-    /// An error message associated with the tool call.
     pub error: Option<String>,
-    /// Index of block in aggregate response. Used during streaming.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<BlockIndex>,
-    /// Provider-specific metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl InvalidToolCallBlock {
-    /// Create a new InvalidToolCallBlock.
     pub fn new() -> Self {
         Self {
             block_type: "invalid_tool_call".to_string(),
@@ -580,31 +437,20 @@ impl Default for InvalidToolCallBlock {
     }
 }
 
-/// Tool call that is executed server-side.
-///
-/// For example: code execution, web search, etc.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ServerToolCall {
-    /// Type of the content block. Always "server_tool_call".
     #[serde(rename = "type")]
     pub block_type: String,
-    /// An identifier associated with the tool call.
     pub id: String,
-    /// The name of the tool to be called.
     pub name: String,
-    /// The arguments to the tool call.
     pub args: HashMap<String, serde_json::Value>,
-    /// Index of block in aggregate response. Used during streaming.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<BlockIndex>,
-    /// Provider-specific metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl ServerToolCall {
-    /// Create a new ServerToolCall.
     pub fn new(
         id: impl Into<String>,
         name: impl Into<String>,
@@ -621,32 +467,23 @@ impl ServerToolCall {
     }
 }
 
-/// A chunk of a server-side tool call (yielded when streaming).
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ServerToolCallChunk {
-    /// Type of the content block. Always "server_tool_call_chunk".
     #[serde(rename = "type")]
     pub block_type: String,
-    /// The name of the tool to be called.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    /// JSON substring of the arguments to the tool call.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub args: Option<String>,
-    /// An identifier associated with the tool call.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// Index of block in aggregate response. Used during streaming.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<BlockIndex>,
-    /// Provider-specific metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl ServerToolCallChunk {
-    /// Create a new ServerToolCallChunk.
     pub fn new() -> Self {
         Self {
             block_type: "server_tool_call_chunk".to_string(),
@@ -665,8 +502,6 @@ impl Default for ServerToolCallChunk {
     }
 }
 
-/// Execution status of the server-side tool.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ServerToolStatus {
@@ -674,33 +509,23 @@ pub enum ServerToolStatus {
     Error,
 }
 
-/// Result of a server-side tool call.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ServerToolResult {
-    /// Type of the content block. Always "server_tool_result".
     #[serde(rename = "type")]
     pub block_type: String,
-    /// An identifier associated with the server tool result.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// ID of the corresponding server tool call.
     pub tool_call_id: String,
-    /// Execution status of the server-side tool.
     pub status: ServerToolStatus,
-    /// Output of the executed tool.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<serde_json::Value>,
-    /// Index of block in aggregate response. Used during streaming.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<BlockIndex>,
-    /// Provider-specific metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl ServerToolResult {
-    /// Create a new successful ServerToolResult.
     pub fn success(tool_call_id: impl Into<String>) -> Self {
         Self {
             block_type: "server_tool_result".to_string(),
@@ -713,7 +538,6 @@ impl ServerToolResult {
         }
     }
 
-    /// Create a new error ServerToolResult.
     pub fn error(tool_call_id: impl Into<String>) -> Self {
         Self {
             block_type: "server_tool_result".to_string(),
@@ -727,32 +551,21 @@ impl ServerToolResult {
     }
 }
 
-/// Reasoning output from a LLM.
-///
-/// Used to represent reasoning/thinking content from AI models that support
-/// chain-of-thought reasoning (e.g., DeepSeek, Ollama, XAI, Groq).
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ReasoningContentBlock {
-    /// Type of the content block. Always "reasoning".
     #[serde(rename = "type")]
     pub block_type: String,
-    /// Content block identifier.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// Reasoning text. Either the thought summary or the raw reasoning text itself.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<String>,
-    /// Index of block in aggregate response. Used during streaming.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<BlockIndex>,
-    /// Provider-specific metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl ReasoningContentBlock {
-    /// Create a new reasoning content block.
     pub fn new(reasoning: impl Into<String>) -> Self {
         Self {
             block_type: "reasoning".to_string(),
@@ -763,7 +576,6 @@ impl ReasoningContentBlock {
         }
     }
 
-    /// Get the reasoning content.
     pub fn reasoning(&self) -> Option<&str> {
         self.reasoning.as_deref()
     }
@@ -781,38 +593,27 @@ impl Default for ReasoningContentBlock {
     }
 }
 
-/// Image data content block.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ImageContentBlock {
-    /// Type of the content block. Always "image".
     #[serde(rename = "type")]
     pub block_type: String,
-    /// Content block identifier.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// ID of the image file, e.g., from a file storage system.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_id: Option<String>,
-    /// MIME type of the image. Required for base64.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mime_type: Option<String>,
-    /// Index of block in aggregate response. Used during streaming.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<BlockIndex>,
-    /// URL of the image.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
-    /// Data as a base64 string.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub base64: Option<String>,
-    /// Provider-specific metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl ImageContentBlock {
-    /// Create a new ImageContentBlock.
     pub fn new() -> Self {
         Self {
             block_type: "image".to_string(),
@@ -826,7 +627,6 @@ impl ImageContentBlock {
         }
     }
 
-    /// Create an ImageContentBlock from a URL.
     pub fn from_url(url: impl Into<String>) -> Self {
         Self {
             block_type: "image".to_string(),
@@ -840,7 +640,6 @@ impl ImageContentBlock {
         }
     }
 
-    /// Create an ImageContentBlock from base64 data.
     pub fn from_base64(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
         Self {
             block_type: "image".to_string(),
@@ -861,38 +660,27 @@ impl Default for ImageContentBlock {
     }
 }
 
-/// Video data content block.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct VideoContentBlock {
-    /// Type of the content block. Always "video".
     #[serde(rename = "type")]
     pub block_type: String,
-    /// Content block identifier.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// ID of the video file, e.g., from a file storage system.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_id: Option<String>,
-    /// MIME type of the video. Required for base64.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mime_type: Option<String>,
-    /// Index of block in aggregate response. Used during streaming.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<BlockIndex>,
-    /// URL of the video.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
-    /// Data as a base64 string.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub base64: Option<String>,
-    /// Provider-specific metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl VideoContentBlock {
-    /// Create a new VideoContentBlock.
     pub fn new() -> Self {
         Self {
             block_type: "video".to_string(),
@@ -913,38 +701,27 @@ impl Default for VideoContentBlock {
     }
 }
 
-/// Audio data content block.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AudioContentBlock {
-    /// Type of the content block. Always "audio".
     #[serde(rename = "type")]
     pub block_type: String,
-    /// Content block identifier.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// ID of the audio file, e.g., from a file storage system.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_id: Option<String>,
-    /// MIME type of the audio. Required for base64.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mime_type: Option<String>,
-    /// Index of block in aggregate response. Used during streaming.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<BlockIndex>,
-    /// URL of the audio.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
-    /// Data as a base64 string.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub base64: Option<String>,
-    /// Provider-specific metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl AudioContentBlock {
-    /// Create a new AudioContentBlock.
     pub fn new() -> Self {
         Self {
             block_type: "audio".to_string(),
@@ -965,46 +742,32 @@ impl Default for AudioContentBlock {
     }
 }
 
-/// Plaintext data content block (e.g., from a `.txt` or `.md` document).
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PlainTextContentBlock {
-    /// Type of the content block. Always "text-plain".
     #[serde(rename = "type")]
     pub block_type: String,
-    /// Content block identifier.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// ID of the plaintext file, e.g., from a file storage system.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_id: Option<String>,
-    /// MIME type of the file. Always "text/plain".
     pub mime_type: String,
-    /// Index of block in aggregate response. Used during streaming.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<BlockIndex>,
-    /// URL of the plaintext.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
-    /// Data as a base64 string.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub base64: Option<String>,
-    /// Plaintext content. Optional if the data is provided as base64.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
-    /// Title of the text data.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    /// Context for the text, e.g., a description or summary.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context: Option<String>,
-    /// Provider-specific metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl PlainTextContentBlock {
-    /// Create a new PlainTextContentBlock.
     pub fn new() -> Self {
         Self {
             block_type: "text-plain".to_string(),
@@ -1028,41 +791,27 @@ impl Default for PlainTextContentBlock {
     }
 }
 
-/// File data content block for files that don't fit other categories.
-///
-/// This block is intended for files that are not images, audio, or plaintext.
-/// For example, it can be used for PDFs, Word documents, etc.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FileContentBlock {
-    /// Type of the content block. Always "file".
     #[serde(rename = "type")]
     pub block_type: String,
-    /// Content block identifier.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// ID of the file, e.g., from a file storage system.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_id: Option<String>,
-    /// MIME type of the file. Required for base64.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mime_type: Option<String>,
-    /// Index of block in aggregate response. Used during streaming.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<BlockIndex>,
-    /// URL of the file.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
-    /// Data as a base64 string.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub base64: Option<String>,
-    /// Provider-specific metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl FileContentBlock {
-    /// Create a new FileContentBlock.
     pub fn new() -> Self {
         Self {
             block_type: "file".to_string(),
@@ -1083,27 +832,18 @@ impl Default for FileContentBlock {
     }
 }
 
-/// Provider-specific content data.
-///
-/// This block contains data for which there is not yet a standard type.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NonStandardContentBlock {
-    /// Type of the content block. Always "non_standard".
     #[serde(rename = "type")]
     pub block_type: String,
-    /// Content block identifier.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// Provider-specific content data.
     pub value: HashMap<String, serde_json::Value>,
-    /// Index of block in aggregate response. Used during streaming.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<BlockIndex>,
 }
 
 impl NonStandardContentBlock {
-    /// Create a new NonStandardContentBlock.
     pub fn new(value: HashMap<String, serde_json::Value>) -> Self {
         Self {
             block_type: "non_standard".to_string(),
@@ -1113,8 +853,6 @@ impl NonStandardContentBlock {
         }
     }
 }
-
-/// A union of all defined multimodal data ContentBlock types.
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
@@ -1131,8 +869,6 @@ pub enum DataContentBlock {
     File(FileContentBlock),
 }
 
-/// A union of all tool-related ContentBlock types.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum ToolContentBlock {
@@ -1147,8 +883,6 @@ pub enum ToolContentBlock {
     #[serde(rename = "server_tool_result")]
     ServerToolResult(ServerToolResult),
 }
-
-/// A union of all defined ContentBlock types.
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
@@ -1183,9 +917,6 @@ pub enum ContentBlock {
     ServerToolResult(ServerToolResult),
 }
 
-/// These are block types known to langchain-core>=1.0.0.
-///
-/// If a block has a type not in this set, it is considered to be provider-specific.
 pub const KNOWN_BLOCK_TYPES: &[&str] = &[
     "text",
     "reasoning",
@@ -1203,19 +934,12 @@ pub const KNOWN_BLOCK_TYPES: &[&str] = &[
     "non_standard",
 ];
 
-/// Data content block type literals.
 const DATA_CONTENT_BLOCK_TYPES: &[&str] = &["image", "video", "audio", "text-plain", "file"];
 
-/// Returns the tuple of data content block type literals.
-///
-/// Mirrors Python's `_get_data_content_block_types()`.
 pub fn get_data_content_block_types() -> &'static [&'static str] {
     DATA_CONTENT_BLOCK_TYPES
 }
 
-/// Check if the provided content block is a data content block.
-///
-/// Returns true for both v0 (old-style) and v1 (new-style) multimodal data blocks.
 pub fn is_data_content_block(block: &serde_json::Value) -> bool {
     let block_type = match block.get("type").and_then(|t| t.as_str()) {
         Some(t) => t,
@@ -1253,15 +977,6 @@ pub fn is_data_content_block(block: &serde_json::Value) -> bool {
     false
 }
 
-/// Create a `TextContentBlock`.
-///
-/// # Arguments
-///
-/// * `text` - The text content of the block.
-/// * `id` - Content block identifier. Generated automatically if not provided.
-/// * `annotations` - Citations and other annotations for the text.
-/// * `index` - Index of block in aggregate response.
-/// * `extras` - Provider-specific metadata.
 pub fn create_text_block(
     text: impl Into<String>,
     id: Option<String>,
@@ -1279,21 +994,6 @@ pub fn create_text_block(
     }
 }
 
-/// Create an `ImageContentBlock`.
-///
-/// # Arguments
-///
-/// * `url` - URL of the image.
-/// * `base64` - Base64-encoded image data.
-/// * `file_id` - ID of the image file from a file storage system.
-/// * `mime_type` - MIME type of the image. Required for base64 data.
-/// * `id` - Content block identifier. Generated automatically if not provided.
-/// * `index` - Index of block in aggregate response.
-/// * `extras` - Provider-specific metadata.
-///
-/// # Errors
-///
-/// Returns an error if no image source is provided.
 pub fn create_image_block(
     url: Option<String>,
     base64: Option<String>,
@@ -1319,21 +1019,6 @@ pub fn create_image_block(
     })
 }
 
-/// Create a `VideoContentBlock`.
-///
-/// # Arguments
-///
-/// * `url` - URL of the video.
-/// * `base64` - Base64-encoded video data.
-/// * `file_id` - ID of the video file from a file storage system.
-/// * `mime_type` - MIME type of the video. Required for base64 data.
-/// * `id` - Content block identifier. Generated automatically if not provided.
-/// * `index` - Index of block in aggregate response.
-/// * `extras` - Provider-specific metadata.
-///
-/// # Errors
-///
-/// Returns an error if no video source is provided or if base64 is used without mime_type.
 pub fn create_video_block(
     url: Option<String>,
     base64: Option<String>,
@@ -1363,21 +1048,6 @@ pub fn create_video_block(
     })
 }
 
-/// Create an `AudioContentBlock`.
-///
-/// # Arguments
-///
-/// * `url` - URL of the audio.
-/// * `base64` - Base64-encoded audio data.
-/// * `file_id` - ID of the audio file from a file storage system.
-/// * `mime_type` - MIME type of the audio. Required for base64 data.
-/// * `id` - Content block identifier. Generated automatically if not provided.
-/// * `index` - Index of block in aggregate response.
-/// * `extras` - Provider-specific metadata.
-///
-/// # Errors
-///
-/// Returns an error if no audio source is provided or if base64 is used without mime_type.
 pub fn create_audio_block(
     url: Option<String>,
     base64: Option<String>,
@@ -1407,21 +1077,6 @@ pub fn create_audio_block(
     })
 }
 
-/// Create a `FileContentBlock`.
-///
-/// # Arguments
-///
-/// * `url` - URL of the file.
-/// * `base64` - Base64-encoded file data.
-/// * `file_id` - ID of the file from a file storage system.
-/// * `mime_type` - MIME type of the file. Required for base64 data.
-/// * `id` - Content block identifier. Generated automatically if not provided.
-/// * `index` - Index of block in aggregate response.
-/// * `extras` - Provider-specific metadata.
-///
-/// # Errors
-///
-/// Returns an error if no file source is provided or if base64 is used without mime_type.
 pub fn create_file_block(
     url: Option<String>,
     base64: Option<String>,
@@ -1451,34 +1106,19 @@ pub fn create_file_block(
     })
 }
 
-/// Configuration for creating a `PlainTextContentBlock`.
 #[derive(Debug, Clone, Default)]
 pub struct PlainTextBlockConfig {
-    /// The plaintext content.
     pub text: Option<String>,
-    /// URL of the plaintext file.
     pub url: Option<String>,
-    /// Base64-encoded plaintext data.
     pub base64: Option<String>,
-    /// ID of the plaintext file from a file storage system.
     pub file_id: Option<String>,
-    /// Title of the text data.
     pub title: Option<String>,
-    /// Context or description of the text content.
     pub context: Option<String>,
-    /// Content block identifier. Generated automatically if not provided.
     pub id: Option<String>,
-    /// Index of block in aggregate response.
     pub index: Option<BlockIndex>,
-    /// Provider-specific metadata.
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
-/// Create a `PlainTextContentBlock`.
-///
-/// # Arguments
-///
-/// * `config` - Configuration for the plaintext block.
 pub fn create_plaintext_block(config: PlainTextBlockConfig) -> PlainTextContentBlock {
     PlainTextContentBlock {
         block_type: "text-plain".to_string(),
@@ -1495,15 +1135,6 @@ pub fn create_plaintext_block(config: PlainTextBlockConfig) -> PlainTextContentB
     }
 }
 
-/// Create a `ToolCallBlock`.
-///
-/// # Arguments
-///
-/// * `name` - The name of the tool to be called.
-/// * `args` - The arguments to the tool call.
-/// * `id` - An identifier for the tool call. Generated automatically if not provided.
-/// * `index` - Index of block in aggregate response.
-/// * `extras` - Provider-specific metadata.
 pub fn create_tool_call(
     name: impl Into<String>,
     args: HashMap<String, serde_json::Value>,
@@ -1521,14 +1152,6 @@ pub fn create_tool_call(
     }
 }
 
-/// Create a `ReasoningContentBlock`.
-///
-/// # Arguments
-///
-/// * `reasoning` - The reasoning text or thought summary.
-/// * `id` - Content block identifier. Generated automatically if not provided.
-/// * `index` - Index of block in aggregate response.
-/// * `extras` - Provider-specific metadata.
 pub fn create_reasoning_block(
     reasoning: Option<String>,
     id: Option<String>,
@@ -1544,17 +1167,6 @@ pub fn create_reasoning_block(
     }
 }
 
-/// Create a `Citation` annotation.
-///
-/// # Arguments
-///
-/// * `url` - URL of the document source.
-/// * `title` - Source document title.
-/// * `start_index` - Start index in the response text where citation applies.
-/// * `end_index` - End index in the response text where citation applies.
-/// * `cited_text` - Excerpt of source text being cited.
-/// * `id` - Content block identifier. Generated automatically if not provided.
-/// * `extras` - Provider-specific metadata.
 pub fn create_citation(
     url: Option<String>,
     title: Option<String>,
@@ -1575,13 +1187,6 @@ pub fn create_citation(
     }
 }
 
-/// Create a `NonStandardContentBlock`.
-///
-/// # Arguments
-///
-/// * `value` - Provider-specific content data.
-/// * `id` - Content block identifier. Generated automatically if not provided.
-/// * `index` - Index of block in aggregate response.
 pub fn create_non_standard_block(
     value: HashMap<String, serde_json::Value>,
     id: Option<String>,

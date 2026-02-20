@@ -1,8 +1,3 @@
-//! Tracer that streams run logs to a stream.
-//!
-//! This module provides a tracer that streams run logs using JSON patches.
-//! Mirrors `langchain_core.tracers.log_stream`.
-
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
@@ -18,37 +13,24 @@ use crate::tracers::memory_stream::{MemoryStream, ReceiveStream, SendStream};
 use crate::tracers::schemas::Run;
 use crate::tracers::streaming::StreamingCallbackHandler;
 
-/// A single entry in the run log.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogEntry {
-    /// ID of the sub-run.
     pub id: String,
-    /// Name of the object being run.
     pub name: String,
-    /// Type of the object being run, eg. prompt, chain, llm, etc.
     #[serde(rename = "type")]
     pub run_type: String,
-    /// List of tags for the run.
     pub tags: Vec<String>,
-    /// Key-value pairs of metadata for the run.
     pub metadata: HashMap<String, Value>,
-    /// ISO-8601 timestamp of when the run started.
     pub start_time: String,
-    /// List of LLM tokens streamed by this run, if applicable.
     pub streamed_output_str: Vec<String>,
-    /// List of output chunks streamed by this run, if available.
     pub streamed_output: Vec<Value>,
-    /// Inputs to this run. Not available currently via astream_log.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inputs: Option<Value>,
-    /// Final output of this run. Only available after the run has finished successfully.
     pub final_output: Option<Value>,
-    /// ISO-8601 timestamp of when the run ended. Only available after the run has finished.
     pub end_time: Option<String>,
 }
 
 impl LogEntry {
-    /// Create a new log entry.
     pub fn new(
         id: String,
         name: String,
@@ -73,26 +55,18 @@ impl LogEntry {
     }
 }
 
-/// State of the run.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunState {
-    /// ID of the run.
     pub id: String,
-    /// List of output chunks streamed by Runnable.stream()
     pub streamed_output: Vec<Value>,
-    /// Final output of the run, usually the result of aggregating streamed_output.
     pub final_output: Option<Value>,
-    /// Name of the object being run.
     pub name: String,
-    /// Type of the object being run, eg. prompt, chain, llm, etc.
     #[serde(rename = "type")]
     pub run_type: String,
-    /// Map of run names to sub-runs.
     pub logs: HashMap<String, LogEntry>,
 }
 
 impl RunState {
-    /// Create a new run state.
     pub fn new(id: String, name: String, run_type: String) -> Self {
         Self {
             id,
@@ -105,20 +79,15 @@ impl RunState {
     }
 }
 
-/// A JSON patch operation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonPatchOp {
-    /// The operation type (add, replace, remove, etc.)
     pub op: String,
-    /// The path to apply the operation to.
     pub path: String,
-    /// The value for the operation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<Value>,
 }
 
 impl JsonPatchOp {
-    /// Create a new add operation.
     pub fn add(path: impl Into<String>, value: Value) -> Self {
         Self {
             op: "add".to_string(),
@@ -127,7 +96,6 @@ impl JsonPatchOp {
         }
     }
 
-    /// Create a new replace operation.
     pub fn replace(path: impl Into<String>, value: Value) -> Self {
         Self {
             op: "replace".to_string(),
@@ -136,7 +104,6 @@ impl JsonPatchOp {
         }
     }
 
-    /// Create a new remove operation.
     pub fn remove(path: impl Into<String>) -> Self {
         Self {
             op: "remove".to_string(),
@@ -146,25 +113,20 @@ impl JsonPatchOp {
     }
 }
 
-/// Patch to the run log.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunLogPatch {
-    /// List of JSONPatch operations.
     pub ops: Vec<JsonPatchOp>,
 }
 
 impl RunLogPatch {
-    /// Create a new run log patch.
     pub fn new(ops: Vec<JsonPatchOp>) -> Self {
         Self { ops }
     }
 
-    /// Create a patch from a single operation.
     pub fn from_op(op: JsonPatchOp) -> Self {
         Self { ops: vec![op] }
     }
 
-    /// Create a patch from multiple operations.
     pub fn from_ops(ops: impl IntoIterator<Item = JsonPatchOp>) -> Self {
         Self {
             ops: ops.into_iter().collect(),
@@ -178,22 +140,17 @@ impl fmt::Display for RunLogPatch {
     }
 }
 
-/// Run log with full state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunLog {
-    /// List of JSONPatch operations.
     pub ops: Vec<JsonPatchOp>,
-    /// Current state of the log.
     pub state: Option<RunState>,
 }
 
 impl RunLog {
-    /// Create a new run log.
     pub fn new(ops: Vec<JsonPatchOp>, state: Option<RunState>) -> Self {
         Self { ops, state }
     }
 
-    /// Apply a patch to the run log.
     pub fn apply_patch(&mut self, patch: RunLogPatch) {
         self.ops.extend(patch.ops.clone());
 
@@ -289,39 +246,22 @@ impl fmt::Display for RunLog {
     }
 }
 
-/// Tracer that streams run logs to a stream.
 pub struct LogStreamCallbackHandler {
-    /// The tracer configuration.
     config: TracerCoreConfig,
-    /// The run map.
     run_map: HashMap<String, Run>,
-    /// The order map.
     order_map: HashMap<Uuid, (Uuid, String)>,
-    /// Whether to auto-close the stream when the root run finishes.
     auto_close: bool,
-    /// Only include runs from Runnables with matching names.
     include_names: Option<Vec<String>>,
-    /// Only include runs from Runnables with matching types.
     include_types: Option<Vec<String>>,
-    /// Only include runs from Runnables with matching tags.
     include_tags: Option<Vec<String>>,
-    /// Exclude runs from Runnables with matching names.
     exclude_names: Option<Vec<String>>,
-    /// Exclude runs from Runnables with matching types.
     exclude_types: Option<Vec<String>>,
-    /// Exclude runs from Runnables with matching tags.
     exclude_tags: Option<Vec<String>>,
-    /// The send stream for patches.
     send_stream: SendStream<RunLogPatch>,
-    /// The receive stream for patches.
     receive_stream: Option<ReceiveStream<RunLogPatch>>,
-    /// Map of run ID to key name.
     key_map_by_run_id: HashMap<Uuid, String>,
-    /// Map of name to counter.
     counter_map_by_name: HashMap<String, usize>,
-    /// The root run ID.
     root_id: Option<Uuid>,
-    /// Lock for thread safety.
     lock: Arc<Mutex<()>>,
 }
 
@@ -341,29 +281,19 @@ impl fmt::Debug for LogStreamCallbackHandler {
     }
 }
 
-/// Configuration for LogStreamCallbackHandler.
 #[derive(Debug, Clone, Default)]
 pub struct LogStreamConfig {
-    /// Whether to auto-close the stream when the root run finishes.
     pub auto_close: bool,
-    /// Only include runs from Runnables with matching names.
     pub include_names: Option<Vec<String>>,
-    /// Only include runs from Runnables with matching types.
     pub include_types: Option<Vec<String>>,
-    /// Only include runs from Runnables with matching tags.
     pub include_tags: Option<Vec<String>>,
-    /// Exclude runs from Runnables with matching names.
     pub exclude_names: Option<Vec<String>>,
-    /// Exclude runs from Runnables with matching types.
     pub exclude_types: Option<Vec<String>>,
-    /// Exclude runs from Runnables with matching tags.
     pub exclude_tags: Option<Vec<String>>,
-    /// The schema format to use.
     pub schema_format: SchemaFormat,
 }
 
 impl LogStreamCallbackHandler {
-    /// Create a new LogStreamCallbackHandler.
     pub fn new(config: LogStreamConfig) -> Self {
         let stream: MemoryStream<RunLogPatch> = MemoryStream::new();
         let send_stream = stream.get_send_stream();
@@ -392,26 +322,18 @@ impl LogStreamCallbackHandler {
         }
     }
 
-    /// Take the receive stream. Can only be called once.
     pub fn take_receive_stream(&mut self) -> Option<ReceiveStream<RunLogPatch>> {
         self.receive_stream.take()
     }
 
-    /// Get the root run ID.
     pub fn root_id(&self) -> Option<Uuid> {
         self.root_id
     }
 
-    /// Send patches to the stream.
-    ///
-    /// # Returns
-    ///
-    /// `true` if the patches were sent successfully, `false` otherwise.
     pub fn send(&self, ops: Vec<JsonPatchOp>) -> bool {
         self.send_stream.send(RunLogPatch::new(ops)).is_ok()
     }
 
-    /// Check if a Run should be included in the log.
     pub fn include_run(&self, run: &Run) -> bool {
         if Some(run.id) == self.root_id {
             return false;
@@ -446,7 +368,6 @@ impl LogStreamCallbackHandler {
         include
     }
 
-    /// Get the standardized inputs for a run.
     fn get_standardized_inputs(&self, run: &Run) -> Option<Value> {
         match self.config.schema_format {
             SchemaFormat::Original | SchemaFormat::OriginalChat => {
@@ -465,7 +386,6 @@ impl LogStreamCallbackHandler {
         }
     }
 
-    /// Get the standardized outputs for a run.
     fn get_standardized_outputs(&self, run: &Run) -> Option<Value> {
         let outputs = run.outputs.as_ref()?;
 
@@ -737,25 +657,17 @@ impl<T> Iterator for TappedIterator<T> {
     }
 }
 
-/// A wrapper that allows `LogStreamCallbackHandler` to be used as a
-/// `BaseCallbackHandler` in `RunnableConfig.callbacks`.
-///
-/// This bridges the `BaseTracer` (which uses `&mut self`) to the
-/// `BaseCallbackHandler` (which uses `&self`) by wrapping the handler
-/// in an `Arc<Mutex<>>`.
 pub struct LogStreamCallbackHandlerBridge {
     inner: Arc<Mutex<LogStreamCallbackHandler>>,
 }
 
 impl LogStreamCallbackHandlerBridge {
-    /// Create a new bridge wrapping a LogStreamCallbackHandler.
     pub fn new(handler: LogStreamCallbackHandler) -> Self {
         Self {
             inner: Arc::new(Mutex::new(handler)),
         }
     }
 
-    /// Take the receive stream from the wrapped handler.
     pub fn take_receive_stream(&self) -> Option<ReceiveStream<RunLogPatch>> {
         self.inner
             .lock()
@@ -763,7 +675,6 @@ impl LogStreamCallbackHandlerBridge {
             .take_receive_stream()
     }
 
-    /// Get a clone of the send stream.
     pub fn get_send_stream(&self) -> SendStream<RunLogPatch> {
         self.inner
             .lock()
@@ -1064,14 +975,6 @@ impl crate::callbacks::base::BaseCallbackHandler for LogStreamCallbackHandlerBri
     }
 }
 
-/// Implementation of the astream_log API.
-///
-/// This is a free function that mirrors Python's
-/// `_astream_log_implementation`. It creates the handler,
-/// injects it into the config, consumes `astream()` while
-/// forwarding log patches from the receive stream.
-///
-/// Mirrors `langchain_core.tracers.log_stream._astream_log_implementation`.
 pub fn astream_log_implementation<'a, R>(
     runnable: &'a R,
     input: R::Input,

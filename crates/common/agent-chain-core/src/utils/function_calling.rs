@@ -1,10 +1,3 @@
-//! Methods for creating function specs in the style of OpenAI Functions.
-//!
-//! This module provides utilities for converting various tool representations
-//! (JSON schemas, Rust structs, tools) to OpenAI function calling format.
-//!
-//! Mirrors `langchain_core/utils/function_calling.py`.
-
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -13,30 +6,20 @@ use crate::tools::BaseTool;
 use crate::utils::json_schema::dereference_refs;
 use crate::utils::uuid::uuid7;
 
-/// Representation of a callable function to send to an LLM.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FunctionDescription {
-    /// The name of the function.
     pub name: String,
-    /// A description of the function.
     pub description: String,
-    /// The parameters of the function as a JSON schema.
     pub parameters: Value,
 }
 
-/// Representation of a callable function to the OpenAI API.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolDescription {
-    /// The type of the tool (always "function").
     #[serde(rename = "type")]
     pub r#type: String,
-    /// The function description.
     pub function: FunctionDescription,
 }
 
-/// Well-known OpenAI tools supported by OpenAI's chat models or responses API.
-/// These tools are not expected to be supported by other chat model providers
-/// that conform to the OpenAI function-calling API.
 const WELL_KNOWN_OPENAI_TOOLS: &[&str] = &[
     "function",
     "file_search",
@@ -48,7 +31,6 @@ const WELL_KNOWN_OPENAI_TOOLS: &[&str] = &[
     "web_search",
 ];
 
-/// Check if a JSON Value represents a well-known OpenAI tool that should be returned unchanged.
 fn is_well_known_openai_tool(tool: &Value) -> bool {
     if let Some(tool_type) = tool.get("type").and_then(|v| v.as_str()) {
         if WELL_KNOWN_OPENAI_TOOLS.contains(&tool_type) {
@@ -61,10 +43,6 @@ fn is_well_known_openai_tool(tool: &Value) -> bool {
     false
 }
 
-/// Recursively sets additionalProperties to false for OpenAI strict mode.
-///
-/// This function processes a JSON schema and adds `additionalProperties: false`
-/// to any object schemas that have `required` fields or empty properties.
 fn recursive_set_additional_properties_false(schema: &mut Value) {
     if let Value::Object(map) = schema {
         let has_required = map.contains_key("required");
@@ -97,10 +75,6 @@ fn recursive_set_additional_properties_false(schema: &mut Value) {
     }
 }
 
-/// Recursively removes "title" fields from a JSON schema dictionary.
-///
-/// Remove "title" fields from the input JSON schema dictionary,
-/// except when a "title" appears within a property definition under "properties".
 pub fn remove_titles(schema: &Value) -> Value {
     remove_titles_helper(schema, "")
 }
@@ -129,18 +103,6 @@ fn remove_titles_helper(kv: &Value, prev_key: &str) -> Value {
     }
 }
 
-/// Convert a JSON schema to an OpenAI function description.
-///
-/// # Arguments
-///
-/// * `schema` - The JSON schema to convert.
-/// * `name` - Optional name for the function. If not provided, uses the schema's title.
-/// * `description` - Optional description. If not provided, uses the schema's description.
-/// * `rm_titles` - Whether to remove titles from the schema (default: true).
-///
-/// # Returns
-///
-/// A `FunctionDescription` compatible with OpenAI function calling.
 fn convert_json_schema_to_openai_function(
     schema: &Value,
     name: Option<&str>,
@@ -188,9 +150,7 @@ fn convert_json_schema_to_openai_function(
     }
 }
 
-/// Trait for types that can be converted to OpenAI function format.
 pub trait ToOpenAIFunction {
-    /// Convert to OpenAI function format.
     fn to_openai_function(&self, strict: Option<bool>) -> Value;
 }
 
@@ -206,23 +166,6 @@ impl<T: BaseTool> ToOpenAIFunction for T {
     }
 }
 
-/// Convert a raw function/class to an OpenAI function.
-///
-/// This function handles various input formats:
-/// - Anthropic format tools (with `name` and `input_schema`)
-/// - Amazon Bedrock Converse format tools (with `toolSpec`)
-/// - OpenAI format (already has `name`)
-/// - JSON schema (with `title`)
-/// - BaseTool implementations
-///
-/// # Arguments
-///
-/// * `function` - The function/tool specification to convert.
-/// * `strict` - If `Some(true)`, model output is guaranteed to exactly match the JSON Schema.
-///
-/// # Returns
-///
-/// A JSON Value compatible with OpenAI function-calling API.
 pub fn convert_to_openai_function<T>(function: &T, strict: Option<bool>) -> Value
 where
     T: ConvertibleToOpenAI + ?Sized,
@@ -230,9 +173,7 @@ where
     function.convert_to_openai_function_impl(strict)
 }
 
-/// Trait for types that can be converted to OpenAI function format.
 pub trait ConvertibleToOpenAI {
-    /// Internal conversion implementation.
     fn convert_to_openai_function_impl(&self, strict: Option<bool>) -> Value;
 }
 
@@ -415,37 +356,11 @@ impl<T: BaseTool + ?Sized> ConvertibleToOpenAI for T {
     }
 }
 
-/// Convert a TypedDict-like schema to OpenAI function format.
-///
-/// In Rust, TypedDict is typically represented as a JSON schema.
-/// This function converts such schemas to the OpenAI function format.
-///
-/// # Arguments
-///
-/// * `schema` - The JSON schema representing the typed dict.
-///
-/// # Returns
-///
-/// A JSON Value in OpenAI function format.
 pub fn convert_typed_dict_to_openai_function(schema: &Value) -> Value {
     convert_to_openai_function(schema, None)
 }
 
-/// Convert a tool-like object to an OpenAI tool schema.
-///
-/// [OpenAI tool schema reference](https://platform.openai.com/docs/api-reference/chat/create#chat-create-tools)
-///
-/// # Arguments
-///
-/// * `tool` - The tool specification to convert.
-/// * `strict` - If `Some(true)`, model output is guaranteed to exactly match the JSON Schema.
-///
-/// # Returns
-///
-/// A JSON Value compatible with OpenAI tool-calling API.
-/// Trait for types that can be converted to OpenAI tool format.
 pub trait ConvertibleToOpenAITool {
-    /// Internal conversion implementation.
     fn convert_to_openai_tool_impl(&self, strict: Option<bool>) -> Value;
 }
 
@@ -480,16 +395,6 @@ where
     tool.convert_to_openai_tool_impl(strict)
 }
 
-/// Convert a schema representation to a JSON schema.
-///
-/// # Arguments
-///
-/// * `schema` - The schema to convert.
-/// * `strict` - If `Some(true)`, model output is guaranteed to exactly match the JSON Schema.
-///
-/// # Returns
-///
-/// A JSON schema representation of the input schema.
 pub fn convert_to_json_schema<T>(schema: &T, strict: Option<bool>) -> crate::Result<Value>
 where
     T: ConvertibleToOpenAITool + ?Sized,
@@ -528,31 +433,6 @@ where
     Ok(Value::Object(json_schema))
 }
 
-/// Convert an example into a list of messages that can be fed into an LLM.
-///
-/// This code is an adapter that converts a single example to a list of messages
-/// that can be fed into a chat model.
-///
-/// The list of messages per example by default corresponds to:
-///
-/// 1. `HumanMessage`: contains the content from which content should be extracted.
-/// 2. `AIMessage`: contains the extracted information from the model
-/// 3. `ToolMessage`: contains confirmation to the model that the model requested a
-///    tool correctly.
-///
-/// If `ai_response` is specified, there will be a final `AIMessage` with that
-/// response.
-///
-/// # Arguments
-///
-/// * `input` - The user input.
-/// * `tool_calls` - Tool calls represented as serializable objects.
-/// * `tool_outputs` - Optional tool call outputs. If not provided, a placeholder value will be used.
-/// * `ai_response` - If provided, content for a final `AIMessage`.
-///
-/// # Returns
-///
-/// A list of messages.
 pub fn tool_example_to_messages<T: Serialize>(
     input: &str,
     tool_calls: Vec<T>,

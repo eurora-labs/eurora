@@ -1,8 +1,3 @@
-//! Configuration for Runnables.
-//!
-//! This module provides `RunnableConfig` and related utilities,
-//! mirroring `langchain_core.runnables.config`.
-
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::future::Future;
@@ -14,51 +9,31 @@ use uuid::Uuid;
 use crate::callbacks::base::BaseCallbackManager;
 use crate::callbacks::{AsyncCallbackManager, CallbackManager, Callbacks};
 
-/// Default recursion limit for runnables.
 pub const DEFAULT_RECURSION_LIMIT: i32 = 25;
 
-/// Configuration for a Runnable.
-///
-/// This struct contains all the configuration options that can be passed
-/// to a Runnable's invoke, batch, or stream methods.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunnableConfig {
-    /// Tags for this call and any sub-calls (e.g. a Chain calling an LLM).
-    /// These can be used to filter calls.
     #[serde(default)]
     pub tags: Vec<String>,
 
-    /// Metadata for this call and any sub-calls (e.g. a Chain calling an LLM).
-    /// Keys should be strings, values should be JSON-serializable.
     #[serde(default)]
     pub metadata: HashMap<String, serde_json::Value>,
 
-    /// Callbacks for this call and any sub-calls.
-    /// Tags and metadata are automagically inherited.
     #[serde(skip)]
     pub callbacks: Option<Callbacks>,
 
-    /// Name for the tracer run for this call.
-    /// Defaults to the name of the class.
     #[serde(default)]
     pub run_name: Option<String>,
 
-    /// Maximum number of parallel calls to make.
-    /// If not provided, defaults to ThreadPoolExecutor's default.
     #[serde(default)]
     pub max_concurrency: Option<usize>,
 
-    /// Maximum number of times a call can recurse.
-    /// If not provided, defaults to 25.
     #[serde(default = "default_recursion_limit")]
     pub recursion_limit: i32,
 
-    /// Runtime values for configurable attributes of the Runnable.
     #[serde(default)]
     pub configurable: HashMap<String, serde_json::Value>,
 
-    /// Unique identifier for the tracer run for this call.
-    /// If not provided, a new UUID will be generated.
     #[serde(default)]
     pub run_id: Option<Uuid>,
 }
@@ -83,61 +58,51 @@ impl Default for RunnableConfig {
 }
 
 impl RunnableConfig {
-    /// Create a new RunnableConfig with default values.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set the tags for this config.
     pub fn with_tags(mut self, tags: Vec<String>) -> Self {
         self.tags = tags;
         self
     }
 
-    /// Set the metadata for this config.
     pub fn with_metadata(mut self, metadata: HashMap<String, serde_json::Value>) -> Self {
         self.metadata = metadata;
         self
     }
 
-    /// Set the callbacks for this config.
     pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
         self.callbacks = Some(callbacks);
         self
     }
 
-    /// Set the run name for this config.
     pub fn with_run_name(mut self, run_name: impl Into<String>) -> Self {
         self.run_name = Some(run_name.into());
         self
     }
 
-    /// Set the max concurrency for this config.
     pub fn with_max_concurrency(mut self, max_concurrency: usize) -> Self {
         self.max_concurrency = Some(max_concurrency);
         self
     }
 
-    /// Set the recursion limit for this config.
     pub fn with_recursion_limit(mut self, recursion_limit: i32) -> Self {
         self.recursion_limit = recursion_limit;
         self
     }
 
-    /// Set the configurable values for this config.
     pub fn with_configurable(mut self, configurable: HashMap<String, serde_json::Value>) -> Self {
         self.configurable = configurable;
         self
     }
 
-    /// Set the run ID for this config.
     pub fn with_run_id(mut self, run_id: Uuid) -> Self {
         self.run_id = Some(run_id);
         self
     }
 }
 
-/// Either a single RunnableConfig or a list of them.
 #[derive(Debug, Clone)]
 pub enum ConfigOrList {
     Single(Box<RunnableConfig>),
@@ -160,7 +125,6 @@ thread_local! {
     static VAR_CHILD_RUNNABLE_CONFIG: RefCell<Option<RunnableConfig>> = const { RefCell::new(None) };
 }
 
-/// RAII guard that restores the previous child runnable config on drop.
 pub struct ConfigContextGuard {
     previous: Option<RunnableConfig>,
 }
@@ -173,25 +137,15 @@ impl Drop for ConfigContextGuard {
     }
 }
 
-/// Set the child Runnable config for the current thread.
-///
-/// Returns an RAII guard that restores the previous config on drop.
-/// This is the Rust equivalent of Python's `set_config_context()` context manager.
 pub fn set_config_context(config: RunnableConfig) -> ConfigContextGuard {
     let previous = VAR_CHILD_RUNNABLE_CONFIG.with(|cell| cell.borrow_mut().replace(config));
     ConfigContextGuard { previous }
 }
 
-/// Get the current child runnable config from the thread-local context variable.
 pub fn get_child_runnable_config() -> Option<RunnableConfig> {
     VAR_CHILD_RUNNABLE_CONFIG.with(|cell| cell.borrow().clone())
 }
 
-/// Ensure that a config has all keys present with defaults.
-///
-/// Reads from the thread-local child runnable config context variable,
-/// then merges the provided config on top. Copies primitive configurable
-/// values into metadata (matching Python behavior).
 pub fn ensure_config(config: Option<RunnableConfig>) -> RunnableConfig {
     let mut result = RunnableConfig::default();
 
@@ -223,7 +177,6 @@ pub fn ensure_config(config: Option<RunnableConfig>) -> RunnableConfig {
     result
 }
 
-/// Helper: merge fields from `source` into `target`, deep-copying copiable fields.
 fn merge_into_config(target: &mut RunnableConfig, source: &RunnableConfig) {
     if !source.tags.is_empty() {
         target.tags = source.tags.clone();
@@ -251,11 +204,6 @@ fn merge_into_config(target: &mut RunnableConfig, source: &RunnableConfig) {
     }
 }
 
-/// Get a list of configs from either a single config or a list.
-///
-/// If a single config is provided, it will be cloned `length` times.
-/// Special handling: if a single config with run_id is provided for length > 1,
-/// only the first element keeps the run_id.
 pub fn get_config_list(config: Option<ConfigOrList>, length: usize) -> Vec<RunnableConfig> {
     match config {
         Some(ConfigOrList::List(list)) => {
@@ -292,10 +240,6 @@ pub fn get_config_list(config: Option<ConfigOrList>, length: usize) -> Vec<Runna
     }
 }
 
-/// Patch a config with updates.
-///
-/// When callbacks are replaced, run_name and run_id are cleared as they
-/// should only apply to the same run as the original callbacks.
 pub fn patch_config(
     config: Option<RunnableConfig>,
     callbacks: Option<CallbackManager>,
@@ -335,9 +279,6 @@ pub fn patch_config(
     config
 }
 
-/// Merge multiple configs into one.
-///
-/// Later configs take precedence over earlier ones.
 pub fn merge_configs(configs: Vec<Option<RunnableConfig>>) -> RunnableConfig {
     let mut base = RunnableConfig {
         tags: Vec::new(),
@@ -411,21 +352,12 @@ pub fn merge_configs(configs: Vec<Option<RunnableConfig>>) -> RunnableConfig {
     base
 }
 
-/// A callable that takes input and optionally a config.
-///
-/// This enum mirrors the Python `call_func_with_variable_args` pattern,
-/// where a function may or may not accept a `RunnableConfig` parameter.
 #[allow(clippy::type_complexity)]
 pub enum VariableArgsFn<I, O> {
-    /// A function that only takes input.
     InputOnly(Box<dyn Fn(I) -> O + Send + Sync>),
-    /// A function that takes input and config.
     WithConfig(Box<dyn Fn(I, &RunnableConfig) -> O + Send + Sync>),
 }
 
-/// Call a function that may optionally accept a config.
-///
-/// This mirrors Python's `call_func_with_variable_args`.
 pub fn call_func_with_variable_args<I, O>(
     func: &VariableArgsFn<I, O>,
     input: I,
@@ -437,20 +369,14 @@ pub fn call_func_with_variable_args<I, O>(
     }
 }
 
-/// An async callable that takes input and optionally a config.
 #[allow(clippy::type_complexity)]
 pub enum AsyncVariableArgsFn<I, O> {
-    /// An async function that only takes input.
     InputOnly(Box<dyn Fn(I) -> Pin<Box<dyn Future<Output = O> + Send>> + Send + Sync>),
-    /// An async function that takes input and config.
     WithConfig(
         Box<dyn Fn(I, RunnableConfig) -> Pin<Box<dyn Future<Output = O> + Send>> + Send + Sync>,
     ),
 }
 
-/// Call an async function that may optionally accept a config.
-///
-/// This mirrors Python's `acall_func_with_variable_args`.
 pub async fn acall_func_with_variable_args<I, O>(
     func: &AsyncVariableArgsFn<I, O>,
     input: I,
@@ -462,7 +388,6 @@ pub async fn acall_func_with_variable_args<I, O>(
     }
 }
 
-/// Get a callback manager configured from the given RunnableConfig.
 pub fn get_callback_manager_for_config(config: &RunnableConfig) -> CallbackManager {
     CallbackManager::configure(
         config.callbacks.clone(),
@@ -475,7 +400,6 @@ pub fn get_callback_manager_for_config(config: &RunnableConfig) -> CallbackManag
     )
 }
 
-/// Get an async callback manager configured from the given RunnableConfig.
 pub fn get_async_callback_manager_for_config(config: &RunnableConfig) -> AsyncCallbackManager {
     AsyncCallbackManager::configure(
         config.callbacks.clone(),
@@ -488,11 +412,6 @@ pub fn get_async_callback_manager_for_config(config: &RunnableConfig) -> AsyncCa
     )
 }
 
-/// Run a synchronous function on a blocking thread.
-///
-/// This is the Rust equivalent of Python's `run_in_executor()`.
-/// Uses `tokio::task::spawn_blocking` to run the function on a dedicated
-/// blocking thread pool, avoiding blocking the async runtime.
 pub async fn run_in_executor<F, T>(func: F) -> T
 where
     F: FnOnce() -> T + Send + 'static,

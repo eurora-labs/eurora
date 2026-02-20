@@ -1,7 +1,3 @@
-//! Tests for ChatMessage and ChatMessageChunk.
-//!
-//! Converted from `langchain/libs/core/tests/unit_tests/messages/test_chat.py`
-
 use agent_chain_core::messages::{
     ChatMessage, ChatMessageChunk, ContentBlock, ContentPart, HumanMessageChunk, MessageContent,
 };

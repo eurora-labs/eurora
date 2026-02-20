@@ -1,15 +1,3 @@
-//! Derivations of standard content blocks from Google (GenAI) content.
-//!
-//! Mirrors `langchain_core/messages/block_translators/google_genai.py`.
-//!
-//! Google GenAI uses a Part-based format:
-//! - Text parts: `{"type": "text", "text": "..."}`
-//! - Inline data: `{"type": "inline_data", "data": "...", "mime_type": "..."}`
-//! - Function calls: `{"type": "function_call", "name": "...", "args": {...}}`
-//! - Thinking: `{"type": "thinking", "thinking": "..."}`
-//! - Executable code: `{"type": "executable_code", ...}`
-//! - Code execution result: `{"type": "code_execution_result", ...}`
-
 use std::collections::HashSet;
 
 use base64::Engine;
@@ -17,7 +5,6 @@ use serde_json::{Value, json};
 
 use crate::messages::content::KNOWN_BLOCK_TYPES;
 
-/// Convert bytes (as a JSON value) to a base64 string.
 fn bytes_to_b64_str(bytes_value: &Value) -> String {
     if let Some(s) = bytes_value.as_str() {
         s.to_string()
@@ -32,7 +19,6 @@ fn bytes_to_b64_str(bytes_value: &Value) -> String {
     }
 }
 
-/// Populate extras field with unknown fields from the original block.
 fn populate_extras(standard_block: &mut Value, block: &Value, known_fields: &HashSet<&str>) {
     if standard_block.get("type").and_then(|v| v.as_str()) == Some("non_standard") {
         return;
@@ -52,7 +38,6 @@ fn populate_extras(standard_block: &mut Value, block: &Value, known_fields: &Has
     }
 }
 
-/// Translate Google AI grounding metadata to LangChain Citations.
 pub fn translate_grounding_metadata_to_citations(grounding_metadata: &Value) -> Vec<Value> {
     if grounding_metadata.is_null() {
         return Vec::new();
@@ -147,11 +132,6 @@ pub fn translate_grounding_metadata_to_citations(grounding_metadata: &Value) -> 
     citations
 }
 
-/// Convert Google GenAI format input blocks to v1 format.
-///
-/// During the `content_blocks` parsing process, blocks not recognized as v1
-/// are wrapped as `non_standard`. This function unpacks those and converts
-/// GenAI-format blocks to v1 ContentBlocks.
 pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
     let mut result = Vec::new();
 
@@ -320,9 +300,6 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
     result
 }
 
-/// Convert Google GenAI content blocks to standard format.
-///
-/// This handles both `AIMessage` content (list of parts) and string content.
 pub fn convert_to_standard_blocks(content: &[Value], _is_chunk: bool) -> Vec<Value> {
     let mut result = Vec::new();
 

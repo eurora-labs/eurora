@@ -1,8 +1,3 @@
-//! Structured tool that can operate on any number of inputs.
-//!
-//! This module provides the `StructuredTool` struct for creating tools
-//! that accept multiple typed arguments, mirroring `langchain_core.tools.structured`.
-
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::future::Future;
@@ -22,48 +17,28 @@ use super::base::{
     ToolInput, ToolOutput,
 };
 
-/// Type alias for sync structured tool function.
 pub type StructuredToolFunc = Arc<dyn Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync>;
 
-/// Type alias for async structured tool function.
 pub type AsyncStructuredToolFunc = Arc<
     dyn Fn(HashMap<String, Value>) -> Pin<Box<dyn Future<Output = Result<Value>> + Send>>
         + Send
         + Sync,
 >;
 
-/// Tool that can operate on any number of inputs.
-///
-/// Unlike `Tool`, which accepts a single string input, `StructuredTool`
-/// accepts a dictionary of typed arguments.
 pub struct StructuredTool {
-    /// The unique name of the tool.
     name: String,
-    /// A description of what the tool does.
     description: String,
-    /// The function to run when the tool is called.
     func: Option<StructuredToolFunc>,
-    /// The asynchronous version of the function.
     coroutine: Option<AsyncStructuredToolFunc>,
-    /// The input arguments' schema.
     args_schema: ArgsSchema,
-    /// Whether to return the tool's output directly.
     return_direct: bool,
-    /// Whether to log the tool's progress.
     verbose: bool,
-    /// How to handle tool errors.
     handle_tool_error: HandleToolError,
-    /// How to handle validation errors.
     handle_validation_error: HandleValidationError,
-    /// The tool response format.
     response_format: ResponseFormat,
-    /// Optional tags for the tool.
     tags: Option<Vec<String>>,
-    /// Optional metadata for the tool.
     metadata: Option<HashMap<String, Value>>,
-    /// Optional provider-specific extras.
     extras: Option<HashMap<String, Value>>,
-    /// Optional callbacks for the tool.
     callbacks: Option<Callbacks>,
 }
 
@@ -80,7 +55,6 @@ impl Debug for StructuredTool {
 }
 
 impl StructuredTool {
-    /// Create a new StructuredTool.
     pub fn new(
         name: impl Into<String>,
         description: impl Into<String>,
@@ -104,69 +78,56 @@ impl StructuredTool {
         }
     }
 
-    /// Set the sync function.
     pub fn with_func(mut self, func: StructuredToolFunc) -> Self {
         self.func = Some(func);
         self
     }
 
-    /// Set the async function.
     pub fn with_coroutine(mut self, coroutine: AsyncStructuredToolFunc) -> Self {
         self.coroutine = Some(coroutine);
         self
     }
 
-    /// Set whether to return directly.
     pub fn with_return_direct(mut self, return_direct: bool) -> Self {
         self.return_direct = return_direct;
         self
     }
 
-    /// Set the response format.
     pub fn with_response_format(mut self, format: ResponseFormat) -> Self {
         self.response_format = format;
         self
     }
 
-    /// Set tags.
     pub fn with_tags(mut self, tags: Vec<String>) -> Self {
         self.tags = Some(tags);
         self
     }
 
-    /// Set metadata.
     pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
         self.metadata = Some(metadata);
         self
     }
 
-    /// Set extras.
     pub fn with_extras(mut self, extras: HashMap<String, Value>) -> Self {
         self.extras = Some(extras);
         self
     }
 
-    /// Set callbacks.
     pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
         self.callbacks = Some(callbacks);
         self
     }
 
-    /// Set handle_tool_error.
     pub fn with_handle_tool_error(mut self, handler: HandleToolError) -> Self {
         self.handle_tool_error = handler;
         self
     }
 
-    /// Set handle_validation_error.
     pub fn with_handle_validation_error(mut self, handler: HandleValidationError) -> Self {
         self.handle_validation_error = handler;
         self
     }
 
-    /// Create a tool from a function.
-    ///
-    /// This is the main way to create a StructuredTool.
     pub fn from_function<F>(
         func: F,
         name: impl Into<String>,
@@ -179,7 +140,6 @@ impl StructuredTool {
         Self::new(name, description, args_schema).with_func(Arc::new(func))
     }
 
-    /// Create a tool from a sync and async function pair.
     pub fn from_function_with_async<F, AF, Fut>(
         func: F,
         coroutine: AF,
@@ -197,7 +157,6 @@ impl StructuredTool {
             .with_coroutine(Arc::new(move |args| Box::pin(coroutine(args))))
     }
 
-    /// Extract the arguments from the tool input.
     fn extract_args(&self, input: ToolInput) -> Result<HashMap<String, Value>> {
         match input {
             ToolInput::String(s) => {
@@ -231,7 +190,6 @@ impl StructuredTool {
         }
     }
 
-    /// Filter out arguments that shouldn't be passed to the function.
     fn filter_args(&self, args: HashMap<String, Value>) -> HashMap<String, Value> {
         args.into_iter()
             .filter(|(k, _)| !FILTERED_ARGS.contains(&k.as_str()))
@@ -333,7 +291,6 @@ impl BaseTool for StructuredTool {
     }
 }
 
-/// Helper function to create an args schema from field definitions.
 pub fn create_args_schema(
     name: &str,
     properties: HashMap<String, Value>,

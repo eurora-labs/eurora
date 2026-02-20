@@ -1,7 +1,3 @@
-//! Unit tests for AsyncCallbackManager.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/callbacks/test_async_callback_manager.py`
-
 use agent_chain_core::callbacks::base::BaseCallbackHandler;
 use agent_chain_core::callbacks::manager::AsyncCallbackManager;
 use agent_chain_core::messages::HumanMessage;
@@ -25,7 +21,6 @@ impl BaseCallbackHandler for FakeHandler {
     }
 }
 
-/// Ported from `test_async_callback_manager_on_llm_start`.
 #[tokio::test]
 async fn test_async_callback_manager_on_llm_start() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -40,7 +35,6 @@ async fn test_async_callback_manager_on_llm_start() {
     assert!(!run_managers[0].run_id().is_nil());
 }
 
-/// Ported from `test_async_callback_manager_on_chain_start`.
 #[tokio::test]
 async fn test_async_callback_manager_on_chain_start() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -54,7 +48,6 @@ async fn test_async_callback_manager_on_chain_start() {
     assert!(!run_manager.run_id().is_nil());
 }
 
-/// Ported from `test_async_callback_manager_on_tool_start`.
 #[tokio::test]
 async fn test_async_callback_manager_on_tool_start() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -68,7 +61,6 @@ async fn test_async_callback_manager_on_tool_start() {
     assert!(!run_manager.run_id().is_nil());
 }
 
-/// Ported from `test_async_callback_manager_on_llm_end`.
 #[tokio::test]
 async fn test_async_callback_manager_on_llm_end() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -84,7 +76,6 @@ async fn test_async_callback_manager_on_llm_end() {
     run_managers[0].on_llm_end(&result).await;
 }
 
-/// Ported from `test_async_callback_manager_on_chain_end`.
 #[tokio::test]
 async fn test_async_callback_manager_on_chain_end() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -98,7 +89,6 @@ async fn test_async_callback_manager_on_chain_end() {
     run_manager.on_chain_end(&HashMap::new()).await;
 }
 
-/// Ported from `test_async_callback_manager_on_tool_end`.
 #[tokio::test]
 async fn test_async_callback_manager_on_tool_end() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -112,7 +102,6 @@ async fn test_async_callback_manager_on_tool_end() {
     run_manager.on_tool_end("test").await;
 }
 
-/// Ported from `test_async_callback_manager_on_llm_error`.
 #[tokio::test]
 async fn test_async_callback_manager_on_llm_error() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -129,7 +118,6 @@ async fn test_async_callback_manager_on_llm_error() {
     run_managers[0].on_llm_error(&error).await;
 }
 
-/// Ported from `test_async_callback_manager_on_chain_error`.
 #[tokio::test]
 async fn test_async_callback_manager_on_chain_error() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -144,7 +132,6 @@ async fn test_async_callback_manager_on_chain_error() {
     run_manager.on_chain_error(&error).await;
 }
 
-/// Ported from `test_async_callback_manager_on_tool_error`.
 #[tokio::test]
 async fn test_async_callback_manager_on_tool_error() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -159,7 +146,6 @@ async fn test_async_callback_manager_on_tool_error() {
     run_manager.on_tool_error(&error).await;
 }
 
-/// Ported from `test_async_callback_manager_on_llm_new_token`.
 #[tokio::test]
 async fn test_async_callback_manager_on_llm_new_token() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -174,7 +160,6 @@ async fn test_async_callback_manager_on_llm_new_token() {
     run_managers[0].on_llm_new_token("test", None).await;
 }
 
-/// Ported from `test_async_callback_manager_with_multiple_handlers`.
 #[tokio::test]
 async fn test_async_callback_manager_with_multiple_handlers() {
     let handler1: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -193,7 +178,6 @@ async fn test_async_callback_manager_with_multiple_handlers() {
     assert_eq!(run_managers[0].handlers().len(), 2);
 }
 
-/// Ported from `test_async_callback_manager_add_handler`.
 #[tokio::test]
 async fn test_async_callback_manager_add_handler() {
     let handler1: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -208,7 +192,6 @@ async fn test_async_callback_manager_add_handler() {
     assert_eq!(manager.handlers().len(), 2);
 }
 
-/// Ported from `test_async_callback_manager_remove_handler`.
 #[tokio::test]
 async fn test_async_callback_manager_remove_handler() {
     let handler1: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -224,7 +207,6 @@ async fn test_async_callback_manager_remove_handler() {
     assert_eq!(manager.handlers().len(), 1);
 }
 
-/// Ported from `test_async_callback_manager_inheritable_handlers`.
 #[tokio::test]
 async fn test_async_callback_manager_inheritable_handlers() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -239,7 +221,6 @@ async fn test_async_callback_manager_inheritable_handlers() {
     assert_eq!(child_manager.handlers().len(), 1);
 }
 
-/// Ported from `test_async_callback_manager_chat_model_start`.
 #[tokio::test]
 async fn test_async_callback_manager_chat_model_start() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -257,10 +238,6 @@ async fn test_async_callback_manager_chat_model_start() {
     assert!(!run_managers[0].run_id().is_nil());
 }
 
-/// Ported from `test_async_callback_manager_ignore_llm`.
-///
-/// Handlers with `ignore_llm() == true` should be skipped during LLM events
-/// but still present in the run manager (filtering happens at dispatch time).
 #[tokio::test]
 async fn test_async_callback_manager_ignore_llm() {
     #[derive(Debug)]
@@ -293,7 +270,6 @@ async fn test_async_callback_manager_ignore_llm() {
     assert_eq!(run_managers.len(), 1);
 }
 
-/// Ported from `test_async_callback_manager_ignore_chain`.
 #[tokio::test]
 async fn test_async_callback_manager_ignore_chain() {
     #[derive(Debug)]
@@ -326,7 +302,6 @@ async fn test_async_callback_manager_ignore_chain() {
     assert!(!run_manager.run_id().is_nil());
 }
 
-/// Ported from `test_async_callback_manager_copy`.
 #[tokio::test]
 async fn test_async_callback_manager_copy() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -337,7 +312,6 @@ async fn test_async_callback_manager_copy() {
     assert_eq!(manager_copy.handlers().len(), 1);
 }
 
-/// Ported from `test_async_callback_manager_chain_child_managers`.
 #[tokio::test]
 async fn test_async_callback_manager_chain_child_managers() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -368,7 +342,6 @@ async fn test_async_callback_manager_chain_child_managers() {
     assert!(!child_tool_run.run_id().is_nil());
 }
 
-/// Ported from `test_async_callback_manager_retriever_callbacks`.
 #[tokio::test]
 async fn test_async_callback_manager_retriever_callbacks() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -386,7 +359,6 @@ async fn test_async_callback_manager_retriever_callbacks() {
     run_manager.on_retriever_end(&[]).await;
 }
 
-/// Ported from `test_async_callback_manager_retriever_error`.
 #[tokio::test]
 async fn test_async_callback_manager_retriever_error() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -404,7 +376,6 @@ async fn test_async_callback_manager_retriever_error() {
     run_manager.on_retriever_error(&error).await;
 }
 
-/// Ported from `test_async_callback_manager_tags`.
 #[tokio::test]
 async fn test_async_callback_manager_tags() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -420,7 +391,6 @@ async fn test_async_callback_manager_tags() {
     assert!(!run_managers[0].run_id().is_nil());
 }
 
-/// Ported from `test_async_callback_manager_metadata`.
 #[tokio::test]
 async fn test_async_callback_manager_metadata() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -439,7 +409,6 @@ async fn test_async_callback_manager_metadata() {
     assert!(!run_managers[0].run_id().is_nil());
 }
 
-/// Ported from `test_async_callback_manager_chain_run_on_agent_action`.
 #[tokio::test]
 async fn test_async_callback_manager_chain_run_on_agent_action() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -464,7 +433,6 @@ async fn test_async_callback_manager_chain_run_on_agent_action() {
     chain_run.on_agent_finish(&finish).await;
 }
 
-/// Ported from `test_async_callback_manager_concurrent_runs`.
 #[tokio::test]
 async fn test_async_callback_manager_concurrent_runs() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -496,7 +464,6 @@ async fn test_async_callback_manager_concurrent_runs() {
     );
 }
 
-/// Ported from `test_async_callback_manager_full_lifecycle`.
 #[tokio::test]
 async fn test_async_callback_manager_full_lifecycle() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);

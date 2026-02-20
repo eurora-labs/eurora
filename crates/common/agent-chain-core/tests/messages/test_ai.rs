@@ -1,7 +1,3 @@
-//! Tests for AI message types.
-//!
-//! Converted from `langchain/libs/core/tests/unit_tests/messages/test_ai.py`
-
 use agent_chain_core::messages::{
     AIMessage, AIMessageChunk, ChunkPosition, InputTokenDetails, OutputTokenDetails, UsageMetadata,
     add_ai_message_chunks, add_usage, invalid_tool_call, subtract_usage, tool_call,

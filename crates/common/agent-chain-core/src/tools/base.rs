@@ -1,8 +1,3 @@
-//! Base classes and utilities for LangChain tools.
-//!
-//! This module provides the core tool abstractions, mirroring
-//! `langchain_core.tools.base`.
-
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -22,10 +17,8 @@ use crate::messages::{BaseMessage, ToolCall, ToolMessage};
 use crate::runnables::config::patch_config;
 use crate::runnables::{RunnableConfig, ensure_config};
 
-/// Arguments that are filtered out from tool schemas.
 pub const FILTERED_ARGS: &[&str] = &["run_manager", "callbacks"];
 
-/// Block types that are valid in tool messages.
 pub const TOOL_MESSAGE_BLOCK_TYPES: &[&str] = &[
     "text",
     "image_url",
@@ -37,7 +30,6 @@ pub const TOOL_MESSAGE_BLOCK_TYPES: &[&str] = &[
     "file",
 ];
 
-/// Error raised when args_schema is missing or has incorrect type annotation.
 #[derive(Debug, Error)]
 #[error("Schema annotation error: {message}")]
 pub struct SchemaAnnotationError {
@@ -52,11 +44,6 @@ impl SchemaAnnotationError {
     }
 }
 
-/// Exception thrown when a tool execution error occurs.
-///
-/// This exception allows tools to signal errors without stopping the agent.
-/// The error is handled according to the tool's `handle_tool_error` setting,
-/// and the result is returned as an observation to the agent.
 #[derive(Debug, Error)]
 #[error("{0}")]
 pub struct ToolException(pub String);
@@ -67,24 +54,18 @@ impl ToolException {
     }
 }
 
-/// Represents the response format for a tool.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ResponseFormat {
-    /// The output is interpreted as the contents of a ToolMessage.
     #[default]
     Content,
-    /// The output is expected to be a tuple of (content, artifact).
     ContentAndArtifact,
 }
 
-/// Represents a tool's schema, which can be a JSON schema or a type reference.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ArgsSchema {
-    /// A JSON schema definition.
     JsonSchema(Value),
-    /// A type name reference.
     TypeName(String),
 }
 
@@ -98,7 +79,6 @@ impl Default for ArgsSchema {
 }
 
 impl ArgsSchema {
-    /// Get the JSON schema for this args schema.
     pub fn to_json_schema(&self) -> Value {
         match self {
             ArgsSchema::JsonSchema(schema) => schema.clone(),
@@ -110,7 +90,6 @@ impl ArgsSchema {
         }
     }
 
-    /// Get properties from the schema.
     pub fn properties(&self) -> HashMap<String, Value> {
         match self {
             ArgsSchema::JsonSchema(schema) => schema
@@ -123,31 +102,17 @@ impl ArgsSchema {
     }
 }
 
-/// Represents a tool's definition for LLM function calling.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolDefinition {
-    /// The name of the tool.
     pub name: String,
-    /// A description of what the tool does.
     pub description: String,
-    /// JSON schema for the tool's parameters.
     pub parameters: Value,
 }
 
-/// How to handle tool errors.
-///
-/// Mirrors Python's `bool | str | Callable[[ToolException], str] | None`.
-/// - `None` or `Bool(false)`: Don't handle errors (re-raise them)
-/// - `Bool(true)`: Return the exception message
-/// - `Message(str)`: Return a specific error message
-/// - `Handler(fn)`: Use a custom function to handle the error
 #[derive(Clone)]
 pub enum HandleToolError {
-    /// Return the exception message when true, don't handle when false.
     Bool(bool),
-    /// Return a specific error message.
     Message(String),
-    /// Use a custom function to handle the error.
     Handler(Arc<dyn Fn(&ToolException) -> String + Send + Sync>),
 }
 
@@ -169,20 +134,10 @@ impl Default for HandleToolError {
     }
 }
 
-/// How to handle validation errors.
-///
-/// Mirrors Python's `bool | str | Callable[[ValidationError], str] | None`.
-/// - `None` or `Bool(false)`: Don't handle errors (re-raise them)
-/// - `Bool(true)`: Return a generic "Tool input validation error" message
-/// - `Message(str)`: Return a specific error message
-/// - `Handler(fn)`: Use a custom function to handle the error
 #[derive(Clone)]
 pub enum HandleValidationError {
-    /// Return a generic error message when true, don't handle when false.
     Bool(bool),
-    /// Return a specific error message.
     Message(String),
-    /// Use a custom function to handle the error.
     Handler(Arc<dyn Fn(&str) -> String + Send + Sync>),
 }
 
@@ -210,14 +165,10 @@ impl Default for HandleValidationError {
     }
 }
 
-/// Input type for tools - can be a string, dict, or ToolCall.
 #[derive(Debug, Clone)]
 pub enum ToolInput {
-    /// A simple string input.
     String(String),
-    /// A dictionary of arguments.
     Dict(HashMap<String, Value>),
-    /// A full tool call.
     ToolCall(ToolCall),
 }
 
@@ -272,16 +223,11 @@ impl From<Value> for ToolInput {
     }
 }
 
-/// Output type for tools.
 #[derive(Debug, Clone)]
 pub enum ToolOutput {
-    /// A simple string output.
     String(String),
-    /// A ToolMessage output.
     Message(ToolMessage),
-    /// A content and artifact tuple.
     ContentAndArtifact { content: Value, artifact: Value },
-    /// Raw JSON value.
     Json(Value),
 }
 
@@ -309,88 +255,68 @@ impl From<Value> for ToolOutput {
     }
 }
 
-/// Base trait for all LangChain tools.
-///
-/// This trait defines the interface that all LangChain tools must implement.
-/// Tools are components that can be called by agents to perform specific actions.
 #[async_trait]
 pub trait BaseTool: Send + Sync + Debug {
-    /// Get the unique name of the tool.
     fn name(&self) -> &str;
 
-    /// Get the description of what the tool does.
     fn description(&self) -> &str;
 
-    /// Get the args schema for the tool.
     fn args_schema(&self) -> Option<&ArgsSchema> {
         None
     }
 
-    /// Whether to return the tool's output directly.
     fn return_direct(&self) -> bool {
         false
     }
 
-    /// Whether to log the tool's progress.
     fn verbose(&self) -> bool {
         false
     }
 
-    /// Get tags associated with the tool.
     fn tags(&self) -> Option<&[String]> {
         None
     }
 
-    /// Get metadata associated with the tool.
     fn metadata(&self) -> Option<&HashMap<String, Value>> {
         None
     }
 
-    /// Get how to handle tool errors.
     fn handle_tool_error(&self) -> &HandleToolError {
         &HandleToolError::Bool(false)
     }
 
-    /// Get how to handle validation errors.
     fn handle_validation_error(&self) -> &HandleValidationError {
         &HandleValidationError::Bool(false)
     }
 
-    /// Get the response format for the tool.
     fn response_format(&self) -> ResponseFormat {
         ResponseFormat::Content
     }
 
-    /// Get callbacks associated with the tool.
     fn callbacks(&self) -> Option<&Callbacks> {
         None
     }
 
-    /// Get optional provider-specific extra fields.
     fn extras(&self) -> Option<&HashMap<String, Value>> {
         None
     }
 
-    /// Check if the tool accepts only a single input argument.
     fn is_single_input(&self) -> bool {
         let args = self.args();
         let keys: Vec<_> = args.keys().filter(|k| *k != "kwargs").collect();
         keys.len() == 1
     }
 
-    /// Get the tool's input arguments schema.
     fn args(&self) -> HashMap<String, Value> {
         self.args_schema()
             .map(|s| s.properties())
             .unwrap_or_default()
     }
 
-    /// Get the schema for tool calls, excluding injected arguments.
     fn tool_call_schema(&self) -> ArgsSchema {
         self.args_schema().cloned().unwrap_or_default()
     }
 
-    /// Get the tool definition for LLM function calling.
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
             name: self.name().to_string(),
@@ -402,16 +328,10 @@ pub trait BaseTool: Send + Sync + Debug {
         }
     }
 
-    /// Get the JSON schema for the tool's parameters.
     fn parameters_schema(&self) -> Value {
         self.definition().parameters
     }
 
-    /// The core tool implementation that concrete types override.
-    ///
-    /// This is the equivalent of Python's `_run()`. Concrete tool types
-    /// (Tool, StructuredTool) implement this method with their actual logic.
-    /// The `run_manager` can be used to get child callback managers for sub-calls.
     fn tool_run(
         &self,
         input: ToolInput,
@@ -419,9 +339,6 @@ pub trait BaseTool: Send + Sync + Debug {
         config: &RunnableConfig,
     ) -> Result<ToolOutput>;
 
-    /// The async core tool implementation that concrete types override.
-    ///
-    /// This is the equivalent of Python's `_arun()`. Default delegates to `tool_run`.
     async fn tool_arun(
         &self,
         input: ToolInput,
@@ -432,15 +349,6 @@ pub trait BaseTool: Send + Sync + Debug {
         self.tool_run(input, sync_manager.as_ref(), config)
     }
 
-    /// Run the tool synchronously with the full callback pipeline.
-    ///
-    /// Mirrors Python's `BaseTool.run()`:
-    /// 1. Configures callback manager (merges tool + config callbacks/tags/metadata)
-    /// 2. Fires `on_tool_start`
-    /// 3. Calls `tool_run()` (the implementation method)
-    /// 4. Handles ToolException / validation errors
-    /// 5. Fires `on_tool_end` or `on_tool_error`
-    /// 6. Returns formatted output
     fn run(
         &self,
         input: ToolInput,
@@ -562,10 +470,6 @@ pub trait BaseTool: Send + Sync + Debug {
         }
     }
 
-    /// Run the tool asynchronously with the full callback pipeline.
-    ///
-    /// Mirrors Python's `BaseTool.arun()`. Uses `AsyncCallbackManager` for
-    /// async callback dispatch and calls `tool_arun()` for the implementation.
     async fn arun(
         &self,
         input: ToolInput,
@@ -690,19 +594,11 @@ pub trait BaseTool: Send + Sync + Debug {
         }
     }
 
-    /// Invoke the tool, routing through the callback pipeline.
-    ///
-    /// Mirrors Python's `BaseTool.invoke()`: extracts tool_call_id from
-    /// ToolCall input, delegates to `run()`.
     async fn invoke(&self, input: ToolInput, config: Option<RunnableConfig>) -> Result<ToolOutput> {
         let (tool_input, tool_call_id, config) = prep_run_args(input, config);
         self.arun(tool_input, Some(config), tool_call_id).await
     }
 
-    /// Invoke the tool with a ToolCall, returning a BaseMessage.
-    ///
-    /// This preserves the old `invoke(ToolCall) -> BaseMessage` behavior for
-    /// callers that need a ToolMessage result (e.g., agent executors).
     async fn invoke_tool_call(&self, tool_call: ToolCall) -> BaseMessage {
         let tool_call_id = tool_call.id.clone().unwrap_or_default();
         let input = ToolInput::ToolCall(tool_call);
@@ -735,7 +631,6 @@ pub trait BaseTool: Send + Sync + Debug {
         }
     }
 
-    /// Invoke the tool directly with arguments.
     async fn invoke_args(&self, args: Value) -> Value {
         let tool_call = ToolCall::builder().name(self.name()).args(args).build();
         let result = self.invoke_tool_call(tool_call).await;
@@ -743,11 +638,6 @@ pub trait BaseTool: Send + Sync + Debug {
     }
 }
 
-/// Adapter that makes a `BaseTool` usable as a `Runnable`.
-///
-/// Mirrors how Python's `BaseTool` extends `RunnableSerializable`.
-/// In Rust, we use the adapter pattern (like `ChatModelRunnable`)
-/// since trait objects cannot directly implement other traits.
 #[derive(Clone)]
 pub struct ToolRunnable {
     tool: Arc<dyn BaseTool>,
@@ -795,32 +685,16 @@ impl crate::runnables::base::Runnable for ToolRunnable {
     }
 }
 
-/// Annotation for tool arguments that are injected at runtime.
-///
-/// Tool arguments annotated with this are not included in the tool
-/// schema sent to language models and are instead injected during execution.
 #[derive(Debug, Clone, Default)]
 pub struct InjectedToolArg;
 
-/// Annotation for injecting the tool call ID.
-///
-/// This annotation is used to mark a tool parameter that should receive
-/// the tool call ID at runtime.
 #[derive(Debug, Clone, Default)]
 pub struct InjectedToolCallId;
 
-/// Check if an input is a tool call dictionary.
 pub fn is_tool_call(input: &Value) -> bool {
     input.get("type").and_then(|t| t.as_str()) == Some("tool_call")
 }
 
-/// Handle a tool exception based on the configured flag.
-///
-/// Mirrors Python's `_handle_tool_error`:
-/// - `Bool(false)`: Returns `None` (don't handle, re-raise)
-/// - `Bool(true)`: Returns the exception message (or "Tool execution error" if empty)
-/// - `Message(str)`: Returns the specific message
-/// - `Handler(fn)`: Calls the handler function
 pub fn handle_tool_error_impl(e: &ToolException, flag: &HandleToolError) -> Option<String> {
     match flag {
         HandleToolError::Bool(false) => None,
@@ -836,13 +710,6 @@ pub fn handle_tool_error_impl(e: &ToolException, flag: &HandleToolError) -> Opti
     }
 }
 
-/// Handle a validation error based on the configured flag.
-///
-/// Mirrors Python's `_handle_validation_error`:
-/// - `Bool(false)`: Returns `None` (don't handle, re-raise)
-/// - `Bool(true)`: Returns "Tool input validation error"
-/// - `Message(str)`: Returns the specific message
-/// - `Handler(fn)`: Calls the handler function
 pub fn handle_validation_error_impl(e: &str, flag: &HandleValidationError) -> Option<String> {
     match flag {
         HandleValidationError::Bool(false) => None,
@@ -852,12 +719,6 @@ pub fn handle_validation_error_impl(e: &str, flag: &HandleValidationError) -> Op
     }
 }
 
-/// Format tool output as a ToolMessage if appropriate.
-///
-/// Mirrors Python's `_format_output`:
-/// - If content is already a ToolMessage (ToolOutput::Message) or tool_call_id is None,
-///   returns the content directly
-/// - Otherwise, wraps content in a ToolMessage with the tool_call_id
 pub fn format_output(
     content: ToolOutput,
     artifact: Option<Value>,
@@ -894,9 +755,6 @@ pub fn format_output(
     ToolOutput::Message(msg)
 }
 
-/// Check if content is a valid message content type.
-///
-/// Validates content for OpenAI or Anthropic format tool messages.
 pub fn is_message_content_type(obj: &Value) -> bool {
     match obj {
         Value::String(_) => true,
@@ -905,9 +763,6 @@ pub fn is_message_content_type(obj: &Value) -> bool {
     }
 }
 
-/// Check if object is a valid message content block.
-///
-/// Validates content blocks for OpenAI or Anthropic format.
 pub fn is_message_content_block(obj: &Value) -> bool {
     match obj {
         Value::String(_) => true,
@@ -919,9 +774,6 @@ pub fn is_message_content_block(obj: &Value) -> bool {
     }
 }
 
-/// Convert content to string, preferring JSON format.
-///
-/// Mirrors Python's `_stringify`: tries JSON first, falls back to str().
 pub fn stringify(content: &Value) -> String {
     match content {
         Value::String(s) => s.clone(),
@@ -929,12 +781,10 @@ pub fn stringify(content: &Value) -> String {
     }
 }
 
-/// Alias for stringify for backwards compatibility.
 pub fn stringify_content(content: &Value) -> String {
     stringify(content)
 }
 
-/// Prepare arguments for tool execution.
 pub fn prep_run_args(
     value: ToolInput,
     config: Option<RunnableConfig>,
@@ -956,16 +806,10 @@ pub fn prep_run_args(
     }
 }
 
-/// Base class for toolkits containing related tools.
-///
-/// A toolkit is a collection of related tools that can be used together
-/// to accomplish a specific task or work with a particular system.
 pub trait BaseToolkit: Send + Sync {
-    /// Get all tools in the toolkit.
     fn get_tools(&self) -> Vec<Arc<dyn BaseTool>>;
 }
 
-/// Type alias for dynamic tool reference.
 pub type DynTool = Arc<dyn BaseTool>;
 
 #[cfg(test)]
