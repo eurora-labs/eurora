@@ -14,7 +14,9 @@ axum = { workspace = true, features = ["macros"] }
 chrono = { workspace = true, features = ["serde"] }
 semver = "1.0"
 serde = { workspace = true, features = ["derive"] }
+posthog-rs = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, features = ["rt"] }
 tower = { workspace = true }
 tower-http = { version = "0.6.8", features = ["cors", "trace"] }
 tracing = { workspace = true }

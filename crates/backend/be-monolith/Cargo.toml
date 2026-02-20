@@ -21,6 +21,7 @@ be-storage = { workspace = true, features = ["encryption"] }
 be-thread-service = { workspace = true }
 be-update-service = { workspace = true }
 dotenv = { workspace = true }
+posthog-rs = { workspace = true }
 prost = { workspace = true }
 proto-gen = { workspace = true }
 sentry = { workspace = true, features = ["log", "logs", "tracing"] }

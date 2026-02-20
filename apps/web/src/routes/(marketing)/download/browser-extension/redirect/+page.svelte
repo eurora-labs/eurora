@@ -1,13 +1,17 @@
 <script lang="ts">
+	import DownloadButton from '$lib/components/marketing/DownloadButton.svelte';
 	import { Button } from '@eurora/ui/components/button/index';
 	import Chromium from '@lucide/svelte/icons/chromium';
 	import Globe from '@lucide/svelte/icons/globe';
+	import MonitorIcon from '@lucide/svelte/icons/monitor';
 
 	const FIREFOX_EXTENSION_URL = 'https://addons.mozilla.org/en-US/firefox/addon/eurora';
 	const CHROME_EXTENSION_URL =
 		'https://chromewebstore.google.com/detail/bfndcocdeinignobnnjplgoggmgebihm';
+	const EDGE_EXTENSION_URL =
+		'https://microsoftedge.microsoft.com/addons/detail/eurora/jldnbebjeaegfgpboohhoipokpbpncke';
 
-	type BrowserType = 'firefox' | 'chromium' | 'unknown';
+	type BrowserType = 'firefox' | 'chrome' | 'edge' | 'safari' | 'unknown';
 
 	let browserType = $state<BrowserType>('unknown');
 	let redirecting = $state(false);
@@ -17,34 +21,51 @@
 			return 'unknown';
 		}
 
-		const userAgent = navigator.userAgent.toLowerCase();
+		const ua = navigator.userAgent.toLowerCase();
 
-		if (userAgent.includes('firefox')) {
-			return 'firefox';
-		}
-
-		if (userAgent.includes('chrome') || userAgent.includes('chromium')) {
-			return 'chromium';
-		}
+		if (ua.includes('firefox')) return 'firefox';
+		if (ua.includes('edg/') || ua.includes('edga/') || ua.includes('edgios/')) return 'edge';
+		if (ua.includes('safari') && !ua.includes('chrome') && !ua.includes('chromium'))
+			return 'safari';
+		if (ua.includes('chrome') || ua.includes('chromium')) return 'chrome';
 
 		return 'unknown';
 	}
 
-	function redirectToExtension(browser: BrowserType) {
-		if (browser === 'firefox') {
-			window.location.href = FIREFOX_EXTENSION_URL;
-		} else if (browser === 'chromium') {
-			window.location.href = CHROME_EXTENSION_URL;
+	function getRedirectUrl(browser: BrowserType): string | null {
+		switch (browser) {
+			case 'firefox':
+				return FIREFOX_EXTENSION_URL;
+			case 'chrome':
+				return CHROME_EXTENSION_URL;
+			case 'edge':
+				return EDGE_EXTENSION_URL;
+			default:
+				return null;
+		}
+	}
+
+	function getStoreName(browser: BrowserType): string {
+		switch (browser) {
+			case 'firefox':
+				return 'Firefox Add-ons';
+			case 'chrome':
+				return 'Chrome Web Store';
+			case 'edge':
+				return 'Edge Add-ons';
+			default:
+				return '';
 		}
 	}
 
 	$effect(() => {
 		if (typeof window !== 'undefined') {
 			browserType = detectBrowser();
+			const url = getRedirectUrl(browserType);
 
-			if (browserType !== 'unknown') {
+			if (url) {
 				redirecting = true;
-				redirectToExtension(browserType);
+				window.location.href = url;
 			}
 		}
 	});
@@ -57,10 +78,17 @@
 				class="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600"
 			></div>
 			<p class="text-lg text-gray-600">
-				Redirecting to {browserType === 'firefox'
-					? 'Firefox Add-ons'
-					: 'Chrome Web Store'}...
+				Redirecting to {getStoreName(browserType)}...
 			</p>
+		</div>
+	{:else if browserType === 'safari'}
+		<div class="flex flex-col items-center gap-6 text-center">
+			<h1 class="text-3xl font-bold">Eurora for Safari</h1>
+			<p class="max-w-md text-gray-600">
+				The Safari extension is included automatically with the Eurora desktop app. Download
+				the app to get started.
+			</p>
+			<DownloadButton />
 		</div>
 	{:else}
 		<div class="flex flex-col items-center gap-6 text-center">
@@ -88,9 +116,19 @@
 					<Chromium class="h-5 w-5" />
 					Chrome / Chromium
 				</Button>
+				<Button
+					class="bg-cyan-700 w-full"
+					variant="secondary"
+					size="lg"
+					href={EDGE_EXTENSION_URL}
+				>
+					<MonitorIcon class="h-5 w-5" />
+					Edge
+				</Button>
 			</div>
 			<p class="mt-4 text-sm text-gray-500">
-				Works with Chrome, Edge, Brave, Opera, Vivaldi, and other Chromium-based browsers
+				For Safari, the extension is included with the
+				<a href="/download" class="underline hover:text-gray-700">desktop app</a>.
 			</p>
 		</div>
 	{/if}

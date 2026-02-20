@@ -20,7 +20,6 @@ export function processQuery(editorRef: Editor): QueryAssets {
 		} else if (node.type && node.type !== 'doc' && node.type !== 'paragraph') {
 			if (node.type.includes('-') || node.type.length > 10) {
 				query.assets.push(node.attrs?.id ?? '');
-				query.text += ' ' + node.attrs?.name + ' ';
 			}
 		}
 
