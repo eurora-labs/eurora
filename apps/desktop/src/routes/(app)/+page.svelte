@@ -21,14 +21,14 @@
 	import * as Launcher from '@eurora/prosemirror-view/launcher';
 	import { inject } from '@eurora/shared/context';
 	import {
+		Conversation,
+		ConversationContent,
+	} from '@eurora/ui/components/ai-elements/conversation/index';
+	import {
 		Message,
 		MessageContent,
 		MessageResponse,
 	} from '@eurora/ui/components/ai-elements/new-message/index';
-	import {
-		Conversation,
-		ConversationContent,
-	} from '@eurora/ui/components/ai-elements/conversation/index';
 	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
 	import { onMount } from 'svelte';
 

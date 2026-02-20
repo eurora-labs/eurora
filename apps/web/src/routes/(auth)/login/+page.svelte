@@ -91,8 +91,16 @@
 		showPassword = !showPassword;
 	}
 
+	function storeRedirectParam() {
+		const redirect = page.url.searchParams.get('redirect');
+		if (redirect) {
+			sessionStorage.setItem('postLoginRedirect', redirect);
+		}
+	}
+
 	async function handleGoogleLogin() {
 		try {
+			storeRedirectParam();
 			const url = (await authService.getThirdPartyAuthUrl(Provider.GOOGLE)).url;
 			window.location.href = url;
 		} catch (err) {
@@ -103,6 +111,7 @@
 
 	async function handleGitHubLogin() {
 		try {
+			storeRedirectParam();
 			const url = (await authService.getThirdPartyAuthUrl(Provider.GITHUB)).url;
 			window.location.href = url;
 		} catch (err) {

@@ -54,7 +54,9 @@ be-auth-core = { workspace = true }
 be-remote-db = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+posthog-rs = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, features = ["rt"] }
 tower = { workspace = true }
 tower_governor = "0.8"
 tower-http = { version = "0.6.8", features = ["cors", "trace"] }
