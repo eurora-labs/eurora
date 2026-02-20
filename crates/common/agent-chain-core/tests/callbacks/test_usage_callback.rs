@@ -47,10 +47,12 @@ fn usage3() -> UsageMetadata {
             audio: Some(5),
             cache_creation: None,
             cache_read: None,
+            ..Default::default()
         }),
         output_token_details: Some(OutputTokenDetails {
             audio: None,
             reasoning: Some(10),
+            ..Default::default()
         }),
     }
 }
@@ -64,10 +66,12 @@ fn usage4() -> UsageMetadata {
             audio: Some(3),
             cache_creation: None,
             cache_read: None,
+            ..Default::default()
         }),
         output_token_details: Some(OutputTokenDetails {
             audio: None,
             reasoning: Some(5),
+            ..Default::default()
         }),
     }
 }

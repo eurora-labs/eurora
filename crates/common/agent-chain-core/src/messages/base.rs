@@ -305,18 +305,13 @@ impl HasId for BaseMessage {
 /// This corresponds to `BaseMessageChunk` in LangChain Python.
 
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::large_enum_variant)]
 pub enum BaseMessageChunk {
-    /// An AI message chunk
     AI(AIMessageChunk),
-    /// A human message chunk
     Human(HumanMessageChunk),
-    /// A system message chunk
     System(SystemMessageChunk),
-    /// A tool message chunk
     Tool(ToolMessageChunk),
-    /// A chat message chunk
     Chat(ChatMessageChunk),
-    /// A function message chunk
     Function(FunctionMessageChunk),
 }
 

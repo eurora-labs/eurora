@@ -86,10 +86,12 @@ fn test_all_imports() {
         audio: None,
         cache_creation: None,
         cache_read: None,
+        ..Default::default()
     };
     let _ = OutputTokenDetails {
         audio: None,
         reasoning: None,
+        ..Default::default()
     };
 
     let _ = KNOWN_BLOCK_TYPES;

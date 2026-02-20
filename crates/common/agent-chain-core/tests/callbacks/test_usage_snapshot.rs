@@ -115,10 +115,12 @@ fn test_with_token_details() {
             audio: Some(3),
             cache_creation: None,
             cache_read: Some(2),
+            ..Default::default()
         }),
         output_token_details: Some(OutputTokenDetails {
             audio: None,
             reasoning: Some(4),
+            ..Default::default()
         }),
     };
     let handler = UsageMetadataCallbackHandler::new();
