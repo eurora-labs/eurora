@@ -50,6 +50,7 @@ impl From<ProtoInputTokenDetails> for InputTokenDetails {
             audio: proto.audio,
             cache_creation: proto.cache_creation,
             cache_read: proto.cache_read,
+            ..Default::default()
         }
     }
 }
@@ -68,6 +69,7 @@ impl From<ProtoOutputTokenDetails> for OutputTokenDetails {
         OutputTokenDetails {
             audio: proto.audio,
             reasoning: proto.reasoning,
+            ..Default::default()
         }
     }
 }

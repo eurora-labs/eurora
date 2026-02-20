@@ -1,7 +1,3 @@
-//! Unit tests for the dump module.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/load/test_dump.py`
-
 use agent_chain_core::load::{Serializable, Serialized, dumpd, dumps};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -46,11 +42,9 @@ impl Serializable for NonSerializableTest {
     }
 }
 
-/// Tests for the Serializable::to_json() method (equivalent to Python's default() function).
 mod test_default {
     use super::*;
 
-    /// Ported from `TestDefault::test_default_with_serializable`
     #[test]
     fn test_default_with_serializable() {
         let obj = SerializableTest { value: 42 };
@@ -63,7 +57,6 @@ mod test_default {
         }
     }
 
-    /// Ported from `TestDefault::test_default_with_non_serializable`
     #[test]
     fn test_default_with_non_serializable() {
         let obj = NonSerializableTest { value: 42 };
@@ -82,11 +75,9 @@ mod test_default {
     }
 }
 
-/// Tests for the dumps() function.
 mod test_dumps {
     use super::*;
 
-    /// Ported from `TestDumps::test_dumps_basic`
     #[test]
     fn test_dumps_basic() {
         let obj = SerializableTest { value: 42 };
@@ -97,7 +88,6 @@ mod test_dumps {
         assert_eq!(parsed["kwargs"]["value"], 42);
     }
 
-    /// Ported from `TestDumps::test_dumps_with_pretty_flag`
     #[test]
     fn test_dumps_with_pretty_flag() {
         let obj = SerializableTest { value: 42 };
@@ -108,7 +98,6 @@ mod test_dumps {
         assert_eq!(parsed["kwargs"]["value"], 42);
     }
 
-    /// Ported from `TestDumps::test_dumps_with_non_serializable_fallback`
     #[test]
     fn test_dumps_with_non_serializable_fallback() {
         let obj = NonSerializableTest { value: 42 };
@@ -118,7 +107,6 @@ mod test_dumps {
         assert_eq!(parsed["type"], "not_implemented");
     }
 
-    /// Ported from `TestDumps::test_dumps_with_pretty_and_typeerror_fallback`
     #[test]
     fn test_dumps_with_pretty_and_non_serializable_fallback() {
         let obj = NonSerializableTest { value: 42 };
@@ -129,7 +117,6 @@ mod test_dumps {
         assert_eq!(parsed["type"], "not_implemented");
     }
 
-    /// Ported from `TestDumps::test_dumps_nested_structures`
     #[test]
     fn test_dumps_nested_structures() {
         let serializable_obj = SerializableTest { value: 1 };
@@ -150,7 +137,6 @@ mod test_dumps {
         assert_eq!(parsed["primitive"], "string");
     }
 
-    /// Ported from `TestDumpsSnapshot::test_dumps_pretty_default_indent_is_2`
     #[test]
     fn test_dumps_pretty_default_indent_is_2() {
         let obj = SerializableTest { value: 1 };
@@ -165,11 +151,9 @@ mod test_dumps {
     }
 }
 
-/// Tests for the dumpd() function.
 mod test_dumpd {
     use super::*;
 
-    /// Ported from `TestDumpd::test_dumpd_basic`
     #[test]
     fn test_dumpd_basic() {
         let obj = SerializableTest { value: 42 };
@@ -180,7 +164,6 @@ mod test_dumpd {
         assert_eq!(result["kwargs"]["value"], 42);
     }
 
-    /// Ported from `TestDumpd::test_dumpd_with_non_serializable`
     #[test]
     fn test_dumpd_with_non_serializable() {
         let obj = NonSerializableTest { value: 42 };
@@ -198,7 +181,6 @@ mod test_dumpd {
         );
     }
 
-    /// Ported from `TestDumpd::test_dumpd_with_nested_structures`
     #[test]
     fn test_dumpd_with_nested_structures() {
         let serializable_obj = SerializableTest { value: 1 };
@@ -215,7 +197,6 @@ mod test_dumpd {
         assert_eq!(data["primitive"], "string");
     }
 
-    /// Ported from `TestDumpd::test_dumpd_equivalence_with_dumps`
     #[test]
     fn test_dumpd_equivalence_with_dumps() {
         let obj = SerializableTest { value: 42 };
@@ -226,7 +207,6 @@ mod test_dumpd {
         assert_eq!(dumpd_result, dumps_result);
     }
 
-    /// Ported from `TestDumpd::test_dumpd_list_of_serializable`
     #[test]
     fn test_dumpd_list_of_serializable() {
         let objs = [SerializableTest { value: 1 }, SerializableTest { value: 2 }];
@@ -239,13 +219,9 @@ mod test_dumpd {
     }
 }
 
-/// Snapshot tests for Serializable::to_json() output structure.
-///
-/// Ported from `TestDefaultSnapshot` in Python.
 mod test_default_snapshot {
     use super::*;
 
-    /// Ported from `TestDefaultSnapshot::test_default_serializable_full_snapshot`
     #[test]
     fn test_default_serializable_full_snapshot() {
         let obj = SerializableTest { value: 99 };
@@ -264,7 +240,6 @@ mod test_default_snapshot {
         assert_eq!(id[3], "test_dump");
     }
 
-    /// Ported from `TestDefaultSnapshot::test_default_non_serializable_full_snapshot`
     #[test]
     fn test_default_non_serializable_full_snapshot() {
         let obj = NonSerializableTest { value: 7 };
@@ -283,7 +258,6 @@ mod test_default_snapshot {
         );
     }
 
-    /// Ported from `TestDefaultSnapshot::test_default_with_builtin_type`
     #[test]
     fn test_default_with_non_serializable_type() {
         let obj = NonSerializableTest { value: 0 };
@@ -294,7 +268,6 @@ mod test_default_snapshot {
         assert_eq!(value["type"], "not_implemented");
     }
 
-    /// Ported from `TestDefaultSnapshot::test_default_with_none`
     #[test]
     fn test_default_with_not_implemented_value() {
         use agent_chain_core::load::to_json_not_implemented_value;
@@ -307,13 +280,9 @@ mod test_default_snapshot {
     }
 }
 
-/// Snapshot tests for dumps() output structure.
-///
-/// Ported from `TestDumpsSnapshot` in Python.
 mod test_dumps_snapshot {
     use super::*;
 
-    /// Ported from `TestDumpsSnapshot::test_dumps_serializable_full_snapshot`
     #[test]
     fn test_dumps_serializable_full_snapshot() {
         let obj = SerializableTest { value: 42 };
@@ -332,7 +301,6 @@ mod test_dumps_snapshot {
         assert_eq!(id[3], "test_dump");
     }
 
-    /// Ported from `TestDumpsSnapshot::test_dumps_non_serializable_full_snapshot`
     #[test]
     fn test_dumps_non_serializable_full_snapshot() {
         let obj = NonSerializableTest { value: 7 };
@@ -352,13 +320,9 @@ mod test_dumps_snapshot {
     }
 }
 
-/// Snapshot tests for dumpd() output structure.
-///
-/// Ported from `TestDumpdSnapshot` in Python.
 mod test_dumpd_snapshot {
     use super::*;
 
-    /// Ported from `TestDumpdSnapshot::test_dumpd_serializable_full_snapshot`
     #[test]
     fn test_dumpd_serializable_full_snapshot() {
         let obj = SerializableTest { value: 42 };

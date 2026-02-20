@@ -1,7 +1,3 @@
-//! Tests for fallback runnables.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/runnables/test_fallbacks.py`
-
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -12,7 +8,6 @@ use agent_chain_core::runnables::base::{Runnable, RunnableLambda};
 use agent_chain_core::runnables::fallbacks::{ExceptionInserter, RunnableWithFallbacks};
 use serde_json::Value;
 
-/// Create an exception inserter for HashMap<String, Value> inputs.
 fn hashmap_exception_inserter() -> ExceptionInserter<HashMap<String, Value>> {
     Arc::new(|input: &HashMap<String, Value>, key: &str, error: &Error| {
         let mut new_input = input.clone();
@@ -21,13 +16,11 @@ fn hashmap_exception_inserter() -> ExceptionInserter<HashMap<String, Value>> {
     })
 }
 
-/// Create a primary runnable that always fails.
 fn failing_runnable()
 -> RunnableLambda<impl Fn(String) -> Result<String> + Send + Sync, String, String> {
     RunnableLambda::new(|_x: String| -> Result<String> { Err(Error::other("primary failed")) })
 }
 
-/// Create a fallback runnable that returns "bar".
 fn bar_runnable() -> RunnableLambda<impl Fn(String) -> Result<String> + Send + Sync, String, String>
 {
     RunnableLambda::new(|_x: String| -> Result<String> { Ok("bar".to_string()) })
@@ -107,8 +100,6 @@ async fn test_fallbacks_abatch() {
     }
 }
 
-/// Mirrors Python's _runnable function: behavior depends on input["text"]
-/// and whether input["exception"] is present.
 #[allow(clippy::type_complexity)]
 fn dict_runnable() -> RunnableLambda<
     impl Fn(HashMap<String, Value>) -> Result<String> + Send + Sync,

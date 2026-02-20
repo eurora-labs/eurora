@@ -1,9 +1,3 @@
-//! **Retriever** trait returns Documents given a text **query**.
-//!
-//! It is more general than a vector store. A retriever does not need to be able to
-//! store documents, only to return (or retrieve) them. Vector stores can be used as
-//! the backbone of a retriever, but there are other types of retrievers as well.
-
 use std::collections::HashMap;
 use std::fmt::Debug;
 
@@ -19,34 +13,26 @@ use crate::documents::Document;
 use crate::error::Result;
 use crate::runnables::{RunnableConfig, ensure_config};
 
-/// Type alias for retriever input (a query string).
 pub type RetrieverInput = String;
 
-/// Type alias for retriever output (a list of documents).
 pub type RetrieverOutput = Vec<Document>;
 
-/// LangSmith parameters for tracing.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct LangSmithRetrieverParams {
-    /// Retriever name.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ls_retriever_name: Option<String>,
 
-    /// Vector store provider.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ls_vector_store_provider: Option<String>,
 
-    /// Embedding provider.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ls_embedding_provider: Option<String>,
 
-    /// Embedding model.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ls_embedding_model: Option<String>,
 }
 
 impl LangSmithRetrieverParams {
-    /// Convert to a HashMap for use in metadata.
     pub fn to_metadata(&self) -> HashMap<String, Value> {
         let mut metadata = HashMap::new();
         if let Some(ref name) = self.ls_retriever_name {
@@ -74,26 +60,8 @@ impl LangSmithRetrieverParams {
     }
 }
 
-/// Abstract base trait for a document retrieval system.
-///
-/// A retrieval system is defined as something that can take string queries and return
-/// the most 'relevant' documents from some source.
-///
-/// # Usage
-///
-/// A retriever follows the standard Runnable interface, and should be used via the
-/// standard Runnable methods of `invoke`, `ainvoke`.
-///
-/// # Implementation
-///
-/// When implementing a custom retriever, the struct should implement the
-/// `get_relevant_documents` method to define the logic for retrieving documents.
-///
-/// Optionally, an async native implementation can be provided by overriding the
-/// `aget_relevant_documents` method.
 #[async_trait]
 pub trait BaseRetriever: Send + Sync + Debug {
-    /// Get the name of this retriever.
     fn get_name(&self) -> String {
         let type_name = std::any::type_name::<Self>();
         type_name
@@ -103,17 +71,14 @@ pub trait BaseRetriever: Send + Sync + Debug {
             .to_string()
     }
 
-    /// Optional list of tags associated with the retriever.
     fn tags(&self) -> Option<&[String]> {
         None
     }
 
-    /// Optional metadata associated with the retriever.
     fn metadata(&self) -> Option<&HashMap<String, Value>> {
         None
     }
 
-    /// Get standard params for tracing.
     fn get_ls_params(&self) -> LangSmithRetrieverParams {
         let name = self.get_name();
         let default_name = if let Some(stripped) = name.strip_prefix("Retriever") {
@@ -130,18 +95,12 @@ pub trait BaseRetriever: Send + Sync + Debug {
         }
     }
 
-    /// Get documents relevant to a query.
-    ///
-    /// This is the main method that retriever implementations should override.
     fn get_relevant_documents(
         &self,
         query: &str,
         run_manager: Option<&CallbackManagerForRetrieverRun>,
     ) -> Result<Vec<Document>>;
 
-    /// Asynchronously get documents relevant to a query.
-    ///
-    /// The default implementation runs the sync version.
     async fn aget_relevant_documents(
         &self,
         query: &str,
@@ -151,9 +110,6 @@ pub trait BaseRetriever: Send + Sync + Debug {
         self.get_relevant_documents(query, sync_run_manager.as_ref())
     }
 
-    /// Invoke the retriever to get relevant documents.
-    ///
-    /// Main entry point for synchronous retriever invocations.
     fn invoke(&self, input: &str, config: Option<RunnableConfig>) -> Result<Vec<Document>> {
         let config = ensure_config(config);
 
@@ -195,9 +151,6 @@ pub trait BaseRetriever: Send + Sync + Debug {
         }
     }
 
-    /// Asynchronously invoke the retriever to get relevant documents.
-    ///
-    /// Main entry point for asynchronous retriever invocations.
     async fn ainvoke(&self, input: &str, config: Option<RunnableConfig>) -> Result<Vec<Document>> {
         let config = ensure_config(config);
 

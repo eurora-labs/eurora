@@ -1,7 +1,3 @@
-//! Tests for OpenAI tools output parsers.
-//!
-//! Ported from langchain/libs/core/tests/unit_tests/output_parsers/test_openai_tools.py
-
 use std::collections::HashMap;
 
 use agent_chain_core::messages::AIMessage;
@@ -12,7 +8,6 @@ use agent_chain_core::outputs::ChatGeneration;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-/// Create a ChatGeneration with tool calls in additional_kwargs (legacy path).
 fn make_additional_kwargs_generation(tool_calls: Value) -> ChatGeneration {
     let mut additional_kwargs = HashMap::new();
     additional_kwargs.insert("tool_calls".to_string(), tool_calls);
@@ -25,7 +20,6 @@ fn make_additional_kwargs_generation(tool_calls: Value) -> ChatGeneration {
     ChatGeneration::new(message.into())
 }
 
-/// Create a ChatGeneration with tool_calls on the AIMessage itself (modern path).
 fn make_tool_calls_generation(
     tool_calls: Vec<agent_chain_core::messages::ToolCall>,
 ) -> ChatGeneration {
@@ -46,8 +40,6 @@ fn make_tool_call(id: &str, name: &str, args: Value) -> agent_chain_core::messag
     }
 }
 
-/// Ported from: test_json_output_key_tools_parser_multiple_tools_first_only
-/// (additional_kwargs variant)
 #[test]
 fn test_json_output_tools_parser_additional_kwargs() {
     let raw_tool_calls = json!([
@@ -75,7 +67,6 @@ fn test_json_output_tools_parser_additional_kwargs() {
     assert_eq!(result, expected);
 }
 
-/// Ported from: test_partial_json_output_parser_return_id (additional_kwargs variant)
 #[test]
 fn test_json_output_tools_parser_return_id_additional_kwargs() {
     let raw_tool_calls = json!([
@@ -146,7 +137,6 @@ fn test_json_output_tools_parser_return_id_tool_calls() {
     assert_eq!(result, expected);
 }
 
-/// Ported from: test_partial_json_output_key_parser (additional_kwargs variant)
 #[test]
 fn test_json_output_key_tools_parser_additional_kwargs() {
     let raw_tool_calls = json!([
@@ -168,7 +158,6 @@ fn test_json_output_key_tools_parser_additional_kwargs() {
     assert_eq!(result, expected);
 }
 
-/// Ported from: test_partial_json_output_key_parser_first_only (additional_kwargs)
 #[test]
 fn test_json_output_key_tools_parser_first_only_additional_kwargs() {
     let raw_tool_calls = json!([
@@ -499,7 +488,6 @@ struct Forecast {
     forecast: String,
 }
 
-/// Ported from: test_parse_with_different_pydantic_2_proper
 fn run_pydantic_tools_parser_test(use_tool_calls: bool) {
     let parser = PydanticToolsParser::new(vec![], false).with_tool::<Forecast>("Forecast");
 
@@ -543,7 +531,6 @@ fn test_pydantic_tools_parser_tool_calls() {
     run_pydantic_tools_parser_test(true);
 }
 
-/// Ported from: test_pydantic_tools_parser_with_nested_models
 fn run_pydantic_nested_models_test(use_tool_calls: bool) {
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     struct Coordinates {
@@ -599,7 +586,6 @@ fn test_pydantic_tools_parser_nested_models_tool_calls() {
     run_pydantic_nested_models_test(true);
 }
 
-/// Ported from: test_pydantic_tools_parser_with_optional_fields
 fn run_pydantic_optional_fields_test(use_tool_calls: bool) {
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     struct User {
@@ -681,8 +667,6 @@ fn test_pydantic_tools_parser_optional_fields_tool_calls() {
     run_pydantic_optional_fields_test(true);
 }
 
-/// Ported from: test_pydantic_tools_parser_with_mixed_pydantic_versions
-/// In Rust we test multiple registered tools in a single parser.
 fn run_pydantic_mixed_tools_test(use_tool_calls: bool) {
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     struct Weather {
@@ -803,7 +787,6 @@ fn test_pydantic_tools_parser_mixed_tools_tool_calls() {
     run_pydantic_mixed_tools_test(true);
 }
 
-/// Ported from: test_pydantic_tools_parser_name_dict_fallback
 #[test]
 fn test_pydantic_tools_parser_name_dict_fallback() {
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -828,7 +811,6 @@ fn test_pydantic_tools_parser_name_dict_fallback() {
     assert_eq!(tool.data, "test_data");
 }
 
-/// Ported from: test_pydantic_tools_parser_with_custom_title
 #[test]
 fn test_pydantic_tools_parser_with_custom_title() {
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -855,8 +837,6 @@ fn test_pydantic_tools_parser_with_custom_title() {
     assert_eq!(tool.description, "test");
 }
 
-/// Ported from: test_max_tokens_error
-/// Validation failure when tool call args don't match the schema.
 #[test]
 fn test_pydantic_tools_parser_validation_error() {
     let parser = PydanticToolsParser::new(vec![], true).with_tool::<NameCollector>("NameCollector");
@@ -871,7 +851,6 @@ fn test_pydantic_tools_parser_validation_error() {
     assert!(result.is_err());
 }
 
-/// Ported from: test_pydantic_tools_parser_with_nested_models (both in one message)
 #[test]
 fn test_pydantic_tools_parser_nested_models_mixed_in_one_message() {
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -941,7 +920,6 @@ fn test_pydantic_tools_parser_nested_models_mixed_in_one_message() {
     assert!((location.coordinates.latitude - 37.8199).abs() < 0.0001);
 }
 
-/// Ported from: test_parse_tool_call_with_none_arguments
 #[test]
 fn test_parse_tool_call_with_none_arguments() {
     let raw_tool_call = json!({
@@ -962,7 +940,6 @@ fn test_parse_tool_call_with_none_arguments() {
     );
 }
 
-/// Ported from: test_parse_tool_call_with_empty_string_arguments
 #[test]
 fn test_parse_tool_call_with_empty_string_arguments() {
     let raw_tool_call = json!({
@@ -980,7 +957,6 @@ fn test_parse_tool_call_with_empty_string_arguments() {
     assert_eq!(result["id"], "call_123");
 }
 
-/// Ported from: test_parse_tool_call_with_valid_arguments
 #[test]
 fn test_parse_tool_call_with_valid_arguments() {
     let raw_tool_call = json!({
@@ -998,7 +974,6 @@ fn test_parse_tool_call_with_valid_arguments() {
     assert_eq!(result["id"], "call_456");
 }
 
-/// Ported from: test_parse_tool_call_partial_mode_with_none_arguments
 #[test]
 fn test_parse_tool_call_partial_mode_with_none_arguments() {
     let raw_tool_call = json!({
@@ -1012,7 +987,6 @@ fn test_parse_tool_call_partial_mode_with_none_arguments() {
     assert!(result.is_none());
 }
 
-/// Test parse_tool_call without return_id
 #[test]
 fn test_parse_tool_call_without_return_id() {
     let raw_tool_call = json!({
@@ -1030,7 +1004,6 @@ fn test_parse_tool_call_without_return_id() {
     assert!(result.get("id").is_none());
 }
 
-/// Test parse_tool_call with no function key returns None
 #[test]
 fn test_parse_tool_call_no_function_key() {
     let raw_tool_call = json!({"id": "call_123"});
@@ -1039,7 +1012,6 @@ fn test_parse_tool_call_no_function_key() {
     assert!(result.is_none());
 }
 
-/// Test parse_tool_call with invalid JSON arguments errors
 #[test]
 fn test_parse_tool_call_invalid_json_arguments() {
     let raw_tool_call = json!({
@@ -1052,7 +1024,6 @@ fn test_parse_tool_call_invalid_json_arguments() {
     assert!(result.is_err());
 }
 
-/// Test parse_tool_call partial mode with partial JSON
 #[test]
 fn test_parse_tool_call_partial_mode_with_partial_json() {
     let raw_tool_call = json!({
@@ -1065,7 +1036,6 @@ fn test_parse_tool_call_partial_mode_with_partial_json() {
     let _ = result;
 }
 
-/// Ported from: test_partial_pydantic_output_parser (non-streaming version)
 #[test]
 fn test_pydantic_tools_parser_first_tool_only() {
     let parser = PydanticToolsParser::new(vec![], true).with_tool::<NameCollector>("NameCollector");
@@ -1090,7 +1060,6 @@ fn test_pydantic_tools_parser_first_tool_only() {
     assert_eq!(collector.person.job, "concierge");
 }
 
-/// Test PydanticToolsParser with empty tool_calls and first_tool_only
 #[test]
 fn test_pydantic_tools_parser_first_tool_only_empty() {
     let parser = PydanticToolsParser::new(vec![], true).with_tool::<Forecast>("Forecast");
@@ -1101,7 +1070,6 @@ fn test_pydantic_tools_parser_first_tool_only_empty() {
     assert!(result.is_null());
 }
 
-/// Test PydanticToolsParser with empty tool_calls and first_tool_only=false
 #[test]
 fn test_pydantic_tools_parser_empty_list() {
     let parser = PydanticToolsParser::new(vec![], false).with_tool::<Forecast>("Forecast");

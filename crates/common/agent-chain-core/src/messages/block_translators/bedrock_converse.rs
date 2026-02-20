@@ -1,12 +1,3 @@
-//! Derivations of standard content blocks from Amazon (Bedrock Converse) content.
-//!
-//! Mirrors `langchain_core/messages/block_translators/bedrock_converse.py`.
-//!
-//! The Converse API uses a different structure than the legacy Bedrock API:
-//! - Content blocks use specific typed keys rather than a "type" field
-//! - Images use `{"image": {"format": "png", "source": {"bytes": ...}}}`
-//! - Tool use/results use `toolUse`/`toolResult` with camelCase keys
-
 use std::collections::HashSet;
 
 use base64::Engine;
@@ -14,7 +5,6 @@ use serde_json::{Value, json};
 
 use crate::messages::content::KNOWN_BLOCK_TYPES;
 
-/// Populate extras field with unknown fields from the original block.
 fn populate_extras(standard_block: &mut Value, block: &Value, known_fields: &HashSet<&str>) {
     if standard_block.get("type").and_then(|v| v.as_str()) == Some("non_standard") {
         return;
@@ -34,7 +24,6 @@ fn populate_extras(standard_block: &mut Value, block: &Value, known_fields: &Has
     }
 }
 
-/// Convert bytes (as a JSON value) to a base64 string.
 fn bytes_to_b64_str(bytes_value: &Value) -> String {
     if let Some(s) = bytes_value.as_str() {
         s.to_string()
@@ -49,11 +38,6 @@ fn bytes_to_b64_str(bytes_value: &Value) -> String {
     }
 }
 
-/// Convert Bedrock Converse format input blocks to v1 format.
-///
-/// During the `content_blocks` parsing process, blocks not recognized as v1
-/// are wrapped as `non_standard`. This function unpacks those and converts
-/// Converse-format blocks to v1 ContentBlocks.
 pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
     let mut result = Vec::new();
 
@@ -168,7 +152,6 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
     result
 }
 
-/// Convert a Converse citation to standard v1 format.
 fn convert_citation_to_v1(citation: &Value) -> Value {
     let mut standard_citation = json!({"type": "citation"});
 
@@ -193,22 +176,15 @@ fn convert_citation_to_v1(citation: &Value) -> Value {
     standard_citation
 }
 
-/// Convert Bedrock Converse content blocks to standard format.
-///
-/// This is the main entry point for converting Converse API response content
-/// to the standardized v1 format.
 pub fn convert_to_standard_blocks(content: &[Value], is_chunk: bool) -> Vec<Value> {
     convert_to_standard_blocks_with_context(content, is_chunk, None)
 }
 
-/// Context for chunk translation in Bedrock Converse.
 #[derive(Default)]
 pub struct ConverseChunkContext {
-    /// Tool call chunks from the message.
     pub tool_call_chunks: Vec<Value>,
 }
 
-/// Convert Bedrock Converse content blocks to standard format with context.
 pub fn convert_to_standard_blocks_with_context(
     content: &[Value],
     is_chunk: bool,

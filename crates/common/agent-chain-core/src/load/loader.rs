@@ -1,13 +1,3 @@
-//! Load LangChain objects from JSON strings or objects.
-//!
-//! This module provides functions for deserializing LangChain objects from JSON,
-//! mirroring `langchain_core.load.load`.
-//!
-//! # Warning
-//!
-//! The `load` and `loads` functions can instantiate arbitrary types based on the
-//! serialized data. Be careful when using with untrusted input.
-
 use serde_json::Value;
 use std::collections::HashMap;
 use std::env;
@@ -16,19 +6,12 @@ use super::mapping::{DEFAULT_NAMESPACES, DISALLOW_LOAD_FROM_PATH, get_all_serial
 use super::serializable::LC_VERSION;
 use crate::error::{Error, Result};
 
-/// Configuration for the Reviver.
 #[derive(Debug, Clone)]
 pub struct ReviverConfig {
-    /// A map of secrets to load. If a secret is not found in the map,
-    /// it will be loaded from the environment if `secrets_from_env` is `true`.
     pub secrets_map: HashMap<String, String>,
-    /// A list of additional namespaces (modules) to allow to be deserialized.
     pub valid_namespaces: Vec<String>,
-    /// Whether to load secrets from the environment.
     pub secrets_from_env: bool,
-    /// Additional import mappings to override or extend the default mappings.
     pub additional_import_mappings: HashMap<Vec<String>, Vec<String>>,
-    /// Whether to ignore unserializable fields (return None instead of error).
     pub ignore_unserializable_fields: bool,
 }
 
@@ -45,30 +28,25 @@ impl Default for ReviverConfig {
 }
 
 impl ReviverConfig {
-    /// Create a new ReviverConfig with default settings.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set the secrets map.
     pub fn with_secrets_map(mut self, secrets_map: HashMap<String, String>) -> Self {
         self.secrets_map = secrets_map;
         self
     }
 
-    /// Add additional valid namespaces.
     pub fn with_valid_namespaces(mut self, namespaces: Vec<String>) -> Self {
         self.valid_namespaces.extend(namespaces);
         self
     }
 
-    /// Set whether to load secrets from the environment.
     pub fn with_secrets_from_env(mut self, secrets_from_env: bool) -> Self {
         self.secrets_from_env = secrets_from_env;
         self
     }
 
-    /// Add additional import mappings.
     pub fn with_additional_import_mappings(
         mut self,
         mappings: HashMap<Vec<String>, Vec<String>>,
@@ -77,20 +55,12 @@ impl ReviverConfig {
         self
     }
 
-    /// Set whether to ignore unserializable fields.
     pub fn with_ignore_unserializable_fields(mut self, ignore: bool) -> Self {
         self.ignore_unserializable_fields = ignore;
         self
     }
 }
 
-/// Reviver for JSON objects.
-///
-/// The Reviver is responsible for transforming serialized LangChain objects
-/// back into their original form. It handles:
-/// - Secret resolution (from secrets_map or environment)
-/// - Namespace validation
-/// - Type mapping (for backwards compatibility)
 #[derive(Debug, Clone)]
 pub struct Reviver {
     config: ReviverConfig,
@@ -98,7 +68,6 @@ pub struct Reviver {
 }
 
 impl Reviver {
-    /// Create a new Reviver with the given configuration.
     pub fn new(config: ReviverConfig) -> Self {
         let mut import_mappings = get_all_serializable_mappings();
         import_mappings.extend(config.additional_import_mappings.clone());
@@ -109,25 +78,10 @@ impl Reviver {
         }
     }
 
-    /// Create a new Reviver with default configuration.
     pub fn with_defaults() -> Self {
         Self::new(ReviverConfig::default())
     }
 
-    /// Revive a JSON value.
-    ///
-    /// This method processes a JSON value and:
-    /// - Resolves secrets
-    /// - Validates namespaces
-    /// - Maps old namespaces to new ones
-    ///
-    /// # Arguments
-    ///
-    /// * `value` - The JSON value to revive.
-    ///
-    /// # Returns
-    ///
-    /// The revived value, or an error if revival fails.
     pub fn revive(&self, value: &Value) -> Result<RevivedValue> {
         let Some(obj) = value.as_object() else {
             return Ok(RevivedValue::Value(value.clone()));
@@ -155,7 +109,6 @@ impl Reviver {
         }
     }
 
-    /// Revive a secret value.
     fn revive_secret(&self, id: &[String]) -> Result<RevivedValue> {
         if id.is_empty() {
             return Ok(RevivedValue::None);
@@ -177,7 +130,6 @@ impl Reviver {
         Ok(RevivedValue::None)
     }
 
-    /// Revive a not_implemented value.
     fn revive_not_implemented(&self, value: &Value) -> Result<RevivedValue> {
         if self.config.ignore_unserializable_fields {
             return Ok(RevivedValue::None);
@@ -189,7 +141,6 @@ impl Reviver {
         )))
     }
 
-    /// Revive a constructor value.
     fn revive_constructor(
         &self,
         id: &[String],
@@ -253,21 +204,15 @@ impl Reviver {
     }
 }
 
-/// Result of reviving a JSON value.
 #[derive(Debug, Clone)]
 pub enum RevivedValue {
-    /// A simple value (unchanged from input).
     Value(Value),
-    /// A string value (typically a resolved secret).
     String(String),
-    /// A constructor to instantiate.
     Constructor(ConstructorInfo),
-    /// No value (for ignored unserializable fields or missing secrets).
     None,
 }
 
 impl RevivedValue {
-    /// Convert to a serde_json::Value.
     pub fn to_value(&self) -> Value {
         match self {
             RevivedValue::Value(v) => v.clone(),
@@ -284,75 +229,28 @@ impl RevivedValue {
         }
     }
 
-    /// Check if this is a None value.
     pub fn is_none(&self) -> bool {
         matches!(self, RevivedValue::None)
     }
 }
 
-/// Information about a constructor to instantiate.
 #[derive(Debug, Clone)]
 pub struct ConstructorInfo {
-    /// The full path to the type (namespace + name).
     pub path: Vec<String>,
-    /// The name of the type.
     pub name: String,
-    /// The constructor arguments.
     pub kwargs: Value,
 }
 
-/// Revive a LangChain object from a JSON string.
-///
-/// # Warning
-///
-/// This function can instantiate arbitrary types based on the serialized data.
-/// Be careful when using with untrusted input.
-///
-/// # Arguments
-///
-/// * `text` - The JSON string to parse and revive.
-/// * `config` - Optional configuration for the reviver.
-///
-/// # Returns
-///
-/// The revived value.
-///
-/// # Errors
-///
-/// Returns an error if parsing or revival fails.
 pub fn loads(text: &str, config: Option<ReviverConfig>) -> Result<Value> {
     let value: Value = serde_json::from_str(text)?;
     load(value, config)
 }
 
-/// Revive a LangChain object from a JSON value.
-///
-/// Use this if you already have a parsed JSON object,
-/// e.g., from `serde_json::from_str` or similar.
-///
-/// # Warning
-///
-/// This function can instantiate arbitrary types based on the serialized data.
-/// Be careful when using with untrusted input.
-///
-/// # Arguments
-///
-/// * `obj` - The JSON value to revive.
-/// * `config` - Optional configuration for the reviver.
-///
-/// # Returns
-///
-/// The revived value.
-///
-/// # Errors
-///
-/// Returns an error if revival fails.
 pub fn load(obj: Value, config: Option<ReviverConfig>) -> Result<Value> {
     let reviver = Reviver::new(config.unwrap_or_default());
     load_recursive(&obj, &reviver)
 }
 
-/// Recursively load a JSON value.
 fn load_recursive(obj: &Value, reviver: &Reviver) -> Result<Value> {
     match obj {
         Value::Object(map) => {
@@ -374,35 +272,11 @@ fn load_recursive(obj: &Value, reviver: &Reviver) -> Result<Value> {
     }
 }
 
-/// Load with secrets from a map.
-///
-/// Convenience function that creates a ReviverConfig with the given secrets map.
-///
-/// # Arguments
-///
-/// * `text` - The JSON string to parse and revive.
-/// * `secrets_map` - A map of secret names to their values.
-///
-/// # Returns
-///
-/// The revived value.
 pub fn loads_with_secrets(text: &str, secrets_map: HashMap<String, String>) -> Result<Value> {
     let config = ReviverConfig::new().with_secrets_map(secrets_map);
     loads(text, Some(config))
 }
 
-/// Load with additional valid namespaces.
-///
-/// Convenience function that creates a ReviverConfig with additional namespaces.
-///
-/// # Arguments
-///
-/// * `text` - The JSON string to parse and revive.
-/// * `namespaces` - Additional namespaces to allow.
-///
-/// # Returns
-///
-/// The revived value.
 pub fn loads_with_namespaces(text: &str, namespaces: Vec<String>) -> Result<Value> {
     let config = ReviverConfig::new().with_valid_namespaces(namespaces);
     loads(text, Some(config))
@@ -474,7 +348,6 @@ static CONSTRUCTOR_REGISTRY: LazyLock<HashMap<String, ConstructorFn>> = LazyLock
     registry
 });
 
-/// Look up a constructor function by lc_id path.
 pub fn lookup_constructor(path: &[String]) -> Option<&'static ConstructorFn> {
     let key = path.join(":");
     CONSTRUCTOR_REGISTRY.get(&key)

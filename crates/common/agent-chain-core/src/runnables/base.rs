@@ -1,8 +1,3 @@
-//! Base classes and utilities for Runnables.
-//!
-//! This module provides the core `Runnable` trait and implementations,
-//! mirroring `langchain_core.runnables.base`.
-
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -26,44 +21,19 @@ use super::config::{
 };
 use super::utils::{Addable, ConfigurableFieldSpec, get_unique_config_specs};
 
-/// Type alias for config factory functions used by `RunnableBinding`.
-///
-/// Config factories are lazily evaluated functions that produce config overrides.
-/// They receive the current merged config and return additional config to merge.
-/// This mirrors Python's `RunnableBinding.config_factories`.
 pub type ConfigFactory = Arc<dyn Fn(&RunnableConfig) -> RunnableConfig + Send + Sync>;
 
-/// Number of generic type arguments for Runnable (Input and Output).
 #[allow(dead_code)]
 const RUNNABLE_GENERIC_NUM_ARGS: usize = 2;
 
-/// Minimum number of steps in a RunnableSequence.
 #[allow(dead_code)]
 const RUNNABLE_SEQUENCE_MIN_STEPS: usize = 2;
 
-/// A unit of work that can be invoked, batched, streamed, transformed and composed.
-///
-/// Key Methods:
-/// - `invoke`/`ainvoke`: Transforms a single input into an output.
-/// - `batch`/`abatch`: Efficiently transforms multiple inputs into outputs.
-/// - `stream`/`astream`: Streams output from a single input as it's produced.
-///
-/// Built-in optimizations:
-/// - **Batch**: By default, batch runs invoke() in parallel using threads.
-///   Override to optimize batching.
-/// - **Async**: Methods with `'a'` prefix are asynchronous. By default, they execute
-///   the sync counterpart using async runtime. Override for native async.
-///
-/// All methods accept an optional config argument, which can be used to configure
-/// execution, add tags and metadata for tracing and debugging.
 #[async_trait]
 pub trait Runnable: Send + Sync + Debug {
-    /// The input type for this Runnable.
     type Input: Send + Sync + Clone + Debug + 'static;
-    /// The output type for this Runnable.
     type Output: Send + Sync + Clone + Debug + 'static;
 
-    /// Get the name of this Runnable.
     fn get_name(&self, suffix: Option<&str>, name: Option<&str>) -> String {
         let name_ = name
             .map(|s| s.to_string())
@@ -79,20 +49,14 @@ pub trait Runnable: Send + Sync + Debug {
         }
     }
 
-    /// Get the optional name of this Runnable.
     fn name(&self) -> Option<String> {
         None
     }
 
-    /// Get the type name of this Runnable.
     fn type_name(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
 
-    /// Helper method to transform an input value to an output value, with
-    /// callbacks. Use this method to implement `invoke` in subclasses.
-    ///
-    /// Mirrors Python's `Runnable._call_with_config`.
     fn call_with_config(
         &self,
         func: &dyn Fn(Self::Input, &RunnableConfig) -> Result<Self::Output>,
@@ -132,10 +96,6 @@ pub trait Runnable: Send + Sync + Debug {
         }
     }
 
-    /// Async helper method to transform an input value to an output value,
-    /// with callbacks. Use this method to implement `ainvoke` in subclasses.
-    ///
-    /// Mirrors Python's `Runnable._acall_with_config`.
     #[allow(async_fn_in_trait)]
     async fn acall_with_config(
         &self,
@@ -188,10 +148,6 @@ pub trait Runnable: Send + Sync + Debug {
         }
     }
 
-    /// Helper method to transform a list of inputs to a list of outputs,
-    /// with per-item callbacks.
-    ///
-    /// Mirrors Python's `Runnable._batch_with_config`.
     fn batch_with_config(
         &self,
         func: &dyn Fn(Vec<Self::Input>, Vec<RunnableConfig>) -> Vec<Result<Self::Output>>,
@@ -265,11 +221,6 @@ pub trait Runnable: Send + Sync + Debug {
         }
     }
 
-    /// Helper method to transform a stream of inputs to a stream of outputs,
-    /// with callbacks. Use this to implement `stream` or `transform` in
-    /// subclasses.
-    ///
-    /// Mirrors Python's `Runnable._transform_stream_with_config`.
     fn transform_stream_with_config<'a>(
         &'a self,
         input: BoxStream<'a, Self::Input>,
@@ -327,14 +278,6 @@ pub trait Runnable: Send + Sync + Debug {
         })
     }
 
-    /// Get a JSON schema describing the input type of this Runnable.
-    ///
-    /// Mirrors `Runnable.get_input_schema()` from
-    /// `langchain_core.runnables.base`.
-    ///
-    /// The default implementation returns a generic object schema derived
-    /// from the Runnable's name. Wrapper runnables (retry, fallbacks, etc.)
-    /// override this to delegate to the wrapped runnable's schema.
     fn get_input_schema(&self, _config: Option<&RunnableConfig>) -> Value {
         serde_json::json!({
             "title": self.get_name(Some("Input"), None),
@@ -342,10 +285,6 @@ pub trait Runnable: Send + Sync + Debug {
         })
     }
 
-    /// Get a JSON schema describing the output type of this Runnable.
-    ///
-    /// Mirrors `Runnable.get_output_schema()` from
-    /// `langchain_core.runnables.base`.
     fn get_output_schema(&self, _config: Option<&RunnableConfig>) -> Value {
         serde_json::json!({
             "title": self.get_name(Some("Output"), None),
@@ -353,26 +292,14 @@ pub trait Runnable: Send + Sync + Debug {
         })
     }
 
-    /// Get a JSON schema that represents the input to the Runnable.
-    ///
-    /// Mirrors `Runnable.get_input_jsonschema()` from
-    /// `langchain_core.runnables.base`.
     fn get_input_jsonschema(&self, config: Option<&RunnableConfig>) -> Value {
         self.get_input_schema(config)
     }
 
-    /// Get a JSON schema that represents the output of the Runnable.
-    ///
-    /// Mirrors `Runnable.get_output_jsonschema()` from
-    /// `langchain_core.runnables.base`.
     fn get_output_jsonschema(&self, config: Option<&RunnableConfig>) -> Value {
         self.get_output_schema(config)
     }
 
-    /// Get a JSON schema that represents the config of the Runnable.
-    ///
-    /// Mirrors `Runnable.get_config_jsonschema()` from
-    /// `langchain_core.runnables.base`.
     fn get_config_jsonschema(&self, include: Option<&[&str]>) -> Result<Value> {
         let specs = self.config_specs()?;
         let include = include.unwrap_or(&[]);
@@ -418,21 +345,8 @@ pub trait Runnable: Send + Sync + Debug {
         }))
     }
 
-    /// Transform a single input into an output.
-    ///
-    /// # Arguments
-    ///
-    /// * `input` - The input to the Runnable.
-    /// * `config` - Optional config to use when invoking the Runnable.
-    ///
-    /// # Returns
-    ///
-    /// The output of the Runnable.
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output>;
 
-    /// Transform a single input into an output asynchronously.
-    ///
-    /// Default implementation runs invoke() in a blocking task.
     async fn ainvoke(
         &self,
         input: Self::Input,
@@ -444,10 +358,6 @@ pub trait Runnable: Send + Sync + Debug {
         self.invoke(input, config)
     }
 
-    /// Transform multiple inputs into outputs in parallel.
-    ///
-    /// Default implementation runs invoke() in parallel using scoped threads,
-    /// respecting the `max_concurrency` setting from config.
     fn batch(
         &self,
         inputs: Vec<Self::Input>,
@@ -550,10 +460,6 @@ pub trait Runnable: Send + Sync + Debug {
         }
     }
 
-    /// Transform multiple inputs into outputs asynchronously.
-    ///
-    /// Default implementation runs ainvoke() concurrently, respecting the
-    /// `max_concurrency` setting from config using a semaphore.
     async fn abatch(
         &self,
         inputs: Vec<Self::Input>,
@@ -607,10 +513,6 @@ pub trait Runnable: Send + Sync + Debug {
         }
     }
 
-    /// Run invoke in parallel on a list of inputs, yielding results as they
-    /// complete.
-    ///
-    /// Default implementation uses scoped threads with concurrency limiting.
     fn batch_as_completed(
         &self,
         inputs: Vec<Self::Input>,
@@ -680,11 +582,6 @@ pub trait Runnable: Send + Sync + Debug {
         receiver.into_iter().collect()
     }
 
-    /// Run ainvoke in parallel on a list of inputs, yielding results as they
-    /// complete.
-    ///
-    /// Default implementation uses FuturesUnordered with semaphore-based
-    /// concurrency limiting. Returns a stream of (index, result) tuples.
     fn abatch_as_completed(
         &self,
         inputs: Vec<Self::Input>,
@@ -719,9 +616,6 @@ pub trait Runnable: Send + Sync + Debug {
         Box::pin(futures_unordered)
     }
 
-    /// Stream output from a single input.
-    ///
-    /// Default implementation calls invoke() and yields the result.
     fn stream(
         &self,
         input: Self::Input,
@@ -731,9 +625,6 @@ pub trait Runnable: Send + Sync + Debug {
         Box::pin(futures::stream::once(async move { result }))
     }
 
-    /// Stream output from a single input asynchronously.
-    ///
-    /// Default implementation calls ainvoke() and yields the result.
     fn astream(
         &self,
         input: Self::Input,
@@ -747,13 +638,6 @@ pub trait Runnable: Send + Sync + Debug {
         }))
     }
 
-    /// Generate a stream of events.
-    ///
-    /// Use to create a stream of `StreamEvent` that provide real-time
-    /// information about the progress of the Runnable, including events
-    /// from intermediate results.
-    ///
-    /// Mirrors Python's `Runnable.astream_events()` (V2 implementation).
     fn astream_events<'a>(
         &'a self,
         input: Self::Input,
@@ -783,12 +667,6 @@ pub trait Runnable: Send + Sync + Debug {
         )
     }
 
-    /// Generate a stream of log patches.
-    ///
-    /// Use to create a stream of `RunLogPatch` that provide real-time
-    /// information about the progress of the Runnable.
-    ///
-    /// Mirrors Python's `Runnable.astream_log()`.
     fn astream_log<'a>(
         &'a self,
         input: Self::Input,
@@ -822,12 +700,6 @@ pub trait Runnable: Send + Sync + Debug {
         )
     }
 
-    /// Return a graph representation of this Runnable.
-    ///
-    /// The default implementation creates a simple 3-node graph:
-    /// Input → Runnable → Output.
-    ///
-    /// Mirrors Python's `Runnable.get_graph()`.
     fn get_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph> {
         use super::graph::NodeData;
         let mut graph = super::graph::Graph::new();
@@ -866,9 +738,6 @@ pub trait Runnable: Send + Sync + Debug {
         Ok(graph)
     }
 
-    /// Transform an input stream into an output stream.
-    ///
-    /// Default implementation buffers input and calls stream().
     fn transform<'a>(
         &'a self,
         input: BoxStream<'a, Self::Input>,
@@ -895,9 +764,6 @@ pub trait Runnable: Send + Sync + Debug {
         })
     }
 
-    /// Transform an input stream into an output stream asynchronously.
-    ///
-    /// Default implementation buffers input and calls astream().
     fn atransform<'a>(
         &'a self,
         input: BoxStream<'a, Self::Input>,
@@ -927,10 +793,6 @@ pub trait Runnable: Send + Sync + Debug {
         })
     }
 
-    /// Bind arguments to this Runnable, returning a new Runnable.
-    /// Compose this Runnable with another, returning a RunnableSequence.
-    ///
-    /// Mirrors Python's `Runnable.pipe()`.
     fn pipe<R2>(self, other: R2) -> RunnableSequence<Self, R2>
     where
         Self: Sized,
@@ -946,7 +808,6 @@ pub trait Runnable: Send + Sync + Debug {
         RunnableBinding::new(self, kwargs, None)
     }
 
-    /// Bind config to this Runnable, returning a new Runnable.
     fn with_config(self, config: RunnableConfig) -> RunnableBinding<Self>
     where
         Self: Sized,
@@ -954,11 +815,6 @@ pub trait Runnable: Send + Sync + Debug {
         RunnableBinding::new(self, HashMap::new(), Some(config))
     }
 
-    /// Create a new Runnable that retries on failure.
-    ///
-    /// This is a convenience method that uses the `RunnableRetryExt` trait.
-    /// For more control over retry behavior, use `RunnableRetryExt::with_retry`
-    /// with a `RunnableRetryConfig`.
     fn with_retry(
         self,
         max_attempts: usize,
@@ -970,7 +826,6 @@ pub trait Runnable: Send + Sync + Debug {
         super::retry::RunnableRetry::with_simple(self, max_attempts, wait_exponential_jitter)
     }
 
-    /// Return a new Runnable that maps a list of inputs to a list of outputs.
     fn map(self) -> RunnableEach<Self>
     where
         Self: Sized,
@@ -978,12 +833,6 @@ pub trait Runnable: Send + Sync + Debug {
         RunnableEach::new(self)
     }
 
-    /// Select keys from the output of this runnable.
-    ///
-    /// Returns a `RunnableSequence` that pipes this runnable's output through
-    /// a `RunnablePick` to select specific keys from a dict output.
-    ///
-    /// Mirrors Python's `Runnable.pick()`.
     fn pick(
         self,
         keys: super::passthrough::PickKeys,
@@ -994,12 +843,6 @@ pub trait Runnable: Send + Sync + Debug {
         pipe(self, super::passthrough::RunnablePick::from(keys))
     }
 
-    /// Assign key-value pairs to dict outputs from this runnable.
-    ///
-    /// Returns a `RunnableSequence` that pipes this runnable's output through
-    /// a `RunnableAssign` to merge additional computed fields into the output.
-    ///
-    /// Mirrors Python's `Runnable.assign()`.
     fn assign(
         self,
         mapper: super::passthrough::RunnableAssign,
@@ -1010,12 +853,6 @@ pub trait Runnable: Send + Sync + Debug {
         pipe(self, mapper)
     }
 
-    /// Add fallback runnables that are invoked if this runnable fails.
-    ///
-    /// Returns a `RunnableWithFallbacks` that tries this runnable first,
-    /// then falls back to the provided alternatives on failure.
-    ///
-    /// Mirrors Python's `Runnable.with_fallbacks()`.
     fn with_fallbacks(
         self,
         fallbacks: Vec<DynRunnable<Self::Input, Self::Output>>,
@@ -1026,13 +863,6 @@ pub trait Runnable: Send + Sync + Debug {
         super::fallbacks::RunnableWithFallbacks::new(self, fallbacks)
     }
 
-    /// Bind lifecycle listeners to this runnable.
-    ///
-    /// Creates a `RunnableBinding` with a config factory that adds a
-    /// `RootListenersTracer` as a callback. The tracer invokes the provided
-    /// listener functions on the root run's start, end, and error events.
-    ///
-    /// Mirrors Python's `Runnable.with_listeners()`.
     fn with_listeners(
         self,
         on_start: Option<crate::tracers::root_listeners::Listener>,
@@ -1125,13 +955,6 @@ pub trait Runnable: Send + Sync + Debug {
         RunnableBinding::with_config_factories(self, HashMap::new(), None, vec![factory])
     }
 
-    /// Bind async lifecycle listeners to this runnable.
-    ///
-    /// Creates a `RunnableBinding` with a config factory that adds an
-    /// `AsyncRootListenersTracer` as a callback. The tracer invokes the provided
-    /// async listener functions on the root run's start, end, and error events.
-    ///
-    /// Mirrors Python's `Runnable.with_alisteners()`.
     fn with_alisteners(
         self,
         on_start: Option<crate::tracers::root_listeners::AsyncListener>,
@@ -1251,24 +1074,14 @@ pub trait Runnable: Send + Sync + Debug {
         RunnableBinding::with_config_factories(self, HashMap::new(), None, vec![factory])
     }
 
-    /// List configurable fields for this Runnable.
-    ///
-    /// Mirrors Python's `Runnable.config_specs` property.
     fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
         Ok(vec![])
     }
 
-    /// Return a list of prompts used by this Runnable.
-    ///
-    /// Mirrors Python's `Runnable.get_prompts()`.
     fn get_prompts(&self) -> Vec<Arc<dyn crate::BasePromptTemplate>> {
         vec![]
     }
 
-    /// Convert this Runnable into a BaseTool.
-    ///
-    /// Mirrors Python's `Runnable.as_tool()`. Only available when
-    /// Input and Output types are compatible with tool interfaces.
     fn as_tool(self: Arc<Self>, name: &str, description: &str) -> crate::tools::StructuredTool
     where
         Self: Sized + Runnable<Input = HashMap<String, Value>, Output = Value> + 'static,
@@ -1277,18 +1090,10 @@ pub trait Runnable: Send + Sync + Debug {
     }
 }
 
-/// Convert a string to title case.
-/// Trait for objects that can provide a graph representation.
-///
-/// Used by `RunnableLambda` to store dependencies that contribute to its graph.
-/// In Python, dependencies are detected via closure inspection;
-/// in Rust, they must be set explicitly.
 pub trait GraphProvider: Send + Sync + Debug {
-    /// Return a graph representation of this object.
     fn provide_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph>;
 }
 
-/// Wrapper that adapts any Runnable into a GraphProvider.
 pub struct RunnableGraphProvider<R: Runnable>(pub R);
 
 impl<R: Runnable> Debug for RunnableGraphProvider<R> {
@@ -1305,11 +1110,6 @@ impl<R: Runnable> GraphProvider for RunnableGraphProvider<R> {
     }
 }
 
-/// Extract a short type name from a fully qualified Rust type path.
-///
-/// Mirrors Python's behavior where `self.__class__.__name__` returns just
-/// the class name (e.g. "RunnableLambda") rather than the full module path.
-/// Strips module paths and generic parameters.
 fn short_type_name(full_name: &str) -> String {
     let base = full_name.split('<').next().unwrap_or(full_name);
     base.rsplit("::").next().unwrap_or(base).to_string()
@@ -1323,9 +1123,7 @@ fn to_title_case(s: &str) -> String {
     }
 }
 
-/// A Runnable that can be serialized to JSON.
 pub trait RunnableSerializable: Runnable + Serializable {
-    /// Serialize this Runnable to JSON.
     fn to_json_runnable(&self) -> Serialized
     where
         Self: Sized + Serialize,
@@ -1334,11 +1132,6 @@ pub trait RunnableSerializable: Runnable + Serializable {
     }
 }
 
-/// A Runnable that wraps a function.
-///
-/// `RunnableLambda` converts a callable into a `Runnable`.
-/// Wrapping a callable in a `RunnableLambda` makes the callable usable
-/// within either a sync or async context.
 pub struct RunnableLambda<F, I, O>
 where
     F: Fn(I) -> Result<O> + Send + Sync,
@@ -1370,7 +1163,6 @@ where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    /// Create a new RunnableLambda from a function.
     pub fn new(func: F) -> Self {
         Self {
             func,
@@ -1380,22 +1172,16 @@ where
         }
     }
 
-    /// Create a new RunnableLambda with a name.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
     }
 
-    /// Add a dependency runnable that contributes to this lambda's graph.
-    ///
-    /// In Python, dependencies are detected automatically by inspecting
-    /// closure variables. In Rust, they must be set explicitly.
     pub fn with_dep(mut self, dep: Arc<dyn GraphProvider>) -> Self {
         self.deps.push(dep);
         self
     }
 
-    /// Add multiple dependency runnables.
     pub fn with_deps(mut self, deps: Vec<Arc<dyn GraphProvider>>) -> Self {
         self.deps.extend(deps);
         self
@@ -1531,7 +1317,6 @@ where
     }
 }
 
-/// Create a RunnableLambda from a function.
 pub fn runnable_lambda<F, I, O>(func: F) -> RunnableLambda<F, I, O>
 where
     F: Fn(I) -> Result<O> + Send + Sync,
@@ -1541,16 +1326,6 @@ where
     RunnableLambda::new(func)
 }
 
-/// A config-aware version of `RunnableLambda` that supports functions which
-/// receive `RunnableConfig`, as well as async functions.
-///
-/// Mirrors Python's `RunnableLambda` support for functions with optional
-/// `config` parameter. Uses `VariableArgsFn` / `AsyncVariableArgsFn` enums
-/// to dispatch to the correct function signature at runtime.
-///
-/// # Examples
-///
-///
 pub struct RunnableLambdaWithConfig<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
@@ -1580,7 +1355,6 @@ where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    /// Create from a sync function that only takes input.
     pub fn new(func: impl Fn(I) -> Result<O> + Send + Sync + 'static) -> Self {
         Self {
             func: Some(VariableArgsFn::InputOnly(Box::new(func))),
@@ -1589,7 +1363,6 @@ where
         }
     }
 
-    /// Create from a sync function that takes input and config.
     pub fn new_with_config(
         func: impl Fn(I, &RunnableConfig) -> Result<O> + Send + Sync + 'static,
     ) -> Self {
@@ -1600,7 +1373,6 @@ where
         }
     }
 
-    /// Create from an async function that only takes input.
     pub fn new_async<F, Fut>(afunc: F) -> Self
     where
         F: Fn(I) -> Fut + Send + Sync + 'static,
@@ -1615,7 +1387,6 @@ where
         }
     }
 
-    /// Create from an async function that takes input and config.
     pub fn new_async_with_config<F, Fut>(afunc: F) -> Self
     where
         F: Fn(I, RunnableConfig) -> Fut + Send + Sync + 'static,
@@ -1630,13 +1401,11 @@ where
         }
     }
 
-    /// Set a name for this runnable.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
     }
 
-    /// Add an async function to this runnable (for use with ainvoke).
     pub fn with_afunc<F, Fut>(mut self, afunc: F) -> Self
     where
         F: Fn(I) -> Fut + Send + Sync + 'static,
@@ -1648,7 +1417,6 @@ where
         self
     }
 
-    /// Add a config-aware async function to this runnable.
     pub fn with_afunc_config<F, Fut>(mut self, afunc: F) -> Self
     where
         F: Fn(I, RunnableConfig) -> Fut + Send + Sync + 'static,
@@ -1800,10 +1568,6 @@ where
     }
 }
 
-/// A sequence of Runnables that are executed one after another.
-///
-/// The output of one Runnable is the input to the next.
-/// This is the most common composition pattern in LangChain.
 pub struct RunnableSequence<R1, R2>
 where
     R1: Runnable,
@@ -1833,7 +1597,6 @@ where
     R1: Runnable,
     R2: Runnable<Input = R1::Output>,
 {
-    /// Create a new RunnableSequence.
     pub fn new(first: R1, last: R2) -> Self {
         Self {
             first,
@@ -1842,7 +1605,6 @@ where
         }
     }
 
-    /// Create a new RunnableSequence with a name.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
@@ -2069,7 +1831,6 @@ where
     }
 }
 
-/// Create a RunnableSequence by piping two Runnables together.
 pub fn pipe<R1, R2>(first: R1, second: R2) -> RunnableSequence<R1, R2>
 where
     R1: Runnable,
@@ -2078,9 +1839,6 @@ where
     RunnableSequence::new(first, second)
 }
 
-/// A Runnable that runs multiple Runnables in parallel.
-///
-/// Returns a HashMap with the results keyed by the step names.
 pub struct RunnableParallel<I>
 where
     I: Send + Sync + Clone + Debug + 'static,
@@ -2101,14 +1859,12 @@ where
     }
 }
 
-/// Type alias mirroring Python's `RunnableMap = RunnableParallel`.
 pub type RunnableMap<I> = RunnableParallel<I>;
 
 impl<I> RunnableParallel<I>
 where
     I: Send + Sync + Clone + Debug + 'static,
 {
-    /// Create a new empty RunnableParallel.
     pub fn new() -> Self {
         Self {
             steps: HashMap::new(),
@@ -2116,7 +1872,6 @@ where
         }
     }
 
-    /// Add a step to the RunnableParallel.
     pub fn add<R>(mut self, key: impl Into<String>, runnable: R) -> Self
     where
         R: Runnable<Input = I, Output = Value> + Send + Sync + 'static,
@@ -2125,7 +1880,6 @@ where
         self
     }
 
-    /// Set the name of this RunnableParallel.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
@@ -2442,7 +2196,6 @@ where
     }
 }
 
-/// A Runnable that binds arguments or config to another Runnable.
 pub struct RunnableBinding<R>
 where
     R: Runnable,
@@ -2471,7 +2224,6 @@ impl<R> RunnableBinding<R>
 where
     R: Runnable,
 {
-    /// Create a new RunnableBinding.
     pub fn new(bound: R, kwargs: HashMap<String, Value>, config: Option<RunnableConfig>) -> Self {
         Self {
             bound,
@@ -2481,10 +2233,6 @@ where
         }
     }
 
-    /// Create a new RunnableBinding with config factories.
-    ///
-    /// Config factories are lazily evaluated functions that produce config
-    /// overrides. They are applied after merging the bound and provided configs.
     pub fn with_config_factories(
         bound: R,
         kwargs: HashMap<String, Value>,
@@ -2499,10 +2247,6 @@ where
         }
     }
 
-    /// Merge configs for the binding.
-    ///
-    /// Mirrors Python's `RunnableBinding._merge_configs`: merges the bound config
-    /// with the provided config, then applies each config factory to the result.
     fn merge_configs(&self, config: Option<RunnableConfig>) -> RunnableConfig {
         let merged = merge_configs(vec![self.config.clone(), config]);
         if self.config_factories.is_empty() {
@@ -2578,7 +2322,6 @@ where
     }
 }
 
-/// A Runnable that maps over a list of inputs.
 pub struct RunnableEach<R>
 where
     R: Runnable,
@@ -2601,7 +2344,6 @@ impl<R> RunnableEach<R>
 where
     R: Runnable,
 {
-    /// Create a new RunnableEach.
     pub fn new(bound: R) -> Self {
         Self { bound }
     }
@@ -2681,33 +2423,9 @@ where
     }
 }
 
-/// Type alias for a transform function that takes an input stream and produces
-/// an output stream.
 pub type TransformFn<I, O> =
     Arc<dyn Fn(BoxStream<'_, I>) -> BoxStream<'_, Result<O>> + Send + Sync>;
 
-/// A Runnable that wraps a transform function (input stream -> output stream).
-///
-/// This is the primary mechanism for custom streaming transforms in chains.
-/// The wrapped function receives a stream of inputs and produces a stream of
-/// outputs, enabling chunk-by-chunk processing without buffering.
-///
-/// Mirrors Python's `RunnableGenerator`.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// use agent_chain_core::runnables::base::RunnableGenerator;
-///
-/// let generator = RunnableGenerator::<String, String>::new(|input_stream| {
-///     Box::pin(async_stream::stream! {
-///         let mut stream = input_stream;
-///         while let Some(chunk) = stream.next().await {
-///             yield Ok(format!("processed: {}", chunk));
-///         }
-///     })
-/// });
-/// ```
 pub struct RunnableGenerator<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
@@ -2734,10 +2452,6 @@ where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + Addable + 'static,
 {
-    /// Create a new RunnableGenerator from a transform function.
-    ///
-    /// The transform function takes a `BoxStream<I>` and returns a
-    /// `BoxStream<Result<O>>`.
     pub fn new<F>(transform_fn: F) -> Self
     where
         F: Fn(BoxStream<'_, I>) -> BoxStream<'_, Result<O>> + Send + Sync + 'static,
@@ -2748,7 +2462,6 @@ where
         }
     }
 
-    /// Set the name of this RunnableGenerator.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
@@ -2850,10 +2563,8 @@ where
     }
 }
 
-/// A type-erased Runnable that can be stored in collections.
 pub type DynRunnable<I, O> = Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>;
 
-/// Convert any Runnable into a DynRunnable.
 pub fn to_dyn<R>(runnable: R) -> DynRunnable<R::Input, R::Output>
 where
     R: Runnable + Send + Sync + 'static,
@@ -2861,7 +2572,6 @@ where
     Arc::new(runnable)
 }
 
-/// Coerce a function into a Runnable.
 pub fn coerce_to_runnable<F, I, O>(func: F) -> RunnableLambda<F, I, O>
 where
     F: Fn(I) -> Result<O> + Send + Sync,
@@ -2871,9 +2581,6 @@ where
     RunnableLambda::new(func)
 }
 
-/// Coerce a HashMap of Runnables into a RunnableParallel.
-///
-/// Mirrors the dict-to-RunnableParallel coercion in Python's `coerce_to_runnable()`.
 pub fn coerce_map_to_runnable<I>(
     map: HashMap<String, Arc<dyn Runnable<Input = I, Output = Value> + Send + Sync>>,
 ) -> RunnableParallel<I>
@@ -2883,22 +2590,6 @@ where
     RunnableParallel::from(map)
 }
 
-/// Decorate a function to make it a Runnable.
-///
-/// Sets the name of the Runnable to the given name.
-/// Any runnables called by the function will be traced as dependencies.
-///
-/// Mirrors Python's `@chain` decorator from `langchain_core.runnables.base`.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// use agent_chain_core::runnables::base::chain;
-///
-/// let my_chain = chain("my_func", |input: String| {
-///     Ok(format!("Hello, {input}!"))
-/// });
-/// ```
 pub fn chain<F, I, O>(name: &str, func: F) -> RunnableLambda<F, I, O>
 where
     F: Fn(I) -> Result<O> + Send + Sync,

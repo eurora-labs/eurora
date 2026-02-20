@@ -1,8 +1,3 @@
-//! Runnable objects that can be dynamically configured.
-//!
-//! This module provides the core configurable runnable types,
-//! mirroring `langchain_core.runnables.configurable`.
-
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -21,39 +16,13 @@ use super::utils::{
     get_unique_config_specs,
 };
 
-/// Trait for runnables that can produce a reconfigured copy of themselves.
-///
-/// This mirrors Python's pattern where `RunnableSerializable` subclasses can be
-/// re-instantiated with modified field values via `__class__(**{**init_params, **configurable})`.
-///
-/// In Rust, types that want to support `configurable_fields` should implement this
-/// trait to allow `RunnableConfigurableFields` to create modified instances at runtime.
 pub trait Reconfigurable: Runnable {
-    /// Create a new instance of this runnable with the given field overrides.
-    ///
-    /// The `fields` map contains field names to JSON values that should override
-    /// the corresponding fields in the new instance.
-    ///
-    /// Returns `None` if the reconfiguration is not possible (e.g., unknown fields).
     fn reconfigure(
         &self,
         fields: &HashMap<String, Value>,
     ) -> Option<Arc<dyn Runnable<Input = Self::Input, Output = Self::Output> + Send + Sync>>;
 }
 
-/// Prefix the id of a `ConfigurableFieldSpec`.
-///
-/// This is useful when a `RunnableConfigurableAlternatives` is used as a
-/// `ConfigurableField` of another `RunnableConfigurableAlternatives`.
-///
-/// # Arguments
-///
-/// * `spec` - The `ConfigurableFieldSpec` to prefix.
-/// * `prefix` - The prefix to add.
-///
-/// # Returns
-///
-/// The prefixed `ConfigurableFieldSpec`.
 pub fn prefix_config_spec(spec: &ConfigurableFieldSpec, prefix: &str) -> ConfigurableFieldSpec {
     if spec.is_shared {
         spec.clone()
@@ -70,17 +39,6 @@ pub fn prefix_config_spec(spec: &ConfigurableFieldSpec, prefix: &str) -> Configu
     }
 }
 
-/// Make a `ConfigurableFieldSpec` for a `ConfigurableFieldSingleOption` or
-/// `ConfigurableFieldMultiOption`.
-///
-/// # Arguments
-///
-/// * `spec` - The `ConfigurableFieldSingleOption` or `ConfigurableFieldMultiOption`.
-/// * `description` - The description to use if the spec does not have one.
-///
-/// # Returns
-///
-/// The `ConfigurableFieldSpec`.
 pub fn make_options_spec_single(
     spec: &ConfigurableFieldSingleOption,
     description: Option<&str>,
@@ -100,7 +58,6 @@ pub fn make_options_spec_single(
     }
 }
 
-/// Make a `ConfigurableFieldSpec` for a `ConfigurableFieldMultiOption`.
 pub fn make_options_spec_multi(
     spec: &ConfigurableFieldMultiOption,
     description: Option<&str>,
@@ -125,7 +82,6 @@ pub fn make_options_spec_multi(
     }
 }
 
-/// Remove a prefix from a string if it starts with that prefix.
 fn str_remove_prefix(s: &str, prefix: &str) -> String {
     if let Some(stripped) = s.strip_prefix(prefix) {
         stripped.to_string()
@@ -134,17 +90,9 @@ fn str_remove_prefix(s: &str, prefix: &str) -> String {
     }
 }
 
-/// Trait for runnables that can be dynamically configured.
-///
-/// A `DynamicRunnable` should be created using the `configurable_fields` or
-/// `configurable_alternatives` methods of a `Runnable`.
 pub trait DynamicRunnable: Runnable {
-    /// Get the configuration specifications for this runnable.
     fn config_specs(&self) -> Vec<ConfigurableFieldSpec>;
 
-    /// Prepare the runnable for invocation with the given configuration.
-    ///
-    /// Returns the prepared runnable and the configuration to use.
     fn prepare(
         &self,
         config: Option<RunnableConfig>,
@@ -154,22 +102,14 @@ pub trait DynamicRunnable: Runnable {
     );
 }
 
-/// A serializable runnable that can be dynamically configured.
-///
-/// This struct wraps a default runnable and allows its fields to be configured
-/// at runtime through the `configurable` section of `RunnableConfig`.
 pub struct RunnableConfigurableFields<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    /// The default runnable to use.
     pub default: Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>,
-    /// The configurable fields.
     pub fields: HashMap<String, AnyConfigurableField>,
-    /// Optional configuration to merge with invocation config.
     pub config: Option<RunnableConfig>,
-    /// Optional reconfigure function for creating modified instances.
     #[allow(clippy::type_complexity)]
     reconfigure_fn: Option<
         Arc<
@@ -222,7 +162,6 @@ where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    /// Create a new `RunnableConfigurableFields`.
     pub fn new(
         default: Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>,
         fields: HashMap<String, AnyConfigurableField>,
@@ -235,7 +174,6 @@ where
         }
     }
 
-    /// Create a new `RunnableConfigurableFields` with a reconfigure function.
     #[allow(clippy::type_complexity)]
     pub fn with_reconfigure_fn(
         default: Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>,
@@ -258,16 +196,11 @@ where
         }
     }
 
-    /// Set the configuration for this runnable.
     pub fn with_config(mut self, config: RunnableConfig) -> Self {
         self.config = Some(config);
         self
     }
 
-    /// Prepare the runnable for invocation.
-    ///
-    /// This method resolves the configuration and returns the runnable to use
-    /// along with the resolved configuration.
     fn prepare_internal(
         &self,
         config: Option<RunnableConfig>,
@@ -526,39 +459,26 @@ where
     }
 }
 
-/// A runnable that can be dynamically configured to choose between alternatives.
-///
-/// This struct allows selecting between different runnable implementations
-/// at runtime based on the `configurable` section of `RunnableConfig`.
 #[derive(Debug)]
 pub struct RunnableConfigurableAlternatives<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    /// The field that determines which alternative to use.
     pub which: ConfigurableField,
-    /// The default runnable to use.
     pub default: Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>,
-    /// The alternative runnables.
     pub alternatives: HashMap<String, Alternative<I, O>>,
-    /// The key for the default option.
     pub default_key: String,
-    /// Whether to prefix configurable fields of each alternative.
     pub prefix_keys: bool,
-    /// Optional configuration to merge with invocation config.
     pub config: Option<RunnableConfig>,
 }
 
-/// An alternative runnable - either a concrete runnable or a factory function.
 pub enum Alternative<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    /// A concrete runnable.
     Runnable(Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>),
-    /// A factory function that creates a runnable.
     Factory(Arc<dyn Fn() -> Arc<dyn Runnable<Input = I, Output = O> + Send + Sync> + Send + Sync>),
 }
 
@@ -610,7 +530,6 @@ where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    /// Create a new `RunnableConfigurableAlternatives`.
     pub fn new(
         which: ConfigurableField,
         default: Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>,
@@ -628,13 +547,11 @@ where
         }
     }
 
-    /// Set the configuration for this runnable.
     pub fn with_config(mut self, config: RunnableConfig) -> Self {
         self.config = Some(config);
         self
     }
 
-    /// Prepare the runnable for invocation.
     fn prepare_internal(
         &self,
         config: Option<RunnableConfig>,
@@ -902,27 +819,7 @@ where
     }
 }
 
-/// Extension trait for adding configurable methods to runnables.
 pub trait ConfigurableRunnable: Runnable + Sized {
-    /// Create a configurable version of this runnable that allows configuring specific fields.
-    ///
-    /// # Arguments
-    ///
-    /// * `fields` - A map of field names to configurable field specifications.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// use agent_chain_core::runnables::{ConfigurableField, ConfigurableRunnable};
-    ///
-    /// let configurable = my_runnable.configurable_fields([
-    ///     ("temperature".to_string(), AnyConfigurableField::Field(
-    ///         ConfigurableField::new("temperature")
-    ///             .with_name("LLM Temperature")
-    ///             .with_description("The temperature of the LLM")
-    ///     )),
-    /// ].into());
-    /// ```
     fn configurable_fields(
         self,
         fields: HashMap<String, AnyConfigurableField>,
@@ -933,8 +830,6 @@ pub trait ConfigurableRunnable: Runnable + Sized {
         RunnableConfigurableFields::new(Arc::new(self), fields)
     }
 
-    /// Create a configurable version of this runnable that allows configuring specific fields,
-    /// with support for runtime reconfiguration via the `Reconfigurable` trait.
     fn configurable_fields_reconfigurable(
         self,
         fields: HashMap<String, AnyConfigurableField>,
@@ -958,27 +853,6 @@ pub trait ConfigurableRunnable: Runnable + Sized {
         RunnableConfigurableFields::with_reconfigure_fn(Arc::new(self), fields, reconfigure_fn)
     }
 
-    /// Create a configurable version of this runnable that allows selecting between alternatives.
-    ///
-    /// # Arguments
-    ///
-    /// * `which` - The configurable field that determines which alternative to use.
-    /// * `alternatives` - A map of alternative keys to runnables.
-    /// * `default_key` - The key for the default option (this runnable).
-    /// * `prefix_keys` - Whether to prefix configurable fields of each alternative.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// use agent_chain_core::runnables::{ConfigurableField, ConfigurableRunnable, Alternative};
-    ///
-    /// let configurable = default_runnable.configurable_alternatives(
-    ///     ConfigurableField::new("model"),
-    ///     [("gpt4".to_string(), Alternative::Runnable(Arc::new(gpt4_runnable)))].into(),
-    ///     "default",
-    ///     false,
-    /// );
-    /// ```
     fn configurable_alternatives(
         self,
         which: ConfigurableField,

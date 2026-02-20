@@ -1,10 +1,3 @@
-//! Snapshot tests for UsageMetadataCallbackHandler and get_usage_metadata_callback.
-//!
-//! These tests capture the behavior of the usage tracking callback handler
-//! including thread safety, accumulation, edge cases, and the guard.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/callbacks/test_usage_snapshot.py`
-
 use std::collections::HashMap;
 
 use agent_chain_core::callbacks::base::{BaseCallbackHandler, LLMManagerMixin};
@@ -15,7 +8,6 @@ use agent_chain_core::messages::{AIMessage, InputTokenDetails, OutputTokenDetail
 use agent_chain_core::outputs::{ChatGeneration, ChatResult};
 use uuid::Uuid;
 
-/// Create a ChatResult with an AIMessage carrying usage metadata and model_name.
 fn make_chat_result(content: &str, usage: &UsageMetadata, model_name: &str) -> ChatResult {
     let mut response_metadata = HashMap::new();
     response_metadata.insert("model_name".to_string(), serde_json::json!(model_name));
@@ -32,17 +24,12 @@ fn make_chat_result(content: &str, usage: &UsageMetadata, model_name: &str) -> C
     }
 }
 
-/// Ported from `test_empty_usage_metadata_on_init`.
 #[test]
 fn test_empty_usage_metadata_on_init() {
     let handler = UsageMetadataCallbackHandler::new();
     assert!(handler.usage_metadata().is_empty());
 }
 
-/// Ported from `test_has_lock`.
-///
-/// The Rust handler uses Arc<Mutex<>> for thread safety. Verify this by
-/// confirming that clone shares state (proving shared interior mutability).
 #[test]
 fn test_handler_is_thread_safe() {
     let handler1 = UsageMetadataCallbackHandler::new();
@@ -55,7 +42,6 @@ fn test_handler_is_thread_safe() {
     assert_eq!(handler1.usage_metadata(), handler2.usage_metadata());
 }
 
-/// Ported from `test_repr_empty`.
 #[test]
 fn test_display_empty() {
     let handler = UsageMetadataCallbackHandler::new();
@@ -63,7 +49,6 @@ fn test_display_empty() {
     assert_eq!(repr, "{}");
 }
 
-/// Ported from `test_collects_single_response`.
 #[test]
 fn test_collects_single_response() {
     let usage = UsageMetadata::new(10, 5);
@@ -76,7 +61,6 @@ fn test_collects_single_response() {
     assert_eq!(metadata.get("model-a").unwrap(), &usage);
 }
 
-/// Ported from `test_accumulates_multiple_responses_same_model`.
 #[test]
 fn test_accumulates_multiple_responses_same_model() {
     let u1 = UsageMetadata::new(10, 5);
@@ -89,7 +73,6 @@ fn test_accumulates_multiple_responses_same_model() {
     assert_eq!(handler.usage_metadata().get("model-a").unwrap(), &expected);
 }
 
-/// Ported from `test_tracks_multiple_models`.
 #[test]
 fn test_tracks_multiple_models() {
     let u1 = UsageMetadata::new(10, 5);
@@ -104,7 +87,6 @@ fn test_tracks_multiple_models() {
     assert_eq!(metadata.get("model-b").unwrap(), &u2);
 }
 
-/// Ported from `test_with_token_details`.
 #[test]
 fn test_with_token_details() {
     let usage = UsageMetadata {
@@ -115,10 +97,12 @@ fn test_with_token_details() {
             audio: Some(3),
             cache_creation: None,
             cache_read: Some(2),
+            ..Default::default()
         }),
         output_token_details: Some(OutputTokenDetails {
             audio: None,
             reasoning: Some(4),
+            ..Default::default()
         }),
     };
     let handler = UsageMetadataCallbackHandler::new();
@@ -133,7 +117,6 @@ fn test_with_token_details() {
     assert_eq!(output_details.reasoning, Some(4));
 }
 
-/// Ported from `test_empty_generations_ignored`.
 #[test]
 fn test_empty_generations_ignored() {
     let result = ChatResult {
@@ -145,9 +128,6 @@ fn test_empty_generations_ignored() {
     assert!(handler.usage_metadata().is_empty());
 }
 
-/// Ported from `test_no_generations_at_all`.
-///
-/// Same as empty_generations in Rust since ChatResult has a flat Vec.
 #[test]
 fn test_no_generations_at_all() {
     let result = ChatResult {
@@ -159,11 +139,6 @@ fn test_no_generations_at_all() {
     assert!(handler.usage_metadata().is_empty());
 }
 
-/// Ported from `test_non_chat_generation_ignored`.
-///
-/// In Python, LLMResult can hold non-ChatGeneration objects. In Rust,
-/// ChatResult only holds ChatGeneration (which always has a BaseMessage).
-/// This test verifies that a non-AI message type is ignored.
 #[test]
 fn test_non_ai_message_ignored() {
     use agent_chain_core::messages::HumanMessage;
@@ -181,7 +156,6 @@ fn test_non_ai_message_ignored() {
     assert!(handler.usage_metadata().is_empty());
 }
 
-/// Ported from `test_missing_model_name_ignored`.
 #[test]
 fn test_missing_model_name_ignored() {
     let ai_msg = AIMessage::builder()
@@ -199,7 +173,6 @@ fn test_missing_model_name_ignored() {
     assert!(handler.usage_metadata().is_empty());
 }
 
-/// Ported from `test_missing_usage_metadata_ignored`.
 #[test]
 fn test_missing_usage_metadata_ignored() {
     let mut response_metadata = HashMap::new();
@@ -220,7 +193,6 @@ fn test_missing_usage_metadata_ignored() {
     assert!(handler.usage_metadata().is_empty());
 }
 
-/// Ported from `test_repr_with_data`.
 #[test]
 fn test_display_with_data() {
     let usage = UsageMetadata::new(1, 2);
@@ -234,7 +206,6 @@ fn test_display_with_data() {
     );
 }
 
-/// Ported from `test_concurrent_on_llm_end_calls`.
 #[test]
 fn test_concurrent_on_llm_end_calls() {
     let handler = UsageMetadataCallbackHandler::new();
@@ -267,26 +238,18 @@ fn test_concurrent_on_llm_end_calls() {
     assert_eq!(model_usage.total_tokens, expected_count * 2);
 }
 
-/// Ported from `test_yields_handler`.
 #[test]
 fn test_guard_yields_handler() {
     let guard = get_usage_metadata_callback();
     assert_eq!(guard.handler().name(), "UsageMetadataCallbackHandler");
 }
 
-/// Ported from `test_handler_starts_empty`.
 #[test]
 fn test_guard_handler_starts_empty() {
     let guard = get_usage_metadata_callback();
     assert!(guard.usage_metadata().is_empty());
 }
 
-/// Ported from `test_custom_name`.
-///
-/// In Python, the `name` parameter is for the context variable name,
-/// not the handler itself. Rust doesn't have context variables, so
-/// this test just verifies get_usage_metadata_callback returns a
-/// valid handler regardless (the function has no name parameter).
 #[test]
 fn test_guard_returns_valid_handler() {
     let guard = get_usage_metadata_callback();
@@ -294,7 +257,6 @@ fn test_guard_returns_valid_handler() {
     assert_eq!(arc.name(), "UsageMetadataCallbackHandler");
 }
 
-/// Ported from `test_multiple_context_managers_independent`.
 #[test]
 fn test_multiple_guards_independent() {
     let guard1 = get_usage_metadata_callback();

@@ -1,7 +1,3 @@
-//! Tests for utility functions.
-//!
-//! Converted from `langchain/libs/core/tests/unit_tests/utils/test_utils.py`
-
 use std::collections::HashMap;
 use std::env;
 
@@ -11,7 +7,6 @@ use agent_chain_core::outputs::GenerationChunk;
 use agent_chain_core::utils::base::{EnvError, from_env, secret_from_env};
 use agent_chain_core::utils::merge::{MergeError, merge_dicts};
 
-/// Test case parameters for merge_dicts tests
 struct MergeDictsTestCase {
     left: serde_json::Value,
     right: serde_json::Value,

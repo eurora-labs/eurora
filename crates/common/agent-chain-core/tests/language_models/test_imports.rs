@@ -1,7 +1,3 @@
-//! Tests for language_models module imports.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/language_models/test_imports.py`
-
 #[test]
 fn test_all_imports() {
     const EXPECTED_ALL: &[&str] = &[

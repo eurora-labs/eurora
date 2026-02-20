@@ -1,15 +1,3 @@
-//! Snapshot tests for OpenAI tools output parsers.
-//!
-//! Ported from langchain/libs/core/tests/unit_tests/output_parsers/test_openai_tools_parser.py
-//!
-//! This file contains tests that mirror the Python test classes:
-//! - TestParseToolCall
-//! - TestMakeInvalidToolCall
-//! - TestParseToolCalls
-//! - TestJsonOutputToolsParser
-//! - TestJsonOutputKeyToolsParser
-//! - TestPydanticToolsParser
-
 use std::collections::HashMap;
 
 use agent_chain_core::messages::{AIMessage, ToolCall};

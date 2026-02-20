@@ -1,52 +1,15 @@
-//! Internal tracers used for stream_log and astream events implementations.
-//!
-//! This module provides the streaming callback handler trait used for
-//! astream_events and astream_log implementations.
-//! Mirrors `langchain_core.tracers._streaming`.
-
 use std::pin::Pin;
 use uuid::Uuid;
 
 use futures::Stream;
 
-/// A trait for streaming callback handlers.
-///
-/// This is a common mixin that the callback handlers for both astream events
-/// and astream log inherit from.
-///
-/// The `tap_output_aiter` method is invoked in some contexts to produce
-/// callbacks for intermediate results.
 pub trait StreamingCallbackHandler<T>: Send + Sync {
-    /// Used for internal astream_log and astream events implementations.
-    ///
-    /// Tap the output async iterator to stream its values.
-    ///
-    /// # Arguments
-    ///
-    /// * `run_id` - The ID of the run.
-    /// * `output` - The output async iterator to tap.
-    ///
-    /// # Returns
-    ///
-    /// An async iterator that yields the same values as the input.
     fn tap_output_aiter(
         &self,
         run_id: Uuid,
         output: Pin<Box<dyn Stream<Item = T> + Send>>,
     ) -> Pin<Box<dyn Stream<Item = T> + Send>>;
 
-    /// Used for internal astream_log and astream events implementations.
-    ///
-    /// Tap the output iterator to stream its values.
-    ///
-    /// # Arguments
-    ///
-    /// * `run_id` - The ID of the run.
-    /// * `output` - The output iterator to tap.
-    ///
-    /// # Returns
-    ///
-    /// An iterator that yields the same values as the input.
     fn tap_output_iter(
         &self,
         run_id: Uuid,
@@ -54,7 +17,6 @@ pub trait StreamingCallbackHandler<T>: Send + Sync {
     ) -> Box<dyn Iterator<Item = T> + Send>;
 }
 
-/// Default implementation that passes through without modification.
 pub struct PassthroughStreamingHandler;
 
 impl<T: Send + 'static> StreamingCallbackHandler<T> for PassthroughStreamingHandler {

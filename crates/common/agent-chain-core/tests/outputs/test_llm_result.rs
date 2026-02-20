@@ -1,7 +1,3 @@
-//! Unit tests for LLMResult class.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/outputs/test_llm_result.py`
-
 use agent_chain_core::messages::AIMessage;
 use agent_chain_core::outputs::{
     ChatGeneration, ChatGenerationChunk, Generation, GenerationChunk, GenerationType, LLMResult,
@@ -11,11 +7,9 @@ use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-/// Test suite for LLMResult class.
 mod llm_result_tests {
     use super::*;
 
-    /// Test creating LLMResult with single prompt and single generation.
     #[test]
     fn test_creation_with_single_prompt_single_generation() {
         let generation = Generation::new("Response");
@@ -27,7 +21,6 @@ mod llm_result_tests {
         assert_eq!(result.result_type, "LLMResult");
     }
 
-    /// Test creating LLMResult with multiple prompts.
     #[test]
     fn test_creation_with_multiple_prompts() {
         let gen1 = Generation::new("Response 1");
@@ -50,7 +43,6 @@ mod llm_result_tests {
         }
     }
 
-    /// Test creating LLMResult with multiple candidate generations per prompt.
     #[test]
     fn test_creation_with_multiple_candidates() {
         let gen1 = Generation::new("Candidate 1");
@@ -70,7 +62,6 @@ mod llm_result_tests {
         }
     }
 
-    /// Test creating LLMResult with ChatGeneration objects.
     #[test]
     fn test_creation_with_chat_generations() {
         let gen1 = ChatGeneration::new(
@@ -92,7 +83,6 @@ mod llm_result_tests {
         }
     }
 
-    /// Test creating LLMResult with GenerationChunk objects.
     #[test]
     fn test_creation_with_generation_chunks() {
         let chunk1 = GenerationChunk::new("Chunk 1");
@@ -108,7 +98,6 @@ mod llm_result_tests {
         }
     }
 
-    /// Test creating LLMResult with llm_output.
     #[test]
     fn test_creation_with_llm_output() {
         let generation = Generation::new("Response");
@@ -132,7 +121,6 @@ mod llm_result_tests {
         );
     }
 
-    /// Test creating LLMResult with run info.
     #[test]
     fn test_creation_with_run_info() {
         let generation = Generation::new("Response");
@@ -145,7 +133,6 @@ mod llm_result_tests {
         assert_eq!(result.run.as_ref().unwrap()[0].run_id, run_id);
     }
 
-    /// Test creating LLMResult with multiple run infos.
     #[test]
     fn test_creation_with_multiple_run_infos() {
         let gen1 = Generation::new("Response 1");
@@ -162,7 +149,6 @@ mod llm_result_tests {
         assert_eq!(result.run.as_ref().unwrap()[1].run_id, run_id2);
     }
 
-    /// Test flattening LLMResult with single prompt and generation.
     #[test]
     fn test_flatten_single_prompt_single_generation() {
         let generation = Generation::new("Response");
@@ -172,7 +158,6 @@ mod llm_result_tests {
         assert_eq!(flattened[0].generations.len(), 1);
     }
 
-    /// Test flattening LLMResult with multiple prompts.
     #[test]
     fn test_flatten_multiple_prompts() {
         let gen1 = Generation::new("Response 1");
@@ -190,7 +175,6 @@ mod llm_result_tests {
         }
     }
 
-    /// Test that flatten preserves llm_output for first result.
     #[test]
     fn test_flatten_preserves_llm_output_for_first() {
         let gen1 = Generation::new("Response 1");
@@ -216,7 +200,6 @@ mod llm_result_tests {
         );
     }
 
-    /// Test that flatten clears token_usage for subsequent results.
     #[test]
     fn test_flatten_clears_token_usage_for_subsequent() {
         let gen1 = Generation::new("Response 1");
@@ -238,7 +221,6 @@ mod llm_result_tests {
         );
     }
 
-    /// Test that flatten handles None llm_output correctly.
     #[test]
     fn test_flatten_handles_none_llm_output() {
         let gen1 = Generation::new("Response 1");
@@ -249,7 +231,6 @@ mod llm_result_tests {
         assert!(flattened[1].llm_output.is_none());
     }
 
-    /// Test flattening with multiple candidate generations.
     #[test]
     fn test_flatten_with_multiple_candidates() {
         let gen1 = Generation::new("Candidate 1");
@@ -260,7 +241,6 @@ mod llm_result_tests {
         assert_eq!(flattened[0].generations[0].len(), 2);
     }
 
-    /// Test equality for LLMResults with same generations and output.
     #[test]
     fn test_equality_same_generations_and_output() {
         let generation = Generation::new("Response");
@@ -272,7 +252,6 @@ mod llm_result_tests {
         assert_eq!(result1, result2);
     }
 
-    /// Test inequality for LLMResults with different generations.
     #[test]
     fn test_equality_different_generations() {
         let gen1 = Generation::new("Response 1");
@@ -282,7 +261,6 @@ mod llm_result_tests {
         assert_ne!(result1, result2);
     }
 
-    /// Test inequality for LLMResults with different llm_output.
     #[test]
     fn test_equality_different_llm_output() {
         let generation = Generation::new("Response");
@@ -296,7 +274,6 @@ mod llm_result_tests {
         assert_ne!(result1, result2);
     }
 
-    /// Test that equality ignores run info.
     #[test]
     fn test_equality_ignores_run_info() {
         let generation = Generation::new("Response");
@@ -309,7 +286,6 @@ mod llm_result_tests {
         assert_eq!(result1, result2);
     }
 
-    /// Test equality when llm_output is None.
     #[test]
     fn test_equality_with_none_llm_output() {
         let generation = Generation::new("Response");
@@ -318,7 +294,6 @@ mod llm_result_tests {
         assert_eq!(result1, result2);
     }
 
-    /// Test that type field is set correctly.
     #[test]
     fn test_type_field_is_literal() {
         let generation = Generation::new("Response");
@@ -326,7 +301,6 @@ mod llm_result_tests {
         assert_eq!(result.result_type, "LLMResult");
     }
 
-    /// Test creating LLMResult with empty generations.
     #[test]
     fn test_empty_generations() {
         let result = LLMResult::new(vec![]);
@@ -335,7 +309,6 @@ mod llm_result_tests {
         assert_eq!(flattened.len(), 0);
     }
 
-    /// Test LLMResult with mixed generation types in same list.
     #[test]
     fn test_mixed_generation_types() {
         let generation = Generation::new("Regular");
@@ -352,7 +325,6 @@ mod llm_result_tests {
         ));
     }
 
-    /// Test LLMResult with complex nested llm_output.
     #[test]
     fn test_complex_llm_output_structure() {
         let generation = Generation::new("Response");
@@ -386,11 +358,9 @@ mod llm_result_tests {
     }
 }
 
-/// Test suite for LLMResult.flatten() edge cases.
 mod llm_result_flatten_tests {
     use super::*;
 
-    /// Test that flatten drops run info from flattened results.
     #[test]
     fn test_flatten_does_not_include_run_info() {
         let gen1 = Generation::new("R1");
@@ -404,7 +374,6 @@ mod llm_result_flatten_tests {
         }
     }
 
-    /// Test that flatten clones llm_output so mutations are isolated.
     #[test]
     fn test_flatten_clones_llm_output_for_subsequent() {
         let gen1 = Generation::new("R1");
@@ -430,7 +399,6 @@ mod llm_result_flatten_tests {
         );
     }
 
-    /// Test flatten keeps all candidates within each generation list.
     #[test]
     fn test_flatten_preserves_all_candidates_in_gen_list() {
         let gen1a = Generation::new("1A");
@@ -452,7 +420,6 @@ mod llm_result_flatten_tests {
         }
     }
 
-    /// Test flatten works with ChatGeneration objects.
     #[test]
     fn test_flatten_with_chat_generations() {
         let gen1 = ChatGeneration::new(AIMessage::builder().content("Chat 1").build().into());
@@ -486,7 +453,6 @@ mod llm_result_flatten_tests {
         );
     }
 
-    /// Test flatten with single generation preserves llm_output fully.
     #[test]
     fn test_flatten_single_generation_preserves_llm_output() {
         let generation = Generation::new("Only");
@@ -499,7 +465,6 @@ mod llm_result_flatten_tests {
         assert_eq!(flattened[0].llm_output, Some(llm_output));
     }
 
-    /// Test flatten clears token_usage for all prompts after the first.
     #[test]
     fn test_flatten_many_prompts_token_usage_cleared() {
         let generations: Vec<Vec<GenerationType>> = (0..5)
@@ -533,7 +498,6 @@ mod llm_result_flatten_tests {
         }
     }
 
-    /// Test flatten with empty generations list.
     #[test]
     fn test_flatten_empty_generations() {
         let result = LLMResult::new(vec![]);
@@ -541,7 +505,6 @@ mod llm_result_flatten_tests {
         assert!(flattened.is_empty());
     }
 
-    /// Test flatten with empty dict llm_output.
     #[test]
     fn test_flatten_with_empty_llm_output_dict() {
         let gen1 = Generation::new("R1");
@@ -558,11 +521,9 @@ mod llm_result_flatten_tests {
     }
 }
 
-/// Test suite for LLMResult equality edge cases.
 mod llm_result_equality_tests {
     use super::*;
 
-    /// Test equality with empty generations.
     #[test]
     fn test_equality_empty_generations() {
         let result1 = LLMResult::new(vec![]);
@@ -570,7 +531,6 @@ mod llm_result_equality_tests {
         assert_eq!(result1, result2);
     }
 
-    /// Test equality ignores run with different values.
     #[test]
     fn test_equality_same_generations_different_run() {
         let generation = Generation::new("test");
@@ -580,7 +540,6 @@ mod llm_result_equality_tests {
         assert_eq!(result1, result2);
     }
 
-    /// Test inequality between None and dict llm_output.
     #[test]
     fn test_inequality_none_vs_dict_llm_output() {
         let generation = Generation::new("Response");
@@ -590,11 +549,9 @@ mod llm_result_equality_tests {
     }
 }
 
-/// Test suite for LLMResult serialization.
 mod llm_result_serialization_tests {
     use super::*;
 
-    /// Test serialization for LLMResult.
     #[test]
     fn test_serialize_basic() {
         let generation = Generation::new("Response");
@@ -608,7 +565,6 @@ mod llm_result_serialization_tests {
         assert!(data.get("run").is_none() || data["run"].is_null());
     }
 
-    /// Test serialization includes run info.
     #[test]
     fn test_serialize_with_run_info() {
         let generation = Generation::new("Response");
@@ -621,7 +577,6 @@ mod llm_result_serialization_tests {
         assert_eq!(data["run"][0]["run_id"], json!(run_id.to_string()));
     }
 
-    /// Test JSON serialization roundtrip.
     #[test]
     fn test_json_roundtrip() {
         let mut generation_info = HashMap::new();
@@ -642,7 +597,6 @@ mod llm_result_serialization_tests {
         assert_eq!(restored.result_type, "LLMResult");
     }
 
-    /// Test deserialization from serialized value.
     #[test]
     fn test_deserialize_from_value() {
         let generation = Generation::new("test");

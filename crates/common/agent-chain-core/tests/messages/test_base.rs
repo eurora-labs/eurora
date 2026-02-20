@@ -1,7 +1,3 @@
-//! Tests for base message functionality.
-//!
-//! Converted from `langchain/libs/core/tests/unit_tests/messages/test_base.py`
-
 use agent_chain_core::messages::{
     AIMessage, BaseMessage, ContentBlock, ContentPart, HumanMessage, HumanMessageChunk,
     MergeableContent, MessageContent, SystemMessage, SystemMessageChunk, TextContentBlock,

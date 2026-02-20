@@ -1,9 +1,3 @@
-//! Runnable that retries a Runnable if it fails.
-//!
-//! This module provides `RunnableRetry`, a Runnable that wraps another Runnable
-//! and retries it on failure with configurable retry logic.
-//! This mirrors `langchain_core.runnables.retry`.
-
 use std::fmt::Debug;
 use std::time::Duration;
 
@@ -20,26 +14,17 @@ use super::config::{
     patch_config,
 };
 
-/// Parameters for exponential backoff with jitter.
-///
-/// These parameters control the wait time between retry attempts.
-/// The wait time is calculated as:
-/// `min(max, initial * exp_base^attempt) + random(0, jitter)`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExponentialJitterParams {
-    /// Initial wait time in seconds. Default: 1.0
     #[serde(default = "default_initial")]
     pub initial: f64,
 
-    /// Maximum wait time in seconds. Default: 60.0
     #[serde(default = "default_max")]
     pub max: f64,
 
-    /// Base for exponential backoff. Default: 2.0
     #[serde(default = "default_exp_base")]
     pub exp_base: f64,
 
-    /// Maximum jitter in seconds to add. Default: 1.0
     #[serde(default = "default_jitter")]
     pub jitter: f64,
 }
@@ -72,36 +57,30 @@ impl Default for ExponentialJitterParams {
 }
 
 impl ExponentialJitterParams {
-    /// Create new exponential jitter parameters with default values.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set the initial wait time.
     pub fn with_initial(mut self, initial: f64) -> Self {
         self.initial = initial;
         self
     }
 
-    /// Set the maximum wait time.
     pub fn with_max(mut self, max: f64) -> Self {
         self.max = max;
         self
     }
 
-    /// Set the exponential base.
     pub fn with_exp_base(mut self, exp_base: f64) -> Self {
         self.exp_base = exp_base;
         self
     }
 
-    /// Set the jitter value.
     pub fn with_jitter(mut self, jitter: f64) -> Self {
         self.jitter = jitter;
         self
     }
 
-    /// Calculate the wait time for a given attempt number (1-indexed).
     pub fn calculate_wait(&self, attempt: usize) -> Duration {
         let exp_wait = self.initial * self.exp_base.powi(attempt.saturating_sub(1) as i32);
         let capped_wait = exp_wait.min(self.max);
@@ -116,12 +95,9 @@ impl ExponentialJitterParams {
     }
 }
 
-/// State of a retry attempt.
 #[derive(Debug, Clone)]
 pub struct RetryCallState {
-    /// The current attempt number (1-indexed).
     pub attempt_number: usize,
-    /// Whether the attempt succeeded.
     pub succeeded: bool,
 }
 
@@ -134,22 +110,15 @@ impl RetryCallState {
     }
 }
 
-/// Error type predicate for retry logic.
-///
-/// This enum allows specifying which error types should trigger a retry.
 #[derive(Debug, Clone, Default)]
 pub enum RetryErrorPredicate {
-    /// Retry on all errors (default).
     #[default]
     All,
-    /// Retry only on HTTP/API errors.
     HttpErrors,
-    /// Retry only on specific error variants using a custom predicate.
     Custom(fn(&Error) -> bool),
 }
 
 impl RetryErrorPredicate {
-    /// Check if the given error should trigger a retry.
     pub fn should_retry(&self, error: &Error) -> bool {
         match self {
             RetryErrorPredicate::All => true,
@@ -159,19 +128,14 @@ impl RetryErrorPredicate {
     }
 }
 
-/// Configuration for creating a RunnableRetry.
 #[derive(Debug, Clone)]
 pub struct RunnableRetryConfig {
-    /// The exception types to retry on. By default all exceptions are retried.
     pub retry_predicate: RetryErrorPredicate,
 
-    /// Whether to add jitter to the exponential backoff.
     pub wait_exponential_jitter: bool,
 
-    /// Parameters for exponential backoff with jitter.
     pub exponential_jitter_params: Option<ExponentialJitterParams>,
 
-    /// The maximum number of attempts to retry the Runnable.
     pub max_attempt_number: usize,
 }
 
@@ -187,68 +151,37 @@ impl Default for RunnableRetryConfig {
 }
 
 impl RunnableRetryConfig {
-    /// Create a new retry configuration with default values.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set the retry predicate.
     pub fn with_retry_predicate(mut self, predicate: RetryErrorPredicate) -> Self {
         self.retry_predicate = predicate;
         self
     }
 
-    /// Set whether to use exponential jitter.
     pub fn with_wait_exponential_jitter(mut self, wait: bool) -> Self {
         self.wait_exponential_jitter = wait;
         self
     }
 
-    /// Set the exponential jitter parameters.
     pub fn with_exponential_jitter_params(mut self, params: ExponentialJitterParams) -> Self {
         self.exponential_jitter_params = Some(params);
         self
     }
 
-    /// Set the maximum number of attempts.
     pub fn with_max_attempt_number(mut self, max: usize) -> Self {
         self.max_attempt_number = max;
         self
     }
 }
 
-/// A Runnable that retries on failure.
-///
-/// `RunnableRetry` wraps another `Runnable` and retries it if it fails.
-/// This is particularly useful for network calls that may fail due to transient errors.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::runnables::{RunnableLambda, RunnableRetry, RunnableRetryConfig};
-///
-/// // Create a runnable that might fail
-/// let runnable = RunnableLambda::new(|x: i32| {
-///     // Simulated unreliable operation
-///     if x > 0 { Ok(x * 2) }
-///     else { Err(Error::other("negative input")) }
-/// });
-///
-/// // Wrap it with retry logic
-/// let config = RunnableRetryConfig::new()
-///     .with_max_attempt_number(3)
-///     .with_wait_exponential_jitter(true);
-///
-/// let with_retry = RunnableRetry::new(runnable, config);
-/// ```
 pub struct RunnableRetry<R>
 where
     R: Runnable,
 {
-    /// The wrapped runnable.
     bound: R,
 
-    /// Retry configuration.
     config: RunnableRetryConfig,
 }
 
@@ -272,12 +205,10 @@ impl<R> RunnableRetry<R>
 where
     R: Runnable,
 {
-    /// Create a new RunnableRetry with the given configuration.
     pub fn new(bound: R, config: RunnableRetryConfig) -> Self {
         Self { bound, config }
     }
 
-    /// Create a new RunnableRetry with simple parameters.
     pub fn with_simple(bound: R, max_attempts: usize, wait_exponential_jitter: bool) -> Self {
         Self {
             bound,
@@ -289,7 +220,6 @@ where
         }
     }
 
-    /// Get the exponential jitter parameters, using defaults if not set.
     fn get_jitter_params(&self) -> ExponentialJitterParams {
         self.config
             .exponential_jitter_params
@@ -297,12 +227,10 @@ where
             .unwrap_or_default()
     }
 
-    /// Check if the error should trigger a retry.
     fn should_retry(&self, error: &Error) -> bool {
         self.config.retry_predicate.should_retry(error)
     }
 
-    /// Calculate the wait time for a given attempt.
     fn calculate_wait(&self, attempt: usize) -> Duration {
         if self.config.wait_exponential_jitter {
             self.get_jitter_params().calculate_wait(attempt)
@@ -311,7 +239,6 @@ where
         }
     }
 
-    /// Patch the config for a retry attempt.
     fn patch_config_for_retry(
         config: &RunnableConfig,
         run_manager: &CallbackManagerForChainRun,
@@ -333,7 +260,6 @@ where
         )
     }
 
-    /// Patch configs for batch retry.
     fn patch_config_list_for_retry(
         configs: &[RunnableConfig],
         run_managers: &[CallbackManagerForChainRun],
@@ -694,15 +620,7 @@ where
     }
 }
 
-/// Extension trait to add retry configuration method to any Runnable.
 pub trait RunnableRetryExt: Runnable {
-    /// Create a new Runnable that retries this runnable on failure with full config.
-    ///
-    /// # Arguments
-    /// * `config` - Retry configuration
-    ///
-    /// # Returns
-    /// A new `RunnableRetry` instance
     fn with_retry_config(self, config: RunnableRetryConfig) -> RunnableRetry<Self>
     where
         Self: Sized,

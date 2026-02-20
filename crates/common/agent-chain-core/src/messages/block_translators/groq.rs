@@ -1,11 +1,3 @@
-//! Derivations of standard content blocks from Groq content.
-//!
-//! Mirrors `langchain_core/messages/block_translators/groq.py`.
-//!
-//! Groq content requires message-level context (additional_kwargs,
-//! tool_calls) in addition to content blocks, because reasoning content
-//! and executed tools are stored in additional_kwargs.
-
 use std::collections::{HashMap, HashSet};
 
 use regex::Regex;
@@ -14,7 +6,6 @@ use serde_json::{Value, json};
 use crate::messages::base::extract_reasoning_from_additional_kwargs;
 use crate::messages::tool::ToolCall;
 
-/// Populate extras field with unknown fields from the original block.
 fn populate_extras(standard_block: &mut Value, block: &Value, known_fields: &HashSet<&str>) {
     if standard_block.get("type").and_then(|v| v.as_str()) == Some("non_standard") {
         return;
@@ -37,13 +28,6 @@ fn populate_extras(standard_block: &mut Value, block: &Value, known_fields: &Has
     }
 }
 
-/// Extract Python code from Groq built-in tool content.
-///
-/// Extracts the value of the 'code' field from a string of the form:
-/// `{"code": some_arbitrary_text_with_unescaped_quotes}`
-///
-/// Groq may not escape quotes in the executed tools, e.g.:
-/// `{"code": "import math; print(\"hello\"); print(math.sqrt(101))"}`
 fn parse_code_json(s: &str) -> Option<Value> {
     let re = Regex::new(r#"(?s)\s*\{\s*"code"\s*:\s*"(.*)"\s*\}\s*"#).ok()?;
     let caps = re.captures(s)?;
@@ -51,10 +35,6 @@ fn parse_code_json(s: &str) -> Option<Value> {
     Some(json!({"code": code}))
 }
 
-/// Convert Groq message content to v1 format.
-///
-/// Unlike most other translators, this function needs message-level context
-/// because Groq stores reasoning and executed tools in `additional_kwargs`.
 pub fn convert_to_standard_blocks_with_message_context(
     content: &[Value],
     _is_chunk: bool,
@@ -186,11 +166,6 @@ pub fn convert_to_standard_blocks_with_message_context(
     content_blocks
 }
 
-/// Convert Groq content blocks to standard format.
-///
-/// This is a simplified version that only processes content blocks without
-/// message-level context. For full translation including reasoning and
-/// executed tools, use `convert_to_standard_blocks_with_message_context`.
 pub fn convert_to_standard_blocks(content: &[Value], is_chunk: bool) -> Vec<Value> {
     convert_to_standard_blocks_with_message_context(content, is_chunk, &HashMap::new(), &[], None)
 }

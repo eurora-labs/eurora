@@ -1,8 +1,3 @@
-//! Convert functions and runnables to tools.
-//!
-//! This module provides utilities for converting functions and runnables
-//! into tools, mirroring `langchain_core.tools.convert`.
-
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
@@ -16,31 +11,20 @@ use super::base::{ArgsSchema, ResponseFormat};
 use super::simple::Tool;
 use super::structured::{StructuredTool, create_args_schema};
 
-/// Configuration for creating a tool from a function.
 #[derive(Debug, Clone, Default)]
 pub struct ToolConfig {
-    /// Optional name for the tool. If not provided, uses the function name.
     pub name: Option<String>,
-    /// Optional description for the tool.
     pub description: Option<String>,
-    /// Whether to return the tool's output directly.
     pub return_direct: bool,
-    /// Optional schema for the tool's input arguments.
     pub args_schema: Option<ArgsSchema>,
-    /// Whether to infer the schema from the function signature.
     pub infer_schema: bool,
-    /// The tool response format.
     pub response_format: ResponseFormat,
-    /// Whether to parse the docstring for parameter descriptions.
     pub parse_docstring: bool,
-    /// Whether to raise an error on invalid docstring.
     pub error_on_invalid_docstring: bool,
-    /// Optional provider-specific extras.
     pub extras: Option<HashMap<String, Value>>,
 }
 
 impl ToolConfig {
-    /// Create a new ToolConfig with defaults.
     pub fn new() -> Self {
         Self {
             infer_schema: true,
@@ -48,58 +32,47 @@ impl ToolConfig {
         }
     }
 
-    /// Set the name.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
     }
 
-    /// Set the description.
     pub fn with_description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
     }
 
-    /// Set return_direct.
     pub fn with_return_direct(mut self, return_direct: bool) -> Self {
         self.return_direct = return_direct;
         self
     }
 
-    /// Set the args schema.
     pub fn with_args_schema(mut self, schema: ArgsSchema) -> Self {
         self.args_schema = Some(schema);
         self
     }
 
-    /// Set infer_schema.
     pub fn with_infer_schema(mut self, infer_schema: bool) -> Self {
         self.infer_schema = infer_schema;
         self
     }
 
-    /// Set the response format.
     pub fn with_response_format(mut self, format: ResponseFormat) -> Self {
         self.response_format = format;
         self
     }
 
-    /// Set parse_docstring.
     pub fn with_parse_docstring(mut self, parse: bool) -> Self {
         self.parse_docstring = parse;
         self
     }
 
-    /// Set extras.
     pub fn with_extras(mut self, extras: HashMap<String, Value>) -> Self {
         self.extras = Some(extras);
         self
     }
 }
 
-/// Create a simple string-to-string tool from a function.
-///
-/// This is useful for tools that take a single string input and return a string.
 pub fn create_simple_tool<F>(
     name: impl Into<String>,
     description: impl Into<String>,
@@ -111,7 +84,6 @@ where
     Tool::from_function(func, name, description)
 }
 
-/// Create a simple tool with async support.
 pub fn create_simple_tool_async<F, AF, Fut>(
     name: impl Into<String>,
     description: impl Into<String>,
@@ -126,9 +98,6 @@ where
     Tool::from_function_with_async(func, coroutine, name, description)
 }
 
-/// Create a structured tool from a function.
-///
-/// This is useful for tools that take multiple typed arguments.
 pub fn create_structured_tool<F>(
     name: impl Into<String>,
     description: impl Into<String>,
@@ -141,7 +110,6 @@ where
     StructuredTool::from_function(func, name, description, args_schema)
 }
 
-/// Create a structured tool with async support.
 pub fn create_structured_tool_async<F, AF, Fut>(
     name: impl Into<String>,
     description: impl Into<String>,
@@ -157,7 +125,6 @@ where
     StructuredTool::from_function_with_async(func, coroutine, name, description, args_schema)
 }
 
-/// Create a tool using a configuration object.
 pub fn create_tool_with_config<F>(func: F, config: ToolConfig) -> Result<StructuredTool>
 where
     F: Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync + 'static,
@@ -183,9 +150,6 @@ where
     Ok(tool)
 }
 
-/// Convert a runnable to a tool.
-///
-/// This function converts a Runnable into a BaseTool.
 pub fn convert_runnable_to_tool<R>(
     runnable: Arc<R>,
     name: impl Into<String>,
@@ -209,13 +173,8 @@ where
     StructuredTool::from_function(func, name, description, schema)
 }
 
-/// Type alias for the tool function used in tool_from_schema.
 pub type ToolFromSchemaFn = Box<dyn Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync>;
 
-/// Helper macro-like function to define a tool with a schema.
-///
-/// In Rust, we can't use decorators like Python's @tool,
-/// but we can provide helper functions that make tool creation easier.
 pub fn tool_from_schema(
     name: impl Into<String>,
     description: impl Into<String>,
@@ -245,7 +204,6 @@ pub fn tool_from_schema(
     move |func| StructuredTool::from_function(func, name, description, schema)
 }
 
-/// Generate a placeholder description for a runnable.
 pub fn get_description_from_runnable<R>(_runnable: &R) -> String
 where
     R: Runnable,

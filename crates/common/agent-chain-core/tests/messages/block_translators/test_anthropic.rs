@@ -1,14 +1,3 @@
-//! Tests for Anthropic block translator.
-//!
-//! Converted from `langchain/libs/core/tests/unit_tests/messages/block_translators/test_anthropic.py`
-//!
-//! These tests verify that Anthropic-specific content blocks are correctly translated
-//! to the standard v1 content block format via the `content_blocks` property.
-//!
-//! NOTE: These tests use API methods that may not yet exist in the Rust implementation.
-//! The tests are written to match the Python API exactly, serving as a specification
-//! for what needs to be implemented.
-
 use agent_chain_core::messages::{
     AIMessage, AIMessageChunk, Annotation, BlockIndex, ChunkPosition, ContentBlock,
     FileContentBlock, HumanMessage, ImageContentBlock, MessageContent, NonStandardContentBlock,
@@ -18,11 +7,6 @@ use agent_chain_core::messages::{
 use serde_json::json;
 use std::collections::HashMap;
 
-/// Test conversion of Anthropic AI message content to v1 format.
-///
-/// This test verifies that various Anthropic-specific content block types
-/// (thinking, tool_use, server_tool_use, web_search_tool_result, etc.)
-/// are correctly translated to standard v1 content blocks.
 #[test]
 fn test_convert_to_v1_from_anthropic() {
     let content = vec![
@@ -315,11 +299,6 @@ fn test_convert_to_v1_from_anthropic() {
     assert_ne!(message2.content, "");
 }
 
-/// Test conversion of Anthropic AI message chunks to v1 format.
-///
-/// This test verifies that streaming chunks from Anthropic are correctly
-/// translated to standard v1 content blocks, including proper handling
-/// of tool_use chunks and input_json_delta.
 #[test]
 fn test_convert_to_v1_from_anthropic_chunk() {
     let mut response_metadata = HashMap::new();
@@ -597,11 +576,6 @@ fn test_convert_to_v1_from_anthropic_chunk() {
     assert_eq!(full_server.content_blocks(), expected_server_content_blocks);
 }
 
-/// Test conversion of Anthropic input content (HumanMessage) to v1 format.
-///
-/// This test verifies that Anthropic-specific input content blocks
-/// (document, image with various source types) are correctly translated
-/// to standard v1 content blocks.
 #[test]
 fn test_convert_to_v1_from_anthropic_input() {
     let content = vec![

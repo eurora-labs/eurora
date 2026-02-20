@@ -1,8 +1,3 @@
-//! Dict prompt template.
-//!
-//! This module provides dict prompt templates that format to dictionaries,
-//! mirroring `langchain_core.prompts.dict` in Python.
-
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
@@ -11,41 +6,15 @@ use crate::error::Result;
 
 use super::string::{PromptTemplateFormat, format_template, get_template_variables};
 
-/// Template represented by a dict.
-///
-/// Recognizes variables in f-string or mustache formatted string dict values.
-/// Does NOT recognize variables in dict keys. Applies recursively.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::prompts::DictPromptTemplate;
-/// use std::collections::HashMap;
-///
-/// let mut template = HashMap::new();
-/// template.insert("name".to_string(), serde_json::json!("{user_name}"));
-/// template.insert("age".to_string(), serde_json::json!("{user_age}"));
-///
-/// let dict_template = DictPromptTemplate::new(template, PromptTemplateFormat::FString);
-///
-/// let mut kwargs = HashMap::new();
-/// kwargs.insert("user_name".to_string(), "Alice".to_string());
-/// kwargs.insert("user_age".to_string(), "30".to_string());
-///
-/// let result = dict_template.format(&kwargs).unwrap();
-/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DictPromptTemplate {
-    /// The template dictionary.
     pub template: serde_json::Value,
 
-    /// The format of the template.
     #[serde(default)]
     pub template_format: PromptTemplateFormat,
 }
 
 impl DictPromptTemplate {
-    /// Create a new DictPromptTemplate.
     pub fn new(template: serde_json::Value, template_format: PromptTemplateFormat) -> Self {
         Self {
             template,
@@ -53,38 +22,31 @@ impl DictPromptTemplate {
         }
     }
 
-    /// Create a new DictPromptTemplate with f-string format.
     pub fn from_dict(template: serde_json::Value) -> Self {
         Self::new(template, PromptTemplateFormat::FString)
     }
 
-    /// Get the input variables for this template.
     pub fn input_variables(&self) -> Vec<String> {
         get_input_variables(&self.template, self.template_format)
     }
 
-    /// Format the template with the inputs.
     pub fn format(&self, kwargs: &HashMap<String, String>) -> Result<serde_json::Value> {
         insert_input_variables(&self.template, kwargs, self.template_format)
     }
 
-    /// Async format the template with the inputs.
     pub async fn aformat(&self, kwargs: &HashMap<String, String>) -> Result<serde_json::Value> {
         self.format(kwargs)
     }
 
-    /// Get the prompt type.
     pub fn prompt_type(&self) -> &str {
         "dict-prompt"
     }
 
-    /// Get a pretty representation.
     pub fn pretty_repr(&self, _html: bool) -> String {
         format!("DictPromptTemplate({:?})", self.template)
     }
 }
 
-/// Get input variables from a template value recursively.
 fn get_input_variables(
     template: &serde_json::Value,
     template_format: PromptTemplateFormat,
@@ -116,7 +78,6 @@ fn get_input_variables(
     input_variables
 }
 
-/// Insert input variables into a template value recursively.
 fn insert_input_variables(
     template: &serde_json::Value,
     inputs: &HashMap<String, String>,

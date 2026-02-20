@@ -1,14 +1,3 @@
-//! Tests for OpenAI block translator.
-//!
-//! Converted from `langchain/libs/core/tests/unit_tests/messages/block_translators/test_openai.py`
-//!
-//! These tests verify that OpenAI-specific content blocks are correctly translated
-//! to the standard v1 content block format via the `content_blocks` property.
-//!
-//! NOTE: These tests use API methods that may not yet exist in the Rust implementation.
-//! The tests are written to match the Python API exactly, serving as a specification
-//! for what needs to be implemented.
-
 use agent_chain_core::messages::block_translators::openai::{
     OpenAiApi, convert_to_openai_data_block,
 };
@@ -21,9 +10,6 @@ use agent_chain_core::messages::{
 use serde_json::json;
 use std::collections::HashMap;
 
-/// Helper function to compare content blocks, ignoring auto-generated `id` fields.
-///
-/// This mirrors the Python `_content_blocks_equal_ignore_id` function.
 fn content_blocks_equal_ignore_id(actual: &[ContentBlock], expected: &[ContentBlock]) -> bool {
     if actual.len() != expected.len() {
         return false;
@@ -41,7 +27,6 @@ fn content_blocks_equal_ignore_id(actual: &[ContentBlock], expected: &[ContentBl
     true
 }
 
-/// Remove the id field from a content block for comparison purposes.
 fn remove_id_from_block(block: &ContentBlock) -> ContentBlock {
     match block {
         ContentBlock::Text(text_block) => ContentBlock::Text(TextContentBlock {
@@ -92,11 +77,6 @@ fn remove_id_from_block(block: &ContentBlock) -> ContentBlock {
     }
 }
 
-/// Test conversion of OpenAI Responses API content to v1 format.
-///
-/// This test verifies that various OpenAI-specific content block types
-/// (reasoning, function_call, text with annotations, image_generation_call,
-/// file_search_call, etc.) are correctly translated to standard v1 content blocks.
 #[test]
 fn test_convert_to_v1_from_responses() {
     let content = vec![
@@ -325,11 +305,6 @@ fn test_convert_to_v1_from_responses() {
     );
 }
 
-/// Test conversion of OpenAI Responses API streaming chunks to v1 format.
-///
-/// This test verifies that streaming chunks from OpenAI Responses API are correctly
-/// translated to standard v1 content blocks, including proper handling of
-/// reasoning blocks with summary.
 #[test]
 fn test_convert_to_v1_from_responses_chunk() {
     let mut response_metadata = HashMap::new();
@@ -498,10 +473,6 @@ fn test_convert_to_v1_from_responses_chunk() {
     assert_eq!(full.content_blocks(), expected_merged_content_blocks);
 }
 
-/// Test conversion of OpenAI Chat Completions input content (HumanMessage) to v1 format.
-///
-/// This test verifies that OpenAI-specific input content blocks
-/// (image_url, input_audio, file) are correctly translated to standard v1 content blocks.
 #[test]
 fn test_convert_to_v1_from_openai_input() {
     let content = [
@@ -607,11 +578,6 @@ fn test_convert_to_v1_from_openai_input() {
     ));
 }
 
-/// Test compatibility with v0.3 legacy message format.
-///
-/// This test verifies that messages in the v0.3 format (with reasoning in
-/// additional_kwargs, tool_outputs, refusal, etc.) are correctly translated
-/// to v1 content blocks.
 #[test]
 fn test_compat_responses_v03() {
     let content = vec![json!({
@@ -886,10 +852,6 @@ fn test_compat_responses_v03() {
     assert_eq!(merged_reasoning.content_blocks(), expected_merged_reasoning);
 }
 
-/// Test conversion of standard data blocks to OpenAI format.
-///
-/// This test verifies that standard v1 data content blocks (image, file, audio)
-/// are correctly converted to OpenAI Chat Completions and Responses API formats.
 #[test]
 fn test_convert_to_openai_data_block() {
     let block = json!({

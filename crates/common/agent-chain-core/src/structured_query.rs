@@ -1,27 +1,17 @@
-//! Internal representation of a structured query language.
-//!
-//! This module provides types for building structured queries that can be
-//! translated to different query languages using the visitor pattern.
-
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use crate::error::{Error, Result};
 
-/// Enumerator of the logical operators.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Operator {
-    /// Logical AND operator.
     And,
-    /// Logical OR operator.
     Or,
-    /// Logical NOT operator.
     Not,
 }
 
 impl Operator {
-    /// Returns the string representation of the operator.
     pub fn as_str(&self) -> &'static str {
         match self {
             Operator::And => "and",
@@ -37,34 +27,22 @@ impl fmt::Display for Operator {
     }
 }
 
-/// Enumerator of the comparison operators.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Comparator {
-    /// Equal to.
     Eq,
-    /// Not equal to.
     Ne,
-    /// Greater than.
     Gt,
-    /// Greater than or equal to.
     Gte,
-    /// Less than.
     Lt,
-    /// Less than or equal to.
     Lte,
-    /// Contains.
     Contain,
-    /// Like (pattern matching).
     Like,
-    /// In a set of values.
     In,
-    /// Not in a set of values.
     Nin,
 }
 
 impl Comparator {
-    /// Returns the string representation of the comparator.
     pub fn as_str(&self) -> &'static str {
         match self {
             Comparator::Eq => "eq",
@@ -87,12 +65,9 @@ impl fmt::Display for Comparator {
     }
 }
 
-/// Either an Operator or a Comparator for validation purposes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OperatorOrComparator {
-    /// An operator variant.
     Operator(Operator),
-    /// A comparator variant.
     Comparator(Comparator),
 }
 
@@ -117,25 +92,17 @@ impl fmt::Display for OperatorOrComparator {
     }
 }
 
-/// Defines interface for IR translation using a visitor pattern.
-///
-/// Implementations of this trait translate structured query expressions
-/// into target-specific query formats.
 pub trait Visitor {
-    /// The output type produced by visiting expressions.
     type Output;
 
-    /// Allowed comparators for this visitor, if restricted.
     fn allowed_comparators(&self) -> Option<&[Comparator]> {
         None
     }
 
-    /// Allowed operators for this visitor, if restricted.
     fn allowed_operators(&self) -> Option<&[Operator]> {
         None
     }
 
-    /// Validates that a function (operator or comparator) is allowed.
     fn validate_func(&self, func: OperatorOrComparator) -> Result<()> {
         match func {
             OperatorOrComparator::Operator(op) => {
@@ -162,47 +129,29 @@ pub trait Visitor {
         Ok(())
     }
 
-    /// Translate an Operation.
     fn visit_operation(&self, operation: &Operation) -> Result<Self::Output>;
 
-    /// Translate a Comparison.
     fn visit_comparison(&self, comparison: &Comparison) -> Result<Self::Output>;
 
-    /// Translate a StructuredQuery.
     fn visit_structured_query(&self, structured_query: &StructuredQuery) -> Result<Self::Output>;
 }
 
-/// Base trait for all expressions.
-///
-/// All expression types implement this trait and can accept visitors
-/// for translation to target-specific formats.
 pub trait Expr: fmt::Debug {
-    /// Returns the name of this expression type in snake_case.
     fn expr_name(&self) -> &'static str;
 
-    /// Accept a visitor and return the result of visiting this expression.
     fn accept<V: Visitor>(&self, visitor: &V) -> Result<V::Output>;
 }
 
-/// A filtering expression.
-///
-/// This is a marker trait for expressions that can be used as filters
-/// in a structured query.
 pub trait FilterDirective: Expr {}
 
-/// Comparison to a value.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Comparison {
-    /// The comparator to use.
     pub comparator: Comparator,
-    /// The attribute to compare.
     pub attribute: String,
-    /// The value to compare to.
     pub value: serde_json::Value,
 }
 
 impl Comparison {
-    /// Create a new Comparison.
     pub fn new(
         comparator: Comparator,
         attribute: impl Into<String>,
@@ -228,17 +177,13 @@ impl Expr for Comparison {
 
 impl FilterDirective for Comparison {}
 
-/// Logical operation over other directives.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Operation {
-    /// The operator to use.
     pub operator: Operator,
-    /// The arguments to the operator.
     pub arguments: Vec<FilterDirectiveEnum>,
 }
 
 impl Operation {
-    /// Create a new Operation.
     pub fn new(operator: Operator, arguments: Vec<FilterDirectiveEnum>) -> Self {
         Operation {
             operator,
@@ -246,17 +191,14 @@ impl Operation {
         }
     }
 
-    /// Create an AND operation.
     pub fn and(arguments: Vec<FilterDirectiveEnum>) -> Self {
         Self::new(Operator::And, arguments)
     }
 
-    /// Create an OR operation.
     pub fn or(arguments: Vec<FilterDirectiveEnum>) -> Self {
         Self::new(Operator::Or, arguments)
     }
 
-    /// Create a NOT operation.
     pub fn not(argument: FilterDirectiveEnum) -> Self {
         Self::new(Operator::Not, vec![argument])
     }
@@ -274,18 +216,14 @@ impl Expr for Operation {
 
 impl FilterDirective for Operation {}
 
-/// Enum wrapper for filter directives to allow recursive structures.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum FilterDirectiveEnum {
-    /// A comparison directive.
     Comparison(Comparison),
-    /// An operation directive.
     Operation(Operation),
 }
 
 impl FilterDirectiveEnum {
-    /// Accept a visitor based on the variant.
     pub fn accept<V: Visitor>(&self, visitor: &V) -> Result<V::Output> {
         match self {
             FilterDirectiveEnum::Comparison(c) => visitor.visit_comparison(c),
@@ -324,19 +262,14 @@ impl Expr for FilterDirectiveEnum {
 
 impl FilterDirective for FilterDirectiveEnum {}
 
-/// Structured query.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructuredQuery {
-    /// Query string.
     pub query: String,
-    /// Filtering expression.
     pub filter: Option<FilterDirectiveEnum>,
-    /// Limit on the number of results.
     pub limit: Option<usize>,
 }
 
 impl StructuredQuery {
-    /// Create a new StructuredQuery.
     pub fn new(
         query: impl Into<String>,
         filter: Option<FilterDirectiveEnum>,
@@ -349,12 +282,10 @@ impl StructuredQuery {
         }
     }
 
-    /// Create a StructuredQuery with only a query string.
     pub fn query_only(query: impl Into<String>) -> Self {
         Self::new(query, None, None)
     }
 
-    /// Create a StructuredQuery with a query and filter.
     pub fn with_filter(query: impl Into<String>, filter: impl Into<FilterDirectiveEnum>) -> Self {
         Self::new(query, Some(filter.into()), None)
     }
@@ -374,7 +305,6 @@ impl Expr for StructuredQuery {
 mod tests {
     use super::*;
 
-    /// Convert a name from PascalCase to snake_case.
     fn to_snake_case(name: &str) -> String {
         let mut snake_case = String::new();
         for (i, char) in name.chars().enumerate() {

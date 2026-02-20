@@ -1168,10 +1168,10 @@ impl ChatOpenAI {
                                         }
                                         "response.completed" | "response.incomplete" => {
                                             if let Some(resp) = event.response {
-                                                if let Some(resp_usage) = resp.usage {
-                                                    usage = Some(UsageMetadata::new(
-                                                        resp_usage.input_tokens as i64,
-                                                        resp_usage.output_tokens as i64,
+                                                if let Some(ref resp_usage) = resp.usage {
+                                                    usage = Some(Self::create_usage_metadata_responses(
+                                                        resp_usage,
+                                                        resp.service_tier.as_deref(),
                                                     ));
                                                 }
                                                 finish_reason = resp.status;
@@ -1256,7 +1256,8 @@ impl ChatOpenAI {
                 }
             }
 
-            let usage_metadata = token_usage.map(Self::create_usage_metadata);
+            let usage_metadata = token_usage
+                .map(|u| Self::create_usage_metadata(u, response.service_tier.as_deref()));
 
             let mut generation_info = HashMap::new();
             if let Some(ref reason) = choice.finish_reason {
@@ -1274,6 +1275,9 @@ impl ChatOpenAI {
             }
             if let Some(ref id) = response.id {
                 response_metadata.insert("id".to_string(), serde_json::json!(id));
+            }
+            if let Some(ref tier) = response.service_tier {
+                response_metadata.insert("service_tier".to_string(), serde_json::json!(tier));
             }
 
             let ai_message = AIMessage::builder()
@@ -1367,7 +1371,7 @@ impl ChatOpenAI {
         let usage_metadata = response
             .usage
             .as_ref()
-            .map(|u| UsageMetadata::new(u.input_tokens as i64, u.output_tokens as i64));
+            .map(|u| Self::create_usage_metadata_responses(u, response.service_tier.as_deref()));
 
         let mut response_metadata = HashMap::new();
         response_metadata.insert("model_name".to_string(), serde_json::json!(response.model));
@@ -1377,6 +1381,9 @@ impl ChatOpenAI {
         }
         if let Some(ref id) = response.id {
             response_metadata.insert("id".to_string(), serde_json::json!(id));
+        }
+        if let Some(ref tier) = response.service_tier {
+            response_metadata.insert("service_tier".to_string(), serde_json::json!(tier));
         }
 
         let ai_message = AIMessage::builder()
@@ -1450,23 +1457,138 @@ impl ChatOpenAI {
     }
 
     /// Create usage metadata from OpenAI token usage.
-    fn create_usage_metadata(usage: &OpenAIUsage) -> UsageMetadata {
-        let mut metadata =
-            UsageMetadata::new(usage.prompt_tokens as i64, usage.completion_tokens as i64);
+    fn create_usage_metadata(usage: &OpenAIUsage, service_tier: Option<&str>) -> UsageMetadata {
+        let input_tokens = usage.prompt_tokens as i64;
+        let output_tokens = usage.completion_tokens as i64;
+        let mut metadata = UsageMetadata::new(input_tokens, output_tokens);
 
-        if let Some(ref details) = usage.prompt_tokens_details {
-            metadata.input_token_details = Some(crate::messages::InputTokenDetails {
-                cache_read: details.cached_tokens.map(|t| t as i64),
-                cache_creation: None,
-                audio: details.audio_tokens.map(|t| t as i64),
-            });
+        let tier = match service_tier {
+            Some("priority" | "flex") => service_tier,
+            _ => None,
+        };
+
+        let cached_tokens = usage
+            .prompt_tokens_details
+            .as_ref()
+            .and_then(|d| d.cached_tokens)
+            .map(|t| t as i64);
+        let audio_input = usage
+            .prompt_tokens_details
+            .as_ref()
+            .and_then(|d| d.audio_tokens)
+            .map(|t| t as i64);
+        let reasoning_tokens = usage
+            .completion_tokens_details
+            .as_ref()
+            .and_then(|d| d.reasoning_tokens)
+            .map(|t| t as i64);
+        let audio_output = usage
+            .completion_tokens_details
+            .as_ref()
+            .and_then(|d| d.audio_tokens)
+            .map(|t| t as i64);
+
+        if cached_tokens.is_some() || audio_input.is_some() || tier.is_some() {
+            let mut input_details = crate::messages::InputTokenDetails {
+                audio: audio_input,
+                ..Default::default()
+            };
+            if let Some(tier_name) = tier {
+                let cache_key = format!("{tier_name}_cache_read");
+                if let Some(val) = cached_tokens {
+                    input_details.extra.insert(cache_key.clone(), val);
+                }
+                let net = input_tokens - cached_tokens.unwrap_or(0);
+                input_details.extra.insert(tier_name.to_string(), net);
+            } else {
+                input_details.cache_read = cached_tokens;
+            }
+            metadata.input_token_details = Some(input_details);
         }
 
-        if let Some(ref details) = usage.completion_tokens_details {
-            metadata.output_token_details = Some(crate::messages::OutputTokenDetails {
-                reasoning: details.reasoning_tokens.map(|t| t as i64),
-                audio: details.audio_tokens.map(|t| t as i64),
-            });
+        if reasoning_tokens.is_some() || audio_output.is_some() || tier.is_some() {
+            let mut output_details = crate::messages::OutputTokenDetails {
+                audio: audio_output,
+                ..Default::default()
+            };
+            if let Some(tier_name) = tier {
+                let reasoning_key = format!("{tier_name}_reasoning");
+                if let Some(val) = reasoning_tokens {
+                    output_details.extra.insert(reasoning_key.clone(), val);
+                }
+                let net = output_tokens - reasoning_tokens.unwrap_or(0);
+                output_details.extra.insert(tier_name.to_string(), net);
+            } else {
+                output_details.reasoning = reasoning_tokens;
+            }
+            metadata.output_token_details = Some(output_details);
+        }
+
+        metadata
+    }
+
+    fn create_usage_metadata_responses(
+        usage: &ResponsesUsage,
+        service_tier: Option<&str>,
+    ) -> UsageMetadata {
+        let input_tokens = usage.input_tokens as i64;
+        let output_tokens = usage.output_tokens as i64;
+        let total_tokens = usage
+            .total_tokens
+            .map(|t| t as i64)
+            .unwrap_or(input_tokens + output_tokens);
+        let mut metadata = UsageMetadata {
+            input_tokens,
+            output_tokens,
+            total_tokens,
+            input_token_details: None,
+            output_token_details: None,
+        };
+
+        let tier = match service_tier {
+            Some("priority" | "flex") => service_tier,
+            _ => None,
+        };
+
+        let cached_tokens = usage
+            .input_tokens_details
+            .as_ref()
+            .and_then(|d| d.cached_tokens)
+            .map(|t| t as i64);
+        let reasoning_tokens = usage
+            .output_tokens_details
+            .as_ref()
+            .and_then(|d| d.reasoning_tokens)
+            .map(|t| t as i64);
+
+        if cached_tokens.is_some() || tier.is_some() {
+            let mut input_details = crate::messages::InputTokenDetails::default();
+            if let Some(tier_name) = tier {
+                let cache_key = format!("{tier_name}_cache_read");
+                if let Some(val) = cached_tokens {
+                    input_details.extra.insert(cache_key, val);
+                }
+                let net = input_tokens - cached_tokens.unwrap_or(0);
+                input_details.extra.insert(tier_name.to_string(), net);
+            } else {
+                input_details.cache_read = cached_tokens;
+            }
+            metadata.input_token_details = Some(input_details);
+        }
+
+        if reasoning_tokens.is_some() || tier.is_some() {
+            let mut output_details = crate::messages::OutputTokenDetails::default();
+            if let Some(tier_name) = tier {
+                let reasoning_key = format!("{tier_name}_reasoning");
+                if let Some(val) = reasoning_tokens {
+                    output_details.extra.insert(reasoning_key, val);
+                }
+                let net = output_tokens - reasoning_tokens.unwrap_or(0);
+                output_details.extra.insert(tier_name.to_string(), net);
+            } else {
+                output_details.reasoning = reasoning_tokens;
+            }
+            metadata.output_token_details = Some(output_details);
         }
 
         metadata
@@ -1662,10 +1784,7 @@ impl ChatOpenAI {
                                                 }
                                             }
                                             if let Some(ref u) = chunk.usage {
-                                                usage = Some(UsageMetadata::new(
-                                                    u.prompt_tokens as i64,
-                                                    u.completion_tokens as i64,
-                                                ));
+                                                usage = Some(Self::create_usage_metadata(u, chunk.service_tier.as_deref()));
                                             }
                                         }
                                         Err(e) => {
@@ -1989,6 +2108,7 @@ struct OpenAIResponse {
     choices: Vec<OpenAIChoice>,
     usage: Option<OpenAIUsage>,
     system_fingerprint: Option<String>,
+    service_tier: Option<String>,
     error: Option<serde_json::Value>,
 }
 
@@ -2037,6 +2157,7 @@ struct TokenDetails {
 struct OpenAIStreamChunk {
     choices: Vec<OpenAIStreamChoice>,
     usage: Option<OpenAIUsage>,
+    service_tier: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2071,6 +2192,7 @@ struct ResponsesApiResponse {
     output: Vec<ResponsesOutput>,
     usage: Option<ResponsesUsage>,
     status: Option<String>,
+    service_tier: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2115,6 +2237,15 @@ enum ResponsesContent {
 struct ResponsesUsage {
     input_tokens: u32,
     output_tokens: u32,
+    total_tokens: Option<u32>,
+    output_tokens_details: Option<ResponsesTokenDetails>,
+    input_tokens_details: Option<ResponsesTokenDetails>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ResponsesTokenDetails {
+    reasoning_tokens: Option<u32>,
+    cached_tokens: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2134,6 +2265,7 @@ struct ResponsesStreamEvent {
 struct ResponsesStreamResponse {
     usage: Option<ResponsesUsage>,
     status: Option<String>,
+    service_tier: Option<String>,
 }
 
 #[cfg(test)]

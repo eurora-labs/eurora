@@ -1,8 +1,3 @@
-//! Prompt templates that contain few shot examples.
-//!
-//! This module provides few-shot prompt templates for adding examples to prompts,
-//! mirroring `langchain_core.prompts.few_shot` in Python.
-
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -23,28 +18,20 @@ use super::string::{
     get_template_variables,
 };
 
-/// Type alias for async example selection future.
 pub type ExampleSelectionFuture<'a> =
     std::pin::Pin<Box<dyn std::future::Future<Output = Vec<HashMap<String, String>>> + Send + 'a>>;
 
-/// Trait for example selectors used by few-shot prompt templates.
-///
-/// Mirrors `BaseExampleSelector` from Python but with string-typed examples
-/// matching the prompt template usage pattern.
 pub trait ExampleSelector: Send + Sync {
-    /// Add new example to store.
     fn add_example(&mut self, example: HashMap<String, String>) -> Option<String> {
         let _ = example;
         None
     }
 
-    /// Select examples based on the input variables.
     fn select_examples(
         &self,
         input_variables: &HashMap<String, String>,
     ) -> Vec<HashMap<String, String>>;
 
-    /// Async select examples based on the input variables.
     fn aselect_examples(
         &self,
         input_variables: &HashMap<String, String>,
@@ -54,7 +41,6 @@ pub trait ExampleSelector: Send + Sync {
     }
 }
 
-/// Helper trait for cloning example selectors.
 pub trait ExampleSelectorClone: ExampleSelector {
     fn clone_box(&self) -> Box<dyn ExampleSelectorClone + Send + Sync>;
 }
@@ -77,7 +63,6 @@ impl std::fmt::Debug for Box<dyn ExampleSelectorClone + Send + Sync> {
     }
 }
 
-/// A simple example selector that always returns the same examples.
 #[cfg(test)]
 #[derive(Debug, Clone)]
 struct StaticExampleSelector {
@@ -101,46 +86,30 @@ impl ExampleSelector for StaticExampleSelector {
     }
 }
 
-/// Prompt template that contains few shot examples.
-///
-/// Direct port of `langchain_core.prompts.few_shot.FewShotPromptTemplate`.
 #[derive(Debug, Clone)]
 pub struct FewShotPromptTemplate {
-    /// Examples to format into the prompt.
-    /// Either this or example_selector should be provided.
     examples: Option<Vec<HashMap<String, String>>>,
 
-    /// ExampleSelector to choose the examples to format into the prompt.
-    /// Either this or examples should be provided.
     example_selector: Option<Box<dyn ExampleSelectorClone + Send + Sync>>,
 
-    /// PromptTemplate used to format an individual example.
     example_prompt: PromptTemplate,
 
-    /// A prompt template string to put after the examples.
     suffix: String,
 
-    /// String separator used to join the prefix, the examples, and suffix.
     example_separator: String,
 
-    /// A prompt template string to put before the examples.
     prefix: String,
 
-    /// The format of the prompt template. Options are: 'f-string', 'jinja2'.
     template_format: PromptTemplateFormat,
 
-    /// Input variables for this prompt.
     input_variables: Vec<String>,
 
-    /// Partial variables for this prompt.
     partial_variables: HashMap<String, String>,
 
-    /// Whether or not to try validating the template.
     validate_template: bool,
 }
 
 impl FewShotPromptTemplate {
-    /// Create a new FewShotPromptTemplate with examples.
     pub fn new(
         examples: Vec<HashMap<String, String>>,
         example_prompt: PromptTemplate,
@@ -163,7 +132,6 @@ impl FewShotPromptTemplate {
         Ok(template)
     }
 
-    /// Create a new FewShotPromptTemplate with an example selector.
     pub fn with_selector(
         selector: impl ExampleSelectorClone + 'static,
         example_prompt: PromptTemplate,
@@ -186,27 +154,22 @@ impl FewShotPromptTemplate {
         Ok(template)
     }
 
-    /// Set the example separator.
     pub fn with_separator(mut self, separator: impl Into<String>) -> Self {
         self.example_separator = separator.into();
         self
     }
 
-    /// Set the template format.
     pub fn with_format(mut self, format: PromptTemplateFormat) -> Self {
         self.template_format = format;
         self.infer_input_variables();
         self
     }
 
-    /// Set the validate_template flag.
     pub fn with_validate_template(mut self, validate: bool) -> Self {
         self.validate_template = validate;
         self
     }
 
-    /// Infer input variables from prefix + suffix template, matching Python's
-    /// `template_is_valid` model_validator.
     fn infer_input_variables(&mut self) {
         if self.validate_template {
             let combined = format!("{}{}", self.prefix, self.suffix);
@@ -227,9 +190,6 @@ impl FewShotPromptTemplate {
         }
     }
 
-    /// Get examples based on kwargs.
-    ///
-    /// Direct port of Python `_get_examples`.
     fn get_examples(
         &self,
         kwargs: &HashMap<String, String>,
@@ -245,9 +205,6 @@ impl FewShotPromptTemplate {
         }
     }
 
-    /// Async get examples based on kwargs.
-    ///
-    /// Direct port of Python `_aget_examples`.
     #[allow(dead_code)]
     async fn aget_examples(
         &self,
@@ -418,29 +375,17 @@ impl StringPromptTemplate for FewShotPromptTemplate {
     }
 }
 
-/// Chat prompt template that supports few-shot examples.
-///
-/// Direct port of `langchain_core.prompts.few_shot.FewShotChatMessagePromptTemplate`.
 #[derive(Debug, Clone)]
 pub struct FewShotChatMessagePromptTemplate {
-    /// Examples to format into the prompt.
     examples: Option<Vec<HashMap<String, String>>>,
 
-    /// ExampleSelector to choose the examples to format into the prompt.
     example_selector: Option<Box<dyn ExampleSelectorClone + Send + Sync>>,
 
-    /// The prompt template to format each example.
     example_prompt: Box<dyn ExamplePrompt>,
 
-    /// Input variables for this prompt (for example selector).
     input_variables: Vec<String>,
 }
 
-/// Trait for prompt templates that can format examples.
-///
-/// This abstracts over both `PromptTemplate` (BaseMessagePromptTemplate)
-/// and `ChatPromptTemplate` (BaseChatPromptTemplate) as Python allows both
-/// as `example_prompt`.
 pub trait ExamplePrompt: Send + Sync {
     fn input_variables(&self) -> Vec<String>;
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>>;
@@ -459,7 +404,6 @@ impl Clone for Box<dyn ExamplePrompt> {
     }
 }
 
-/// Wrapper for ChatPromptTemplate as an ExamplePrompt.
 impl ExamplePrompt for super::chat::ChatPromptTemplate {
     fn input_variables(&self) -> Vec<String> {
         BasePromptTemplate::input_variables(self).to_vec()
@@ -473,7 +417,6 @@ impl ExamplePrompt for super::chat::ChatPromptTemplate {
 }
 
 impl FewShotChatMessagePromptTemplate {
-    /// Create a new FewShotChatMessagePromptTemplate with examples.
     pub fn new(
         examples: Vec<HashMap<String, String>>,
         example_prompt: impl ExamplePrompt + 'static,
@@ -486,7 +429,6 @@ impl FewShotChatMessagePromptTemplate {
         }
     }
 
-    /// Create a new FewShotChatMessagePromptTemplate with an example selector.
     pub fn with_selector(
         selector: impl ExampleSelectorClone + 'static,
         example_prompt: impl ExamplePrompt + 'static,

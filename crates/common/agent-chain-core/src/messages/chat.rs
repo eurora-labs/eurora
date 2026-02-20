@@ -1,8 +1,3 @@
-//! Chat message type.
-//!
-//! This module contains the `ChatMessage` and `ChatMessageChunk` types which represent
-//! messages with an arbitrary speaker role. Mirrors `langchain_core.messages.chat`.
-
 use bon::bon;
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
@@ -14,48 +9,15 @@ use super::human::HumanMessageChunk;
 use crate::load::Serializable;
 use crate::utils::merge::{merge_dicts, merge_lists};
 
-/// A chat message that can be assigned an arbitrary speaker (role).
-///
-/// Use this when you need to specify a custom role that isn't covered
-/// by the standard message types (Human, AI, System, Tool).
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::messages::ChatMessage;
-///
-/// // Simple message with content and role
-/// let msg = ChatMessage::builder()
-///     .content("Hello!")
-///     .role("assistant")
-///     .build();
-///
-/// // Message with ID and name
-/// let msg = ChatMessage::builder()
-///     .content("Hello!")
-///     .role("assistant")
-///     .maybe_id(Some("msg-123".to_string()))
-///     .maybe_name(Some("bot".to_string()))
-///     .build();
-/// ```
-///
-/// This corresponds to `ChatMessage` in LangChain Python.
-
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct ChatMessage {
-    /// The message content (text or multipart)
     pub content: MessageContent,
-    /// The speaker / role of the message
     pub role: String,
-    /// Optional unique identifier
     pub id: Option<String>,
-    /// Optional name for the message
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    /// Additional metadata
     #[serde(default)]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
-    /// Response metadata
     #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
@@ -91,34 +53,9 @@ impl Serialize for ChatMessage {
 
 #[bon]
 impl ChatMessage {
-    /// Create a new chat message with named parameters using the builder pattern.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use agent_chain_core::messages::ChatMessage;
-    ///
-    /// // Simple message with content and role
-    /// let msg = ChatMessage::builder()
-    ///     .content("Hello!")
-    ///     .role("assistant")
-    ///     .build();
-    ///
-    /// // Message with ID and name
-    /// let msg = ChatMessage::builder()
-    ///     .content("Hello!")
-    ///     .role("assistant")
-    ///     .maybe_id(Some("msg-123".to_string()))
-    ///     .maybe_name(Some("bot".to_string()))
-    ///     .build();
-    /// ```
     #[builder]
     pub fn new(
         content: impl Into<MessageContent>,
-        /// Optional typed standard content blocks. When provided, these are
-        /// serialized and used as the message content instead of `content`.
-        /// Corresponds to the `content_blocks` parameter in Python's
-        /// `ChatMessage.__init__`.
         content_blocks: Option<Vec<ContentBlock>>,
         role: impl Into<String>,
         id: Option<String>,
@@ -146,28 +83,18 @@ impl ChatMessage {
         }
     }
 
-    /// Set the message ID.
     pub fn set_id(&mut self, id: String) {
         self.id = Some(id);
     }
 
-    /// Get the message type as a string.
     pub fn message_type(&self) -> &'static str {
         "chat"
     }
 
-    /// Get the text content of the message as a string.
-    ///
-    /// This extracts text from both simple string content and list content
-    /// (filtering for text blocks). Corresponds to the `text` property
-    /// on `BaseMessage` in LangChain Python.
     pub fn text(&self) -> String {
         self.content.as_text()
     }
 
-    /// Get a pretty representation of the message.
-    ///
-    /// Corresponds to `BaseMessage.pretty_repr` in LangChain Python.
     pub fn pretty_repr(&self, html: bool) -> String {
         let title = get_msg_title_repr("Chat Message", html);
         let name_line = if let Some(name) = &self.name {
@@ -178,18 +105,10 @@ impl ChatMessage {
         format!("{}{}\n\n{}", title, name_line, self.content.as_text_ref())
     }
 
-    /// Pretty print the message to stdout.
-    ///
-    /// Corresponds to `BaseMessage.pretty_print` in LangChain Python.
     pub fn pretty_print(&self) {
         println!("{}", self.pretty_repr(is_interactive_env()));
     }
 
-    /// Get the content blocks translated to the standard format.
-    ///
-    /// Translates provider-specific content blocks to the standardized
-    /// LangChain content block format. Corresponds to the `content_blocks`
-    /// property on `BaseMessage` in LangChain Python.
     pub fn content_blocks(&self) -> Vec<ContentBlock> {
         use super::content::{
             AudioContentBlock, FileContentBlock, ImageContentBlock, InvalidToolCallBlock,
@@ -310,44 +229,15 @@ impl ChatMessage {
     }
 }
 
-/// Chat message chunk (yielded when streaming).
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::messages::ChatMessageChunk;
-///
-/// // Simple chunk with content and role
-/// let chunk = ChatMessageChunk::builder()
-///     .content("Hello")
-///     .role("assistant")
-///     .build();
-///
-/// // Chunk with ID
-/// let chunk = ChatMessageChunk::builder()
-///     .content("Hello")
-///     .role("assistant")
-///     .maybe_id(Some("chunk-123".to_string()))
-///     .build();
-/// ```
-///
-/// This corresponds to `ChatMessageChunk` in LangChain Python.
-
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct ChatMessageChunk {
-    /// The message content (may be partial during streaming)
     pub content: MessageContent,
-    /// The speaker / role of the message
     pub role: String,
-    /// Optional unique identifier
     pub id: Option<String>,
-    /// Optional name for the message
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    /// Additional metadata
     #[serde(default)]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
-    /// Response metadata
     #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
@@ -383,26 +273,6 @@ impl Serialize for ChatMessageChunk {
 
 #[bon]
 impl ChatMessageChunk {
-    /// Create a new chat message chunk with named parameters using the builder pattern.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use agent_chain_core::messages::ChatMessageChunk;
-    ///
-    /// // Simple chunk with content and role
-    /// let chunk = ChatMessageChunk::builder()
-    ///     .content("Hello")
-    ///     .role("assistant")
-    ///     .build();
-    ///
-    /// // Chunk with ID
-    /// let chunk = ChatMessageChunk::builder()
-    ///     .content("Hello")
-    ///     .role("assistant")
-    ///     .maybe_id(Some("chunk-123".to_string()))
-    ///     .build();
-    /// ```
     #[builder]
     pub fn new(
         content: impl Into<MessageContent>,
@@ -422,26 +292,14 @@ impl ChatMessageChunk {
         }
     }
 
-    /// Get the message type as a string.
     pub fn message_type(&self) -> &'static str {
         "ChatMessageChunk"
     }
 
-    /// Get the text content of the chunk as a string.
-    ///
-    /// Corresponds to the `text` property on `BaseMessage` in LangChain Python.
     pub fn text(&self) -> String {
         self.content.as_text()
     }
 
-    /// Concatenate this chunk with another chunk.
-    ///
-    /// Handles both simple text and multipart content merging,
-    /// matching the behavior of `ChatMessageChunk.__add__` in Python.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the roles are different.
     pub fn concat(&self, other: &ChatMessageChunk) -> ChatMessageChunk {
         if self.role != other.role {
             panic!("Cannot concatenate ChatMessageChunks with different roles");
@@ -515,10 +373,6 @@ impl ChatMessageChunk {
         }
     }
 
-    /// Get the content blocks translated to the standard format.
-    ///
-    /// Corresponds to the `content_blocks` property on `BaseMessage`
-    /// in LangChain Python.
     pub fn content_blocks(&self) -> Vec<ContentBlock> {
         use super::content::{
             AudioContentBlock, FileContentBlock, ImageContentBlock, InvalidToolCallBlock,
@@ -640,7 +494,6 @@ impl ChatMessageChunk {
             .collect()
     }
 
-    /// Convert this chunk to a complete ChatMessage.
     pub fn to_message(&self) -> ChatMessage {
         ChatMessage {
             content: self.content.clone(),
@@ -661,9 +514,6 @@ impl std::ops::Add for ChatMessageChunk {
     }
 }
 
-/// Adding a `HumanMessageChunk` to a `ChatMessageChunk` produces a
-/// `ChatMessageChunk`, matching the Python behavior where
-/// `ChatMessageChunk.__add__` accepts any `BaseMessageChunk`.
 impl std::ops::Add<HumanMessageChunk> for ChatMessageChunk {
     type Output = ChatMessageChunk;
 

@@ -1,28 +1,4 @@
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
-//! Agent Chain Core - A Rust implementation of LangChain core library.
-//!
-//! This crate provides:
-//! - Message types for LLM threads (human, AI, system, tool)
-//! - Tool trait and `#[tool]` macro for function calling
-//! - Chat model abstractions
-//! - Callback system for tracking and monitoring operations
-//! - Prompt templates for flexible prompt construction
-//! - Support for multiple providers (Anthropic, OpenAI, etc.)
-//!
-//! # Architecture
-//!
-//! The architecture follows LangChain's pattern:
-//!
-//! - **Core layer** ([`chat_models`]): Base `ChatModel` trait that all providers implement
-//! - **Message layer** ([`messages`]): Message types for threads
-//! - **Prompts layer** ([`prompts`]): Prompt templates for constructing prompts
-//! - **Tools layer** ([`tools`]): Tool definitions and the `#[tool]` macro
-//! - **Callbacks layer** ([`callbacks`]): Callback handlers and managers for monitoring
-//!
-//! # Feature Flags
-//!
-//! - `default`: Includes all providers
-//! - `specta`: Specta derive support
 
 pub mod agents;
 pub mod api;
@@ -59,12 +35,6 @@ pub mod utils;
 pub mod vectorstores;
 
 pub mod chat_models {
-    //! Re-export of language_models types for backward compatibility.
-    //!
-    //! This module re-exports types from [`language_models`] to maintain
-    //! backward compatibility with code using the old `chat_models` module.
-    //!
-    //! New code should use [`language_models`] directly.
 
     pub use crate::language_models::{
         BaseChatModel, ChatChunk, ChatModelConfig, ChatStream, DisableStreaming, LangSmithParams,

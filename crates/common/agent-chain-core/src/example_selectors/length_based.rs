@@ -11,17 +11,11 @@ fn get_length_based(text: &str) -> usize {
     text.split(['\n', ' ']).count()
 }
 
-/// Select examples based on length.
 pub struct LengthBasedExampleSelector {
-    /// A list of the examples that the prompt template expects.
     pub examples: Vec<HashMap<String, String>>,
-    /// Prompt template used to format the examples.
     pub example_prompt: PromptTemplate,
-    /// Function to measure prompt length. Defaults to word count.
     pub get_text_length: fn(&str) -> usize,
-    /// Max length for the prompt, beyond which examples are cut.
     pub max_length: usize,
-    /// Length of each example.
     example_text_lengths: Vec<usize>,
 }
 

@@ -1,9 +1,3 @@
-//! Output parser for XML format.
-//!
-//! This module contains the `XMLOutputParser` which parses LLM output as XML,
-//! and the `StreamingParser` which provides incremental XML parsing for streaming.
-//! Mirrors `langchain_core.output_parsers.xml`.
-
 use std::fmt::Debug;
 
 use regex::Regex;
@@ -17,8 +11,6 @@ use crate::runnables::AddableDict;
 use super::base::BaseOutputParser;
 use super::transform::BaseTransformOutputParser;
 
-/// XML format instructions template, defined locally matching
-/// `XML_FORMAT_INSTRUCTIONS` in `langchain_core.output_parsers.xml`.
 const XML_FORMAT_INSTRUCTIONS: &str = r#"The output should be formatted as a XML file.
 1. Output should conform to the tags below.
 2. If tags are not given, make them on your own.
@@ -34,26 +26,12 @@ Here are the output tags:
 {tags}
 ```"#;
 
-/// Streaming parser for XML.
-///
-/// Mirrors Python's `_StreamingParser` class. Incrementally parses XML elements
-/// as chunks arrive, yielding `AddableDict` values for leaf elements.
-///
-/// Uses `quick_xml::Reader` for robust XML parsing. The full accumulated buffer
-/// is re-parsed on each `parse()` call; completed elements are yielded and
-/// removed from the buffer.
 pub(crate) struct StreamingParser {
-    /// Full accumulated XML text (never truncated — re-parsed from scratch each call).
     buffer: String,
-    /// Whether we have found the start of XML content.
     xml_started: bool,
-    /// Regex to detect the start of an XML tag.
     xml_start_re: Regex,
-    /// Number of "end" events already yielded (to avoid re-yielding on re-parse).
     yielded_count: usize,
-    /// Stack of tag names representing current nesting depth.
     current_path: Vec<String>,
-    /// Whether the current innermost element has child elements.
     current_path_has_children: bool,
 }
 
@@ -69,11 +47,6 @@ impl StreamingParser {
         }
     }
 
-    /// Parse a chunk of text and yield completed XML elements as `AddableDict`.
-    ///
-    /// Mirrors Python's `_StreamingParser.parse()`. The full buffer is re-parsed
-    /// from scratch each time; already-yielded elements are skipped by tracking
-    /// a yield counter.
     fn parse(&mut self, chunk: &str) -> Vec<AddableDict> {
         self.buffer.push_str(chunk);
 
@@ -166,35 +139,19 @@ impl StreamingParser {
         new_results
     }
 
-    /// Close the parser, ignoring any remaining incomplete XML.
     fn close(&mut self) {
         self.buffer.clear();
     }
 }
 
-/// Parse an output using XML format.
-///
-/// Returns a dictionary of tags.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::output_parsers::XMLOutputParser;
-///
-/// let parser = XMLOutputParser::new();
-/// let result = parser.parse("<root><item>value</item></root>").unwrap();
-/// ```
 #[derive(Debug, Clone)]
 pub struct XMLOutputParser {
-    /// Tags to tell the LLM to expect in the XML output.
     pub tags: Option<Vec<String>>,
 
-    /// Regex pattern to match encoding declarations.
     encoding_matcher: Regex,
 }
 
 impl XMLOutputParser {
-    /// Create a new `XMLOutputParser` with no tag hints.
     pub fn new() -> Self {
         Self {
             tags: None,
@@ -203,7 +160,6 @@ impl XMLOutputParser {
         }
     }
 
-    /// Create a parser with expected tags.
     pub fn with_tags(tags: Vec<String>) -> Self {
         Self {
             tags: Some(tags),
@@ -211,7 +167,6 @@ impl XMLOutputParser {
         }
     }
 
-    /// Parse XML string into a nested dictionary structure using `quick-xml`.
     fn parse_xml(&self, text: &str) -> Result<Value> {
         let text = self.preprocess_xml(text);
 
@@ -221,9 +176,6 @@ impl XMLOutputParser {
         self.read_root(&mut reader)
     }
 
-    /// Read the root element and convert to a nested dict structure.
-    ///
-    /// Mirrors Python's `XMLOutputParser._root_to_dict()`.
     fn read_root(&self, reader: &mut quick_xml::Reader<&[u8]>) -> Result<Value> {
         loop {
             match reader.read_event() {
@@ -256,7 +208,6 @@ impl XMLOutputParser {
         }
     }
 
-    /// Read the content of an element (text or children) until its closing tag.
     #[allow(clippy::only_used_in_recursion)]
     fn read_element_content(
         &self,
@@ -320,7 +271,6 @@ impl XMLOutputParser {
         }
     }
 
-    /// Preprocess XML text to handle code blocks and encoding.
     fn preprocess_xml(&self, text: &str) -> String {
         let mut text = text.to_string();
 
@@ -413,10 +363,6 @@ impl BaseTransformOutputParser for XMLOutputParser {
     }
 }
 
-/// Create a nested dictionary element from a path.
-///
-/// Used for streaming XML parsing.
-/// Mirrors Python's `nested_element()` function.
 pub fn nested_element(path: &[String], tag: &str, text: Option<&str>) -> AddableDict {
     let inner_value = match text {
         Some(t) => Value::String(t.to_string()),

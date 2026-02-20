@@ -1,8 +1,3 @@
-//! Base interfaces for tracing runs.
-//!
-//! This module provides the BaseTracer and AsyncBaseTracer traits.
-//! Mirrors `langchain_core.tracers.base`.
-
 use std::collections::HashMap;
 
 use async_trait::async_trait;
@@ -14,21 +9,14 @@ use crate::outputs::LLMResult;
 use crate::tracers::core::{TracerCore, TracerError};
 use crate::tracers::schemas::Run;
 
-/// Base interface for tracers.
-///
-/// This trait extends TracerCore and adds callback handler-like methods
-/// for tracking runs of chains, LLMs, tools, and retrievers.
 pub trait BaseTracer: TracerCore {
-    /// Persist a run (required implementation).
     fn persist_run_impl(&mut self, run: &Run);
 
-    /// Start a trace for a run.
     fn start_trace_impl(&mut self, run: &mut Run) {
         self.start_trace(run);
         self.on_run_create(run);
     }
 
-    /// End a trace for a run.
     fn end_trace_impl(&mut self, run: &Run) {
         if run.parent_run_id.is_none() {
             self.persist_run_impl(run);
@@ -37,7 +25,6 @@ pub trait BaseTracer: TracerCore {
         self.on_run_update(run);
     }
 
-    /// Handle chat model start.
     #[allow(clippy::too_many_arguments)]
     fn handle_chat_model_start(
         &mut self,
@@ -65,7 +52,6 @@ pub trait BaseTracer: TracerCore {
         Ok(chat_model_run)
     }
 
-    /// Handle LLM start.
     #[allow(clippy::too_many_arguments)]
     fn handle_llm_start(
         &mut self,
@@ -93,7 +79,6 @@ pub trait BaseTracer: TracerCore {
         llm_run
     }
 
-    /// Handle new LLM token.
     fn handle_llm_new_token(
         &mut self,
         token: &str,
@@ -106,7 +91,6 @@ pub trait BaseTracer: TracerCore {
         Ok(llm_run)
     }
 
-    /// Handle retry event.
     fn handle_retry(
         &mut self,
         retry_state: &HashMap<String, Value>,
@@ -115,7 +99,6 @@ pub trait BaseTracer: TracerCore {
         self.llm_run_with_retry_event(retry_state, run_id)
     }
 
-    /// Handle LLM end.
     fn handle_llm_end(&mut self, response: &LLMResult, run_id: Uuid) -> Result<Run, TracerError> {
         let llm_run = self.complete_llm_run(response, run_id)?;
         self.end_trace_impl(&llm_run);
@@ -123,7 +106,6 @@ pub trait BaseTracer: TracerCore {
         Ok(llm_run)
     }
 
-    /// Handle LLM error.
     fn handle_llm_error(
         &mut self,
         error: &dyn std::error::Error,
@@ -136,7 +118,6 @@ pub trait BaseTracer: TracerCore {
         Ok(llm_run)
     }
 
-    /// Handle chain start.
     #[allow(clippy::too_many_arguments)]
     fn handle_chain_start(
         &mut self,
@@ -166,7 +147,6 @@ pub trait BaseTracer: TracerCore {
         chain_run
     }
 
-    /// Handle chain end.
     fn handle_chain_end(
         &mut self,
         outputs: HashMap<String, Value>,
@@ -179,7 +159,6 @@ pub trait BaseTracer: TracerCore {
         Ok(chain_run)
     }
 
-    /// Handle chain error.
     fn handle_chain_error(
         &mut self,
         error: &dyn std::error::Error,
@@ -192,7 +171,6 @@ pub trait BaseTracer: TracerCore {
         Ok(chain_run)
     }
 
-    /// Handle tool start.
     #[allow(clippy::too_many_arguments)]
     fn handle_tool_start(
         &mut self,
@@ -222,7 +200,6 @@ pub trait BaseTracer: TracerCore {
         tool_run
     }
 
-    /// Handle tool end.
     fn handle_tool_end(&mut self, output: Value, run_id: Uuid) -> Result<Run, TracerError> {
         let tool_run = self.complete_tool_run(output, run_id)?;
         self.end_trace_impl(&tool_run);
@@ -230,7 +207,6 @@ pub trait BaseTracer: TracerCore {
         Ok(tool_run)
     }
 
-    /// Handle tool error.
     fn handle_tool_error(
         &mut self,
         error: &dyn std::error::Error,
@@ -242,7 +218,6 @@ pub trait BaseTracer: TracerCore {
         Ok(tool_run)
     }
 
-    /// Handle retriever start.
     #[allow(clippy::too_many_arguments)]
     fn handle_retriever_start(
         &mut self,
@@ -270,7 +245,6 @@ pub trait BaseTracer: TracerCore {
         retrieval_run
     }
 
-    /// Handle retriever end.
     fn handle_retriever_end(
         &mut self,
         documents: Vec<Value>,
@@ -282,7 +256,6 @@ pub trait BaseTracer: TracerCore {
         Ok(retrieval_run)
     }
 
-    /// Handle retriever error.
     fn handle_retriever_error(
         &mut self,
         error: &dyn std::error::Error,
@@ -295,21 +268,15 @@ pub trait BaseTracer: TracerCore {
     }
 }
 
-/// Async base interface for tracers.
-///
-/// This trait provides async versions of the tracer methods.
 #[async_trait]
 pub trait AsyncBaseTracer: TracerCore + Send + Sync {
-    /// Persist a run asynchronously (required implementation).
     async fn persist_run_async(&mut self, run: &Run);
 
-    /// Start a trace for a run asynchronously.
     async fn start_trace_async(&mut self, run: &mut Run) {
         self.start_trace(run);
         self.on_run_create_async(run).await;
     }
 
-    /// End a trace for a run asynchronously.
     async fn end_trace_async(&mut self, run: &Run) {
         if run.parent_run_id.is_none() {
             self.persist_run_async(run).await;
@@ -318,7 +285,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         self.on_run_update_async(run).await;
     }
 
-    /// Handle chat model start asynchronously.
     #[allow(clippy::too_many_arguments)]
     async fn handle_chat_model_start_async(
         &mut self,
@@ -348,7 +314,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         Ok(chat_model_run)
     }
 
-    /// Handle LLM start asynchronously.
     #[allow(clippy::too_many_arguments)]
     async fn handle_llm_start_async(
         &mut self,
@@ -378,7 +343,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         llm_run
     }
 
-    /// Handle new LLM token asynchronously.
     async fn handle_llm_new_token_async(
         &mut self,
         token: &str,
@@ -396,7 +360,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         Ok(llm_run)
     }
 
-    /// Handle retry event asynchronously.
     async fn handle_retry_async(
         &mut self,
         retry_state: &HashMap<String, Value>,
@@ -405,7 +368,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         self.llm_run_with_retry_event(retry_state, run_id)
     }
 
-    /// Handle LLM end asynchronously.
     async fn handle_llm_end_async(
         &mut self,
         response: &LLMResult,
@@ -419,7 +381,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         Ok(llm_run)
     }
 
-    /// Handle LLM error asynchronously.
     async fn handle_llm_error_async(
         &mut self,
         error: &(dyn std::error::Error + Send + Sync),
@@ -434,7 +395,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         Ok(llm_run)
     }
 
-    /// Handle chain start asynchronously.
     #[allow(clippy::too_many_arguments)]
     async fn handle_chain_start_async(
         &mut self,
@@ -466,7 +426,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         chain_run
     }
 
-    /// Handle chain end asynchronously.
     async fn handle_chain_end_async(
         &mut self,
         outputs: HashMap<String, Value>,
@@ -481,7 +440,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         Ok(chain_run)
     }
 
-    /// Handle chain error asynchronously.
     async fn handle_chain_error_async(
         &mut self,
         error: &(dyn std::error::Error + Send + Sync),
@@ -496,7 +454,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         Ok(chain_run)
     }
 
-    /// Handle tool start asynchronously.
     #[allow(clippy::too_many_arguments)]
     async fn handle_tool_start_async(
         &mut self,
@@ -528,7 +485,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         tool_run
     }
 
-    /// Handle tool end asynchronously.
     async fn handle_tool_end_async(
         &mut self,
         output: Value,
@@ -542,7 +498,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         Ok(tool_run)
     }
 
-    /// Handle tool error asynchronously.
     async fn handle_tool_error_async(
         &mut self,
         error: &(dyn std::error::Error + Send + Sync),
@@ -556,7 +511,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         Ok(tool_run)
     }
 
-    /// Handle retriever start asynchronously.
     #[allow(clippy::too_many_arguments)]
     async fn handle_retriever_start_async(
         &mut self,
@@ -586,7 +540,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         retriever_run
     }
 
-    /// Handle retriever end asynchronously.
     async fn handle_retriever_end_async(
         &mut self,
         documents: Vec<Value>,
@@ -600,7 +553,6 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         Ok(retrieval_run)
     }
 
-    /// Handle retriever error asynchronously.
     async fn handle_retriever_error_async(
         &mut self,
         error: &(dyn std::error::Error + Send + Sync),
@@ -614,16 +566,12 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         Ok(retrieval_run)
     }
 
-    /// Called when a run is created (async).
     async fn on_run_create_async(&mut self, _run: &Run) {}
 
-    /// Called when a run is updated (async).
     async fn on_run_update_async(&mut self, _run: &Run) {}
 
-    /// Called when an LLM run starts (async).
     async fn on_llm_start_async(&mut self, _run: &Run) {}
 
-    /// Called when a new LLM token is received (async).
     async fn on_llm_new_token_async(
         &mut self,
         _run: &Run,
@@ -632,40 +580,28 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
     ) {
     }
 
-    /// Called when an LLM run ends (async).
     async fn on_llm_end_async(&mut self, _run: &Run) {}
 
-    /// Called when an LLM run errors (async).
     async fn on_llm_error_async(&mut self, _run: &Run) {}
 
-    /// Called when a chain run starts (async).
     async fn on_chain_start_async(&mut self, _run: &Run) {}
 
-    /// Called when a chain run ends (async).
     async fn on_chain_end_async(&mut self, _run: &Run) {}
 
-    /// Called when a chain run errors (async).
     async fn on_chain_error_async(&mut self, _run: &Run) {}
 
-    /// Called when a tool run starts (async).
     async fn on_tool_start_async(&mut self, _run: &Run) {}
 
-    /// Called when a tool run ends (async).
     async fn on_tool_end_async(&mut self, _run: &Run) {}
 
-    /// Called when a tool run errors (async).
     async fn on_tool_error_async(&mut self, _run: &Run) {}
 
-    /// Called when a chat model run starts (async).
     async fn on_chat_model_start_async(&mut self, _run: &Run) {}
 
-    /// Called when a retriever run starts (async).
     async fn on_retriever_start_async(&mut self, _run: &Run) {}
 
-    /// Called when a retriever run ends (async).
     async fn on_retriever_end_async(&mut self, _run: &Run) {}
 
-    /// Called when a retriever run errors (async).
     async fn on_retriever_error_async(&mut self, _run: &Run) {}
 }
 

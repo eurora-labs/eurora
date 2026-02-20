@@ -1,8 +1,3 @@
-//! Draws DAG in ASCII.
-//!
-//! Adapted from langchain_core/runnables/graph_ascii.py
-//! which itself was adapted from https://github.com/iterative/dvc/blob/main/dvc/dagascii.py
-
 use std::collections::HashMap;
 
 use rust_sugiyama::configure::Config;
@@ -11,12 +6,10 @@ use super::graph::Edge;
 
 const VERTEX_HEIGHT: usize = 3;
 
-/// Calculate vertex width from its label.
 fn vertex_width(name: &str) -> usize {
     name.len() + 2
 }
 
-/// Class for drawing in ASCII.
 struct AsciiCanvas {
     cols: usize,
     lines: usize,
@@ -122,16 +115,6 @@ impl AsciiCanvas {
     }
 }
 
-/// Build a DAG and draw it in ASCII.
-///
-/// # Arguments
-///
-/// * `vertices` - Map of vertex id to vertex label.
-/// * `edges` - List of graph edges.
-///
-/// # Returns
-///
-/// ASCII representation of the graph.
 pub fn draw_ascii(vertices: &HashMap<String, String>, edges: &[Edge]) -> Result<String, String> {
     if vertices.is_empty() {
         return Ok(String::new());

@@ -1,13 +1,3 @@
-//! Tests for runnable utility functions and types.
-//!
-//! Converted from `langchain/libs/core/tests/unit_tests/runnables/test_utils.py`
-//!
-//! Python tests that rely on runtime introspection (get_lambda_source,
-//! get_function_nonlocals, get_function_first_arg_dict_keys,
-//! accepts_run_manager, accepts_config, accepts_context, is_async_generator,
-//! is_async_callable) cannot be ported because Rust handles these concerns at
-//! compile time through type bounds rather than runtime inspection.
-
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;

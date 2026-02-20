@@ -1,7 +1,3 @@
-//! Tests for OpenAI functions output parsers.
-//!
-//! Ported from langchain/libs/core/tests/unit_tests/output_parsers/test_openai_functions.py
-
 use std::collections::HashMap;
 
 use agent_chain_core::messages::{AIMessage, HumanMessage};
@@ -10,7 +6,6 @@ use agent_chain_core::outputs::ChatGeneration;
 use serde::Deserialize;
 use serde_json::json;
 
-/// Helper to create a ChatGeneration with a function call in additional_kwargs.
 fn make_function_call_generation(function_name: &str, arguments: &str) -> ChatGeneration {
     let mut additional_kwargs = HashMap::new();
     additional_kwargs.insert(
@@ -29,7 +24,6 @@ fn make_function_call_generation(function_name: &str, arguments: &str) -> ChatGe
     ChatGeneration::new(message.into())
 }
 
-/// Ported from: test_json_output_function_parser
 #[test]
 fn test_json_output_function_parser() {
     let chat_generation =
@@ -61,9 +55,6 @@ fn test_json_output_function_parser() {
     );
 }
 
-/// Ported from: test_json_output_function_parser_strictness (parametrized)
-///
-/// Test case: args_only=false, strict=false, valid JSON args
 #[test]
 fn test_json_output_function_parser_strictness_full_output() {
     let chat_generation = make_function_call_generation("function_name", "{\"arg1\": \"value1\"}");
@@ -76,7 +67,6 @@ fn test_json_output_function_parser_strictness_full_output() {
     );
 }
 
-/// Test case: args_only=true, strict=false, valid JSON args
 #[test]
 fn test_json_output_function_parser_strictness_args_only() {
     let chat_generation = make_function_call_generation("function_name", "{\"arg1\": \"value1\"}");
@@ -86,7 +76,6 @@ fn test_json_output_function_parser_strictness_args_only() {
     assert_eq!(result, Some(json!({"arg1": "value1"})));
 }
 
-/// Test case: args_only=true, strict=false, args with literal newline (lenient parsing)
 #[test]
 fn test_json_output_function_parser_strictness_newline_lenient() {
     let chat_generation =
@@ -97,7 +86,6 @@ fn test_json_output_function_parser_strictness_newline_lenient() {
     assert_eq!(result, Some(json!({"code": "print(2+\n2)"})));
 }
 
-/// Test case: args_only=true, strict=false, unicode characters
 #[test]
 fn test_json_output_function_parser_strictness_unicode() {
     let chat_generation = make_function_call_generation("function_name", "{\"code\": \"你好)\"}");
@@ -107,7 +95,6 @@ fn test_json_output_function_parser_strictness_unicode() {
     assert_eq!(result, Some(json!({"code": "你好)"})));
 }
 
-/// Test case: args_only=true, strict=true, args with literal newline (should fail)
 #[test]
 fn test_json_output_function_parser_strictness_strict_rejects_newline() {
     let chat_generation =
@@ -118,9 +105,6 @@ fn test_json_output_function_parser_strictness_strict_rejects_newline() {
     assert!(result.is_err());
 }
 
-/// Ported from: test_exceptions_raised_while_parsing (parametrized)
-///
-/// Test case: HumanMessage has no function call
 #[test]
 fn test_exception_human_message() {
     let message = HumanMessage::builder()
@@ -133,7 +117,6 @@ fn test_exception_human_message() {
     assert!(result.is_err());
 }
 
-/// Test case: AIMessage has no function call information
 #[test]
 fn test_exception_ai_message_no_function_call() {
     let message = AIMessage::builder()
@@ -146,7 +129,6 @@ fn test_exception_ai_message_no_function_call() {
     assert!(result.is_err());
 }
 
-/// Test case: Bad function call information (arguments is not a string)
 #[test]
 fn test_exception_arguments_not_string() {
     let mut additional_kwargs = HashMap::new();
@@ -169,7 +151,6 @@ fn test_exception_arguments_not_string() {
     assert!(result.is_err());
 }
 
-/// Test case: Bad function call information (arguments is not valid JSON)
 #[test]
 fn test_exception_arguments_invalid_json() {
     let chat_generation = make_function_call_generation("function_name", "noqweqwe");
@@ -179,7 +160,6 @@ fn test_exception_arguments_invalid_json() {
     assert!(result.is_err());
 }
 
-/// Ported from: test_pydantic_output_functions_parser
 #[test]
 fn test_pydantic_output_functions_parser() {
     #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -204,7 +184,6 @@ fn test_pydantic_output_functions_parser() {
     );
 }
 
-/// Ported from: test_pydantic_output_functions_parser_multiple_schemas
 #[test]
 fn test_pydantic_output_functions_parser_multiple_schemas() {
     #[derive(Debug, Clone, Deserialize, PartialEq)]

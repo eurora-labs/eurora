@@ -1,12 +1,7 @@
-//! Handle chained inputs and terminal output formatting.
-//!
-//! Adapted from langchain_core/utils/input.py
-
 use std::collections::HashMap;
 use std::io::{self, Write};
 use tracing::warn;
 
-/// Text color mapping for terminal output.
 pub static TEXT_COLOR_MAPPING: std::sync::LazyLock<HashMap<&'static str, &'static str>> =
     std::sync::LazyLock::new(|| {
         let mut m = HashMap::new();
@@ -18,31 +13,6 @@ pub static TEXT_COLOR_MAPPING: std::sync::LazyLock<HashMap<&'static str, &'stati
         m
     });
 
-/// Get mapping for items to a support color.
-///
-/// # Arguments
-///
-/// * `items` - The items to map to colors.
-/// * `excluded_colors` - The colors to exclude.
-///
-/// # Returns
-///
-/// A mapping of items to colors.
-///
-/// # Errors
-///
-/// Returns an error if no colors are available after applying exclusions.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::utils::input::get_color_mapping;
-///
-/// let items = vec!["item1".to_string(), "item2".to_string()];
-/// let mapping = get_color_mapping(&items, None).unwrap();
-/// assert!(mapping.contains_key("item1"));
-/// assert!(mapping.contains_key("item2"));
-/// ```
 pub fn get_color_mapping(
     items: &[String],
     excluded_colors: Option<&[&str]>,
@@ -69,69 +39,16 @@ pub fn get_color_mapping(
     Ok(mapping)
 }
 
-/// Get colored text for terminal output.
-///
-/// # Arguments
-///
-/// * `text` - The text to color.
-/// * `color` - The color to use (must be a key in `TEXT_COLOR_MAPPING`).
-///
-/// # Returns
-///
-/// The colored text with ANSI escape codes.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::utils::input::get_colored_text;
-///
-/// let colored = get_colored_text("Hello", "blue");
-/// // Returns text with ANSI color codes
-/// ```
 pub fn get_colored_text(text: &str, color: &str) -> String {
     let color_str = TEXT_COLOR_MAPPING.get(color).copied().unwrap_or("0");
 
     format!("\x1b[{}m\x1b[1;3m{}\x1b[0m", color_str, text)
 }
 
-/// Get bolded text for terminal output.
-///
-/// # Arguments
-///
-/// * `text` - The text to bold.
-///
-/// # Returns
-///
-/// The bolded text with ANSI escape codes.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::utils::input::get_bolded_text;
-///
-/// let bold = get_bolded_text("Important");
-/// // Returns text with ANSI bold codes
-/// ```
 pub fn get_bolded_text(text: &str) -> String {
     format!("\x1b[1m{}\x1b[0m", text)
 }
 
-/// Print text with highlighting and optional color.
-///
-/// # Arguments
-///
-/// * `text` - The text to print.
-/// * `color` - Optional color for the text.
-/// * `end` - The string to append at the end (default is empty).
-/// * `writer` - Optional writer to output to (defaults to stdout).
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::utils::input::print_text;
-///
-/// print_text("Hello, World!", Some("blue"), "", None);
-/// ```
 pub fn print_text(text: &str, color: Option<&str>, end: &str, writer: Option<&mut dyn Write>) {
     let text_to_print = if let Some(c) = color {
         get_colored_text(text, c)
@@ -156,10 +73,8 @@ pub fn print_text(text: &str, color: Option<&str>, end: &str, writer: Option<&mu
     }
 }
 
-/// Error types for input operations.
 #[derive(Debug, Clone, PartialEq)]
 pub enum InputError {
-    /// No colors are available after applying exclusions.
     NoColorsAvailable,
 }
 

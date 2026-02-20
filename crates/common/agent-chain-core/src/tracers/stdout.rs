@@ -1,8 +1,3 @@
-//! Tracers that print to the console.
-//!
-//! This module provides tracers that output run information to the console.
-//! Mirrors `langchain_core.tracers.stdout`.
-
 use std::collections::HashMap;
 
 use serde_json::Value;
@@ -17,32 +12,12 @@ use crate::tracers::core::{TracerCore, TracerCoreConfig};
 use crate::tracers::schemas::Run;
 use crate::utils::input::{get_bolded_text, get_colored_text};
 
-/// Milliseconds in a second.
 const MILLISECONDS_IN_SECOND: f64 = 1000.0;
 
-/// Try to stringify an object to JSON.
-///
-/// # Arguments
-///
-/// * `obj` - The object to stringify.
-/// * `fallback` - The fallback string to return if stringification fails.
-///
-/// # Returns
-///
-/// A JSON string if successful, otherwise the fallback string.
 pub fn try_json_stringify(obj: &Value, fallback: &str) -> String {
     serde_json::to_string_pretty(obj).unwrap_or_else(|_| fallback.to_string())
 }
 
-/// Get the elapsed time of a run.
-///
-/// # Arguments
-///
-/// * `run` - The run to get the elapsed time of.
-///
-/// # Returns
-///
-/// A string with the elapsed time in seconds or milliseconds.
 pub fn elapsed(run: &Run) -> String {
     if let Some(end_time) = run.end_time {
         let duration = end_time.signed_duration_since(run.start_time);
@@ -57,19 +32,14 @@ pub fn elapsed(run: &Run) -> String {
     }
 }
 
-/// Tracer that calls a function with a single string parameter.
 #[derive(Debug)]
 pub struct FunctionCallbackHandler<F>
 where
     F: Fn(&str) + Send + Sync,
 {
-    /// The function to call.
     function_callback: F,
-    /// The tracer configuration.
     config: TracerCoreConfig,
-    /// The run map.
     run_map: HashMap<String, Run>,
-    /// The order map.
     order_map: HashMap<Uuid, (Uuid, String)>,
 }
 
@@ -77,11 +47,6 @@ impl<F> FunctionCallbackHandler<F>
 where
     F: Fn(&str) + Send + Sync,
 {
-    /// Create a new FunctionCallbackHandler.
-    ///
-    /// # Arguments
-    ///
-    /// * `function` - The callback function to call.
     pub fn new(function: F) -> Self {
         Self {
             function_callback: function,
@@ -91,15 +56,6 @@ where
         }
     }
 
-    /// Get the parents of a run.
-    ///
-    /// # Arguments
-    ///
-    /// * `run` - The run to get the parents of.
-    ///
-    /// # Returns
-    ///
-    /// A list of parent runs.
     pub fn get_parents(&self, run: &Run) -> Vec<Run> {
         let mut parents = Vec::new();
         let mut current_run = run.clone();
@@ -116,15 +72,6 @@ where
         parents
     }
 
-    /// Get the breadcrumbs of a run.
-    ///
-    /// # Arguments
-    ///
-    /// * `run` - The run to get the breadcrumbs of.
-    ///
-    /// # Returns
-    ///
-    /// A string with the breadcrumbs of the run.
     pub fn get_breadcrumbs(&self, run: &Run) -> String {
         let parents: Vec<Run> = self.get_parents(run).into_iter().rev().collect();
         let mut all_runs = parents;
@@ -346,7 +293,6 @@ where
     fn persist_run_impl(&mut self, _run: &Run) {}
 }
 
-/// Helper function to capitalize the first letter of a string.
 fn capitalize_first(s: &str) -> String {
     let mut chars = s.chars();
     match chars.next() {
@@ -355,15 +301,12 @@ fn capitalize_first(s: &str) -> String {
     }
 }
 
-/// Tracer that prints to the console.
 #[derive(Debug)]
 pub struct ConsoleCallbackHandler {
-    /// The inner function callback handler.
     inner: FunctionCallbackHandler<fn(&str)>,
 }
 
 impl ConsoleCallbackHandler {
-    /// Create a new ConsoleCallbackHandler.
     pub fn new() -> Self {
         fn print_fn(s: &str) {
             println!("{}", s);

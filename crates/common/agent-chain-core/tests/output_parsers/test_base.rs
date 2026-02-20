@@ -1,7 +1,3 @@
-//! Tests for base output parser traits.
-//!
-//! Ported from langchain/libs/core/tests/unit_tests/output_parsers/test_base.py
-
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use agent_chain_core::error::{Error, Result};
@@ -10,7 +6,6 @@ use agent_chain_core::output_parsers::{BaseLLMOutputParser, BaseOutputParser, Ou
 use agent_chain_core::outputs::{ChatGeneration, Generation};
 use agent_chain_core::prompt_values::StringPromptValue;
 
-/// Parses string to i64.
 #[derive(Debug)]
 struct IntParser;
 
@@ -28,7 +23,6 @@ impl BaseOutputParser for IntParser {
     }
 }
 
-/// Parses YES/NO to bool.
 #[derive(Debug)]
 struct BoolParser {
     true_val: String,
@@ -67,7 +61,6 @@ impl BaseOutputParser for BoolParser {
     }
 }
 
-/// Parser that returns a not-implemented error for parser_type.
 #[derive(Debug)]
 struct NoTypeParser;
 

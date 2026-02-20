@@ -1,7 +1,3 @@
-//! Comprehensive tests for the load module.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/load/test_load.py`
-
 use std::collections::HashMap;
 
 use agent_chain_core::load::{

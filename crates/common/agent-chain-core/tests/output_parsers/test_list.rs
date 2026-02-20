@@ -1,7 +1,3 @@
-//! Tests for list output parsers.
-//!
-//! Ported from langchain/libs/core/tests/unit_tests/output_parsers/test_list.py
-
 use agent_chain_core::drop_last_n;
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::output_parsers::{

@@ -1,7 +1,3 @@
-//! Tests for configurable runnables.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/runnables/test_configurable.py`
-
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -20,7 +16,6 @@ use agent_chain_core::runnables::utils::{
 use async_trait::async_trait;
 use serde_json::Value;
 
-/// A simple reconfigurable runnable that appends `my_property` to the input.
 #[derive(Debug, Clone)]
 struct MyRunnable {
     my_property: String,
@@ -59,7 +54,6 @@ impl Reconfigurable for MyRunnable {
     }
 }
 
-/// Another runnable with a different property, used as an alternative.
 #[derive(Debug, Clone)]
 struct MyOtherRunnable {
     my_other_property: String,

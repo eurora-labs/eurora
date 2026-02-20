@@ -1,10 +1,3 @@
-//! Snapshot tests for StdOutCallbackHandler.
-//!
-//! These tests capture the exact output format and behavior of the
-//! StdOutCallbackHandler to detect unintended changes.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/callbacks/test_stdout_snapshot.py`
-
 use std::collections::HashMap;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
@@ -15,7 +8,6 @@ use agent_chain_core::callbacks::base::{
 use agent_chain_core::callbacks::stdout::StdOutCallbackHandler;
 use uuid::Uuid;
 
-/// A Write implementation backed by a shared buffer for test output capture.
 #[derive(Clone)]
 struct TestWriter {
     buffer: Arc<Mutex<Vec<u8>>>,
@@ -58,28 +50,24 @@ fn create_test_handler_with_color(color: &str) -> (StdOutCallbackHandler, TestWr
     (handler, writer)
 }
 
-/// Ported from `test_default_color_is_none`.
 #[test]
 fn test_default_color_is_none() {
     let handler = StdOutCallbackHandler::new();
     assert!(handler.color.is_none());
 }
 
-/// Ported from `test_custom_color_stored`.
 #[test]
 fn test_custom_color_stored() {
     let handler = StdOutCallbackHandler::with_color("blue");
     assert_eq!(handler.color, Some("blue".to_string()));
 }
 
-/// Ported from `test_inherits_base_handler`.
 #[test]
 fn test_inherits_base_handler() {
     let handler = StdOutCallbackHandler::new();
     let _: &dyn BaseCallbackHandler = &handler;
 }
 
-/// Ported from `test_default_flags`.
 #[test]
 fn test_default_flags() {
     let handler = StdOutCallbackHandler::new();
@@ -87,9 +75,6 @@ fn test_default_flags() {
     assert!(!handler.run_inline());
 }
 
-/// Ported from `test_uses_name_from_kwargs`.
-///
-/// In Python, name is passed as a kwarg. In Rust, it is passed via the name parameter.
 #[test]
 fn test_chain_start_uses_name_from_kwargs() {
     let (handler, writer) = create_test_handler();
@@ -110,7 +95,6 @@ fn test_chain_start_uses_name_from_kwargs() {
     );
 }
 
-/// Ported from `test_uses_name_from_serialized`.
 #[test]
 fn test_chain_start_uses_name_from_serialized() {
     let (handler, writer) = create_test_handler();
@@ -132,7 +116,6 @@ fn test_chain_start_uses_name_from_serialized() {
     );
 }
 
-/// Ported from `test_uses_id_from_serialized_as_fallback`.
 #[test]
 fn test_chain_start_uses_id_from_serialized_as_fallback() {
     let (handler, writer) = create_test_handler();
@@ -157,7 +140,6 @@ fn test_chain_start_uses_id_from_serialized_as_fallback() {
     );
 }
 
-/// Ported from `test_uses_unknown_when_no_name`.
 #[test]
 fn test_chain_start_uses_unknown_when_no_name() {
     let (handler, writer) = create_test_handler();
@@ -178,7 +160,6 @@ fn test_chain_start_uses_unknown_when_no_name() {
     );
 }
 
-/// Ported from `test_name_kwarg_takes_precedence_over_serialized`.
 #[test]
 fn test_chain_start_name_kwarg_takes_precedence_over_serialized() {
     let (handler, writer) = create_test_handler();
@@ -205,7 +186,6 @@ fn test_chain_start_name_kwarg_takes_precedence_over_serialized() {
     );
 }
 
-/// Ported from `test_output_has_bold_ansi_codes` (on_chain_start).
 #[test]
 fn test_chain_start_output_has_bold_ansi_codes() {
     let (handler, writer) = create_test_handler();
@@ -232,9 +212,6 @@ fn test_chain_start_output_has_bold_ansi_codes() {
     );
 }
 
-/// Ported from `test_serialized_none_uses_unknown`.
-///
-/// In Python, serialized can be None. In Rust, we pass an empty HashMap.
 #[test]
 fn test_chain_start_serialized_none_uses_unknown() {
     let (handler, writer) = create_test_handler();
@@ -255,7 +232,6 @@ fn test_chain_start_serialized_none_uses_unknown() {
     );
 }
 
-/// Ported from `test_outputs_finished_chain`.
 #[test]
 fn test_chain_end_outputs_finished_chain() {
     let (handler, writer) = create_test_handler();
@@ -268,7 +244,6 @@ fn test_chain_end_outputs_finished_chain() {
     );
 }
 
-/// Ported from `test_output_has_bold_ansi_codes` (on_chain_end).
 #[test]
 fn test_chain_end_output_has_bold_ansi_codes() {
     let (handler, writer) = create_test_handler();
@@ -286,7 +261,6 @@ fn test_chain_end_output_has_bold_ansi_codes() {
     );
 }
 
-/// Ported from `test_outputs_start_with_newline`.
 #[test]
 fn test_chain_end_outputs_start_with_newline() {
     let (handler, writer) = create_test_handler();
@@ -299,7 +273,6 @@ fn test_chain_end_outputs_start_with_newline() {
     );
 }
 
-/// Ported from `test_outputs_action_log`.
 #[test]
 fn test_agent_action_outputs_action_log() {
     let (handler, writer) = create_test_handler();
@@ -317,7 +290,6 @@ fn test_agent_action_outputs_action_log() {
     );
 }
 
-/// Ported from `test_color_override` (on_agent_action).
 #[test]
 fn test_agent_action_color_override() {
     let (handler, writer) = create_test_handler_with_color("green");
@@ -335,7 +307,6 @@ fn test_agent_action_color_override() {
     );
 }
 
-/// Ported from `test_uses_default_color_when_no_override`.
 #[test]
 fn test_agent_action_uses_default_color_when_no_override() {
     let (handler, writer) = create_test_handler_with_color("green");
@@ -353,7 +324,6 @@ fn test_agent_action_uses_default_color_when_no_override() {
     );
 }
 
-/// Ported from `test_outputs_tool_result`.
 #[test]
 fn test_tool_end_outputs_tool_result() {
     let (handler, writer) = create_test_handler();
@@ -366,7 +336,6 @@ fn test_tool_end_outputs_tool_result() {
     );
 }
 
-/// Ported from `test_with_observation_prefix`.
 #[test]
 fn test_tool_end_with_observation_prefix() {
     let (handler, writer) = create_test_handler();
@@ -384,7 +353,6 @@ fn test_tool_end_with_observation_prefix() {
     );
 }
 
-/// Ported from `test_with_llm_prefix`.
 #[test]
 fn test_tool_end_with_llm_prefix() {
     let (handler, writer) = create_test_handler();
@@ -402,7 +370,6 @@ fn test_tool_end_with_llm_prefix() {
     );
 }
 
-/// Ported from `test_with_both_prefixes`.
 #[test]
 fn test_tool_end_with_both_prefixes() {
     let (handler, writer) = create_test_handler();
@@ -432,7 +399,6 @@ fn test_tool_end_with_both_prefixes() {
     );
 }
 
-/// Ported from `test_no_prefix_when_none`.
 #[test]
 fn test_tool_end_no_prefix_when_none() {
     let (handler, writer) = create_test_handler();
@@ -445,11 +411,6 @@ fn test_tool_end_no_prefix_when_none() {
     );
 }
 
-/// Ported from `test_non_string_output_converted`.
-///
-/// In Python, on_tool_end calls str(output). In Rust, the parameter is
-/// already `&str`, so callers convert before passing. This test verifies
-/// the pattern works.
 #[test]
 fn test_tool_end_non_string_output_converted() {
     let (handler, writer) = create_test_handler();
@@ -462,7 +423,6 @@ fn test_tool_end_non_string_output_converted() {
     );
 }
 
-/// Ported from `test_color_override` (on_tool_end).
 #[test]
 fn test_tool_end_color_override() {
     let (handler, writer) = create_test_handler_with_color("green");
@@ -475,7 +435,6 @@ fn test_tool_end_color_override() {
     );
 }
 
-/// Ported from `test_outputs_text`.
 #[test]
 fn test_on_text_outputs_text() {
     let (handler, writer) = create_test_handler();
@@ -488,7 +447,6 @@ fn test_on_text_outputs_text() {
     );
 }
 
-/// Ported from `test_custom_end_character`.
 #[test]
 fn test_on_text_custom_end_character() {
     let (handler, writer) = create_test_handler();
@@ -507,7 +465,6 @@ fn test_on_text_custom_end_character() {
     );
 }
 
-/// Ported from `test_default_end_is_empty`.
 #[test]
 fn test_on_text_default_end_is_empty() {
     let (handler, writer) = create_test_handler();
@@ -518,14 +475,12 @@ fn test_on_text_default_end_is_empty() {
     assert!(output.contains("b"), "Expected 'b' in output: {:?}", output);
 }
 
-/// Ported from `test_empty_text`.
 #[test]
 fn test_on_text_empty_text() {
     let (handler, _writer) = create_test_handler();
     handler.on_text("", Uuid::new_v4(), None, None, "");
 }
 
-/// Ported from `test_outputs_finish_log`.
 #[test]
 fn test_agent_finish_outputs_finish_log() {
     let (handler, writer) = create_test_handler();
@@ -542,7 +497,6 @@ fn test_agent_finish_outputs_finish_log() {
     );
 }
 
-/// Ported from `test_color_override` (on_agent_finish).
 #[test]
 fn test_agent_finish_color_override() {
     let (handler, writer) = create_test_handler_with_color("green");
@@ -559,7 +513,6 @@ fn test_agent_finish_color_override() {
     );
 }
 
-/// Ported from `test_ends_with_newline`.
 #[test]
 fn test_agent_finish_ends_with_newline() {
     let (handler, writer) = create_test_handler();

@@ -1,5 +1,3 @@
-//! Document loaders.
-
 pub mod base;
 pub mod blob_loaders;
 

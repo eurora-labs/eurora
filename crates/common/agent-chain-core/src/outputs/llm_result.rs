@@ -1,9 +1,3 @@
-//! LLMResult class.
-//!
-//! This module contains the `LLMResult` type which is a container
-//! for results of an LLM call.
-//! Mirrors `langchain_core.outputs.llm_result`.
-
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -12,20 +6,12 @@ use super::chat_generation::{ChatGeneration, ChatGenerationChunk};
 use super::generation::{Generation, GenerationChunk};
 use super::run_info::RunInfo;
 
-/// Enum representing different types of generations.
-///
-/// This allows LLMResult to hold different generation types.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum GenerationType {
-    /// A standard text generation.
     Generation(Generation),
-    /// A text generation chunk.
     GenerationChunk(GenerationChunk),
-    /// A chat generation.
     ChatGeneration(ChatGeneration),
-    /// A chat generation chunk.
     ChatGenerationChunk(ChatGenerationChunk),
 }
 
@@ -53,45 +39,16 @@ impl From<ChatGenerationChunk> for GenerationType {
     }
 }
 
-/// A container for results of an LLM call.
-///
-/// Both chat models and LLMs generate an LLMResult object. This object contains the
-/// generated outputs and any additional information that the model provider wants to
-/// return.
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LLMResult {
-    /// Generated outputs.
-    ///
-    /// The first dimension of the list represents completions for different input prompts.
-    ///
-    /// The second dimension of the list represents different candidate generations for a
-    /// given prompt.
-    ///
-    /// - When returned from **an LLM**, the type is `list[list[Generation]]`.
-    /// - When returned from a **chat model**, the type is `list[list[ChatGeneration]]`.
-    ///
-    /// ChatGeneration is a subclass of Generation that has a field for a structured chat
-    /// message.
     pub generations: Vec<Vec<GenerationType>>,
 
-    /// For arbitrary LLM provider specific output.
-    ///
-    /// This dictionary is a free-form dictionary that can contain any information that the
-    /// provider wants to return. It is not standardized and is provider-specific.
-    ///
-    /// Users should generally avoid relying on this field and instead rely on accessing
-    /// relevant information from standardized fields present in AIMessage.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub llm_output: Option<HashMap<String, Value>>,
 
-    /// List of metadata info for model call for each input.
-    ///
-    /// See `RunInfo` for details.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub run: Option<Vec<RunInfo>>,
 
-    /// Type is used exclusively for serialization purposes.
     #[serde(rename = "type", default = "default_llm_result_type")]
     pub result_type: String,
 }
@@ -101,7 +58,6 @@ fn default_llm_result_type() -> String {
 }
 
 impl LLMResult {
-    /// Create a new LLMResult with the given generations.
     pub fn new(generations: Vec<Vec<GenerationType>>) -> Self {
         Self {
             generations,
@@ -111,7 +67,6 @@ impl LLMResult {
         }
     }
 
-    /// Create a new LLMResult with generations and LLM output.
     pub fn with_llm_output(
         generations: Vec<Vec<GenerationType>>,
         llm_output: HashMap<String, Value>,
@@ -124,15 +79,6 @@ impl LLMResult {
         }
     }
 
-    /// Flatten generations into a single list.
-    ///
-    /// Unpack list\[list\[Generation\]\] -> list\[LLMResult\] where each returned LLMResult
-    /// contains only a single Generation. If token usage information is available,
-    /// it is kept only for the LLMResult corresponding to the top-choice
-    /// Generation, to avoid over-counting of token usage downstream.
-    ///
-    /// Returns a list of LLMResults where each returned LLMResult contains a single
-    /// Generation.
     pub fn flatten(&self) -> Vec<LLMResult> {
         let mut llm_results = Vec::new();
 

@@ -1,8 +1,3 @@
-//! Prompt template schema definition.
-//!
-//! This module provides the PromptTemplate struct which is the main prompt
-//! template for simple string formatting, mirroring `langchain_core.prompts.prompt` in Python.
-
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -22,78 +17,32 @@ use super::string::{
     get_template_variables,
 };
 
-/// Prompt template for a language model.
-///
-/// A prompt template consists of a string template. It accepts a set of parameters
-/// from the user that can be used to generate a prompt for a language model.
-///
-/// The template can be formatted using either f-strings (default), jinja2, or mustache syntax.
-///
-/// **Security warning**: Prefer using `template_format = FString` instead of
-/// `template_format = Jinja2`, or make sure to NEVER accept jinja2 templates
-/// from untrusted sources as they may lead to arbitrary code execution.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::prompts::PromptTemplate;
-/// use agent_chain_core::BasePromptTemplate;
-/// use std::collections::HashMap;
-///
-/// // Using from_template (recommended)
-/// let prompt = PromptTemplate::from_template("Say {foo}").unwrap();
-///
-/// let mut kwargs = HashMap::new();
-/// kwargs.insert("foo".to_string(), "bar".to_string());
-///
-/// let result = BasePromptTemplate::format(&prompt, &kwargs).unwrap();
-/// assert_eq!(result, "Say bar");
-/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptTemplate {
-    /// The prompt template string.
     pub template: String,
 
-    /// A list of the names of the variables whose values are required as inputs to the prompt.
     pub input_variables: Vec<String>,
 
-    /// A list of the names of the variables that are optional.
     #[serde(default)]
     pub optional_variables: Vec<String>,
 
-    /// The format of the prompt template.
     #[serde(default)]
     pub template_format: PromptTemplateFormat,
 
-    /// Whether or not to try validating the template.
     #[serde(default)]
     pub validate_template: bool,
 
-    /// A dictionary of the partial variables the prompt template carries.
     #[serde(default)]
     pub partial_variables: HashMap<String, String>,
 
-    /// Metadata to be used for tracing.
     #[serde(default)]
     pub metadata: Option<HashMap<String, serde_json::Value>>,
 
-    /// Tags to be used for tracing.
     #[serde(default)]
     pub tags: Option<Vec<String>>,
 }
 
 impl PromptTemplate {
-    /// Create a new PromptTemplate.
-    ///
-    /// # Arguments
-    ///
-    /// * `template` - The template string.
-    /// * `input_variables` - Optional list of input variables. If not provided, they will be inferred.
-    /// * `template_format` - The format of the template.
-    ///
-    /// # Returns
-    ///
-    /// A new PromptTemplate, or an error if validation fails.
     pub fn new(
         template: impl Into<String>,
         input_variables: Option<Vec<String>>,
@@ -119,39 +68,10 @@ impl PromptTemplate {
         Ok(prompt)
     }
 
-    /// Create a prompt template from a template string.
-    ///
-    /// This is the recommended way to create a PromptTemplate.
-    ///
-    /// # Arguments
-    ///
-    /// * `template` - The template string.
-    ///
-    /// # Returns
-    ///
-    /// A new PromptTemplate, or an error if validation fails.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use agent_chain_core::prompts::PromptTemplate;
-    ///
-    /// let prompt = PromptTemplate::from_template("Say {foo}").unwrap();
-    /// ```
     pub fn from_template(template: impl Into<String>) -> Result<Self> {
         Self::from_template_with_format(template, PromptTemplateFormat::FString)
     }
 
-    /// Create a prompt template from a template string with a specific format.
-    ///
-    /// # Arguments
-    ///
-    /// * `template` - The template string.
-    /// * `template_format` - The format of the template.
-    ///
-    /// # Returns
-    ///
-    /// A new PromptTemplate, or an error if validation fails.
     pub fn from_template_with_format(
         template: impl Into<String>,
         template_format: PromptTemplateFormat,
@@ -159,17 +79,6 @@ impl PromptTemplate {
         Self::new(template, None, template_format)
     }
 
-    /// Create a prompt template from a template string with partial variables.
-    ///
-    /// # Arguments
-    ///
-    /// * `template` - The template string.
-    /// * `template_format` - The format of the template.
-    /// * `partial_variables` - A dictionary of partial variables.
-    ///
-    /// # Returns
-    ///
-    /// A new PromptTemplate, or an error if validation fails.
     pub fn from_template_with_partials(
         template: impl Into<String>,
         template_format: PromptTemplateFormat,
@@ -198,22 +107,11 @@ impl PromptTemplate {
         Ok(prompt)
     }
 
-    /// Load a prompt from a file.
-    ///
-    /// # Arguments
-    ///
-    /// * `template_file` - The path to the file containing the prompt template.
-    /// * `encoding` - Optional encoding (currently ignored, uses UTF-8).
-    ///
-    /// # Returns
-    ///
-    /// A new PromptTemplate, or an error if loading fails.
     pub fn from_file(template_file: impl AsRef<Path>) -> Result<Self> {
         let template = std::fs::read_to_string(template_file)?;
         Self::from_template(template)
     }
 
-    /// Load a prompt from a file with a specific format.
     pub fn from_file_with_format(
         template_file: impl AsRef<Path>,
         template_format: PromptTemplateFormat,
@@ -222,21 +120,6 @@ impl PromptTemplate {
         Self::from_template_with_format(template, template_format)
     }
 
-    /// Take examples in list format with prefix and suffix to create a prompt.
-    ///
-    /// Intended to be used as a way to dynamically create a prompt from examples.
-    ///
-    /// # Arguments
-    ///
-    /// * `examples` - List of examples to use in the prompt.
-    /// * `suffix` - String to go after the list of examples.
-    /// * `input_variables` - A list of variable names the final prompt template will expect.
-    /// * `example_separator` - The separator to use in between examples.
-    /// * `prefix` - String that should go before any examples.
-    ///
-    /// # Returns
-    ///
-    /// A new PromptTemplate.
     pub fn from_examples(
         examples: &[String],
         suffix: &str,
@@ -265,7 +148,6 @@ impl PromptTemplate {
         })
     }
 
-    /// Validate the prompt template.
     fn validate(&self) -> Result<()> {
         if self.validate_template {
             if self.template_format == PromptTemplateFormat::Mustache {
@@ -287,19 +169,16 @@ impl PromptTemplate {
         Ok(())
     }
 
-    /// Set whether to validate the template.
     pub fn with_validation(mut self, validate: bool) -> Self {
         self.validate_template = validate;
         self
     }
 
-    /// Set metadata for tracing.
     pub fn with_metadata(mut self, metadata: HashMap<String, serde_json::Value>) -> Self {
         self.metadata = Some(metadata);
         self
     }
 
-    /// Set tags for tracing.
     pub fn with_tags(mut self, tags: Vec<String>) -> Self {
         self.tags = Some(tags);
         self

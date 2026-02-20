@@ -1,9 +1,3 @@
-//! Utility functions for language models.
-//!
-//! This module contains helper functions for working with language models,
-//! including message normalization and content block utilities.
-//! Mirrors `langchain_core.language_models._utils`.
-
 use crate::messages::BaseMessage;
 use crate::messages::content::{ContentPart, MessageContent};
 use std::collections::HashMap;
@@ -11,29 +5,13 @@ use std::collections::HashMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-/// Filter type for OpenAI data blocks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataBlockFilter {
-    /// Only match image blocks.
     Image,
-    /// Only match audio blocks.
     Audio,
-    /// Only match file blocks.
     File,
 }
 
-/// Check whether a block contains multimodal data in OpenAI Chat Completions format.
-///
-/// Supports both data and ID-style blocks (e.g. `'file_data'` and `'file_id'`)
-///
-/// # Arguments
-///
-/// * `block` - The content block to check.
-/// * `filter` - If provided, only return true for blocks matching this specific type.
-///
-/// # Returns
-///
-/// `true` if the block is a valid OpenAI data block and matches the filter (if provided).
 pub fn is_openai_data_block(block: &serde_json::Value, filter: Option<DataBlockFilter>) -> bool {
     let block_type = block.get("type").and_then(|t| t.as_str());
 
@@ -96,26 +74,13 @@ pub fn is_openai_data_block(block: &serde_json::Value, filter: Option<DataBlockF
     }
 }
 
-/// Parsed data URI components.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParsedDataUri {
-    /// Source type (always "base64" for data URIs).
     pub source_type: String,
-    /// The base64-encoded data.
     pub data: String,
-    /// The MIME type of the data.
     pub mime_type: String,
 }
 
-/// Parse a data URI into its components.
-///
-/// # Arguments
-///
-/// * `uri` - The data URI to parse (e.g., "data:image/jpeg;base64,/9j/4AAQ...")
-///
-/// # Returns
-///
-/// `Some(ParsedDataUri)` if parsing succeeds, `None` otherwise.
 pub fn parse_data_uri(uri: &str) -> Option<ParsedDataUri> {
     let re = Regex::new(r"^data:(?P<mime_type>[^;]+);base64,(?P<data>.+)$").ok()?;
     let captures = re.captures(uri)?;
@@ -134,18 +99,6 @@ pub fn parse_data_uri(uri: &str) -> Option<ParsedDataUri> {
     })
 }
 
-/// Get a default tokenizer estimate for token counting.
-///
-/// This provides a rough estimate based on whitespace splitting.
-/// For accurate counts, use a proper tokenizer for the specific model.
-///
-/// # Arguments
-///
-/// * `text` - The text to tokenize.
-///
-/// # Returns
-///
-/// Estimated token IDs (just indices in this simple implementation).
 pub fn get_token_ids_default(text: &str) -> Vec<u32> {
     text.split_whitespace()
         .enumerate()
@@ -153,26 +106,11 @@ pub fn get_token_ids_default(text: &str) -> Vec<u32> {
         .collect()
 }
 
-/// Estimate the number of tokens in a text.
-///
-/// This is a rough estimate. For accurate counts, use model-specific tokenizers.
-///
-/// # Arguments
-///
-/// * `text` - The text to count tokens for.
-///
-/// # Returns
-///
-/// Estimated token count.
 pub fn estimate_token_count(text: &str) -> usize {
     let char_count = text.chars().count();
     char_count.div_ceil(4)
 }
 
-/// Convert a v0 content block format to v1 format.
-///
-/// LangChain v0 content blocks had different structure than v1.
-/// This function converts the older format to the newer standard.
 pub fn convert_legacy_v0_content_block_to_v1(
     block: &HashMap<String, serde_json::Value>,
 ) -> HashMap<String, serde_json::Value> {
@@ -225,7 +163,6 @@ pub fn convert_legacy_v0_content_block_to_v1(
     result
 }
 
-/// Convert an OpenAI format content block to a standard data block.
 pub fn convert_openai_format_to_data_block(
     block: &serde_json::Value,
 ) -> HashMap<String, serde_json::Value> {
@@ -325,13 +262,6 @@ pub fn convert_openai_format_to_data_block(
     result
 }
 
-/// Update message content to use content blocks format.
-///
-/// Creates a copy of the AIMessage where `content` is replaced by the
-/// serialized `content_blocks()` result, and `response_metadata["output_version"]`
-/// is set to the given version string.
-///
-/// This mirrors Python's `_update_message_content_to_blocks`.
 pub fn update_message_content_to_blocks(
     message: &crate::messages::AIMessage,
     output_version: &str,
@@ -367,14 +297,6 @@ pub fn update_message_content_to_blocks(
         .build()
 }
 
-/// Normalize message content blocks to LangChain v1 standard format.
-///
-/// Converts OpenAI Chat Completions multimodal blocks and LangChain v0
-/// blocks to v1 standard format. Messages with plain string content or
-/// already-v1 blocks pass through unchanged.
-///
-/// This mirrors Python's `_normalize_messages` from
-/// `langchain_core.language_models._utils`.
 pub fn normalize_messages(messages: Vec<BaseMessage>) -> Vec<BaseMessage> {
     messages.into_iter().map(normalize_single_message).collect()
 }
@@ -441,13 +363,6 @@ fn normalize_single_message(mut message: BaseMessage) -> BaseMessage {
     message
 }
 
-/// Update an AIMessageChunk's content to use content blocks format.
-///
-/// Creates a new AIMessageChunk where `content` is replaced by the
-/// serialized `content_blocks()` result, and
-/// `response_metadata["output_version"]` is set to the given version string.
-///
-/// This mirrors Python's `_update_message_content_to_blocks` for chunks.
 pub fn update_chunk_content_to_blocks(
     chunk: &crate::messages::AIMessageChunk,
     output_version: &str,

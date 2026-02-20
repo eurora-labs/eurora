@@ -1,15 +1,9 @@
-//! Custom error types for agent-chain.
-//!
-//! This module mirrors the exception hierarchy from `langchain_core.exceptions`.
-
 use std::fmt;
 
 use thiserror::Error;
 
-/// Result type alias for agent-chain operations.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Error codes matching `langchain_core.exceptions.ErrorCode`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ErrorCode {
     InvalidPromptInput,
@@ -41,9 +35,6 @@ impl fmt::Display for ErrorCode {
     }
 }
 
-/// Create an error message with a link to the troubleshooting guide.
-///
-/// Mirrors `langchain_core.exceptions.create_message`.
 pub fn create_message(message: &str, error_code: ErrorCode) -> String {
     format!(
         "{message}
@@ -52,21 +43,14 @@ For troubleshooting, visit:          https://docs.langchain.com/oss/python/langc
     )
 }
 
-/// Main error type for agent-chain operations.
-///
-/// Mirrors the exception hierarchy from `langchain_core.exceptions`.
 #[derive(Debug, Error)]
 pub enum Error {
-    /// General agent-chain exception. Mirrors `LangChainException`.
     #[error("{0}")]
     General(String),
 
-    /// Exception for tracer errors. Mirrors `TracerException`.
     #[error("Tracer error: {0}")]
     Tracer(String),
 
-    /// Exception that output parsers raise to signify a parsing error.
-    /// Mirrors `OutputParserException`.
     #[error("{message}")]
     OutputParser {
         message: String,
@@ -75,78 +59,59 @@ pub enum Error {
         send_to_llm: bool,
     },
 
-    /// Error from HTTP requests.
     #[error("HTTP error: {0}")]
     Http(#[from] reqwest::Error),
 
-    /// Error parsing JSON.
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 
-    /// IO error.
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    /// API returned an error response.
     #[error("API error ({status}): {message}")]
     Api { status: u16, message: String },
 
-    /// Missing required configuration.
     #[error("Missing configuration: {0}")]
     MissingConfig(String),
 
-    /// Unsupported provider.
     #[error("Unsupported provider: {0}")]
     UnsupportedProvider(String),
 
-    /// Unable to infer provider from model name.
     #[error("Unable to infer provider for model '{0}'. Please specify model_provider explicitly.")]
     UnableToInferProvider(String),
 
-    /// Invalid model configuration.
     #[error("Invalid configuration: {0}")]
     InvalidConfig(String),
 
-    /// Tool invocation error.
     #[error("Tool invocation error: {0}")]
     ToolInvocation(String),
 
-    /// Tool exception — raised by tool implementations to signal a handled error.
-    /// Mirrors Python's `ToolException`.
     #[error("{0}")]
     ToolException(String),
 
-    /// Validation error on tool input.
     #[error("Validation error: {0}")]
     ValidationError(String),
 
-    /// Feature or method not implemented.
-    /// Exception raised when an indexing operation fails.
     #[error("Indexing error: {0}")]
     Indexing(String),
 
     #[error("Not implemented: {0}")]
     NotImplemented(String),
 
-    /// Operation timed out.
     #[error("Timeout: {0}")]
     Timeout(String),
 
-    /// All retry attempts exhausted.
     #[error("Retry exhausted: {0}")]
     RetryExhausted(String),
 
-    /// Lock poisoned (mutex/rwlock).
     #[error("Lock poisoned: {0}")]
     LockPoisoned(String),
 
-    /// Generic error with message.
     #[error("{0}")]
     Other(String),
 }
 
 impl Error {
-    /// Check if this error is a ToolException.
     pub fn as_tool_exception(&self) -> Option<&str> {
         match self {
             Error::ToolException(msg) => Some(msg),
@@ -155,7 +120,6 @@ impl Error {
         }
     }
 
-    /// Check if this error is a validation error.
     pub fn as_validation_error(&self) -> Option<&str> {
         match self {
             Error::ValidationError(msg) => Some(msg),
@@ -163,9 +127,6 @@ impl Error {
         }
     }
 
-    /// Create an output parser error, mirroring `OutputParserException.__init__`.
-    ///
-    /// If `send_to_llm` is true, both `observation` and `llm_output` must be `Some`.
     pub fn output_parser(
         error: impl Into<String>,
         observation: Option<String>,
@@ -187,7 +148,6 @@ impl Error {
         })
     }
 
-    /// Create a new API error.
     pub fn api(status: u16, message: impl Into<String>) -> Self {
         Self::Api {
             status,
@@ -195,30 +155,22 @@ impl Error {
         }
     }
 
-    /// Create a missing config error.
     pub fn missing_config(key: impl Into<String>) -> Self {
         Self::MissingConfig(key.into())
     }
 
-    /// Create an unsupported provider error.
     pub fn unsupported_provider(provider: impl Into<String>) -> Self {
         Self::UnsupportedProvider(provider.into())
     }
 
-    /// Create an unable to infer provider error.
     pub fn unable_to_infer_provider(model: impl Into<String>) -> Self {
         Self::UnableToInferProvider(model.into())
     }
 
-    /// Create a generic error.
     pub fn other(message: impl Into<String>) -> Self {
         Self::Other(message.into())
     }
 
-    /// Whether this error is worth retrying.
-    ///
-    /// Returns `true` for transient network/server errors and rate-limiting.
-    /// Returns `false` for client errors, parse/config errors that won't resolve on retry.
     pub fn is_retryable(&self) -> bool {
         match self {
             Self::Http(_) => true,

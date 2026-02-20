@@ -8,17 +8,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::Semaphore;
 
-/// Run a coroutine with a semaphore.
-///
-/// This is a helper function that acquires a permit from the semaphore before
-/// running the future, and releases it when the future completes.
-///
-/// # Arguments
-/// * `semaphore` - The semaphore to use for limiting concurrency
-/// * `fut` - The future to run
-///
-/// # Returns
-/// The result of the future
 pub async fn gated_coro<T>(semaphore: Arc<Semaphore>, fut: impl Future<Output = T>) -> T {
     let _permit = semaphore
         .acquire()
@@ -27,17 +16,6 @@ pub async fn gated_coro<T>(semaphore: Arc<Semaphore>, fut: impl Future<Output = 
     fut.await
 }
 
-/// Gather futures with a limit on the number of concurrent futures.
-///
-/// This function runs multiple futures concurrently, but limits the number of
-/// futures that can run at the same time using a semaphore.
-///
-/// # Arguments
-/// * `n` - The maximum number of futures to run concurrently. If None, all futures run concurrently.
-/// * `futures` - The futures to run
-///
-/// # Returns
-/// A vector of results in the same order as the input futures
 pub async fn gather_with_concurrency<T: Send + 'static>(
     n: Option<usize>,
     futures: Vec<Pin<Box<dyn Future<Output = T> + Send>>>,
@@ -62,14 +40,6 @@ pub async fn gather_with_concurrency<T: Send + 'static>(
     }
 }
 
-/// Indent all lines of text after the first line.
-///
-/// # Arguments
-/// * `text` - The text to indent
-/// * `prefix` - Used to determine the number of spaces to indent (uses len of prefix)
-///
-/// # Returns
-/// The indented text with all lines after the first indented by spaces equal to prefix length
 pub fn indent_lines_after_first(text: &str, prefix: &str) -> String {
     let n_spaces = prefix.len();
     let spaces = " ".repeat(n_spaces);
@@ -89,23 +59,14 @@ pub fn indent_lines_after_first(text: &str, prefix: &str) -> String {
     result
 }
 
-/// Dictionary that can be added to another dictionary.
-///
-/// When adding two AddableDict instances:
-/// - Keys only in the other dict are added
-/// - Keys with null values in self are replaced
-/// - Values that support addition are added together
-/// - Otherwise the value from other replaces the value in self
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct AddableDict(pub HashMap<String, Value>);
 
 impl AddableDict {
-    /// Create a new empty AddableDict
     pub fn new() -> Self {
         Self(HashMap::new())
     }
 
-    /// Create an AddableDict from an existing HashMap
     pub fn from_map(map: HashMap<String, Value>) -> Self {
         Self(map)
     }
@@ -137,13 +98,6 @@ impl std::ops::Add for AddableDict {
     }
 }
 
-/// Try to add two JSON values together.
-///
-/// - Strings are concatenated
-/// - Arrays are concatenated
-/// - Objects are merged (later values overwrite)
-/// - Numbers are added
-/// - For other types or mismatched types, returns the second value
 fn try_add_values(a: &Value, b: &Value) -> Value {
     match (a, b) {
         (Value::String(s1), Value::String(s2)) => Value::String(format!("{}{}", s1, s2)),
@@ -174,21 +128,10 @@ fn try_add_values(a: &Value, b: &Value) -> Value {
     }
 }
 
-/// Trait for types that support addition.
-///
-/// This is the Rust equivalent of Python's `SupportsAdd` protocol.
 pub trait Addable: Clone {
-    /// Add another value to this one
     fn add(self, other: Self) -> Self;
 }
 
-/// Add a sequence of addable objects together.
-///
-/// # Arguments
-/// * `addables` - An iterator of addable objects
-///
-/// # Returns
-/// The result of adding all objects, or None if the iterator was empty
 pub fn add<T: Addable>(addables: impl IntoIterator<Item = T>) -> Option<T> {
     let mut final_value: Option<T> = None;
 
@@ -202,13 +145,6 @@ pub fn add<T: Addable>(addables: impl IntoIterator<Item = T>) -> Option<T> {
     final_value
 }
 
-/// Asynchronously add a sequence of addable objects together.
-///
-/// # Arguments
-/// * `addables` - A stream of addable objects
-///
-/// # Returns
-/// The result of adding all objects, or None if the stream was empty
 pub async fn aadd<T: Addable>(addables: impl Stream<Item = T> + Unpin) -> Option<T> {
     let mut final_value: Option<T> = None;
     let mut stream = addables;
@@ -262,20 +198,12 @@ impl Addable for HashMap<String, Value> {
     }
 }
 
-/// Field that can be configured by the user.
-///
-/// This corresponds to Python's `ConfigurableField` NamedTuple.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ConfigurableField {
-    /// The unique identifier of the field
     pub id: String,
-    /// The name of the field
     pub name: Option<String>,
-    /// The description of the field
     pub description: Option<String>,
-    /// The annotation of the field (type hint as string in Rust)
     pub annotation: Option<String>,
-    /// Whether the field is shared across runnables
     pub is_shared: bool,
 }
 
@@ -311,22 +239,13 @@ impl ConfigurableField {
     }
 }
 
-/// Field that can be configured by the user with a single option from a set.
-///
-/// This corresponds to Python's `ConfigurableFieldSingleOption` NamedTuple.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConfigurableFieldSingleOption {
-    /// The unique identifier of the field
     pub id: String,
-    /// The available options for the field
     pub options: HashMap<String, serde_json::Value>,
-    /// The default option key
     pub default: String,
-    /// The name of the field
     pub name: Option<String>,
-    /// The description of the field
     pub description: Option<String>,
-    /// Whether the field is shared across runnables
     pub is_shared: bool,
 }
 
@@ -359,22 +278,13 @@ impl ConfigurableFieldSingleOption {
     }
 }
 
-/// Field that can be configured by the user with multiple options from a set.
-///
-/// This corresponds to Python's `ConfigurableFieldMultiOption` NamedTuple.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConfigurableFieldMultiOption {
-    /// The unique identifier of the field
     pub id: String,
-    /// The available options for the field
     pub options: HashMap<String, serde_json::Value>,
-    /// The default option keys (multiple can be selected)
     pub default: Vec<String>,
-    /// The name of the field
     pub name: Option<String>,
-    /// The description of the field
     pub description: Option<String>,
-    /// Whether the field is shared across runnables
     pub is_shared: bool,
 }
 
@@ -409,7 +319,6 @@ impl ConfigurableFieldMultiOption {
     }
 }
 
-/// Union type for any configurable field variant.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AnyConfigurableField {
     Field(ConfigurableField),
@@ -417,24 +326,14 @@ pub enum AnyConfigurableField {
     MultiOption(ConfigurableFieldMultiOption),
 }
 
-/// Specification of a configurable field.
-///
-/// This corresponds to Python's `ConfigurableFieldSpec` NamedTuple.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConfigurableFieldSpec {
-    /// The unique identifier of the field
     pub id: String,
-    /// The annotation (type) of the field
     pub annotation: String,
-    /// The name of the field
     pub name: Option<String>,
-    /// The description of the field
     pub description: Option<String>,
-    /// The default value for the field
     pub default: Option<serde_json::Value>,
-    /// Whether the field is shared across runnables
     pub is_shared: bool,
-    /// Dependencies on other fields
     pub dependencies: Option<Vec<String>>,
 }
 
@@ -452,16 +351,6 @@ impl ConfigurableFieldSpec {
     }
 }
 
-/// Get the unique config specs from a sequence of config specs.
-///
-/// This function groups specs by ID and ensures there are no conflicts.
-/// If two specs have the same ID but different values, an error is returned.
-///
-/// # Arguments
-/// * `specs` - An iterable of config specs
-///
-/// # Returns
-/// A vector of unique config specs, or an error if there are conflicts
 pub fn get_unique_config_specs(
     specs: impl IntoIterator<Item = ConfigurableFieldSpec>,
 ) -> Result<Vec<ConfigurableFieldSpec>, String> {
@@ -495,28 +384,17 @@ pub fn get_unique_config_specs(
     Ok(unique)
 }
 
-/// Utility to filter events in the astream_events implementation.
-///
-/// This class provides filtering based on names, types, and tags for both
-/// inclusion and exclusion criteria.
 #[derive(Debug, Clone)]
 pub struct RootEventFilter {
-    /// Names to include (if any match, include)
     pub include_names: Option<Vec<String>>,
-    /// Types to include (if any match, include)
     pub include_types: Option<Vec<String>>,
-    /// Tags to include (if any match, include)
     pub include_tags: Option<Vec<String>>,
-    /// Names to exclude (if any match, exclude)
     pub exclude_names: Option<Vec<String>>,
-    /// Types to exclude (if any match, exclude)
     pub exclude_types: Option<Vec<String>>,
-    /// Tags to exclude (if any match, exclude)
     pub exclude_tags: Option<Vec<String>>,
 }
 
 impl RootEventFilter {
-    /// Create a new event filter with no filters applied
     pub fn new() -> Self {
         Self {
             include_names: None,
@@ -528,15 +406,6 @@ impl RootEventFilter {
         }
     }
 
-    /// Determine whether to include an event based on the filter criteria.
-    ///
-    /// # Arguments
-    /// * `event_name` - The name of the event
-    /// * `event_tags` - Tags associated with the event
-    /// * `root_type` - The type of the root runnable
-    ///
-    /// # Returns
-    /// `true` if the event should be included, `false` otherwise
     pub fn include_event(&self, event_name: &str, event_tags: &[String], root_type: &str) -> bool {
         let mut include = self.include_names.is_none()
             && self.include_types.is_none()
@@ -576,20 +445,6 @@ impl Default for RootEventFilter {
     }
 }
 
-/// Check if a function is an async generator.
-///
-/// In Rust, this is determined at compile time through type bounds rather than
-/// runtime inspection as in Python. This function serves as a marker for
-/// API compatibility.
-///
-/// Note: In Rust, async generators are represented as types implementing
-/// `Stream` rather than a special function type.
-///
-/// # Arguments
-/// * `_f` - The function to check (unused, type is checked at compile time)
-///
-/// # Returns
-/// Always returns `true` when the type bounds are satisfied
 pub fn is_async_generator<F, S, T>(_f: F) -> bool
 where
     F: Fn() -> S,
@@ -598,17 +453,6 @@ where
     true
 }
 
-/// Check if a function is async.
-///
-/// In Rust, this is determined at compile time through type bounds rather than
-/// runtime inspection as in Python. This function serves as a marker for
-/// API compatibility.
-///
-/// # Arguments
-/// * `_f` - The function to check (unused, type is checked at compile time)
-///
-/// # Returns
-/// Always returns `true` when the type bounds are satisfied
 pub fn is_async_callable<F, Fut>(_f: F) -> bool
 where
     F: Fn() -> Fut,

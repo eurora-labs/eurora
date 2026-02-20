@@ -1,8 +1,3 @@
-//! Base class for prompt templates.
-//!
-//! This module provides the base trait for all prompt templates,
-//! mirroring `langchain_core.prompts.base` in Python.
-
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -11,101 +6,58 @@ use serde::{Deserialize, Serialize};
 use crate::error::{Error, Result};
 use crate::prompt_values::{PromptValue, StringPromptValue};
 
-/// Type alias for format output type.
 pub type FormatOutputType = String;
 
-/// Configuration for a prompt template.
-///
-/// This struct is used for serialization/deserialization of prompt templates
-/// and matches the Python langchain_core configuration structure.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PromptTemplateConfig {
-    /// A list of the names of the variables whose values are required as inputs to the prompt.
     pub input_variables: Vec<String>,
 
-    /// A list of the names of the variables that are optional.
     #[serde(default)]
     pub optional_variables: Vec<String>,
 
-    /// A dictionary of the types of the variables the prompt template expects.
     #[serde(default)]
     pub input_types: HashMap<String, String>,
 
-    /// A dictionary of the partial variables the prompt template carries.
     #[serde(default)]
     pub partial_variables: HashMap<String, String>,
 
-    /// Metadata to be used for tracing.
     #[serde(default)]
     pub metadata: Option<HashMap<String, serde_json::Value>>,
 
-    /// Tags to be used for tracing.
     #[serde(default)]
     pub tags: Option<Vec<String>>,
 }
 
-/// Base trait for all prompt templates.
-///
-/// This trait defines the common interface that all prompt templates must implement.
-/// Prompt templates are responsible for formatting prompts with input variables.
 pub trait BasePromptTemplate: Send + Sync {
-    /// Get the input variables for this template.
-    ///
-    /// These are the variables whose values are required as inputs to format the prompt.
     fn input_variables(&self) -> &[String];
 
-    /// Get the optional variables for this template.
-    ///
-    /// These variables are auto-inferred from the prompt and users need not provide them.
     fn optional_variables(&self) -> &[String] {
         &[]
     }
 
-    /// Get the input types for this template.
-    ///
-    /// A dictionary mapping variable names to their expected types.
-    /// If not provided, all variables are assumed to be strings.
     fn input_types(&self) -> &HashMap<String, String> {
         static EMPTY: std::sync::LazyLock<HashMap<String, String>> =
             std::sync::LazyLock::new(HashMap::new);
         &EMPTY
     }
 
-    /// Get the partial variables for this template.
-    ///
-    /// Partial variables populate the template so you don't need to pass them in
-    /// every time you call the prompt.
     fn partial_variables(&self) -> &HashMap<String, String> {
         static EMPTY: std::sync::LazyLock<HashMap<String, String>> =
             std::sync::LazyLock::new(HashMap::new);
         &EMPTY
     }
 
-    /// Get metadata for tracing.
     fn metadata(&self) -> Option<&HashMap<String, serde_json::Value>> {
         None
     }
 
-    /// Get tags for tracing.
     fn tags(&self) -> Option<&[String]> {
         None
     }
 
-    /// Format the prompt with the inputs.
-    ///
-    /// # Arguments
-    ///
-    /// * `kwargs` - The keyword arguments to format the template with.
-    ///
-    /// # Returns
-    ///
-    /// A formatted string, or an error if formatting fails.
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<FormatOutputType>;
 
-    /// Async format the prompt with the inputs.
-    ///
-    /// Default implementation calls the sync version.
     fn aformat(
         &self,
         kwargs: &HashMap<String, String>,
@@ -115,17 +67,11 @@ pub trait BasePromptTemplate: Send + Sync {
         Box::pin(async move { result })
     }
 
-    /// Format the prompt into a PromptValue.
-    ///
-    /// Default implementation wraps the formatted string in a StringPromptValue.
     fn format_prompt(&self, kwargs: &HashMap<String, String>) -> Result<Box<dyn PromptValue>> {
         let text = self.format(kwargs)?;
         Ok(Box::new(StringPromptValue::new(text)))
     }
 
-    /// Async format the prompt into a PromptValue.
-    ///
-    /// Default implementation calls the sync version.
     fn aformat_prompt(
         &self,
         kwargs: &HashMap<String, String>,
@@ -136,21 +82,10 @@ pub trait BasePromptTemplate: Send + Sync {
         Box::pin(async move { result })
     }
 
-    /// Create a partial of the prompt template.
-    ///
-    /// # Arguments
-    ///
-    /// * `kwargs` - Partial variables to set.
-    ///
-    /// # Returns
-    ///
-    /// A new prompt template with the partial variables set, or an error.
     fn partial(&self, kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>>;
 
-    /// Get the prompt type key for serialization.
     fn prompt_type(&self) -> &str;
 
-    /// Validate that input variables do not include restricted names.
     fn validate_variable_names(&self) -> Result<()> {
         if self.input_variables().contains(&"stop".to_string()) {
             return Err(Error::InvalidConfig(
@@ -184,7 +119,6 @@ pub trait BasePromptTemplate: Send + Sync {
         Ok(())
     }
 
-    /// Validate the input dictionary.
     fn validate_input(&self, inner_input: &HashMap<String, String>) -> Result<()> {
         let input_vars: std::collections::HashSet<_> =
             self.input_variables().iter().cloned().collect();
@@ -208,7 +142,6 @@ pub trait BasePromptTemplate: Send + Sync {
         Ok(())
     }
 
-    /// Merge partial and user variables.
     fn merge_partial_and_user_variables(
         &self,
         kwargs: &HashMap<String, String>,
@@ -218,18 +151,8 @@ pub trait BasePromptTemplate: Send + Sync {
         merged
     }
 
-    /// Convert to a dictionary for serialization.
     fn to_dict(&self) -> serde_json::Value;
 
-    /// Save the prompt to a file.
-    ///
-    /// # Arguments
-    ///
-    /// * `file_path` - Path to the file to save to.
-    ///
-    /// # Returns
-    ///
-    /// Ok(()) if successful, or an error.
     fn save(&self, file_path: &Path) -> Result<()> {
         if !self.partial_variables().is_empty() {
             return Err(Error::InvalidConfig(
@@ -273,19 +196,15 @@ pub trait BasePromptTemplate: Send + Sync {
     }
 }
 
-/// Document type for format_document.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Document {
-    /// The page content.
     pub page_content: String,
 
-    /// Metadata for the document.
     #[serde(default)]
     pub metadata: HashMap<String, String>,
 }
 
 impl Document {
-    /// Create a new document.
     pub fn new(page_content: impl Into<String>) -> Self {
         Self {
             page_content: page_content.into(),
@@ -293,7 +212,6 @@ impl Document {
         }
     }
 
-    /// Create a new document with metadata.
     pub fn with_metadata(
         page_content: impl Into<String>,
         metadata: HashMap<String, String>,
@@ -305,7 +223,6 @@ impl Document {
     }
 }
 
-/// Get document information for formatting.
 fn get_document_info(
     doc: &Document,
     input_variables: &[String],
@@ -341,50 +258,11 @@ fn get_document_info(
     Ok(result)
 }
 
-/// Format a document into a string based on a prompt template.
-///
-/// First, this pulls information from the document from two sources:
-///
-/// 1. `page_content`: Takes the information from `document.page_content` and assigns
-///    it to a variable named `page_content`.
-/// 2. `metadata`: Takes information from `document.metadata` and assigns it to
-///    variables of the same name.
-///
-/// Those variables are then passed into the prompt to produce a formatted string.
-///
-/// # Arguments
-///
-/// * `doc` - The document to format.
-/// * `prompt` - The prompt template to use for formatting.
-///
-/// # Returns
-///
-/// A formatted string.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::prompts::{PromptTemplate, format_document};
-/// use agent_chain_core::prompts::base::Document;
-/// use std::collections::HashMap;
-///
-/// let mut metadata = HashMap::new();
-/// metadata.insert("page".to_string(), "1".to_string());
-///
-/// let doc = Document::with_metadata("This is a joke", metadata);
-/// let prompt = PromptTemplate::from_template("Page {page}: {page_content}").unwrap();
-///
-/// let result = format_document(&doc, &prompt).unwrap();
-/// assert_eq!(result, "Page 1: This is a joke");
-/// ```
 pub fn format_document(doc: &Document, prompt: &dyn BasePromptTemplate) -> Result<String> {
     let info = get_document_info(doc, prompt.input_variables())?;
     prompt.format(&info)
 }
 
-/// Async format a document into a string based on a prompt template.
-///
-/// See [`format_document`] for details.
 pub async fn aformat_document(doc: &Document, prompt: &dyn BasePromptTemplate) -> Result<String> {
     let info = get_document_info(doc, prompt.input_variables())?;
     prompt.aformat(&info).await

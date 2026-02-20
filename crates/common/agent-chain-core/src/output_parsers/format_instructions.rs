@@ -1,11 +1,3 @@
-/// Format instructions for output parsers.
-///
-/// Mirrors `langchain_core.output_parsers.format_instructions`.
-///
-/// JSON format instructions template.
-///
-/// Uses `{schema}` as the placeholder for the JSON schema, matching the
-/// Python format string in `langchain_core.output_parsers.format_instructions`.
 pub const JSON_FORMAT_INSTRUCTIONS: &str = r#"STRICT OUTPUT FORMAT:
 - Return only the JSON value that conforms to the schema. Do not include any additional text, explanations, headings, or separators.
 - Do not wrap the JSON in Markdown or code fences (no ``` or ```json).

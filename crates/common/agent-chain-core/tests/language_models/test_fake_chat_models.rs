@@ -1,11 +1,5 @@
-//! Tests for fake chat models.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/language_models/test_fake_chat_models.py`
-
 #[cfg(test)]
 mod test_fake_messages_list_chat_model {
-    //! Tests for FakeMessagesListChatModel class
-    //! Python equivalent: TestFakeMessagesListChatModel
 
     use std::time::{Duration, Instant};
 
@@ -125,8 +119,6 @@ mod test_fake_messages_list_chat_model {
 
 #[cfg(test)]
 mod test_fake_list_chat_model_error {
-    //! Tests for FakeListChatModelError exception
-    //! Python equivalent: TestFakeListChatModelError
 
     use agent_chain_core::FakeListChatModelError;
     use std::error::Error;
@@ -146,8 +138,6 @@ mod test_fake_list_chat_model_error {
 
 #[cfg(test)]
 mod test_fake_list_chat_model {
-    //! Tests for FakeListChatModel class
-    //! Python equivalent: TestFakeListChatModel
 
     use agent_chain_core::FakeListChatModel;
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
@@ -328,8 +318,6 @@ mod test_fake_list_chat_model {
 
 #[cfg(test)]
 mod test_fake_chat_model {
-    //! Tests for FakeChatModel class
-    //! Python equivalent: TestFakeChatModel
 
     use agent_chain_core::FakeChatModel;
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
@@ -396,8 +384,6 @@ mod test_fake_chat_model {
 
 #[cfg(test)]
 mod test_generic_fake_chat_model {
-    //! Tests for GenericFakeChatModel class
-    //! Python equivalent: TestGenericFakeChatModel
 
     use agent_chain_core::GenericFakeChatModel;
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
@@ -545,8 +531,6 @@ mod test_generic_fake_chat_model {
 
 #[cfg(test)]
 mod test_parrot_fake_chat_model {
-    //! Tests for ParrotFakeChatModel class
-    //! Python equivalent: TestParrotFakeChatModel
 
     use agent_chain_core::ParrotFakeChatModel;
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
@@ -700,7 +684,6 @@ mod test_fake_messages_list_additional {
     use agent_chain_core::language_models::BaseChatModel;
     use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
 
-    /// Ported from `test_single_response_counter_stays_at_zero`.
     #[tokio::test]
     async fn test_single_response_counter_stays_at_zero() {
         let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(
@@ -715,7 +698,6 @@ mod test_fake_messages_list_additional {
         assert_eq!(model.current_index(), 0);
     }
 
-    /// Ported from `test_ainvoke` (async cycling).
     #[tokio::test]
     async fn test_ainvoke() {
         let responses = vec![
@@ -734,7 +716,6 @@ mod test_fake_messages_list_additional {
         assert_eq!(result3.generations[0].message.content(), "async first");
     }
 
-    /// Ported from `test_generate_returns_proper_chat_result_structure`.
     #[tokio::test]
     async fn test_generate_returns_proper_chat_result_structure() {
         let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(
@@ -757,7 +738,6 @@ mod test_fake_messages_list_additional {
         assert_eq!(generation.message.content(), "structured");
     }
 
-    /// Ported from `test_generate_with_non_ai_message_response`.
     #[tokio::test]
     async fn test_generate_with_non_ai_message_response() {
         let human_msg = BaseMessage::Human(HumanMessage::builder().content("echoed back").build());
@@ -789,7 +769,6 @@ mod test_fake_list_chat_model_additional {
     use futures::StreamExt;
     use std::time::{Duration, Instant};
 
-    /// Ported from `test_call_with_sleep`.
     #[tokio::test]
     async fn test_call_with_sleep() {
         let model =
@@ -803,7 +782,6 @@ mod test_fake_list_chat_model_additional {
         assert_eq!(result.generations[0].message.content(), "hello");
     }
 
-    /// Ported from `test_stream_chunk_position_single_char`.
     #[tokio::test]
     async fn test_stream_chunk_position_single_char() {
         let model = FakeListChatModel::new(vec!["x".to_string()]);
@@ -818,7 +796,6 @@ mod test_fake_list_chat_model_additional {
         assert_eq!(chunks[0].text, "x");
     }
 
-    /// Ported from `test_astream_chunk_position_last`.
     #[tokio::test]
     async fn test_astream_chunk_position_last() {
         let model = FakeListChatModel::new(vec!["abc".to_string()]);
@@ -834,7 +811,6 @@ mod test_fake_list_chat_model_additional {
         assert_eq!(contents, vec!["a", "b", "c"]);
     }
 
-    /// Ported from `test_stream_error_on_first_chunk`.
     #[tokio::test]
     async fn test_stream_error_on_first_chunk() {
         let model = FakeListChatModel::new(vec!["hello".to_string()]).with_error_on_chunk(0);
@@ -844,7 +820,6 @@ mod test_fake_list_chat_model_additional {
         assert!(first.is_err());
     }
 
-    /// Ported from `test_astream_error_on_first_chunk`.
     #[tokio::test]
     async fn test_astream_error_on_first_chunk() {
         let model = FakeListChatModel::new(vec!["hello".to_string()]).with_error_on_chunk(0);
@@ -860,7 +835,6 @@ mod test_fake_list_chat_model_additional {
         assert!(chunks.is_empty());
     }
 
-    /// Ported from `test_stream_empty_string_response`.
     #[tokio::test]
     async fn test_stream_empty_string_response() {
         let model = FakeListChatModel::new(vec!["".to_string()]);
@@ -875,7 +849,6 @@ mod test_fake_list_chat_model_additional {
         assert!(chunks.is_empty());
     }
 
-    /// Ported from `test_batch_with_single_config`.
     #[tokio::test]
     async fn test_batch_with_single_config() {
         let model =
@@ -890,7 +863,6 @@ mod test_fake_list_chat_model_additional {
         assert_eq!(result3.generations[0].message.content(), "r3");
     }
 
-    /// Ported from `test_abatch_with_single_config`.
     #[tokio::test]
     async fn test_abatch_with_single_config() {
         let model =
@@ -912,7 +884,6 @@ mod test_fake_chat_model_additional {
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
     use agent_chain_core::messages::{BaseMessage, HumanMessage};
 
-    /// Ported from `test_agenerate_returns_chat_result`.
     #[tokio::test]
     async fn test_agenerate_returns_chat_result() {
         let model = FakeChatModel::new();
@@ -932,7 +903,6 @@ mod test_fake_chat_model_additional {
         assert_eq!(result.generations[0].message.content(), "fake response");
     }
 
-    /// Ported from `test_llm_type_and_identifying_params_consistency`.
     #[test]
     fn test_llm_type_and_identifying_params_consistency() {
         let model = FakeChatModel::new();
@@ -951,7 +921,6 @@ mod test_generic_fake_chat_model_additional {
     use agent_chain_core::messages::AIMessage;
     use futures::StreamExt;
 
-    /// Ported from `test_stream_with_multiple_words_preserves_whitespace`.
     #[tokio::test]
     async fn test_stream_with_multiple_words_preserves_whitespace() {
         let messages = vec![AIMessage::builder().content("hello world foo").build()];
@@ -969,11 +938,6 @@ mod test_generic_fake_chat_model_additional {
         assert_eq!(chunks.join(""), "hello world foo");
     }
 
-    /// Ported from `test_stream_function_call_non_string_values`.
-    ///
-    /// Tests that function_call with non-string values (dict) produces chunks.
-    /// The "name" key (string) gets split by comma, "parsed" key (dict) gets
-    /// a single chunk.
     #[tokio::test]
     async fn test_stream_function_call_non_string_values() {
         use serde_json::Value;
@@ -1007,7 +971,6 @@ mod test_generic_fake_chat_model_additional {
         assert!(!chunks.is_empty());
     }
 
-    /// Ported from `test_stream_chunk_position_last_no_additional_kwargs`.
     #[tokio::test]
     async fn test_stream_chunk_position_last_no_additional_kwargs() {
         let messages = vec![AIMessage::builder().content("hi there").build()];
@@ -1026,11 +989,6 @@ mod test_generic_fake_chat_model_additional {
         assert_eq!(contents, vec!["hi", " ", "there"]);
     }
 
-    /// Ported from `test_stream_with_content_and_additional_kwargs`.
-    ///
-    /// Tests that a message with both content and additional_kwargs produces
-    /// chunks for both. Content "hello" is a single word -> 1 content chunk.
-    /// Then additional_kwargs produces 1+ chunks.
     #[tokio::test]
     async fn test_stream_with_content_and_additional_kwargs() {
         use serde_json::Value;
@@ -1072,7 +1030,6 @@ mod test_parrot_fake_chat_model_additional {
     use agent_chain_core::language_models::{BaseChatModel, LanguageModelInput};
     use agent_chain_core::messages::{BaseMessage, HumanMessage, SystemMessage};
 
-    /// Ported from `test_generate_with_multiple_messages_returns_last`.
     #[tokio::test]
     async fn test_generate_with_multiple_messages_returns_last() {
         let model = ParrotFakeChatModel::new();
@@ -1087,7 +1044,6 @@ mod test_parrot_fake_chat_model_additional {
         assert_eq!(result.generations[0].message.content(), "last human");
     }
 
-    /// Ported from `test_ainvoke_with_string`.
     #[tokio::test]
     async fn test_ainvoke_with_string() {
         let model = ParrotFakeChatModel::new();
@@ -1113,7 +1069,6 @@ mod test_generic_fake_chat_model_run_manager {
     use futures::StreamExt;
     use uuid::Uuid;
 
-    /// A callback handler that records all tokens received via on_llm_new_token.
     #[derive(Debug, Clone)]
     struct TokenRecorder {
         tokens: Arc<Mutex<Vec<String>>>,
@@ -1155,10 +1110,6 @@ mod test_generic_fake_chat_model_run_manager {
         }
     }
 
-    /// Ported from `test_stream_with_run_manager_callback`.
-    ///
-    /// Verifies that _stream calls on_llm_new_token on the run_manager's
-    /// handlers for each content chunk.
     #[tokio::test]
     async fn test_stream_with_run_manager_callback() {
         let messages = vec![AIMessage::builder().content("hello world").build()];

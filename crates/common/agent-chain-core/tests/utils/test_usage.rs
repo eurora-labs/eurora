@@ -1,7 +1,3 @@
-//! Unit tests for usage utilities.
-//!
-//! Converted from langchain/libs/core/tests/unit_tests/utils/test_usage.py
-
 use agent_chain_core::utils::usage::{UsageError, dict_int_op};
 use serde_json::json;
 

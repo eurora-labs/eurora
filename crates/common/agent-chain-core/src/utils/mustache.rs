@@ -1,27 +1,23 @@
-//! Mustache template rendering.
-//!
-//! Adapted from langchain_core/utils/mustache.py (which is based on chevron)
-//! MIT License.
-
 use std::collections::HashMap;
 
-/// Error type for mustache template operations.
 #[derive(Debug, Clone, PartialEq)]
 pub enum MustacheError {
-    /// Syntax error in template.
     SyntaxError(String),
-    /// Unclosed tag.
-    UnclosedTag { line: usize },
-    /// Unclosed section.
-    UnclosedSection { tag: String, line: usize },
-    /// Mismatched section closing tag.
+    UnclosedTag {
+        line: usize,
+    },
+    UnclosedSection {
+        tag: String,
+        line: usize,
+    },
     MismatchedSection {
         expected: String,
         got: String,
         line: usize,
     },
-    /// Empty tag.
-    EmptyTag { line: usize },
+    EmptyTag {
+        line: usize,
+    },
 }
 
 impl std::fmt::Display for MustacheError {
@@ -50,27 +46,18 @@ impl std::fmt::Display for MustacheError {
 
 impl std::error::Error for MustacheError {}
 
-/// A mustache template value.
 #[derive(Debug, Clone)]
 pub enum MustacheValue {
-    /// A string value.
     String(String),
-    /// A boolean value.
     Bool(bool),
-    /// An integer value.
     Int(i64),
-    /// A floating point value.
     Float(f64),
-    /// A list of values.
     List(Vec<MustacheValue>),
-    /// A map of values.
     Map(HashMap<String, MustacheValue>),
-    /// A null value.
     Null,
 }
 
 impl MustacheValue {
-    /// Check if the value is truthy.
     pub fn is_truthy(&self) -> bool {
         match self {
             MustacheValue::String(s) => !s.is_empty(),
@@ -83,7 +70,6 @@ impl MustacheValue {
         }
     }
 
-    /// Convert to string for output.
     pub fn to_output_string(&self) -> String {
         match self {
             MustacheValue::String(s) => s.clone(),
@@ -145,7 +131,6 @@ impl From<HashMap<String, MustacheValue>> for MustacheValue {
     }
 }
 
-/// Token types for mustache parsing.
 #[derive(Debug, Clone, PartialEq)]
 enum TokenType {
     Literal,
@@ -158,14 +143,12 @@ enum TokenType {
     Comment,
 }
 
-/// A token from mustache parsing.
 #[derive(Debug, Clone)]
 struct Token {
     token_type: TokenType,
     key: String,
 }
 
-/// Tokenize a mustache template.
 fn tokenize(template: &str, l_del: &str, r_del: &str) -> Result<Vec<Token>, MustacheError> {
     let mut tokens = Vec::new();
     let mut current_line = 1;
@@ -259,7 +242,6 @@ fn tokenize(template: &str, l_del: &str, r_del: &str) -> Result<Vec<Token>, Must
     Ok(tokens)
 }
 
-/// HTML escape a string.
 fn html_escape(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
     for c in s.chars() {
@@ -274,7 +256,6 @@ fn html_escape(s: &str) -> String {
     result
 }
 
-/// Get a key from the scope stack.
 fn get_key(key: &str, scopes: &[&MustacheValue]) -> MustacheValue {
     if key == "." {
         return scopes
@@ -306,30 +287,6 @@ fn get_key(key: &str, scopes: &[&MustacheValue]) -> MustacheValue {
     MustacheValue::Null
 }
 
-/// Render a mustache template.
-///
-/// # Arguments
-///
-/// * `template` - The template string.
-/// * `data` - The data to render with.
-/// * `partials` - Optional partial templates.
-///
-/// # Returns
-///
-/// The rendered string, or an error if rendering fails.
-///
-/// # Example
-///
-/// ```
-/// use std::collections::HashMap;
-/// use agent_chain_core::utils::mustache::{render, MustacheValue};
-///
-/// let mut data = HashMap::new();
-/// data.insert("name".to_string(), MustacheValue::String("World".to_string()));
-///
-/// let result = render("Hello, {{name}}!", &MustacheValue::Map(data), None);
-/// assert_eq!(result.unwrap(), "Hello, World!");
-/// ```
 pub fn render(
     template: &str,
     data: &MustacheValue,
@@ -338,7 +295,6 @@ pub fn render(
     render_with_delimiters(template, data, partials, "{{", "}}")
 }
 
-/// Render a mustache template with custom delimiters.
 pub fn render_with_delimiters(
     template: &str,
     data: &MustacheValue,

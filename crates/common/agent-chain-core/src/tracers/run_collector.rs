@@ -1,8 +1,3 @@
-//! A tracer that collects all nested runs in a list.
-//!
-//! This module provides a tracer that is useful for inspection and evaluation purposes.
-//! Mirrors `langchain_core.tracers.run_collector`.
-
 use std::collections::HashMap;
 
 use uuid::Uuid;
@@ -11,30 +6,16 @@ use crate::tracers::base::BaseTracer;
 use crate::tracers::core::{TracerCore, TracerCoreConfig};
 use crate::tracers::schemas::Run;
 
-/// Tracer that collects all nested runs in a list.
-///
-/// This tracer is useful for inspection and evaluation purposes.
-/// It collects all runs including nested child runs.
 #[derive(Debug)]
 pub struct RunCollectorCallbackHandler {
-    /// The tracer configuration.
     config: TracerCoreConfig,
-    /// The run map.
     run_map: HashMap<String, Run>,
-    /// The order map.
     order_map: HashMap<Uuid, (Uuid, String)>,
-    /// The example ID being traced.
     example_id: Option<Uuid>,
-    /// List of traced runs.
     pub traced_runs: Vec<Run>,
 }
 
 impl RunCollectorCallbackHandler {
-    /// Create a new RunCollectorCallbackHandler.
-    ///
-    /// # Arguments
-    ///
-    /// * `example_id` - The ID of the example being traced. (default: None).
     pub fn new(example_id: Option<Uuid>) -> Self {
         Self {
             config: TracerCoreConfig::default(),
@@ -45,51 +26,35 @@ impl RunCollectorCallbackHandler {
         }
     }
 
-    /// Create a new RunCollectorCallbackHandler with an example ID from a string.
-    ///
-    /// # Arguments
-    ///
-    /// * `example_id` - The ID of the example being traced as a string.
     pub fn with_example_id_str(example_id: &str) -> Result<Self, uuid::Error> {
         let uuid = Uuid::parse_str(example_id)?;
         Ok(Self::new(Some(uuid)))
     }
 
-    /// Get the name of the handler.
     pub fn name(&self) -> &str {
         "run-collector_callback_handler"
     }
 
-    /// Get the example ID.
     pub fn example_id(&self) -> Option<Uuid> {
         self.example_id
     }
 
-    /// Get the number of traced runs.
     pub fn len(&self) -> usize {
         self.traced_runs.len()
     }
 
-    /// Check if there are any traced runs.
     pub fn is_empty(&self) -> bool {
         self.traced_runs.is_empty()
     }
 
-    /// Clear all traced runs.
     pub fn clear(&mut self) {
         self.traced_runs.clear();
     }
 
-    /// Get the most recent run.
     pub fn latest_run(&self) -> Option<&Run> {
         self.traced_runs.last()
     }
 
-    /// Get runs by type.
-    ///
-    /// # Arguments
-    ///
-    /// * `run_type` - The type of runs to get (e.g., "chain", "llm", "tool").
     pub fn runs_by_type(&self, run_type: &str) -> Vec<&Run> {
         self.traced_runs
             .iter()
@@ -97,16 +62,10 @@ impl RunCollectorCallbackHandler {
             .collect()
     }
 
-    /// Get runs by name.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The name of runs to get.
     pub fn runs_by_name(&self, name: &str) -> Vec<&Run> {
         self.traced_runs.iter().filter(|r| r.name == name).collect()
     }
 
-    /// Get runs that have errors.
     pub fn errored_runs(&self) -> Vec<&Run> {
         self.traced_runs
             .iter()
@@ -114,7 +73,6 @@ impl RunCollectorCallbackHandler {
             .collect()
     }
 
-    /// Get successful runs (completed without error).
     pub fn successful_runs(&self) -> Vec<&Run> {
         self.traced_runs
             .iter()

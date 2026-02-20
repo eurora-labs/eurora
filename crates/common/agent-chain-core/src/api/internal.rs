@@ -1,26 +1,3 @@
-//! Internal utilities for checking if calls originate from within the agent-chain crates.
-
-/// Checks if the caller module is internal to agent-chain.
-///
-/// In Rust, we use compile-time module paths rather than runtime introspection.
-/// This function provides a way to check if a given module path is internal.
-///
-/// # Arguments
-///
-/// * `module_path` - The module path to check (typically from `module_path!()` macro)
-///
-/// # Returns
-///
-/// `true` if the module path starts with "agent_chain", `false` otherwise.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::api::is_caller_internal;
-///
-/// // Check at compile time
-/// let is_internal = is_caller_internal(module_path!());
-/// ```
 #[inline]
 pub fn is_caller_internal(module_path: &str) -> bool {
     module_path.starts_with("agent_chain")

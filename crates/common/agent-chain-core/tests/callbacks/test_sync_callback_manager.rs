@@ -1,7 +1,3 @@
-//! Unit tests for sync callback manager.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/callbacks/test_sync_callback_manager.py`
-
 use std::sync::Arc;
 
 use agent_chain_core::callbacks::base::{
@@ -33,12 +29,6 @@ impl BaseCallbackHandler for TestHandler {
     }
 }
 
-/// Ported from `test_remove_handler`.
-///
-/// Test removing handler does not raise an error on removal.
-/// A handler can be inheritable or not. This test checks that
-/// removing a handler does not raise an error if the handler
-/// is not inheritable.
 #[test]
 fn test_remove_handler() {
     let handler1: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler::new("h1"));
@@ -59,16 +49,6 @@ fn test_remove_handler() {
     assert!(manager.inheritable_handlers.is_empty());
 }
 
-/// Ported from `test_merge_preserves_handler_distinction`.
-///
-/// The Python test is marked xfail because merge() incorrectly mixes
-/// handlers and inheritable_handlers. The Rust implementation has the
-/// same behavior (inheritable handlers also get added to handlers via
-/// add_handler), so this test documents the current behavior rather
-/// than the ideal behavior.
-///
-/// When the Python bug (#32028) is fixed, both implementations should
-/// be updated and this test should assert strict separation.
 #[test]
 fn test_merge_preserves_handler_distinction() {
     let h1: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler::new("h1"));

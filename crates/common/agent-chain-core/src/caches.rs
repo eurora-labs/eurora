@@ -1,155 +1,40 @@
-//! Optional caching layer for language models.
-//!
-//! Distinct from provider-based prompt caching.
-//!
-//! A cache is useful for two reasons:
-//!
-//! 1. It can save you money by reducing the number of API calls you make to the LLM
-//!    provider if you're often requesting the same completion multiple times.
-//! 2. It can speed up your application by reducing the number of API calls you make to the
-//!    LLM provider.
-//!
-//! Mirrors `langchain_core.caches`.
-
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::RwLock;
 
 use crate::outputs::Generation;
 
-/// The return type for cache operations - a sequence of Generations.
 pub type CacheReturnValue = Vec<Generation>;
 
-/// Interface for a caching layer for LLMs and Chat models.
-///
-/// The cache interface consists of the following methods:
-///
-/// - `lookup`: Look up a value based on a prompt and `llm_string`.
-/// - `update`: Update the cache based on a prompt and `llm_string`.
-/// - `clear`: Clear the cache.
-///
-/// In addition, the cache interface provides an async version of each method.
-///
-/// The default implementation of the async methods is to run the synchronous
-/// method directly. It's recommended to override the async methods
-/// and provide async implementations to avoid unnecessary overhead.
 #[async_trait]
 pub trait BaseCache: Send + Sync {
-    /// Look up based on `prompt` and `llm_string`.
-    ///
-    /// A cache implementation is expected to generate a key from the 2-tuple
-    /// of `prompt` and `llm_string` (e.g., by concatenating them with a delimiter).
-    ///
-    /// # Arguments
-    ///
-    /// * `prompt` - A string representation of the prompt.
-    ///   In the case of a chat model, the prompt is a non-trivial
-    ///   serialization of the prompt into the language model.
-    /// * `llm_string` - A string representation of the LLM configuration.
-    ///   This is used to capture the invocation parameters of the LLM
-    ///   (e.g., model name, temperature, stop tokens, max tokens, etc.).
-    ///   These invocation parameters are serialized into a string representation.
-    ///
-    /// # Returns
-    ///
-    /// On a cache miss, return `None`. On a cache hit, return the cached value.
-    /// The cached value is a list of `Generation` (or subclasses).
     fn lookup(&self, prompt: &str, llm_string: &str) -> Option<CacheReturnValue>;
 
-    /// Update cache based on `prompt` and `llm_string`.
-    ///
-    /// The prompt and llm_string are used to generate a key for the cache.
-    /// The key should match that of the lookup method.
-    ///
-    /// # Arguments
-    ///
-    /// * `prompt` - A string representation of the prompt.
-    ///   In the case of a chat model, the prompt is a non-trivial
-    ///   serialization of the prompt into the language model.
-    /// * `llm_string` - A string representation of the LLM configuration.
-    ///   This is used to capture the invocation parameters of the LLM
-    ///   (e.g., model name, temperature, stop tokens, max tokens, etc.).
-    ///   These invocation parameters are serialized into a string representation.
-    /// * `return_val` - The value to be cached. The value is a list of `Generation`
-    ///   (or subclasses).
     fn update(&self, prompt: &str, llm_string: &str, return_val: CacheReturnValue);
 
-    /// Clear cache that can take additional keyword arguments.
     fn clear(&self);
 
-    /// Async look up based on `prompt` and `llm_string`.
-    ///
-    /// A cache implementation is expected to generate a key from the 2-tuple
-    /// of `prompt` and `llm_string` (e.g., by concatenating them with a delimiter).
-    ///
-    /// # Arguments
-    ///
-    /// * `prompt` - A string representation of the prompt.
-    ///   In the case of a chat model, the prompt is a non-trivial
-    ///   serialization of the prompt into the language model.
-    /// * `llm_string` - A string representation of the LLM configuration.
-    ///   This is used to capture the invocation parameters of the LLM
-    ///   (e.g., model name, temperature, stop tokens, max tokens, etc.).
-    ///   These invocation parameters are serialized into a string representation.
-    ///
-    /// # Returns
-    ///
-    /// On a cache miss, return `None`. On a cache hit, return the cached value.
-    /// The cached value is a list of `Generation` (or subclasses).
     async fn alookup(&self, prompt: &str, llm_string: &str) -> Option<CacheReturnValue> {
         self.lookup(prompt, llm_string)
     }
 
-    /// Async update cache based on `prompt` and `llm_string`.
-    ///
-    /// The prompt and llm_string are used to generate a key for the cache.
-    /// The key should match that of the look up method.
-    ///
-    /// # Arguments
-    ///
-    /// * `prompt` - A string representation of the prompt.
-    ///   In the case of a chat model, the prompt is a non-trivial
-    ///   serialization of the prompt into the language model.
-    /// * `llm_string` - A string representation of the LLM configuration.
-    ///   This is used to capture the invocation parameters of the LLM
-    ///   (e.g., model name, temperature, stop tokens, max tokens, etc.).
-    ///   These invocation parameters are serialized into a string representation.
-    /// * `return_val` - The value to be cached. The value is a list of `Generation`
-    ///   (or subclasses).
     async fn aupdate(&self, prompt: &str, llm_string: &str, return_val: CacheReturnValue) {
         self.update(prompt, llm_string, return_val);
     }
 
-    /// Async clear cache.
     async fn aclear(&self) {
         self.clear();
     }
 }
 
-/// Cache that stores things in memory.
 #[derive(Debug)]
 pub struct InMemoryCache {
-    /// The internal cache storage using (prompt, llm_string) as key.
     cache: RwLock<HashMap<(String, String), CacheReturnValue>>,
-    /// The maximum number of items to store in the cache.
-    /// If `None`, the cache has no maximum size.
     maxsize: Option<usize>,
-    /// Order of keys for LRU-style eviction (stores keys in insertion order).
     key_order: RwLock<Vec<(String, String)>>,
 }
 
 impl InMemoryCache {
-    /// Initialize with empty cache.
-    ///
-    /// # Arguments
-    ///
-    /// * `maxsize` - The maximum number of items to store in the cache.
-    ///   If `None`, the cache has no maximum size.
-    ///   If the cache exceeds the maximum size, the oldest items are removed.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `maxsize` is less than or equal to `0`.
     pub fn new(maxsize: Option<usize>) -> crate::Result<Self> {
         if let Some(size) = maxsize
             && size == 0
@@ -165,7 +50,6 @@ impl InMemoryCache {
         })
     }
 
-    /// Create a new InMemoryCache with no maximum size.
     pub fn unbounded() -> Self {
         Self {
             cache: RwLock::new(HashMap::new()),

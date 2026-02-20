@@ -1,12 +1,3 @@
-//! Tests for streaming event schema types and event filtering.
-//!
-//! Mirrors the event structure assertions from
-//! `langchain/libs/core/tests/unit_tests/runnables/test_runnable_events_v2.py`.
-//!
-//! The Python tests exercise `astream_events()` which is not yet implemented
-//! in Rust. These tests verify the underlying schema types and filter utility
-//! that `astream_events` would use.
-
 use std::collections::HashMap;
 
 use agent_chain_core::runnables::schema::{
@@ -121,8 +112,6 @@ fn test_base_stream_event_with_parent_ids() {
     assert_eq!(event.parent_ids, vec!["run-root", "run-parent"]);
 }
 
-/// Mirrors the event structure from `test_event_stream_with_single_lambda`:
-/// on_chain_start → on_chain_stream → on_chain_end.
 #[test]
 fn test_standard_event_chain_lifecycle() {
     let run_id = "run-abc";
@@ -153,7 +142,6 @@ fn test_standard_event_chain_lifecycle() {
     assert_eq!(end.data.output, Some(json!("olleh")));
 }
 
-/// Mirrors the sequence event pattern: parent start, child events, parent end.
 #[test]
 fn test_standard_event_sequence_pattern() {
     let events = [
@@ -209,7 +197,6 @@ fn test_custom_event_type_constant() {
     assert_eq!(CUSTOM_EVENT_TYPE, "on_custom_event");
 }
 
-/// Mirrors the event structure from `test_custom_event`.
 #[test]
 fn test_custom_event_construction() {
     let run_id = "run-007";
@@ -319,7 +306,6 @@ fn test_filter_default_includes_all() {
     assert!(filter.include_event("foo", &["tag1".into()], "llm"));
 }
 
-/// Mirrors `include_names=["1"]` from the filtering test.
 #[test]
 fn test_filter_include_names() {
     let filter = RootEventFilter {
@@ -332,7 +318,6 @@ fn test_filter_include_names() {
     assert!(!filter.include_event("3", &[], "chain"));
 }
 
-/// Mirrors `include_tags=["my_tag"]` from the filtering test.
 #[test]
 fn test_filter_include_tags() {
     let filter = RootEventFilter {
@@ -347,7 +332,6 @@ fn test_filter_include_tags() {
     assert!(!filter.include_event("1", &untagged, "chain"));
 }
 
-/// Mirrors `include_tags=["my_tag"], exclude_names=["2"]` from the filtering test.
 #[test]
 fn test_filter_include_tags_exclude_names() {
     let filter = RootEventFilter {
@@ -480,8 +464,6 @@ fn test_event_type_naming_conventions() {
     }
 }
 
-/// Verify that start events carry input, end events carry input+output,
-/// stream events carry chunks.
 #[test]
 fn test_event_data_conventions() {
     let start_data = EventData::new().with_input(json!("hello"));

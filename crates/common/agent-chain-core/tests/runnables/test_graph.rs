@@ -1,7 +1,3 @@
-//! Tests for graph data structures and Mermaid rendering.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/runnables/test_graph.py`
-
 use std::collections::HashMap;
 
 use agent_chain_core::runnables::graph::{Edge, Graph, MermaidOptions, Node};

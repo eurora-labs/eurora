@@ -1,8 +1,3 @@
-//! Callback Handler that writes to a file.
-//!
-//! This module provides a callback handler for writing output to a file,
-//! following the Python LangChain FileCallbackHandler pattern.
-
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufWriter, Write};
@@ -17,63 +12,20 @@ use super::base::{
     RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
 };
 
-/// Callback Handler that writes to a file.
-///
-/// This handler supports writing callback output to a file. It can be used
-/// to log chain execution to a file for debugging or auditing purposes.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::callbacks::FileCallbackHandler;
-///
-/// // Using with mode string (recommended, matches Python API)
-/// let handler = FileCallbackHandler::with_mode("output.txt", "a")?;
-///
-/// // Using with append boolean
-/// let handler = FileCallbackHandler::new("output.txt", false)?;
-/// ```
 #[derive(Debug)]
 pub struct FileCallbackHandler {
-    /// The file path (filename in Python).
     filename: String,
-    /// The file open mode.
     mode: String,
-    /// The color to use for the text (not used for file output but kept for API compatibility).
     pub color: Option<String>,
-    /// The buffered writer wrapping the file.
-    /// This is an Option to support the close() method.
     file: Mutex<Option<BufWriter<File>>>,
 }
 
 impl FileCallbackHandler {
-    /// Create a new FileCallbackHandler.
-    ///
-    /// # Arguments
-    ///
-    /// * `filename` - The path to the output file.
-    /// * `append` - Whether to append to the file or truncate it.
-    ///
-    /// # Returns
-    ///
-    /// A Result containing the FileCallbackHandler or an IO error.
     pub fn new<P: AsRef<Path>>(filename: P, append: bool) -> io::Result<Self> {
         let mode = if append { "a" } else { "w" };
         Self::with_mode(filename, mode)
     }
 
-    /// Create a new FileCallbackHandler with a specific file mode.
-    ///
-    /// This matches the Python API more closely.
-    ///
-    /// # Arguments
-    ///
-    /// * `filename` - Path to the output file.
-    /// * `mode` - File open mode (e.g., "w", "a", "x"). Defaults to "a".
-    ///
-    /// # Returns
-    ///
-    /// A Result containing the FileCallbackHandler or an IO error.
     pub fn with_mode<P: AsRef<Path>>(filename: P, mode: &str) -> io::Result<Self> {
         let file = match mode {
             "w" => File::create(filename.as_ref())?,
@@ -101,13 +53,6 @@ impl FileCallbackHandler {
         })
     }
 
-    /// Create a new FileCallbackHandler with a specific color.
-    ///
-    /// # Arguments
-    ///
-    /// * `filename` - Path to the output file.
-    /// * `mode` - File open mode (e.g., "w", "a"). Defaults to "a".
-    /// * `color` - Default text color for output.
     pub fn with_color<P: AsRef<Path>>(
         filename: P,
         mode: &str,
@@ -118,20 +63,14 @@ impl FileCallbackHandler {
         Ok(handler)
     }
 
-    /// Get the file path (filename).
     pub fn filename(&self) -> &str {
         &self.filename
     }
 
-    /// Get the file mode.
     pub fn mode(&self) -> &str {
         &self.mode
     }
 
-    /// Close the file if it's open.
-    ///
-    /// This method is safe to call multiple times and will only close
-    /// the file if it's currently open.
     pub fn close(&self) {
         if let Some(mut writer) = self.file.lock().expect("file lock poisoned").take()
             && let Err(e) = writer.flush()
@@ -140,12 +79,6 @@ impl FileCallbackHandler {
         }
     }
 
-    /// Write text to the file.
-    ///
-    /// # Arguments
-    ///
-    /// * `text` - The text to write to the file.
-    /// * `end` - String appended after the text.
     fn write(&self, text: &str, end: &str) {
         if let Some(ref mut writer) = *self.file.lock().expect("file lock poisoned") {
             if let Err(e) = write!(writer, "{}{}", text, end) {
@@ -157,7 +90,6 @@ impl FileCallbackHandler {
         }
     }
 
-    /// Flush the writer.
     pub fn flush(&self) -> io::Result<()> {
         if let Some(ref mut writer) = *self.file.lock().expect("file lock poisoned") {
             writer.flush()
@@ -181,7 +113,6 @@ impl LLMManagerMixin for FileCallbackHandler {}
 impl RetrieverManagerMixin for FileCallbackHandler {}
 
 impl ToolManagerMixin for FileCallbackHandler {
-    /// Handle tool end by writing the output.
     fn on_tool_end(
         &self,
         output: &str,
@@ -202,7 +133,6 @@ impl ToolManagerMixin for FileCallbackHandler {
 }
 
 impl RunManagerMixin for FileCallbackHandler {
-    /// Handle text output.
     fn on_text(
         &self,
         text: &str,
@@ -256,7 +186,6 @@ impl ChainManagerMixin for FileCallbackHandler {
         self.write("\n> Finished chain.", "\n");
     }
 
-    /// Handle agent action by writing the action log.
     fn on_agent_action(
         &self,
         action: &serde_json::Value,
@@ -269,7 +198,6 @@ impl ChainManagerMixin for FileCallbackHandler {
         }
     }
 
-    /// Handle agent finish by writing the finish log.
     fn on_agent_finish(
         &self,
         finish: &serde_json::Value,

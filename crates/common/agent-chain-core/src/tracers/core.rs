@@ -1,8 +1,3 @@
-//! Utilities for the tracer core.
-//!
-//! This module provides the TracerCore trait with common methods for tracers.
-//! Mirrors `langchain_core.tracers.core`.
-
 use std::collections::HashMap;
 use std::fmt::Debug;
 
@@ -14,24 +9,17 @@ use crate::messages::BaseMessage;
 use crate::outputs::{ChatGenerationChunk, GenerationChunk, LLMResult};
 use crate::tracers::schemas::{Run, RunEvent};
 
-/// Schema format type for tracers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SchemaFormat {
-    /// Original format used by all current tracers.
     #[default]
     Original,
-    /// Streaming events format for internal usage.
     StreamingEvents,
-    /// Original format with chat model support.
     OriginalChat,
 }
 
-/// Configuration for TracerCore.
 #[derive(Debug, Clone)]
 pub struct TracerCoreConfig {
-    /// The schema format to use.
     pub schema_format: SchemaFormat,
-    /// Whether to log missing parent warnings.
     pub log_missing_parent: bool,
 }
 
@@ -44,42 +32,29 @@ impl Default for TracerCoreConfig {
     }
 }
 
-/// Abstract base trait for tracers.
-///
-/// This trait provides common methods and reusable methods for tracers.
 pub trait TracerCore: Send + Sync + Debug {
-    /// Get the configuration for this tracer.
     fn config(&self) -> &TracerCoreConfig;
 
-    /// Get the mutable configuration for this tracer.
     fn config_mut(&mut self) -> &mut TracerCoreConfig;
 
-    /// Get the run map.
     fn run_map(&self) -> &HashMap<String, Run>;
 
-    /// Get the mutable run map.
     fn run_map_mut(&mut self) -> &mut HashMap<String, Run>;
 
-    /// Get the order map (run_id -> (trace_id, dotted_order)).
     fn order_map(&self) -> &HashMap<Uuid, (Uuid, String)>;
 
-    /// Get the mutable order map.
     fn order_map_mut(&mut self) -> &mut HashMap<Uuid, (Uuid, String)>;
 
-    /// Persist a run.
     fn persist_run(&mut self, run: &Run);
 
-    /// Add a child run to a parent run.
     fn add_child_run(&mut self, parent_run: &mut Run, child_run: Run) {
         parent_run.child_runs.push(child_run);
     }
 
-    /// Get the stacktrace of an error.
     fn get_stacktrace(error: &dyn std::error::Error) -> String {
         error.to_string()
     }
 
-    /// Start a trace for a run.
     fn start_trace(&mut self, run: &mut Run) {
         let current_dotted_order =
             format!("{}{}", run.start_time.format("%Y%m%dT%H%M%S%fZ"), run.id);
@@ -121,12 +96,10 @@ pub trait TracerCore: Send + Sync + Debug {
         self.run_map_mut().insert(run.id.to_string(), run.clone());
     }
 
-    /// End a trace for a run.
     fn end_trace(&mut self, run: &Run) {
         self.run_map_mut().remove(&run.id.to_string());
     }
 
-    /// Get a run by ID.
     fn get_run(&self, run_id: Uuid, run_type: Option<&[&str]>) -> Result<Run, TracerError> {
         let run = self
             .run_map()
@@ -147,12 +120,10 @@ pub trait TracerCore: Send + Sync + Debug {
         Ok(run)
     }
 
-    /// Get a mutable run by ID.
     fn get_run_mut(&mut self, run_id: Uuid) -> Option<&mut Run> {
         self.run_map_mut().get_mut(&run_id.to_string())
     }
 
-    /// Create a chat model run.
     #[allow(clippy::too_many_arguments)]
     fn create_chat_model_run(
         &self,
@@ -225,7 +196,6 @@ pub trait TracerCore: Send + Sync + Debug {
         Ok(run)
     }
 
-    /// Create an LLM run.
     #[allow(clippy::too_many_arguments)]
     fn create_llm_run(
         &self,
@@ -276,7 +246,6 @@ pub trait TracerCore: Send + Sync + Debug {
         }
     }
 
-    /// Process an LLM run with a new token event.
     fn llm_run_with_token_event(
         &mut self,
         token: &str,
@@ -320,7 +289,6 @@ pub trait TracerCore: Send + Sync + Debug {
         Ok(run.clone())
     }
 
-    /// Process an LLM run with a retry event.
     fn llm_run_with_retry_event(
         &mut self,
         retry_state: &HashMap<String, Value>,
@@ -337,7 +305,6 @@ pub trait TracerCore: Send + Sync + Debug {
         Ok(run.clone())
     }
 
-    /// Complete an LLM run.
     fn complete_llm_run(&mut self, response: &LLMResult, run_id: Uuid) -> Result<Run, TracerError> {
         let run = self
             .run_map_mut()
@@ -380,7 +347,6 @@ pub trait TracerCore: Send + Sync + Debug {
         Ok(run.clone())
     }
 
-    /// Mark an LLM run as errored.
     fn errored_llm_run(
         &mut self,
         error: &dyn std::error::Error,
@@ -432,7 +398,6 @@ pub trait TracerCore: Send + Sync + Debug {
         Ok(run.clone())
     }
 
-    /// Create a chain run.
     #[allow(clippy::too_many_arguments)]
     fn create_chain_run(
         &self,
@@ -479,7 +444,6 @@ pub trait TracerCore: Send + Sync + Debug {
         }
     }
 
-    /// Get chain inputs based on schema format.
     fn get_chain_inputs(&self, inputs: HashMap<String, Value>) -> HashMap<String, Value> {
         match self.config().schema_format {
             SchemaFormat::Original | SchemaFormat::OriginalChat => inputs,
@@ -492,7 +456,6 @@ pub trait TracerCore: Send + Sync + Debug {
         }
     }
 
-    /// Get chain outputs based on schema format.
     fn get_chain_outputs(&self, outputs: HashMap<String, Value>) -> HashMap<String, Value> {
         match self.config().schema_format {
             SchemaFormat::Original | SchemaFormat::OriginalChat => outputs,
@@ -505,7 +468,6 @@ pub trait TracerCore: Send + Sync + Debug {
         }
     }
 
-    /// Complete a chain run.
     fn complete_chain_run(
         &mut self,
         outputs: HashMap<String, Value>,
@@ -547,7 +509,6 @@ pub trait TracerCore: Send + Sync + Debug {
         Ok(run.clone())
     }
 
-    /// Mark a chain run as errored.
     fn errored_chain_run(
         &mut self,
         error: &dyn std::error::Error,
@@ -575,7 +536,6 @@ pub trait TracerCore: Send + Sync + Debug {
         Ok(run.clone())
     }
 
-    /// Create a tool run.
     #[allow(clippy::too_many_arguments)]
     fn create_tool_run(
         &self,
@@ -634,7 +594,6 @@ pub trait TracerCore: Send + Sync + Debug {
         }
     }
 
-    /// Complete a tool run.
     fn complete_tool_run(&mut self, output: Value, run_id: Uuid) -> Result<Run, TracerError> {
         let run = self
             .run_map_mut()
@@ -672,7 +631,6 @@ pub trait TracerCore: Send + Sync + Debug {
         Ok(run.clone())
     }
 
-    /// Mark a tool run as errored.
     fn errored_tool_run(
         &mut self,
         error: &dyn std::error::Error,
@@ -701,7 +659,6 @@ pub trait TracerCore: Send + Sync + Debug {
         Ok(run.clone())
     }
 
-    /// Create a retrieval run.
     #[allow(clippy::too_many_arguments)]
     fn create_retrieval_run(
         &self,
@@ -750,7 +707,6 @@ pub trait TracerCore: Send + Sync + Debug {
         }
     }
 
-    /// Complete a retrieval run.
     fn complete_retrieval_run(
         &mut self,
         documents: Vec<Value>,
@@ -792,7 +748,6 @@ pub trait TracerCore: Send + Sync + Debug {
         Ok(run.clone())
     }
 
-    /// Mark a retrieval run as errored.
     fn errored_retrieval_run(
         &mut self,
         error: &dyn std::error::Error,
@@ -821,67 +776,47 @@ pub trait TracerCore: Send + Sync + Debug {
         Ok(run.clone())
     }
 
-    /// Called when a run is created.
     fn on_run_create(&mut self, _run: &Run) {}
 
-    /// Called when a run is updated.
     fn on_run_update(&mut self, _run: &Run) {}
 
-    /// Called when an LLM run starts.
     fn on_llm_start(&mut self, _run: &Run) {}
 
-    /// Called when a new LLM token is received.
     fn on_llm_new_token(&mut self, _run: &Run, _token: &str, _chunk: Option<&dyn std::any::Any>) {}
 
-    /// Called when an LLM run ends.
     fn on_llm_end(&mut self, _run: &Run) {}
 
-    /// Called when an LLM run errors.
     fn on_llm_error(&mut self, _run: &Run) {}
 
-    /// Called when a chain run starts.
     fn on_chain_start(&mut self, _run: &Run) {}
 
-    /// Called when a chain run ends.
     fn on_chain_end(&mut self, _run: &Run) {}
 
-    /// Called when a chain run errors.
     fn on_chain_error(&mut self, _run: &Run) {}
 
-    /// Called when a tool run starts.
     fn on_tool_start(&mut self, _run: &Run) {}
 
-    /// Called when a tool run ends.
     fn on_tool_end(&mut self, _run: &Run) {}
 
-    /// Called when a tool run errors.
     fn on_tool_error(&mut self, _run: &Run) {}
 
-    /// Called when a chat model run starts.
     fn on_chat_model_start(&mut self, _run: &Run) {}
 
-    /// Called when a retriever run starts.
     fn on_retriever_start(&mut self, _run: &Run) {}
 
-    /// Called when a retriever run ends.
     fn on_retriever_end(&mut self, _run: &Run) {}
 
-    /// Called when a retriever run errors.
     fn on_retriever_error(&mut self, _run: &Run) {}
 }
 
-/// Error type for tracer operations.
 #[derive(Debug, Clone)]
 pub enum TracerError {
-    /// Run not found.
     RunNotFound(Uuid),
-    /// Wrong run type.
     WrongRunType {
         run_id: Uuid,
         expected: Vec<String>,
         actual: String,
     },
-    /// Unsupported schema format.
     UnsupportedSchemaFormat(String),
 }
 

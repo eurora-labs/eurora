@@ -1,7 +1,3 @@
-//! Tests for message module imports.
-//!
-//! Converted from `langchain/libs/core/tests/unit_tests/messages/test_imports.py`
-
 #[test]
 #[allow(unused_imports)]
 fn test_all_imports() {
@@ -86,10 +82,12 @@ fn test_all_imports() {
         audio: None,
         cache_creation: None,
         cache_read: None,
+        ..Default::default()
     };
     let _ = OutputTokenDetails {
         audio: None,
         reasoning: None,
+        ..Default::default()
     };
 
     let _ = KNOWN_BLOCK_TYPES;

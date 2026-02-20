@@ -1,7 +1,3 @@
-//! Tests for message utility functions.
-//!
-//! Converted from `langchain/libs/core/tests/unit_tests/messages/test_utils.py`
-
 use agent_chain_core::messages::{
     AIMessage, AIMessageChunk, BaseMessage, BaseMessageChunk, ChatMessage, ChatMessageChunk,
     CountTokensConfig, ExcludeToolCalls, FunctionMessage, FunctionMessageChunk, HumanMessage,
@@ -545,9 +541,6 @@ fn test_get_buffer_string_multiple_msg() {
     assert_eq!(get_buffer_string(&messages, "Human", "AI"), expected_output);
 }
 
-/// Dummy token counter for testing.
-/// Treat each message like it adds 3 default tokens at the beginning
-/// of the message and at the end of the message. 3 + 4 + 3 = 10 tokens per message.
 fn dummy_token_counter(messages: &[BaseMessage]) -> usize {
     let default_content_len = 4;
     let default_msg_prefix_len = 3;

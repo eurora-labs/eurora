@@ -1,16 +1,9 @@
-//! Benchmark tests for chat models.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/language_models/chat_models/test_benchmark.py`
-
 use std::time::Instant;
 
 use agent_chain_core::GenericFakeChatModel;
 use agent_chain_core::language_models::BaseChatModel;
 use agent_chain_core::messages::AIMessage;
 
-/// Ported from `test_benchmark_model`.
-///
-/// Ensures the model can handle 1000 invocations in under 1 second.
 #[tokio::test]
 async fn test_benchmark_model() {
     let messages: Vec<AIMessage> = (0..1000)

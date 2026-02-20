@@ -13,13 +13,10 @@ use crate::error::{Error, Result};
 use crate::indexing::base::{DocumentIndex, RecordManager};
 use crate::vectorstores::VectorStore;
 
-/// Magic UUID namespace for deterministic hashing.
-/// Equivalent to Python's `uuid.UUID(int=1984)`.
 pub const NAMESPACE_UUID: Uuid = Uuid::from_u128(1984);
 
 static WARNED_ABOUT_SHA1: AtomicBool = AtomicBool::new(false);
 
-/// Hash algorithm selection for document hashing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HashAlgorithm {
     Sha1,
@@ -28,7 +25,6 @@ pub enum HashAlgorithm {
     Blake2b,
 }
 
-/// Cleanup mode for the indexing operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CleanupMode {
     Incremental,
@@ -36,25 +32,21 @@ pub enum CleanupMode {
     ScopedFull,
 }
 
-/// How to encode document keys for hashing.
 pub enum KeyEncoder {
     Algorithm(HashAlgorithm),
     Custom(Box<dyn Fn(&Document) -> String + Send + Sync>),
 }
 
-/// How to extract source IDs from documents.
 pub enum SourceIdKey {
     MetadataKey(String),
     Custom(Box<dyn Fn(&Document) -> Option<String> + Send + Sync>),
 }
 
-/// Where to index documents.
 pub enum IndexDestination<'a> {
     VectorStore(&'a dyn VectorStore),
     DocumentIndex(&'a dyn DocumentIndex),
 }
 
-/// Configuration for the `index` / `aindex` functions.
 pub struct IndexConfig {
     pub batch_size: usize,
     pub cleanup: Option<CleanupMode>,
@@ -77,7 +69,6 @@ impl Default for IndexConfig {
     }
 }
 
-/// Result of an indexing operation.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct IndexingResult {
     pub num_added: usize,
@@ -97,10 +88,6 @@ fn warn_about_sha1() {
     }
 }
 
-/// Return a hex digest of `text` using the specified algorithm.
-///
-/// Note: SHA-1 path is special -- it wraps the hex digest in uuid5(NAMESPACE, hex).
-/// Other algorithms return the raw hex digest.
 fn calculate_hash(text: &str, algorithm: HashAlgorithm) -> String {
     use sha1::Digest as _;
 
@@ -125,8 +112,6 @@ fn calculate_hash(text: &str, algorithm: HashAlgorithm) -> String {
     }
 }
 
-/// A JSON formatter that matches Python's json.dumps default format:
-/// `", "` between items and `": "` between key-value pairs.
 struct PythonJsonFormatter;
 
 impl serde_json::ser::Formatter for PythonJsonFormatter {
@@ -162,7 +147,6 @@ impl serde_json::ser::Formatter for PythonJsonFormatter {
     }
 }
 
-/// Serialize metadata with sorted keys for deterministic hashing.
 fn sorted_json_string(metadata: &std::collections::HashMap<String, Value>) -> Result<String> {
     let sorted: BTreeMap<&String, &Value> = metadata.iter().collect();
     let mut buf = Vec::new();
@@ -175,7 +159,6 @@ fn sorted_json_string(metadata: &std::collections::HashMap<String, Value>) -> Re
     String::from_utf8(buf).map_err(|e| Error::Other(format!("Invalid UTF-8 in JSON: {e}")))
 }
 
-/// Calculate a hash of the document and return a new Document with the hash as its ID.
 pub fn get_document_with_hash(document: &Document, key_encoder: &KeyEncoder) -> Result<Document> {
     let hash = match key_encoder {
         KeyEncoder::Custom(encoder) => encoder(document),
@@ -195,7 +178,6 @@ pub fn get_document_with_hash(document: &Document, key_encoder: &KeyEncoder) -> 
     })
 }
 
-/// Deduplicate documents by ID, preserving order.
 fn deduplicate_in_order(documents: Vec<Document>) -> Vec<Document> {
     let mut seen = HashSet::new();
     documents
@@ -210,7 +192,6 @@ fn deduplicate_in_order(documents: Vec<Document>) -> Vec<Document> {
         .collect()
 }
 
-/// Build a closure that extracts a source ID from a Document.
 fn get_source_id_assigner<'a>(
     source_id_key: &'a Option<SourceIdKey>,
 ) -> Box<dyn Fn(&Document) -> Option<String> + 'a> {
@@ -227,7 +208,6 @@ fn get_source_id_assigner<'a>(
     }
 }
 
-/// Batch an iterator into chunks of the given size.
 fn batch_iter<T>(size: usize, items: impl IntoIterator<Item = T>) -> Vec<Vec<T>> {
     let mut result = Vec::new();
     let mut current = Vec::with_capacity(size);
@@ -244,7 +224,6 @@ fn batch_iter<T>(size: usize, items: impl IntoIterator<Item = T>) -> Vec<Vec<T>>
     result
 }
 
-/// Delete documents from the destination.
 fn delete_from_destination(destination: &IndexDestination<'_>, ids: &[String]) -> Result<()> {
     match destination {
         IndexDestination::VectorStore(vs) => {
@@ -265,7 +244,6 @@ fn delete_from_destination(destination: &IndexDestination<'_>, ids: &[String]) -
     }
 }
 
-/// Async delete documents from the destination.
 async fn adelete_from_destination(
     destination: &IndexDestination<'_>,
     ids: &[String],
@@ -289,7 +267,6 @@ async fn adelete_from_destination(
     }
 }
 
-/// Add documents to the destination.
 fn add_to_destination(
     destination: &IndexDestination<'_>,
     documents: Vec<Document>,
@@ -307,7 +284,6 @@ fn add_to_destination(
     }
 }
 
-/// Async add documents to the destination.
 async fn aadd_to_destination(
     destination: &IndexDestination<'_>,
     documents: Vec<Document>,
@@ -325,9 +301,6 @@ async fn aadd_to_destination(
     }
 }
 
-/// Index data into a vector store or document index.
-///
-/// Mirrors `langchain_core.indexing.api.index`.
 pub fn index(
     docs_source: impl IntoIterator<Item = Document>,
     record_manager: &dyn RecordManager,
@@ -499,9 +472,6 @@ pub fn index(
     })
 }
 
-/// Async index data into a vector store or document index.
-///
-/// Mirrors `langchain_core.indexing.api.aindex`.
 pub async fn aindex(
     docs_source: impl IntoIterator<Item = Document> + Send,
     record_manager: &dyn RecordManager,

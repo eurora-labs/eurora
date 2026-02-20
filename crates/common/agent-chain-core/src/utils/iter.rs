@@ -1,22 +1,13 @@
-//! Utilities for working with iterators.
-//!
-//! Adapted from langchain_core/utils/iter.py
-
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
-/// A dummy lock that provides the proper interface but no protection.
-///
-/// This is used as a default lock when no synchronization is needed.
 pub struct NoLock;
 
 impl NoLock {
-    /// Create a new NoLock.
     pub fn new() -> Self {
         Self
     }
 
-    /// Acquire the lock (no-op for NoLock).
     pub fn lock(&self) -> NoLockGuard {
         NoLockGuard
     }
@@ -28,29 +19,8 @@ impl Default for NoLock {
     }
 }
 
-/// A guard for NoLock that does nothing.
 pub struct NoLockGuard;
 
-/// Utility batching function for iterables.
-///
-/// # Arguments
-///
-/// * `size` - The size of each batch. If `None`, returns a single batch with all items.
-/// * `iterable` - The iterable to batch.
-///
-/// # Returns
-///
-/// An iterator over batches.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::utils::iter::batch_iterate;
-///
-/// let items = vec![1, 2, 3, 4, 5];
-/// let batches: Vec<Vec<i32>> = batch_iterate(Some(2), items).collect();
-/// assert_eq!(batches, vec![vec![1, 2], vec![3, 4], vec![5]]);
-/// ```
 pub fn batch_iterate<T, I>(size: Option<usize>, iterable: I) -> BatchIterator<T, I::IntoIter>
 where
     I: IntoIterator<Item = T>,
@@ -61,7 +31,6 @@ where
     }
 }
 
-/// An iterator that yields batches from an underlying iterator.
 pub struct BatchIterator<T, I>
 where
     I: Iterator<Item = T>,
@@ -90,32 +59,6 @@ where
     }
 }
 
-/// Create `n` separate iterators over an iterable.
-///
-/// This splits a single iterable into multiple iterators, each providing
-/// the same items in the same order. All child iterators may advance separately
-/// but share the same items from the source -- when the most advanced iterator
-/// retrieves an item, it is buffered until the least advanced iterator has
-/// yielded it as well.
-///
-/// # Arguments
-///
-/// * `iterable` - The iterable to split.
-/// * `n` - The number of iterators to create.
-///
-/// # Returns
-///
-/// A `Tee` containing `n` child iterators.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::utils::iter::tee;
-///
-/// let items = vec![1, 2, 3];
-/// let t = tee(items, 2);
-/// // Now t contains 2 iterators that will each yield 1, 2, 3
-/// ```
 pub fn tee<T, I>(iterable: I, n: usize) -> Tee<T>
 where
     T: Clone,
@@ -125,7 +68,6 @@ where
     Tee::new(iterable, n)
 }
 
-/// A tee implementation that creates multiple iterators from a single source.
 pub struct Tee<T> {
     source: Arc<Mutex<TeeSource<T>>>,
     children: Vec<TeeChild<T>>,
@@ -140,7 +82,6 @@ impl<T> Tee<T>
 where
     T: Clone,
 {
-    /// Create a new Tee with `n` child iterators.
     pub fn new<I>(iterable: I, n: usize) -> Self
     where
         I: IntoIterator<Item = T>,
@@ -161,17 +102,14 @@ where
         Self { source, children }
     }
 
-    /// Get the number of child iterators.
     pub fn len(&self) -> usize {
         self.children.len()
     }
 
-    /// Check if the tee is empty.
     pub fn is_empty(&self) -> bool {
         self.children.is_empty()
     }
 
-    /// Get a child iterator by index.
     pub fn get(&self, index: usize) -> Option<TeeChild<T>> {
         if index < self.children.len() {
             Some(TeeChild {
@@ -183,13 +121,11 @@ where
         }
     }
 
-    /// Consume the tee and return all child iterators.
     pub fn into_children(self) -> Vec<TeeChild<T>> {
         self.children
     }
 }
 
-/// A child iterator of a Tee.
 pub struct TeeChild<T> {
     source: Arc<Mutex<TeeSource<T>>>,
     index: usize,
@@ -227,7 +163,6 @@ impl<T: Clone> Iterator for TeeChild<T> {
     }
 }
 
-/// A safe version of tee that ensures thread safety.
 pub fn safetee<T, I>(iterable: I, n: usize) -> Tee<T>
 where
     T: Clone,

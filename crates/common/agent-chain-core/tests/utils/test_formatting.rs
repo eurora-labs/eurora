@@ -1,14 +1,9 @@
-//! Tests for the formatting module.
-//!
-//! These tests mirror the tests for `langchain_core/utils/formatting.py`.
-
 use std::collections::HashMap;
 
 use agent_chain_core::utils::formatting::{
     FORMATTER, FormattingError, StrictFormatter, format_string,
 };
 
-/// Test that the formatter can format a basic string with a single placeholder.
 #[test]
 fn test_format_basic() {
     let formatter = StrictFormatter::new();
@@ -19,7 +14,6 @@ fn test_format_basic() {
     assert_eq!(result, "Hello, World!");
 }
 
-/// Test that the formatter can handle multiple placeholders.
 #[test]
 fn test_format_multiple_placeholders() {
     let formatter = StrictFormatter::new();
@@ -31,7 +25,6 @@ fn test_format_multiple_placeholders() {
     assert_eq!(result, "John Doe");
 }
 
-/// Test that the formatter returns an error when a key is missing.
 #[test]
 fn test_format_missing_key() {
     let formatter = StrictFormatter::new();
@@ -45,7 +38,6 @@ fn test_format_missing_key() {
     }
 }
 
-/// Test that the formatter can extract placeholders from a format string.
 #[test]
 fn test_extract_placeholders() {
     let formatter = StrictFormatter::new();
@@ -56,7 +48,6 @@ fn test_extract_placeholders() {
     assert_eq!(placeholders.len(), 2);
 }
 
-/// Test that escaped braces ({{ and }}) are not treated as placeholders.
 #[test]
 fn test_extract_placeholders_escaped() {
     let formatter = StrictFormatter::new();
@@ -65,7 +56,6 @@ fn test_extract_placeholders_escaped() {
     assert!(placeholders.is_empty());
 }
 
-/// Test that escaped braces are preserved in the output.
 #[test]
 fn test_format_escaped_braces() {
     let formatter = StrictFormatter::new();
@@ -75,7 +65,6 @@ fn test_format_escaped_braces() {
     assert_eq!(result, "Hello, {{name}}!");
 }
 
-/// Test that validate_input_variables succeeds when all variables are provided.
 #[test]
 fn test_validate_input_variables_success() {
     let formatter = StrictFormatter::new();
@@ -84,7 +73,6 @@ fn test_validate_input_variables_success() {
     assert!(result.is_ok());
 }
 
-/// Test that validate_input_variables fails when a variable is missing.
 #[test]
 fn test_validate_input_variables_missing() {
     let formatter = StrictFormatter::new();
@@ -93,7 +81,6 @@ fn test_validate_input_variables_missing() {
     assert!(result.is_err());
 }
 
-/// Test that validate_input_variables works with multiple variables.
 #[test]
 fn test_validate_input_variables_multiple() {
     let formatter = StrictFormatter::new();
@@ -105,7 +92,6 @@ fn test_validate_input_variables_multiple() {
     assert!(result.is_ok());
 }
 
-/// Test the global format_string function.
 #[test]
 fn test_format_string_function() {
     let mut kwargs = HashMap::new();
@@ -115,7 +101,6 @@ fn test_format_string_function() {
     assert_eq!(result, "Hi!");
 }
 
-/// Test that the global FORMATTER instance works correctly.
 #[test]
 fn test_global_formatter() {
     let mut kwargs = HashMap::new();
@@ -125,7 +110,6 @@ fn test_global_formatter() {
     assert_eq!(result, "Hello, World!");
 }
 
-/// Test formatting with empty string values.
 #[test]
 fn test_format_empty_value() {
     let formatter = StrictFormatter::new();
@@ -136,7 +120,6 @@ fn test_format_empty_value() {
     assert_eq!(result, "Hello, !");
 }
 
-/// Test formatting with a string containing no placeholders.
 #[test]
 fn test_format_no_placeholders() {
     let formatter = StrictFormatter::new();
@@ -146,7 +129,6 @@ fn test_format_no_placeholders() {
     assert_eq!(result, "Hello, World!");
 }
 
-/// Test formatting with repeated placeholders.
 #[test]
 fn test_format_repeated_placeholder() {
     let formatter = StrictFormatter::new();
@@ -159,8 +141,6 @@ fn test_format_repeated_placeholder() {
     assert_eq!(result, "World says hello to World!");
 }
 
-/// Test that extra kwargs (not in the format string) are allowed.
-/// This mirrors Python's behavior where extra kwargs are simply ignored.
 #[test]
 fn test_format_extra_kwargs() {
     let formatter = StrictFormatter::new();
@@ -172,7 +152,6 @@ fn test_format_extra_kwargs() {
     assert_eq!(result, "Hello, World!");
 }
 
-/// Test extracting placeholders with format specifiers (e.g., {name:>10}).
 #[test]
 fn test_extract_placeholders_with_format_spec() {
     let formatter = StrictFormatter::new();
@@ -182,7 +161,6 @@ fn test_extract_placeholders_with_format_spec() {
     assert_eq!(placeholders.len(), 1);
 }
 
-/// Test extracting placeholders with conversion flags (e.g., {name!r}).
 #[test]
 fn test_extract_placeholders_with_conversion() {
     let formatter = StrictFormatter::new();
@@ -192,7 +170,6 @@ fn test_extract_placeholders_with_conversion() {
     assert_eq!(placeholders.len(), 1);
 }
 
-/// Test the Default implementation for StrictFormatter.
 #[test]
 fn test_formatter_default() {
     let formatter = StrictFormatter::new();
@@ -203,7 +180,6 @@ fn test_formatter_default() {
     assert_eq!(result, "Hello, World!");
 }
 
-/// Test FormattingError Display implementation.
 #[test]
 fn test_formatting_error_display() {
     let error = FormattingError::MissingKey("name".to_string());
@@ -213,7 +189,6 @@ fn test_formatting_error_display() {
     assert_eq!(error.to_string(), "Invalid format string: bad format");
 }
 
-/// Test formatting a complex template.
 #[test]
 fn test_format_complex_template() {
     let formatter = StrictFormatter::new();

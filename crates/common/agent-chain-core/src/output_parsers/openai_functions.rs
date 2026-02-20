@@ -1,9 +1,3 @@
-//! Parsers for OpenAI functions output.
-//!
-//! This module contains parsers for extracting and parsing function call
-//! information from OpenAI-style chat model responses.
-//! Mirrors `langchain_core.output_parsers.openai_functions`.
-
 use std::fmt::Debug;
 
 use serde::de::DeserializeOwned;
@@ -22,13 +16,8 @@ use crate::outputs::Generation;
 use crate::runnables::RunnableConfig;
 use crate::utils::json::parse_partial_json;
 
-/// Parse an output that is one of sets of values.
-///
-/// Extracts the raw function call information from the `additional_kwargs`
-/// of a `ChatGeneration`'s message.
 #[derive(Debug, Clone)]
 pub struct OutputFunctionsParser {
-    /// Whether to only return the arguments to the function call.
     pub args_only: bool,
 }
 
@@ -37,7 +26,6 @@ impl OutputFunctionsParser {
         Self { args_only }
     }
 
-    /// Parse the result of an LLM call, extracting raw function call data.
     pub fn parse_result(&self, result: &[ChatGeneration]) -> Result<Value> {
         let generation = result
             .first()
@@ -68,19 +56,10 @@ impl OutputFunctionsParser {
     }
 }
 
-/// Parse an output as a JSON object from OpenAI function calling.
-///
-/// Extracts the function call from `additional_kwargs["function_call"]` and
-/// parses the `arguments` string as JSON.
 #[derive(Debug, Clone)]
 pub struct JsonOutputFunctionsParser {
-    /// Whether to allow non-JSON-compliant strings.
-    ///
-    /// When `false` (default), uses lenient parsing that handles unicode characters
-    /// and newlines in strings. When `true`, uses strict JSON parsing.
     pub strict: bool,
 
-    /// Whether to only return the parsed arguments to the function call.
     pub args_only: bool,
 }
 
@@ -106,35 +85,22 @@ impl JsonOutputFunctionsParser {
         self
     }
 
-    /// Return the output parser type for serialization.
     pub fn parser_type(&self) -> &str {
         "json_functions"
     }
 
-    /// Parse the output of an LLM call to a JSON object.
-    ///
-    /// This method is not implemented because `JsonOutputFunctionsParser` works
-    /// directly with `ChatGeneration` results, not raw text strings.
     pub fn parse(&self, _text: &str) -> Result<Value> {
         Err(Error::NotImplemented(
             "JsonOutputFunctionsParser.parse is not implemented".to_string(),
         ))
     }
 
-    /// Compute a JSON patch diff between two values.
-    ///
-    /// Returns a list of JSON patch operations that transform `prev` into `next`.
-    /// This mirrors the Python `_diff` method which uses `jsonpatch.make_patch`.
     pub fn diff(&self, prev: &Value, next: &Value) -> Vec<Value> {
         let mut ops = Vec::new();
         compute_json_diff("", prev, next, &mut ops);
         ops
     }
 
-    /// Parse the result of an LLM call to a JSON object.
-    ///
-    /// When `partial` is true, attempts to parse partial JSON and returns
-    /// `Ok(None)` instead of erroring on missing or invalid data.
     pub fn parse_result_with_partial(
         &self,
         result: &[ChatGeneration],
@@ -225,13 +191,11 @@ impl JsonOutputFunctionsParser {
         }
     }
 
-    /// Parse the result of an LLM call to a JSON object (non-partial).
     pub fn parse_result(&self, result: &[ChatGeneration]) -> Result<Option<Value>> {
         self.parse_result_with_partial(result, false)
     }
 }
 
-/// Internal type-erased parser function for single-schema parsing.
 #[derive(Clone)]
 pub struct SingleSchemaParser<T>(
     #[allow(clippy::type_complexity)]
@@ -244,16 +208,9 @@ impl<T> Debug for SingleSchemaParser<T> {
     }
 }
 
-/// Schema specification for `PydanticOutputFunctionsParser`.
-///
-/// In Python, `pydantic_schema` can be either a single Pydantic class or a dict
-/// mapping function names to classes. In Rust, we use an enum to represent this.
 #[derive(Clone)]
 pub enum PydanticSchema<T> {
-    /// A single schema type. `args_only` will be true.
     Single(SingleSchemaParser<T>),
-    /// Multiple schemas keyed by function name.
-    /// The caller provides a function that deserializes by name.
     Multiple(
         #[allow(clippy::type_complexity)]
         std::sync::Arc<dyn Fn(&str, &str) -> Result<T> + Send + Sync>,
@@ -270,7 +227,6 @@ impl<T> Debug for PydanticSchema<T> {
 }
 
 impl<T: Send + Sync + 'static> PydanticSchema<T> {
-    /// Create a single-schema variant that deserializes via `serde_json`.
     pub fn single<D: DeserializeOwned + Into<T> + 'static>() -> Self {
         Self::Single(SingleSchemaParser(std::sync::Arc::new(|result| {
             let base_parser = OutputFunctionsParser::new(true);
@@ -289,20 +245,11 @@ impl<T: Send + Sync + 'static> PydanticSchema<T> {
         })))
     }
 
-    /// Create a multiple-schema variant with a resolver function.
-    ///
-    /// The resolver takes `(function_name, json_args_string)` and returns
-    /// the deserialized value.
     pub fn multiple(resolver: impl Fn(&str, &str) -> Result<T> + Send + Sync + 'static) -> Self {
         Self::Multiple(std::sync::Arc::new(resolver))
     }
 }
 
-/// Parse an output as a deserialized struct from OpenAI function calling.
-///
-/// This is the Rust equivalent of `PydanticOutputFunctionsParser`. Instead of
-/// Pydantic models, it uses `serde::Deserialize` to parse the function call
-/// arguments into a typed struct.
 #[derive(Debug, Clone)]
 pub struct PydanticOutputFunctionsParser<T> {
     pub schema: PydanticSchema<T>,
@@ -319,14 +266,12 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + 'static> Default
 }
 
 impl<T: DeserializeOwned + Send + Sync + Clone + Debug + 'static> PydanticOutputFunctionsParser<T> {
-    /// Create a parser for a single schema type (args_only = true).
     pub fn new() -> Self {
         Self::default()
     }
 }
 
 impl<T: Send + Sync + Clone + Debug + 'static> PydanticOutputFunctionsParser<T> {
-    /// Create a parser for multiple schemas keyed by function name.
     pub fn with_multiple_schemas(
         resolver: impl Fn(&str, &str) -> Result<T> + Send + Sync + 'static,
     ) -> Self {
@@ -335,11 +280,6 @@ impl<T: Send + Sync + Clone + Debug + 'static> PydanticOutputFunctionsParser<T> 
         }
     }
 
-    /// Parse the result of an LLM call into a typed struct.
-    ///
-    /// For `Single` schemas, `T` must implement `DeserializeOwned` (enforced at
-    /// construction via `new()`). For `Multiple` schemas, deserialization is
-    /// handled by the user-provided resolver function.
     pub fn parse_result(&self, result: &[ChatGeneration]) -> Result<T> {
         match &self.schema {
             PydanticSchema::Single(parse_fn) => (parse_fn.0)(result),
@@ -359,16 +299,10 @@ impl<T: Send + Sync + Clone + Debug + 'static> PydanticOutputFunctionsParser<T> 
     }
 }
 
-/// Parse an output as a specific key of the JSON object from OpenAI function calling.
-///
-/// Extracts a specific key from the parsed JSON arguments.
-/// Mirrors `langchain_core.output_parsers.openai_functions.JsonKeyOutputFunctionsParser`.
 #[derive(Debug, Clone)]
 pub struct JsonKeyOutputFunctionsParser {
-    /// The name of the key to extract from the parsed JSON.
     pub key_name: String,
 
-    /// The underlying JSON parser.
     inner: JsonOutputFunctionsParser,
 }
 
@@ -385,10 +319,6 @@ impl JsonKeyOutputFunctionsParser {
         self
     }
 
-    /// Parse the result, extracting the value at `key_name` from the JSON.
-    ///
-    /// When `partial` is true, returns `Ok(None)` if the key is not present
-    /// instead of erroring.
     pub fn parse_result_with_partial(
         &self,
         result: &[ChatGeneration],
@@ -416,27 +346,20 @@ impl JsonKeyOutputFunctionsParser {
         }
     }
 
-    /// Parse the result (non-partial).
     pub fn parse_result(&self, result: &[ChatGeneration]) -> Result<Option<Value>> {
         self.parse_result_with_partial(result, false)
     }
 }
 
-/// Parse an output as a Pydantic object and extract a specific attribute.
-///
-/// Mirrors `langchain_core.output_parsers.openai_functions.PydanticAttrOutputFunctionsParser`.
 #[derive(Debug, Clone)]
 pub struct PydanticAttrOutputFunctionsParser<T> {
-    /// The underlying pydantic parser.
     inner: PydanticOutputFunctionsParser<T>,
-    /// The attribute name to extract from the parsed struct.
     pub attr_name: String,
 }
 
 impl<T: DeserializeOwned + Send + Sync + Clone + Debug + 'static>
     PydanticAttrOutputFunctionsParser<T>
 {
-    /// Create a new parser that extracts a specific attribute from the parsed struct.
     pub fn new(attr_name: impl Into<String>) -> Self {
         Self {
             inner: PydanticOutputFunctionsParser::new(),
@@ -444,10 +367,6 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + 'static>
         }
     }
 
-    /// Parse the result and extract the named attribute as a `Value`.
-    ///
-    /// First parses the result into the typed struct `T` using serde, then
-    /// serializes it back to a `Value` and extracts the named field.
     pub fn parse_result(&self, result: &[ChatGeneration]) -> Result<Value>
     where
         T: serde::Serialize,
@@ -464,9 +383,6 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + 'static>
     }
 }
 
-/// Compute a JSON patch-like diff between two values.
-///
-/// Produces a list of operations (add, remove, replace) that transform `prev` into `next`.
 fn compute_json_diff(path: &str, prev: &Value, next: &Value, ops: &mut Vec<Value>) {
     if prev == next {
         return;
@@ -544,12 +460,6 @@ fn compute_json_diff(path: &str, prev: &Value, next: &Value, ops: &mut Vec<Value
     }
 }
 
-/// Parse JSON leniently, handling newlines and special characters inside strings.
-///
-/// Python's `json.loads` with `strict=False` allows control characters (like
-/// literal newlines) inside JSON strings. Rust's `serde_json` is strict by
-/// default. This function preprocesses the input to escape unescaped control
-/// characters inside JSON string values before parsing.
 fn parse_json_lenient(input: &str) -> std::result::Result<Value, String> {
     if let Ok(value) = serde_json::from_str::<Value>(input) {
         return Ok(value);
