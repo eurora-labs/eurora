@@ -4,6 +4,7 @@
 	import { auth, isAuthenticated, accessToken } from '$lib/stores/auth.js';
 	import { Button, type ButtonProps } from '@eurora/ui/components/button/index';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import { onMount } from 'svelte';
 
 	const REST_API_URL = import.meta.env.VITE_REST_API_URL;
 	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID;
@@ -11,16 +12,21 @@
 	let {
 		class: className = '',
 		variant = 'default' as ButtonProps['variant'],
+		autoTrigger = false,
 		children,
 		...restProps
-	}: ButtonProps & { children?: Snippet } = $props();
+	}: ButtonProps & { children?: Snippet; autoTrigger?: boolean } = $props();
 
 	let loading = $state(false);
 	let error = $state<string | null>(null);
 
+	onMount(() => {
+		if (autoTrigger) handleGetPro();
+	});
+
 	async function handleGetPro() {
 		if (!$isAuthenticated) {
-			goto('/login?redirect=/pricing');
+			goto('/login?redirect=' + encodeURIComponent('/pricing?checkout=true'));
 			return;
 		}
 
@@ -29,7 +35,7 @@
 
 		try {
 			if (!(await auth.ensureValidToken())) {
-				goto('/login?redirect=/pricing');
+				goto('/login?redirect=' + encodeURIComponent('/pricing?checkout=true'));
 				return;
 			}
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import GetProButton from '$lib/components/GetProButton.svelte';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
@@ -13,6 +14,8 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import countries from 'i18n-iso-countries';
 	import enLocale from 'i18n-iso-countries/langs/en.json';
+
+	const shouldAutoCheckout = page.url.searchParams.get('checkout') === 'true';
 
 	countries.registerLocale(enLocale);
 
@@ -144,7 +147,7 @@
 						<span class="text-gray-500">Custom integrations</span>
 					</li>
 				</ul>
-				<GetProButton class="w-full">Get</GetProButton>
+				<GetProButton class="w-full" autoTrigger={shouldAutoCheckout}>Get</GetProButton>
 			</Card.Content>
 		</Card.Root>
 
