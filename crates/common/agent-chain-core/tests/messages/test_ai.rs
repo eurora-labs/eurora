@@ -151,10 +151,12 @@ fn test_add_usage_with_details() {
             audio: Some(5),
             cache_creation: None,
             cache_read: None,
+            ..Default::default()
         }),
         output_token_details: Some(OutputTokenDetails {
             audio: None,
             reasoning: Some(10),
+            ..Default::default()
         }),
     };
     let usage2 = UsageMetadata {
@@ -165,10 +167,12 @@ fn test_add_usage_with_details() {
             audio: Some(3),
             cache_creation: None,
             cache_read: None,
+            ..Default::default()
         }),
         output_token_details: Some(OutputTokenDetails {
             audio: None,
             reasoning: Some(5),
+            ..Default::default()
         }),
     };
     let result = add_usage(Some(&usage1), Some(&usage2));
@@ -236,10 +240,12 @@ fn test_add_ai_message_chunks_usage() {
                 audio: Some(1),
                 cache_creation: None,
                 cache_read: Some(1),
+                ..Default::default()
             }),
             output_token_details: Some(OutputTokenDetails {
                 audio: Some(1),
                 reasoning: Some(2),
+                ..Default::default()
             }),
         })
         .build();
@@ -635,10 +641,12 @@ fn test_ai_message_serdes_with_usage_metadata() {
             audio: None,
             cache_creation: None,
             cache_read: Some(20),
+            ..Default::default()
         }),
         output_token_details: Some(OutputTokenDetails {
             audio: None,
             reasoning: Some(10),
+            ..Default::default()
         }),
     };
     let msg = AIMessage::builder()
@@ -885,10 +893,12 @@ fn test_subtract_usage_with_details() {
             audio: Some(10),
             cache_creation: None,
             cache_read: Some(8),
+            ..Default::default()
         }),
         output_token_details: Some(OutputTokenDetails {
             audio: Some(5),
             reasoning: Some(15),
+            ..Default::default()
         }),
     };
     let usage2 = UsageMetadata {
@@ -899,10 +909,12 @@ fn test_subtract_usage_with_details() {
             audio: Some(3),
             cache_creation: None,
             cache_read: Some(2),
+            ..Default::default()
         }),
         output_token_details: Some(OutputTokenDetails {
             audio: Some(2),
             reasoning: Some(5),
+            ..Default::default()
         }),
     };
     let result = subtract_usage(Some(&usage1), Some(&usage2));
@@ -931,6 +943,7 @@ fn test_subtract_usage_right_none_returns_left() {
             audio: None,
             cache_creation: None,
             cache_read: Some(5),
+            ..Default::default()
         }),
         output_token_details: None,
     };

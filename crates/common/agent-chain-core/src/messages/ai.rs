@@ -34,6 +34,9 @@ pub struct InputTokenDetails {
     /// Input tokens that were cached and there was a cache hit.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_read: Option<i64>,
+    /// Extra provider-specific token detail fields (e.g. service-tier-prefixed keys).
+    #[serde(flatten, default, skip_serializing_if = "HashMap::is_empty")]
+    pub extra: HashMap<String, i64>,
 }
 
 /// Breakdown of output token counts.
@@ -48,6 +51,9 @@ pub struct OutputTokenDetails {
     /// Reasoning output tokens.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<i64>,
+    /// Extra provider-specific token detail fields (e.g. service-tier-prefixed keys).
+    #[serde(flatten, default, skip_serializing_if = "HashMap::is_empty")]
+    pub extra: HashMap<String, i64>,
 }
 
 /// Usage metadata for a message, such as token counts.
@@ -68,6 +74,14 @@ pub struct UsageMetadata {
     /// Breakdown of output token counts.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_token_details: Option<OutputTokenDetails>,
+}
+
+fn merge_extra_maps(a: &HashMap<String, i64>, b: &HashMap<String, i64>) -> HashMap<String, i64> {
+    let mut merged = a.clone();
+    for (key, value) in b {
+        *merged.entry(key.clone()).or_insert(0) += value;
+    }
+    merged
 }
 
 impl UsageMetadata {
@@ -105,6 +119,7 @@ impl UsageMetadata {
                         (Some(x), None) | (None, Some(x)) => Some(x),
                         (None, None) => None,
                     },
+                    extra: merge_extra_maps(&a.extra, &b.extra),
                 }),
                 (Some(a), None) => Some(a.clone()),
                 (None, Some(b)) => Some(b.clone()),
@@ -122,6 +137,7 @@ impl UsageMetadata {
                         (Some(x), None) | (None, Some(x)) => Some(x),
                         (None, None) => None,
                     },
+                    extra: merge_extra_maps(&a.extra, &b.extra),
                 }),
                 (Some(a), None) => Some(a.clone()),
                 (None, Some(b)) => Some(b.clone()),
@@ -1371,6 +1387,7 @@ impl std::iter::Sum for AIMessageChunk {
 ///         audio: None,
 ///         cache_creation: None,
 ///         cache_read: Some(3),
+///         ..Default::default()
 ///     }),
 ///     output_token_details: None,
 /// };
@@ -1422,6 +1439,7 @@ pub fn add_usage(left: Option<&UsageMetadata>, right: Option<&UsageMetadata>) ->
 ///         audio: None,
 ///         cache_creation: None,
 ///         cache_read: Some(4),
+///         ..Default::default()
 ///     }),
 ///     output_token_details: None,
 /// };
@@ -1460,6 +1478,15 @@ pub fn subtract_usage(
     }
 }
 
+fn subtract_extra_maps(a: &HashMap<String, i64>, b: &HashMap<String, i64>) -> HashMap<String, i64> {
+    let mut result = a.clone();
+    for (key, value) in b {
+        let entry = result.entry(key.clone()).or_insert(0);
+        *entry = (*entry - value).max(0);
+    }
+    result
+}
+
 /// Manual subtraction fallback for UsageMetadata.
 fn subtract_manual(l: &UsageMetadata, r: &UsageMetadata) -> UsageMetadata {
     UsageMetadata {
@@ -1473,12 +1500,14 @@ fn subtract_manual(l: &UsageMetadata, r: &UsageMetadata) -> UsageMetadata {
                     .cache_creation
                     .map(|x| (x - b.cache_creation.unwrap_or(0)).max(0)),
                 cache_read: a.cache_read.map(|x| (x - b.cache_read.unwrap_or(0)).max(0)),
+                extra: subtract_extra_maps(&a.extra, &b.extra),
             }),
             (Some(a), None) => Some(a.clone()),
             (None, Some(b)) => Some(InputTokenDetails {
                 audio: b.audio.map(|_| 0),
                 cache_creation: b.cache_creation.map(|_| 0),
                 cache_read: b.cache_read.map(|_| 0),
+                extra: b.extra.keys().map(|k| (k.clone(), 0)).collect(),
             }),
             (None, None) => None,
         },
@@ -1486,11 +1515,13 @@ fn subtract_manual(l: &UsageMetadata, r: &UsageMetadata) -> UsageMetadata {
             (Some(a), Some(b)) => Some(OutputTokenDetails {
                 audio: a.audio.map(|x| (x - b.audio.unwrap_or(0)).max(0)),
                 reasoning: a.reasoning.map(|x| (x - b.reasoning.unwrap_or(0)).max(0)),
+                extra: subtract_extra_maps(&a.extra, &b.extra),
             }),
             (Some(a), None) => Some(a.clone()),
             (None, Some(b)) => Some(OutputTokenDetails {
                 audio: b.audio.map(|_| 0),
                 reasoning: b.reasoning.map(|_| 0),
+                extra: b.extra.keys().map(|k| (k.clone(), 0)).collect(),
             }),
             (None, None) => None,
         },
@@ -1581,6 +1612,7 @@ mod tests {
                 audio: None,
                 cache_creation: None,
                 cache_read: Some(3),
+                ..Default::default()
             }),
             output_token_details: None,
         };
@@ -1592,6 +1624,7 @@ mod tests {
             output_token_details: Some(OutputTokenDetails {
                 audio: None,
                 reasoning: Some(4),
+                ..Default::default()
             }),
         };
 
@@ -1640,6 +1673,7 @@ mod tests {
                 audio: None,
                 cache_creation: None,
                 cache_read: Some(4),
+                ..Default::default()
             }),
             output_token_details: None,
         };
@@ -1651,6 +1685,7 @@ mod tests {
             output_token_details: Some(OutputTokenDetails {
                 audio: None,
                 reasoning: Some(4),
+                ..Default::default()
             }),
         };
 

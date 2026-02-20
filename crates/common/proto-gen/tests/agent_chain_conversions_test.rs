@@ -19,10 +19,12 @@ mod tests {
                 audio: Some(10),
                 cache_creation: Some(20),
                 cache_read: Some(30),
+                ..Default::default()
             }),
             output_token_details: Some(OutputTokenDetails {
                 audio: Some(5),
                 reasoning: Some(15),
+                ..Default::default()
             }),
         };
 

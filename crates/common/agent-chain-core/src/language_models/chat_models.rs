@@ -1620,6 +1620,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                             BaseMessage::AI(ai_msg) => AIMessageChunk::builder()
                                 .content(ai_msg.content.clone())
                                 .tool_calls(ai_msg.tool_calls.clone())
+                                .maybe_usage_metadata(ai_msg.usage_metadata.clone())
                                 .build(),
                             other => AIMessageChunk::builder().content(other.text()).build(),
                         };
