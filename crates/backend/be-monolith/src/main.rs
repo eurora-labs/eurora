@@ -97,6 +97,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .try_init()
         .unwrap();
 
+    if let Some(posthog_key) = std::env::var("POSTHOG_API_KEY")
+        .ok()
+        .filter(|s| !s.is_empty())
+    {
+        match posthog_rs::init_global(posthog_key.as_str()).await {
+            Ok(()) => info!("PostHog analytics initialized"),
+            Err(e) => warn!("Failed to initialize PostHog: {}", e),
+        }
+    } else {
+        debug!("POSTHOG_API_KEY not set, analytics disabled");
+    }
+
     let database_url = std::env::var("REMOTE_DATABASE_URL")
         .expect("REMOTE_DATABASE_URL environment variable must be set");
     let db_manager = Arc::new(DatabaseManager::new(&database_url).await?);

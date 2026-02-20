@@ -11,6 +11,7 @@ use stripe_core::customer::ListCustomer;
 use stripe_webhook::{Event, EventObject, Webhook};
 use tracing::{error, info, warn};
 
+use crate::analytics;
 use crate::auth::AuthUser;
 use crate::error::PaymentError;
 use crate::service::AppState;
@@ -43,6 +44,10 @@ pub async fn create_checkout_session(
         .allowed_price_ids()
         .contains(&body.price_id.as_str())
     {
+        analytics::track_checkout_session_creation_failed(
+            Some(&body.price_id),
+            "invalid_price_id",
+        );
         return Err(PaymentError::InvalidField(
             "price_id is not a recognised plan",
         ));
@@ -52,7 +57,7 @@ pub async fn create_checkout_session(
 
     let line_items = vec![CreateCheckoutSessionLineItems {
         quantity: Some(1),
-        price: Some(body.price_id),
+        price: Some(body.price_id.clone()),
         ..Default::default()
     }];
 
@@ -72,7 +77,14 @@ pub async fn create_checkout_session(
         .email(email)
         .limit(1)
         .send(&state.client)
-        .await?;
+        .await
+        .map_err(|e| {
+            analytics::track_checkout_session_creation_failed(
+                Some(&body.price_id),
+                "stripe_error",
+            );
+            e
+        })?;
 
     if let Some(customer) = existing.data.first() {
         info!(customer_id = %customer.id, %email, "Reusing existing Stripe customer");
@@ -81,11 +93,20 @@ pub async fn create_checkout_session(
         req = req.customer_email(email);
     }
 
-    let session = req.send(&state.client).await?;
+    let session = req.send(&state.client).await.map_err(|e| {
+        analytics::track_checkout_session_creation_failed(Some(&body.price_id), "stripe_error");
+        e
+    })?;
 
-    let url = session
-        .url
-        .ok_or_else(|| PaymentError::MissingField("checkout session URL"))?;
+    let url = session.url.ok_or_else(|| {
+        analytics::track_checkout_session_creation_failed(
+            Some(&body.price_id),
+            "missing_checkout_url",
+        );
+        PaymentError::MissingField("checkout session URL")
+    })?;
+
+    analytics::track_checkout_session_created(&body.price_id);
 
     Ok(Json(CreateCheckoutResponse {
         session_id: session.id.to_string(),
@@ -97,14 +118,23 @@ pub async fn create_portal_session(
     State(state): State<Arc<AppState>>,
     AuthUser(claims): AuthUser,
 ) -> Result<Json<CreatePortalResponse>, PaymentError> {
-    let customer_id = resolve_customer_id(&state, &claims.email).await?;
+    let customer_id = resolve_customer_id(&state, &claims.email).await.map_err(|e| {
+        analytics::track_billing_portal_failed(e.error_kind());
+        e
+    })?;
     let return_url = format!("{}/settings/billing", state.config.frontend_url);
 
     let session = stripe_billing::billing_portal_session::CreateBillingPortalSession::new()
         .customer(&customer_id)
         .return_url(&return_url)
         .send(&state.client)
-        .await?;
+        .await
+        .map_err(|e| {
+            analytics::track_billing_portal_failed("stripe_error");
+            PaymentError::from(e)
+        })?;
+
+    analytics::track_billing_portal_created();
 
     Ok(Json(CreatePortalResponse { url: session.url }))
 }
@@ -115,7 +145,10 @@ pub async fn get_subscription_status(
 ) -> Result<Json<SubscriptionStatus>, PaymentError> {
     let customer_id = match resolve_customer_id(&state, &claims.email).await {
         Ok(id) => id,
-        Err(PaymentError::InvalidField(_)) => return Ok(Json(SubscriptionStatus::default())),
+        Err(PaymentError::InvalidField(_)) => {
+            analytics::track_subscription_status_checked(None, None);
+            return Ok(Json(SubscriptionStatus::default()));
+        }
         Err(e) => return Err(e),
     };
 
@@ -133,7 +166,13 @@ pub async fn get_subscription_status(
         cancel_at_period_end: Some(sub.cancel_at_period_end),
     });
 
-    Ok(Json(status.unwrap_or_default()))
+    let result = status.unwrap_or_default();
+    analytics::track_subscription_status_checked(
+        result.status.as_deref(),
+        result.price_id.as_deref(),
+    );
+
+    Ok(Json(result))
 }
 
 pub async fn get_checkout_status(
@@ -156,6 +195,8 @@ pub async fn get_checkout_status(
         .status
         .map(|s| s.as_str().to_owned())
         .unwrap_or_else(|| "unknown".to_owned());
+
+    analytics::track_checkout_status_checked(&status);
 
     Ok(Json(CheckoutStatusResponse { status }))
 }
@@ -213,7 +254,7 @@ pub async fn handle_webhook(
             if let Err(e) = webhook::on_checkout_completed(
                 &state.db,
                 customer_id,
-                subscription_id,
+                subscription_id.clone(),
                 customer_email,
                 subscription_obj,
                 &raw_data,
@@ -223,6 +264,11 @@ pub async fn handle_webhook(
                 error!(%event_id, error = %e, "Failed to provision access after checkout");
                 return Err(e);
             }
+
+            analytics::track_webhook_checkout_completed(
+                subscription_id.is_some(),
+                true,
+            );
         }
         EventObject::CustomerSubscriptionUpdated(sub) => {
             info!(
@@ -236,6 +282,13 @@ pub async fn handle_webhook(
                 error!(%event_id, error = %e, "Failed to handle subscription update");
                 return Err(e);
             }
+
+            let plan_id = webhook::resolve_plan_id_for_tracking(&state.db, &sub).await;
+            analytics::track_webhook_subscription_updated(
+                &sub.status.to_string(),
+                &plan_id,
+                sub.cancel_at_period_end,
+            );
         }
         EventObject::CustomerSubscriptionDeleted(sub) => {
             info!(
@@ -248,6 +301,8 @@ pub async fn handle_webhook(
                 error!(%event_id, error = %e, "Failed to revoke access after subscription deletion");
                 return Err(e);
             }
+
+            analytics::track_webhook_subscription_deleted();
         }
         EventObject::InvoicePaid(invoice) => {
             info!(
@@ -256,10 +311,14 @@ pub async fn handle_webhook(
                 "Invoice paid"
             );
 
+            let has_subscription = invoice.subscription.is_some();
+
             if let Err(e) = webhook::on_invoice_paid(&state.db, &invoice).await {
                 error!(%event_id, error = %e, "Failed to handle invoice paid event");
                 return Err(e);
             }
+
+            analytics::track_webhook_invoice_paid(has_subscription);
         }
         EventObject::InvoicePaymentFailed(invoice) => {
             info!(
@@ -268,10 +327,14 @@ pub async fn handle_webhook(
                 "Invoice payment failed"
             );
 
+            let attempt_count = invoice.attempt_count;
+
             if let Err(e) = webhook::on_invoice_payment_failed(&state.db, &invoice).await {
                 error!(%event_id, error = %e, "Failed to handle invoice payment failure");
                 return Err(e);
             }
+
+            analytics::track_webhook_invoice_payment_failed(attempt_count);
         }
         _ => {
             warn!(%event_id, %event_type, "Unhandled webhook event");

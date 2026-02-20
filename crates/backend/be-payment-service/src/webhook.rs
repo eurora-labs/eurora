@@ -216,6 +216,22 @@ pub async fn on_subscription_updated(
     Ok(())
 }
 
+pub async fn resolve_plan_id_for_tracking(
+    db: &Arc<DatabaseManager>,
+    sub: &Subscription,
+) -> String {
+    let status = sub.status.to_string();
+    if matches!(status.as_str(), "active" | "trialing") {
+        if let Some(price_id) = extract_first_price_id(sub) {
+            if let Ok(Some(plan_id)) = db.resolve_plan_for_stripe_price(&db.pool, &price_id).await
+            {
+                return plan_id;
+            }
+        }
+    }
+    "free".to_string()
+}
+
 pub async fn on_subscription_deleted(
     db: &Arc<DatabaseManager>,
     sub: &Subscription,

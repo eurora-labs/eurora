@@ -10,6 +10,7 @@ use tonic::{Request, Response, Status};
 use tracing::{debug, info};
 use uuid::Uuid;
 
+use crate::analytics;
 use crate::error::{ActivityResult, ActivityServiceError};
 
 use proto_gen::activity::{
@@ -112,6 +113,8 @@ impl ProtoActivityService for ActivityService {
             user_id
         );
 
+        analytics::track_activities_listed(req.limit, req.offset, proto_activities.len());
+
         Ok(Response::new(ListActivitiesResponse {
             activities: proto_activities,
         }))
@@ -128,18 +131,34 @@ impl ProtoActivityService for ActivityService {
 
         let req = request.into_inner();
 
-        let id = parse_optional_uuid(req.id.as_ref(), "activity_id")?;
+        let id = match parse_optional_uuid(req.id.as_ref(), "activity_id") {
+            Ok(id) => id,
+            Err(e) => {
+                analytics::track_activity_insert_failed("invalid_uuid");
+                return Err(e.into());
+            }
+        };
 
-        let started_at = req
+        let started_at = match req
             .started_at
             .as_ref()
             .and_then(timestamp_to_datetime)
-            .ok_or_else(|| ActivityServiceError::invalid_timestamp("started_at"))?;
+        {
+            Some(ts) => ts,
+            None => {
+                analytics::track_activity_insert_failed("invalid_timestamp");
+                return Err(ActivityServiceError::invalid_timestamp("started_at").into());
+            }
+        };
 
         let ended_at = req.ended_at.as_ref().and_then(timestamp_to_datetime);
         info!("Ended at: {:?}", ended_at);
 
-        let activity = self
+        let has_icon = req.icon.is_some();
+        let has_ended_at = ended_at.is_some();
+        let process_name = req.process_name.clone();
+
+        let activity = match self
             .db
             .create_activity()
             .maybe_id(id)
@@ -151,11 +170,18 @@ impl ProtoActivityService for ActivityService {
             .maybe_ended_at(ended_at)
             .call()
             .await
-            .map_err(ActivityServiceError::from)?;
+        {
+            Ok(a) => a,
+            Err(e) => {
+                analytics::track_activity_insert_failed("database_error");
+                return Err(ActivityServiceError::from(e).into());
+            }
+        };
+
         info!("Created activity at: {:?}", activity.created_at);
         let icon_id = match req.icon {
             Some(icon) => {
-                let icon_response = self
+                match self
                     .asset_service
                     .create_asset(
                         CreateAssetRequest {
@@ -168,26 +194,36 @@ impl ProtoActivityService for ActivityService {
                         user_id,
                     )
                     .await
-                    .map_err(ActivityServiceError::Asset)?;
-
-                match icon_response.asset {
-                    Some(asset) => Some(Uuid::parse_str(&asset.id).unwrap()),
-                    None => None,
+                {
+                    Ok(icon_response) => match icon_response.asset {
+                        Some(asset) => Some(Uuid::parse_str(&asset.id).unwrap()),
+                        None => None,
+                    },
+                    Err(e) => {
+                        analytics::track_activity_insert_failed("asset_error");
+                        return Err(ActivityServiceError::Asset(e).into());
+                    }
                 }
             }
             None => None,
         };
 
-        self.db
+        if let Err(e) = self
+            .db
             .update_activity()
             .id(activity.id)
             .user_id(user_id)
             .maybe_icon_asset_id(icon_id)
             .call()
             .await
-            .map_err(ActivityServiceError::Database)?;
+        {
+            analytics::track_activity_insert_failed("database_error");
+            return Err(ActivityServiceError::Database(e).into());
+        }
 
         debug!("Created activity {} for user {}", activity.id, user_id);
+
+        analytics::track_activity_inserted(has_icon, has_ended_at, &process_name);
 
         Ok(Response::new(ActivityResponse {
             activity: Some(Self::db_activity_to_proto(&activity)),

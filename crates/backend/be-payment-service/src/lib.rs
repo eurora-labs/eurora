@@ -14,6 +14,7 @@ use tower_governor::{
 use tower_http::trace::TraceLayer;
 use tracing::debug;
 
+pub mod analytics;
 pub mod auth;
 pub mod config;
 pub mod error;
