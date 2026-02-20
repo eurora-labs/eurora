@@ -1,11 +1,3 @@
-//! Chat models for threadal AI.
-//!
-//! This module provides the base abstraction for chat models,
-//! following the LangChain pattern of having a common interface
-//! for different providers.
-//!
-//! Mirrors `langchain_core.language_models.chat_models`.
-
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -31,49 +23,27 @@ use crate::runnables::config::RunnableConfig;
 use crate::tools::{BaseTool, ToolDefinition};
 use crate::utils::function_calling::convert_to_openai_tool;
 
-/// Type alias for streaming output.
 pub type ChatStream = Pin<Box<dyn Stream<Item = Result<ChatChunk>> + Send>>;
 
-/// Type alias for a streaming chat generation output.
 pub type ChatGenerationStream = Pin<Box<dyn Stream<Item = Result<ChatGenerationChunk>> + Send>>;
 
-/// Type alias for streaming AIMessageChunk output.
 pub type AIMessageChunkStream = Pin<Box<dyn Stream<Item = Result<AIMessageChunk>> + Send>>;
 
-/// Configuration for `generate()` and `agenerate()` calls.
-///
-/// Wraps the optional parameters that Python passes as keyword arguments.
-/// Use the builder pattern for clean construction:
-///
-/// ```ignore
-/// let config = GenerateConfig::builder()
-///     .callbacks(my_callbacks)
-///     .tags(vec!["tag1".into()])
-///     .build();
-/// model.generate(messages, config).await?;
-/// ```
 #[derive(Debug, Clone, Default, bon::Builder)]
 pub struct GenerateConfig {
-    /// Stop words to use when generating.
     #[builder(into)]
     pub stop: Option<Vec<String>>,
-    /// Callbacks to pass through.
     pub callbacks: Option<Callbacks>,
-    /// Tags to apply to the run.
     #[builder(into)]
     pub tags: Option<Vec<String>>,
-    /// Metadata to apply to the run.
     #[builder(into)]
     pub metadata: Option<HashMap<String, Value>>,
-    /// Name for the run (used in tracing).
     #[builder(into)]
     pub run_name: Option<String>,
-    /// ID for the run (used in tracing).
     pub run_id: Option<uuid::Uuid>,
 }
 
 impl GenerateConfig {
-    /// Create a GenerateConfig from a RunnableConfig.
     pub fn from_runnable_config(config: &RunnableConfig) -> Self {
         Self {
             stop: None,
@@ -86,30 +56,19 @@ impl GenerateConfig {
     }
 }
 
-/// A chunk of output from streaming.
-///
-/// This struct carries content deltas during streaming, along with optional
-/// metadata that is typically attached to the final chunk.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatChunk {
-    /// The content delta.
     pub content: String,
-    /// Whether this is the final chunk.
     pub is_final: bool,
-    /// Usage metadata (token counts) - typically present on the final chunk.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage_metadata: Option<UsageMetadata>,
-    /// The reason the model stopped generating (e.g., "stop", "length", "tool_calls").
-    /// Typically present on the final chunk.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub finish_reason: Option<String>,
-    /// Accumulated tool calls - typically present on the final chunk when finish_reason is "tool_calls".
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_calls: Vec<crate::messages::ToolCall>,
 }
 
 impl ChatChunk {
-    /// Create a new content chunk (non-final).
     pub fn new(content: impl Into<String>) -> Self {
         Self {
             content: content.into(),
@@ -120,7 +79,6 @@ impl ChatChunk {
         }
     }
 
-    /// Create a final chunk with optional metadata.
     pub fn final_chunk(
         usage_metadata: Option<UsageMetadata>,
         finish_reason: Option<String>,
@@ -134,34 +92,24 @@ impl ChatChunk {
         }
     }
 
-    /// Set usage metadata on this chunk.
     pub fn with_usage_metadata(mut self, usage: UsageMetadata) -> Self {
         self.usage_metadata = Some(usage);
         self
     }
 
-    /// Set finish reason on this chunk.
     pub fn with_finish_reason(mut self, reason: impl Into<String>) -> Self {
         self.finish_reason = Some(reason.into());
         self
     }
 }
 
-/// Represents a tool-like object that can be bound to a chat model.
-///
-/// Mirrors Python's polymorphic parameter type for `bind_tools`:
-/// `Sequence[Dict | type | Callable | BaseTool]`. In Rust, we support
-/// `BaseTool` trait objects and raw JSON schema values.
 #[derive(Debug, Clone)]
 pub enum ToolLike {
-    /// A concrete tool implementing the BaseTool trait.
     Tool(Arc<dyn BaseTool>),
-    /// A JSON schema describing a tool (OpenAI tool format or JSON Schema).
     Schema(Value),
 }
 
 impl ToolLike {
-    /// Convert to a ToolDefinition.
     pub fn to_definition(&self) -> ToolDefinition {
         match self {
             ToolLike::Tool(tool) => tool.definition(),
@@ -201,42 +149,31 @@ impl From<Value> for ToolLike {
     }
 }
 
-/// Configuration for tool choice.
-///
-/// Mirrors Python's tool_choice parameter patterns.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum ToolChoice {
-    /// String value like "auto", "any", "none", or a specific tool name.
     String(String),
-    /// Structured tool choice with type and optional name.
     Structured {
-        /// Type of tool choice.
         #[serde(rename = "type")]
         choice_type: String,
-        /// Optional tool name.
         #[serde(skip_serializing_if = "Option::is_none")]
         name: Option<String>,
     },
 }
 
 impl ToolChoice {
-    /// Create an "auto" tool choice - let the model decide.
     pub fn auto() -> Self {
         ToolChoice::String("auto".to_string())
     }
 
-    /// Create an "any" tool choice - model must use at least one tool.
     pub fn any() -> Self {
         ToolChoice::String("any".to_string())
     }
 
-    /// Create a "none" tool choice - model should not use any tools.
     pub fn none() -> Self {
         ToolChoice::String("none".to_string())
     }
 
-    /// Create a tool choice for a specific tool by name.
     pub fn tool(name: impl Into<String>) -> Self {
         ToolChoice::Structured {
             choice_type: "tool".to_string(),
@@ -245,15 +182,10 @@ impl ToolChoice {
     }
 }
 
-/// Disable streaming options.
-///
-/// Mirrors Python's `disable_streaming: bool | Literal["tool_calling"]` field.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum DisableStreaming {
-    /// Boolean value: true = always disable, false = never disable.
     Bool(bool),
-    /// Literal "tool_calling": disable only when tools are present.
     ToolCalling,
 }
 
@@ -264,11 +196,6 @@ impl Default for DisableStreaming {
 }
 
 impl DisableStreaming {
-    /// Check if streaming should be bypassed.
-    ///
-    /// # Arguments
-    ///
-    /// * `has_tools` - Whether tools are present in the current call.
     pub fn should_disable(&self, has_tools: bool) -> bool {
         match self {
             DisableStreaming::Bool(b) => *b,
@@ -283,37 +210,18 @@ impl From<bool> for DisableStreaming {
     }
 }
 
-/// Configuration specific to chat models.
 #[derive(Clone, Default)]
 pub struct ChatModelConfig {
-    /// Base language model configuration.
     pub base: LanguageModelConfig,
 
-    /// Rate limiter for limiting API requests.
     pub rate_limiter: Option<Arc<dyn BaseRateLimiter>>,
 
-    /// Whether to disable streaming for this model.
-    ///
-    /// If streaming is bypassed, then `stream`/`astream` will defer to `invoke`/`ainvoke`.
-    ///
-    /// - If `Bool(true)`, will always bypass streaming case.
-    /// - If `ToolCalling`, will bypass streaming case only when tools are present.
-    /// - If `Bool(false)` (default), will always use streaming case if available.
     pub disable_streaming: DisableStreaming,
 
-    /// Version of `AIMessage` output format.
-    ///
-    /// - `"v0"`: provider-specific format in content
-    /// - `"v1"`: standardized format in content
-    ///
-    /// Can also be set via `LC_OUTPUT_VERSION` environment variable.
     pub output_version: Option<String>,
 
-    /// Profile detailing model capabilities.
     pub profile: Option<ModelProfile>,
 
-    /// Optional local cache instance for this chat model.
-    /// When set, this cache is used instead of the global cache.
     pub cache_instance: Option<Arc<dyn crate::caches::BaseCache>>,
 }
 
@@ -337,113 +245,69 @@ impl std::fmt::Debug for ChatModelConfig {
 }
 
 impl ChatModelConfig {
-    /// Create a new chat model configuration.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set the rate limiter.
     pub fn with_rate_limiter(mut self, rate_limiter: Arc<dyn BaseRateLimiter>) -> Self {
         self.rate_limiter = Some(rate_limiter);
         self
     }
 
-    /// Set a local cache instance for this chat model.
     pub fn with_cache_instance(mut self, cache: Arc<dyn crate::caches::BaseCache>) -> Self {
         self.cache_instance = Some(cache);
         self
     }
 
-    /// Disable caching for this chat model.
     pub fn with_cache_disabled(mut self) -> Self {
         self.base.cache = Some(false);
         self
     }
 
-    /// Enable caching (use global cache).
     pub fn with_cache_enabled(mut self) -> Self {
         self.base.cache = Some(true);
         self
     }
 
-    /// Set whether to disable streaming.
     pub fn with_disable_streaming(mut self, disable: impl Into<DisableStreaming>) -> Self {
         self.disable_streaming = disable.into();
         self
     }
 
-    /// Set the output version.
     pub fn with_output_version(mut self, version: impl Into<String>) -> Self {
         self.output_version = Some(version.into());
         self
     }
 
-    /// Set the model profile.
     pub fn with_profile(mut self, profile: ModelProfile) -> Self {
         self.profile = Some(profile);
         self
     }
 
-    /// Enable caching.
     pub fn with_cache(mut self, cache: bool) -> Self {
         self.base.cache = Some(cache);
         self
     }
 
-    /// Set tags.
     pub fn with_tags(mut self, tags: Vec<String>) -> Self {
         self.base.tags = Some(tags);
         self
     }
 
-    /// Set metadata.
     pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
         self.base.metadata = Some(metadata);
         self
     }
 }
 
-/// Base trait for all chat models.
-///
-/// This trait follows the LangChain pattern where each provider implements
-/// the core generation methods. The trait provides both sync-style (via async)
-/// and streaming interfaces.
-///
-/// # Implementation Guide
-///
-/// Custom chat model implementations should override these methods:
-///
-/// | Method/Property           | Description                                        | Required |
-/// |--------------------------|----------------------------------------------------|---------:|
-/// | `_generate`              | Use to generate a chat result from messages        | Required |
-/// | `_llm_type` (property)   | Used to uniquely identify the type of the model    | Required |
-/// | `_identifying_params`    | Represent model parameterization for tracing       | Optional |
-/// | `_stream`                | Use to implement streaming                         | Optional |
-/// | `_agenerate`             | Use to implement a native async method             | Optional |
-/// | `_astream`               | Use to implement async version of `_stream`        | Optional |
 #[async_trait]
 pub trait BaseChatModel: BaseLanguageModel {
-    /// Get the chat model configuration.
     fn chat_config(&self) -> &ChatModelConfig;
 
-    /// Get the model profile, if available.
     fn profile(&self) -> Option<&ModelProfile> {
         self.chat_config().profile.as_ref()
     }
 
-    /// Core abstract method to generate a chat result.
-    ///
-    /// Implementations must override this method.
-    ///
-    /// # Arguments
-    ///
-    /// * `messages` - The messages to generate from.
-    /// * `stop` - Optional list of stop words to use when generating.
-    /// * `run_manager` - Optional callback manager to use for this call.
-    ///
-    /// # Returns
-    ///
-    /// The output chat result containing generations.
     async fn _generate(
         &self,
         messages: Vec<BaseMessage>,
@@ -451,9 +315,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult>;
 
-    /// Async version of `_generate`.
-    ///
-    /// Default implementation calls `_generate`.
     async fn _agenerate(
         &self,
         messages: Vec<BaseMessage>,
@@ -464,19 +325,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         self._generate(messages, stop, sync_manager.as_ref()).await
     }
 
-    /// Stream the output of the model.
-    ///
-    /// Default implementation raises NotImplementedError.
-    ///
-    /// # Arguments
-    ///
-    /// * `messages` - The messages to generate from.
-    /// * `stop` - Optional list of stop words to use when generating.
-    /// * `run_manager` - Optional callback manager to use for this call.
-    ///
-    /// # Yields
-    ///
-    /// The chat generation chunks.
     fn _stream(
         &self,
         _messages: Vec<BaseMessage>,
@@ -486,9 +334,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         Err(Error::NotImplemented("Streaming not implemented".into()))
     }
 
-    /// Async stream the output of the model.
-    ///
-    /// Default implementation calls `_stream`.
     async fn _astream(
         &self,
         messages: Vec<BaseMessage>,
@@ -499,9 +344,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         self._stream(messages, stop, sync_manager.as_ref())
     }
 
-    /// Get the first AI message from a chat result.
-    ///
-    /// Helper method to extract the first generation's message as an AIMessage.
     fn get_first_message(&self, result: &ChatResult) -> Result<AIMessage> {
         if result.generations.is_empty() {
             return Err(Error::Other("No generations returned".into()));
@@ -513,13 +355,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
     }
 
-    /// Combine LLM outputs from multiple results.
-    ///
-    /// This method is called after generating results from multiple prompts
-    /// to combine any LLM-specific output information.
-    ///
-    /// Default implementation returns an empty HashMap.
-    /// Subclasses can override to combine provider-specific output data.
     fn _combine_llm_outputs(
         &self,
         _llm_outputs: &[Option<HashMap<String, Value>>],
@@ -527,15 +362,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         HashMap::new()
     }
 
-    /// Convert cached `Generation` objects to `ChatGeneration` objects.
-    ///
-    /// Handle case where cache contains `Generation` objects instead of
-    /// `ChatGeneration` objects. If the `generation_info` contains a
-    /// serialized message (stored under the `"message"` key), it is
-    /// deserialized and used. Otherwise, an `AIMessage` is created from
-    /// the text content.
-    ///
-    /// Mirrors Python's `BaseChatModel._convert_cached_generations`.
     fn _convert_cached_generations(&self, cache_val: Vec<Generation>) -> Vec<ChatGeneration> {
         cache_val
             .into_iter()
@@ -568,9 +394,6 @@ pub trait BaseChatModel: BaseLanguageModel {
             .collect()
     }
 
-    /// Get invocation parameters for tracing.
-    ///
-    /// Returns a HashMap containing the model configuration and stop sequences.
     fn _get_invocation_params(
         &self,
         stop: Option<&[String]>,
@@ -589,9 +412,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         params
     }
 
-    /// Get the LLM string for cache key generation.
-    ///
-    /// This string uniquely identifies the model configuration for caching purposes.
     fn _get_llm_string(
         &self,
         stop: Option<&[String]>,
@@ -605,48 +425,18 @@ pub trait BaseChatModel: BaseLanguageModel {
         format!("{:?}", sorted_items)
     }
 
-    /// Check if `_stream` is implemented (not the default).
-    ///
-    /// This is used by `_should_stream` to determine if streaming is available.
-    /// Implementations that override `_stream` should also override this to return `true`.
     fn has_stream_impl(&self) -> bool {
         false
     }
 
-    /// Check if `_astream` is implemented (not the default).
-    ///
-    /// This is used by `_should_stream` to determine if async streaming is available.
-    /// Implementations that override `_astream` should also override this to return `true`.
     fn has_astream_impl(&self) -> bool {
         false
     }
 
-    /// Check if streaming is enabled via a model field.
-    ///
-    /// Override this if the model has a `streaming` field that should be checked.
     fn has_streaming_field(&self) -> Option<bool> {
         None
     }
 
-    /// Determine if a given model call should hit the streaming API.
-    ///
-    /// This method mirrors Python's `_should_stream` behavior:
-    /// 1. Check if streaming is implemented (either sync or async)
-    /// 2. Check if streaming has been disabled on this instance
-    /// 3. Check if streaming is disabled for tool calling and tools are present
-    /// 4. Check if streaming field is set on the model
-    /// 5. Check if any streaming callback handlers are present
-    ///
-    /// # Arguments
-    ///
-    /// * `async_api` - Whether this is an async API call
-    /// * `has_tools` - Whether tools are present in the call
-    /// * `stream_kwarg` - Optional explicit stream kwarg from caller
-    /// * `run_manager` - Optional callback manager for checking streaming handlers
-    ///
-    /// # Returns
-    ///
-    /// `true` if streaming should be used, `false` otherwise.
     fn _should_stream(
         &self,
         async_api: bool,
@@ -689,28 +479,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         false
     }
 
-    /// Generate from a batch of message lists.
-    ///
-    /// This method should make use of batched calls for models that expose a batched API.
-    ///
-    /// Use this method when you want to:
-    /// 1. Take advantage of batched calls
-    /// 2. Need more output from the model than just the top generated value
-    /// 3. Are building chains that are agnostic to the underlying language model type
-    ///
-    /// # Arguments
-    ///
-    /// * `messages` - List of message lists.
-    /// * `stop` - Stop words to use when generating.
-    /// * `callbacks` - Callbacks to pass through.
-    /// * `tags` - Tags to apply.
-    /// * `metadata` - Metadata to apply.
-    /// * `run_name` - Name of the run.
-    /// * `run_id` - ID of the run.
-    ///
-    /// # Returns
-    ///
-    /// An `LLMResult` containing a list of candidate `ChatGeneration` objects.
     async fn generate(
         &self,
         messages: Vec<Vec<BaseMessage>>,
@@ -834,16 +602,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         Ok(output)
     }
 
-    /// Async version of `generate`.
-    ///
-    /// # Arguments
-    ///
-    /// * `messages` - List of message lists.
-    /// * `config` - Generation configuration (stop, callbacks, tags, metadata, etc.).
-    ///
-    /// # Returns
-    ///
-    /// An `LLMResult` containing a list of candidate `ChatGeneration` objects.
     async fn agenerate(
         &self,
         messages: Vec<Vec<BaseMessage>>,
@@ -981,10 +739,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         Ok(output)
     }
 
-    /// Generate with cache support.
-    ///
-    /// This method checks the cache before calling `_generate` and caches the result.
-    /// It also handles streaming if appropriate.
     async fn _generate_with_cache(
         &self,
         messages: Vec<BaseMessage>,
@@ -1078,10 +832,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         Ok(result)
     }
 
-    /// Async generate with cache support.
-    ///
-    /// This method checks the cache before calling `_agenerate` and caches the result.
-    /// It also handles streaming if appropriate.
     async fn _agenerate_with_cache(
         &self,
         messages: Vec<BaseMessage>,
@@ -1176,9 +926,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         Ok(result)
     }
 
-    /// Async call helper.
-    ///
-    /// This is a convenience method that wraps `agenerate` for single-message calls.
     async fn _call_async(
         &self,
         messages: Vec<BaseMessage>,
@@ -1205,21 +952,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
     }
 
-    /// Generate a response from the model with tools.
-    ///
-    /// This is the preferred method when tool calling is needed.
-    /// Default implementation ignores tools and calls `_generate`.
-    ///
-    /// # Arguments
-    ///
-    /// * `messages` - The thread history.
-    /// * `tools` - Tool definitions for the model to use.
-    /// * `tool_choice` - Optional configuration for tool selection.
-    /// * `stop` - Optional stop sequences.
-    ///
-    /// # Returns
-    ///
-    /// An `AIMessage` containing the generated response.
     async fn generate_with_tools(
         &self,
         messages: Vec<BaseMessage>,
@@ -1239,15 +971,10 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
     }
 
-    /// Convert input to messages.
     fn convert_input(&self, input: LanguageModelInput) -> Result<Vec<BaseMessage>> {
         Ok(input.to_messages())
     }
 
-    /// Invoke the model with input.
-    ///
-    /// Routes through `generate()` to ensure the full callback pipeline
-    /// (on_chat_model_start, on_llm_end, on_llm_error) is triggered.
     async fn invoke(
         &self,
         input: LanguageModelInput,
@@ -1293,10 +1020,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
     }
 
-    /// Async invoke the model.
-    ///
-    /// Routes through `agenerate()` to ensure the full callback pipeline
-    /// (on_chat_model_start, on_llm_end, on_llm_error) is triggered.
     async fn ainvoke(
         &self,
         input: LanguageModelInput,
@@ -1342,13 +1065,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
     }
 
-    /// Bind tools to the model.
-    ///
-    /// Returns a model with the given tools bound. Provider implementations
-    /// should override this method to return a configured model clone.
-    ///
-    /// Accepts `&[ToolLike]` to support both concrete `BaseTool` trait objects
-    /// and raw JSON schema values (matching Python's polymorphic parameter).
     fn bind_tools(
         &self,
         _tools: &[ToolLike],
@@ -1359,21 +1075,10 @@ pub trait BaseChatModel: BaseLanguageModel {
         ))
     }
 
-    /// Get tool definitions from tools.
-    ///
-    /// Helper method to convert tool-like objects to their definitions.
     fn get_tool_definitions(&self, tools: &[ToolLike]) -> Vec<ToolDefinition> {
         tools.iter().map(|t| t.to_definition()).collect()
     }
 
-    /// Generate a streaming response from the model.
-    ///
-    /// This is the main streaming API. It yields `AIMessageChunk`s.
-    /// Providers should override `_stream` for native streaming support.
-    ///
-    /// Sets up the full callback pipeline: on_chat_model_start before
-    /// streaming, on_llm_new_token for each chunk, on_llm_end at
-    /// completion, and on_llm_error on failure.
     async fn stream(
         &self,
         input: LanguageModelInput,
@@ -1528,14 +1233,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         Ok(Box::pin(chunk_stream))
     }
 
-    /// Async stream the model output.
-    ///
-    /// This is the async version of `stream`. It yields `AIMessageChunk`s.
-    /// Providers should override `_astream` for native async streaming support.
-    ///
-    /// Sets up the full async callback pipeline: on_chat_model_start before
-    /// streaming, on_llm_new_token for each chunk, on_llm_end at
-    /// completion, and on_llm_error on failure.
     async fn astream(
         &self,
         input: LanguageModelInput,
@@ -1620,6 +1317,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                             BaseMessage::AI(ai_msg) => AIMessageChunk::builder()
                                 .content(ai_msg.content.clone())
                                 .tool_calls(ai_msg.tool_calls.clone())
+                                .maybe_usage_metadata(ai_msg.usage_metadata.clone())
                                 .build(),
                             other => AIMessageChunk::builder().content(other.text()).build(),
                         };
@@ -1691,20 +1389,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         Ok(Box::pin(chunk_stream))
     }
 
-    /// Stream ChatGenerationChunk objects from the model.
-    ///
-    /// This is a lower-level streaming API that yields `ChatGenerationChunk`s directly.
-    /// Most users should use `stream()` or `astream()` instead.
-    ///
-    /// # Arguments
-    ///
-    /// * `messages` - The thread history.
-    /// * `stop` - Optional stop sequences.
-    /// * `run_manager` - Optional callback manager for the run.
-    ///
-    /// # Returns
-    ///
-    /// A stream of `ChatGenerationChunk`s.
     async fn stream_generations(
         &self,
         messages: Vec<BaseMessage>,
@@ -1727,16 +1411,12 @@ pub trait BaseChatModel: BaseLanguageModel {
         self._stream(messages, stop, run_manager)
     }
 
-    /// Get standard params for tracing.
     fn get_chat_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
         let mut params = self.get_ls_params(stop);
         params.ls_model_type = Some("chat".to_string());
         params
     }
 
-    /// Get a dictionary representation of the model.
-    ///
-    /// Returns identifying parameters plus the model type.
     fn to_dict(&self) -> HashMap<String, Value> {
         let mut result = self.get_identifying_params();
         result.insert(
@@ -1746,21 +1426,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         result
     }
 
-    /// Create a runnable that structures model output using a schema.
-    ///
-    /// Returns a `Runnable` that takes `LanguageModelInput` and produces
-    /// parsed `Value` output. The chain is composed as `llm | output_parser`.
-    ///
-    /// When `include_raw` is true, the output is a dict with keys:
-    /// - `"raw"`: the raw `AIMessage` from the model
-    /// - `"parsed"`: the parsed structured output (or null on parse failure)
-    /// - `"parsing_error"`: null on success, or the error string on failure
-    ///
-    /// This matches Python's `BaseChatModel.with_structured_output()` which
-    /// returns `Runnable[LanguageModelInput, Dict | BaseModel]`.
-    ///
-    /// Provider implementations should override `bind_tools` first, as the
-    /// default implementation uses `bind_tools` internally.
     fn with_structured_output(
         &self,
         schema: Value,
@@ -1786,10 +1451,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
     }
 
-    /// Pass prompt values to the model and return model generations.
-    ///
-    /// Converts each input to messages and delegates to `generate()`.
-    /// Matches Python's `BaseChatModel.generate_prompt()`.
     async fn generate_prompt(
         &self,
         prompts: &[LanguageModelInput],
@@ -1802,10 +1463,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         self.generate(prompt_messages, config).await
     }
 
-    /// Async version of `generate_prompt`.
-    ///
-    /// Converts each input to messages and delegates to `agenerate()`.
-    /// Matches Python's `BaseChatModel.agenerate_prompt()`.
     async fn agenerate_prompt(
         &self,
         prompts: &[LanguageModelInput],
@@ -1818,9 +1475,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         self.agenerate(prompt_messages, config).await
     }
 
-    /// Get the identifying parameters for this model.
-    ///
-    /// Returns a map of parameters that uniquely identify this model instance.
     fn get_identifying_params(&self) -> HashMap<String, Value> {
         let mut params = HashMap::new();
         params.insert(
@@ -1835,11 +1489,6 @@ pub trait BaseChatModel: BaseLanguageModel {
     }
 }
 
-/// Convert `ChatGeneration` objects to `Generation` objects for cache storage.
-///
-/// Serializes the message into `generation_info` under the `"message"` key so
-/// that `_convert_cached_generations` can reconstruct the full `ChatGeneration`
-/// on a cache hit.
 fn _chat_generations_to_cache(generations: &[ChatGeneration]) -> Vec<Generation> {
     generations
         .iter()
@@ -1853,12 +1502,6 @@ fn _chat_generations_to_cache(generations: &[ChatGeneration]) -> Vec<Generation>
         .collect()
 }
 
-/// Extract response metadata from an error into a `ChatGeneration`.
-///
-/// Attempts to extract HTTP response info (body, status code) from errors.
-/// Returns an empty vec if no response metadata is available.
-///
-/// Matches Python's `_generate_response_from_error`.
 pub fn generate_response_from_error(error: &crate::error::Error) -> Vec<ChatGeneration> {
     use crate::error::Error;
 
@@ -1889,26 +1532,10 @@ pub fn generate_response_from_error(error: &crate::error::Error) -> Vec<ChatGene
     ))]
 }
 
-/// Format messages for tracing in `on_chat_model_start`.
-///
-/// Converts image content blocks to OpenAI Chat Completions format for
-/// backward compatibility. In Rust, multimodal content uses typed `ContentPart`
-/// enums rather than raw JSON dicts, so this primarily serializes content parts
-/// to JSON and applies OpenAI format conversions where applicable.
-///
-/// Matches Python's `_format_for_tracing`.
 pub fn format_for_tracing(messages: &[BaseMessage]) -> Vec<BaseMessage> {
     messages.to_vec()
 }
 
-/// Remove non-serializable objects from a serialized LLM representation.
-///
-/// Used for cache key generation. Recursively removes:
-/// - `repr` from `{"type": "not_implemented"}` entries
-/// - `graph` keys
-/// - Cleans kwargs values recursively
-///
-/// Matches Python's `_cleanup_llm_representation`.
 pub fn cleanup_llm_representation(serialized: &mut Value, depth: usize) {
     const MAX_DEPTH: usize = 20;
     if depth > MAX_DEPTH {
@@ -1935,19 +1562,12 @@ pub fn cleanup_llm_representation(serialized: &mut Value, depth: usize) {
     }
 }
 
-/// Format structured output schema for LangSmith tracing.
-///
-/// LangSmith-specific — returns empty map per project guidelines.
 pub fn format_ls_structured_output(
     _format: Option<&HashMap<String, Value>>,
 ) -> HashMap<String, Value> {
     HashMap::new()
 }
 
-/// Extract the tool name from a JSON schema.
-///
-/// Uses `convert_to_openai_tool` to normalize the schema, then extracts
-/// the function name from the result.
 pub fn extract_tool_name_from_schema(schema: &Value) -> String {
     let openai_tool = convert_to_openai_tool(schema, None);
     openai_tool
@@ -1958,20 +1578,11 @@ pub fn extract_tool_name_from_schema(schema: &Value) -> String {
         .to_string()
 }
 
-/// Adapter that wraps a `BaseChatModel` as a `Runnable`.
-///
-/// This bridges the gap between `BaseChatModel` (which has its own invoke/stream
-/// methods) and the `Runnable` trait (which uses associated types). This adapter
-/// is needed for chain composition (e.g., `with_structured_output` which pipes
-/// a chat model into an output parser).
-///
-/// Mirrors how Python's `BaseChatModel` inherits from `Runnable`.
 pub struct ChatModelRunnable {
     model: Arc<dyn BaseChatModel>,
 }
 
 impl ChatModelRunnable {
-    /// Create a new ChatModelRunnable wrapping a chat model.
     pub fn new(model: Arc<dyn BaseChatModel>) -> Self {
         Self { model }
     }
@@ -2005,16 +1616,6 @@ impl Runnable for ChatModelRunnable {
     }
 }
 
-/// Adapter that wraps a model + parser pipeline and returns raw output alongside parsed.
-///
-/// When parsing succeeds, returns:
-/// `{"raw": <serialized AIMessage>, "parsed": <parsed value>, "parsing_error": null}`
-///
-/// When parsing fails, returns:
-/// `{"raw": <serialized AIMessage>, "parsed": null, "parsing_error": <error string>}`
-///
-/// This matches Python's `with_structured_output(include_raw=True)` behavior which uses
-/// `RunnablePassthrough.assign` + `with_fallbacks(exception_key="parsing_error")`.
 pub struct StructuredOutputWithRaw {
     model: ChatModelRunnable,
     parser: JsonOutputKeyToolsParser,
@@ -2074,15 +1675,8 @@ impl Runnable for StructuredOutputWithRaw {
     }
 }
 
-/// Simplified implementation for a chat model to inherit from.
-///
-/// This implementation is primarily here for backwards compatibility.
-/// For new implementations, please use `BaseChatModel` directly.
 #[async_trait]
 pub trait SimpleChatModel: BaseChatModel {
-    /// Simple call method that takes messages and returns a string.
-    ///
-    /// Implementations should override this method.
     async fn _call(
         &self,
         messages: Vec<BaseMessage>,
@@ -2110,23 +1704,6 @@ impl<T: SimpleChatModel> BaseChatModel for T {
     }
 }
 
-/// Generate from a stream of chunks.
-///
-/// Collects all chunks from the stream and generates a final ChatResult.
-///
-/// This corresponds to `generate_from_stream` in LangChain Python.
-///
-/// # Arguments
-///
-/// * `stream` - An iterator of `ChatGenerationChunk` objects.
-///
-/// # Returns
-///
-/// A `ChatResult` containing the merged generation.
-///
-/// # Errors
-///
-/// Returns an error if no generations are found in the stream.
 pub fn generate_from_stream<I>(mut stream: I) -> Result<ChatResult>
 where
     I: Iterator<Item = ChatGenerationChunk>,
@@ -2144,23 +1721,6 @@ where
     Ok(ChatResult::new(vec![chat_generation]))
 }
 
-/// Async generate from a stream of chunks.
-///
-/// Collects all chunks from an async stream and generates a final ChatResult.
-///
-/// This corresponds to `agenerate_from_stream` in LangChain Python.
-///
-/// # Arguments
-///
-/// * `stream` - An async stream of `ChatGenerationChunk` objects.
-///
-/// # Returns
-///
-/// A `ChatResult` containing the merged generation.
-///
-/// # Errors
-///
-/// Returns an error if no generations are found in the stream.
 pub async fn agenerate_from_stream(
     stream: impl futures::Stream<Item = Result<ChatGenerationChunk>> + Unpin,
 ) -> Result<ChatResult> {
@@ -2179,18 +1739,6 @@ pub async fn agenerate_from_stream(
     generate_from_stream(chunks.into_iter())
 }
 
-/// Collect a stream of ChatGenerationChunks and merge them.
-///
-/// This is a convenience function that collects all chunks from a stream
-/// and returns the merged result.
-///
-/// # Arguments
-///
-/// * `stream` - An async stream of `ChatGenerationChunk` results.
-///
-/// # Returns
-///
-/// The merged `ChatGenerationChunk`, or `None` if the stream was empty.
 pub async fn collect_and_merge_stream(
     mut stream: impl futures::StreamExt<Item = Result<ChatGenerationChunk>> + Unpin,
 ) -> Result<Option<ChatGenerationChunk>> {
@@ -2206,14 +1754,6 @@ pub async fn collect_and_merge_stream(
     Ok(crate::outputs::merge_chat_generation_chunks(chunks))
 }
 
-/// Apply sequential block indices to content blocks in an AIMessageChunk.
-///
-/// This tracks block type changes across streaming chunks and assigns
-/// incrementing `index` values when the block type changes.
-/// Mirrors Python's index tracking in `stream()` and `astream()`.
-/// Merge `generation_info` and the message's `response_metadata` into one map.
-///
-/// Mirrors Python's `_gen_info_and_msg_metadata()`.
 pub fn _gen_info_and_msg_metadata(
     generation_info: Option<&HashMap<String, Value>>,
     response_metadata: &HashMap<String, Value>,

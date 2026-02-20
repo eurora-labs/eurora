@@ -1,7 +1,3 @@
-//! Rate limiting tests for chat models.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/language_models/chat_models/test_rate_limiting.py`
-
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -25,7 +21,6 @@ fn make_rate_limited_model(
     GenericFakeChatModel::from_vec(messages).with_config(config)
 }
 
-/// Ported from `test_rate_limit_invoke`.
 #[tokio::test]
 async fn test_rate_limit_invoke() {
     let model = make_rate_limited_model(
@@ -63,7 +58,6 @@ async fn test_rate_limit_invoke() {
     );
 }
 
-/// Ported from `test_rate_limit_ainvoke`.
 #[tokio::test]
 async fn test_rate_limit_ainvoke() {
     let model = make_rate_limited_model(
@@ -102,7 +96,6 @@ async fn test_rate_limit_ainvoke() {
     assert!(elapsed >= Duration::from_millis(100));
 }
 
-/// Ported from `test_rate_limit_skips_cache`.
 #[tokio::test]
 async fn test_rate_limit_skips_cache() {
     use agent_chain_core::caches::InMemoryCache;
@@ -152,10 +145,6 @@ async fn test_rate_limit_skips_cache() {
     }
 }
 
-/// Ported from `test_rate_limit_stream`.
-///
-/// Tests that the rate limiter applies to streaming calls. First stream
-/// must wait, second has a token available.
 #[tokio::test]
 async fn test_rate_limit_stream() {
     let model = make_rate_limited_model(
@@ -207,10 +196,6 @@ async fn test_rate_limit_stream() {
     );
 }
 
-/// Ported from `test_rate_limit_astream`.
-///
-/// Async version of test_rate_limit_stream — verifies rate limiting
-/// applies through the ainvoke path.
 #[tokio::test]
 async fn test_rate_limit_astream() {
     let model = make_rate_limited_model(
@@ -249,10 +234,6 @@ async fn test_rate_limit_astream() {
     assert!(elapsed >= Duration::from_millis(100));
 }
 
-/// Ported from `test_rate_limit_skips_cache_async`.
-///
-/// Async version of test_rate_limit_skips_cache — cache hits bypass
-/// rate limiting through the ainvoke path.
 #[tokio::test]
 async fn test_rate_limit_skips_cache_async() {
     use agent_chain_core::caches::InMemoryCache;

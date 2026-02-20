@@ -1,8 +1,3 @@
-//! Chat prompt template.
-//!
-//! This module provides chat prompt templates for chat-based models,
-//! mirroring `langchain_core.prompts.chat` in Python.
-
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -24,23 +19,13 @@ use super::message::{BaseMessagePromptTemplate, get_msg_title_repr};
 use super::prompt::PromptTemplate;
 use super::string::{PromptTemplateFormat, StringPromptTemplate};
 
-/// Prompt template that assumes variable is already a list of messages.
-///
-/// A placeholder which can be used to pass in a list of messages.
-///
-/// Direct port of `langchain_core.prompts.chat.MessagesPlaceholder`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessagesPlaceholder {
-    /// Name of variable to use as messages.
     pub variable_name: String,
 
-    /// If `true`, format_messages can be called with no arguments and will return
-    /// an empty list. If `false` then a named argument with name `variable_name`
-    /// must be passed in, even if the value is an empty list.
     #[serde(default)]
     pub optional: bool,
 
-    /// Maximum number of messages to include. If `None`, then will include all.
     #[serde(default)]
     pub n_messages: Option<usize>,
 }
@@ -64,7 +49,6 @@ impl MessagesPlaceholder {
         self
     }
 
-    /// Format messages from an explicit messages argument.
     pub fn format_with_messages(
         &self,
         messages: Option<Vec<BaseMessage>>,
@@ -127,24 +111,17 @@ impl BaseMessagePromptTemplate for MessagesPlaceholder {
     }
 }
 
-/// Base class for message prompt templates that use a string prompt template.
-///
-/// Direct port of `langchain_core.prompts.chat.BaseStringMessagePromptTemplate`.
 pub trait BaseStringMessagePromptTemplate: BaseMessagePromptTemplate {
-    /// Get the underlying string prompt template.
     fn prompt(&self) -> &PromptTemplate;
 
-    /// Get additional kwargs to pass to the message.
     fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
         static EMPTY: std::sync::LazyLock<HashMap<String, serde_json::Value>> =
             std::sync::LazyLock::new(HashMap::new);
         &EMPTY
     }
 
-    /// Format the prompt template into a message.
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<BaseMessage>;
 
-    /// Async format the prompt template into a message.
     fn aformat(
         &self,
         kwargs: &HashMap<String, String>,
@@ -154,9 +131,6 @@ pub trait BaseStringMessagePromptTemplate: BaseMessagePromptTemplate {
     }
 }
 
-/// Chat message prompt template with a specific role.
-///
-/// Direct port of `langchain_core.prompts.chat.ChatMessagePromptTemplate`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessagePromptTemplate {
     pub prompt: PromptTemplate,
@@ -226,9 +200,6 @@ impl BaseStringMessagePromptTemplate for ChatMessagePromptTemplate {
     }
 }
 
-/// Human message prompt template.
-///
-/// Direct port of `langchain_core.prompts.chat.HumanMessagePromptTemplate`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HumanMessagePromptTemplate {
     pub prompt: PromptTemplate,
@@ -297,9 +268,6 @@ impl BaseStringMessagePromptTemplate for HumanMessagePromptTemplate {
     }
 }
 
-/// AI message prompt template.
-///
-/// Direct port of `langchain_core.prompts.chat.AIMessagePromptTemplate`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AIMessagePromptTemplate {
     pub prompt: PromptTemplate,
@@ -366,9 +334,6 @@ impl BaseStringMessagePromptTemplate for AIMessagePromptTemplate {
     }
 }
 
-/// System message prompt template.
-///
-/// Direct port of `langchain_core.prompts.chat.SystemMessagePromptTemplate`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemMessagePromptTemplate {
     pub prompt: PromptTemplate,
@@ -437,17 +402,10 @@ impl BaseStringMessagePromptTemplate for SystemMessagePromptTemplate {
     }
 }
 
-/// A message-like type that can be part of a chat prompt.
-///
-/// Corresponds to `MessageLike` in Python:
-/// `BaseMessagePromptTemplate | BaseMessage | BaseChatPromptTemplate`
 #[derive(Clone)]
 pub enum MessageLike {
-    /// A base message.
     Message(Box<BaseMessage>),
-    /// A message prompt template.
     Template(Box<dyn MessageLikeClone + Send + Sync>),
-    /// A messages placeholder.
     Placeholder(MessagesPlaceholder),
 }
 
@@ -461,7 +419,6 @@ impl std::fmt::Debug for MessageLike {
     }
 }
 
-/// Helper trait for cloning message-like templates.
 pub trait MessageLikeClone: BaseMessagePromptTemplate {
     fn clone_box(&self) -> Box<dyn MessageLikeClone + Send + Sync>;
 }
@@ -481,24 +438,15 @@ impl Clone for Box<dyn MessageLikeClone + Send + Sync> {
     }
 }
 
-/// Representation of a message-like that can be converted to a message template.
-///
-/// Corresponds to `MessageLikeRepresentation` in Python:
-/// `MessageLike | tuple[str|type, str|list] | str | dict[str, Any]`
 #[derive(Clone)]
 pub enum MessageLikeRepresentation {
-    /// A (role, content) tuple — e.g., `("human", "{user_input}")`.
     Tuple(String, String),
-    /// A string (shorthand for human message) — e.g., `"{user_input}"`.
     String(String),
-    /// A base message passed directly.
     Message(Box<BaseMessage>),
-    /// A placeholder: `("placeholder", "{variable_name}")`.
     Placeholder {
         variable_name: String,
         optional: bool,
     },
-    /// A message prompt template.
     Template(Box<dyn MessageLikeClone + Send + Sync>),
 }
 
@@ -519,21 +467,18 @@ impl MessageLikeRepresentation {
     }
 }
 
-/// Allow `(&str, &str)` tuples to be converted to `MessageLikeRepresentation`.
 impl From<(&str, &str)> for MessageLikeRepresentation {
     fn from((role, content): (&str, &str)) -> Self {
         Self::Tuple(role.to_string(), content.to_string())
     }
 }
 
-/// Allow `BaseMessage` to be converted to `MessageLikeRepresentation`.
 impl From<BaseMessage> for MessageLikeRepresentation {
     fn from(msg: BaseMessage) -> Self {
         Self::Message(Box::new(msg))
     }
 }
 
-/// Allow `&str` to be converted to `MessageLikeRepresentation` (human message).
 impl From<&str> for MessageLikeRepresentation {
     fn from(s: &str) -> Self {
         Self::String(s.to_string())
@@ -561,14 +506,9 @@ impl std::fmt::Debug for MessageLikeRepresentation {
     }
 }
 
-/// Base trait for chat prompt templates.
-///
-/// Direct port of `langchain_core.prompts.chat.BaseChatPromptTemplate`.
 pub trait BaseChatPromptTemplate: BasePromptTemplate {
-    /// Format kwargs into a list of messages.
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>>;
 
-    /// Async format kwargs into a list of messages.
     fn aformat_messages(
         &self,
         kwargs: &HashMap<String, String>,
@@ -578,13 +518,11 @@ pub trait BaseChatPromptTemplate: BasePromptTemplate {
         Box::pin(async move { result })
     }
 
-    /// Format prompt. Returns a ChatPromptValue.
     fn format_prompt_chat(&self, kwargs: &HashMap<String, String>) -> Result<ChatPromptValue> {
         let messages = self.format_messages(kwargs)?;
         Ok(ChatPromptValue::new(messages))
     }
 
-    /// Async format prompt. Returns a ChatPromptValue.
     fn aformat_prompt_chat(
         &self,
         kwargs: &HashMap<String, String>,
@@ -594,31 +532,20 @@ pub trait BaseChatPromptTemplate: BasePromptTemplate {
         Box::pin(async move { result })
     }
 
-    /// Get a pretty representation of the template.
     fn pretty_repr(&self, html: bool) -> String;
 
-    /// Print a human-readable representation.
     fn pretty_print(&self) {
         println!("{}", self.pretty_repr(is_interactive_env()));
     }
 }
 
-/// A message in a chat prompt template.
-///
-/// Internal enum dispatching to the concrete message template types.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ChatPromptMessage {
-    /// A static message.
     Message(BaseMessage),
-    /// A human message template.
     Human(HumanMessagePromptTemplate),
-    /// An AI message template.
     AI(AIMessagePromptTemplate),
-    /// A system message template.
     System(SystemMessagePromptTemplate),
-    /// A chat message template with role.
     Chat(ChatMessagePromptTemplate),
-    /// A messages placeholder.
     Placeholder(MessagesPlaceholder),
 }
 
@@ -657,27 +584,8 @@ impl ChatPromptMessage {
     }
 }
 
-/// Chat prompt template for chat models.
-///
-/// Use to create flexible templated prompts for chat models.
-///
-/// Direct port of `langchain_core.prompts.chat.ChatPromptTemplate`.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::prompts::ChatPromptTemplate;
-///
-/// let template = ChatPromptTemplate::from_messages(vec![
-///     ("system", "You are a helpful AI bot. Your name is {name}.").into(),
-///     ("human", "Hello, how are you doing?").into(),
-///     ("ai", "I'm doing well, thanks!").into(),
-///     ("human", "{user_input}").into(),
-/// ]).unwrap();
-/// ```
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ChatPromptTemplate {
-    /// List of messages or message templates.
     pub messages: Vec<ChatPromptMessage>,
     input_variables: Vec<String>,
     optional_variables: Vec<String>,
@@ -687,25 +595,14 @@ pub struct ChatPromptTemplate {
 }
 
 impl ChatPromptTemplate {
-    /// Create a new empty chat prompt template.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Create a chat prompt template from a variety of message formats.
-    ///
-    /// Accepts `MessageLikeRepresentation` items which can be:
-    /// 1. `BaseMessagePromptTemplate` (via `MessageLikeRepresentation::Template`)
-    /// 2. `BaseMessage` (via `MessageLikeRepresentation::Message` or `.into()`)
-    /// 3. 2-tuple of `(role, template)` — e.g., `("human", "{user_input}")`
-    /// 4. A string shorthand for `("human", template)`
-    ///
-    /// Direct port of Python `ChatPromptTemplate.from_messages()`.
     pub fn from_messages(messages: Vec<MessageLikeRepresentation>) -> Result<Self> {
         Self::from_messages_with_format(messages, PromptTemplateFormat::FString)
     }
 
-    /// Create a chat prompt template with a specific template format.
     pub fn from_messages_with_format(
         messages: Vec<MessageLikeRepresentation>,
         template_format: PromptTemplateFormat,
@@ -751,12 +648,6 @@ impl ChatPromptTemplate {
         })
     }
 
-    /// Create a chat prompt template from a single template string.
-    ///
-    /// Creates a chat template consisting of a single message assumed to be from
-    /// the human.
-    ///
-    /// Direct port of Python `ChatPromptTemplate.from_template()`.
     pub fn from_template(template: &str) -> Result<Self> {
         Self::from_messages(vec![MessageLikeRepresentation::Tuple(
             "human".to_string(),
@@ -764,9 +655,6 @@ impl ChatPromptTemplate {
         )])
     }
 
-    /// Append a message to the end of the chat template.
-    ///
-    /// Direct port of Python `ChatPromptTemplate.append()`.
     pub fn append(&mut self, message: MessageLikeRepresentation) -> Result<()> {
         let chat_msg = convert_to_message_template(message, self.template_format)?;
         match &chat_msg {
@@ -787,9 +675,6 @@ impl ChatPromptTemplate {
         Ok(())
     }
 
-    /// Extend the chat template with a sequence of messages.
-    ///
-    /// Direct port of Python `ChatPromptTemplate.extend()`.
     pub fn extend(&mut self, messages: Vec<MessageLikeRepresentation>) -> Result<()> {
         for msg in messages {
             self.append(msg)?;
@@ -797,9 +682,6 @@ impl ChatPromptTemplate {
         Ok(())
     }
 
-    /// Get a new ChatPromptTemplate with some input variables already filled in.
-    ///
-    /// Direct port of Python `ChatPromptTemplate.partial()`.
     pub fn partial(&self, kwargs: HashMap<String, String>) -> Self {
         let new_vars: Vec<_> = self
             .input_variables
@@ -821,17 +703,14 @@ impl ChatPromptTemplate {
         }
     }
 
-    /// Get the number of messages in the template.
     pub fn len(&self) -> usize {
         self.messages.len()
     }
 
-    /// Check if the template is empty.
     pub fn is_empty(&self) -> bool {
         self.messages.is_empty()
     }
 
-    /// Get a message by index.
     pub fn get(&self, index: usize) -> Option<&ChatPromptMessage> {
         self.messages.get(index)
     }
@@ -893,9 +772,6 @@ impl Runnable for ChatPromptTemplate {
     }
 }
 
-/// Create a message prompt template from a message type string and template.
-///
-/// Direct port of Python `_create_template_from_message_type`.
 fn create_template_from_message_type(
     message_type: &str,
     template: &str,
@@ -934,9 +810,6 @@ fn create_template_from_message_type(
     }
 }
 
-/// Instantiate a ChatPromptMessage from a MessageLikeRepresentation.
-///
-/// Direct port of Python `_convert_to_message_template`.
 fn convert_to_message_template(
     message: MessageLikeRepresentation,
     template_format: PromptTemplateFormat,
@@ -964,9 +837,6 @@ fn convert_to_message_template(
     }
 }
 
-/// Implements `BasePromptTemplate` for `ChatPromptTemplate`, matching
-/// Python's inheritance chain where `BaseChatPromptTemplate` extends
-/// `BasePromptTemplate`.
 impl BasePromptTemplate for ChatPromptTemplate {
     fn input_variables(&self) -> &[String] {
         &self.input_variables
@@ -1010,9 +880,6 @@ impl BasePromptTemplate for ChatPromptTemplate {
 impl std::ops::Add for ChatPromptTemplate {
     type Output = ChatPromptTemplate;
 
-    /// Combine two prompt templates.
-    ///
-    /// Direct port of Python `ChatPromptTemplate.__add__`.
     fn add(self, other: Self) -> Self::Output {
         let mut messages = self.messages;
         messages.extend(other.messages);

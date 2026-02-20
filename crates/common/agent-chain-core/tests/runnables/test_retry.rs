@@ -1,7 +1,3 @@
-//! Comprehensive tests for RunnableRetry functionality.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/runnables/test_retry.py`
-
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -13,7 +9,6 @@ use agent_chain_core::runnables::retry::{
     RunnableRetryExt,
 };
 
-/// Mirrors `test_retry_initialization`.
 #[test]
 fn test_retry_initialization() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -27,7 +22,6 @@ fn test_retry_initialization() {
     assert_eq!(result, 6);
 }
 
-/// Mirrors `test_retry_initialization` — custom parameters.
 #[test]
 fn test_retry_initialization_custom() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -47,7 +41,6 @@ fn test_retry_initialization_custom() {
     assert_eq!(result, 6);
 }
 
-/// Mirrors `test_retry_invoke_success_no_retry`.
 #[test]
 fn test_retry_invoke_success_no_retry() {
     let call_count = Arc::new(AtomicUsize::new(0));
@@ -70,7 +63,6 @@ fn test_retry_invoke_success_no_retry() {
     assert_eq!(call_count.load(Ordering::SeqCst), 1);
 }
 
-/// Mirrors `test_retry_invoke_with_retryable_exception`.
 #[test]
 fn test_retry_invoke_with_retryable_exception() {
     let call_count = Arc::new(AtomicUsize::new(0));
@@ -97,7 +89,6 @@ fn test_retry_invoke_with_retryable_exception() {
     assert_eq!(call_count.load(Ordering::SeqCst), 3);
 }
 
-/// Mirrors `test_retry_invoke_exhausts_retries`.
 #[test]
 fn test_retry_invoke_exhausts_retries() {
     let call_count = Arc::new(AtomicUsize::new(0));
@@ -121,7 +112,6 @@ fn test_retry_invoke_exhausts_retries() {
     assert_eq!(call_count.load(Ordering::SeqCst), 2);
 }
 
-/// Mirrors `test_retry_invoke_non_retryable_exception`.
 #[test]
 fn test_retry_invoke_non_retryable_exception() {
     let call_count = Arc::new(AtomicUsize::new(0));
@@ -146,7 +136,6 @@ fn test_retry_invoke_non_retryable_exception() {
     assert_eq!(call_count.load(Ordering::SeqCst), 1);
 }
 
-/// Mirrors `test_retry_ainvoke_success_no_retry`.
 #[tokio::test]
 async fn test_retry_ainvoke_success_no_retry() {
     let call_count = Arc::new(AtomicUsize::new(0));
@@ -169,7 +158,6 @@ async fn test_retry_ainvoke_success_no_retry() {
     assert_eq!(call_count.load(Ordering::SeqCst), 1);
 }
 
-/// Mirrors `test_retry_ainvoke_with_retryable_exception`.
 #[tokio::test]
 async fn test_retry_ainvoke_with_retryable_exception() {
     let call_count = Arc::new(AtomicUsize::new(0));
@@ -196,7 +184,6 @@ async fn test_retry_ainvoke_with_retryable_exception() {
     assert_eq!(call_count.load(Ordering::SeqCst), 3);
 }
 
-/// Mirrors `test_retry_ainvoke_exhausts_retries`.
 #[tokio::test]
 async fn test_retry_ainvoke_exhausts_retries() {
     let runnable = RunnableLambda::new(|_x: i32| Err::<i32, _>(Error::other("Always fails")));
@@ -213,7 +200,6 @@ async fn test_retry_ainvoke_exhausts_retries() {
     assert!(result.unwrap_err().to_string().contains("Always fails"));
 }
 
-/// Mirrors `test_retry_batch_partial_failures`.
 #[test]
 fn test_retry_batch_partial_failures() {
     let call_counts: Arc<std::sync::Mutex<std::collections::HashMap<i32, usize>>> =
@@ -251,7 +237,6 @@ fn test_retry_batch_partial_failures() {
     assert_eq!(*map.get(&3).unwrap(), 1); // No retry needed
 }
 
-/// Mirrors `test_retry_batch_with_return_exceptions`.
 #[test]
 fn test_retry_batch_with_return_exceptions() {
     let runnable = RunnableLambda::new(|x: i32| {
@@ -282,7 +267,6 @@ fn test_retry_batch_with_return_exceptions() {
     assert_eq!(*results[2].as_ref().unwrap(), 4);
 }
 
-/// Mirrors `test_retry_abatch_partial_failures`.
 #[tokio::test]
 async fn test_retry_abatch_partial_failures() {
     let call_counts: Arc<std::sync::Mutex<std::collections::HashMap<i32, usize>>> =
@@ -314,7 +298,6 @@ async fn test_retry_abatch_partial_failures() {
     }
 }
 
-/// Mirrors `test_retry_abatch_with_return_exceptions`.
 #[tokio::test]
 async fn test_retry_abatch_with_return_exceptions() {
     let runnable = RunnableLambda::new(|x: i32| {
@@ -338,7 +321,6 @@ async fn test_retry_abatch_with_return_exceptions() {
     assert_eq!(*results[2].as_ref().unwrap(), 4);
 }
 
-/// Mirrors `test_retry_with_exponential_jitter`.
 #[test]
 fn test_retry_with_exponential_jitter() {
     let call_count = Arc::new(AtomicUsize::new(0));
@@ -371,7 +353,6 @@ fn test_retry_with_exponential_jitter() {
     assert_eq!(call_count.load(Ordering::SeqCst), 2);
 }
 
-/// Mirrors `test_retry_async_with_exponential_jitter`.
 #[tokio::test]
 async fn test_retry_async_with_exponential_jitter() {
     let call_count = Arc::new(AtomicUsize::new(0));
@@ -404,7 +385,6 @@ async fn test_retry_async_with_exponential_jitter() {
     assert_eq!(call_count.load(Ordering::SeqCst), 2);
 }
 
-/// Mirrors `test_retry_with_config`.
 #[test]
 fn test_retry_with_config() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -426,9 +406,6 @@ fn test_retry_with_config() {
     assert_eq!(result, 6);
 }
 
-/// Mirrors `test_retry_config_propagation`.
-///
-/// Verifies that config is propagated through all retry attempts.
 #[test]
 fn test_retry_config_propagation() {
     let call_count = Arc::new(AtomicUsize::new(0));
@@ -458,9 +435,6 @@ fn test_retry_config_propagation() {
     assert_eq!(call_count.load(Ordering::SeqCst), 2);
 }
 
-/// Mirrors `test_retry_multiple_exception_types`.
-///
-/// Uses a custom predicate that matches multiple error variants.
 #[test]
 fn test_retry_multiple_exception_types() {
     let call_count = Arc::new(AtomicUsize::new(0));
@@ -492,7 +466,6 @@ fn test_retry_multiple_exception_types() {
     assert_eq!(call_count.load(Ordering::SeqCst), 3);
 }
 
-/// Mirrors `test_retry_batch_preserves_order`.
 #[test]
 fn test_retry_batch_preserves_order() {
     let first_fail: Arc<std::sync::Mutex<std::collections::HashSet<i32>>> =
@@ -522,7 +495,6 @@ fn test_retry_batch_preserves_order() {
     assert_eq!(*results[2].as_ref().unwrap(), 2);
 }
 
-/// Mirrors `test_retry_abatch_preserves_order`.
 #[tokio::test]
 async fn test_retry_abatch_preserves_order() {
     let first_fail: Arc<std::sync::Mutex<std::collections::HashSet<i32>>> =
@@ -552,7 +524,6 @@ async fn test_retry_abatch_preserves_order() {
     assert_eq!(*results[2].as_ref().unwrap(), 2);
 }
 
-/// Mirrors `test_retry_batch_all_fail`.
 #[test]
 fn test_retry_batch_all_fail() {
     let runnable = RunnableLambda::new(|_x: i32| Err::<i32, _>(Error::other("Always fails")));
@@ -568,7 +539,6 @@ fn test_retry_batch_all_fail() {
     assert!(results.iter().all(|r| r.is_err()));
 }
 
-/// Mirrors `test_retry_batch_empty_input`.
 #[test]
 fn test_retry_batch_empty_input() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x));
@@ -579,7 +549,6 @@ fn test_retry_batch_empty_input() {
     assert!(results.is_empty());
 }
 
-/// Mirrors `test_retry_abatch_empty_input`.
 #[tokio::test]
 async fn test_retry_abatch_empty_input() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x));
@@ -590,12 +559,6 @@ async fn test_retry_abatch_empty_input() {
     assert!(results.is_empty());
 }
 
-/// Mirrors `test_retry_stream_and_transform_not_retried`.
-///
-/// In the Rust implementation, stream() uses the default Runnable impl
-/// which calls invoke(), so it does go through retry logic. This is a
-/// behavioral difference from Python where stream is explicitly not retried.
-/// We test the actual Rust behavior here.
 #[tokio::test]
 async fn test_retry_stream_uses_invoke_with_retries() {
     let call_count = Arc::new(AtomicUsize::new(0));
@@ -624,9 +587,6 @@ async fn test_retry_stream_uses_invoke_with_retries() {
     assert_eq!(call_count.load(Ordering::SeqCst), 2);
 }
 
-/// Mirrors `test_retry_chain_composition`.
-///
-/// Tests retry in a sequential pipeline by manually chaining runnables.
 #[test]
 fn test_retry_chain_composition() {
     let call_count = Arc::new(AtomicUsize::new(0));
@@ -659,7 +619,6 @@ fn test_retry_chain_composition() {
     assert_eq!(call_count.load(Ordering::SeqCst), 2);
 }
 
-/// Mirrors `test_retry_batch_individual_tracking`.
 #[test]
 fn test_retry_batch_individual_tracking() {
     let call_tracker: Arc<std::sync::Mutex<std::collections::HashMap<i32, Vec<i32>>>> =
@@ -702,7 +661,6 @@ fn test_retry_batch_individual_tracking() {
     assert_eq!(map[&2].len(), 1); // Succeeded immediately
 }
 
-/// Test exponential jitter parameter calculations.
 #[test]
 fn test_exponential_jitter_params_calculation() {
     let params = ExponentialJitterParams::new()
@@ -721,7 +679,6 @@ fn test_exponential_jitter_params_calculation() {
     assert!((wait3.as_secs_f64() - 0.4).abs() < 0.01);
 }
 
-/// Test exponential jitter max cap.
 #[test]
 fn test_exponential_jitter_max_cap() {
     let params = ExponentialJitterParams::new()
@@ -734,7 +691,6 @@ fn test_exponential_jitter_max_cap() {
     assert!((wait.as_secs_f64() - 2.0).abs() < 0.01);
 }
 
-/// Test default exponential jitter params.
 #[test]
 fn test_exponential_jitter_defaults() {
     let params = ExponentialJitterParams::default();
@@ -744,7 +700,6 @@ fn test_exponential_jitter_defaults() {
     assert_eq!(params.jitter, 1.0);
 }
 
-/// Test the RunnableRetryExt trait.
 #[test]
 fn test_retry_ext_trait() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -755,7 +710,6 @@ fn test_retry_ext_trait() {
     assert_eq!(result, 2);
 }
 
-/// Test the with_retry convenience method on Runnable trait.
 #[test]
 fn test_with_retry_convenience() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -765,7 +719,6 @@ fn test_with_retry_convenience() {
     assert_eq!(result, 2);
 }
 
-/// Test Debug formatting doesn't panic.
 #[test]
 fn test_retry_debug() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -776,7 +729,6 @@ fn test_retry_debug() {
     assert!(debug_str.contains("max_attempt_number"));
 }
 
-/// Test name propagation from inner runnable.
 #[test]
 fn test_retry_name_propagation() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1)).with_name("my_step");
@@ -785,9 +737,6 @@ fn test_retry_name_propagation() {
     assert_eq!(retry.name(), Some("my_step".to_string()));
 }
 
-/// Mirrors `test_retry_preserves_schemas`.
-///
-/// Verifies that RunnableRetry delegates schema to the wrapped runnable.
 #[test]
 fn test_retry_preserves_schemas() {
     let runnable_for_schema = RunnableLambda::new(|x: i32| Ok(x.to_string()));

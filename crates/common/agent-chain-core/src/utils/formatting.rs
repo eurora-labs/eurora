@@ -1,47 +1,13 @@
-//! Utilities for formatting strings.
-//!
-//! Adapted from langchain_core/utils/formatting.py
-
 use std::collections::{HashMap, HashSet};
 
-/// A strict formatter that checks for extra keys and requires all arguments as keyword arguments.
-///
-/// This formatter is based on Python's string formatting but enforces stricter rules:
-/// - All arguments must be provided as keyword arguments
-/// - All placeholders in the format string must be used
 #[derive(Debug, Clone, Default)]
 pub struct StrictFormatter;
 
 impl StrictFormatter {
-    /// Create a new StrictFormatter.
     pub fn new() -> Self {
         Self
     }
 
-    /// Format a string with keyword arguments.
-    ///
-    /// # Arguments
-    ///
-    /// * `format_string` - The format string with placeholders like `{name}`.
-    /// * `kwargs` - The keyword arguments to substitute.
-    ///
-    /// # Returns
-    ///
-    /// The formatted string, or an error if formatting fails.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use std::collections::HashMap;
-    /// use agent_chain_core::utils::formatting::StrictFormatter;
-    ///
-    /// let formatter = StrictFormatter::new();
-    /// let mut kwargs = HashMap::new();
-    /// kwargs.insert("name".to_string(), "World".to_string());
-    ///
-    /// let result = formatter.format("Hello, {name}!", &kwargs).unwrap();
-    /// assert_eq!(result, "Hello, World!");
-    /// ```
     pub fn format(
         &self,
         format_string: &str,
@@ -61,26 +27,6 @@ impl StrictFormatter {
         Ok(result)
     }
 
-    /// Validate that input variables can be used with the format string.
-    ///
-    /// # Arguments
-    ///
-    /// * `format_string` - The format string to validate.
-    /// * `input_variables` - The input variables that will be provided.
-    ///
-    /// # Returns
-    ///
-    /// Ok(()) if validation passes, or an error if any input variables are not used.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use agent_chain_core::utils::formatting::StrictFormatter;
-    ///
-    /// let formatter = StrictFormatter::new();
-    /// let result = formatter.validate_input_variables("Hello, {name}!", &["name".to_string()]);
-    /// assert!(result.is_ok());
-    /// ```
     pub fn validate_input_variables(
         &self,
         format_string: &str,
@@ -94,15 +40,6 @@ impl StrictFormatter {
         self.format(format_string, &dummy_inputs).map(|_| ())
     }
 
-    /// Extract placeholders from a format string.
-    ///
-    /// # Arguments
-    ///
-    /// * `format_string` - The format string to extract placeholders from.
-    ///
-    /// # Returns
-    ///
-    /// A set of placeholder names found in the format string.
     pub fn extract_placeholders(&self, format_string: &str) -> HashSet<String> {
         let mut placeholders = HashSet::new();
         let mut chars = format_string.chars().peekable();
@@ -146,22 +83,9 @@ impl StrictFormatter {
     }
 }
 
-/// A global formatter instance.
 pub static FORMATTER: std::sync::LazyLock<StrictFormatter> =
     std::sync::LazyLock::new(StrictFormatter::new);
 
-/// Format a string using the global formatter.
-///
-/// This is a convenience function that uses the global [`FORMATTER`] instance.
-///
-/// # Arguments
-///
-/// * `format_string` - The format string with placeholders.
-/// * `kwargs` - The keyword arguments to substitute.
-///
-/// # Returns
-///
-/// The formatted string, or an error if formatting fails.
 pub fn format_string(
     format_string: &str,
     kwargs: &HashMap<String, String>,
@@ -169,12 +93,9 @@ pub fn format_string(
     FORMATTER.format(format_string, kwargs)
 }
 
-/// Error types for formatting operations.
 #[derive(Debug, Clone, PartialEq)]
 pub enum FormattingError {
-    /// A required key was missing from the kwargs.
     MissingKey(String),
-    /// An invalid format string was provided.
     InvalidFormat(String),
 }
 

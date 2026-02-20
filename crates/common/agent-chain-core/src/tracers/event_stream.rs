@@ -1,11 +1,3 @@
-//! Internal tracer to power the event stream API.
-//!
-//! This module provides the callback handler and implementation functions for
-//! the `astream_events()` API. It converts nested tracer run data into a flat
-//! stream of typed events.
-//!
-//! Mirrors `langchain_core.tracers.event_stream`.
-
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Mutex;
@@ -29,27 +21,17 @@ use crate::runnables::utils::RootEventFilter;
 use crate::tracers::memory_stream::{MemoryStream, ReceiveStream, SendStream};
 use crate::tracers::streaming::StreamingCallbackHandler;
 
-/// Information about a run.
-///
-/// This is used to keep track of the metadata associated with a run.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunInfo {
-    /// The name of the run.
     pub name: String,
-    /// The tags associated with the run.
     pub tags: Vec<String>,
-    /// The metadata associated with the run.
     pub metadata: HashMap<String, Value>,
-    /// The type of the run.
     pub run_type: String,
-    /// The inputs to the run.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inputs: Option<Value>,
-    /// The ID of the parent run.
     pub parent_run_id: Option<Uuid>,
 }
 
-/// Assign a name to a run.
 fn assign_name(name: Option<&str>, serialized: Option<&HashMap<String, Value>>) -> String {
     if let Some(n) = name {
         return n.to_string();
@@ -67,38 +49,21 @@ fn assign_name(name: Option<&str>, serialized: Option<&HashMap<String, Value>>) 
     "Unnamed".to_string()
 }
 
-/// Interior mutable state for the callback handler.
 #[derive(Debug)]
 struct HandlerState {
-    /// Map of run ID to run info. Entries are cleaned up when each run ends.
     run_map: HashMap<Uuid, RunInfo>,
-    /// Map of child run ID to parent run ID. Kept separately from run_map
-    /// because parent end events may fire before child end events.
     parent_map: HashMap<Uuid, Option<Uuid>>,
-    /// Track which runs have been tapped for streaming.
     is_tapped: HashMap<Uuid, bool>,
 }
 
-/// An implementation of a callback handler for astream events.
-///
-/// This handler tracks run metadata and sends stream events through a memory
-/// stream. It is used internally by `astream_events()`.
-///
-/// Implements `BaseCallbackHandler` so it can be injected into
-/// `RunnableConfig.callbacks` and receive callbacks during execution.
 pub struct AstreamEventsCallbackHandler {
-    /// Interior-mutable state (run_map, parent_map, is_tapped).
     state: Mutex<HandlerState>,
-    /// Filter which events will be sent over the queue.
     root_event_filter: RootEventFilter,
-    /// The send stream for events.
     send_stream: SendStream<StreamEvent>,
-    /// The receive stream for events (can only be taken once).
     receive_stream: Mutex<Option<ReceiveStream<StreamEvent>>>,
 }
 
 impl AstreamEventsCallbackHandler {
-    /// Create a new AstreamEventsCallbackHandler.
     pub fn new(
         include_names: Option<Vec<String>>,
         include_types: Option<Vec<String>>,
@@ -130,7 +95,6 @@ impl AstreamEventsCallbackHandler {
         }
     }
 
-    /// Take the receive stream. Can only be called once.
     pub fn take_receive_stream(&self) -> Option<ReceiveStream<StreamEvent>> {
         self.receive_stream
             .lock()
@@ -138,14 +102,10 @@ impl AstreamEventsCallbackHandler {
             .take()
     }
 
-    /// Get the send stream (clone).
     pub fn get_send_stream(&self) -> SendStream<StreamEvent> {
         self.send_stream.clone()
     }
 
-    /// Get the parent IDs of a run (non-recursively) cast to strings.
-    ///
-    /// Returns parent IDs in order from root to immediate parent.
     fn get_parent_ids(parent_map: &HashMap<Uuid, Option<Uuid>>, mut run_id: Uuid) -> Vec<String> {
         let mut parent_ids = Vec::new();
 
@@ -164,7 +124,6 @@ impl AstreamEventsCallbackHandler {
         parent_ids
     }
 
-    /// Send an event to the stream if it passes the filter.
     fn send(&self, event: StreamEvent, event_type: &str) {
         let (event_name, event_tags) = match &event {
             StreamEvent::Standard(e) => (e.name.as_str(), e.base.tags.as_slice()),
@@ -179,7 +138,6 @@ impl AstreamEventsCallbackHandler {
         }
     }
 
-    /// Record the start of a run.
     fn write_run_start_info(
         state: &mut HandlerState,
         run_id: Uuid,
@@ -203,7 +161,6 @@ impl AstreamEventsCallbackHandler {
         state.parent_map.insert(run_id, parent_run_id);
     }
 
-    /// Handle a chat model start event.
     fn handle_chat_model_start(
         &self,
         serialized: &HashMap<String, Value>,
@@ -249,7 +206,6 @@ impl AstreamEventsCallbackHandler {
         self.send(StreamEvent::Standard(event), run_type);
     }
 
-    /// Handle an LLM start event.
     fn handle_llm_start(
         &self,
         serialized: &HashMap<String, Value>,
@@ -297,7 +253,6 @@ impl AstreamEventsCallbackHandler {
         self.send(StreamEvent::Standard(event), run_type);
     }
 
-    /// Handle a custom event.
     fn handle_custom_event(
         &self,
         name: &str,
@@ -319,7 +274,6 @@ impl AstreamEventsCallbackHandler {
         self.send(StreamEvent::Custom(event), name);
     }
 
-    /// Handle a new LLM token event.
     fn handle_llm_new_token(
         &self,
         token: &str,
@@ -377,7 +331,6 @@ impl AstreamEventsCallbackHandler {
         Ok(())
     }
 
-    /// Handle an LLM end event.
     fn handle_llm_end(&self, response: &LLMResult, run_id: Uuid) -> Result<(), String> {
         let (run_info, parent_ids) = {
             let mut state = self.state.lock().expect("state lock poisoned");
@@ -464,7 +417,6 @@ impl AstreamEventsCallbackHandler {
         Ok(())
     }
 
-    /// Handle a chain start event.
     #[allow(clippy::too_many_arguments)]
     fn handle_chain_start(
         &self,
@@ -518,7 +470,6 @@ impl AstreamEventsCallbackHandler {
         self.send(StreamEvent::Standard(event), run_type_);
     }
 
-    /// Handle a chain end event.
     fn handle_chain_end(
         &self,
         outputs: &HashMap<String, Value>,
@@ -557,7 +508,6 @@ impl AstreamEventsCallbackHandler {
         Ok(())
     }
 
-    /// Handle a tool start event.
     #[allow(clippy::too_many_arguments)]
     fn handle_tool_start(
         &self,
@@ -601,7 +551,6 @@ impl AstreamEventsCallbackHandler {
         self.send(StreamEvent::Standard(event), "tool");
     }
 
-    /// Get run info for a tool, extracting inputs with validation.
     fn remove_tool_run_info_with_inputs(
         state: &mut HandlerState,
         run_id: Uuid,
@@ -622,7 +571,6 @@ impl AstreamEventsCallbackHandler {
         Ok((run_info, inputs, parent_ids))
     }
 
-    /// Handle a tool error event.
     fn handle_tool_error(&self, error: &str, run_id: Uuid) -> Result<(), String> {
         let (run_info, inputs, parent_ids) = {
             let mut state = self.state.lock().expect("state lock poisoned");
@@ -641,7 +589,6 @@ impl AstreamEventsCallbackHandler {
         Ok(())
     }
 
-    /// Handle a tool end event.
     fn handle_tool_end(&self, output: Value, run_id: Uuid) -> Result<(), String> {
         let (run_info, inputs, parent_ids) = {
             let mut state = self.state.lock().expect("state lock poisoned");
@@ -660,7 +607,6 @@ impl AstreamEventsCallbackHandler {
         Ok(())
     }
 
-    /// Handle a retriever start event.
     #[allow(clippy::too_many_arguments)]
     fn handle_retriever_start(
         &self,
@@ -699,7 +645,6 @@ impl AstreamEventsCallbackHandler {
         self.send(StreamEvent::Standard(event), run_type);
     }
 
-    /// Handle a retriever end event.
     fn handle_retriever_end(&self, documents: Value, run_id: Uuid) -> Result<(), String> {
         let (run_info, parent_ids) = {
             let mut state = self.state.lock().expect("state lock poisoned");
@@ -1038,14 +983,6 @@ impl StreamingCallbackHandler<crate::error::Result<Value>> for AstreamEventsCall
     }
 }
 
-/// Implementation of the astream_events API for V2 runnables.
-///
-/// This is a free function that mirrors Python's
-/// `_astream_events_implementation_v2`. It creates the handler,
-/// injects it into the config, consumes `astream()` while
-/// forwarding events from the receive stream.
-///
-/// Mirrors `langchain_core.tracers.event_stream._astream_events_implementation_v2`.
 pub fn astream_events_implementation<'a, R>(
     runnable: &'a R,
     input: R::Input,

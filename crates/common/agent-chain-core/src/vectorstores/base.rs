@@ -13,7 +13,6 @@ use crate::embeddings::Embeddings;
 use crate::error::Error;
 use crate::retrievers::{BaseRetriever, LangSmithRetrieverParams};
 
-/// Search type for vector store retrieval.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SearchType {
     Similarity,
@@ -37,15 +36,8 @@ impl std::fmt::Display for SearchType {
     }
 }
 
-/// Interface for vector store.
-///
-/// Implementors should also provide `from_texts` and `from_documents` constructors
-/// following the `VectorStoreFactory` trait pattern.
 #[async_trait]
 pub trait VectorStore: Send + Sync {
-    /// Add texts to the vector store.
-    ///
-    /// Returns list of IDs from adding the texts.
     fn add_texts(
         &self,
         texts: Vec<String>,
@@ -80,7 +72,6 @@ pub trait VectorStore: Send + Sync {
         self.add_documents(documents, None)
     }
 
-    /// Async add texts to the vector store.
     async fn aadd_texts(
         &self,
         texts: Vec<String>,
@@ -90,16 +81,12 @@ pub trait VectorStore: Send + Sync {
         self.add_texts(texts, metadatas, ids)
     }
 
-    /// Add documents to the vector store.
-    ///
-    /// Returns list of IDs from adding the documents.
     fn add_documents(
         &self,
         documents: Vec<Document>,
         ids: Option<Vec<String>>,
     ) -> Result<Vec<String>>;
 
-    /// Async add documents to the vector store.
     async fn aadd_documents(
         &self,
         documents: Vec<Document>,
@@ -108,28 +95,22 @@ pub trait VectorStore: Send + Sync {
         self.add_documents(documents, ids)
     }
 
-    /// Access the query embedding object if available.
     fn embeddings(&self) -> Option<&dyn Embeddings> {
         None
     }
 
-    /// Delete by vector ID or other criteria.
     fn delete(&self, ids: Option<Vec<String>>) -> Result<()>;
 
-    /// Async delete by vector ID or other criteria.
     async fn adelete(&self, ids: Option<Vec<String>>) -> Result<()> {
         self.delete(ids)
     }
 
-    /// Get documents by their IDs.
     fn get_by_ids(&self, ids: &[String]) -> Result<Vec<Document>>;
 
-    /// Async get documents by their IDs.
     async fn aget_by_ids(&self, ids: &[String]) -> Result<Vec<Document>> {
         self.get_by_ids(ids)
     }
 
-    /// Return docs most similar to query.
     fn similarity_search(
         &self,
         query: &str,
@@ -137,12 +118,10 @@ pub trait VectorStore: Send + Sync {
         filter: Option<&dyn Fn(&Document) -> bool>,
     ) -> Result<Vec<Document>>;
 
-    /// Async return docs most similar to query.
     async fn asimilarity_search(&self, query: &str, k: usize) -> Result<Vec<Document>> {
         self.similarity_search(query, k, None)
     }
 
-    /// Return docs most similar to embedding vector.
     fn similarity_search_by_vector(
         &self,
         embedding: &[f32],
@@ -150,7 +129,6 @@ pub trait VectorStore: Send + Sync {
         filter: Option<&dyn Fn(&Document) -> bool>,
     ) -> Result<Vec<Document>>;
 
-    /// Async return docs most similar to embedding vector.
     async fn asimilarity_search_by_vector(
         &self,
         embedding: &[f32],
@@ -159,7 +137,6 @@ pub trait VectorStore: Send + Sync {
         self.similarity_search_by_vector(embedding, k, None)
     }
 
-    /// Run similarity search with distance.
     fn similarity_search_with_score(
         &self,
         query: &str,
@@ -167,7 +144,6 @@ pub trait VectorStore: Send + Sync {
         filter: Option<&dyn Fn(&Document) -> bool>,
     ) -> Result<Vec<(Document, f32)>>;
 
-    /// Async run similarity search with distance.
     async fn asimilarity_search_with_score(
         &self,
         query: &str,
@@ -176,7 +152,6 @@ pub trait VectorStore: Send + Sync {
         self.similarity_search_with_score(query, k, None)
     }
 
-    /// Return docs selected using the maximal marginal relevance.
     fn max_marginal_relevance_search(
         &self,
         query: &str,
@@ -186,7 +161,6 @@ pub trait VectorStore: Send + Sync {
         filter: Option<&dyn Fn(&Document) -> bool>,
     ) -> Result<Vec<Document>>;
 
-    /// Async return docs selected using the maximal marginal relevance.
     async fn amax_marginal_relevance_search(
         &self,
         query: &str,
@@ -197,7 +171,6 @@ pub trait VectorStore: Send + Sync {
         self.max_marginal_relevance_search(query, k, fetch_k, lambda_mult, None)
     }
 
-    /// Return docs selected using MMR by vector.
     fn max_marginal_relevance_search_by_vector(
         &self,
         embedding: &[f32],
@@ -207,7 +180,6 @@ pub trait VectorStore: Send + Sync {
         filter: Option<&dyn Fn(&Document) -> bool>,
     ) -> Result<Vec<Document>>;
 
-    /// Async return docs selected using MMR by vector.
     async fn amax_marginal_relevance_search_by_vector(
         &self,
         embedding: &[f32],
@@ -218,7 +190,6 @@ pub trait VectorStore: Send + Sync {
         self.max_marginal_relevance_search_by_vector(embedding, k, fetch_k, lambda_mult, None)
     }
 
-    /// Return docs most similar to query using a specified search type.
     fn search(&self, query: &str, search_type: &SearchType, k: usize) -> Result<Vec<Document>> {
         match search_type {
             SearchType::Similarity => self.similarity_search(query, k, None),
@@ -230,7 +201,6 @@ pub trait VectorStore: Send + Sync {
         }
     }
 
-    /// Async return docs using a specified search type.
     async fn asearch(
         &self,
         query: &str,
@@ -240,17 +210,10 @@ pub trait VectorStore: Send + Sync {
         self.search(query, search_type, k)
     }
 
-    /// Select the relevance score function for this vector store.
-    ///
-    /// Subclasses should override this to return a function that converts
-    /// a distance/similarity score to a relevance score in [0, 1].
     fn select_relevance_score_fn(&self) -> Option<fn(f32) -> f32> {
         None
     }
 
-    /// Similarity search with relevance scores (internal).
-    ///
-    /// Calls `similarity_search_with_score` and applies the relevance score function.
     fn similarity_search_with_relevance_scores_internal(
         &self,
         query: &str,
@@ -272,9 +235,6 @@ pub trait VectorStore: Send + Sync {
             .collect())
     }
 
-    /// Return docs and relevance scores in the range [0, 1].
-    ///
-    /// 0 is dissimilar, 1 is most similar.
     fn similarity_search_with_relevance_scores(
         &self,
         query: &str,
@@ -311,7 +271,6 @@ pub trait VectorStore: Send + Sync {
         Ok(docs_and_similarities)
     }
 
-    /// Async return docs and relevance scores in the range [0, 1].
     async fn asimilarity_search_with_relevance_scores(
         &self,
         query: &str,
@@ -321,7 +280,6 @@ pub trait VectorStore: Send + Sync {
         self.similarity_search_with_relevance_scores(query, k, score_threshold, None)
     }
 
-    /// Euclidean relevance score on a scale [0, 1].
     fn euclidean_relevance_score(distance: f32) -> f32
     where
         Self: Sized,
@@ -329,7 +287,6 @@ pub trait VectorStore: Send + Sync {
         1.0 - distance / std::f32::consts::SQRT_2
     }
 
-    /// Cosine relevance score on a scale [0, 1].
     fn cosine_relevance_score(distance: f32) -> f32
     where
         Self: Sized,
@@ -337,7 +294,6 @@ pub trait VectorStore: Send + Sync {
         1.0 - distance
     }
 
-    /// Max inner product relevance score on a scale [0, 1].
     fn max_inner_product_relevance_score(distance: f32) -> f32
     where
         Self: Sized,
@@ -350,12 +306,7 @@ pub trait VectorStore: Send + Sync {
     }
 }
 
-/// Factory trait for creating vector stores from texts or documents.
-///
-/// This is separate from `VectorStore` because Rust trait objects cannot have
-/// constructors that return `Self`.
 pub trait VectorStoreFactory: VectorStore + Sized {
-    /// Create a vector store from texts and an embedding function.
     fn from_texts(
         texts: &[&str],
         embedding: Box<dyn Embeddings>,
@@ -363,7 +314,6 @@ pub trait VectorStoreFactory: VectorStore + Sized {
         ids: Option<Vec<String>>,
     ) -> Result<Self>;
 
-    /// Create a vector store from documents and an embedding function.
     fn from_documents(documents: Vec<Document>, embedding: Box<dyn Embeddings>) -> Result<Self> {
         let texts: Vec<&str> = documents.iter().map(|d| d.page_content.as_str()).collect();
         let metadatas: Vec<HashMap<String, Value>> =
@@ -374,7 +324,6 @@ pub trait VectorStoreFactory: VectorStore + Sized {
     }
 }
 
-/// Configuration for a VectorStoreRetriever.
 pub struct VectorStoreRetrieverConfig {
     pub search_type: SearchType,
     pub search_kwargs: HashMap<String, Value>,
@@ -382,7 +331,6 @@ pub struct VectorStoreRetrieverConfig {
 }
 
 impl VectorStoreRetrieverConfig {
-    /// Get the `k` parameter (number of documents to return).
     pub fn k(&self) -> usize {
         self.search_kwargs
             .get("k")
@@ -390,7 +338,6 @@ impl VectorStoreRetrieverConfig {
             .unwrap_or(4) as usize
     }
 
-    /// Get the `fetch_k` parameter (number of documents to fetch for MMR).
     pub fn fetch_k(&self) -> usize {
         self.search_kwargs
             .get("fetch_k")
@@ -398,7 +345,6 @@ impl VectorStoreRetrieverConfig {
             .unwrap_or(20) as usize
     }
 
-    /// Get the `lambda_mult` parameter (diversity for MMR).
     pub fn lambda_mult(&self) -> f32 {
         self.search_kwargs
             .get("lambda_mult")
@@ -406,7 +352,6 @@ impl VectorStoreRetrieverConfig {
             .unwrap_or(0.5) as f32
     }
 
-    /// Get the `score_threshold` parameter.
     pub fn score_threshold(&self) -> Option<f32> {
         self.search_kwargs
             .get("score_threshold")
@@ -427,7 +372,6 @@ impl Default for VectorStoreRetrieverConfig {
     }
 }
 
-/// Validate the retriever configuration.
 fn validate_retriever_config(config: &VectorStoreRetrieverConfig) -> Result<()> {
     let allowed = ["similarity", "similarity_score_threshold", "mmr"];
     let search_type_str = config.search_type.as_str();
@@ -449,17 +393,10 @@ fn validate_retriever_config(config: &VectorStoreRetrieverConfig) -> Result<()> 
     Ok(())
 }
 
-/// Retriever class for VectorStore.
-///
-/// Direct port of Python `VectorStoreRetriever(BaseRetriever)`.
 pub struct VectorStoreRetriever {
-    /// The underlying vector store.
     pub vectorstore: Arc<dyn VectorStore>,
-    /// Type of search to perform.
     pub search_type: SearchType,
-    /// Keyword arguments to pass to the search function.
     pub search_kwargs: HashMap<String, Value>,
-    /// Tags for tracing.
     pub tags: Vec<String>,
 }
 
@@ -474,7 +411,6 @@ impl Debug for VectorStoreRetriever {
 }
 
 impl VectorStoreRetriever {
-    /// Create a new VectorStoreRetriever.
     pub fn new(
         vectorstore: Arc<dyn VectorStore>,
         config: VectorStoreRetrieverConfig,
@@ -489,7 +425,6 @@ impl VectorStoreRetriever {
         })
     }
 
-    /// Get the `k` parameter.
     fn k(&self) -> usize {
         self.search_kwargs
             .get("k")
@@ -497,7 +432,6 @@ impl VectorStoreRetriever {
             .unwrap_or(4) as usize
     }
 
-    /// Get the `fetch_k` parameter.
     fn fetch_k(&self) -> usize {
         self.search_kwargs
             .get("fetch_k")
@@ -505,7 +439,6 @@ impl VectorStoreRetriever {
             .unwrap_or(20) as usize
     }
 
-    /// Get the `lambda_mult` parameter.
     fn lambda_mult(&self) -> f32 {
         self.search_kwargs
             .get("lambda_mult")
@@ -513,7 +446,6 @@ impl VectorStoreRetriever {
             .unwrap_or(0.5) as f32
     }
 
-    /// Get the `score_threshold` parameter.
     fn score_threshold(&self) -> Option<f32> {
         self.search_kwargs
             .get("score_threshold")
@@ -521,7 +453,6 @@ impl VectorStoreRetriever {
             .map(|v| v as f32)
     }
 
-    /// Add documents to the underlying vector store.
     pub fn add_documents(
         &self,
         documents: Vec<Document>,
@@ -530,7 +461,6 @@ impl VectorStoreRetriever {
         self.vectorstore.add_documents(documents, ids)
     }
 
-    /// Async add documents to the underlying vector store.
     pub async fn aadd_documents(
         &self,
         documents: Vec<Document>,
@@ -614,9 +544,7 @@ impl BaseRetriever for VectorStoreRetriever {
     }
 }
 
-/// Extension trait providing `into_retriever()` for `Arc<dyn VectorStore>`.
 pub trait VectorStoreRetrieverExt {
-    /// Create a VectorStoreRetriever from this vector store.
     fn into_retriever(self, config: VectorStoreRetrieverConfig) -> Result<VectorStoreRetriever>;
 }
 

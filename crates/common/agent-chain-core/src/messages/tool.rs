@@ -1,8 +1,3 @@
-//! Tool-related message types.
-//!
-//! This module contains types for tool calls and tool messages,
-//! mirroring `langchain_core.messages.tool`.
-
 use bon::bon;
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
@@ -12,10 +7,6 @@ use super::base::{get_msg_title_repr, is_interactive_env, merge_content};
 use super::content::MessageContent;
 use crate::utils::merge::{merge_dicts, merge_obj};
 
-/// Custom deserializer for tool_call_id that coerces non-string values to strings.
-///
-/// Python's ToolMessage.coerce_args validator converts non-string tool_call_id
-/// (e.g., integers, UUIDs) to strings during deserialization.
 fn deserialize_tool_call_id<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -29,34 +20,19 @@ where
     }
 }
 
-/// Mixin trait for objects that tools can return directly.
-///
-/// If a custom Tool is invoked with a `ToolCall` and the output of custom code is
-/// not an instance of `ToolOutputMixin`, the output will automatically be coerced to
-/// a string and wrapped in a `ToolMessage`.
 pub trait ToolOutputMixin {}
-
-/// A tool call made by the AI model.
-///
-/// Represents an AI's request to call a tool. This corresponds to
-/// `ToolCall` in LangChain Python.
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolCall {
-    /// Unique identifier for this tool call
     pub id: Option<String>,
-    /// Name of the tool to call
     pub name: String,
-    /// Arguments for the tool call as a JSON object
     pub args: serde_json::Value,
-    /// Type discriminant. Always "tool_call" when present.
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub call_type: Option<String>,
 }
 
 #[bon]
 impl ToolCall {
-    /// Create a new tool call.
     #[builder]
     pub fn new(name: impl Into<String>, args: serde_json::Value, id: Option<String>) -> Self {
         Self {
@@ -68,33 +44,22 @@ impl ToolCall {
     }
 }
 
-/// A tool call chunk (yielded when streaming).
-///
-/// When merging tool call chunks, all string attributes are concatenated.
-/// Chunks are only merged if their values of `index` are equal and not None.
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolCallChunk {
-    /// The name of the tool to be called (may be partial during streaming)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    /// The arguments to the tool call (may be partial JSON string during streaming)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub args: Option<String>,
-    /// An identifier associated with the tool call
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// The index of the tool call in a sequence
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<i32>,
-    /// Type discriminant. Always "tool_call_chunk" when present.
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub chunk_type: Option<String>,
 }
 
 #[bon]
 impl ToolCallChunk {
-    /// Create a new tool call chunk.
     #[builder]
     pub fn new(
         name: Option<String>,
@@ -112,33 +77,22 @@ impl ToolCallChunk {
     }
 }
 
-/// Represents an invalid tool call that failed parsing.
-///
-/// Here we add an `error` key to surface errors made during generation
-/// (e.g., invalid JSON arguments.)
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct InvalidToolCall {
-    /// The name of the tool to be called
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    /// The arguments to the tool call (unparsed string)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub args: Option<String>,
-    /// An identifier associated with the tool call
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// An error message associated with the tool call
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
-    /// Type discriminant. Always "invalid_tool_call" when present.
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub call_type: Option<String>,
 }
 
 #[bon]
 impl InvalidToolCall {
-    /// Create a new invalid tool call.
     #[builder]
     pub fn new(
         name: Option<String>,
@@ -156,39 +110,20 @@ impl InvalidToolCall {
     }
 }
 
-/// A tool message containing the result of a tool call.
-///
-/// `ToolMessage` objects contain the result of a tool invocation. Typically, the result
-/// is encoded inside the `content` field.
-///
-/// This corresponds to `ToolMessage` in LangChain Python.
-
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct ToolMessage {
-    /// The tool result content
     pub content: MessageContent,
-    /// The ID of the tool call this message is responding to
     #[serde(deserialize_with = "deserialize_tool_call_id")]
     pub tool_call_id: String,
-    /// Optional unique identifier
     pub id: Option<String>,
-    /// Optional name for the tool
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    /// Status of the tool invocation
     #[serde(default = "default_status")]
     pub status: ToolStatus,
-    /// Artifact of the tool execution which is not meant to be sent to the model.
-    ///
-    /// Should only be specified if it is different from the message content, e.g. if only
-    /// a subset of the full tool output is being passed as message content but the full
-    /// output is needed in other parts of the code.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub artifact: Option<serde_json::Value>,
-    /// Additional metadata
     #[serde(default)]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
-    /// Response metadata
     #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
@@ -229,8 +164,6 @@ impl Serialize for ToolMessage {
 fn default_status() -> ToolStatus {
     ToolStatus::Success
 }
-
-/// Status of a tool invocation.
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
@@ -276,7 +209,6 @@ impl PartialEq<&str> for ToolStatus {
 
 #[bon]
 impl ToolMessage {
-    /// Create a new tool message.
     #[builder]
     pub fn new(
         content: impl Into<MessageContent>,
@@ -300,24 +232,18 @@ impl ToolMessage {
         }
     }
 
-    /// Set the message ID.
     pub fn set_id(&mut self, id: String) {
         self.id = Some(id);
     }
 
-    /// Get the message type as a string.
     pub fn message_type(&self) -> &'static str {
         "tool"
     }
 
-    /// Get the text content of the message.
     pub fn text(&self) -> String {
         self.content.as_text()
     }
 
-    /// Get a pretty representation of the message.
-    ///
-    /// Corresponds to `BaseMessage.pretty_repr` in LangChain Python.
     pub fn pretty_repr(&self, html: bool) -> String {
         let title = get_msg_title_repr("Tool Message", html);
         let name_line = if let Some(name) = &self.name {
@@ -328,9 +254,6 @@ impl ToolMessage {
         format!("{}{}\n\n{}", title, name_line, self.content)
     }
 
-    /// Pretty print the message to stdout.
-    ///
-    /// Corresponds to `BaseMessage.pretty_print` in LangChain Python.
     pub fn pretty_print(&self) {
         println!("{}", self.pretty_repr(is_interactive_env()));
     }
@@ -338,32 +261,20 @@ impl ToolMessage {
 
 impl ToolOutputMixin for ToolMessage {}
 
-/// Tool message chunk (yielded when streaming).
-///
-/// This corresponds to `ToolMessageChunk` in LangChain Python.
-
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct ToolMessageChunk {
-    /// The tool result content (may be partial during streaming)
     pub content: MessageContent,
-    /// The ID of the tool call this message is responding to
     #[serde(deserialize_with = "deserialize_tool_call_id")]
     pub tool_call_id: String,
-    /// Optional unique identifier
     pub id: Option<String>,
-    /// Optional name for the tool
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    /// Status of the tool invocation
     #[serde(default = "default_status")]
     pub status: ToolStatus,
-    /// Artifact of the tool execution
     #[serde(skip_serializing_if = "Option::is_none")]
     pub artifact: Option<serde_json::Value>,
-    /// Additional metadata
     #[serde(default)]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
-    /// Response metadata
     #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
@@ -403,7 +314,6 @@ impl Serialize for ToolMessageChunk {
 
 #[bon]
 impl ToolMessageChunk {
-    /// Create a new tool message chunk.
     #[builder]
     pub fn new(
         content: impl Into<MessageContent>,
@@ -427,20 +337,10 @@ impl ToolMessageChunk {
         }
     }
 
-    /// Get the message type as a string.
     pub fn message_type(&self) -> &'static str {
         "ToolMessageChunk"
     }
 
-    /// Concatenate this chunk with another chunk.
-    ///
-    /// Matches `ToolMessageChunk.__add__` in LangChain Python:
-    /// - Uses `merge_content` for content
-    /// - Uses `merge_obj` for artifact
-    /// - Uses `merge_dicts` for additional_kwargs and response_metadata
-    /// - Uses `_merge_status` for status
-    ///
-    /// Panics if the tool_call_ids don't match.
     pub fn concat(&self, other: &ToolMessageChunk) -> ToolMessageChunk {
         if self.tool_call_id != other.tool_call_id {
             panic!("Cannot concatenate ToolMessageChunks with different names.");
@@ -485,7 +385,6 @@ impl ToolMessageChunk {
         }
     }
 
-    /// Convert this chunk to a complete ToolMessage.
     pub fn to_message(&self) -> ToolMessage {
         ToolMessage {
             content: self.content.clone(),
@@ -525,10 +424,6 @@ impl From<ToolMessageChunk> for ToolMessage {
     }
 }
 
-/// Merge two tool statuses.
-///
-/// Returns "error" if either status is "error", otherwise "success".
-/// This corresponds to `_merge_status` in LangChain Python.
 fn merge_status(left: &ToolStatus, right: &ToolStatus) -> ToolStatus {
     if *left == ToolStatus::Error || *right == ToolStatus::Error {
         ToolStatus::Error
@@ -537,9 +432,6 @@ fn merge_status(left: &ToolStatus, right: &ToolStatus) -> ToolStatus {
     }
 }
 
-/// Factory function to create a tool call.
-///
-/// This corresponds to the `tool_call` function in LangChain Python.
 pub fn tool_call(name: impl Into<String>, args: serde_json::Value, id: Option<String>) -> ToolCall {
     ToolCall::builder()
         .name(name)
@@ -548,9 +440,6 @@ pub fn tool_call(name: impl Into<String>, args: serde_json::Value, id: Option<St
         .build()
 }
 
-/// Factory function to create a tool call chunk.
-///
-/// This corresponds to the `tool_call_chunk` function in LangChain Python.
 pub fn tool_call_chunk(
     name: Option<String>,
     args: Option<String>,
@@ -565,9 +454,6 @@ pub fn tool_call_chunk(
         .build()
 }
 
-/// Factory function to create an invalid tool call.
-///
-/// This corresponds to the `invalid_tool_call` function in LangChain Python.
 pub fn invalid_tool_call(
     name: Option<String>,
     args: Option<String>,
@@ -582,9 +468,6 @@ pub fn invalid_tool_call(
         .build()
 }
 
-/// Best-effort parsing of tools from raw tool call dictionaries.
-///
-/// This corresponds to the `default_tool_parser` function in LangChain Python.
 pub fn default_tool_parser(
     raw_tool_calls: &[serde_json::Value],
 ) -> (Vec<ToolCall>, Vec<InvalidToolCall>) {
@@ -636,9 +519,6 @@ pub fn default_tool_parser(
     (tool_calls, invalid_tool_calls)
 }
 
-/// Best-effort parsing of tool call chunks from raw tool call dictionaries.
-///
-/// This corresponds to the `default_tool_chunk_parser` function in LangChain Python.
 pub fn default_tool_chunk_parser(raw_tool_calls: &[serde_json::Value]) -> Vec<ToolCallChunk> {
     let mut chunks = Vec::new();
 

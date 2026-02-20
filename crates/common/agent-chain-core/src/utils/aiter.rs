@@ -1,8 +1,3 @@
-//! Asynchronous iterator utilities.
-//!
-//! Adapted from langchain_core/utils/aiter.py which itself was adapted from
-//! <https://github.com/maxfischer2781/asyncstdlib/blob/master/asyncstdlib/itertools.py>
-
 use std::collections::VecDeque;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -11,7 +6,6 @@ use std::task::{Context, Poll};
 use futures::stream::Stream;
 use tokio::sync::Mutex;
 
-/// A dummy async lock that provides the proper interface but no protection.
 pub struct NoLock;
 
 impl NoLock {
@@ -26,20 +20,12 @@ impl Default for NoLock {
     }
 }
 
-/// Shared state for async tee peers.
 struct TeeShared<T> {
     source: Pin<Box<dyn Stream<Item = T> + Send>>,
     buffers: Vec<VecDeque<T>>,
     exhausted: bool,
 }
 
-/// Create `n` separate asynchronous streams over a single source stream.
-///
-/// This splits a single stream into multiple streams, each providing
-/// the same items in the same order. All child streams may advance separately
-/// but share the same items from the source — when the most advanced stream
-/// retrieves an item, it is buffered until the least advanced stream has
-/// yielded it as well.
 pub fn atee<T>(source: Pin<Box<dyn Stream<Item = T> + Send>>, n: usize) -> Vec<TeePeer<T>>
 where
     T: Clone + Send + 'static,
@@ -58,7 +44,6 @@ where
         .collect()
 }
 
-/// An individual async stream of a [`atee`].
 pub struct TeePeer<T> {
     shared: Arc<Mutex<TeeShared<T>>>,
     index: usize,
@@ -106,38 +91,21 @@ where
     }
 }
 
-/// A guard that calls `aclose` on drop for an async generator/stream.
-///
-/// Equivalent to Python's `aclosing` async context manager.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::utils::aiter::AClosing;
-///
-/// let stream = some_async_stream();
-/// let guard = AClosing::new(stream);
-/// // use guard.stream()...
-/// // stream is closed when guard is dropped
-/// ```
 pub struct AClosing<S> {
     stream: Option<S>,
 }
 
 impl<S> AClosing<S> {
-    /// Wrap a stream in the closing guard.
     pub fn new(stream: S) -> Self {
         Self {
             stream: Some(stream),
         }
     }
 
-    /// Get a mutable reference to the underlying stream.
     pub fn get_mut(&mut self) -> Option<&mut S> {
         self.stream.as_mut()
     }
 
-    /// Consume the guard and return the underlying stream.
     pub fn into_inner(mut self) -> Option<S> {
         self.stream.take()
     }
@@ -149,20 +117,6 @@ impl<S> Drop for AClosing<S> {
     }
 }
 
-/// Utility batching function for async streams.
-///
-/// Collects items from the stream into batches of the given size.
-///
-/// # Example
-///
-/// ```ignore
-/// use futures::stream;
-/// use agent_chain_core::utils::aiter::abatch_iterate;
-///
-/// let source = stream::iter(vec![1, 2, 3, 4, 5]);
-/// let mut batches = abatch_iterate(2, source);
-/// // yields [1, 2], [3, 4], [5]
-/// ```
 pub fn abatch_iterate<S, T>(size: usize, source: S) -> ABatchIterator<S>
 where
     S: Stream<Item = T>,
@@ -174,7 +128,6 @@ where
     }
 }
 
-/// A stream that yields batches from an underlying stream.
 pub struct ABatchIterator<S: Stream> {
     source: S,
     size: usize,

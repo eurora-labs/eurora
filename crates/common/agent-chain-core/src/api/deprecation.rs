@@ -1,30 +1,19 @@
-//! Helper functions for deprecating parts of the Agent Chain API.
-//!
-//! This module was adapted from matplotlib's _api/deprecation.py module:
-//! https://github.com/matplotlib/matplotlib/blob/main/lib/matplotlib/_api/deprecation.py
-//!
-//! **Warning:** This module is for internal use only. Do not use it in your own code.
-//! We may change the API at any time with no warning.
-
 use std::fmt;
 
 use super::internal::is_caller_internal;
 
-/// A warning type for deprecated features in Agent Chain.
 #[derive(Debug, Clone)]
 pub struct AgentChainDeprecationWarning {
     message: String,
 }
 
 impl AgentChainDeprecationWarning {
-    /// Create a new deprecation warning with the given message.
     pub fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
         }
     }
 
-    /// Get the warning message.
     pub fn message(&self) -> &str {
         &self.message
     }
@@ -38,21 +27,18 @@ impl fmt::Display for AgentChainDeprecationWarning {
 
 impl std::error::Error for AgentChainDeprecationWarning {}
 
-/// A warning type for pending deprecations in Agent Chain.
 #[derive(Debug, Clone)]
 pub struct AgentChainPendingDeprecationWarning {
     message: String,
 }
 
 impl AgentChainPendingDeprecationWarning {
-    /// Create a new pending deprecation warning with the given message.
     pub fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
         }
     }
 
-    /// Get the warning message.
     pub fn message(&self) -> &str {
         &self.message
     }
@@ -66,33 +52,21 @@ impl fmt::Display for AgentChainPendingDeprecationWarning {
 
 impl std::error::Error for AgentChainPendingDeprecationWarning {}
 
-/// Parameters for configuring deprecation warnings.
 #[derive(Debug, Clone, Default)]
 pub struct DeprecationParams {
-    /// The release at which this API became deprecated.
     pub since: String,
-    /// Override the default deprecation message.
     pub message: Option<String>,
-    /// The name of the deprecated object.
     pub name: Option<String>,
-    /// An alternative API that the user may use in place of the deprecated API.
     pub alternative: Option<String>,
-    /// An alternative import path that the user may use instead.
     pub alternative_import: Option<String>,
-    /// If `true`, uses a pending deprecation warning instead.
     pub pending: bool,
-    /// The object type being deprecated (e.g., "function", "class", "method").
     pub obj_type: Option<String>,
-    /// Additional text appended directly to the final message.
     pub addendum: Option<String>,
-    /// The expected removal version.
     pub removal: Option<String>,
-    /// The package of the deprecated object.
     pub package: Option<String>,
 }
 
 impl DeprecationParams {
-    /// Create new deprecation parameters with the version when deprecation started.
     pub fn new(since: impl Into<String>) -> Self {
         Self {
             since: since.into(),
@@ -100,63 +74,51 @@ impl DeprecationParams {
         }
     }
 
-    /// Set the name of the deprecated item.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
     }
 
-    /// Set a custom deprecation message.
     pub fn with_message(mut self, message: impl Into<String>) -> Self {
         self.message = Some(message.into());
         self
     }
 
-    /// Set the alternative to use instead of the deprecated item.
     pub fn with_alternative(mut self, alternative: impl Into<String>) -> Self {
         self.alternative = Some(alternative.into());
         self
     }
 
-    /// Set the alternative import path.
     pub fn with_alternative_import(mut self, alternative_import: impl Into<String>) -> Self {
         self.alternative_import = Some(alternative_import.into());
         self
     }
 
-    /// Mark this as a pending deprecation.
     pub fn with_pending(mut self, pending: bool) -> Self {
         self.pending = pending;
         self
     }
 
-    /// Set the object type.
     pub fn with_obj_type(mut self, obj_type: impl Into<String>) -> Self {
         self.obj_type = Some(obj_type.into());
         self
     }
 
-    /// Set the addendum text.
     pub fn with_addendum(mut self, addendum: impl Into<String>) -> Self {
         self.addendum = Some(addendum.into());
         self
     }
 
-    /// Set the expected removal version.
     pub fn with_removal(mut self, removal: impl Into<String>) -> Self {
         self.removal = Some(removal.into());
         self
     }
 
-    /// Set the package name.
     pub fn with_package(mut self, package: impl Into<String>) -> Self {
         self.package = Some(package.into());
         self
     }
 
-    /// Validate the deprecation parameters.
-    ///
-    /// Returns an error if the parameters are invalid.
     pub fn validate(&self) -> Result<(), String> {
         if self.pending && self.removal.is_some() {
             return Err("A pending deprecation cannot have a scheduled removal".to_string());
@@ -183,21 +145,15 @@ impl DeprecationParams {
     }
 }
 
-/// Parameters for renaming a deprecated parameter.
 #[derive(Debug, Clone)]
 pub struct RenameParameterParams {
-    /// The version in which the parameter was renamed.
     pub since: String,
-    /// The version in which the old parameter will be removed.
     pub removal: String,
-    /// The old parameter name.
     pub old: String,
-    /// The new parameter name.
     pub new: String,
 }
 
 impl RenameParameterParams {
-    /// Create new rename parameter params.
     pub fn new(
         since: impl Into<String>,
         removal: impl Into<String>,
@@ -213,43 +169,6 @@ impl RenameParameterParams {
     }
 }
 
-/// Check if an old parameter name was used and emit a deprecation warning.
-///
-/// This function is used to handle parameter renaming with deprecation warnings.
-/// It checks if the old parameter name is present in the provided parameters,
-/// and if so, emits a deprecation warning and returns the value that should be used.
-///
-/// # Arguments
-///
-/// * `params` - The rename parameter configuration.
-/// * `old_value` - The value passed with the old parameter name (if any).
-/// * `new_value` - The value passed with the new parameter name (if any).
-/// * `func_name` - The name of the function for the warning message.
-/// * `caller_module` - The module path of the caller.
-///
-/// # Returns
-///
-/// * `Ok(value)` - The value to use (old_value takes precedence if both are provided).
-/// * `Err(message)` - If both old and new parameters were provided.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::api::{handle_renamed_parameter, RenameParameterParams};
-///
-/// fn my_function(new_param: Option<String>, old_param: Option<String>) -> Result<(), String> {
-///     let params = RenameParameterParams::new("0.1.0", "0.2.0", "old_param", "new_param");
-///     let value = handle_renamed_parameter(
-///         &params,
-///         old_param,
-///         new_param,
-///         "my_function",
-///         module_path!()
-///     )?;
-///     // Use `value` which is the resolved parameter value
-///     Ok(())
-/// }
-/// ```
 pub fn handle_renamed_parameter<T>(
     params: &RenameParameterParams,
     old_value: Option<T>,
@@ -278,36 +197,6 @@ pub fn handle_renamed_parameter<T>(
     }
 }
 
-/// Display a standardized deprecation warning.
-///
-/// # Arguments
-///
-/// * `params` - Parameters for the deprecation warning.
-/// * `caller_module` - The module path of the caller (typically from `module_path!()` macro).
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::api::{warn_deprecated, DeprecationParams};
-///
-/// // Simple deprecation warning
-/// warn_deprecated(
-///     DeprecationParams::new("0.1.0")
-///         .with_name("old_function")
-///         .with_removal("0.2.0"),
-///     module_path!()
-/// );
-///
-/// // With alternative
-/// warn_deprecated(
-///     DeprecationParams::new("0.1.0")
-///         .with_name("OldClass")
-///         .with_obj_type("class")
-///         .with_alternative("NewClass")
-///         .with_removal("0.2.0"),
-///     module_path!()
-/// );
-/// ```
 pub fn warn_deprecated(params: DeprecationParams, caller_module: &str) {
     if is_caller_internal(caller_module) {
         return;
@@ -386,27 +275,6 @@ pub fn warn_deprecated(params: DeprecationParams, caller_module: &str) {
     }
 }
 
-/// Macro for handling renamed parameters with deprecation warnings.
-///
-/// This macro simplifies the common pattern of renaming a function parameter
-/// while maintaining backward compatibility.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::renamed_parameter;
-///
-/// fn my_function(new_param: Option<String>, old_param: Option<String>) -> Result<String, String> {
-///     let value = renamed_parameter!(
-///         since = "0.1.0",
-///         removal = "0.2.0",
-///         old = "old_param" => old_param,
-///         new = "new_param" => new_param,
-///         func = "my_function"
-///     )?;
-///     Ok(value.unwrap_or_default())
-/// }
-/// ```
 #[macro_export]
 macro_rules! renamed_parameter {
     (
@@ -428,23 +296,6 @@ macro_rules! renamed_parameter {
     }};
 }
 
-/// Macro to emit a deprecation warning.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::deprecated;
-///
-/// // Simple deprecation
-/// deprecated!("0.1.0", "old_function", removal = "0.2.0");
-///
-/// // With alternative
-/// deprecated!("0.1.0", "OldClass",
-///     obj_type = "class",
-///     alternative = "NewClass",
-///     removal = "0.2.0"
-/// );
-/// ```
 #[macro_export]
 macro_rules! deprecated {
     ($since:expr, $name:expr $(, $key:ident = $value:expr)* $(,)?) => {{

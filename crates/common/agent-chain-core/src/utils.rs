@@ -1,9 +1,3 @@
-//! Utility functions for LangChain.
-//!
-//! These functions do not depend on any other LangChain module.
-//!
-//! This module provides various utilities ported from `langchain_core/utils/`.
-
 pub mod aiter;
 pub mod base;
 pub mod env;

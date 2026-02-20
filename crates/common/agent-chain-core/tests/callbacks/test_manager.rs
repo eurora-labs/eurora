@@ -1,7 +1,3 @@
-//! Unit tests for callback run managers.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/callbacks/test_manager.py`
-
 use agent_chain_core::callbacks::base::{
     BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
     RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
@@ -31,7 +27,6 @@ impl BaseCallbackHandler for TestHandler {
     }
 }
 
-/// Ported from `test_base_run_manager_initialization`.
 #[test]
 fn test_base_run_manager_initialization() {
     let run_id = Uuid::new_v4();
@@ -68,7 +63,6 @@ fn test_base_run_manager_initialization() {
     );
 }
 
-/// Ported from `test_base_run_manager_get_noop_manager`.
 #[test]
 fn test_base_run_manager_get_noop_manager() {
     let manager = BaseRunManager::get_noop_manager();
@@ -78,7 +72,6 @@ fn test_base_run_manager_get_noop_manager() {
     assert!(manager.inheritable_handlers.is_empty());
 }
 
-/// Ported from `test_run_manager_on_text`.
 #[test]
 fn test_run_manager_on_text() {
     let run_id = Uuid::new_v4();
@@ -90,7 +83,6 @@ fn test_run_manager_on_text() {
     manager.on_text("World");
 }
 
-/// Ported from `test_run_manager_empty_handlers`.
 #[test]
 fn test_run_manager_empty_handlers() {
     let manager = RunManager::new(Uuid::new_v4(), vec![], vec![], None, None, None, None, None);
@@ -98,7 +90,6 @@ fn test_run_manager_empty_handlers() {
     manager.on_text("test");
 }
 
-/// Ported from `test_parent_run_manager_get_child`.
 #[test]
 fn test_parent_run_manager_get_child() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -132,7 +123,6 @@ fn test_parent_run_manager_get_child() {
     );
 }
 
-/// Ported from `test_parent_run_manager_get_child_with_tag`.
 #[test]
 fn test_parent_run_manager_get_child_with_tag() {
     let parent =
@@ -144,7 +134,6 @@ fn test_parent_run_manager_get_child_with_tag() {
     assert!(!child.inheritable_tags.contains(&"child_tag".to_string()));
 }
 
-/// Ported from `test_callback_manager_for_llm_run_on_llm_new_token`.
 #[test]
 fn test_callback_manager_for_llm_run_on_llm_new_token() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -164,7 +153,6 @@ fn test_callback_manager_for_llm_run_on_llm_new_token() {
     manager.on_llm_new_token("World", None);
 }
 
-/// Ported from `test_callback_manager_for_llm_run_on_llm_end`.
 #[test]
 fn test_callback_manager_for_llm_run_on_llm_end() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -183,7 +171,6 @@ fn test_callback_manager_for_llm_run_on_llm_end() {
     manager.on_llm_end(&result);
 }
 
-/// Ported from `test_callback_manager_for_llm_run_on_llm_error`.
 #[test]
 fn test_callback_manager_for_llm_run_on_llm_error() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -202,7 +189,6 @@ fn test_callback_manager_for_llm_run_on_llm_error() {
     manager.on_llm_error(&error);
 }
 
-/// Ported from `test_async_callback_manager_for_llm_run_get_sync`.
 #[test]
 fn test_async_callback_manager_for_llm_run_get_sync() {
     let run_id = Uuid::new_v4();
@@ -227,7 +213,6 @@ fn test_async_callback_manager_for_llm_run_get_sync() {
     assert!(sync_back.tags().contains(&"test".to_string()));
 }
 
-/// Ported from `test_callback_manager_for_chain_run_on_chain_end`.
 #[test]
 fn test_callback_manager_for_chain_run_on_chain_end() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -248,7 +233,6 @@ fn test_callback_manager_for_chain_run_on_chain_end() {
     )]));
 }
 
-/// Ported from `test_callback_manager_for_chain_run_on_chain_error`.
 #[test]
 fn test_callback_manager_for_chain_run_on_chain_error() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -267,7 +251,6 @@ fn test_callback_manager_for_chain_run_on_chain_error() {
     manager.on_chain_error(&error);
 }
 
-/// Ported from `test_callback_manager_for_tool_run_on_tool_end`.
 #[test]
 fn test_callback_manager_for_tool_run_on_tool_end() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -285,7 +268,6 @@ fn test_callback_manager_for_tool_run_on_tool_end() {
     manager.on_tool_end("Tool result");
 }
 
-/// Ported from `test_callback_manager_for_tool_run_on_tool_error`.
 #[test]
 fn test_callback_manager_for_tool_run_on_tool_error() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -304,7 +286,6 @@ fn test_callback_manager_for_tool_run_on_tool_error() {
     manager.on_tool_error(&error);
 }
 
-/// Ported from `test_callback_manager_for_retriever_run_on_retriever_end`.
 #[test]
 fn test_callback_manager_for_retriever_run_on_retriever_end() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -322,7 +303,6 @@ fn test_callback_manager_for_retriever_run_on_retriever_end() {
     manager.on_retriever_end(&[]);
 }
 
-/// Ported from `test_callback_manager_for_retriever_run_on_retriever_error`.
 #[test]
 fn test_callback_manager_for_retriever_run_on_retriever_error() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -341,7 +321,6 @@ fn test_callback_manager_for_retriever_run_on_retriever_error() {
     manager.on_retriever_error(&error);
 }
 
-/// Ported from `test_callback_manager_on_llm_start_single_prompt`.
 #[test]
 fn test_callback_manager_on_llm_start_single_prompt() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -354,7 +333,6 @@ fn test_callback_manager_on_llm_start_single_prompt() {
     assert!(!run_managers[0].run_id().is_nil());
 }
 
-/// Ported from `test_callback_manager_on_llm_start_multiple_prompts`.
 #[test]
 fn test_callback_manager_on_llm_start_multiple_prompts() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -374,7 +352,6 @@ fn test_callback_manager_on_llm_start_multiple_prompts() {
     assert_eq!(run_managers.len(), 3);
 }
 
-/// Ported from `test_callback_manager_on_chain_start`.
 #[test]
 fn test_callback_manager_on_chain_start() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -390,7 +367,6 @@ fn test_callback_manager_on_chain_start() {
     assert!(!run_manager.run_id().is_nil());
 }
 
-/// Ported from `test_callback_manager_on_tool_start`.
 #[test]
 fn test_callback_manager_on_tool_start() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -402,7 +378,6 @@ fn test_callback_manager_on_tool_start() {
     assert!(!run_manager.run_id().is_nil());
 }
 
-/// Ported from `test_callback_manager_on_retriever_start`.
 #[test]
 fn test_callback_manager_on_retriever_start() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -418,14 +393,12 @@ fn test_callback_manager_on_retriever_start() {
     assert!(!run_manager.run_id().is_nil());
 }
 
-/// Ported from `test_async_callback_manager_is_async`.
 #[test]
 fn test_async_callback_manager_is_async() {
     let manager = AsyncCallbackManager::new();
     assert!(manager.is_async());
 }
 
-/// Ported from `test_async_callback_manager_on_llm_start`.
 #[tokio::test]
 async fn test_async_callback_manager_on_llm_start() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -440,7 +413,6 @@ async fn test_async_callback_manager_on_llm_start() {
     assert!(!run_managers[0].run_id().is_nil());
 }
 
-/// Ported from `test_async_callback_manager_on_chain_start`.
 #[tokio::test]
 async fn test_async_callback_manager_on_chain_start() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -454,7 +426,6 @@ async fn test_async_callback_manager_on_chain_start() {
     assert!(!run_manager.run_id().is_nil());
 }
 
-/// Ported from `test_async_run_manager_on_text`.
 #[tokio::test]
 async fn test_async_run_manager_on_text() {
     use agent_chain_core::callbacks::manager::AsyncRunManager;
@@ -476,7 +447,6 @@ async fn test_async_run_manager_on_text() {
     manager.on_text("World").await;
 }
 
-/// Ported from `test_async_parent_run_manager_get_child`.
 #[tokio::test]
 async fn test_async_parent_run_manager_get_child() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);

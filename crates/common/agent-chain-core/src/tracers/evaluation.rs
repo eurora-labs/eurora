@@ -1,15 +1,3 @@
-//! A tracer that runs evaluators over completed runs.
-//!
-//! This module provides a local, LangSmith-independent evaluation system
-//! that follows the same architectural pattern as Python's
-//! `langchain_core.tracers.evaluation`.
-//!
-//! The [`EvaluatorCallbackHandler`] hooks into the tracer system via
-//! `persist_run_impl` and runs [`RunEvaluator`] implementations on each
-//! completed run, storing [`EvaluationResult`]s locally.
-//!
-//! Mirrors `langchain_core.tracers.evaluation`.
-
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, Weak};
 
@@ -21,80 +9,42 @@ use crate::tracers::base::BaseTracer;
 use crate::tracers::core::{TracerCore, TracerCoreConfig};
 use crate::tracers::schemas::Run;
 
-/// Result of evaluating a single run.
-///
-/// Mirrors `langsmith.evaluation.evaluator.EvaluationResult`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationResult {
-    /// Identifier for the evaluation metric (e.g., "correctness", "relevance").
     pub key: String,
-    /// Numeric score (e.g., 0.0 to 1.0).
     pub score: Option<f64>,
-    /// Categorical value (e.g., "correct", "incorrect").
     pub value: Option<String>,
-    /// Human-readable explanation.
     pub comment: Option<String>,
-    /// Optional correction for the run's output.
     pub correction: Option<Value>,
-    /// Additional evaluator metadata.
     pub evaluator_info: Option<HashMap<String, Value>>,
 }
 
-/// Trait for evaluators that can assess a completed run.
-///
-/// Mirrors `langsmith.RunEvaluator`. Implement this trait to create custom
-/// evaluation logic. Evaluators receive the full [`Run`] data including
-/// inputs, outputs, and metadata.
 pub trait RunEvaluator: Send + Sync {
-    /// Evaluate a completed run and return results.
     fn evaluate_run(&self, run: &Run) -> crate::error::Result<Vec<EvaluationResult>>;
 }
 
 static EVALUATOR_TRACERS: std::sync::LazyLock<Mutex<Vec<Weak<Mutex<EvaluatorCallbackHandler>>>>> =
     std::sync::LazyLock::new(|| Mutex::new(Vec::new()));
 
-/// Wait for all registered evaluator handlers to complete their work.
-///
-/// In the synchronous local implementation, evaluations run inline during
-/// `persist_run_impl()`, so this is effectively a cleanup of dead weak
-/// references. If async evaluators are added later (e.g., LLM-as-judge),
-/// this would wait for spawned tasks.
-///
-/// Mirrors `langchain_core.tracers.evaluation.wait_for_all_evaluators`.
 pub fn wait_for_all_evaluators() {
     if let Ok(mut tracers) = EVALUATOR_TRACERS.lock() {
         tracers.retain(|weak| weak.strong_count() > 0);
     }
 }
 
-/// Register an evaluator handler in the global registry.
 fn register_evaluator(handler: &Arc<Mutex<EvaluatorCallbackHandler>>) {
     if let Ok(mut tracers) = EVALUATOR_TRACERS.lock() {
         tracers.push(Arc::downgrade(handler));
     }
 }
 
-/// Tracer that runs evaluators whenever a run is persisted.
-///
-/// This is the Rust equivalent of Python's `EvaluatorCallbackHandler`,
-/// adapted to work without LangSmith. Results are stored locally and
-/// can be retrieved after execution.
-///
-/// Mirrors `langchain_core.tracers.evaluation.EvaluatorCallbackHandler`.
 pub struct EvaluatorCallbackHandler {
-    /// The tracer configuration.
     config: TracerCoreConfig,
-    /// The run map.
     run_map: HashMap<String, Run>,
-    /// The order map.
     order_map: HashMap<Uuid, (Uuid, String)>,
-    /// The example ID to associate with runs.
     example_id: Option<Uuid>,
-    /// Evaluators to run on each completed run.
     evaluators: Vec<Box<dyn RunEvaluator>>,
-    /// Whether to skip runs that have no outputs.
     skip_unfinished: bool,
-    /// Accumulated evaluation results, keyed by (run_id, example_id).
     logged_eval_results: HashMap<(String, String), Vec<EvaluationResult>>,
 }
 
@@ -110,13 +60,6 @@ impl std::fmt::Debug for EvaluatorCallbackHandler {
 }
 
 impl EvaluatorCallbackHandler {
-    /// Create a new EvaluatorCallbackHandler.
-    ///
-    /// # Arguments
-    ///
-    /// * `evaluators` - The run evaluators to apply to all top-level runs.
-    /// * `example_id` - Optional example ID to associate with runs.
-    /// * `skip_unfinished` - Whether to skip runs with no outputs (default: true).
     pub fn new(
         evaluators: Vec<Box<dyn RunEvaluator>>,
         example_id: Option<Uuid>,
@@ -133,25 +76,20 @@ impl EvaluatorCallbackHandler {
         }
     }
 
-    /// Wrap this handler in an `Arc<Mutex<_>>` and register it in the
-    /// global evaluator registry.
     pub fn into_shared(self) -> Arc<Mutex<Self>> {
         let shared = Arc::new(Mutex::new(self));
         register_evaluator(&shared);
         shared
     }
 
-    /// Get the handler name.
     pub fn name(&self) -> &str {
         "evaluator_callback_handler"
     }
 
-    /// Get all accumulated evaluation results.
     pub fn get_results(&self) -> &HashMap<(String, String), Vec<EvaluationResult>> {
         &self.logged_eval_results
     }
 
-    /// Get evaluation results for a specific run.
     pub fn get_results_for_run(&self, run_id: &str) -> Vec<&EvaluationResult> {
         self.logged_eval_results
             .iter()
@@ -160,12 +98,10 @@ impl EvaluatorCallbackHandler {
             .collect()
     }
 
-    /// Clear all stored results.
     pub fn clear_results(&mut self) {
         self.logged_eval_results.clear();
     }
 
-    /// Get the example ID.
     pub fn example_id(&self) -> Option<Uuid> {
         self.example_id
     }
@@ -229,7 +165,6 @@ impl BaseTracer for EvaluatorCallbackHandler {
     }
 }
 
-/// Evaluator that checks if the run produced non-empty output.
 pub struct NonEmptyOutputEvaluator;
 
 impl std::fmt::Debug for NonEmptyOutputEvaluator {
@@ -257,7 +192,6 @@ impl RunEvaluator for NonEmptyOutputEvaluator {
     }
 }
 
-/// Evaluator that checks if a run completed within a time threshold.
 pub struct LatencyEvaluator {
     pub max_seconds: f64,
 }

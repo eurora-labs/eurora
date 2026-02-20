@@ -1,7 +1,3 @@
-//! Tests for format instructions module.
-//!
-//! Ported from langchain/libs/core/tests/unit_tests/output_parsers/test_format_instructions.py
-
 use agent_chain_core::output_parsers::JSON_FORMAT_INSTRUCTIONS;
 
 #[test]

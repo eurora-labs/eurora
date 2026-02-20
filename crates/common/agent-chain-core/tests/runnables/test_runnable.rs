@@ -1,8 +1,3 @@
-//! Comprehensive tests for core Runnable types and composition.
-//!
-//! Mirrors portable tests from
-//! `langchain/libs/core/tests/unit_tests/runnables/test_runnable.py`
-
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -23,14 +18,12 @@ fn make_input(pairs: &[(&str, Value)]) -> HashMap<String, Value> {
         .collect()
 }
 
-/// Test basic RunnableLambda invoke.
 #[test]
 fn test_runnable_lambda_invoke() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x * 2));
     assert_eq!(runnable.invoke(5, None).unwrap(), 10);
 }
 
-/// Test RunnableLambda with named function.
 #[test]
 fn test_runnable_lambda_named() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1)).with_name("add_one");
@@ -38,7 +31,6 @@ fn test_runnable_lambda_named() {
     assert_eq!(runnable.invoke(5, None).unwrap(), 6);
 }
 
-/// Test RunnableLambda returning error.
 #[test]
 fn test_runnable_lambda_error() {
     let runnable = RunnableLambda::new(|_x: i32| Err::<i32, _>(Error::other("boom")));
@@ -47,7 +39,6 @@ fn test_runnable_lambda_error() {
     assert!(result.unwrap_err().to_string().contains("boom"));
 }
 
-/// Mirrors `test_runnable_lambda_stream` (normal function part).
 #[tokio::test]
 async fn test_runnable_lambda_stream() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -59,7 +50,6 @@ async fn test_runnable_lambda_stream() {
     assert_eq!(output, vec![6]);
 }
 
-/// Mirrors `test_runnable_lambda_astream`.
 #[tokio::test]
 async fn test_runnable_lambda_astream() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -71,7 +61,6 @@ async fn test_runnable_lambda_astream() {
     assert_eq!(output, vec![6]);
 }
 
-/// Test basic sequence: first | second.
 #[test]
 fn test_sequence_invoke() {
     let add_one = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -81,7 +70,6 @@ fn test_sequence_invoke() {
     assert_eq!(seq.invoke(5, None).unwrap(), 12);
 }
 
-/// Test sequence async invoke.
 #[tokio::test]
 async fn test_sequence_ainvoke() {
     let add_one = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -91,7 +79,6 @@ async fn test_sequence_ainvoke() {
     assert_eq!(seq.ainvoke(5, None).await.unwrap(), 12);
 }
 
-/// Test three-step sequence using nested pipe.
 #[test]
 fn test_sequence_three_steps() {
     let step1 = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -102,7 +89,6 @@ fn test_sequence_three_steps() {
     assert_eq!(seq.invoke(5, None).unwrap(), 9);
 }
 
-/// Test sequence error propagation: first step fails.
 #[test]
 fn test_sequence_first_step_error() {
     let fail = RunnableLambda::new(|_x: i32| Err::<i32, _>(Error::other("first failed")));
@@ -114,7 +100,6 @@ fn test_sequence_first_step_error() {
     assert!(result.unwrap_err().to_string().contains("first failed"));
 }
 
-/// Test sequence error propagation: second step fails.
 #[test]
 fn test_sequence_second_step_error() {
     let add_one = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -126,7 +111,6 @@ fn test_sequence_second_step_error() {
     assert!(result.unwrap_err().to_string().contains("second failed"));
 }
 
-/// Test sequence streaming.
 #[tokio::test]
 async fn test_sequence_stream() {
     let add_one = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -141,7 +125,6 @@ async fn test_sequence_stream() {
     assert_eq!(output, vec![12]);
 }
 
-/// Mirrors `test_runnable_sequence_transform`.
 #[tokio::test]
 async fn test_runnable_sequence_transform() {
     let add_one = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -158,7 +141,6 @@ async fn test_runnable_sequence_transform() {
     assert_eq!(result, vec![12]);
 }
 
-/// Mirrors `test_runnable_sequence_atransform`.
 #[tokio::test]
 async fn test_runnable_sequence_atransform() {
     let add_one = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -175,7 +157,6 @@ async fn test_runnable_sequence_atransform() {
     assert_eq!(result, vec![12]);
 }
 
-/// Test sequence name.
 #[test]
 fn test_sequence_name() {
     let add = RunnableLambda::new(|x: i32| Ok(x + 1)).with_name("add");
@@ -185,7 +166,6 @@ fn test_sequence_name() {
     assert_eq!(seq.name(), Some("my_seq".to_string()));
 }
 
-/// Mirrors `test_with_config_with_config` (simplified — no LLM, just config merging).
 #[test]
 fn test_with_config_with_config() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -201,8 +181,6 @@ fn test_with_config_with_config() {
     assert_eq!(result, 6);
 }
 
-/// Test binding kwargs. In Rust, bind stores kwargs but RunnableLambda
-/// doesn't use them (no **kwargs in Rust). We verify the binding works.
 #[test]
 fn test_bind_creates_binding() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -214,7 +192,6 @@ fn test_bind_creates_binding() {
     assert_eq!(bound.invoke(5, None).unwrap(), 6);
 }
 
-/// Test with_config propagates tags.
 #[test]
 fn test_with_config_tags() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -226,7 +203,6 @@ fn test_with_config_tags() {
     assert_eq!(result, 6);
 }
 
-/// Test with_config metadata.
 #[test]
 fn test_with_config_metadata() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -238,7 +214,6 @@ fn test_with_config_metadata() {
     assert_eq!(result, 6);
 }
 
-/// Test with_config propagates to invoke config.
 #[test]
 fn test_with_config_merge_at_invoke() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -253,7 +228,6 @@ fn test_with_config_merge_at_invoke() {
     assert_eq!(result, 6);
 }
 
-/// Test basic parallel execution.
 #[test]
 fn test_parallel_invoke() {
     let parallel = RunnableParallel::<i32>::new()
@@ -265,7 +239,6 @@ fn test_parallel_invoke() {
     assert_eq!(result["tripled"], json!(15));
 }
 
-/// Test parallel async invoke.
 #[tokio::test]
 async fn test_parallel_ainvoke() {
     let parallel = RunnableParallel::<i32>::new()
@@ -277,7 +250,6 @@ async fn test_parallel_ainvoke() {
     assert_eq!(result["tripled"], json!(15));
 }
 
-/// Test parallel name generation.
 #[test]
 fn test_parallel_name() {
     let parallel = RunnableParallel::<i32>::new()
@@ -290,7 +262,6 @@ fn test_parallel_name() {
     assert!(name.contains('b'));
 }
 
-/// Test parallel with error in one branch.
 #[test]
 fn test_parallel_error_in_branch() {
     let parallel = RunnableParallel::<i32>::new()
@@ -304,7 +275,6 @@ fn test_parallel_error_in_branch() {
     assert!(result.is_err());
 }
 
-/// Mirrors `test_each_simple`.
 #[test]
 fn test_each_simple() {
     let double = RunnableLambda::new(|x: i32| Ok(x * 2));
@@ -314,7 +284,6 @@ fn test_each_simple() {
     assert_eq!(result, vec![2, 4, 6]);
 }
 
-/// Test map() convenience method.
 #[test]
 fn test_map_convenience() {
     let double = RunnableLambda::new(|x: i32| Ok(x * 2));
@@ -324,7 +293,6 @@ fn test_map_convenience() {
     assert_eq!(result, vec![2, 4, 6, 8, 10]);
 }
 
-/// Test map().map() (nested).
 #[test]
 fn test_map_nested() {
     let add_one = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -336,7 +304,6 @@ fn test_map_nested() {
     assert_eq!(result, vec![vec![2, 3, 4], vec![11, 21]]);
 }
 
-/// Test each with error.
 #[test]
 fn test_each_error() {
     let fail_on_3 = RunnableLambda::new(|x: i32| {
@@ -352,7 +319,6 @@ fn test_each_error() {
     assert!(result.is_err());
 }
 
-/// Test each name.
 #[test]
 fn test_each_name() {
     let named = RunnableLambda::new(|x: i32| Ok(x)).with_name("identity");
@@ -360,9 +326,6 @@ fn test_each_name() {
     assert_eq!(each.name(), Some("RunnableEach<identity>".to_string()));
 }
 
-/// Mirrors `test_combining_sequences` (simplified — no prompts).
-///
-/// Tests: int → parallel(doubled, tripled) → pick one.
 #[test]
 fn test_combining_sequences() {
     let parallel = RunnableParallel::<i32>::new()
@@ -377,7 +340,6 @@ fn test_combining_sequences() {
     assert_eq!(chain.invoke(5, None).unwrap(), 10);
 }
 
-/// Mirrors `test_transform_of_runnable_lambda_with_dicts`.
 #[tokio::test]
 async fn test_transform_of_runnable_lambda_with_dicts() {
     let runnable = RunnableLambda::new(|x: HashMap<String, Value>| Ok(x));
@@ -394,7 +356,6 @@ async fn test_transform_of_runnable_lambda_with_dicts() {
     assert_eq!(result, vec![make_input(&[("foo", json!("n"))])]);
 }
 
-/// Mirrors `test_transform_of_runnable_lambda_with_dicts` — sequence part.
 #[tokio::test]
 async fn test_transform_sequence_with_dicts() {
     let identity1 = RunnableLambda::new(|x: HashMap<String, Value>| Ok(x));
@@ -413,7 +374,6 @@ async fn test_transform_sequence_with_dicts() {
     assert_eq!(result, vec![make_input(&[("foo", json!("n"))])]);
 }
 
-/// Mirrors `test_passthrough_transform_with_dicts`.
 #[tokio::test]
 async fn test_passthrough_transform_with_dicts() {
     let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
@@ -441,7 +401,6 @@ async fn test_passthrough_transform_with_dicts() {
     assert_eq!(result[1]["foo"], json!("n"));
 }
 
-/// Test RunnableLambda batch.
 #[test]
 fn test_lambda_batch() {
     let double = RunnableLambda::new(|x: i32| Ok(x * 2));
@@ -450,7 +409,6 @@ fn test_lambda_batch() {
     assert_eq!(values, vec![2, 4, 6, 8, 10]);
 }
 
-/// Test sequence batch.
 #[test]
 fn test_sequence_batch() {
     let add_one = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -462,7 +420,6 @@ fn test_sequence_batch() {
     assert_eq!(values, vec![4, 6, 8]); // (1+1)*2=4, (2+1)*2=6, (3+1)*2=8
 }
 
-/// Mirrors `test_seq_batch_return_exceptions` (simplified).
 #[test]
 fn test_seq_batch_return_exceptions() {
     let maybe_fail = RunnableLambda::new(|x: i32| {
@@ -483,7 +440,6 @@ fn test_seq_batch_return_exceptions() {
     assert_eq!(*results[2].as_ref().unwrap(), 8); // (3+1)*2=8
 }
 
-/// Test empty batch.
 #[test]
 fn test_empty_batch() {
     let double = RunnableLambda::new(|x: i32| Ok(x * 2));
@@ -491,7 +447,6 @@ fn test_empty_batch() {
     assert!(results.is_empty());
 }
 
-/// Test async lambda batch.
 #[tokio::test]
 async fn test_lambda_abatch() {
     let double = RunnableLambda::new(|x: i32| Ok(x * 2));
@@ -500,7 +455,6 @@ async fn test_lambda_abatch() {
     assert_eq!(values, vec![2, 4, 6]);
 }
 
-/// Test async sequence batch.
 #[tokio::test]
 async fn test_sequence_abatch() {
     let add_one = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -512,7 +466,6 @@ async fn test_sequence_abatch() {
     assert_eq!(values, vec![4, 6, 8]);
 }
 
-/// Mirrors `test_runnable_assign`.
 #[test]
 fn test_runnable_assign() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
@@ -531,7 +484,6 @@ fn test_runnable_assign() {
     assert_eq!(result["add_step"], json!({"added": 15}));
 }
 
-/// Mirrors `test_representation_of_runnables`.
 #[test]
 fn test_representation_of_runnables() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x * 2));
@@ -560,9 +512,6 @@ fn test_representation_of_runnables() {
     assert!(repr.contains("RunnableEach"));
 }
 
-/// Mirrors `test_default_method_implementations`.
-///
-/// All runnables should support invoke, batch, and stream via defaults.
 #[test]
 fn test_default_method_implementations() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -574,7 +523,6 @@ fn test_default_method_implementations() {
     assert_eq!(values, vec![2, 3, 4]);
 }
 
-/// Mirrors `test_default_method_implementations_async`.
 #[tokio::test]
 async fn test_default_method_implementations_async() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
@@ -593,7 +541,6 @@ async fn test_default_method_implementations_async() {
     assert_eq!(output, vec![6]);
 }
 
-/// Test schema on sequence.
 #[test]
 fn test_sequence_schema() {
     let step1 = RunnableLambda::new(|x: i32| Ok(x + 1)).with_name("step1");
@@ -607,7 +554,6 @@ fn test_sequence_schema() {
     assert_eq!(output_schema["type"], "object");
 }
 
-/// Test schema on parallel.
 #[test]
 fn test_parallel_schema() {
     let parallel =
@@ -617,7 +563,6 @@ fn test_parallel_schema() {
     assert_eq!(input_schema["type"], "object");
 }
 
-/// Test schema delegation through binding.
 #[test]
 fn test_binding_schema_delegation() {
     let inner = RunnableLambda::new(|x: i32| Ok(x + 1)).with_name("inner");
@@ -630,7 +575,6 @@ fn test_binding_schema_delegation() {
     assert_eq!(bound.get_input_schema(None), inner_schema);
 }
 
-/// Test get_name with suffix.
 #[test]
 fn test_get_name_with_suffix() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x)).with_name("MyRunnable");
@@ -638,7 +582,6 @@ fn test_get_name_with_suffix() {
     assert_eq!(name, "MyRunnableInput");
 }
 
-/// Test get_name with lowercase name and suffix.
 #[test]
 fn test_get_name_lowercase_with_suffix() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x)).with_name("my_runnable");
@@ -646,7 +589,6 @@ fn test_get_name_lowercase_with_suffix() {
     assert_eq!(name, "my_runnable_input");
 }
 
-/// Test get_name with override.
 #[test]
 fn test_get_name_override() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x)).with_name("original");
@@ -654,7 +596,6 @@ fn test_get_name_override() {
     assert_eq!(name, "override");
 }
 
-/// Test that invoke call count is exactly 1 for each input in each.
 #[test]
 fn test_each_call_count() {
     let counter = Arc::new(AtomicUsize::new(0));
@@ -670,7 +611,6 @@ fn test_each_call_count() {
     assert_eq!(counter.load(Ordering::SeqCst), 5);
 }
 
-/// Test that sequence runs each step exactly once.
 #[test]
 fn test_sequence_step_count() {
     let counter1 = Arc::new(AtomicUsize::new(0));
@@ -694,7 +634,6 @@ fn test_sequence_step_count() {
     assert_eq!(counter2.load(Ordering::SeqCst), 1);
 }
 
-/// Test parallel runs each branch exactly once.
 #[test]
 fn test_parallel_call_count() {
     let counter_a = Arc::new(AtomicUsize::new(0));
@@ -723,7 +662,6 @@ fn test_parallel_call_count() {
     assert_eq!(counter_b.load(Ordering::SeqCst), 1);
 }
 
-/// Test type_name returns something meaningful.
 #[test]
 fn test_type_name() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x));
@@ -731,7 +669,6 @@ fn test_type_name() {
     assert!(name.contains("RunnableLambda"));
 }
 
-/// Test Default for RunnableParallel.
 #[test]
 fn test_parallel_default() {
     let parallel = RunnableParallel::<i32>::default();
@@ -739,7 +676,6 @@ fn test_parallel_default() {
     assert!(result.is_empty());
 }
 
-/// Test binding debug.
 #[test]
 fn test_binding_debug() {
     let runnable = RunnableLambda::new(|x: i32| Ok(x));
@@ -749,7 +685,6 @@ fn test_binding_debug() {
     assert!(debug.contains("key"));
 }
 
-/// Test pick() convenience method with a single key.
 #[test]
 fn test_pick_single_key() {
     use agent_chain_core::runnables::passthrough::PickKeys;
@@ -766,7 +701,6 @@ fn test_pick_single_key() {
     assert_eq!(result, json!("Alice"));
 }
 
-/// Test pick() convenience method with multiple keys.
 #[test]
 fn test_pick_multiple_keys() {
     use agent_chain_core::runnables::passthrough::PickKeys;
@@ -790,7 +724,6 @@ fn test_pick_multiple_keys() {
     assert_eq!(result_map.get("age"), Some(&json!(30)));
 }
 
-/// Test assign() convenience method.
 #[test]
 fn test_assign_convenience() {
     let passthrough = RunnablePassthrough::<HashMap<String, serde_json::Value>>::new();
@@ -815,7 +748,6 @@ fn test_assign_convenience() {
     assert_eq!(result.get("doubled"), Some(&json!(10)));
 }
 
-/// Test with_fallbacks() convenience method.
 #[test]
 fn test_with_fallbacks_convenience() {
     let primary = RunnableLambda::new(|_x: i32| -> Result<i32, Error> {
@@ -829,7 +761,6 @@ fn test_with_fallbacks_convenience() {
     assert_eq!(result, 10);
 }
 
-/// Test with_fallbacks() convenience method when primary succeeds.
 #[test]
 fn test_with_fallbacks_primary_succeeds() {
     let primary = RunnableLambda::new(|x: i32| -> Result<i32, Error> { Ok(x + 1) });
@@ -841,7 +772,6 @@ fn test_with_fallbacks_primary_succeeds() {
     assert_eq!(result, 6);
 }
 
-/// Test with_listeners() convenience method.
 #[test]
 fn test_with_listeners_convenience() {
     use agent_chain_core::tracers::root_listeners::Listener;
@@ -867,7 +797,6 @@ fn test_with_listeners_convenience() {
     assert_eq!(result, 6);
 }
 
-/// Test chaining pick() with with_fallbacks().
 #[test]
 fn test_chaining_pick_with_fallbacks() {
     use agent_chain_core::runnables::passthrough::PickKeys;

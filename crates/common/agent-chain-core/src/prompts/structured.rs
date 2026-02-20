@@ -1,10 +1,3 @@
-//! Structured prompt template for a language model.
-//!
-//! This module provides `StructuredPrompt`, a chat prompt that combines
-//! with a schema for structured output extraction.
-//!
-//! Direct port of `langchain_core.prompts.structured` in Python.
-
 use std::collections::HashMap;
 
 use serde_json::Value;
@@ -22,50 +15,14 @@ use super::base::BasePromptTemplate;
 use super::chat::{BaseChatPromptTemplate, ChatPromptTemplate, MessageLikeRepresentation};
 use super::string::PromptTemplateFormat;
 
-/// Structured prompt template for a language model.
-///
-/// Combines a `ChatPromptTemplate` with a schema for structured output.
-/// When piped to a language model, it calls `with_structured_output(schema)`
-/// on the model.
-///
-/// Direct port of Python `langchain_core.prompts.structured.StructuredPrompt`.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::prompts::StructuredPrompt;
-/// use serde_json::json;
-///
-/// let schema = json!({
-///     "type": "object",
-///     "properties": {
-///         "name": {"type": "string"},
-///         "value": {"type": "integer"}
-///     }
-/// });
-///
-/// let prompt = StructuredPrompt::new(
-///     vec![
-///         ("system", "Extract structured data.").into(),
-///         ("human", "{input}").into(),
-///     ],
-///     schema,
-/// ).unwrap();
-/// ```
 #[derive(Debug, Clone)]
 pub struct StructuredPrompt {
-    /// The underlying chat prompt template.
     chat_template: ChatPromptTemplate,
-    /// Schema for the structured prompt (JSON schema or model definition).
     pub schema: Value,
-    /// Additional kwargs to pass to `with_structured_output`.
     pub structured_output_kwargs: HashMap<String, Value>,
 }
 
 impl StructuredPrompt {
-    /// Create a new structured prompt template.
-    ///
-    /// Direct port of Python `StructuredPrompt.__init__`.
     pub fn new(messages: Vec<MessageLikeRepresentation>, schema: Value) -> Result<Self> {
         Self::with_kwargs(
             messages,
@@ -75,7 +32,6 @@ impl StructuredPrompt {
         )
     }
 
-    /// Create a new structured prompt template with additional kwargs.
     pub fn with_kwargs(
         messages: Vec<MessageLikeRepresentation>,
         schema: Value,
@@ -109,9 +65,6 @@ impl StructuredPrompt {
         })
     }
 
-    /// Create from messages and schema.
-    ///
-    /// Direct port of Python `StructuredPrompt.from_messages_and_schema`.
     pub fn from_messages_and_schema(
         messages: Vec<MessageLikeRepresentation>,
         schema: Value,
@@ -119,7 +72,6 @@ impl StructuredPrompt {
         Self::new(messages, schema)
     }
 
-    /// Get the underlying chat template.
     pub fn chat_template(&self) -> &ChatPromptTemplate {
         &self.chat_template
     }

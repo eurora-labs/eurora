@@ -4,14 +4,22 @@ use agent_chain::{
     AIMessage, BaseChatModel, BaseMessage, BaseTool, HumanMessage, language_models::ToolLike,
     messages::ToolCall, ollama::ChatOllama, openai::ChatOpenAI,
 };
-use std::collections::HashMap;
-
-use crate::tools::firecrawl_search_tool;
 use be_authz::{extract_claims, parse_user_id};
 use be_local_settings::{OllamaConfig, OpenAIConfig, ProviderSettings, SettingsReceiver};
 use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
+pub use proto_gen::thread::proto_thread_service_server::{
+    ProtoThreadService, ProtoThreadServiceServer,
+};
+use proto_gen::thread::{
+    AddHiddenHumanMessageRequest, AddHiddenHumanMessageResponse, AddHumanMessageRequest,
+    AddHumanMessageResponse, AddSystemMessageRequest, AddSystemMessageResponse, ChatStreamRequest,
+    ChatStreamResponse, CreateThreadRequest, CreateThreadResponse, GenerateThreadTitleRequest,
+    GenerateThreadTitleResponse, GetMessagesRequest, GetMessagesResponse, GetThreadResponse,
+    ListThreadsRequest, ListThreadsResponse, Thread,
+};
+use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 use tokio_stream::{Stream, StreamExt};
@@ -20,6 +28,8 @@ use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use crate::converters::convert_db_message_to_base_message;
+use crate::error::ThreadServiceError;
+use crate::tools::firecrawl_search_tool;
 
 const BASE_NEBUL_URL: &str = "https://api.inference.nebul.io/v1";
 
@@ -37,19 +47,6 @@ fn resolve_host_url(url: &str) -> String {
         url.to_string()
     }
 }
-use crate::error::ThreadServiceError;
-
-use proto_gen::thread::{
-    AddHiddenHumanMessageRequest, AddHiddenHumanMessageResponse, AddHumanMessageRequest,
-    AddHumanMessageResponse, AddSystemMessageRequest, AddSystemMessageResponse, ChatStreamRequest,
-    ChatStreamResponse, CreateThreadRequest, CreateThreadResponse, GenerateThreadTitleRequest,
-    GenerateThreadTitleResponse, GetMessagesRequest, GetMessagesResponse, GetThreadResponse,
-    ListThreadsRequest, ListThreadsResponse, Thread,
-};
-
-pub use proto_gen::thread::proto_thread_service_server::{
-    ProtoThreadService, ProtoThreadServiceServer,
-};
 
 struct Providers {
     chat: Arc<dyn BaseChatModel + Send + Sync>,

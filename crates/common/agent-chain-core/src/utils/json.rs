@@ -1,32 +1,6 @@
-//! Utilities for JSON parsing.
-//!
-//! Adapted from langchain_core/utils/json.py
-
 use regex::Regex;
 use serde_json::Value;
 
-/// Parse a JSON string that may be missing closing braces.
-///
-/// This function attempts to parse a JSON string that may be incomplete,
-/// such as from a streaming LLM response.
-///
-/// # Arguments
-///
-/// * `s` - The JSON string to parse.
-/// * `strict` - Whether to use strict parsing (disallow control characters in strings).
-///
-/// # Returns
-///
-/// The parsed JSON value, or an error if parsing fails.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::utils::json::parse_partial_json;
-///
-/// let result = parse_partial_json(r#"{"key": "value"}"#, false);
-/// assert!(result.is_ok());
-/// ```
 pub fn parse_partial_json(s: &str, strict: bool) -> Result<Value, JsonParseError> {
     if let Ok(value) = serde_json::from_str::<Value>(s) {
         if strict && contains_control_chars(s) {
@@ -113,28 +87,6 @@ fn contains_control_chars(s: &str) -> bool {
         .any(|c| c.is_control() && c != '\n' && c != '\r' && c != '\t')
 }
 
-/// Parse a JSON string from a Markdown string.
-///
-/// This function extracts JSON from a Markdown code block if present.
-///
-/// # Arguments
-///
-/// * `json_string` - The Markdown string.
-///
-/// # Returns
-///
-/// The parsed JSON value, or an error if parsing fails.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::utils::json::parse_json_markdown;
-///
-/// let result = parse_json_markdown(r#"```json
-/// {"key": "value"}
-/// ```"#);
-/// assert!(result.is_ok());
-/// ```
 pub fn parse_json_markdown(json_string: &str) -> Result<Value, JsonParseError> {
     if let Ok(value) = parse_json_inner(json_string) {
         return Ok(value);
@@ -178,7 +130,6 @@ fn custom_parser(multiline_string: &str) -> String {
     .to_string()
 }
 
-/// Escape double quotes that are not already escaped
 fn escape_unescaped_quotes(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
@@ -200,25 +151,6 @@ fn escape_unescaped_quotes(s: &str) -> String {
     result
 }
 
-/// Parse a JSON string and check that it contains the expected keys.
-///
-/// # Arguments
-///
-/// * `text` - The Markdown string.
-/// * `expected_keys` - The expected keys in the JSON object.
-///
-/// # Returns
-///
-/// The parsed JSON object, or an error if parsing fails or keys are missing.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::utils::json::parse_and_check_json_markdown;
-///
-/// let result = parse_and_check_json_markdown(r#"{"key": "value"}"#, &["key"]);
-/// assert!(result.is_ok());
-/// ```
 pub fn parse_and_check_json_markdown(
     text: &str,
     expected_keys: &[&str],
@@ -238,18 +170,12 @@ pub fn parse_and_check_json_markdown(
     Ok(json_obj)
 }
 
-/// Error types for JSON parsing.
 #[derive(Debug, Clone, PartialEq)]
 pub enum JsonParseError {
-    /// Failed to parse JSON.
     ParseError(String),
-    /// Mismatched bracket in JSON.
     MismatchedBracket,
-    /// Control characters found in strict mode.
     ControlCharacters,
-    /// Expected an object but got something else.
     NotAnObject(String),
-    /// Missing expected key.
     MissingKey(String),
 }
 

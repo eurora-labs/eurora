@@ -1,8 +1,3 @@
-//! Tracers that call listeners.
-//!
-//! This module provides tracers that call listener functions on run start, end, and error.
-//! Mirrors langchain_core.tracers.root_listeners.
-
 use std::collections::HashMap;
 use std::fmt;
 
@@ -18,32 +13,21 @@ use crate::tracers::base::{AsyncBaseTracer, BaseTracer};
 use crate::tracers::core::{SchemaFormat, TracerCore, TracerCoreConfig};
 use crate::tracers::schemas::Run;
 
-/// Type alias for a synchronous listener function that receives a run and config.
 pub type Listener = Box<dyn Fn(&Run, &RunnableConfig) + Send + Sync>;
 
-/// Type alias for an asynchronous listener function that receives a run and config.
 pub type AsyncListener =
     Box<dyn Fn(&Run, &RunnableConfig) -> futures::future::BoxFuture<'static, ()> + Send + Sync>;
 
-/// Tracer that calls listeners on run start, end, and error.
 pub struct RootListenersTracer {
-    /// The tracer configuration.
     tracer_config: TracerCoreConfig,
-    /// The run map.
     run_map: HashMap<String, Run>,
-    /// The order map.
     order_map: HashMap<Uuid, (Uuid, String)>,
-    /// The root run ID.
     root_id: Option<Uuid>,
-    /// The runnable config.
     config: RunnableConfig,
-    /// Listener called on run start.
     #[allow(dead_code)]
     on_start: Option<Listener>,
-    /// Listener called on run end.
     #[allow(dead_code)]
     on_end: Option<Listener>,
-    /// Listener called on run error.
     #[allow(dead_code)]
     on_error: Option<Listener>,
 }
@@ -63,7 +47,6 @@ impl fmt::Debug for RootListenersTracer {
 }
 
 impl RootListenersTracer {
-    /// Create a new RootListenersTracer.
     pub fn new(
         config: RunnableConfig,
         on_start: Option<Listener>,
@@ -85,7 +68,6 @@ impl RootListenersTracer {
         }
     }
 
-    /// Get the root run ID.
     pub fn root_id(&self) -> Option<Uuid> {
         self.root_id
     }
@@ -162,23 +144,14 @@ impl BaseCallbackHandler for RootListenersTracer {
     }
 }
 
-/// Async tracer that calls async listeners on run start, end, and error.
 pub struct AsyncRootListenersTracer {
-    /// The tracer configuration.
     tracer_config: TracerCoreConfig,
-    /// The run map.
     run_map: HashMap<String, Run>,
-    /// The order map.
     order_map: HashMap<Uuid, (Uuid, String)>,
-    /// The root run ID.
     root_id: Option<Uuid>,
-    /// The runnable config.
     config: RunnableConfig,
-    /// Async listener called on run start.
     on_start: Option<AsyncListener>,
-    /// Async listener called on run end.
     on_end: Option<AsyncListener>,
-    /// Async listener called on run error.
     on_error: Option<AsyncListener>,
 }
 
@@ -197,7 +170,6 @@ impl fmt::Debug for AsyncRootListenersTracer {
 }
 
 impl AsyncRootListenersTracer {
-    /// Create a new AsyncRootListenersTracer.
     pub fn new(
         config: RunnableConfig,
         on_start: Option<AsyncListener>,
@@ -219,7 +191,6 @@ impl AsyncRootListenersTracer {
         }
     }
 
-    /// Get the root run ID.
     pub fn root_id(&self) -> Option<Uuid> {
         self.root_id
     }

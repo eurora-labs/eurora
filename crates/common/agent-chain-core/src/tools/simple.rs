@@ -1,8 +1,3 @@
-//! Tool that takes in function or coroutine directly.
-//!
-//! This module provides the `Tool` struct for creating simple single-input tools,
-//! mirroring `langchain_core.tools.simple`.
-
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::future::Future;
@@ -22,45 +17,25 @@ use super::base::{
     ToolOutput,
 };
 
-/// Type alias for sync tool function.
 pub type ToolFunc = Arc<dyn Fn(String) -> Result<String> + Send + Sync>;
 
-/// Type alias for async tool function.
 pub type AsyncToolFunc =
     Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Send + Sync>;
 
-/// Tool that takes in a function or coroutine directly.
-///
-/// This is the simplest form of tool that takes a single string input
-/// and returns a string output.
 pub struct Tool {
-    /// The unique name of the tool.
     name: String,
-    /// A description of what the tool does.
     description: String,
-    /// The function to run when the tool is called.
     func: Option<ToolFunc>,
-    /// The asynchronous version of the function.
     coroutine: Option<AsyncToolFunc>,
-    /// Optional schema for the tool's input arguments.
     args_schema: Option<ArgsSchema>,
-    /// Whether to return the tool's output directly.
     return_direct: bool,
-    /// Whether to log the tool's progress.
     verbose: bool,
-    /// How to handle tool errors.
     handle_tool_error: HandleToolError,
-    /// How to handle validation errors.
     handle_validation_error: HandleValidationError,
-    /// The tool response format.
     response_format: ResponseFormat,
-    /// Optional tags for the tool.
     tags: Option<Vec<String>>,
-    /// Optional metadata for the tool.
     metadata: Option<HashMap<String, Value>>,
-    /// Optional provider-specific extras.
     extras: Option<HashMap<String, Value>>,
-    /// Optional callbacks for the tool.
     callbacks: Option<Callbacks>,
 }
 
@@ -76,7 +51,6 @@ impl Debug for Tool {
 }
 
 impl Tool {
-    /// Create a new Tool.
     pub fn new(
         name: impl Into<String>,
         func: Option<ToolFunc>,
@@ -100,55 +74,46 @@ impl Tool {
         }
     }
 
-    /// Set the coroutine (async function).
     pub fn with_coroutine(mut self, coroutine: AsyncToolFunc) -> Self {
         self.coroutine = Some(coroutine);
         self
     }
 
-    /// Set the args schema.
     pub fn with_args_schema(mut self, schema: ArgsSchema) -> Self {
         self.args_schema = Some(schema);
         self
     }
 
-    /// Set whether to return directly.
     pub fn with_return_direct(mut self, return_direct: bool) -> Self {
         self.return_direct = return_direct;
         self
     }
 
-    /// Set the response format.
     pub fn with_response_format(mut self, format: ResponseFormat) -> Self {
         self.response_format = format;
         self
     }
 
-    /// Set tags.
     pub fn with_tags(mut self, tags: Vec<String>) -> Self {
         self.tags = Some(tags);
         self
     }
 
-    /// Set metadata.
     pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
         self.metadata = Some(metadata);
         self
     }
 
-    /// Set extras.
     pub fn with_extras(mut self, extras: HashMap<String, Value>) -> Self {
         self.extras = Some(extras);
         self
     }
 
-    /// Set callbacks.
     pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
         self.callbacks = Some(callbacks);
         self
     }
 
-    /// Create a Tool from a function.
     pub fn from_function<F>(
         func: F,
         name: impl Into<String>,
@@ -160,8 +125,6 @@ impl Tool {
         Self::new(name, Some(Arc::new(func)), description)
     }
 
-    /// Create a Tool from a function with additional options matching Python's
-    /// `Tool.from_function(func, name, description, return_direct, args_schema, coroutine, **kwargs)`.
     pub fn from_function_full<F>(
         func: F,
         name: impl Into<String>,
@@ -180,7 +143,6 @@ impl Tool {
         tool
     }
 
-    /// Create a Tool from a sync and async function pair.
     pub fn from_function_with_async<F, AF, Fut>(
         func: F,
         coroutine: AF,
@@ -196,7 +158,6 @@ impl Tool {
             .with_coroutine(Arc::new(move |input| Box::pin(coroutine(input))))
     }
 
-    /// Extract the single input from the tool input.
     fn extract_single_input(&self, input: ToolInput) -> Result<String> {
         match input {
             ToolInput::String(s) => Ok(s),
