@@ -35,6 +35,7 @@
 		"amplify-adapter": "^1.2.3",
 		"autoprefixer": "^10.4.24",
 		"bits-ui": "^2.15.5",
+		"svelte-sonner": "^1.0.7",
 		"eslint": "^9.39.2",
 		"esm-env": "^1.2.2",
 		"grpc-web": "^1.5.0",
