@@ -7,7 +7,7 @@ use stripe_checkout::CheckoutSessionMode;
 use stripe_checkout::checkout_session::{
     CreateCheckoutSession, CreateCheckoutSessionLineItems, RetrieveCheckoutSession,
 };
-use stripe_core::customer::ListCustomer;
+use stripe_core::customer::{CreateCustomer, ListCustomer};
 use stripe_webhook::{Event, EventObject, Webhook};
 use tracing::{error, info, warn};
 
@@ -28,10 +28,46 @@ async fn resolve_customer_id(state: &AppState, email: &str) -> Result<String, Pa
         .send(&state.client)
         .await?;
 
-    page.data
-        .first()
-        .map(|c| c.id.to_string())
-        .ok_or_else(|| PaymentError::InvalidField("no Stripe customer found for this account"))
+    if let Some(c) = page.data.first() {
+        return Ok(c.id.to_string());
+    }
+
+    let customer = CreateCustomer::new()
+        .email(email)
+        .send(&state.client)
+        .await?;
+
+    let customer_id = customer.id.to_string();
+
+    let raw_data = serde_json::to_value(&customer).unwrap_or_default();
+    let mut tx = state
+        .db
+        .pool
+        .begin()
+        .await
+        .map_err(|e| anyhow::anyhow!("begin tx: {e}"))?;
+
+    state
+        .db
+        .upsert_stripe_customer(&mut *tx, &customer_id, Some(email), &raw_data)
+        .await
+        .map_err(|e| anyhow::anyhow!("upsert stripe customer: {e}"))?;
+
+    if let Ok(user) = state.db.get_user_by_email(email).await {
+        state
+            .db
+            .ensure_account_for_user(&mut *tx, user.id, &customer_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("link account to stripe customer: {e}"))?;
+    }
+
+    tx.commit()
+        .await
+        .map_err(|e| anyhow::anyhow!("commit tx: {e}"))?;
+
+    info!(%customer_id, %email, "Auto-created Stripe customer for new account");
+
+    Ok(customer_id)
 }
 
 pub async fn create_checkout_session(
