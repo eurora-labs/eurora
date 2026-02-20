@@ -49,9 +49,7 @@ pub fn track_billing_portal_failed(error_kind: &str) {
 
 pub fn track_subscription_status_checked(status: Option<&str>, price_id: Option<&str>) {
     let mut event = Event::new_anon("subscription_status_checked");
-    event
-        .insert_prop("status", status.unwrap_or("none"))
-        .ok();
+    event.insert_prop("status", status.unwrap_or("none")).ok();
     if let Some(pid) = price_id {
         event.insert_prop("price_id", pid).ok();
     }
@@ -65,11 +63,7 @@ pub fn track_webhook_checkout_completed(has_subscription: bool, has_user: bool) 
     capture_async(event);
 }
 
-pub fn track_webhook_subscription_updated(
-    status: &str,
-    plan_id: &str,
-    cancel_at_period_end: bool,
-) {
+pub fn track_webhook_subscription_updated(status: &str, plan_id: &str, cancel_at_period_end: bool) {
     let mut event = Event::new_anon("webhook_subscription_updated");
     event.insert_prop("status", status).ok();
     event.insert_prop("plan_id", plan_id).ok();

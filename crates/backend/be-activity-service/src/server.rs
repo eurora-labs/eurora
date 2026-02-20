@@ -139,11 +139,7 @@ impl ProtoActivityService for ActivityService {
             }
         };
 
-        let started_at = match req
-            .started_at
-            .as_ref()
-            .and_then(timestamp_to_datetime)
-        {
+        let started_at = match req.started_at.as_ref().and_then(timestamp_to_datetime) {
             Some(ts) => ts,
             None => {
                 analytics::track_activity_insert_failed("invalid_timestamp");

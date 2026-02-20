@@ -47,12 +47,7 @@ pub fn track_update_check_failed(
     capture_async(event);
 }
 
-pub fn track_download_redirect(
-    channel: &str,
-    target: &str,
-    arch: &str,
-    bundle_type: Option<&str>,
-) {
+pub fn track_download_redirect(channel: &str, target: &str, arch: &str, bundle_type: Option<&str>) {
     let mut event = Event::new_anon("download_redirect");
     event.insert_prop("channel", channel).ok();
     event.insert_prop("target", target).ok();

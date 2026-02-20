@@ -44,10 +44,7 @@ pub async fn create_checkout_session(
         .allowed_price_ids()
         .contains(&body.price_id.as_str())
     {
-        analytics::track_checkout_session_creation_failed(
-            Some(&body.price_id),
-            "invalid_price_id",
-        );
+        analytics::track_checkout_session_creation_failed(Some(&body.price_id), "invalid_price_id");
         return Err(PaymentError::InvalidField(
             "price_id is not a recognised plan",
         ));
@@ -78,12 +75,8 @@ pub async fn create_checkout_session(
         .limit(1)
         .send(&state.client)
         .await
-        .map_err(|e| {
-            analytics::track_checkout_session_creation_failed(
-                Some(&body.price_id),
-                "stripe_error",
-            );
-            e
+        .inspect_err(|_e| {
+            analytics::track_checkout_session_creation_failed(Some(&body.price_id), "stripe_error");
         })?;
 
     if let Some(customer) = existing.data.first() {
@@ -93,9 +86,8 @@ pub async fn create_checkout_session(
         req = req.customer_email(email);
     }
 
-    let session = req.send(&state.client).await.map_err(|e| {
+    let session = req.send(&state.client).await.inspect_err(|_e| {
         analytics::track_checkout_session_creation_failed(Some(&body.price_id), "stripe_error");
-        e
     })?;
 
     let url = session.url.ok_or_else(|| {
@@ -118,10 +110,11 @@ pub async fn create_portal_session(
     State(state): State<Arc<AppState>>,
     AuthUser(claims): AuthUser,
 ) -> Result<Json<CreatePortalResponse>, PaymentError> {
-    let customer_id = resolve_customer_id(&state, &claims.email).await.map_err(|e| {
-        analytics::track_billing_portal_failed(e.error_kind());
-        e
-    })?;
+    let customer_id = resolve_customer_id(&state, &claims.email)
+        .await
+        .inspect_err(|e| {
+            analytics::track_billing_portal_failed(e.error_kind());
+        })?;
     let return_url = format!("{}/settings/billing", state.config.frontend_url);
 
     let session = stripe_billing::billing_portal_session::CreateBillingPortalSession::new()
@@ -234,7 +227,12 @@ pub async fn handle_webhook(
 
     // Atomic idempotency: try to claim the event before processing.
     // Returns false if the event was already recorded by a concurrent handler.
-    if !state.db.try_claim_webhook_event(event_id, event_type).await.unwrap_or(false) {
+    if !state
+        .db
+        .try_claim_webhook_event(event_id, event_type)
+        .await
+        .unwrap_or(false)
+    {
         info!(%event_id, %event_type, "Webhook event already processed — skipping");
         return Ok(StatusCode::OK);
     }
@@ -274,10 +272,7 @@ pub async fn handle_webhook(
                 return Err(e);
             }
 
-            analytics::track_webhook_checkout_completed(
-                subscription_id.is_some(),
-                true,
-            );
+            analytics::track_webhook_checkout_completed(subscription_id.is_some(), true);
         }
         EventObject::CustomerSubscriptionUpdated(sub) => {
             info!(
