@@ -26,7 +26,7 @@ impl AppState {
     #[instrument(skip_all, fields(bucket = %bucket_name))]
     pub async fn new(bucket_name: String) -> Result<Self> {
         let config = aws_config::defaults(BehaviorVersion::latest())
-            .region("us-west-2")
+            .region("eu-central-1")
             .load()
             .await;
         let s3_client = S3Client::new(&config);

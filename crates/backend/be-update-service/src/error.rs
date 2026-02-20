@@ -40,6 +40,21 @@ pub enum UpdateServiceError {
     PresignedUrlError(String),
 }
 
+impl UpdateServiceError {
+    pub fn error_kind(&self) -> &'static str {
+        match self {
+            Self::InvalidVersion(_) => "invalid_version",
+            Self::InvalidTargetArch(_) => "invalid_target_arch",
+            Self::InvalidChannel(_) => "invalid_channel",
+            Self::InvalidExtensionChannel(_) => "invalid_extension_channel",
+            Self::S3Error(_) => "s3_error",
+            Self::SignatureNotFound(_) => "signature_not_found",
+            Self::DownloadFileNotFound(_) => "download_not_found",
+            Self::PresignedUrlError(_) => "presigned_url_error",
+        }
+    }
+}
+
 impl IntoResponse for UpdateServiceError {
     fn into_response(self) -> Response {
         let (status, error_code, message, details) = match &self {

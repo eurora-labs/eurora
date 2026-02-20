@@ -14,6 +14,7 @@ use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 use tracing::debug;
 
+pub mod analytics;
 pub mod error;
 pub mod handlers;
 pub mod service;

@@ -23,9 +23,8 @@
 			.then((role) => {
 				if (role === 'Free') {
 					goto('/no-access');
-				} else {
-					roleChecked = true;
 				}
+				roleChecked = true;
 			})
 			.catch((error) => {
 				console.error('Failed to check user role:', error);

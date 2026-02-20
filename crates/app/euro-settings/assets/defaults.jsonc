@@ -3,7 +3,7 @@
         "autostart": true
     },
     "telemetry": {
-        "considered": false,
+        "considered": true, // For now we collect no telemetry, so the user does not have to opt-in
         "anonymousMetrics": true,
         "anonymousErrors": true,
         "nonAnonymousMetrics": false,

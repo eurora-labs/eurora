@@ -26,6 +26,20 @@ pub enum PaymentError {
     Internal(#[from] anyhow::Error),
 }
 
+impl PaymentError {
+    pub fn error_kind(&self) -> &'static str {
+        match self {
+            Self::Stripe(_) => "stripe_error",
+            Self::Unauthorized(_) => "unauthorized",
+            Self::WebhookSignatureInvalid => "webhook_signature_invalid",
+            Self::MissingField(_) => "missing_field",
+            Self::InvalidField(_) => "invalid_field",
+            Self::Config(_) => "config_error",
+            Self::Internal(_) => "internal_error",
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 struct ErrorBody {
     error: String,

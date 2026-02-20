@@ -217,16 +217,6 @@ fn install_native_messaging_manifests(app: &tauri::App) {
     }
 }
 
-async fn initialize_posthog() -> Result<(), posthog_rs::Error> {
-    let posthog_key = option_env!("POSTHOG_API_KEY");
-    if let Some(key) = posthog_key {
-        return posthog_rs::init_global(key).await;
-    }
-    Err(posthog_rs::Error::Connection(
-        "Posthog key not found".to_string(),
-    ))
-}
-
 fn main() {
     dotenv().ok();
 
@@ -234,22 +224,6 @@ fn main() {
     {
         use keyring::{mock, set_default_credential_builder};
         set_default_credential_builder(mock::default_credential_builder());
-    }
-
-    // TODO: Check if this still works on Nightly
-    if cfg!(not(debug_assertions)) {
-        let _guard = sentry::init((
-            // TODO: Replace with Sentry DSN from env
-            "https://a0c23c10925999f104c7fd07fd8e3871@o4508907847352320.ingest.de.sentry.io/4510097240424528",
-            sentry::ClientOptions {
-                release: sentry::release_name!(),
-                traces_sample_rate: 0.0,
-                enable_logs: true,
-                send_default_pii: true, // during closed beta all metrics are non-anonymous
-                debug: true,
-                ..Default::default()
-            },
-        ));
     }
 
     let tauri_context = generate_context!();
@@ -272,15 +246,6 @@ fn main() {
 
                     let started_by_autostart =
                         std::env::args().any(|arg| arg == "--startup-launch");
-                    if started_by_autostart {
-                        let event = posthog_rs::Event::new_anon("start_app_by_autostart");
-
-                        tauri::async_runtime::spawn(async move {
-                            let _ = posthog_rs::capture(event).await.map_err(|e| {
-                                error!("Failed to capture posthog event: {}", e);
-                            });
-                        });
-                    }
 
                     let app_settings = AppSettings::load_from_default_path_creating().unwrap();
                     let endpoint_url = &app_settings.api.endpoint;
@@ -293,12 +258,6 @@ fn main() {
                     let endpoint_manager = std::sync::Arc::new(endpoint_manager);
                     tauri_app.manage(endpoint_manager.clone());
                     tauri_app.manage(Mutex::new(app_settings.clone()));
-
-                    tauri::async_runtime::spawn(async move {
-                        let _ = initialize_posthog().await.map_err(|e| {
-                            error!("Failed to initialize posthog: {}", e);
-                        });
-                    });
 
                     // Autostart is never registered in debug builds — during
                     // development you launch from your IDE or terminal and

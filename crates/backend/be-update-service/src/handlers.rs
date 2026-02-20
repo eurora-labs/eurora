@@ -8,11 +8,13 @@ use axum::{
 use tracing::{debug, instrument, warn};
 
 use crate::{
+    analytics,
     service::AppState,
     types::{
         DownloadParams, DownloadWithBundleTypeParams, ExtensionReleaseParams, ReleaseParams,
         UpdateParams, UpdateWithBundleTypeParams,
     },
+    utils::parse_target_arch,
 };
 
 #[instrument(skip(state), fields(
@@ -28,6 +30,20 @@ pub async fn check_update_handler(
         return StatusCode::NO_CONTENT.into_response();
     }
 
+    let (target, arch) = match parse_target_arch(&params.target_arch) {
+        Ok(ta) => ta,
+        Err(e) => {
+            analytics::track_update_check_failed(
+                &params.channel,
+                &params.target_arch,
+                &params.current_version,
+                e.error_kind(),
+            );
+            warn!("Update check failed: {}", e);
+            return e.into_response();
+        }
+    };
+
     match state
         .check_for_update(
             &params.channel,
@@ -39,10 +55,36 @@ pub async fn check_update_handler(
     {
         Ok(Some(update)) => {
             debug!("Update available: version {}", update.version);
+            analytics::track_update_check(
+                &params.channel,
+                &target,
+                &arch,
+                &params.current_version,
+                None,
+                true,
+                Some(&update.version),
+            );
             (StatusCode::OK, Json(update)).into_response()
         }
-        Ok(None) => StatusCode::NO_CONTENT.into_response(),
+        Ok(None) => {
+            analytics::track_update_check(
+                &params.channel,
+                &target,
+                &arch,
+                &params.current_version,
+                None,
+                false,
+                None,
+            );
+            StatusCode::NO_CONTENT.into_response()
+        }
         Err(e) => {
+            analytics::track_update_check_failed(
+                &params.channel,
+                &params.target_arch,
+                &params.current_version,
+                e.error_kind(),
+            );
             warn!("Update check failed: {}", e);
             e.into_response()
         }
@@ -61,10 +103,19 @@ pub async fn get_release_handler(
                 release_info.version,
                 release_info.platforms.len()
             );
+            analytics::track_release_info_request(
+                &params.channel,
+                Some(&release_info.version),
+                release_info.platforms.len(),
+            );
             (StatusCode::OK, Json(release_info)).into_response()
         }
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Ok(None) => {
+            analytics::track_release_info_request(&params.channel, None, 0);
+            StatusCode::NOT_FOUND.into_response()
+        }
         Err(e) => {
+            analytics::track_release_info_request(&params.channel, None, 0);
             warn!("Release info request failed: {}", e);
             e.into_response()
         }
@@ -93,6 +144,20 @@ pub async fn check_update_with_bundle_type_handler(
         Some(params.bundle_type.as_str())
     };
 
+    let (target, arch) = match parse_target_arch(&params.target_arch) {
+        Ok(ta) => ta,
+        Err(e) => {
+            analytics::track_update_check_failed(
+                &params.channel,
+                &params.target_arch,
+                &params.current_version,
+                e.error_kind(),
+            );
+            warn!("Update check failed: {}", e);
+            return e.into_response();
+        }
+    };
+
     match state
         .check_for_update(
             &params.channel,
@@ -104,10 +169,36 @@ pub async fn check_update_with_bundle_type_handler(
     {
         Ok(Some(update)) => {
             debug!("Update available: version {}", update.version);
+            analytics::track_update_check(
+                &params.channel,
+                &target,
+                &arch,
+                &params.current_version,
+                bundle_type,
+                true,
+                Some(&update.version),
+            );
             (StatusCode::OK, Json(update)).into_response()
         }
-        Ok(None) => StatusCode::NO_CONTENT.into_response(),
+        Ok(None) => {
+            analytics::track_update_check(
+                &params.channel,
+                &target,
+                &arch,
+                &params.current_version,
+                bundle_type,
+                false,
+                None,
+            );
+            StatusCode::NO_CONTENT.into_response()
+        }
         Err(e) => {
+            analytics::track_update_check_failed(
+                &params.channel,
+                &params.target_arch,
+                &params.current_version,
+                e.error_kind(),
+            );
             warn!("Update check failed: {}", e);
             e.into_response()
         }
@@ -126,10 +217,16 @@ pub async fn get_extension_release_handler(
                 release_info.channel,
                 release_info.browsers.len()
             );
+            let browsers: Vec<String> = release_info.browsers.keys().cloned().collect();
+            analytics::track_extension_check(&params.channel, &browsers);
             (StatusCode::OK, Json(release_info)).into_response()
         }
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Ok(None) => {
+            analytics::track_extension_check(&params.channel, &[]);
+            StatusCode::NOT_FOUND.into_response()
+        }
         Err(e) => {
+            analytics::track_extension_check_failed(&params.channel, e.error_kind());
             warn!("Extension release request failed: {}", e);
             e.into_response()
         }
@@ -146,15 +243,36 @@ pub async fn download_handler(
     State(state): State<Arc<AppState>>,
     Path(params): Path<DownloadParams>,
 ) -> Response {
+    let (target, arch) = match parse_target_arch(&params.target_arch) {
+        Ok(ta) => ta,
+        Err(e) => {
+            analytics::track_download_failed(
+                &params.channel,
+                &params.target_arch,
+                None,
+                e.error_kind(),
+            );
+            warn!("Download failed: {}", e);
+            return e.into_response();
+        }
+    };
+
     match state
         .get_download_url(&params.channel, &params.target_arch, None)
         .await
     {
         Ok(url) => {
             debug!("Redirecting download for {}", params.target_arch);
+            analytics::track_download_redirect(&params.channel, &target, &arch, None);
             Redirect::temporary(&url).into_response()
         }
         Err(e) => {
+            analytics::track_download_failed(
+                &params.channel,
+                &params.target_arch,
+                None,
+                e.error_kind(),
+            );
             warn!("Download failed: {}", e);
             e.into_response()
         }
@@ -177,6 +295,20 @@ pub async fn download_with_bundle_type_handler(
         Some(params.bundle_type.as_str())
     };
 
+    let (target, arch) = match parse_target_arch(&params.target_arch) {
+        Ok(ta) => ta,
+        Err(e) => {
+            analytics::track_download_failed(
+                &params.channel,
+                &params.target_arch,
+                bundle_type,
+                e.error_kind(),
+            );
+            warn!("Download failed: {}", e);
+            return e.into_response();
+        }
+    };
+
     match state
         .get_download_url(&params.channel, &params.target_arch, bundle_type)
         .await
@@ -186,9 +318,16 @@ pub async fn download_with_bundle_type_handler(
                 "Redirecting download for {} ({})",
                 params.target_arch, params.bundle_type
             );
+            analytics::track_download_redirect(&params.channel, &target, &arch, bundle_type);
             Redirect::temporary(&url).into_response()
         }
         Err(e) => {
+            analytics::track_download_failed(
+                &params.channel,
+                &params.target_arch,
+                bundle_type,
+                e.error_kind(),
+            );
             warn!("Download failed: {}", e);
             e.into_response()
         }
