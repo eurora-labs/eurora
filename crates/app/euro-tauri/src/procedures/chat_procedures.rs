@@ -43,13 +43,6 @@ impl ChatApi for ChatApiImpl {
     ) -> Result<String, String> {
         let mut thread_id = thread_id;
 
-        let event = posthog_rs::Event::new_anon("send_query");
-        tauri::async_runtime::spawn(async move {
-            let _ = posthog_rs::capture(event).await.map_err(|e| {
-                tracing::error!("Failed to capture posthog event: {}", e);
-            });
-        });
-
         {
             let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle.state();
             let timeline = timeline_state.lock().await;
