@@ -1,19 +1,9 @@
-//! Unit tests for RunInfo class.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/outputs/test_run_info.py`
-//!
-//! Pydantic-specific functionality is mapped to Rust equivalents:
-//! model_dump/model_validate -> serde serialization/deserialization,
-//! model_copy -> Clone, BaseModel inheritance -> derive macros.
-
 use agent_chain_core::outputs::RunInfo;
 use uuid::Uuid;
 
-/// Test suite for RunInfo class.
 mod run_info_tests {
     use super::*;
 
-    /// Test creating RunInfo with a UUID.
     #[test]
     fn test_creation_with_uuid() {
         let run_id = Uuid::new_v4();
@@ -21,7 +11,6 @@ mod run_info_tests {
         assert_eq!(run_info.run_id, run_id);
     }
 
-    /// Test creating RunInfo with a specific UUID string.
     #[test]
     fn test_creation_with_specific_uuid() {
         let uuid_str = "12345678-1234-5678-1234-567812345678";
@@ -31,7 +20,6 @@ mod run_info_tests {
         assert_eq!(run_info.run_id.to_string(), uuid_str);
     }
 
-    /// Test that run_id is of UUID type.
     #[test]
     fn test_run_id_is_uuid_type() {
         let run_id = Uuid::new_v4();
@@ -39,7 +27,6 @@ mod run_info_tests {
         let _: Uuid = run_info.run_id;
     }
 
-    /// Test that different RunInfo instances can have different IDs.
     #[test]
     fn test_different_run_infos_have_different_ids() {
         let run_id1 = Uuid::new_v4();
@@ -49,7 +36,6 @@ mod run_info_tests {
         assert_ne!(run_info1.run_id, run_info2.run_id);
     }
 
-    /// Test equality for RunInfo with same run_id.
     #[test]
     fn test_equality_same_run_id() {
         let run_id = Uuid::new_v4();
@@ -58,7 +44,6 @@ mod run_info_tests {
         assert_eq!(run_info1, run_info2);
     }
 
-    /// Test inequality for RunInfo with different run_id.
     #[test]
     fn test_inequality_different_run_id() {
         let run_id1 = Uuid::new_v4();
@@ -68,7 +53,6 @@ mod run_info_tests {
         assert_ne!(run_info1, run_info2);
     }
 
-    /// Test serialization of RunInfo to dictionary (via serde_json).
     #[test]
     fn test_serialization_to_dict() {
         let run_id = Uuid::new_v4();
@@ -81,7 +65,6 @@ mod run_info_tests {
         );
     }
 
-    /// Test deserialization of RunInfo from dictionary (via serde_json).
     #[test]
     fn test_deserialization_from_dict() {
         let run_id = Uuid::new_v4();
@@ -90,7 +73,6 @@ mod run_info_tests {
         assert_eq!(run_info.run_id, run_id);
     }
 
-    /// Test JSON serialization of RunInfo.
     #[test]
     fn test_json_serialization() {
         let run_id = Uuid::new_v4();
@@ -99,7 +81,6 @@ mod run_info_tests {
         assert!(json_str.contains(&run_id.to_string()));
     }
 
-    /// Test JSON deserialization of RunInfo.
     #[test]
     fn test_json_deserialization() {
         let run_id = Uuid::new_v4();
@@ -120,7 +101,6 @@ mod run_info_tests {
         assert_ne!(run_info.run_id, original_id);
     }
 
-    /// Test that Debug repr contains the run_id.
     #[test]
     fn test_repr_contains_run_id() {
         let run_id = Uuid::new_v4();
@@ -130,7 +110,6 @@ mod run_info_tests {
         assert!(repr_str.contains(&run_id.to_string()));
     }
 
-    /// Test string representation of RunInfo.
     #[test]
     fn test_str_representation() {
         let run_id = Uuid::new_v4();
@@ -139,7 +118,6 @@ mod run_info_tests {
         assert!(str_repr.contains("run_id"));
     }
 
-    /// Test that hash is consistent for same run_id.
     #[test]
     fn test_hash_consistency() {
         use std::collections::hash_map::DefaultHasher;
@@ -160,7 +138,6 @@ mod run_info_tests {
         assert_eq!(hash1, hash2);
     }
 
-    /// Test that UUID version is preserved.
     #[test]
     fn test_uuid_version() {
         let run_id = Uuid::new_v4(); // Creates UUID version 4
@@ -168,7 +145,6 @@ mod run_info_tests {
         assert_eq!(run_info.run_id.get_version_num(), 4);
     }
 
-    /// Test creating a list of RunInfo objects.
     #[test]
     fn test_multiple_run_infos_in_list() {
         let run_ids: Vec<Uuid> = (0..5).map(|_| Uuid::new_v4()).collect();
@@ -179,7 +155,6 @@ mod run_info_tests {
         }
     }
 
-    /// Test creating RunInfo with UUID parsed from string.
     #[test]
     fn test_run_info_with_uuid_from_string() {
         let uuid_str = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
@@ -188,14 +163,12 @@ mod run_info_tests {
         assert_eq!(run_info.run_id.to_string(), uuid_str);
     }
 
-    /// Test creating RunInfo with new_random.
     #[test]
     fn test_new_random() {
         let run_info = RunInfo::new_random();
         assert_eq!(run_info.run_id.get_version_num(), 4);
     }
 
-    /// Test Default implementation for RunInfo.
     #[test]
     fn test_default() {
         let run_info = RunInfo::default();
@@ -203,12 +176,9 @@ mod run_info_tests {
     }
 }
 
-/// Test suite for RunInfo serde coercion behavior.
-/// Equivalent to Python's TestRunInfoPydanticCoercion.
 mod run_info_serde_coercion_tests {
     use super::*;
 
-    /// Test that serde coerces a string UUID to a Uuid when deserializing.
     #[test]
     fn test_creation_from_string_uuid() {
         let uuid_str = "12345678-1234-5678-1234-567812345678";
@@ -218,7 +188,6 @@ mod run_info_serde_coercion_tests {
         assert_eq!(run_info.run_id.to_string(), uuid_str);
     }
 
-    /// Test deserialization from a dict containing a UUID value.
     #[test]
     fn test_deserialize_from_value() {
         let run_id = Uuid::new_v4();
@@ -228,7 +197,6 @@ mod run_info_serde_coercion_tests {
         assert_eq!(run_info.run_id, run_id);
     }
 
-    /// Test deserialization from a dict containing a string UUID.
     #[test]
     fn test_deserialize_with_string_uuid() {
         let uuid_str = "12345678-1234-5678-1234-567812345678";
@@ -238,7 +206,6 @@ mod run_info_serde_coercion_tests {
         assert_eq!(run_info.run_id.to_string(), uuid_str);
     }
 
-    /// Test that RunInfo has the expected fields when serialized.
     #[test]
     fn test_serialized_fields() {
         let run_id = Uuid::new_v4();
@@ -252,7 +219,6 @@ mod run_info_serde_coercion_tests {
         assert!(fields.contains(&&"run_id".to_string()));
     }
 
-    /// Test RunInfo clone produces equivalent object.
     #[test]
     fn test_clone() {
         let run_id = Uuid::new_v4();
@@ -262,7 +228,6 @@ mod run_info_serde_coercion_tests {
         assert_eq!(cloned, original);
     }
 
-    /// Test RunInfo clone produces an independent object.
     #[test]
     fn test_clone_independence() {
         let run_id = Uuid::new_v4();

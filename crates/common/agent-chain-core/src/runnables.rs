@@ -1,8 +1,3 @@
-//! Runnables module for agent-chain-core.
-//!
-//! This module provides the core Runnable abstraction and implementations,
-//! mirroring `langchain_core.runnables`.
-
 pub mod base;
 pub mod branch;
 pub mod config;

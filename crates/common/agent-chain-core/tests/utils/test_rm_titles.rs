@@ -1,11 +1,6 @@
-//! Unit tests for removing titles from JSON schemas.
-//!
-//! Converted from langchain/libs/core/tests/unit_tests/utils/test_rm_titles.py
-
 use agent_chain_core::utils::function_calling::remove_titles;
 use serde_json::json;
 
-/// Test case 1: Basic schema with nested arrays
 #[test]
 fn test_rm_titles_schema1() {
     let schema = json!({
@@ -57,7 +52,6 @@ fn test_rm_titles_schema1() {
     assert_eq!(remove_titles(&schema), expected);
 }
 
-/// Test case 2: Schema with "title" as a property name
 #[test]
 fn test_rm_titles_schema2() {
     let schema = json!({
@@ -109,7 +103,6 @@ fn test_rm_titles_schema2() {
     assert_eq!(remove_titles(&schema), expected);
 }
 
-/// Test case 3: Schema with "title" and "type" as property names
 #[test]
 fn test_rm_titles_schema3() {
     let schema = json!({
@@ -161,7 +154,6 @@ fn test_rm_titles_schema3() {
     assert_eq!(remove_titles(&schema), expected);
 }
 
-/// Test case 4: Schema with "properties" as a property name and deeply nested "title"
 #[test]
 fn test_rm_titles_schema4() {
     let schema = json!({
@@ -215,7 +207,6 @@ fn test_rm_titles_schema4() {
     assert_eq!(remove_titles(&schema), expected);
 }
 
-/// Test case 5: Array schema without title fields (should remain unchanged)
 #[test]
 fn test_rm_titles_schema5() {
     let schema = json!({

@@ -1,9 +1,3 @@
-//! Parser for Pydantic-style (struct) output.
-//!
-//! This module contains the `PydanticOutputParser` which parses LLM output
-//! as JSON and validates it against a Rust struct using `serde::Deserialize`.
-//! Mirrors `langchain_core.output_parsers.pydantic`.
-
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
@@ -22,56 +16,14 @@ use futures::stream::BoxStream;
 use crate::messages::BaseMessage;
 use crate::utils::json::parse_partial_json;
 
-/// Parse an output using a Rust struct (Pydantic model equivalent).
-///
-/// This parser first extracts JSON from the LLM output (handling markdown code
-/// blocks), then deserializes the JSON into the target type `T` using serde.
-///
-/// This is the Rust equivalent of Python's `PydanticOutputParser`. Instead of
-/// Pydantic models, it uses `serde::Deserialize` for type validation.
-///
-/// # Type Parameters
-///
-/// * `T` - The target type to deserialize into. Must implement `DeserializeOwned`,
-///   `Send`, `Sync`, `Clone`, and `Debug`.
-///
-/// # Example
-///
-/// ```ignore
-/// use serde::Deserialize;
-/// use agent_chain_core::output_parsers::PydanticOutputParser;
-///
-/// #[derive(Debug, Clone, Deserialize)]
-/// struct Person {
-///     name: String,
-///     age: i64,
-/// }
-///
-/// let parser = PydanticOutputParser::<Person>::new(
-///     "Person",
-///     serde_json::json!({"properties": {"name": {"type": "string"}, "age": {"type": "integer"}}, "required": ["name", "age"]}),
-/// );
-/// let result = parser.parse(r#"{"name": "Alice", "age": 30}"#).unwrap();
-/// assert_eq!(result.name, "Alice");
-/// ```
 #[derive(Debug, Clone)]
 pub struct PydanticOutputParser<T> {
-    /// The name of the target type (used in error messages).
     name: String,
-    /// The JSON schema of the target type (used for format instructions).
     schema: Value,
     _marker: PhantomData<T>,
 }
 
 impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq> PydanticOutputParser<T> {
-    /// Create a new `PydanticOutputParser`.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The name of the target type (used in error messages, equivalent
-    ///   to `pydantic_object.__name__` in Python).
-    /// * `schema` - The JSON schema of the target type (equivalent to
-    ///   `pydantic_object.model_json_schema()` in Python).
     pub fn new(name: impl Into<String>, schema: Value) -> Self {
         Self {
             name: name.into(),
@@ -80,16 +32,10 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq> PydanticOutp
         }
     }
 
-    /// Parse a JSON object (as `Value`) into the target type.
-    ///
-    /// Mirrors Python's `PydanticOutputParser._parse_obj()`.
     pub fn parse_obj(&self, obj: &Value) -> Result<T> {
         serde_json::from_value::<T>(obj.clone()).map_err(|e| self.parser_exception(&e, obj))
     }
 
-    /// Create an `OutputParserError` for a failed parse.
-    ///
-    /// Mirrors Python's `PydanticOutputParser._parser_exception()`.
     pub fn parser_exception(&self, error: &dyn std::fmt::Display, json_object: &Value) -> Error {
         let json_string = serde_json::to_string(json_object).unwrap_or_default();
         let message = format!(
@@ -99,12 +45,10 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq> PydanticOutp
         OutputParserError::parse_error(message, json_string).into()
     }
 
-    /// Get the JSON schema for the target type.
     pub fn get_schema(&self) -> &Value {
         &self.schema
     }
 
-    /// Get the name of the target type.
     pub fn output_type_name(&self) -> &str {
         &self.name
     }
@@ -204,8 +148,6 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq + 'static>
 {
 }
 
-/// Pydantic format instructions template, defined locally matching
-/// `_PYDANTIC_FORMAT_INSTRUCTIONS` in `langchain_core.output_parsers.pydantic`.
 const _PYDANTIC_FORMAT_INSTRUCTIONS: &str = r#"The output should be formatted as a JSON instance that conforms to the JSON schema below.
 
 As an example, for the schema {{"properties": {{"foo": {{"title": "Foo", "description": "a list of strings", "type": "array", "items": {{"type": "string"}}}}}}, "required": ["foo"]}}

@@ -1,7 +1,3 @@
-//! Snapshot tests for OpenAI functions output parsers.
-//!
-//! Ported from langchain/libs/core/tests/unit_tests/output_parsers/test_openai_functions_parser.py
-
 use std::collections::HashMap;
 
 use agent_chain_core::messages::AIMessage;

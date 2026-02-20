@@ -1,8 +1,3 @@
-//! Image prompt template for multimodal models.
-//!
-//! This module provides image prompt templates for multimodal models,
-//! mirroring `langchain_core.prompts.image` in Python.
-
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
@@ -17,19 +12,15 @@ use crate::runnables::config::{RunnableConfig, ensure_config};
 use super::base::{BasePromptTemplate, FormatOutputType};
 use super::string::{PromptTemplateFormat, format_template, get_template_variables};
 
-/// Image URL structure for multimodal prompts.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ImageURL {
-    /// The URL of the image.
     pub url: String,
 
-    /// The detail level for the image.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
 }
 
 impl ImageURL {
-    /// Create a new ImageURL.
     pub fn new(url: impl Into<String>) -> Self {
         Self {
             url: url.into(),
@@ -37,7 +28,6 @@ impl ImageURL {
         }
     }
 
-    /// Create a new ImageURL with a detail level.
     pub fn with_detail(url: impl Into<String>, detail: impl Into<String>) -> Self {
         Self {
             url: url.into(),
@@ -46,52 +36,20 @@ impl ImageURL {
     }
 }
 
-/// Template for image prompts in multimodal models.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::prompts::ImagePromptTemplate;
-/// use std::collections::HashMap;
-///
-/// let template = ImagePromptTemplate::new(
-///     HashMap::from([("url".to_string(), "{image_url}".to_string())]),
-///     vec!["image_url".to_string()],
-/// ).unwrap();
-///
-/// let mut kwargs = HashMap::new();
-/// kwargs.insert("image_url".to_string(), "https://example.com/image.jpg".to_string());
-///
-/// let result = template.format(&kwargs).unwrap();
-/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImagePromptTemplate {
-    /// Template for the image URL.
     pub template: HashMap<String, String>,
 
-    /// Input variables for the template.
     pub input_variables: Vec<String>,
 
-    /// The format of the prompt template.
     #[serde(default)]
     pub template_format: PromptTemplateFormat,
 
-    /// Partial variables that are pre-filled.
     #[serde(default)]
     pub partial_variables: HashMap<String, String>,
 }
 
 impl ImagePromptTemplate {
-    /// Create a new ImagePromptTemplate.
-    ///
-    /// # Arguments
-    ///
-    /// * `template` - A map containing the template configuration (url, detail, etc.)
-    /// * `input_variables` - The input variables used in the template.
-    ///
-    /// # Returns
-    ///
-    /// A new ImagePromptTemplate, or an error if validation fails.
     pub fn new(template: HashMap<String, String>, input_variables: Vec<String>) -> Result<Self> {
         let reserved = ["url", "path", "detail"];
         let overlap: Vec<_> = input_variables
@@ -115,7 +73,6 @@ impl ImagePromptTemplate {
         })
     }
 
-    /// Create a new ImagePromptTemplate with just a URL template.
     pub fn from_url_template(url_template: impl Into<String>) -> Result<Self> {
         let url_template = url_template.into();
         let input_variables = get_template_variables(&url_template, PromptTemplateFormat::FString)?;
@@ -126,13 +83,11 @@ impl ImagePromptTemplate {
         Self::new(template, input_variables)
     }
 
-    /// Set the template format.
     pub fn with_format(mut self, format: PromptTemplateFormat) -> Self {
         self.template_format = format;
         self
     }
 
-    /// Format the template into an ImageURL.
     pub fn format_image(&self, kwargs: &HashMap<String, String>) -> Result<ImageURL> {
         let mut merged_kwargs = self.partial_variables.clone();
         merged_kwargs.extend(kwargs.iter().map(|(k, v)| (k.clone(), v.clone())));

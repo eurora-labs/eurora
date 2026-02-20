@@ -1,23 +1,14 @@
-//! Base string prompt template.
-//!
-//! This module provides the base string prompt template and formatting utilities,
-//! mirroring `langchain_core.prompts.string` in Python.
-
 use std::collections::{HashMap, HashSet};
 
 use crate::error::{Error, Result};
 use crate::utils::formatting::{FORMATTER, FormattingError};
 use crate::utils::mustache::{MustacheValue, render as mustache_render};
 
-/// Template format types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PromptTemplateFormat {
-    /// F-string format using `{variable}` syntax.
     #[default]
     FString,
-    /// Mustache format using `{{variable}}` syntax.
     Mustache,
-    /// Jinja2 format (requires jinja2 feature).
     Jinja2,
 }
 
@@ -38,7 +29,6 @@ impl std::str::FromStr for PromptTemplateFormat {
 }
 
 impl PromptTemplateFormat {
-    /// Convert to a string representation.
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::FString => "f-string",
@@ -74,19 +64,6 @@ impl<'de> serde::Deserialize<'de> for PromptTemplateFormat {
     }
 }
 
-/// Format a template using jinja2.
-///
-/// **Security warning**: Jinja2 templates can execute arbitrary code.
-/// Never use jinja2 templates from untrusted sources.
-///
-/// # Arguments
-///
-/// * `template` - The template string.
-/// * `kwargs` - The keyword arguments to substitute.
-///
-/// # Returns
-///
-/// The formatted string, or an error if formatting fails.
 pub fn jinja2_formatter(template: &str, kwargs: &HashMap<String, String>) -> Result<String> {
     let mut result = template.to_string();
 
@@ -101,16 +78,6 @@ pub fn jinja2_formatter(template: &str, kwargs: &HashMap<String, String>) -> Res
     Ok(result)
 }
 
-/// Format a template using mustache.
-///
-/// # Arguments
-///
-/// * `template` - The template string.
-/// * `kwargs` - The keyword arguments to substitute.
-///
-/// # Returns
-///
-/// The formatted string, or an error if formatting fails.
 pub fn mustache_formatter(template: &str, kwargs: &HashMap<String, String>) -> Result<String> {
     let mut data = HashMap::new();
     for (key, value) in kwargs {
@@ -121,14 +88,6 @@ pub fn mustache_formatter(template: &str, kwargs: &HashMap<String, String>) -> R
         .map_err(|e| Error::Other(format!("Mustache error: {}", e)))
 }
 
-/// Validate that input variables match the template for jinja2.
-///
-/// Issues a warning if missing or extra variables are found.
-///
-/// # Arguments
-///
-/// * `template` - The template string.
-/// * `input_variables` - The input variables to validate.
 pub fn validate_jinja2(template: &str, input_variables: &[String]) -> Result<()> {
     let template_vars = get_jinja2_variables(template);
     let input_set: HashSet<_> = input_variables.iter().cloned().collect();
@@ -150,7 +109,6 @@ pub fn validate_jinja2(template: &str, input_variables: &[String]) -> Result<()>
     Ok(())
 }
 
-/// Get variables from a jinja2 template.
 fn get_jinja2_variables(template: &str) -> HashSet<String> {
     let mut variables = HashSet::new();
     let mut chars = template.chars().peekable();
@@ -181,10 +139,6 @@ fn get_jinja2_variables(template: &str) -> HashSet<String> {
     variables
 }
 
-/// Get the top-level variables from a mustache template.
-///
-/// For nested variables like `{{person.name}}`, only the top-level
-/// key (`person`) is returned.
 pub fn mustache_template_vars(template: &str) -> HashSet<String> {
     let mut variables = HashSet::new();
     let mut chars = template.chars().peekable();
@@ -277,17 +231,6 @@ pub fn mustache_template_vars(template: &str) -> HashSet<String> {
     variables
 }
 
-/// Check that template string is valid.
-///
-/// # Arguments
-///
-/// * `template` - The template string.
-/// * `template_format` - The template format.
-/// * `input_variables` - The input variables.
-///
-/// # Returns
-///
-/// Ok(()) if valid, or an error if invalid.
 pub fn check_valid_template(
     template: &str,
     template_format: PromptTemplateFormat,
@@ -310,16 +253,6 @@ pub fn check_valid_template(
     }
 }
 
-/// Get the variables from the template.
-///
-/// # Arguments
-///
-/// * `template` - The template string.
-/// * `template_format` - The template format.
-///
-/// # Returns
-///
-/// A sorted list of variable names from the template.
 pub fn get_template_variables(
     template: &str,
     template_format: PromptTemplateFormat,
@@ -354,7 +287,6 @@ pub fn get_template_variables(
     Ok(vars)
 }
 
-/// Format a template string with the given format and kwargs.
 pub fn format_template(
     template: &str,
     template_format: PromptTemplateFormat,
@@ -374,44 +306,25 @@ pub fn format_template(
     }
 }
 
-/// Trait for string prompt templates.
-///
-/// String prompt templates format to a string (as opposed to a list of messages).
 pub trait StringPromptTemplate: Send + Sync {
-    /// Get the input variables for this template.
     fn input_variables(&self) -> &[String];
 
-    /// Get the optional variables for this template.
     fn optional_variables(&self) -> &[String] {
         &[]
     }
 
-    /// Get partial variables for this template.
     fn partial_variables(&self) -> &HashMap<String, String> {
         static EMPTY: std::sync::LazyLock<HashMap<String, String>> =
             std::sync::LazyLock::new(HashMap::new);
         &EMPTY
     }
 
-    /// Get the template format.
     fn template_format(&self) -> PromptTemplateFormat {
         PromptTemplateFormat::FString
     }
 
-    /// Format the prompt with the inputs.
-    ///
-    /// # Arguments
-    ///
-    /// * `kwargs` - The keyword arguments to format the template with.
-    ///
-    /// # Returns
-    ///
-    /// A formatted string, or an error if formatting fails.
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<String>;
 
-    /// Async format the prompt with the inputs.
-    ///
-    /// Default implementation calls the sync version.
     fn aformat(
         &self,
         kwargs: &HashMap<String, String>,
@@ -420,19 +333,13 @@ pub trait StringPromptTemplate: Send + Sync {
         Box::pin(async move { result })
     }
 
-    /// Get a pretty representation of the prompt.
     fn pretty_repr(&self, html: bool) -> String;
 
-    /// Print a pretty representation of the prompt.
     fn pretty_print(&self) {
         println!("{}", self.pretty_repr(false));
     }
 }
 
-/// Check if a value is a subsequence of another sequence.
-///
-/// This function checks if `child` is a prefix of `parent`.
-/// Part of the Python langchain_core API.
 #[allow(dead_code)]
 pub fn is_subsequence<T: PartialEq>(child: &[T], parent: &[T]) -> bool {
     if child.is_empty() || parent.is_empty() {

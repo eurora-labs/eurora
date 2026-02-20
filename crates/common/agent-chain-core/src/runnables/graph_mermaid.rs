@@ -1,8 +1,3 @@
-//! Mermaid graph drawing utilities.
-//!
-//! This module provides functions for rendering graphs as Mermaid syntax,
-//! mirroring `langchain_core.runnables.graph_mermaid`.
-
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
@@ -15,10 +10,6 @@ use super::graph::{Edge, MermaidDrawMethod, Node, NodeStyles};
 
 const MARKDOWN_SPECIAL_CHARS: &[char] = &['*', '_', '`'];
 
-/// Convert a string into a Mermaid-compatible node id.
-///
-/// Keep `[a-zA-Z0-9_-]` characters unchanged.
-/// Map every other character to backslash + lowercase hex codepoint.
 pub fn to_safe_id(label: &str) -> String {
     let mut out = String::with_capacity(label.len());
     for ch in label.chars() {
@@ -32,7 +23,6 @@ pub fn to_safe_id(label: &str) -> String {
     out
 }
 
-/// Serialize a value to a minimal YAML-like string (for Mermaid frontmatter).
 fn value_to_yaml(value: &Value, indent: usize) -> String {
     let prefix = " ".repeat(indent);
     match value {
@@ -73,7 +63,6 @@ fn scalar_to_yaml(value: &Value) -> String {
     }
 }
 
-/// Draw a Mermaid graph from nodes and edges.
 #[allow(clippy::too_many_arguments)]
 pub fn draw_mermaid(
     nodes: &HashMap<String, Node>,
@@ -375,7 +364,6 @@ pub fn draw_mermaid(
     Ok(mermaid_graph)
 }
 
-/// Generate Mermaid graph styles for different node types.
 pub fn generate_mermaid_graph_styles(node_colors: &NodeStyles) -> String {
     let mut styles = String::new();
     styles += &format!("\tclassDef default {}\n", node_colors.default);
@@ -384,11 +372,6 @@ pub fn generate_mermaid_graph_styles(node_colors: &NodeStyles) -> String {
     styles
 }
 
-/// Draw a Mermaid graph as PNG using the specified method.
-///
-/// Mirrors `draw_mermaid_png()` from `langchain_core.runnables.graph_mermaid`.
-///
-/// Only the API method is supported. Pyppeteer rendering is not available in Rust.
 pub async fn draw_mermaid_png(
     mermaid_syntax: &str,
     output_file_path: Option<&Path>,
@@ -416,9 +399,6 @@ pub async fn draw_mermaid_png(
     }
 }
 
-/// Render a Mermaid graph using the Mermaid.INK API.
-///
-/// Mirrors `_render_mermaid_using_api()` from `langchain_core.runnables.graph_mermaid`.
 async fn render_mermaid_using_api(
     mermaid_syntax: &str,
     output_file_path: Option<&Path>,

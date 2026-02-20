@@ -1,5 +1,3 @@
-//! Document transformers.
-
 use std::collections::HashMap;
 
 use async_trait::async_trait;
@@ -7,22 +5,14 @@ use serde_json::Value;
 
 use super::Document;
 
-/// Abstract base trait for document transformation.
-///
-/// A document transformation takes a sequence of Documents and returns a
-/// sequence of transformed Documents.
 #[async_trait]
 pub trait BaseDocumentTransformer: Send + Sync {
-    /// Transform a list of documents.
     fn transform_documents(
         &self,
         documents: Vec<Document>,
         kwargs: HashMap<String, Value>,
     ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>>;
 
-    /// Asynchronously transform a list of documents.
-    ///
-    /// Default implementation delegates to the sync version.
     async fn atransform_documents(
         &self,
         documents: Vec<Document>,

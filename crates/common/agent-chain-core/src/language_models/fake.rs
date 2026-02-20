@@ -1,9 +1,3 @@
-//! Fake LLMs for testing purposes.
-//!
-//! This module provides fake LLM implementations that can be used
-//! for testing without making actual API calls.
-//! Mirrors `langchain_core.language_models.fake`.
-
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
@@ -18,19 +12,11 @@ use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::error::Result;
 use crate::outputs::{Generation, GenerationChunk, GenerationType, LLMResult};
 
-/// Fake LLM for testing purposes.
-///
-/// Returns responses from a list in order, cycling back to the start
-/// when the end is reached.
 #[derive(Debug)]
 pub struct FakeListLLM {
-    /// List of responses to return in order.
     responses: Vec<String>,
-    /// Sleep time in seconds between responses (ignored in base class).
     sleep: Option<Duration>,
-    /// Current index (internally incremented after every invocation).
     index: AtomicUsize,
-    /// LLM configuration.
     config: LLMConfig,
 }
 
@@ -46,7 +32,6 @@ impl Clone for FakeListLLM {
 }
 
 impl FakeListLLM {
-    /// Create a new FakeListLLM with the given responses.
     pub fn new(responses: Vec<String>) -> Self {
         Self {
             responses,
@@ -56,19 +41,16 @@ impl FakeListLLM {
         }
     }
 
-    /// Set the sleep duration between responses.
     pub fn with_sleep(mut self, duration: Duration) -> Self {
         self.sleep = Some(duration);
         self
     }
 
-    /// Set the configuration.
     pub fn with_config(mut self, config: LLMConfig) -> Self {
         self.config = config;
         self
     }
 
-    /// Set a local cache instance for this LLM.
     pub fn with_cache_instance(
         mut self,
         cache: std::sync::Arc<dyn crate::caches::BaseCache>,
@@ -77,23 +59,19 @@ impl FakeListLLM {
         self
     }
 
-    /// Disable caching for this LLM.
     pub fn with_cache_disabled(mut self) -> Self {
         self.config.base.cache = Some(false);
         self
     }
 
-    /// Get the current index.
     pub fn current_index(&self) -> usize {
         self.index.load(Ordering::SeqCst)
     }
 
-    /// Reset the index to 0.
     pub fn reset(&self) {
         self.index.store(0, Ordering::SeqCst);
     }
 
-    /// Get the next response and advance the index.
     fn get_next_response(&self) -> String {
         let i = self.index.load(Ordering::SeqCst);
         let response = self.responses.get(i).cloned().unwrap_or_default();
@@ -191,25 +169,17 @@ impl LLM for FakeListLLM {
     }
 }
 
-/// Error raised by FakeStreamingListLLM during streaming.
 #[derive(Debug, Clone, thiserror::Error)]
 #[error("FakeListLLM error")]
 pub struct FakeListLLMError;
 
-/// Fake streaming list LLM for testing purposes.
-///
-/// An LLM that will return responses from a list in order,
-/// with support for streaming character by character.
 #[derive(Debug)]
 pub struct FakeStreamingListLLM {
-    /// Inner FakeListLLM.
     inner: FakeListLLM,
-    /// If set, will raise an exception on the specified chunk number.
     error_on_chunk_number: Option<usize>,
 }
 
 impl FakeStreamingListLLM {
-    /// Create a new FakeStreamingListLLM with the given responses.
     pub fn new(responses: Vec<String>) -> Self {
         Self {
             inner: FakeListLLM::new(responses),
@@ -217,30 +187,25 @@ impl FakeStreamingListLLM {
         }
     }
 
-    /// Set the sleep duration between chunks.
     pub fn with_sleep(mut self, duration: Duration) -> Self {
         self.inner = self.inner.with_sleep(duration);
         self
     }
 
-    /// Set the configuration.
     pub fn with_config(mut self, config: LLMConfig) -> Self {
         self.inner = self.inner.with_config(config);
         self
     }
 
-    /// Set the chunk number to error on.
     pub fn with_error_on_chunk(mut self, chunk_number: usize) -> Self {
         self.error_on_chunk_number = Some(chunk_number);
         self
     }
 
-    /// Get the current index.
     pub fn current_index(&self) -> usize {
         self.inner.current_index()
     }
 
-    /// Reset the index to 0.
     pub fn reset(&self) {
         self.inner.reset();
     }

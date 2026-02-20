@@ -1,20 +1,11 @@
-//! Implementation of the RunnablePassthrough and related types.
-//!
-//! This module provides:
-//! - `RunnablePassthrough`: A runnable that passes through inputs unchanged or with additional keys
-//! - `RunnableAssign`: A runnable that assigns key-value pairs to dict inputs
-//! - `RunnablePick`: A runnable that picks keys from dict inputs
-
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-/// Type alias for the synchronous callback function in RunnablePassthrough.
 type PassthroughFunc<I> = Arc<dyn Fn(&I, &RunnableConfig) + Send + Sync>;
 
-/// Type alias for the asynchronous callback function in RunnablePassthrough.
 type PassthroughAfunc<I> =
     Arc<dyn Fn(&I, &RunnableConfig) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync>;
 
@@ -28,26 +19,6 @@ use crate::error::{Error, Result};
 use super::base::{Runnable, RunnableParallel};
 use super::config::{RunnableConfig, ensure_config, get_callback_manager_for_config, patch_config};
 
-/// A Runnable that passes through its input unchanged or with additional keys.
-///
-/// This Runnable behaves almost like the identity function, except that it
-/// can be configured to add additional keys to the output, if the input is a dict.
-/// It can also optionally run a callback function with the input.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::runnables::{RunnablePassthrough, RunnableParallel};
-///
-/// // Simple passthrough
-/// let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
-/// let result = passthrough.invoke(42, None).unwrap();
-/// assert_eq!(result, 42);
-///
-/// // With assign
-/// let runnable = RunnablePassthrough::assign()
-///     .add("extra_key", RunnableLambda::new(|x| Ok(x["value"].clone())));
-/// ```
 pub struct RunnablePassthrough<I>
 where
     I: Send + Sync + Clone + Debug + 'static,
@@ -98,7 +69,6 @@ impl<I> RunnablePassthrough<I>
 where
     I: Send + Sync + Clone + Debug + 'static,
 {
-    /// Create a new RunnablePassthrough.
     pub fn new() -> Self {
         Self {
             name: None,
@@ -108,9 +78,6 @@ where
         }
     }
 
-    /// Create a new RunnablePassthrough with a callback function.
-    ///
-    /// The function will be called with the input before passing it through.
     pub fn with_func<F>(func: F) -> Self
     where
         F: Fn(&I, &RunnableConfig) + Send + Sync + 'static,
@@ -123,9 +90,6 @@ where
         }
     }
 
-    /// Create a new RunnablePassthrough with an async callback function.
-    ///
-    /// The function will be called with the input before passing it through.
     pub fn with_afunc<F, Fut>(afunc: F) -> Self
     where
         F: Fn(&I, &RunnableConfig) -> Fut + Send + Sync + 'static,
@@ -141,16 +105,11 @@ where
         }
     }
 
-    /// Set the name of this RunnablePassthrough.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
     }
 
-    /// Merge the dict input with the output produced by the mapping argument.
-    ///
-    /// Returns a `RunnableAssign` that will run the given mapper in parallel
-    /// and merge its output with the input.
     pub fn assign() -> RunnableAssignBuilder {
         RunnableAssignBuilder::new()
     }
@@ -303,9 +262,6 @@ where
     }
 }
 
-/// Builder for creating a RunnableAssign.
-///
-/// Use `RunnablePassthrough::assign()` to create a new builder.
 pub struct RunnableAssignBuilder {
     mapper: RunnableParallel<HashMap<String, Value>>,
 }
@@ -317,7 +273,6 @@ impl RunnableAssignBuilder {
         }
     }
 
-    /// Add a step to the assign operation.
     pub fn add<R>(mut self, key: impl Into<String>, runnable: R) -> Self
     where
         R: Runnable<Input = HashMap<String, Value>, Output = Value> + Send + Sync + 'static,
@@ -326,36 +281,11 @@ impl RunnableAssignBuilder {
         self
     }
 
-    /// Build the RunnableAssign.
     pub fn build(self) -> RunnableAssign {
         RunnableAssign::new(self.mapper)
     }
 }
 
-/// Runnable that assigns key-value pairs to dict inputs.
-///
-/// The `RunnableAssign` class takes input dictionaries and, through a
-/// `RunnableParallel` instance, applies transformations, then combines
-/// these with the original data, introducing new key-value pairs based
-/// on the mapper's logic.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::runnables::{RunnableAssign, RunnableParallel, RunnableLambda};
-/// use std::collections::HashMap;
-///
-/// let mapper = RunnableParallel::new()
-///     .add("extra", RunnableLambda::new(|input: HashMap<String, Value>| {
-///         Ok(serde_json::json!(input.get("value").cloned().unwrap_or_default()))
-///     }));
-///
-/// let assign = RunnableAssign::new(mapper);
-/// let mut input = HashMap::new();
-/// input.insert("value".to_string(), serde_json::json!(42));
-/// let result = assign.invoke(input, None).unwrap();
-/// // result contains {"value": 42, "extra": 42}
-/// ```
 pub struct RunnableAssign {
     mapper: RunnableParallel<HashMap<String, Value>>,
     name: Option<String>,
@@ -371,18 +301,15 @@ impl Debug for RunnableAssign {
 }
 
 impl RunnableAssign {
-    /// Create a new RunnableAssign with the given mapper.
     pub fn new(mapper: RunnableParallel<HashMap<String, Value>>) -> Self {
         Self { mapper, name: None }
     }
 
-    /// Set the name of this RunnableAssign.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
     }
 
-    /// Get a reference to the underlying mapper.
     pub fn mapper(&self) -> &RunnableParallel<HashMap<String, Value>> {
         &self.mapper
     }
@@ -611,40 +538,11 @@ impl Runnable for RunnableAssign {
     }
 }
 
-/// Runnable that picks keys from dict inputs.
-///
-/// `RunnablePick` selects specific keys from a dictionary input.
-/// The return type depends on whether a single key or multiple keys are specified:
-/// - Single key: Returns the value directly
-/// - Multiple keys: Returns a dictionary with only the selected keys
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::runnables::RunnablePick;
-/// use std::collections::HashMap;
-///
-/// let mut input = HashMap::new();
-/// input.insert("name".to_string(), serde_json::json!("John"));
-/// input.insert("age".to_string(), serde_json::json!(30));
-/// input.insert("city".to_string(), serde_json::json!("NYC"));
-///
-/// // Single key - returns the value directly
-/// let pick_single = RunnablePick::new_single("name");
-/// let result = pick_single.invoke(input.clone(), None).unwrap();
-/// // result is "John"
-///
-/// // Multiple keys - returns a dict
-/// let pick_multi = RunnablePick::new_multi(vec!["name", "age"]);
-/// let result = pick_multi.invoke(input, None).unwrap();
-/// // result is {"name": "John", "age": 30}
-/// ```
 pub struct RunnablePick {
     keys: PickKeys,
     name: Option<String>,
 }
 
-/// Keys to pick - either a single key or multiple keys.
 #[derive(Debug, Clone)]
 pub enum PickKeys {
     Single(String),
@@ -667,7 +565,6 @@ impl From<PickKeys> for RunnablePick {
 }
 
 impl RunnablePick {
-    /// Create a new RunnablePick that picks a single key.
     pub fn new_single(key: impl Into<String>) -> Self {
         Self {
             keys: PickKeys::Single(key.into()),
@@ -675,7 +572,6 @@ impl RunnablePick {
         }
     }
 
-    /// Create a new RunnablePick that picks multiple keys.
     pub fn new_multi(keys: impl IntoIterator<Item = impl Into<String>>) -> Self {
         Self {
             keys: PickKeys::Multiple(keys.into_iter().map(Into::into).collect()),
@@ -683,13 +579,11 @@ impl RunnablePick {
         }
     }
 
-    /// Set the name of this RunnablePick.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
     }
 
-    /// Pick the specified keys from the input.
     fn pick(&self, input: &HashMap<String, Value>) -> Option<Value> {
         match &self.keys {
             PickKeys::Single(key) => input.get(key).cloned(),
@@ -808,7 +702,6 @@ impl Runnable for RunnablePick {
     }
 }
 
-/// A global passthrough runnable used for graph operations.
 pub fn graph_passthrough<I>() -> RunnablePassthrough<I>
 where
     I: Send + Sync + Clone + Debug + 'static,

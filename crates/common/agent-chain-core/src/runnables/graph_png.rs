@@ -1,24 +1,11 @@
-//! Helper to draw a state graph into a PNG file.
-//!
-//! This module provides `PngDrawer`, mirroring
-//! `langchain_core.runnables.graph_png.PngDrawer`.
-//!
-//! Actual PNG rendering requires the `graphviz` feature (not yet wired up);
-//! the label-management API works without any optional dependency.
-
 use std::collections::HashMap;
 use std::path::Path;
 
 use super::graph::{Graph, LabelsDict};
 
-/// Helper to draw a state graph into a PNG file.
-///
-/// Mirrors Python's `PngDrawer` from `langchain_core.runnables.graph_png`.
 #[derive(Debug, Clone)]
 pub struct PngDrawer {
-    /// Font name used for node and edge labels.
     pub fontname: String,
-    /// Label overrides for nodes and edges.
     pub labels: LabelsDict,
 }
 
@@ -32,10 +19,6 @@ impl Default for PngDrawer {
 }
 
 impl PngDrawer {
-    /// Create a new `PngDrawer`.
-    ///
-    /// * `fontname` – font for labels (defaults to `"arial"`).
-    /// * `labels`   – optional label overrides.
     pub fn new(fontname: Option<&str>, labels: Option<LabelsDict>) -> Self {
         Self {
             fontname: fontname.unwrap_or("arial").to_string(),
@@ -43,11 +26,6 @@ impl PngDrawer {
         }
     }
 
-    /// Return the display label for a node.
-    ///
-    /// If the node has a custom label in [`Self::labels`], that label is used;
-    /// otherwise the original `label` string is kept. The result is wrapped in
-    /// HTML bold tags: `<<B>…</B>>`.
     pub fn get_node_label(&self, label: &str) -> String {
         let resolved = self
             .labels
@@ -58,11 +36,6 @@ impl PngDrawer {
         format!("<<B>{resolved}</B>>")
     }
 
-    /// Return the display label for an edge.
-    ///
-    /// If the edge has a custom label in [`Self::labels`], that label is used;
-    /// otherwise the original `label` string is kept. The result is wrapped in
-    /// HTML underline tags: `<<U>…</U>>`.
     pub fn get_edge_label(&self, label: &str) -> String {
         let resolved = self
             .labels
@@ -73,10 +46,6 @@ impl PngDrawer {
         format!("<<U>{resolved}</U>>")
     }
 
-    /// Build the graphviz attribute map for adding a single node.
-    ///
-    /// Returns a `HashMap` of attribute key-value pairs that mirror the
-    /// Python `add_node` call (yellow fill, font size 15, solid+filled style).
     pub fn node_attrs(&self, node: &str) -> HashMap<String, String> {
         let mut attrs = HashMap::new();
         attrs.insert("label".to_string(), self.get_node_label(node));
@@ -87,10 +56,6 @@ impl PngDrawer {
         attrs
     }
 
-    /// Build the graphviz attribute map for adding a single edge.
-    ///
-    /// Returns a `HashMap` of attribute key-value pairs that mirror the
-    /// Python `add_edge` call.
     pub fn edge_attrs(&self, label: Option<&str>, conditional: bool) -> HashMap<String, String> {
         let mut attrs = HashMap::new();
         let edge_label = match label {
@@ -107,9 +72,6 @@ impl PngDrawer {
         attrs
     }
 
-    /// Collect attribute maps for all nodes in the graph.
-    ///
-    /// Mirrors `add_nodes` in the Python implementation.
     pub fn add_nodes(&self, graph: &Graph) -> Vec<(String, HashMap<String, String>)> {
         let mut nodes: Vec<_> = graph.nodes.keys().cloned().collect();
         nodes.sort();
@@ -122,9 +84,6 @@ impl PngDrawer {
             .collect()
     }
 
-    /// Collect attribute maps for all edges in the graph.
-    ///
-    /// Mirrors `add_edges` in the Python implementation.
     pub fn add_edges(&self, graph: &Graph) -> Vec<(String, String, HashMap<String, String>)> {
         graph
             .edges
@@ -137,10 +96,6 @@ impl PngDrawer {
             .collect()
     }
 
-    /// Identify subgraph groupings from colon-separated node IDs.
-    ///
-    /// Mirrors `add_subgraph` in the Python implementation. Returns a list of
-    /// `(cluster_name, member_node_ids)` pairs for each subgraph detected.
     #[allow(clippy::only_used_in_recursion)]
     pub fn collect_subgraphs(
         &self,
@@ -181,25 +136,12 @@ impl PngDrawer {
         result
     }
 
-    /// Determine style updates for first and last nodes.
-    ///
-    /// Mirrors `update_styles` in the Python implementation.
-    /// Returns `(first_node_id, last_node_id)` so the caller can set
-    /// `fillcolor` to `"lightblue"` and `"orange"` respectively.
     pub fn styled_node_ids(&self, graph: &Graph) -> (Option<String>, Option<String>) {
         let first = graph.first_node().map(|n| n.id.clone());
         let last = graph.last_node().map(|n| n.id.clone());
         (first, last)
     }
 
-    /// Draw the graph to PNG bytes or save to a file.
-    ///
-    /// This is the main entry point, mirroring `PngDrawer.draw()`.
-    ///
-    /// Because actual rendering requires a graphviz C library binding that is
-    /// not currently wired up as a dependency, this method always returns an
-    /// error indicating the missing dependency — exactly like the Python
-    /// implementation raises `ImportError` when `pygraphviz` is absent.
     pub fn draw(
         &self,
         _graph: &Graph,
@@ -213,23 +155,16 @@ impl PngDrawer {
     }
 }
 
-/// Errors that can occur when drawing a PNG.
 #[derive(Debug, thiserror::Error)]
 pub enum PngDrawError {
-    /// The required graphviz library is not available.
     #[error("{0}")]
     MissingDependency(String),
 
-    /// An I/O error occurred while writing the PNG file.
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 }
 
 mod itertools_substitute {
-    /// Group a sorted slice of `Vec<String>` by popping the first element as key.
-    ///
-    /// Each input vec must have at least one element.
-    /// Returns `(key, remaining_tails)` pairs.
     pub fn group_by_key(sorted: &[Vec<String>]) -> Vec<(String, Vec<Vec<String>>)> {
         let mut result: Vec<(String, Vec<Vec<String>>)> = Vec::new();
 

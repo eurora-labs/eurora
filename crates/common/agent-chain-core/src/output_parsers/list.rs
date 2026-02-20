@@ -1,8 +1,3 @@
-//! Parsers for list output.
-//!
-//! This module contains output parsers that parse LLM output into lists.
-//! Mirrors `langchain_core.output_parsers.list`.
-
 use std::collections::VecDeque;
 use std::fmt::Debug;
 
@@ -15,74 +10,36 @@ use crate::messages::BaseMessage;
 use super::base::BaseOutputParser;
 use super::transform::BaseTransformOutputParser;
 
-/// A single match from `parse_iter`, carrying the captured group text
-/// and the byte offset where the overall match ends in the input.
-///
-/// Mirrors the `re.Match` objects returned by Python's
-/// `ListOutputParser.parse_iter`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseMatch {
-    /// The text captured by the first group (equivalent to `m.group(1)`).
     pub group: String,
-    /// The byte offset where the overall regex match ends in the input
-    /// (equivalent to `m.end()`).
     pub end: usize,
 }
 
-/// Parse the output of a model to a list.
-///
-/// This is a base trait for list output parsers.
 pub trait ListOutputParser: BaseOutputParser<Output = Vec<String>> {
-    /// Parse the output iteratively, yielding match results.
-    ///
-    /// Returns a vector of [`ParseMatch`] values carrying the captured text
-    /// and the end position of each match. Used for streaming parsing where
-    /// the caller needs to know how much of the input has been consumed.
-    ///
-    /// The default implementation returns an empty vector.
     fn parse_iter(&self, _text: &str) -> Vec<ParseMatch> {
         Vec::new()
     }
 
-    /// Parse the output without filtering empty strings.
-    ///
-    /// Used internally by the streaming transform fallback path.
-    /// Python's CSV reader preserves empty fields from trailing commas
-    /// (e.g., `"foo,"` → `["foo", ""]`), which the streaming logic relies on
-    /// to detect complete items. The default delegates to `parse()`.
     fn parse_with_empties(&self, text: &str) -> Result<Vec<String>> {
         self.parse(text)
     }
 }
 
-/// Parse the output of a model to a comma-separated list.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::output_parsers::CommaSeparatedListOutputParser;
-///
-/// let parser = CommaSeparatedListOutputParser::new();
-/// let result = parser.parse("apple, banana, cherry").unwrap();
-/// assert_eq!(result, vec!["apple", "banana", "cherry"]);
-/// ```
 #[derive(Debug, Clone, Default)]
 pub struct CommaSeparatedListOutputParser {
     _private: (),
 }
 
 impl CommaSeparatedListOutputParser {
-    /// Create a new `CommaSeparatedListOutputParser`.
     pub fn new() -> Self {
         Self { _private: () }
     }
 
-    /// Returns `true` as this class is serializable.
     pub fn is_lc_serializable() -> bool {
         true
     }
 
-    /// Get the namespace of the LangChain object.
     pub fn get_lc_namespace() -> Vec<&'static str> {
         vec!["langchain", "output_parsers", "list"]
     }
@@ -182,32 +139,18 @@ impl ListOutputParser for CommaSeparatedListOutputParser {
     }
 }
 
-/// Parse a numbered list.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::output_parsers::NumberedListOutputParser;
-///
-/// let parser = NumberedListOutputParser::new();
-/// let result = parser.parse("1. apple\n2. banana\n3. cherry").unwrap();
-/// assert_eq!(result, vec!["apple", "banana", "cherry"]);
-/// ```
 #[derive(Debug, Clone)]
 pub struct NumberedListOutputParser {
-    /// The regex pattern to match numbered list items.
     pub pattern: String,
 }
 
 impl NumberedListOutputParser {
-    /// Create a new `NumberedListOutputParser`.
     pub fn new() -> Self {
         Self {
             pattern: r"\d+\.\s*([^\n]+)".to_string(),
         }
     }
 
-    /// Create a parser with a custom pattern.
     pub fn with_pattern(pattern: impl Into<String>) -> Self {
         Self {
             pattern: pattern.into(),
@@ -282,32 +225,18 @@ impl ListOutputParser for NumberedListOutputParser {
     }
 }
 
-/// Parse a Markdown list.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::output_parsers::MarkdownListOutputParser;
-///
-/// let parser = MarkdownListOutputParser::new();
-/// let result = parser.parse("- apple\n- banana\n- cherry").unwrap();
-/// assert_eq!(result, vec!["apple", "banana", "cherry"]);
-/// ```
 #[derive(Debug, Clone)]
 pub struct MarkdownListOutputParser {
-    /// The regex pattern to match Markdown list items.
     pub pattern: String,
 }
 
 impl MarkdownListOutputParser {
-    /// Create a new `MarkdownListOutputParser`.
     pub fn new() -> Self {
         Self {
             pattern: r"^\s*[-*]\s+([^\n]+)$".to_string(),
         }
     }
 
-    /// Create a parser with a custom pattern.
     pub fn with_pattern(pattern: impl Into<String>) -> Self {
         Self {
             pattern: pattern.into(),
@@ -386,15 +315,6 @@ impl ListOutputParser for MarkdownListOutputParser {
     }
 }
 
-/// Streaming transform implementation for list parsers.
-///
-/// Mirrors the `_transform` method of Python's `ListOutputParser`. Accumulates
-/// text from incoming message chunks and yields individual list items as they
-/// become complete. For parsers that implement `parse_iter` (returning non-empty
-/// results), it uses `drop_last_n` to avoid yielding the last (potentially
-/// incomplete) item until the stream ends. For parsers without `parse_iter`
-/// (like `CommaSeparatedListOutputParser`), it falls back to `parse()` and holds
-/// back the last item.
 fn list_transform<'a, P: ListOutputParser + 'a>(
     parser: &'a P,
     input: BoxStream<'a, BaseMessage>,
@@ -449,10 +369,6 @@ fn list_transform<'a, P: ListOutputParser + 'a>(
     })
 }
 
-/// Drop the last n elements of an iterator.
-///
-/// This is useful for streaming list parsing where we want to avoid
-/// yielding incomplete items.
 pub fn drop_last_n<T, I: Iterator<Item = T>>(iter: I, n: usize) -> impl Iterator<Item = T> {
     let mut buffer: VecDeque<T> = VecDeque::with_capacity(n);
 

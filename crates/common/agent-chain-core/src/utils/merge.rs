@@ -1,41 +1,5 @@
-//! Dictionary and list merging utilities.
-//!
-//! Adapted from langchain_core/utils/_merge.py
-
 use serde_json::{Map, Value};
 
-/// Merge multiple JSON objects.
-///
-/// Handles specific scenarios where a key exists in both
-/// dictionaries but has a value of null in 'left'. In such cases, the method uses the
-/// value from 'right' for that key in the merged dictionary.
-///
-/// # Arguments
-///
-/// * `left` - The first dictionary to merge
-/// * `others` - The other dictionaries to merge
-///
-/// # Returns
-///
-/// The merged dictionary.
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - The key exists in both dictionaries but has a different type.
-/// - The value has an unsupported type.
-///
-/// # Example
-///
-/// ```
-/// use serde_json::json;
-/// use agent_chain_core::utils::merge::merge_dicts;
-///
-/// let left = json!({"function_call": {"arguments": null}});
-/// let right = json!({"function_call": {"arguments": "{\n"}});
-/// let merged = merge_dicts(left, vec![right]).unwrap();
-/// // merged = {"function_call": {"arguments": "{\n"}}
-/// ```
 pub fn merge_dicts(left: Value, others: Vec<Value>) -> Result<Value, MergeError> {
     let mut merged = match left {
         Value::Object(map) => map,
@@ -125,16 +89,6 @@ pub fn merge_dicts(left: Value, others: Vec<Value>) -> Result<Value, MergeError>
     Ok(Value::Object(merged))
 }
 
-/// Merge multiple lists, handling None.
-///
-/// # Arguments
-///
-/// * `left` - The first list to merge
-/// * `others` - The other lists to merge
-///
-/// # Returns
-///
-/// The merged list.
 pub fn merge_lists(
     left: Option<Vec<Value>>,
     others: Vec<Option<Vec<Value>>>,
@@ -248,26 +202,6 @@ pub fn merge_lists(
     Ok(merged)
 }
 
-/// Merge two objects.
-///
-/// It handles specific scenarios where a key exists in both
-/// dictionaries but has a value of null in 'left'. In such cases, the method uses the
-/// value from 'right' for that key in the merged dictionary.
-///
-/// # Arguments
-///
-/// * `left` - The first object to merge
-/// * `right` - The other object to merge
-///
-/// # Returns
-///
-/// The merged object.
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - The key exists in both dictionaries but has a different type.
-/// - The two objects cannot be merged.
 pub fn merge_obj(left: Value, right: Value) -> Result<Value, MergeError> {
     if left == Value::Null || right == Value::Null {
         return Ok(if left != Value::Null { left } else { right });
@@ -296,20 +230,18 @@ pub fn merge_obj(left: Value, right: Value) -> Result<Value, MergeError> {
     }
 }
 
-/// Error types for merge operations.
 #[derive(Debug, Clone, PartialEq)]
 pub enum MergeError {
-    /// The value is not a JSON object.
     NotAnObject,
-    /// Type mismatch between left and right values.
     TypeMismatch {
         key: String,
         left_type: String,
         right_type: String,
     },
-    /// Unsupported value type.
-    UnsupportedType { key: String, value_type: String },
-    /// Unable to merge the two values.
+    UnsupportedType {
+        key: String,
+        value_type: String,
+    },
     UnableToMerge {
         left_type: String,
         right_type: String,

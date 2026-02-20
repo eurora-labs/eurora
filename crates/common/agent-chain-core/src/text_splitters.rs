@@ -1,33 +1,14 @@
-//! Text splitter interface.
-//!
-//! Provides the base [`TextSplitter`] trait for splitting text into chunks.
-//! This trait extends [`BaseDocumentTransformer`] and adds text-specific
-//! splitting methods.
-//!
-//! Concrete implementations (e.g. `RecursiveCharacterTextSplitter`,
-//! `CharacterTextSplitter`) live in the `agent-chain` crate.
-
 use crate::documents::{BaseDocumentTransformer, Document};
 use async_trait::async_trait;
 use std::collections::HashMap;
 
-/// Base trait for text splitters.
-///
-/// Text splitters break text into smaller chunks, which is useful for
-/// fitting text within LLM context windows and for creating embeddings.
-///
-/// Implementations must provide [`split_text`](TextSplitter::split_text).
-/// Default implementations of [`create_documents`](TextSplitter::create_documents)
-/// and [`split_documents`](TextSplitter::split_documents) are provided.
 #[async_trait]
 pub trait TextSplitter: BaseDocumentTransformer {
-    /// Split text into multiple components.
     fn split_text(
         &self,
         text: &str,
     ) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>>;
 
-    /// Create documents from a list of texts and optional metadata.
     fn create_documents(
         &self,
         texts: &[String],
@@ -47,7 +28,6 @@ pub trait TextSplitter: BaseDocumentTransformer {
         Ok(documents)
     }
 
-    /// Split documents into smaller chunks.
     fn split_documents(
         &self,
         documents: &[Document],
@@ -63,7 +43,6 @@ pub trait TextSplitter: BaseDocumentTransformer {
 mod tests {
     use super::*;
 
-    /// Simple splitter that splits on newlines for testing.
     struct NewlineSplitter;
 
     #[async_trait]

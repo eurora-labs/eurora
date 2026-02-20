@@ -8,13 +8,7 @@ use rand_distr::{Distribution, StandardNormal};
 use crate::Result;
 use crate::embeddings::Embeddings;
 
-/// Fake embedding model for unit testing purposes.
-///
-/// This embedding model creates embeddings by sampling from a normal distribution.
-///
-/// Do not use this outside of testing, as it is not a real embedding model.
 pub struct FakeEmbeddings {
-    /// The size of the embedding vector.
     pub size: usize,
 }
 
@@ -42,14 +36,7 @@ impl Embeddings for FakeEmbeddings {
     }
 }
 
-/// Deterministic fake embedding model for unit testing purposes.
-///
-/// This embedding model creates embeddings by sampling from a normal distribution
-/// with a seed based on the hash of the text.
-///
-/// Do not use this outside of testing, as it is not a real embedding model.
 pub struct DeterministicFakeEmbedding {
-    /// The size of the embedding vector.
     pub size: usize,
 }
 
