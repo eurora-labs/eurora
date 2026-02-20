@@ -1,16 +1,10 @@
-//! Unit tests for Generation and GenerationChunk classes.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/outputs/test_generation.py`
-
 use agent_chain_core::outputs::{Generation, GenerationChunk};
 use serde_json::json;
 use std::collections::HashMap;
 
-/// Test suite for Generation class.
 mod generation_tests {
     use super::*;
 
-    /// Test creating a Generation with only text.
     #[test]
     fn test_creation_with_text_only() {
         let generation = Generation::new("Hello, world!");
@@ -19,7 +13,6 @@ mod generation_tests {
         assert_eq!(generation.generation_type, "Generation");
     }
 
-    /// Test creating a Generation with generation_info.
     #[test]
     fn test_creation_with_generation_info() {
         let mut gen_info = HashMap::new();
@@ -31,7 +24,6 @@ mod generation_tests {
         assert_eq!(generation.generation_type, "Generation");
     }
 
-    /// Test creating a Generation with empty text.
     #[test]
     fn test_creation_with_empty_text() {
         let generation = Generation::new("");
@@ -39,20 +31,17 @@ mod generation_tests {
         assert!(generation.generation_info.is_none());
     }
 
-    /// Test that Generation is marked as serializable.
     #[test]
     fn test_is_lc_serializable() {
         assert!(Generation::is_lc_serializable());
     }
 
-    /// Test that Generation returns correct namespace.
     #[test]
     fn test_get_lc_namespace() {
         let expected_namespace = vec!["langchain", "schema", "output"];
         assert_eq!(Generation::get_lc_namespace(), expected_namespace);
     }
 
-    /// Test that type field is set correctly.
     #[test]
     fn test_type_field_is_literal() {
         let generation = Generation::new("test");
@@ -60,11 +49,9 @@ mod generation_tests {
     }
 }
 
-/// Test suite for GenerationChunk class.
 mod test_generation_chunk {
     use super::*;
 
-    /// Test creating a GenerationChunk.
     #[test]
     fn test_creation() {
         let chunk = GenerationChunk::new("chunk");
@@ -72,7 +59,6 @@ mod test_generation_chunk {
         assert!(chunk.generation_info.is_none());
     }
 
-    /// Test concatenating two GenerationChunks.
     #[test]
     fn test_add_two_chunks() {
         let chunk1 = GenerationChunk::new("Hello, ");
@@ -82,7 +68,6 @@ mod test_generation_chunk {
         assert!(result.generation_info.is_none());
     }
 
-    /// Test concatenating chunks with generation_info.
     #[test]
     fn test_add_chunks_with_generation_info() {
         let mut info1 = HashMap::new();
@@ -104,7 +89,6 @@ mod test_generation_chunk {
         assert_eq!(info.get("shared"), Some(&json!("firstsecond")));
     }
 
-    /// Test concatenating chunks where one has None generation_info.
     #[test]
     fn test_add_chunk_with_none_generation_info() {
         let mut info = HashMap::new();
@@ -116,7 +100,6 @@ mod test_generation_chunk {
         assert_eq!(result.generation_info, Some(info));
     }
 
-    /// Test concatenating chunks where both have None generation_info.
     #[test]
     fn test_add_chunks_both_none_generation_info() {
         let chunk1 = GenerationChunk::new("Hello");
@@ -126,7 +109,6 @@ mod test_generation_chunk {
         assert!(result.generation_info.is_none());
     }
 
-    /// Test concatenating empty chunks.
     #[test]
     fn test_add_empty_chunks() {
         let chunk1 = GenerationChunk::new("");
@@ -135,7 +117,6 @@ mod test_generation_chunk {
         assert_eq!(result.text, "");
     }
 
-    /// Test concatenating multiple chunks in sequence.
     #[test]
     fn test_add_multiple_chunks_sequentially() {
         let chunk1 = GenerationChunk::new("A");
@@ -145,8 +126,6 @@ mod test_generation_chunk {
         assert_eq!(result.text, "ABC");
     }
 
-    /// Test that GenerationChunk can be created from Generation via From trait.
-    /// In Python this would test inheritance; in Rust we use the From trait.
     #[test]
     fn test_conversion_from_generation() {
         let generation = Generation::new("test");
@@ -154,7 +133,6 @@ mod test_generation_chunk {
         assert_eq!(chunk.text, "test");
     }
 
-    /// Test that GenerationChunk is serializable.
     #[test]
     fn test_is_lc_serializable_inherited() {
         let chunk = GenerationChunk::new("test");
@@ -163,15 +141,12 @@ mod test_generation_chunk {
             serde_json::from_str(&json_str).expect("deserialization should succeed");
     }
 
-    /// Test that GenerationChunk follows same namespace convention as Generation.
     #[test]
     fn test_get_lc_namespace_inherited() {
         let expected_namespace = vec!["langchain", "schema", "output"];
         assert_eq!(Generation::get_lc_namespace(), expected_namespace);
     }
 
-    /// Test that GenerationChunk type field stays "Generation" (inherited from
-    /// Generation in Python, where GenerationChunk does not override the type).
     #[test]
     fn test_type_field_is_generation() {
         let chunk = GenerationChunk::new("test");
@@ -179,11 +154,9 @@ mod test_generation_chunk {
     }
 }
 
-/// Test suite for Generation serialization roundtrips.
 mod test_generation_serialization {
     use super::*;
 
-    /// Test that serialization produces correct structure.
     #[test]
     fn test_model_dump_basic() {
         let mut gen_info = HashMap::new();
@@ -196,7 +169,6 @@ mod test_generation_serialization {
         assert_eq!(data["type"], "Generation");
     }
 
-    /// Test serialization with None generation_info.
     #[test]
     fn test_model_dump_none_generation_info() {
         let generation = Generation::new("Hello");
@@ -205,7 +177,6 @@ mod test_generation_serialization {
         assert!(data.get("generation_info").is_none());
     }
 
-    /// Test serialization roundtrip via to_value/from_value.
     #[test]
     fn test_model_validate_roundtrip() {
         let mut gen_info = HashMap::new();
@@ -219,7 +190,6 @@ mod test_generation_serialization {
         assert_eq!(restored.generation_type, generation.generation_type);
     }
 
-    /// Test JSON string serialization roundtrip.
     #[test]
     fn test_json_roundtrip() {
         let mut gen_info = HashMap::new();
@@ -234,7 +204,6 @@ mod test_generation_serialization {
         assert_eq!(restored.generation_type, generation.generation_type);
     }
 
-    /// Test GenerationChunk serialization produces correct structure.
     #[test]
     fn test_generation_chunk_model_dump() {
         let mut gen_info = HashMap::new();
@@ -246,7 +215,6 @@ mod test_generation_serialization {
         assert_eq!(data["generation_info"]["key"], "val");
     }
 
-    /// Test GenerationChunk JSON string roundtrip.
     #[test]
     fn test_generation_chunk_json_roundtrip() {
         let mut gen_info = HashMap::new();
@@ -260,11 +228,9 @@ mod test_generation_serialization {
     }
 }
 
-/// Test suite for GenerationChunk merging edge cases.
 mod test_generation_chunk_merging {
     use super::*;
 
-    /// Test merging generation_info containing nested dictionaries.
     #[test]
     fn test_merge_generation_info_with_nested_dicts() {
         let mut info1 = HashMap::new();
@@ -284,7 +250,6 @@ mod test_generation_chunk_merging {
         assert_eq!(nested["key2"], "val2");
     }
 
-    /// Test merging generation_info containing list values.
     #[test]
     fn test_merge_generation_info_with_list_values() {
         let mut info1 = HashMap::new();
@@ -302,7 +267,6 @@ mod test_generation_chunk_merging {
         assert_eq!(info.get("items"), Some(&json!([1, 2, 3, 4])));
     }
 
-    /// Test merging generation_info containing integer values.
     #[test]
     fn test_merge_generation_info_with_int_values() {
         let mut info1 = HashMap::new();
@@ -320,7 +284,6 @@ mod test_generation_chunk_merging {
         assert_eq!(info.get("count"), Some(&json!(8)));
     }
 
-    /// Test that addition always returns GenerationChunk, not Generation.
     #[test]
     fn test_add_preserves_generation_chunk_type() {
         let chunk1 = GenerationChunk::new("A");
@@ -329,7 +292,6 @@ mod test_generation_chunk_merging {
         let _: GenerationChunk = result;
     }
 
-    /// Test that sequential adds properly accumulate generation_info.
     #[test]
     fn test_sequential_add_accumulates_generation_info() {
         let mut info1 = HashMap::new();
@@ -354,7 +316,6 @@ mod test_generation_chunk_merging {
         assert_eq!(info.get("k3"), Some(&json!("v3")));
     }
 
-    /// Test adding when first chunk has None generation_info.
     #[test]
     fn test_add_first_has_none_second_has_info() {
         let chunk1 = GenerationChunk::new("A");

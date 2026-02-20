@@ -1,7 +1,3 @@
-//! Tests for BaseGenerationOutputParser and BaseTransformOutputParser.
-//!
-//! Ported from langchain/libs/core/tests/unit_tests/output_parsers/test_base_parsers.py
-
 use agent_chain_core::GenericFakeChatModel;
 use agent_chain_core::error::Result;
 use agent_chain_core::language_models::BaseChatModel;
@@ -12,7 +8,6 @@ use agent_chain_core::output_parsers::{
 use agent_chain_core::outputs::Generation;
 use futures::StreamExt;
 
-/// Inverts the case of each character in a string, equivalent to Python's str.swapcase().
 fn swap_case(s: &str) -> String {
     s.chars()
         .map(|c| {
@@ -27,8 +22,6 @@ fn swap_case(s: &str) -> String {
         .collect()
 }
 
-/// A parser that inverts the case of the characters in the message.
-/// Implements BaseGenerationOutputParser (via BaseLLMOutputParser + BaseGenerationOutputParser).
 #[derive(Debug)]
 struct GenerationStrInvertCase;
 
@@ -70,8 +63,6 @@ async fn test_base_generation_parser() {
     assert_eq!(result, "HeLLO");
 }
 
-/// A parser that inverts the case of the characters in the message.
-/// Implements BaseTransformOutputParser (via BaseOutputParser + BaseTransformOutputParser).
 #[derive(Debug)]
 struct TransformStrInvertCase;
 

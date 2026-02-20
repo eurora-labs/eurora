@@ -1,7 +1,3 @@
-//! Unit tests for BaseCallbackHandler and AsyncCallbackHandler.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/callbacks/test_base.py`
-
 use agent_chain_core::callbacks::base::{
     AsyncCallbackHandler, BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin,
     LLMManagerMixin, RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
@@ -116,39 +112,24 @@ impl AsyncCallbackHandler for AsyncChatModelStartHandler {
     }
 }
 
-/// Ported from `test_on_llm_end_is_defined`.
-///
-/// When a handler overrides `on_llm_end`, `ignore_llm` should still be `false`.
 #[test]
 fn test_on_llm_end_is_defined() {
     let handler = LlmEndHandler;
     assert!(!handler.ignore_llm());
 }
 
-/// Ported from `test_on_chat_model_start_is_defined`.
-///
-/// When a handler overrides `on_chat_model_start`, `ignore_chat_model` should
-/// still be `false`.
 #[test]
 fn test_on_chat_model_start_is_defined() {
     let handler = ChatModelStartHandler;
     assert!(!handler.ignore_chat_model());
 }
 
-/// Ported from `test_async_on_llm_end_is_defined`.
-///
-/// When an async handler overrides `on_llm_end_async`, `ignore_llm` should
-/// still be `false`.
 #[test]
 fn test_async_on_llm_end_is_defined() {
     let handler = AsyncLlmEndHandler;
     assert!(!handler.ignore_llm());
 }
 
-/// Ported from `test_async_on_chat_model_start_is_defined`.
-///
-/// When an async handler overrides `on_chat_model_start_async`,
-/// `ignore_chat_model` should still be `false`.
 #[test]
 fn test_async_on_chat_model_start_is_defined() {
     let handler = AsyncChatModelStartHandler;

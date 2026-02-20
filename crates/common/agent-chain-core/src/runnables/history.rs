@@ -1,11 +1,3 @@
-//! Runnable that manages chat message history for another Runnable.
-//!
-//! This module provides [`RunnableWithMessageHistory`], which wraps another
-//! runnable and transparently loads / saves chat history around each
-//! invocation.
-//!
-//! Mirrors `langchain_core.runnables.history`.
-
 use std::collections::HashMap;
 use std::fmt;
 use std::future::Future;
@@ -23,14 +15,9 @@ use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
 use crate::runnables::utils::ConfigurableFieldSpec;
 
-/// Closure type for the inner runnable: takes Value input and optional config,
-/// returns Value output.
-///
-/// Mirrors the bound `Runnable.invoke` from Python's `RunnableWithMessageHistory`.
 pub type HistoryInvokeFn =
     Arc<dyn Fn(Value, Option<&RunnableConfig>) -> Result<Value> + Send + Sync>;
 
-/// Async closure type for the inner runnable.
 pub type HistoryAInvokeFn = Arc<
     dyn Fn(
             Value,
@@ -40,18 +27,10 @@ pub type HistoryAInvokeFn = Arc<
         + Sync,
 >;
 
-/// A function that takes configurable params and returns a chat message history.
-///
-/// Mirrors Python's `GetSessionHistoryCallable`.
 pub type GetSessionHistoryFn =
     Arc<dyn Fn(&HashMap<String, String>) -> Arc<Mutex<dyn BaseChatMessageHistory>> + Send + Sync>;
 
-/// Legacy inner runnable type that operates on `Vec<BaseMessage>` directly.
-///
-/// New code should prefer constructing `RunnableWithMessageHistory` with
-/// `from_messages_fn` or by providing a `HistoryInvokeFn` directly.
 pub enum HistoryRunnable {
-    /// A lambda/closure-based runnable.
     Lambda(
         Arc<
             dyn Fn(Vec<BaseMessage>, Option<&RunnableConfig>) -> Result<Vec<BaseMessage>>
@@ -62,7 +41,6 @@ pub enum HistoryRunnable {
 }
 
 impl HistoryRunnable {
-    /// Create a `HistoryRunnable` from a closure.
     pub fn from_fn<F>(f: F) -> Self
     where
         F: Fn(Vec<BaseMessage>, Option<&RunnableConfig>) -> Result<Vec<BaseMessage>>
@@ -73,7 +51,6 @@ impl HistoryRunnable {
         HistoryRunnable::Lambda(Arc::new(f))
     }
 
-    /// Invoke the runnable with the given messages.
     pub fn invoke(
         &self,
         input: Vec<BaseMessage>,
@@ -93,32 +70,13 @@ impl fmt::Debug for HistoryRunnable {
     }
 }
 
-/// Wraps another runnable and manages chat message history.
-///
-/// Mirrors Python's `RunnableWithMessageHistory`.
-///
-/// The wrapped runnable is called with a `serde_json::Value` representing the
-/// (possibly augmented) input. When `history_messages_key` is set, the input
-/// is a dict with history injected under that key; otherwise the input is
-/// a serialized `Vec<BaseMessage>` with history prepended.
 pub struct RunnableWithMessageHistory {
-    /// The wrapped runnable (sync).
     runnable: HistoryInvokeFn,
-    /// Optional async variant of the wrapped runnable.
     runnable_async: Option<HistoryAInvokeFn>,
-    /// Factory that returns a chat message history for a given session.
     get_session_history: GetSessionHistoryFn,
-    /// Key in a dict input that holds the input messages.
-    /// Must be specified if the runnable accepts a dict.
     input_messages_key: Option<String>,
-    /// Key in a dict output that holds the output messages.
-    /// Must be specified if the runnable returns a dict.
     output_messages_key: Option<String>,
-    /// Key where historical messages are injected into the input dict.
-    /// Must be specified if the runnable accepts a dict and expects a
-    /// separate key for historical messages.
     history_messages_key: Option<String>,
-    /// Config specs describing the fields passed to the session factory.
     history_factory_config: Vec<ConfigurableFieldSpec>,
 }
 
@@ -133,17 +91,6 @@ impl fmt::Debug for RunnableWithMessageHistory {
 }
 
 impl RunnableWithMessageHistory {
-    /// Create a new `RunnableWithMessageHistory`.
-    ///
-    /// # Arguments
-    ///
-    /// * `runnable` - Sync invoke function operating on `Value`.
-    /// * `runnable_async` - Optional async invoke function operating on `Value`.
-    /// * `get_session_history` - Factory returning a history for session params.
-    /// * `input_messages_key` - Key in a dict input holding messages.
-    /// * `output_messages_key` - Key in a dict output holding messages.
-    /// * `history_messages_key` - Key where history is injected in the input.
-    /// * `history_factory_config` - Config specs for the session factory params.
     pub fn new(
         runnable: HistoryInvokeFn,
         runnable_async: Option<HistoryAInvokeFn>,
@@ -176,12 +123,6 @@ impl RunnableWithMessageHistory {
         }
     }
 
-    /// Convenience constructor for runnables that take `Vec<BaseMessage>` and
-    /// return `Vec<BaseMessage>`.
-    ///
-    /// Wraps the closure to serialize/deserialize via `Value`, matching
-    /// the Python pattern where `RunnableWithMessageHistory` wraps any
-    /// `Runnable[list[BaseMessage], ...]`.
     pub fn from_messages_fn<F>(
         func: F,
         get_session_history: GetSessionHistoryFn,
@@ -221,10 +162,6 @@ impl RunnableWithMessageHistory {
         )
     }
 
-    /// Convenience constructor that accepts a legacy `HistoryRunnable`.
-    ///
-    /// This preserves backwards compatibility with existing code that
-    /// constructs a `HistoryRunnable` and passes it directly.
     pub fn from_history_runnable(
         runnable: HistoryRunnable,
         get_session_history: GetSessionHistoryFn,
@@ -258,14 +195,10 @@ impl RunnableWithMessageHistory {
         )
     }
 
-    /// Get the config specs for this runnable.
     pub fn config_specs(&self) -> &[ConfigurableFieldSpec] {
         &self.history_factory_config
     }
 
-    /// Get a JSON schema describing the expected input.
-    ///
-    /// Mirrors `RunnableWithMessageHistory.get_input_schema()` from Python.
     pub fn get_input_schema(&self) -> Value {
         if let (Some(input_key), Some(_)) = (&self.input_messages_key, &self.history_messages_key) {
             serde_json::json!({
@@ -301,9 +234,6 @@ impl RunnableWithMessageHistory {
         }
     }
 
-    /// Get a JSON schema describing the expected output.
-    ///
-    /// Mirrors `RunnableWithMessageHistory.get_output_schema()` from Python.
     pub fn get_output_schema(&self) -> Value {
         serde_json::json!({
             "title": "RunnableWithChatHistoryOutput",
@@ -312,9 +242,6 @@ impl RunnableWithMessageHistory {
         })
     }
 
-    /// Extract input messages from the input value.
-    ///
-    /// Mirrors Python's `_get_input_messages`.
     pub fn get_input_messages(&self, input: &Value) -> Result<Vec<BaseMessage>> {
         let value = if let Some(obj) = input.as_object() {
             if let Some(ref key) = self.input_messages_key {
@@ -374,9 +301,6 @@ impl RunnableWithMessageHistory {
             })
     }
 
-    /// Extract output messages from the output value.
-    ///
-    /// Mirrors Python's `_get_output_messages`.
     pub fn get_output_messages(&self, output: &Value) -> Result<Vec<BaseMessage>> {
         let value = if let Some(obj) = output.as_object() {
             let key = if let Some(ref key) = self.output_messages_key {
@@ -432,15 +356,6 @@ impl RunnableWithMessageHistory {
             })
     }
 
-    /// Load history messages and optionally append input messages.
-    ///
-    /// Mirrors Python's `_enter_history`.
-    ///
-    /// When `history_messages_key` is `None`, the returned list contains
-    /// history messages followed by input messages (the runnable sees the
-    /// full thread). When `history_messages_key` is `Some`, only
-    /// the history messages are returned (they will be injected into the
-    /// dict under that key).
     pub fn enter_history(
         &self,
         input: &Value,
@@ -468,12 +383,6 @@ impl RunnableWithMessageHistory {
         Ok(messages)
     }
 
-    /// Save input and output messages to history.
-    ///
-    /// Mirrors Python's `_exit_history`.
-    ///
-    /// Unlike Python, we don't need the `input_messages[len(historic_messages):]`
-    /// deduplication because we have the original input, not the prepended version.
     pub fn exit_history(
         &self,
         input: &Value,
@@ -494,13 +403,6 @@ impl RunnableWithMessageHistory {
         Ok(())
     }
 
-    /// Resolve session history from the config and validate required keys.
-    ///
-    /// Mirrors Python's `_merge_configs`.
-    ///
-    /// Returns the config and the resolved history instance. The history is
-    /// returned separately because we cannot store trait objects in the
-    /// `Value`-based configurable map.
     pub fn merge_configs(
         &self,
         config: RunnableConfig,
@@ -526,14 +428,6 @@ impl RunnableWithMessageHistory {
         Ok((config, history))
     }
 
-    /// Invoke the wrapped runnable with history management.
-    ///
-    /// Mirrors Python's `invoke` flow:
-    /// 1. Merge configs and resolve session history.
-    /// 2. Enter history: load existing messages.
-    /// 3. Build augmented input with history injected.
-    /// 4. Call the inner runnable.
-    /// 5. Exit history: save input + output messages.
     pub fn invoke_with_history(
         &self,
         input: Value,
@@ -573,13 +467,6 @@ impl RunnableWithMessageHistory {
         Ok(output)
     }
 
-    /// Async invoke the wrapped runnable with history management.
-    ///
-    /// Uses `runnable_async` if available, otherwise falls back to the sync
-    /// `runnable`.
-    ///
-    /// TODO: Use async history methods once `BaseChatMessageHistory` has
-    /// truly async variants accessible through `Arc<Mutex<..>>`.
     pub async fn ainvoke_with_history(
         &self,
         input: Value,
@@ -623,9 +510,6 @@ impl RunnableWithMessageHistory {
         Ok(output)
     }
 
-    /// Convenience: invoke with `Vec<BaseMessage>` input and output.
-    ///
-    /// Serializes input to `Value`, calls `invoke`, deserializes output.
     pub fn invoke_messages(
         &self,
         input: Vec<BaseMessage>,
@@ -638,7 +522,6 @@ impl RunnableWithMessageHistory {
             .map_err(|e| Error::Other(format!("Failed to deserialize output messages: {}", e)))
     }
 
-    /// Convenience: async invoke with `Vec<BaseMessage>` input and output.
     pub async fn ainvoke_messages(
         &self,
         input: Vec<BaseMessage>,

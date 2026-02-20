@@ -1,9 +1,3 @@
-//! Tests for base chat model.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/language_models/chat_models/test_base.py`
-//!
-//! This file contains tests for the BaseChatModel trait and related functionality.
-
 use agent_chain_core::error::{Error, Result};
 use agent_chain_core::language_models::GenerateConfig;
 use agent_chain_core::language_models::{
@@ -16,7 +10,6 @@ use agent_chain_core::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult}
 use async_trait::async_trait;
 use futures::StreamExt;
 
-/// Helper function to create messages fixture
 fn create_messages() -> Vec<BaseMessage> {
     vec![
         BaseMessage::System(
@@ -32,7 +25,6 @@ fn create_messages() -> Vec<BaseMessage> {
     ]
 }
 
-/// Helper function to create a second set of messages fixture
 fn create_messages_2() -> Vec<BaseMessage> {
     vec![
         BaseMessage::System(
@@ -48,7 +40,6 @@ fn create_messages_2() -> Vec<BaseMessage> {
     ]
 }
 
-/// A model that only implements `_generate` (no streaming).
 struct ModelWithGenerateOnly {
     config: ChatModelConfig,
 }
@@ -141,7 +132,6 @@ async fn test_astream_fallback_to_ainvoke() {
     assert!(!model.has_stream_impl());
 }
 
-/// A model that implements `_stream` but not `_astream`.
 struct ModelWithSyncStream {
     config: ChatModelConfig,
 }
@@ -239,7 +229,6 @@ async fn test_astream_implementation_fallback_to_stream() {
     assert!(!model.has_astream_impl());
 }
 
-/// A model that implements `_astream`.
 struct ModelWithAsyncStream {
     config: ChatModelConfig,
 }
@@ -337,7 +326,6 @@ async fn test_astream_implementation_uses_astream() {
     assert!(model.has_astream_impl());
 }
 
-/// A model without streaming support.
 struct NoStreamingModel {
     config: ChatModelConfig,
 }
@@ -417,7 +405,6 @@ impl BaseChatModel for NoStreamingModel {
     }
 }
 
-/// A model with streaming support.
 struct StreamingModel {
     config: ChatModelConfig,
     streaming: bool,
@@ -614,7 +601,6 @@ async fn test_disable_streaming_no_streaming_model_async() {
     }
 }
 
-/// A model for testing _get_ls_params.
 struct LSParamsModel {
     config: ChatModelConfig,
     model: String,
@@ -907,7 +893,6 @@ async fn test_generate_basic() {
     assert_eq!(llm_result.generations.len(), 2);
 }
 
-/// Ported from `TestGenerateFromStream::test_accumulates_chunks`.
 #[test]
 fn test_generate_from_stream_accumulates_chunks() {
     use agent_chain_core::language_models::generate_from_stream;
@@ -926,7 +911,6 @@ fn test_generate_from_stream_accumulates_chunks() {
     assert!(result.generations[0].message.content().contains("world"));
 }
 
-/// Ported from `TestGenerateFromStream::test_single_chunk`.
 #[test]
 fn test_generate_from_stream_single_chunk() {
     use agent_chain_core::language_models::generate_from_stream;
@@ -939,7 +923,6 @@ fn test_generate_from_stream_single_chunk() {
     assert_eq!(result.generations[0].message.content(), "single");
 }
 
-/// Ported from `TestGenerateFromStream::test_empty_stream_raises_value_error`.
 #[test]
 fn test_generate_from_stream_empty_raises_error() {
     use agent_chain_core::language_models::generate_from_stream;
@@ -949,7 +932,6 @@ fn test_generate_from_stream_empty_raises_error() {
     assert!(result.is_err());
 }
 
-/// Ported from `TestAGenerateFromStream::test_accumulates_chunks`.
 #[tokio::test]
 async fn test_agenerate_from_stream_accumulates_chunks() {
     use agent_chain_core::language_models::agenerate_from_stream;
@@ -967,7 +949,6 @@ async fn test_agenerate_from_stream_accumulates_chunks() {
     assert_eq!(result.generations.len(), 1);
 }
 
-/// Ported from `TestAGenerateFromStream::test_empty_stream_raises_value_error`.
 #[tokio::test]
 async fn test_agenerate_from_stream_empty_raises_error() {
     use agent_chain_core::language_models::agenerate_from_stream;
@@ -978,7 +959,6 @@ async fn test_agenerate_from_stream_empty_raises_error() {
     assert!(result.is_err());
 }
 
-/// Ported from `TestCombineLlmOutputs::test_returns_empty_dict_by_default`.
 #[test]
 fn test_combine_llm_outputs_returns_empty_dict() {
     let model = agent_chain_core::FakeChatModel::new();
@@ -986,7 +966,6 @@ fn test_combine_llm_outputs_returns_empty_dict() {
     assert!(result.is_empty());
 }
 
-/// Ported from `TestCombineLlmOutputs::test_returns_empty_dict_with_empty_list`.
 #[test]
 fn test_combine_llm_outputs_returns_empty_dict_with_empty_list() {
     let model = agent_chain_core::FakeChatModel::new();
@@ -994,7 +973,6 @@ fn test_combine_llm_outputs_returns_empty_dict_with_empty_list() {
     assert!(result.is_empty());
 }
 
-/// Ported from `TestConvertCachedGenerations::test_with_chat_generation_objects`.
 #[test]
 fn test_convert_cached_generations_chat_generation() {
     use agent_chain_core::outputs::Generation;
@@ -1006,7 +984,6 @@ fn test_convert_cached_generations_chat_generation() {
     assert_eq!(result[0].message.content(), "hello");
 }
 
-/// Ported from `TestConvertCachedGenerations::test_with_legacy_generation_objects`.
 #[test]
 fn test_convert_cached_generations_legacy() {
     use agent_chain_core::outputs::Generation;
@@ -1022,7 +999,6 @@ fn test_convert_cached_generations_legacy() {
     assert_eq!(result[1].message.content(), "second");
 }
 
-/// Ported from `TestConvertCachedGenerations::test_with_mixed_generation_objects`.
 #[test]
 fn test_convert_cached_generations_mixed() {
     use agent_chain_core::outputs::Generation;
@@ -1040,21 +1016,18 @@ fn test_convert_cached_generations_mixed() {
     assert_eq!(result[2].message.content(), "c");
 }
 
-/// Ported from `TestShouldStream::test_no_stream_implemented_returns_false`.
 #[test]
 fn test_should_stream_no_stream_returns_false() {
     let model = agent_chain_core::FakeChatModel::new();
     assert!(!model._should_stream(false, false, None, None));
 }
 
-/// Ported from `TestShouldStream::test_no_stream_or_astream_returns_false_for_async`.
 #[test]
 fn test_should_stream_no_astream_returns_false() {
     let model = agent_chain_core::FakeChatModel::new();
     assert!(!model._should_stream(true, false, None, None));
 }
 
-/// Ported from `TestShouldStream::test_disable_streaming_true_returns_false`.
 #[test]
 fn test_should_stream_disabled_returns_false() {
     let config = ChatModelConfig::new().with_disable_streaming(true);
@@ -1062,21 +1035,18 @@ fn test_should_stream_disabled_returns_false() {
     assert!(!model._should_stream(false, false, None, None));
 }
 
-/// Ported from `TestShouldStream::test_stream_kwarg_true`.
 #[test]
 fn test_should_stream_kwarg_true() {
     let model = FakeListChatModel::new(vec!["test".to_string()]);
     assert!(model._should_stream(false, false, Some(true), None));
 }
 
-/// Ported from `TestShouldStream::test_stream_kwarg_false`.
 #[test]
 fn test_should_stream_kwarg_false() {
     let model = FakeListChatModel::new(vec!["test".to_string()]);
     assert!(!model._should_stream(false, false, Some(false), None));
 }
 
-/// Ported from `TestShouldStream::test_no_handlers_no_streaming`.
 #[test]
 fn test_should_stream_no_handlers() {
     let model = FakeListChatModel::new(vec!["test".to_string()]);
@@ -1085,7 +1055,6 @@ fn test_should_stream_no_handlers() {
     assert!(!model._should_stream(false, false, None, Some(&handlers)));
 }
 
-/// Ported from `TestConvertInput::test_convert_input_from_string`.
 #[test]
 fn test_convert_input_from_string() {
     let model = agent_chain_core::FakeChatModel::new();
@@ -1097,7 +1066,6 @@ fn test_convert_input_from_string() {
     assert_eq!(result[0].content(), "hello world");
 }
 
-/// Ported from `TestConvertInput::test_convert_input_from_message_sequence`.
 #[test]
 fn test_convert_input_from_message_sequence() {
     let model = agent_chain_core::FakeChatModel::new();
@@ -1111,7 +1079,6 @@ fn test_convert_input_from_message_sequence() {
     assert_eq!(result[0].content(), "hi");
 }
 
-/// Ported from `TestGenerateMethod::test_single_message_list`.
 #[tokio::test]
 async fn test_generate_single_message_list() {
     let model = FakeListChatModel::new(vec!["response".to_string()]);
@@ -1127,7 +1094,6 @@ async fn test_generate_single_message_list() {
     assert_eq!(result.generations.len(), 1);
 }
 
-/// Ported from `TestGenerateMethod::test_multiple_message_lists`.
 #[tokio::test]
 async fn test_generate_multiple_message_lists() {
     let model = FakeListChatModel::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
@@ -1151,7 +1117,6 @@ async fn test_generate_multiple_message_lists() {
     assert_eq!(result.generations.len(), 3);
 }
 
-/// Ported from `TestGenerateMethod::test_generate_returns_chat_result`.
 #[tokio::test]
 async fn test_generate_returns_chat_result() {
     let model = FakeListChatModel::new(vec!["hello".to_string()]);
@@ -1173,7 +1138,6 @@ async fn test_generate_returns_chat_result() {
     }
 }
 
-/// Ported from `TestAGenerateMethod::test_single_message_list`.
 #[tokio::test]
 async fn test_agenerate_single_message_list() {
     let model = FakeListChatModel::new(vec!["response".to_string()]);
@@ -1189,7 +1153,6 @@ async fn test_agenerate_single_message_list() {
     assert_eq!(result.generations.len(), 1);
 }
 
-/// Ported from `TestAGenerateMethod::test_multiple_message_lists`.
 #[tokio::test]
 async fn test_agenerate_multiple_message_lists() {
     let model = FakeListChatModel::new(vec!["r1".to_string(), "r2".to_string()]);
@@ -1210,7 +1173,6 @@ async fn test_agenerate_multiple_message_lists() {
     assert_eq!(result.generations.len(), 2);
 }
 
-/// Ported from `TestAGenerateMethod::test_agenerate_returns_chat_result`.
 #[tokio::test]
 async fn test_agenerate_returns_chat_result() {
     let model = FakeListChatModel::new(vec!["hello".to_string()]);
@@ -1226,7 +1188,6 @@ async fn test_agenerate_returns_chat_result() {
     assert_eq!(result.generations.len(), 1);
 }
 
-/// Ported from `TestBindTools::test_raises_not_implemented_by_default`.
 #[test]
 fn test_bind_tools_raises_not_implemented() {
     let model = agent_chain_core::FakeChatModel::new();
@@ -1234,7 +1195,6 @@ fn test_bind_tools_raises_not_implemented() {
     assert!(result.is_err());
 }
 
-/// Ported from `TestWithStructuredOutput::test_raises_not_implemented`.
 #[test]
 fn test_with_structured_output_raises_not_implemented() {
     let model = agent_chain_core::FakeChatModel::new();
@@ -1242,7 +1202,6 @@ fn test_with_structured_output_raises_not_implemented() {
     assert!(result.is_err());
 }
 
-/// Ported from `TestSimpleChatModelGenerate::test_generate_wraps_call_output`.
 #[tokio::test]
 async fn test_simple_chat_model_generate_wraps_call() {
     let model = agent_chain_core::FakeChatModel::new();
@@ -1260,7 +1219,6 @@ async fn test_simple_chat_model_generate_wraps_call() {
     assert_eq!(result.generations[0].message.content(), "fake response");
 }
 
-/// Ported from `TestSimpleChatModelFakeChatModel::test_generate_returns_chat_result`.
 #[tokio::test]
 async fn test_simple_fake_chat_generate_returns_chat_result() {
     let model = agent_chain_core::FakeChatModel::new();
@@ -1278,7 +1236,6 @@ async fn test_simple_fake_chat_generate_returns_chat_result() {
     assert!(matches!(result.generations[0].message, BaseMessage::AI(_)));
 }
 
-/// Ported from `TestSimpleChatModelFakeChatModel::test_agenerate_returns_chat_result`.
 #[tokio::test]
 async fn test_simple_fake_chat_agenerate_returns_chat_result() {
     let model = agent_chain_core::FakeChatModel::new();
@@ -1296,7 +1253,6 @@ async fn test_simple_fake_chat_agenerate_returns_chat_result() {
     assert_eq!(result.generations[0].message.content(), "fake response");
 }
 
-/// Ported from `TestGenInfoAndMsgMetadata::test_merges_generation_info_with_response_metadata`.
 #[test]
 fn test_gen_info_merges_with_response_metadata() {
     use agent_chain_core::language_models::chat_models::_gen_info_and_msg_metadata;
@@ -1322,7 +1278,6 @@ fn test_gen_info_merges_with_response_metadata() {
     assert_eq!(result.get("model").and_then(|v| v.as_str()), Some("test"));
 }
 
-/// Ported from `TestGenInfoAndMsgMetadata::test_empty_generation_info`.
 #[test]
 fn test_gen_info_empty_generation_info() {
     use agent_chain_core::language_models::chat_models::_gen_info_and_msg_metadata;
@@ -1339,7 +1294,6 @@ fn test_gen_info_empty_generation_info() {
     assert_eq!(result.get("key").and_then(|v| v.as_str()), Some("val"));
 }
 
-/// Ported from `TestGenInfoAndMsgMetadata::test_empty_response_metadata`.
 #[test]
 fn test_gen_info_empty_response_metadata() {
     use agent_chain_core::language_models::chat_models::_gen_info_and_msg_metadata;
@@ -1356,7 +1310,6 @@ fn test_gen_info_empty_response_metadata() {
     assert_eq!(result.get("token_count").and_then(|v| v.as_i64()), Some(10));
 }
 
-/// Ported from `TestGenInfoAndMsgMetadata::test_response_metadata_overrides_generation_info`.
 #[test]
 fn test_gen_info_response_metadata_overrides() {
     use agent_chain_core::language_models::chat_models::_gen_info_and_msg_metadata;
@@ -1381,7 +1334,6 @@ fn test_gen_info_response_metadata_overrides() {
     );
 }
 
-/// Test that streaming via `stream()` injects response_metadata on yielded chunks.
 #[tokio::test]
 async fn test_stream_injects_response_metadata() {
     use agent_chain_core::messages::AIMessageChunk;
@@ -1410,7 +1362,6 @@ async fn test_stream_injects_response_metadata() {
     );
 }
 
-/// Test that `on_llm_new_token` receives chunk data when streaming.
 #[tokio::test]
 async fn test_stream_callback_receives_chunk_data() {
     use agent_chain_core::callbacks::base::{
@@ -1482,7 +1433,6 @@ async fn test_stream_callback_receives_chunk_data() {
     );
 }
 
-/// Test that StructuredOutputWithRaw returns raw + parsed + null error on successful parse.
 #[tokio::test]
 async fn test_structured_output_with_raw_success() {
     use agent_chain_core::language_models::{ChatModelRunnable, StructuredOutputWithRaw};
@@ -1518,10 +1468,6 @@ async fn test_structured_output_with_raw_success() {
     assert!(!result["raw"].is_null());
 }
 
-/// Test that StructuredOutputWithRaw returns null parsed when no tool calls match.
-///
-/// JsonOutputKeyToolsParser with first_tool_only returns Ok(Null) when no
-/// matching tool calls exist, so parsing_error remains null.
 #[tokio::test]
 async fn test_structured_output_with_raw_no_matching_tool() {
     use agent_chain_core::language_models::{ChatModelRunnable, StructuredOutputWithRaw};
@@ -1547,9 +1493,6 @@ async fn test_structured_output_with_raw_no_matching_tool() {
     assert!(!result["raw"].is_null());
 }
 
-/// Test that StructuredOutputWithRaw catches parse errors and returns them.
-///
-/// Uses a tool call with invalid JSON in additional_kwargs to trigger a real parse error.
 #[tokio::test]
 async fn test_structured_output_with_raw_parse_error() {
     use agent_chain_core::language_models::{ChatModelRunnable, StructuredOutputWithRaw};
@@ -1586,7 +1529,6 @@ async fn test_structured_output_with_raw_parse_error() {
     assert!(result.get("raw").is_some());
 }
 
-/// Test that StructuredOutputWithRaw returns correct raw serialization.
 #[tokio::test]
 async fn test_structured_output_with_raw_serializes_message() {
     use agent_chain_core::language_models::{ChatModelRunnable, StructuredOutputWithRaw};

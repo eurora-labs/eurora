@@ -1,7 +1,3 @@
-//! Tests for FunctionMessage and FunctionMessageChunk.
-//!
-//! Converted from `langchain/libs/core/tests/unit_tests/messages/test_function.py`
-
 use agent_chain_core::messages::{FunctionMessage, FunctionMessageChunk};
 
 #[test]

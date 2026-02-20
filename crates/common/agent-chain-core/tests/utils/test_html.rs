@@ -1,7 +1,3 @@
-//! Tests for HTML utilities.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/utils/test_html.py`
-
 use agent_chain_core::utils::html::{
     PREFIXES_TO_IGNORE, SUFFIXES_TO_IGNORE, extract_sub_links, find_all_links,
 };

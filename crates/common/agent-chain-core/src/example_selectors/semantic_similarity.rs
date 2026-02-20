@@ -7,7 +7,6 @@ use crate::documents::Document;
 use crate::example_selectors::BaseExampleSelector;
 use crate::vectorstores::VectorStore;
 
-/// Return a list of values in dict sorted by key.
 pub fn sorted_values(values: &HashMap<String, String>) -> Vec<String> {
     let mut keys: Vec<&String> = values.keys().collect();
     keys.sort();
@@ -47,16 +46,10 @@ fn documents_to_examples(
     examples
 }
 
-/// Select examples based on semantic similarity.
 pub struct SemanticSimilarityExampleSelector {
-    /// VectorStore that contains information about examples.
     pub vectorstore: Box<dyn VectorStore>,
-    /// Number of examples to select.
     pub k: usize,
-    /// Optional keys to filter examples to.
     pub example_keys: Option<Vec<String>>,
-    /// Optional keys to filter input to. If provided, the search is based on
-    /// the input variables instead of all variables.
     pub input_keys: Option<Vec<String>>,
 }
 
@@ -109,20 +102,11 @@ impl BaseExampleSelector for SemanticSimilarityExampleSelector {
     }
 }
 
-/// Select examples based on Max Marginal Relevance.
-///
-/// This was shown to improve performance in this paper:
-/// https://arxiv.org/pdf/2211.13892.pdf
 pub struct MaxMarginalRelevanceExampleSelector {
-    /// VectorStore that contains information about examples.
     pub vectorstore: Box<dyn VectorStore>,
-    /// Number of examples to select.
     pub k: usize,
-    /// Number of examples to fetch to rerank.
     pub fetch_k: usize,
-    /// Optional keys to filter examples to.
     pub example_keys: Option<Vec<String>>,
-    /// Optional keys to filter input to.
     pub input_keys: Option<Vec<String>>,
 }
 

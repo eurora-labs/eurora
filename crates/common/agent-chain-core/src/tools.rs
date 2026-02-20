@@ -1,39 +1,3 @@
-//! **Tools** are classes that an Agent uses to interact with the world.
-//!
-//! Each tool has a **description**. Agent uses the description to choose the right
-//! tool for the job.
-//!
-//! This module provides the core tool abstractions, mirroring
-//! `langchain_core.tools`.
-//!
-//! # Overview
-//!
-//! Tools are the primary way for LLM agents to interact with external systems,
-//! APIs, and data sources. This module provides:
-//!
-//! - [`BaseTool`] - The base trait that all tools must implement
-//! - [`Tool`] - A simple single-input string-to-string tool
-//! - [`StructuredTool`] - A tool that accepts multiple typed arguments
-//! - [`ToolDefinition`] - Schema definition for LLM function calling
-//! - Rendering utilities for displaying tool information
-//! - Retriever tool creation utilities
-//!
-//! # Example
-//!
-//! ```rust,ignore
-//! use agent_chain_core::tools::{Tool, StructuredTool, BaseTool, ToolInput};
-//!
-//! // Create a simple tool
-//! let echo_tool = Tool::from_function(
-//!     |input| Ok(format!("Echo: {}", input)),
-//!     "echo",
-//!     "Echoes back the input",
-//! );
-//!
-//! // Use the tool
-//! let result = echo_tool.run(ToolInput::from("Hello"), None)?;
-//! ```
-
 pub mod base;
 pub mod convert;
 pub mod render;

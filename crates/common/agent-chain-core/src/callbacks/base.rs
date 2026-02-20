@@ -1,8 +1,3 @@
-//! Base callback handler for LangChain.
-//!
-//! This module provides the base traits and types for the callback system,
-//! following the LangChain pattern.
-
 use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -14,9 +9,7 @@ use uuid::Uuid;
 use crate::messages::BaseMessage;
 use crate::outputs::ChatResult;
 
-/// Mixin for Retriever callbacks.
 pub trait RetrieverManagerMixin {
-    /// Run when Retriever errors.
     fn on_retriever_error(
         &self,
         error: &dyn std::error::Error,
@@ -26,7 +19,6 @@ pub trait RetrieverManagerMixin {
         let _ = (error, run_id, parent_run_id);
     }
 
-    /// Run when Retriever ends running.
     fn on_retriever_end(
         &self,
         documents: &[serde_json::Value],
@@ -37,9 +29,7 @@ pub trait RetrieverManagerMixin {
     }
 }
 
-/// Mixin for LLM callbacks.
 pub trait LLMManagerMixin {
-    /// Run on new output token. Only available when streaming is enabled.
     fn on_llm_new_token(
         &self,
         token: &str,
@@ -50,12 +40,10 @@ pub trait LLMManagerMixin {
         let _ = (token, run_id, parent_run_id, chunk);
     }
 
-    /// Run when LLM ends running.
     fn on_llm_end(&self, response: &ChatResult, run_id: Uuid, parent_run_id: Option<Uuid>) {
         let _ = (response, run_id, parent_run_id);
     }
 
-    /// Run when LLM errors.
     fn on_llm_error(
         &self,
         error: &dyn std::error::Error,
@@ -66,9 +54,7 @@ pub trait LLMManagerMixin {
     }
 }
 
-/// Mixin for chain callbacks.
 pub trait ChainManagerMixin {
-    /// Run when chain ends running.
     fn on_chain_end(
         &self,
         outputs: &HashMap<String, serde_json::Value>,
@@ -78,7 +64,6 @@ pub trait ChainManagerMixin {
         let _ = (outputs, run_id, parent_run_id);
     }
 
-    /// Run when chain errors.
     fn on_chain_error(
         &self,
         error: &dyn std::error::Error,
@@ -88,7 +73,6 @@ pub trait ChainManagerMixin {
         let _ = (error, run_id, parent_run_id);
     }
 
-    /// Run on agent action.
     fn on_agent_action(
         &self,
         action: &serde_json::Value,
@@ -99,7 +83,6 @@ pub trait ChainManagerMixin {
         let _ = (action, run_id, parent_run_id, color);
     }
 
-    /// Run on the agent end.
     fn on_agent_finish(
         &self,
         finish: &serde_json::Value,
@@ -111,9 +94,7 @@ pub trait ChainManagerMixin {
     }
 }
 
-/// Mixin for tool callbacks.
 pub trait ToolManagerMixin {
-    /// Run when the tool ends running.
     fn on_tool_end(
         &self,
         output: &str,
@@ -133,7 +114,6 @@ pub trait ToolManagerMixin {
         );
     }
 
-    /// Run when tool errors.
     fn on_tool_error(
         &self,
         error: &dyn std::error::Error,
@@ -144,9 +124,7 @@ pub trait ToolManagerMixin {
     }
 }
 
-/// Mixin for callback manager.
 pub trait CallbackManagerMixin {
-    /// Run when LLM starts running.
     #[allow(clippy::too_many_arguments)]
     fn on_llm_start(
         &self,
@@ -160,10 +138,6 @@ pub trait CallbackManagerMixin {
         let _ = (serialized, prompts, run_id, parent_run_id, tags, metadata);
     }
 
-    /// Run when a chat model starts running.
-    ///
-    /// The default implementation falls back to on_llm_start with stringified
-    /// messages, matching Python's NotImplementedError fallback behavior.
     #[allow(clippy::too_many_arguments)]
     fn on_chat_model_start(
         &self,
@@ -189,7 +163,6 @@ pub trait CallbackManagerMixin {
         );
     }
 
-    /// Run when the Retriever starts running.
     #[allow(clippy::too_many_arguments)]
     fn on_retriever_start(
         &self,
@@ -212,7 +185,6 @@ pub trait CallbackManagerMixin {
         );
     }
 
-    /// Run when a chain starts running.
     #[allow(clippy::too_many_arguments)]
     fn on_chain_start(
         &self,
@@ -235,7 +207,6 @@ pub trait CallbackManagerMixin {
         );
     }
 
-    /// Run when the tool starts running.
     #[allow(clippy::too_many_arguments)]
     fn on_tool_start(
         &self,
@@ -259,9 +230,7 @@ pub trait CallbackManagerMixin {
     }
 }
 
-/// Mixin for run manager.
 pub trait RunManagerMixin {
-    /// Run on an arbitrary text.
     fn on_text(
         &self,
         text: &str,
@@ -273,12 +242,10 @@ pub trait RunManagerMixin {
         let _ = (text, run_id, parent_run_id, color, end);
     }
 
-    /// Run on a retry event.
     fn on_retry(&self, retry_state: &dyn Any, run_id: Uuid, parent_run_id: Option<Uuid>) {
         let _ = (retry_state, run_id, parent_run_id);
     }
 
-    /// Override to define a handler for a custom event.
     fn on_custom_event(
         &self,
         name: &str,
@@ -291,10 +258,6 @@ pub trait RunManagerMixin {
     }
 }
 
-/// Base callback handler for LangChain.
-///
-/// This trait combines all the mixin traits and provides the base interface
-/// for callback handlers. Handlers can override specific methods they care about.
 pub trait BaseCallbackHandler:
     LLMManagerMixin
     + ChainManagerMixin
@@ -306,64 +269,49 @@ pub trait BaseCallbackHandler:
     + Sync
     + Debug
 {
-    /// Whether to raise an error if an exception occurs.
     fn raise_error(&self) -> bool {
         false
     }
 
-    /// Whether to run the callback inline.
     fn run_inline(&self) -> bool {
         false
     }
 
-    /// Whether to ignore LLM callbacks.
     fn ignore_llm(&self) -> bool {
         false
     }
 
-    /// Whether to ignore retry callbacks.
     fn ignore_retry(&self) -> bool {
         false
     }
 
-    /// Whether to ignore chain callbacks.
     fn ignore_chain(&self) -> bool {
         false
     }
 
-    /// Whether to ignore agent callbacks.
     fn ignore_agent(&self) -> bool {
         false
     }
 
-    /// Whether to ignore retriever callbacks.
     fn ignore_retriever(&self) -> bool {
         false
     }
 
-    /// Whether to ignore chat model callbacks.
     fn ignore_chat_model(&self) -> bool {
         false
     }
 
-    /// Whether to ignore custom events.
     fn ignore_custom_event(&self) -> bool {
         false
     }
 
-    /// Get a unique name for this handler.
-    /// Note: This is a Rust-specific addition for debugging purposes.
     fn name(&self) -> &str {
         "BaseCallbackHandler"
     }
 }
 
-/// Async callback handler for LangChain.
-///
-/// This trait provides async versions of all callback methods.
 #[async_trait]
 pub trait AsyncCallbackHandler: BaseCallbackHandler {
-    /// Run when LLM starts running (async).
     #[allow(clippy::too_many_arguments)]
     async fn on_llm_start_async(
         &self,
@@ -377,10 +325,6 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         let _ = (serialized, prompts, run_id, parent_run_id, tags, metadata);
     }
 
-    /// Run when a chat model starts running (async).
-    ///
-    /// The default implementation falls back to on_llm_start_async with stringified
-    /// messages, matching Python's NotImplementedError fallback behavior.
     #[allow(clippy::too_many_arguments)]
     async fn on_chat_model_start_async(
         &self,
@@ -407,7 +351,6 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         .await;
     }
 
-    /// Run on new output token (async).
     async fn on_llm_new_token_async(
         &self,
         token: &str,
@@ -419,7 +362,6 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         let _ = (token, run_id, parent_run_id, chunk, tags);
     }
 
-    /// Run when LLM ends running (async).
     async fn on_llm_end_async(
         &self,
         response: &ChatResult,
@@ -430,7 +372,6 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         let _ = (response, run_id, parent_run_id, tags);
     }
 
-    /// Run when LLM errors (async).
     async fn on_llm_error_async(
         &self,
         error: &str,
@@ -441,7 +382,6 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         let _ = (error, run_id, parent_run_id, tags);
     }
 
-    /// Run when chain starts running (async).
     #[allow(clippy::too_many_arguments)]
     async fn on_chain_start_async(
         &self,
@@ -464,7 +404,6 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         );
     }
 
-    /// Run when chain ends running (async).
     async fn on_chain_end_async(
         &self,
         outputs: &HashMap<String, serde_json::Value>,
@@ -475,7 +414,6 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         let _ = (outputs, run_id, parent_run_id, tags);
     }
 
-    /// Run when chain errors (async).
     async fn on_chain_error_async(
         &self,
         error: &str,
@@ -486,7 +424,6 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         let _ = (error, run_id, parent_run_id, tags);
     }
 
-    /// Run when tool starts running (async).
     #[allow(clippy::too_many_arguments)]
     async fn on_tool_start_async(
         &self,
@@ -509,7 +446,6 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         );
     }
 
-    /// Run when tool ends running (async).
     async fn on_tool_end_async(
         &self,
         output: &str,
@@ -520,7 +456,6 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         let _ = (output, run_id, parent_run_id, tags);
     }
 
-    /// Run when tool errors (async).
     async fn on_tool_error_async(
         &self,
         error: &str,
@@ -531,7 +466,6 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         let _ = (error, run_id, parent_run_id, tags);
     }
 
-    /// Run on an arbitrary text (async).
     async fn on_text_async(
         &self,
         text: &str,
@@ -542,7 +476,6 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         let _ = (text, run_id, parent_run_id, tags);
     }
 
-    /// Run on a retry event (async).
     async fn on_retry_async(
         &self,
         retry_state: &serde_json::Value,
@@ -552,7 +485,6 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         let _ = (retry_state, run_id, parent_run_id);
     }
 
-    /// Run on agent action (async).
     async fn on_agent_action_async(
         &self,
         action: &serde_json::Value,
@@ -563,7 +495,6 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         let _ = (action, run_id, parent_run_id, tags);
     }
 
-    /// Run on the agent end (async).
     async fn on_agent_finish_async(
         &self,
         finish: &serde_json::Value,
@@ -574,7 +505,6 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         let _ = (finish, run_id, parent_run_id, tags);
     }
 
-    /// Run on the retriever start (async).
     #[allow(clippy::too_many_arguments)]
     async fn on_retriever_start_async(
         &self,
@@ -597,7 +527,6 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         );
     }
 
-    /// Run on the retriever end (async).
     async fn on_retriever_end_async(
         &self,
         documents: &[serde_json::Value],
@@ -608,7 +537,6 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         let _ = (documents, run_id, parent_run_id, tags);
     }
 
-    /// Run on retriever error (async).
     async fn on_retriever_error_async(
         &self,
         error: &str,
@@ -619,7 +547,6 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         let _ = (error, run_id, parent_run_id, tags);
     }
 
-    /// Override to define a handler for custom events (async).
     async fn on_custom_event_async(
         &self,
         name: &str,
@@ -632,31 +559,18 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
     }
 }
 
-/// Type alias for a boxed callback handler.
 pub type BoxedCallbackHandler = Box<dyn BaseCallbackHandler>;
 
-/// Type alias for an Arc-wrapped callback handler.
 pub type ArcCallbackHandler = Arc<dyn BaseCallbackHandler>;
 
-/// Base callback manager for LangChain.
-///
-/// Manages a collection of callback handlers and provides methods to
-/// add, remove, and configure handlers.
 #[derive(Debug, Clone)]
 pub struct BaseCallbackManager {
-    /// The handlers.
     pub handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-    /// The inheritable handlers.
     pub inheritable_handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-    /// The parent run ID.
     pub parent_run_id: Option<Uuid>,
-    /// The tags.
     pub tags: Vec<String>,
-    /// The inheritable tags.
     pub inheritable_tags: Vec<String>,
-    /// The metadata.
     pub metadata: HashMap<String, serde_json::Value>,
-    /// The inheritable metadata.
     pub inheritable_metadata: HashMap<String, serde_json::Value>,
 }
 
@@ -667,7 +581,6 @@ impl Default for BaseCallbackManager {
 }
 
 impl BaseCallbackManager {
-    /// Create a new callback manager.
     pub fn new() -> Self {
         Self {
             handlers: Vec::new(),
@@ -680,9 +593,6 @@ impl BaseCallbackManager {
         }
     }
 
-    /// Create a new callback manager with handlers.
-    ///
-    /// This matches the Python `__init__` signature.
     #[allow(clippy::too_many_arguments)]
     pub fn with_handlers(
         handlers: Vec<Arc<dyn BaseCallbackHandler>>,
@@ -704,7 +614,6 @@ impl BaseCallbackManager {
         }
     }
 
-    /// Return a copy of the callback manager.
     pub fn copy(&self) -> Self {
         Self {
             handlers: self.handlers.clone(),
@@ -717,10 +626,6 @@ impl BaseCallbackManager {
         }
     }
 
-    /// Merge with another callback manager.
-    ///
-    /// Note: This matches Python's behavior which does NOT merge inheritable_metadata
-    /// (this appears to be a bug in the Python implementation, but we match it for compatibility).
     pub fn merge(&self, other: &BaseCallbackManager) -> Self {
         let mut tags_set: std::collections::HashSet<String> = self.tags.iter().cloned().collect();
         tags_set.extend(other.tags.iter().cloned());
@@ -767,12 +672,10 @@ impl BaseCallbackManager {
         manager
     }
 
-    /// Whether the callback manager is async.
     pub fn is_async(&self) -> bool {
         false
     }
 
-    /// Add a handler to the callback manager.
     pub fn add_handler(&mut self, handler: Arc<dyn BaseCallbackHandler>, inherit: bool) {
         if !self
             .handlers
@@ -791,7 +694,6 @@ impl BaseCallbackManager {
         }
     }
 
-    /// Remove a handler from the callback manager.
     pub fn remove_handler(&mut self, handler: &Arc<dyn BaseCallbackHandler>) {
         self.handlers
             .retain(|h| !std::ptr::eq(h.as_ref(), handler.as_ref()));
@@ -799,7 +701,6 @@ impl BaseCallbackManager {
             .retain(|h| !std::ptr::eq(h.as_ref(), handler.as_ref()));
     }
 
-    /// Set handlers as the only handlers on the callback manager.
     pub fn set_handlers(&mut self, handlers: Vec<Arc<dyn BaseCallbackHandler>>, inherit: bool) {
         self.handlers.clear();
         self.inheritable_handlers.clear();
@@ -808,12 +709,10 @@ impl BaseCallbackManager {
         }
     }
 
-    /// Set a single handler as the only handler on the callback manager.
     pub fn set_handler(&mut self, handler: Arc<dyn BaseCallbackHandler>, inherit: bool) {
         self.set_handlers(vec![handler], inherit);
     }
 
-    /// Add tags to the callback manager.
     pub fn add_tags(&mut self, tags: Vec<String>, inherit: bool) {
         for tag in &tags {
             if self.tags.contains(tag) {
@@ -826,7 +725,6 @@ impl BaseCallbackManager {
         }
     }
 
-    /// Remove tags from the callback manager.
     pub fn remove_tags(&mut self, tags: Vec<String>) {
         for tag in &tags {
             self.tags.retain(|t| t != tag);
@@ -834,7 +732,6 @@ impl BaseCallbackManager {
         }
     }
 
-    /// Add metadata to the callback manager.
     pub fn add_metadata(&mut self, metadata: HashMap<String, serde_json::Value>, inherit: bool) {
         self.metadata.extend(metadata.clone());
         if inherit {
@@ -842,7 +739,6 @@ impl BaseCallbackManager {
         }
     }
 
-    /// Remove metadata from the callback manager.
     pub fn remove_metadata(&mut self, keys: Vec<String>) {
         for key in &keys {
             self.metadata.remove(key);
@@ -851,32 +747,25 @@ impl BaseCallbackManager {
     }
 }
 
-/// Callbacks type alias - can be a list of handlers or a callback manager.
 #[derive(Debug, Clone)]
 pub enum Callbacks {
-    /// A list of callback handlers.
     Handlers(Vec<Arc<dyn BaseCallbackHandler>>),
-    /// A callback manager.
     Manager(BaseCallbackManager),
 }
 
 impl Callbacks {
-    /// Create empty callbacks.
     pub fn none() -> Option<Self> {
         None
     }
 
-    /// Create callbacks from handlers.
     pub fn from_handlers(handlers: Vec<Arc<dyn BaseCallbackHandler>>) -> Self {
         Callbacks::Handlers(handlers)
     }
 
-    /// Create callbacks from a manager.
     pub fn from_manager(manager: BaseCallbackManager) -> Self {
         Callbacks::Manager(manager)
     }
 
-    /// Convert to a callback manager.
     pub fn to_manager(&self) -> BaseCallbackManager {
         match self {
             Callbacks::Handlers(handlers) => BaseCallbackManager::with_handlers(

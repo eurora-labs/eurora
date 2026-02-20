@@ -1,13 +1,5 @@
-//! Unit tests for outputs module exports.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/outputs/test_imports.py`
-//!
-//! Note: Rust doesn't have a direct equivalent to Python's `__all__`. Instead, we verify
-//! that the expected types are re-exported from the outputs module and can be used.
-
 use agent_chain_core::outputs;
 
-/// Expected exports from the outputs module (matching Python's EXPECTED_ALL).
 const EXPECTED_ALL: &[&str] = &[
     "ChatGeneration",
     "ChatGenerationChunk",
@@ -18,10 +10,6 @@ const EXPECTED_ALL: &[&str] = &[
     "RunInfo",
 ];
 
-/// Test that all expected types are exported from the outputs module.
-///
-/// In Rust, we verify this by ensuring the types can be imported and used.
-/// If any of these types were not exported, this code would fail to compile.
 #[test]
 fn test_all_imports() {
     use agent_chain_core::messages::AIMessage;
@@ -55,8 +43,6 @@ fn test_all_imports() {
     assert!(EXPECTED_ALL.contains(&"RunInfo"));
 }
 
-/// Additionally test that types can be imported from the crate root.
-/// This mirrors how Python users typically import from langchain_core.outputs.
 #[test]
 fn test_imports_from_crate_root() {
     use agent_chain_core::messages::AIMessage;
@@ -77,8 +63,6 @@ fn test_imports_from_crate_root() {
     let _ = RunInfo::new(Uuid::new_v4());
 }
 
-/// Test that merge_chat_generation_chunks is also exported.
-/// This is an additional function in the Python module.
 #[test]
 fn test_merge_function_export() {
     use agent_chain_core::messages::AIMessage;
@@ -97,8 +81,6 @@ fn test_merge_function_export() {
     assert!(merged.is_some());
 }
 
-/// Test that GenerationType enum is also exported.
-/// This is needed for working with LLMResult generations.
 #[test]
 fn test_generation_type_export() {
     use agent_chain_core::outputs::GenerationType;

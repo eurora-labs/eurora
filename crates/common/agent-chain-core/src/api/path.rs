@@ -1,29 +1,5 @@
-//! Path utilities for converting file paths to import paths.
-
 use std::path::{Path, PathBuf};
 
-/// Get the path of the file as a relative path to a base directory.
-///
-/// # Arguments
-///
-/// * `file` - The file path to convert.
-/// * `relative_to` - The base path to make the file path relative to.
-///
-/// # Returns
-///
-/// The relative path as a `PathBuf`, or `None` if the path cannot be made relative.
-///
-/// # Example
-///
-/// ```
-/// use std::path::Path;
-/// use agent_chain_core::api::get_relative_path;
-///
-/// let base = Path::new("/home/user/project");
-/// let file = Path::new("/home/user/project/src/main.rs");
-/// let relative = get_relative_path(file, base);
-/// assert_eq!(relative, Some("src/main.rs".into()));
-/// ```
 pub fn get_relative_path<P: AsRef<Path>, B: AsRef<Path>>(
     file: P,
     relative_to: B,
@@ -36,31 +12,6 @@ pub fn get_relative_path<P: AsRef<Path>, B: AsRef<Path>>(
         .map(|p| p.to_string_lossy().into_owned())
 }
 
-/// Convert a file path to an import path (module path format).
-///
-/// This converts a file path like `src/api/path.rs` to a module path like `api::path`.
-///
-/// # Arguments
-///
-/// * `file` - The file path to convert.
-/// * `suffix` - An optional suffix to append to the import path.
-/// * `relative_to` - The base path to make the file path relative to.
-///
-/// # Returns
-///
-/// The import path as a `String`, or `None` if the conversion fails.
-///
-/// # Example
-///
-/// ```
-/// use std::path::Path;
-/// use agent_chain_core::api::as_import_path;
-///
-/// let base = Path::new("/home/user/project/src");
-/// let file = Path::new("/home/user/project/src/api/path.rs");
-/// let import = as_import_path(file, None, base);
-/// assert_eq!(import, Some("api::path".to_string()));
-/// ```
 pub fn as_import_path<P: AsRef<Path>, B: AsRef<Path>>(
     file: P,
     suffix: Option<&str>,

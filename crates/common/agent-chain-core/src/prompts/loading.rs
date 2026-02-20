@@ -1,8 +1,3 @@
-//! Load prompts from files.
-//!
-//! This module provides functions for loading prompts from JSON and YAML files,
-//! mirroring `langchain_core.prompts.loading` in Python.
-
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -16,9 +11,6 @@ use super::few_shot::FewShotPromptTemplate;
 use super::prompt::PromptTemplate;
 use super::string::PromptTemplateFormat;
 
-/// Type mapping from prompt type string to loader function.
-///
-/// Direct port of Python `type_to_loader_dict`.
 type LoaderFn =
     fn(&mut serde_json::Map<String, serde_json::Value>) -> Result<Box<dyn BasePromptTemplate>>;
 
@@ -30,9 +22,6 @@ fn get_type_to_loader() -> HashMap<&'static str, LoaderFn> {
     map
 }
 
-/// Load prompt from a configuration dictionary.
-///
-/// Direct port of Python `load_prompt_from_config`.
 pub fn load_prompt_from_config(config: serde_json::Value) -> Result<Box<dyn BasePromptTemplate>> {
     let mut config = match config {
         serde_json::Value::Object(map) => map,
@@ -60,9 +49,6 @@ pub fn load_prompt_from_config(config: serde_json::Value) -> Result<Box<dyn Base
     loader(&mut config)
 }
 
-/// Load template from the path if applicable.
-///
-/// Direct port of Python `_load_template`.
 fn load_template(var_name: &str, config: &mut serde_json::Map<String, serde_json::Value>) {
     let path_key = format!("{}_path", var_name);
 
@@ -83,9 +69,6 @@ fn load_template(var_name: &str, config: &mut serde_json::Map<String, serde_json
     }
 }
 
-/// Load examples if necessary.
-///
-/// Direct port of Python `_load_examples`.
 fn load_examples_from_config(
     config: &mut serde_json::Map<String, serde_json::Value>,
 ) -> Result<()> {
@@ -123,7 +106,6 @@ fn load_examples_from_config(
     }
 }
 
-/// Extract examples from config value into Vec<HashMap<String, String>>.
 fn extract_examples(
     config: &serde_json::Map<String, serde_json::Value>,
 ) -> Result<Vec<HashMap<String, String>>> {
@@ -148,9 +130,6 @@ fn extract_examples(
     Ok(examples)
 }
 
-/// Load a basic prompt template from config.
-///
-/// Direct port of Python `_load_prompt`.
 fn load_basic_prompt(
     config: &mut serde_json::Map<String, serde_json::Value>,
 ) -> Result<Box<dyn BasePromptTemplate>> {
@@ -186,9 +165,6 @@ fn load_basic_prompt(
     Ok(Box::new(prompt))
 }
 
-/// Load the "few shot" prompt from the config.
-///
-/// Direct port of Python `_load_few_shot_prompt`.
 fn load_few_shot_prompt(
     config: &mut serde_json::Map<String, serde_json::Value>,
 ) -> Result<Box<dyn BasePromptTemplate>> {
@@ -249,9 +225,6 @@ fn load_few_shot_prompt(
     Ok(Box::new(few_shot))
 }
 
-/// Load chat prompt from config.
-///
-/// Direct port of Python `_load_chat_prompt`.
 fn load_chat_prompt(
     config: &mut serde_json::Map<String, serde_json::Value>,
 ) -> Result<Box<dyn BasePromptTemplate>> {
@@ -280,16 +253,10 @@ fn load_chat_prompt(
     Ok(Box::new(chat_prompt))
 }
 
-/// Load a prompt from a file.
-///
-/// Direct port of Python `load_prompt`.
 pub fn load_prompt(path: impl AsRef<Path>) -> Result<Box<dyn BasePromptTemplate>> {
     load_prompt_with_encoding(path, None)
 }
 
-/// Load a prompt from a file with optional encoding.
-///
-/// Direct port of Python `load_prompt` with encoding parameter.
 pub fn load_prompt_with_encoding(
     path: impl AsRef<Path>,
     _encoding: Option<&str>,
@@ -309,9 +276,6 @@ pub fn load_prompt_with_encoding(
     load_prompt_from_file(path)
 }
 
-/// Load prompt from a file path.
-///
-/// Direct port of Python `_load_prompt_from_file`.
 fn load_prompt_from_file(path: &Path) -> Result<Box<dyn BasePromptTemplate>> {
     let content = std::fs::read_to_string(path)?;
 

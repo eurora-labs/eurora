@@ -1,14 +1,5 @@
 use crate::{Error, Result};
 
-/// Row-wise cosine similarity between two equal-width matrices.
-///
-/// # Arguments
-/// * `x` - A matrix of shape (n, m) represented as `Vec<Vec<f32>>`.
-/// * `y` - A matrix of shape (k, m) represented as `Vec<Vec<f32>>`.
-///
-/// # Returns
-/// A matrix of shape (n, k) where each element (i, j) is the cosine similarity
-/// between the ith row of x and the jth row of y.
 pub fn cosine_similarity(x: &[Vec<f32>], y: &[Vec<f32>]) -> Result<Vec<Vec<f32>>> {
     if x.is_empty() || y.is_empty() {
         return Ok(vec![vec![]]);
@@ -52,19 +43,6 @@ fn l2_norm(v: &[f32]) -> f32 {
     v.iter().map(|x| x * x).sum::<f32>().sqrt()
 }
 
-/// Calculate maximal marginal relevance.
-///
-/// Maximal marginal relevance optimizes for similarity to the query AND diversity
-/// among selected documents.
-///
-/// # Arguments
-/// * `query_embedding` - The query embedding vector.
-/// * `embedding_list` - A list of embedding vectors to select from.
-/// * `lambda_mult` - The lambda parameter for MMR (0.0 = max diversity, 1.0 = max relevance).
-/// * `k` - The number of embeddings to return.
-///
-/// # Returns
-/// A list of indices of the selected embeddings.
 pub fn maximal_marginal_relevance(
     query_embedding: &[f32],
     embedding_list: &[Vec<f32>],

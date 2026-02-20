@@ -1,7 +1,3 @@
-//! Tests for JSON output parser.
-//!
-//! Ported from langchain/libs/core/tests/unit_tests/output_parsers/test_json.py
-
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::output_parsers::{
     BaseOutputParser, BaseTransformOutputParser, SimpleJsonOutputParser,

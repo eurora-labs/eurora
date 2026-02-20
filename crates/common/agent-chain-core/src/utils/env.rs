@@ -1,32 +1,6 @@
-//! Utilities for environment variables.
-//!
-//! Adapted from `langchain_core/utils/env.py`
-
 use std::collections::HashMap;
 use std::env;
 
-/// Check if an environment variable is set.
-///
-/// # Arguments
-///
-/// * `env_var` - The name of the environment variable.
-///
-/// # Returns
-///
-/// `true` if the environment variable is set and not falsy, `false` otherwise.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::utils::env::env_var_is_set;
-/// use std::env;
-///
-/// // SAFETY: This is a single-threaded doc test
-/// unsafe { env::set_var("MY_TEST_VAR", "value"); }
-/// assert!(env_var_is_set("MY_TEST_VAR"));
-/// // SAFETY: This is a single-threaded doc test
-/// unsafe { env::remove_var("MY_TEST_VAR"); }
-/// ```
 pub fn env_var_is_set(env_var: &str) -> bool {
     match env::var(env_var) {
         Ok(value) => !value.is_empty() && value != "0" && value != "false" && value != "False",
@@ -34,31 +8,6 @@ pub fn env_var_is_set(env_var: &str) -> bool {
     }
 }
 
-/// Get a value from a dictionary or an environment variable.
-///
-/// # Arguments
-///
-/// * `data` - The dictionary to look up the key in.
-/// * `keys` - The keys to look up in the dictionary. This can be multiple keys to try in order.
-/// * `env_key` - The environment variable to look up if the key is not in the dictionary.
-/// * `default` - The default value to return if the key is not in the dictionary or the environment.
-///
-/// # Returns
-///
-/// The dict value or the environment variable value, or an error if not found.
-///
-/// # Example
-///
-/// ```
-/// use std::collections::HashMap;
-/// use agent_chain_core::utils::env::get_from_dict_or_env;
-///
-/// let mut data = HashMap::new();
-/// data.insert("api_key".to_string(), "my_key".to_string());
-///
-/// let result = get_from_dict_or_env(&data, &["api_key"], "API_KEY", None);
-/// assert_eq!(result.unwrap(), "my_key");
-/// ```
 pub fn get_from_dict_or_env(
     data: &HashMap<String, String>,
     keys: &[&str],
@@ -77,35 +26,6 @@ pub fn get_from_dict_or_env(
     get_from_env(key_for_err, env_key, default)
 }
 
-/// Get a value from an environment variable.
-///
-/// # Arguments
-///
-/// * `key` - The key name (used in error messages).
-/// * `env_key` - The environment variable to look up.
-/// * `default` - The default value to return if the environment variable is not set.
-///
-/// # Returns
-///
-/// The value of the environment variable, or an error if not found and no default provided.
-///
-/// # Errors
-///
-/// Returns `EnvError::NotFound` if the environment variable is not set and no default value is provided.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::utils::env::get_from_env;
-/// use std::env;
-///
-/// // SAFETY: This is a single-threaded doc test
-/// unsafe { env::set_var("MY_TEST_VAR", "test_value"); }
-/// let result = get_from_env("my_test", "MY_TEST_VAR", None);
-/// assert_eq!(result.unwrap(), "test_value");
-/// // SAFETY: This is a single-threaded doc test
-/// unsafe { env::remove_var("MY_TEST_VAR"); }
-/// ```
 pub fn get_from_env(key: &str, env_key: &str, default: Option<&str>) -> Result<String, EnvError> {
     if let Ok(value) = env::var(env_key)
         && !value.is_empty()
@@ -123,12 +43,9 @@ pub fn get_from_env(key: &str, env_key: &str, default: Option<&str>) -> Result<S
     })
 }
 
-/// Error types for environment operations.
 #[derive(Debug, Clone, PartialEq)]
 pub enum EnvError {
-    /// The environment variable was not found.
     NotFound { key: String, env_key: String },
-    /// A custom error message.
     Custom(String),
 }
 

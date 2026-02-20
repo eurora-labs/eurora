@@ -1,7 +1,3 @@
-//! Tests for RunnableWithMessageHistory and related types.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/runnables/test_history.py`
-
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -15,7 +11,6 @@ use agent_chain_core::runnables::history::{
 use agent_chain_core::runnables::utils::ConfigurableFieldSpec;
 use serde_json::Value;
 
-/// Build a `RunnableConfig` with the given configurable key-value pairs.
 fn config_with(pairs: &[(&str, &str)]) -> RunnableConfig {
     let mut cfg = RunnableConfig::default();
     for (k, v) in pairs {
@@ -25,9 +20,6 @@ fn config_with(pairs: &[(&str, &str)]) -> RunnableConfig {
     cfg
 }
 
-/// Convenience: create a `GetSessionHistoryFn` backed by a shared store.
-///
-/// The store maps a single `session_id` string to a history instance.
 fn make_session_factory(
     store: Arc<Mutex<HashMap<String, Arc<Mutex<InMemoryChatMessageHistory>>>>>,
 ) -> GetSessionHistoryFn {
@@ -53,10 +45,6 @@ fn system(content: &str) -> BaseMessage {
     BaseMessage::System(SystemMessage::builder().content(content).build())
 }
 
-/// A runnable that concatenates human-message contents, prefixed with "you said: ".
-/// Returns a single AIMessage.
-///
-/// Mirrors the Python lambda used across many of the tests.
 fn concat_human_messages() -> HistoryRunnable {
     HistoryRunnable::from_fn(|messages, _config| {
         let human_contents: Vec<String> = messages
@@ -74,8 +62,6 @@ fn concat_human_messages() -> HistoryRunnable {
     })
 }
 
-/// A runnable that returns the message count as a single AIMessage.
-/// Mirrors the Python LengthChatModel.
 fn length_runnable() -> HistoryRunnable {
     HistoryRunnable::from_fn(|messages, _config| {
         let count = messages.len();
@@ -85,7 +71,6 @@ fn length_runnable() -> HistoryRunnable {
     })
 }
 
-/// Mirrors `test_interfaces` in Python.
 #[test]
 fn test_interfaces() {
     let mut history = InMemoryChatMessageHistory::new();
@@ -96,10 +81,6 @@ fn test_interfaces() {
     );
 }
 
-/// Mirrors `test_input_messages` in Python.
-///
-/// The runnable takes a list of messages and returns a string.
-/// History should accumulate across invocations for the same session.
 #[test]
 fn test_input_messages() {
     let store: Arc<Mutex<HashMap<String, Arc<Mutex<InMemoryChatMessageHistory>>>>> =
@@ -139,10 +120,6 @@ fn test_input_messages() {
     assert_eq!(msgs[3].content(), "you said: hello\ngood bye");
 }
 
-/// Mirrors `test_input_messages_output_message` in Python (LengthChatModel).
-///
-/// First invocation sees 1 message -> "1".
-/// Second invocation sees 3 messages (prev human + prev AI + new human) -> "3".
 #[test]
 fn test_input_messages_output_message() {
     let store: Arc<Mutex<HashMap<String, Arc<Mutex<InMemoryChatMessageHistory>>>>> =
@@ -171,9 +148,6 @@ fn test_input_messages_output_message() {
     assert_eq!(output[0].content(), "3");
 }
 
-/// Mirrors `test_using_custom_config_specs` in Python.
-///
-/// Uses a session factory that takes `user_id` and `thread_id`.
 #[test]
 fn test_using_custom_config_specs() {
     #[allow(clippy::type_complexity)]
@@ -280,9 +254,6 @@ fn test_using_custom_config_specs() {
     }
 }
 
-/// Mirrors `test_ignore_session_id` in Python.
-///
-/// A factory that takes no session_id — a single global history.
 #[test]
 fn test_ignore_session_id() {
     let history = Arc::new(Mutex::new(InMemoryChatMessageHistory::new()));
@@ -311,7 +282,6 @@ fn test_ignore_session_id() {
     assert_eq!(hist.messages().len(), 4);
 }
 
-/// Test that multiple sessions maintain separate histories.
 #[test]
 fn test_multiple_sessions() {
     let store: Arc<Mutex<HashMap<String, Arc<Mutex<InMemoryChatMessageHistory>>>>> =
@@ -348,7 +318,6 @@ fn test_multiple_sessions() {
     assert_eq!(hist_b.messages().len(), 2);
 }
 
-/// Mirrors `test_get_input_schema_input_messages`.
 #[test]
 fn test_get_input_schema_input_messages() {
     let store: Arc<Mutex<HashMap<String, Arc<Mutex<InMemoryChatMessageHistory>>>>> =
@@ -369,7 +338,6 @@ fn test_get_input_schema_input_messages() {
     assert_eq!(schema["type"], "array");
 }
 
-/// Mirrors `test_get_output_schema`.
 #[test]
 fn test_get_output_schema() {
     let store: Arc<Mutex<HashMap<String, Arc<Mutex<InMemoryChatMessageHistory>>>>> =
@@ -398,13 +366,6 @@ fn ai_as_value(content: &str) -> Value {
     serde_json::to_value(ai(content)).expect("ai message serialization should not fail")
 }
 
-/// Test dict input with `input_messages_key` and `history_messages_key`.
-///
-/// The inner runnable receives a dict with "question" and "history" keys.
-/// History accumulates across invocations.
-///
-/// Mirrors the Python test with `input_messages_key="question"` and
-/// `history_messages_key="history"`.
 #[test]
 fn test_dict_input_with_history_messages_key() {
     use agent_chain_core::error::Error;
@@ -490,10 +451,6 @@ fn test_dict_input_with_history_messages_key() {
     );
 }
 
-/// Test that `output_messages_key` extracts output messages from a dict output.
-///
-/// The inner runnable returns a dict with an "answer" key. History should
-/// store only the messages from the "answer" key.
 #[test]
 fn test_dict_input_with_output_messages_key() {
     use agent_chain_core::error::Error;
@@ -566,10 +523,6 @@ fn test_dict_input_with_output_messages_key() {
     );
 }
 
-/// Test `get_input_messages` normalization logic:
-/// - String input becomes a HumanMessage
-/// - Array input is deserialized as Vec<BaseMessage>
-/// - Dict input with `input_messages_key` extracts from the correct key
 #[test]
 fn test_get_input_messages_normalization() {
     use agent_chain_core::runnables::history::HistoryInvokeFn;
@@ -625,10 +578,6 @@ fn test_get_input_messages_normalization() {
     assert_eq!(msgs[0].content(), "what?");
 }
 
-/// Test `get_output_messages` normalization logic:
-/// - String output becomes an AIMessage
-/// - Dict output with `output_messages_key` extracts from the correct key
-/// - Array output is deserialized as Vec<BaseMessage>
 #[test]
 fn test_get_output_messages_normalization() {
     use agent_chain_core::runnables::history::HistoryInvokeFn;

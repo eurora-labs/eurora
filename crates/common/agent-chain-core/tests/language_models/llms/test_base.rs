@@ -1,7 +1,3 @@
-//! Tests for base LLM.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/language_models/llms/test_base.py`
-
 use std::collections::HashMap;
 
 use agent_chain_core::caches::{BaseCache, InMemoryCache};
@@ -13,7 +9,6 @@ use agent_chain_core::outputs::{Generation, GenerationType, LLMResult};
 use futures::StreamExt;
 use serde_json::json;
 
-/// Ported from `test_batch`.
 #[tokio::test]
 async fn test_batch() {
     let llm = FakeListLLM::new(vec!["foo".to_string(); 3]);
@@ -31,7 +26,6 @@ async fn test_batch() {
     assert_eq!(output, vec!["foo", "foo", "foo"]);
 }
 
-/// Ported from `test_abatch`.
 #[tokio::test]
 async fn test_abatch() {
     let llm = FakeListLLM::new(vec!["foo".to_string(); 3]);
@@ -49,7 +43,6 @@ async fn test_abatch() {
     assert_eq!(output, vec!["foo", "foo", "foo"]);
 }
 
-/// Ported from `test_batch_empty_inputs_returns_empty_list`.
 #[tokio::test]
 async fn test_batch_empty_inputs_returns_empty_list() {
     let llm = FakeListLLM::new(vec!["a".to_string()]);
@@ -57,7 +50,6 @@ async fn test_batch_empty_inputs_returns_empty_list() {
     assert!(result.is_empty());
 }
 
-/// Ported from `test_abatch_empty_inputs_returns_empty_list`.
 #[tokio::test]
 async fn test_abatch_empty_inputs_returns_empty_list() {
     let llm = FakeListLLM::new(vec!["a".to_string()]);
@@ -65,7 +57,6 @@ async fn test_abatch_empty_inputs_returns_empty_list() {
     assert!(result.is_empty());
 }
 
-/// Ported from `test_convert_string_input`.
 #[test]
 fn test_convert_string_input() {
     let llm = FakeListLLM::new(vec!["r".to_string()]);
@@ -75,7 +66,6 @@ fn test_convert_string_input() {
     assert_eq!(result, "hello world");
 }
 
-/// Ported from `test_convert_prompt_value_input`.
 #[test]
 fn test_convert_prompt_value_input() {
     use agent_chain_core::prompt_values::StringPromptValue;
@@ -86,7 +76,6 @@ fn test_convert_prompt_value_input() {
     assert_eq!(result, "already a prompt value");
 }
 
-/// Ported from `test_convert_message_sequence_input`.
 #[test]
 fn test_convert_message_sequence_input() {
     use agent_chain_core::messages::{BaseMessage, HumanMessage};
@@ -101,7 +90,6 @@ fn test_convert_message_sequence_input() {
     assert!(result.contains("hi"));
 }
 
-/// Ported from `test_generate_single_prompt`.
 #[tokio::test]
 async fn test_generate_single_prompt() {
     let llm = FakeListLLM::new(vec!["result".to_string()]);
@@ -116,7 +104,6 @@ async fn test_generate_single_prompt() {
     }
 }
 
-/// Ported from `test_generate_multiple_prompts`.
 #[tokio::test]
 async fn test_generate_multiple_prompts() {
     let llm = FakeListLLM::new(vec![
@@ -138,7 +125,6 @@ async fn test_generate_multiple_prompts() {
     }
 }
 
-/// Ported from `test_generate_empty_prompts`.
 #[tokio::test]
 async fn test_generate_empty_prompts() {
     let llm = FakeListLLM::new(vec!["out".to_string()]);
@@ -146,7 +132,6 @@ async fn test_generate_empty_prompts() {
     assert_eq!(result.generations.len(), 0);
 }
 
-/// Ported from `test_agenerate_single_prompt`.
 #[tokio::test]
 async fn test_agenerate_single_prompt() {
     let llm = FakeListLLM::new(vec!["async_result".to_string()]);
@@ -161,7 +146,6 @@ async fn test_agenerate_single_prompt() {
     }
 }
 
-/// Ported from `test_agenerate_multiple_prompts`.
 #[tokio::test]
 async fn test_agenerate_multiple_prompts() {
     let llm = FakeListLLM::new(vec!["out1".to_string(), "out2".to_string()]);
@@ -178,11 +162,6 @@ async fn test_agenerate_multiple_prompts() {
     }
 }
 
-/// Ported from `test_astream_fallback_to_ainvoke`.
-///
-/// A model with only generate_prompts (no stream_prompt override) should
-/// still work via the default stream_prompt implementation, which falls
-/// back to generate_prompts and returns the result as a single chunk.
 #[tokio::test]
 async fn test_astream_fallback_to_ainvoke() {
     let llm = FakeListLLM::new(vec!["hello".to_string()]);
@@ -198,10 +177,6 @@ async fn test_astream_fallback_to_ainvoke() {
     assert_eq!(chunks, vec!["hello"]);
 }
 
-/// Ported from `test_astream_implementation_uses_astream`.
-///
-/// FakeStreamingListLLM overrides stream_prompt, so it should yield
-/// individual characters.
 #[tokio::test]
 async fn test_astream_implementation_uses_stream() {
     let llm = FakeStreamingListLLM::new(vec!["ab".to_string()]);
@@ -217,7 +192,6 @@ async fn test_astream_implementation_uses_stream() {
     assert_eq!(chunks, vec!["a", "b"]);
 }
 
-/// Ported from `test_get_ls_params`.
 #[test]
 fn test_get_ls_params() {
     let llm = FakeListLLM::new(vec!["foo".to_string()]);
@@ -231,7 +205,6 @@ fn test_get_ls_params() {
     assert_eq!(params.ls_stop, Some(vec!["stop".to_string()]));
 }
 
-/// Ported from `test_no_cache_returns_all_missing`.
 #[test]
 fn test_get_prompts_no_cache_returns_all_missing() {
     let params = HashMap::from([("model".to_string(), json!("test"))]);
@@ -243,7 +216,6 @@ fn test_get_prompts_no_cache_returns_all_missing() {
     assert_eq!(missing, vec!["p1", "p2"]);
 }
 
-/// Ported from `test_with_cache_all_miss`.
 #[test]
 fn test_get_prompts_with_cache_all_miss() {
     let cache = InMemoryCache::unbounded();
@@ -256,7 +228,6 @@ fn test_get_prompts_with_cache_all_miss() {
     assert_eq!(missing, vec!["p1", "p2"]);
 }
 
-/// Ported from `test_with_cache_partial_hit`.
 #[test]
 fn test_get_prompts_with_cache_partial_hit() {
     let cache = InMemoryCache::unbounded();
@@ -274,7 +245,6 @@ fn test_get_prompts_with_cache_partial_hit() {
     assert_eq!(missing, vec!["p2"]);
 }
 
-/// Ported from `test_with_cache_all_hit`.
 #[test]
 fn test_get_prompts_with_cache_all_hit() {
     let cache = InMemoryCache::unbounded();
@@ -291,7 +261,6 @@ fn test_get_prompts_with_cache_all_hit() {
     assert!(missing.is_empty());
 }
 
-/// Ported from `test_update_cache_stores_results`.
 #[test]
 fn test_update_cache_stores_results() {
     let cache = InMemoryCache::unbounded();
@@ -322,7 +291,6 @@ fn test_update_cache_stores_results() {
     assert_eq!(existing[&0][0].text, "r1");
 }
 
-/// Ported from `test_update_cache_with_none_does_not_store`.
 #[test]
 fn test_update_cache_with_none_does_not_store() {
     let new_results = LLMResult::new(vec![vec![GenerationType::Generation(Generation::new(
@@ -342,7 +310,6 @@ fn test_update_cache_with_none_does_not_store() {
     assert!(existing.is_empty());
 }
 
-/// Ported from `test_generate_prompt_converts_prompt_values`.
 #[tokio::test]
 async fn test_generate_prompt_converts_prompt_values() {
     let llm = FakeListLLM::new(vec!["resp1".to_string(), "resp2".to_string()]);
@@ -368,7 +335,6 @@ async fn test_generate_prompt_converts_prompt_values() {
     }
 }
 
-/// Ported from `test_agenerate_prompt_converts_prompt_values`.
 #[tokio::test]
 async fn test_agenerate_prompt_converts_prompt_values() {
     let llm = FakeListLLM::new(vec!["async_resp".to_string()]);
@@ -383,7 +349,6 @@ async fn test_agenerate_prompt_converts_prompt_values() {
     }
 }
 
-/// Ported from `test_generate_prompt_with_chat_prompt_value`.
 #[tokio::test]
 async fn test_generate_prompt_with_message_input() {
     use agent_chain_core::messages::{BaseMessage, HumanMessage};
@@ -403,7 +368,6 @@ async fn test_generate_prompt_with_message_input() {
     }
 }
 
-/// Ported from `test_str_representation`.
 #[test]
 fn test_str_representation() {
     let llm = FakeListLLM::new(vec!["foo".to_string()]);
@@ -411,7 +375,6 @@ fn test_str_representation() {
     assert!(result.contains("FakeListLLM"));
 }
 
-/// Ported from `test_dict_contains_type_and_identifying_params`.
 #[test]
 fn test_dict_contains_type_and_identifying_params() {
     let llm = FakeListLLM::new(vec!["a".to_string(), "b".to_string()]);
@@ -422,7 +385,6 @@ fn test_dict_contains_type_and_identifying_params() {
     assert_eq!(params["responses"], json!(["a", "b"]));
 }
 
-/// Ported from `test_invoke` (via FakeListLLM).
 #[tokio::test]
 async fn test_invoke() {
     let llm = FakeListLLM::new(vec!["hello".to_string()]);
@@ -433,7 +395,6 @@ async fn test_invoke() {
     assert_eq!(result, "hello");
 }
 
-/// Ported from `test_call_method` (via LLM trait).
 #[tokio::test]
 async fn test_call_method() {
     let llm = FakeListLLM::new(vec!["direct".to_string()]);
@@ -441,7 +402,6 @@ async fn test_call_method() {
     assert_eq!(result, "direct");
 }
 
-/// Ported from `test_none_run_id`.
 #[test]
 fn test_get_run_ids_list_none() {
     use agent_chain_core::language_models::RunIdInput;
@@ -451,7 +411,6 @@ fn test_get_run_ids_list_none() {
     assert_eq!(result, vec![None, None, None]);
 }
 
-/// Ported from `test_single_uuid`.
 #[test]
 fn test_get_run_ids_list_single_uuid() {
     use agent_chain_core::language_models::{RunIdInput, get_run_ids_list};
@@ -463,7 +422,6 @@ fn test_get_run_ids_list_single_uuid() {
     assert_eq!(result[2], None);
 }
 
-/// Ported from `test_list_of_uuids`.
 #[test]
 fn test_get_run_ids_list_list_of_uuids() {
     use agent_chain_core::language_models::{RunIdInput, get_run_ids_list};
@@ -474,7 +432,6 @@ fn test_get_run_ids_list_list_of_uuids() {
     assert_eq!(result, vec![Some(uid1), Some(uid2)]);
 }
 
-/// Ported from `test_mismatched_list_length_raises`.
 #[test]
 fn test_get_run_ids_list_mismatched_length() {
     use agent_chain_core::language_models::{RunIdInput, get_run_ids_list};
@@ -486,7 +443,6 @@ fn test_get_run_ids_list_mismatched_length() {
     assert!(err_msg.contains("does not match batch length"));
 }
 
-/// Ported from `test_single_prompt_with_uuid`.
 #[test]
 fn test_get_run_ids_list_single_prompt_with_uuid() {
     use agent_chain_core::language_models::{RunIdInput, get_run_ids_list};
@@ -496,7 +452,6 @@ fn test_get_run_ids_list_single_prompt_with_uuid() {
     assert_eq!(result, vec![Some(uid)]);
 }
 
-/// Ported from `test_cache_is_base_cache_instance`.
 #[test]
 fn test_resolve_cache_instance() {
     use agent_chain_core::language_models::{CacheValue, resolve_cache};
@@ -507,7 +462,6 @@ fn test_resolve_cache_instance() {
     assert!(result.is_some());
 }
 
-/// Ported from `test_cache_is_none_returns_global_cache`.
 #[test]
 fn test_resolve_cache_none_returns_global() {
     use agent_chain_core::language_models::resolve_cache;
@@ -523,7 +477,6 @@ fn test_resolve_cache_none_returns_global() {
     set_llm_cache(None);
 }
 
-/// Ported from `test_cache_is_none_no_global_returns_none`.
 #[test]
 fn test_resolve_cache_none_no_global_returns_none() {
     use agent_chain_core::language_models::resolve_cache;
@@ -534,7 +487,6 @@ fn test_resolve_cache_none_no_global_returns_none() {
     assert!(result.is_none());
 }
 
-/// Ported from `test_cache_is_true_with_global_cache`.
 #[test]
 fn test_resolve_cache_true_with_global() {
     use agent_chain_core::language_models::{CacheValue, resolve_cache};
@@ -550,7 +502,6 @@ fn test_resolve_cache_true_with_global() {
     set_llm_cache(None);
 }
 
-/// Ported from `test_cache_is_true_without_global_cache_raises`.
 #[test]
 fn test_resolve_cache_true_without_global_raises() {
     use agent_chain_core::language_models::{CacheValue, resolve_cache};
@@ -566,7 +517,6 @@ fn test_resolve_cache_true_without_global_raises() {
     }
 }
 
-/// Ported from `test_cache_is_false`.
 #[test]
 fn test_resolve_cache_false() {
     use agent_chain_core::language_models::{CacheValue, resolve_cache};
@@ -575,7 +525,6 @@ fn test_resolve_cache_false() {
     assert!(result.is_none());
 }
 
-/// Ported from `test_batch_return_exceptions_true`.
 #[tokio::test]
 async fn test_batch_with_exceptions() {
     let llm = FakeListLLM::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
@@ -597,7 +546,6 @@ async fn test_batch_with_exceptions() {
     assert_eq!(results[2].as_ref().unwrap(), "r3");
 }
 
-/// Ported from `test_save_json`.
 #[test]
 fn test_save_json() {
     use agent_chain_core::language_models::save_llm;
@@ -620,7 +568,6 @@ fn test_save_json() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
-/// Ported from `test_save_invalid_extension_raises`.
 #[test]
 fn test_save_invalid_extension_raises() {
     use agent_chain_core::language_models::save_llm;
@@ -640,7 +587,6 @@ fn test_save_invalid_extension_raises() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
-/// Ported from `test_retries_on_specified_error`.
 #[test]
 fn test_retry_on_specified_error() {
     use agent_chain_core::language_models::create_base_retry;
@@ -667,7 +613,6 @@ fn test_retry_on_specified_error() {
     assert_eq!(call_count.load(Ordering::SeqCst), 3);
 }
 
-/// Ported from `test_does_not_retry_on_unspecified_error`.
 #[test]
 fn test_retry_does_not_retry_on_unspecified_error() {
     use agent_chain_core::language_models::create_base_retry;
@@ -686,7 +631,6 @@ fn test_retry_does_not_retry_on_unspecified_error() {
     assert!(format!("{}", result.unwrap_err()).contains("unrecoverable"));
 }
 
-/// Ported from `test_max_retries_one_means_no_retry`.
 #[test]
 fn test_retry_max_retries_one_means_no_retry() {
     use agent_chain_core::language_models::create_base_retry;

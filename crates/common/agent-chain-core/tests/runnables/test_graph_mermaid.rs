@@ -1,7 +1,3 @@
-//! Comprehensive tests for Mermaid graph drawing functionality.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/runnables/test_graph_mermaid.py`
-
 use std::collections::HashMap;
 
 use agent_chain_core::runnables::graph::{

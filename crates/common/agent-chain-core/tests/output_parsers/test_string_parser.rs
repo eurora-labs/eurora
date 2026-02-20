@@ -1,7 +1,3 @@
-//! Test StrOutputParser.
-//!
-//! Ported from langchain/libs/core/tests/unit_tests/output_parsers/test_string_parser.py
-
 use agent_chain_core::GenericFakeChatModel;
 use agent_chain_core::language_models::BaseChatModel;
 use agent_chain_core::messages::{

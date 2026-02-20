@@ -1,39 +1,3 @@
-//! **Load** module helps with serialization and deserialization.
-//!
-//! This module provides functionality for serializing and deserializing LangChain
-//! objects to/from JSON, mirroring `langchain_core.load`.
-//!
-//! # Overview
-//!
-//! The load module contains:
-//! - [`Serializable`] trait for objects that can be serialized
-//! - [`Serialized`] types for different serialization representations
-//! - [`dumps`] and [`dumpd`] functions for serialization
-//! - [`loads`] and [`load`] functions for deserialization
-//! - [`Reviver`] for customizing deserialization behavior
-//!
-//! # Example
-//!
-//! ```ignore
-//! use agent_chain_core::load::{dumps, loads, Serializable};
-//!
-//! #[derive(Serialize, Deserialize)]
-//! struct MyModel {
-//!     name: String,
-//! }
-//!
-//! impl Serializable for MyModel {
-//!     fn is_lc_serializable() -> bool { true }
-//!     fn get_lc_namespace() -> Vec<String> {
-//!         vec!["my_package".to_string()]
-//!     }
-//! }
-//!
-//! let model = MyModel { name: "test".to_string() };
-//! let json = dumps(&model, false)?;
-//! let loaded = loads(&json, None)?;
-//! ```
-
 mod dump;
 mod loader;
 mod mapping;

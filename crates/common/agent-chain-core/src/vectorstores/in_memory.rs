@@ -12,7 +12,6 @@ use crate::embeddings::Embeddings;
 use crate::vectorstores::base::{VectorStore, VectorStoreFactory};
 use crate::vectorstores::utils::{cosine_similarity, maximal_marginal_relevance};
 
-/// Entry stored in the in-memory vector store.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct StoreEntry {
     id: String,
@@ -21,16 +20,12 @@ struct StoreEntry {
     metadata: HashMap<String, Value>,
 }
 
-/// In-memory vector store implementation.
-///
-/// Uses a dictionary, and computes cosine similarity for search.
 pub struct InMemoryVectorStore {
     store: RwLock<HashMap<String, StoreEntry>>,
     embedding: Box<dyn Embeddings>,
 }
 
 impl InMemoryVectorStore {
-    /// Initialize with the given embedding function.
     pub fn new(embedding: Box<dyn Embeddings>) -> Self {
         Self {
             store: RwLock::new(HashMap::new()),
@@ -38,27 +33,21 @@ impl InMemoryVectorStore {
         }
     }
 
-    /// Get a snapshot of the current store keys (for testing/inspection).
     pub fn store_keys(&self) -> Result<Vec<String>> {
         let store = self.lock_read()?;
         Ok(store.keys().cloned().collect())
     }
 
-    /// Get the number of documents in the store.
     pub fn len(&self) -> Result<usize> {
         let store = self.lock_read()?;
         Ok(store.len())
     }
 
-    /// Check if the store is empty.
     pub fn is_empty(&self) -> Result<bool> {
         let store = self.lock_read()?;
         Ok(store.is_empty())
     }
 
-    /// Dump the vector store to a JSON file.
-    ///
-    /// Mirrors Python's `InMemoryVectorStore.dump()`.
     pub fn dump(&self, path: &Path) -> Result<()> {
         let store = self.lock_read()?;
 
@@ -72,9 +61,6 @@ impl InMemoryVectorStore {
         Ok(())
     }
 
-    /// Load a vector store from a JSON file.
-    ///
-    /// Mirrors Python's `InMemoryVectorStore.load()`.
     pub fn load(path: &Path, embedding: Box<dyn Embeddings>) -> Result<Self> {
         let file = std::fs::File::open(path)?;
         let reader = std::io::BufReader::new(file);

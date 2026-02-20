@@ -1,23 +1,8 @@
-//! Serialization mapping.
-//!
-//! This module contains a mapping between the lc_namespace path for a given
-//! type that implements Serializable to the namespace where that type is
-//! actually located.
-//!
-//! This mapping helps maintain the ability to serialize and deserialize
-//! well-known LangChain objects even if they are moved around in the codebase
-//! across different LangChain versions.
-
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-/// Type alias for namespace mapping: (serialized_as) -> (import_from)
 pub type NamespaceMapping = HashMap<Vec<String>, Vec<String>>;
 
-/// Main serializable mapping.
-///
-/// Maps the lc_namespace path to the actual import path.
-/// First value is what it's serialized as, second is where to load it from.
 pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
     let mut map = HashMap::new();
 
@@ -813,7 +798,6 @@ pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
     map
 });
 
-/// Mapping for old LangChain versions where things were in different places.
 pub static OG_SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
     let mut map = HashMap::new();
 
@@ -884,7 +868,6 @@ pub static OG_SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|
     map
 });
 
-/// Mapping for old core namespaces for backwards compatibility.
 pub static OLD_CORE_NAMESPACES_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
     let mut map = HashMap::new();
 
@@ -1684,7 +1667,6 @@ pub static OLD_CORE_NAMESPACES_MAPPING: LazyLock<NamespaceMapping> = LazyLock::n
     map
 });
 
-/// Mapping for JavaScript serialization compatibility.
 pub static JS_SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
     let mut map = HashMap::new();
 
@@ -1888,7 +1870,6 @@ pub static JS_SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|
     map
 });
 
-/// Get all serializable mappings combined.
 pub fn get_all_serializable_mappings() -> NamespaceMapping {
     let mut combined = HashMap::new();
     combined.extend(SERIALIZABLE_MAPPING.clone());
@@ -1898,7 +1879,6 @@ pub fn get_all_serializable_mappings() -> NamespaceMapping {
     combined
 }
 
-/// Default namespaces that are allowed for deserialization.
 pub const DEFAULT_NAMESPACES: &[&str] = &[
     "langchain",
     "langchain_core",
@@ -1916,8 +1896,6 @@ pub const DEFAULT_NAMESPACES: &[&str] = &[
     "langchain_perplexity",
 ];
 
-/// Namespaces for which only deserializing via the SERIALIZABLE_MAPPING is allowed.
-/// Load by path is not allowed.
 pub const DISALLOW_LOAD_FROM_PATH: &[&str] = &["langchain_community", "langchain"];
 
 #[cfg(test)]
