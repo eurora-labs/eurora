@@ -6,6 +6,7 @@ pub struct PaymentConfig {
     pub stripe_webhook_secret: String,
     pub frontend_url: String,
     pub pro_price_id: String,
+    pub approved_beta_emails: Vec<String>,
 }
 
 impl PaymentConfig {
@@ -37,12 +38,27 @@ impl PaymentConfig {
             )
         })?;
 
+        let approved_beta_emails = std::env::var("APPROVED_BETA_EMAILS")
+            .unwrap_or_default()
+            .split(',')
+            .map(|s| s.trim().to_lowercase().to_string())
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>();
+
         Ok(Self {
             stripe_secret_key,
             stripe_webhook_secret,
             frontend_url,
             pro_price_id,
+            approved_beta_emails,
         })
+    }
+
+    pub fn is_approved_beta_email(&self, email: &str) -> bool {
+        let email = email.to_lowercase();
+        self.approved_beta_emails
+            .iter()
+            .any(|approved| approved == "*" || *approved == email)
     }
 
     pub fn allowed_price_ids(&self) -> Vec<&str> {
