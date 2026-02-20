@@ -8,14 +8,8 @@ use tokio::sync::watch;
 use tonic::transport::{Channel, ClientTlsConfig};
 use tracing::info;
 
-const DEFAULT_API_URL: &str = "https://api.eurora-labs.com";
+pub const DEFAULT_API_URL: &str = "https://api.eurora-labs.com";
 
-/// Centralized API endpoint manager.
-///
-/// Owns the current API URL and broadcasts a raw `tonic::Channel`
-/// via `tokio::sync::watch` whenever the URL changes. Consumers
-/// subscribe once and always get the latest channel — they never
-/// need to know or care about the URL.
 pub struct EndpointManager {
     tx: watch::Sender<Channel>,
     current_url: RwLock<String>,
