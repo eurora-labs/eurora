@@ -75,6 +75,12 @@ pub async fn create_checkout_session(
     AuthUser(claims): AuthUser,
     Json(body): Json<CreateCheckoutRequest>,
 ) -> Result<Json<CreateCheckoutResponse>, PaymentError> {
+    if !state.config.is_approved_beta_email(&claims.email) {
+        return Err(PaymentError::Forbidden(
+            "Your account is not approved for beta access".to_string(),
+        ));
+    }
+
     if !state
         .config
         .allowed_price_ids()
