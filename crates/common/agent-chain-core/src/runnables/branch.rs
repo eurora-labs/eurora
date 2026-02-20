@@ -1,8 +1,3 @@
-//! Runnable that selects which branch to run based on a condition.
-//!
-//! This module provides `RunnableBranch` which selects and runs one of several
-//! branches based on conditions, mirroring `langchain_core.runnables.branch`.
-
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -17,49 +12,13 @@ use crate::load::{Serializable, Serialized, SerializedConstructorData};
 use super::base::{DynRunnable, Runnable, RunnableLambda, RunnableSerializable};
 use super::config::{RunnableConfig, ensure_config, get_callback_manager_for_config, patch_config};
 
-/// A `Runnable` that selects which branch to run based on a condition.
-///
-/// The `Runnable` is initialized with a list of `(condition, Runnable)` pairs and
-/// a default branch.
-///
-/// When operating on an input, the first condition that evaluates to `true` is
-/// selected, and the corresponding `Runnable` is run on the input.
-///
-/// If no condition evaluates to `true`, the default branch is run on the input.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::runnables::{RunnableBranch, RunnableLambda};
-/// use std::sync::Arc;
-///
-/// let branch = RunnableBranch::new(
-///     vec![
-///         (
-///             Arc::new(RunnableLambda::new(|x: i32| Ok(x > 0))),
-///             Arc::new(RunnableLambda::new(|x: i32| Ok(format!("positive: {}", x)))),
-///         ),
-///         (
-///             Arc::new(RunnableLambda::new(|x: i32| Ok(x < 0))),
-///             Arc::new(RunnableLambda::new(|x: i32| Ok(format!("negative: {}", x)))),
-///         ),
-///     ],
-///     Arc::new(RunnableLambda::new(|_: i32| Ok("zero".to_string()))),
-/// ).unwrap();
-///
-/// let result = branch.invoke(5, None).unwrap();
-/// assert_eq!(result, "positive: 5");
-/// ```
 pub struct RunnableBranch<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    /// A list of `(condition, Runnable)` pairs.
     branches: Vec<(DynRunnable<I, bool>, DynRunnable<I, O>)>,
-    /// A `Runnable` to run if no condition is met.
     default: DynRunnable<I, O>,
-    /// Optional name for this branch.
     name: Option<String>,
 }
 
@@ -81,24 +40,6 @@ where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    /// Create a new RunnableBranch.
-    ///
-    /// # Arguments
-    ///
-    /// * `branches` - A list of `(condition, runnable)` pairs. The condition is a
-    ///   Runnable that returns a boolean, and the runnable is executed if the
-    ///   condition returns true.
-    /// * `default` - The runnable to execute if no condition returns true.
-    ///
-    /// # Returns
-    ///
-    /// A Result containing the RunnableBranch, or an error if fewer than one
-    /// condition branch is provided.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the number of branches is less than 1 (meaning at
-    /// least one condition branch plus the default is required).
     pub fn new(
         branches: Vec<(DynRunnable<I, bool>, DynRunnable<I, O>)>,
         default: DynRunnable<I, O>,
@@ -116,14 +57,12 @@ where
         })
     }
 
-    /// Set the name of this branch.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
     }
 }
 
-/// Builder for creating RunnableBranch with closures.
 pub struct RunnableBranchBuilder<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
@@ -138,7 +77,6 @@ where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    /// Create a new builder.
     pub fn new() -> Self {
         Self {
             branches: Vec::new(),
@@ -146,7 +84,6 @@ where
         }
     }
 
-    /// Add a branch with closures.
     pub fn branch<CF, RF>(mut self, condition: CF, runnable: RF) -> Self
     where
         CF: Fn(I) -> Result<bool> + Send + Sync + 'static,
@@ -158,7 +95,6 @@ where
         self
     }
 
-    /// Add a branch with Arc runnables.
     pub fn branch_arc(
         mut self,
         condition: DynRunnable<I, bool>,
@@ -168,7 +104,6 @@ where
         self
     }
 
-    /// Build the RunnableBranch with a default closure.
     pub fn default<DF>(self, default_fn: DF) -> Result<RunnableBranch<I, O>>
     where
         DF: Fn(I) -> Result<O> + Send + Sync + 'static,
@@ -177,7 +112,6 @@ where
         RunnableBranch::new(self.branches, default_runnable)
     }
 
-    /// Build the RunnableBranch with a default Arc runnable.
     pub fn default_arc(self, default: DynRunnable<I, O>) -> Result<RunnableBranch<I, O>> {
         RunnableBranch::new(self.branches, default)
     }

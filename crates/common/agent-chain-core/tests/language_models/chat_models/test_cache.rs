@@ -1,14 +1,9 @@
-//! Cache interaction tests for chat models.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/language_models/chat_models/test_cache.py`
-
 use std::sync::Arc;
 
 use agent_chain_core::caches::InMemoryCache;
 use agent_chain_core::language_models::{BaseChatModel, LanguageModelInput};
 use agent_chain_core::{FakeListChatModel, set_llm_cache};
 
-/// Ported from `test_local_cache_sync`.
 #[tokio::test]
 async fn test_local_cache_sync() {
     let global_cache = Arc::new(InMemoryCache::unbounded());
@@ -39,7 +34,6 @@ async fn test_local_cache_sync() {
     set_llm_cache(None);
 }
 
-/// Ported from `test_local_cache_async`.
 #[tokio::test]
 async fn test_local_cache_async() {
     let global_cache = Arc::new(InMemoryCache::unbounded());
@@ -70,10 +64,6 @@ async fn test_local_cache_async() {
     set_llm_cache(None);
 }
 
-/// Ported from `test_global_cache_sync`.
-///
-/// Uses a local cache instance to avoid global state races in parallel tests.
-/// The test intent (cache=true uses a cache, hits return same result) is preserved.
 #[tokio::test]
 async fn test_global_cache_sync() {
     let cache = Arc::new(InMemoryCache::unbounded());
@@ -105,7 +95,6 @@ async fn test_global_cache_sync() {
     assert_eq!(result.content, "goodbye");
 }
 
-/// Ported from `test_global_cache_async`.
 #[tokio::test]
 async fn test_global_cache_async() {
     let cache = Arc::new(InMemoryCache::unbounded());
@@ -137,7 +126,6 @@ async fn test_global_cache_async() {
     assert_eq!(result.content, "goodbye");
 }
 
-/// Ported from `test_no_cache_sync`.
 #[tokio::test]
 async fn test_no_cache_sync() {
     let global_cache = Arc::new(InMemoryCache::unbounded());
@@ -161,7 +149,6 @@ async fn test_no_cache_sync() {
     set_llm_cache(None);
 }
 
-/// Ported from `test_no_cache_async`.
 #[tokio::test]
 async fn test_no_cache_async() {
     let global_cache = Arc::new(InMemoryCache::unbounded());
@@ -185,7 +172,6 @@ async fn test_no_cache_async() {
     set_llm_cache(None);
 }
 
-/// Ported from `test_can_swap_caches`.
 #[tokio::test]
 async fn test_can_swap_caches() {
     let cache = Arc::new(InMemoryCache::unbounded());
@@ -210,12 +196,6 @@ async fn test_can_swap_caches() {
     assert_eq!(result.content, "different");
 }
 
-/// Ported from `test_cache_with_generation_objects`.
-///
-/// Tests that the cache can handle Generation objects (instead of ChatGeneration)
-/// and properly convert them back to ChatGeneration when returned as cache hits.
-/// This reproduces a scenario where cache contains Generation objects due to
-/// serialization/deserialization issues or legacy cache data.
 #[tokio::test]
 async fn test_cache_with_generation_objects() {
     use agent_chain_core::language_models::BaseChatModel;
@@ -238,11 +218,6 @@ async fn test_cache_with_generation_objects() {
     assert_eq!(result.content, "hello");
 }
 
-/// Test that the cache round-trip preserves message data through
-/// `_chat_generations_to_cache` and `_convert_cached_generations`.
-///
-/// Verifies the fix for cache previously only storing `Generation::new(text)`,
-/// which lost the original message type and generation_info.
 #[tokio::test]
 async fn test_cache_preserves_message_through_round_trip() {
     let cache = Arc::new(InMemoryCache::unbounded());
@@ -268,8 +243,6 @@ async fn test_cache_preserves_message_through_round_trip() {
     );
 }
 
-/// Test that `_convert_cached_generations` handles legacy `Generation` objects
-/// (i.e., no serialized "message" in generation_info) by creating AIMessages.
 #[tokio::test]
 async fn test_convert_cached_generations_legacy_format() {
     use agent_chain_core::caches::BaseCache;
@@ -302,7 +275,6 @@ async fn test_convert_cached_generations_legacy_format() {
     assert_eq!(result.content, "legacy text");
 }
 
-/// Test that cache key is deterministic — same model parameters produce the same key.
 #[test]
 fn test_cache_key_determinism() {
     let model = FakeListChatModel::new(vec!["test".to_string()]);

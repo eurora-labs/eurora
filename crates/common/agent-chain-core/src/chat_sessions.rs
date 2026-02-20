@@ -1,50 +1,21 @@
-//! **Chat Sessions** are a collection of messages and function calls.
-//!
-//! This module provides the [`ChatSession`] type for representing a single
-//! thread, channel, or other group of messages.
-//!
-//! Mirrors `langchain_core.chat_sessions`.
-
 use serde::{Deserialize, Serialize};
 
 use crate::messages::BaseMessage;
 
-/// Chat Session.
-///
-/// A Chat Session represents a single thread, channel, or other group of messages.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::chat_sessions::ChatSession;
-/// use agent_chain_core::messages::{BaseMessage, HumanMessage, AIMessage};
-///
-/// let session = ChatSession {
-///     messages: Some(vec![
-///         BaseMessage::Human(HumanMessage::builder().content("Hello!").build()),
-///         BaseMessage::AI(AIMessage::builder().content("Hi there!").build()),
-///     ]),
-///     functions: None,
-/// };
-/// ```
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ChatSession {
-    /// A sequence of the LangChain chat messages loaded from the source.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub messages: Option<Vec<BaseMessage>>,
 
-    /// A sequence of the function calling specs for the messages.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub functions: Option<Vec<serde_json::Value>>,
 }
 
 impl ChatSession {
-    /// Create a new empty chat session.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Create a chat session with the given messages.
     pub fn with_messages(messages: Vec<BaseMessage>) -> Self {
         Self {
             messages: Some(messages),
@@ -52,7 +23,6 @@ impl ChatSession {
         }
     }
 
-    /// Create a chat session with the given messages and functions.
     pub fn with_messages_and_functions(
         messages: Vec<BaseMessage>,
         functions: Vec<serde_json::Value>,
@@ -63,22 +33,18 @@ impl ChatSession {
         }
     }
 
-    /// Get the messages in this session, or an empty slice if none.
     pub fn messages(&self) -> &[BaseMessage] {
         self.messages.as_deref().unwrap_or(&[])
     }
 
-    /// Get the functions in this session, or an empty slice if none.
     pub fn functions(&self) -> &[serde_json::Value] {
         self.functions.as_deref().unwrap_or(&[])
     }
 
-    /// Check if this session has any messages.
     pub fn has_messages(&self) -> bool {
         self.messages.as_ref().is_some_and(|m| !m.is_empty())
     }
 
-    /// Check if this session has any functions.
     pub fn has_functions(&self) -> bool {
         self.functions.as_ref().is_some_and(|f| !f.is_empty())
     }

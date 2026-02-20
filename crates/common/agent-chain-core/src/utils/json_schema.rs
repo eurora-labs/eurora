@@ -1,45 +1,6 @@
-//! Utilities for JSON Schema.
-//!
-//! Adapted from langchain_core/utils/json_schema.py
-
 use serde_json::{Map, Value};
 use std::collections::HashSet;
 
-/// Resolve and inline JSON Schema `$ref` references in a schema object.
-///
-/// This function processes a JSON Schema and resolves all `$ref` references by
-/// replacing them with the actual referenced content.
-///
-/// Handles both simple references and complex cases like circular references and mixed
-/// `$ref` objects that contain additional properties alongside the `$ref`.
-///
-/// # Arguments
-///
-/// * `schema_obj` - The JSON Schema object or fragment to process.
-/// * `full_schema` - The complete schema containing all definitions that `$refs` might
-///   point to. If not provided, defaults to `schema_obj`.
-/// * `skip_keys` - Controls recursion behavior and reference resolution depth.
-///   If `None` (Default): Only recurse under `'$defs'` and use shallow reference resolution.
-///   If provided (even as empty): Recurse under all keys and use deep reference resolution.
-///
-/// # Returns
-///
-/// A new value with all $ref references resolved and inlined.
-///
-/// # Example
-///
-/// ```
-/// use serde_json::json;
-/// use agent_chain_core::utils::json_schema::dereference_refs;
-///
-/// let schema = json!({
-///     "type": "object",
-///     "properties": {"name": {"$ref": "#/$defs/string_type"}},
-///     "$defs": {"string_type": {"type": "string"}}
-/// });
-/// let result = dereference_refs(&schema, None, None);
-/// // result["properties"]["name"] is now {"type": "string"}
-/// ```
 pub fn dereference_refs(
     schema_obj: &Value,
     full_schema: Option<&Value>,

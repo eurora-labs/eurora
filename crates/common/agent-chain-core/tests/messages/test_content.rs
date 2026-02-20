@@ -1,7 +1,3 @@
-//! Tests for content module types and functions.
-//!
-//! Converted from `langchain/libs/core/tests/unit_tests/messages/test_content.py`
-
 use std::collections::{HashMap, HashSet};
 
 use agent_chain_core::messages::{

@@ -1,7 +1,3 @@
-//! Unit tests for JSON schema dereferencing utilities.
-//!
-//! Converted from langchain/libs/core/tests/unit_tests/utils/test_json_schema.py
-
 use agent_chain_core::utils::json_schema::dereference_refs;
 use serde_json::json;
 

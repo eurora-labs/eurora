@@ -1,11 +1,3 @@
-//! **IMPORTANT** Snapshot tests for base callback handler.
-//!
-//! These tests check that the public API of the base callback handler
-//! has not changed. If they fail it means that the public API has changed
-//! and the changes need to be reviewed and approved.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/callbacks/test_base_snapshot.py`
-
 use agent_chain_core::callbacks::base::{
     BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
     RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
@@ -26,14 +18,6 @@ impl BaseCallbackHandler for SnapshotHandler {
     }
 }
 
-/// Ported from `test_sync_handler_has_methods`.
-///
-/// Verifies that BaseCallbackHandler (via its mixin traits) exposes all
-/// expected callback methods. If this test fails to compile, the public API
-/// has changed.
-///
-/// Please do not remove or change the order of the expected methods.
-/// If a method is added, it should be added at the end of the list.
 #[test]
 fn test_sync_handler_has_methods() {
     let handler = SnapshotHandler;
@@ -146,10 +130,6 @@ fn test_sync_handler_has_methods() {
     );
 }
 
-/// Ported from `test_async_handler_has_methods`.
-///
-/// Verifies that AsyncCallbackHandler exposes async versions of all expected
-/// callback methods. Compilation success means the API is intact.
 #[test]
 fn test_async_handler_has_methods() {
     use agent_chain_core::callbacks::base::AsyncCallbackHandler;
@@ -161,10 +141,6 @@ fn test_async_handler_has_methods() {
 #[async_trait::async_trait]
 impl agent_chain_core::callbacks::base::AsyncCallbackHandler for SnapshotHandler {}
 
-/// Ported from `test_base_callback_handler_attributes`.
-///
-/// Verifies that BaseCallbackHandler exposes all expected ignore flags,
-/// and that they default to `false`.
 #[test]
 fn test_base_callback_handler_attributes() {
     let handler = SnapshotHandler;
@@ -180,10 +156,6 @@ fn test_base_callback_handler_attributes() {
     assert!(!handler.run_inline());
 }
 
-/// Ported from `test_async_callback_handler_attributes`.
-///
-/// Verifies that AsyncCallbackHandler inherits all ignore flags from
-/// BaseCallbackHandler (since it is a supertrait), and they default to `false`.
 #[test]
 fn test_async_callback_handler_attributes() {
     let handler = SnapshotHandler;

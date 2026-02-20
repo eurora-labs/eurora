@@ -1,8 +1,3 @@
-//! Run managers and callback managers for LangChain.
-//!
-//! This module provides the callback manager and run manager types that
-//! handle callback dispatch during LangChain operations.
-
 use std::collections::HashMap;
 use std::future::Future;
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -24,11 +19,6 @@ use crate::tracers::stdout::ConsoleCallbackHandler;
 use crate::utils::env::env_var_is_set;
 use crate::utils::uuid::uuid7;
 
-/// Handle an event for the given handlers.
-///
-/// This function dispatches an event to all handlers that don't ignore it.
-/// Catches panics from handler calls, logs warnings, and re-panics if
-/// the handler has raise_error set to true.
 pub fn handle_event<F>(
     handlers: &[Arc<dyn BaseCallbackHandler>],
     ignore_condition: Option<fn(&dyn BaseCallbackHandler) -> bool>,
@@ -66,11 +56,6 @@ pub fn handle_event<F>(
     }
 }
 
-/// Async generic event handler for `AsyncCallbackManager`.
-///
-/// This function dispatches events to handlers asynchronously.
-/// Handlers with `run_inline = true` are run sequentially first,
-/// then non-inline handlers are run concurrently.
 pub async fn ahandle_event<F, Fut>(
     handlers: &[Arc<dyn BaseCallbackHandler>],
     ignore_condition: Option<fn(&dyn BaseCallbackHandler) -> bool>,
@@ -104,29 +89,19 @@ pub async fn ahandle_event<F, Fut>(
     futures::future::join_all(non_inline_futures).await;
 }
 
-/// Base class for run manager (a bound callback manager).
 #[derive(Debug, Clone)]
 pub struct BaseRunManager {
-    /// The ID of the run.
     pub run_id: Uuid,
-    /// The list of handlers.
     pub handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-    /// The list of inheritable handlers.
     pub inheritable_handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-    /// The ID of the parent run.
     pub parent_run_id: Option<Uuid>,
-    /// The list of tags.
     pub tags: Vec<String>,
-    /// The list of inheritable tags.
     pub inheritable_tags: Vec<String>,
-    /// The metadata.
     pub metadata: HashMap<String, serde_json::Value>,
-    /// The inheritable metadata.
     pub inheritable_metadata: HashMap<String, serde_json::Value>,
 }
 
 impl BaseRunManager {
-    /// Create a new base run manager.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         run_id: Uuid,
@@ -150,7 +125,6 @@ impl BaseRunManager {
         }
     }
 
-    /// Return a manager that doesn't perform any operations.
     pub fn get_noop_manager() -> Self {
         Self {
             run_id: uuid7(None),
@@ -165,15 +139,12 @@ impl BaseRunManager {
     }
 }
 
-/// Sync Run Manager.
 #[derive(Debug, Clone)]
 pub struct RunManager {
-    /// The base run manager.
     inner: BaseRunManager,
 }
 
 impl RunManager {
-    /// Create a new run manager.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         run_id: Uuid,
@@ -199,27 +170,22 @@ impl RunManager {
         }
     }
 
-    /// Get the run ID.
     pub fn run_id(&self) -> Uuid {
         self.inner.run_id
     }
 
-    /// Get the parent run ID.
     pub fn parent_run_id(&self) -> Option<Uuid> {
         self.inner.parent_run_id
     }
 
-    /// Get the handlers.
     pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
         &self.inner.handlers
     }
 
-    /// Get the tags.
     pub fn tags(&self) -> &[String] {
         &self.inner.tags
     }
 
-    /// Run when a text is received.
     pub fn on_text(&self, text: &str) {
         if self.inner.handlers.is_empty() {
             return;
@@ -232,7 +198,6 @@ impl RunManager {
         });
     }
 
-    /// Run when a retry is received.
     pub fn on_retry(&self, retry_state: &serde_json::Value) {
         if self.inner.handlers.is_empty() {
             return;
@@ -249,7 +214,6 @@ impl RunManager {
         );
     }
 
-    /// Return a noop manager.
     pub fn get_noop_manager() -> Self {
         Self {
             inner: BaseRunManager::get_noop_manager(),
@@ -257,17 +221,12 @@ impl RunManager {
     }
 }
 
-/// Async Run Manager.
-///
-/// This is the async counterpart to `RunManager`.
 #[derive(Debug, Clone)]
 pub struct AsyncRunManager {
-    /// The base run manager.
     inner: BaseRunManager,
 }
 
 impl AsyncRunManager {
-    /// Create a new async run manager.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         run_id: Uuid,
@@ -293,7 +252,6 @@ impl AsyncRunManager {
         }
     }
 
-    /// Get the sync version of this run manager.
     pub fn get_sync(&self) -> RunManager {
         RunManager::new(
             self.inner.run_id,
@@ -307,27 +265,22 @@ impl AsyncRunManager {
         )
     }
 
-    /// Get the run ID.
     pub fn run_id(&self) -> Uuid {
         self.inner.run_id
     }
 
-    /// Get the parent run ID.
     pub fn parent_run_id(&self) -> Option<Uuid> {
         self.inner.parent_run_id
     }
 
-    /// Get the handlers.
     pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
         &self.inner.handlers
     }
 
-    /// Get the tags.
     pub fn tags(&self) -> &[String] {
         &self.inner.tags
     }
 
-    /// Run when a text is received (async).
     pub async fn on_text(&self, text: &str) {
         if self.inner.handlers.is_empty() {
             return;
@@ -342,7 +295,6 @@ impl AsyncRunManager {
         .await;
     }
 
-    /// Run when a retry is received (async).
     pub async fn on_retry(&self, retry_state: &serde_json::Value) {
         if self.inner.handlers.is_empty() {
             return;
@@ -361,7 +313,6 @@ impl AsyncRunManager {
         .await;
     }
 
-    /// Return a noop manager.
     pub fn get_noop_manager() -> Self {
         Self {
             inner: BaseRunManager::get_noop_manager(),
@@ -369,17 +320,12 @@ impl AsyncRunManager {
     }
 }
 
-/// Async Parent Run Manager.
-///
-/// This is the async counterpart to `ParentRunManager`.
 #[derive(Debug, Clone)]
 pub struct AsyncParentRunManager {
-    /// The inner async run manager.
     inner: AsyncRunManager,
 }
 
 impl AsyncParentRunManager {
-    /// Create a new async parent run manager.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         run_id: Uuid,
@@ -405,7 +351,6 @@ impl AsyncParentRunManager {
         }
     }
 
-    /// Get a child async callback manager.
     pub fn get_child(&self, tag: Option<&str>) -> AsyncCallbackManager {
         let mut manager = AsyncCallbackManager::new();
         manager.inner.parent_run_id = Some(self.inner.run_id());
@@ -418,7 +363,6 @@ impl AsyncParentRunManager {
         manager
     }
 
-    /// Get the sync version.
     pub fn get_sync(&self) -> ParentRunManager {
         ParentRunManager::new(
             self.inner.inner.run_id,
@@ -432,27 +376,22 @@ impl AsyncParentRunManager {
         )
     }
 
-    /// Get the run ID.
     pub fn run_id(&self) -> Uuid {
         self.inner.run_id()
     }
 
-    /// Get the parent run ID.
     pub fn parent_run_id(&self) -> Option<Uuid> {
         self.inner.parent_run_id()
     }
 
-    /// Get the handlers.
     pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
         self.inner.handlers()
     }
 
-    /// Get the tags.
     pub fn tags(&self) -> &[String] {
         self.inner.tags()
     }
 
-    /// Return a noop manager.
     pub fn get_noop_manager() -> Self {
         Self {
             inner: AsyncRunManager::get_noop_manager(),
@@ -460,15 +399,12 @@ impl AsyncParentRunManager {
     }
 }
 
-/// Sync Parent Run Manager.
 #[derive(Debug, Clone)]
 pub struct ParentRunManager {
-    /// The inner run manager.
     inner: RunManager,
 }
 
 impl ParentRunManager {
-    /// Create a new parent run manager.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         run_id: Uuid,
@@ -494,7 +430,6 @@ impl ParentRunManager {
         }
     }
 
-    /// Get a child callback manager.
     pub fn get_child(&self, tag: Option<&str>) -> CallbackManager {
         let mut manager = CallbackManager::new();
         manager.parent_run_id = Some(self.inner.run_id());
@@ -507,27 +442,22 @@ impl ParentRunManager {
         manager
     }
 
-    /// Get the run ID.
     pub fn run_id(&self) -> Uuid {
         self.inner.run_id()
     }
 
-    /// Get the parent run ID.
     pub fn parent_run_id(&self) -> Option<Uuid> {
         self.inner.parent_run_id()
     }
 
-    /// Get the handlers.
     pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
         self.inner.handlers()
     }
 
-    /// Get the tags.
     pub fn tags(&self) -> &[String] {
         self.inner.tags()
     }
 
-    /// Return a noop manager.
     pub fn get_noop_manager() -> Self {
         Self {
             inner: RunManager::get_noop_manager(),
@@ -535,15 +465,12 @@ impl ParentRunManager {
     }
 }
 
-/// Callback manager for LLM run.
 #[derive(Debug, Clone)]
 pub struct CallbackManagerForLLMRun {
-    /// The inner run manager.
     inner: RunManager,
 }
 
 impl CallbackManagerForLLMRun {
-    /// Create a new callback manager for LLM run.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         run_id: Uuid,
@@ -569,27 +496,22 @@ impl CallbackManagerForLLMRun {
         }
     }
 
-    /// Get the run ID.
     pub fn run_id(&self) -> Uuid {
         self.inner.run_id()
     }
 
-    /// Get the parent run ID.
     pub fn parent_run_id(&self) -> Option<Uuid> {
         self.inner.parent_run_id()
     }
 
-    /// Get the handlers.
     pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
         self.inner.handlers()
     }
 
-    /// Get the tags.
     pub fn tags(&self) -> &[String] {
         self.inner.tags()
     }
 
-    /// Run when LLM generates a new token.
     pub fn on_llm_new_token(&self, token: &str, chunk: Option<&serde_json::Value>) {
         if self.inner.inner.handlers.is_empty() {
             return;
@@ -606,7 +528,6 @@ impl CallbackManagerForLLMRun {
         );
     }
 
-    /// Run when LLM ends running.
     pub fn on_llm_end(&self, response: &ChatResult) {
         if self.inner.inner.handlers.is_empty() {
             return;
@@ -623,7 +544,6 @@ impl CallbackManagerForLLMRun {
         );
     }
 
-    /// Run when LLM errors.
     pub fn on_llm_error(&self, error: &dyn std::error::Error) {
         if self.inner.inner.handlers.is_empty() {
             return;
@@ -640,7 +560,6 @@ impl CallbackManagerForLLMRun {
         );
     }
 
-    /// Return a noop manager.
     pub fn get_noop_manager() -> Self {
         Self {
             inner: RunManager::get_noop_manager(),
@@ -648,15 +567,12 @@ impl CallbackManagerForLLMRun {
     }
 }
 
-/// Callback manager for chain run.
 #[derive(Debug, Clone)]
 pub struct CallbackManagerForChainRun {
-    /// The inner parent run manager.
     inner: ParentRunManager,
 }
 
 impl CallbackManagerForChainRun {
-    /// Create a new callback manager for chain run.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         run_id: Uuid,
@@ -682,32 +598,26 @@ impl CallbackManagerForChainRun {
         }
     }
 
-    /// Get the run ID.
     pub fn run_id(&self) -> Uuid {
         self.inner.run_id()
     }
 
-    /// Get the parent run ID.
     pub fn parent_run_id(&self) -> Option<Uuid> {
         self.inner.parent_run_id()
     }
 
-    /// Get the handlers.
     pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
         self.inner.handlers()
     }
 
-    /// Get the tags.
     pub fn tags(&self) -> &[String] {
         self.inner.tags()
     }
 
-    /// Get a child callback manager.
     pub fn get_child(&self, tag: Option<&str>) -> CallbackManager {
         self.inner.get_child(tag)
     }
 
-    /// Run when chain ends running.
     pub fn on_chain_end(&self, outputs: &HashMap<String, serde_json::Value>) {
         if self.inner.inner.inner.handlers.is_empty() {
             return;
@@ -724,7 +634,6 @@ impl CallbackManagerForChainRun {
         );
     }
 
-    /// Run when chain errors.
     pub fn on_chain_error(&self, error: &dyn std::error::Error) {
         if self.inner.inner.inner.handlers.is_empty() {
             return;
@@ -741,7 +650,6 @@ impl CallbackManagerForChainRun {
         );
     }
 
-    /// Run when agent action is received.
     pub fn on_agent_action(&self, action: &serde_json::Value) {
         if self.inner.inner.inner.handlers.is_empty() {
             return;
@@ -758,7 +666,6 @@ impl CallbackManagerForChainRun {
         );
     }
 
-    /// Run when agent finish is received.
     pub fn on_agent_finish(&self, finish: &serde_json::Value) {
         if self.inner.inner.inner.handlers.is_empty() {
             return;
@@ -775,7 +682,6 @@ impl CallbackManagerForChainRun {
         );
     }
 
-    /// Return a noop manager.
     pub fn get_noop_manager() -> Self {
         Self {
             inner: ParentRunManager::get_noop_manager(),
@@ -783,15 +689,12 @@ impl CallbackManagerForChainRun {
     }
 }
 
-/// Callback manager for tool run.
 #[derive(Debug, Clone)]
 pub struct CallbackManagerForToolRun {
-    /// The inner parent run manager.
     inner: ParentRunManager,
 }
 
 impl CallbackManagerForToolRun {
-    /// Create a new callback manager for tool run.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         run_id: Uuid,
@@ -817,32 +720,26 @@ impl CallbackManagerForToolRun {
         }
     }
 
-    /// Get the run ID.
     pub fn run_id(&self) -> Uuid {
         self.inner.run_id()
     }
 
-    /// Get the parent run ID.
     pub fn parent_run_id(&self) -> Option<Uuid> {
         self.inner.parent_run_id()
     }
 
-    /// Get the handlers.
     pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
         self.inner.handlers()
     }
 
-    /// Get the tags.
     pub fn tags(&self) -> &[String] {
         self.inner.tags()
     }
 
-    /// Get a child callback manager.
     pub fn get_child(&self, tag: Option<&str>) -> CallbackManager {
         self.inner.get_child(tag)
     }
 
-    /// Run when tool ends running.
     pub fn on_tool_end(&self, output: &str) {
         if self.inner.inner.inner.handlers.is_empty() {
             return;
@@ -859,7 +756,6 @@ impl CallbackManagerForToolRun {
         );
     }
 
-    /// Run when tool errors.
     pub fn on_tool_error(&self, error: &dyn std::error::Error) {
         if self.inner.inner.inner.handlers.is_empty() {
             return;
@@ -876,7 +772,6 @@ impl CallbackManagerForToolRun {
         );
     }
 
-    /// Return a noop manager.
     pub fn get_noop_manager() -> Self {
         Self {
             inner: ParentRunManager::get_noop_manager(),
@@ -884,15 +779,12 @@ impl CallbackManagerForToolRun {
     }
 }
 
-/// Callback manager for retriever run.
 #[derive(Debug, Clone)]
 pub struct CallbackManagerForRetrieverRun {
-    /// The inner parent run manager.
     inner: ParentRunManager,
 }
 
 impl CallbackManagerForRetrieverRun {
-    /// Create a new callback manager for retriever run.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         run_id: Uuid,
@@ -918,32 +810,26 @@ impl CallbackManagerForRetrieverRun {
         }
     }
 
-    /// Get the run ID.
     pub fn run_id(&self) -> Uuid {
         self.inner.run_id()
     }
 
-    /// Get the parent run ID.
     pub fn parent_run_id(&self) -> Option<Uuid> {
         self.inner.parent_run_id()
     }
 
-    /// Get the handlers.
     pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
         self.inner.handlers()
     }
 
-    /// Get the tags.
     pub fn tags(&self) -> &[String] {
         self.inner.tags()
     }
 
-    /// Get a child callback manager.
     pub fn get_child(&self, tag: Option<&str>) -> CallbackManager {
         self.inner.get_child(tag)
     }
 
-    /// Run when retriever ends running.
     pub fn on_retriever_end(&self, documents: &[serde_json::Value]) {
         if self.inner.inner.inner.handlers.is_empty() {
             return;
@@ -960,7 +846,6 @@ impl CallbackManagerForRetrieverRun {
         );
     }
 
-    /// Run when retriever errors.
     pub fn on_retriever_error(&self, error: &dyn std::error::Error) {
         if self.inner.inner.inner.handlers.is_empty() {
             return;
@@ -977,7 +862,6 @@ impl CallbackManagerForRetrieverRun {
         );
     }
 
-    /// Return a noop manager.
     pub fn get_noop_manager() -> Self {
         Self {
             inner: ParentRunManager::get_noop_manager(),
@@ -985,32 +869,22 @@ impl CallbackManagerForRetrieverRun {
     }
 }
 
-/// Callback manager for LangChain.
 #[derive(Debug, Clone, Default)]
 pub struct CallbackManager {
-    /// The handlers.
     pub handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-    /// The inheritable handlers.
     pub inheritable_handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-    /// The parent run ID.
     pub parent_run_id: Option<Uuid>,
-    /// The tags.
     pub tags: Vec<String>,
-    /// The inheritable tags.
     pub inheritable_tags: Vec<String>,
-    /// The metadata.
     pub metadata: HashMap<String, serde_json::Value>,
-    /// The inheritable metadata.
     pub inheritable_metadata: HashMap<String, serde_json::Value>,
 }
 
 impl CallbackManager {
-    /// Create a new callback manager.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Create a callback manager from a base callback manager.
     pub fn from_base(base: BaseCallbackManager) -> Self {
         Self {
             handlers: base.handlers,
@@ -1023,7 +897,6 @@ impl CallbackManager {
         }
     }
 
-    /// Set handlers as the only handlers on the callback manager.
     pub fn set_handlers(&mut self, handlers: Vec<Arc<dyn BaseCallbackHandler>>, inherit: bool) {
         self.handlers = Vec::new();
         self.inheritable_handlers = Vec::new();
@@ -1032,12 +905,10 @@ impl CallbackManager {
         }
     }
 
-    /// Set a single handler as the only handler on the callback manager.
     pub fn set_handler(&mut self, handler: Arc<dyn BaseCallbackHandler>, inherit: bool) {
         self.set_handlers(vec![handler], inherit);
     }
 
-    /// Add handler.
     pub fn add_handler(&mut self, handler: Arc<dyn BaseCallbackHandler>, inherit: bool) {
         if !self
             .handlers
@@ -1056,14 +927,12 @@ impl CallbackManager {
         }
     }
 
-    /// Remove a handler from the callback manager.
     pub fn remove_handler(&mut self, handler: &Arc<dyn BaseCallbackHandler>) {
         self.handlers
             .retain(|h| !std::ptr::eq(h.as_ref(), handler.as_ref()));
         self.inheritable_handlers
             .retain(|h| !std::ptr::eq(h.as_ref(), handler.as_ref()));
     }
-    /// Add tags to the callback manager.
     pub fn add_tags(&mut self, tags: Vec<String>, inherit: bool) {
         for tag in &tags {
             if self.tags.contains(tag) {
@@ -1076,7 +945,6 @@ impl CallbackManager {
         }
     }
 
-    /// Remove tags from the callback manager.
     pub fn remove_tags(&mut self, tags: &[String]) {
         for tag in tags {
             self.tags.retain(|t| t != tag);
@@ -1084,7 +952,6 @@ impl CallbackManager {
         }
     }
 
-    /// Remove metadata keys from the callback manager.
     pub fn remove_metadata(&mut self, keys: &[String]) {
         for key in keys {
             self.metadata.remove(key);
@@ -1092,7 +959,6 @@ impl CallbackManager {
         }
     }
 
-    /// Add metadata.
     pub fn add_metadata(&mut self, metadata: HashMap<String, serde_json::Value>, inherit: bool) {
         self.metadata.extend(metadata.clone());
         if inherit {
@@ -1100,7 +966,6 @@ impl CallbackManager {
         }
     }
 
-    /// Run when LLM starts running.
     pub fn on_llm_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -1148,7 +1013,6 @@ impl CallbackManager {
         managers
     }
 
-    /// Run when chat model starts running.
     pub fn on_chat_model_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -1192,7 +1056,6 @@ impl CallbackManager {
         managers
     }
 
-    /// Run when tool starts running.
     pub fn on_tool_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -1230,7 +1093,6 @@ impl CallbackManager {
         )
     }
 
-    /// Dispatch a custom event.
     pub fn on_custom_event(&self, name: &str, data: &serde_json::Value, run_id: Option<Uuid>) {
         if self.handlers.is_empty() {
             return;
@@ -1247,7 +1109,6 @@ impl CallbackManager {
         );
     }
 
-    /// Return a copy of the callback manager.
     pub fn copy(&self) -> Self {
         Self {
             handlers: self.handlers.clone(),
@@ -1260,7 +1121,6 @@ impl CallbackManager {
         }
     }
 
-    /// Merge the callback manager with another callback manager.
     pub fn merge(&self, other: &CallbackManager) -> Self {
         let mut tags: Vec<String> = self.tags.clone();
         for tag in &other.tags {
@@ -1317,9 +1177,6 @@ impl CallbackManager {
         manager
     }
 
-    /// Configure the callback manager.
-    ///
-    /// Matches Python's `CallbackManager.configure()` which delegates to `_configure()`.
     pub fn configure(
         inheritable_callbacks: Option<Callbacks>,
         local_callbacks: Option<Callbacks>,
@@ -1341,9 +1198,6 @@ impl CallbackManager {
     }
 }
 
-/// Internal configure implementation shared by CallbackManager and AsyncCallbackManager.
-///
-/// This matches Python's `_configure()` function in manager.py.
 #[allow(clippy::too_many_arguments)]
 fn _configure(
     inheritable_callbacks: Option<Callbacks>,
@@ -1499,16 +1353,13 @@ fn _configure(
     callback_manager
 }
 
-/// Async callback manager for LangChain.
 #[derive(Debug, Clone, Default)]
 pub struct AsyncCallbackManager {
-    /// The inner callback manager.
     inner: CallbackManager,
 }
 
 #[bon]
 impl CallbackManager {
-    /// Run when chain starts running.
     #[builder]
     pub fn on_chain_start(
         &self,
@@ -1547,7 +1398,6 @@ impl CallbackManager {
         )
     }
 
-    /// Run when retriever starts running.
     #[builder]
     pub fn on_retriever_start(
         &self,
@@ -1588,62 +1438,50 @@ impl CallbackManager {
 }
 
 impl AsyncCallbackManager {
-    /// Create a new async callback manager.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Create from a callback manager.
     pub fn from_callback_manager(manager: CallbackManager) -> Self {
         Self { inner: manager }
     }
 
-    /// Get the handlers.
     pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
         &self.inner.handlers
     }
 
-    /// Get the parent run ID.
     pub fn parent_run_id(&self) -> Option<Uuid> {
         self.inner.parent_run_id
     }
 
-    /// Set handlers.
     pub fn set_handlers(&mut self, handlers: Vec<Arc<dyn BaseCallbackHandler>>, inherit: bool) {
         self.inner.set_handlers(handlers, inherit);
     }
 
-    /// Add handler.
     pub fn add_handler(&mut self, handler: Arc<dyn BaseCallbackHandler>, inherit: bool) {
         self.inner.add_handler(handler, inherit);
     }
 
-    /// Remove a handler from the callback manager.
     pub fn remove_handler(&mut self, handler: &Arc<dyn BaseCallbackHandler>) {
         self.inner.remove_handler(handler);
     }
 
-    /// Get the inner sync CallbackManager.
     pub fn to_callback_manager(&self) -> CallbackManager {
         self.inner.clone()
     }
 
-    /// Add tags.
     pub fn add_tags(&mut self, tags: Vec<String>, inherit: bool) {
         self.inner.add_tags(tags, inherit);
     }
 
-    /// Add metadata.
     pub fn add_metadata(&mut self, metadata: HashMap<String, serde_json::Value>, inherit: bool) {
         self.inner.add_metadata(metadata, inherit);
     }
 
-    /// Whether this is async.
     pub fn is_async(&self) -> bool {
         true
     }
 
-    /// Run when LLM starts running (async).
     pub async fn on_llm_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -1657,7 +1495,6 @@ impl AsyncCallbackManager {
             .collect()
     }
 
-    /// Run when chat model starts running (async).
     pub async fn on_chat_model_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -1671,7 +1508,6 @@ impl AsyncCallbackManager {
             .collect()
     }
 
-    /// Run when chain starts running (async).
     pub async fn on_chain_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -1690,7 +1526,6 @@ impl AsyncCallbackManager {
         )
     }
 
-    /// Run when tool starts running (async).
     pub async fn on_tool_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -1704,7 +1539,6 @@ impl AsyncCallbackManager {
         )
     }
 
-    /// Dispatch a custom event (async).
     pub async fn on_custom_event(
         &self,
         name: &str,
@@ -1726,9 +1560,6 @@ impl AsyncCallbackManager {
         );
     }
 
-    /// Configure the async callback manager.
-    ///
-    /// Matches Python's `AsyncCallbackManager.configure()` which delegates to `_configure()`.
     pub fn configure(
         inheritable_callbacks: Option<Callbacks>,
         local_callbacks: Option<Callbacks>,
@@ -1752,16 +1583,13 @@ impl AsyncCallbackManager {
     }
 }
 
-/// Async callback manager for LLM run.
 #[derive(Debug, Clone)]
 pub struct AsyncCallbackManagerForLLMRun {
-    /// The inner sync callback manager.
     inner: CallbackManagerForLLMRun,
 }
 
 #[bon]
 impl AsyncCallbackManager {
-    /// Run when retriever starts running (async).
     #[builder]
     pub async fn on_retriever_start(
         &self,
@@ -1783,47 +1611,38 @@ impl AsyncCallbackManager {
 }
 
 impl AsyncCallbackManagerForLLMRun {
-    /// Create from sync callback manager.
     pub fn from_sync(inner: CallbackManagerForLLMRun) -> Self {
         Self { inner }
     }
 
-    /// Get the sync version.
     pub fn get_sync(&self) -> CallbackManagerForLLMRun {
         self.inner.clone()
     }
 
-    /// Get the run ID.
     pub fn run_id(&self) -> Uuid {
         self.inner.run_id()
     }
 
-    /// Get the parent run ID.
     pub fn parent_run_id(&self) -> Option<Uuid> {
         self.inner.parent_run_id()
     }
 
-    /// Get the handlers.
     pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
         self.inner.handlers()
     }
 
-    /// Run when LLM generates a new token (async).
     pub async fn on_llm_new_token(&self, token: &str, chunk: Option<&serde_json::Value>) {
         self.inner.on_llm_new_token(token, chunk);
     }
 
-    /// Run when LLM ends running (async).
     pub async fn on_llm_end(&self, response: &ChatResult) {
         self.inner.on_llm_end(response);
     }
 
-    /// Run when LLM errors (async).
     pub async fn on_llm_error(&self, error: &dyn std::error::Error) {
         self.inner.on_llm_error(error);
     }
 
-    /// Return a noop manager.
     pub fn get_noop_manager() -> Self {
         Self {
             inner: CallbackManagerForLLMRun::get_noop_manager(),
@@ -1831,65 +1650,52 @@ impl AsyncCallbackManagerForLLMRun {
     }
 }
 
-/// Async callback manager for chain run.
 #[derive(Debug, Clone)]
 pub struct AsyncCallbackManagerForChainRun {
-    /// The inner sync callback manager.
     inner: CallbackManagerForChainRun,
 }
 
 impl AsyncCallbackManagerForChainRun {
-    /// Create from sync callback manager.
     pub fn from_sync(inner: CallbackManagerForChainRun) -> Self {
         Self { inner }
     }
 
-    /// Get the sync version.
     pub fn get_sync(&self) -> CallbackManagerForChainRun {
         self.inner.clone()
     }
 
-    /// Get the run ID.
     pub fn run_id(&self) -> Uuid {
         self.inner.run_id()
     }
 
-    /// Get the parent run ID.
     pub fn parent_run_id(&self) -> Option<Uuid> {
         self.inner.parent_run_id()
     }
 
-    /// Get the handlers.
     pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
         self.inner.handlers()
     }
 
-    /// Get a child callback manager.
     pub fn get_child(&self, tag: Option<&str>) -> AsyncCallbackManager {
         AsyncCallbackManager::from_callback_manager(self.inner.get_child(tag))
     }
 
-    /// Run when chain ends running (async).
     pub async fn on_chain_end(&self, outputs: &HashMap<String, serde_json::Value>) {
         self.inner.on_chain_end(outputs);
     }
 
-    /// Run when chain errors (async).
     pub async fn on_chain_error(&self, error: &dyn std::error::Error) {
         self.inner.on_chain_error(error);
     }
 
-    /// Run when agent action is received (async).
     pub async fn on_agent_action(&self, action: &serde_json::Value) {
         self.inner.on_agent_action(action);
     }
 
-    /// Run when agent finish is received (async).
     pub async fn on_agent_finish(&self, finish: &serde_json::Value) {
         self.inner.on_agent_finish(finish);
     }
 
-    /// Return a noop manager.
     pub fn get_noop_manager() -> Self {
         Self {
             inner: CallbackManagerForChainRun::get_noop_manager(),
@@ -1897,55 +1703,44 @@ impl AsyncCallbackManagerForChainRun {
     }
 }
 
-/// Async callback manager for tool run.
 #[derive(Debug, Clone)]
 pub struct AsyncCallbackManagerForToolRun {
-    /// The inner sync callback manager.
     inner: CallbackManagerForToolRun,
 }
 
 impl AsyncCallbackManagerForToolRun {
-    /// Create from sync callback manager.
     pub fn from_sync(inner: CallbackManagerForToolRun) -> Self {
         Self { inner }
     }
 
-    /// Get the sync version.
     pub fn get_sync(&self) -> CallbackManagerForToolRun {
         self.inner.clone()
     }
 
-    /// Get the run ID.
     pub fn run_id(&self) -> Uuid {
         self.inner.run_id()
     }
 
-    /// Get the parent run ID.
     pub fn parent_run_id(&self) -> Option<Uuid> {
         self.inner.parent_run_id()
     }
 
-    /// Get the handlers.
     pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
         self.inner.handlers()
     }
 
-    /// Get a child callback manager.
     pub fn get_child(&self, tag: Option<&str>) -> AsyncCallbackManager {
         AsyncCallbackManager::from_callback_manager(self.inner.get_child(tag))
     }
 
-    /// Run when tool ends running (async).
     pub async fn on_tool_end(&self, output: &str) {
         self.inner.on_tool_end(output);
     }
 
-    /// Run when tool errors (async).
     pub async fn on_tool_error(&self, error: &dyn std::error::Error) {
         self.inner.on_tool_error(error);
     }
 
-    /// Return a noop manager.
     pub fn get_noop_manager() -> Self {
         Self {
             inner: CallbackManagerForToolRun::get_noop_manager(),
@@ -1953,55 +1748,44 @@ impl AsyncCallbackManagerForToolRun {
     }
 }
 
-/// Async callback manager for retriever run.
 #[derive(Debug, Clone)]
 pub struct AsyncCallbackManagerForRetrieverRun {
-    /// The inner sync callback manager.
     inner: CallbackManagerForRetrieverRun,
 }
 
 impl AsyncCallbackManagerForRetrieverRun {
-    /// Create from sync callback manager.
     pub fn from_sync(inner: CallbackManagerForRetrieverRun) -> Self {
         Self { inner }
     }
 
-    /// Get the sync version.
     pub fn get_sync(&self) -> CallbackManagerForRetrieverRun {
         self.inner.clone()
     }
 
-    /// Get the run ID.
     pub fn run_id(&self) -> Uuid {
         self.inner.run_id()
     }
 
-    /// Get the parent run ID.
     pub fn parent_run_id(&self) -> Option<Uuid> {
         self.inner.parent_run_id()
     }
 
-    /// Get the handlers.
     pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
         self.inner.handlers()
     }
 
-    /// Get a child callback manager.
     pub fn get_child(&self, tag: Option<&str>) -> AsyncCallbackManager {
         AsyncCallbackManager::from_callback_manager(self.inner.get_child(tag))
     }
 
-    /// Run when retriever ends running (async).
     pub async fn on_retriever_end(&self, documents: &[serde_json::Value]) {
         self.inner.on_retriever_end(documents);
     }
 
-    /// Run when retriever errors (async).
     pub async fn on_retriever_error(&self, error: &dyn std::error::Error) {
         self.inner.on_retriever_error(error);
     }
 
-    /// Return a noop manager.
     pub fn get_noop_manager() -> Self {
         Self {
             inner: CallbackManagerForRetrieverRun::get_noop_manager(),
@@ -2102,22 +1886,14 @@ mod tests {
     }
 }
 
-/// Callback manager for chain group.
-///
-/// This manager is used for grouping different calls together as a single run
-/// even if they aren't composed in a single chain.
 #[derive(Debug, Clone)]
 pub struct CallbackManagerForChainGroup {
-    /// The inner callback manager.
     inner: CallbackManager,
-    /// The parent run manager.
     parent_run_manager: CallbackManagerForChainRun,
-    /// Whether the chain group has ended.
     pub ended: bool,
 }
 
 impl CallbackManagerForChainGroup {
-    /// Create a new callback manager for chain group.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         handlers: Vec<Arc<dyn BaseCallbackHandler>>,
@@ -2145,22 +1921,18 @@ impl CallbackManagerForChainGroup {
         }
     }
 
-    /// Get the handlers.
     pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
         &self.inner.handlers
     }
 
-    /// Get the parent run ID.
     pub fn parent_run_id(&self) -> Option<Uuid> {
         self.inner.parent_run_id
     }
 
-    /// Get the tags.
     pub fn tags(&self) -> &[String] {
         &self.inner.tags
     }
 
-    /// Copy the callback manager.
     pub fn copy(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -2169,7 +1941,6 @@ impl CallbackManagerForChainGroup {
         }
     }
 
-    /// Merge with another callback manager.
     pub fn merge(&self, other: &CallbackManager) -> Self {
         let mut merged_inner = self.inner.clone();
 
@@ -2197,39 +1968,32 @@ impl CallbackManagerForChainGroup {
         }
     }
 
-    /// Set handlers.
     pub fn set_handlers(&mut self, handlers: Vec<Arc<dyn BaseCallbackHandler>>, inherit: bool) {
         self.inner.set_handlers(handlers, inherit);
     }
 
-    /// Add handler.
     pub fn add_handler(&mut self, handler: Arc<dyn BaseCallbackHandler>, inherit: bool) {
         self.inner.add_handler(handler, inherit);
     }
 
-    /// Add tags.
     pub fn add_tags(&mut self, tags: Vec<String>, inherit: bool) {
         self.inner.add_tags(tags, inherit);
     }
 
-    /// Add metadata.
     pub fn add_metadata(&mut self, metadata: HashMap<String, serde_json::Value>, inherit: bool) {
         self.inner.add_metadata(metadata, inherit);
     }
 
-    /// Run when chain ends running.
     pub fn on_chain_end(&mut self, outputs: &HashMap<String, serde_json::Value>) {
         self.ended = true;
         self.parent_run_manager.on_chain_end(outputs);
     }
 
-    /// Run when chain errors.
     pub fn on_chain_error(&mut self, error: &dyn std::error::Error) {
         self.ended = true;
         self.parent_run_manager.on_chain_error(error);
     }
 
-    /// Run when LLM starts running.
     pub fn on_llm_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -2239,7 +2003,6 @@ impl CallbackManagerForChainGroup {
         self.inner.on_llm_start(serialized, prompts, run_id)
     }
 
-    /// Run when chat model starts running.
     pub fn on_chat_model_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -2249,7 +2012,6 @@ impl CallbackManagerForChainGroup {
         self.inner.on_chat_model_start(serialized, messages, run_id)
     }
 
-    /// Run when chain starts running.
     pub fn on_chain_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -2266,7 +2028,6 @@ impl CallbackManagerForChainGroup {
             .call()
     }
 
-    /// Run when tool starts running.
     pub fn on_tool_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -2278,7 +2039,6 @@ impl CallbackManagerForChainGroup {
             .on_tool_start(serialized, input_str, run_id, inputs)
     }
 
-    /// Run when retriever starts running.
     pub fn on_retriever_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -2296,19 +2056,14 @@ impl CallbackManagerForChainGroup {
     }
 }
 
-/// Async callback manager for chain group.
 #[derive(Debug, Clone)]
 pub struct AsyncCallbackManagerForChainGroup {
-    /// The inner callback manager.
     inner: AsyncCallbackManager,
-    /// The parent run manager.
     parent_run_manager: AsyncCallbackManagerForChainRun,
-    /// Whether the chain group has ended.
     pub ended: bool,
 }
 
 impl AsyncCallbackManagerForChainGroup {
-    /// Create a new async callback manager for chain group.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         handlers: Vec<Arc<dyn BaseCallbackHandler>>,
@@ -2336,17 +2091,14 @@ impl AsyncCallbackManagerForChainGroup {
         }
     }
 
-    /// Get the handlers.
     pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
         self.inner.handlers()
     }
 
-    /// Get the parent run ID.
     pub fn parent_run_id(&self) -> Option<Uuid> {
         self.inner.parent_run_id()
     }
 
-    /// Copy the callback manager.
     pub fn copy(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -2355,7 +2107,6 @@ impl AsyncCallbackManagerForChainGroup {
         }
     }
 
-    /// Merge with another callback manager.
     pub fn merge(&self, other: &CallbackManager) -> Self {
         let mut inner_sync = self.inner.inner.clone();
 
@@ -2383,39 +2134,32 @@ impl AsyncCallbackManagerForChainGroup {
         }
     }
 
-    /// Set handlers.
     pub fn set_handlers(&mut self, handlers: Vec<Arc<dyn BaseCallbackHandler>>, inherit: bool) {
         self.inner.set_handlers(handlers, inherit);
     }
 
-    /// Add handler.
     pub fn add_handler(&mut self, handler: Arc<dyn BaseCallbackHandler>, inherit: bool) {
         self.inner.add_handler(handler, inherit);
     }
 
-    /// Add tags.
     pub fn add_tags(&mut self, tags: Vec<String>, inherit: bool) {
         self.inner.add_tags(tags, inherit);
     }
 
-    /// Add metadata.
     pub fn add_metadata(&mut self, metadata: HashMap<String, serde_json::Value>, inherit: bool) {
         self.inner.add_metadata(metadata, inherit);
     }
 
-    /// Run when chain ends running (async).
     pub async fn on_chain_end(&mut self, outputs: &HashMap<String, serde_json::Value>) {
         self.ended = true;
         self.parent_run_manager.on_chain_end(outputs).await;
     }
 
-    /// Run when chain errors (async).
     pub async fn on_chain_error(&mut self, error: &dyn std::error::Error) {
         self.ended = true;
         self.parent_run_manager.on_chain_error(error).await;
     }
 
-    /// Run when LLM starts running (async).
     pub async fn on_llm_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -2425,7 +2169,6 @@ impl AsyncCallbackManagerForChainGroup {
         self.inner.on_llm_start(serialized, prompts, run_id).await
     }
 
-    /// Run when chat model starts running (async).
     pub async fn on_chat_model_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -2437,7 +2180,6 @@ impl AsyncCallbackManagerForChainGroup {
             .await
     }
 
-    /// Run when chain starts running (async).
     pub async fn on_chain_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -2450,7 +2192,6 @@ impl AsyncCallbackManagerForChainGroup {
             .await
     }
 
-    /// Run when tool starts running (async).
     pub async fn on_tool_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -2463,7 +2204,6 @@ impl AsyncCallbackManagerForChainGroup {
             .await
     }
 
-    /// Run when retriever starts running (async).
     pub async fn on_retriever_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -2482,10 +2222,6 @@ impl AsyncCallbackManagerForChainGroup {
     }
 }
 
-/// Get a callback manager for a chain group.
-///
-/// Useful for grouping different calls together as a single run even if
-/// they aren't composed in a single chain.
 pub fn trace_as_chain_group<F, R>(
     group_name: &str,
     callback_manager: Option<CallbackManager>,
@@ -2554,7 +2290,6 @@ where
     }
 }
 
-/// Error type for chain group panic.
 #[derive(Debug)]
 struct ChainGroupPanicError;
 
@@ -2566,11 +2301,6 @@ impl std::fmt::Display for ChainGroupPanicError {
 
 impl std::error::Error for ChainGroupPanicError {}
 
-/// Dispatch an adhoc event to the handlers (sync version).
-///
-/// This event should NOT be used in any internal LangChain code. The event
-/// is meant specifically for users of the library to dispatch custom
-/// events that are tailored to their application.
 pub fn dispatch_custom_event(
     name: &str,
     data: &serde_json::Value,
@@ -2597,24 +2327,6 @@ pub fn dispatch_custom_event(
     Ok(())
 }
 
-/// Get an async callback manager for a chain group in an async context.
-///
-/// Useful for grouping different async calls together as a single run even if
-/// they aren't composed in a single chain.
-///
-/// # Arguments
-///
-/// * `group_name` - The name of the chain group.
-/// * `callback_manager` - Optional async callback manager to use.
-/// * `inputs` - Optional inputs to the chain group.
-/// * `tags` - Optional inheritable tags to apply to all runs.
-/// * `metadata` - Optional metadata to apply to all runs.
-/// * `run_id` - Optional run ID.
-/// * `f` - The async function to execute with the chain group manager.
-///
-/// # Returns
-///
-/// The result of the async function.
 pub async fn atrace_as_chain_group<F, Fut, R>(
     group_name: &str,
     callback_manager: Option<AsyncCallbackManager>,
@@ -2676,11 +2388,6 @@ where
     result
 }
 
-/// Dispatch an adhoc event to the handlers (async version).
-///
-/// This event should NOT be used in any internal LangChain code. The event
-/// is meant specifically for users of the library to dispatch custom
-/// events that are tailored to their application.
 pub async fn adispatch_custom_event(
     name: &str,
     data: &serde_json::Value,

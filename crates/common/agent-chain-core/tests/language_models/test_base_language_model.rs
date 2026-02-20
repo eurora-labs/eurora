@@ -1,7 +1,3 @@
-//! Tests for base language model.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/language_models/test_base_language_model.py`
-
 use std::collections::HashMap;
 
 use agent_chain_core::language_models::{
@@ -560,7 +556,6 @@ mod test_base_language_model_trait {
 mod test_get_num_tokens_edge_cases {
     use super::*;
 
-    /// Ported from `test_get_num_tokens_whitespace_only`.
     #[test]
     fn test_get_num_tokens_whitespace_only() {
         let model = FakeListLLM::new(vec!["response".to_string()]);
@@ -568,7 +563,6 @@ mod test_get_num_tokens_edge_cases {
         assert_eq!(result, 0);
     }
 
-    /// Ported from `test_get_num_tokens_single_token`.
     #[test]
     fn test_get_num_tokens_single_token() {
         let model = FakeListLLM::new(vec!["response".to_string()]);
@@ -581,7 +575,6 @@ mod test_get_num_tokens_edge_cases {
 mod test_get_num_tokens_from_messages_edge_cases {
     use super::*;
 
-    /// Ported from `test_single_message_returns_correct_count`.
     #[test]
     fn test_single_message_returns_correct_count() {
         let model = FakeListLLM::new(vec!["response".to_string()]);
@@ -597,7 +590,6 @@ mod test_get_num_tokens_from_messages_edge_cases {
 mod test_generate_prompt {
     use super::*;
 
-    /// Ported from `test_generate_prompt_single_prompt`.
     #[tokio::test]
     async fn test_generate_prompt_single_prompt() {
         let model = FakeListLLM::new(vec!["test response".to_string()]);
@@ -614,7 +606,6 @@ mod test_generate_prompt {
         }
     }
 
-    /// Ported from `test_generate_prompt_multiple_prompts`.
     #[tokio::test]
     async fn test_generate_prompt_multiple_prompts() {
         let model = FakeListLLM::new(vec![
@@ -635,7 +626,6 @@ mod test_generate_prompt {
         }
     }
 
-    /// Ported from `test_generate_prompt_empty_prompts`.
     #[tokio::test]
     async fn test_generate_prompt_empty_prompts() {
         let model = FakeListLLM::new(vec!["response".to_string()]);
@@ -649,10 +639,6 @@ mod test_generate_prompt {
 mod test_agenerate_prompt {
     use super::*;
 
-    /// Ported from `test_agenerate_prompt_single_prompt`.
-    ///
-    /// In Rust, generate_prompt is already async, so this tests the same
-    /// code path as the sync test but explicitly exercises the async nature.
     #[tokio::test]
     async fn test_agenerate_prompt_single_prompt() {
         let model = FakeListLLM::new(vec!["test response".to_string()]);
@@ -663,7 +649,6 @@ mod test_agenerate_prompt {
         assert_eq!(result.generations[0].len(), 1);
     }
 
-    /// Ported from `test_agenerate_prompt_multiple_prompts`.
     #[tokio::test]
     async fn test_agenerate_prompt_multiple_prompts() {
         let model = FakeListLLM::new(vec!["Response 1".to_string(), "Response 2".to_string()]);
@@ -676,7 +661,6 @@ mod test_agenerate_prompt {
         assert_eq!(result.generations.len(), 2);
     }
 
-    /// Ported from `test_agenerate_prompt_empty_prompts`.
     #[tokio::test]
     async fn test_agenerate_prompt_empty_prompts() {
         let model = FakeListLLM::new(vec!["response".to_string()]);
@@ -710,7 +694,6 @@ mod test_callbacks_config {
         }
     }
 
-    /// Ported from `test_initialization_with_callbacks`.
     #[test]
     fn test_initialization_with_callbacks() {
         let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
@@ -719,7 +702,6 @@ mod test_callbacks_config {
         assert!(config.callbacks.is_some());
     }
 
-    /// Ported from `test_callbacks_excluded_from_serialization`.
     #[test]
     fn test_callbacks_excluded_from_serialization() {
         let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);

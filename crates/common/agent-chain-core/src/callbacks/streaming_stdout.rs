@@ -1,5 +1,3 @@
-//! Callback Handler that streams to stdout on new LLM token.
-
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 
@@ -11,9 +9,6 @@ use super::base::{
     RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
 };
 
-/// Callback handler for streaming. Only works with LLMs that support streaming.
-///
-/// This handler prints tokens to stdout as they are generated.
 #[derive(Clone)]
 pub struct StreamingStdOutCallbackHandler {
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
@@ -32,14 +27,12 @@ impl Default for StreamingStdOutCallbackHandler {
 }
 
 impl StreamingStdOutCallbackHandler {
-    /// Create a new StreamingStdOutCallbackHandler.
     pub fn new() -> Self {
         Self {
             writer: Arc::new(Mutex::new(Box::new(io::stdout()))),
         }
     }
 
-    /// Create a new StreamingStdOutCallbackHandler with a custom writer.
     pub fn with_writer(writer: Arc<Mutex<Box<dyn Write + Send>>>) -> Self {
         Self { writer }
     }

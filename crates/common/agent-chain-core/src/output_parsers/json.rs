@@ -1,8 +1,3 @@
-//! Parser for JSON output.
-//!
-//! This module contains the `JsonOutputParser` which parses LLM output as JSON.
-//! Mirrors `langchain_core.output_parsers.json`.
-
 use std::fmt::Debug;
 
 use futures::stream::BoxStream;
@@ -19,36 +14,14 @@ use super::base::{BaseOutputParser, OutputParserError};
 use super::format_instructions::JSON_FORMAT_INSTRUCTIONS;
 use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
 
-/// Parse the output of an LLM call to a JSON object.
-///
-/// Probably the most reliable output parser for getting structured data that does *not*
-/// use function calling.
-///
-/// When used in streaming mode, it will yield partial JSON objects containing
-/// all the keys that have been returned so far.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::output_parsers::JsonOutputParser;
-///
-/// let parser = JsonOutputParser::new();
-/// let result = parser.parse(r#"{"name": "Alice", "age": 30}"#).unwrap();
-/// assert_eq!(result["name"], "Alice");
-/// ```
 #[derive(Debug, Clone, Default)]
 pub struct JsonOutputParser {
-    /// Optional JSON schema to validate against.
-    /// If `None`, no validation is performed.
     pub schema: Option<Value>,
 
-    /// Whether to yield diffs between the previous and current parsed output
-    /// in streaming mode.
     pub diff: bool,
 }
 
 impl JsonOutputParser {
-    /// Create a new `JsonOutputParser` with no schema validation.
     pub fn new() -> Self {
         Self {
             schema: None,
@@ -56,7 +29,6 @@ impl JsonOutputParser {
         }
     }
 
-    /// Create a new `JsonOutputParser` with a schema.
     pub fn with_schema(schema: Value) -> Self {
         Self {
             schema: Some(schema),
@@ -64,13 +36,11 @@ impl JsonOutputParser {
         }
     }
 
-    /// Enable diff mode for streaming.
     pub fn with_diff(mut self) -> Self {
         self.diff = true;
         self
     }
 
-    /// Get the JSON schema if available.
     pub fn get_schema(&self) -> Option<&Value> {
         self.schema.as_ref()
     }
@@ -179,9 +149,6 @@ impl BaseCumulativeTransformOutputParser for JsonOutputParser {
     }
 }
 
-/// Compute a JSON diff between two values.
-///
-/// Returns a JSON patch-like representation of the differences.
 fn compute_json_diff(prev: &Value, next: &Value) -> Value {
     let mut patches = Vec::new();
     compute_json_diff_recursive(prev, next, "", &mut patches);
@@ -251,7 +218,6 @@ fn compute_json_diff_recursive(prev: &Value, next: &Value, path: &str, patches: 
     }
 }
 
-/// Type alias for backwards compatibility.
 pub type SimpleJsonOutputParser = JsonOutputParser;
 
 #[cfg(test)]

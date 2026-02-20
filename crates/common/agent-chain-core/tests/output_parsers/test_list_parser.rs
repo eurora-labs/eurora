@@ -1,11 +1,3 @@
-//! Tests for list output parsers — streaming transform behavior.
-//!
-//! Ported from langchain/libs/core/tests/unit_tests/output_parsers/test_list_parser.py
-//!
-//! These tests exercise the `_transform` streaming logic of the list parsers,
-//! verifying that character-by-character, line-by-line, word-by-word, and
-//! single-chunk streaming all produce the correct results.
-
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::output_parsers::{
     BaseOutputParser, BaseTransformOutputParser, CommaSeparatedListOutputParser,
@@ -13,8 +5,6 @@ use agent_chain_core::output_parsers::{
 };
 use futures::StreamExt;
 
-/// Collect all yielded chunks from a transform stream into a flat list.
-/// Equivalent to Python's `add(parser.transform(...))`.
 async fn transform_add<P: BaseTransformOutputParser<Output = Vec<String>>>(
     parser: &P,
     chunks: Vec<BaseMessage>,
@@ -30,9 +20,6 @@ async fn transform_add<P: BaseTransformOutputParser<Output = Vec<String>>>(
         .collect()
 }
 
-/// Collect all yielded chunks from a transform stream, keeping each yield
-/// as a separate `Vec<String>`.
-/// Equivalent to Python's `list(parser.transform(...))`.
 async fn transform_list<P: BaseTransformOutputParser<Output = Vec<String>>>(
     parser: &P,
     chunks: Vec<BaseMessage>,
@@ -45,14 +32,12 @@ async fn transform_list<P: BaseTransformOutputParser<Output = Vec<String>>>(
         .await
 }
 
-/// Convert a string into character-by-character BaseMessage chunks.
 fn char_chunks(text: &str) -> Vec<BaseMessage> {
     text.chars()
         .map(|c| BaseMessage::from(c.to_string()))
         .collect()
 }
 
-/// Convert a string into line-by-line BaseMessage chunks (keeping line endings).
 fn line_chunks(text: &str) -> Vec<BaseMessage> {
     let mut chunks = Vec::new();
     let mut start = 0;
@@ -68,9 +53,6 @@ fn line_chunks(text: &str) -> Vec<BaseMessage> {
     chunks
 }
 
-/// Convert a string into word-by-word BaseMessage chunks.
-/// Words after the first are prefixed with a space (matching the Python
-/// `" " + t if i > 0 else t for i, t in enumerate(text.split(" "))` pattern).
 fn word_chunks(text: &str) -> Vec<BaseMessage> {
     text.split(' ')
         .enumerate()
@@ -84,7 +66,6 @@ fn word_chunks(text: &str) -> Vec<BaseMessage> {
         .collect()
 }
 
-/// Wrap a full string as a single BaseMessage chunk.
 fn single_chunk(text: &str) -> Vec<BaseMessage> {
     vec![BaseMessage::from(text)]
 }

@@ -1,44 +1,13 @@
-//! UUID utility functions.
-//!
-//! This module exports a `uuid7` function to generate monotonic, time-ordered UUIDs
-//! for tracing and similar operations.
-//!
-//! Adapted from `langchain_core/utils/uuid.py`
-
 use uuid::Uuid;
 
-/// Nanoseconds per second.
 const NANOS_PER_SECOND: u64 = 1_000_000_000;
 
-/// Split a nanosecond timestamp into seconds and remaining nanoseconds.
 fn to_timestamp_and_nanos(nanoseconds: u64) -> (u64, u32) {
     let seconds = nanoseconds / NANOS_PER_SECOND;
     let nanos = (nanoseconds % NANOS_PER_SECOND) as u32;
     (seconds, nanos)
 }
 
-/// Generate a UUID from a Unix timestamp in nanoseconds and random bits.
-///
-/// UUIDv7 objects feature monotonicity within a millisecond,
-/// making them suitable for use as database keys or for tracing
-/// where time ordering is important.
-///
-/// # Arguments
-///
-/// * `nanoseconds` - Optional ns timestamp. If not provided, uses current time.
-///
-/// # Returns
-///
-/// A new time-ordered UUID.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::utils::uuid::uuid7;
-///
-/// let id = uuid7(None);
-/// println!("Generated UUID v7: {}", id);
-/// ```
 pub fn uuid7(nanoseconds: Option<u64>) -> Uuid {
     use uuid::Timestamp;
 

@@ -1,7 +1,3 @@
-//! Tests for runnable schema types and structures.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/runnables/test_schema.py`
-
 use std::collections::HashMap;
 
 use agent_chain_core::runnables::schema::{
@@ -10,7 +6,6 @@ use agent_chain_core::runnables::schema::{
 };
 use serde_json::json;
 
-/// Mirrors `test_event_data_structure`.
 #[test]
 fn test_event_data_structure() {
     let data = EventData::new()
@@ -29,7 +24,6 @@ fn test_event_data_structure() {
     assert!(minimal.error.is_none());
 }
 
-/// Mirrors `test_event_data_with_error`.
 #[test]
 fn test_event_data_with_error() {
     let data = EventData::new()
@@ -40,7 +34,6 @@ fn test_event_data_with_error() {
     assert_eq!(data.input, Some(json!("test")));
 }
 
-/// Mirrors `test_event_data_empty`.
 #[test]
 fn test_event_data_empty() {
     let data = EventData::new();
@@ -48,7 +41,6 @@ fn test_event_data_empty() {
     assert_eq!(json_str, "{}");
 }
 
-/// Mirrors `test_event_data_chunk_field`.
 #[test]
 fn test_event_data_chunk_field() {
     let data = EventData::new().with_chunk(json!("partial output"));
@@ -58,7 +50,6 @@ fn test_event_data_chunk_field() {
     assert_eq!(chunk_list.chunk, Some(json!([1, 2, 3])));
 }
 
-/// Mirrors `test_event_data_supports_various_input_types`.
 #[test]
 fn test_event_data_supports_various_input_types() {
     let data1 = EventData::new().with_input(json!("simple string"));
@@ -75,7 +66,6 @@ fn test_event_data_supports_various_input_types() {
     assert_eq!(data4.input.as_ref().unwrap()["field2"], json!(42));
 }
 
-/// Mirrors `test_event_data_supports_various_output_types`.
 #[test]
 fn test_event_data_supports_various_output_types() {
     let data1 = EventData::new().with_output(json!("result"));
@@ -88,7 +78,6 @@ fn test_event_data_supports_various_output_types() {
     assert_eq!(data3.output, Some(json!([1, 2, 3])));
 }
 
-/// Mirrors `test_standard_event_with_all_data_fields`.
 #[test]
 fn test_standard_event_with_all_data_fields() {
     let data = EventData::new()
@@ -103,9 +92,6 @@ fn test_standard_event_with_all_data_fields() {
     assert!(data.error.is_some());
 }
 
-/// Mirrors `test_event_data_with_base_message`.
-///
-/// In Rust, messages are serialized to JSON Value.
 #[test]
 fn test_event_data_with_messages() {
     use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
@@ -127,7 +113,6 @@ fn test_event_data_with_messages() {
     assert!(data.chunk.is_some());
 }
 
-/// Mirrors `test_event_with_multiple_chunks`.
 #[test]
 fn test_event_with_multiple_chunks() {
     let chunks = [
@@ -144,7 +129,6 @@ fn test_event_with_multiple_chunks() {
     assert_eq!(accumulated, "Hello World!");
 }
 
-/// Mirrors `test_base_stream_event_structure`.
 #[test]
 fn test_base_stream_event_structure() {
     let event = BaseStreamEvent::new("on_chain_start", "test-run-id");
@@ -153,7 +137,6 @@ fn test_base_stream_event_structure() {
     assert!(event.parent_ids.is_empty());
 }
 
-/// Mirrors `test_base_stream_event_with_optional_fields`.
 #[test]
 fn test_base_stream_event_with_optional_fields() {
     let event = BaseStreamEvent::new("on_chain_end", "test-run-id")
@@ -166,7 +149,6 @@ fn test_base_stream_event_with_optional_fields() {
     assert_eq!(event.parent_ids.len(), 2);
 }
 
-/// Mirrors `test_parent_ids_hierarchy`.
 #[test]
 fn test_parent_ids_hierarchy() {
     let root = BaseStreamEvent::new("on_chain_start", "root-id");
@@ -181,7 +163,6 @@ fn test_parent_ids_hierarchy() {
     assert_eq!(grandchild.parent_ids, vec!["root-id", "child-id"]);
 }
 
-/// Mirrors `test_event_parent_ids_can_be_nested` (deep hierarchy).
 #[test]
 fn test_event_parent_ids_can_be_nested() {
     let parent_chain: Vec<String> = (0..10).map(|i| format!("parent-{i}")).collect();
@@ -193,7 +174,6 @@ fn test_event_parent_ids_can_be_nested() {
     assert_eq!(event.parent_ids[9], "parent-9");
 }
 
-/// Mirrors `test_event_run_id_format`.
 #[test]
 fn test_event_run_id_format() {
     let run_id = uuid::Uuid::new_v4().to_string();
@@ -202,7 +182,6 @@ fn test_event_run_id_format() {
     assert!(uuid::Uuid::parse_str(&event.run_id).is_ok());
 }
 
-/// Mirrors `test_standard_stream_event_structure`.
 #[test]
 fn test_standard_stream_event_structure() {
     let event = StandardStreamEvent::new("on_llm_start", "test-run-id", "TestLLM")
@@ -212,7 +191,6 @@ fn test_standard_stream_event_structure() {
     assert_eq!(event.data.input, Some(json!("test input")));
 }
 
-/// Mirrors `test_standard_stream_event_types`.
 #[test]
 fn test_standard_stream_event_types() {
     let event_types = [
@@ -241,7 +219,6 @@ fn test_standard_stream_event_types() {
     }
 }
 
-/// Mirrors `test_standard_event_naming_convention`.
 #[test]
 fn test_standard_event_naming_convention() {
     let valid_patterns = [
@@ -270,7 +247,6 @@ fn test_standard_event_naming_convention() {
     }
 }
 
-/// Mirrors `test_metadata_serializable`.
 #[test]
 fn test_metadata_serializable() {
     let metadata = HashMap::from([
@@ -295,7 +271,6 @@ fn test_metadata_serializable() {
     assert_eq!(deserialized["null"], json!(null));
 }
 
-/// Mirrors `test_tags_list_of_strings`.
 #[test]
 fn test_tags_list_of_strings() {
     let event = StandardStreamEvent::new("on_chain_start", "id", "test").with_tags(vec![
@@ -310,7 +285,6 @@ fn test_tags_list_of_strings() {
     }
 }
 
-/// Mirrors `test_event_metadata_empty_dict`.
 #[test]
 fn test_event_metadata_empty_dict() {
     let event =
@@ -318,14 +292,12 @@ fn test_event_metadata_empty_dict() {
     assert!(event.base.metadata.is_empty());
 }
 
-/// Mirrors `test_event_tags_empty_list`.
 #[test]
 fn test_event_tags_empty_list() {
     let event = StandardStreamEvent::new("on_chain_start", "id", "test").with_tags(vec![]);
     assert!(event.base.tags.is_empty());
 }
 
-/// Mirrors `test_event_minimal_required_fields`.
 #[test]
 fn test_event_minimal_required_fields() {
     let base = BaseStreamEvent::new("on_chain_start", "id");
@@ -340,7 +312,6 @@ fn test_event_minimal_required_fields() {
     assert_eq!(custom.base.event, "on_custom_event");
 }
 
-/// Mirrors `test_event_all_optional_fields`.
 #[test]
 fn test_event_all_optional_fields() {
     let event = StandardStreamEvent::new("on_chain_start", "test-run-id", "TestChain")
@@ -365,7 +336,6 @@ fn test_event_all_optional_fields() {
     assert!(event.data.chunk.is_some());
 }
 
-/// Mirrors `test_event_metadata_nested_structure`.
 #[test]
 fn test_event_metadata_nested_structure() {
     let metadata = HashMap::from([
@@ -398,14 +368,12 @@ fn test_event_metadata_nested_structure() {
     assert_eq!(event.base.metadata["user_info"]["user_id"], json!("123"));
 }
 
-/// Mirrors `test_standard_event_data_field_required`.
 #[test]
 fn test_standard_event_data_field_required() {
     let event = StandardStreamEvent::new("on_chain_start", "id", "test");
     let _ = &event.data;
 }
 
-/// Mirrors `test_event_tags_inherited_from_parent`.
 #[test]
 fn test_event_tags_inherited_from_parent() {
     let _parent = StandardStreamEvent::new("on_chain_start", "parent", "parent")
@@ -419,7 +387,6 @@ fn test_event_tags_inherited_from_parent() {
     assert!(child.base.tags.contains(&"child-tag".to_string()));
 }
 
-/// Mirrors `test_custom_stream_event_structure`.
 #[test]
 fn test_custom_stream_event_structure() {
     let event = CustomStreamEvent::new(
@@ -433,7 +400,6 @@ fn test_custom_stream_event_structure() {
     assert_eq!(event.data["custom_field"], json!("custom_value"));
 }
 
-/// Mirrors `test_custom_stream_event_with_any_data`.
 #[test]
 fn test_custom_stream_event_with_any_data() {
     let event1 = CustomStreamEvent::new("id1", "event1", json!("string data"));
@@ -450,7 +416,6 @@ fn test_custom_stream_event_with_any_data() {
     assert_eq!(event3.data["nested"]["deeply"]["value"], json!(42));
 }
 
-/// Mirrors `test_custom_event_must_be_on_custom_event`.
 #[test]
 fn test_custom_event_must_be_on_custom_event() {
     let event = CustomStreamEvent::new("id", "my_event", json!({}));
@@ -458,7 +423,6 @@ fn test_custom_event_must_be_on_custom_event() {
     assert_eq!(event.base.event, "on_custom_event");
 }
 
-/// Mirrors `test_custom_event_name_can_be_any_string`.
 #[test]
 fn test_custom_event_name_can_be_any_string() {
     let names = [
@@ -475,21 +439,18 @@ fn test_custom_event_name_can_be_any_string() {
     }
 }
 
-/// Mirrors `test_custom_event_data_can_be_none`.
 #[test]
 fn test_custom_event_data_can_be_none() {
     let event = CustomStreamEvent::new("id", "event", json!(null));
     assert_eq!(event.data, json!(null));
 }
 
-/// Mirrors `test_custom_event_data_field_required`.
 #[test]
 fn test_custom_event_data_field_required() {
     let event = CustomStreamEvent::new("id", "test", json!({"info": "required"}));
     assert_eq!(event.data["info"], json!("required"));
 }
 
-/// Mirrors `test_stream_event_union_type`.
 #[test]
 fn test_stream_event_union_type() {
     let standard: StreamEvent = StandardStreamEvent::new("on_chain_start", "id", "chain")
@@ -501,7 +462,6 @@ fn test_stream_event_union_type() {
     assert_eq!(custom.event(), "on_custom_event");
 }
 
-/// Mirrors `test_stream_event_can_be_either_type`.
 #[test]
 fn test_stream_event_can_be_either_type() {
     fn process_event(event: &StreamEvent) -> &str {

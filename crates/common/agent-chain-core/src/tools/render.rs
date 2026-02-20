@@ -1,21 +1,9 @@
-//! Utilities to render tools.
-//!
-//! Mirrors `langchain_core.tools.render`.
-
 use std::sync::Arc;
 
 use super::base::BaseTool;
 
-/// Type alias for a tools renderer function.
 pub type ToolsRenderer = fn(&[Arc<dyn BaseTool>]) -> String;
 
-/// Render the tool name and description in plain text.
-///
-/// Output will be in the format of:
-/// ```text
-/// search: This tool is used for search
-/// calculator: This tool is used for math
-/// ```
 pub fn render_text_description(tools: &[Arc<dyn BaseTool>]) -> String {
     let descriptions: Vec<String> = tools
         .iter()
@@ -25,13 +13,6 @@ pub fn render_text_description(tools: &[Arc<dyn BaseTool>]) -> String {
     descriptions.join("\n")
 }
 
-/// Render the tool name, description, and args in plain text.
-///
-/// Output will be in the format of:
-/// ```text
-/// search: This tool is used for search, args: {"query": {"type": "string"}}
-/// calculator: This tool is used for math, args: {"expression": {"type": "string"}}
-/// ```
 pub fn render_text_description_and_args(tools: &[Arc<dyn BaseTool>]) -> String {
     let tool_strings: Vec<String> = tools
         .iter()

@@ -1,8 +1,3 @@
-//! Base message types.
-//!
-//! This module contains the core `BaseMessage` enum and related traits,
-//! mirroring `langchain_core.messages.base`.
-
 use serde::de::{self, MapAccess, Visitor};
 use serde::ser::Serializer;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -20,24 +15,14 @@ use super::system::{SystemMessage, SystemMessageChunk};
 use super::tool::{ToolCall, ToolMessage, ToolMessageChunk};
 use crate::utils::merge::merge_lists;
 
-/// A unified message type that can represent any message role.
-///
-/// This corresponds to `BaseMessage` in LangChain Python.
 #[derive(Debug, Clone, PartialEq)]
 pub enum BaseMessage {
-    /// A human message
     Human(HumanMessage),
-    /// A system message
     System(SystemMessage),
-    /// An AI message
     AI(AIMessage),
-    /// A tool result message
     Tool(ToolMessage),
-    /// A chat message with arbitrary role
     Chat(ChatMessage),
-    /// A function message (deprecated, use Tool)
     Function(FunctionMessage),
-    /// A remove message (for message deletion)
     Remove(RemoveMessage),
 }
 
@@ -142,7 +127,6 @@ impl<'de> Deserialize<'de> for BaseMessage {
 }
 
 impl BaseMessage {
-    /// Get the message content.
     pub fn content(&self) -> &MessageContent {
         match self {
             BaseMessage::Human(m) => &m.content,
@@ -155,7 +139,6 @@ impl BaseMessage {
         }
     }
 
-    /// Get the message ID.
     pub fn id(&self) -> Option<String> {
         match self {
             BaseMessage::Human(m) => m.id.clone(),
@@ -168,7 +151,6 @@ impl BaseMessage {
         }
     }
 
-    /// Get the message name if present.
     pub fn name(&self) -> Option<String> {
         match self {
             BaseMessage::Human(m) => m.name.clone(),
@@ -181,7 +163,6 @@ impl BaseMessage {
         }
     }
 
-    /// Set id of the message.
     pub fn set_id(&mut self, id: String) {
         match self {
             BaseMessage::Human(m) => m.set_id(id),
@@ -194,10 +175,6 @@ impl BaseMessage {
         }
     }
 
-    /// Get the text content of the message as a string.
-    ///
-    /// This extracts text from both simple string content and list content
-    /// (filtering for text blocks). Corresponds to the `text` property in Python.
     pub fn text(&self) -> String {
         match self {
             BaseMessage::Human(m) => m.content.as_text(),
@@ -210,7 +187,6 @@ impl BaseMessage {
         }
     }
 
-    /// Get tool calls if this is an AI message.
     pub fn tool_calls(&self) -> &[ToolCall] {
         match self {
             BaseMessage::AI(m) => &m.tool_calls,
@@ -218,7 +194,6 @@ impl BaseMessage {
         }
     }
 
-    /// Get the message type as a string.
     pub fn message_type(&self) -> &'static str {
         match self {
             BaseMessage::Human(_) => "human",
@@ -231,7 +206,6 @@ impl BaseMessage {
         }
     }
 
-    /// Get additional kwargs if present.
     pub fn additional_kwargs(&self) -> Option<&HashMap<String, serde_json::Value>> {
         match self {
             BaseMessage::Human(m) => Some(&m.additional_kwargs),
@@ -244,7 +218,6 @@ impl BaseMessage {
         }
     }
 
-    /// Get response metadata if present.
     pub fn response_metadata(&self) -> Option<&HashMap<String, serde_json::Value>> {
         match self {
             BaseMessage::Human(m) => Some(&m.response_metadata),
@@ -257,20 +230,10 @@ impl BaseMessage {
         }
     }
 
-    /// Pretty print the message to stdout.
-    ///
-    /// This corresponds to `pretty_print` in LangChain Python, which calls
-    /// `print(self.pretty_repr(html=is_interactive_env()))`.
     pub fn pretty_print(&self) {
         println!("{}", self.pretty_repr(is_interactive_env()));
     }
 
-    /// Get a pretty representation of the message.
-    ///
-    /// # Arguments
-    ///
-    /// * `html` - Whether to format the message with bold text (using ANSI codes).
-    ///   Named `html` for Python compatibility but actually uses terminal codes.
     pub fn pretty_repr(&self, html: bool) -> String {
         let msg_type = self.message_type();
         let title_cased = title_case(msg_type);
@@ -287,10 +250,7 @@ impl BaseMessage {
     }
 }
 
-/// Trait for types that have an optional ID.
-/// Used for message merging operations.
 pub trait HasId {
-    /// Get the ID if present.
     fn get_id(&self) -> Option<String>;
 }
 
@@ -300,23 +260,14 @@ impl HasId for BaseMessage {
     }
 }
 
-/// A message chunk enum that represents streaming message chunks.
-///
-/// This corresponds to `BaseMessageChunk` in LangChain Python.
-
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::large_enum_variant)]
 pub enum BaseMessageChunk {
-    /// An AI message chunk
     AI(AIMessageChunk),
-    /// A human message chunk
     Human(HumanMessageChunk),
-    /// A system message chunk
     System(SystemMessageChunk),
-    /// A tool message chunk
     Tool(ToolMessageChunk),
-    /// A chat message chunk
     Chat(ChatMessageChunk),
-    /// A function message chunk
     Function(FunctionMessageChunk),
 }
 
@@ -420,7 +371,6 @@ impl<'de> Deserialize<'de> for BaseMessageChunk {
 }
 
 impl BaseMessageChunk {
-    /// Get the message content.
     pub fn content(&self) -> &MessageContent {
         match self {
             BaseMessageChunk::AI(m) => &m.content,
@@ -432,7 +382,6 @@ impl BaseMessageChunk {
         }
     }
 
-    /// Get the message ID.
     pub fn id(&self) -> Option<String> {
         match self {
             BaseMessageChunk::AI(m) => m.id.clone(),
@@ -444,7 +393,6 @@ impl BaseMessageChunk {
         }
     }
 
-    /// Get the message type as a string.
     pub fn message_type(&self) -> &'static str {
         match self {
             BaseMessageChunk::AI(_) => "AIMessageChunk",
@@ -456,7 +404,6 @@ impl BaseMessageChunk {
         }
     }
 
-    /// Convert this chunk to a complete message.
     pub fn to_message(&self) -> BaseMessage {
         match self {
             BaseMessageChunk::AI(m) => BaseMessage::AI(m.to_message()),
@@ -505,14 +452,6 @@ impl From<FunctionMessageChunk> for BaseMessageChunk {
     }
 }
 
-/// Concatenation support for `BaseMessageChunk`.
-///
-/// This corresponds to `BaseMessageChunk.__add__` in LangChain Python.
-/// Both chunks must be of the same variant; panics on type mismatch
-/// (matching Python's `TypeError`).
-///
-/// Merges `content` via `merge_content`, `additional_kwargs` via `merge_dicts`,
-/// and `response_metadata` via `merge_dicts`.
 impl std::ops::Add for BaseMessageChunk {
     type Output = BaseMessageChunk;
 
@@ -595,15 +534,9 @@ impl From<String> for BaseMessage {
     }
 }
 
-/// Content type for merge operations.
-///
-/// Represents message content that can be either a string or a list of values.
-/// This corresponds to `str | list[str | dict]` in Python.
 #[derive(Debug, Clone, PartialEq)]
 pub enum MergeableContent {
-    /// String content.
     Text(String),
-    /// List content (strings or dicts).
     List(Vec<Value>),
 }
 
@@ -625,36 +558,12 @@ impl From<Vec<Value>> for MergeableContent {
     }
 }
 
-/// Merge multiple message contents (simple string version).
-///
-/// Concatenates two strings together. This is a convenience wrapper for the
-/// common case where both contents are known to be strings.
 pub fn merge_content(first: &str, second: &str) -> String {
     let mut result = first.to_string();
     result.push_str(second);
     result
 }
 
-/// Merge multiple message contents.
-///
-/// Handles merging string and list contents together, matching the behavior of
-/// `merge_content` in LangChain Python (`langchain_core.messages.base`).
-///
-/// The merge rules are:
-/// - String + String → String (concatenation)
-/// - String + List → List (string is prepended as first element)
-/// - List + List → List (merged via `merge_lists` for index-aware merging)
-/// - List + String → List (string is appended to last element if it's a string,
-///   empty strings are no-ops, otherwise appended as new element)
-///
-/// # Arguments
-///
-/// * `first_content` - The first content to merge.
-/// * `contents` - Additional contents to merge.
-///
-/// # Returns
-///
-/// The merged content.
 pub fn merge_content_complex(
     first_content: MergeableContent,
     contents: Vec<MergeableContent>,
@@ -688,7 +597,6 @@ pub fn merge_content_complex(
                         s.push_str(&right);
                     }
                 } else if right.is_empty() {
-                    // no-op
                 } else if !left.is_empty() {
                     left.push(Value::String(right));
                 }
@@ -700,18 +608,12 @@ pub fn merge_content_complex(
     merged
 }
 
-/// Merge content vectors (for multimodal content).
 pub fn merge_content_vec(first: Vec<Value>, second: Vec<Value>) -> Vec<Value> {
     let mut result = first;
     result.extend(second);
     result
 }
 
-/// Convert a Message to a dictionary.
-///
-/// This corresponds to `message_to_dict` in LangChain Python.
-/// The dict will have a `type` key with the message type and a `data` key
-/// with the message data as a dict (all fields serialized).
 pub fn message_to_dict(message: &BaseMessage) -> Value {
     let mut data = serde_json::to_value(message).unwrap_or_default();
 
@@ -727,23 +629,10 @@ pub fn message_to_dict(message: &BaseMessage) -> Value {
     })
 }
 
-/// Convert a sequence of Messages to a list of dictionaries.
-///
-/// This corresponds to `messages_to_dict` in LangChain Python.
 pub fn messages_to_dict(messages: &[BaseMessage]) -> Vec<serde_json::Value> {
     messages.iter().map(message_to_dict).collect()
 }
 
-/// Get a title representation for a message.
-///
-/// # Arguments
-///
-/// * `title` - The title to format.
-/// * `bold` - Whether to bold the title using ANSI escape codes.
-///
-/// # Returns
-///
-/// The formatted title representation.
 pub fn get_msg_title_repr(title: &str, bold: bool) -> String {
     let padded = format!(" {} ", title);
     let sep_len = 80usize.saturating_sub(padded.len()) / 2;
@@ -762,14 +651,10 @@ pub fn get_msg_title_repr(title: &str, bold: bool) -> String {
     }
 }
 
-/// Get bolded text using ANSI escape codes.
-///
-/// Corresponds to `get_bolded_text` in Python's `langchain_core.utils.input`.
 pub fn get_bolded_text(text: &str) -> String {
     format!("\x1b[1m{}\x1b[0m", text)
 }
 
-/// Convert a string to title case (capitalize first letter of each word).
 fn title_case(s: &str) -> String {
     s.split('_')
         .map(|word| {
@@ -786,20 +671,6 @@ fn title_case(s: &str) -> String {
         .join(" ")
 }
 
-/// Extract `reasoning_content` from `additional_kwargs`.
-///
-/// Handles reasoning content stored in various formats:
-/// - `additional_kwargs["reasoning_content"]` (string) - Ollama, DeepSeek, XAI, Groq
-///
-/// Corresponds to `_extract_reasoning_from_additional_kwargs` in Python.
-///
-/// # Arguments
-///
-/// * `additional_kwargs` - The additional_kwargs dictionary from a message.
-///
-/// # Returns
-///
-/// A `ReasoningContentBlock` if reasoning content is found, None otherwise.
 pub fn extract_reasoning_from_additional_kwargs(
     additional_kwargs: &HashMap<String, Value>,
 ) -> Option<ReasoningContentBlock> {
@@ -810,11 +681,6 @@ pub fn extract_reasoning_from_additional_kwargs(
     }
 }
 
-/// Check if running in an interactive environment.
-///
-/// In Rust, this always returns false as we don't have the same
-/// IPython/Jupyter detection available. Applications can override
-/// behavior based on their own environment detection.
 pub fn is_interactive_env() -> bool {
     false
 }

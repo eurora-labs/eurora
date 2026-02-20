@@ -1,8 +1,3 @@
-//! Prompt template that contains few shot examples with templates for prefix and suffix.
-//!
-//! This module provides few-shot prompt templates that use templates for prefix and suffix,
-//! mirroring `langchain_core.prompts.few_shot_with_templates` in Python.
-
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -18,70 +13,30 @@ use super::few_shot::ExampleSelectorClone;
 use super::prompt::PromptTemplate;
 use super::string::{PromptTemplateFormat, StringPromptTemplate, format_template};
 
-/// Prompt template that contains few shot examples with templated prefix and suffix.
-///
-/// Unlike `FewShotPromptTemplate`, this uses `StringPromptTemplate` instances
-/// for the prefix and suffix, allowing them to also contain template variables.
-///
-/// # Example
-///
-/// ```ignore
-/// use agent_chain_core::prompts::{FewShotPromptWithTemplates, PromptTemplate};
-/// use std::collections::HashMap;
-///
-/// let examples = vec![
-///     HashMap::from([
-///         ("input".to_string(), "2+2".to_string()),
-///         ("output".to_string(), "4".to_string()),
-///     ]),
-/// ];
-///
-/// let example_prompt = PromptTemplate::from_template("Q: {input}\nA: {output}").unwrap();
-/// let prefix = PromptTemplate::from_template("You are {role}.").unwrap();
-/// let suffix = PromptTemplate::from_template("Q: {question}\nA:").unwrap();
-///
-/// let few_shot = FewShotPromptWithTemplates::new(
-///     examples,
-///     example_prompt,
-///     suffix,
-///     Some(prefix),
-/// ).unwrap();
-/// ```
 #[derive(Debug, Clone)]
 pub struct FewShotPromptWithTemplates {
-    /// Examples to format into the prompt.
     examples: Option<Vec<HashMap<String, String>>>,
 
-    /// ExampleSelector to choose the examples to format into the prompt.
     example_selector: Option<Box<dyn ExampleSelectorClone + Send + Sync>>,
 
-    /// PromptTemplate used to format an individual example.
     example_prompt: PromptTemplate,
 
-    /// A StringPromptTemplate to put after the examples.
     suffix: PromptTemplate,
 
-    /// String separator used to join the prefix, the examples, and suffix.
     example_separator: String,
 
-    /// A StringPromptTemplate to put before the examples.
     prefix: Option<PromptTemplate>,
 
-    /// The format of the prompt template.
     template_format: PromptTemplateFormat,
 
-    /// Input variables for this prompt.
     input_variables: Vec<String>,
 
-    /// Partial variables for this prompt.
     partial_variables: HashMap<String, String>,
 
-    /// Whether to validate the template.
     validate_template: bool,
 }
 
 impl FewShotPromptWithTemplates {
-    /// Create a new FewShotPromptWithTemplates with examples.
     pub fn new(
         examples: Vec<HashMap<String, String>>,
         example_prompt: PromptTemplate,
@@ -119,7 +74,6 @@ impl FewShotPromptWithTemplates {
         Ok(result)
     }
 
-    /// Create a new FewShotPromptWithTemplates with an example selector.
     pub fn with_selector(
         selector: impl ExampleSelectorClone + 'static,
         example_prompt: PromptTemplate,
@@ -157,19 +111,16 @@ impl FewShotPromptWithTemplates {
         Ok(result)
     }
 
-    /// Set the example separator.
     pub fn with_separator(mut self, separator: impl Into<String>) -> Self {
         self.example_separator = separator.into();
         self
     }
 
-    /// Set the template format.
     pub fn with_format(mut self, format: PromptTemplateFormat) -> Self {
         self.template_format = format;
         self
     }
 
-    /// Get examples based on kwargs.
     fn get_examples(
         &self,
         kwargs: &HashMap<String, String>,
@@ -185,7 +136,6 @@ impl FewShotPromptWithTemplates {
         }
     }
 
-    /// Async get examples based on kwargs.
     #[allow(dead_code)]
     async fn aget_examples(
         &self,

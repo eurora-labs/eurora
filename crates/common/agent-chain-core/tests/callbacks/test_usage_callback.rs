@@ -1,13 +1,3 @@
-//! Unit tests for UsageMetadataCallbackHandler.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/callbacks/test_usage_callback.py`
-//!
-//! The Python tests use `GenericFakeChatModel` and `invoke`/`batch` to drive
-//! the callback handler through the full LLM pipeline. Since those are
-//! higher-level constructs not in agent-chain-core, we test the handler's
-//! `on_llm_end` method directly with ChatResult objects that match the
-//! Python test's usage metadata values.
-
 use std::collections::HashMap;
 
 use agent_chain_core::callbacks::base::LLMManagerMixin;
@@ -47,10 +37,12 @@ fn usage3() -> UsageMetadata {
             audio: Some(5),
             cache_creation: None,
             cache_read: None,
+            ..Default::default()
         }),
         output_token_details: Some(OutputTokenDetails {
             audio: None,
             reasoning: Some(10),
+            ..Default::default()
         }),
     }
 }
@@ -64,17 +56,16 @@ fn usage4() -> UsageMetadata {
             audio: Some(3),
             cache_creation: None,
             cache_read: None,
+            ..Default::default()
         }),
         output_token_details: Some(OutputTokenDetails {
             audio: None,
             reasoning: Some(5),
+            ..Default::default()
         }),
     }
 }
 
-/// Create a ChatResult that mimics what a FakeChatModelWithResponseMetadata
-/// would produce: an AIMessage with usage_metadata and response_metadata
-/// containing the model_name.
 fn create_chat_result(content: &str, model_name: &str, usage: &UsageMetadata) -> ChatResult {
     let mut response_metadata = HashMap::new();
     response_metadata.insert("model_name".to_string(), serde_json::json!(model_name));
@@ -91,10 +82,6 @@ fn create_chat_result(content: &str, model_name: &str, usage: &UsageMetadata) ->
     }
 }
 
-/// Ported from `test_usage_callback` — context manager section.
-///
-/// Tests accumulation of usage across 4 LLM calls using
-/// `get_usage_metadata_callback`, checking intermediate and final state.
 #[test]
 fn test_usage_callback_accumulation() {
     let callback = get_usage_metadata_callback();
@@ -131,10 +118,6 @@ fn test_usage_callback_accumulation() {
     );
 }
 
-/// Ported from `test_usage_callback` — via config section.
-///
-/// Tests that a UsageMetadataCallbackHandler can be used directly
-/// (equivalent to passing via config={"callbacks": [callback]}).
 #[test]
 fn test_usage_callback_via_handler() {
     let callback = UsageMetadataCallbackHandler::new();
@@ -151,9 +134,6 @@ fn test_usage_callback_via_handler() {
     );
 }
 
-/// Ported from `test_usage_callback` — multiple models section.
-///
-/// Tests that usage is tracked separately per model name.
 #[test]
 fn test_usage_callback_multiple_models() {
     let callback = UsageMetadataCallbackHandler::new();
@@ -185,8 +165,6 @@ fn test_usage_callback_multiple_models() {
     );
 }
 
-/// Tests that input_token_details and output_token_details are properly
-/// accumulated across calls (verifying the token detail fields from usage3/usage4).
 #[test]
 fn test_usage_callback_token_details_accumulation() {
     let callback = UsageMetadataCallbackHandler::new();
@@ -210,7 +188,6 @@ fn test_usage_callback_token_details_accumulation() {
     assert_eq!(output_details.reasoning, Some(15));
 }
 
-/// Tests that get_usage_metadata_callback guard works via Deref.
 #[test]
 fn test_get_usage_metadata_callback_guard() {
     let guard = get_usage_metadata_callback();
@@ -221,7 +198,6 @@ fn test_get_usage_metadata_callback_guard() {
     assert_eq!(arc_handler.name(), "UsageMetadataCallbackHandler");
 }
 
-/// Tests that the handler reports no usage when no model name is available.
 #[test]
 fn test_usage_callback_no_model_name() {
     let callback = UsageMetadataCallbackHandler::new();
@@ -241,7 +217,6 @@ fn test_usage_callback_no_model_name() {
     assert!(callback.usage_metadata().is_empty());
 }
 
-/// Tests that the handler reports no usage when no usage metadata is present.
 #[test]
 fn test_usage_callback_no_usage_metadata() {
     let callback = UsageMetadataCallbackHandler::new();

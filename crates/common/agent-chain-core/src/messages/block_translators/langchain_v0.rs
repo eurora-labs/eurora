@@ -1,21 +1,9 @@
-//! Derivations of standard content blocks from LangChain v0 multimodal content.
-//!
-//! Mirrors `langchain_core.messages.block_translators.langchain_v0`.
-
 use std::collections::HashMap;
 
 use serde_json::Value;
 
 use crate::messages::content::KNOWN_BLOCK_TYPES;
 
-/// Convert v0 multimodal blocks to v1 format.
-///
-/// During the `content_blocks` parsing process, blocks not recognized as a v1
-/// block are wrapped as a `non_standard` block with the original block stored
-/// in the `value` field. This function attempts to unpack those blocks and
-/// convert any v0 format blocks to v1 format.
-///
-/// If conversion fails, the block is left as a `non_standard` block.
 pub fn convert_v0_multimodal_input_to_v1(
     content: &[HashMap<String, Value>],
 ) -> Vec<HashMap<String, Value>> {
@@ -58,10 +46,6 @@ pub fn convert_v0_multimodal_input_to_v1(
         .collect()
 }
 
-/// Convert a LangChain v0 content block to v1 format.
-///
-/// Preserves unknown keys as extras to avoid data loss.
-/// Returns the original block unchanged if it's not in v0 format.
 pub fn convert_legacy_v0_content_block_to_v1(
     block: &HashMap<String, Value>,
 ) -> HashMap<String, Value> {
@@ -135,7 +119,6 @@ pub fn convert_legacy_v0_content_block_to_v1(
     result
 }
 
-/// Extract unknown keys from a v0 block and insert them as extras.
 fn insert_extras(
     result: &mut HashMap<String, Value>,
     block: &HashMap<String, Value>,

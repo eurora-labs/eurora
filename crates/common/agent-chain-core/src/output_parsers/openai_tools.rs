@@ -1,9 +1,3 @@
-//! Parsers for OpenAI tools output.
-//!
-//! This module contains parsers for extracting and parsing tool call
-//! information from OpenAI-style chat model responses using the tools API.
-//! Mirrors `langchain_core.output_parsers.openai_tools`.
-
 use std::collections::HashMap;
 use std::fmt::Debug;
 
@@ -19,9 +13,6 @@ use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
 use crate::utils::json::parse_partial_json;
 
-/// Parse a single raw tool call dictionary into a structured result.
-///
-/// Mirrors `langchain_core.output_parsers.openai_tools.parse_tool_call`.
 pub fn parse_tool_call(
     raw_tool_call: &Value,
     partial: bool,
@@ -89,9 +80,6 @@ pub fn parse_tool_call(
     Ok(Some(Value::Object(parsed)))
 }
 
-/// Create an `InvalidToolCall` from a raw tool call and an error message.
-///
-/// Mirrors `langchain_core.output_parsers.openai_tools.make_invalid_tool_call`.
 pub fn make_invalid_tool_call(raw_tool_call: &Value, error_msg: Option<&str>) -> InvalidToolCall {
     let function = raw_tool_call.get("function");
 
@@ -113,9 +101,6 @@ pub fn make_invalid_tool_call(raw_tool_call: &Value, error_msg: Option<&str>) ->
     invalid_tool_call(name, args, id, error_msg.map(|s| s.to_string()))
 }
 
-/// Parse a list of raw tool calls.
-///
-/// Mirrors `langchain_core.output_parsers.openai_tools.parse_tool_calls`.
 pub fn parse_tool_calls(
     raw_tool_calls: &[Value],
     partial: bool,
@@ -142,9 +127,6 @@ pub fn parse_tool_calls(
     Ok(final_tools)
 }
 
-/// Parse tools from OpenAI response.
-///
-/// Mirrors `langchain_core.output_parsers.openai_tools.JsonOutputToolsParser`.
 #[derive(Debug, Clone, Default)]
 pub struct JsonOutputToolsParser {
     pub strict: bool,
@@ -172,7 +154,6 @@ impl JsonOutputToolsParser {
         self
     }
 
-    /// Parse the result of an LLM call to a list of tool calls.
     pub fn parse_result(&self, result: &[ChatGeneration], partial: bool) -> Result<Value> {
         let generation = result.first().ok_or_else(|| {
             OutputParserError::new("This output parser can only be used with a chat generation.")
@@ -247,9 +228,6 @@ impl Runnable for JsonOutputToolsParser {
     }
 }
 
-/// Parse tools from OpenAI response, filtering by key name.
-///
-/// Mirrors `langchain_core.output_parsers.openai_tools.JsonOutputKeyToolsParser`.
 #[derive(Debug, Clone)]
 pub struct JsonOutputKeyToolsParser {
     pub key_name: String,
@@ -283,7 +261,6 @@ impl JsonOutputKeyToolsParser {
         self
     }
 
-    /// Parse the result of an LLM call, filtering by key_name.
     pub fn parse_result(&self, result: &[ChatGeneration], partial: bool) -> Result<Value> {
         let generation = result.first().ok_or_else(|| {
             OutputParserError::new("This output parser can only be used with a chat generation.")
@@ -397,13 +374,8 @@ impl Runnable for JsonOutputKeyToolsParser {
     }
 }
 
-/// Parse tools from OpenAI response into typed structs.
-///
-/// Mirrors `langchain_core.output_parsers.openai_tools.PydanticToolsParser`.
-/// Uses serde deserialization instead of Pydantic.
 #[derive(Clone)]
 pub struct PydanticToolsParser {
-    /// Map of tool name -> deserialization function.
     name_dict: HashMap<String, DeserializerFn>,
     pub first_tool_only: bool,
     inner: JsonOutputToolsParser,
@@ -421,10 +393,6 @@ impl Debug for PydanticToolsParser {
 }
 
 impl PydanticToolsParser {
-    /// Create a new parser that deserializes tool calls into typed structs.
-    ///
-    /// Each tool is registered by name with a deserialization function that
-    /// takes the args Value and returns the validated/deserialized Value.
     pub fn new(tools: Vec<(String, DeserializerFn)>, first_tool_only: bool) -> Self {
         let name_dict = tools.into_iter().collect();
         Self {
@@ -434,10 +402,6 @@ impl PydanticToolsParser {
         }
     }
 
-    /// Register a single typed tool for deserialization.
-    ///
-    /// The tool name is derived from the type name. The deserializer validates
-    /// the JSON args against the type `T`.
     pub fn with_tool<T>(mut self, name: impl Into<String>) -> Self
     where
         T: DeserializeOwned + serde::Serialize + 'static,
@@ -459,7 +423,6 @@ impl PydanticToolsParser {
         self
     }
 
-    /// Parse the result of an LLM call to typed Pydantic-like objects.
     pub fn parse_result(&self, result: &[ChatGeneration], partial: bool) -> Result<Value> {
         let json_results = self.inner.parse_result(result, partial)?;
 

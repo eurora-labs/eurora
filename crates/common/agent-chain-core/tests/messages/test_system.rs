@@ -1,7 +1,3 @@
-//! Tests for SystemMessage and SystemMessageChunk.
-//!
-//! Converted from `langchain/libs/core/tests/unit_tests/messages/test_system.py`
-
 use agent_chain_core::messages::{
     ContentBlock, ContentPart, HumanMessage, HumanMessageChunk, MessageContent, SystemMessage,
     SystemMessageChunk, TextContentBlock,

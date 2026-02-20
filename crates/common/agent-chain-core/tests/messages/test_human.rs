@@ -1,7 +1,3 @@
-//! Tests for HumanMessage and HumanMessageChunk.
-//!
-//! Converted from `langchain/libs/core/tests/unit_tests/messages/test_human.py`
-
 use agent_chain_core::load::Serializable;
 use agent_chain_core::messages::{
     ContentBlock, ContentPart, HumanMessage, HumanMessageChunk, ImageContentBlock, ImageSource,

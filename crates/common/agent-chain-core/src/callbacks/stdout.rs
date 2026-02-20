@@ -1,8 +1,3 @@
-//! Callback Handler that prints to stdout.
-//!
-//! This module provides callback handlers for printing output to stdout,
-//! including a standard handler and a streaming handler.
-
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
@@ -15,7 +10,6 @@ use super::base::{
     RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
 };
 
-/// ANSI color codes for terminal output.
 pub mod colors {
     pub const RESET: &str = "\x1b[0m";
     pub const BOLD: &str = "\x1b[1m";
@@ -28,7 +22,6 @@ pub mod colors {
     pub const WHITE: &str = "\x1b[37m";
 }
 
-/// Write text with optional color to a writer.
 fn write_text(writer: &Mutex<Box<dyn Write + Send>>, text: &str, color: Option<&str>, end: &str) {
     if let Ok(mut w) = writer.lock() {
         let result = if let Some(c) = color {
@@ -45,10 +38,8 @@ fn write_text(writer: &Mutex<Box<dyn Write + Send>>, text: &str, color: Option<&
     }
 }
 
-/// Callback Handler that prints to stdout.
 #[derive(Clone)]
 pub struct StdOutCallbackHandler {
-    /// The color to use for the text.
     pub color: Option<String>,
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
 }
@@ -68,7 +59,6 @@ impl Default for StdOutCallbackHandler {
 }
 
 impl StdOutCallbackHandler {
-    /// Create a new StdOutCallbackHandler.
     pub fn new() -> Self {
         Self {
             color: None,
@@ -76,7 +66,6 @@ impl StdOutCallbackHandler {
         }
     }
 
-    /// Create a new StdOutCallbackHandler with a specific color.
     pub fn with_color(color: impl Into<String>) -> Self {
         Self {
             color: Some(color.into()),
@@ -84,7 +73,6 @@ impl StdOutCallbackHandler {
         }
     }
 
-    /// Create a new StdOutCallbackHandler with a custom writer.
     pub fn with_writer(writer: Arc<Mutex<Box<dyn Write + Send>>>) -> Self {
         Self {
             color: None,

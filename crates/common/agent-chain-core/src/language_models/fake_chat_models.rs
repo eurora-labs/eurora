@@ -1,9 +1,3 @@
-//! Fake chat models for testing purposes.
-//!
-//! This module provides fake chat model implementations that can be used
-//! for testing without making actual API calls.
-//! Mirrors `langchain_core.language_models.fake_chat_models`.
-
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -22,18 +16,11 @@ use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition};
 use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, GenerationType, LLMResult};
 use crate::runnables::RunnableConfig;
 
-/// Fake chat model for testing purposes.
-///
-/// Cycles through BaseMessage responses in order.
 #[derive(Debug)]
 pub struct FakeMessagesListChatModel {
-    /// List of responses to cycle through.
     responses: Vec<BaseMessage>,
-    /// Sleep time in seconds between responses.
     sleep: Option<Duration>,
-    /// Internally incremented after every model invocation.
     index: AtomicUsize,
-    /// Chat model configuration.
     config: ChatModelConfig,
 }
 
@@ -49,7 +36,6 @@ impl Clone for FakeMessagesListChatModel {
 }
 
 impl FakeMessagesListChatModel {
-    /// Create a new FakeMessagesListChatModel with the given responses.
     pub fn new(responses: Vec<BaseMessage>) -> Self {
         Self {
             responses,
@@ -59,24 +45,20 @@ impl FakeMessagesListChatModel {
         }
     }
 
-    /// Set the sleep duration.
     pub fn with_sleep(mut self, duration: Duration) -> Self {
         self.sleep = Some(duration);
         self
     }
 
-    /// Set the configuration.
     pub fn with_config(mut self, config: ChatModelConfig) -> Self {
         self.config = config;
         self
     }
 
-    /// Get the current index.
     pub fn current_index(&self) -> usize {
         self.index.load(Ordering::SeqCst)
     }
 
-    /// Reset the index.
     pub fn reset(&self) {
         self.index.store(0, Ordering::SeqCst);
     }
@@ -163,25 +145,16 @@ impl BaseChatModel for FakeMessagesListChatModel {
     }
 }
 
-/// Fake error for testing purposes.
 #[derive(Debug, Clone, thiserror::Error)]
 #[error("FakeListChatModelError")]
 pub struct FakeListChatModelError;
 
-/// Fake chat model for testing purposes.
-///
-/// Cycles through string responses in order.
 #[derive(Debug)]
 pub struct FakeListChatModel {
-    /// List of string responses to cycle through.
     responses: Vec<String>,
-    /// Sleep time in seconds between responses.
     sleep: Option<Duration>,
-    /// Internally incremented after every model invocation.
     index: AtomicUsize,
-    /// If set, raise an error on the specified chunk number during streaming.
     error_on_chunk_number: Option<usize>,
-    /// Chat model configuration.
     config: ChatModelConfig,
 }
 
@@ -198,7 +171,6 @@ impl Clone for FakeListChatModel {
 }
 
 impl FakeListChatModel {
-    /// Create a new FakeListChatModel with the given responses.
     pub fn new(responses: Vec<String>) -> Self {
         Self {
             responses,
@@ -209,25 +181,21 @@ impl FakeListChatModel {
         }
     }
 
-    /// Set the sleep duration.
     pub fn with_sleep(mut self, duration: Duration) -> Self {
         self.sleep = Some(duration);
         self
     }
 
-    /// Set the configuration.
     pub fn with_config(mut self, config: ChatModelConfig) -> Self {
         self.config = config;
         self
     }
 
-    /// Set the chunk number to error on during streaming.
     pub fn with_error_on_chunk(mut self, chunk_number: usize) -> Self {
         self.error_on_chunk_number = Some(chunk_number);
         self
     }
 
-    /// Set a local cache instance.
     pub fn with_cache_instance(
         mut self,
         cache: std::sync::Arc<dyn crate::caches::BaseCache>,
@@ -236,29 +204,24 @@ impl FakeListChatModel {
         self
     }
 
-    /// Disable caching.
     pub fn with_cache_disabled(mut self) -> Self {
         self.config.base.cache = Some(false);
         self
     }
 
-    /// Enable caching (use global cache).
     pub fn with_cache_enabled(mut self) -> Self {
         self.config.base.cache = Some(true);
         self
     }
 
-    /// Get the current index.
     pub fn current_index(&self) -> usize {
         self.index.load(Ordering::SeqCst)
     }
 
-    /// Reset the index.
     pub fn reset(&self) {
         self.index.store(0, Ordering::SeqCst);
     }
 
-    /// Get the next response and update index.
     fn get_next_response(&self) -> String {
         let i = self.index.load(Ordering::SeqCst);
         let response = self.responses.get(i).cloned().unwrap_or_default();
@@ -273,11 +236,6 @@ impl FakeListChatModel {
         response
     }
 
-    /// Process inputs sequentially to preserve response ordering.
-    ///
-    /// Unlike the default concurrent `Runnable::batch`, this processes inputs
-    /// one at a time to ensure deterministic response ordering. Matches
-    /// Python's `FakeListChatModel.batch()` override.
     pub async fn batch(
         &self,
         inputs: Vec<LanguageModelInput>,
@@ -290,9 +248,6 @@ impl FakeListChatModel {
         Ok(results)
     }
 
-    /// Async version of sequential batch processing.
-    ///
-    /// Matches Python's `FakeListChatModel.abatch()` override.
     pub async fn abatch(
         &self,
         inputs: Vec<LanguageModelInput>,
@@ -427,22 +382,18 @@ impl BaseChatModel for FakeListChatModel {
     }
 }
 
-/// Fake Chat Model wrapper for testing purposes.
 #[derive(Debug, Clone, Default)]
 #[allow(dead_code)]
 pub struct FakeChatModel {
-    /// Chat model configuration.
     config: ChatModelConfig,
 }
 
 #[allow(dead_code)]
 impl FakeChatModel {
-    /// Create a new FakeChatModel.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set the configuration.
     pub fn with_config(mut self, config: ChatModelConfig) -> Self {
         self.config = config;
         self
@@ -519,17 +470,8 @@ impl BaseChatModel for FakeChatModel {
     }
 }
 
-/// Generic fake chat model that can be used to test the chat model interface.
-///
-/// * Chat model should be usable in both sync and async tests
-/// * Invokes `on_llm_new_token` to allow for testing of callback related code for new tokens.
-/// * Includes logic to break messages into message chunks to facilitate testing of streaming.
 pub struct GenericFakeChatModel {
-    /// Iterator over messages to return.
-    ///
-    /// If you want to pass a list, you can use `into_iter()` to convert it to an iterator.
     messages: std::sync::Mutex<Box<dyn Iterator<Item = AIMessage> + Send>>,
-    /// Chat model configuration.
     config: ChatModelConfig,
 }
 
@@ -543,7 +485,6 @@ impl fmt::Debug for GenericFakeChatModel {
 }
 
 impl GenericFakeChatModel {
-    /// Create a new GenericFakeChatModel with an iterator of messages.
     pub fn new<I>(messages: I) -> Self
     where
         I: Iterator<Item = AIMessage> + Send + 'static,
@@ -554,12 +495,10 @@ impl GenericFakeChatModel {
         }
     }
 
-    /// Create from a vector of messages.
     pub fn from_vec(messages: Vec<AIMessage>) -> Self {
         Self::new(messages.into_iter())
     }
 
-    /// Create from a vector of strings (converted to AIMessages).
     pub fn from_strings(messages: Vec<String>) -> Self {
         Self::new(
             messages
@@ -568,13 +507,11 @@ impl GenericFakeChatModel {
         )
     }
 
-    /// Set the configuration.
     pub fn with_config(mut self, config: ChatModelConfig) -> Self {
         self.config = config;
         self
     }
 
-    /// Set a local cache instance.
     pub fn with_cache_instance(
         mut self,
         cache: std::sync::Arc<dyn crate::caches::BaseCache>,
@@ -583,13 +520,11 @@ impl GenericFakeChatModel {
         self
     }
 
-    /// Disable caching.
     pub fn with_cache_disabled(mut self) -> Self {
         self.config.base.cache = Some(false);
         self
     }
 
-    /// Enable caching (use global cache).
     pub fn with_cache_enabled(mut self) -> Self {
         self.config.base.cache = Some(true);
         self
@@ -840,22 +775,16 @@ impl BaseChatModel for GenericFakeChatModel {
     }
 }
 
-/// Generic fake chat model that echoes the last message.
-///
-/// * Chat model should be usable in both sync and async tests
 #[derive(Debug, Clone, Default)]
 pub struct ParrotFakeChatModel {
-    /// Chat model configuration.
     config: ChatModelConfig,
 }
 
 impl ParrotFakeChatModel {
-    /// Create a new ParrotFakeChatModel.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set the configuration.
     pub fn with_config(mut self, config: ChatModelConfig) -> Self {
         self.config = config;
         self

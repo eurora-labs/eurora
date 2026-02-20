@@ -1,16 +1,8 @@
-//! Tests for UUID utility functions.
-//!
-//! Converted from `langchain/libs/core/tests/unit_tests/utils/test_uuid_utils.py`
-
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use agent_chain_core::utils::uuid::uuid7;
 use uuid::Uuid;
 
-/// Extract milliseconds since epoch from a UUIDv7 using string layout.
-///
-/// UUIDv7 stores Unix time in ms in the first 12 hex chars of the canonical
-/// string representation (48 msb bits).
 fn uuid_v7_ms(uuid_obj: &Uuid) -> u64 {
     let s = uuid_obj.to_string().replace("-", "");
     u64::from_str_radix(&s[..12], 16).expect("Failed to parse UUID timestamp")

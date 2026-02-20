@@ -1,8 +1,3 @@
-//! Context management for tracers.
-//!
-//! This module provides context management for tracers using thread-local storage.
-//! Mirrors `langchain_core.tracers.context`.
-
 use std::cell::RefCell;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -17,22 +12,16 @@ thread_local! {
     static RUN_COLLECTOR: RefCell<Option<Arc<std::sync::Mutex<RunCollectorCallbackHandler>>>> = const { RefCell::new(None) };
 }
 
-/// Trait for tracing callbacks that can be stored in context.
 pub trait TracingCallback: Send + Sync {
-    /// Get the project name.
     fn project_name(&self) -> Option<&str>;
 
-    /// Get the example ID.
     fn example_id(&self) -> Option<Uuid>;
 
-    /// Get the latest run.
     fn latest_run(&self) -> Option<&Run>;
 
-    /// Get the run URL.
     fn get_run_url(&self) -> Option<String>;
 }
 
-/// Guard that resets the tracing callback when dropped.
 pub struct TracingV2Guard {
     previous: Option<Arc<dyn TracingCallback>>,
 }
@@ -45,7 +34,6 @@ impl Drop for TracingV2Guard {
     }
 }
 
-/// Guard that resets the run collector when dropped.
 pub struct RunCollectorGuard {
     previous: Option<Arc<std::sync::Mutex<RunCollectorCallbackHandler>>>,
 }
@@ -58,15 +46,6 @@ impl Drop for RunCollectorGuard {
     }
 }
 
-/// Enable tracing v2 in the current context.
-///
-/// # Arguments
-///
-/// * `callback` - The tracing callback to use.
-///
-/// # Returns
-///
-/// A guard that will reset the callback when dropped.
 pub fn tracing_v2_enabled(callback: Arc<dyn TracingCallback>) -> TracingV2Guard {
     let previous = TRACING_V2_CALLBACK.with(|cell| {
         let mut borrow = cell.borrow_mut();
@@ -78,12 +57,6 @@ pub fn tracing_v2_enabled(callback: Arc<dyn TracingCallback>) -> TracingV2Guard 
     TracingV2Guard { previous }
 }
 
-/// Check if tracing v2 is enabled via context or environment variables.
-///
-/// Checks (in order):
-/// 1. Thread-local tracing callback is set
-/// 2. LANGSMITH_TRACING_V2 or LANGCHAIN_TRACING_V2 env var is "true"
-/// 3. LANGSMITH_TRACING or LANGCHAIN_TRACING env var is "true"
 pub fn tracing_v2_is_enabled() -> bool {
     let has_callback = TRACING_V2_CALLBACK.with(|cell| cell.borrow().is_some());
     if has_callback {
@@ -95,20 +68,10 @@ pub fn tracing_v2_is_enabled() -> bool {
         || env_var_is_set("LANGCHAIN_TRACING")
 }
 
-/// Get the current tracing callback.
 pub fn get_tracing_callback() -> Option<Arc<dyn TracingCallback>> {
     TRACING_V2_CALLBACK.with(|cell| cell.borrow().clone())
 }
 
-/// Collect runs in the current context.
-///
-/// # Arguments
-///
-/// * `collector` - The run collector to use.
-///
-/// # Returns
-///
-/// A guard that will reset the collector when dropped.
 pub fn collect_runs(
     collector: RunCollectorCallbackHandler,
 ) -> (
@@ -128,16 +91,10 @@ pub fn collect_runs(
     (RunCollectorGuard { previous }, collector_clone)
 }
 
-/// Get the current run collector.
 pub fn get_run_collector() -> Option<Arc<std::sync::Mutex<RunCollectorCallbackHandler>>> {
     RUN_COLLECTOR.with(|cell| cell.borrow().clone())
 }
 
-/// Get the project name for tracing.
-///
-/// Checks env vars in order: HOSTED_LANGSERVE_PROJECT_NAME,
-/// LANGSMITH_PROJECT / LANGCHAIN_PROJECT,
-/// LANGSMITH_SESSION / LANGCHAIN_SESSION, then falls back to "default".
 pub fn get_tracer_project() -> String {
     if let Ok(val) = std::env::var("HOSTED_LANGSERVE_PROJECT_NAME")
         && !val.is_empty()
@@ -161,23 +118,15 @@ pub fn get_tracer_project() -> String {
     "default".to_string()
 }
 
-/// Configuration hook for registering callback handlers that get
-/// auto-added during `configure()`.
 pub struct ConfigureHook {
-    /// Function to get the current context value (replaces Python's ContextVar.get()).
     pub context_getter: Box<dyn Fn() -> Option<Arc<dyn BaseCallbackHandler>> + Send + Sync>,
-    /// Whether the handler should be inheritable.
     pub inheritable: bool,
-    /// Optional factory to create a new handler (replaces Python's handler_class()).
     pub handler_factory: Option<Box<dyn Fn() -> Arc<dyn BaseCallbackHandler> + Send + Sync>>,
-    /// Optional handler type name for deduplication (replaces Python's isinstance check).
     pub handler_type_name: Option<String>,
-    /// Optional environment variable that triggers auto-creation.
     pub env_var: Option<String>,
 }
 
 impl ConfigureHook {
-    /// Create a new configure hook.
     pub fn new(
         context_getter: impl Fn() -> Option<Arc<dyn BaseCallbackHandler>> + Send + Sync + 'static,
         inheritable: bool,
@@ -205,36 +154,28 @@ impl std::fmt::Debug for ConfigureHook {
     }
 }
 
-/// Registry for configure hooks.
 #[derive(Debug, Default)]
 pub struct ConfigureHookRegistry {
     hooks: Vec<ConfigureHook>,
 }
 
 impl ConfigureHookRegistry {
-    /// Create a new configure hook registry.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Register a configure hook.
     pub fn register(&mut self, hook: ConfigureHook) {
         self.hooks.push(hook);
     }
 
-    /// Get all registered hooks.
     pub fn hooks(&self) -> &[ConfigureHook] {
         &self.hooks
     }
 }
 
-/// Global configure hook registry.
 static CONFIGURE_HOOKS: std::sync::LazyLock<std::sync::Mutex<ConfigureHookRegistry>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(ConfigureHookRegistry::new()));
 
-/// Register a configure hook.
-///
-/// Matches Python's `register_configure_hook(context_var, inheritable, handler_class)`.
 pub fn register_configure_hook(
     context_getter: impl Fn() -> Option<Arc<dyn BaseCallbackHandler>> + Send + Sync + 'static,
     inheritable: bool,
@@ -253,7 +194,6 @@ pub fn register_configure_hook(
     }
 }
 
-/// Get a reference to the global configure hooks registry.
 pub fn get_configure_hooks() -> &'static std::sync::LazyLock<std::sync::Mutex<ConfigureHookRegistry>>
 {
     &CONFIGURE_HOOKS

@@ -1,7 +1,3 @@
-//! Tests for concurrency behavior of batch and async batch operations.
-//!
-//! Converted from `langchain/libs/core/tests/unit_tests/runnables/test_concurrency.py`
-
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};

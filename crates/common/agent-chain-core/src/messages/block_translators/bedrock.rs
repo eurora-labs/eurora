@@ -1,23 +1,11 @@
-//! Derivations of standard content blocks from Bedrock content.
-//!
-//! Mirrors `langchain_core/messages/block_translators/bedrock.py`.
-//!
-//! The Bedrock (non-Converse) API uses the same format as Anthropic for
-//! Claude models, so this module delegates to the Anthropic translator.
-
 use serde_json::Value;
 
 use super::anthropic;
 
-/// Convert Bedrock content blocks to standard format.
-///
-/// For Claude models, Bedrock uses Anthropic's format, so we delegate
-/// directly to the Anthropic translator.
 pub fn convert_to_standard_blocks(content: &[Value], is_chunk: bool) -> Vec<Value> {
     anthropic::convert_to_standard_blocks(content, is_chunk)
 }
 
-/// Convert Bedrock content blocks to standard format with context.
 pub fn convert_to_standard_blocks_with_context(
     content: &[Value],
     is_chunk: bool,

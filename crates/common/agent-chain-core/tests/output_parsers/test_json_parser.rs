@@ -1,7 +1,3 @@
-//! Snapshot tests for JsonOutputParser.
-//!
-//! Ported from langchain/libs/core/tests/unit_tests/output_parsers/test_json_parser.py
-
 use agent_chain_core::output_parsers::{
     BaseCumulativeTransformOutputParser, BaseOutputParser, JsonOutputParser, SimpleJsonOutputParser,
 };

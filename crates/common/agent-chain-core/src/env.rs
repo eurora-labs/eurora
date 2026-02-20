@@ -1,13 +1,9 @@
-//! Utilities for getting information about the runtime environment.
-
 use rustc_version_runtime::version;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-/// The version of the agent-chain-core library.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Cached runtime environment information.
 static RUNTIME_ENVIRONMENT: LazyLock<HashMap<&'static str, String>> = LazyLock::new(|| {
     let mut env = HashMap::new();
     env.insert("library_version", VERSION.to_string());
@@ -18,19 +14,10 @@ static RUNTIME_ENVIRONMENT: LazyLock<HashMap<&'static str, String>> = LazyLock::
     env
 });
 
-/// Get information about the LangChain runtime environment.
-///
-/// Returns a HashMap with information about the runtime environment:
-/// - `library_version`: The version of the library
-/// - `library`: The library name ("agent-chain-core")
-/// - `platform`: Platform information (OS, architecture)
-/// - `runtime`: The runtime ("rust")
-/// - `runtime_version`: The Rust version used to compile
 pub fn get_runtime_environment() -> &'static HashMap<&'static str, String> {
     &RUNTIME_ENVIRONMENT
 }
 
-/// Gets a platform string similar to Python's platform.platform().
 fn get_platform_string() -> String {
     format!(
         "{}-{}-{}",
@@ -40,7 +27,6 @@ fn get_platform_string() -> String {
     )
 }
 
-/// Gets the Rust version used to compile this crate.
 fn get_rust_version() -> String {
     version().to_string()
 }

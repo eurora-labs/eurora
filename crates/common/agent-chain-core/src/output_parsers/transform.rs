@@ -1,7 +1,3 @@
-//! Base classes for output parsers that can handle streaming input.
-//!
-//! Mirrors `langchain_core.output_parsers.transform`.
-
 use async_trait::async_trait;
 use futures::StreamExt;
 use futures::stream::BoxStream;
@@ -13,15 +9,12 @@ use crate::runnables::RunnableConfig;
 
 use super::base::BaseOutputParser;
 
-/// Base trait for an output parser that can handle streaming input.
 #[async_trait]
 pub trait BaseTransformOutputParser: BaseOutputParser {
-    /// Parse a generation into the output type.
     fn parse_generation(&self, generation: &Generation) -> Result<Self::Output> {
         self.parse(&generation.text)
     }
 
-    /// Transform an input stream into an output stream.
     fn transform<'a>(
         &'a self,
         input: BoxStream<'a, BaseMessage>,
@@ -39,7 +32,6 @@ pub trait BaseTransformOutputParser: BaseOutputParser {
         })
     }
 
-    /// Async transform an input stream into an output stream.
     fn atransform<'a>(
         &'a self,
         input: BoxStream<'a, BaseMessage>,
@@ -51,22 +43,12 @@ pub trait BaseTransformOutputParser: BaseOutputParser {
     }
 }
 
-/// Base trait for an output parser that accumulates chunks before parsing.
-///
-/// Extends `BaseTransformOutputParser` - in diff mode, yields diffs between
-/// the previous and current parsed output.
 #[async_trait]
 pub trait BaseCumulativeTransformOutputParser: BaseTransformOutputParser {
-    /// Whether to yield diffs between the previous and current parsed output,
-    /// or just the current parsed output.
     fn diff_mode(&self) -> bool {
         false
     }
 
-    /// Convert parsed outputs into a diff format.
-    ///
-    /// Must be implemented by subclasses when `diff_mode` is true.
-    /// Default implementation returns an error (matching Python's `raise NotImplementedError`).
     fn compute_diff(
         &self,
         _prev: Option<&Self::Output>,
@@ -75,7 +57,6 @@ pub trait BaseCumulativeTransformOutputParser: BaseTransformOutputParser {
         Err(Error::Other("_diff not implemented".to_string()))
     }
 
-    /// Transform an input stream into an output stream, accumulating chunks.
     fn cumulative_transform<'a>(
         &'a self,
         input: BoxStream<'a, BaseMessage>,

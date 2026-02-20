@@ -1,7 +1,3 @@
-//! Unit tests for dispatch_custom_event and adispatch_custom_event.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/callbacks/test_dispatch_custom_event.py`
-
 use agent_chain_core::callbacks::Callbacks;
 use agent_chain_core::callbacks::base::{
     BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
@@ -31,9 +27,6 @@ impl BaseCallbackHandler for FakeHandler {
     }
 }
 
-/// Ported from `test_custom_event_root_dispatch`.
-///
-/// Dispatching a custom event without a parent_run_id should fail.
 #[test]
 fn test_custom_event_root_dispatch() {
     let manager = CallbackManager::new();
@@ -50,9 +43,6 @@ fn test_custom_event_root_dispatch() {
     assert!(result.unwrap_err().contains("parent run id"));
 }
 
-/// Ported from `test_async_custom_event_root_dispatch`.
-///
-/// Dispatching a custom event asynchronously without a parent_run_id should fail.
 #[tokio::test]
 async fn test_async_custom_event_root_dispatch() {
     let manager = AsyncCallbackManager::new();
@@ -69,10 +59,6 @@ async fn test_async_custom_event_root_dispatch() {
     assert!(result.unwrap_err().contains("parent run id"));
 }
 
-/// Ported from `test_sync_callback_manager`.
-///
-/// Uses RunnableLambdaWithConfig to dispatch custom events from within a
-/// lambda, verifying the full callback pipeline wires up parent_run_id.
 #[test]
 fn test_sync_callback_manager() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -96,10 +82,6 @@ fn test_sync_callback_manager() {
     assert_eq!(result.unwrap(), 1);
 }
 
-/// Ported from `test_async_callback_manager`.
-///
-/// Uses RunnableLambdaWithConfig with an async function to dispatch custom
-/// events, verifying the async callback pipeline.
 #[tokio::test]
 async fn test_async_callback_manager() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -123,7 +105,6 @@ async fn test_async_callback_manager() {
     assert_eq!(result.unwrap(), 1);
 }
 
-/// Verify that RunnableLambda::invoke now fires callback lifecycle events.
 #[test]
 fn test_runnable_lambda_callback_lifecycle() {
     use agent_chain_core::runnables::base::RunnableLambda;
@@ -142,7 +123,6 @@ fn test_runnable_lambda_callback_lifecycle() {
     assert_eq!(result.unwrap(), 2);
 }
 
-/// Verify that RunnableLambda error path fires on_chain_error.
 #[test]
 fn test_runnable_lambda_callback_error_lifecycle() {
     use agent_chain_core::runnables::base::RunnableLambda;
@@ -162,7 +142,6 @@ fn test_runnable_lambda_callback_error_lifecycle() {
     assert!(result.is_err());
 }
 
-/// Verify empty handlers short-circuit without error.
 #[test]
 fn test_dispatch_custom_event_no_handlers() {
     let mut manager = CallbackManager::new();
@@ -172,7 +151,6 @@ fn test_dispatch_custom_event_no_handlers() {
     assert!(result.is_ok());
 }
 
-/// Async version with empty handlers short-circuits.
 #[tokio::test]
 async fn test_adispatch_custom_event_no_handlers() {
     let manager = AsyncCallbackManager::new();

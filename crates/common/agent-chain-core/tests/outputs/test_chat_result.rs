@@ -1,17 +1,11 @@
-//! Unit tests for ChatResult class.
-//!
-//! Ported from `langchain/libs/core/tests/unit_tests/outputs/test_chat_result.py`
-
 use agent_chain_core::messages::{AIMessage, AIMessageChunk};
 use agent_chain_core::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult};
 use serde_json::json;
 use std::collections::HashMap;
 
-/// Test suite for ChatResult class.
 mod chat_result_tests {
     use super::*;
 
-    /// Test creating ChatResult with a single generation.
     #[test]
     fn test_creation_with_single_generation() {
         let msg = AIMessage::builder().content("Hello").build();
@@ -22,7 +16,6 @@ mod chat_result_tests {
         assert!(result.llm_output.is_none());
     }
 
-    /// Test creating ChatResult with multiple generations.
     #[test]
     fn test_creation_with_multiple_generations() {
         let gen1 = ChatGeneration::new(AIMessage::builder().content("Response 1").build().into());
@@ -35,7 +28,6 @@ mod chat_result_tests {
         assert_eq!(result.generations[2], gen3);
     }
 
-    /// Test creating ChatResult with llm_output.
     #[test]
     fn test_creation_with_llm_output() {
         let msg = AIMessage::builder().content("Test").build();
@@ -58,7 +50,6 @@ mod chat_result_tests {
         );
     }
 
-    /// Test creating ChatResult with empty llm_output dict.
     #[test]
     fn test_creation_with_empty_llm_output() {
         let msg = AIMessage::builder().content("Test").build();
@@ -67,7 +58,6 @@ mod chat_result_tests {
         assert_eq!(result.llm_output, Some(HashMap::new()));
     }
 
-    /// Test that llm_output defaults to None when not provided.
     #[test]
     fn test_llm_output_defaults_to_none() {
         let msg = AIMessage::builder().content("Test").build();
@@ -76,7 +66,6 @@ mod chat_result_tests {
         assert!(result.llm_output.is_none());
     }
 
-    /// Test ChatResult with generations that have generation_info.
     #[test]
     fn test_generations_with_generation_info() {
         let mut gen_info1 = HashMap::new();
@@ -112,7 +101,6 @@ mod chat_result_tests {
         );
     }
 
-    /// Test creating ChatResult with empty generations list.
     #[test]
     fn test_empty_generations_list() {
         let result = ChatResult::new(vec![]);
@@ -120,7 +108,6 @@ mod chat_result_tests {
         assert!(result.llm_output.is_none());
     }
 
-    /// Test that message attributes are preserved in generations.
     #[test]
     fn test_generations_preserve_message_attributes() {
         let mut msg = AIMessage::builder().content("Test response").build();
@@ -139,7 +126,6 @@ mod chat_result_tests {
         }
     }
 
-    /// Test llm_output can contain various data types.
     #[test]
     fn test_llm_output_with_various_types() {
         let msg = AIMessage::builder().content("Test").build();
@@ -163,7 +149,6 @@ mod chat_result_tests {
         );
     }
 
-    /// Test ChatResult with multiple candidate generations for same prompt.
     #[test]
     fn test_multiple_candidate_generations() {
         let candidates = vec![
@@ -179,11 +164,9 @@ mod chat_result_tests {
     }
 }
 
-/// Test suite for ChatResult serialization roundtrips.
 mod chat_result_serialization_tests {
     use super::*;
 
-    /// Test serialization for ChatResult.
     #[test]
     fn test_model_dump_basic() {
         let chat_gen = ChatGeneration::new(AIMessage::builder().content("Hello").build().into());
@@ -197,7 +180,6 @@ mod chat_result_serialization_tests {
         assert!(data.get("llm_output").is_none());
     }
 
-    /// Test serialization includes llm_output.
     #[test]
     fn test_model_dump_with_llm_output() {
         let chat_gen = ChatGeneration::new(AIMessage::builder().content("Hello").build().into());
@@ -210,7 +192,6 @@ mod chat_result_serialization_tests {
         assert_eq!(data["llm_output"]["token_usage"]["total"], json!(50));
     }
 
-    /// Test JSON serialization roundtrip.
     #[test]
     fn test_json_roundtrip() {
         let mut generation_info = HashMap::new();
@@ -233,7 +214,6 @@ mod chat_result_serialization_tests {
         assert_eq!(restored.llm_output, Some(expected_output));
     }
 
-    /// Test deserialization from a Value (dict equivalent).
     #[test]
     fn test_model_validate_from_dict() {
         let chat_gen = ChatGeneration::new(AIMessage::builder().content("test").build().into());
@@ -249,11 +229,9 @@ mod chat_result_serialization_tests {
     }
 }
 
-/// Test suite for ChatResult equality semantics.
 mod chat_result_equality_tests {
     use super::*;
 
-    /// Test equality for ChatResults with same content.
     #[test]
     fn test_equality_same_content() {
         let chat_gen = ChatGeneration::new(AIMessage::builder().content("Hello").build().into());
@@ -264,7 +242,6 @@ mod chat_result_equality_tests {
         assert_eq!(result1, result2);
     }
 
-    /// Test inequality for ChatResults with different generations.
     #[test]
     fn test_inequality_different_generations() {
         let chat_gen1 = ChatGeneration::new(AIMessage::builder().content("Hello").build().into());
@@ -274,7 +251,6 @@ mod chat_result_equality_tests {
         assert_ne!(result1, result2);
     }
 
-    /// Test inequality for ChatResults with different llm_output.
     #[test]
     fn test_inequality_different_llm_output() {
         let chat_gen = ChatGeneration::new(AIMessage::builder().content("Hello").build().into());
@@ -287,7 +263,6 @@ mod chat_result_equality_tests {
         assert_ne!(result1, result2);
     }
 
-    /// Test equality when both have None llm_output.
     #[test]
     fn test_equality_both_none_llm_output() {
         let chat_gen = ChatGeneration::new(AIMessage::builder().content("Hello").build().into());
@@ -297,14 +272,9 @@ mod chat_result_equality_tests {
     }
 }
 
-/// Test suite for ChatResult model behavior.
 mod chat_result_model_behavior_tests {
     use super::*;
 
-    /// Test ChatResult with ChatGenerationChunk objects.
-    ///
-    /// In Python, ChatGenerationChunk is a subclass of ChatGeneration, so it
-    /// can be stored directly. In Rust, we convert via From<ChatGenerationChunk>.
     #[test]
     fn test_with_chat_generation_chunk() {
         let chunk = ChatGenerationChunk::new(
@@ -320,7 +290,6 @@ mod chat_result_model_behavior_tests {
         assert_eq!(result.generations[0].text, "chunk");
     }
 
-    /// Test that generation ordering is preserved.
     #[test]
     fn test_generations_ordering_preserved() {
         let generations: Vec<ChatGeneration> = (0..5)
@@ -339,11 +308,6 @@ mod chat_result_model_behavior_tests {
         }
     }
 
-    /// Test ChatResult with generations having different content types.
-    ///
-    /// In Python, AIMessage content can be a string or a list of content blocks.
-    /// In Rust, list content is stored as a JSON string via `with_content_list`,
-    /// and text extraction follows the same logic as Python's `set_text` validator.
     #[test]
     fn test_generations_with_mixed_content_types() {
         let gen_str = ChatGeneration::new(

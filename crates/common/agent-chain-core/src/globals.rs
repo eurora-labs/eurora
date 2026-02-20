@@ -1,5 +1,3 @@
-//! Global values and configuration that apply to all of LangChain.
-
 use std::sync::{Arc, RwLock};
 
 use crate::caches::BaseCache;
@@ -32,11 +30,6 @@ pub fn get_debug() -> bool {
     DEBUG.read().map(|d| *d).unwrap_or(false)
 }
 
-/// Set a new LLM cache, overwriting the previous value, if any.
-///
-/// # Arguments
-///
-/// * `value` - The new LLM cache to use. If `None`, the LLM cache is disabled.
 pub fn set_llm_cache(value: Option<Arc<dyn BaseCache>>) {
     if let Ok(mut cache) = LLM_CACHE.write() {
         *cache = value;
@@ -45,11 +38,6 @@ pub fn set_llm_cache(value: Option<Arc<dyn BaseCache>>) {
     }
 }
 
-/// Get the value of the `llm_cache` global setting.
-///
-/// # Returns
-///
-/// The value of the `llm_cache` global setting.
 pub fn get_llm_cache() -> Option<Arc<dyn BaseCache>> {
     LLM_CACHE.read().ok().and_then(|cache| cache.clone())
 }

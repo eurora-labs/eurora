@@ -1,9 +1,3 @@
-//! OpenAI block translator.
-//!
-//! Converts OpenAI-specific content blocks to the standard LangChain format.
-//!
-//! This corresponds to `langchain_core/messages/block_translators/openai.py` in Python.
-
 use serde_json::{Value, json};
 use std::collections::{HashMap, HashSet};
 use tracing::warn;
@@ -11,27 +5,20 @@ use tracing::warn;
 use crate::messages::content::KNOWN_BLOCK_TYPES;
 use crate::{is_openai_data_block, parse_data_uri};
 
-/// Simple hex encoding function to avoid adding a dependency.
 fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
-/// OpenAI API type for formatting data blocks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OpenAiApi {
-    /// Chat Completions API format.
     #[default]
     ChatCompletions,
-    /// Responses API format.
     Responses,
 }
 
-/// Key used to store function call IDs in additional_kwargs.
-/// This matches the Python implementation's `_FUNCTION_CALL_IDS_MAP_KEY`.
 #[allow(dead_code)]
 const FUNCTION_CALL_IDS_MAP_KEY: &str = "__openai_function_call_ids__";
 
-/// Convert `ImageContentBlock` to format expected by OpenAI Chat Completions.
 pub fn convert_to_openai_image_block(block: &Value) -> Result<Value, String> {
     if let Some(url) = block.get("url").and_then(|v| v.as_str()) {
         return Ok(json!({
@@ -68,10 +55,6 @@ pub fn convert_to_openai_image_block(block: &Value) -> Result<Value, String> {
     Err("Unsupported source type. Only 'url' and 'base64' are supported.".to_string())
 }
 
-/// Format standard data content block to format expected by OpenAI.
-///
-/// "Standard data content block" can include old-style LangChain v0 blocks
-/// (URLContentBlock, Base64ContentBlock, IDContentBlock) or new ones.
 pub fn convert_to_openai_data_block(block: &Value, api: OpenAiApi) -> Result<Value, String> {
     let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
@@ -219,7 +202,6 @@ pub fn convert_to_openai_data_block(block: &Value, api: OpenAiApi) -> Result<Val
     }
 }
 
-/// Extract unknown keys from block to preserve as extras.
 fn extract_extras(block: &Value, known_keys: &HashSet<&str>) -> Value {
     let mut extras = json!({});
     if let Some(obj) = block.as_object() {
@@ -232,10 +214,6 @@ fn extract_extras(block: &Value, known_keys: &HashSet<&str>) -> Value {
     extras
 }
 
-/// Convert OpenAI image/audio/file content block to respective v1 multimodal block.
-///
-/// We expect that the incoming block is verified to be in OpenAI Chat Completions format.
-/// If parsing fails, passes block through unchanged.
 pub fn convert_openai_format_to_data_block(block: &Value) -> Value {
     let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
@@ -410,7 +388,6 @@ pub fn convert_openai_format_to_data_block(block: &Value) -> Value {
     block.clone()
 }
 
-/// Convert annotation to v1 format.
 fn convert_annotation_to_v1(annotation: &Value) -> Value {
     let annotation_type = annotation.get("type").and_then(|v| v.as_str());
 
@@ -492,7 +469,6 @@ fn convert_annotation_to_v1(annotation: &Value) -> Value {
     })
 }
 
-/// Explode reasoning blocks with summary into individual blocks.
 fn explode_reasoning(block: &Value) -> Vec<Value> {
     if block.get("summary").is_none() {
         return vec![block.clone()];
@@ -590,53 +566,21 @@ fn explode_reasoning(block: &Value) -> Vec<Value> {
     results
 }
 
-/// Context for OpenAI message translation.
 #[derive(Default)]
 pub struct OpenAiContext {
-    /// Tool calls from the message.
     pub tool_calls: Vec<Value>,
-    /// Tool call chunks from the message (for streaming).
     pub tool_call_chunks: Vec<Value>,
-    /// Invalid tool calls from the message.
     pub invalid_tool_calls: Vec<Value>,
-    /// Additional kwargs from the message.
     pub additional_kwargs: Value,
-    /// Response metadata from the message.
     pub response_metadata: Value,
-    /// Message ID.
     pub message_id: Option<String>,
-    /// Chunk position (for streaming).
     pub chunk_position: Option<String>,
 }
 
-/// Convert OpenAI content blocks to standard format.
-///
-/// # Arguments
-/// * `content` - The raw content blocks from OpenAI
-/// * `is_chunk` - Whether this is a streaming chunk
-/// * `context` - Optional context containing tool_calls and other message data
-///
-/// # Returns
-/// A vector of standardized content blocks.
 pub fn convert_to_standard_blocks(content: &[Value], is_chunk: bool) -> Vec<Value> {
     convert_to_standard_blocks_with_context(content, is_chunk, None)
 }
 
-/// Convert OpenAI content blocks to standard format with additional context.
-///
-/// This is the main entry point for converting OpenAI content blocks to v1 format.
-/// It handles:
-/// - v0.3 backwards compatibility (reasoning in additional_kwargs, tool_outputs, refusal)
-/// - OpenAI Responses API format (reasoning with summary, function_call, etc.)
-/// - OpenAI Chat Completions format (plain string content with tool_calls)
-///
-/// # Arguments
-/// * `content` - The raw content blocks from OpenAI
-/// * `is_chunk` - Whether this is a streaming chunk
-/// * `context` - Optional context containing tool_calls and other message data
-///
-/// # Returns
-/// A vector of standardized content blocks.
 pub fn convert_to_standard_blocks_with_context(
     content: &[Value],
     is_chunk: bool,
@@ -653,14 +597,6 @@ pub fn convert_to_standard_blocks_with_context(
     convert_to_v1_from_responses(&processed_content, is_chunk, context)
 }
 
-/// Check if this is a v0.3 format message.
-///
-/// v0.3 messages have one or more of these characteristics:
-/// - `reasoning` in `additional_kwargs`
-/// - `tool_outputs` in `additional_kwargs`
-/// - `refusal` in `additional_kwargs`
-/// - `__openai_function_call_ids__` in `additional_kwargs`
-/// - Message ID starts with "msg_" and response ID starts with "resp_"
 fn is_v03_format(content: &[Value], context: &OpenAiContext) -> bool {
     let has_v03_kwargs = [
         "reasoning",
@@ -689,13 +625,6 @@ fn is_v03_format(content: &[Value], context: &OpenAiContext) -> bool {
     false
 }
 
-/// Convert v0.3 format message to Responses format.
-///
-/// This handles backwards compatibility with v0.3 messages which had:
-/// - `reasoning` in `additional_kwargs`
-/// - `tool_outputs` in `additional_kwargs`
-/// - `refusal` in `additional_kwargs`
-/// - `__openai_function_call_ids__` mapping in `additional_kwargs`
 fn convert_from_v03_format(
     content: &[Value],
     context: &OpenAiContext,
@@ -841,14 +770,6 @@ fn convert_from_v03_format(
     new_content
 }
 
-/// Convert OpenAI Responses API blocks to v1 format.
-///
-/// This handles the main conversion logic for:
-/// - text blocks (with annotations)
-/// - reasoning blocks (with summary explosion)
-/// - function_call -> tool_call
-/// - web_search_call, file_search_call, code_interpreter_call, mcp_call, etc.
-///
 fn convert_to_v1_from_responses(
     content: &[Value],
     is_chunk: bool,
@@ -1384,14 +1305,6 @@ fn convert_to_v1_from_responses(
     result
 }
 
-/// Convert OpenAI Chat Completions format blocks to v1 format.
-///
-/// During the `content_blocks` parsing process, we wrap blocks not recognized as a v1
-/// block as a `'non_standard'` block with the original block stored in the `value`
-/// field. This function attempts to unpack those blocks and convert any blocks that
-/// might be OpenAI format to v1 ContentBlocks.
-///
-/// If conversion fails, the block is left as a `'non_standard'` block.
 pub fn convert_to_v1_from_chat_completions_input(content: &[Value]) -> Vec<Value> {
     let mut converted_blocks = Vec::new();
 

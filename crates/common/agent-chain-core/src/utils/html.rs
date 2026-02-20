@@ -1,58 +1,28 @@
-//! Utilities for working with HTML.
-//!
-//! Adapted from langchain_core/utils/html.py
-
 use regex::Regex;
 use std::collections::HashSet;
 
-/// Prefixes to ignore when extracting links.
 pub const PREFIXES_TO_IGNORE: &[&str] = &["javascript:", "mailto:", "#"];
 
-/// Suffixes to ignore when extracting links.
 pub const SUFFIXES_TO_IGNORE: &[&str] = &[
     ".css", ".js", ".ico", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".csv", ".bz2", ".zip", ".epub",
 ];
 
-/// Default regex pattern for extracting links from HTML.
-/// This captures all href values, filtering is done in Rust code.
 pub fn default_link_regex() -> Regex {
     Regex::new(r#"href=["']([^"'#]+)["'#]"#).expect("Failed to compile default link regex")
 }
 
-/// Check if a link should be ignored based on its prefix.
 fn should_ignore_prefix(link: &str) -> bool {
     PREFIXES_TO_IGNORE
         .iter()
         .any(|prefix| link.starts_with(prefix))
 }
 
-/// Check if a link should be ignored based on its suffix.
 fn should_ignore_suffix(link: &str) -> bool {
     SUFFIXES_TO_IGNORE
         .iter()
         .any(|suffix| link.ends_with(suffix))
 }
 
-/// Extract all links from a raw HTML string.
-///
-/// # Arguments
-///
-/// * `raw_html` - The original HTML string.
-/// * `pattern` - Optional regex pattern for extracting links. If not provided, uses the default pattern.
-///
-/// # Returns
-///
-/// A list of all unique links found in the HTML.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::utils::html::find_all_links;
-///
-/// let html = r#"<a href="https://example.com">Link</a>"#;
-/// let links = find_all_links(html, None);
-/// assert!(links.contains(&"https://example.com".to_string()));
-/// ```
 pub fn find_all_links(raw_html: &str, pattern: Option<&Regex>) -> Vec<String> {
     let default_regex = default_link_regex();
     let regex = pattern.unwrap_or(&default_regex);
@@ -66,30 +36,6 @@ pub fn find_all_links(raw_html: &str, pattern: Option<&Regex>) -> Vec<String> {
         .collect()
 }
 
-/// Extract all links from a raw HTML string and convert into absolute paths.
-///
-/// # Arguments
-///
-/// * `raw_html` - The original HTML string.
-/// * `url` - The URL of the HTML page.
-/// * `base_url` - The base URL to check for outside links against. If not provided, uses `url`.
-/// * `pattern` - Optional regex pattern for extracting links.
-/// * `prevent_outside` - If `true`, ignore external links which are not children of the base URL.
-/// * `exclude_prefixes` - Exclude any URLs that start with one of these prefixes.
-///
-/// # Returns
-///
-/// A list of absolute URLs found in the HTML.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::utils::html::extract_sub_links;
-///
-/// let html = r#"<a href="/page">Link</a>"#;
-/// let links = extract_sub_links(html, "https://example.com", None, None, true, &[]);
-/// // Would contain "https://example.com/page"
-/// ```
 pub fn extract_sub_links(
     raw_html: &str,
     url: &str,

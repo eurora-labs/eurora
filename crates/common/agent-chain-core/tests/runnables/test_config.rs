@@ -1,7 +1,3 @@
-//! Tests for RunnableConfig and related utilities.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/runnables/test_config.py`
-
 use std::collections::HashMap;
 use std::sync::Arc;
 
