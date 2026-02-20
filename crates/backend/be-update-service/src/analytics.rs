@@ -1,10 +1,9 @@
 use posthog_rs::Event;
-use tracing::debug;
 
 fn capture_async(event: Event) {
     tokio::spawn(async move {
         if let Err(e) = posthog_rs::capture(event).await {
-            debug!("Failed to capture posthog event: {}", e);
+            tracing::error!("Failed to capture posthog event: {}", e);
         }
     });
 }

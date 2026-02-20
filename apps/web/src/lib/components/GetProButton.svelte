@@ -1,10 +1,11 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { auth, isAuthenticated, accessToken } from '$lib/stores/auth.js';
 	import { Button, type ButtonProps } from '@eurora/ui/components/button/index';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { onMount } from 'svelte';
+	import type { Snippet } from 'svelte';
+	import { toast } from 'svelte-sonner';
 
 	const REST_API_URL = import.meta.env.VITE_REST_API_URL;
 	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID;
@@ -18,8 +19,6 @@
 	}: ButtonProps & { children?: Snippet; autoTrigger?: boolean } = $props();
 
 	let loading = $state(false);
-	let error = $state<string | null>(null);
-
 	onMount(() => {
 		if (autoTrigger) handleGetPro();
 	});
@@ -31,7 +30,6 @@
 		}
 
 		loading = true;
-		error = null;
 
 		try {
 			if (!(await auth.ensureValidToken())) {
@@ -59,17 +57,13 @@
 			window.location.href = url;
 		} catch (err) {
 			console.error('Checkout error:', err);
-			error = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+			toast.error(
+				err instanceof Error ? err.message : 'Something went wrong. Please try again.',
+			);
 			loading = false;
 		}
 	}
 </script>
-
-{#if error}
-	<div class="mb-2 rounded-md bg-red-50 p-2">
-		<p class="text-sm text-red-800">{error}</p>
-	</div>
-{/if}
 
 <Button {variant} class={className} onclick={handleGetPro} disabled={loading} {...restProps}>
 	{#if loading}
