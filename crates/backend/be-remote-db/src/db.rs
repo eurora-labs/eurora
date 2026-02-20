@@ -1072,7 +1072,31 @@ impl DatabaseManager {
         Ok(())
     }
 
+    /// Atomically claims a webhook event for processing.
+    /// Returns `true` if the event was newly inserted (caller should process it),
+    /// or `false` if it was already recorded (duplicate — caller should skip).
+    pub async fn try_claim_webhook_event(
+        &self,
+        event_id: &str,
+        event_type: &str,
+    ) -> DbResult<bool> {
+        let result = sqlx::query(
+            r#"
+            INSERT INTO stripe.webhook_events (event_id, event_type)
+            VALUES ($1, $2)
+            ON CONFLICT (event_id) DO NOTHING
+            "#,
+        )
+        .bind(event_id)
+        .bind(event_type)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
     /// If `email` matches an existing user, `app_user_id` is set automatically.
+    /// The user lookup runs within the same executor (transaction-safe).
     pub async fn upsert_stripe_customer<'e, E>(
         &self,
         executor: E,
@@ -1085,19 +1109,10 @@ impl DatabaseManager {
     {
         let now = Utc::now();
 
-        let app_user_id: Option<Uuid> = if let Some(email) = email {
-            sqlx::query_scalar("SELECT id FROM users WHERE email = $1")
-                .bind(email)
-                .fetch_optional(&self.pool)
-                .await?
-        } else {
-            None
-        };
-
         sqlx::query(
             r#"
             INSERT INTO stripe.customers (id, app_user_id, email, created_at, updated_at, raw_data)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            VALUES ($1, (SELECT id FROM users WHERE email = $2), $2, $3, $3, $4)
             ON CONFLICT (id) DO UPDATE
             SET email = COALESCE(EXCLUDED.email, stripe.customers.email),
                 app_user_id = COALESCE(EXCLUDED.app_user_id, stripe.customers.app_user_id),
@@ -1106,9 +1121,7 @@ impl DatabaseManager {
             "#,
         )
         .bind(customer_id)
-        .bind(app_user_id)
         .bind(email)
-        .bind(now)
         .bind(now)
         .bind(raw_data)
         .execute(executor)
@@ -1307,6 +1320,48 @@ impl DatabaseManager {
         .bind(raw_data)
         .bind(now)
         .execute(&self.pool)
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(DbError::not_found_with_id("subscription", subscription_id));
+        }
+
+        Ok(())
+    }
+
+    pub async fn update_stripe_subscription_status_with_executor<'e, E>(
+        &self,
+        executor: E,
+        subscription_id: &str,
+        status: &str,
+        cancel_at_period_end: bool,
+        canceled_at: Option<i64>,
+        raw_data: &serde_json::Value,
+    ) -> DbResult<()>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        let now = Utc::now();
+        let canceled_at_ts = canceled_at.and_then(|ts| chrono::DateTime::from_timestamp(ts, 0));
+
+        let result = sqlx::query(
+            r#"
+            UPDATE stripe.subscriptions
+            SET status = $2::stripe.subscription_status,
+                cancel_at_period_end = $3,
+                canceled_at = $4,
+                raw_data = $5,
+                updated_at = $6
+            WHERE id = $1
+            "#,
+        )
+        .bind(subscription_id)
+        .bind(status)
+        .bind(cancel_at_period_end)
+        .bind(canceled_at_ts)
+        .bind(raw_data)
+        .bind(now)
+        .execute(executor)
         .await?;
 
         if result.rows_affected() == 0 {

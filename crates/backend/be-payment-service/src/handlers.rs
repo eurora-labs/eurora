@@ -184,7 +184,16 @@ pub async fn get_checkout_status(
         .send(&state.client)
         .await?;
 
-    let session_email = session.customer_email.as_deref().unwrap_or_default();
+    let session_email = session
+        .customer_email
+        .as_deref()
+        .or_else(|| {
+            session
+                .customer_details
+                .as_ref()
+                .and_then(|d| d.email.as_deref())
+        })
+        .unwrap_or_default();
     if !session_email.eq_ignore_ascii_case(&claims.email) {
         return Err(PaymentError::Unauthorized(
             "Session does not belong to this user".to_string(),
@@ -220,20 +229,20 @@ pub async fn handle_webhook(
         Webhook::construct_event(&body, signature, &state.config.stripe_webhook_secret)
             .map_err(|_| PaymentError::WebhookSignatureInvalid)?;
 
-    // Idempotency: skip events we have already processed
     let event_id = event.id.as_str();
     let event_type = event.type_.as_str();
-    if state
-        .db
-        .is_webhook_event_processed(event_id)
-        .await
-        .unwrap_or(false)
-    {
+
+    // Atomic idempotency: try to claim the event before processing.
+    // Returns false if the event was already recorded by a concurrent handler.
+    if !state.db.try_claim_webhook_event(event_id, event_type).await.unwrap_or(false) {
         info!(%event_id, %event_type, "Webhook event already processed — skipping");
         return Ok(StatusCode::OK);
     }
 
-    let raw_data: serde_json::Value = serde_json::from_str(&body).unwrap_or_default();
+    let raw_data: serde_json::Value = serde_json::from_str(&body).map_err(|e| {
+        error!(%event_id, error = %e, "Failed to parse webhook body as JSON");
+        PaymentError::Internal(anyhow::anyhow!("webhook body JSON parse error: {e}"))
+    })?;
 
     match event.data.object {
         EventObject::CheckoutSessionCompleted(session) => {
@@ -339,11 +348,6 @@ pub async fn handle_webhook(
         _ => {
             warn!(%event_id, %event_type, "Unhandled webhook event");
         }
-    }
-
-    // Record successful processing for idempotency
-    if let Err(e) = state.db.record_webhook_event(event_id, event_type).await {
-        error!(%event_id, error = %e, "Failed to record webhook event — event may be reprocessed");
     }
 
     Ok(StatusCode::OK)

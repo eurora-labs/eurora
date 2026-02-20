@@ -25,13 +25,20 @@ pub mod webhook;
 
 use service::AppState;
 
-pub fn create_router(state: Arc<AppState>) -> Router {
+pub fn create_router(state: Arc<AppState>) -> Result<Router> {
     let checkout_governor = GovernorConfigBuilder::default()
         .per_second(6)
         .burst_size(10)
         .key_extractor(SmartIpKeyExtractor)
         .finish()
-        .expect("valid governor config");
+        .context("invalid checkout rate-limiter config")?;
+
+    let authed_governor = GovernorConfigBuilder::default()
+        .per_second(30)
+        .burst_size(50)
+        .key_extractor(SmartIpKeyExtractor)
+        .finish()
+        .context("invalid authed rate-limiter config")?;
 
     let checkout_route = Router::new()
         .route("/payment/checkout", post(handlers::create_checkout_session))
@@ -46,16 +53,17 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route(
             "/payment/checkout-status",
             get(handlers::get_checkout_status),
-        );
+        )
+        .layer(GovernorLayer::new(Arc::new(authed_governor)));
 
     let webhook_route = Router::new().route("/payment/webhook", post(handlers::handle_webhook));
 
-    checkout_route
+    Ok(checkout_route
         .merge(authed_routes)
         .merge(webhook_route)
         .layer(DefaultBodyLimit::max(1024 * 1024))
         .layer(ServiceBuilder::new().layer(TraceLayer::new_for_http()))
-        .with_state(state)
+        .with_state(state))
 }
 
 pub fn init_payment_service(db: Arc<DatabaseManager>) -> Result<Router> {
@@ -63,7 +71,7 @@ pub fn init_payment_service(db: Arc<DatabaseManager>) -> Result<Router> {
 
     let state = Arc::new(AppState::from_env(db).context("Failed to create payment service state")?);
 
-    Ok(create_router(state))
+    create_router(state)
 }
 
 pub use config::PaymentConfig;
