@@ -3,7 +3,6 @@ use euro_timeline::TimelineManager;
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
 use tokio::sync::Mutex;
-use tracing::{debug, error, info};
 
 use crate::{
     procedures::thread_procedures::TauRpcThreadApiEventTrigger, shared_types::SharedThreadManager,
@@ -47,7 +46,7 @@ impl ChatApi for ChatApiImpl {
         let event = posthog_rs::Event::new_anon("send_query");
         tauri::async_runtime::spawn(async move {
             let _ = posthog_rs::capture(event).await.map_err(|e| {
-                error!("Failed to capture posthog event: {}", e);
+                tracing::error!("Failed to capture posthog event: {}", e);
             });
         });
 
@@ -69,9 +68,11 @@ impl ChatApi for ChatApiImpl {
             }
 
             if timeline.save_current_activity_to_service().await.is_ok() {
-                if let Ok(infos) = timeline.save_assets_to_service_by_ids(&query.assets).await {
-                    info!("Infos: {:?}", infos);
-                }
+                // For now, we don't need to save assets to service, that will come later
+                // when there is a way to convert assets to messages directly
+                // if let Ok(infos) = timeline.save_assets_to_service_by_ids(&query.assets).await {
+                //     info!("Infos: {:?}", infos);
+                // }
 
                 let has_assets = !query.assets.is_empty();
 
@@ -130,7 +131,7 @@ impl ChatApi for ChatApiImpl {
             })
             .map_err(|e| format!("Failed to send initial response: {e}"))?;
 
-        debug!("Sending chat stream");
+        tracing::debug!("Sending chat stream");
         let stream_result = {
             let thread_state: tauri::State<SharedThreadManager> = app_handle.state();
             let mut thread_manager = thread_state.lock().await;
@@ -139,7 +140,7 @@ impl ChatApi for ChatApiImpl {
 
         match stream_result {
             Ok(mut stream) => {
-                debug!("Starting to consume stream...");
+                tracing::debug!("Starting to consume stream...");
 
                 let timeout_duration = std::time::Duration::from_secs(300);
                 let stream_future = async {
@@ -166,7 +167,7 @@ impl ChatApi for ChatApiImpl {
 
                 match tokio::time::timeout(timeout_duration, stream_future).await {
                     Ok(Ok(())) => {
-                        debug!("Stream completed successfully");
+                        tracing::debug!("Stream completed successfully");
                     }
                     Ok(Err(e)) => {
                         return Err(e);
