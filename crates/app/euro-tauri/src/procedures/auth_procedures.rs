@@ -54,12 +54,14 @@ impl AuthApi for AuthApiImpl {
             // as to not let previous settings disturb the
             // web login flow
             if !cfg!(debug_assertions) {
-                let settings_state = app_handle.state::<SharedAppSettings>();
-                let mut settings = settings_state.lock().await;
-                settings.api.endpoint = DEFAULT_API_URL.to_string();
-                settings
-                    .save_to_default_path()
-                    .map_err(|e| format!("Failed to save settings: {}", e))?;
+                {
+                    let settings_state = app_handle.state::<SharedAppSettings>();
+                    let mut settings = settings_state.lock().await;
+                    settings.api.endpoint = DEFAULT_API_URL.to_string();
+                    settings
+                        .save_to_default_path()
+                        .map_err(|e| format!("Failed to save settings: {}", e))?;
+                }
 
                 let endpoint_manager = app_handle.state::<SharedEndpointManager>();
                 endpoint_manager
