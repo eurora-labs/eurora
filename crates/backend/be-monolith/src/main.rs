@@ -1,5 +1,3 @@
-use std::{net::SocketAddr, sync::Arc};
-
 use axum::http::HeaderValue;
 use be_activity_service::{ActivityService, ProtoActivityServiceServer};
 use be_asset_service::{AssetService, ProtoAssetServiceServer};
@@ -15,10 +13,10 @@ use be_thread_service::{ProtoThreadServiceServer, ThreadService};
 use be_update_service::init_update_service;
 use dotenv::dotenv;
 use proto_gen::auth::proto_auth_service_server::ProtoAuthServiceServer;
+use std::{net::SocketAddr, sync::Arc};
 use tonic::transport::Server;
 use tonic_web::GrpcWebLayer;
 use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer};
-use tracing::{debug, error, info, warn};
 use tracing_subscriber::Layer;
 use tracing_subscriber::filter::{EnvFilter, LevelFilter};
 use tracing_subscriber::layer::SubscriberExt;
@@ -88,7 +86,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         EnvFilter::builder()
             .with_default_directive(LevelFilter::WARN.into())
-            .parse_lossy("hyper=off,tokio=off")
+            .parse_lossy("be_=info,agent_chain=infO,hyper=off,tokio=off")
     };
 
     tracing_subscriber::registry()
@@ -96,6 +94,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(sentry::integrations::tracing::layer().with_filter(filter))
         .try_init()
         .unwrap();
+
+    if let Some(posthog_key) = std::env::var("POSTHOG_API_KEY")
+        .ok()
+        .filter(|s| !s.is_empty())
+    {
+        match posthog_rs::init_global(posthog_key.as_str()).await {
+            Ok(()) => tracing::info!("PostHog analytics initialized"),
+            Err(e) => tracing::warn!("Failed to initialize PostHog: {}", e),
+        }
+    } else {
+        tracing::info!("POSTHOG_API_KEY not set, analytics disabled");
+    }
 
     let database_url = std::env::var("REMOTE_DATABASE_URL")
         .expect("REMOTE_DATABASE_URL environment variable must be set");
@@ -146,8 +156,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let thread_service = ThreadService::new(db_manager.clone(), settings_rx);
 
-    info!("Starting gRPC server at {}", grpc_addr);
-    info!("Starting HTTP server at {}", http_addr);
+    tracing::info!("Starting gRPC server at {}", grpc_addr);
+    tracing::info!("Starting HTTP server at {}", http_addr);
 
     let bucket_name =
         std::env::var("S3_BUCKET_NAME").unwrap_or_else(|_| "eurora-releases".to_string());
@@ -155,11 +165,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let update_router = match init_update_service(bucket_name).await {
         Ok(router) => router,
         Err(e) if local_mode => {
-            warn!("Update service disabled in local mode: {}", e);
+            tracing::warn!("Update service disabled in local mode: {}", e);
             axum::Router::new()
         }
         Err(e) => {
-            error!("Failed to initialize update service: {}", e);
+            tracing::error!("Failed to initialize update service: {}", e);
             return Err(e.into());
         }
     };
@@ -167,11 +177,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let payment_router = match init_payment_service(db_manager.clone()) {
         Ok(router) => router,
         Err(e) if local_mode => {
-            warn!("Payment service disabled in local mode: {}", e);
+            tracing::warn!("Payment service disabled in local mode: {}", e);
             axum::Router::new()
         }
         Err(e) => {
-            error!("Failed to initialize payment service: {}", e);
+            tracing::error!("Failed to initialize payment service: {}", e);
             return Err(e.into());
         }
     };
@@ -196,7 +206,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let local_settings =
             be_local_settings_service::LocalSettingsService::new(storage.clone(), settings_tx);
         grpc_server = grpc_server.add_service(local_settings.into_server());
-        info!("Local mode: registered LocalSettingsService (encryption key will be set by client)");
+        tracing::info!(
+            "Local mode: registered LocalSettingsService (encryption key will be set by client)"
+        );
     }
 
     let authz_state = Arc::new(AuthzState::new(authz, jwt_config, auth_rate_limiter));
@@ -219,7 +231,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::signal::ctrl_c()
             .await
             .expect("Failed to install CTRL+C signal handler");
-        debug!("Shutting down gRPC server...");
+        tracing::info!("Shutting down gRPC server...");
     });
 
     let http_listener = tokio::net::TcpListener::bind(http_addr).await?;
@@ -231,19 +243,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::signal::ctrl_c()
             .await
             .expect("Failed to install CTRL+C signal handler");
-        debug!("Shutting down HTTP server...");
+        tracing::info!("Shutting down HTTP server...");
     });
 
     tokio::select! {
         result = grpc_future => {
             if let Err(e) = result {
-                error!("gRPC server error: {}", e);
+                tracing::error!("gRPC server error: {}", e);
                 return Err(e.into());
             }
         }
         result = http_future => {
             if let Err(e) = result {
-                error!("HTTP server error: {}", e);
+                tracing::error!("HTTP server error: {}", e);
                 return Err(e.into());
             }
         }

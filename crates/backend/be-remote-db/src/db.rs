@@ -72,13 +72,12 @@ impl DatabaseManager {
         .bind(&username)
         .bind(&email)
         .bind(&display_name)
-        .bind(false) // email_verified defaults to false
+        .bind(false)
         .bind(now)
-        .bind(now) // updated_at is NOT NULL, set to now initially
+        .bind(now)
         .fetch_one(&mut *tx)
         .await?;
 
-        // OAuth-only users don't have password credentials
         if let Some(ref password_hash) = password_hash {
             let password_id = Uuid::now_v7();
             sqlx::query(
@@ -90,8 +89,8 @@ impl DatabaseManager {
             .bind(password_id)
             .bind(user_id)
             .bind(password_hash)
-            .bind(now) // created_at
-            .bind(now) // updated_at is NOT NULL, set to now initially
+            .bind(now)
+            .bind(now)
             .execute(&mut *tx)
             .await?;
         }
@@ -397,7 +396,7 @@ impl DatabaseManager {
         .bind(&pkce_verifier)
         .bind(&redirect_uri)
         .bind(ip_address)
-        .bind(false) // consumed defaults to false
+        .bind(false)
         .bind(now)
         .bind(now)
         .bind(expires_at)
@@ -463,7 +462,7 @@ impl DatabaseManager {
         .bind(&token_hash)
         .bind(expires_at)
         .bind(user_id)
-        .bind(false) // consumed starts as false
+        .bind(false)
         .bind(now)
         .bind(now)
         .fetch_one(&self.pool)
@@ -487,8 +486,6 @@ impl DatabaseManager {
         Ok(login_token)
     }
 
-    /// Look up a login token by hash regardless of consumed status (still checks expiry).
-    /// Used to detect already-consumed tokens for idempotent retry handling.
     pub async fn get_login_token_by_hash_any(&self, token_hash: &[u8]) -> DbResult<LoginToken> {
         let login_token = sqlx::query_as::<_, LoginToken>(
             r#"
@@ -522,10 +519,6 @@ impl DatabaseManager {
 
         Ok(login_token)
     }
-
-    // =========================================================================
-    // Activity Management Methods
-    // =========================================================================
 
     #[builder]
     pub async fn create_activity(
@@ -747,10 +740,6 @@ impl DatabaseManager {
         Ok(activities)
     }
 
-    // =========================================================================
-    // Asset Management Methods
-    // =========================================================================
-
     #[builder]
     pub async fn create_asset(
         &self,
@@ -826,10 +815,6 @@ impl DatabaseManager {
 
         Ok(activity_asset)
     }
-
-    // =========================================================================
-    // Thread Management Methods
-    // =========================================================================
 
     #[builder]
     pub async fn create_thread(
@@ -925,10 +910,6 @@ impl DatabaseManager {
         Ok(threads)
     }
 
-    // =========================================================================
-    // Message Management Methods
-    // =========================================================================
-
     #[builder]
     pub async fn create_message(
         &self,
@@ -986,7 +967,6 @@ impl DatabaseManager {
     }
 
     #[builder]
-    /// `only_visible`: `None` = all, `Some(true)` = visible only, `Some(false)` = hidden only.
     pub async fn list_messages(
         &self,
         thread_id: Uuid,
@@ -1042,22 +1022,12 @@ impl DatabaseManager {
         Ok(messages)
     }
 
-    // =========================================================================
-    // Stripe Billing Methods
-    // =========================================================================
-
-    pub async fn is_webhook_event_processed(&self, event_id: &str) -> DbResult<bool> {
-        let count: (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM stripe.webhook_events WHERE event_id = $1")
-                .bind(event_id)
-                .fetch_one(&self.pool)
-                .await?;
-
-        Ok(count.0 > 0)
-    }
-
-    pub async fn record_webhook_event(&self, event_id: &str, event_type: &str) -> DbResult<()> {
-        sqlx::query(
+    pub async fn try_claim_webhook_event(
+        &self,
+        event_id: &str,
+        event_type: &str,
+    ) -> DbResult<bool> {
+        let result = sqlx::query(
             r#"
             INSERT INTO stripe.webhook_events (event_id, event_type)
             VALUES ($1, $2)
@@ -1069,10 +1039,9 @@ impl DatabaseManager {
         .execute(&self.pool)
         .await?;
 
-        Ok(())
+        Ok(result.rows_affected() > 0)
     }
 
-    /// If `email` matches an existing user, `app_user_id` is set automatically.
     pub async fn upsert_stripe_customer<'e, E>(
         &self,
         executor: E,
@@ -1085,19 +1054,10 @@ impl DatabaseManager {
     {
         let now = Utc::now();
 
-        let app_user_id: Option<Uuid> = if let Some(email) = email {
-            sqlx::query_scalar("SELECT id FROM users WHERE email = $1")
-                .bind(email)
-                .fetch_optional(&self.pool)
-                .await?
-        } else {
-            None
-        };
-
         sqlx::query(
             r#"
             INSERT INTO stripe.customers (id, app_user_id, email, created_at, updated_at, raw_data)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            VALUES ($1, (SELECT id FROM users WHERE email = $2), $2, $3, $3, $4)
             ON CONFLICT (id) DO UPDATE
             SET email = COALESCE(EXCLUDED.email, stripe.customers.email),
                 app_user_id = COALESCE(EXCLUDED.app_user_id, stripe.customers.app_user_id),
@@ -1106,9 +1066,7 @@ impl DatabaseManager {
             "#,
         )
         .bind(customer_id)
-        .bind(app_user_id)
         .bind(email)
-        .bind(now)
         .bind(now)
         .bind(raw_data)
         .execute(executor)
@@ -1117,7 +1075,6 @@ impl DatabaseManager {
         Ok(())
     }
 
-    /// Upserts an account for the user, linking to a Stripe customer. Returns the account ID.
     pub async fn ensure_account_for_user<'e, E>(
         &self,
         executor: E,
@@ -1225,12 +1182,11 @@ impl DatabaseManager {
         Ok(())
     }
 
-    /// Replaces all existing items for the subscription with the provided set.
     pub async fn sync_stripe_subscription_items<'e, E>(
         &self,
         executor: E,
         subscription_id: &str,
-        items: &[(String, String, Option<i64>, serde_json::Value)], // (item_id, price_id, quantity, raw_data)
+        items: &[(String, String, Option<i64>, serde_json::Value)],
     ) -> DbResult<()>
     where
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
@@ -1243,7 +1199,6 @@ impl DatabaseManager {
             return Ok(());
         }
 
-        // Single CTE to delete + insert in one round-trip (executor is consumed after one use)
         let mut query = String::from(
             "WITH deleted AS (DELETE FROM stripe.subscription_items WHERE subscription_id = $1) INSERT INTO stripe.subscription_items (id, subscription_id, price_id, quantity, raw_data) VALUES ",
         );
@@ -1316,12 +1271,48 @@ impl DatabaseManager {
         Ok(())
     }
 
-    // =========================================================================
-    // Plan / Account Methods
-    // =========================================================================
+    pub async fn update_stripe_subscription_status_with_executor<'e, E>(
+        &self,
+        executor: E,
+        subscription_id: &str,
+        status: &str,
+        cancel_at_period_end: bool,
+        canceled_at: Option<i64>,
+        raw_data: &serde_json::Value,
+    ) -> DbResult<()>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        let now = Utc::now();
+        let canceled_at_ts = canceled_at.and_then(|ts| chrono::DateTime::from_timestamp(ts, 0));
 
-    /// Creates an account for the user with the given plan.
-    /// On conflict (user already has an account), only upgrades the plan — never downgrades.
+        let result = sqlx::query(
+            r#"
+            UPDATE stripe.subscriptions
+            SET status = $2::stripe.subscription_status,
+                cancel_at_period_end = $3,
+                canceled_at = $4,
+                raw_data = $5,
+                updated_at = $6
+            WHERE id = $1
+            "#,
+        )
+        .bind(subscription_id)
+        .bind(status)
+        .bind(cancel_at_period_end)
+        .bind(canceled_at_ts)
+        .bind(raw_data)
+        .bind(now)
+        .execute(executor)
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(DbError::not_found_with_id("subscription", subscription_id));
+        }
+
+        Ok(())
+    }
+
     pub async fn ensure_account_for_user_with_plan<'e, E>(
         &self,
         executor: E,
@@ -1359,7 +1350,6 @@ impl DatabaseManager {
         Ok(account_id)
     }
 
-    /// Returns the plan_id for the user's account, or None if no account exists.
     pub async fn get_plan_id_for_user(&self, user_id: Uuid) -> DbResult<Option<String>> {
         let result: Option<String> =
             sqlx::query_scalar("SELECT plan_id FROM accounts WHERE owner_user_id = $1")
@@ -1369,7 +1359,6 @@ impl DatabaseManager {
         Ok(result)
     }
 
-    /// Updates the plan for an account identified by its Stripe customer ID.
     pub async fn update_account_plan_by_stripe_customer<'e, E>(
         &self,
         executor: E,
@@ -1397,7 +1386,6 @@ impl DatabaseManager {
         Ok(())
     }
 
-    /// Resolves the application plan for a given Stripe price ID via the plan_prices junction table.
     pub async fn resolve_plan_for_stripe_price<'e, E>(
         &self,
         executor: E,

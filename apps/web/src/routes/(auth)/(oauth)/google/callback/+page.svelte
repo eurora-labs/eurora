@@ -47,7 +47,9 @@
 			const tokens = await authService.login(loginData);
 			auth.login(tokens);
 
-			goto('/settings');
+			const redirect = sessionStorage.getItem('postLoginRedirect') || '/settings';
+			sessionStorage.removeItem('postLoginRedirect');
+			goto(redirect);
 		} catch (error) {
 			console.error('Token exchange failed:', error);
 			goto('/login?error=token_exchange_failed');
