@@ -10,6 +10,9 @@ pub enum PaymentError {
     #[error("Unauthorized: {0}")]
     Unauthorized(String),
 
+    #[error("Forbidden: {0}")]
+    Forbidden(String),
+
     #[error("Webhook signature verification failed")]
     WebhookSignatureInvalid,
 
@@ -31,6 +34,7 @@ impl PaymentError {
         match self {
             Self::Stripe(_) => "stripe_error",
             Self::Unauthorized(_) => "unauthorized",
+            Self::Forbidden(_) => "forbidden",
             Self::WebhookSignatureInvalid => "webhook_signature_invalid",
             Self::MissingField(_) => "missing_field",
             Self::InvalidField(_) => "invalid_field",
@@ -68,6 +72,7 @@ impl IntoResponse for PaymentError {
                 "Internal server error".to_string(),
             ),
             PaymentError::Unauthorized(_) => (StatusCode::UNAUTHORIZED, self.to_string()),
+            PaymentError::Forbidden(_) => (StatusCode::FORBIDDEN, self.to_string()),
             PaymentError::WebhookSignatureInvalid => (StatusCode::BAD_REQUEST, self.to_string()),
             PaymentError::MissingField(_) | PaymentError::InvalidField(_) => {
                 (StatusCode::BAD_REQUEST, self.to_string())
