@@ -833,7 +833,7 @@ jobs:
         #     shell: bash
         #     if: secrets.BOT_AUTH_TOKEN != ''
         #     run: |
-        #       curl 'https://app.eurora.com/api/releases' \
+        #       curl 'https://api.eurora-labs.com/api/releases' \
         #         --fail \
         #         --request POST \
         #         --header 'Content-Type: application/json' \

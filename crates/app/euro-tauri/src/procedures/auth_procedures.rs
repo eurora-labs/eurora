@@ -1,9 +1,10 @@
+use euro_endpoint::DEFAULT_API_URL;
 use euro_secret::{Sensitive, secret};
 use tauri::{AppHandle, Manager, Runtime};
 use tracing::error;
 use url::Url;
 
-use crate::shared_types::{SharedAppSettings, SharedUserController};
+use crate::shared_types::{SharedAppSettings, SharedEndpointManager, SharedUserController};
 
 #[taurpc::ipc_type]
 pub struct LoginToken {
@@ -49,6 +50,25 @@ impl AuthApi for AuthApiImpl {
         app_handle: AppHandle<R>,
     ) -> Result<LoginToken, String> {
         if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
+            // The endpoint should switch to remote in production
+            // as to not let previous settings disturb the
+            // web login flow
+            if !cfg!(debug_assertions) {
+                {
+                    let settings_state = app_handle.state::<SharedAppSettings>();
+                    let mut settings = settings_state.lock().await;
+                    settings.api.endpoint = DEFAULT_API_URL.to_string();
+                    settings
+                        .save_to_default_path()
+                        .map_err(|e| format!("Failed to save settings: {}", e))?;
+                }
+
+                let endpoint_manager = app_handle.state::<SharedEndpointManager>();
+                endpoint_manager
+                    .set_global_backend_url(DEFAULT_API_URL)
+                    .map_err(|e| format!("Failed to switch to cloud endpoint: {}", e))?;
+            }
+
             let mut controller = user_state.lock().await;
             let (code_verifier, code_challenge) = controller
                 .get_login_tokens()
