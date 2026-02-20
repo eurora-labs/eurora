@@ -2,9 +2,47 @@
 	import GetProButton from '$lib/components/GetProButton.svelte';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
+	import { Input } from '@eurora/ui/components/input/index';
+	import { Label } from '@eurora/ui/components/label/index';
+	import * as Select from '@eurora/ui/components/select/index';
+	import * as Sheet from '@eurora/ui/components/sheet/index';
+	import { Textarea } from '@eurora/ui/components/textarea/index';
+	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import XIcon from '@lucide/svelte/icons/x';
+	import countries from 'i18n-iso-countries';
+	import enLocale from 'i18n-iso-countries/langs/en.json';
+
+	countries.registerLocale(enLocale);
+
+	const countryNames = Object.values(countries.getNames('en', { select: 'official' })).sort();
+
+	let contactSheetOpen = $state(false);
+	let step = $state<1 | 2>(1);
+	let companyEmail = $state('');
+	let firstName = $state('');
+	let lastName = $state('');
+	let company = $state('');
+	let country = $state('');
+	let employees = $state('');
+	let details = $state('');
+
+	function resetForm() {
+		step = 1;
+		companyEmail = '';
+		firstName = '';
+		lastName = '';
+		company = '';
+		country = '';
+		employees = '';
+		details = '';
+	}
+
+	function openContactSheet() {
+		resetForm();
+		contactSheetOpen = true;
+	}
 </script>
 
 <div class="container mx-auto max-w-5xl px-4 py-16">
@@ -150,7 +188,9 @@
 						<span>Custom integrations & API access</span>
 					</li>
 				</ul>
-				<Button variant="outline" class="w-full">Contact Sales</Button>
+				<Button variant="outline" class="w-full" onclick={openContactSheet}
+					>Contact Sales</Button
+				>
 			</Card.Content>
 		</Card.Root>
 	</div>
@@ -295,3 +335,107 @@
 		</Card.Root>
 	</div>
 </div>
+
+<Sheet.Root
+	bind:open={contactSheetOpen}
+	onOpenChange={(open) => {
+		if (!open) resetForm();
+	}}
+>
+	<Sheet.Content side="right" class="overflow-y-auto">
+		<Sheet.Header>
+			<Sheet.Title>Contact Sales</Sheet.Title>
+			<Sheet.Description>
+				{#if step === 1}
+					Enter your company email to get started.
+				{:else}
+					Tell us about your organization.
+				{/if}
+			</Sheet.Description>
+		</Sheet.Header>
+
+		{#if step === 1}
+			<div class="space-y-4 p-4">
+				<div class="space-y-2">
+					<Label for="company-email">Company Email</Label>
+					<Input
+						id="company-email"
+						type="email"
+						placeholder="you@company.com"
+						bind:value={companyEmail}
+					/>
+				</div>
+				<Button
+					class="w-full"
+					disabled={!companyEmail}
+					onclick={() => {
+						step = 2;
+					}}
+				>
+					Continue
+					<ArrowRightIcon class="ml-2 h-4 w-4" />
+				</Button>
+			</div>
+		{:else}
+			<div class="space-y-4 p-4">
+				<div class="grid grid-cols-2 gap-4">
+					<div class="space-y-2">
+						<Label for="first-name">First Name</Label>
+						<Input id="first-name" placeholder="Jane" bind:value={firstName} />
+					</div>
+					<div class="space-y-2">
+						<Label for="last-name">Last Name</Label>
+						<Input id="last-name" placeholder="Doe" bind:value={lastName} />
+					</div>
+				</div>
+
+				<div class="space-y-2">
+					<Label for="company">Company</Label>
+					<Input id="company" placeholder="Acme Inc." bind:value={company} />
+				</div>
+
+				<div class="space-y-2">
+					<Label>Country</Label>
+					<Select.Root type="single" bind:value={country}>
+						<Select.Trigger>
+							{country || 'Select a country'}
+						</Select.Trigger>
+						<Select.Content>
+							{#each countryNames as c}
+								<Select.Item value={c}>{c}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				</div>
+
+				<div class="space-y-2">
+					<Label>Employees</Label>
+					<Select.Root type="single" bind:value={employees}>
+						<Select.Trigger>
+							{employees || 'Select company size'}
+						</Select.Trigger>
+						<Select.Content>
+							<Select.Item value="1-100">1-100</Select.Item>
+							<Select.Item value="100-750">100-750</Select.Item>
+							<Select.Item value="750-5000">750-5,000</Select.Item>
+							<Select.Item value="5000+">5,000+</Select.Item>
+						</Select.Content>
+					</Select.Root>
+				</div>
+
+				<div class="space-y-2">
+					<Label for="details">Additional Details</Label>
+					<Textarea
+						id="details"
+						placeholder="Tell us about your needs..."
+						bind:value={details}
+					/>
+				</div>
+			</div>
+
+			<Sheet.Footer>
+				<Button class="w-full">Submit</Button>
+			</Sheet.Footer>
+		{/if}
+	</Sheet.Content>
+</Sheet.Root>
