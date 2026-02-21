@@ -28,6 +28,13 @@ CREATE TABLE token_usage (
 
 CREATE INDEX idx_token_usage_user_month ON token_usage (user_id, created_at);
 
+CREATE TABLE monthly_token_totals (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    year_month INT NOT NULL,
+    total_tokens BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, year_month)
+);
+
 ALTER TABLE plans ADD COLUMN monthly_token_limit BIGINT NOT NULL DEFAULT 0;
 
 UPDATE plans SET monthly_token_limit = 0 WHERE id = 'free';

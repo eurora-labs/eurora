@@ -1537,6 +1537,7 @@ dependencies = [
 name = "be-authz"
 version = "0.0.0"
 dependencies = [
+ "async-trait",
  "auth-core",
  "axum",
  "be-auth-core",
