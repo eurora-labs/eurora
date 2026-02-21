@@ -1452,8 +1452,8 @@ impl DatabaseManager {
             SELECT COALESCE(SUM(input_tokens + output_tokens + reasoning_tokens), 0)
             FROM token_usage
             WHERE user_id = $1
-              AND created_at >= make_timestamptz($2, $3, 1, 0, 0, 0.0)
-              AND created_at < make_timestamptz($2, $3, 1, 0, 0, 0.0) + interval '1 month'
+              AND created_at >= make_timestamptz($2, $3, 1, 0, 0, 0.0, 'UTC')
+              AND created_at < make_timestamptz($2, $3, 1, 0, 0, 0.0, 'UTC') + interval '1 month'
             "#,
         )
         .bind(user_id)
