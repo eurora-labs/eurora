@@ -10,7 +10,6 @@ use be_auth_core::JwtConfig;
 use http::Request;
 use tonic::Status;
 use tower::{Layer, Service};
-use tracing::{debug, warn};
 
 use crate::CasbinAuthz;
 use crate::bypass::is_grpc_bypass;
@@ -98,18 +97,18 @@ where
             let (service_full, method) = match parse_grpc_path(&path) {
                 Some(parts) => parts,
                 None => {
-                    warn!(path = %path, "Rejecting request with unparseable gRPC path");
+                    tracing::warn!(path = %path, "Rejecting request with unparseable gRPC path");
                     return Ok(Status::invalid_argument("Invalid gRPC path").into_http());
                 }
             };
 
             if is_grpc_bypass(&service_full) {
-                debug!(path = %path, "Bypassing authorization for public service");
+                tracing::debug!(path = %path, "Bypassing authorization for public service");
                 return inner.call(req).await;
             }
 
             if rate_limiter.check_key(&client_ip).is_err() {
-                warn!(ip = %client_ip, "Rate limited — too many auth failures");
+                tracing::warn!(ip = %client_ip, "Rate limited — too many auth failures");
                 return Ok(Status::resource_exhausted(
                     "Too many failed requests. Try again later.",
                 )
@@ -129,20 +128,20 @@ where
 
             match authz.enforce(&role, &service_name, &method) {
                 Ok(true) => {
-                    debug!(role = %role, service = %service_name, method = %method, "gRPC authorized");
+                    tracing::debug!(role = %role, service = %service_name, method = %method, "gRPC authorized");
                     req.extensions_mut().insert(claims);
                     inner.call(req).await
                 }
                 Ok(false) => {
                     let _ = rate_limiter.check_key(&client_ip);
-                    warn!(role = %role, service = %service_name, method = %method, "gRPC authorization denied");
+                    tracing::warn!(role = %role, service = %service_name, method = %method, "gRPC authorization denied");
                     Ok(Status::permission_denied(
                         "Insufficient permissions. Please upgrade your plan.",
                     )
                     .into_http())
                 }
                 Err(e) => {
-                    warn!(error = %e, "Authorization enforcement error");
+                    tracing::warn!(error = %e, "Authorization enforcement error");
                     Ok(Status::internal("Authorization error").into_http())
                 }
             }
@@ -163,7 +162,7 @@ fn extract_jwt_claims<B>(req: &Request<B>, jwt_config: &JwtConfig) -> Result<Cla
         .ok_or_else(|| Status::unauthenticated("Authorization header must start with 'Bearer '"))?;
 
     jwt_config.validate_access_token(token).map_err(|e| {
-        warn!(error = %e, "JWT validation failed");
+        tracing::warn!(error = %e, "JWT validation failed");
         Status::unauthenticated("Invalid or expired token")
     })
 }

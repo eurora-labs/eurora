@@ -6,7 +6,6 @@ use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use be_auth_core::JwtConfig;
-use tracing::{debug, warn};
 
 use crate::CasbinAuthz;
 use crate::bypass::is_rest_bypass;
@@ -60,21 +59,21 @@ pub async fn authz_middleware(
     let method = req.method().to_string();
 
     if is_rest_bypass(&raw_path) {
-        debug!(path = %raw_path, "Bypassing authorization for public route");
+        tracing::debug!(path = %raw_path, "Bypassing authorization for public route");
         return next.run(req).await;
     }
 
     let client_ip = extract_client_ip(&req);
 
     if state.rate_limiter.check_key(&client_ip).is_err() {
-        warn!(ip = %client_ip, "Rate limited — too many auth failures");
+        tracing::warn!(ip = %client_ip, "Rate limited — too many auth failures");
         return too_many_requests_response();
     }
 
     let policy_path = match req.extensions().get::<MatchedPath>() {
         Some(m) => m.as_str().to_string(),
         None => {
-            warn!(
+            tracing::warn!(
                 path = %raw_path,
                 "MatchedPath missing from request extensions, falling back to raw URI \
                  — parameterized routes may fail policy matching"
@@ -117,7 +116,7 @@ pub async fn authz_middleware(
         Ok(c) => c,
         Err(e) => {
             let _ = state.rate_limiter.check_key(&client_ip);
-            warn!(error = %e, "JWT validation failed");
+            tracing::warn!(error = %e, "JWT validation failed");
             return (
                 StatusCode::UNAUTHORIZED,
                 axum::Json(serde_json::json!({"error": "Invalid or expired token"})),
@@ -130,13 +129,13 @@ pub async fn authz_middleware(
 
     match state.authz.enforce(&role, &policy_path, &method) {
         Ok(true) => {
-            debug!(role = %role, path = %raw_path, method = %method, "REST authorized");
+            tracing::debug!(role = %role, path = %raw_path, method = %method, "REST authorized");
             req.extensions_mut().insert(claims);
             next.run(req).await
         }
         Ok(false) => {
             let _ = state.rate_limiter.check_key(&client_ip);
-            warn!(role = %role, path = %raw_path, method = %method, "REST authorization denied");
+            tracing::warn!(role = %role, path = %raw_path, method = %method, "REST authorization denied");
             (
                 StatusCode::FORBIDDEN,
                 axum::Json(
@@ -146,7 +145,7 @@ pub async fn authz_middleware(
                 .into_response()
         }
         Err(e) => {
-            warn!(error = %e, "REST authorization enforcement error");
+            tracing::warn!(error = %e, "REST authorization enforcement error");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(serde_json::json!({"error": "Authorization error"})),

@@ -9,7 +9,6 @@ use chacha20poly1305::{
 };
 use rand::RngCore;
 use thiserror::Error;
-use tracing::error;
 
 /// Errors that can occur during cryptographic operations.
 #[derive(Debug, Error)]
@@ -85,7 +84,7 @@ pub fn encrypt_sensitive_string(verifier: &str) -> Result<Vec<u8>, CryptoError> 
 
     // Encrypt the verifier
     let ciphertext = cipher.encrypt(nonce, verifier.as_bytes()).map_err(|e| {
-        error!("PKCE verifier encryption failed: {}", e);
+        tracing::error!("PKCE verifier encryption failed: {}", e);
         CryptoError::EncryptionFailed(e.to_string())
     })?;
 
@@ -127,7 +126,7 @@ pub fn decrypt_sensitive_string(encrypted: &[u8]) -> Result<String, CryptoError>
 
     // Decrypt
     let plaintext = cipher.decrypt(nonce, ciphertext).map_err(|e| {
-        error!("PKCE verifier decryption failed: {}", e);
+        tracing::error!("PKCE verifier decryption failed: {}", e);
         CryptoError::DecryptionFailed(e.to_string())
     })?;
 

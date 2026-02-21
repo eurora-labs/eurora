@@ -7,7 +7,6 @@ use async_trait::async_trait;
 use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
-use tracing::debug;
 
 use crate::{
     error::ActivityResult,
@@ -44,7 +43,7 @@ impl ActivityStrategyFunctionality for NoStrategy {
         focus_window: &focus_tracker::FocusedWindow,
         _sender: mpsc::UnboundedSender<ActivityReport>,
     ) -> ActivityResult<()> {
-        debug!(
+        tracing::debug!(
             "NoStrategy: not starting tracking for {:?}",
             focus_window.process_name
         );
@@ -55,7 +54,7 @@ impl ActivityStrategyFunctionality for NoStrategy {
         &mut self,
         focus_window: &FocusedWindow,
     ) -> ActivityResult<bool> {
-        debug!(
+        tracing::debug!(
             "NoStrategy: handling process change to: {}",
             focus_window.process_name
         );
@@ -63,17 +62,17 @@ impl ActivityStrategyFunctionality for NoStrategy {
     }
 
     async fn stop_tracking(&mut self) -> ActivityResult<()> {
-        debug!("NoStrategy: stopping tracking (no-op)");
+        tracing::debug!("NoStrategy: stopping tracking (no-op)");
         Ok(())
     }
 
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
-        debug!("NoStrategy: skipping asset retrieval");
+        tracing::debug!("NoStrategy: skipping asset retrieval");
         Ok(vec![])
     }
 
     async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        debug!("NoStrategy: skipping snapshot retrieval");
+        tracing::debug!("NoStrategy: skipping snapshot retrieval");
         Ok(vec![])
     }
 

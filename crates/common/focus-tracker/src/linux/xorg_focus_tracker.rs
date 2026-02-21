@@ -3,7 +3,6 @@ use focus_tracker_core::IconConfig;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tracing::info;
 
 #[cfg(feature = "async")]
 use std::future::Future;
@@ -107,19 +106,21 @@ where
                         window,
                         &ChangeWindowAttributesAux::new().event_mask(EventMask::PROPERTY_CHANGE),
                     ) {
-                        info!("Failed to monitor initial window {window}: {e}");
+                        tracing::info!("Failed to monitor initial window {window}: {e}");
                     }
                     if let Err(e) = flush_connection(&conn) {
-                        info!("Failed to flush after initial monitoring: {e}");
+                        tracing::info!("Failed to flush after initial monitoring: {e}");
                     }
 
                     if tx.send(focused_window).is_err() {
-                        info!("Async task dropped before initial event, stopping X11 event loop");
+                        tracing::info!(
+                            "Async task dropped before initial event, stopping X11 event loop"
+                        );
                         return Ok(());
                     }
                 }
                 Err(e) => {
-                    info!("Failed to get initial window info: {}", e);
+                    tracing::info!("Failed to get initial window info: {}", e);
                 }
             }
         }
@@ -137,7 +138,9 @@ where
                 }
                 Err(e) => {
                     consecutive_errors += 1;
-                    info!("X11 error ({consecutive_errors}/{MAX_CONSECUTIVE_X11_ERRORS}): {e}");
+                    tracing::info!(
+                        "X11 error ({consecutive_errors}/{MAX_CONSECUTIVE_X11_ERRORS}): {e}"
+                    );
                     if consecutive_errors >= MAX_CONSECUTIVE_X11_ERRORS {
                         return Err(FocusTrackerError::platform_with_source(
                             "X11 connection failed repeatedly",
@@ -167,11 +170,11 @@ where
 
                         update_window_monitoring(&conn, &mut current_focused_window, new_window);
                         if let Err(e) = flush_connection(&conn) {
-                            info!("Failed to flush connection: {e}");
+                            tracing::info!("Failed to flush connection: {e}");
                         }
                     }
                     Err(e) => {
-                        info!("Failed to get active window: {}", e);
+                        tracing::info!("Failed to get active window: {}", e);
                         continue;
                     }
                 }
@@ -198,12 +201,12 @@ where
                         }
 
                         if tx.send(focused_window).is_err() {
-                            info!("Async task dropped, stopping X11 event loop");
+                            tracing::info!("Async task dropped, stopping X11 event loop");
                             break;
                         }
                     }
                     Err(e) => {
-                        info!("Failed to get window info for window {}: {}", window, e);
+                        tracing::info!("Failed to get window info for window {}: {}", window, e);
                         if is_focus_change {
                             current_focused_window = None;
                         }
@@ -220,14 +223,14 @@ where
             if let Some(external_stop) = stop_signal
                 && external_stop.load(Ordering::Acquire)
             {
-                info!("External stop signal detected");
+                tracing::info!("External stop signal detected");
                 break;
             }
 
             match tokio::time::timeout(std::time::Duration::from_millis(50), rx.recv()).await {
                 Ok(Some(focused_window)) => {
                     if let Err(e) = on_focus(focused_window).await {
-                        info!("Focus event handler failed: {}", e);
+                        tracing::info!("Focus event handler failed: {}", e);
                     }
                 }
                 Ok(None) => {
@@ -242,7 +245,7 @@ where
     }
     .await;
 
-    info!("Async task ending, signaling X11 thread to stop");
+    tracing::info!("Async task ending, signaling X11 thread to stop");
     cleanup_stop.store(true, Ordering::Release);
 
     drop(rx);
@@ -251,20 +254,20 @@ where
 
     match tokio::time::timeout(shutdown_timeout, blocking_handle).await {
         Ok(Ok(Ok(()))) => {
-            info!("X11 event loop completed successfully");
+            tracing::info!("X11 event loop completed successfully");
             result
         }
         Ok(Ok(Err(e))) => {
-            info!("X11 event loop error: {}", e);
+            tracing::info!("X11 event loop error: {}", e);
             Err(e)
         }
         Ok(Err(e)) => {
             let err_msg = format!("X11 blocking task panicked: {e}");
-            info!("{}", err_msg);
+            tracing::info!("{}", err_msg);
             Err(FocusTrackerError::platform(err_msg))
         }
         Err(_) => {
-            info!("X11 blocking task did not stop within {shutdown_timeout:?}, aborting");
+            tracing::info!("X11 blocking task did not stop within {shutdown_timeout:?}, aborting");
             Err(FocusTrackerError::platform(
                 "X11 event loop shutdown timed out",
             ))
@@ -304,16 +307,16 @@ where
                     window,
                     &ChangeWindowAttributesAux::new().event_mask(EventMask::PROPERTY_CHANGE),
                 ) {
-                    info!("Failed to monitor initial window {window}: {e}");
+                    tracing::info!("Failed to monitor initial window {window}: {e}");
                 }
                 if let Err(e) = flush_connection(&conn) {
-                    info!("Failed to flush after initial monitoring: {e}");
+                    tracing::info!("Failed to flush after initial monitoring: {e}");
                 }
 
                 on_focus(focused_window)?;
             }
             Err(e) => {
-                info!("Failed to get initial window info: {}", e);
+                tracing::info!("Failed to get initial window info: {}", e);
             }
         }
     }
@@ -343,7 +346,7 @@ where
                     flush_connection(&conn)?;
                 }
                 Err(e) => {
-                    info!("Failed to get active window: {}", e);
+                    tracing::info!("Failed to get active window: {}", e);
                     continue;
                 }
             }
@@ -371,7 +374,7 @@ where
                     on_focus(focused_window)?;
                 }
                 Err(e) => {
-                    info!("Failed to get window info for window {}: {}", window, e);
+                    tracing::info!("Failed to get window info for window {}: {}", window, e);
                     if is_focus_change {
                         current_focused_window = None;
                     }
@@ -455,7 +458,9 @@ fn get_next_event<C: Connection>(
                 }
                 Err(e) => {
                     consecutive_errors += 1;
-                    info!("X11 error ({consecutive_errors}/{MAX_CONSECUTIVE_X11_ERRORS}): {e}");
+                    tracing::info!(
+                        "X11 error ({consecutive_errors}/{MAX_CONSECUTIVE_X11_ERRORS}): {e}"
+                    );
                     if consecutive_errors >= MAX_CONSECUTIVE_X11_ERRORS {
                         return Err(FocusTrackerError::platform_with_source(
                             "X11 connection failed repeatedly",
@@ -471,7 +476,9 @@ fn get_next_event<C: Connection>(
                 Ok(e) => return Ok(Some(e)),
                 Err(e) => {
                     consecutive_errors += 1;
-                    info!("X11 error ({consecutive_errors}/{MAX_CONSECUTIVE_X11_ERRORS}): {e}");
+                    tracing::info!(
+                        "X11 error ({consecutive_errors}/{MAX_CONSECUTIVE_X11_ERRORS}): {e}"
+                    );
                     if consecutive_errors >= MAX_CONSECUTIVE_X11_ERRORS {
                         return Err(FocusTrackerError::platform_with_source(
                             "X11 connection failed repeatedly",
@@ -496,7 +503,7 @@ fn update_window_monitoring<C: Connection>(
             &ChangeWindowAttributesAux::new().event_mask(EventMask::NO_EVENT),
         )
     {
-        info!("Failed to remove monitoring from window {old_win}: {e}");
+        tracing::info!("Failed to remove monitoring from window {old_win}: {e}");
     }
 
     if let Some(new_win) = new_window {
@@ -504,7 +511,7 @@ fn update_window_monitoring<C: Connection>(
             new_win,
             &ChangeWindowAttributesAux::new().event_mask(EventMask::PROPERTY_CHANGE),
         ) {
-            info!("Failed to add monitoring to window {new_win}: {e}");
+            tracing::info!("Failed to add monitoring to window {new_win}: {e}");
         }
         *current_focused_window = Some(new_win);
     } else {
@@ -523,7 +530,7 @@ fn get_window_info<C: Connection>(
     atoms: &X11Atoms,
 ) -> FocusTrackerResult<FocusedWindow> {
     let title = get_window_name(conn, window, atoms).unwrap_or_else(|e| {
-        info!("Failed to get window title for window {}: {}", window, e);
+        tracing::info!("Failed to get window title for window {}: {}", window, e);
         "<unknown title>".to_string()
     });
 
@@ -772,7 +779,7 @@ fn get_icon_data<C: Connection>(
         Ok(image) => return Ok(image),
         Err(e) => {
             if !matches!(e, FocusTrackerError::Unsupported) {
-                info!("_NET_WM_ICON failed: {e}, trying desktop file fallback");
+                tracing::info!("_NET_WM_ICON failed: {e}, trying desktop file fallback");
             }
         }
     }
@@ -785,7 +792,7 @@ fn get_icon_data<C: Connection>(
 
     let icon_path = resolve_icon_path(&icon_value).ok_or(FocusTrackerError::Unsupported)?;
 
-    info!(
+    tracing::info!(
         "Loading icon from desktop file fallback: {}",
         icon_path.display()
     );

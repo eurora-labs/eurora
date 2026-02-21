@@ -26,7 +26,6 @@ use std::sync::Arc;
 use bon::bon;
 use opendal::{Operator, services};
 use sha2::{Digest, Sha256};
-use tracing::{debug, info};
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -136,14 +135,14 @@ impl StorageService {
     /// Returns an error if the configuration is invalid or the operator cannot be created.
     pub fn from_env() -> StorageResult<Self> {
         let config = StorageConfig::from_env()?;
-        info!("Initializing storage service with config: {:?}", config);
+        tracing::info!("Initializing storage service with config: {:?}", config);
         Self::builder().config(config).build()
     }
 
     fn create_operator(config: &StorageConfig) -> StorageResult<Operator> {
         match config {
             StorageConfig::FS { root } => {
-                debug!("Creating filesystem storage operator with root: {}", root);
+                tracing::debug!("Creating filesystem storage operator with root: {}", root);
 
                 std::fs::create_dir_all(root)?;
 
@@ -158,7 +157,7 @@ impl StorageService {
                 access_key_id,
                 secret_access_key,
             } => {
-                debug!("Creating S3 storage operator for bucket: {}", bucket);
+                tracing::debug!("Creating S3 storage operator for bucket: {}", bucket);
 
                 let mut builder = services::S3::default().bucket(bucket).region(region);
 
@@ -233,7 +232,7 @@ impl StorageService {
         let extension = Self::extension_from_mime(mime_type);
         let path = Self::generate_path(user_id, asset_id, Some(extension));
 
-        debug!(
+        tracing::debug!(
             "Uploading asset {} for user {} to path: {} ({} bytes)",
             asset_id,
             user_id,
@@ -252,7 +251,7 @@ impl StorageService {
                     let encrypted = be_encrypt::encrypt(key, content, "asset").map_err(|e| {
                         StorageError::Encryption(format!("Failed to encrypt asset: {}", e))
                     })?;
-                    debug!(
+                    tracing::debug!(
                         "Encrypted asset {} ({} -> {} bytes)",
                         asset_id,
                         content.len(),
@@ -269,7 +268,7 @@ impl StorageService {
 
         self.operator.write(&path, content).await?;
 
-        info!("Successfully uploaded asset {}", asset_id);
+        tracing::info!("Successfully uploaded asset {}", asset_id);
 
         Ok(path)
     }
@@ -280,7 +279,7 @@ impl StorageService {
     ///
     /// Returns an error if the download operation fails or the asset is not found.
     pub async fn download(&self, path: &str) -> StorageResult<Vec<u8>> {
-        debug!("Downloading asset from path: {}", path);
+        tracing::debug!("Downloading asset from path: {}", path);
 
         let content = self.operator.read(path).await.map_err(|e| {
             if e.kind() == opendal::ErrorKind::NotFound {
@@ -303,7 +302,7 @@ impl StorageService {
                     let decrypted = be_encrypt::decrypt(key, &bytes).map_err(|e| {
                         StorageError::Encryption(format!("Failed to decrypt asset: {}", e))
                     })?;
-                    debug!(
+                    tracing::debug!(
                         "Decrypted asset from {} ({} -> {} bytes)",
                         path,
                         bytes.len(),
@@ -320,7 +319,7 @@ impl StorageService {
             }
         };
 
-        debug!(
+        tracing::debug!(
             "Successfully downloaded {} bytes from {}",
             bytes.len(),
             path
@@ -335,11 +334,11 @@ impl StorageService {
     ///
     /// Returns an error if the delete operation fails.
     pub async fn delete(&self, path: &str) -> StorageResult<()> {
-        debug!("Deleting asset at path: {}", path);
+        tracing::debug!("Deleting asset at path: {}", path);
 
         self.operator.delete(path).await?;
 
-        info!("Successfully deleted asset at {}", path);
+        tracing::info!("Successfully deleted asset at {}", path);
 
         Ok(())
     }

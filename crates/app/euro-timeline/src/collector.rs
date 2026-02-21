@@ -16,7 +16,6 @@ use tokio::{
     sync::{Mutex, RwLock, broadcast, mpsc},
     task::JoinHandle,
 };
-use tracing::{debug, error};
 
 pub struct CollectorService {
     storage: Arc<Mutex<TimelineStorage>>,
@@ -32,7 +31,7 @@ impl CollectorService {
         storage: Arc<Mutex<TimelineStorage>>,
         timeline_config: crate::config::TimelineConfig,
     ) -> Self {
-        debug!(
+        tracing::debug!(
             "Creating collector service with interval: {:?}",
             timeline_config.collector.collection_interval
         );
@@ -55,7 +54,7 @@ impl CollectorService {
             return Err(TimelineError::AlreadyRunning);
         }
 
-        debug!("Starting timeline collection service");
+        tracing::debug!("Starting timeline collection service");
 
         self.start_focus_tracking().await?;
 
@@ -93,7 +92,7 @@ impl CollectorService {
             while let Some(report) = activity_rx.recv().await {
                 match report {
                     ActivityReport::NewActivity(activity) => {
-                        debug!("Received new activity report: {}", activity.name);
+                        tracing::debug!("Received new activity report: {}", activity.name);
                         let context_chips = activity.get_context_chips();
                         let _ = assets_event_tx_for_reports.send(context_chips);
 
@@ -107,7 +106,7 @@ impl CollectorService {
                         storage.add_activity(activity);
                     }
                     ActivityReport::Snapshots(snapshots) => {
-                        debug!("Received {} snapshots", snapshots.len());
+                        tracing::debug!("Received {} snapshots", snapshots.len());
                         let mut storage = storage_for_reports.lock().await;
                         if let Some(current_activity) = storage.get_all_activities_mut().back_mut()
                         {
@@ -116,7 +115,7 @@ impl CollectorService {
                         }
                     }
                     ActivityReport::Assets(assets) => {
-                        debug!("Received {} additional assets", assets.len());
+                        tracing::debug!("Received {} additional assets", assets.len());
                         let mut storage = storage_for_reports.lock().await;
                         if let Some(current_activity) = storage.get_all_activities_mut().back_mut()
                         {
@@ -127,7 +126,7 @@ impl CollectorService {
                         }
                     }
                     ActivityReport::Stopping => {
-                        debug!("Strategy reported stopping");
+                        tracing::debug!("Strategy reported stopping");
                     }
                 }
             }
@@ -155,7 +154,7 @@ impl CollectorService {
                     async move {
                         let process_name = window.process_name.clone();
                         let new_focus = process_name.clone();
-                        debug!("New focus: {:?}", new_focus);
+                        tracing::debug!("New focus: {:?}", new_focus);
 
                         let mut prev = prev_focus.lock().await;
                         if new_focus != *prev {
@@ -163,28 +162,40 @@ impl CollectorService {
 
                             match strategy_write.handle_process_change(&window).await {
                                 Ok(true) => {
-                                    debug!("Strategy can continue handling: {}", process_name);
+                                    tracing::debug!(
+                                        "Strategy can continue handling: {}",
+                                        process_name
+                                    );
                                 }
                                 Ok(false) => {
-                                    debug!("Strategy can no longer handle: {}", process_name);
+                                    tracing::debug!(
+                                        "Strategy can no longer handle: {}",
+                                        process_name
+                                    );
                                     match ActivityStrategy::new(&process_name).await {
                                         Ok(mut new_strategy) => {
                                             let _ = new_strategy
                                                 .start_tracking(&window, activity_tx_inner.clone())
                                                 .await
                                                 .map_err(|err| {
-                                                    error!("Failed to start tracking: {}", err);
+                                                    tracing::error!(
+                                                        "Failed to start tracking: {}",
+                                                        err
+                                                    );
                                                 });
 
                                             *strategy_write = new_strategy;
                                         }
                                         Err(err) => {
-                                            error!("Failed to create new strategy: {}", err);
+                                            tracing::error!(
+                                                "Failed to create new strategy: {}",
+                                                err
+                                            );
                                         }
                                     };
                                 }
                                 Err(err) => {
-                                    debug!("Error handling process change: {}", err);
+                                    tracing::debug!("Error handling process change: {}", err);
                                 }
                             }
                             *prev = new_focus;

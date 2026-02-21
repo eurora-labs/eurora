@@ -12,7 +12,6 @@ use anyhow::{Context, Result};
 use axum::{Router, routing::get};
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
-use tracing::debug;
 
 pub mod analytics;
 pub mod error;
@@ -51,7 +50,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
 }
 
 pub async fn init_update_service(bucket_name: String) -> Result<Router> {
-    debug!("Initializing update service with bucket: {}", bucket_name);
+    tracing::debug!("Initializing update service with bucket: {}", bucket_name);
 
     let state = Arc::new(
         AppState::new(bucket_name)

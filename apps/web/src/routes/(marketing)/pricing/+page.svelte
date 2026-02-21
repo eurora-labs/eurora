@@ -51,60 +51,60 @@
 <div class="container mx-auto max-w-5xl px-4 py-16">
 	<div class="mb-12 text-center">
 		<h1 class="mb-4 text-4xl font-bold">Simple, Transparent Pricing</h1>
-		<p class="mx-auto max-w-2xl text-xl text-gray-600">
+		<p class="mx-auto max-w-2xl text-xl text-muted-foreground">
 			Choose the plan that works best for you. All plans include core features with different
 			usage limits.
 		</p>
 	</div>
 
 	<div class="mb-16 grid grid-cols-1 gap-8 md:grid-cols-3">
-		<Card.Root class="border-t-4 border-gray-400 p-6">
+		<Card.Root class="border-t-4 border-border p-6">
 			<Card.Header>
 				<Card.Title>Free</Card.Title>
 				<Card.Description>Perfect for casual users</Card.Description>
 				<div class="mt-4">
 					<span class="text-4xl font-bold">$0</span>
-					<span class="text-gray-600">/month</span>
+					<span class="text-muted-foreground">/month</span>
 				</div>
 			</Card.Header>
 			<Card.Content>
 				<ul class="mb-6 space-y-3">
 					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
 						<span>Basic AI assistance</span>
 					</li>
 					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
 						<span>Up to 20 queries per day</span>
 					</li>
 					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
 						<span>Standard response time</span>
 					</li>
 					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
 						<span>Desktop and mobile apps</span>
 					</li>
 					<li class="flex items-start">
-						<XIcon class="mr-2 mt-0.5 h-5 w-5 text-gray-400" />
-						<span class="text-gray-500">Advanced AI models</span>
+						<XIcon class="mr-2 mt-0.5 h-5 w-5 text-muted-foreground" />
+						<span class="text-muted-foreground">Advanced AI models</span>
 					</li>
 					<li class="flex items-start">
-						<XIcon class="mr-2 mt-0.5 h-5 w-5 text-gray-400" />
-						<span class="text-gray-500">Priority support</span>
+						<XIcon class="mr-2 mt-0.5 h-5 w-5 text-muted-foreground" />
+						<span class="text-muted-foreground">Priority support</span>
 					</li>
 					<li class="flex items-start">
-						<XIcon class="mr-2 mt-0.5 h-5 w-5 text-gray-400" />
-						<span class="text-gray-500">Custom integrations</span>
+						<XIcon class="mr-2 mt-0.5 h-5 w-5 text-muted-foreground" />
+						<span class="text-muted-foreground">Custom integrations</span>
 					</li>
 				</ul>
 				<Button variant="outline" class="w-full" href="/register">Get Started</Button>
 			</Card.Content>
 		</Card.Root>
 
-		<Card.Root class="relative border-t-4 border-purple-600 p-6 shadow-lg">
+		<Card.Root class="relative border-t-4 border-primary p-6 shadow-lg">
 			<div
-				class="absolute right-0 top-0 rounded-bl-md bg-purple-600 px-3 py-1 text-sm font-medium text-white"
+				class="absolute right-0 top-0 rounded-bl-md bg-primary px-3 py-1 text-sm font-medium text-primary-foreground"
 			>
 				Popular
 			</div>
@@ -113,81 +113,81 @@
 				<Card.Description>For power users and professionals</Card.Description>
 				<div class="mt-4">
 					<span class="text-4xl font-bold">$20</span>
-					<span class="text-gray-600">/month</span>
+					<span class="text-muted-foreground">/month</span>
 				</div>
 			</Card.Header>
 			<Card.Content>
 				<ul class="mb-6 space-y-3">
 					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
 						<span>Advanced AI assistance</span>
 					</li>
 					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
 						<span>Unlimited queries</span>
 					</li>
 					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
 						<span>Faster response time</span>
 					</li>
 					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
 						<span>Desktop and mobile apps</span>
 					</li>
 					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
 						<span>Access to premium AI models</span>
 					</li>
 					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
 						<span>Priority email support</span>
 					</li>
 					<li class="flex items-start">
-						<XIcon class="mr-2 mt-0.5 h-5 w-5 text-gray-400" />
-						<span class="text-gray-500">Custom integrations</span>
+						<XIcon class="mr-2 mt-0.5 h-5 w-5 text-muted-foreground" />
+						<span class="text-muted-foreground">Custom integrations</span>
 					</li>
 				</ul>
 				<GetProButton class="w-full" autoTrigger={shouldAutoCheckout}>Get</GetProButton>
 			</Card.Content>
 		</Card.Root>
 
-		<Card.Root class="border-t-4 border-blue-600 p-6">
+		<Card.Root class="border-t-4 border-primary p-6">
 			<Card.Header>
 				<Card.Title>Enterprise</Card.Title>
 				<Card.Description>For teams and organizations</Card.Description>
 				<div class="mt-4">
 					<span class="text-4xl font-bold">$29</span>
-					<span class="text-gray-600">/user/month</span>
+					<span class="text-muted-foreground">/user/month</span>
 				</div>
 			</Card.Header>
 			<Card.Content>
 				<ul class="mb-6 space-y-3">
 					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
 						<span>Enterprise-grade AI assistance</span>
 					</li>
 					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
 						<span>Unlimited queries with higher rate limits</span>
 					</li>
 					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
 						<span>Fastest response time</span>
 					</li>
 					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
 						<span>All apps and platforms</span>
 					</li>
 					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
 						<span>Access to all AI models</span>
 					</li>
 					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
 						<span>24/7 dedicated support</span>
 					</li>
 					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
 						<span>Custom integrations & API access</span>
 					</li>
 				</ul>
@@ -248,19 +248,19 @@
 						<tr class="border-b">
 							<td class="px-4 py-3 font-medium">Team Collaboration</td>
 							<td class="px-4 py-3 text-center">
-								<XIcon class="mx-auto h-5 w-5 text-gray-400" />
+								<XIcon class="mx-auto h-5 w-5 text-muted-foreground" />
 							</td>
 							<td class="px-4 py-3 text-center">
-								<XIcon class="mx-auto h-5 w-5 text-gray-400" />
+								<XIcon class="mx-auto h-5 w-5 text-muted-foreground" />
 							</td>
 							<td class="px-4 py-3 text-center">
-								<CheckIcon class="mx-auto h-5 w-5 text-green-500" />
+								<CheckIcon class="mx-auto h-5 w-5 text-primary" />
 							</td>
 						</tr>
 						<tr class="border-b">
 							<td class="px-4 py-3 font-medium">API Access</td>
 							<td class="px-4 py-3 text-center">
-								<XIcon class="mx-auto h-5 w-5 text-gray-400" />
+								<XIcon class="mx-auto h-5 w-5 text-muted-foreground" />
 							</td>
 							<td class="px-4 py-3 text-center">Limited</td>
 							<td class="px-4 py-3 text-center">Full Access</td>
@@ -281,7 +281,7 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<SparklesIcon class="h-6 w-6 text-purple-600" />
+					<SparklesIcon class="h-6 w-6 text-primary" />
 					<Card.Title>Frequently Asked Questions</Card.Title>
 				</div>
 			</Card.Header>
@@ -289,7 +289,7 @@
 				<div class="space-y-4">
 					<div>
 						<h3 class="mb-1 text-lg font-medium">Can I change plans later?</h3>
-						<p class="text-gray-600">
+						<p class="text-muted-foreground">
 							Yes, you can upgrade or downgrade your plan at any time. Changes take
 							effect at the start of your next billing cycle.
 						</p>
@@ -298,7 +298,7 @@
 						<h3 class="mb-1 text-lg font-medium">
 							Is there a free trial for paid plans?
 						</h3>
-						<p class="text-gray-600">
+						<p class="text-muted-foreground">
 							Yes, both Pro and Enterprise plans come with a 14-day free trial. No
 							credit card required to start.
 						</p>
@@ -307,7 +307,7 @@
 						<h3 class="mb-1 text-lg font-medium">
 							What payment methods do you accept?
 						</h3>
-						<p class="text-gray-600">
+						<p class="text-muted-foreground">
 							We accept all major credit cards, PayPal, and for Enterprise customers,
 							we also offer invoicing.
 						</p>
@@ -323,15 +323,15 @@
 				>
 			</Card.Header>
 			<Card.Content>
-				<p class="mb-6 text-gray-600">
+				<p class="mb-6 text-muted-foreground">
 					Not sure which plan is right for you? Our team can help you assess your needs
 					and recommend the best option for your use case.
 				</p>
 				<div class="space-y-4">
 					<Button variant="outline" class="w-full">Schedule a Demo</Button>
 					<Button variant="outline" class="w-full">Contact Sales</Button>
-					<p class="mt-2 text-center text-sm text-gray-500">
-						Or email us at <span class="text-purple-600">sales@eurora-labs.com</span>
+					<p class="mt-2 text-center text-sm text-muted-foreground">
+						Or email us at <span class="text-primary">sales@eurora-labs.com</span>
 					</p>
 				</div>
 			</Card.Content>

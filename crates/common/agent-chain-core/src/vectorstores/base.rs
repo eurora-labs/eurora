@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use tracing::warn;
 
 use crate::Result;
 use crate::callbacks::{AsyncCallbackManagerForRetrieverRun, CallbackManagerForRetrieverRun};
@@ -249,7 +248,7 @@ pub trait VectorStore: Send + Sync {
             .iter()
             .any(|(_, score)| *score < 0.0 || *score > 1.0)
         {
-            warn!(
+            tracing::warn!(
                 "Relevance scores must be between 0 and 1, got {:?}",
                 docs_and_similarities
                     .iter()
@@ -261,7 +260,7 @@ pub trait VectorStore: Send + Sync {
         if let Some(threshold) = score_threshold {
             docs_and_similarities.retain(|(_, score)| *score >= threshold);
             if docs_and_similarities.is_empty() {
-                warn!(
+                tracing::warn!(
                     "No relevant docs were retrieved using the relevance score threshold {}",
                     threshold
                 );

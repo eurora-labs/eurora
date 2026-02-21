@@ -4,7 +4,6 @@ use std::io::{self, BufWriter, Write};
 use std::path::Path;
 use std::sync::Mutex;
 
-use tracing::warn;
 use uuid::Uuid;
 
 use super::base::{
@@ -75,17 +74,17 @@ impl FileCallbackHandler {
         if let Some(mut writer) = self.file.lock().expect("file lock poisoned").take()
             && let Err(e) = writer.flush()
         {
-            warn!("FileCallbackHandler close flush error: {e}");
+            tracing::warn!("FileCallbackHandler close flush error: {e}");
         }
     }
 
     fn write(&self, text: &str, end: &str) {
         if let Some(ref mut writer) = *self.file.lock().expect("file lock poisoned") {
             if let Err(e) = write!(writer, "{}{}", text, end) {
-                warn!("FileCallbackHandler write error: {e}");
+                tracing::warn!("FileCallbackHandler write error: {e}");
             }
             if let Err(e) = writer.flush() {
-                warn!("FileCallbackHandler flush error: {e}");
+                tracing::warn!("FileCallbackHandler flush error: {e}");
             }
         }
     }
