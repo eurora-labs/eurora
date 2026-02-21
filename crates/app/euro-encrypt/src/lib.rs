@@ -10,7 +10,6 @@ use hkdf::Hkdf;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-use tracing::error;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 mod error;
@@ -85,7 +84,7 @@ impl MainKey {
         // Domain separation so FEKs can't collide with other derived keys
         let info = b"EURORA-FEK-v1";
         hk.expand(info, &mut out).map_err(|e| {
-            error!("Failed to derive FEK: {}", e);
+            tracing::error!("Failed to derive FEK: {}", e);
             EncryptError::Format(format!("FEK derivation failed: {}", e))
         })?;
 
@@ -127,7 +126,7 @@ pub fn generate_new_main_key() -> EncryptResult<MainKey> {
         secret::Namespace::Global,
     )
     .map_err(|e| {
-        error!("Failed to persist main key: {}", e);
+        tracing::error!("Failed to persist main key: {}", e);
         EncryptError::Key(e)
     })?;
 
@@ -137,7 +136,7 @@ pub fn generate_new_main_key() -> EncryptResult<MainKey> {
 
 pub async fn load_file_and_header(path: &Path) -> EncryptResult<(FileHeader, Vec<u8>)> {
     let buf = fs::read(path).map_err(|e| {
-        error!("Failed to read file: {}", e);
+        tracing::error!("Failed to read file: {}", e);
         EncryptError::Io(e)
     })?;
 
@@ -189,7 +188,7 @@ where
     bytes.zeroize();
 
     let val = serde_json::from_slice::<T>(&decrypted_bytes).map_err(|e| {
-        error!("Failed to deserialize JSON: {}", e);
+        tracing::error!("Failed to deserialize JSON: {}", e);
         EncryptError::Json(e)
     })?;
 

@@ -21,7 +21,6 @@ use chacha20poly1305::{
 use hkdf::Hkdf;
 use rand::RngCore;
 use sha2::Sha256;
-use tracing::error;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Magic bytes identifying encrypted files (shared with `euro-encrypt`).
@@ -97,7 +96,7 @@ impl MainKey {
         let hk = Hkdf::<Sha256>::new(Some(salt), &self.0);
         let mut out = [0u8; 32];
         hk.expand(FEK_INFO, &mut out).map_err(|e| {
-            error!("Failed to derive FEK: {}", e);
+            tracing::error!("Failed to derive FEK: {}", e);
             EncryptError::Format(format!("FEK derivation failed: {}", e))
         })?;
 

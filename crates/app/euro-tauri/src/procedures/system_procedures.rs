@@ -24,7 +24,6 @@ fn find_outermost_app_bundle() -> Option<PathBuf> {
 }
 
 use crate::shared_types::SharedEndpointManager;
-use tracing::{debug, error, info};
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 pub struct UpdateInfo {
@@ -147,18 +146,18 @@ impl SystemApi for SystemApiImpl {
     ) -> Result<String, String> {
         let address = server_address.unwrap_or_else(|| "localhost:50051".to_string());
 
-        debug!("Checking connection to gRPC server: {}", address);
+        tracing::debug!("Checking connection to gRPC server: {}", address);
 
         match tokio::net::TcpStream::connect(address.replace("http://", "").replace("https://", ""))
             .await
         {
             Ok(_) => {
-                debug!("TCP connection successful");
+                tracing::debug!("TCP connection successful");
                 Ok("Server is reachable".to_string())
             }
             Err(e) => {
                 let error_msg = format!("Failed to connect to server: {}", e);
-                debug!("{}", error_msg);
+                tracing::debug!("{}", error_msg);
                 Err(error_msg)
             }
         }
@@ -180,27 +179,27 @@ impl SystemApi for SystemApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<Option<UpdateInfo>, String> {
-        debug!("Checking for updates...");
+        tracing::debug!("Checking for updates...");
 
         let updater = app_handle.updater().map_err(|e| {
-            error!("Failed to get updater: {}", e);
+            tracing::error!("Failed to get updater: {}", e);
             format!("Failed to get updater: {}", e)
         })?;
 
         match updater.check().await {
             Ok(Some(update)) => {
-                debug!("Update available: {}", update.version);
+                tracing::debug!("Update available: {}", update.version);
                 Ok(Some(UpdateInfo {
                     version: update.version.clone(),
                     body: update.body.clone(),
                 }))
             }
             Ok(None) => {
-                debug!("No update available");
+                tracing::debug!("No update available");
                 Ok(None)
             }
             Err(e) => {
-                error!("Failed to check for updates: {}", e);
+                tracing::error!("Failed to check for updates: {}", e);
                 Err(format!("Failed to check for updates: {}", e))
             }
         }
@@ -210,7 +209,7 @@ impl SystemApi for SystemApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<(), String> {
-        debug!("Installing update...");
+        tracing::debug!("Installing update...");
 
         // On macOS, when running inside a nested bundle (Eurora.app wraps
         // Eurora.app), we must tell the updater to target the
@@ -228,7 +227,7 @@ impl SystemApi for SystemApiImpl {
             // resolves EuroraMacOS.app (not Eurora.app) as the bundle
             // to replace.
             let exe_inside_outer = outer.join("Contents").join("MacOS").join("Eurora");
-            debug!(
+            tracing::debug!(
                 "Using outer app executable path for updater: {}",
                 exe_inside_outer.display()
             );
@@ -236,17 +235,17 @@ impl SystemApi for SystemApiImpl {
         }
 
         let updater = builder.build().map_err(|e| {
-            error!("Failed to build updater: {}", e);
+            tracing::error!("Failed to build updater: {}", e);
             format!("Failed to build updater: {}", e)
         })?;
 
         let update = updater.check().await.map_err(|e| {
-            error!("Failed to check for updates: {}", e);
+            tracing::error!("Failed to check for updates: {}", e);
             format!("Failed to check for updates: {}", e)
         })?;
 
         if let Some(update) = update {
-            debug!(
+            tracing::debug!(
                 "Downloading and installing update version: {}",
                 update.version
             );
@@ -254,19 +253,19 @@ impl SystemApi for SystemApiImpl {
             update
                 .download_and_install(
                     |chunk_length, content_length| {
-                        debug!("Downloaded {} from {:?}", chunk_length, content_length);
+                        tracing::debug!("Downloaded {} from {:?}", chunk_length, content_length);
                     },
                     || {
-                        debug!("Download finished");
+                        tracing::debug!("Download finished");
                     },
                 )
                 .await
                 .map_err(|e| {
-                    error!("Failed to download and install update: {}", e);
+                    tracing::error!("Failed to download and install update: {}", e);
                     format!("Failed to download and install update: {}", e)
                 })?;
 
-            debug!("Update installed, restarting application");
+            tracing::debug!("Update installed, restarting application");
 
             // On macOS with the nested wrapper bundle we must restart the
             // *outer* Eurora.app (which hosts the launcher, bridge server
@@ -280,7 +279,7 @@ impl SystemApi for SystemApiImpl {
             // termination and shut itself down cleanly.
             if let Some(ref outer) = outer_app {
                 let outer_path = outer.to_string_lossy().to_string();
-                info!("Scheduling restart of outer app bundle: {}", outer_path);
+                tracing::info!("Scheduling restart of outer app bundle: {}", outer_path);
                 let _ = std::process::Command::new("sh")
                     .arg("-c")
                     .arg(format!("sleep 2 && open {:?}", outer_path))
@@ -296,7 +295,7 @@ impl SystemApi for SystemApiImpl {
             #[allow(unreachable_code)]
             Ok(())
         } else {
-            debug!("No update available to install");
+            tracing::debug!("No update available to install");
             Err("No update available to install".to_string())
         }
     }
@@ -369,7 +368,7 @@ impl SystemApi for SystemApiImpl {
         app_handle: tauri::AppHandle<R>,
     ) -> Result<String, String> {
         let path = resolve_docker_compose_path(&app_handle)?;
-        debug!("Docker compose path: {}", path.display());
+        tracing::debug!("Docker compose path: {}", path.display());
         Ok(path.to_string_lossy().to_string())
     }
 
@@ -381,7 +380,7 @@ impl SystemApi for SystemApiImpl {
         let compose_path = resolve_docker_compose_path(&app_handle)?;
         let compose_file = compose_path.to_string_lossy();
 
-        info!("Stopping any existing eurora docker compose instances");
+        tracing::info!("Stopping any existing eurora docker compose instances");
         let _ = tokio::process::Command::new("docker")
             .args(["compose", "-f", &compose_file, "down", "--remove-orphans"])
             .output()
@@ -395,7 +394,7 @@ impl SystemApi for SystemApiImpl {
             let ids = String::from_utf8_lossy(&ps.stdout);
             let ids: Vec<&str> = ids.split_whitespace().collect();
             if !ids.is_empty() {
-                info!("Stopping {} stray eurora container(s)", ids.len());
+                tracing::info!("Stopping {} stray eurora container(s)", ids.len());
                 let _ = tokio::process::Command::new("docker")
                     .arg("rm")
                     .arg("-f")
@@ -424,7 +423,7 @@ impl SystemApi for SystemApiImpl {
 
         let (uid, gid) = host_ids();
 
-        info!(
+        tracing::info!(
             "Starting local backend via docker compose: {} (grpc={}, http={}, postgres={}, ollama_model={}, asset_dir={}, uid={}, gid={})",
             compose_path.display(),
             grpc_port,
@@ -451,12 +450,12 @@ impl SystemApi for SystemApiImpl {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            error!("docker compose failed: {}", stderr);
+            tracing::error!("docker compose failed: {}", stderr);
             return Err(format!("docker compose failed: {}", stderr));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
-        info!("docker compose started: {}", stdout);
+        tracing::info!("docker compose started: {}", stdout);
 
         let local_url = format!("http://localhost:{}", grpc_port);
         let endpoint_manager = app_handle.state::<SharedEndpointManager>();
@@ -507,11 +506,11 @@ async fn send_encryption_key(backend_url: &str) -> Result<(), String> {
     )
     .sleep(tokio::time::sleep)
     .notify(|err, dur| {
-        info!("Waiting for backend to be ready (retrying in {dur:?}): {err}");
+        tracing::info!("Waiting for backend to be ready (retrying in {dur:?}): {err}");
     })
     .await
     .map_err(|e| format!("Backend did not become ready: {e}"))?;
 
-    info!("Encryption key sent to local backend");
+    tracing::info!("Encryption key sent to local backend");
     Ok(())
 }

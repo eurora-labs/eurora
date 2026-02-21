@@ -13,7 +13,6 @@ use sqlx::{
     postgres::{PgPool, PgPoolOptions},
 };
 use std::time::Duration;
-use tracing::warn;
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -1127,21 +1126,22 @@ impl DatabaseManager {
         let canceled_at_ts = canceled_at.and_then(|ts| {
             let dt = chrono::DateTime::from_timestamp(ts, 0);
             if dt.is_none() {
-                warn!(
+                tracing::warn!(
                     subscription_id,
-                    ts, "malformed canceled_at timestamp in stripe subscription"
+                    ts,
+                    "malformed canceled_at timestamp in stripe subscription"
                 );
             }
             dt
         });
         let period_start = chrono::DateTime::from_timestamp(current_period_start, 0)
             .unwrap_or_else(|| {
-                warn!(subscription_id, current_period_start, "malformed current_period_start timestamp in stripe subscription, falling back to now");
+                tracing::warn!(subscription_id, current_period_start, "malformed current_period_start timestamp in stripe subscription, falling back to now");
                 now
             });
         let period_end = chrono::DateTime::from_timestamp(current_period_end, 0).unwrap_or_else(
             || {
-                warn!(subscription_id, current_period_end, "malformed current_period_end timestamp in stripe subscription, falling back to now");
+                tracing::warn!(subscription_id, current_period_end, "malformed current_period_end timestamp in stripe subscription, falling back to now");
                 now
             },
         );

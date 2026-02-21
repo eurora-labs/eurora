@@ -5,7 +5,6 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Json, Redirect, Response},
 };
-use tracing::{debug, instrument, warn};
 
 use crate::{
     analytics,
@@ -17,7 +16,7 @@ use crate::{
     utils::parse_target_arch,
 };
 
-#[instrument(skip(state), fields(
+#[tracing::instrument(skip(state), fields(
     channel = %params.channel,
     target_arch = %params.target_arch,
     current_version = %params.current_version
@@ -39,7 +38,7 @@ pub async fn check_update_handler(
                 &params.current_version,
                 e.error_kind(),
             );
-            warn!("Update check failed: {}", e);
+            tracing::warn!("Update check failed: {}", e);
             return e.into_response();
         }
     };
@@ -54,7 +53,7 @@ pub async fn check_update_handler(
         .await
     {
         Ok(Some(update)) => {
-            debug!("Update available: version {}", update.version);
+            tracing::debug!("Update available: version {}", update.version);
             analytics::track_update_check(
                 &params.channel,
                 &target,
@@ -85,20 +84,20 @@ pub async fn check_update_handler(
                 &params.current_version,
                 e.error_kind(),
             );
-            warn!("Update check failed: {}", e);
+            tracing::warn!("Update check failed: {}", e);
             e.into_response()
         }
     }
 }
 
-#[instrument(skip(state), fields(channel = %params.channel))]
+#[tracing::instrument(skip(state), fields(channel = %params.channel))]
 pub async fn get_release_handler(
     State(state): State<Arc<AppState>>,
     Path(params): Path<ReleaseParams>,
 ) -> Response {
     match state.get_latest_release(&params.channel).await {
         Ok(Some(release_info)) => {
-            debug!(
+            tracing::debug!(
                 "Release info: version={}, platforms={}",
                 release_info.version,
                 release_info.platforms.len()
@@ -116,7 +115,7 @@ pub async fn get_release_handler(
         }
         Err(e) => {
             analytics::track_release_info_request(&params.channel, None, 0);
-            warn!("Release info request failed: {}", e);
+            tracing::warn!("Release info request failed: {}", e);
             e.into_response()
         }
     }
@@ -124,7 +123,7 @@ pub async fn get_release_handler(
 
 /// Serves the correct artifact format based on the Tauri `{{bundle_type}}` variable
 /// (e.g. .deb for deb installs, .AppImage for appimage installs).
-#[instrument(skip(state), fields(
+#[tracing::instrument(skip(state), fields(
     channel = %params.channel,
     target_arch = %params.target_arch,
     current_version = %params.current_version,
@@ -153,7 +152,7 @@ pub async fn check_update_with_bundle_type_handler(
                 &params.current_version,
                 e.error_kind(),
             );
-            warn!("Update check failed: {}", e);
+            tracing::warn!("Update check failed: {}", e);
             return e.into_response();
         }
     };
@@ -168,7 +167,7 @@ pub async fn check_update_with_bundle_type_handler(
         .await
     {
         Ok(Some(update)) => {
-            debug!("Update available: version {}", update.version);
+            tracing::debug!("Update available: version {}", update.version);
             analytics::track_update_check(
                 &params.channel,
                 &target,
@@ -199,20 +198,20 @@ pub async fn check_update_with_bundle_type_handler(
                 &params.current_version,
                 e.error_kind(),
             );
-            warn!("Update check failed: {}", e);
+            tracing::warn!("Update check failed: {}", e);
             e.into_response()
         }
     }
 }
 
-#[instrument(skip(state), fields(channel = %params.channel))]
+#[tracing::instrument(skip(state), fields(channel = %params.channel))]
 pub async fn get_extension_release_handler(
     State(state): State<Arc<AppState>>,
     Path(params): Path<ExtensionReleaseParams>,
 ) -> Response {
     match state.get_extension_release(&params.channel).await {
         Ok(Some(release_info)) => {
-            debug!(
+            tracing::debug!(
                 "Extension release: channel={}, browsers={}",
                 release_info.channel,
                 release_info.browsers.len()
@@ -227,7 +226,7 @@ pub async fn get_extension_release_handler(
         }
         Err(e) => {
             analytics::track_extension_check_failed(&params.channel, e.error_kind());
-            warn!("Extension release request failed: {}", e);
+            tracing::warn!("Extension release request failed: {}", e);
             e.into_response()
         }
     }
@@ -235,7 +234,7 @@ pub async fn get_extension_release_handler(
 
 /// Redirects to a presigned S3 URL for the latest release artifact.
 /// Used by website download buttons.
-#[instrument(skip(state), fields(
+#[tracing::instrument(skip(state), fields(
     channel = %params.channel,
     target_arch = %params.target_arch
 ))]
@@ -252,7 +251,7 @@ pub async fn download_handler(
                 None,
                 e.error_kind(),
             );
-            warn!("Download failed: {}", e);
+            tracing::warn!("Download failed: {}", e);
             return e.into_response();
         }
     };
@@ -262,7 +261,7 @@ pub async fn download_handler(
         .await
     {
         Ok(url) => {
-            debug!("Redirecting download for {}", params.target_arch);
+            tracing::debug!("Redirecting download for {}", params.target_arch);
             analytics::track_download_redirect(&params.channel, &target, &arch, None);
             Redirect::temporary(&url).into_response()
         }
@@ -273,14 +272,14 @@ pub async fn download_handler(
                 None,
                 e.error_kind(),
             );
-            warn!("Download failed: {}", e);
+            tracing::warn!("Download failed: {}", e);
             e.into_response()
         }
     }
 }
 
 /// Redirects to a presigned S3 URL for a specific bundle type (e.g. deb, rpm, dmg).
-#[instrument(skip(state), fields(
+#[tracing::instrument(skip(state), fields(
     channel = %params.channel,
     target_arch = %params.target_arch,
     bundle_type = %params.bundle_type
@@ -304,7 +303,7 @@ pub async fn download_with_bundle_type_handler(
                 bundle_type,
                 e.error_kind(),
             );
-            warn!("Download failed: {}", e);
+            tracing::warn!("Download failed: {}", e);
             return e.into_response();
         }
     };
@@ -314,9 +313,10 @@ pub async fn download_with_bundle_type_handler(
         .await
     {
         Ok(url) => {
-            debug!(
+            tracing::debug!(
                 "Redirecting download for {} ({})",
-                params.target_arch, params.bundle_type
+                params.target_arch,
+                params.bundle_type
             );
             analytics::track_download_redirect(&params.channel, &target, &arch, bundle_type);
             Redirect::temporary(&url).into_response()
@@ -328,7 +328,7 @@ pub async fn download_with_bundle_type_handler(
                 bundle_type,
                 e.error_kind(),
             );
-            warn!("Download failed: {}", e);
+            tracing::warn!("Download failed: {}", e);
             e.into_response()
         }
     }
