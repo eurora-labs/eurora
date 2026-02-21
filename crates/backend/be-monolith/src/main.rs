@@ -189,8 +189,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let auth_rate_limiter = new_auth_failure_rate_limiter();
 
-    let grpc_authz_layer =
-        GrpcAuthzLayer::new(authz.clone(), jwt_config.clone(), auth_rate_limiter.clone());
+    let grpc_authz_layer = GrpcAuthzLayer::new(
+        authz.clone(),
+        jwt_config.clone(),
+        auth_rate_limiter.clone(),
+        db_manager.clone(),
+    );
 
     let mut grpc_server = Server::builder()
         .accept_http1(true)
