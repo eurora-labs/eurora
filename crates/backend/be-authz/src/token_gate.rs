@@ -1,5 +1,4 @@
-use be_remote_db::{DatabaseManager, DbResult};
-use chrono::Datelike;
+use be_remote_db::{DatabaseManager, DbResult, year_month_key};
 use tonic::Status;
 use uuid::Uuid;
 
@@ -20,7 +19,7 @@ pub(crate) trait TokenUsageRepo: Send + Sync {
         &self,
         user_id: Uuid,
         year_month: i32,
-    ) -> DbResult<(Option<i64>, i64)>;
+    ) -> DbResult<(i64, i64)>;
 }
 
 #[async_trait::async_trait]
@@ -29,7 +28,7 @@ impl TokenUsageRepo for DatabaseManager {
         &self,
         user_id: Uuid,
         year_month: i32,
-    ) -> DbResult<(Option<i64>, i64)> {
+    ) -> DbResult<(i64, i64)> {
         self.get_token_limit_and_usage(user_id, year_month).await
     }
 }
@@ -40,7 +39,7 @@ impl<T: TokenUsageRepo> TokenUsageRepo for std::sync::Arc<T> {
         &self,
         user_id: Uuid,
         year_month: i32,
-    ) -> DbResult<(Option<i64>, i64)> {
+    ) -> DbResult<(i64, i64)> {
         (**self)
             .get_token_limit_and_usage(user_id, year_month)
             .await
@@ -52,20 +51,18 @@ pub(crate) async fn check_token_limit(
     user_id: Uuid,
 ) -> Result<(), Status> {
     let now = chrono::Utc::now();
-    let year_month = now.year() * 100 + now.month() as i32;
+    let year_month = year_month_key(&now);
 
-    let (token_limit, used) = db
+    let (limit, used) = db
         .get_token_limit_and_usage(user_id, year_month)
         .await
         .map_err(|e| {
-            tracing::error!("Failed to check token limit: {}", e);
+            tracing::error!(error = %e, "Failed to check token limit");
             Status::internal("Failed to check token limit")
         })?;
 
-    if let Some(limit) = token_limit
-        && used >= limit
-    {
-        tracing::warn!(user_id = %user_id, used = used, limit = limit, "Token limit reached");
+    if used >= limit {
+        tracing::warn!(user_id = %user_id, used, limit, "Token limit reached");
         return Err(Status::resource_exhausted(
             "Monthly token limit reached. Please upgrade your plan.",
         ));
@@ -109,7 +106,27 @@ mod tests {
     }
 
     struct MockRepo {
-        result: DbResult<(Option<i64>, i64)>,
+        limit: i64,
+        used: i64,
+        error: Option<DbError>,
+    }
+
+    impl MockRepo {
+        fn ok(limit: i64, used: i64) -> Self {
+            Self {
+                limit,
+                used,
+                error: None,
+            }
+        }
+
+        fn err(error: DbError) -> Self {
+            Self {
+                limit: 0,
+                used: 0,
+                error: Some(error),
+            }
+        }
     }
 
     #[async_trait::async_trait]
@@ -118,47 +135,38 @@ mod tests {
             &self,
             _user_id: Uuid,
             _year_month: i32,
-        ) -> DbResult<(Option<i64>, i64)> {
-            match &self.result {
-                Ok(v) => Ok(*v),
-                Err(e) => Err(DbError::Internal(e.to_string())),
+        ) -> DbResult<(i64, i64)> {
+            if let Some(ref e) = self.error {
+                return Err(DbError::Internal(e.to_string()));
             }
+            Ok((self.limit, self.used))
         }
     }
 
     #[tokio::test]
     async fn check_token_limit_enforces_limit() {
-        let repo = MockRepo {
-            result: Ok((Some(1000), 1000)),
-        };
+        let repo = MockRepo::ok(1000, 1000);
         let err = check_token_limit(&repo, Uuid::nil()).await.unwrap_err();
         assert_eq!(err.code(), tonic::Code::ResourceExhausted);
 
-        let repo = MockRepo {
-            result: Ok((Some(1000), 1500)),
-        };
+        let repo = MockRepo::ok(1000, 1500);
         let err = check_token_limit(&repo, Uuid::nil()).await.unwrap_err();
         assert_eq!(err.code(), tonic::Code::ResourceExhausted);
 
-        let repo = MockRepo {
-            result: Ok((Some(1000), 999)),
-        };
+        let repo = MockRepo::ok(1000, 999);
         assert!(check_token_limit(&repo, Uuid::nil()).await.is_ok());
     }
 
     #[tokio::test]
-    async fn check_token_limit_unlimited_when_none() {
-        let repo = MockRepo {
-            result: Ok((None, 999_999)),
-        };
-        assert!(check_token_limit(&repo, Uuid::nil()).await.is_ok());
+    async fn check_token_limit_zero_limit_blocks() {
+        let repo = MockRepo::ok(0, 0);
+        let err = check_token_limit(&repo, Uuid::nil()).await.unwrap_err();
+        assert_eq!(err.code(), tonic::Code::ResourceExhausted);
     }
 
     #[tokio::test]
     async fn check_token_limit_maps_db_error() {
-        let repo = MockRepo {
-            result: Err(DbError::connection("db went away")),
-        };
+        let repo = MockRepo::err(DbError::connection("db went away"));
         let err = check_token_limit(&repo, Uuid::nil()).await.unwrap_err();
         assert_eq!(err.code(), tonic::Code::Internal);
     }

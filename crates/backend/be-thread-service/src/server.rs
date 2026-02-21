@@ -6,8 +6,8 @@ use agent_chain::{
 };
 use be_authz::{extract_claims, parse_user_id};
 use be_local_settings::{OllamaConfig, OpenAIConfig, ProviderSettings, SettingsReceiver};
-use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
-use chrono::{DateTime, Datelike, Utc};
+use be_remote_db::{DatabaseManager, MessageType, PaginationParams, year_month_key};
+use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
 pub use proto_gen::thread::proto_thread_service_server::{
     ProtoThreadService, ProtoThreadServiceServer,
@@ -612,7 +612,7 @@ impl ProtoThreadService for ThreadService {
                     Ok(ai_message) => {
                         if (total_input_tokens > 0 || total_output_tokens > 0) && let Err(e) = {
                                 let now = Utc::now();
-                                let year_month = now.year() * 100 + now.month() as i32;
+                                let year_month = year_month_key(&now);
                                 db
                                 .record_token_usage()
                                 .user_id(user_id)
