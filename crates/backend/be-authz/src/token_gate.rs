@@ -5,10 +5,7 @@ use uuid::Uuid;
 
 const TOKEN_GATED_METHODS: &[(&str, &str)] = &[
     ("thread_service.ProtoThreadService", "ChatStream"),
-    (
-        "thread_service.ProtoThreadService",
-        "GenerateThreadTitle",
-    ),
+    ("thread_service.ProtoThreadService", "GenerateThreadTitle"),
 ];
 
 pub(crate) fn is_token_gated(service_full: &str, method: &str) -> bool {
@@ -20,13 +17,10 @@ pub(crate) fn is_token_gated(service_full: &str, method: &str) -> bool {
 pub(crate) async fn check_token_limit(db: &DatabaseManager, user_id: Uuid) -> Result<(), Status> {
     let now = chrono::Utc::now();
 
-    let token_limit = db
-        .get_token_limit_for_user(user_id)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to query token limit: {}", e);
-            Status::internal("Failed to check token limit")
-        })?;
+    let token_limit = db.get_token_limit_for_user(user_id).await.map_err(|e| {
+        tracing::error!("Failed to query token limit: {}", e);
+        Status::internal("Failed to check token limit")
+    })?;
 
     if let Some(limit) = token_limit {
         let used = db
