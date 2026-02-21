@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use posthog_rs::Event;
-use tracing::warn;
 
 const CAPTURE_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -9,8 +8,8 @@ fn capture_async(event: Event) {
     tokio::spawn(async move {
         match tokio::time::timeout(CAPTURE_TIMEOUT, posthog_rs::capture(event)).await {
             Ok(Ok(())) => {}
-            Ok(Err(e)) => warn!("Failed to capture analytics event: {e}"),
-            Err(_) => warn!("Analytics event capture timed out"),
+            Ok(Err(e)) => tracing::warn!("Failed to capture analytics event: {e}"),
+            Err(_) => tracing::warn!("Analytics event capture timed out"),
         }
     });
 }

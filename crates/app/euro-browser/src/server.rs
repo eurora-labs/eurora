@@ -12,7 +12,6 @@ use std::time::Duration;
 use tokio::sync::{OnceCell, RwLock, broadcast, mpsc, oneshot, watch};
 use tokio_stream::{Stream, wrappers::ReceiverStream};
 use tonic::{Request, Response, Status, transport::Server};
-use tracing::{debug, error, info, warn};
 
 pub const BROWSER_BRIDGE_PORT: &str = "1431";
 
@@ -41,7 +40,7 @@ impl PendingRequest {
 
     fn send(self, frame: Frame) -> Result<(), ()> {
         if self.sender.send(frame).is_err() {
-            error!("Failed to send frame to waiting request");
+            tracing::error!("Failed to send frame to waiting request");
         }
         Ok(())
     }
@@ -89,12 +88,12 @@ impl BrowserBridgeService {
         let mut frames_rx = frames_from_messengers_tx.subscribe();
 
         let handle = tokio::spawn(async move {
-            debug!("Frame handler task started");
+            tracing::debug!("Frame handler task started");
             while let Ok((browser_pid, frame)) = frames_rx.recv().await {
                 let kind = match &frame.kind {
                     Some(k) => k.clone(),
                     None => {
-                        warn!(
+                        tracing::warn!(
                             "Received frame with no kind from browser PID {}",
                             browser_pid
                         );
@@ -104,11 +103,13 @@ impl BrowserBridgeService {
 
                 match kind {
                     FrameKind::Request(req_frame) => {
-                        debug!(
+                        tracing::debug!(
                             "Received request frame from browser PID {}: id={}, action={}",
-                            browser_pid, req_frame.id, req_frame.action
+                            browser_pid,
+                            req_frame.id,
+                            req_frame.action
                         );
-                        warn!(
+                        tracing::warn!(
                             "Received unsupported request from browser extension: action={}",
                             req_frame.action
                         );
@@ -120,53 +121,63 @@ impl BrowserBridgeService {
                                 kind: Some(FrameKind::Response(resp_frame.clone())),
                             };
                             if let Err(err) = pending_request.send(frame) {
-                                warn!("Failed to send frame to waiting request: {:?}", err);
+                                tracing::warn!(
+                                    "Failed to send frame to waiting request: {:?}",
+                                    err
+                                );
                             }
                         } else {
-                            debug!(
+                            tracing::debug!(
                                 "Received frame with no pending request: id={} action={}",
-                                resp_frame.id, resp_frame.action,
+                                resp_frame.id,
+                                resp_frame.action,
                             );
                         }
                     }
                     FrameKind::Event(evt_frame) => {
-                        debug!(
+                        tracing::debug!(
                             "Received event frame from browser PID {}: action={}",
-                            browser_pid, evt_frame.action
+                            browser_pid,
+                            evt_frame.action
                         );
                         if let Err(e) = events_tx.send((browser_pid, evt_frame)) {
-                            debug!(
+                            tracing::debug!(
                                 "No event subscribers for event frame from browser PID {}: {}",
-                                browser_pid, e
+                                browser_pid,
+                                e
                             );
                         }
                     }
                     FrameKind::Error(err_frame) => {
-                        error!(
+                        tracing::error!(
                             "Received error frame: id={}, message={}",
-                            err_frame.id, err_frame.message
+                            err_frame.id,
+                            err_frame.message
                         );
                         if let Some((_, pending_request)) = pending_requests.remove(&err_frame.id) {
                             let frame = Frame {
                                 kind: Some(FrameKind::Error(err_frame)),
                             };
                             if let Err(err) = pending_request.send(frame) {
-                                warn!("Failed to send error frame to waiting request: {:?}", err);
+                                tracing::warn!(
+                                    "Failed to send error frame to waiting request: {:?}",
+                                    err
+                                );
                             }
                         }
                     }
                     FrameKind::Cancel(cancel_frame) => {
-                        debug!("Received cancel frame: id={}", cancel_frame.id);
+                        tracing::debug!("Received cancel frame: id={}", cancel_frame.id);
                         if pending_requests.remove(&cancel_frame.id).is_some() {
-                            debug!("Cancelled pending request: id={}", cancel_frame.id);
+                            tracing::debug!("Cancelled pending request: id={}", cancel_frame.id);
                         }
                     }
                     FrameKind::Register(_) => {
-                        debug!("Received register frame (should be handled by server)");
+                        tracing::debug!("Received register frame (should be handled by server)");
                     }
                 }
             }
-            debug!("Frame handler task ended");
+            tracing::debug!("Frame handler task ended");
         });
 
         let _ = self.frame_handler_handle.set(handle);
@@ -183,7 +194,7 @@ impl BrowserBridgeService {
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .is_err()
         {
-            debug!("Browser Bridge gRPC server already running");
+            tracing::debug!("Browser Bridge gRPC server already running");
             return;
         }
 
@@ -199,7 +210,7 @@ impl BrowserBridgeService {
                 .next()
                 .expect("No valid socket address");
 
-            info!("Starting Browser Bridge gRPC server at {}", addr);
+            tracing::info!("Starting Browser Bridge gRPC server at {}", addr);
 
             let server = Server::builder()
                 .add_service(BrowserBridgeServer::new(service_clone))
@@ -209,29 +220,31 @@ impl BrowserBridgeService {
                             break;
                         }
                         if *shutdown_rx.borrow() {
-                            info!("Received shutdown signal for Browser Bridge gRPC server");
+                            tracing::info!(
+                                "Received shutdown signal for Browser Bridge gRPC server"
+                            );
                             break;
                         }
                     }
                 });
 
             if let Err(e) = server.await {
-                error!("Browser Bridge gRPC server error: {}", e);
+                tracing::error!("Browser Bridge gRPC server error: {}", e);
             }
 
             SERVER_STARTED.store(false, Ordering::SeqCst);
-            info!("Browser Bridge gRPC server ended");
+            tracing::info!("Browser Bridge gRPC server ended");
         });
     }
 
     pub async fn stop_server() {
         if !SERVER_STARTED.load(Ordering::SeqCst) {
-            debug!("Browser Bridge gRPC server is not running");
+            tracing::debug!("Browser Bridge gRPC server is not running");
             return;
         }
 
         if let Some(tx) = SHUTDOWN_TX.get() {
-            info!("Sending shutdown signal to Browser Bridge gRPC server");
+            tracing::info!("Sending shutdown signal to Browser Bridge gRPC server");
             let _ = tx.send(true);
         }
     }
@@ -288,9 +301,11 @@ impl BrowserBridgeService {
             payload,
         };
 
-        debug!(
+        tracing::debug!(
             "Sending request frame: id={}, action={}, browser_pid={}",
-            request_id, action, browser_pid
+            request_id,
+            action,
+            browser_pid
         );
 
         let frame = Frame {
@@ -305,7 +320,7 @@ impl BrowserBridgeService {
         match tokio::time::timeout(DEFAULT_REQUEST_TIMEOUT, rx).await {
             Ok(Ok(frame)) => match frame.kind {
                 Some(FrameKind::Response(response_frame)) => {
-                    debug!("Received response for request {}", request_id);
+                    tracing::debug!("Received response for request {}", request_id);
                     Ok(response_frame)
                 }
                 Some(FrameKind::Error(error_frame)) => Err(Status::internal(format!(
@@ -315,11 +330,11 @@ impl BrowserBridgeService {
                 _ => Err(Status::internal("Unexpected frame kind in response")),
             },
             Ok(Err(_)) => {
-                error!("Response channel closed for request {}", request_id);
+                tracing::error!("Response channel closed for request {}", request_id);
                 Err(Status::internal("Response channel closed"))
             }
             Err(_) => {
-                error!("Timeout waiting for response to request {}", request_id);
+                tracing::error!("Timeout waiting for response to request {}", request_id);
                 self.pending_requests.remove(&request_id);
                 Err(Status::deadline_exceeded("Request timeout"))
             }
@@ -364,23 +379,23 @@ impl BrowserBridge for BrowserBridgeService {
         &self,
         request: Request<tonic::Streaming<Frame>>,
     ) -> Result<Response<Self::OpenStream>, Status> {
-        info!("Received first browser open request");
+        tracing::info!("Received first browser open request");
         let mut inbound = request.into_inner();
 
         let first_frame = inbound.message().await.map_err(|e| {
-            error!("Failed to receive the Register frame as first frame: {}", e);
+            tracing::error!("Failed to receive the Register frame as first frame: {}", e);
             Status::internal("Failed to receive the Register frame as first frame")
         })?;
 
         let Some(frame) = first_frame else {
-            error!("Received an unexpected frame type as the first frame");
+            tracing::error!("Received an unexpected frame type as the first frame");
             return Err(Status::internal(
                 "Received an unexpected frame type as the first frame",
             ));
         };
 
         let Some(FrameKind::Register(register_frame)) = frame.kind else {
-            error!("Received an unexpected frame type as the first frame");
+            tracing::error!("Received an unexpected frame type as the first frame");
             return Err(Status::internal(
                 "Received an unexpected frame type as the first frame",
             ));
@@ -401,7 +416,7 @@ impl BrowserBridge for BrowserBridgeService {
                     browser_pid,
                 },
             );
-            debug!(
+            tracing::debug!(
                 "Registered browser with browser_pid: {} and host_pid: {}. Total registered browsers: {}",
                 browser_pid,
                 host_pid,
@@ -412,34 +427,36 @@ impl BrowserBridge for BrowserBridgeService {
         let frames_tx = self.frames_from_messengers_tx.clone();
 
         tokio::spawn(async move {
-            info!(
+            tracing::info!(
                 "gRPC client connected, starting forward task: Eurora -> Native Messenger -> Chrome"
             );
             loop {
                 match inbound.message().await {
                     Ok(Some(frame)) => {
-                        info!(
+                        tracing::info!(
                             "Received frame from native messenger browser_pid={}",
                             browser_pid
                         );
                         if let Err(e) = frames_tx.send((browser_pid, frame)) {
-                            warn!(
+                            tracing::warn!(
                                 "Failed to broadcast frame from browser PID {}: {}",
-                                browser_pid, e
+                                browser_pid,
+                                e
                             );
                         }
                     }
                     Ok(None) => {
-                        info!(
+                        tracing::info!(
                             "Native messenger disconnected (browser_pid={})",
                             browser_pid
                         );
                         break;
                     }
                     Err(e) => {
-                        error!(
+                        tracing::error!(
                             "Error receiving frame from native messenger (browser_pid={}): {}",
-                            browser_pid, e
+                            browser_pid,
+                            e
                         );
                         break;
                     }
@@ -452,16 +469,17 @@ impl BrowserBridge for BrowserBridgeService {
                 .is_some_and(|m| m.host_pid == host_pid)
             {
                 registry.remove(&browser_pid);
-                info!(
+                tracing::info!(
                     "Unregistered native messenger for browser PID {} and host PID {}. Remaining: {}",
                     browser_pid,
                     host_pid,
                     registry.len()
                 );
             } else {
-                warn!(
+                tracing::warn!(
                     "Failed to unregister native messenger: browser_pid={} host_pid={} not found or mismatch",
-                    browser_pid, host_pid
+                    browser_pid,
+                    host_pid
                 );
             }
         });

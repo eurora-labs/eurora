@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use be_remote_db::DatabaseManager;
 use stripe_shared::Subscription;
-use tracing::{info, warn};
 
 use crate::error::PaymentError;
 
@@ -10,7 +9,7 @@ fn serialize_or_null(value: &impl serde::Serialize, context: &str) -> serde_json
     match serde_json::to_value(value) {
         Ok(v) => v,
         Err(e) => {
-            warn!(error = %e, context, "Failed to serialize Stripe object, storing null");
+            tracing::warn!(error = %e, context, "Failed to serialize Stripe object, storing null");
             serde_json::Value::Null
         }
     }
@@ -62,7 +61,7 @@ pub async fn on_checkout_completed(
     let customer_email = customer_email
         .ok_or_else(|| PaymentError::MissingField("customer_email in checkout session"))?;
 
-    info!(
+    tracing::info!(
         %customer_id,
         ?subscription_id,
         %customer_email,
@@ -75,7 +74,7 @@ pub async fn on_checkout_completed(
     let user = match db.get_user_by_email(&customer_email).await {
         Ok(u) => Some(u),
         Err(e) if e.is_not_found() => {
-            warn!(
+            tracing::warn!(
                 %customer_email,
                 "No application user found for checkout email — Stripe customer will be saved but account provisioning skipped"
             );
@@ -141,7 +140,7 @@ pub async fn on_checkout_completed(
             }
         }
     } else {
-        warn!(
+        tracing::warn!(
             %customer_id,
             %customer_email,
             "Checkout completed without a subscription_id — subscription provisioning skipped"
@@ -167,7 +166,7 @@ pub async fn on_subscription_updated(
     let canceled_at = sub.canceled_at;
     let (period_start, period_end) = extract_period(sub);
 
-    info!(
+    tracing::info!(
         %subscription_id,
         %customer_id,
         %status,
@@ -246,7 +245,7 @@ pub async fn on_subscription_deleted(
     let customer_id = sub.customer.id().to_string();
     let canceled_at = sub.canceled_at;
 
-    info!(
+    tracing::info!(
         %subscription_id,
         "Subscription deleted — revoking"
     );
@@ -292,7 +291,7 @@ pub async fn on_invoice_paid(
         .unwrap_or_else(|| "unknown".to_string());
     let subscription_id = invoice.subscription.as_ref().map(|s| s.id().to_string());
 
-    info!(
+    tracing::info!(
         %invoice_id,
         subscription_id = ?subscription_id,
         "Invoice paid — subscription renewal confirmed"
@@ -313,7 +312,7 @@ pub async fn on_invoice_payment_failed(
     let subscription_id = invoice.subscription.as_ref().map(|s| s.id().to_string());
     let attempt_count = invoice.attempt_count;
 
-    warn!(
+    tracing::warn!(
         %invoice_id,
         subscription_id = ?subscription_id,
         attempt_count,

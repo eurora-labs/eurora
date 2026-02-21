@@ -3,7 +3,6 @@ use std::pin::Pin;
 use tonic::{Request, Status, transport::Channel};
 use tonic_async_interceptor::{AsyncInterceptor, async_interceptor};
 use tower::ServiceBuilder;
-use tracing::error;
 
 pub type AuthedChannel = tonic_async_interceptor::AsyncInterceptedService<Channel, AuthInterceptor>;
 
@@ -30,13 +29,13 @@ impl AsyncInterceptor for AuthInterceptor {
                 .get_or_refresh_access_token()
                 .await
                 .map_err(|e| {
-                    error!("Failed to get access token: {}", e);
+                    tracing::error!("Failed to get access token: {}", e);
                     Status::unauthenticated(format!("Failed to retrieve access token: {}", e))
                 })?;
 
             let bearer_value = format!("Bearer {}", token.0);
             let metadata_value = bearer_value.parse().map_err(|e| {
-                error!("Failed to parse authorization header: {}", e);
+                tracing::error!("Failed to parse authorization header: {}", e);
                 Status::internal("Failed to create authorization header")
             })?;
 

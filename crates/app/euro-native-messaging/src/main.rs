@@ -10,7 +10,6 @@ use std::{env, time::Duration};
 use tokio::io::{self};
 use tokio::sync::{broadcast, mpsc};
 use tonic::transport::Channel;
-use tracing::{error, info, warn};
 #[allow(unused_imports)]
 use tracing_subscriber::prelude::*;
 
@@ -21,7 +20,7 @@ async fn connect_with_retry(server_addr: &str) -> BrowserBridgeClient<Channel> {
     (|| {
         let addr = addr.clone();
         async move {
-            info!("Attempting to connect to euro-activity server at {}", addr);
+            tracing::info!("Attempting to connect to euro-activity server at {}", addr);
             BrowserBridgeClient::connect(addr)
                 .await
                 .map_err(|e| e.to_string())
@@ -30,7 +29,7 @@ async fn connect_with_retry(server_addr: &str) -> BrowserBridgeClient<Channel> {
     .retry(ConstantBuilder::default().with_delay(Duration::from_secs(RETRY_INTERVAL_SECS)))
     .sleep(tokio::time::sleep)
     .notify(|err, dur| {
-        warn!("Failed to connect to euro-activity server: {err}. Retrying in {dur:?}...");
+        tracing::warn!("Failed to connect to euro-activity server: {err}. Retrying in {dur:?}...");
     })
     .await
     .expect("infinite retry should never return Err")
@@ -49,9 +48,10 @@ async fn main() -> Result<()> {
     let browser_pid = parent_pid::get_parent_pid();
     let host_pid = std::process::id();
 
-    info!(
+    tracing::info!(
         "Starting native messaging client: host_pid={}, browser_pid={}",
-        host_pid, browser_pid
+        host_pid,
+        browser_pid
     );
 
     let server_addr = format!("http://[::1]:{}", PORT);
@@ -61,39 +61,39 @@ async fn main() -> Result<()> {
 
     let chrome_writer_handle = tokio::spawn(async move {
         let mut stdout = io::stdout();
-        info!("Chrome writer task started");
+        tracing::info!("Chrome writer task started");
         while let Some(frame) = from_server_rx.recv().await {
-            info!("Writing frame to Chrome: {:?}", frame.kind);
+            tracing::info!("Writing frame to Chrome: {:?}", frame.kind);
             if let Err(err) = write_framed(&mut stdout, &frame).await {
-                error!("Native host write error: {:?}", err);
+                tracing::error!("Native host write error: {:?}", err);
                 break;
             }
         }
-        info!("Chrome writer task stopped");
+        tracing::info!("Chrome writer task stopped");
     });
 
     let chrome_reader_handle = {
         let to_server_tx = to_server_tx.clone();
         tokio::spawn(async move {
             let mut stdin = io::stdin();
-            info!("Chrome reader task started");
+            tracing::info!("Chrome reader task started");
             loop {
                 match read_framed(&mut stdin).await {
                     Ok(Some(frame)) => {
-                        info!("Read frame from Chrome: {:?}", frame.kind);
+                        tracing::info!("Read frame from Chrome: {:?}", frame.kind);
                         let _ = to_server_tx.send(frame);
                     }
                     Ok(None) => {
-                        info!("EOF from Chrome, connection closed");
+                        tracing::info!("EOF from Chrome, connection closed");
                         break;
                     }
                     Err(e) => {
-                        error!("Native host read error: {:?}", e);
+                        tracing::error!("Native host read error: {:?}", e);
                         break;
                     }
                 }
             }
-            info!("Chrome reader task stopped");
+            tracing::info!("Chrome reader task stopped");
         })
     };
 
@@ -112,21 +112,21 @@ async fn main() -> Result<()> {
                 };
 
                 let outbound_stream = async_stream::stream! {
-                    info!("Sending registration frame: host_pid={}, browser_pid={}", host_pid, browser_pid);
+                    tracing::info!("Sending registration frame: host_pid={}, browser_pid={}", host_pid, browser_pid);
                     yield register_frame;
 
                     loop {
                         match to_server_rx.recv().await {
                             Ok(frame) => {
-                                info!("Forwarding frame to server: {:?}", frame);
+                                tracing::info!("Forwarding frame to server: {:?}", frame);
                                 yield frame;
                             }
                             Err(broadcast::error::RecvError::Lagged(n)) => {
-                                warn!("Server connection lagged by {} frames", n);
+                                tracing::warn!("Server connection lagged by {} frames", n);
                                 continue;
                             }
                             Err(broadcast::error::RecvError::Closed) => {
-                                info!("Chrome reader channel closed");
+                                tracing::info!("Chrome reader channel closed");
                                 break;
                             }
                         }
@@ -135,12 +135,12 @@ async fn main() -> Result<()> {
 
                 let response = match client.open(outbound_stream).await {
                     Ok(response) => {
-                        info!("Bidirectional stream opened successfully");
+                        tracing::info!("Bidirectional stream opened successfully");
                         response
                     }
                     Err(e) => {
-                        error!("Failed to open bidirectional stream: {}", e);
-                        info!(
+                        tracing::error!("Failed to open bidirectional stream: {}", e);
+                        tracing::info!(
                             "Waiting {} seconds before reconnecting...",
                             RETRY_INTERVAL_SECS
                         );
@@ -154,25 +154,25 @@ async fn main() -> Result<()> {
                 loop {
                     match inbound_stream.message().await {
                         Ok(Some(frame)) => {
-                            info!("Received frame from server: {:?}", frame);
+                            tracing::info!("Received frame from server: {:?}", frame);
                             if let Err(e) = from_server_tx.send(frame).await {
-                                error!("Failed to forward frame from server: {}", e);
+                                tracing::error!("Failed to forward frame from server: {}", e);
                                 break;
                             }
                         }
                         Ok(None) => {
-                            info!("Server stream ended");
+                            tracing::info!("Server stream ended");
                             break;
                         }
                         Err(e) => {
-                            error!("Error receiving from server: {}", e);
+                            tracing::error!("Error receiving from server: {}", e);
                             break;
                         }
                     }
                 }
 
-                warn!("Server connection lost, reconnecting...");
-                info!(
+                tracing::warn!("Server connection lost, reconnecting...");
+                tracing::info!(
                     "Waiting {} seconds before reconnecting...",
                     RETRY_INTERVAL_SECS
                 );
@@ -183,13 +183,13 @@ async fn main() -> Result<()> {
 
     tokio::select! {
         _ = chrome_writer_handle => {
-            info!("Chrome writer task stopped");
+            tracing::info!("Chrome writer task stopped");
         }
         _ = chrome_reader_handle => {
-            info!("Chrome reader task stopped");
+            tracing::info!("Chrome reader task stopped");
         }
         _ = server_connection_handle => {
-            info!("Server connection task stopped");
+            tracing::info!("Server connection task stopped");
         }
     }
 

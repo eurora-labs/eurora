@@ -3,7 +3,6 @@
 use std::env;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
-use tracing::info;
 
 /// Spawn a test window using the helper binary
 ///
@@ -254,12 +253,12 @@ pub fn setup_test_environment() -> Result<(), Box<dyn std::error::Error>> {
         unsafe {
             env::set_var("WAYLAND_DISPLAY", "wayland-test");
         }
-        info!("Using Wayland backend for tests");
+        tracing::info!("Using Wayland backend for tests");
     } else if should_use_x11() {
         unsafe {
             env::set_var("DISPLAY", ":99");
         }
-        info!("Using X11 backend for tests");
+        tracing::info!("Using X11 backend for tests");
     }
 
     Ok(())

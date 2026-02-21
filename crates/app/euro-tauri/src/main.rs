@@ -34,7 +34,6 @@ use tauri::{
 
 use taurpc::Router;
 use tokio::sync::Mutex;
-use tracing::{debug, error, info, warn};
 
 fn install_native_messaging_manifests(app: &tauri::App) {
     #[cfg(target_os = "windows")]
@@ -51,7 +50,7 @@ fn install_native_messaging_manifests(app: &tauri::App) {
         let resource_dir = match app.path().resource_dir() {
             Ok(dir) => dir,
             Err(e) => {
-                warn!(
+                tracing::warn!(
                     "Could not resolve resource dir, skipping native messaging manifest install: {e}"
                 );
                 return;
@@ -62,13 +61,13 @@ fn install_native_messaging_manifests(app: &tauri::App) {
             Ok(exe) => match exe.parent() {
                 Some(dir) => dir.join("euro-native-messaging"),
                 None => {
-                    warn!("Could not resolve parent directory of current exe");
+                    tracing::warn!("Could not resolve parent directory of current exe");
                     return;
                 }
             },
 
             Err(e) => {
-                warn!("Could not resolve current exe path: {e}");
+                tracing::warn!("Could not resolve current exe path: {e}");
                 return;
             }
         };
@@ -121,7 +120,7 @@ fn install_native_messaging_manifests(app: &tauri::App) {
             // so that browser manifests can reference a stable, well-known path.
             let native_messaging_dir = home.join(".eurora/native-messaging");
             if let Err(e) = std::fs::create_dir_all(&native_messaging_dir) {
-                warn!(
+                tracing::warn!(
                     "Could not create native messaging directory {}: {e}",
                     native_messaging_dir.display()
                 );
@@ -133,14 +132,14 @@ fn install_native_messaging_manifests(app: &tauri::App) {
                             &dest,
                             <std::fs::Permissions as PermissionsExt>::from_mode(0o755),
                         ) {
-                            warn!(
+                            tracing::warn!(
                                 "Could not set executable permission on {}: {e}",
                                 dest.display()
                             );
                         }
-                        info!("Copied native messaging binary to {}", dest.display());
+                        tracing::info!("Copied native messaging binary to {}", dest.display());
                     }
-                    Err(e) => warn!(
+                    Err(e) => tracing::warn!(
                         "Could not copy native messaging binary to {}: {e}",
                         dest.display()
                     ),
@@ -172,7 +171,7 @@ fn install_native_messaging_manifests(app: &tauri::App) {
             let content = match std::fs::read_to_string(&template_path) {
                 Ok(c) => c,
                 Err(e) => {
-                    warn!("Could not read native messaging template {template_name}: {e}");
+                    tracing::warn!("Could not read native messaging template {template_name}: {e}");
                     continue;
                 }
             };
@@ -180,7 +179,9 @@ fn install_native_messaging_manifests(app: &tauri::App) {
             let mut manifest: serde_json::Value = match serde_json::from_str(&content) {
                 Ok(v) => v,
                 Err(e) => {
-                    warn!("Could not parse native messaging template {template_name}: {e}");
+                    tracing::warn!(
+                        "Could not parse native messaging template {template_name}: {e}"
+                    );
                     continue;
                 }
             };
@@ -194,20 +195,22 @@ fn install_native_messaging_manifests(app: &tauri::App) {
             let manifest_json = match serde_json::to_string_pretty(&manifest) {
                 Ok(s) => s,
                 Err(e) => {
-                    warn!("Could not serialize native messaging manifest: {e}");
+                    tracing::warn!("Could not serialize native messaging manifest: {e}");
                     continue;
                 }
             };
 
             for dir in browser_dirs {
                 if let Err(e) = std::fs::create_dir_all(dir) {
-                    warn!("Could not create directory {}: {e}", dir.display());
+                    tracing::warn!("Could not create directory {}: {e}", dir.display());
                     continue;
                 }
                 let dest = dir.join("com.eurora.app.json");
                 match std::fs::write(&dest, &manifest_json) {
-                    Ok(()) => info!("Installed native messaging manifest to {}", dest.display()),
-                    Err(e) => warn!(
+                    Ok(()) => {
+                        tracing::info!("Installed native messaging manifest to {}", dest.display())
+                    }
+                    Err(e) => tracing::warn!(
                         "Failed to write native messaging manifest to {}: {e}",
                         dest.display()
                     ),
@@ -228,14 +231,14 @@ fn main() {
 
     let tauri_context = generate_context!();
 
-    debug!("Starting Tauri application...");
+    tracing::debug!("Starting Tauri application...");
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap()
         .block_on(async {
-            debug!("Setting tokio runtime");
+            tracing::debug!("Setting tokio runtime");
             tauri::async_runtime::set(tokio::runtime::Handle::current());
 
             let builder = tauri::Builder::default()
@@ -288,8 +291,8 @@ fn main() {
                         let autostart_manager = tauri_app.autolaunch();
                         if !autostart_manager.is_enabled().unwrap_or(false) {
                             match autostart_manager.enable() {
-                                Ok(_) => debug!("Autostart enabled"),
-                                Err(e) => error!("Failed to enable autostart: {}", e),
+                                Ok(_) => tracing::debug!("Autostart enabled"),
+                                Err(e) => tracing::error!("Failed to enable autostart: {}", e),
                             }
                         }
                     }
@@ -343,11 +346,15 @@ fn main() {
                                     .expect("Failed to get main window");
                                 main_window
                                     .unminimize()
-                                    .map_err(|e| error!("Failed to set window state: {}", e))
+                                    .map_err(|e| {
+                                        tracing::error!("Failed to set window state: {}", e)
+                                    })
                                     .ok();
                                 main_window
                                     .show()
-                                    .map_err(|e| error!("Failed to show main window: {}", e))
+                                    .map_err(|e| {
+                                        tracing::error!("Failed to show main window: {}", e)
+                                    })
                                     .ok();
                             }
                         })
@@ -394,7 +401,10 @@ fn main() {
                         let activity_timeline_handle = db_app_handle.clone();
                         tauri::async_runtime::spawn(async move {
                             while let Ok(activity_event) = activity_receiver.recv().await {
-                                debug!("Activity changed to: {}", activity_event.name.clone(),);
+                                tracing::debug!(
+                                    "Activity changed to: {}",
+                                    activity_event.name.clone(),
+                                );
 
                                 let mut primary_icon_color = None;
                                 let mut icon_base64 = None;
@@ -431,9 +441,9 @@ fn main() {
 
                         let mut timeline = timeline_mutex.lock().await;
                         if let Err(e) = timeline.start().await {
-                            error!("Failed to start timeline collection: {}", e);
+                            tracing::error!("Failed to start timeline collection: {}", e);
                         } else {
-                            debug!("Timeline collection started successfully");
+                            tracing::debug!("Timeline collection started successfully");
                         }
                     });
 
@@ -443,7 +453,7 @@ fn main() {
                     tauri::async_runtime::spawn(async move {
                         let user_controller = euro_user::Controller::new(path, user_channel_rx)
                             .map_err(|e| {
-                                error!("Failed to create user controller: {}", e);
+                                tracing::error!("Failed to create user controller: {}", e);
                                 e
                             })
                             .unwrap();

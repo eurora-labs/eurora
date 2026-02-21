@@ -1,7 +1,6 @@
 use euro_endpoint::DEFAULT_API_URL;
 use euro_secret::{Sensitive, secret};
 use tauri::{AppHandle, Manager, Runtime};
-use tracing::error;
 use url::Url;
 
 use crate::shared_types::{SharedAppSettings, SharedEndpointManager, SharedUserController};
@@ -121,13 +120,13 @@ impl AuthApi for AuthApiImpl {
                     Ok(true)
                 }
                 Err(e) => {
-                    error!("Login by login token failed: {}", e);
+                    tracing::error!("Login by login token failed: {}", e);
 
                     Ok(false)
                 }
             }
         } else {
-            error!("Failed to initialize prompt kit service: Invalid configuration");
+            tracing::error!("Failed to initialize prompt kit service: Invalid configuration");
 
             Ok(false)
         }

@@ -4,7 +4,6 @@ use euro_activity::{SavedAssetInfo, types::SnapshotFunctionality};
 use std::sync::Arc;
 use tokio::sync::{Mutex, watch};
 use tonic::transport::Channel;
-use tracing::{debug, info};
 
 use crate::{
     ActivityStorage, AssetFunctionality, ContextChip, TimelineError, collector::CollectorService,
@@ -39,21 +38,21 @@ impl TimelineManager {
     }
 
     pub async fn start(&mut self) -> TimelineResult<()> {
-        debug!("Starting timeline manager");
+        tracing::debug!("Starting timeline manager");
 
-        info!("Starting browser bridge gRPC server");
+        tracing::info!("Starting browser bridge gRPC server");
         euro_browser::start_browser_bridge_server().await;
 
         self.collector.start().await
     }
 
     pub async fn stop(&mut self) -> TimelineResult<()> {
-        debug!("Stopping timeline manager");
+        tracing::debug!("Stopping timeline manager");
 
-        info!("Stopping browser bridge gRPC server");
+        tracing::info!("Stopping browser bridge gRPC server");
         euro_browser::stop_browser_bridge_server().await;
 
-        info!("Timeline manager stopped");
+        tracing::info!("Timeline manager stopped");
 
         Ok(())
     }

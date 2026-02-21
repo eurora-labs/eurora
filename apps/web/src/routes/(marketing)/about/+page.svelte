@@ -15,7 +15,7 @@
 <div class="container mx-auto max-w-5xl px-4 py-16">
 	<div class="mb-12 text-center">
 		<h1 class="mb-4 text-4xl font-bold">About Us</h1>
-		<p class="mx-auto max-w-2xl text-xl text-gray-600">
+		<p class="mx-auto max-w-2xl text-xl text-muted-foreground">
 			Meet the team behind Eurora. We're passionate about creating intelligent AI solutions
 			that respect your privacy.
 		</p>
@@ -24,18 +24,18 @@
 	<Card.Root class="mb-12 p-6">
 		<Card.Header>
 			<div class="flex items-center gap-2">
-				<UsersIcon class="h-6 w-6 text-purple-600" />
+				<UsersIcon class="h-6 w-6 text-primary" />
 				<Card.Title>Our Mission</Card.Title>
 			</div>
 		</Card.Header>
 		<Card.Content>
-			<p class="mb-4 text-gray-600">
+			<p class="mb-4 text-muted-foreground">
 				At Eurora, we believe in intelligence without compromise. Our mission is to create
 				AI tools that enhance human capabilities while maintaining the highest standards of
 				privacy and security. We're committed to developing technology that works for
 				people, not the other way around.
 			</p>
-			<p class="text-gray-600">
+			<p class="text-muted-foreground">
 				Founded in 2025, our team brings together expertise in artificial intelligence,
 				privacy engineering, and user experience design to build the next generation of AI
 				assistants that you can truly trust.
@@ -56,16 +56,16 @@
 					/>
 
 					<Card.Title>Laura Thommen</Card.Title>
-					<p class="font-medium text-purple-600">Chief Executive Officer</p>
+					<p class="font-medium text-primary">Chief Executive Officer</p>
 				</div>
 			</Card.Header>
 			<Card.Content>
 				<div class="space-y-4">
 					<div>
 						<h3 class="flex items-center gap-2 font-medium">
-							<BriefcaseIcon class="h-4 w-4 text-purple-600" /> Experience
+							<BriefcaseIcon class="h-4 w-4 text-primary" /> Experience
 						</h3>
-						<p class="text-gray-600">
+						<p class="text-muted-foreground">
 							Demonstrated breadth of experience from sales to management, driving new
 							product adoption and revenue growth with over 30 years of experience
 							working for manufacturers such as Apple, Adobe, Avid, DDN Storage and
@@ -74,9 +74,9 @@
 					</div>
 					<div>
 						<h3 class="flex items-center gap-2 font-medium">
-							<GraduationCapIcon class="h-4 w-4 text-purple-600" /> Education
+							<GraduationCapIcon class="h-4 w-4 text-primary" /> Education
 						</h3>
-						<p class="text-gray-600">
+						<p class="text-muted-foreground">
 							MBA from Pepperdine University, BS in Business Administration with a
 							minor in Finance from the University of Southern California.
 						</p>
@@ -105,16 +105,16 @@
 						class="mb-4 h-32 w-32 rounded-full object-cover"
 					/>
 					<Card.Title>Andre Roelofs</Card.Title>
-					<p class="font-medium text-purple-600">Chief Technology Officer</p>
+					<p class="font-medium text-primary">Chief Technology Officer</p>
 				</div>
 			</Card.Header>
 			<Card.Content>
 				<div class="space-y-4">
 					<div>
 						<h3 class="flex items-center gap-2 font-medium">
-							<BriefcaseIcon class="h-4 w-4 text-purple-600" /> Experience
+							<BriefcaseIcon class="h-4 w-4 text-primary" /> Experience
 						</h3>
-						<p class="text-gray-600">
+						<p class="text-muted-foreground">
 							Founder and CTO of Eurora Labs, previously Head of Engineering and
 							Machine Learning at Cuebric. Led development of award-winning AI
 							solutions, specializing in software architecture, machine learning, and
@@ -123,9 +123,9 @@
 					</div>
 					<div>
 						<h3 class="flex items-center gap-2 font-medium">
-							<GraduationCapIcon class="h-4 w-4 text-purple-600" /> Education
+							<GraduationCapIcon class="h-4 w-4 text-primary" /> Education
 						</h3>
-						<p class="text-gray-600">
+						<p class="text-muted-foreground">
 							BS in Computer Science from Avans University of Applied Sciences;
 							graduate studies in AI at Maastricht University.
 						</p>
@@ -155,16 +155,16 @@
 					/>
 
 					<Card.Title>Linda Rosner</Card.Title>
-					<p class="font-medium text-purple-600">Chief Operations Officer</p>
+					<p class="font-medium text-primary">Chief Operations Officer</p>
 				</div>
 			</Card.Header>
 			<Card.Content>
 				<div class="space-y-4">
 					<div>
 						<h3 class="flex items-center gap-2 font-medium">
-							<BriefcaseIcon class="h-4 w-4 text-purple-600" /> Experience
+							<BriefcaseIcon class="h-4 w-4 text-primary" /> Experience
 						</h3>
-						<p class="text-gray-600">
+						<p class="text-muted-foreground">
 							Co-founder of ArtisansPR, with deep expertise in media, entertainment,
 							and tech communications. Serves on HPA’s Awards Committee and formerly
 							chaired SMPTE Hollywood’s Board. Founding Board Member of EIPMA and
@@ -173,9 +173,9 @@
 					</div>
 					<div>
 						<h3 class="flex items-center gap-2 font-medium">
-							<GraduationCapIcon class="h-4 w-4 text-purple-600" /> Education
+							<GraduationCapIcon class="h-4 w-4 text-primary" /> Education
 						</h3>
-						<p class="text-gray-600">BA in Theater from UCLA.</p>
+						<p class="text-muted-foreground">BA in Theater from UCLA.</p>
 					</div>
 					<div class="mt-4 flex justify-center gap-3">
 						<Button variant="ghost" size="icon" class="h-8 w-8">
@@ -193,10 +193,10 @@
 		</Card.Root>
 	</div>
 
-	<Card.Root class="mb-16 border-none bg-purple-50 p-6">
+	<Card.Root class="mb-16 border-none bg-muted p-6">
 		<Card.Content class="text-center">
 			<h2 class="mb-4 text-2xl font-bold">Join Our Team</h2>
-			<p class="mx-auto mb-6 max-w-2xl text-gray-600">
+			<p class="mx-auto mb-6 max-w-2xl text-muted-foreground">
 				We're always looking for talented individuals who are passionate about AI, privacy,
 				and creating exceptional user experiences. Check out our open positions and become
 				part of our journey.
@@ -212,7 +212,7 @@
 				<Card.Title>Privacy First</Card.Title>
 			</Card.Header>
 			<Card.Content>
-				<p class="text-gray-600">
+				<p class="text-muted-foreground">
 					We believe that privacy is a fundamental right. All our products are designed
 					with privacy as a core principle, not an afterthought.
 				</p>
@@ -224,7 +224,7 @@
 				<Card.Title>User-Centered Design</Card.Title>
 			</Card.Header>
 			<Card.Content>
-				<p class="text-gray-600">
+				<p class="text-muted-foreground">
 					We create technology that adapts to how people work, not the other way around.
 					Our products are intuitive, accessible, and designed for real human needs.
 				</p>
@@ -236,7 +236,7 @@
 				<Card.Title>Ethical AI</Card.Title>
 			</Card.Header>
 			<Card.Content>
-				<p class="text-gray-600">
+				<p class="text-muted-foreground">
 					We're committed to developing AI that is fair, transparent, and beneficial to
 					society. We actively work to identify and mitigate biases in our systems.
 				</p>
@@ -248,7 +248,7 @@
 				<Card.Title>Continuous Innovation</Card.Title>
 			</Card.Header>
 			<Card.Content>
-				<p class="text-gray-600">
+				<p class="text-muted-foreground">
 					We're never satisfied with the status quo. We continuously push the boundaries
 					of what's possible to deliver ever-improving experiences to our users.
 				</p>
@@ -256,10 +256,10 @@
 		</Card.Root>
 	</div>
 
-	<Card.Root class="border-none bg-purple-50 p-8">
+	<Card.Root class="border-none bg-muted p-8">
 		<Card.Content class="text-center">
 			<h2 class="mb-4 text-3xl font-bold">Want to Learn More?</h2>
-			<p class="mx-auto mb-6 max-w-2xl text-xl text-gray-600">
+			<p class="mx-auto mb-6 max-w-2xl text-xl text-muted-foreground">
 				Have questions about our team or company? We'd love to hear from you.
 			</p>
 			<Button href="/contact" size="lg" class="px-8">Contact Us</Button>

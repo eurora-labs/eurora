@@ -13,7 +13,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 #[allow(unused_imports)]
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tracing::info;
 use util::*;
 
 /// Test macOS Accessibility permission handling
@@ -23,16 +22,16 @@ use util::*;
 #[ignore] // Only run when AX_ALLOWED=1 is set
 fn test_macos_accessibility_permission() {
     if env::var("AX_ALLOWED").unwrap_or_default() != "1" {
-        info!("Skipping macOS accessibility test - AX_ALLOWED=1 not set");
+        tracing::info!("Skipping macOS accessibility test - AX_ALLOWED=1 not set");
         return;
     }
 
     if !should_run_integration_tests() {
-        info!("Skipping integration test - INTEGRATION_TEST=1 not set");
+        tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
     }
 
-    info!("Testing macOS Accessibility permission handling");
+    tracing::info!("Testing macOS Accessibility permission handling");
 
     let tracker = FocusTracker::new();
     let stop_signal = AtomicBool::new(false);
@@ -41,7 +40,7 @@ fn test_macos_accessibility_permission() {
     let focus_events_clone = Arc::clone(&focus_events);
     let result = tracker.track_focus_with_stop(
         move |window: FocusedWindow| -> FocusTrackerResult<()> {
-            info!("Focus event received: {:?}", window);
+            tracing::info!("Focus event received: {:?}", window);
             if let Ok(mut events) = focus_events_clone.lock() {
                 events.push(window);
             }
@@ -55,18 +54,18 @@ fn test_macos_accessibility_permission() {
 
     match result {
         Ok(_) => {
-            info!("Focus tracking succeeded - accessibility permission likely granted");
+            tracing::info!("Focus tracking succeeded - accessibility permission likely granted");
             if let Ok(events) = focus_events.lock()
                 && events.iter().any(|w| w.window_title.is_none())
             {
-                info!("Some windows had no title - possible permission issue");
+                tracing::info!("Some windows had no title - possible permission issue");
             }
         }
         Err(FocusTrackerError::PermissionDenied { .. }) => {
-            info!("Expected PermissionDenied error received");
+            tracing::info!("Expected PermissionDenied error received");
         }
         Err(e) => {
-            info!("Unexpected error (but didn't panic): {}", e);
+            tracing::info!("Unexpected error (but didn't panic): {}", e);
         }
     }
 }
@@ -77,14 +76,14 @@ fn test_macos_accessibility_permission() {
 #[serial]
 fn test_macos_accessibility_no_permission_mock() {
     if !should_run_integration_tests() {
-        info!("Skipping integration test - INTEGRATION_TEST=1 not set");
+        tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
     }
 
-    info!("Testing macOS Accessibility mock permission denial");
+    tracing::info!("Testing macOS Accessibility mock permission denial");
 
     let tracker = FocusTracker::new();
-    info!("FocusTracker created successfully: {:?}", tracker);
+    tracing::info!("FocusTracker created successfully: {:?}", tracker);
 
     let stop_signal = AtomicBool::new(false);
 
@@ -93,7 +92,7 @@ fn test_macos_accessibility_no_permission_mock() {
     let result = tracker.track_focus_with_stop(
         |window: FocusedWindow| -> FocusTrackerResult<()> {
             if window.window_title.is_none() {
-                info!("Received window with no title - possible permission issue");
+                tracing::info!("Received window with no title - possible permission issue");
             }
             Ok(())
         },
@@ -101,8 +100,8 @@ fn test_macos_accessibility_no_permission_mock() {
     );
 
     match result {
-        Ok(_) => info!("Focus tracking completed without error"),
-        Err(e) => info!("Focus tracking failed gracefully: {}", e),
+        Ok(_) => tracing::info!("Focus tracking completed without error"),
+        Err(e) => tracing::info!("Focus tracking failed gracefully: {}", e),
     }
 }
 
@@ -112,16 +111,16 @@ fn test_macos_accessibility_no_permission_mock() {
 #[serial]
 fn test_wayland_unsupported_compositor() {
     if !should_run_integration_tests() {
-        info!("Skipping integration test - INTEGRATION_TEST=1 not set");
+        tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
     }
 
     if !should_use_wayland() {
-        info!("Skipping Wayland test - not in Wayland environment");
+        tracing::info!("Skipping Wayland test - not in Wayland environment");
         return;
     }
 
-    info!("Testing Wayland unsupported compositor handling");
+    tracing::info!("Testing Wayland unsupported compositor handling");
 
     let tracker = FocusTracker::new();
     let stop_signal = AtomicBool::new(false);
@@ -138,7 +137,7 @@ fn test_wayland_unsupported_compositor() {
 
     let result = tracker.track_focus_with_stop(
         |window: FocusedWindow| -> FocusTrackerResult<()> {
-            info!(
+            tracing::info!(
                 "Unexpected focus event in unsupported environment: {:?}",
                 window
             );
@@ -151,13 +150,13 @@ fn test_wayland_unsupported_compositor() {
 
     match result {
         Ok(_) => {
-            info!("Focus tracking completed - compositor may be supported");
+            tracing::info!("Focus tracking completed - compositor may be supported");
         }
         Err(FocusTrackerError::Unsupported) => {
-            info!("Expected Unsupported error received - test passed");
+            tracing::info!("Expected Unsupported error received - test passed");
         }
         Err(e) => {
-            info!("Received error (didn't panic): {}", e);
+            tracing::info!("Received error (didn't panic): {}", e);
         }
     }
 }
@@ -168,11 +167,11 @@ fn test_wayland_unsupported_compositor() {
 #[serial]
 fn test_missing_x_server() {
     if !should_run_integration_tests() {
-        info!("Skipping integration test - INTEGRATION_TEST=1 not set");
+        tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
     }
 
-    info!("Testing missing X server handling");
+    tracing::info!("Testing missing X server handling");
 
     let original_display = env::var("DISPLAY").ok();
 
@@ -193,7 +192,7 @@ fn test_missing_x_server() {
 
         tracker.track_focus_with_stop(
             |window: FocusedWindow| -> FocusTrackerResult<()> {
-                info!("Unexpected focus event without display: {:?}", window);
+                tracing::info!("Unexpected focus event without display: {:?}", window);
                 Ok(())
             },
             &stop_signal,
@@ -214,16 +213,16 @@ fn test_missing_x_server() {
     match result {
         Ok(track_result) => match track_result {
             Ok(_) => {
-                info!("Focus tracking completed unexpectedly without display");
+                tracing::info!("Focus tracking completed unexpectedly without display");
             }
             Err(FocusTrackerError::NoDisplay) => {
-                info!("Expected NoDisplay error received - test passed");
+                tracing::info!("Expected NoDisplay error received - test passed");
             }
             Err(FocusTrackerError::Unsupported) => {
-                info!("Received Unsupported error - acceptable fallback");
+                tracing::info!("Received Unsupported error - acceptable fallback");
             }
             Err(e) => {
-                info!("Received error without panic: {}", e);
+                tracing::info!("Received error without panic: {}", e);
             }
         },
         Err(_) => {
@@ -238,11 +237,11 @@ fn test_missing_x_server() {
 #[serial]
 fn test_windows_service_context_mock() {
     if !should_run_integration_tests() {
-        info!("Skipping integration test - INTEGRATION_TEST=1 not set");
+        tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
     }
 
-    info!("Testing Windows service context handling (mock)");
+    tracing::info!("Testing Windows service context handling (mock)");
 
     let tracker = FocusTracker::new();
     let stop_signal = AtomicBool::new(false);
@@ -251,7 +250,7 @@ fn test_windows_service_context_mock() {
 
     let result = tracker.track_focus_with_stop(
         |window: FocusedWindow| -> FocusTrackerResult<()> {
-            info!("Focus event in service context: {:?}", window);
+            tracing::info!("Focus event in service context: {:?}", window);
             Ok(())
         },
         &stop_signal,
@@ -259,13 +258,13 @@ fn test_windows_service_context_mock() {
 
     match result {
         Ok(_) => {
-            info!("Focus tracking completed - interactive session available");
+            tracing::info!("Focus tracking completed - interactive session available");
         }
         Err(FocusTrackerError::NotInteractiveSession) => {
-            info!("Expected NotInteractiveSession error received - test passed");
+            tracing::info!("Expected NotInteractiveSession error received - test passed");
         }
         Err(e) => {
-            info!("Received error without panic: {}", e);
+            tracing::info!("Received error without panic: {}", e);
         }
     }
 }
@@ -275,21 +274,21 @@ fn test_windows_service_context_mock() {
 #[serial]
 fn test_error_handling_robustness() {
     if !should_run_integration_tests() {
-        info!("Skipping integration test - INTEGRATION_TEST=1 not set");
+        tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
     }
 
-    info!("Testing general error handling robustness");
+    tracing::info!("Testing general error handling robustness");
 
     let result = std::panic::catch_unwind(|| {
         let tracker = FocusTracker::new();
-        info!("FocusTracker created: {:?}", tracker);
+        tracing::info!("FocusTracker created: {:?}", tracker);
         tracker
     });
 
     match result {
         Ok(_tracker) => {
-            info!("FocusTracker creation succeeded without panic");
+            tracing::info!("FocusTracker creation succeeded without panic");
         }
         Err(_) => {
             panic!("FocusTracker creation panicked - test failed");
@@ -300,7 +299,7 @@ fn test_error_handling_robustness() {
 /// Test that all error types can be created and displayed
 #[test]
 fn test_error_types() {
-    info!("Testing all error types");
+    tracing::info!("Testing all error types");
 
     let errors: Vec<FocusTrackerError> = vec![
         FocusTrackerError::Unsupported,
@@ -321,11 +320,11 @@ fn test_error_types() {
     ];
 
     for error in errors {
-        info!("Error: {}", error);
-        info!("Debug: {:?}", error);
+        tracing::info!("Error: {}", error);
+        tracing::info!("Debug: {:?}", error);
     }
 
-    info!("All error types tested successfully");
+    tracing::info!("All error types tested successfully");
 }
 
 /// Test timeout behavior to ensure tests don't hang
@@ -333,11 +332,11 @@ fn test_error_types() {
 #[serial]
 fn test_timeout_behavior() {
     if !should_run_integration_tests() {
-        info!("Skipping integration test - INTEGRATION_TEST=1 not set");
+        tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
     }
 
-    info!("Testing timeout behavior");
+    tracing::info!("Testing timeout behavior");
 
     let tracker = FocusTracker::new();
     let stop_signal = AtomicBool::new(false);
@@ -356,7 +355,7 @@ fn test_timeout_behavior() {
 
     let result = tracker.track_focus_with_stop(
         |window: FocusedWindow| -> FocusTrackerResult<()> {
-            info!("Focus event: {:?}", window);
+            tracing::info!("Focus event: {:?}", window);
             Ok(())
         },
         &stop_signal,
@@ -364,7 +363,7 @@ fn test_timeout_behavior() {
 
     let elapsed = start_time.elapsed();
 
-    info!("Focus tracking completed in {:?}", elapsed);
+    tracing::info!("Focus tracking completed in {:?}", elapsed);
 
     assert!(
         elapsed < Duration::from_secs(2),
@@ -372,7 +371,7 @@ fn test_timeout_behavior() {
     );
 
     match result {
-        Ok(_) => info!("Focus tracking completed successfully"),
-        Err(e) => info!("Focus tracking failed gracefully: {}", e),
+        Ok(_) => tracing::info!("Focus tracking completed successfully"),
+        Err(e) => tracing::info!("Focus tracking failed gracefully: {}", e),
     }
 }

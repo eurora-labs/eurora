@@ -12,7 +12,6 @@ use tower_governor::{
     GovernorLayer, governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor,
 };
 use tower_http::trace::TraceLayer;
-use tracing::debug;
 
 pub mod analytics;
 pub mod auth;
@@ -67,7 +66,7 @@ pub fn create_router(state: Arc<AppState>) -> Result<Router> {
 }
 
 pub fn init_payment_service(db: Arc<DatabaseManager>) -> Result<Router> {
-    debug!("Initializing payment service");
+    tracing::debug!("Initializing payment service");
 
     let state = Arc::new(AppState::from_env(db).context("Failed to create payment service state")?);
 

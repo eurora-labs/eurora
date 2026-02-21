@@ -6,7 +6,6 @@ use std::{
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, mpsc},
     time::Duration,
 };
-use tracing::{debug, error};
 
 use crate::AppSettings;
 
@@ -118,14 +117,14 @@ impl SettingsWithDiskSync {
                             continue;
                         };
                         if let Ok(update) = AppSettings::load(&config_path) {
-                            debug!("settings.json modified; refreshing settings");
+                            tracing::debug!("settings.json modified; refreshing settings");
                             *last_seen_settings = update.clone();
                             send_event(update)?;
                         }
                     }
 
                     Err(_) => {
-                        error!(
+                        tracing::error!(
                             "Error watching config file {:?} - watcher terminated",
                             config_path
                         );

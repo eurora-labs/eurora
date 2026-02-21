@@ -16,7 +16,6 @@ use be_local_settings::{
 };
 use be_storage::StorageService;
 use tonic::{Request, Response, Status};
-use tracing::info;
 
 pub struct LocalSettingsService {
     storage: Arc<StorageService>,
@@ -47,7 +46,7 @@ impl ProtoLocalSettingsService for LocalSettingsService {
         let key = be_encrypt::MainKey::from_base64(&req.encryption_key)
             .map_err(LocalSettingsError::from)?;
 
-        info!("Encryption key received from client, enabling asset encryption");
+        tracing::info!("Encryption key received from client, enabling asset encryption");
         self.storage.set_encryption_key(key);
 
         Ok(Response::new(SetEncryptionKeyResponse { success: true }))
@@ -66,7 +65,7 @@ impl ProtoLocalSettingsService for LocalSettingsService {
             .try_into()
             .map_err(LocalSettingsError::from)?;
 
-        info!("Provider settings updated: {:?}", provider);
+        tracing::info!("Provider settings updated: {:?}", provider);
 
         let response_proto: proto::ProviderSettings = (&provider).into();
 

@@ -8,7 +8,6 @@ use rand::{TryRngCore, rngs::OsRng};
 use sha2::{Digest, Sha256};
 use tokio::sync::watch;
 use tonic::transport::Channel;
-use tracing::error;
 
 #[derive(Debug, Clone)]
 pub struct JwtConfig {
@@ -99,7 +98,7 @@ impl AuthManager {
                     self.get_access_token()
                 } else {
                     self.refresh_tokens().await.map_err(|err| {
-                        error!("Failed to refresh tokens: {}", err);
+                        tracing::error!("Failed to refresh tokens: {}", err);
                         err
                     })?;
                     self.get_access_token()
@@ -108,7 +107,7 @@ impl AuthManager {
 
             Err(_) => {
                 self.refresh_tokens().await.map_err(|err| {
-                    error!("Failed to refresh tokens: {}", err);
+                    tracing::error!("Failed to refresh tokens: {}", err);
                     err
                 })?;
                 self.get_access_token()
@@ -130,7 +129,7 @@ impl AuthManager {
     pub async fn get_login_tokens(&self) -> Result<(String, String)> {
         let mut verifier_bytes = vec![0u8; 32];
         OsRng.try_fill_bytes(&mut verifier_bytes).map_err(|e| {
-            error!("Failed to generate random bytes: {}", e);
+            tracing::error!("Failed to generate random bytes: {}", e);
             anyhow!("Failed to generate random bytes")
         })?;
 

@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use casbin::{CoreApi, DefaultModel, Enforcer, MgmtApi, prelude::FileAdapter};
-use tracing::info;
 
 use crate::AuthzError;
 
@@ -20,7 +19,7 @@ impl CasbinAuthz {
             .await
             .map_err(|e| AuthzError::Init(e.to_string()))?;
 
-        info!(
+        tracing::info!(
             policies = enforcer.get_policy().len(),
             "Casbin enforcer initialized"
         );

@@ -3,7 +3,6 @@ use focus_tracker_core::IconConfig;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tracing::debug;
 
 #[cfg(feature = "async")]
 use std::future::Future;
@@ -87,7 +86,7 @@ fn poll_focus_change(
     let (title, process_name) = match utils::get_window_info(hwnd) {
         Ok(info) => info,
         Err(e) => {
-            debug!("Failed to get window info: {e}");
+            tracing::debug!("Failed to get window info: {e}");
             return None;
         }
     };
@@ -183,7 +182,7 @@ impl ImplFocusTracker {
 
         loop {
             if should_stop(stop_signal) {
-                debug!("Stop signal received, exiting focus tracking loop");
+                tracing::debug!("Stop signal received, exiting focus tracking loop");
                 break;
             }
 
@@ -218,7 +217,7 @@ impl ImplFocusTracker {
 
         loop {
             if should_stop(stop_signal) {
-                debug!("Stop signal received, exiting focus tracking loop");
+                tracing::debug!("Stop signal received, exiting focus tracking loop");
                 break;
             }
 
@@ -248,11 +247,11 @@ fn resolve_icon(
     let image = match extract_window_icon(hwnd, icon_config) {
         Ok(img) => img,
         Err(e) => {
-            debug!("Failed to extract window icon: {e}, trying exe fallback");
+            tracing::debug!("Failed to extract window icon: {e}, trying exe fallback");
             match extract_exe_icon(process_id, icon_config) {
                 Ok(img) => img,
                 Err(e2) => {
-                    debug!("Failed to extract exe icon: {e2}");
+                    tracing::debug!("Failed to extract exe icon: {e2}");
                     return None;
                 }
             }

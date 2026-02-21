@@ -190,9 +190,9 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Eurora's threadal abilities go beyond simple command-response interactions. Have
-					natural, flowing threads with follow-up questions, clarifications, and even
-					humor.
+					Eurora's conversational abilities go beyond simple command-response
+					interactions. Have natural, flowing threads with follow-up questions,
+					clarifications, and even humor.
 				</p>
 				<div class="mb-4 rounded-md border border-gray-200 bg-gray-50 p-4">
 					<div class="mb-3 flex gap-2">

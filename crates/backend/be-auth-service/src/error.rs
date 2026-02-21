@@ -1,6 +1,5 @@
 use crate::crypto::CryptoError;
 use thiserror::Error;
-use tracing::error;
 
 #[derive(Debug, Error)]
 pub enum AuthError {
@@ -61,27 +60,27 @@ impl From<AuthError> for tonic::Status {
             }
 
             AuthError::PasswordHash(ref msg) => {
-                error!("Password hashing error: {msg}");
+                tracing::error!("Password hashing error: {msg}");
                 tonic::Status::internal("Authentication error")
             }
             AuthError::TokenGeneration(ref msg) => {
-                error!("Token generation error: {msg}");
+                tracing::error!("Token generation error: {msg}");
                 tonic::Status::internal("Token generation error")
             }
             AuthError::Database(ref e) => {
-                error!("Database error: {e}");
+                tracing::error!("Database error: {e}");
                 tonic::Status::internal("Internal database error")
             }
             AuthError::OAuth(ref e) => {
-                error!("OAuth error: {e}");
+                tracing::error!("OAuth error: {e}");
                 tonic::Status::internal("OAuth authentication error")
             }
             AuthError::Crypto(ref e) => {
-                error!("Crypto error: {e}");
+                tracing::error!("Crypto error: {e}");
                 tonic::Status::internal("Internal security error")
             }
             AuthError::Internal(ref msg) => {
-                error!("Internal error: {msg}");
+                tracing::error!("Internal error: {msg}");
                 tonic::Status::internal("Internal error")
             }
         }

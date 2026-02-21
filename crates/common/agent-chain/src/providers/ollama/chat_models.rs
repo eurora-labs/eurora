@@ -30,7 +30,6 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncBufReadExt;
 use tokio_util::io::StreamReader;
-use tracing::warn;
 
 use super::compat::convert_from_v1_to_ollama;
 use super::utils::{merge_auth_headers, parse_url_with_auth, validate_model};
@@ -1182,7 +1181,7 @@ impl ChatOllama {
                     && stream_resp.done_reason.as_deref() == Some("load")
                     && content.trim().is_empty()
                 {
-                    warn!(
+                    tracing::warn!(
                         "Ollama returned empty response with done_reason='load'. \
                          This typically indicates the model was loaded but no content \
                          was generated. Skipping this response."

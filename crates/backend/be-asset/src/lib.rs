@@ -8,7 +8,6 @@ use be_remote_db::DatabaseManager;
 use be_storage::StorageService;
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
-use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use proto_gen::asset::{Asset, AssetResponse, CreateAssetRequest};
@@ -21,7 +20,7 @@ pub struct AssetService {
 
 impl AssetService {
     pub fn new(db: Arc<DatabaseManager>, storage: Arc<StorageService>) -> Self {
-        info!("Creating new AssetsService instance");
+        tracing::info!("Creating new AssetsService instance");
         Self { db, storage }
     }
 
@@ -66,7 +65,7 @@ impl AssetService {
         req: CreateAssetRequest,
         user_id: Uuid,
     ) -> AssetResult<AssetResponse> {
-        info!("CreateAsset request received");
+        tracing::info!("CreateAsset request received");
 
         if req.content.is_empty() {
             return Err(AssetError::EmptyContent);
@@ -79,7 +78,7 @@ impl AssetService {
         let checksum_sha256 = StorageService::calculate_sha256(&req.content);
         let size_bytes = req.content.len() as i64;
 
-        debug!(
+        tracing::debug!(
             "Processing asset: {} bytes, SHA256: {}",
             size_bytes,
             hex::encode(&checksum_sha256)
@@ -92,7 +91,7 @@ impl AssetService {
             .upload(&user_id, &asset_id, &req.content, &req.mime_type)
             .await
             .map_err(|e| {
-                error!("Failed to upload asset to storage: {}", e);
+                tracing::error!("Failed to upload asset to storage: {}", e);
                 AssetError::StorageUpload(e)
             })?;
 
@@ -118,7 +117,7 @@ impl AssetService {
             .call()
             .await
             .map_err(|e| {
-                error!("Failed to create asset in database: {}", e);
+                tracing::error!("Failed to create asset in database: {}", e);
                 AssetError::DatabaseCreate(e)
             })?;
 
@@ -130,12 +129,12 @@ impl AssetService {
                 .link_asset_to_activity(activity_id, asset.id, user_id)
                 .await
                 .map_err(|e| {
-                    error!("Failed to link asset to activity: {}", e);
+                    tracing::error!("Failed to link asset to activity: {}", e);
                     AssetError::DatabaseLinkActivity(e)
                 })?;
         }
 
-        debug!("Created asset {} for user {}", asset.id, user_id);
+        tracing::debug!("Created asset {} for user {}", asset.id, user_id);
 
         Ok(AssetResponse {
             asset: Some(Self::db_asset_to_proto(&asset)),

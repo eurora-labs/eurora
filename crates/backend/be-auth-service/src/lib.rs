@@ -15,7 +15,6 @@ use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tokio::sync::OnceCell;
 use tonic::{Request, Response, Status};
-use tracing::{error, info, warn};
 use uuid::Uuid;
 
 use argon2::{
@@ -41,9 +40,9 @@ pub struct AuthService {
 
 impl AuthService {
     pub fn new(db: Arc<DatabaseManager>, jwt_config: JwtConfig) -> Self {
-        info!("Creating new AuthService instance");
+        tracing::info!("Creating new AuthService instance");
         let desktop_login_url = std::env::var("DESKTOP_LOGIN_URL").unwrap_or_else(|e| {
-            error!("DESKTOP_LOGIN_URL environment variable not set: {}", e);
+            tracing::error!("DESKTOP_LOGIN_URL environment variable not set: {}", e);
             "http://localhost:5173/login".to_string()
         });
         Self {
@@ -261,13 +260,13 @@ impl AuthService {
             .await
         {
             Ok(_) => {
-                info!(
+                tracing::info!(
                     "Successfully associated login token with user: {}",
                     user.username
                 );
             }
             Err(e) => {
-                error!("Failed to update login token with user_id: {}", e);
+                tracing::error!("Failed to update login token with user_id: {}", e);
             }
         }
     }
@@ -366,21 +365,21 @@ impl AuthService {
         let state = &creds.state;
 
         if code.is_empty() {
-            warn!("Google login attempt with empty authorization code");
+            tracing::warn!("Google login attempt with empty authorization code");
             return Err(AuthError::InvalidInput(
                 "Authorization code is required".into(),
             ));
         }
 
         if state.is_empty() {
-            warn!("Google login attempt with empty state parameter");
+            tracing::warn!("Google login attempt with empty state parameter");
             return Err(AuthError::InvalidInput(
                 "State parameter is required".into(),
             ));
         }
 
         let oauth_state = self.db.get_oauth_state_by_state(state).await.map_err(|_| {
-            warn!("Invalid or expired OAuth state: {}", state);
+            tracing::warn!("Invalid or expired OAuth state: {}", state);
             AuthError::InvalidInput("Invalid or expired state parameter".into())
         })?;
 
@@ -396,7 +395,7 @@ impl AuthService {
 
         // Must succeed to prevent replay attacks
         self.db.consume_oauth_state(state).await.map_err(|e| {
-            error!("Failed to consume OAuth state: {}", e);
+            tracing::error!("Failed to consume OAuth state: {}", e);
             AuthError::Internal("Failed to process OAuth state".into())
         })?;
 
@@ -406,7 +405,7 @@ impl AuthService {
             .await?;
 
         if !user_info.verified_email {
-            warn!(
+            tracing::warn!(
                 "Google login rejected: email {} not verified",
                 user_info.email
             );
@@ -445,7 +444,7 @@ impl AuthService {
                         .call()
                         .await
                 {
-                    warn!("Failed to update OAuth credentials: {}", e);
+                    tracing::warn!("Failed to update OAuth credentials: {}", e);
                 }
 
                 user
@@ -499,7 +498,7 @@ impl AuthService {
                                     {
                                         counter += 1;
                                         if counter >= MAX_RETRIES {
-                                            error!(
+                                            tracing::error!(
                                                 "Failed to create unique username after {} attempts",
                                                 MAX_RETRIES
                                             );
@@ -508,9 +507,11 @@ impl AuthService {
                                             ));
                                         }
                                         final_username = format!("{}_{}", username, counter);
-                                        info!(
+                                        tracing::info!(
                                             "Username conflict on '{}' ({}), retrying with '{}'",
-                                            field, value, final_username
+                                            field,
+                                            value,
+                                            final_username
                                         );
                                     }
                                     Err(e) => return Err(AuthError::Database(e)),
@@ -561,7 +562,7 @@ impl AuthService {
         &self,
         _creds: ThirdPartyCredentials,
     ) -> Result<Response<TokenResponse>, Status> {
-        info!("Handling GitHub login");
+        tracing::info!("Handling GitHub login");
         todo!()
     }
 }
@@ -572,11 +573,11 @@ impl ProtoAuthService for AuthService {
         &self,
         request: Request<LoginRequest>,
     ) -> Result<Response<TokenResponse>, Status> {
-        info!("Login request received");
+        tracing::info!("Login request received");
         let req = request.into_inner();
 
         let credential = req.credential.ok_or_else(|| {
-            warn!("Login request missing credentials");
+            tracing::warn!("Login request missing credentials");
             Status::invalid_argument("Missing credentials")
         })?;
 
@@ -593,7 +594,7 @@ impl ProtoAuthService for AuthService {
                     Provider::Google => self.handle_google_login(creds).await.map_err(Into::into),
                     Provider::Github => self.handle_github_login(creds).await,
                     Provider::Unspecified => {
-                        warn!("Unspecified provider in OAuth request");
+                        tracing::warn!("Unspecified provider in OAuth request");
                         Err(Status::invalid_argument("Provider must be specified"))
                     }
                 }
@@ -605,7 +606,7 @@ impl ProtoAuthService for AuthService {
         &self,
         request: Request<RegisterRequest>,
     ) -> Result<Response<TokenResponse>, Status> {
-        info!("Register request received");
+        tracing::info!("Register request received");
         let req = request.into_inner();
 
         let response = self
@@ -619,7 +620,7 @@ impl ProtoAuthService for AuthService {
         &self,
         request: Request<RefreshTokenRequest>,
     ) -> Result<Response<TokenResponse>, Status> {
-        info!("Refresh token request received");
+        tracing::info!("Refresh token request received");
         let (_, refresh_token) = self.authenticate_request_refresh_token(&request)?;
         let response = self.refresh_access_token(&refresh_token).await?;
         Ok(Response::new(response))
@@ -631,7 +632,7 @@ impl ProtoAuthService for AuthService {
     ) -> Result<Response<ThirdPartyAuthUrlResponse>, Status> {
         let req = request.into_inner();
 
-        info!(
+        tracing::info!(
             "Third-party auth URL request received for provider: {:?}",
             req.provider
         );
@@ -641,7 +642,7 @@ impl ProtoAuthService for AuthService {
 
         let auth_url = match provider {
             Provider::Google => {
-                info!("Generating Google OAuth URL");
+                tracing::info!("Generating Google OAuth URL");
 
                 let google_client = self.google_oauth_client().await.map_err(Status::from)?;
 
@@ -680,11 +681,11 @@ impl ProtoAuthService for AuthService {
                 )
             }
             Provider::Github => {
-                warn!("GitHub OAuth not implemented yet");
+                tracing::warn!("GitHub OAuth not implemented yet");
                 return Err(Status::unimplemented("GitHub OAuth not implemented"));
             }
             Provider::Unspecified => {
-                warn!("Unspecified provider in OAuth request");
+                tracing::warn!("Unspecified provider in OAuth request");
                 return Err(Status::invalid_argument("Provider must be specified"));
             }
         };
@@ -704,13 +705,13 @@ impl ProtoAuthService for AuthService {
         &self,
         request: Request<LoginByLoginTokenRequest>,
     ) -> Result<Response<TokenResponse>, Status> {
-        info!("Login by login token request received");
+        tracing::info!("Login by login token request received");
 
         let req = request.into_inner();
         let code_verifier = req.token;
 
         if code_verifier.is_empty() {
-            warn!("Login by login token request received with empty token");
+            tracing::warn!("Login by login token request received with empty token");
             return Err(Status::invalid_argument("Login token is required"));
         }
 
@@ -726,13 +727,13 @@ impl ProtoAuthService for AuthService {
                 // since the caller proved identity via PKCE code_verifier.
                 match self.db.get_login_token_by_hash_any(&token_hash).await {
                     Ok(login_token) if login_token.consumed => {
-                        info!(
+                        tracing::info!(
                             "Login token already consumed, re-issuing tokens for idempotent retry"
                         );
                         login_token
                     }
                     _ => {
-                        warn!("Login token not found or expired");
+                        tracing::warn!("Login token not found or expired");
                         return Err(AuthError::InvalidToken.into());
                     }
                 }
@@ -744,7 +745,7 @@ impl ProtoAuthService for AuthService {
             .get_user_by_id(login_token.user_id)
             .await
             .map_err(|e| {
-                error!("User not found for login token: {}", e);
+                tracing::error!("User not found for login token: {}", e);
                 Status::from(AuthError::Internal("User not found".into()))
             })?;
 
@@ -776,7 +777,7 @@ impl AuthService {
         let password = creds.password;
 
         if login.is_empty() || password.is_empty() {
-            warn!("Login attempt with empty credentials");
+            tracing::warn!("Login attempt with empty credentials");
             return Err(AuthError::InvalidInput(
                 "Login and password cannot be empty".into(),
             ));
@@ -789,7 +790,7 @@ impl AuthService {
         };
 
         let user = user.map_err(|_| {
-            warn!("Login failed: user not found for {}", login);
+            tracing::warn!("Login failed: user not found for {}", login);
             AuthError::InvalidCredentials
         })?;
 
@@ -798,14 +799,14 @@ impl AuthService {
             .get_password_credentials(user.id)
             .await
             .map_err(|_| {
-                warn!("Login failed: no password credentials for {}", login);
+                tracing::warn!("Login failed: no password credentials for {}", login);
                 AuthError::InvalidCredentials
             })?;
 
         let password_valid = self.verify_password(&password, &password_creds.password_hash)?;
 
         if !password_valid {
-            warn!("Login failed: invalid password for {}", login);
+            tracing::warn!("Login failed: invalid password for {}", login);
             return Err(AuthError::InvalidCredentials);
         }
 

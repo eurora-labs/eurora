@@ -3,7 +3,6 @@ use axum::{
     response::{IntoResponse, Json, Response},
 };
 use serde::Serialize;
-use tracing::{error, warn};
 
 #[derive(Serialize)]
 pub struct ErrorResponse {
@@ -59,7 +58,7 @@ impl IntoResponse for UpdateServiceError {
     fn into_response(self) -> Response {
         let (status, error_code, message, details) = match &self {
             UpdateServiceError::InvalidVersion(v) => {
-                warn!("Invalid version provided: {}", v);
+                tracing::warn!("Invalid version provided: {}", v);
                 (
                     StatusCode::BAD_REQUEST,
                     "invalid_version",
@@ -68,7 +67,7 @@ impl IntoResponse for UpdateServiceError {
                 )
             }
             UpdateServiceError::InvalidTargetArch(t) => {
-                warn!("Invalid target architecture: {}", t);
+                tracing::warn!("Invalid target architecture: {}", t);
                 (
                     StatusCode::BAD_REQUEST,
                     "invalid_target_arch",
@@ -80,7 +79,7 @@ impl IntoResponse for UpdateServiceError {
                 )
             }
             UpdateServiceError::InvalidChannel(c) => {
-                warn!("Invalid channel: {}", c);
+                tracing::warn!("Invalid channel: {}", c);
                 (
                     StatusCode::BAD_REQUEST,
                     "invalid_channel",
@@ -92,7 +91,7 @@ impl IntoResponse for UpdateServiceError {
                 )
             }
             UpdateServiceError::InvalidExtensionChannel(c) => {
-                warn!("Invalid extension channel: {}", c);
+                tracing::warn!("Invalid extension channel: {}", c);
                 (
                     StatusCode::BAD_REQUEST,
                     "invalid_extension_channel",
@@ -104,7 +103,7 @@ impl IntoResponse for UpdateServiceError {
                 )
             }
             UpdateServiceError::S3Error(e) => {
-                error!("S3 operation failed: {}", e);
+                tracing::error!("S3 operation failed: {}", e);
                 (
                     StatusCode::SERVICE_UNAVAILABLE,
                     "service_unavailable",
@@ -113,7 +112,7 @@ impl IntoResponse for UpdateServiceError {
                 )
             }
             UpdateServiceError::SignatureNotFound(k) => {
-                error!("Signature file not found: {}", k);
+                tracing::error!("Signature file not found: {}", k);
                 (
                     StatusCode::NOT_FOUND,
                     "signature_not_found",
@@ -122,7 +121,7 @@ impl IntoResponse for UpdateServiceError {
                 )
             }
             UpdateServiceError::DownloadFileNotFound(dir) => {
-                error!("Download file not found in directory: {}", dir);
+                tracing::error!("Download file not found in directory: {}", dir);
                 (
                     StatusCode::NOT_FOUND,
                     "download_not_found",
@@ -131,7 +130,7 @@ impl IntoResponse for UpdateServiceError {
                 )
             }
             UpdateServiceError::PresignedUrlError(e) => {
-                error!("Failed to generate presigned URL: {}", e);
+                tracing::error!("Failed to generate presigned URL: {}", e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "url_generation_failed",

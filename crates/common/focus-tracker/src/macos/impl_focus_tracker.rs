@@ -2,7 +2,6 @@ use crate::{FocusTrackerConfig, FocusTrackerResult, FocusedWindow};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tracing::debug;
 
 #[cfg(feature = "async")]
 use std::future::Future;
@@ -107,7 +106,7 @@ impl ImplFocusTracker {
 
         loop {
             if should_stop(stop_signal) {
-                debug!("Stop signal received, exiting focus tracking loop");
+                tracing::debug!("Stop signal received, exiting focus tracking loop");
                 break;
             }
 
@@ -128,7 +127,7 @@ impl ImplFocusTracker {
                                     window.icon = Some(icon);
                                 }
                                 Ok(None) => {}
-                                Err(e) => debug!("Error fetching icon: {e}"),
+                                Err(e) => tracing::debug!("Error fetching icon: {e}"),
                             }
                         }
                         prev_state.update_from(&window);
@@ -136,7 +135,7 @@ impl ImplFocusTracker {
                     }
                 }
                 Err(e) => {
-                    debug!("Error getting window info: {e}");
+                    tracing::debug!("Error getting window info: {e}");
                 }
             }
 
@@ -161,7 +160,7 @@ impl ImplFocusTracker {
 
         loop {
             if should_stop(stop_signal) {
-                debug!("Stop signal received, exiting focus tracking loop");
+                tracing::debug!("Stop signal received, exiting focus tracking loop");
                 break;
             }
 
@@ -182,7 +181,7 @@ impl ImplFocusTracker {
                                     window.icon = Some(icon);
                                 }
                                 Ok(None) => {}
-                                Err(e) => debug!("Error fetching icon: {e}"),
+                                Err(e) => tracing::debug!("Error fetching icon: {e}"),
                             }
                         }
                         prev_state.update_from(&window);
@@ -190,7 +189,7 @@ impl ImplFocusTracker {
                     }
                 }
                 Err(e) => {
-                    debug!("Error getting window info: {e}");
+                    tracing::debug!("Error getting window info: {e}");
                 }
             }
 
