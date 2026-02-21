@@ -1,11 +1,3 @@
-use crate::{
-    MessageType, PaginationParams,
-    error::{DbError, DbResult},
-    types::{
-        Activity, ActivityAsset, Asset, AssetStatus, LoginToken, Message, OAuthCredentials,
-        OAuthProvider, OAuthState, PasswordCredentials, RefreshToken, Thread, TokenUsage, User,
-    },
-};
 use bon::bon;
 use chrono::{DateTime, Utc};
 use sqlx::{
@@ -14,6 +6,17 @@ use sqlx::{
 };
 use std::time::Duration;
 use uuid::Uuid;
+
+use crate::{
+    MessageType, PaginationParams,
+    error::{DbError, DbResult},
+    types::{
+        Activity, ActivityAsset, Asset, AssetStatus, LoginToken, Message, OAuthCredentials,
+        OAuthProvider, OAuthState, PasswordCredentials, RefreshToken, Thread, TokenUsage, User,
+    },
+};
+
+pub const DEFAULT_TOKEN_LIMIT: i64 = 50_000;
 
 #[derive(Debug)]
 pub struct DatabaseManager {
@@ -1447,7 +1450,7 @@ impl DatabaseManager {
         year: i32,
         month: u32,
     ) -> DbResult<i64> {
-        let total: Option<i64> = sqlx::query_scalar(
+        let total = sqlx::query_scalar(
             r#"
             SELECT COALESCE(SUM(input_tokens + output_tokens + reasoning_tokens), 0)
             FROM token_usage
@@ -1462,7 +1465,7 @@ impl DatabaseManager {
         .fetch_one(&self.pool)
         .await?;
 
-        Ok(total.unwrap_or(0))
+        Ok(total)
     }
 
     pub async fn get_token_limit_for_user(&self, user_id: Uuid) -> DbResult<Option<i64>> {
@@ -1480,7 +1483,7 @@ impl DatabaseManager {
 
         match limit {
             Some(inner) => Ok(inner),
-            None => Ok(Some(50000)),
+            None => Ok(Some(DEFAULT_TOKEN_LIMIT)),
         }
     }
 }
