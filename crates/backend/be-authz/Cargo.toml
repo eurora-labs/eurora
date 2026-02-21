@@ -8,6 +8,7 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 ignored = ["tonic-prost"]
 
 [dependencies]
+async-trait = { workspace = true }
 auth-core = { workspace = true }
 axum = { workspace = true }
 be-auth-core = { workspace = true }

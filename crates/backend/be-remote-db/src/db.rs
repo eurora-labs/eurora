@@ -1417,17 +1417,29 @@ impl DatabaseManager {
         cache_creation_tokens: Option<i64>,
         cache_read_tokens: Option<i64>,
     ) -> DbResult<TokenUsage> {
+        let reasoning = reasoning_tokens.unwrap_or(0);
+        let billable = input_tokens + output_tokens + reasoning;
+
         let record = sqlx::query_as::<_, TokenUsage>(
             r#"
-            INSERT INTO token_usage (
-                user_id, thread_id, message_id,
-                input_tokens, output_tokens, reasoning_tokens,
-                cache_creation_tokens, cache_read_tokens
+            WITH inserted AS (
+                INSERT INTO token_usage (
+                    user_id, thread_id, message_id,
+                    input_tokens, output_tokens, reasoning_tokens,
+                    cache_creation_tokens, cache_read_tokens
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                RETURNING id, user_id, thread_id, message_id,
+                          input_tokens, output_tokens, reasoning_tokens,
+                          cache_creation_tokens, cache_read_tokens, created_at
+            ),
+            upsert_total AS (
+                INSERT INTO monthly_token_totals (user_id, year_month, total_tokens)
+                VALUES ($1, (EXTRACT(YEAR FROM now())::INT * 100 + EXTRACT(MONTH FROM now())::INT), $9)
+                ON CONFLICT (user_id, year_month)
+                DO UPDATE SET total_tokens = monthly_token_totals.total_tokens + EXCLUDED.total_tokens
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING id, user_id, thread_id, message_id,
-                      input_tokens, output_tokens, reasoning_tokens,
-                      cache_creation_tokens, cache_read_tokens, created_at
+            SELECT * FROM inserted
             "#,
         )
         .bind(user_id)
@@ -1435,55 +1447,41 @@ impl DatabaseManager {
         .bind(message_id)
         .bind(input_tokens)
         .bind(output_tokens)
-        .bind(reasoning_tokens.unwrap_or(0))
+        .bind(reasoning)
         .bind(cache_creation_tokens.unwrap_or(0))
         .bind(cache_read_tokens.unwrap_or(0))
+        .bind(billable)
         .fetch_one(&self.pool)
         .await?;
 
         Ok(record)
     }
 
-    pub async fn get_monthly_token_usage(
+    pub async fn get_token_limit_and_usage(
         &self,
         user_id: Uuid,
-        year: i32,
-        month: u32,
-    ) -> DbResult<i64> {
-        let total = sqlx::query_scalar(
+        year_month: i32,
+    ) -> DbResult<(Option<i64>, i64)> {
+        let row: Option<(i64, Option<i64>)> = sqlx::query_as(
             r#"
-            SELECT COALESCE(SUM(input_tokens + output_tokens + reasoning_tokens), 0)::BIGINT
-            FROM token_usage
-            WHERE user_id = $1
-              AND created_at >= make_timestamptz($2, $3, 1, 0, 0, 0.0, 'UTC')
-              AND created_at < make_timestamptz($2, $3, 1, 0, 0, 0.0, 'UTC') + interval '1 month'
-            "#,
-        )
-        .bind(user_id)
-        .bind(year)
-        .bind(month as i32)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(total)
-    }
-
-    pub async fn get_token_limit_for_user(&self, user_id: Uuid) -> DbResult<Option<i64>> {
-        let limit: Option<Option<i64>> = sqlx::query_scalar(
-            r#"
-            SELECT p.monthly_token_limit
+            SELECT p.monthly_token_limit,
+                   mtt.total_tokens
             FROM accounts a
             JOIN plans p ON p.id = a.plan_id
+            LEFT JOIN monthly_token_totals mtt
+                   ON mtt.user_id = a.owner_user_id
+                  AND mtt.year_month = $2
             WHERE a.owner_user_id = $1
             "#,
         )
         .bind(user_id)
+        .bind(year_month)
         .fetch_optional(&self.pool)
         .await?;
 
-        match limit {
-            Some(inner) => Ok(inner),
-            None => Ok(Some(DEFAULT_TOKEN_LIMIT)),
+        match row {
+            Some((limit, used)) => Ok((Some(limit), used.unwrap_or(0))),
+            None => Ok((Some(DEFAULT_TOKEN_LIMIT), 0)),
         }
     }
 }
