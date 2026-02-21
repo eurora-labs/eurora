@@ -142,7 +142,9 @@ where
                         let user_id = match uuid::Uuid::parse_str(&claims.sub) {
                             Ok(id) => id,
                             Err(_) => {
-                                return Ok(Status::internal("Invalid user ID in token").into_http());
+                                return Ok(
+                                    Status::unauthenticated("Invalid user ID in token").into_http()
+                                );
                             }
                         };
                         if let Err(status) = token_gate::check_token_limit(&db, user_id).await {
