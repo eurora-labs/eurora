@@ -114,7 +114,7 @@
 				clearQuery(editorRef);
 				await askQuestion(query);
 			} catch (error) {
-				messages.splice(0, messages.length);
+				messages.splice(-2);
 				toast.error(String(error), {
 					duration: Infinity,
 					cancel: { label: 'Ok', onClick: () => {} },
