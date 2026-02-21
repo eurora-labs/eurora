@@ -2,7 +2,6 @@ use async_trait::async_trait;
 use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
-use tracing::debug;
 
 use crate::{
     error::ActivityResult,
@@ -39,7 +38,7 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
         focus_window: &FocusedWindow,
         sender: mpsc::UnboundedSender<ActivityReport>,
     ) -> ActivityResult<()> {
-        debug!(
+        tracing::debug!(
             "Default strategy starting tracking for: {:?}",
             focus_window.process_name
         );
@@ -60,7 +59,7 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
         &mut self,
         focus_window: &FocusedWindow,
     ) -> ActivityResult<bool> {
-        debug!(
+        tracing::debug!(
             "Default strategy handling process change to: {}",
             focus_window.process_name
         );
@@ -68,17 +67,17 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
     }
 
     async fn stop_tracking(&mut self) -> ActivityResult<()> {
-        debug!("Default strategy stopping tracking");
+        tracing::debug!("Default strategy stopping tracking");
         Ok(())
     }
 
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
-        debug!("Retrieving assets for default strategy");
+        tracing::debug!("Retrieving assets for default strategy");
         Ok(vec![])
     }
 
     async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        debug!("Retrieving snapshots for default strategy");
+        tracing::debug!("Retrieving snapshots for default strategy");
         Ok(vec![])
     }
 

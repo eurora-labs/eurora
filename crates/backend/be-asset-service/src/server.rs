@@ -5,7 +5,6 @@ use be_authz::{extract_claims, parse_user_id};
 use be_remote_db::DatabaseManager;
 use be_storage::StorageService;
 use tonic::{Request, Response, Status};
-use tracing::info;
 
 use crate::error::{AssetServiceError, Result};
 use proto_gen::asset::{AssetResponse, CreateAssetRequest};
@@ -20,7 +19,7 @@ pub struct AssetService(CoreAssetService);
 impl AssetService {
     pub fn new(db: Arc<DatabaseManager>, storage: Arc<StorageService>) -> Self {
         let core_service = CoreAssetService::new(db, storage);
-        info!("Creating new AssetsService instance");
+        tracing::info!("Creating new AssetsService instance");
         Self(core_service)
     }
 
@@ -36,7 +35,7 @@ impl ProtoAssetService for AssetService {
         &self,
         request: Request<CreateAssetRequest>,
     ) -> std::result::Result<Response<AssetResponse>, Status> {
-        info!("CreateAsset request received");
+        tracing::info!("CreateAsset request received");
 
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;

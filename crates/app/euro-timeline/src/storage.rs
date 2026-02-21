@@ -1,7 +1,6 @@
 use std::collections::VecDeque;
 
 use chrono::Utc;
-use tracing::debug;
 
 use crate::{Activity, config::StorageConfig};
 
@@ -12,9 +11,10 @@ pub struct TimelineStorage {
 
 impl TimelineStorage {
     pub fn new(config: StorageConfig) -> Self {
-        debug!(
+        tracing::debug!(
             "Creating timeline storage with max_activities: {}, max_age: {:?}",
-            config.max_activities, config.max_age
+            config.max_activities,
+            config.max_age
         );
 
         Self {
@@ -24,16 +24,17 @@ impl TimelineStorage {
     }
 
     pub fn add_activity(&mut self, activity: Activity) {
-        debug!(
+        tracing::debug!(
             "Adding activity: {} (process: {})",
-            activity.name, activity.process_name
+            activity.name,
+            activity.process_name
         );
 
         self.activities.push_back(activity);
 
         while self.activities.len() > self.config.max_activities {
             if let Some(removed) = self.activities.pop_front() {
-                debug!(
+                tracing::debug!(
                     "Removed old activity due to capacity limit: {}",
                     removed.name
                 );
@@ -64,7 +65,7 @@ impl TimelineStorage {
         while let Some(activity) = self.activities.front() {
             if activity.start < cutoff_time {
                 if let Some(removed) = self.activities.pop_front() {
-                    debug!(
+                    tracing::debug!(
                         "Cleaned up old activity: {} (age: {:?})",
                         removed.name,
                         now - removed.start
@@ -77,7 +78,7 @@ impl TimelineStorage {
 
         let removed_count = initial_count - self.activities.len();
         if removed_count > 0 {
-            debug!("Cleaned up {} old activities", removed_count);
+            tracing::debug!("Cleaned up {} old activities", removed_count);
         }
     }
 }

@@ -6,7 +6,6 @@ use std::sync::RwLock;
 
 use tokio::sync::watch;
 use tonic::transport::{Channel, ClientTlsConfig};
-use tracing::info;
 
 pub const DEFAULT_API_URL: &str = "https://api.eurora-labs.com";
 
@@ -47,7 +46,7 @@ impl EndpointManager {
             .send(channel)
             .map_err(|_| EndpointError::NoSubscribers)?;
         *self.current_url.write().unwrap() = url.to_owned();
-        info!("Switched API endpoint to {}", url);
+        tracing::info!("Switched API endpoint to {}", url);
         Ok(())
     }
 }

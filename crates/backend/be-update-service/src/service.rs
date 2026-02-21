@@ -5,7 +5,6 @@ use aws_config::BehaviorVersion;
 use aws_sdk_s3::{Client as S3Client, presigning::PresigningConfig, types::Object};
 use chrono::{DateTime, Utc};
 use semver::Version;
-use tracing::{debug, instrument};
 
 use crate::{
     error::UpdateServiceError,
@@ -23,7 +22,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    #[instrument(skip_all, fields(bucket = %bucket_name))]
+    #[tracing::instrument(skip_all, fields(bucket = %bucket_name))]
     pub async fn new(bucket_name: String) -> Result<Self> {
         let config = aws_config::defaults(BehaviorVersion::latest())
             .region("eu-central-1")
@@ -177,7 +176,7 @@ impl AppState {
             .map_err(|_| UpdateServiceError::InvalidExtensionChannel(channel.to_owned()))
     }
 
-    #[instrument(skip(self), fields(channel, target_arch, current_version, ?bundle_type))]
+    #[tracing::instrument(skip(self), fields(channel, target_arch, current_version, ?bundle_type))]
     pub async fn check_for_update(
         &self,
         channel: &str,
@@ -201,7 +200,7 @@ impl AppState {
             .map(|(_, s)| s.as_str())
             .collect();
 
-        debug!(
+        tracing::debug!(
             "Found {} candidate versions newer than {}",
             candidates.len(),
             current_version
@@ -222,9 +221,11 @@ impl AppState {
                 .map_err(|e| UpdateServiceError::S3Error(format!("{e:#}")))?;
 
             if !resp.contents().is_empty() {
-                debug!(
+                tracing::debug!(
                     "Latest version with files for {}/{}: {}",
-                    target, arch, version_str
+                    target,
+                    arch,
+                    version_str
                 );
                 let response = self
                     .build_update_response(channel, &target, &arch, version_str, bundle_type)
@@ -236,7 +237,7 @@ impl AppState {
         Ok(None)
     }
 
-    #[instrument(skip(self), fields(channel, target, arch, version, ?bundle_type))]
+    #[tracing::instrument(skip(self), fields(channel, target, arch, version, ?bundle_type))]
     async fn build_update_response(
         &self,
         channel: &str,
@@ -275,7 +276,7 @@ impl AppState {
     ///
     /// Returns the file key, last-modified timestamp, and the signature content.
     /// Only files that have a corresponding `.sig` signature are considered.
-    #[instrument(skip(self), fields(directory_prefix, target, ?bundle_type))]
+    #[tracing::instrument(skip(self), fields(directory_prefix, target, ?bundle_type))]
     async fn find_signed_download_file(
         &self,
         directory_prefix: &str,
@@ -323,7 +324,7 @@ impl AppState {
                             .map_err(|_| UpdateServiceError::SignatureNotFound(sig_key))?;
                         return Ok((key.to_owned(), last_modified, signature));
                     }
-                    debug!("Skipping {} (no signature file {})", key, sig_key);
+                    tracing::debug!("Skipping {} (no signature file {})", key, sig_key);
                 }
             }
         }
@@ -350,7 +351,7 @@ impl AppState {
         ))
     }
 
-    #[instrument(skip(self), fields(channel, target_arch, ?bundle_type))]
+    #[tracing::instrument(skip(self), fields(channel, target_arch, ?bundle_type))]
     pub async fn get_download_url(
         &self,
         channel: &str,
@@ -392,7 +393,7 @@ impl AppState {
 
     /// Find a download file without requiring a `.sig` signature file.
     /// Used for website downloads where Tauri signature verification is not needed.
-    #[instrument(skip(self), fields(directory_prefix, target, ?bundle_type))]
+    #[tracing::instrument(skip(self), fields(directory_prefix, target, ?bundle_type))]
     async fn find_download_file_unsigned(
         &self,
         directory_prefix: &str,
@@ -448,7 +449,7 @@ impl AppState {
         ))
     }
 
-    #[instrument(skip(self), fields(channel))]
+    #[tracing::instrument(skip(self), fields(channel))]
     pub async fn get_latest_release(
         &self,
         channel: &str,
@@ -463,9 +464,10 @@ impl AppState {
         }
 
         let latest_version_str = &all_versions[0].1;
-        debug!(
+        tracing::debug!(
             "Latest version for channel {}: {}",
-            channel, latest_version_str
+            channel,
+            latest_version_str
         );
 
         let (platforms, pub_date) = self
@@ -485,7 +487,7 @@ impl AppState {
 
     /// Get all available platforms for a specific version.
     /// Returns the platforms map and the maximum last_modified date across all platforms.
-    #[instrument(skip(self), fields(channel, version))]
+    #[tracing::instrument(skip(self), fields(channel, version))]
     async fn get_platforms_for_version(
         &self,
         channel: &str,
@@ -512,7 +514,7 @@ impl AppState {
                 {
                     Ok(result) => result,
                     Err(e) => {
-                        debug!("No download file found for {}/{}: {}", target, arch, e);
+                        tracing::debug!("No download file found for {}/{}: {}", target, arch, e);
                         continue;
                     }
                 };
@@ -522,7 +524,7 @@ impl AppState {
                 let url = match self.generate_presigned_url(&file_key).await {
                     Ok(url) => url,
                     Err(e) => {
-                        debug!("Failed to generate URL for {}/{}: {}", target, arch, e);
+                        tracing::debug!("Failed to generate URL for {}/{}: {}", target, arch, e);
                         continue;
                     }
                 };
@@ -539,7 +541,7 @@ impl AppState {
     /// Get the latest extension versions for all browsers in a specific channel.
     ///
     /// S3 structure: extensions/{channel}/{browser}/{version}/
-    #[instrument(skip(self), fields(channel))]
+    #[tracing::instrument(skip(self), fields(channel))]
     pub async fn get_extension_release(
         &self,
         channel: &str,
@@ -563,12 +565,14 @@ impl AppState {
                     browsers.insert(browser.to_string(), info);
                 }
                 Ok(None) => {
-                    debug!("No extension for {} in channel '{}'", browser, channel);
+                    tracing::debug!("No extension for {} in channel '{}'", browser, channel);
                 }
                 Err(e) => {
-                    debug!(
+                    tracing::debug!(
                         "Error getting extension for {} channel '{}': {}",
-                        browser, channel, e
+                        browser,
+                        channel,
+                        e
                     );
                 }
             }
@@ -585,7 +589,7 @@ impl AppState {
         }))
     }
 
-    #[instrument(skip(self), fields(%browser, %channel))]
+    #[tracing::instrument(skip(self), fields(%browser, %channel))]
     async fn get_latest_browser_extension(
         &self,
         browser: BrowserType,
@@ -599,9 +603,11 @@ impl AppState {
         }
 
         let latest_version_str = &all_versions[0].1;
-        debug!(
+        tracing::debug!(
             "Latest extension: {}/{} v{}",
-            channel, browser, latest_version_str
+            channel,
+            browser,
+            latest_version_str
         );
 
         let version_prefix = format!(
@@ -624,7 +630,7 @@ impl AppState {
         )))
     }
 
-    #[instrument(skip(self), fields(directory_prefix, %browser))]
+    #[tracing::instrument(skip(self), fields(directory_prefix, %browser))]
     async fn find_extension_file_and_url(
         &self,
         directory_prefix: &str,

@@ -1,11 +1,3 @@
-use crate::{
-    MessageType, PaginationParams,
-    error::{DbError, DbResult},
-    types::{
-        Activity, ActivityAsset, Asset, AssetStatus, LoginToken, Message, OAuthCredentials,
-        OAuthProvider, OAuthState, PasswordCredentials, RefreshToken, Thread, User,
-    },
-};
 use bon::bon;
 use chrono::{DateTime, Utc};
 use sqlx::{
@@ -13,8 +5,18 @@ use sqlx::{
     postgres::{PgPool, PgPoolOptions},
 };
 use std::time::Duration;
-use tracing::warn;
 use uuid::Uuid;
+
+use crate::{
+    MessageType, PaginationParams,
+    error::{DbError, DbResult},
+    types::{
+        Activity, ActivityAsset, Asset, AssetStatus, LoginToken, Message, OAuthCredentials,
+        OAuthProvider, OAuthState, PasswordCredentials, RefreshToken, Thread, TokenUsage, User,
+    },
+};
+
+pub const DEFAULT_TOKEN_LIMIT: i64 = 50_000;
 
 #[derive(Debug)]
 pub struct DatabaseManager {
@@ -1127,21 +1129,22 @@ impl DatabaseManager {
         let canceled_at_ts = canceled_at.and_then(|ts| {
             let dt = chrono::DateTime::from_timestamp(ts, 0);
             if dt.is_none() {
-                warn!(
+                tracing::warn!(
                     subscription_id,
-                    ts, "malformed canceled_at timestamp in stripe subscription"
+                    ts,
+                    "malformed canceled_at timestamp in stripe subscription"
                 );
             }
             dt
         });
         let period_start = chrono::DateTime::from_timestamp(current_period_start, 0)
             .unwrap_or_else(|| {
-                warn!(subscription_id, current_period_start, "malformed current_period_start timestamp in stripe subscription, falling back to now");
+                tracing::warn!(subscription_id, current_period_start, "malformed current_period_start timestamp in stripe subscription, falling back to now");
                 now
             });
         let period_end = chrono::DateTime::from_timestamp(current_period_end, 0).unwrap_or_else(
             || {
-                warn!(subscription_id, current_period_end, "malformed current_period_end timestamp in stripe subscription, falling back to now");
+                tracing::warn!(subscription_id, current_period_end, "malformed current_period_end timestamp in stripe subscription, falling back to now");
                 now
             },
         );
@@ -1400,5 +1403,87 @@ impl DatabaseManager {
                 .fetch_optional(executor)
                 .await?;
         Ok(result)
+    }
+
+    #[builder]
+    pub async fn record_token_usage(
+        &self,
+        user_id: Uuid,
+        thread_id: Uuid,
+        message_id: Uuid,
+        input_tokens: i64,
+        output_tokens: i64,
+        reasoning_tokens: Option<i64>,
+        cache_creation_tokens: Option<i64>,
+        cache_read_tokens: Option<i64>,
+    ) -> DbResult<TokenUsage> {
+        let record = sqlx::query_as::<_, TokenUsage>(
+            r#"
+            INSERT INTO token_usage (
+                user_id, thread_id, message_id,
+                input_tokens, output_tokens, reasoning_tokens,
+                cache_creation_tokens, cache_read_tokens
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id, user_id, thread_id, message_id,
+                      input_tokens, output_tokens, reasoning_tokens,
+                      cache_creation_tokens, cache_read_tokens, created_at
+            "#,
+        )
+        .bind(user_id)
+        .bind(thread_id)
+        .bind(message_id)
+        .bind(input_tokens)
+        .bind(output_tokens)
+        .bind(reasoning_tokens.unwrap_or(0))
+        .bind(cache_creation_tokens.unwrap_or(0))
+        .bind(cache_read_tokens.unwrap_or(0))
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(record)
+    }
+
+    pub async fn get_monthly_token_usage(
+        &self,
+        user_id: Uuid,
+        year: i32,
+        month: u32,
+    ) -> DbResult<i64> {
+        let total = sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(SUM(input_tokens + output_tokens + reasoning_tokens), 0)
+            FROM token_usage
+            WHERE user_id = $1
+              AND created_at >= make_timestamptz($2, $3, 1, 0, 0, 0.0, 'UTC')
+              AND created_at < make_timestamptz($2, $3, 1, 0, 0, 0.0, 'UTC') + interval '1 month'
+            "#,
+        )
+        .bind(user_id)
+        .bind(year)
+        .bind(month as i32)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(total)
+    }
+
+    pub async fn get_token_limit_for_user(&self, user_id: Uuid) -> DbResult<Option<i64>> {
+        let limit: Option<Option<i64>> = sqlx::query_scalar(
+            r#"
+            SELECT p.monthly_token_limit
+            FROM accounts a
+            JOIN plans p ON p.id = a.plan_id
+            WHERE a.owner_user_id = $1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        match limit {
+            Some(inner) => Ok(inner),
+            None => Ok(Some(DEFAULT_TOKEN_LIMIT)),
+        }
     }
 }

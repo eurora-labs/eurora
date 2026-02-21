@@ -9,7 +9,6 @@ use stripe_checkout::checkout_session::{
 };
 use stripe_core::customer::{CreateCustomer, ListCustomer};
 use stripe_webhook::{Event, EventObject, Webhook};
-use tracing::{error, info, warn};
 
 use crate::analytics;
 use crate::auth::AuthUser;
@@ -65,7 +64,7 @@ async fn resolve_customer_id(state: &AppState, email: &str) -> Result<String, Pa
         .await
         .map_err(|e| anyhow::anyhow!("commit tx: {e}"))?;
 
-    info!(%customer_id, %email, "Auto-created Stripe customer for new account");
+    tracing::info!(%customer_id, %email, "Auto-created Stripe customer for new account");
 
     Ok(customer_id)
 }
@@ -122,7 +121,7 @@ pub async fn create_checkout_session(
         })?;
 
     if let Some(customer) = existing.data.first() {
-        info!(customer_id = %customer.id, %email, "Reusing existing Stripe customer");
+        tracing::info!(customer_id = %customer.id, %email, "Reusing existing Stripe customer");
         req = req.customer(&customer.id);
     } else {
         req = req.customer_email(email);
@@ -275,12 +274,12 @@ pub async fn handle_webhook(
         .await
         .unwrap_or(false)
     {
-        info!(%event_id, %event_type, "Webhook event already processed — skipping");
+        tracing::info!(%event_id, %event_type, "Webhook event already processed — skipping");
         return Ok(StatusCode::OK);
     }
 
     let raw_data: serde_json::Value = serde_json::from_str(&body).map_err(|e| {
-        error!(%event_id, error = %e, "Failed to parse webhook body as JSON");
+        tracing::error!(%event_id, error = %e, "Failed to parse webhook body as JSON");
         PaymentError::Internal(anyhow::anyhow!("webhook body JSON parse error: {e}"))
     })?;
 
@@ -293,7 +292,7 @@ pub async fn handle_webhook(
             // Try to get the expanded subscription object for period/item data
             let subscription_obj = session.subscription.as_ref().and_then(|s| s.as_object());
 
-            info!(
+            tracing::info!(
                 %event_id,
                 session_id = %session.id,
                 customer = ?customer_id,
@@ -310,14 +309,14 @@ pub async fn handle_webhook(
             )
             .await
             {
-                error!(%event_id, error = %e, "Failed to provision access after checkout");
+                tracing::error!(%event_id, error = %e, "Failed to provision access after checkout");
                 return Err(e);
             }
 
             analytics::track_webhook_checkout_completed(subscription_id.is_some(), true);
         }
         EventObject::CustomerSubscriptionUpdated(sub) => {
-            info!(
+            tracing::info!(
                 %event_id,
                 subscription_id = %sub.id,
                 status = %sub.status,
@@ -325,7 +324,7 @@ pub async fn handle_webhook(
             );
 
             if let Err(e) = webhook::on_subscription_updated(&state.db, &sub, &raw_data).await {
-                error!(%event_id, error = %e, "Failed to handle subscription update");
+                tracing::error!(%event_id, error = %e, "Failed to handle subscription update");
                 return Err(e);
             }
 
@@ -337,21 +336,21 @@ pub async fn handle_webhook(
             );
         }
         EventObject::CustomerSubscriptionDeleted(sub) => {
-            info!(
+            tracing::info!(
                 %event_id,
                 subscription_id = %sub.id,
                 "Subscription deleted"
             );
 
             if let Err(e) = webhook::on_subscription_deleted(&state.db, &sub, &raw_data).await {
-                error!(%event_id, error = %e, "Failed to revoke access after subscription deletion");
+                tracing::error!(%event_id, error = %e, "Failed to revoke access after subscription deletion");
                 return Err(e);
             }
 
             analytics::track_webhook_subscription_deleted();
         }
         EventObject::InvoicePaid(invoice) => {
-            info!(
+            tracing::info!(
                 %event_id,
                 invoice_id = ?invoice.id,
                 "Invoice paid"
@@ -360,14 +359,14 @@ pub async fn handle_webhook(
             let has_subscription = invoice.subscription.is_some();
 
             if let Err(e) = webhook::on_invoice_paid(&state.db, &invoice).await {
-                error!(%event_id, error = %e, "Failed to handle invoice paid event");
+                tracing::error!(%event_id, error = %e, "Failed to handle invoice paid event");
                 return Err(e);
             }
 
             analytics::track_webhook_invoice_paid(has_subscription);
         }
         EventObject::InvoicePaymentFailed(invoice) => {
-            info!(
+            tracing::info!(
                 %event_id,
                 invoice_id = ?invoice.id,
                 "Invoice payment failed"
@@ -376,14 +375,14 @@ pub async fn handle_webhook(
             let attempt_count = invoice.attempt_count;
 
             if let Err(e) = webhook::on_invoice_payment_failed(&state.db, &invoice).await {
-                error!(%event_id, error = %e, "Failed to handle invoice payment failure");
+                tracing::error!(%event_id, error = %e, "Failed to handle invoice payment failure");
                 return Err(e);
             }
 
             analytics::track_webhook_invoice_payment_failed(attempt_count);
         }
         _ => {
-            warn!(%event_id, %event_type, "Unhandled webhook event");
+            tracing::warn!(%event_id, %event_type, "Unhandled webhook event");
         }
     }
 

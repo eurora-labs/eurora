@@ -12,7 +12,6 @@ use std::{io::Cursor, path::PathBuf};
 use tokio::sync::watch;
 use tonic::Status;
 use tonic::transport::Channel;
-use tracing::{debug, error};
 
 use crate::{Activity, ActivityAsset, ActivityError, error::ActivityResult};
 
@@ -92,7 +91,7 @@ impl ActivityStorage {
             })
             .await
             .map_err(|e| {
-                error!("Failed to insert activity: {}", e);
+                tracing::error!("Failed to insert activity: {}", e);
                 Status::internal("Failed to insert activity")
             })
             .expect("Failed to insert activity");
@@ -148,7 +147,7 @@ impl ActivityStorage {
             .asset
             .ok_or_else(|| ActivityError::Network("No asset returned from service".to_string()))?;
 
-        debug!("Asset saved with ID: {}", created_asset.id);
+        tracing::debug!("Asset saved with ID: {}", created_asset.id);
 
         Ok(SavedAssetInfo {
             file_path: PathBuf::from(&created_asset.storage_uri),
