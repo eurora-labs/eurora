@@ -6,8 +6,8 @@ use agent_chain::{
 };
 use be_authz::{extract_claims, parse_user_id};
 use be_local_settings::{OllamaConfig, OpenAIConfig, ProviderSettings, SettingsReceiver};
-use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
-use chrono::{DateTime, Datelike, Utc};
+use be_remote_db::{DatabaseManager, MessageType, PaginationParams, year_month_key};
+use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
 pub use proto_gen::thread::proto_thread_service_server::{
     ProtoThreadService, ProtoThreadServiceServer,
@@ -121,8 +121,8 @@ fn build_env_fallback() -> Option<Providers> {
     } else {
         let chat_model =
             ChatOpenAI::new(std::env::var("NEBUL_MODEL").expect("Nebul model should be set"))
-                .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"))
-                .api_base(BASE_NEBUL_URL);
+                .api_base(BASE_NEBUL_URL)
+                .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"));
         let bound = chat_model
             .bind_tools(&[ToolLike::Tool(firecrawl_search_tool())], None)
             .expect("Failed to bind firecrawl_search tool");
@@ -133,8 +133,8 @@ fn build_env_fallback() -> Option<Providers> {
             ChatOpenAI::new(
                 std::env::var("NEBUL_TITLE_MODEL").expect("Nebul title model should be set"),
             )
-            .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"))
-            .api_base(BASE_NEBUL_URL),
+            .api_base(BASE_NEBUL_URL)
+            .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set")),
         );
 
         Some(Providers {
@@ -509,25 +509,6 @@ impl ProtoThreadService for ThreadService {
         let chat_provider = self.get_chat_provider()?;
         let tools = self.get_tools();
 
-        let now = chrono::Utc::now();
-        let token_limit = self
-            .db
-            .get_token_limit_for_user(user_id)
-            .await
-            .map_err(ThreadServiceError::from)?;
-        if let Some(limit) = token_limit {
-            let used = self
-                .db
-                .get_monthly_token_usage(user_id, now.year(), now.month())
-                .await
-                .map_err(ThreadServiceError::from)?;
-            if used >= limit {
-                return Err(
-                    ThreadServiceError::token_limit_reached("Monthly token limit reached").into(),
-                );
-            }
-        }
-
         let db = self.db.clone();
         let output_stream = async_stream::try_stream! {
             let mut full_content = String::new();
@@ -597,7 +578,6 @@ impl ProtoThreadService for ThreadService {
                         .into(),
                 );
 
-                // Execute each tool call and append results
                 for tc in tool_calls {
                     let tool_name = tc.name.clone();
                     let result_msg = if let Some(tool) = tools.get(&tool_name) {
@@ -615,7 +595,6 @@ impl ProtoThreadService for ThreadService {
                 }
             }
 
-            // Final empty chunk to signal completion
             yield ChatStreamResponse {
                 chunk: String::new(),
                 is_final: true,
@@ -631,7 +610,10 @@ impl ProtoThreadService for ThreadService {
                     .await
                 {
                     Ok(ai_message) => {
-                        if (total_input_tokens > 0 || total_output_tokens > 0) && let Err(e) = db
+                        if (total_input_tokens > 0 || total_output_tokens > 0) && let Err(e) = {
+                                let now = Utc::now();
+                                let year_month = year_month_key(&now);
+                                db
                                 .record_token_usage()
                                 .user_id(user_id)
                                 .thread_id(thread_id)
@@ -641,8 +623,10 @@ impl ProtoThreadService for ThreadService {
                                 .reasoning_tokens(total_reasoning_tokens)
                                 .cache_creation_tokens(total_cache_creation_tokens)
                                 .cache_read_tokens(total_cache_read_tokens)
+                                .year_month(year_month)
                                 .call()
                                 .await
+                            }
                             {
                                 tracing::error!("Failed to record token usage: {}", e);
                             }

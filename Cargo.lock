@@ -1537,10 +1537,13 @@ dependencies = [
 name = "be-authz"
 version = "0.0.0"
 dependencies = [
+ "async-trait",
  "auth-core",
  "axum",
  "be-auth-core",
+ "be-remote-db",
  "casbin",
+ "chrono",
  "governor",
  "http 1.4.0",
  "percent-encoding",
@@ -9546,7 +9549,6 @@ dependencies = [
  "sentry-contexts",
  "sentry-core",
  "sentry-debug-images",
- "sentry-log",
  "sentry-panic",
  "sentry-tracing",
  "tokio",
@@ -9611,17 +9613,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5637ec550dc6f8c49a711537950722d3fc4baa6fd433c371912104eaff31e2a5"
 dependencies = [
  "findshlibs",
- "sentry-core",
-]
-
-[[package]]
-name = "sentry-log"
-version = "0.46.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f95c213ed8ffd52952174a956a2c32b012ecea8e778a3b1cc24d2d8603306f5"
-dependencies = [
- "bitflags 2.10.0",
- "log",
  "sentry-core",
 ]
 

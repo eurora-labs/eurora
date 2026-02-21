@@ -118,12 +118,6 @@ impl ChatApi for ChatApiImpl {
 
         let mut complete_response = String::new();
 
-        channel
-            .send(ResponseChunk {
-                chunk: "".to_string(),
-            })
-            .map_err(|e| format!("Failed to send initial response: {e}"))?;
-
         tracing::debug!("Sending chat stream");
         let stream_result = {
             let thread_state: tauri::State<SharedThreadManager> = app_handle.state();
