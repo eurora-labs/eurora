@@ -18,7 +18,8 @@
 
 		<Button onclick={downloadBrowserExtension}>Download</Button>
 	</div>
-	<div class="flex justify-start w-full items-start mt-auto pt-8">
+	<div class="flex justify-between w-full items-start mt-auto pt-8">
 		<Button variant="outline" href="/onboarding">Back</Button>
+		<Button href="/">Continue</Button>
 	</div>
 </div>
