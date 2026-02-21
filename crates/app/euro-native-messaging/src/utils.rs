@@ -7,7 +7,6 @@ use resvg::render;
 use specta_typescript::BigIntExportBehavior;
 use tiny_skia::Pixmap;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use tracing::debug;
 use usvg::{Options, Tree};
 
 pub fn convert_svg_to_rgba(svg: &str) -> Result<image::RgbaImage> {
@@ -62,7 +61,7 @@ pub fn generate_typescript_definitions() -> Result<()> {
             &specta::export(),
         )
     {
-        debug!("Failed to generate TypeScript definitions: {}", e);
+        tracing::debug!("Failed to generate TypeScript definitions: {}", e);
     }
 
     Ok(())

@@ -12,7 +12,6 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 use std::time::Duration;
-use tracing::info;
 use util::*;
 
 /// Test that PNG format icons have correct PNG header and can be decoded
@@ -20,12 +19,12 @@ use util::*;
 #[serial]
 fn test_icon_format_png() {
     if !should_run_integration_tests() {
-        info!("Skipping integration test - INTEGRATION_TEST=1 not set");
+        tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
     }
 
     if let Err(e) = setup_test_environment() {
-        info!("Skipping test due to environment setup failure: {}", e);
+        tracing::info!("Skipping test due to environment setup failure: {}", e);
         return;
     }
 
@@ -38,10 +37,10 @@ fn test_icon_format_png() {
 
         match spawn_test_window("PNG Icon Test Window") {
             Ok(mut child) => {
-                info!("Spawned test window for PNG icon test");
+                tracing::info!("Spawned test window for PNG icon test");
 
                 if let Err(e) = focus_window(&mut child) {
-                    info!("Warning: Failed to focus window: {}", e);
+                    tracing::info!("Warning: Failed to focus window: {}", e);
                 }
 
                 let tracker_handle = std::thread::spawn(move || {
@@ -62,18 +61,18 @@ fn test_icon_format_png() {
                 let _ = tracker_handle.join();
 
                 if let Err(e) = cleanup_child_process(child) {
-                    info!("Warning: Failed to cleanup child process: {}", e);
+                    tracing::info!("Warning: Failed to cleanup child process: {}", e);
                 }
             }
             Err(e) => {
-                info!("Could not spawn test window: {}", e);
+                tracing::info!("Could not spawn test window: {}", e);
             }
         }
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
-        info!("PNG format test is primarily for Windows/macOS platforms");
+        tracing::info!("PNG format test is primarily for Windows/macOS platforms");
     }
 }
 
@@ -82,12 +81,12 @@ fn test_icon_format_png() {
 #[serial]
 fn test_icon_format_rgba() {
     if !should_run_integration_tests() {
-        info!("Skipping integration test - INTEGRATION_TEST=1 not set");
+        tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
     }
 
     if let Err(e) = setup_test_environment() {
-        info!("Skipping test due to environment setup failure: {}", e);
+        tracing::info!("Skipping test due to environment setup failure: {}", e);
         return;
     }
 
@@ -100,10 +99,10 @@ fn test_icon_format_rgba() {
 
         match spawn_test_window("RGBA Icon Test Window") {
             Ok(mut child) => {
-                info!("Spawned test window for RGBA icon test");
+                tracing::info!("Spawned test window for RGBA icon test");
 
                 if let Err(e) = focus_window(&mut child) {
-                    info!("Warning: Failed to focus window: {}", e);
+                    tracing::info!("Warning: Failed to focus window: {}", e);
                 }
 
                 let tracker_handle = std::thread::spawn(move || {
@@ -129,7 +128,7 @@ fn test_icon_format_rgba() {
                             let expected_size = icon.width() * icon.height() * 4;
                             let actual_size = icon.pixels().len() as u32;
 
-                            info!(
+                            tracing::info!(
                                 "Icon dimensions: {}x{}, expected size: {}, actual size: {}",
                                 icon.width(),
                                 icon.height(),
@@ -141,24 +140,24 @@ fn test_icon_format_rgba() {
                                 expected_size, actual_size,
                                 "Icon data size should match width * height * 4 for RGBA format. Expected: {expected_size} bytes, Actual: {actual_size} bytes",
                             );
-                            info!("RGBA icon format validation passed");
+                            tracing::info!("RGBA icon format validation passed");
                         }
                     }
                 }
 
                 if let Err(e) = cleanup_child_process(child) {
-                    info!("Warning: Failed to cleanup child process: {}", e);
+                    tracing::info!("Warning: Failed to cleanup child process: {}", e);
                 }
             }
             Err(e) => {
-                info!("Could not spawn test window: {}", e);
+                tracing::info!("Could not spawn test window: {}", e);
             }
         }
     }
 
     #[cfg(not(target_os = "linux"))]
     {
-        info!("RGBA format test is primarily for Linux X11 systems");
+        tracing::info!("RGBA format test is primarily for Linux X11 systems");
     }
 }
 
@@ -167,12 +166,12 @@ fn test_icon_format_rgba() {
 #[serial]
 fn test_icon_diff_between_apps() {
     if !should_run_integration_tests() {
-        info!("Skipping integration test - INTEGRATION_TEST=1 not set");
+        tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
     }
 
     if let Err(e) = setup_test_environment() {
-        info!("Skipping test due to environment setup failure: {}", e);
+        tracing::info!("Skipping test due to environment setup failure: {}", e);
         return;
     }
 
@@ -186,10 +185,10 @@ fn test_icon_diff_between_apps() {
 
         match spawn_test_window(window_title) {
             Ok(mut child) => {
-                info!("Spawned test window: {}", window_title);
+                tracing::info!("Spawned test window: {}", window_title);
 
                 if let Err(e) = focus_window(&mut child) {
-                    info!("Warning: Failed to focus window: {}", e);
+                    tracing::info!("Warning: Failed to focus window: {}", e);
                 }
 
                 let tracker_handle = std::thread::spawn(move || {
@@ -210,13 +209,13 @@ fn test_icon_diff_between_apps() {
                 let _ = tracker_handle.join();
 
                 if let Err(e) = cleanup_child_process(child) {
-                    info!("Warning: Failed to cleanup child process: {}", e);
+                    tracing::info!("Warning: Failed to cleanup child process: {}", e);
                 }
 
                 std::thread::sleep(Duration::from_millis(500));
             }
             Err(e) => {
-                info!("Could not spawn test window '{}': {}", window_title, e);
+                tracing::info!("Could not spawn test window '{}': {}", window_title, e);
             }
         }
     }

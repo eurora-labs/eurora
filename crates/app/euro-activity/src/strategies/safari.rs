@@ -30,7 +30,6 @@ use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tracing::{debug, info, warn};
 use url::Url;
 
 pub use euro_browser::{
@@ -93,9 +92,10 @@ impl SafariStrategy {
             let last_url = Arc::clone(&last_url);
 
             while let Ok((browser_pid, event_frame)) = events_rx.recv().await {
-                debug!(
+                tracing::debug!(
                     "Received event from browser PID {}: action={}",
-                    browser_pid, event_frame.action
+                    browser_pid,
+                    event_frame.action
                 );
 
                 let Some(payload_str) = event_frame.payload else {
@@ -108,7 +108,7 @@ impl SafariStrategy {
                             match serde_json::from_str::<NativeMessage>(&payload_str) {
                                 Ok(msg) => msg,
                                 Err(e) => {
-                                    warn!("Failed to parse metadata payload: {}", e);
+                                    tracing::warn!("Failed to parse metadata payload: {}", e);
                                     continue;
                                 }
                             };
@@ -116,7 +116,7 @@ impl SafariStrategy {
                         let metadata = match native_message {
                             NativeMessage::NativeMetadata(data) => StrategyMetadata::from(data),
                             _ => {
-                                debug!("Ignoring non-metadata event");
+                                tracing::debug!("Ignoring non-metadata event");
                                 continue;
                             }
                         };
@@ -140,12 +140,13 @@ impl SafariStrategy {
 
                         let activity = Activity::new(url_str, icon, "".to_string(), vec![]);
 
-                        info!(
+                        tracing::info!(
                             "Creating new activity from event: browser_pid={}, name={}",
-                            browser_pid, activity.name
+                            browser_pid,
+                            activity.name
                         );
                         if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                            warn!("Failed to send new activity report - receiver dropped");
+                            tracing::warn!("Failed to send new activity report - receiver dropped");
                             break;
                         }
                     }
@@ -155,21 +156,21 @@ impl SafariStrategy {
                             match serde_json::from_str::<NativeMessage>(&payload_str) {
                                 Ok(msg) => msg,
                                 Err(e) => {
-                                    warn!("Failed to parse asset payload: {}", e);
+                                    tracing::warn!("Failed to parse asset payload: {}", e);
                                     continue;
                                 }
                             };
 
                         match ActivityAsset::try_from(native_message) {
                             Ok(asset) => {
-                                debug!("Received asset from browser PID {}", browser_pid);
+                                tracing::debug!("Received asset from browser PID {}", browser_pid);
                                 if sender.send(ActivityReport::Assets(vec![asset])).is_err() {
-                                    warn!("Failed to send assets - receiver dropped");
+                                    tracing::warn!("Failed to send assets - receiver dropped");
                                     break;
                                 }
                             }
                             Err(e) => {
-                                warn!("Failed to convert native message to asset: {}", e);
+                                tracing::warn!("Failed to convert native message to asset: {}", e);
                             }
                         }
                     }
@@ -179,35 +180,41 @@ impl SafariStrategy {
                             match serde_json::from_str::<NativeMessage>(&payload_str) {
                                 Ok(msg) => msg,
                                 Err(e) => {
-                                    warn!("Failed to parse snapshot payload: {}", e);
+                                    tracing::warn!("Failed to parse snapshot payload: {}", e);
                                     continue;
                                 }
                             };
 
                         match ActivitySnapshot::try_from(native_message) {
                             Ok(snapshot) => {
-                                debug!("Received snapshot from browser PID {}", browser_pid);
+                                tracing::debug!(
+                                    "Received snapshot from browser PID {}",
+                                    browser_pid
+                                );
                                 if sender
                                     .send(ActivityReport::Snapshots(vec![snapshot]))
                                     .is_err()
                                 {
-                                    warn!("Failed to send snapshots - receiver dropped");
+                                    tracing::warn!("Failed to send snapshots - receiver dropped");
                                     break;
                                 }
                             }
                             Err(e) => {
-                                warn!("Failed to convert native message to snapshot: {}", e);
+                                tracing::warn!(
+                                    "Failed to convert native message to snapshot: {}",
+                                    e
+                                );
                             }
                         }
                     }
 
                     other => {
-                        debug!("Ignoring unknown event action: {}", other);
+                        tracing::debug!("Ignoring unknown event action: {}", other);
                     }
                 }
             }
 
-            debug!("Event subscription task ended");
+            tracing::debug!("Event subscription task ended");
         });
 
         self.event_subscription_handle = Some(Arc::new(handle));
@@ -252,7 +259,7 @@ impl ActivityStrategyFunctionality for SafariStrategy {
 
         self.init_collection(focus_window).await?;
 
-        debug!("Browser strategy starting tracking for: {:?}", process_name);
+        tracing::debug!("Browser strategy starting tracking for: {:?}", process_name);
         Ok(())
     }
 
@@ -260,18 +267,18 @@ impl ActivityStrategyFunctionality for SafariStrategy {
         &mut self,
         focus_window: &FocusedWindow,
     ) -> ActivityResult<bool> {
-        debug!(
+        tracing::debug!(
             "Browser strategy handling process change to: {}",
             focus_window.process_name
         );
 
         if self.can_handle_process(focus_window) {
-            debug!(
+            tracing::debug!(
                 "Browser strategy can continue handling: {}",
                 focus_window.process_name
             );
             if self.active_browser_pid == Some(focus_window.process_id) {
-                info!("Detected the same browser. Ignoring...");
+                tracing::info!("Detected the same browser. Ignoring...");
             } else {
                 self.active_browser_pid = Some(focus_window.process_id);
                 self.active_browser = Some(focus_window.process_name.to_string());
@@ -292,11 +299,11 @@ impl ActivityStrategyFunctionality for SafariStrategy {
                         vec![],
                     );
                     if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                        warn!("Failed to send new activity report - receiver dropped");
+                        tracing::warn!("Failed to send new activity report - receiver dropped");
                     }
                 }
             } else {
-                debug!(
+                tracing::debug!(
                     "Browser PID {} has registered gRPC client, skipping activity report \
                      (will be handled by event subscription)",
                     focus_window.process_id
@@ -305,7 +312,7 @@ impl ActivityStrategyFunctionality for SafariStrategy {
 
             Ok(true)
         } else {
-            debug!(
+            tracing::debug!(
                 "Browser strategy cannot handle: {}, stopping tracking",
                 focus_window.process_name
             );
@@ -315,7 +322,7 @@ impl ActivityStrategyFunctionality for SafariStrategy {
     }
 
     async fn stop_tracking(&mut self) -> ActivityResult<()> {
-        debug!("Browser strategy stopping tracking");
+        tracing::debug!("Browser strategy stopping tracking");
         self.active_browser = None;
         self.active_browser_pid = None;
 
@@ -329,17 +336,17 @@ impl ActivityStrategyFunctionality for SafariStrategy {
     }
 
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
-        debug!("retrieve_assets called (no-op in push model)");
+        tracing::debug!("retrieve_assets called (no-op in push model)");
         Ok(vec![])
     }
 
     async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        debug!("retrieve_snapshots called (no-op in push model)");
+        tracing::debug!("retrieve_snapshots called (no-op in push model)");
         Ok(vec![])
     }
 
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
-        debug!("get_metadata called (no-op in push model)");
+        tracing::debug!("get_metadata called (no-op in push model)");
         Ok(StrategyMetadata::default())
     }
 }

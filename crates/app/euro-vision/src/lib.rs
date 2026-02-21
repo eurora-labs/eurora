@@ -1,7 +1,6 @@
 use anyhow::{Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
 use image::{ImageBuffer, Rgb, Rgba};
-use tracing::debug;
 use xcap::Monitor;
 
 pub fn capture_monitor() -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
@@ -48,7 +47,7 @@ pub fn capture_monitor_region(
     width: u32,
     height: u32,
 ) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
-    debug!("Capturing monitor region");
+    tracing::debug!("Capturing monitor region");
 
     let image_region = monitor
         .capture_region(x, y, width, height)

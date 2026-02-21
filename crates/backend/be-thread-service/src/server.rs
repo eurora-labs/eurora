@@ -7,7 +7,7 @@ use agent_chain::{
 use be_authz::{extract_claims, parse_user_id};
 use be_local_settings::{OllamaConfig, OpenAIConfig, ProviderSettings, SettingsReceiver};
 use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Datelike, Utc};
 use prost_types::Timestamp;
 pub use proto_gen::thread::proto_thread_service_server::{
     ProtoThreadService, ProtoThreadServiceServer,
@@ -24,7 +24,6 @@ use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 use tokio_stream::{Stream, StreamExt};
 use tonic::{Request, Response, Status};
-use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use crate::converters::convert_db_message_to_base_message;
@@ -154,7 +153,7 @@ pub struct ThreadService {
 impl ThreadService {
     pub fn new(db: Arc<DatabaseManager>, mut settings_rx: SettingsReceiver) -> Self {
         let env_fallback = build_env_fallback();
-        info!(
+        tracing::info!(
             "Creating new ThreadService instance (env fallback: {})",
             env_fallback.is_some()
         );
@@ -174,12 +173,12 @@ impl ThreadService {
         tokio::spawn(async move {
             loop {
                 if settings_rx.changed().await.is_err() {
-                    info!("Settings channel closed, stopping provider watcher");
+                    tracing::info!("Settings channel closed, stopping provider watcher");
                     break;
                 }
                 let new_settings = settings_rx.borrow_and_update().clone();
                 let new_providers = new_settings.map(|s| {
-                    info!("Provider settings changed, rebuilding providers");
+                    tracing::info!("Provider settings changed, rebuilding providers");
                     Providers {
                         chat: build_chat_provider_from(&s).into(),
                         title: build_title_provider_from(&s).into(),
@@ -246,7 +245,7 @@ impl ProtoThreadService for ThreadService {
         &self,
         request: Request<CreateThreadRequest>,
     ) -> Result<Response<CreateThreadResponse>, Status> {
-        info!("CreateThread request received");
+        tracing::info!("CreateThread request received");
 
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
@@ -268,7 +267,7 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        info!("Created thread {} for user {}", thread.id, user_id);
+        tracing::info!("Created thread {} for user {}", thread.id, user_id);
 
         Ok(Response::new(CreateThreadResponse {
             thread: Some(Self::db_thread_to_proto(thread)),
@@ -279,7 +278,7 @@ impl ProtoThreadService for ThreadService {
         &self,
         request: Request<ListThreadsRequest>,
     ) -> Result<Response<ListThreadsResponse>, Status> {
-        info!("ListThreads request received");
+        tracing::info!("ListThreads request received");
 
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
@@ -299,7 +298,7 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        info!("Listed {} threads for user {}", threads.len(), user_id);
+        tracing::info!("Listed {} threads for user {}", threads.len(), user_id);
 
         Ok(Response::new(ListThreadsResponse {
             threads: threads.into_iter().map(Self::db_thread_to_proto).collect(),
@@ -310,7 +309,7 @@ impl ProtoThreadService for ThreadService {
         &self,
         request: Request<AddHumanMessageRequest>,
     ) -> Result<Response<AddHumanMessageResponse>, Status> {
-        info!("AddHumanMessage request received");
+        tracing::info!("AddHumanMessage request received");
 
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
@@ -343,9 +342,10 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        info!(
+        tracing::info!(
             "Added human message to thread {} for user {}",
-            thread_id, user_id
+            thread_id,
+            user_id
         );
 
         Ok(Response::new(AddHumanMessageResponse {
@@ -357,7 +357,7 @@ impl ProtoThreadService for ThreadService {
         &self,
         request: Request<AddHiddenHumanMessageRequest>,
     ) -> Result<Response<AddHiddenHumanMessageResponse>, Status> {
-        info!("AddHiddenHumanMessage request received");
+        tracing::info!("AddHiddenHumanMessage request received");
 
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
@@ -391,9 +391,10 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        info!(
+        tracing::info!(
             "Added hidden human message to thread {} for user {}",
-            thread_id, user_id
+            thread_id,
+            user_id
         );
 
         Ok(Response::new(AddHiddenHumanMessageResponse {
@@ -405,7 +406,7 @@ impl ProtoThreadService for ThreadService {
         &self,
         request: Request<AddSystemMessageRequest>,
     ) -> Result<Response<AddSystemMessageResponse>, Status> {
-        info!("AddSystemMessage request received");
+        tracing::info!("AddSystemMessage request received");
 
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
@@ -438,9 +439,10 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        info!(
+        tracing::info!(
             "Added system message to thread {} for user {}",
-            thread_id, user_id
+            thread_id,
+            user_id
         );
 
         Ok(Response::new(AddSystemMessageResponse {
@@ -452,7 +454,7 @@ impl ProtoThreadService for ThreadService {
         &self,
         request: Request<ChatStreamRequest>,
     ) -> ChatResult<Self::ChatStreamStream> {
-        info!("ChatStream request received");
+        tracing::info!("ChatStream request received");
 
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
@@ -464,9 +466,10 @@ impl ProtoThreadService for ThreadService {
                 source: e,
             })?;
 
-        debug!(
+        tracing::debug!(
             "ChatStream: user_id = {}, thread_id = {}",
-            user_id, thread_id
+            user_id,
+            thread_id
         );
 
         let db_messages = self
@@ -506,9 +509,33 @@ impl ProtoThreadService for ThreadService {
         let chat_provider = self.get_chat_provider()?;
         let tools = self.get_tools();
 
+        let now = chrono::Utc::now();
+        let token_limit = self
+            .db
+            .get_token_limit_for_user(user_id)
+            .await
+            .map_err(ThreadServiceError::from)?;
+        if let Some(limit) = token_limit {
+            let used = self
+                .db
+                .get_monthly_token_usage(user_id, now.year(), now.month())
+                .await
+                .map_err(ThreadServiceError::from)?;
+            if used >= limit {
+                return Err(
+                    ThreadServiceError::token_limit_reached("Monthly token limit reached").into(),
+                );
+            }
+        }
+
         let db = self.db.clone();
         let output_stream = async_stream::try_stream! {
             let mut full_content = String::new();
+            let mut total_input_tokens: i64 = 0;
+            let mut total_output_tokens: i64 = 0;
+            let mut total_reasoning_tokens: i64 = 0;
+            let mut total_cache_creation_tokens: i64 = 0;
+            let mut total_cache_read_tokens: i64 = 0;
             const MAX_TOOL_ROUNDS: usize = 5;
 
             for round in 0..=MAX_TOOL_ROUNDS {
@@ -516,7 +543,7 @@ impl ProtoThreadService for ThreadService {
                     .astream(messages.clone().into(), None, None)
                     .await
                     .map_err(|e| {
-                        error!("Error in chat_stream: {}", e);
+                        tracing::error!("Error in chat_stream: {}", e);
                         Status::internal(e.to_string())
                     })?;
 
@@ -537,6 +564,17 @@ impl ProtoThreadService for ThreadService {
                             }
                             if !chunk.tool_calls.is_empty() {
                                 tool_calls.extend(chunk.tool_calls);
+                            }
+                            if let Some(ref usage) = chunk.usage_metadata {
+                                total_input_tokens += usage.input_tokens;
+                                total_output_tokens += usage.output_tokens;
+                                if let Some(ref details) = usage.output_token_details {
+                                    total_reasoning_tokens += details.reasoning.unwrap_or(0);
+                                }
+                                if let Some(ref details) = usage.input_token_details {
+                                    total_cache_creation_tokens += details.cache_creation.unwrap_or(0);
+                                    total_cache_read_tokens += details.cache_read.unwrap_or(0);
+                                }
                             }
                         }
                         Err(e) => {
@@ -565,7 +603,7 @@ impl ProtoThreadService for ThreadService {
                     let result_msg = if let Some(tool) = tools.get(&tool_name) {
                         tool.invoke_tool_call(tc).await
                     } else {
-                        error!("Unknown tool: {}", tool_name);
+                        tracing::error!("Unknown tool: {}", tool_name);
                         agent_chain::messages::ToolMessage::builder()
                             .content(format!("Error: unknown tool '{}'", tool_name))
                             .tool_call_id("")
@@ -583,7 +621,8 @@ impl ProtoThreadService for ThreadService {
                 is_final: true,
             };
 
-            if !full_content.is_empty() && let Err(e) = db
+            if !full_content.is_empty() {
+                match db
                     .create_message().thread_id(thread_id)
                     .user_id(user_id)
                     .message_type(MessageType::Ai)
@@ -591,8 +630,28 @@ impl ProtoThreadService for ThreadService {
                     .call()
                     .await
                 {
-                    error!("Failed to save AI message to database: {}", e);
+                    Ok(ai_message) => {
+                        if (total_input_tokens > 0 || total_output_tokens > 0) && let Err(e) = db
+                                .record_token_usage()
+                                .user_id(user_id)
+                                .thread_id(thread_id)
+                                .message_id(ai_message.id)
+                                .input_tokens(total_input_tokens)
+                                .output_tokens(total_output_tokens)
+                                .reasoning_tokens(total_reasoning_tokens)
+                                .cache_creation_tokens(total_cache_creation_tokens)
+                                .cache_read_tokens(total_cache_read_tokens)
+                                .call()
+                                .await
+                            {
+                                tracing::error!("Failed to record token usage: {}", e);
+                            }
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to save AI message to database: {}", e);
+                    }
                 }
+            }
         };
 
         Ok(Response::new(
@@ -604,7 +663,7 @@ impl ProtoThreadService for ThreadService {
         &self,
         request: Request<GetMessagesRequest>,
     ) -> Result<Response<GetMessagesResponse>, Status> {
-        info!("Get messages request received");
+        tracing::info!("Get messages request received");
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
@@ -639,7 +698,7 @@ impl ProtoThreadService for ThreadService {
         &self,
         request: tonic::Request<proto_gen::thread::GetThreadRequest>,
     ) -> Result<Response<GetThreadResponse>, Status> {
-        info!("Get thread request received");
+        tracing::info!("Get thread request received");
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
@@ -668,7 +727,7 @@ impl ProtoThreadService for ThreadService {
         &self,
         request: tonic::Request<GenerateThreadTitleRequest>,
     ) -> Result<Response<GenerateThreadTitleResponse>, Status> {
-        info!("Generate thread title request received");
+        tracing::info!("Generate thread title request received");
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();

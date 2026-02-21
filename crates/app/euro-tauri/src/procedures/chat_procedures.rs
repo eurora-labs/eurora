@@ -64,7 +64,7 @@ impl ChatApi for ChatApiImpl {
                 // For now, we don't need to save assets to service, that will come later
                 // when there is a way to convert assets to messages directly
                 // if let Ok(infos) = timeline.save_assets_to_service_by_ids(&query.assets).await {
-                //     info!("Infos: {:?}", infos);
+                //     tracing::info!("Infos: {:?}", infos);
                 // }
 
                 let has_assets = !query.assets.is_empty();

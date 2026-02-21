@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use tracing::warn;
-
 use crate::error::{Error, Result};
 
 use super::base::BasePromptTemplate;
@@ -33,7 +31,7 @@ pub fn load_prompt_from_config(config: serde_json::Value) -> Result<Box<dyn Base
     };
 
     if !config.contains_key("_type") {
-        warn!("No `_type` key found, defaulting to `prompt`.");
+        tracing::warn!("No `_type` key found, defaulting to `prompt`.");
     }
 
     let config_type = config
@@ -54,7 +52,7 @@ fn load_template(var_name: &str, config: &mut serde_json::Map<String, serde_json
 
     if let Some(path_value) = config.remove(&path_key) {
         if config.contains_key(var_name) {
-            warn!("Both '{}' and '{}' cannot be provided.", path_key, var_name);
+            tracing::warn!("Both '{}' and '{}' cannot be provided.", path_key, var_name);
             return;
         }
 

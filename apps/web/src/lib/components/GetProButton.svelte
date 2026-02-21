@@ -4,8 +4,8 @@
 	import { Button, type ButtonProps } from '@eurora/ui/components/button/index';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { onMount } from 'svelte';
-	import type { Snippet } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import type { Snippet } from 'svelte';
 
 	const REST_API_URL = import.meta.env.VITE_REST_API_URL;
 	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID;

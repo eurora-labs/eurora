@@ -7,7 +7,6 @@ use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
 use proto_gen::asset::CreateAssetRequest;
 use tonic::{Request, Response, Status};
-use tracing::{debug, info};
 use uuid::Uuid;
 
 use crate::analytics;
@@ -30,7 +29,7 @@ pub struct ActivityService {
 
 impl ActivityService {
     pub fn new(db: Arc<DatabaseManager>, asset: Arc<AssetService>) -> Self {
-        info!("Creating new ActivityService instance");
+        tracing::info!("Creating new ActivityService instance");
         Self {
             db,
             asset_service: asset,
@@ -84,7 +83,7 @@ impl ProtoActivityService for ActivityService {
         &self,
         request: Request<ListActivitiesRequest>,
     ) -> Result<Response<ListActivitiesResponse>, Status> {
-        info!("ListActivities request received");
+        tracing::info!("ListActivities request received");
 
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
@@ -107,7 +106,7 @@ impl ProtoActivityService for ActivityService {
         let proto_activities: Vec<Activity> =
             activities.iter().map(Self::db_activity_to_proto).collect();
 
-        debug!(
+        tracing::debug!(
             "Listed {} activities for user {}",
             proto_activities.len(),
             user_id
@@ -124,7 +123,7 @@ impl ProtoActivityService for ActivityService {
         &self,
         request: Request<InsertActivityRequest>,
     ) -> Result<Response<ActivityResponse>, Status> {
-        info!("InsertActivity request received");
+        tracing::info!("InsertActivity request received");
 
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
@@ -148,7 +147,7 @@ impl ProtoActivityService for ActivityService {
         };
 
         let ended_at = req.ended_at.as_ref().and_then(timestamp_to_datetime);
-        info!("Ended at: {:?}", ended_at);
+        tracing::info!("Ended at: {:?}", ended_at);
 
         let has_icon = req.icon.is_some();
         let has_ended_at = ended_at.is_some();
@@ -174,7 +173,7 @@ impl ProtoActivityService for ActivityService {
             }
         };
 
-        info!("Created activity at: {:?}", activity.created_at);
+        tracing::info!("Created activity at: {:?}", activity.created_at);
         let icon_id = match req.icon {
             Some(icon) => {
                 match self
@@ -217,7 +216,7 @@ impl ProtoActivityService for ActivityService {
             return Err(ActivityServiceError::Database(e).into());
         }
 
-        debug!("Created activity {} for user {}", activity.id, user_id);
+        tracing::debug!("Created activity {} for user {}", activity.id, user_id);
 
         analytics::track_activity_inserted(has_icon, has_ended_at, &process_name);
 

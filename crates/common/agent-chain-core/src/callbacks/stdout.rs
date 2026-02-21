@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 
-use tracing::warn;
 use uuid::Uuid;
 
 use super::base::{
@@ -30,10 +29,10 @@ fn write_text(writer: &Mutex<Box<dyn Write + Send>>, text: &str, color: Option<&
             write!(w, "{}{}", text, end)
         };
         if let Err(e) = result {
-            warn!("StdOutCallbackHandler write error: {e}");
+            tracing::warn!("StdOutCallbackHandler write error: {e}");
         }
         if let Err(e) = w.flush() {
-            warn!("StdOutCallbackHandler flush error: {e}");
+            tracing::warn!("StdOutCallbackHandler flush error: {e}");
         }
     }
 }
@@ -158,10 +157,10 @@ impl CallbackManagerMixin for StdOutCallbackHandler {
                 name,
                 colors::RESET
             ) {
-                warn!("StdOutCallbackHandler write error: {e}");
+                tracing::warn!("StdOutCallbackHandler write error: {e}");
             }
             if let Err(e) = w.flush() {
-                warn!("StdOutCallbackHandler flush error: {e}");
+                tracing::warn!("StdOutCallbackHandler flush error: {e}");
             }
         }
     }
@@ -176,10 +175,10 @@ impl ChainManagerMixin for StdOutCallbackHandler {
     ) {
         if let Ok(mut w) = self.writer.lock() {
             if let Err(e) = writeln!(w, "\n{}> Finished chain.{}", colors::BOLD, colors::RESET) {
-                warn!("StdOutCallbackHandler write error: {e}");
+                tracing::warn!("StdOutCallbackHandler write error: {e}");
             }
             if let Err(e) = w.flush() {
-                warn!("StdOutCallbackHandler flush error: {e}");
+                tracing::warn!("StdOutCallbackHandler flush error: {e}");
             }
         }
     }
