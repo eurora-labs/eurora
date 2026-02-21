@@ -5,6 +5,7 @@ mod enforcer;
 mod error;
 mod grpc_layer;
 mod rate_limit;
+mod token_gate;
 
 pub use axum_layer::{AuthzState, authz_middleware};
 pub use be_auth_core::*;

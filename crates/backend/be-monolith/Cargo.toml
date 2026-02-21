@@ -24,7 +24,7 @@ dotenv = { workspace = true }
 posthog-rs = { workspace = true }
 prost = { workspace = true }
 proto-gen = { workspace = true }
-sentry = { workspace = true, features = ["log", "logs", "tracing"] }
+sentry = { workspace = true, features = ["tracing"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
 tonic = { workspace = true }
 tonic-health = "0.14.3"
