@@ -128,17 +128,20 @@
 			text: query.text,
 			assets: query.assets,
 		};
-		let agentMessage: MessageView | undefined = undefined;
+
+		let agentMessage: MessageView | undefined;
+		messages.push({
+			id: null,
+			role: 'ai',
+			content: '',
+		});
 
 		function onEvent(response: ResponseChunk) {
 			if (!agentMessage) {
-				messages.push({
-					id: null,
-					role: 'ai',
-					content: response.chunk,
-				});
 				agentMessage = messages.at(-1);
-			} else if (agentMessage.role === 'ai') {
+			}
+
+			if (agentMessage && agentMessage.role === 'ai') {
 				agentMessage.content += response.chunk;
 			}
 		}
