@@ -28,7 +28,7 @@ CREATE TABLE token_usage (
 
 CREATE INDEX idx_token_usage_user_month ON token_usage (user_id, created_at);
 
-ALTER TABLE plans ADD COLUMN monthly_token_limit BIGINT;
+ALTER TABLE plans ADD COLUMN monthly_token_limit BIGINT NOT NULL;
 
 UPDATE plans SET monthly_token_limit = 0 WHERE id = 'free';
 UPDATE plans SET monthly_token_limit = 2000000 WHERE id = 'tier1';
