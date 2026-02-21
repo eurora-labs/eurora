@@ -1463,7 +1463,7 @@ impl DatabaseManager {
         &self,
         user_id: Uuid,
         year_month: i32,
-    ) -> DbResult<(Option<i64>, i64)> {
+    ) -> DbResult<(i64, i64)> {
         let row: Option<(i64, Option<i64>)> = sqlx::query_as(
             r#"
             SELECT p.monthly_token_limit,
@@ -1482,8 +1482,8 @@ impl DatabaseManager {
         .await?;
 
         match row {
-            Some((limit, used)) => Ok((Some(limit), used.unwrap_or(0))),
-            None => Ok((Some(DEFAULT_TOKEN_LIMIT), 0)),
+            Some((limit, used)) => Ok((limit, used.unwrap_or(0))),
+            None => Ok((DEFAULT_TOKEN_LIMIT, 0)),
         }
     }
 }
