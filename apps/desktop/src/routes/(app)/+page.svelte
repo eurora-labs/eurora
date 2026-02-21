@@ -31,6 +31,7 @@
 	} from '@eurora/ui/components/ai-elements/new-message/index';
 	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
 	import { onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
 
 	let thread = $state<ThreadView | null>(null);
 	let messages = $state<MessageView[]>([]);
@@ -113,35 +114,39 @@
 				clearQuery(editorRef);
 				await askQuestion(query);
 			} catch (error) {
-				console.error('Error:', error);
+				messages.splice(-2);
+				toast.error(String(error), {
+					duration: Infinity,
+					cancel: { label: 'Ok', onClick: () => {} },
+				});
 			}
 		}
 	}
 
 	async function askQuestion(query: QueryAssets): Promise<void> {
-		try {
-			const tauRpcQuery: Query = {
-				text: query.text,
-				assets: query.assets,
-			};
-			const aiMessage: MessageView = {
-				id: null,
-				role: 'ai',
-				content: '',
-			};
-			messages.push(aiMessage);
-			const agentMessage = messages.at(-1);
+		const tauRpcQuery: Query = {
+			text: query.text,
+			assets: query.assets,
+		};
 
-			function onEvent(response: ResponseChunk) {
-				if (agentMessage && agentMessage.role === 'ai') {
-					agentMessage.content += response.chunk;
-				}
+		let agentMessage: MessageView | undefined;
+		messages.push({
+			id: null,
+			role: 'ai',
+			content: '',
+		});
+
+		function onEvent(response: ResponseChunk) {
+			if (!agentMessage) {
+				agentMessage = messages.at(-1);
 			}
 
-			await taurpc.chat.send_query(thread?.id ?? null, onEvent, tauRpcQuery);
-		} catch (error) {
-			console.error('Failed to get answer:', error);
+			if (agentMessage && agentMessage.role === 'ai') {
+				agentMessage.content += response.chunk;
+			}
 		}
+
+		await taurpc.chat.send_query(thread?.id ?? null, onEvent, tauRpcQuery);
 	}
 </script>
 
@@ -169,7 +174,7 @@
 		class={[
 			'flex justify-center',
 			messages.length > 0
-				? 'fixed bottom-4 left-[var(--sidebar-width)] right-0 z-10'
+				? 'fixed bottom-4 left-(--sidebar-width) right-0 z-10'
 				: 'h-full items-center',
 		]}
 	>
