@@ -1452,7 +1452,7 @@ impl DatabaseManager {
     ) -> DbResult<i64> {
         let total = sqlx::query_scalar(
             r#"
-            SELECT COALESCE(SUM(input_tokens + output_tokens + reasoning_tokens), 0)
+            SELECT COALESCE(SUM(input_tokens + output_tokens + reasoning_tokens), 0)::BIGINT
             FROM token_usage
             WHERE user_id = $1
               AND created_at >= make_timestamptz($2, $3, 1, 0, 0, 0.0, 'UTC')
