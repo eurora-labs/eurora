@@ -7,7 +7,7 @@ use agent_chain::{
 use be_authz::{extract_claims, parse_user_id};
 use be_local_settings::{OllamaConfig, OpenAIConfig, ProviderSettings, SettingsReceiver};
 use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Datelike, Utc};
 use prost_types::Timestamp;
 pub use proto_gen::thread::proto_thread_service_server::{
     ProtoThreadService, ProtoThreadServiceServer,
@@ -506,9 +506,33 @@ impl ProtoThreadService for ThreadService {
         let chat_provider = self.get_chat_provider()?;
         let tools = self.get_tools();
 
+        let now = chrono::Utc::now();
+        let token_limit = self
+            .db
+            .get_token_limit_for_user(user_id)
+            .await
+            .map_err(ThreadServiceError::from)?;
+        if let Some(limit) = token_limit {
+            let used = self
+                .db
+                .get_monthly_token_usage(user_id, now.year(), now.month())
+                .await
+                .map_err(ThreadServiceError::from)?;
+            if used >= limit {
+                return Err(
+                    ThreadServiceError::token_limit_reached("Monthly token limit reached").into(),
+                );
+            }
+        }
+
         let db = self.db.clone();
         let output_stream = async_stream::try_stream! {
             let mut full_content = String::new();
+            let mut total_input_tokens: i64 = 0;
+            let mut total_output_tokens: i64 = 0;
+            let mut total_reasoning_tokens: i64 = 0;
+            let mut total_cache_creation_tokens: i64 = 0;
+            let mut total_cache_read_tokens: i64 = 0;
             const MAX_TOOL_ROUNDS: usize = 5;
 
             for round in 0..=MAX_TOOL_ROUNDS {
@@ -537,6 +561,17 @@ impl ProtoThreadService for ThreadService {
                             }
                             if !chunk.tool_calls.is_empty() {
                                 tool_calls.extend(chunk.tool_calls);
+                            }
+                            if let Some(ref usage) = chunk.usage_metadata {
+                                total_input_tokens += usage.input_tokens;
+                                total_output_tokens += usage.output_tokens;
+                                if let Some(ref details) = usage.output_token_details {
+                                    total_reasoning_tokens += details.reasoning.unwrap_or(0);
+                                }
+                                if let Some(ref details) = usage.input_token_details {
+                                    total_cache_creation_tokens += details.cache_creation.unwrap_or(0);
+                                    total_cache_read_tokens += details.cache_read.unwrap_or(0);
+                                }
                             }
                         }
                         Err(e) => {
@@ -583,7 +618,8 @@ impl ProtoThreadService for ThreadService {
                 is_final: true,
             };
 
-            if !full_content.is_empty() && let Err(e) = db
+            if !full_content.is_empty() {
+                match db
                     .create_message().thread_id(thread_id)
                     .user_id(user_id)
                     .message_type(MessageType::Ai)
@@ -591,8 +627,28 @@ impl ProtoThreadService for ThreadService {
                     .call()
                     .await
                 {
-                    error!("Failed to save AI message to database: {}", e);
+                    Ok(ai_message) => {
+                        if (total_input_tokens > 0 || total_output_tokens > 0) && let Err(e) = db
+                                .record_token_usage()
+                                .user_id(user_id)
+                                .thread_id(thread_id)
+                                .message_id(ai_message.id)
+                                .input_tokens(total_input_tokens)
+                                .output_tokens(total_output_tokens)
+                                .reasoning_tokens(total_reasoning_tokens)
+                                .cache_creation_tokens(total_cache_creation_tokens)
+                                .cache_read_tokens(total_cache_read_tokens)
+                                .call()
+                                .await
+                            {
+                                error!("Failed to record token usage: {}", e);
+                            }
+                    }
+                    Err(e) => {
+                        error!("Failed to save AI message to database: {}", e);
+                    }
                 }
+            }
         };
 
         Ok(Response::new(
