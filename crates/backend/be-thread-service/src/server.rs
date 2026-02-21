@@ -7,7 +7,7 @@ use agent_chain::{
 use be_authz::{extract_claims, parse_user_id};
 use be_local_settings::{OllamaConfig, OpenAIConfig, ProviderSettings, SettingsReceiver};
 use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Datelike, Utc};
 use prost_types::Timestamp;
 pub use proto_gen::thread::proto_thread_service_server::{
     ProtoThreadService, ProtoThreadServiceServer,
@@ -610,7 +610,10 @@ impl ProtoThreadService for ThreadService {
                     .await
                 {
                     Ok(ai_message) => {
-                        if (total_input_tokens > 0 || total_output_tokens > 0) && let Err(e) = db
+                        if (total_input_tokens > 0 || total_output_tokens > 0) && let Err(e) = {
+                                let now = Utc::now();
+                                let year_month = now.year() * 100 + now.month() as i32;
+                                db
                                 .record_token_usage()
                                 .user_id(user_id)
                                 .thread_id(thread_id)
@@ -620,8 +623,10 @@ impl ProtoThreadService for ThreadService {
                                 .reasoning_tokens(total_reasoning_tokens)
                                 .cache_creation_tokens(total_cache_creation_tokens)
                                 .cache_read_tokens(total_cache_read_tokens)
+                                .year_month(year_month)
                                 .call()
                                 .await
+                            }
                             {
                                 tracing::error!("Failed to record token usage: {}", e);
                             }
