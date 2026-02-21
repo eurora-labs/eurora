@@ -38,4 +38,4 @@ CREATE TABLE monthly_token_totals (
 ALTER TABLE plans ADD COLUMN monthly_token_limit BIGINT NOT NULL DEFAULT 0;
 
 UPDATE plans SET monthly_token_limit = 0 WHERE id = 'free';
-UPDATE plans SET monthly_token_limit = 2000000 WHERE id = 'tier1';
+UPDATE plans SET monthly_token_limit = 20000000 WHERE id = 'tier1';
