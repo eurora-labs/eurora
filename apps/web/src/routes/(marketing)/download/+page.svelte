@@ -83,6 +83,7 @@
 			{/each}
 		</div>
 	{/if}
+	<Button href="download/browser-extension/redirect">Download Browser Extension</Button>
 
 	{#if platformDetected}
 		<Collapsible.Root class="mt-8 w-full" open={true}>
