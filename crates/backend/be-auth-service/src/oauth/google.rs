@@ -9,7 +9,6 @@ use openidconnect::{
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tracing::info;
 
 #[derive(Debug, Error)]
 pub enum OAuthError {
@@ -84,7 +83,7 @@ impl GoogleOAuthClient {
 
         let http_client = build_http_client()?;
 
-        info!("Discovering OpenID Connect provider metadata");
+        tracing::info!("Discovering OpenID Connect provider metadata");
         let provider_metadata = CoreProviderMetadata::discover_async(issuer_url, &http_client)
             .await
             .map_err(|e| OAuthError::Discovery(e.to_string()))?;
@@ -107,7 +106,7 @@ impl GoogleOAuthClient {
         pkce_verifier: &str,
         nonce: &Nonce,
     ) -> String {
-        info!("Generating Google OAuth authorization URL with custom state and PKCE");
+        tracing::info!("Generating Google OAuth authorization URL with custom state and PKCE");
 
         let pkce_code_verifier = PkceCodeVerifier::new(pkce_verifier.to_string());
         let pkce_challenge = PkceCodeChallenge::from_code_verifier_sha256(&pkce_code_verifier);

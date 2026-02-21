@@ -24,7 +24,6 @@ use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tracing::{debug, info, warn};
 use url::Url;
 
 pub use euro_browser::{
@@ -98,9 +97,10 @@ impl BrowserStrategy {
             let last_url = Arc::clone(&last_url);
 
             while let Ok((browser_pid, event_frame)) = events_rx.recv().await {
-                debug!(
+                tracing::debug!(
                     "Received event from browser PID {}: action={}",
-                    browser_pid, event_frame.action
+                    browser_pid,
+                    event_frame.action
                 );
 
                 let Some(payload_str) = event_frame.payload else {
@@ -110,7 +110,7 @@ impl BrowserStrategy {
                 let native_message = match serde_json::from_str::<NativeMessage>(&payload_str) {
                     Ok(msg) => msg,
                     Err(e) => {
-                        warn!("Failed to parse native message: {}", e);
+                        tracing::warn!("Failed to parse native message: {}", e);
                         continue;
                     }
                 };
@@ -118,7 +118,7 @@ impl BrowserStrategy {
                 let metadata = match native_message {
                     NativeMessage::NativeMetadata(data) => StrategyMetadata::from(data),
                     _ => {
-                        debug!("Ignoring non-metadata event");
+                        tracing::debug!("Ignoring non-metadata event");
                         continue;
                     }
                 };
@@ -141,27 +141,28 @@ impl BrowserStrategy {
                 let url_str = metadata.url.clone().unwrap_or_default();
 
                 let assets = strategy.retrieve_assets().await.map_err(|e| {
-                    warn!("Failed to retrieve assets: {}", e);
+                    tracing::warn!("Failed to retrieve assets: {}", e);
                     e
                 });
 
                 let activity =
                     Activity::new(url_str, icon, "".to_string(), assets.unwrap_or_default());
 
-                info!(
+                tracing::info!(
                     "Creating new activity from event: browser_pid={}, name={}",
-                    browser_pid, activity.name
+                    browser_pid,
+                    activity.name
                 );
                 if sender
                     .send(ActivityReport::NewActivity(activity.clone()))
                     .is_err()
                 {
-                    warn!("Failed to send new activity report - receiver dropped");
+                    tracing::warn!("Failed to send new activity report - receiver dropped");
                     break;
                 }
             }
 
-            debug!("Event subscription task ended");
+            tracing::debug!("Event subscription task ended");
         });
 
         self.event_subscription_handle = Some(Arc::new(handle));
@@ -217,7 +218,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                     assets,
                 );
                 if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                    warn!("Failed to send new activity report - receiver dropped");
+                    tracing::warn!("Failed to send new activity report - receiver dropped");
                 }
             }
             Err(err) => {
@@ -228,16 +229,16 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                     vec![],
                 );
                 if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                    warn!("Failed to send new activity report - receiver dropped");
+                    tracing::warn!("Failed to send new activity report - receiver dropped");
                 }
 
-                warn!("Failed to get metadata: {}", err);
+                tracing::warn!("Failed to get metadata: {}", err);
             }
         }
 
         self.init_collection(focus_window).await?;
 
-        debug!("Browser strategy starting tracking for: {:?}", process_name);
+        tracing::debug!("Browser strategy starting tracking for: {:?}", process_name);
 
         Ok(())
     }
@@ -246,18 +247,18 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         &mut self,
         focus_window: &FocusedWindow,
     ) -> ActivityResult<bool> {
-        debug!(
+        tracing::debug!(
             "Browser strategy handling process change to: {}",
             focus_window.process_name
         );
 
         if self.can_handle_process(focus_window) {
-            debug!(
+            tracing::debug!(
                 "Browser strategy can continue handling: {}",
                 focus_window.process_name
             );
             if self.active_browser_pid == Some(focus_window.process_id) {
-                info!("Detected the same browser. Ignoring...",);
+                tracing::info!("Detected the same browser. Ignoring...",);
             } else {
                 self.active_browser_pid = Some(focus_window.process_id);
                 self.active_browser = Some(focus_window.process_name.to_string());
@@ -280,7 +281,9 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                                 vec![],
                             );
                             if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                                warn!("Failed to send new activity report - receiver dropped");
+                                tracing::warn!(
+                                    "Failed to send new activity report - receiver dropped"
+                                );
                             }
                         }
                         Err(err) => {
@@ -291,15 +294,17 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                                 vec![],
                             );
                             if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                                warn!("Failed to send new activity report - receiver dropped");
+                                tracing::warn!(
+                                    "Failed to send new activity report - receiver dropped"
+                                );
                             }
 
-                            warn!("Failed to get metadata: {}", err);
+                            tracing::warn!("Failed to get metadata: {}", err);
                         }
                     }
                 }
             } else {
-                debug!(
+                tracing::debug!(
                     "Browser PID {} has registered gRPC client, skipping activity report (will be handled by event subscription)",
                     focus_window.process_id
                 );
@@ -307,7 +312,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
             Ok(true)
         } else {
-            debug!(
+            tracing::debug!(
                 "Browser strategy cannot handle: {}, stopping tracking",
                 focus_window.process_name
             );
@@ -317,7 +322,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     }
 
     async fn stop_tracking(&mut self) -> ActivityResult<()> {
-        debug!("Browser strategy stopping tracking");
+        tracing::debug!("Browser strategy stopping tracking");
         self.active_browser = None;
         self.active_browser_pid = None;
 
@@ -337,7 +342,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     }
 
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
-        debug!("Retrieving assets for browser strategy");
+        tracing::debug!("Retrieving assets for browser strategy");
 
         let service = self
             .bridge_service
@@ -353,7 +358,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         })?;
 
         let Some(payload) = response_frame.payload else {
-            warn!("No payload in assets response");
+            tracing::warn!("No payload in assets response");
             return Ok(vec![]);
         };
 
@@ -363,7 +368,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         let asset = ActivityAsset::try_from(native_asset)
             .map_err(|e| -> ActivityError { ActivityError::InvalidAssetType(e.to_string()) })?;
 
-        debug!("Retrieved 1 asset from browser");
+        tracing::debug!("Retrieved 1 asset from browser");
         Ok(vec![asset])
     }
 
@@ -382,7 +387,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         })?;
 
         let Some(payload) = response_frame.payload else {
-            warn!("No payload in snapshot response");
+            tracing::warn!("No payload in snapshot response");
             return Ok(vec![]);
         };
 
@@ -396,7 +401,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     }
 
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
-        debug!("Retrieving metadata for browser strategy");
+        tracing::debug!("Retrieving metadata for browser strategy");
 
         let service = self
             .bridge_service
@@ -413,7 +418,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             .map_err(|e| ActivityError::invalid_data(format!("Failed to get metadata: {}", e)))?;
 
         let Some(payload) = response_frame.payload else {
-            warn!("No payload in metadata response");
+            tracing::warn!("No payload in metadata response");
             return Ok(StrategyMetadata::default());
         };
 
@@ -441,11 +446,11 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
 impl BrowserStrategy {
     fn collect_assets_and_snapshots(&mut self) {
-        info!("Starting active collection task");
+        tracing::info!("Starting active collection task");
         let sender = match self.sender.clone() {
             Some(sender) => sender,
             None => {
-                warn!("No sender available for snapshot collection");
+                tracing::warn!("No sender available for snapshot collection");
                 return;
             }
         };
@@ -453,7 +458,7 @@ impl BrowserStrategy {
         let mut worker = self.worker_clone();
 
         let handle = tokio::spawn(async move {
-            debug!("Starting snapshot collection task");
+            tracing::debug!("Starting snapshot collection task");
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(3));
 
             loop {
@@ -461,38 +466,38 @@ impl BrowserStrategy {
 
                 match worker.retrieve_assets().await {
                     Ok(assets) if !assets.is_empty() => {
-                        debug!("Collected {} asset(s)", assets.len());
+                        tracing::debug!("Collected {} asset(s)", assets.len());
                         if sender.send(ActivityReport::Assets(assets)).is_err() {
-                            warn!("Failed to send assets - receiver dropped");
+                            tracing::warn!("Failed to send assets - receiver dropped");
                             break;
                         }
                     }
                     Ok(_) => {
-                        debug!("No assets collected");
+                        tracing::debug!("No assets collected");
                     }
                     Err(e) => {
-                        warn!("Failed to retrieve assets: {}", e);
+                        tracing::warn!("Failed to retrieve assets: {}", e);
                     }
                 }
 
                 match worker.retrieve_snapshots().await {
                     Ok(snapshots) if !snapshots.is_empty() => {
-                        debug!("Collected {} snapshot(s)", snapshots.len());
+                        tracing::debug!("Collected {} snapshot(s)", snapshots.len());
                         if sender.send(ActivityReport::Snapshots(snapshots)).is_err() {
-                            warn!("Failed to send snapshots - receiver dropped");
+                            tracing::warn!("Failed to send snapshots - receiver dropped");
                             break;
                         }
                     }
                     Ok(_) => {
-                        debug!("No snapshots collected");
+                        tracing::debug!("No snapshots collected");
                     }
                     Err(e) => {
-                        warn!("Failed to retrieve snapshots: {}", e);
+                        tracing::warn!("Failed to retrieve snapshots: {}", e);
                     }
                 }
             }
 
-            debug!("Snapshot collection task ended");
+            tracing::debug!("Snapshot collection task ended");
         });
 
         self.snapshot_collection_handle = Some(Arc::new(handle));

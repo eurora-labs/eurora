@@ -6,7 +6,6 @@ use proto_gen::auth::{
 };
 use tokio::sync::watch;
 use tonic::transport::Channel;
-use tracing::error;
 
 #[derive(Debug, Clone)]
 pub struct AuthClient {
@@ -35,7 +34,7 @@ impl AuthClient {
     async fn login(&mut self, data: LoginRequest) -> Result<TokenResponse> {
         let mut client = self.client();
         let response = client.login(data).await.map_err(|e| {
-            error!("Login failed: {}", e);
+            tracing::error!("Login failed: {}", e);
             anyhow!("Login failed: {}", e)
         })?;
 
@@ -59,7 +58,7 @@ impl AuthClient {
             })
             .await
             .map_err(|e| {
-                error!("Registration failed: {}", e);
+                tracing::error!("Registration failed: {}", e);
                 anyhow!("Registration failed: {}", e)
             })?;
 
@@ -78,7 +77,7 @@ impl AuthClient {
             format!("Bearer {}", refresh_token).parse().unwrap(),
         );
         let response = client.refresh_token(request).await.map_err(|e| {
-            error!("Token refresh failed: {}", e);
+            tracing::error!("Token refresh failed: {}", e);
             anyhow!("Token refresh failed: {}", e)
         })?;
 
@@ -97,7 +96,7 @@ impl AuthClient {
             })
             .await
             .map_err(|e| {
-                error!("Login by login token failed: {}", e);
+                tracing::error!("Login by login token failed: {}", e);
                 anyhow!("Login by login token failed: {}", e)
             })?;
 
@@ -107,7 +106,7 @@ impl AuthClient {
     pub async fn get_login_token(&mut self) -> Result<GetLoginTokenResponse> {
         let mut client = self.client();
         let response = client.get_login_token(()).await.map_err(|e| {
-            error!("Get login token failed: {}", e);
+            tracing::error!("Get login token failed: {}", e);
             anyhow!("Get login token failed: {}", e)
         })?;
 

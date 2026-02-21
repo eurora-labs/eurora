@@ -2,7 +2,6 @@ use crate::shared_types::SharedThreadManager;
 use agent_chain_core::BaseMessage;
 use euro_thread::{ListThreadsRequest, Thread};
 use tauri::{Manager, Runtime};
-use tracing::error;
 
 #[taurpc::ipc_type]
 pub struct ThreadView {
@@ -93,7 +92,7 @@ impl ThreadApi for ThreadApiImpl {
         match TauRpcThreadApiEventTrigger::new(event_handler).current_thread_changed(view.clone()) {
             Ok(_) => Ok(view),
             Err(e) => {
-                error!("Failed to trigger current thread changed event: {}", e);
+                tracing::error!("Failed to trigger current thread changed event: {}", e);
                 Err(e.to_string())
             }
         }

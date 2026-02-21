@@ -1,6 +1,5 @@
 use serde_json::{Value, json};
 use std::collections::{HashMap, HashSet};
-use tracing::warn;
 
 use crate::messages::content::KNOWN_BLOCK_TYPES;
 use crate::{is_openai_data_block, parse_data_uri};
@@ -112,7 +111,7 @@ pub fn convert_to_openai_data_block(block: &Value, api: OpenAiApi) -> Result<Val
                         file["filename"] = json!(filename);
                     }
                 } else {
-                    warn!(
+                    tracing::warn!(
                         "OpenAI may require a filename for file uploads. Specify a filename \
                          in the content block, e.g.: {{'type': 'file', 'mime_type': \
                          '...', 'base64': '...', 'filename': 'my-file.pdf'}}"

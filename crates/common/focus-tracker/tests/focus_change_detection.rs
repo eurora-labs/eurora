@@ -8,42 +8,41 @@ mod util;
 use focus_tracker::subscribe_focus_changes;
 use serial_test::serial;
 use std::time::Duration;
-use tracing::info;
 use util::*;
 
 #[test]
 #[serial]
 fn polling_focus_switch() {
     if !should_run_integration_tests() {
-        info!("Skipping integration test - INTEGRATION_TEST=1 not set");
+        tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
     }
 
     if let Err(e) = setup_test_environment() {
-        info!("Skipping test due to environment setup failure: {}", e);
+        tracing::info!("Skipping test due to environment setup failure: {}", e);
         return;
     }
 
-    info!("Starting polling focus switch test");
+    tracing::info!("Starting polling focus switch test");
 
     let win_a = match spawn_window("WinA") {
         Ok(child) => child,
         Err(e) => {
-            info!("Failed to spawn WinA: {}", e);
+            tracing::info!("Failed to spawn WinA: {}", e);
             return;
         }
     };
 
     let mut win_a_mut = win_a;
     if let Err(e) = focus_window(&mut win_a_mut) {
-        info!("Failed to focus WinA: {}", e);
+        tracing::info!("Failed to focus WinA: {}", e);
         cleanup_child_process(win_a_mut).ok();
         return;
     }
 
     std::thread::sleep(Duration::from_millis(500));
     let focused = get_focused_window();
-    info!(
+    tracing::info!(
         "Current focused window after focusing WinA: {:?}",
         focused.window_title
     );
@@ -55,13 +54,13 @@ fn polling_focus_switch() {
         .unwrap_or(false);
 
     if !win_a_focused {
-        info!("WinA not focused as expected, but continuing test");
+        tracing::info!("WinA not focused as expected, but continuing test");
     }
 
     let win_b = match spawn_window("WinB") {
         Ok(child) => child,
         Err(e) => {
-            info!("Failed to spawn WinB: {}", e);
+            tracing::info!("Failed to spawn WinB: {}", e);
             cleanup_child_process(win_a_mut).ok();
             return;
         }
@@ -69,17 +68,17 @@ fn polling_focus_switch() {
 
     let mut win_b_mut = win_b;
     if let Err(e) = focus_window(&mut win_b_mut) {
-        info!("Failed to focus WinB: {}", e);
+        tracing::info!("Failed to focus WinB: {}", e);
         cleanup_child_process(win_a_mut).ok();
         cleanup_child_process(win_b_mut).ok();
         return;
     }
 
     let found_focus = wait_for_focus("WinB", Duration::from_secs(2));
-    info!("Found expected focus for WinB: {}", found_focus);
+    tracing::info!("Found expected focus for WinB: {}", found_focus);
 
     let final_focused = get_focused_window();
-    info!("Final focused window: {:?}", final_focused.window_title);
+    tracing::info!("Final focused window: {:?}", final_focused.window_title);
 
     let win_b_focused = final_focused
         .window_title
@@ -88,9 +87,9 @@ fn polling_focus_switch() {
         .unwrap_or(false);
 
     if win_b_focused {
-        info!("✓ Polling focus switch test passed");
+        tracing::info!("✓ Polling focus switch test passed");
     } else {
-        info!("⚠ Polling focus switch test: WinB not focused as expected");
+        tracing::info!("⚠ Polling focus switch test: WinB not focused as expected");
     }
 
     cleanup(win_a_mut, win_b_mut);
@@ -100,21 +99,21 @@ fn polling_focus_switch() {
 #[serial]
 fn event_mode_focus_switch() {
     if !should_run_integration_tests() {
-        info!("Skipping integration test - INTEGRATION_TEST=1 not set");
+        tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
     }
 
     if let Err(e) = setup_test_environment() {
-        info!("Skipping test due to environment setup failure: {}", e);
+        tracing::info!("Skipping test due to environment setup failure: {}", e);
         return;
     }
 
-    info!("Starting event mode focus switch test");
+    tracing::info!("Starting event mode focus switch test");
 
     let subscription = match subscribe_focus_changes() {
         Ok(sub) => sub,
         Err(e) => {
-            info!("Failed to subscribe to focus changes: {}", e);
+            tracing::info!("Failed to subscribe to focus changes: {}", e);
             return;
         }
     };
@@ -125,14 +124,14 @@ fn event_mode_focus_switch() {
     let win_a = match spawn_window("EventWinA") {
         Ok(child) => child,
         Err(e) => {
-            info!("Failed to spawn EventWinA: {}", e);
+            tracing::info!("Failed to spawn EventWinA: {}", e);
             return;
         }
     };
 
     let mut win_a_mut = win_a;
     if let Err(e) = focus_window(&mut win_a_mut) {
-        info!("Failed to focus EventWinA: {}", e);
+        tracing::info!("Failed to focus EventWinA: {}", e);
         cleanup_child_process(win_a_mut).ok();
         return;
     }
@@ -142,7 +141,7 @@ fn event_mode_focus_switch() {
     let win_b = match spawn_window("EventWinB") {
         Ok(child) => child,
         Err(e) => {
-            info!("Failed to spawn EventWinB: {}", e);
+            tracing::info!("Failed to spawn EventWinB: {}", e);
             cleanup_child_process(win_a_mut).ok();
             return;
         }
@@ -150,7 +149,7 @@ fn event_mode_focus_switch() {
 
     let mut win_b_mut = win_b;
     if let Err(e) = focus_window(&mut win_b_mut) {
-        info!("Failed to focus EventWinB: {}", e);
+        tracing::info!("Failed to focus EventWinB: {}", e);
         cleanup_child_process(win_a_mut).ok();
         cleanup_child_process(win_b_mut).ok();
         return;
@@ -163,18 +162,18 @@ fn event_mode_focus_switch() {
     while start.elapsed() < timeout && events.len() < 10 {
         match receiver.recv_timeout(Duration::from_millis(100)) {
             Ok(event) => {
-                info!("Received focus event: {:?}", event.window_title);
+                tracing::info!("Received focus event: {:?}", event.window_title);
                 events.push(event);
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                info!("Focus event channel disconnected");
+                tracing::info!("Focus event channel disconnected");
                 break;
             }
         }
     }
 
-    info!("Collected {} focus events", events.len());
+    tracing::info!("Collected {} focus events", events.len());
 
     let has_win_a = events.iter().any(|e| {
         e.window_title
@@ -203,15 +202,17 @@ fn event_mode_focus_switch() {
         .map(|title| title.contains("EventWinB"))
         .unwrap_or(false);
 
-    info!(
+    tracing::info!(
         "Event analysis - Has WinA: {}, Has WinB: {}, Final is WinB: {}",
-        has_win_a, has_win_b, final_event_is_win_b
+        has_win_a,
+        has_win_b,
+        final_event_is_win_b
     );
 
     if events.len() >= 2 && (has_win_a || has_win_b) {
-        info!("✓ Event mode focus switch test passed");
+        tracing::info!("✓ Event mode focus switch test passed");
     } else {
-        info!(
+        tracing::info!(
             "⚠ Event mode focus switch test: Expected at least 2 events with window focus changes"
         );
     }
@@ -223,21 +224,21 @@ fn event_mode_focus_switch() {
 #[serial]
 fn stress_focus_switch() {
     if !should_run_integration_tests() {
-        info!("Skipping integration test - INTEGRATION_TEST=1 not set");
+        tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
     }
 
     if let Err(e) = setup_test_environment() {
-        info!("Skipping test due to environment setup failure: {}", e);
+        tracing::info!("Skipping test due to environment setup failure: {}", e);
         return;
     }
 
-    info!("Starting stress focus switch test");
+    tracing::info!("Starting stress focus switch test");
 
     let win_a = match spawn_window("StressWinA") {
         Ok(child) => child,
         Err(e) => {
-            info!("Failed to spawn StressWinA: {}", e);
+            tracing::info!("Failed to spawn StressWinA: {}", e);
             return;
         }
     };
@@ -245,7 +246,7 @@ fn stress_focus_switch() {
     let win_b = match spawn_window("StressWinB") {
         Ok(child) => child,
         Err(e) => {
-            info!("Failed to spawn StressWinB: {}", e);
+            tracing::info!("Failed to spawn StressWinB: {}", e);
             cleanup_child_process(win_a).ok();
             return;
         }
@@ -256,7 +257,7 @@ fn stress_focus_switch() {
 
     let mut successful_switches = 0;
     for i in 0..10 {
-        info!("Focus switch iteration {}", i + 1);
+        tracing::info!("Focus switch iteration {}", i + 1);
 
         if focus_window(&mut win_a_mut).is_ok() {
             std::thread::sleep(Duration::from_millis(100));
@@ -275,7 +276,7 @@ fn stress_focus_switch() {
         }
     }
 
-    info!("Successful focus switches: {}/20", successful_switches);
+    tracing::info!("Successful focus switches: {}/20", successful_switches);
 
     let final_focused = get_focused_window();
     let final_is_correct = final_focused
@@ -284,12 +285,12 @@ fn stress_focus_switch() {
         .map(|title| title.contains("StressWin"))
         .unwrap_or(false);
 
-    info!("Final focused window: {:?}", final_focused.window_title);
+    tracing::info!("Final focused window: {:?}", final_focused.window_title);
 
     if successful_switches >= 10 && final_is_correct {
-        info!("✓ Stress focus switch test passed");
+        tracing::info!("✓ Stress focus switch test passed");
     } else {
-        info!(
+        tracing::info!(
             "⚠ Stress focus switch test: Expected more successful switches or correct final state"
         );
     }
