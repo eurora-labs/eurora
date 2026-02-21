@@ -294,3 +294,21 @@ pub struct ActivityThread {
     pub thread_id: Uuid,
     pub created_at: DateTime<Utc>,
 }
+
+// =============================================================================
+// Token Usage Types
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct TokenUsage {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub thread_id: Uuid,
+    pub message_id: Uuid,
+    pub input_tokens: i64,
+    pub output_tokens: i64,
+    pub reasoning_tokens: i64,
+    pub cache_creation_tokens: i64,
+    pub cache_read_tokens: i64,
+    pub created_at: DateTime<Utc>,
+}

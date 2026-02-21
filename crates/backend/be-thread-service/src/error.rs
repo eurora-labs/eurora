@@ -30,6 +30,9 @@ pub enum ThreadServiceError {
     #[error("Invalid timestamp for field '{0}'")]
     InvalidTimestamp(&'static str),
 
+    #[error("Token limit reached: {0}")]
+    TokenLimitReached(String),
+
     #[error("Internal error: {0}")]
     Internal(String),
 }
@@ -67,6 +70,10 @@ impl ThreadServiceError {
         matches!(self, Self::Unauthenticated(_))
     }
 
+    pub fn token_limit_reached(msg: impl Into<String>) -> Self {
+        Self::TokenLimitReached(msg.into())
+    }
+
     pub fn code(&self) -> Code {
         match self {
             Self::Unauthenticated(_) => Code::Unauthenticated,
@@ -74,6 +81,7 @@ impl ThreadServiceError {
                 Code::InvalidArgument
             }
             Self::NotFound(_) => Code::NotFound,
+            Self::TokenLimitReached(_) => Code::ResourceExhausted,
             Self::Database(_) | Self::Internal(_) => Code::Internal,
         }
     }
@@ -101,6 +109,9 @@ impl From<ThreadServiceError> for Status {
             }
             ThreadServiceError::NotFound(_) => {
                 tracing::debug!("Resource not found: {}", message);
+            }
+            ThreadServiceError::TokenLimitReached(_) => {
+                tracing::info!("Token limit reached: {}", message);
             }
             ThreadServiceError::Database(e) => {
                 tracing::error!("Database error: {} (source: {:?})", message, e);

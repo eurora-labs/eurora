@@ -3,7 +3,7 @@ use crate::{
     error::{DbError, DbResult},
     types::{
         Activity, ActivityAsset, Asset, AssetStatus, LoginToken, Message, OAuthCredentials,
-        OAuthProvider, OAuthState, PasswordCredentials, RefreshToken, Thread, User,
+        OAuthProvider, OAuthState, PasswordCredentials, RefreshToken, Thread, TokenUsage, User,
     },
 };
 use bon::bon;
@@ -1400,5 +1400,87 @@ impl DatabaseManager {
                 .fetch_optional(executor)
                 .await?;
         Ok(result)
+    }
+
+    #[builder]
+    pub async fn record_token_usage(
+        &self,
+        user_id: Uuid,
+        thread_id: Uuid,
+        message_id: Uuid,
+        input_tokens: i64,
+        output_tokens: i64,
+        reasoning_tokens: Option<i64>,
+        cache_creation_tokens: Option<i64>,
+        cache_read_tokens: Option<i64>,
+    ) -> DbResult<TokenUsage> {
+        let record = sqlx::query_as::<_, TokenUsage>(
+            r#"
+            INSERT INTO token_usage (
+                user_id, thread_id, message_id,
+                input_tokens, output_tokens, reasoning_tokens,
+                cache_creation_tokens, cache_read_tokens
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id, user_id, thread_id, message_id,
+                      input_tokens, output_tokens, reasoning_tokens,
+                      cache_creation_tokens, cache_read_tokens, created_at
+            "#,
+        )
+        .bind(user_id)
+        .bind(thread_id)
+        .bind(message_id)
+        .bind(input_tokens)
+        .bind(output_tokens)
+        .bind(reasoning_tokens.unwrap_or(0))
+        .bind(cache_creation_tokens.unwrap_or(0))
+        .bind(cache_read_tokens.unwrap_or(0))
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(record)
+    }
+
+    pub async fn get_monthly_token_usage(
+        &self,
+        user_id: Uuid,
+        year: i32,
+        month: u32,
+    ) -> DbResult<i64> {
+        let total: Option<i64> = sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(SUM(input_tokens + output_tokens + reasoning_tokens), 0)
+            FROM token_usage
+            WHERE user_id = $1
+              AND created_at >= make_timestamptz($2, $3, 1, 0, 0, 0.0)
+              AND created_at < make_timestamptz($2, $3, 1, 0, 0, 0.0) + interval '1 month'
+            "#,
+        )
+        .bind(user_id)
+        .bind(year)
+        .bind(month as i32)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(total.unwrap_or(0))
+    }
+
+    pub async fn get_token_limit_for_user(&self, user_id: Uuid) -> DbResult<Option<i64>> {
+        let limit: Option<Option<i64>> = sqlx::query_scalar(
+            r#"
+            SELECT p.monthly_token_limit
+            FROM accounts a
+            JOIN plans p ON p.id = a.plan_id
+            WHERE a.owner_user_id = $1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        match limit {
+            Some(inner) => Ok(inner),
+            None => Ok(Some(50000)),
+        }
     }
 }
