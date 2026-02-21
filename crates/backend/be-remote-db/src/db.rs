@@ -1416,6 +1416,7 @@ impl DatabaseManager {
         reasoning_tokens: Option<i64>,
         cache_creation_tokens: Option<i64>,
         cache_read_tokens: Option<i64>,
+        year_month: i32,
     ) -> DbResult<TokenUsage> {
         let reasoning = reasoning_tokens.unwrap_or(0);
         let billable = input_tokens + output_tokens + reasoning;
@@ -1435,7 +1436,7 @@ impl DatabaseManager {
             ),
             upsert_total AS (
                 INSERT INTO monthly_token_totals (user_id, year_month, total_tokens)
-                VALUES ($1, (EXTRACT(YEAR FROM now())::INT * 100 + EXTRACT(MONTH FROM now())::INT), $9)
+                VALUES ($1, $9, $10)
                 ON CONFLICT (user_id, year_month)
                 DO UPDATE SET total_tokens = monthly_token_totals.total_tokens + EXCLUDED.total_tokens
             )
@@ -1450,6 +1451,7 @@ impl DatabaseManager {
         .bind(reasoning)
         .bind(cache_creation_tokens.unwrap_or(0))
         .bind(cache_read_tokens.unwrap_or(0))
+        .bind(year_month)
         .bind(billable)
         .fetch_one(&self.pool)
         .await?;
