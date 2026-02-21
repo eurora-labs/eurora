@@ -17,7 +17,7 @@
 			if (!isLoginSuccess) {
 				return;
 			}
-			goto('/');
+			goto('/onboarding/login/first-party/browser-extension');
 			clearInterval(interval);
 		}, 5000);
 	}
