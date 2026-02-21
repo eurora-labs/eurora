@@ -38,12 +38,15 @@ impl PaymentConfig {
             )
         })?;
 
-        let approved_beta_emails = std::env::var("APPROVED_BETA_EMAILS")
-            .unwrap_or_default()
-            .split(',')
-            .map(|s| s.trim().to_lowercase().to_string())
-            .filter(|s| !s.is_empty())
-            .collect::<Vec<_>>();
+        let approved_beta_emails = match std::env::var("APPROVED_BETA_EMAILS") {
+            Ok(emails) => emails
+                .split(',')
+                .map(|s| s.trim().to_lowercase().to_string())
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>(),
+            // Allow all by default
+            Err(_) => vec!["*".to_string()],
+        };
 
         Ok(Self {
             stripe_secret_key,
