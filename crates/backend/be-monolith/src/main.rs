@@ -17,8 +17,7 @@ use std::{net::SocketAddr, sync::Arc};
 use tonic::transport::Server;
 use tonic_web::GrpcWebLayer;
 use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer};
-use tracing_subscriber::Layer;
-use tracing_subscriber::filter::{EnvFilter, LevelFilter};
+use tracing_subscriber::filter::{LevelFilter, Targets};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -63,7 +62,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     sentry::ClientOptions {
                         release: sentry::release_name!(),
                         traces_sample_rate: 0.0,
-                        enable_logs: true,
                         send_default_pii: send_pii,
                         debug: sentry_debug,
                         ..Default::default()
@@ -79,19 +77,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .set_serving::<ProtoAuthServiceServer<AuthService>>()
         .await;
 
-    let filter = if cfg!(debug_assertions) {
-        EnvFilter::builder()
-            .with_default_directive(LevelFilter::WARN.into())
-            .parse_lossy("be_=debug,agent_chain=debug,hyper=off,tokio=off")
+    let app_level = if cfg!(debug_assertions) {
+        LevelFilter::DEBUG
     } else {
-        EnvFilter::builder()
-            .with_default_directive(LevelFilter::WARN.into())
-            .parse_lossy("be_=info,agent_chain=infO,hyper=off,tokio=off")
+        LevelFilter::INFO
     };
+    let global_filter = Targets::new()
+        .with_default(LevelFilter::WARN)
+        .with_target("be_", app_level)
+        .with_target("agent_chain", app_level)
+        .with_target("hyper", LevelFilter::OFF)
+        .with_target("tokio", LevelFilter::OFF);
 
     tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer().with_filter(filter.clone()))
-        .with(sentry::integrations::tracing::layer().with_filter(filter))
+        .with(tracing_subscriber::fmt::layer())
+        .with(sentry::integrations::tracing::layer())
+        .with(global_filter)
         .try_init()
         .unwrap();
 
@@ -188,8 +189,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let auth_rate_limiter = new_auth_failure_rate_limiter();
 
-    let grpc_authz_layer =
-        GrpcAuthzLayer::new(authz.clone(), jwt_config.clone(), auth_rate_limiter.clone());
+    let grpc_authz_layer = GrpcAuthzLayer::new(
+        authz.clone(),
+        jwt_config.clone(),
+        auth_rate_limiter.clone(),
+        db_manager.clone(),
+    );
 
     let mut grpc_server = Server::builder()
         .accept_http1(true)

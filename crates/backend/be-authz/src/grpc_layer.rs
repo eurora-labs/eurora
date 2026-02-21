@@ -7,6 +7,7 @@ use std::task::{Context, Poll};
 use auth_core::Claims;
 use axum::extract::ConnectInfo;
 use be_auth_core::JwtConfig;
+use be_remote_db::DatabaseManager;
 use http::Request;
 use tonic::Status;
 use tower::{Layer, Service};
@@ -14,12 +15,14 @@ use tower::{Layer, Service};
 use crate::CasbinAuthz;
 use crate::bypass::is_grpc_bypass;
 use crate::rate_limit::AuthFailureRateLimiter;
+use crate::token_gate;
 
 #[derive(Clone)]
 pub struct GrpcAuthzLayer {
     authz: CasbinAuthz,
     jwt_config: Arc<JwtConfig>,
     rate_limiter: AuthFailureRateLimiter,
+    db: Arc<DatabaseManager>,
 }
 
 impl GrpcAuthzLayer {
@@ -27,11 +30,13 @@ impl GrpcAuthzLayer {
         authz: CasbinAuthz,
         jwt_config: JwtConfig,
         rate_limiter: AuthFailureRateLimiter,
+        db: Arc<DatabaseManager>,
     ) -> Self {
         Self {
             authz,
             jwt_config: Arc::new(jwt_config),
             rate_limiter,
+            db,
         }
     }
 }
@@ -45,6 +50,7 @@ impl<S> Layer<S> for GrpcAuthzLayer {
             authz: self.authz.clone(),
             jwt_config: Arc::clone(&self.jwt_config),
             rate_limiter: Arc::clone(&self.rate_limiter),
+            db: Arc::clone(&self.db),
         }
     }
 }
@@ -55,6 +61,7 @@ pub struct GrpcAuthzService<S> {
     authz: CasbinAuthz,
     jwt_config: Arc<JwtConfig>,
     rate_limiter: AuthFailureRateLimiter,
+    db: Arc<DatabaseManager>,
 }
 
 fn extract_client_ip<B>(req: &Request<B>) -> IpAddr {
@@ -85,6 +92,7 @@ where
         let authz = self.authz.clone();
         let jwt_config = Arc::clone(&self.jwt_config);
         let rate_limiter = Arc::clone(&self.rate_limiter);
+        let db = Arc::clone(&self.db);
         let client_ip = extract_client_ip(&req);
         let inner = self.inner.clone();
         let mut inner = std::mem::replace(&mut self.inner, inner);
@@ -129,6 +137,21 @@ where
             match authz.enforce(&role, &service_name, &method) {
                 Ok(true) => {
                     tracing::debug!(role = %role, service = %service_name, method = %method, "gRPC authorized");
+
+                    if token_gate::is_token_gated(&service_full, &method) {
+                        let user_id = match uuid::Uuid::parse_str(&claims.sub) {
+                            Ok(id) => id,
+                            Err(_) => {
+                                return Ok(
+                                    Status::unauthenticated("Invalid user ID in token").into_http()
+                                );
+                            }
+                        };
+                        if let Err(status) = token_gate::check_token_limit(&db, user_id).await {
+                            return Ok(status.into_http());
+                        }
+                    }
+
                     req.extensions_mut().insert(claims);
                     inner.call(req).await
                 }
