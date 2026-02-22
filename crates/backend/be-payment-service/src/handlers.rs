@@ -306,6 +306,7 @@ pub async fn handle_webhook(
                 customer_email,
                 subscription_obj,
                 &raw_data,
+                &state.config.pro_price_id,
             )
             .await
             {
@@ -323,7 +324,7 @@ pub async fn handle_webhook(
                 "Subscription updated"
             );
 
-            if let Err(e) = webhook::on_subscription_updated(&state.db, &sub, &raw_data).await {
+            if let Err(e) = webhook::on_subscription_updated(&state.db, &sub, &raw_data, &state.config.pro_price_id).await {
                 tracing::error!(%event_id, error = %e, "Failed to handle subscription update");
                 return Err(e);
             }

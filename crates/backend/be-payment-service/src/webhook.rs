@@ -47,6 +47,30 @@ fn extract_first_price_id(sub: &Subscription) -> Option<String> {
     sub.items.data.first().map(|item| item.price.id.to_string())
 }
 
+struct PriceData {
+    id: String,
+    currency: String,
+    unit_amount: Option<i64>,
+    recurring_interval: Option<String>,
+    active: bool,
+    raw: serde_json::Value,
+}
+
+fn extract_prices(sub: &Subscription) -> Vec<PriceData> {
+    sub.items
+        .data
+        .iter()
+        .map(|item| PriceData {
+            id: item.price.id.to_string(),
+            currency: item.price.currency.to_string(),
+            unit_amount: item.price.unit_amount,
+            recurring_interval: item.price.recurring.as_ref().map(|r| r.interval.to_string()),
+            active: item.price.active,
+            raw: serialize_or_null(&item.price, "price"),
+        })
+        .collect()
+}
+
 pub async fn on_checkout_completed(
     db: &Arc<DatabaseManager>,
     customer_id: Option<String>,
@@ -54,6 +78,7 @@ pub async fn on_checkout_completed(
     customer_email: Option<String>,
     subscription: Option<&Subscription>,
     raw_data: &serde_json::Value,
+    pro_price_id: &str,
 ) -> Result<(), PaymentError> {
     let customer_id =
         customer_id.ok_or_else(|| PaymentError::MissingField("customer_id in checkout session"))?;
@@ -125,6 +150,26 @@ pub async fn on_checkout_completed(
             .map_err(|e| anyhow::anyhow!("upsert subscription: {e}"))?;
 
         if let Some(sub) = subscription {
+            for price in extract_prices(sub) {
+                db.upsert_stripe_price(
+                    &mut *tx,
+                    &price.id,
+                    &price.currency,
+                    price.unit_amount,
+                    price.recurring_interval.as_deref(),
+                    price.active,
+                    &price.raw,
+                )
+                .await
+                .map_err(|e| anyhow::anyhow!("upsert stripe price: {e}"))?;
+
+                if price.id == pro_price_id {
+                    db.ensure_plan_price(&mut *tx, "tier1", &price.id)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("ensure plan price: {e}"))?;
+                }
+            }
+
             let items = extract_subscription_items(sub);
             db.sync_stripe_subscription_items(&mut *tx, sub_id, &items)
                 .await
@@ -158,6 +203,7 @@ pub async fn on_subscription_updated(
     db: &Arc<DatabaseManager>,
     sub: &Subscription,
     _raw_data: &serde_json::Value,
+    pro_price_id: &str,
 ) -> Result<(), PaymentError> {
     let subscription_id = sub.id.to_string();
     let customer_id = sub.customer.id().to_string();
@@ -194,6 +240,26 @@ pub async fn on_subscription_updated(
         .call()
         .await
         .map_err(|e| anyhow::anyhow!("upsert subscription: {e}"))?;
+
+    for price in extract_prices(sub) {
+        db.upsert_stripe_price(
+            &mut *tx,
+            &price.id,
+            &price.currency,
+            price.unit_amount,
+            price.recurring_interval.as_deref(),
+            price.active,
+            &price.raw,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("upsert stripe price: {e}"))?;
+
+        if price.id == pro_price_id {
+            db.ensure_plan_price(&mut *tx, "tier1", &price.id)
+                .await
+                .map_err(|e| anyhow::anyhow!("ensure plan price: {e}"))?;
+        }
+    }
 
     let items = extract_subscription_items(sub);
     db.sync_stripe_subscription_items(&mut *tx, &subscription_id, &items)
