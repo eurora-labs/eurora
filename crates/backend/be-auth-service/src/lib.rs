@@ -144,7 +144,7 @@ impl AuthService {
         }
     }
 
-    async fn ensure_account_and_resolve_role(
+    async fn ensure_plan_and_resolve_role(
         &self,
         user_id: Uuid,
         email: &str,
@@ -156,7 +156,7 @@ impl AuthService {
         };
 
         self.db
-            .ensure_account_for_user_with_plan(&self.db.pool, user_id, plan_id)
+            .ensure_user_plan(&self.db.pool, user_id, plan_id)
             .await?;
 
         Ok(self.resolve_role(user_id).await)
@@ -316,7 +316,7 @@ impl AuthService {
             .await?;
 
         let role = self
-            .ensure_account_and_resolve_role(user.id, &user.email)
+            .ensure_plan_and_resolve_role(user.id, &user.email)
             .await?;
         let (access_token, refresh_token) = self
             .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
@@ -344,7 +344,7 @@ impl AuthService {
         let user = self.db.get_user_by_id(revoked_token.user_id).await?;
 
         let role = self
-            .ensure_account_and_resolve_role(user.id, &user.email)
+            .ensure_plan_and_resolve_role(user.id, &user.email)
             .await?;
         let (access_token, new_refresh_token) = self
             .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
@@ -543,7 +543,7 @@ impl AuthService {
         }
 
         let role = self
-            .ensure_account_and_resolve_role(user.id, &user.email)
+            .ensure_plan_and_resolve_role(user.id, &user.email)
             .await?;
         let (access_token, refresh_token) = self
             .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
@@ -750,7 +750,7 @@ impl ProtoAuthService for AuthService {
             })?;
 
         let role = self
-            .ensure_account_and_resolve_role(user.id, &user.email)
+            .ensure_plan_and_resolve_role(user.id, &user.email)
             .await
             .map_err(Status::from)?;
         let (access_token, refresh_token) = self
@@ -811,7 +811,7 @@ impl AuthService {
         }
 
         let role = self
-            .ensure_account_and_resolve_role(user.id, &user.email)
+            .ensure_plan_and_resolve_role(user.id, &user.email)
             .await?;
         let (access_token, refresh_token) = self
             .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
