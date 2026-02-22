@@ -255,12 +255,12 @@ jobs:
                   } >> "$GITHUB_ENV"
                   mkdir -p release && echo "$NEXT_VERSION" > release/version
 
-            # - name: Import GPG key
-            #   if: runner.os == 'Linux'
-            #   uses: crazy-max/ghaction-import-gpg@v6
-            #   with:
-            #       gpg_private_key: ${{ secrets.APPIMAGE_PRIVATE_KEY }}
-            #       passphrase: ${{ secrets.APPIMAGE_KEY_PASSPHRASE }}
+            - name: Import GPG key
+              if: runner.os == 'Linux'
+              uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6
+              with:
+                  gpg_private_key: ${{ secrets.APPIMAGE_PRIVATE_KEY }}
+                  passphrase: ${{ secrets.APPIMAGE_KEY_PASSPHRASE }}
 
             - name: Install linux dependencies
               shell: bash
