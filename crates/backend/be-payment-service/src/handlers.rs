@@ -287,10 +287,34 @@ pub async fn handle_webhook(
         EventObject::CheckoutSessionCompleted(session) => {
             let customer_id = session.customer.as_ref().map(|c| c.id().to_string());
             let subscription_id = session.subscription.as_ref().map(|s| s.id().to_string());
-            let customer_email = session.customer_email.clone();
+            let customer_email = session.customer_email.clone().or_else(|| {
+                session
+                    .customer_details
+                    .as_ref()
+                    .and_then(|d| d.email.clone())
+            });
 
-            // Try to get the expanded subscription object for period/item data
-            let subscription_obj = session.subscription.as_ref().and_then(|s| s.as_object());
+            // The webhook payload only includes the subscription ID (not expanded).
+            // Fetch the full subscription object from Stripe so we have items/prices.
+            let fetched_sub = match &subscription_id {
+                Some(sub_id) => {
+                    match stripe_billing::subscription::RetrieveSubscription::new(sub_id.as_str())
+                        .send(&state.client)
+                        .await
+                    {
+                        Ok(sub) => Some(sub),
+                        Err(e) => {
+                            tracing::warn!(%event_id, error = %e, "Failed to fetch subscription from Stripe — falling back to webhook data");
+                            session
+                                .subscription
+                                .as_ref()
+                                .and_then(|s| s.as_object())
+                                .cloned()
+                        }
+                    }
+                }
+                None => None,
+            };
 
             tracing::info!(
                 %event_id,
@@ -304,7 +328,7 @@ pub async fn handle_webhook(
                 customer_id,
                 subscription_id.clone(),
                 customer_email,
-                subscription_obj,
+                fetched_sub.as_ref(),
                 &raw_data,
                 &state.config.pro_price_id,
             )
