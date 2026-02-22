@@ -108,7 +108,7 @@ impl DatabaseManager {
         email: Option<String>,
     ) -> DbResult<User> {
         let (clause, bind_value) = match (id, username, email) {
-            (Some(id), _, _) => ("id = $1", id.to_string()),
+            (Some(id), _, _) => ("id = $1::uuid", id.to_string()),
             (_, Some(username), _) => ("username = $1", username),
             (_, _, Some(email)) => ("email = $1", email),
             _ => {
