@@ -83,12 +83,8 @@ impl AuthApi for AuthApiImpl {
             url.query_pairs_mut()
                 .append_pair("code_challenge", &code_challenge)
                 .append_pair("code_challenge_method", "S256");
-            secret::persist(
-                LOGIN_CODE_VERIFIER,
-                &Sensitive(code_verifier.clone()),
-                secret::Namespace::Global,
-            )
-            .map_err(|e| format!("Failed to persist code verifier: {}", e))?;
+            secret::persist(LOGIN_CODE_VERIFIER, &Sensitive(code_verifier.clone()))
+                .map_err(|e| format!("Failed to persist code verifier: {}", e))?;
             Ok(LoginToken {
                 code_challenge: code_challenge.to_string(),
                 expires_in,
@@ -102,13 +98,16 @@ impl AuthApi for AuthApiImpl {
     async fn poll_for_login<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
         if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
             let mut controller = user_state.lock().await;
-            let login_token = secret::retrieve(LOGIN_CODE_VERIFIER, secret::Namespace::Global)
+            let login_token = secret::retrieve(LOGIN_CODE_VERIFIER)
                 .map_err(|e| format!("Failed to retrieve login token: {}", e))?
                 .ok_or_else(|| "Login token not found".to_string())?;
 
-            match controller.login_by_login_token(login_token.0).await {
+            match controller
+                .login_by_login_token(login_token.into_inner())
+                .await
+            {
                 Ok(_) => {
-                    secret::delete(LOGIN_CODE_VERIFIER, secret::Namespace::Global)
+                    secret::delete(LOGIN_CODE_VERIFIER)
                         .map_err(|e| format!("Failed to remove login token: {}", e))?;
 
                     let state = app_handle.state::<SharedAppSettings>();
