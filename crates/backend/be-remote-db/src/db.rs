@@ -1185,6 +1185,7 @@ impl DatabaseManager {
         Ok(())
     }
 
+    #[builder]
     pub async fn upsert_stripe_price<'e, E>(
         &self,
         executor: E,

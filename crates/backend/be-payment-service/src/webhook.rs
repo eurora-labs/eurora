@@ -64,7 +64,11 @@ fn extract_prices(sub: &Subscription) -> Vec<PriceData> {
             id: item.price.id.to_string(),
             currency: item.price.currency.to_string(),
             unit_amount: item.price.unit_amount,
-            recurring_interval: item.price.recurring.as_ref().map(|r| r.interval.to_string()),
+            recurring_interval: item
+                .price
+                .recurring
+                .as_ref()
+                .map(|r| r.interval.to_string()),
             active: item.price.active,
             raw: serialize_or_null(&item.price, "price"),
         })
@@ -151,17 +155,17 @@ pub async fn on_checkout_completed(
 
         if let Some(sub) = subscription {
             for price in extract_prices(sub) {
-                db.upsert_stripe_price(
-                    &mut *tx,
-                    &price.id,
-                    &price.currency,
-                    price.unit_amount,
-                    price.recurring_interval.as_deref(),
-                    price.active,
-                    &price.raw,
-                )
-                .await
-                .map_err(|e| anyhow::anyhow!("upsert stripe price: {e}"))?;
+                db.upsert_stripe_price()
+                    .executor(&mut *tx)
+                    .price_id(&price.id)
+                    .currency(&price.currency)
+                    .maybe_unit_amount(price.unit_amount)
+                    .maybe_recurring_interval(price.recurring_interval.as_deref())
+                    .active(price.active)
+                    .raw_data(&price.raw)
+                    .call()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("upsert stripe price: {e}"))?;
 
                 if price.id == pro_price_id {
                     db.ensure_plan_price(&mut *tx, "tier1", &price.id)
@@ -242,17 +246,17 @@ pub async fn on_subscription_updated(
         .map_err(|e| anyhow::anyhow!("upsert subscription: {e}"))?;
 
     for price in extract_prices(sub) {
-        db.upsert_stripe_price(
-            &mut *tx,
-            &price.id,
-            &price.currency,
-            price.unit_amount,
-            price.recurring_interval.as_deref(),
-            price.active,
-            &price.raw,
-        )
-        .await
-        .map_err(|e| anyhow::anyhow!("upsert stripe price: {e}"))?;
+        db.upsert_stripe_price()
+            .executor(&mut *tx)
+            .price_id(&price.id)
+            .currency(&price.currency)
+            .maybe_unit_amount(price.unit_amount)
+            .maybe_recurring_interval(price.recurring_interval.as_deref())
+            .active(price.active)
+            .raw_data(&price.raw)
+            .call()
+            .await
+            .map_err(|e| anyhow::anyhow!("upsert stripe price: {e}"))?;
 
         if price.id == pro_price_id {
             db.ensure_plan_price(&mut *tx, "tier1", &price.id)
