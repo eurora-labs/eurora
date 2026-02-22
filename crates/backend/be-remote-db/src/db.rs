@@ -100,51 +100,37 @@ impl DatabaseManager {
         Ok(user)
     }
 
-    pub async fn get_user_by_id(&self, user_id: Uuid) -> DbResult<User> {
-        let user = sqlx::query_as::<_, User>(
-            r#"
-            SELECT id, username, email, display_name, email_verified, created_at, updated_at
-            FROM users
-            WHERE id = $1
-            "#,
-        )
-        .bind(user_id)
-        .fetch_one(&self.pool)
-        .await?;
+    #[builder]
+    pub async fn get_user(
+        &self,
+        id: Option<Uuid>,
+        username: Option<String>,
+        email: Option<String>,
+    ) -> DbResult<User> {
+        let (clause, bind_value) = match (id, username, email) {
+            (Some(id), _, _) => ("id = $1", id.to_string()),
+            (_, Some(username), _) => ("username = $1", username),
+            (_, _, Some(email)) => ("email = $1", email),
+            _ => {
+                return Err(DbError::Internal(
+                    "get_user requires at least one filter".into(),
+                ));
+            }
+        };
+
+        let query = format!(
+            "SELECT id, username, email, display_name, email_verified, created_at, updated_at FROM users WHERE {clause}"
+        );
+
+        let user = sqlx::query_as::<_, User>(&query)
+            .bind(bind_value)
+            .fetch_one(&self.pool)
+            .await?;
 
         Ok(user)
     }
 
-    pub async fn get_user_by_username(&self, username: &str) -> DbResult<User> {
-        let user = sqlx::query_as::<_, User>(
-            r#"
-            SELECT id, username, email, display_name, email_verified, created_at, updated_at
-            FROM users
-            WHERE username = $1
-            "#,
-        )
-        .bind(username)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(user)
-    }
-
-    pub async fn get_user_by_email(&self, email: &str) -> DbResult<User> {
-        let user = sqlx::query_as::<_, User>(
-            r#"
-            SELECT id, username, email, display_name, email_verified, created_at, updated_at
-            FROM users
-            WHERE email = $1
-            "#,
-        )
-        .bind(email)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(user)
-    }
-
+    #[builder]
     pub async fn get_password_credentials(&self, user_id: Uuid) -> DbResult<PasswordCredentials> {
         let credentials = sqlx::query_as::<_, PasswordCredentials>(
             r#"
@@ -160,6 +146,7 @@ impl DatabaseManager {
         Ok(credentials)
     }
 
+    #[builder]
     pub async fn user_exists_by_username(&self, username: &str) -> DbResult<bool> {
         let count: (i64,) = sqlx::query_as(
             r#"
@@ -173,6 +160,7 @@ impl DatabaseManager {
         Ok(count.0 > 0)
     }
 
+    #[builder]
     pub async fn user_exists_by_email(&self, email: &str) -> DbResult<bool> {
         let count: (i64,) = sqlx::query_as(
             r#"
@@ -227,6 +215,7 @@ impl DatabaseManager {
         Ok(oauth_creds)
     }
 
+    #[builder]
     pub async fn get_oauth_credentials_by_provider_and_user(
         &self,
         provider: OAuthProvider,
@@ -284,6 +273,7 @@ impl DatabaseManager {
         Ok(oauth_creds)
     }
 
+    #[builder]
     pub async fn get_user_by_oauth_provider(
         &self,
         provider: OAuthProvider,
@@ -335,6 +325,7 @@ impl DatabaseManager {
         Ok(refresh_token)
     }
 
+    #[builder]
     pub async fn get_refresh_token_by_hash(&self, token_hash: &[u8]) -> DbResult<RefreshToken> {
         let refresh_token = sqlx::query_as::<_, RefreshToken>(
             r#"
@@ -350,6 +341,7 @@ impl DatabaseManager {
         Ok(refresh_token)
     }
 
+    #[builder]
     pub async fn revoke_refresh_token(&self, token_hash: &[u8]) -> DbResult<RefreshToken> {
         let now = Utc::now();
 
@@ -405,6 +397,7 @@ impl DatabaseManager {
         Ok(oauth_state)
     }
 
+    #[builder]
     pub async fn get_oauth_state_by_state(&self, state: &str) -> DbResult<OAuthState> {
         let oauth_state = sqlx::query_as::<_, OAuthState>(
             r#"
@@ -420,6 +413,7 @@ impl DatabaseManager {
         Ok(oauth_state)
     }
 
+    #[builder]
     pub async fn consume_oauth_state(&self, state: &str) -> DbResult<OAuthState> {
         let now = Utc::now();
 
@@ -469,6 +463,7 @@ impl DatabaseManager {
         Ok(login_token)
     }
 
+    #[builder]
     pub async fn get_login_token_by_hash(&self, token_hash: &[u8]) -> DbResult<LoginToken> {
         let login_token = sqlx::query_as::<_, LoginToken>(
             r#"
@@ -484,6 +479,7 @@ impl DatabaseManager {
         Ok(login_token)
     }
 
+    #[builder]
     pub async fn get_login_token_by_hash_any(&self, token_hash: &[u8]) -> DbResult<LoginToken> {
         let login_token = sqlx::query_as::<_, LoginToken>(
             r#"
@@ -499,6 +495,7 @@ impl DatabaseManager {
         Ok(login_token)
     }
 
+    #[builder]
     pub async fn consume_login_token(&self, token_hash: &[u8]) -> DbResult<LoginToken> {
         let now = Utc::now();
 
@@ -556,6 +553,7 @@ impl DatabaseManager {
         Ok(activity)
     }
 
+    #[builder]
     pub async fn get_activity_for_user(
         &self,
         activity_id: Uuid,
@@ -672,6 +670,7 @@ impl DatabaseManager {
         Ok(())
     }
 
+    #[builder]
     pub async fn get_last_active_activity(&self, user_id: Uuid) -> DbResult<Option<Activity>> {
         let activity = sqlx::query_as::<_, Activity>(
             r#"
@@ -689,6 +688,7 @@ impl DatabaseManager {
         Ok(activity)
     }
 
+    #[builder]
     pub async fn delete_activity(&self, activity_id: Uuid, user_id: Uuid) -> DbResult<Activity> {
         let activity = sqlx::query_as::<_, Activity>(
             r#"
@@ -782,6 +782,7 @@ impl DatabaseManager {
         Ok(asset)
     }
 
+    #[builder]
     pub async fn link_asset_to_activity(
         &self,
         activity_id: Uuid,
@@ -1020,6 +1021,7 @@ impl DatabaseManager {
         Ok(messages)
     }
 
+    #[builder]
     pub async fn try_claim_webhook_event(
         &self,
         event_id: &str,
@@ -1040,6 +1042,7 @@ impl DatabaseManager {
         Ok(result.rows_affected() > 0)
     }
 
+    #[builder]
     pub async fn upsert_stripe_customer<'e, E>(
         &self,
         executor: E,
@@ -1073,6 +1076,7 @@ impl DatabaseManager {
         Ok(())
     }
 
+    #[builder]
     pub async fn link_stripe_customer_to_user<'e, E>(
         &self,
         executor: E,
@@ -1215,6 +1219,7 @@ impl DatabaseManager {
         Ok(())
     }
 
+    #[builder]
     pub async fn ensure_plan_price<'e, E>(
         &self,
         executor: E,
@@ -1235,6 +1240,7 @@ impl DatabaseManager {
         Ok(())
     }
 
+    #[builder]
     pub async fn sync_stripe_subscription_items<'e, E>(
         &self,
         executor: E,
@@ -1286,6 +1292,7 @@ impl DatabaseManager {
         Ok(())
     }
 
+    #[builder]
     pub async fn update_stripe_subscription_status(
         &self,
         subscription_id: &str,
@@ -1324,6 +1331,7 @@ impl DatabaseManager {
         Ok(())
     }
 
+    #[builder]
     pub async fn update_stripe_subscription_status_with_executor<'e, E>(
         &self,
         executor: E,
@@ -1366,6 +1374,7 @@ impl DatabaseManager {
         Ok(())
     }
 
+    #[builder]
     pub async fn ensure_user_plan<'e, E>(
         &self,
         executor: E,
@@ -1395,6 +1404,7 @@ impl DatabaseManager {
         Ok(())
     }
 
+    #[builder]
     pub async fn get_plan_id_for_user(&self, user_id: Uuid) -> DbResult<Option<String>> {
         let result: Option<String> = sqlx::query_scalar("SELECT plan_id FROM users WHERE id = $1")
             .bind(user_id)
@@ -1403,6 +1413,7 @@ impl DatabaseManager {
         Ok(result)
     }
 
+    #[builder]
     pub async fn update_plan_by_stripe_customer<'e, E>(
         &self,
         executor: E,
@@ -1427,6 +1438,7 @@ impl DatabaseManager {
         Ok(())
     }
 
+    #[builder]
     pub async fn resolve_plan_for_stripe_price<'e, E>(
         &self,
         executor: E,
@@ -1482,6 +1494,7 @@ impl DatabaseManager {
         Ok(record)
     }
 
+    #[builder]
     pub async fn get_token_limit_and_usage(
         &self,
         user_id: Uuid,

@@ -138,7 +138,7 @@ impl AuthService {
             return Role::Tier1;
         }
 
-        match self.db.get_plan_id_for_user(user_id).await {
+        match self.db.get_plan_id_for_user().user_id(user_id).call().await {
             Ok(Some(ref plan)) if plan == "tier1" => Role::Tier1,
             _ => Role::Free,
         }
@@ -156,7 +156,11 @@ impl AuthService {
         };
 
         self.db
-            .ensure_user_plan(&self.db.pool, user_id, plan_id)
+            .ensure_user_plan()
+            .executor(&self.db.pool)
+            .user_id(user_id)
+            .plan_id(plan_id)
+            .call()
             .await?;
 
         Ok(self.resolve_role(user_id).await)
@@ -292,14 +296,16 @@ impl AuthService {
     ) -> Result<TokenResponse, AuthError> {
         if self
             .db
-            .user_exists_by_username(username)
+            .user_exists_by_username()
+            .username(username)
+            .call()
             .await
             .unwrap_or(false)
         {
             return Err(AuthError::UsernameExists);
         }
 
-        if self.db.user_exists_by_email(email).await? {
+        if self.db.user_exists_by_email().email(email).call().await? {
             return Err(AuthError::EmailExists);
         }
 
@@ -337,11 +343,13 @@ impl AuthService {
 
         let revoked_token = self
             .db
-            .revoke_refresh_token(&token_hash)
+            .revoke_refresh_token()
+            .token_hash(&token_hash)
+            .call()
             .await
             .map_err(|_| AuthError::InvalidToken)?;
 
-        let user = self.db.get_user_by_id(revoked_token.user_id).await?;
+        let user = self.db.get_user().id(revoked_token.user_id).call().await?;
 
         let role = self
             .ensure_plan_and_resolve_role(user.id, &user.email)
@@ -378,10 +386,16 @@ impl AuthService {
             ));
         }
 
-        let oauth_state = self.db.get_oauth_state_by_state(state).await.map_err(|_| {
-            tracing::warn!("Invalid or expired OAuth state: {}", state);
-            AuthError::InvalidInput("Invalid or expired state parameter".into())
-        })?;
+        let oauth_state = self
+            .db
+            .get_oauth_state_by_state()
+            .state(state)
+            .call()
+            .await
+            .map_err(|_| {
+                tracing::warn!("Invalid or expired OAuth state: {}", state);
+                AuthError::InvalidInput("Invalid or expired state parameter".into())
+            })?;
 
         let pkce_verifier = decrypt_sensitive_string(&oauth_state.pkce_verifier)?;
 
@@ -394,10 +408,15 @@ impl AuthService {
         };
 
         // Must succeed to prevent replay attacks
-        self.db.consume_oauth_state(state).await.map_err(|e| {
-            tracing::error!("Failed to consume OAuth state: {}", e);
-            AuthError::Internal("Failed to process OAuth state".into())
-        })?;
+        self.db
+            .consume_oauth_state()
+            .state(state)
+            .call()
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to consume OAuth state: {}", e);
+                AuthError::Internal("Failed to process OAuth state".into())
+            })?;
 
         let google_client = self.google_oauth_client().await?;
         let user_info = google_client
@@ -424,14 +443,20 @@ impl AuthService {
 
         let existing_user_by_oauth = self
             .db
-            .get_user_by_oauth_provider(OAuthProvider::Google, &user_info.id)
+            .get_user_by_oauth_provider()
+            .provider(OAuthProvider::Google)
+            .provider_user_id(&user_info.id)
+            .call()
             .await;
 
         let user = match existing_user_by_oauth {
             Ok(user) => {
                 if let Ok(oauth_creds) = self
                     .db
-                    .get_oauth_credentials_by_provider_and_user(OAuthProvider::Google, user.id)
+                    .get_oauth_credentials_by_provider_and_user()
+                    .provider(OAuthProvider::Google)
+                    .user_id(user.id)
+                    .call()
                     .await
                     && let Err(e) = self
                         .db
@@ -450,7 +475,12 @@ impl AuthService {
                 user
             }
             Err(_) => {
-                let existing_user_by_email = self.db.get_user_by_email(&user_info.email).await;
+                let existing_user_by_email = self
+                    .db
+                    .get_user()
+                    .email(user_info.email.clone())
+                    .call()
+                    .await;
 
                 match existing_user_by_email {
                     Ok(user) => {
@@ -720,12 +750,24 @@ impl ProtoAuthService for AuthService {
         let token_hash = self.hash_login_token(&code_challenge);
 
         // Atomic consume avoids TOCTOU race between get + check + consume
-        let login_token = match self.db.consume_login_token(&token_hash).await {
+        let login_token = match self
+            .db
+            .consume_login_token()
+            .token_hash(&token_hash)
+            .call()
+            .await
+        {
             Ok(login_token) => login_token,
             Err(_) => {
                 // Re-issue tokens for already-consumed tokens (idempotent retry)
                 // since the caller proved identity via PKCE code_verifier.
-                match self.db.get_login_token_by_hash_any(&token_hash).await {
+                match self
+                    .db
+                    .get_login_token_by_hash_any()
+                    .token_hash(&token_hash)
+                    .call()
+                    .await
+                {
                     Ok(login_token) if login_token.consumed => {
                         tracing::info!(
                             "Login token already consumed, re-issuing tokens for idempotent retry"
@@ -742,7 +784,9 @@ impl ProtoAuthService for AuthService {
 
         let user = self
             .db
-            .get_user_by_id(login_token.user_id)
+            .get_user()
+            .id(login_token.user_id)
+            .call()
             .await
             .map_err(|e| {
                 tracing::error!("User not found for login token: {}", e);
@@ -784,9 +828,9 @@ impl AuthService {
         }
 
         let user = if login.contains('@') {
-            self.db.get_user_by_email(login).await
+            self.db.get_user().email(login.to_string()).call().await
         } else {
-            self.db.get_user_by_username(login).await
+            self.db.get_user().username(login.to_string()).call().await
         };
 
         let user = user.map_err(|_| {
@@ -796,7 +840,9 @@ impl AuthService {
 
         let password_creds = self
             .db
-            .get_password_credentials(user.id)
+            .get_password_credentials()
+            .user_id(user.id)
+            .call()
             .await
             .map_err(|_| {
                 tracing::warn!("Login failed: no password credentials for {}", login);
