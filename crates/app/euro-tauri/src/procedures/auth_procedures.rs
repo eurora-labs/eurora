@@ -35,6 +35,7 @@ pub trait AuthApi {
     async fn get_role<R: Runtime>(app_handle: AppHandle<R>) -> Result<String, String>;
     async fn get_username<R: Runtime>(app_handle: AppHandle<R>) -> Result<String, String>;
     async fn get_email<R: Runtime>(app_handle: AppHandle<R>) -> Result<String, String>;
+    async fn refresh_session<R: Runtime>(app_handle: AppHandle<R>) -> Result<(), String>;
 }
 
 const LOGIN_CODE_VERIFIER: &str = "LOGIN_CODE_VERIFIER";
@@ -259,6 +260,18 @@ impl AuthApi for AuthApiImpl {
         } else {
             Err("User controller not available".to_string())
         }
+    }
+
+    async fn refresh_session<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<(), String> {
+        let user_state = app_handle
+            .try_state::<SharedUserController>()
+            .ok_or_else(|| "User controller not available".to_string())?;
+        let mut controller = user_state.lock().await;
+        controller
+            .refresh_tokens()
+            .await
+            .map_err(|e| format!("Failed to refresh session: {}", e))?;
+        Ok(())
     }
 
     async fn get_email<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<String, String> {
