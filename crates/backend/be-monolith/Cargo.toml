@@ -5,6 +5,18 @@ edition.workspace = true
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 publish = false
 
+[lib]
+name = "be_monolith"
+path = "src/lib.rs"
+
+[[bin]]
+name = "be-monolith"
+path = "src/main.rs"
+test = false
+
+[features]
+default = []
+
 [dependencies]
 axum = { workspace = true }
 be-activity-service = { workspace = true }
@@ -13,6 +25,7 @@ be-asset-service = { workspace = true }
 be-auth-core = { workspace = true }
 be-auth-service = { workspace = true }
 be-authz = { workspace = true }
+be-encrypt = { workspace = true }
 be-local-settings = { workspace = true }
 be-local-settings-service = { workspace = true }
 be-payment-service = { workspace = true }

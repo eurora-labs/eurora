@@ -1,0 +1,233 @@
+name: 'Publish Server'
+env:
+    RUSTUP_TOOLCHAIN: stable
+permissions:
+    contents: write
+    actions: read
+on:
+    workflow_dispatch:
+        inputs:
+            channel:
+                type: choice
+                required: true
+                description: channel
+                default: nightly
+                options:
+                    - release
+                    - nightly
+            bump:
+                type: choice
+                required: true
+                description: update type
+                default: patch
+                options:
+                    - undefined
+                    - patch
+                    - minor
+                    - major
+
+jobs:
+    build-server:
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - platform: macos-15
+                      arch: aarch64
+                      target: ''
+                      os: darwin
+                    - platform: macos-15
+                      arch: x86_64
+                      target: x86_64-apple-darwin
+                      os: darwin
+                    - platform: ubuntu-24.04
+                      arch: x86_64
+                      target: ''
+                      os: linux
+                    - platform: ubuntu-24.04-arm
+                      arch: aarch64
+                      target: ''
+                      os: linux
+                    - platform: windows-latest
+                      arch: x86_64
+                      target: ''
+                      os: windows
+        runs-on: ${{ matrix.platform }}
+        environment:
+            name: eurora-server
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  lfs: true
+
+            - name: Rust Cache
+              uses: Swatinem/rust-cache@v2
+              with:
+                  shared-key: server-${{ matrix.os }}-${{ matrix.arch }}
+                  workspaces: |
+                      . -> target
+
+            - name: Install Protoc
+              uses: arduino/setup-protoc@v3
+              with:
+                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Install Linux dependencies
+              if: runner.os == 'Linux'
+              shell: bash
+              run: |
+                  sudo apt update
+                  sudo apt install -y \
+                    build-essential \
+                    libssl-dev \
+                    libgtk-3-dev \
+                    libappindicator3-dev \
+                    librsvg2-dev \
+                    libwebkit2gtk-4.1-dev \
+                    libjavascriptcoregtk-4.1-dev \
+                    libsoup-3.0-dev \
+                    libpipewire-0.3-dev \
+                    pkg-config
+
+            - name: Install cross-compilation target
+              if: matrix.target != ''
+              shell: bash
+              run: rustup target add ${{ matrix.target }}
+
+            - name: Download PostgreSQL binaries
+              shell: bash
+              run: |
+                  ./scripts/download-postgres.sh \
+                    "${{ matrix.os }}" \
+                    "${{ matrix.arch }}" \
+                    "./crates/app/euro-server/postgres"
+
+            - name: Copy authz config
+              shell: bash
+              run: |
+                  mkdir -p ./crates/app/euro-server/config/authz
+                  cp ./config/authz/model.conf ./crates/app/euro-server/config/authz/
+                  cp ./config/authz/policy.csv ./crates/app/euro-server/config/authz/
+
+            - name: Install pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 9
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '22'
+
+            - name: Install Tauri CLI
+              shell: bash
+              run: pnpm add -g @tauri-apps/cli
+
+            - name: Build euro-server
+              shell: bash
+              env:
+                  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SERVER_PRIVATE_KEY }}
+                  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SERVER_KEY_PASSWORD }}
+                  APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+                  APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+                  APPLE_ID: ${{ secrets.APPLE_ID }}
+                  APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
+                  APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+                  CARGO_BUILD_TARGET: ${{ matrix.target }}
+              working-directory: crates/app/euro-server
+              run: |
+                  if [ -n "$CARGO_BUILD_TARGET" ]; then
+                    cargo tauri build --config tauri.conf.release.json --target "$CARGO_BUILD_TARGET"
+                  else
+                    cargo tauri build --config tauri.conf.release.json
+                  fi
+
+            - name: Collect artifacts
+              shell: bash
+              run: |
+                  mkdir -p release/${{ matrix.os }}/${{ matrix.arch }}
+
+                  # macOS
+                  if [ "${{ matrix.os }}" = "darwin" ]; then
+                    find target -name "*.dmg" -exec cp {} release/${{ matrix.os }}/${{ matrix.arch }}/ \;
+                    find target -name "*.app.tar.gz" -exec cp {} release/${{ matrix.os }}/${{ matrix.arch }}/ \;
+                    find target -name "*.app.tar.gz.sig" -exec cp {} release/${{ matrix.os }}/${{ matrix.arch }}/ \;
+                  fi
+
+                  # Linux
+                  if [ "${{ matrix.os }}" = "linux" ]; then
+                    find target -name "*.AppImage" -exec cp {} release/${{ matrix.os }}/${{ matrix.arch }}/ \;
+                    find target -name "*.deb" -exec cp {} release/${{ matrix.os }}/${{ matrix.arch }}/ \;
+                    find target -name "*.rpm" -exec cp {} release/${{ matrix.os }}/${{ matrix.arch }}/ \;
+                  fi
+
+                  # Windows
+                  if [ "${{ matrix.os }}" = "windows" ]; then
+                    find target -name "*.msi" -exec cp {} release/${{ matrix.os }}/${{ matrix.arch }}/ \;
+                    find target -name "*.msi.sig" -exec cp {} release/${{ matrix.os }}/${{ matrix.arch }}/ \;
+                  fi
+
+                  echo "Collected artifacts:"
+                  ls -la release/${{ matrix.os }}/${{ matrix.arch }}/
+
+            - name: Upload artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: server-${{ matrix.os }}-${{ matrix.arch }}-${{ github.run_number }}
+                  path: release/
+                  retention-days: 7
+
+    publish-server:
+        needs: build-server
+        runs-on: ubuntu-latest
+        environment:
+            name: eurora-server
+        steps:
+            - uses: actions/checkout@v6
+
+            - name: Calculate version
+              id: version
+              shell: bash
+              run: |
+                  CHANNEL="${{ github.event.inputs.channel || 'nightly' }}"
+                  BUMP="${{ github.event.inputs.bump || 'patch' }}"
+
+                  # Get current version from API (or default to 0.0.0)
+                  CURRENT=$(curl -sf "https://api.eurora-labs.com/releases/server/${CHANNEL}" \
+                    | jq -r '.version // "0.0.0"' 2>/dev/null || echo "0.0.0")
+
+                  if [ "$BUMP" != "undefined" ]; then
+                    VERSION=$(./scripts/next.sh "$CURRENT" "$BUMP")
+                  else
+                    VERSION="$CURRENT"
+                  fi
+
+                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+                  echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+                  echo "Version: $VERSION, Channel: $CHANNEL"
+
+            - name: Download all artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  path: artifacts/
+                  pattern: server-*
+
+            - name: Upload to S3
+              uses: shallwefootball/s3-upload-action@master
+              with:
+                  aws_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws_bucket: releases.eurora-labs.com
+                  source_dir: artifacts/
+                  destination_dir: releases/server/${{ steps.version.outputs.channel }}/${{ steps.version.outputs.version }}-${{ github.run_number }}/
+
+            - name: Create git tag
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              shell: bash
+              run: |
+                  TAG="server/${{ steps.version.outputs.channel }}/${{ steps.version.outputs.version }}"
+                  git tag -d "$TAG" 2>/dev/null || true
+                  git push origin ":refs/tags/$TAG" 2>/dev/null || true
+                  git tag "$TAG"
+                  git push origin "$TAG"

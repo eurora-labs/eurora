@@ -8,7 +8,6 @@
 		"active": true,
 		"resources": [
 			"LICENSES-THIRD-PARTY.md",
-			"docker-compose.yml",
 			"hosts/mac.chromium.native-messaging.json",
 			"hosts/mac.edge.native-messaging.json",
 			"hosts/mac.firefox.native-messaging.json",

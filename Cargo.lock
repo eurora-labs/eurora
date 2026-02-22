@@ -1607,6 +1607,7 @@ dependencies = [
  "be-auth-core",
  "be-auth-service",
  "be-authz",
+ "be-encrypt",
  "be-local-settings",
  "be-local-settings-service",
  "be-payment-service",
@@ -3724,6 +3725,26 @@ dependencies = [
  "serde_json",
  "tracing",
  "zeroize",
+]
+
+[[package]]
+name = "euro-server"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "be-encrypt",
+ "be-monolith",
+ "dirs 6.0.0",
+ "euro-encrypt",
+ "euro-secret",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-autostart",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -10384,9 +10405,9 @@ dependencies = [
  "ipnet",
  "log",
  "memchr",
- "native-tls",
  "once_cell",
  "percent-encoding",
+ "rustls 0.23.36",
  "serde",
  "serde_json",
  "sha2",
@@ -10397,6 +10418,7 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
+ "webpki-roots 0.26.11",
 ]
 
 [[package]]
@@ -12811,6 +12833,15 @@ name = "webpki-roots"
 version = "0.25.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f20c57d8d7db6d3b86154206ae5d8fba62dd39573114de97c2cb0578251f8e1"
+
+[[package]]
+name = "webpki-roots"
+version = "0.26.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "521bc38abb08001b01866da9f51eb7c5d647a19260e00054a8c7fd5f9e57f7a9"
+dependencies = [
+ "webpki-roots 1.0.5",
+]
 
 [[package]]
 name = "webpki-roots"

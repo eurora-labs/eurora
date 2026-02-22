@@ -1,0 +1,30 @@
+[package]
+name = "euro-server"
+version = "0.0.0"
+edition.workspace = true
+description = "Eurora Server — standalone backend with embedded PostgreSQL"
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+publish = false
+
+[[bin]]
+name = "euro-server"
+path = "src/main.rs"
+test = false
+
+[dependencies]
+anyhow = { workspace = true }
+be-encrypt = { workspace = true }
+be-monolith = { workspace = true }
+dirs = { workspace = true }
+euro-encrypt = { workspace = true }
+euro-secret = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tauri = { version = "2.10.2", features = ["tray-icon"] }
+tauri-plugin-autostart = "2"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "net", "process", "time"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
