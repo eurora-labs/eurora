@@ -1185,6 +1185,67 @@ impl DatabaseManager {
         Ok(())
     }
 
+    pub async fn upsert_stripe_price<'e, E>(
+        &self,
+        executor: E,
+        price_id: &str,
+        currency: &str,
+        unit_amount: Option<i64>,
+        recurring_interval: Option<&str>,
+        active: bool,
+        raw_data: &serde_json::Value,
+    ) -> DbResult<()>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        let now = Utc::now();
+
+        sqlx::query(
+            r#"
+            INSERT INTO stripe.prices (id, currency, unit_amount, recurring_interval, active, created_at, updated_at, raw_data)
+            VALUES ($1, $2, $3, $4, $5, $6, $6, $7)
+            ON CONFLICT (id) DO UPDATE
+            SET currency = EXCLUDED.currency,
+                unit_amount = EXCLUDED.unit_amount,
+                recurring_interval = EXCLUDED.recurring_interval,
+                active = EXCLUDED.active,
+                raw_data = EXCLUDED.raw_data,
+                updated_at = EXCLUDED.updated_at
+            "#,
+        )
+        .bind(price_id)
+        .bind(currency)
+        .bind(unit_amount)
+        .bind(recurring_interval)
+        .bind(active)
+        .bind(now)
+        .bind(raw_data)
+        .execute(executor)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn ensure_plan_price<'e, E>(
+        &self,
+        executor: E,
+        plan_id: &str,
+        stripe_price_id: &str,
+    ) -> DbResult<()>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        sqlx::query(
+            "INSERT INTO plan_prices (plan_id, stripe_price_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        )
+        .bind(plan_id)
+        .bind(stripe_price_id)
+        .execute(executor)
+        .await?;
+
+        Ok(())
+    }
+
     pub async fn sync_stripe_subscription_items<'e, E>(
         &self,
         executor: E,
