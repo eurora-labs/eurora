@@ -339,6 +339,7 @@ jobs:
                   POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
               run: |
                   ./scripts/release.sh \
+                    --sign \
                     --channel                    "$RELEASE_CHANNEL" \
                     --dist                       "./release" \
                     --version                    "$RELEASE_VERSION"
