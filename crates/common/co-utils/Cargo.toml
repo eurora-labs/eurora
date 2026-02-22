@@ -6,3 +6,4 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
 serde = { workspace = true, features = ["std"] }
+zeroize = { version = "1.8.2" }

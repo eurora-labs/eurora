@@ -1,17 +1,27 @@
 use std::ops::{Deref, DerefMut};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use zeroize::Zeroize;
 
 /// A type to clearly mark sensitive information using the type-system. As such, it should
 ///
 /// * *not* be logged
 /// * *not* be stored in plain text
 /// * *not* be presented in any way unless the user explicitly confirmed it to be displayed.
-pub struct Sensitive<T>(pub T);
+///
+/// The inner value is automatically zeroized when the `Sensitive` wrapper is dropped,
+/// preventing secret material from lingering in memory.
+pub struct Sensitive<T: Zeroize>(pub T);
+
+impl<T: Zeroize> Drop for Sensitive<T> {
+    fn drop(&mut self) {
+        self.0.zeroize();
+    }
+}
 
 impl<T> Serialize for Sensitive<T>
 where
-    T: Serialize,
+    T: Serialize + Zeroize,
 {
     fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -24,7 +34,7 @@ where
 }
 impl<'de, T> Deserialize<'de> for Sensitive<T>
 where
-    T: Deserialize<'de>,
+    T: Deserialize<'de> + Zeroize,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -36,7 +46,7 @@ where
 
 impl<T> std::fmt::Debug for Sensitive<T>
 where
-    T: std::fmt::Debug,
+    T: std::fmt::Debug + Zeroize,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt("<redacted>", f)
@@ -45,14 +55,14 @@ where
 
 impl<T> Default for Sensitive<T>
 where
-    T: Default,
+    T: Default + Zeroize,
 {
     fn default() -> Self {
         Self(T::default())
     }
 }
 
-impl<T> Deref for Sensitive<T> {
+impl<T: Zeroize> Deref for Sensitive<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -60,19 +70,28 @@ impl<T> Deref for Sensitive<T> {
     }
 }
 
-impl<T> DerefMut for Sensitive<T> {
+impl<T: Zeroize> DerefMut for Sensitive<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
+impl<T: Zeroize + Default> Sensitive<T> {
+    /// Consume the wrapper and return the inner value.
+    ///
+    /// The returned value is **not** automatically zeroized — the caller takes
+    /// ownership and responsibility for it.
+    pub fn into_inner(mut self) -> T {
+        std::mem::take(&mut self.0)
+        // `self` is dropped here, zeroizing the now-default value (no-op).
+    }
+}
+
 impl<T> Clone for Sensitive<T>
 where
-    T: Clone,
+    T: Clone + Zeroize,
 {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
-
-impl<T> Copy for Sensitive<T> where T: Copy {}

@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::path::Path;
 
 use base64::prelude::*;
 use chacha20poly1305::{
@@ -8,7 +8,6 @@ use chacha20poly1305::{
 use euro_secret::{self, Sensitive, secret};
 use hkdf::Hkdf;
 use rand::RngCore;
-use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
@@ -20,8 +19,8 @@ const MAGIC: &[u8; 8] = b"EURFILES";
 const VERSION: u8 = 1;
 pub const USER_MAIN_KEY_HANDLE: &str = "USER_MAIN_KEY_HANDLE";
 
-#[derive(Zeroize, ZeroizeOnDrop, Clone, Serialize, Deserialize)]
-pub struct MainKey(pub [u8; 32]);
+#[derive(Zeroize, ZeroizeOnDrop, Clone)]
+pub struct MainKey([u8; 32]);
 
 impl std::fmt::Debug for MainKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -43,36 +42,57 @@ pub struct FileHeader {
 }
 
 impl MainKey {
+    /// Retrieve the existing main key from the OS keychain, or generate and
+    /// persist a brand-new one if no entry exists yet (first run).
+    ///
+    /// # Errors
+    ///
+    /// * Returns [`EncryptError::Keyring`] if the keychain cannot be accessed
+    ///   (locked, permission denied, transient I/O error).  This is
+    ///   intentionally **not** silently swallowed — generating a new key when
+    ///   the old one is merely unreachable would make all previously encrypted
+    ///   data unrecoverable.
+    /// * Returns [`EncryptError::Base64Decode`] / [`EncryptError::InvalidKeyLength`]
+    ///   if the stored value is corrupt.
     pub fn new() -> EncryptResult<Self> {
-        if let Ok(Some(key)) = secret::retrieve(USER_MAIN_KEY_HANDLE, secret::Namespace::Global) {
-            let decoded = BASE64_STANDARD
-                .decode(key.0)
-                .map_err(EncryptError::Base64Decode)?;
-            let key_bytes: [u8; 32] = decoded
-                .try_into()
-                .map_err(|_| EncryptError::InvalidKeyLength)?;
+        match secret::keyring_retrieve(USER_MAIN_KEY_HANDLE) {
+            Ok(Some(key)) => {
+                let decoded = BASE64_STANDARD
+                    .decode(&*key)
+                    .map_err(EncryptError::Base64Decode)?;
+                let key_bytes: [u8; 32] = decoded
+                    .try_into()
+                    .map_err(|_| EncryptError::InvalidKeyLength)?;
 
-            let main_key = MainKey(key_bytes);
-            main_key.validate()?;
-            Ok(main_key)
-        } else {
-            generate_new_main_key()
+                let main_key = MainKey(key_bytes);
+                main_key.validate()?;
+                Ok(main_key)
+            }
+            Ok(None) => {
+                // First run — no key in the keychain yet.
+                generate_new_main_key()
+            }
+            Err(e) => {
+                tracing::error!("Failed to access keyring: {}", e);
+                Err(EncryptError::Keyring(format!(
+                    "Cannot access OS keychain: {e}"
+                )))
+            }
         }
     }
-}
 
-impl Default for MainKey {
-    fn default() -> Self {
-        // This is a fallback that should not be used in production
-        let mut temp_key = [0u8; 32];
-        rand::rng().fill_bytes(&mut temp_key);
-        let key = MainKey(temp_key);
-        temp_key.zeroize();
-        key
+    /// Construct a `MainKey` from raw bytes.
+    ///
+    /// Useful in tests or when the caller already holds validated key material.
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        MainKey(bytes)
     }
-}
 
-impl MainKey {
+    /// Borrow the raw key bytes.
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+
     pub fn derive_fek(&self, salt: &[u8; 32]) -> EncryptResult<Key> {
         if salt.iter().all(|&b| b == 0) {
             return Err(EncryptError::Format("Salt cannot be all zeros".to_string()));
@@ -119,11 +139,10 @@ pub fn generate_new_main_key() -> EncryptResult<MainKey> {
     // Should never fail with proper RNG, but safety first
     main_key.validate()?;
 
-    let encoded = BASE64_STANDARD.encode(mk);
-    secret::persist(
+    let mut encoded = Zeroizing::new(BASE64_STANDARD.encode(mk));
+    secret::keyring_persist(
         USER_MAIN_KEY_HANDLE,
-        &Sensitive(encoded),
-        secret::Namespace::Global,
+        &Sensitive(std::mem::take(&mut *encoded)),
     )
     .map_err(|e| {
         tracing::error!("Failed to persist main key: {}", e);
@@ -135,7 +154,7 @@ pub fn generate_new_main_key() -> EncryptResult<MainKey> {
 }
 
 pub async fn load_file_and_header(path: &Path) -> EncryptResult<(FileHeader, Vec<u8>)> {
-    let buf = fs::read(path).map_err(|e| {
+    let buf = tokio::fs::read(path).await.map_err(|e| {
         tracing::error!("Failed to read file: {}", e);
         EncryptError::Io(e)
     })?;
@@ -298,19 +317,7 @@ pub fn parse_header(buf: &[u8]) -> EncryptResult<FileHeader> {
         return Err(EncryptError::Format("Header too short".to_string()));
     }
 
-    // Constant-time comparison to prevent timing attacks
-    let mut magic_match = true;
-    if buf.len() >= MAGIC.len() {
-        for (a, b) in buf[0..MAGIC.len()].iter().zip(MAGIC.iter()) {
-            if a != b {
-                magic_match = false;
-            }
-        }
-    } else {
-        magic_match = false;
-    }
-
-    if !magic_match {
+    if buf.len() < MAGIC.len() || buf[..MAGIC.len()] != MAGIC[..] {
         return Err(EncryptError::Format("Invalid magic number".to_string()));
     }
 
@@ -375,7 +382,7 @@ mod tests {
 
         let mut key_bytes = [0u8; 32];
         rand::rng().fill_bytes(&mut key_bytes);
-        let main_key = MainKey(key_bytes);
+        let main_key = MainKey::from_bytes(key_bytes);
 
         let json_bytes = serde_json::to_vec(&test_data).expect("JSON serialization should succeed");
 
@@ -396,15 +403,15 @@ mod tests {
 
     #[test]
     fn test_main_key_validation() {
-        let weak_key = MainKey([0u8; 32]);
+        let weak_key = MainKey::from_bytes([0u8; 32]);
         assert!(weak_key.validate().is_err());
 
-        let same_byte_key = MainKey([0x42u8; 32]);
+        let same_byte_key = MainKey::from_bytes([0x42u8; 32]);
         assert!(same_byte_key.validate().is_err());
 
         let mut valid_key_bytes = [0u8; 32];
         rand::rng().fill_bytes(&mut valid_key_bytes);
-        let valid_key = MainKey(valid_key_bytes);
+        let valid_key = MainKey::from_bytes(valid_key_bytes);
         assert!(valid_key.validate().is_ok());
     }
 
@@ -422,7 +429,7 @@ mod tests {
     async fn test_input_validation() {
         let mut key_bytes = [0u8; 32];
         rand::rng().fill_bytes(&mut key_bytes);
-        let main_key = MainKey(key_bytes);
+        let main_key = MainKey::from_bytes(key_bytes);
 
         let result = encrypt_file_contents(&main_key, b"test", "").await;
         assert!(result.is_err());
