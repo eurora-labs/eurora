@@ -126,7 +126,11 @@ impl AssetService {
                 Uuid::parse_str(activity_id_str).map_err(AssetError::InvalidActivityId)?;
 
             self.db
-                .link_asset_to_activity(activity_id, asset.id, user_id)
+                .link_asset_to_activity()
+                .activity_id(activity_id)
+                .asset_id(asset.id)
+                .user_id(user_id)
+                .call()
                 .await
                 .map_err(|e| {
                     tracing::error!("Failed to link asset to activity: {}", e);
