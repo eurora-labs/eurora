@@ -48,16 +48,25 @@ async fn resolve_customer_id(state: &AppState, email: &str) -> Result<String, Pa
 
     state
         .db
-        .upsert_stripe_customer(&mut *tx, &customer_id, Some(email), &raw_data)
+        .upsert_stripe_customer()
+        .executor(&mut *tx)
+        .customer_id(&customer_id)
+        .email(email)
+        .raw_data(&raw_data)
+        .call()
         .await
         .map_err(|e| anyhow::anyhow!("upsert stripe customer: {e}"))?;
 
-    if let Ok(user) = state.db.get_user_by_email(email).await {
+    if let Ok(user) = state.db.get_user().email(email.to_string()).call().await {
         state
             .db
-            .ensure_account_for_user(&mut *tx, user.id, &customer_id)
+            .link_stripe_customer_to_user()
+            .executor(&mut *tx)
+            .user_id(user.id)
+            .stripe_customer_id(&customer_id)
+            .call()
             .await
-            .map_err(|e| anyhow::anyhow!("link account to stripe customer: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("link stripe customer to user: {e}"))?;
     }
 
     tx.commit()
@@ -270,7 +279,10 @@ pub async fn handle_webhook(
     // Returns false if the event was already recorded by a concurrent handler.
     if !state
         .db
-        .try_claim_webhook_event(event_id, event_type)
+        .try_claim_webhook_event()
+        .event_id(event_id)
+        .event_type(event_type)
+        .call()
         .await
         .unwrap_or(false)
     {
@@ -287,10 +299,34 @@ pub async fn handle_webhook(
         EventObject::CheckoutSessionCompleted(session) => {
             let customer_id = session.customer.as_ref().map(|c| c.id().to_string());
             let subscription_id = session.subscription.as_ref().map(|s| s.id().to_string());
-            let customer_email = session.customer_email.clone();
+            let customer_email = session.customer_email.clone().or_else(|| {
+                session
+                    .customer_details
+                    .as_ref()
+                    .and_then(|d| d.email.clone())
+            });
 
-            // Try to get the expanded subscription object for period/item data
-            let subscription_obj = session.subscription.as_ref().and_then(|s| s.as_object());
+            // The webhook payload only includes the subscription ID (not expanded).
+            // Fetch the full subscription object from Stripe so we have items/prices.
+            let fetched_sub = match &subscription_id {
+                Some(sub_id) => {
+                    match stripe_billing::subscription::RetrieveSubscription::new(sub_id.as_str())
+                        .send(&state.client)
+                        .await
+                    {
+                        Ok(sub) => Some(sub),
+                        Err(e) => {
+                            tracing::warn!(%event_id, error = %e, "Failed to fetch subscription from Stripe — falling back to webhook data");
+                            session
+                                .subscription
+                                .as_ref()
+                                .and_then(|s| s.as_object())
+                                .cloned()
+                        }
+                    }
+                }
+                None => None,
+            };
 
             tracing::info!(
                 %event_id,
@@ -304,8 +340,9 @@ pub async fn handle_webhook(
                 customer_id,
                 subscription_id.clone(),
                 customer_email,
-                subscription_obj,
+                fetched_sub.as_ref(),
                 &raw_data,
+                &state.config.pro_price_id,
             )
             .await
             {
@@ -323,7 +360,14 @@ pub async fn handle_webhook(
                 "Subscription updated"
             );
 
-            if let Err(e) = webhook::on_subscription_updated(&state.db, &sub, &raw_data).await {
+            if let Err(e) = webhook::on_subscription_updated(
+                &state.db,
+                &sub,
+                &raw_data,
+                &state.config.pro_price_id,
+            )
+            .await
+            {
                 tracing::error!(%event_id, error = %e, "Failed to handle subscription update");
                 return Err(e);
             }
