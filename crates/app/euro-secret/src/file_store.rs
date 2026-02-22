@@ -247,7 +247,7 @@ mod tests {
         flush(&store).unwrap();
         let data = fs::read(&path).unwrap();
         let loaded = decrypt_store(&store.key, &data).unwrap();
-        assert!(loaded.get("handle").is_none());
+        assert!(!loaded.contains_key("handle"));
 
         fs::remove_dir_all(&dir).ok();
     }
