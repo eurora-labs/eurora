@@ -9,5 +9,3 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 anyhow = { workspace = true }
 base64 = { workspace = true }
 image = { workspace = true }
-tracing = { workspace = true }
-xcap = { version = "0.7.0" }

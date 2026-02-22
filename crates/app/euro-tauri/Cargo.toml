@@ -13,8 +13,6 @@ ignored = [
   "tauri-plugin-process",
   "tauri-plugin-store",
   "tauri-plugin-stronghold",
-  "serde",
-  "specta"
 ]
 
 [lib]
@@ -45,7 +43,6 @@ euro-timeline = { workspace = true }
 euro-user = { workspace = true }
 euro-vision = { workspace = true }
 futures = { workspace = true }
-image = { workspace = true }
 keyring = { workspace = true }
 parking_lot = { workspace = true }
 proto-gen = { workspace = true }
