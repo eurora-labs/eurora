@@ -247,6 +247,17 @@ fn main() {
                 .setup(move |tauri_app| {
                     install_native_messaging_manifests(tauri_app);
 
+                    // Reduces macOS Keychain "Allow" prompts to a single item
+                    // instead of one per secret.
+                    #[cfg(not(feature = "mock-keyring"))]
+                    {
+                        let main_key = euro_encrypt::MainKey::new()
+                            .expect("Failed to initialise encryption key");
+                        let data_dir = tauri_app.path().app_data_dir().unwrap();
+                        euro_secret::secret::init_file_store(*main_key.as_bytes(), data_dir)
+                            .expect("Failed to initialise secret store");
+                    }
+
                     let started_by_autostart =
                         std::env::args().any(|arg| arg == "--startup-launch");
 

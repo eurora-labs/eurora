@@ -17,21 +17,16 @@ pub struct OpenAISettings {
 
 impl OpenAISettings {
     fn api_key() -> Result<Option<Sensitive<String>>> {
-        secret::retrieve(OPENAI_API_KEY_HANDLE, secret::Namespace::Global)
-            .map_err(|e| Error::Secret(e.to_string()))
+        secret::retrieve(OPENAI_API_KEY_HANDLE).map_err(|e| Error::Secret(e.to_string()))
     }
 
     pub fn set_api_key(api_key: &str) -> Result<()> {
-        secret::persist(
-            OPENAI_API_KEY_HANDLE,
-            &Sensitive(api_key.to_owned()),
-            secret::Namespace::Global,
-        )
-        .map_err(|e| Error::Secret(e.to_string()))
+        secret::persist(OPENAI_API_KEY_HANDLE, &Sensitive(api_key.to_owned()))
+            .map_err(|e| Error::Secret(e.to_string()))
     }
 
     fn to_proto(&self) -> Result<proto::OpenAiSettings> {
-        let api_key = Self::api_key()?.map(|s| s.0).unwrap_or_default();
+        let api_key = Self::api_key()?.map(|s| s.into_inner()).unwrap_or_default();
         Ok(proto::OpenAiSettings {
             base_url: self.base_url.clone(),
             api_key,

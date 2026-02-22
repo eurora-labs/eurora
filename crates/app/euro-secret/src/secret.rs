@@ -1,29 +1,81 @@
-//! This module contains facilities to handle the persistence of secrets.
+//! Two-tier secret storage.
 //!
-//! These are stateless and global, while discouraging storing secrets
-//! in memory beyond their use.
+//! Only the master encryption key stays in the OS keychain.  This reduces
+//! macOS Keychain "Allow" prompts from one per secret to exactly one per
+//! application update.
+//!
+//! Secrets still in the keychain from a previous version are lazily migrated
+//! into the file store on first [`retrieve`].
+
+use std::path::PathBuf;
 
 use anyhow::Result;
 use co_utils::Sensitive;
-use std::sync::Mutex;
 
-/// Determines how a secret's name should be modified to produce a namespace.
-///
-/// Namespaces can be used to partition secrets, depending on some criteria.
-#[derive(Debug, Clone, Copy)]
-pub enum Namespace {
-    /// Each application build, like `dev`, `production` and `nightly` have their
-    /// own set of secrets. They do not overlap, which reflects how data-files
-    /// are stored as well.
-    BuildKind,
-    /// All secrets are in a single namespace. There is no partitioning.
-    /// This can be useful for secrets to be shared across all build kinds.
-    Global,
+use crate::file_store;
+
+/// Kept constant so that migration from the keychain maps 1-to-1 with the
+/// file-store backend.
+const PREFIX: &str = "eurora";
+
+pub fn init_file_store(encryption_key: [u8; 32], data_dir: impl Into<PathBuf>) -> Result<()> {
+    file_store::init(encryption_key, data_dir.into())
 }
 
-/// Persist `secret` in `namespace` so that it can be retrieved by the given `handle`.
-pub fn persist(handle: &str, secret: &Sensitive<String>, namespace: Namespace) -> Result<()> {
-    let entry = entry_for(handle, namespace)?;
+pub fn persist(handle: &str, secret: &Sensitive<String>) -> Result<()> {
+    if file_store::is_initialized() {
+        let qh = qualified_handle(handle);
+        if secret.0.is_empty() {
+            file_store::remove(&qh)?;
+        } else {
+            file_store::set(&qh, &secret.0)?;
+        }
+        Ok(())
+    } else {
+        keyring_persist(handle, secret)
+    }
+}
+
+pub fn retrieve(handle: &str) -> Result<Option<Sensitive<String>>> {
+    if file_store::is_initialized() {
+        let qh = qualified_handle(handle);
+
+        if let Some(value) = file_store::get(&qh)? {
+            return Ok(Some(Sensitive(value)));
+        }
+
+        match keyring_retrieve(handle) {
+            Ok(Some(secret)) => {
+                tracing::debug!(handle, "migrating secret from keychain to file store");
+                file_store::set(&qh, &secret.0)?;
+                let _ = keyring_delete(handle);
+                Ok(Some(secret))
+            }
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
+        }
+    } else {
+        keyring_retrieve(handle)
+    }
+}
+
+pub fn delete(handle: &str) -> Result<()> {
+    if file_store::is_initialized() {
+        let qh = qualified_handle(handle);
+        file_store::remove(&qh)?;
+
+        // Don't touch the keychain here — `retrieve()` already handles
+        // migration and cleanup lazily.  Hitting the keychain directly
+        // would bypass that path and could trigger an extra macOS "Allow"
+        // prompt for an entry that hasn't been migrated yet.
+    } else {
+        let _ = keyring_delete(handle);
+    }
+    Ok(())
+}
+
+pub fn keyring_persist(handle: &str, secret: &Sensitive<String>) -> Result<()> {
+    let entry = keyring_entry_for(handle)?;
     if secret.0.is_empty() {
         entry.delete_credential()?;
     } else {
@@ -32,41 +84,26 @@ pub fn persist(handle: &str, secret: &Sensitive<String>, namespace: Namespace) -
     Ok(())
 }
 
-/// Obtain the previously [stored](persist()) secret known as `handle` from `namespace`.
-pub fn retrieve(handle: &str, namespace: Namespace) -> Result<Option<Sensitive<String>>> {
-    match entry_for(handle, namespace)?.get_password() {
+pub fn keyring_retrieve(handle: &str) -> Result<Option<Sensitive<String>>> {
+    match keyring_entry_for(handle)?.get_password() {
         Ok(secret) => Ok(Some(Sensitive(secret))),
         Err(keyring::Error::NoEntry) => Ok(None),
         Err(err) => Err(err.into()),
     }
 }
 
-/// Delete the secret at `handle` permanently from `namespace`.
-pub fn delete(handle: &str, namespace: Namespace) -> Result<()> {
-    Ok(entry_for(handle, namespace)?.delete_credential()?)
+pub fn keyring_delete(handle: &str) -> Result<()> {
+    match keyring_entry_for(handle)?.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Err(err) => Err(err.into()),
+    }
 }
 
-/// Use this `identifier` as 'namespace' for identifying secrets.
-/// Each namespace has its own set of secrets, useful for different application versions.
-///
-/// Note that the namespace will be `development` if `identifier` is empty (or wasn't set).
-pub fn set_application_namespace(identifier: impl Into<String>) {
-    *NAMESPACE.lock().unwrap() = identifier.into()
+fn qualified_handle(handle: &str) -> String {
+    format!("{PREFIX}-{handle}")
 }
 
-fn entry_for(handle: &str, namespace: Namespace) -> Result<keyring::Entry> {
-    let ns = match namespace {
-        Namespace::BuildKind => NAMESPACE.lock().unwrap().clone(),
-        Namespace::Global => "eurora".into(),
-    };
-    Ok(keyring::Entry::new(
-        &format!(
-            "{prefix}-{handle}",
-            prefix = if ns.is_empty() { "development" } else { &ns }
-        ),
-        "Eurora",
-    )?)
+fn keyring_entry_for(handle: &str) -> Result<keyring::Entry> {
+    let service = qualified_handle(handle);
+    Ok(keyring::Entry::new(&service, "Eurora")?)
 }
-
-/// How to further specialize secrets to avoid name clashes in the globally shared keystore.
-static NAMESPACE: Mutex<String> = Mutex::new(String::new());

@@ -67,13 +67,11 @@ impl AuthManager {
     }
 
     fn get_access_token(&self) -> Result<Sensitive<String>> {
-        secret::retrieve(ACCESS_TOKEN_HANDLE, secret::Namespace::Global)?
-            .ok_or_else(|| anyhow!("No access token found"))
+        secret::retrieve(ACCESS_TOKEN_HANDLE)?.ok_or_else(|| anyhow!("No access token found"))
     }
 
     fn get_refresh_token(&self) -> Result<Sensitive<String>> {
-        secret::retrieve(REFRESH_TOKEN_HANDLE, secret::Namespace::Global)?
-            .ok_or_else(|| anyhow!("No refresh token found"))
+        secret::retrieve(REFRESH_TOKEN_HANDLE)?.ok_or_else(|| anyhow!("No refresh token found"))
     }
 
     pub fn get_access_token_payload(&self) -> Result<Claims> {
@@ -153,19 +151,11 @@ impl AuthManager {
 }
 
 fn store_access_token(token: String) -> Result<()> {
-    secret::persist(
-        ACCESS_TOKEN_HANDLE,
-        &Sensitive(token),
-        secret::Namespace::Global,
-    )
-    .map_err(|e| anyhow!("Failed to store access token: {}", e))
+    secret::persist(ACCESS_TOKEN_HANDLE, &Sensitive(token))
+        .map_err(|e| anyhow!("Failed to store access token: {}", e))
 }
 
 fn store_refresh_token(token: String) -> Result<()> {
-    secret::persist(
-        REFRESH_TOKEN_HANDLE,
-        &Sensitive(token),
-        secret::Namespace::Global,
-    )
-    .map_err(|e| anyhow!("Failed to store refresh token: {}", e))
+    secret::persist(REFRESH_TOKEN_HANDLE, &Sensitive(token))
+        .map_err(|e| anyhow!("Failed to store refresh token: {}", e))
 }

@@ -26,6 +26,7 @@ agent-chain-core = { path = "crates/common/agent-chain-core" }
 agent-chain-macros = { path = "crates/common/agent-chain-macros" }
 agent-graph = { path = "crates/common/agent-graph" }
 agent-graph-macros = { path = "crates/common/agent-graph-macros" }
+chacha20poly1305 = "0.10.1"
 anyhow = "1.0.99"
 argon2 = "0.5"
 async_from = "0.2.0"

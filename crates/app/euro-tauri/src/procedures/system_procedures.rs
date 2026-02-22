@@ -482,7 +482,7 @@ async fn send_encryption_key(backend_url: &str) -> Result<(), String> {
     let main_key = euro_encrypt::MainKey::new()
         .map_err(|e| format!("Failed to retrieve encryption key from keyring: {e}"))?;
 
-    let encoded = BASE64_STANDARD.encode(main_key.0);
+    let encoded = BASE64_STANDARD.encode(main_key.as_bytes());
     let url = backend_url.to_string();
 
     // The backend container needs time to start (postgres health check + boot).
