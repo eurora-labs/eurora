@@ -143,9 +143,9 @@ jobs:
                       target: ''
                     - platform: macos-15 # [macOs, x64] - cross-compile
                       target: x86_64-apple-darwin
-                    - platform: ubuntu-24.04 # [linux, x64]
+                    - platform: ubuntu-22.04 # [linux, x64]
                       target: ''
-                    - platform: ubuntu-24.04-arm # [linux, ARM64]
+                    - platform: ubuntu-22.04-arm # [linux, ARM64]
                       target: ''
                     - platform: windows-latest # [windows, x64]
                       target: ''
@@ -255,12 +255,12 @@ jobs:
                   } >> "$GITHUB_ENV"
                   mkdir -p release && echo "$NEXT_VERSION" > release/version
 
-            - name: Import GPG key
-              if: runner.os == 'Linux'
-              uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6
-              with:
-                  gpg_private_key: ${{ secrets.APPIMAGE_PRIVATE_KEY }}
-                  passphrase: ${{ secrets.APPIMAGE_KEY_PASSPHRASE }}
+            # - name: Import GPG key
+            #   if: runner.os == 'Linux'
+            #   uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6
+            #   with:
+            #       gpg_private_key: ${{ secrets.APPIMAGE_KEY_ID }}
+            #       passphrase: ${{ secrets.APPIMAGE_KEY_PASSPHRASE }}
 
             - name: Install linux dependencies
               shell: bash
@@ -339,7 +339,6 @@ jobs:
                   POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
               run: |
                   ./scripts/release.sh \
-                    --sign \
                     --channel                    "$RELEASE_CHANNEL" \
                     --dist                       "./release" \
                     --version                    "$RELEASE_VERSION"
@@ -756,10 +755,10 @@ jobs:
                       source: assembled
                       assembled_arch: x86_64
                     # Linux/Windows: use Tauri artifacts directly
-                    - platform: ubuntu-24.04
+                    - platform: ubuntu-22.04
                       target: ''
                       source: tauri
-                    - platform: ubuntu-24.04-arm
+                    - platform: ubuntu-22.04-arm
                       target: ''
                       source: tauri
                     - platform: windows-latest
