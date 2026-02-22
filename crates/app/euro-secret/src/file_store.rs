@@ -232,17 +232,22 @@ mod tests {
         let (dir, key) = temp_store(key_bytes);
 
         let path = dir.join(STORE_FILENAME);
-        let store = SecretStore {
+        let mut store = SecretStore {
             secrets: HashMap::from([("handle".to_owned(), "value".to_owned())]),
             key,
             path: path.clone(),
         };
 
         flush(&store).unwrap();
-
         let data = fs::read(&path).unwrap();
         let loaded = decrypt_store(&store.key, &data).unwrap();
         assert_eq!(loaded.get("handle").unwrap(), "value");
+
+        store.secrets.remove("handle");
+        flush(&store).unwrap();
+        let data = fs::read(&path).unwrap();
+        let loaded = decrypt_store(&store.key, &data).unwrap();
+        assert!(loaded.get("handle").is_none());
 
         fs::remove_dir_all(&dir).ok();
     }

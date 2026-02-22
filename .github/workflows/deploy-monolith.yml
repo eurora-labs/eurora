@@ -1,13 +1,6 @@
 name: Deploy Monolith Backend
 
 on:
-    push:
-        branches: ['main']
-        paths:
-            - 'crates/backend/**'
-            - 'crates/common/**'
-            - 'proto/**'
-            - '.github/workflows/deploy-monolith.yml'
     workflow_dispatch:
 
 permissions:
@@ -25,6 +18,7 @@ env:
 
 jobs:
     build:
+        environment: monolith-deploy
         strategy:
             fail-fast: true
             matrix:
@@ -45,6 +39,8 @@ jobs:
             - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
               with:
                   workspaces: 'crates/backend/be-monolith'
+                  shared-key: deploy-monolith-${{ matrix.arch }}
+                  save-if: ${{ github.ref == 'refs/heads/main' }}
 
             - name: Install system dependencies
               run: |
