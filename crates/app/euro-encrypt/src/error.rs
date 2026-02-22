@@ -11,6 +11,9 @@ pub enum EncryptError {
     #[error("Key error {0}")]
     Key(#[from] anyhow::Error),
 
+    #[error("Keyring error: {0}")]
+    Keyring(String),
+
     #[error("Format error: {0}")]
     Format(String),
 
