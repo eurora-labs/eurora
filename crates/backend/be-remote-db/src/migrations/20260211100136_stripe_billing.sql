@@ -72,24 +72,12 @@ CREATE TABLE stripe.subscription_items (
         ON DELETE CASCADE
 );
 
-CREATE TABLE accounts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner_user_id UUID NOT NULL UNIQUE,
-    name TEXT NOT NULL,
-    stripe_customer_id TEXT UNIQUE,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-
-    CONSTRAINT fk_accounts_owner_user_id
-        FOREIGN KEY (owner_user_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_accounts_stripe_customer_id
+ALTER TABLE users
+    ADD COLUMN stripe_customer_id TEXT UNIQUE,
+    ADD CONSTRAINT fk_users_stripe_customer_id
         FOREIGN KEY (stripe_customer_id)
         REFERENCES stripe.customers(id)
-        ON DELETE SET NULL
-);
+        ON DELETE SET NULL;
 
 CREATE TABLE plans (
     id TEXT PRIMARY KEY,
@@ -125,7 +113,6 @@ CREATE INDEX idx_stripe_subscriptions_status ON stripe.subscriptions(status);
 CREATE INDEX idx_stripe_subscriptions_current_period_end ON stripe.subscriptions(current_period_end);
 CREATE INDEX idx_stripe_subscription_items_subscription_id ON stripe.subscription_items(subscription_id);
 CREATE INDEX idx_stripe_subscription_items_price_id ON stripe.subscription_items(price_id);
-CREATE INDEX idx_accounts_owner_user_id ON accounts(owner_user_id);
 CREATE INDEX idx_plan_prices_stripe_price_id ON plan_prices(stripe_price_id);
 
 CREATE TRIGGER update_stripe_customers_updated_at
@@ -140,11 +127,6 @@ CREATE TRIGGER update_stripe_prices_updated_at
 
 CREATE TRIGGER update_stripe_subscriptions_updated_at
     BEFORE UPDATE ON stripe.subscriptions
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_accounts_updated_at
-    BEFORE UPDATE ON accounts
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 

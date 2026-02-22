@@ -81,14 +81,12 @@ impl DatabaseManager {
         .await?;
 
         if let Some(ref password_hash) = password_hash {
-            let password_id = Uuid::now_v7();
             sqlx::query(
                 r#"
-                INSERT INTO password_credentials (id, user_id, password_hash, created_at, updated_at)
-                VALUES ($1, $2, $3, $4, $5)
+                INSERT INTO password_credentials (user_id, password_hash, created_at, updated_at)
+                VALUES ($1, $2, $3, $4)
                 "#,
             )
-            .bind(password_id)
             .bind(user_id)
             .bind(password_hash)
             .bind(now)
@@ -102,55 +100,41 @@ impl DatabaseManager {
         Ok(user)
     }
 
-    pub async fn get_user_by_id(&self, user_id: Uuid) -> DbResult<User> {
-        let user = sqlx::query_as::<_, User>(
-            r#"
-            SELECT id, username, email, display_name, email_verified, created_at, updated_at
-            FROM users
-            WHERE id = $1
-            "#,
-        )
-        .bind(user_id)
-        .fetch_one(&self.pool)
-        .await?;
+    #[builder]
+    pub async fn get_user(
+        &self,
+        id: Option<Uuid>,
+        username: Option<String>,
+        email: Option<String>,
+    ) -> DbResult<User> {
+        let (clause, bind_value) = match (id, username, email) {
+            (Some(id), _, _) => ("id = $1::uuid", id.to_string()),
+            (_, Some(username), _) => ("username = $1", username),
+            (_, _, Some(email)) => ("email = $1", email),
+            _ => {
+                return Err(DbError::Internal(
+                    "get_user requires at least one filter".into(),
+                ));
+            }
+        };
+
+        let query = format!(
+            "SELECT id, username, email, display_name, email_verified, created_at, updated_at FROM users WHERE {clause}"
+        );
+
+        let user = sqlx::query_as::<_, User>(&query)
+            .bind(bind_value)
+            .fetch_one(&self.pool)
+            .await?;
 
         Ok(user)
     }
 
-    pub async fn get_user_by_username(&self, username: &str) -> DbResult<User> {
-        let user = sqlx::query_as::<_, User>(
-            r#"
-            SELECT id, username, email, display_name, email_verified, created_at, updated_at
-            FROM users
-            WHERE username = $1
-            "#,
-        )
-        .bind(username)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(user)
-    }
-
-    pub async fn get_user_by_email(&self, email: &str) -> DbResult<User> {
-        let user = sqlx::query_as::<_, User>(
-            r#"
-            SELECT id, username, email, display_name, email_verified, created_at, updated_at
-            FROM users
-            WHERE email = $1
-            "#,
-        )
-        .bind(email)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(user)
-    }
-
+    #[builder]
     pub async fn get_password_credentials(&self, user_id: Uuid) -> DbResult<PasswordCredentials> {
         let credentials = sqlx::query_as::<_, PasswordCredentials>(
             r#"
-            SELECT id, user_id, password_hash, created_at, updated_at
+            SELECT user_id, password_hash, created_at, updated_at
             FROM password_credentials
             WHERE user_id = $1
             "#,
@@ -162,6 +146,7 @@ impl DatabaseManager {
         Ok(credentials)
     }
 
+    #[builder]
     pub async fn user_exists_by_username(&self, username: &str) -> DbResult<bool> {
         let count: (i64,) = sqlx::query_as(
             r#"
@@ -175,6 +160,7 @@ impl DatabaseManager {
         Ok(count.0 > 0)
     }
 
+    #[builder]
     pub async fn user_exists_by_email(&self, email: &str) -> DbResult<bool> {
         let count: (i64,) = sqlx::query_as(
             r#"
@@ -206,11 +192,11 @@ impl DatabaseManager {
             r#"
             INSERT INTO oauth_credentials (
                 id, user_id, provider, provider_user_id, access_token,
-                refresh_token, access_token_expiry, scope, issued_at, created_at, updated_at
+                refresh_token, access_token_expiry, scope, created_at, updated_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING id, user_id, provider, provider_user_id, access_token,
-                      refresh_token, access_token_expiry, scope, issued_at, created_at, updated_at
+                      refresh_token, access_token_expiry, scope, created_at, updated_at
             "#,
         )
         .bind(id)
@@ -223,13 +209,13 @@ impl DatabaseManager {
         .bind(&scope)
         .bind(now)
         .bind(now)
-        .bind(now)
         .fetch_one(&self.pool)
         .await?;
 
         Ok(oauth_creds)
     }
 
+    #[builder]
     pub async fn get_oauth_credentials_by_provider_and_user(
         &self,
         provider: OAuthProvider,
@@ -238,7 +224,7 @@ impl DatabaseManager {
         let oauth_creds = sqlx::query_as::<_, OAuthCredentials>(
             r#"
             SELECT id, user_id, provider, provider_user_id, access_token,
-                   refresh_token, access_token_expiry, scope, issued_at, created_at, updated_at
+                   refresh_token, access_token_expiry, scope, created_at, updated_at
             FROM oauth_credentials
             WHERE provider = $1 AND user_id = $2
             "#,
@@ -272,7 +258,7 @@ impl DatabaseManager {
                 updated_at = $6
             WHERE id = $1
             RETURNING id, user_id, provider, provider_user_id, access_token,
-                      refresh_token, access_token_expiry, scope, issued_at, created_at, updated_at
+                      refresh_token, access_token_expiry, scope, created_at, updated_at
             "#,
         )
         .bind(id)
@@ -287,6 +273,7 @@ impl DatabaseManager {
         Ok(oauth_creds)
     }
 
+    #[builder]
     pub async fn get_user_by_oauth_provider(
         &self,
         provider: OAuthProvider,
@@ -320,15 +307,14 @@ impl DatabaseManager {
 
         let refresh_token = sqlx::query_as::<_, RefreshToken>(
             r#"
-            INSERT INTO refresh_tokens (id, user_id, token_hash, issued_at, expires_at, revoked, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING id, user_id, token_hash, issued_at, expires_at, revoked, created_at, updated_at
+            INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, revoked, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id, user_id, token_hash, expires_at, revoked, created_at, updated_at
             "#,
         )
         .bind(id)
         .bind(user_id)
         .bind(&token_hash)
-        .bind(now)
         .bind(expires_at)
         .bind(false)
         .bind(now)
@@ -339,10 +325,11 @@ impl DatabaseManager {
         Ok(refresh_token)
     }
 
+    #[builder]
     pub async fn get_refresh_token_by_hash(&self, token_hash: &[u8]) -> DbResult<RefreshToken> {
         let refresh_token = sqlx::query_as::<_, RefreshToken>(
             r#"
-            SELECT id, user_id, token_hash, issued_at, expires_at, revoked, created_at, updated_at
+            SELECT id, user_id, token_hash, expires_at, revoked, created_at, updated_at
             FROM refresh_tokens
             WHERE token_hash = $1 AND revoked = false AND expires_at > now()
             "#,
@@ -354,6 +341,7 @@ impl DatabaseManager {
         Ok(refresh_token)
     }
 
+    #[builder]
     pub async fn revoke_refresh_token(&self, token_hash: &[u8]) -> DbResult<RefreshToken> {
         let now = Utc::now();
 
@@ -362,7 +350,7 @@ impl DatabaseManager {
             UPDATE refresh_tokens
             SET revoked = true, updated_at = $2
             WHERE token_hash = $1 AND revoked = false
-            RETURNING id, user_id, token_hash, issued_at, expires_at, revoked, created_at, updated_at
+            RETURNING id, user_id, token_hash, expires_at, revoked, created_at, updated_at
             "#,
         )
         .bind(token_hash)
@@ -409,6 +397,7 @@ impl DatabaseManager {
         Ok(oauth_state)
     }
 
+    #[builder]
     pub async fn get_oauth_state_by_state(&self, state: &str) -> DbResult<OAuthState> {
         let oauth_state = sqlx::query_as::<_, OAuthState>(
             r#"
@@ -424,6 +413,7 @@ impl DatabaseManager {
         Ok(oauth_state)
     }
 
+    #[builder]
     pub async fn consume_oauth_state(&self, state: &str) -> DbResult<OAuthState> {
         let now = Utc::now();
 
@@ -473,6 +463,7 @@ impl DatabaseManager {
         Ok(login_token)
     }
 
+    #[builder]
     pub async fn get_login_token_by_hash(&self, token_hash: &[u8]) -> DbResult<LoginToken> {
         let login_token = sqlx::query_as::<_, LoginToken>(
             r#"
@@ -488,6 +479,7 @@ impl DatabaseManager {
         Ok(login_token)
     }
 
+    #[builder]
     pub async fn get_login_token_by_hash_any(&self, token_hash: &[u8]) -> DbResult<LoginToken> {
         let login_token = sqlx::query_as::<_, LoginToken>(
             r#"
@@ -503,6 +495,7 @@ impl DatabaseManager {
         Ok(login_token)
     }
 
+    #[builder]
     pub async fn consume_login_token(&self, token_hash: &[u8]) -> DbResult<LoginToken> {
         let now = Utc::now();
 
@@ -560,6 +553,7 @@ impl DatabaseManager {
         Ok(activity)
     }
 
+    #[builder]
     pub async fn get_activity_for_user(
         &self,
         activity_id: Uuid,
@@ -676,6 +670,7 @@ impl DatabaseManager {
         Ok(())
     }
 
+    #[builder]
     pub async fn get_last_active_activity(&self, user_id: Uuid) -> DbResult<Option<Activity>> {
         let activity = sqlx::query_as::<_, Activity>(
             r#"
@@ -693,6 +688,7 @@ impl DatabaseManager {
         Ok(activity)
     }
 
+    #[builder]
     pub async fn delete_activity(&self, activity_id: Uuid, user_id: Uuid) -> DbResult<Activity> {
         let activity = sqlx::query_as::<_, Activity>(
             r#"
@@ -786,6 +782,7 @@ impl DatabaseManager {
         Ok(asset)
     }
 
+    #[builder]
     pub async fn link_asset_to_activity(
         &self,
         activity_id: Uuid,
@@ -1024,6 +1021,7 @@ impl DatabaseManager {
         Ok(messages)
     }
 
+    #[builder]
     pub async fn try_claim_webhook_event(
         &self,
         event_id: &str,
@@ -1044,6 +1042,7 @@ impl DatabaseManager {
         Ok(result.rows_affected() > 0)
     }
 
+    #[builder]
     pub async fn upsert_stripe_customer<'e, E>(
         &self,
         executor: E,
@@ -1077,36 +1076,29 @@ impl DatabaseManager {
         Ok(())
     }
 
-    pub async fn ensure_account_for_user<'e, E>(
+    #[builder]
+    pub async fn link_stripe_customer_to_user<'e, E>(
         &self,
         executor: E,
         user_id: Uuid,
         stripe_customer_id: &str,
-    ) -> DbResult<Uuid>
+    ) -> DbResult<()>
     where
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
-        let now = Utc::now();
-
-        let account_id: Uuid = sqlx::query_scalar(
+        sqlx::query(
             r#"
-            INSERT INTO accounts (owner_user_id, name, stripe_customer_id, created_at, updated_at)
-            SELECT $1, u.username, $2, $3, $4
-            FROM users u WHERE u.id = $1
-            ON CONFLICT (owner_user_id) DO UPDATE
-            SET stripe_customer_id = EXCLUDED.stripe_customer_id,
-                updated_at = EXCLUDED.updated_at
-            RETURNING id
+            UPDATE users
+            SET stripe_customer_id = $2
+            WHERE id = $1
             "#,
         )
         .bind(user_id)
         .bind(stripe_customer_id)
-        .bind(now)
-        .bind(now)
-        .fetch_one(executor)
+        .execute(executor)
         .await?;
 
-        Ok(account_id)
+        Ok(())
     }
 
     #[builder]
@@ -1185,6 +1177,70 @@ impl DatabaseManager {
         Ok(())
     }
 
+    #[builder]
+    pub async fn upsert_stripe_price<'e, E>(
+        &self,
+        executor: E,
+        price_id: &str,
+        currency: &str,
+        unit_amount: Option<i64>,
+        recurring_interval: Option<&str>,
+        active: bool,
+        raw_data: &serde_json::Value,
+    ) -> DbResult<()>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        let now = Utc::now();
+
+        sqlx::query(
+            r#"
+            INSERT INTO stripe.prices (id, currency, unit_amount, recurring_interval, active, created_at, updated_at, raw_data)
+            VALUES ($1, $2, $3, $4, $5, $6, $6, $7)
+            ON CONFLICT (id) DO UPDATE
+            SET currency = EXCLUDED.currency,
+                unit_amount = EXCLUDED.unit_amount,
+                recurring_interval = EXCLUDED.recurring_interval,
+                active = EXCLUDED.active,
+                raw_data = EXCLUDED.raw_data,
+                updated_at = EXCLUDED.updated_at
+            "#,
+        )
+        .bind(price_id)
+        .bind(currency)
+        .bind(unit_amount)
+        .bind(recurring_interval)
+        .bind(active)
+        .bind(now)
+        .bind(raw_data)
+        .execute(executor)
+        .await?;
+
+        Ok(())
+    }
+
+    #[builder]
+    pub async fn ensure_plan_price<'e, E>(
+        &self,
+        executor: E,
+        plan_id: &str,
+        stripe_price_id: &str,
+    ) -> DbResult<()>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        sqlx::query(
+            "INSERT INTO plan_prices (plan_id, stripe_price_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        )
+        .bind(plan_id)
+        .bind(stripe_price_id)
+        .execute(executor)
+        .await?;
+
+        Ok(())
+    }
+
+    #[builder]
     pub async fn sync_stripe_subscription_items<'e, E>(
         &self,
         executor: E,
@@ -1236,6 +1292,7 @@ impl DatabaseManager {
         Ok(())
     }
 
+    #[builder]
     pub async fn update_stripe_subscription_status(
         &self,
         subscription_id: &str,
@@ -1274,6 +1331,7 @@ impl DatabaseManager {
         Ok(())
     }
 
+    #[builder]
     pub async fn update_stripe_subscription_status_with_executor<'e, E>(
         &self,
         executor: E,
@@ -1316,53 +1374,47 @@ impl DatabaseManager {
         Ok(())
     }
 
-    pub async fn ensure_account_for_user_with_plan<'e, E>(
+    #[builder]
+    pub async fn ensure_user_plan<'e, E>(
         &self,
         executor: E,
         user_id: Uuid,
         plan_id: &str,
-    ) -> DbResult<Uuid>
+    ) -> DbResult<()>
     where
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
-        let now = Utc::now();
-
-        let account_id: Uuid = sqlx::query_scalar(
+        sqlx::query(
             r#"
-            INSERT INTO accounts (owner_user_id, name, plan_id, created_at, updated_at)
-            SELECT $1, u.username, $2, $3, $4
-            FROM users u WHERE u.id = $1
-            ON CONFLICT (owner_user_id) DO UPDATE
+            UPDATE users
             SET plan_id = CASE
-                    WHEN (SELECT rank FROM (VALUES ('free',0),('tier1',1)) AS r(id,rank) WHERE r.id = EXCLUDED.plan_id)
-                       > (SELECT rank FROM (VALUES ('free',0),('tier1',1)) AS r(id,rank) WHERE r.id = accounts.plan_id)
-                    THEN EXCLUDED.plan_id
-                    ELSE accounts.plan_id
-                END,
-                updated_at = EXCLUDED.updated_at
-            RETURNING id
+                    WHEN (SELECT rank FROM (VALUES ('free',0),('tier1',1)) AS r(id,rank) WHERE r.id = $2)
+                       > (SELECT rank FROM (VALUES ('free',0),('tier1',1)) AS r(id,rank) WHERE r.id = users.plan_id)
+                    THEN $2
+                    ELSE users.plan_id
+                END
+            WHERE id = $1
             "#,
         )
         .bind(user_id)
         .bind(plan_id)
-        .bind(now)
-        .bind(now)
-        .fetch_one(executor)
+        .execute(executor)
         .await?;
 
-        Ok(account_id)
+        Ok(())
     }
 
+    #[builder]
     pub async fn get_plan_id_for_user(&self, user_id: Uuid) -> DbResult<Option<String>> {
-        let result: Option<String> =
-            sqlx::query_scalar("SELECT plan_id FROM accounts WHERE owner_user_id = $1")
-                .bind(user_id)
-                .fetch_optional(&self.pool)
-                .await?;
+        let result: Option<String> = sqlx::query_scalar("SELECT plan_id FROM users WHERE id = $1")
+            .bind(user_id)
+            .fetch_optional(&self.pool)
+            .await?;
         Ok(result)
     }
 
-    pub async fn update_account_plan_by_stripe_customer<'e, E>(
+    #[builder]
+    pub async fn update_plan_by_stripe_customer<'e, E>(
         &self,
         executor: E,
         stripe_customer_id: &str,
@@ -1371,24 +1423,22 @@ impl DatabaseManager {
     where
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
-        let now = Utc::now();
-
         sqlx::query(
             r#"
-            UPDATE accounts
-            SET plan_id = $2, updated_at = $3
+            UPDATE users
+            SET plan_id = $2
             WHERE stripe_customer_id = $1
             "#,
         )
         .bind(stripe_customer_id)
         .bind(plan_id)
-        .bind(now)
         .execute(executor)
         .await?;
 
         Ok(())
     }
 
+    #[builder]
     pub async fn resolve_plan_for_stripe_price<'e, E>(
         &self,
         executor: E,
@@ -1416,31 +1466,18 @@ impl DatabaseManager {
         reasoning_tokens: Option<i64>,
         cache_creation_tokens: Option<i64>,
         cache_read_tokens: Option<i64>,
-        year_month: i32,
     ) -> DbResult<TokenUsage> {
-        let reasoning = reasoning_tokens.unwrap_or(0);
-        let billable = input_tokens + output_tokens + reasoning;
-
         let record = sqlx::query_as::<_, TokenUsage>(
             r#"
-            WITH inserted AS (
-                INSERT INTO token_usage (
-                    user_id, thread_id, message_id,
-                    input_tokens, output_tokens, reasoning_tokens,
-                    cache_creation_tokens, cache_read_tokens
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                RETURNING id, user_id, thread_id, message_id,
-                          input_tokens, output_tokens, reasoning_tokens,
-                          cache_creation_tokens, cache_read_tokens, created_at
-            ),
-            upsert_total AS (
-                INSERT INTO monthly_token_totals (user_id, year_month, total_tokens)
-                VALUES ($1, $9, $10)
-                ON CONFLICT (user_id, year_month)
-                DO UPDATE SET total_tokens = monthly_token_totals.total_tokens + EXCLUDED.total_tokens
+            INSERT INTO token_usage (
+                user_id, thread_id, message_id,
+                input_tokens, output_tokens, reasoning_tokens,
+                cache_creation_tokens, cache_read_tokens
             )
-            SELECT * FROM inserted
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id, user_id, thread_id, message_id,
+                      input_tokens, output_tokens, reasoning_tokens,
+                      cache_creation_tokens, cache_read_tokens, created_at
             "#,
         )
         .bind(user_id)
@@ -1448,17 +1485,16 @@ impl DatabaseManager {
         .bind(message_id)
         .bind(input_tokens)
         .bind(output_tokens)
-        .bind(reasoning)
+        .bind(reasoning_tokens.unwrap_or(0))
         .bind(cache_creation_tokens.unwrap_or(0))
         .bind(cache_read_tokens.unwrap_or(0))
-        .bind(year_month)
-        .bind(billable)
         .fetch_one(&self.pool)
         .await?;
 
         Ok(record)
     }
 
+    #[builder]
     pub async fn get_token_limit_and_usage(
         &self,
         user_id: Uuid,
@@ -1468,12 +1504,12 @@ impl DatabaseManager {
             r#"
             SELECT p.monthly_token_limit,
                    mtt.total_tokens
-            FROM accounts a
-            JOIN plans p ON p.id = a.plan_id
+            FROM users u
+            JOIN plans p ON p.id = u.plan_id
             LEFT JOIN monthly_token_totals mtt
-                   ON mtt.user_id = a.owner_user_id
+                   ON mtt.user_id = u.id
                   AND mtt.year_month = $2
-            WHERE a.owner_user_id = $1
+            WHERE u.id = $1
             "#,
         )
         .bind(user_id)

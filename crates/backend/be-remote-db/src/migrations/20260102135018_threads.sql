@@ -145,11 +145,9 @@ CREATE INDEX idx_threads_user_id ON threads(user_id);
 CREATE INDEX idx_threads_updated_at ON threads(updated_at DESC);
 CREATE INDEX idx_threads_user_updated ON threads(user_id, updated_at DESC);
 
-CREATE INDEX idx_messages_thread_id ON messages(thread_id);
+CREATE INDEX idx_messages_thread_id ON messages(thread_id, created_at);
 CREATE INDEX idx_messages_user_id ON messages(user_id);
 CREATE INDEX idx_messages_type ON messages(message_type);
-CREATE INDEX idx_messages_content ON messages USING GIN (content jsonb_path_ops);
-
 CREATE INDEX idx_activities_user_id ON activities(user_id);
 CREATE INDEX idx_activities_started_at ON activities(started_at DESC);
 CREATE INDEX idx_activities_user_started ON activities(user_id, started_at DESC);

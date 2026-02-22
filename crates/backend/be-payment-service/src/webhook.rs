@@ -47,6 +47,34 @@ fn extract_first_price_id(sub: &Subscription) -> Option<String> {
     sub.items.data.first().map(|item| item.price.id.to_string())
 }
 
+struct PriceData {
+    id: String,
+    currency: String,
+    unit_amount: Option<i64>,
+    recurring_interval: Option<String>,
+    active: bool,
+    raw: serde_json::Value,
+}
+
+fn extract_prices(sub: &Subscription) -> Vec<PriceData> {
+    sub.items
+        .data
+        .iter()
+        .map(|item| PriceData {
+            id: item.price.id.to_string(),
+            currency: item.price.currency.to_string(),
+            unit_amount: item.price.unit_amount,
+            recurring_interval: item
+                .price
+                .recurring
+                .as_ref()
+                .map(|r| r.interval.to_string()),
+            active: item.price.active,
+            raw: serialize_or_null(&item.price, "price"),
+        })
+        .collect()
+}
+
 pub async fn on_checkout_completed(
     db: &Arc<DatabaseManager>,
     customer_id: Option<String>,
@@ -54,6 +82,7 @@ pub async fn on_checkout_completed(
     customer_email: Option<String>,
     subscription: Option<&Subscription>,
     raw_data: &serde_json::Value,
+    pro_price_id: &str,
 ) -> Result<(), PaymentError> {
     let customer_id =
         customer_id.ok_or_else(|| PaymentError::MissingField("customer_id in checkout session"))?;
@@ -71,7 +100,7 @@ pub async fn on_checkout_completed(
     // Look up the application user; if no user exists for this email,
     // we still upsert the Stripe customer (so the data is captured)
     // but skip account/subscription provisioning.
-    let user = match db.get_user_by_email(&customer_email).await {
+    let user = match db.get_user().email(customer_email.clone()).call().await {
         Ok(u) => Some(u),
         Err(e) if e.is_not_found() => {
             tracing::warn!(
@@ -89,14 +118,23 @@ pub async fn on_checkout_completed(
         .await
         .map_err(|e| anyhow::anyhow!("begin tx: {e}"))?;
 
-    db.upsert_stripe_customer(&mut *tx, &customer_id, Some(&customer_email), raw_data)
+    db.upsert_stripe_customer()
+        .executor(&mut *tx)
+        .customer_id(&customer_id)
+        .email(&customer_email)
+        .raw_data(raw_data)
+        .call()
         .await
         .map_err(|e| anyhow::anyhow!("upsert stripe customer: {e}"))?;
 
     if let Some(user) = &user {
-        db.ensure_account_for_user(&mut *tx, user.id, &customer_id)
+        db.link_stripe_customer_to_user()
+            .executor(&mut *tx)
+            .user_id(user.id)
+            .stripe_customer_id(&customer_id)
+            .call()
             .await
-            .map_err(|e| anyhow::anyhow!("ensure account: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("link stripe customer to user: {e}"))?;
     }
 
     if let Some(ref sub_id) = subscription_id {
@@ -125,16 +163,52 @@ pub async fn on_checkout_completed(
             .map_err(|e| anyhow::anyhow!("upsert subscription: {e}"))?;
 
         if let Some(sub) = subscription {
+            for price in extract_prices(sub) {
+                db.upsert_stripe_price()
+                    .executor(&mut *tx)
+                    .price_id(&price.id)
+                    .currency(&price.currency)
+                    .maybe_unit_amount(price.unit_amount)
+                    .maybe_recurring_interval(price.recurring_interval.as_deref())
+                    .active(price.active)
+                    .raw_data(&price.raw)
+                    .call()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("upsert stripe price: {e}"))?;
+
+                if price.id == pro_price_id {
+                    db.ensure_plan_price()
+                        .executor(&mut *tx)
+                        .plan_id("tier1")
+                        .stripe_price_id(&price.id)
+                        .call()
+                        .await
+                        .map_err(|e| anyhow::anyhow!("ensure plan price: {e}"))?;
+                }
+            }
+
             let items = extract_subscription_items(sub);
-            db.sync_stripe_subscription_items(&mut *tx, sub_id, &items)
+            db.sync_stripe_subscription_items()
+                .executor(&mut *tx)
+                .subscription_id(sub_id)
+                .items(&items)
+                .call()
                 .await
                 .map_err(|e| anyhow::anyhow!("sync subscription items: {e}"))?;
 
             if let Some(price_id) = extract_first_price_id(sub)
-                && let Ok(Some(plan_id)) =
-                    db.resolve_plan_for_stripe_price(&mut *tx, &price_id).await
+                && let Ok(Some(plan_id)) = db
+                    .resolve_plan_for_stripe_price()
+                    .executor(&mut *tx)
+                    .price_id(&price_id)
+                    .call()
+                    .await
             {
-                db.update_account_plan_by_stripe_customer(&mut *tx, &customer_id, &plan_id)
+                db.update_plan_by_stripe_customer()
+                    .executor(&mut *tx)
+                    .stripe_customer_id(&customer_id)
+                    .plan_id(&plan_id)
+                    .call()
                     .await
                     .map_err(|e| anyhow::anyhow!("update account plan: {e}"))?;
             }
@@ -158,6 +232,7 @@ pub async fn on_subscription_updated(
     db: &Arc<DatabaseManager>,
     sub: &Subscription,
     _raw_data: &serde_json::Value,
+    pro_price_id: &str,
 ) -> Result<(), PaymentError> {
     let subscription_id = sub.id.to_string();
     let customer_id = sub.customer.id().to_string();
@@ -195,14 +270,45 @@ pub async fn on_subscription_updated(
         .await
         .map_err(|e| anyhow::anyhow!("upsert subscription: {e}"))?;
 
+    for price in extract_prices(sub) {
+        db.upsert_stripe_price()
+            .executor(&mut *tx)
+            .price_id(&price.id)
+            .currency(&price.currency)
+            .maybe_unit_amount(price.unit_amount)
+            .maybe_recurring_interval(price.recurring_interval.as_deref())
+            .active(price.active)
+            .raw_data(&price.raw)
+            .call()
+            .await
+            .map_err(|e| anyhow::anyhow!("upsert stripe price: {e}"))?;
+
+        if price.id == pro_price_id {
+            db.ensure_plan_price()
+                .executor(&mut *tx)
+                .plan_id("tier1")
+                .stripe_price_id(&price.id)
+                .call()
+                .await
+                .map_err(|e| anyhow::anyhow!("ensure plan price: {e}"))?;
+        }
+    }
+
     let items = extract_subscription_items(sub);
-    db.sync_stripe_subscription_items(&mut *tx, &subscription_id, &items)
+    db.sync_stripe_subscription_items()
+        .executor(&mut *tx)
+        .subscription_id(&subscription_id)
+        .items(&items)
+        .call()
         .await
         .map_err(|e| anyhow::anyhow!("sync subscription items: {e}"))?;
 
     let plan_id = if matches!(status.as_str(), "active" | "trialing") {
         let resolved = if let Some(price_id) = extract_first_price_id(sub) {
-            db.resolve_plan_for_stripe_price(&mut *tx, &price_id)
+            db.resolve_plan_for_stripe_price()
+                .executor(&mut *tx)
+                .price_id(&price_id)
+                .call()
                 .await
                 .ok()
                 .flatten()
@@ -214,7 +320,11 @@ pub async fn on_subscription_updated(
         "free".to_string()
     };
 
-    db.update_account_plan_by_stripe_customer(&mut *tx, &customer_id, &plan_id)
+    db.update_plan_by_stripe_customer()
+        .executor(&mut *tx)
+        .stripe_customer_id(&customer_id)
+        .plan_id(&plan_id)
+        .call()
         .await
         .map_err(|e| anyhow::anyhow!("update account plan: {e}"))?;
 
@@ -229,7 +339,12 @@ pub async fn resolve_plan_id_for_tracking(db: &Arc<DatabaseManager>, sub: &Subsc
     let status = sub.status.to_string();
     if matches!(status.as_str(), "active" | "trialing")
         && let Some(price_id) = extract_first_price_id(sub)
-        && let Ok(Some(plan_id)) = db.resolve_plan_for_stripe_price(&db.pool, &price_id).await
+        && let Ok(Some(plan_id)) = db
+            .resolve_plan_for_stripe_price()
+            .executor(&db.pool)
+            .price_id(&price_id)
+            .call()
+            .await
     {
         return plan_id;
     }
@@ -258,18 +373,22 @@ pub async fn on_subscription_deleted(
         .await
         .map_err(|e| anyhow::anyhow!("begin tx: {e}"))?;
 
-    db.update_stripe_subscription_status_with_executor(
-        &mut *tx,
-        &subscription_id,
-        "canceled",
-        false,
-        canceled_at,
-        &sub_raw,
-    )
-    .await
-    .map_err(|e| anyhow::anyhow!("update subscription status: {e}"))?;
+    db.update_stripe_subscription_status_with_executor()
+        .executor(&mut *tx)
+        .subscription_id(&subscription_id)
+        .status("canceled")
+        .cancel_at_period_end(false)
+        .maybe_canceled_at(canceled_at)
+        .raw_data(&sub_raw)
+        .call()
+        .await
+        .map_err(|e| anyhow::anyhow!("update subscription status: {e}"))?;
 
-    db.update_account_plan_by_stripe_customer(&mut *tx, &customer_id, "free")
+    db.update_plan_by_stripe_customer()
+        .executor(&mut *tx)
+        .stripe_customer_id(&customer_id)
+        .plan_id("free")
+        .call()
         .await
         .map_err(|e| anyhow::anyhow!("reset account plan: {e}"))?;
 
