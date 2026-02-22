@@ -23,9 +23,9 @@ jobs:
             fail-fast: true
             matrix:
                 include:
-                    - runner: ubuntu-latest
+                    - runner: ubuntu-22.04
                       arch: amd64
-                    - runner: ubuntu-24.04-arm
+                    - runner: ubuntu-22.04-arm
                       arch: arm64
         runs-on: ${{ matrix.runner }}
         permissions:
