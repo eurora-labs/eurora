@@ -9,8 +9,7 @@ CREATE TABLE users (
 );
 
 CREATE TABLE password_credentials (
-    id UUID PRIMARY KEY,
-    user_id UUID NOT NULL,
+    user_id UUID PRIMARY KEY,
     password_hash VARCHAR(255) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -20,9 +19,6 @@ CREATE TABLE password_credentials (
         REFERENCES users(id)
         ON DELETE CASCADE
 );
-
--- One password per user
-CREATE UNIQUE INDEX idx_password_credentials_user_id ON password_credentials(user_id);
 
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$

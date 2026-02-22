@@ -29,7 +29,11 @@ impl TokenUsageRepo for DatabaseManager {
         user_id: Uuid,
         year_month: i32,
     ) -> DbResult<(i64, i64)> {
-        self.get_token_limit_and_usage(user_id, year_month).await
+        self.get_token_limit_and_usage()
+            .user_id(user_id)
+            .year_month(year_month)
+            .call()
+            .await
     }
 }
 

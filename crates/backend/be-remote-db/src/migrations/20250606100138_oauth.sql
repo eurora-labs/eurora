@@ -9,7 +9,6 @@ CREATE TABLE oauth_credentials (
     refresh_token BYTEA,
     access_token_expiry TIMESTAMP WITH TIME ZONE,
     scope TEXT,
-    issued_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
 
@@ -30,7 +29,6 @@ CREATE TABLE refresh_tokens (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL,
     token_hash BYTEA NOT NULL,
-    issued_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     revoked BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
