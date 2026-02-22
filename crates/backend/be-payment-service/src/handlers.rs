@@ -55,9 +55,9 @@ async fn resolve_customer_id(state: &AppState, email: &str) -> Result<String, Pa
     if let Ok(user) = state.db.get_user_by_email(email).await {
         state
             .db
-            .ensure_account_for_user(&mut *tx, user.id, &customer_id)
+            .link_stripe_customer_to_user(&mut *tx, user.id, &customer_id)
             .await
-            .map_err(|e| anyhow::anyhow!("link account to stripe customer: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("link stripe customer to user: {e}"))?;
     }
 
     tx.commit()

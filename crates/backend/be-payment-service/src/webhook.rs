@@ -123,9 +123,9 @@ pub async fn on_checkout_completed(
         .map_err(|e| anyhow::anyhow!("upsert stripe customer: {e}"))?;
 
     if let Some(user) = &user {
-        db.ensure_account_for_user(&mut *tx, user.id, &customer_id)
+        db.link_stripe_customer_to_user(&mut *tx, user.id, &customer_id)
             .await
-            .map_err(|e| anyhow::anyhow!("ensure account: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("link stripe customer to user: {e}"))?;
     }
 
     if let Some(ref sub_id) = subscription_id {
@@ -183,7 +183,7 @@ pub async fn on_checkout_completed(
                 && let Ok(Some(plan_id)) =
                     db.resolve_plan_for_stripe_price(&mut *tx, &price_id).await
             {
-                db.update_account_plan_by_stripe_customer(&mut *tx, &customer_id, &plan_id)
+                db.update_plan_by_stripe_customer(&mut *tx, &customer_id, &plan_id)
                     .await
                     .map_err(|e| anyhow::anyhow!("update account plan: {e}"))?;
             }
@@ -284,7 +284,7 @@ pub async fn on_subscription_updated(
         "free".to_string()
     };
 
-    db.update_account_plan_by_stripe_customer(&mut *tx, &customer_id, &plan_id)
+    db.update_plan_by_stripe_customer(&mut *tx, &customer_id, &plan_id)
         .await
         .map_err(|e| anyhow::anyhow!("update account plan: {e}"))?;
 
@@ -339,7 +339,7 @@ pub async fn on_subscription_deleted(
     .await
     .map_err(|e| anyhow::anyhow!("update subscription status: {e}"))?;
 
-    db.update_account_plan_by_stripe_customer(&mut *tx, &customer_id, "free")
+    db.update_plan_by_stripe_customer(&mut *tx, &customer_id, "free")
         .await
         .map_err(|e| anyhow::anyhow!("reset account plan: {e}"))?;
 

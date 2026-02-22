@@ -73,7 +73,6 @@ pub struct User {
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct PasswordCredentials {
-    pub id: Uuid,
     pub user_id: Uuid,
     #[serde(skip_serializing)]
     pub password_hash: String,
@@ -108,7 +107,6 @@ pub struct OAuthCredentials {
     pub refresh_token: Option<Vec<u8>>,
     pub access_token_expiry: Option<DateTime<Utc>>,
     pub scope: Option<String>,
-    pub issued_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -119,7 +117,6 @@ pub struct RefreshToken {
     pub user_id: Uuid,
     #[serde(skip_serializing)]
     pub token_hash: Vec<u8>,
-    pub issued_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
     pub revoked: bool,
     pub created_at: DateTime<Utc>,
