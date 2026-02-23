@@ -1,7 +1,5 @@
 import { getContext, setContext } from 'svelte';
 
-const CONFIRMATION_CONTEXT_KEY = Symbol('confirmation-context');
-
 export type ToolUIPartApproval =
 	| {
 			id: string;
@@ -26,26 +24,37 @@ export type ToolUIPartApproval =
 	| undefined;
 
 export type ToolUIPartState =
-	| 'input-streaming'
-	| 'input-available'
 	| 'approval-requested'
 	| 'approval-responded'
+	| 'input-streaming'
+	| 'input-available'
+	| 'output-available'
 	| 'output-denied'
-	| 'output-available';
+	| 'output-error';
 
-export type ConfirmationContextValue = {
-	approval: ToolUIPartApproval;
-	state: ToolUIPartState;
+type Getter<T> = () => T;
+
+export type ConfirmationStateProps = {
+	approval: Getter<ToolUIPartApproval>;
+	state: Getter<ToolUIPartState>;
 };
 
-export function setConfirmationContext(value: ConfirmationContextValue) {
-	setContext(CONFIRMATION_CONTEXT_KEY, value);
+class ConfirmationState {
+	readonly props: ConfirmationStateProps;
+	approval = $derived.by(() => this.props.approval());
+	state = $derived.by(() => this.props.state());
+
+	constructor(props: ConfirmationStateProps) {
+		this.props = props;
+	}
 }
 
-export function getConfirmationContext(): ConfirmationContextValue {
-	const context = getContext<ConfirmationContextValue>(CONFIRMATION_CONTEXT_KEY);
-	if (!context) {
-		throw new Error('Confirmation components must be used within Confirmation');
-	}
-	return context;
+const SYMBOL_KEY = 'ai-confirmation';
+
+export function setConfirmation(props: ConfirmationStateProps): ConfirmationState {
+	return setContext(Symbol.for(SYMBOL_KEY), new ConfirmationState(props));
+}
+
+export function useConfirmation(): ConfirmationState {
+	return getContext(Symbol.for(SYMBOL_KEY));
 }
