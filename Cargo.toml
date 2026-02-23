@@ -73,6 +73,7 @@ euro-encrypt = { path = "crates/app/euro-encrypt" }
 euro-endpoint = { path = "crates/app/euro-endpoint" }
 euro-fs = { path = "crates/app/euro-fs" }
 euro-native-messaging = { path = "crates/app/euro-native-messaging" }
+euro-process = { path = "crates/app/euro-process" }
 euro-secret = { path = "crates/app/euro-secret" }
 euro-settings = { path = "crates/app/euro-settings" }
 euro-storage = { path = "crates/app/euro-storage" }
