@@ -6,13 +6,7 @@ permissions:
     actions: read # Required for downloading artifacts
 on:
     schedule:
-        # every day at 1am UTC, 3AM CEST or 2AM CET.
         - cron: '0 1 * * *'
-    workflow_run:
-        workflows: ['Nightly build']
-        types:
-            - completed
-
     workflow_dispatch:
         inputs:
             channel:
@@ -39,6 +33,9 @@ jobs:
         runs-on: ubuntu-latest
         environment:
             name: eurora-main-app
+        outputs:
+            channel: ${{ env.channel }}
+            version: ${{ env.version }}
         env:
             SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         steps:
@@ -57,7 +54,6 @@ jobs:
 
             - name: Consume input variables
               shell: bash
-              if: ${{ !github.event.workflow_run }}
               env:
                   INPUT_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
                   INPUT_BUMP: ${{ github.event.inputs.bump || 'patch' }}
@@ -152,10 +148,6 @@ jobs:
 
         runs-on: ${{ matrix.platform }}
 
-        outputs:
-            platform: ${{ matrix.platform }}
-            channel: ${{ env.channel }}
-
         steps:
             # Because GitHub broke perl installations sometime in 2022 on Windows.
             - name: perl -V (before re-install)
@@ -224,7 +216,6 @@ jobs:
 
             - name: Consume input variables
               shell: bash
-              if: ${{ !github.event.workflow_run }}
               env:
                   INPUT_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
                   INPUT_BUMP: ${{ github.event.inputs.bump || 'patch' }}
@@ -390,7 +381,6 @@ jobs:
 
             - name: Consume input variables
               shell: bash
-              if: ${{ !github.event.workflow_run }}
               env:
                   INPUT_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
                   INPUT_BUMP: ${{ github.event.inputs.bump || 'patch' }}
@@ -531,7 +521,7 @@ jobs:
                   if-no-files-found: error
 
     assemble-macos-dmg:
-        needs: [build-tauri, build-safari-launcher]
+        needs: [build-sveltekit, build-tauri, build-safari-launcher]
         runs-on: macos-15
         strategy:
             fail-fast: false
@@ -565,7 +555,7 @@ jobs:
             - name: Download Tauri artifacts
               uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
               with:
-                  name: '${{ needs.build-tauri.outputs.channel }}-macos-15${{ matrix.tauri_suffix }}-${{ github.run_number }}'
+                  name: '${{ needs.build-sveltekit.outputs.channel }}-macos-15${{ matrix.tauri_suffix }}-${{ github.run_number }}'
                   path: tauri-release
 
             - name: Download launcher artifacts
@@ -605,9 +595,10 @@ jobs:
 
             - name: Compute app name from channel
               shell: bash
+              env:
+                  CHANNEL: ${{ env.channel }}
               run: |
-                  CHANNEL="${channel:-release}"
-                  if [ "$CHANNEL" = "nightly" ]; then
+                  if [ "${CHANNEL:-release}" = "nightly" ]; then
                     APP_NAME="Eurora Nightly.app"
                   else
                     APP_NAME="Eurora.app"
@@ -618,7 +609,7 @@ jobs:
                     echo 'EOF'
                   } >> "$GITHUB_ENV"
 
-            - name: Assemble unified app and create DMG
+            - name: Assemble unified app
               shell: bash
               env:
                   ARCH: ${{ matrix.arch }}
@@ -635,7 +626,6 @@ jobs:
                   APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
                   APP_NAME: ${{ env.app_name }}
               run: |
-                  # Notarize the final assembled app
                   ditto -c -k --keepParent "assembled/$APP_NAME" "$RUNNER_TEMP/eurora-notarize.zip"
 
                   xcrun notarytool submit "$RUNNER_TEMP/eurora-notarize.zip" \
@@ -644,10 +634,9 @@ jobs:
                     --password "$APPLE_PASSWORD" \
                     --wait
 
-                  # Staple the notarization ticket
                   xcrun stapler staple "assembled/$APP_NAME"
 
-            - name: Recreate DMG with notarized app
+            - name: Create DMG from notarized app
               shell: bash
               env:
                   APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
@@ -669,9 +658,8 @@ jobs:
                   fi
                   DMG_LABEL="${DISPLAY_NAME// /_}"
 
-                  # Recreate DMG with the now-notarized app + Applications symlink
                   DMG_NAME="${DMG_LABEL}_${APP_VERSION}_${MATRIX_ARCH}.dmg"
-                  rm -f "release/darwin/${ARCH_DIR}/$DMG_NAME"
+                  mkdir -p "release/darwin/${ARCH_DIR}"
                   DMG_STAGING="$(mktemp -d)"
                   ditto "assembled/$APP_NAME" "$DMG_STAGING/$APP_NAME"
                   ln -s /Applications "$DMG_STAGING/Applications"
@@ -683,7 +671,6 @@ jobs:
                     "release/darwin/${ARCH_DIR}/$DMG_NAME"
                   rm -rf "$DMG_STAGING"
 
-                  # Sign the DMG itself (Apple recommends signing disk images for distribution)
                   SIGN_IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | grep "$APPLE_TEAM_ID" | head -1 | sed 's/.*"\(.*\)"/\1/')
                   if [ -n "$SIGN_IDENTITY" ]; then
                     codesign --force --sign "$SIGN_IDENTITY" "release/darwin/${ARCH_DIR}/$DMG_NAME"
@@ -712,18 +699,13 @@ jobs:
 
                   RELEASE_DIR="release/darwin/${ARCH_DIR}"
 
-                  # Find the original Tauri tar.gz filename so the update API
-                  # keeps serving the same key on S3 (e.g. Eurora.app.tar.gz)
+                  # Reuse the original Tauri tar.gz filename so the update API keeps the same S3 key
                   ORIG_TARGZ=$(find "tauri-release/darwin/${ARCH_DIR}" -maxdepth 1 -name '*.tar.gz' -not -name '*.sig' | head -1)
                   TARGZ_NAME=$(basename "$ORIG_TARGZ")
 
                   echo "Creating updater tar.gz: $TARGZ_NAME (full assembled $APP_NAME)"
 
-                  # Package the notarized app into a tar.gz with the
-                  # same filename the Tauri updater expects.
                   tar czf "$RELEASE_DIR/$TARGZ_NAME" -C assembled "$APP_NAME"
-
-                  # Sign with the Tauri updater key so the client can verify
                   pnpm tauri signer sign "$RELEASE_DIR/$TARGZ_NAME"
 
                   echo "Updater tar.gz created and signed:"
@@ -737,7 +719,7 @@ jobs:
                   if-no-files-found: error
 
     publish-tauri:
-        needs: [build-tauri, assemble-macos-dmg]
+        needs: [build-sveltekit, build-tauri, assemble-macos-dmg]
         runs-on: ubuntu-latest
         outputs:
             version: ${{ env.version }}
@@ -793,7 +775,7 @@ jobs:
               if: matrix.source == 'tauri'
               uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
               with:
-                  name: '${{ needs.build-tauri.outputs.channel }}-${{ matrix.platform }}${{ env.artifact_suffix }}-${{ github.run_number }}'
+                  name: '${{ needs.build-sveltekit.outputs.channel }}-${{ matrix.platform }}${{ env.artifact_suffix }}-${{ github.run_number }}'
                   path: release
             - name: Download assembled macOS artifacts
               if: matrix.source == 'assembled'
@@ -826,7 +808,7 @@ jobs:
                   aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
                   aws_bucket: 'releases.eurora-labs.com'
                   source_dir: 'release-s3/'
-                  destination_dir: 'releases/${{ needs.build-tauri.outputs.channel }}/${{ env.version }}-${{ github.run_number }}'
+                  destination_dir: 'releases/${{ needs.build-sveltekit.outputs.channel }}/${{ env.version }}-${{ github.run_number }}'
 
             # tell our server to update with the version number
         #   - name: Notify Eurora API of new release
@@ -838,10 +820,10 @@ jobs:
         #         --request POST \
         #         --header 'Content-Type: application/json' \
         #         --header 'X-Auth-Token: ${{ secrets.BOT_AUTH_TOKEN }}' \
-        #         --data '{"channel":"${{ needs.build-tauri.outputs.channel }}","version":"${{ env.version }}-${{ github.run_number }}","sha":"${{ github.sha }}"}'
+        #         --data '{"channel":"${{ needs.build-sveltekit.outputs.channel }}","version":"${{ env.version }}-${{ github.run_number }}","sha":"${{ github.sha }}"}'
 
     create-git-tag:
-        needs: [publish-tauri, build-tauri]
+        needs: [build-sveltekit, publish-tauri]
         runs-on: ubuntu-latest
         permissions:
             contents: write # Required for creating and pushing git tags
@@ -853,7 +835,7 @@ jobs:
             - name: Create git tag
               shell: bash
               env:
-                  TAG_NAME: '${{ needs.build-tauri.outputs.channel }}/${{ needs.publish-tauri.outputs.version }}'
+                  TAG_NAME: '${{ needs.build-sveltekit.outputs.channel }}/${{ needs.publish-tauri.outputs.version }}'
               run: |
                   function tag_exists() {
                     git tag --list | grep -q "^$1$"
