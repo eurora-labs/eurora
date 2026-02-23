@@ -1,0 +1,119 @@
+name: 'Build Browser Extensions'
+permissions:
+    contents: read
+    actions: read
+on:
+    workflow_dispatch: {}
+    workflow_run:
+        workflows: ['Publish']
+        types:
+            - completed
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                browser: [chrome, firefox, edge]
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  persist-credentials: false
+                  lfs: true
+
+            - name: Fetch nightly version
+              shell: bash
+              run: |
+                  VERSION="$(curl --silent "https://api.eurora-labs.com/releases/nightly" | jq -r '.version' | tr -d '\r')"
+                  if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
+                    echo "Failed to fetch nightly version"
+                    exit 1
+                  fi
+                  echo "version=$VERSION" >> "$GITHUB_ENV"
+                  echo "Browser extension version: $VERSION (from nightly)"
+
+            - name: Init Node Environment
+              uses: ./.github/actions/init-env-node
+
+            - name: Install Protoc
+              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+              with:
+                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Compile Protobuf
+              run: pnpm proto:typescript
+
+            - name: Build extension
+              shell: bash
+              env:
+                  NODE_ENV: production
+                  VERSION: ${{ env.version }}
+                  BROWSER: ${{ matrix.browser }}
+              run: |
+                  pnpm run "build:${BROWSER}"
+
+            - name: Create extension zip
+              shell: bash
+              env:
+                  BROWSER: ${{ matrix.browser }}
+              run: |
+                  mkdir -p release
+                  cd "apps/browser/dist/${BROWSER}"
+                  zip -r "../../../../release/${BROWSER}.zip" . -x "*.git*" -x "*.zip"
+                  cd ../../../..
+                  echo "${{ env.version }}" > release/version
+                  echo "Created release/${BROWSER}.zip"
+                  ls -lh "release/${BROWSER}.zip"
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+              with:
+                  name: 'browser-${{ matrix.browser }}-${{ github.run_number }}'
+                  path: release/
+                  if-no-files-found: error
+
+    publish:
+        needs: [build]
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                browser: [chrome, firefox, edge]
+        steps:
+            - name: Download artifact
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: 'browser-${{ matrix.browser }}-${{ github.run_number }}'
+                  path: release
+
+            - name: Extract version
+              shell: bash
+              run: |
+                  VERSION="$(cat release/version)"
+                  echo "version=$VERSION" >> "$GITHUB_ENV"
+
+            - name: Prepare S3 payload
+              shell: bash
+              env:
+                  BROWSER: ${{ matrix.browser }}
+              run: |
+                  rm -rf release-s3
+                  mkdir -p "release-s3"
+                  cp "release/${BROWSER}.zip" "release-s3/${BROWSER}.zip"
+                  ls -lh release-s3/
+
+            - name: Upload to S3
+              uses: shallwefootball/s3-upload-action@0d261a6f15b3b2e209dfebdecace4b100c04f95b # master
+              with:
+                  aws_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws_bucket: 'releases.eurora-labs.com'
+                  source_dir: 'release-s3/'
+                  destination_dir: 'browser/${{ env.version }}'
