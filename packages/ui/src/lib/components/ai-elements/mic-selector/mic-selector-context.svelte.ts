@@ -124,6 +124,8 @@ export function useAudioDevices() {
 		}
 	}
 
+	let cleanup: (() => void) | undefined;
+
 	if (typeof window !== 'undefined') {
 		loadDevicesWithoutPermission();
 
@@ -136,6 +138,9 @@ export function useAudioDevices() {
 		};
 
 		navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
+		cleanup = () => {
+			navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
+		};
 	}
 
 	return {
@@ -152,5 +157,8 @@ export function useAudioDevices() {
 			return hasPermission;
 		},
 		loadDevices: loadDevicesWithPermission,
+		destroy() {
+			cleanup?.();
+		},
 	};
 }

@@ -52,6 +52,7 @@
 		"@tanstack/table-core": "^8.21.3",
 		"@testing-library/jest-dom": "^6.9.1",
 		"@testing-library/svelte": "^5.3.1",
+		"@xyflow/svelte": "^1.5.1",
 		"autoprefixer": "^10.4.24",
 		"bits-ui": "^2.16.0",
 		"clsx": "^2.1.1",

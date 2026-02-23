@@ -20,7 +20,7 @@
 {#if isActive}
 	<div
 		data-slot="inline-citation-carousel-item"
-		class={cn('w-full space-y-2 p-4', className)}
+		class={cn('w-full space-y-2 p-4 pl-8', className)}
 		{...rest}
 	>
 		{@render children?.()}

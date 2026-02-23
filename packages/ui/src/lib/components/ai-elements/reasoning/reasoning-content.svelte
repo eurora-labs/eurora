@@ -2,12 +2,17 @@
 	import { cn } from '$lib/utils.js';
 	import { CollapsibleContent } from '$lib/components/collapsible/index.js';
 	import { Streamdown } from 'svelte-streamdown';
+	import Code from 'svelte-streamdown/code';
+	import Math from 'svelte-streamdown/math';
+	import Mermaid from 'svelte-streamdown/mermaid';
 
 	let {
 		class: className,
 		children,
 		...restProps
 	}: { class?: string; children: string; [key: string]: any } = $props();
+
+	const components = { code: Code, math: Math, mermaid: Mermaid };
 </script>
 
 <CollapsibleContent
@@ -19,5 +24,5 @@
 	)}
 	{...restProps}
 >
-	<Streamdown {children} />
+	<Streamdown content={children} {components} baseTheme="shadcn" />
 </CollapsibleContent>

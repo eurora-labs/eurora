@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { BaseEdge, getSmoothStepPath, type EdgeProps } from '@xyflow/svelte';
+	import { BaseEdge, getBezierPath, type EdgeProps } from '@xyflow/svelte';
 
 	let {
 		id,
@@ -12,7 +12,7 @@
 	}: EdgeProps = $props();
 
 	let edgePath = $derived(
-		getSmoothStepPath({
+		getBezierPath({
 			sourcePosition,
 			sourceX,
 			sourceY,

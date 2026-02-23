@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import type { Snippet } from 'svelte';
 	import * as Popover from '$lib/components/popover/index.js';
 	import {
@@ -28,6 +29,7 @@
 	}: Props = $props();
 
 	let audioDevices = useAudioDevices();
+	onDestroy(() => audioDevices.destroy());
 
 	let context = new MicSelectorContext({
 		value: controlledValue ?? defaultValue,

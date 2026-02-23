@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils.js';
+	import CodeBlock from '../code-block/code-block.svelte';
 
-	// TODO: Replace with CodeBlock when implemented
 	let {
 		class: className,
 		input,
@@ -19,7 +19,6 @@
 		Parameters
 	</h4>
 	<div class="rounded-md bg-muted/50">
-		<!-- TODO: Replace with CodeBlock when implemented -->
-		<pre class="overflow-x-auto p-3 text-xs">{formatted}</pre>
+		<CodeBlock code={formatted} language="json" />
 	</div>
 </div>

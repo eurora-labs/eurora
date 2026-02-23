@@ -16,13 +16,16 @@
 </script>
 
 <CollapsibleTrigger {...restProps}>
-	<Button
-		class={cn('size-8', className)}
-		data-slot="plan-trigger"
-		size="icon"
-		variant="ghost"
-	>
-		<ChevronsUpDown class="size-4" />
-		<span class="sr-only">Toggle plan</span>
-	</Button>
+	{#snippet child({ props })}
+		<Button
+			{...props}
+			class={cn('size-8', className)}
+			data-slot="plan-trigger"
+			size="icon"
+			variant="ghost"
+		>
+			<ChevronsUpDown class="size-4" />
+			<span class="sr-only">Toggle plan</span>
+		</Button>
+	{/snippet}
 </CollapsibleTrigger>
