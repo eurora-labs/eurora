@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { cn } from '$lib/utils.js';
 
 	let {
@@ -6,12 +7,14 @@
 		class: className,
 		duration = 2,
 		spread = 2,
-	}: { children: string; class?: string; duration?: number; spread?: number } = $props();
+	}: { children: Snippet; class?: string; duration?: number; spread?: number } = $props();
 
-	let dynamicSpread = $derived((children?.length ?? 0) * spread);
+	let shimmerEl = $state<HTMLElement | null>(null);
+	let dynamicSpread = $derived((shimmerEl?.textContent?.length ?? 10) * spread);
 </script>
 
 <p
+	bind:this={shimmerEl}
 	data-slot="shimmer"
 	class={cn(
 		'relative inline-block bg-[length:250%_100%,auto] bg-clip-text text-transparent [background-repeat:no-repeat,padding-box] animate-shimmer',
@@ -21,7 +24,7 @@
 	style:--shimmer-duration="{duration}s"
 	style:background-image="var(--bg), linear-gradient(var(--color-muted-foreground), var(--color-muted-foreground))"
 >
-	{children}
+	{@render children()}
 </p>
 
 <style>
