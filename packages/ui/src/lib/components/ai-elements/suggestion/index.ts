@@ -1,4 +1,10 @@
-import Suggestion from './Suggestion.svelte';
-import Suggestions from './Suggestions.svelte';
+import Root from './suggestions.svelte';
+import Item from './suggestion.svelte';
 
-export { Suggestion, Suggestions };
+export {
+	Root,
+	Item,
+	//
+	Root as Suggestions,
+	Item as Suggestion,
+};

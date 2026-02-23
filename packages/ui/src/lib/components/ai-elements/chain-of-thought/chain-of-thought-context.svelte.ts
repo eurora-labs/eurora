@@ -1,19 +1,14 @@
 import { getContext, setContext } from 'svelte';
 
-const CHAIN_OF_THOUGHT_CONTEXT_KEY = 'chain-of-thought-context';
+const CHAIN_OF_THOUGHT_KEY = Symbol.for('chain-of-thought');
 
-export class ChainOfThoughtContext {
+export class ChainOfThoughtState {
 	#isOpen = $state(false);
-	#onOpenChange: ((open: boolean) => void) | undefined;
+	#isStreaming = $state(false);
 
-	constructor(
-		options: {
-			isOpen?: boolean;
-			onOpenChange?: (open: boolean) => void;
-		} = {},
-	) {
+	constructor(options: { isOpen?: boolean; isStreaming?: boolean }) {
 		this.#isOpen = options.isOpen ?? false;
-		this.#onOpenChange = options.onOpenChange;
+		this.#isStreaming = options.isStreaming ?? false;
 	}
 
 	get isOpen() {
@@ -22,24 +17,23 @@ export class ChainOfThoughtContext {
 
 	set isOpen(value: boolean) {
 		this.#isOpen = value;
-		this.#onOpenChange?.(value);
 	}
 
-	setIsOpen = (open: boolean) => {
-		this.isOpen = open;
-	};
+	get isStreaming() {
+		return this.#isStreaming;
+	}
 
-	toggle() {
-		this.isOpen = !this.isOpen;
+	set isStreaming(value: boolean) {
+		this.#isStreaming = value;
 	}
 }
 
-export function setChainOfThoughtContext(context: ChainOfThoughtContext) {
-	setContext(CHAIN_OF_THOUGHT_CONTEXT_KEY, context);
+export function setChainOfThoughtContext(state: ChainOfThoughtState) {
+	setContext(CHAIN_OF_THOUGHT_KEY, state);
 }
 
-export function getChainOfThoughtContext(): ChainOfThoughtContext {
-	const context = getContext<ChainOfThoughtContext | undefined>(CHAIN_OF_THOUGHT_CONTEXT_KEY);
+export function getChainOfThoughtContext(): ChainOfThoughtState {
+	const context = getContext<ChainOfThoughtState | undefined>(CHAIN_OF_THOUGHT_KEY);
 	if (!context) {
 		throw new Error('ChainOfThought components must be used within ChainOfThought');
 	}
