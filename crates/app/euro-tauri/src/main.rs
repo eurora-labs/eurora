@@ -243,6 +243,7 @@ fn main() {
 
             let builder = tauri::Builder::default()
                 .plugin(tauri_plugin_os::init())
+                .plugin(tauri_plugin_clipboard_manager::init())
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .setup(move |tauri_app| {
                     install_native_messaging_manifests(tauri_app);

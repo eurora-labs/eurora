@@ -1,19 +1,26 @@
 import { getContext, setContext } from 'svelte';
 
-const PLAN_CONTEXT_KEY = Symbol('plan-context');
+type Getter<T> = () => T;
 
-export type PlanContextValue = {
-	isStreaming: boolean;
+export type PlanStateProps = {
+	isStreaming: Getter<boolean>;
 };
 
-export function setPlanContext(value: PlanContextValue) {
-	setContext(PLAN_CONTEXT_KEY, value);
+class PlanState {
+	readonly props: PlanStateProps;
+	isStreaming = $derived.by(() => this.props.isStreaming());
+
+	constructor(props: PlanStateProps) {
+		this.props = props;
+	}
 }
 
-export function getPlanContext(): PlanContextValue {
-	const context = getContext<PlanContextValue>(PLAN_CONTEXT_KEY);
-	if (!context) {
-		throw new Error('Plan components must be used within Plan');
-	}
-	return context;
+const SYMBOL_KEY = 'ai-plan';
+
+export function setPlan(props: PlanStateProps): PlanState {
+	return setContext(Symbol.for(SYMBOL_KEY), new PlanState(props));
+}
+
+export function usePlan(): PlanState {
+	return getContext(Symbol.for(SYMBOL_KEY));
 }
