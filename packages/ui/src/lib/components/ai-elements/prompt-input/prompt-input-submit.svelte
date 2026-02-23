@@ -1,12 +1,23 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { cn } from '$lib/utils.js';
-	import { Button, type ButtonProps } from '$lib/components/button/index.js';
+	import { Button, type ButtonVariant, type ButtonSize } from '$lib/components/button/index.js';
 	import { Spinner } from '$lib/components/spinner/index.js';
 	import CornerDownLeftIcon from '@lucide/svelte/icons/corner-down-left';
 	import SquareIcon from '@lucide/svelte/icons/square';
 	import XIcon from '@lucide/svelte/icons/x';
 	import type { ChatStatus } from './prompt-input-context.svelte.js';
+
+	interface Props {
+		class?: string;
+		variant?: ButtonVariant;
+		size?: ButtonSize;
+		disabled?: boolean;
+		status?: ChatStatus;
+		onStop?: () => void;
+		onclick?: (e: MouseEvent & { currentTarget: EventTarget & HTMLElement }) => void;
+		children?: Snippet;
+	}
 
 	let {
 		class: className,
@@ -15,18 +26,13 @@
 		status = undefined,
 		onStop = undefined,
 		onclick = undefined,
+		disabled = undefined,
 		children,
-		...restProps
-	}: ButtonProps & {
-		status?: ChatStatus;
-		onStop?: () => void;
-		onclick?: (e: MouseEvent & { currentTarget: HTMLButtonElement }) => void;
-		children?: Snippet;
-	} = $props();
+	}: Props = $props();
 
 	const isGenerating = $derived(status === 'submitted' || status === 'streaming');
 
-	function handleClick(e: MouseEvent & { currentTarget: HTMLButtonElement }) {
+	function handleClick(e: MouseEvent & { currentTarget: EventTarget & HTMLElement }) {
 		if (isGenerating && onStop) {
 			e.preventDefault();
 			onStop();
@@ -41,10 +47,10 @@
 	aria-label={isGenerating ? 'Stop' : 'Submit'}
 	class={cn(className)}
 	onclick={handleClick}
+	{disabled}
 	{size}
 	type={isGenerating && onStop ? 'button' : 'submit'}
 	{variant}
-	{...restProps}
 >
 	{#if children}
 		{@render children()}

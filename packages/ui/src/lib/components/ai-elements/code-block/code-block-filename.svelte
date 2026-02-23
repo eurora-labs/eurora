@@ -11,10 +11,6 @@
 	let { class: className, children, ...rest }: Props = $props();
 </script>
 
-<span
-	data-slot="code-block-filename"
-	class={cn('font-mono', className)}
-	{...rest}
->
+<span data-slot="code-block-filename" class={cn('font-mono', className)} {...rest}>
 	{@render children?.()}
 </span>

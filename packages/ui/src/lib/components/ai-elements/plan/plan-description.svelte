@@ -16,11 +16,7 @@
 	const plan = usePlan();
 </script>
 
-<CardDescription
-	data-slot="plan-description"
-	class={cn('text-balance', className)}
-	{...restProps}
->
+<CardDescription data-slot="plan-description" class={cn('text-balance', className)} {...restProps}>
 	{#if plan.isStreaming}
 		<Shimmer>{children}</Shimmer>
 	{:else}

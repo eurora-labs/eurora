@@ -36,10 +36,6 @@
 	);
 </script>
 
-<div
-	data-slot="attachments"
-	class={cn(attachmentsVariants({ variant }), className)}
-	{...restProps}
->
+<div data-slot="attachments" class={cn(attachmentsVariants({ variant }), className)} {...restProps}>
 	{@render children?.()}
 </div>

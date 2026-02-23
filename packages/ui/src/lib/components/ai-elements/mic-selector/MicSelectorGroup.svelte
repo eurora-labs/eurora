@@ -1,16 +1,16 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import type { HTMLAttributes } from 'svelte/elements';
 	import * as Command from '$lib/components/command/index.js';
 
-	interface Props extends HTMLAttributes<HTMLDivElement> {
+	interface Props {
+		class?: string;
 		heading?: string;
 		children?: Snippet;
 	}
 
-	let { children, heading, ...restProps }: Props = $props();
+	let { children, heading, class: className }: Props = $props();
 </script>
 
-<Command.Group data-slot="mic-selector-group" {heading} {...restProps}>
+<Command.Group data-slot="mic-selector-group" {heading} class={className}>
 	{@render children?.()}
 </Command.Group>

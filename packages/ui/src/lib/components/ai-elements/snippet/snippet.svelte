@@ -19,10 +19,7 @@
 
 <div
 	data-slot="snippet"
-	class={cn(
-		'flex items-center rounded-md border font-mono text-sm',
-		className,
-	)}
+	class={cn('flex items-center rounded-md border font-mono text-sm', className)}
 	{...restProps}
 >
 	{@render children?.()}

@@ -19,7 +19,10 @@
 {#if ctx.currentVersion || ctx.newVersion}
 	<div
 		data-slot="package-info-version"
-		class={cn('mt-2 flex items-center gap-2 font-mono text-muted-foreground text-sm', className)}
+		class={cn(
+			'mt-2 flex items-center gap-2 font-mono text-muted-foreground text-sm',
+			className,
+		)}
 		{...restProps}
 	>
 		{#if children}

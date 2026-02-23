@@ -13,14 +13,7 @@
 		children?: Snippet;
 	}
 
-	let {
-		class: className,
-		onCopy,
-		onError,
-		timeout = 2000,
-		children,
-		...rest
-	}: Props = $props();
+	let { class: className, onCopy, onError, timeout = 2000, children, ...rest }: Props = $props();
 
 	let ctx = getTerminalContext();
 	let isCopied = $state(false);
@@ -46,10 +39,7 @@
 
 <Button
 	data-slot="terminal-copy-button"
-	class={cn(
-		'size-7 shrink-0 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100',
-		className,
-	)}
+	class={cn('size-7 shrink-0 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100', className)}
 	onclick={copyToClipboard}
 	size="icon"
 	variant="ghost"

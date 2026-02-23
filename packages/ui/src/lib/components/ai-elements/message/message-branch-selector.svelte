@@ -21,8 +21,8 @@
 	<ButtonGroup
 		data-slot="message-branch-selector"
 		class={cn(
-			"[&>*:not(:first-child)]:rounded-l-md [&>*:not(:last-child)]:rounded-r-md",
-			className
+			'[&>*:not(:first-child)]:rounded-l-md [&>*:not(:last-child)]:rounded-r-md',
+			className,
 		)}
 		orientation="horizontal"
 		{...restProps}

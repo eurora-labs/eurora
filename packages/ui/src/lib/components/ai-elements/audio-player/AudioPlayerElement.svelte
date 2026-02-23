@@ -9,7 +9,15 @@
 
 	let { src, data, ...restProps }: Props = $props();
 
-	let audioSrc = $derived(src ? src : data ? `data:${data.mediaType};base64,${data.base64}` : undefined);
+	let audioSrc = $derived(
+		src ? src : data ? `data:${data.mediaType};base64,${data.base64}` : undefined,
+	);
+
+	let audioEl: HTMLAudioElement;
+
+	$effect(() => {
+		audioEl?.setAttribute('slot', 'media');
+	});
 </script>
 
-<audio data-slot="audio-player-element" slot="media" src={audioSrc} {...restProps}></audio>
+<audio bind:this={audioEl} data-slot="audio-player-element" src={audioSrc} {...restProps}></audio>

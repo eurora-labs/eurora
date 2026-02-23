@@ -57,7 +57,7 @@
 	};
 
 	let derivedName = $derived(
-		type === 'dynamic-tool' ? (toolName ?? '') : type.split('-').slice(1).join('-')
+		type === 'dynamic-tool' ? (toolName ?? '') : type.split('-').slice(1).join('-'),
 	);
 </script>
 
@@ -88,5 +88,7 @@
 			{statusLabels[state]}
 		</Badge>
 	</div>
-	<ChevronDown class="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+	<ChevronDown
+		class="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
+	/>
 </CollapsibleTrigger>

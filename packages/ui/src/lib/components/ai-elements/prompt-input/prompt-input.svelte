@@ -35,10 +35,7 @@
 			code: 'max_files' | 'max_file_size' | 'accept';
 			message: string;
 		}) => void;
-		onSubmit: (
-			message: PromptInputMessage,
-			event: SubmitEvent,
-		) => void | Promise<void>;
+		onSubmit: (message: PromptInputMessage, event: SubmitEvent) => void | Promise<void>;
 		children?: Snippet;
 	} = $props();
 

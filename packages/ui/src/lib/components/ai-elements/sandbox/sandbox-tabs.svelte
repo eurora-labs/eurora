@@ -13,10 +13,6 @@
 	} = $props();
 </script>
 
-<Tabs
-	data-slot="sandbox-tabs"
-	class={cn('w-full gap-0', className)}
-	{...restProps}
->
+<Tabs data-slot="sandbox-tabs" class={cn('w-full gap-0', className)} {...restProps}>
 	{@render children?.()}
 </Tabs>

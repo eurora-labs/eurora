@@ -20,11 +20,7 @@
 	} = $props();
 </script>
 
-<div
-	data-slot="schema-display-parameter"
-	class={cn('px-4 py-3 pl-10', className)}
-	{...restProps}
->
+<div data-slot="schema-display-parameter" class={cn('px-4 py-3 pl-10', className)} {...restProps}>
 	<div class="flex items-center gap-2">
 		<span class="font-mono text-sm">{name}</span>
 		<Badge class="text-xs" variant="outline">{type}</Badge>

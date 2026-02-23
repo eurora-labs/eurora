@@ -10,6 +10,10 @@
 	let { class: className, children, ...restProps }: Props = $props();
 </script>
 
-<span data-slot="model-selector-name" class={cn('flex-1 truncate text-left', className)} {...restProps}>
+<span
+	data-slot="model-selector-name"
+	class={cn('flex-1 truncate text-left', className)}
+	{...restProps}
+>
 	{@render children()}
 </span>

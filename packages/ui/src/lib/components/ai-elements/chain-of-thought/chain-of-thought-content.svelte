@@ -1,10 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { cn } from '$lib/utils.js';
-	import {
-		Collapsible,
-		CollapsibleContent,
-	} from '$lib/components/collapsible/index.js';
+	import { Collapsible, CollapsibleContent } from '$lib/components/collapsible/index.js';
 	import { getChainOfThoughtContext } from './chain-of-thought-context.svelte.js';
 
 	interface Props {

@@ -10,10 +10,6 @@
 	let { class: className, children, ...rest }: Props = $props();
 </script>
 
-<div
-	data-slot="terminal-actions"
-	class={cn('flex items-center gap-1', className)}
-	{...rest}
->
+<div data-slot="terminal-actions" class={cn('flex items-center gap-1', className)} {...rest}>
 	{@render children?.()}
 </div>

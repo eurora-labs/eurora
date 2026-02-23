@@ -14,11 +14,6 @@
 	} = $props();
 </script>
 
-<Collapsible
-	bind:open
-	class={cn(className)}
-	data-slot="queue-section"
-	{...restProps}
->
+<Collapsible bind:open class={cn(className)} data-slot="queue-section" {...restProps}>
 	{@render children?.()}
 </Collapsible>

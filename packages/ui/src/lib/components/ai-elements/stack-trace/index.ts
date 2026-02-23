@@ -17,8 +17,4 @@ export {
 	getStackTraceContext,
 	setStackTraceContext,
 } from './stack-trace-context.svelte.js';
-export {
-	parseStackTrace,
-	type StackFrame,
-	type ParsedStackTrace,
-} from './parse-stack.js';
+export { parseStackTrace, type StackFrame, type ParsedStackTrace } from './parse-stack.js';

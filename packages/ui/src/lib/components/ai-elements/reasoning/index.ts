@@ -12,4 +12,8 @@ export {
 	Content as ReasoningContent,
 };
 
-export { getReasoningContext, setReasoningContext, ReasoningState } from './reasoning-context.svelte.js';
+export {
+	getReasoningContext,
+	setReasoningContext,
+	ReasoningState,
+} from './reasoning-context.svelte.js';

@@ -45,28 +45,29 @@
 <div data-slot="code-block-content" class="relative overflow-auto">
 	<pre
 		class={cn(
-			"dark:!bg-[var(--shiki-dark-bg)] dark:!text-[var(--shiki-dark)] m-0 p-4 text-sm",
+			'dark:!bg-[var(--shiki-dark-bg)] dark:!text-[var(--shiki-dark)] m-0 p-4 text-sm',
 			className,
 		)}
 		style:background-color={tokenized.bg}
-		style:color={tokenized.fg}
-	>
+		style:color={tokenized.fg}>
 		<code
 			class={cn(
 				'font-mono text-sm',
 				showLineNumbers && '[counter-increment:line_0] [counter-reset:line]',
 			)}
-		>{#each keyedLines as keyedLine (keyedLine.key)}<span
-				class={showLineNumbers ? LINE_NUMBER_CLASSES : 'block'}
-			>{#if keyedLine.tokens.length === 0}{'\n'}{:else}{#each keyedLine.tokens as { token, key } (key)}<span
-							class="dark:!bg-[var(--shiki-dark-bg)] dark:!text-[var(--shiki-dark)]"
-							style:background-color={token.bgColor}
-							style:color={token.color}
-							style:font-style={isItalic(token.fontStyle) ? 'italic' : undefined}
-							style:font-weight={isBold(token.fontStyle) ? 'bold' : undefined}
-							style:text-decoration={isUnderline(token.fontStyle)
-								? 'underline'
-								: undefined}
-						>{token.content}</span>{/each}{/if}</span>{/each}</code>
+			>{#each keyedLines as keyedLine (keyedLine.key)}<span
+					class={showLineNumbers ? LINE_NUMBER_CLASSES : 'block'}
+					>{#if keyedLine.tokens.length === 0}{'\n'}{:else}{#each keyedLine.tokens as { token, key } (key)}<span
+								class="dark:!bg-[var(--shiki-dark-bg)] dark:!text-[var(--shiki-dark)]"
+								style:background-color={token.bgColor}
+								style:color={token.color}
+								style:font-style={isItalic(token.fontStyle) ? 'italic' : undefined}
+								style:font-weight={isBold(token.fontStyle) ? 'bold' : undefined}
+								style:text-decoration={isUnderline(token.fontStyle)
+									? 'underline'
+									: undefined}>{token.content}</span
+							>{/each}{/if}</span
+				>{/each}</code
+		>
 	</pre>
 </div>

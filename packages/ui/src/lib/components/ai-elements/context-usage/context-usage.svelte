@@ -53,6 +53,6 @@
 	});
 </script>
 
-<HoverCard data-slot="context-usage" bind:open {closeDelay} {openDelay} {...rest}>
+<HoverCard bind:open {closeDelay} {openDelay} {...rest}>
 	{@render children?.()}
 </HoverCard>

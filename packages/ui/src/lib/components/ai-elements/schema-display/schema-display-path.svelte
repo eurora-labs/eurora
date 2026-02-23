@@ -31,11 +31,7 @@
 	}
 </script>
 
-<span
-	data-slot="schema-display-path"
-	class={cn('font-mono text-sm', className)}
-	{...restProps}
->
+<span data-slot="schema-display-path" class={cn('font-mono text-sm', className)} {...restProps}>
 	{#if children}
 		{@render children()}
 	{:else}

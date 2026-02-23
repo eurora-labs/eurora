@@ -14,11 +14,7 @@
 	} = $props();
 </script>
 
-<ScrollArea
-	data-slot="queue-list"
-	class={cn('mt-2 -mb-1', className)}
-	{...restProps}
->
+<ScrollArea data-slot="queue-list" class={cn('mt-2 -mb-1', className)} {...restProps}>
 	<div class="max-h-40 pr-4">
 		<ul>
 			{@render children?.()}

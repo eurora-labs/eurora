@@ -20,9 +20,16 @@
 
 {#if tooltip}
 	<Tooltip.Root>
-		<Tooltip.Trigger asChild>
+		<Tooltip.Trigger>
 			{#snippet child({ props })}
-				<Button data-slot="checkpoint-trigger" {size} type="button" {variant} {...restProps} {...props}>
+				<Button
+					data-slot="checkpoint-trigger"
+					{size}
+					type="button"
+					{variant}
+					{...restProps}
+					{...props}
+				>
 					{@render children?.()}
 				</Button>
 			{/snippet}

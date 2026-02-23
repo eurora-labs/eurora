@@ -40,7 +40,7 @@
 
 {#if tooltip}
 	<Tooltip.Root>
-		<Tooltip.Trigger asChild>
+		<Tooltip.Trigger>
 			{#snippet child({ props })}
 				{@render button(props)}
 			{/snippet}

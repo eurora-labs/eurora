@@ -15,10 +15,6 @@
 	} = $props();
 </script>
 
-<TabsContent
-	data-slot="sandbox-tab-content"
-	class={cn('mt-0 text-sm', className)}
-	{...restProps}
->
+<TabsContent data-slot="sandbox-tab-content" class={cn('mt-0 text-sm', className)} {...restProps}>
 	{@render children?.()}
 </TabsContent>

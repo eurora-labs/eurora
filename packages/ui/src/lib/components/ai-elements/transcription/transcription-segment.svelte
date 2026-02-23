@@ -37,7 +37,7 @@
 		!(isActive || isPast) && 'text-muted-foreground/60',
 		ctx.onSeek && 'cursor-pointer hover:text-foreground',
 		!ctx.onSeek && 'cursor-default',
-		className
+		className,
 	)}
 	onclick={(e) => {
 		if (ctx.onSeek) {

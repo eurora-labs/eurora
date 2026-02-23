@@ -15,14 +15,7 @@
 		[key: string]: unknown;
 	}
 
-	let {
-		onCopy,
-		onError,
-		timeout = 2000,
-		class: className,
-		children,
-		...rest
-	}: Props = $props();
+	let { onCopy, onError, timeout = 2000, class: className, children, ...rest }: Props = $props();
 
 	let ctx = getCodeBlockContext();
 	let isCopied = $state(false);

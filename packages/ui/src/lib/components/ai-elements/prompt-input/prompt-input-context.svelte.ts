@@ -114,10 +114,7 @@ export class ReferencedSourcesState {
 
 	add(incoming: SourceDocumentUIPart[] | SourceDocumentUIPart) {
 		const array = Array.isArray(incoming) ? incoming : [incoming];
-		this.sources = [
-			...this.sources,
-			...array.map((s) => ({ ...s, id: nanoid() })),
-		];
+		this.sources = [...this.sources, ...array.map((s) => ({ ...s, id: nanoid() }))];
 	}
 
 	remove(id: string) {
@@ -204,9 +201,7 @@ export function usePromptInputAttachments(): AttachmentsState {
 	return ctx;
 }
 
-export function setReferencedSources(
-	state: ReferencedSourcesState,
-): ReferencedSourcesState {
+export function setReferencedSources(state: ReferencedSourcesState): ReferencedSourcesState {
 	return setContext(Symbol.for(REFERENCED_SOURCES_KEY), state);
 }
 

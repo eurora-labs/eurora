@@ -53,7 +53,13 @@ export function getVoiceSelectorContext(): VoiceSelectorContext {
 	return context;
 }
 
-export type GenderValue = 'male' | 'female' | 'transgender' | 'androgyne' | 'non-binary' | 'intersex';
+export type GenderValue =
+	| 'male'
+	| 'female'
+	| 'transgender'
+	| 'androgyne'
+	| 'non-binary'
+	| 'intersex';
 
 export type AccentValue =
 	| 'american'

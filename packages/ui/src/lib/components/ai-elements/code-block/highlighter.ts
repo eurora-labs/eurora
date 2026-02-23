@@ -1,9 +1,4 @@
-import type {
-	BundledLanguage,
-	BundledTheme,
-	HighlighterGeneric,
-	ThemedToken,
-} from 'shiki';
+import type { BundledLanguage, BundledTheme, HighlighterGeneric, ThemedToken } from 'shiki';
 import { createHighlighter } from 'shiki';
 import { cn } from '$lib/utils.js';
 

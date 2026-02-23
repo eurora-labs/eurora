@@ -3,15 +3,18 @@
 	import type { HTMLAnchorAttributes } from 'svelte/elements';
 	import BookIcon from '@lucide/svelte/icons/book';
 
-	let {
-		href,
-		title,
-		children,
-		...restProps
-	}: HTMLAnchorAttributes & { children?: Snippet } = $props();
+	let { href, title, children, ...restProps }: HTMLAnchorAttributes & { children?: Snippet } =
+		$props();
 </script>
 
-<a data-slot="source" class="flex items-center gap-2" {href} rel="noreferrer" target="_blank" {...restProps}>
+<a
+	data-slot="source"
+	class="flex items-center gap-2"
+	{href}
+	rel="noreferrer"
+	target="_blank"
+	{...restProps}
+>
 	{#if children}
 		{@render children()}
 	{:else}

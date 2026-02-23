@@ -5,4 +5,4 @@
 	let { ...restProps }: DropdownMenuPrimitive.RootProps = $props();
 </script>
 
-<DropdownMenu data-slot="prompt-input-action-menu" {...restProps} />
+<DropdownMenu {...restProps} />

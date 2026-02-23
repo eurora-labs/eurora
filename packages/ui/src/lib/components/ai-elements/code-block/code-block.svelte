@@ -32,12 +32,7 @@
 	});
 </script>
 
-<CodeBlockContainer
-	data-slot="code-block"
-	{language}
-	class={className}
-	{...rest}
->
+<CodeBlockContainer data-slot="code-block" {language} class={className} {...rest}>
 	{@render children?.()}
 	<CodeBlockContent {code} {language} {showLineNumbers} />
 </CodeBlockContainer>

@@ -1,15 +1,8 @@
 <script lang="ts">
 	import { BaseEdge, getBezierPath, type EdgeProps } from '@xyflow/svelte';
 
-	let {
-		id,
-		sourceX,
-		sourceY,
-		targetX,
-		targetY,
-		sourcePosition,
-		targetPosition,
-	}: EdgeProps = $props();
+	let { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition }: EdgeProps =
+		$props();
 
 	let edgePath = $derived(
 		getBezierPath({

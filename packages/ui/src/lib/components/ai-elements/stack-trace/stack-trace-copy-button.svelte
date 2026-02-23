@@ -13,14 +13,7 @@
 		children?: Snippet;
 	}
 
-	let {
-		class: className,
-		onCopy,
-		onError,
-		timeout = 2000,
-		children,
-		...rest
-	}: Props = $props();
+	let { class: className, onCopy, onError, timeout = 2000, children, ...rest }: Props = $props();
 
 	let ctx = getStackTraceContext();
 	let isCopied = $state(false);

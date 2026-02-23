@@ -10,7 +10,7 @@
 		ctx.approval?.approved === true &&
 			(ctx.state === 'approval-responded' ||
 				ctx.state === 'output-denied' ||
-				ctx.state === 'output-available')
+				ctx.state === 'output-available'),
 	);
 </script>
 

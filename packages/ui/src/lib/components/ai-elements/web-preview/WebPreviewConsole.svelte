@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils.js';
 	import { Button } from '$lib/components/button/index.js';
 	import * as Collapsible from '$lib/components/collapsible/index.js';
@@ -13,21 +12,20 @@
 		timestamp: Date;
 	}
 
-	interface Props extends HTMLAttributes<HTMLDivElement> {
+	interface Props {
+		class?: string;
 		logs?: ConsoleLog[];
 		children?: Snippet;
 	}
 
-	let { class: className, logs = [], children, ...restProps }: Props = $props();
+	let { class: className, logs = [], children }: Props = $props();
 
 	let context = getWebPreviewContext();
 </script>
 
 <Collapsible.Root
-	data-slot="web-preview-console"
 	class={cn('border-t bg-muted/50 font-mono text-sm', className)}
 	bind:open={context.consoleOpen}
-	{...restProps}
 >
 	<Collapsible.Trigger>
 		{#snippet child({ props })}
@@ -38,7 +36,10 @@
 			>
 				Console
 				<ChevronDownIcon
-					class={cn('h-4 w-4 transition-transform duration-200', context.consoleOpen && 'rotate-180')}
+					class={cn(
+						'h-4 w-4 transition-transform duration-200',
+						context.consoleOpen && 'rotate-180',
+					)}
 				/>
 			</Button>
 		{/snippet}

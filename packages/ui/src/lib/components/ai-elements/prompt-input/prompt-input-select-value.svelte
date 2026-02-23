@@ -12,10 +12,6 @@
 	} = $props();
 </script>
 
-<span
-	data-slot="prompt-input-select-value"
-	class={cn(className)}
-	{...restProps}
->
+<span data-slot="prompt-input-select-value" class={cn(className)} {...restProps}>
 	{@render children?.()}
 </span>

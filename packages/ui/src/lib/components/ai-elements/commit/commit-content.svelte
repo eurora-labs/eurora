@@ -13,10 +13,6 @@
 	} = $props();
 </script>
 
-<CollapsibleContent
-	data-slot="commit-content"
-	class={cn('border-t p-3', className)}
-	{...restProps}
->
+<CollapsibleContent data-slot="commit-content" class={cn('border-t p-3', className)} {...restProps}>
 	{@render children?.()}
 </CollapsibleContent>

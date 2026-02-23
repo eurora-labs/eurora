@@ -13,10 +13,6 @@
 	} = $props();
 </script>
 
-<CollapsibleContent
-	data-slot="queue-section-content"
-	class={cn(className)}
-	{...restProps}
->
+<CollapsibleContent data-slot="queue-section-content" class={cn(className)} {...restProps}>
 	{@render children?.()}
 </CollapsibleContent>

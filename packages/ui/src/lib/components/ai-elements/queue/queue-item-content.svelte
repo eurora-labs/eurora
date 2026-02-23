@@ -18,9 +18,7 @@
 	data-slot="queue-item-content"
 	class={cn(
 		'line-clamp-1 grow break-words',
-		completed
-			? 'text-muted-foreground/50 line-through'
-			: 'text-muted-foreground',
+		completed ? 'text-muted-foreground/50 line-through' : 'text-muted-foreground',
 		className,
 	)}
 	{...restProps}

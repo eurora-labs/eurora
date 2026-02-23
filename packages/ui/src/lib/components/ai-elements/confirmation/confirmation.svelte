@@ -27,16 +27,12 @@
 	});
 
 	let visible = $derived(
-		!!approval && state !== 'input-streaming' && state !== 'input-available'
+		!!approval && state !== 'input-streaming' && state !== 'input-available',
 	);
 </script>
 
 {#if visible}
-	<Alert
-		data-slot="confirmation"
-		class={cn('flex flex-col gap-2', className)}
-		{...restProps}
-	>
+	<Alert data-slot="confirmation" class={cn('flex flex-col gap-2', className)} {...restProps}>
 		{@render children?.()}
 	</Alert>
 {/if}

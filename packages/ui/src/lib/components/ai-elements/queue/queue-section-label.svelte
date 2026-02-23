@@ -29,6 +29,7 @@
 		{@render icon()}
 	{/if}
 	<span>
-		{count} {label}
+		{count}
+		{label}
 	</span>
 </span>

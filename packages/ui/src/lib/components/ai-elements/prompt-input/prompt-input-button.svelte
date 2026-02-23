@@ -18,13 +18,11 @@
 					content: string;
 					shortcut?: string;
 					side?: 'top' | 'bottom' | 'left' | 'right';
-				};
+			  };
 		children?: Snippet;
 	} = $props();
 
-	const tooltipContent = $derived(
-		typeof tooltip === 'string' ? tooltip : tooltip?.content,
-	);
+	const tooltipContent = $derived(typeof tooltip === 'string' ? tooltip : tooltip?.content);
 	const shortcut = $derived(typeof tooltip === 'string' ? undefined : tooltip?.shortcut);
 	const side = $derived(typeof tooltip === 'string' ? 'top' : (tooltip?.side ?? 'top'));
 </script>
