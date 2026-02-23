@@ -30,8 +30,8 @@
 		{size}
 		type="button"
 		{variant}
-		{...restProps}
 		{...extraProps}
+		{...restProps}
 	>
 		{@render children?.()}
 		<span class="sr-only">{label || tooltip}</span>

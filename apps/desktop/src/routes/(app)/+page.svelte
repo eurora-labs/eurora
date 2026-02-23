@@ -27,11 +27,28 @@
 	import {
 		Message,
 		MessageContent,
+		MessageActions,
+		MessageAction,
 		MessageResponse,
 	} from '@eurora/ui/components/ai-elements/message/index';
 	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
+	import CheckIcon from '@lucide/svelte/icons/check';
+	import CopyIcon from '@lucide/svelte/icons/copy';
+	import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
+
+	let copiedMessageId = $state<string | null>(null);
+
+	async function copyMessageContent(content: string, messageIndex: number) {
+		await writeText(content);
+
+		const id = String(messageIndex);
+		copiedMessageId = id;
+		setTimeout(() => {
+			if (copiedMessageId === id) copiedMessageId = null;
+		}, 2000);
+	}
 
 	let thread = $state<ThreadView | null>(null);
 	let messages = $state<MessageView[]>([]);
@@ -154,7 +171,7 @@
 	<Conversation class="min-h-0 flex-1">
 		{#if messages.length > 0}
 			<ConversationContent>
-				{#each messages as message}
+				{#each messages as message, i}
 					{@const content = getMessageContent(message)}
 					{@const isUser = isUserMessage(message)}
 					{#if content.length > 0 || !isUser}
@@ -166,6 +183,20 @@
 									<Shimmer>Thinking</Shimmer>
 								{/if}
 							</MessageContent>
+							{#if !isUser && content.trim().length > 0}
+								<MessageActions>
+									<MessageAction
+										tooltip="Copy"
+										onclick={() => copyMessageContent(content, i)}
+									>
+										{#if copiedMessageId === String(i)}
+											<CheckIcon />
+										{:else}
+											<CopyIcon />
+										{/if}
+									</MessageAction>
+								</MessageActions>
+							{/if}
 						</Message>
 					{/if}
 				{/each}
