@@ -40,17 +40,22 @@ pub enum ActivityReport {
 impl From<NativeMetadata> for StrategyMetadata {
     fn from(metadata: NativeMetadata) -> Self {
         let icon = match metadata.icon_base64 {
-            Some(icon) => match icon.starts_with("data:image/svg+xml;base64") {
-                true => convert_svg_to_rgba(&icon).ok().map(Arc::new),
-                false => {
-                    let icon = icon.split(',').nth(1).unwrap_or(&icon);
-                    let icon_data = BASE64_STANDARD.decode(icon.trim()).ok();
-
-                    image::load_from_memory(&icon_data.unwrap_or_default())
-                        .ok()
-                        .map(|icon_image| Arc::new(icon_image.to_rgba8()))
-                }
-            },
+            Some(ref icon) if icon.is_empty() => None,
+            Some(ref icon) if icon.starts_with("data:image/svg+xml;base64") => {
+                convert_svg_to_rgba(icon).ok().map(Arc::new)
+            }
+            Some(ref icon) => {
+                let raw = if let Some(pos) = icon.find(',') {
+                    &icon[pos + 1..]
+                } else {
+                    icon.as_str()
+                };
+                BASE64_STANDARD
+                    .decode(raw.trim())
+                    .ok()
+                    .and_then(|bytes| image::load_from_memory(&bytes).ok())
+                    .map(|img| Arc::new(img.to_rgba8()))
+            }
             None => None,
         };
         StrategyMetadata {

@@ -97,18 +97,12 @@ impl AssetFunctionality for YoutubeAsset {
             .collect::<Vec<_>>()
             .join(" ");
 
-        let recent_content = format!("The professor just said this: {}", last_20);
+        let content = format!(
+            "{}\nThe professor just said this: {}",
+            transcript_content, last_20
+        );
 
-        vec![
-            HumanMessage::builder()
-                .content(transcript_content)
-                .build()
-                .into(),
-            HumanMessage::builder()
-                .content(recent_content)
-                .build()
-                .into(),
-        ]
+        vec![HumanMessage::builder().content(content).build().into()]
     }
 
     fn get_context_chip(&self) -> Option<ContextChip> {

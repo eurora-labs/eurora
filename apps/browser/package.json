@@ -16,7 +16,7 @@
 		"build:chrome": "cross-env BROWSER=chrome node scripts/build.mjs",
 		"build:chrome:dev": "cross-env BROWSER=chrome BUILD_MODE=development node scripts/build.mjs",
 		"build:firefox": "cross-env BROWSER=firefox node scripts/build.mjs",
-		"build:firefox:dev": "cross-env BROWSER=firefox BUILD_MODE=development node scripts/build.mjs",
+		"build:firefox:dev": "cross-env BROWSER=firefox BUILD_MODE=development ZIP_OUTPUT=true node scripts/build.mjs",
 		"build:safari": "cross-env BROWSER=safari node scripts/build.mjs",
 		"build:safari:dev": "cross-env BROWSER=safari BUILD_MODE=development node scripts/build.mjs"
 	},

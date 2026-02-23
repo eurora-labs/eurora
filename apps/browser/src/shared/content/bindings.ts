@@ -30,8 +30,6 @@ export type NativeArticleAsset = {
 
 export type NativeArticleSnapshot = { highlighted_text: string | null };
 
-export type NativeIcon = { base64: string | null };
-
 export type NativeMetadata = { url: string | null; icon_base64: string | null };
 
 export type NativeTwitterAsset = {

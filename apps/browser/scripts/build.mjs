@@ -61,6 +61,13 @@ async function main() {
 	await build(backgroundConfig({ browser, outDir, emptyOutDir: false, mode }));
 
 	await writeManifest({ browser, outDir });
+
+	if (browser === 'firefox' && process.env['ZIP_OUTPUT'] === 'true') {
+		const zipFile = `dist/firefox.zip`;
+		fs.rmSync(zipFile, { force: true });
+		execSync(`cd ${outDir} && zip -r ../firefox.zip .`, { stdio: 'inherit' });
+		console.log(`Created ${zipFile}`);
+	}
 }
 
 function copyDir(src, dest) {
