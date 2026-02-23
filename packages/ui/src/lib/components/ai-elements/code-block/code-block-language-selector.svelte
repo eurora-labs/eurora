@@ -12,6 +12,6 @@
 	let { children, ...rest }: Props = $props();
 </script>
 
-<Select data-slot="code-block-language-selector" {...rest}>
+<Select type="single" {...rest}>
 	{@render children?.()}
 </Select>

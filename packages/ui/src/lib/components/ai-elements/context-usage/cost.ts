@@ -5,9 +5,12 @@ type UsageInput = {
 	cacheReads?: number;
 };
 
-let getUsageFn: ((opts: { modelId: string; usage: UsageInput }) => { costUSD?: { totalUSD?: number } }) | undefined;
+let getUsageFn:
+	| ((opts: { modelId: string; usage: UsageInput }) => { costUSD?: { totalUSD?: number } })
+	| undefined;
 
 try {
+	// @ts-ignore
 	const tokenlens = await import('tokenlens');
 	getUsageFn = tokenlens.getUsage;
 } catch {

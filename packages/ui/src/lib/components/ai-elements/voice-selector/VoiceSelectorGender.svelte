@@ -17,7 +17,11 @@
 	let { class: className, value, children, ...restProps }: Props = $props();
 </script>
 
-<span data-slot="voice-selector-gender" class={cn('text-muted-foreground text-xs', className)} {...restProps}>
+<span
+	data-slot="voice-selector-gender"
+	class={cn('text-muted-foreground text-xs', className)}
+	{...restProps}
+>
 	{#if children}
 		{@render children()}
 	{:else if value === 'male'}

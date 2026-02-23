@@ -12,10 +12,6 @@
 	} = $props();
 </script>
 
-<div
-	data-slot="package-info-content"
-	class={cn('mt-3 border-t pt-3', className)}
-	{...restProps}
->
+<div data-slot="package-info-content" class={cn('mt-3 border-t pt-3', className)} {...restProps}>
 	{@render children?.()}
 </div>

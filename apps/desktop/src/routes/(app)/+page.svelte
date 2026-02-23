@@ -28,7 +28,7 @@
 		Message,
 		MessageContent,
 		MessageResponse,
-	} from '@eurora/ui/components/ai-elements/new-message/index';
+	} from '@eurora/ui/components/ai-elements/message/index';
 	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';

@@ -1,10 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { cn } from '$lib/utils.js';
-	import {
-		Collapsible,
-		CollapsibleTrigger,
-	} from '$lib/components/collapsible/index.js';
+	import { Collapsible, CollapsibleTrigger } from '$lib/components/collapsible/index.js';
 	import BrainIcon from '@lucide/svelte/icons/brain';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import { getChainOfThoughtContext } from './chain-of-thought-context.svelte.js';

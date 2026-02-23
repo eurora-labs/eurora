@@ -11,10 +11,6 @@
 	let { class: className, children, ...rest }: Props = $props();
 </script>
 
-<div
-	data-slot="code-block-title"
-	class={cn('flex items-center gap-2', className)}
-	{...rest}
->
+<div data-slot="code-block-title" class={cn('flex items-center gap-2', className)} {...rest}>
 	{@render children?.()}
 </div>

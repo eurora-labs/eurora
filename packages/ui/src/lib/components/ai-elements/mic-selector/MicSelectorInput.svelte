@@ -1,10 +1,12 @@
 <script lang="ts">
-	import type { HTMLInputAttributes } from 'svelte/elements';
 	import * as Command from '$lib/components/command/index.js';
 
-	interface Props extends HTMLInputAttributes {}
+	interface Props {
+		class?: string;
+		placeholder?: string;
+	}
 
-	let { ...restProps }: Props = $props();
+	let { class: className, placeholder = 'Search microphones...' }: Props = $props();
 </script>
 
-<Command.Input data-slot="mic-selector-input" placeholder="Search microphones..." {...restProps} />
+<Command.Input data-slot="mic-selector-input" class={className} {placeholder} />

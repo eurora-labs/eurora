@@ -11,7 +11,7 @@
 
 <media-seek-backward-button
 	data-slot="audio-player-seek-backward-button"
-	seekoffset={seekoffset}
+	{seekoffset}
 	class={cn(
 		'inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border bg-transparent text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground',
 		className,

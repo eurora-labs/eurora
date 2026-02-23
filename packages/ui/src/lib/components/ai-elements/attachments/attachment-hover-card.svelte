@@ -10,6 +10,6 @@
 	let { openDelay = 0, closeDelay = 0, children, ...restProps }: Props = $props();
 </script>
 
-<HoverCard.Root data-slot="attachment-hover-card" {openDelay} {closeDelay} {...restProps}>
+<HoverCard.Root {openDelay} {closeDelay} {...restProps}>
 	{@render children?.()}
 </HoverCard.Root>

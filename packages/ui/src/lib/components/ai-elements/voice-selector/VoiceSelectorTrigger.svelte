@@ -1,15 +1,15 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import type { HTMLButtonAttributes } from 'svelte/elements';
 	import * as Dialog from '$lib/components/dialog/index.js';
 
-	interface Props extends HTMLButtonAttributes {
+	interface Props {
+		class?: string;
 		children?: Snippet;
 	}
 
-	let { children, ...restProps }: Props = $props();
+	let { children, class: className }: Props = $props();
 </script>
 
-<Dialog.Trigger data-slot="voice-selector-trigger" {...restProps}>
+<Dialog.Trigger data-slot="voice-selector-trigger" class={className}>
 	{@render children?.()}
 </Dialog.Trigger>

@@ -5,22 +5,22 @@ export type ToolUIPartApproval =
 			id: string;
 			approved?: never;
 			reason?: never;
-		}
+	  }
 	| {
 			id: string;
 			approved: boolean;
 			reason?: string;
-		}
+	  }
 	| {
 			id: string;
 			approved: true;
 			reason?: string;
-		}
+	  }
 	| {
 			id: string;
 			approved: false;
 			reason?: string;
-		}
+	  }
 	| undefined;
 
 export type ToolUIPartState =

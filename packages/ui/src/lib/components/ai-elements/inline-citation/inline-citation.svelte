@@ -11,6 +11,10 @@
 	let { class: className, children, ...rest }: Props = $props();
 </script>
 
-<span data-slot="inline-citation" class={cn('group inline items-center gap-1', className)} {...rest}>
+<span
+	data-slot="inline-citation"
+	class={cn('group inline items-center gap-1', className)}
+	{...rest}
+>
 	{@render children?.()}
 </span>

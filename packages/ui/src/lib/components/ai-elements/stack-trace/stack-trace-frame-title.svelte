@@ -10,10 +10,6 @@
 	let { class: className, children, ...rest }: Props = $props();
 </script>
 
-<span
-	data-slot="stack-trace-frame-title"
-	class={cn('text-foreground', className)}
-	{...rest}
->
+<span data-slot="stack-trace-frame-title" class={cn('text-foreground', className)} {...rest}>
 	{@render children?.()}
 </span>

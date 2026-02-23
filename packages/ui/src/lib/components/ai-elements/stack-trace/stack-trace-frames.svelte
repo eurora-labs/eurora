@@ -15,9 +15,7 @@
 	let ctx = getStackTraceContext();
 
 	let framesToShow = $derived(
-		showInternalFrames
-			? ctx.trace.frames
-			: ctx.trace.frames.filter((f) => !f.isInternal),
+		showInternalFrames ? ctx.trace.frames : ctx.trace.frames.filter((f) => !f.isInternal),
 	);
 
 	function handleFilePathClick(frame: StackFrame) {
@@ -31,11 +29,7 @@
 	}
 </script>
 
-<div
-	data-slot="stack-trace-frames"
-	class={cn('space-y-1 p-3', className)}
-	{...rest}
->
+<div data-slot="stack-trace-frames" class={cn('space-y-1 p-3', className)} {...rest}>
 	{#if children}
 		{@render children()}
 	{:else if framesToShow.length === 0}

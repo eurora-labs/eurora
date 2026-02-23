@@ -1,6 +1,12 @@
 import { getContext, setContext } from 'svelte';
 
-export type AttachmentMediaCategory = 'image' | 'video' | 'audio' | 'document' | 'source' | 'unknown';
+export type AttachmentMediaCategory =
+	| 'image'
+	| 'video'
+	| 'audio'
+	| 'document'
+	| 'source'
+	| 'unknown';
 
 export type AttachmentVariant = 'grid' | 'inline' | 'list';
 
@@ -79,7 +85,9 @@ export function setAttachmentsContext(variant: AttachmentVariant): AttachmentsSt
 }
 
 export function getAttachmentsContext(): AttachmentsState {
-	return getContext<AttachmentsState>(Symbol.for(ATTACHMENTS_KEY)) ?? new AttachmentsState('grid');
+	return (
+		getContext<AttachmentsState>(Symbol.for(ATTACHMENTS_KEY)) ?? new AttachmentsState('grid')
+	);
 }
 
 export function setAttachmentItemContext(

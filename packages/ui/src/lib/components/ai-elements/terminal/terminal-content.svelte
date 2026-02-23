@@ -32,11 +32,9 @@
 		{@render children()}
 	{:else if content}
 		<pre class="whitespace-pre-wrap break-words">{@render content()}{#if ctx.isStreaming}<span
-					class="ml-0.5 inline-block h-4 w-2 animate-pulse bg-zinc-100"
-				></span>{/if}</pre>
+					class="ml-0.5 inline-block h-4 w-2 animate-pulse bg-zinc-100"></span>{/if}</pre>
 	{:else}
 		<pre class="whitespace-pre-wrap break-words">{ctx.output}{#if ctx.isStreaming}<span
-					class="ml-0.5 inline-block h-4 w-2 animate-pulse bg-zinc-100"
-				></span>{/if}</pre>
+					class="ml-0.5 inline-block h-4 w-2 animate-pulse bg-zinc-100"></span>{/if}</pre>
 	{/if}
 </div>

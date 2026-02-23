@@ -5,4 +5,4 @@
 	let { ...restProps }: SelectPrimitive.RootProps = $props();
 </script>
 
-<Select data-slot="prompt-input-select" {...restProps} />
+<Select {...restProps} />

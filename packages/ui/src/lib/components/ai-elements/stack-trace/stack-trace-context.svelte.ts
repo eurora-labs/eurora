@@ -45,7 +45,9 @@ export class StackTraceState {
 		return this.#onFilePathClick;
 	}
 
-	set onFilePathClick(value: ((filePath: string, line?: number, column?: number) => void) | undefined) {
+	set onFilePathClick(
+		value: ((filePath: string, line?: number, column?: number) => void) | undefined,
+	) {
 		this.#onFilePathClick = value;
 	}
 }

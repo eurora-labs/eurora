@@ -4,10 +4,7 @@
 	import { Select as SelectPrimitive } from 'bits-ui';
 	import type { WithoutChild } from '$lib/utils.js';
 
-	let {
-		class: className,
-		...restProps
-	}: WithoutChild<SelectPrimitive.TriggerProps> = $props();
+	let { class: className, ...restProps }: WithoutChild<SelectPrimitive.TriggerProps> = $props();
 </script>
 
 <SelectTrigger

@@ -11,10 +11,14 @@
 
 	let { class: className, value, children, ...restProps }: Props = $props();
 
-	let emoji = $derived(value ? accentEmojiMap[value] ?? null : null);
+	let emoji = $derived(value ? (accentEmojiMap[value] ?? null) : null);
 </script>
 
-<span data-slot="voice-selector-accent" class={cn('text-muted-foreground text-xs', className)} {...restProps}>
+<span
+	data-slot="voice-selector-accent"
+	class={cn('text-muted-foreground text-xs', className)}
+	{...restProps}
+>
 	{#if children}
 		{@render children()}
 	{:else if emoji}

@@ -13,5 +13,9 @@
 {#if children}
 	{@render children()}
 {:else}
-	<BookmarkIcon data-slot="checkpoint-icon" class={cn('size-4 shrink-0', className)} {...restProps} />
+	<BookmarkIcon
+		data-slot="checkpoint-icon"
+		class={cn('size-4 shrink-0', className)}
+		{...restProps}
+	/>
 {/if}

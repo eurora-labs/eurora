@@ -12,10 +12,6 @@
 	let { align = 'end', children, ...rest }: Props = $props();
 </script>
 
-<SelectContent
-	data-slot="code-block-language-selector-content"
-	{align}
-	{...rest}
->
+<SelectContent data-slot="code-block-language-selector-content" {align} {...rest}>
 	{@render children?.()}
 </SelectContent>

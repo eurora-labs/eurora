@@ -3,14 +3,7 @@
 	import { SelectContent } from '$lib/components/select/index.js';
 	import { Select as SelectPrimitive } from 'bits-ui';
 
-	let {
-		class: className,
-		...restProps
-	}: SelectPrimitive.ContentProps = $props();
+	let { class: className, ...restProps }: SelectPrimitive.ContentProps = $props();
 </script>
 
-<SelectContent
-	data-slot="prompt-input-select-content"
-	class={cn(className)}
-	{...restProps}
-/>
+<SelectContent data-slot="prompt-input-select-content" class={cn(className)} {...restProps} />

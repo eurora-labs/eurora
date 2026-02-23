@@ -18,9 +18,7 @@
 	data-slot="queue-item-description"
 	class={cn(
 		'ml-6 text-xs',
-		completed
-			? 'text-muted-foreground/40 line-through'
-			: 'text-muted-foreground',
+		completed ? 'text-muted-foreground/40 line-through' : 'text-muted-foreground',
 		className,
 	)}
 	{...restProps}

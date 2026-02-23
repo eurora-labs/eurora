@@ -13,10 +13,6 @@
 	} = $props();
 </script>
 
-<AlertDescription
-	data-slot="confirmation-title"
-	class={cn('inline', className)}
-	{...restProps}
->
+<AlertDescription data-slot="confirmation-title" class={cn('inline', className)} {...restProps}>
 	{@render children?.()}
 </AlertDescription>

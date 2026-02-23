@@ -13,11 +13,7 @@
 
 <div
 	data-slot="stack-trace-frame"
-	class={cn(
-		'text-xs',
-		isInternal ? 'text-muted-foreground/50' : 'text-foreground/90',
-		className,
-	)}
+	class={cn('text-xs', isInternal ? 'text-muted-foreground/50' : 'text-foreground/90', className)}
 	{...rest}
 >
 	{@render children?.()}

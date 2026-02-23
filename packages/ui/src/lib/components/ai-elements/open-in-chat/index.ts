@@ -17,8 +17,4 @@ export { default as ChatGPTIcon } from './chatgpt-icon.svelte';
 export { default as ClaudeIcon } from './claude-icon.svelte';
 export { default as V0Icon } from './v0-icon.svelte';
 
-export {
-	setOpenInContext,
-	getOpenInContext,
-	providers,
-} from './open-in-context.svelte.js';
+export { setOpenInContext, getOpenInContext, providers } from './open-in-context.svelte.js';

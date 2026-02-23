@@ -12,11 +12,7 @@
 	} = $props();
 </script>
 
-<div
-	data-slot="package-info-dependencies"
-	class={cn('space-y-2', className)}
-	{...restProps}
->
+<div data-slot="package-info-dependencies" class={cn('space-y-2', className)} {...restProps}>
 	<span class="font-medium text-muted-foreground text-xs uppercase tracking-wide">
 		Dependencies
 	</span>

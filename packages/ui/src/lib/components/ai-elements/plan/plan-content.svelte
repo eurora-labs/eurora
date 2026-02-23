@@ -12,8 +12,8 @@
 	} = $props();
 </script>
 
-<CollapsibleContent>
-	<CardContent data-slot="plan-content" {...restProps}>
+<CollapsibleContent {...restProps}>
+	<CardContent data-slot="plan-content">
 		{@render children?.()}
 	</CardContent>
 </CollapsibleContent>

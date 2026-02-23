@@ -12,10 +12,6 @@
 	} = $props();
 </script>
 
-<div
-	data-slot="queue-item-actions"
-	class={cn('flex gap-1', className)}
-	{...restProps}
->
+<div data-slot="queue-item-actions" class={cn('flex gap-1', className)} {...restProps}>
 	{@render children?.()}
 </div>

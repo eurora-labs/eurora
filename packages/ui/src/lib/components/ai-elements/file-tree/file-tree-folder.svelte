@@ -2,7 +2,11 @@
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils.js';
-	import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '$lib/components/collapsible/index.js';
+	import {
+		Collapsible,
+		CollapsibleTrigger,
+		CollapsibleContent,
+	} from '$lib/components/collapsible/index.js';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import Folder from '@lucide/svelte/icons/folder';
 	import FolderOpen from '@lucide/svelte/icons/folder-open';

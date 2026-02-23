@@ -12,7 +12,7 @@
 	let { class: className, src, loading, ...restProps }: Props = $props();
 
 	let context = getWebPreviewContext();
-	let iframeSrc = $derived(src ?? context.url || undefined);
+	let iframeSrc = $derived((src ?? context.url) || undefined);
 </script>
 
 <div data-slot="web-preview-body" class="flex-1">

@@ -24,5 +24,6 @@
 	onSelect={handleSelect}
 	{...restProps}
 >
-	<ImageIcon class="mr-2 size-4" /> {label}
+	<ImageIcon class="mr-2 size-4" />
+	{label}
 </DropdownMenuItem>

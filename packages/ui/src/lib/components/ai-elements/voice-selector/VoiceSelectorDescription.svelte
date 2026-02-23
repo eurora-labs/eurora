@@ -10,6 +10,10 @@
 	let { class: className, children, ...restProps }: Props = $props();
 </script>
 
-<span data-slot="voice-selector-description" class={cn('text-muted-foreground text-xs', className)} {...restProps}>
+<span
+	data-slot="voice-selector-description"
+	class={cn('text-muted-foreground text-xs', className)}
+	{...restProps}
+>
 	{@render children?.()}
 </span>

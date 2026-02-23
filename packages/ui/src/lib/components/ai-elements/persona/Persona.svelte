@@ -12,7 +12,7 @@
 
 	interface Props extends HTMLCanvasAttributes {
 		variant?: PersonaVariant;
-		state?: PersonaState;
+		personaState?: PersonaState;
 		onLoad?: () => void;
 		onLoadError?: (error: unknown) => void;
 		onReady?: () => void;
@@ -21,14 +21,14 @@
 	let {
 		class: className,
 		variant = 'obsidian',
-		state = 'idle',
+		personaState = 'idle',
 		onLoad,
 		onLoadError,
 		onReady,
 		...restProps
 	}: Props = $props();
 
-	let context = new PersonaContext({ variant, state });
+	let context = new PersonaContext({ variant, state: personaState });
 	setPersonaContext(context);
 
 	$effect(() => {
@@ -36,7 +36,7 @@
 	});
 
 	$effect(() => {
-		context.state = state;
+		context.state = personaState;
 	});
 
 	let canvasRef: HTMLCanvasElement | undefined = $state();
@@ -62,8 +62,7 @@
 
 		const mql = window.matchMedia?.('(prefers-color-scheme: dark)');
 		const handleMediaChange = () => {
-			const dark =
-				document.documentElement.classList.contains('dark') || mql?.matches;
+			const dark = document.documentElement.classList.contains('dark') || mql?.matches;
 			context.colorRgb = dark ? [255, 255, 255] : [0, 0, 0];
 		};
 		mql?.addEventListener('change', handleMediaChange);

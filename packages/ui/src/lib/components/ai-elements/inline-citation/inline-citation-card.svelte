@@ -19,6 +19,6 @@
 	}: Props = $props();
 </script>
 
-<HoverCard data-slot="inline-citation-card" bind:open {closeDelay} {openDelay} {...rest}>
+<HoverCard bind:open {closeDelay} {openDelay} {...rest}>
 	{@render children?.()}
 </HoverCard>

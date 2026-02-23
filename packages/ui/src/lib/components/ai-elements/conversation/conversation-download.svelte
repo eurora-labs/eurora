@@ -11,7 +11,10 @@
 
 	export function messagesToMarkdown(
 		messages: ConversationMessage[],
-		formatMessage: (message: ConversationMessage, index: number) => string = defaultFormatMessage,
+		formatMessage: (
+			message: ConversationMessage,
+			index: number,
+		) => string = defaultFormatMessage,
 	): string {
 		return messages.map((msg, i) => formatMessage(msg, i)).join('\n\n');
 	}

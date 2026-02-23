@@ -11,6 +11,10 @@
 	let { class: className, children, ...rest }: Props = $props();
 </script>
 
-<div data-slot="inline-citation-carousel-content" class={cn('overflow-hidden', className)} {...rest}>
+<div
+	data-slot="inline-citation-carousel-content"
+	class={cn('overflow-hidden', className)}
+	{...rest}
+>
 	{@render children?.()}
 </div>

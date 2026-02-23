@@ -1,6 +1,4 @@
 <script lang="ts" module>
-	import type { HTMLButtonAttributes } from 'svelte/elements';
-
 	interface SpeechRecognitionInstance extends EventTarget {
 		continuous: boolean;
 		interimResults: boolean;
@@ -43,7 +41,8 @@
 		return 'none';
 	}
 
-	export interface SpeechInputProps extends HTMLButtonAttributes {
+	export interface SpeechInputProps {
+		class?: string;
 		onTranscriptionChange?: (text: string) => void;
 		onAudioRecorded?: (audioBlob: Blob) => Promise<string>;
 		lang?: string;
@@ -63,7 +62,6 @@
 		onTranscriptionChange,
 		onAudioRecorded,
 		lang = 'en-US',
-		...restProps
 	}: SpeechInputProps = $props();
 
 	let isListening = $state(false);
@@ -240,7 +238,6 @@
 		)}
 		disabled={isDisabled}
 		onclick={toggleListening}
-		{...restProps}
 	>
 		{#if isProcessing}
 			<LoaderCircleIcon class="size-4 animate-spin" />

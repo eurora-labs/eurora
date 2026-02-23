@@ -35,7 +35,11 @@
 	);
 </script>
 
-<div data-slot="context-usage-content-header" class={cn('w-full space-y-2 p-3', className)} {...rest}>
+<div
+	data-slot="context-usage-content-header"
+	class={cn('w-full space-y-2 p-3', className)}
+	{...rest}
+>
 	{#if children}
 		{@render children()}
 	{:else}

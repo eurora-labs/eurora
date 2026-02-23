@@ -30,7 +30,7 @@
 			class={cn(
 				'grid gap-2 overflow-hidden [&>div]:pb-0',
 				index === branchState.currentBranch ? 'block' : 'hidden',
-				className
+				className,
 			)}
 			{...restProps}
 		>

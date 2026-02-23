@@ -16,7 +16,7 @@
 	let visible = $derived(!!(output || errorText));
 
 	let formatted = $derived(
-		typeof output === 'object' ? JSON.stringify(output, null, 2) : String(output ?? '')
+		typeof output === 'object' ? JSON.stringify(output, null, 2) : String(output ?? ''),
 	);
 </script>
 
@@ -28,9 +28,7 @@
 		<div
 			class={cn(
 				'overflow-x-auto rounded-md text-xs [&_table]:w-full',
-				errorText
-					? 'bg-destructive/10 text-destructive'
-					: 'bg-muted/50 text-foreground',
+				errorText ? 'bg-destructive/10 text-destructive' : 'bg-muted/50 text-foreground',
 			)}
 		>
 			{#if errorText}

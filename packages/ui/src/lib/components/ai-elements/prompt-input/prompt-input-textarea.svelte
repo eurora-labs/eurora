@@ -40,11 +40,7 @@
 			form?.requestSubmit();
 		}
 
-		if (
-			e.key === 'Backspace' &&
-			e.currentTarget.value === '' &&
-			attachments.files.length > 0
-		) {
+		if (e.key === 'Backspace' && e.currentTarget.value === '' && attachments.files.length > 0) {
 			e.preventDefault();
 			const lastAttachment = attachments.files.at(-1);
 			if (lastAttachment) {
@@ -89,7 +85,10 @@
 
 <textarea
 	data-slot="prompt-input-textarea"
-	class={cn('field-sizing-content max-h-48 min-h-16 w-full resize-none border-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50', className)}
+	class={cn(
+		'field-sizing-content max-h-48 min-h-16 w-full resize-none border-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
+		className,
+	)}
 	name="message"
 	{placeholder}
 	oncompositionstart={handleCompositionStart}

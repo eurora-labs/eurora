@@ -15,15 +15,13 @@ export class MessageBranchState {
 	}
 
 	goToPrevious() {
-		const newBranch =
-			this.currentBranch > 0 ? this.currentBranch - 1 : this.totalBranches - 1;
+		const newBranch = this.currentBranch > 0 ? this.currentBranch - 1 : this.totalBranches - 1;
 		this.currentBranch = newBranch;
 		this.#onBranchChange?.(newBranch);
 	}
 
 	goToNext() {
-		const newBranch =
-			this.currentBranch < this.totalBranches - 1 ? this.currentBranch + 1 : 0;
+		const newBranch = this.currentBranch < this.totalBranches - 1 ? this.currentBranch + 1 : 0;
 		this.currentBranch = newBranch;
 		this.#onBranchChange?.(newBranch);
 	}

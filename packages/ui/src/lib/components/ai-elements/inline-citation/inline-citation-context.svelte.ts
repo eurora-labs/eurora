@@ -47,7 +47,9 @@ export function setCarouselContext(state: CarouselState) {
 export function getCarouselContext(): CarouselState {
 	const context = getContext<CarouselState | undefined>(CAROUSEL_CONTEXT_KEY);
 	if (!context) {
-		throw new Error('InlineCitationCarousel components must be used within InlineCitationCarousel');
+		throw new Error(
+			'InlineCitationCarousel components must be used within InlineCitationCarousel',
+		);
 	}
 	return context;
 }

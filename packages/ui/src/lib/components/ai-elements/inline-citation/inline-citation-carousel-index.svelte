@@ -18,7 +18,10 @@
 
 <div
 	data-slot="inline-citation-carousel-index"
-	class={cn('text-muted-foreground flex flex-1 items-center justify-end px-3 py-1 text-xs', className)}
+	class={cn(
+		'text-muted-foreground flex flex-1 items-center justify-end px-3 py-1 text-xs',
+		className,
+	)}
 	{...rest}
 >
 	{#if children}

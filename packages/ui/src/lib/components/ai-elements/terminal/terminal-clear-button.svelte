@@ -17,10 +17,7 @@
 {#if ctx.onClear}
 	<Button
 		data-slot="terminal-clear-button"
-		class={cn(
-			'size-7 shrink-0 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100',
-			className,
-		)}
+		class={cn('size-7 shrink-0 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100', className)}
 		onclick={ctx.onClear}
 		size="icon"
 		variant="ghost"

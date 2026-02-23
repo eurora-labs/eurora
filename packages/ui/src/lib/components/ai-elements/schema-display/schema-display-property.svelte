@@ -3,8 +3,13 @@
 	import type { SchemaProperty } from './schema-display-context.svelte.js';
 	import { cn } from '$lib/utils.js';
 	import { Badge } from '$lib/components/badge/index.js';
-	import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '$lib/components/collapsible/index.js';
+	import {
+		Collapsible,
+		CollapsibleTrigger,
+		CollapsibleContent,
+	} from '$lib/components/collapsible/index.js';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
+	import SchemaDisplayProperty from './schema-display-property.svelte';
 
 	let {
 		class: className,
@@ -36,11 +41,13 @@
 			data-slot="schema-display-property"
 			class={cn(
 				'group flex w-full items-center gap-2 py-3 text-left transition-colors hover:bg-muted/50',
-				className
+				className,
 			)}
 			style="padding-left: {paddingLeft}px"
 		>
-			<ChevronRight class="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+			<ChevronRight
+				class="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
+			/>
 			<span class="font-mono text-sm">{name}</span>
 			<Badge class="text-xs" variant="outline">{type}</Badge>
 			{#if required}
@@ -64,7 +71,7 @@
 			<div class="divide-y border-t">
 				{#if properties}
 					{#each properties as prop (prop.name)}
-						<svelte:self
+						<SchemaDisplayProperty
 							name={prop.name}
 							type={prop.type}
 							required={prop.required}
@@ -76,7 +83,7 @@
 					{/each}
 				{/if}
 				{#if items}
-					<svelte:self
+					<SchemaDisplayProperty
 						name="{name}[]"
 						type={items.type}
 						required={items.required}

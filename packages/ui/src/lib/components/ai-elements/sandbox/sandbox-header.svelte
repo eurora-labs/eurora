@@ -81,5 +81,7 @@
 			{statusLabels[state]}
 		</Badge>
 	</div>
-	<ChevronDown class="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+	<ChevronDown
+		class="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
+	/>
 </CollapsibleTrigger>

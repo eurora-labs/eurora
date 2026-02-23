@@ -1,7 +1,11 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
-	import type { HttpMethod, SchemaParameter, SchemaProperty } from './schema-display-context.svelte.js';
+	import type {
+		HttpMethod,
+		SchemaParameter,
+		SchemaProperty,
+	} from './schema-display-context.svelte.js';
 	import { cn } from '$lib/utils.js';
 	import { setSchemaDisplay } from './schema-display-context.svelte.js';
 
