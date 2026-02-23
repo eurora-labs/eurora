@@ -89,10 +89,24 @@ impl CollectorService {
         let assets_event_tx_for_reports = assets_event_tx.clone();
         tokio::spawn(async move {
             let activity_event_tx_inner = activity_event_tx.clone();
+            let mut last_activity_name: Option<String> = None;
             while let Some(report) = activity_rx.recv().await {
                 match report {
                     ActivityReport::NewActivity(activity) => {
+                        let is_duplicate = last_activity_name
+                            .as_ref()
+                            .is_some_and(|prev| prev == &activity.name);
+
+                        if is_duplicate {
+                            tracing::debug!(
+                                "Suppressing duplicate activity report: {}",
+                                activity.name
+                            );
+                            continue;
+                        }
+
                         tracing::debug!("Received new activity report: {}", activity.name);
+                        last_activity_name = Some(activity.name.clone());
                         let context_chips = activity.get_context_chips();
                         let _ = assets_event_tx_for_reports.send(context_chips);
 

@@ -12,21 +12,18 @@ function deepMerge(a, b) {
 	return b ?? a;
 }
 
-// Firefox extension ID configuration
-// Development ID is used by default, production ID should be set via FIREFOX_EXTENSION_ID env var
 const FIREFOX_DEV_ID = 'dev@eurora-labs.com';
-const _FIREFOX_PROD_ID = '{271903fe-1905-4636-b47f-6f0873dc97f8}';
+const FIREFOX_PROD_ID = '{271903fe-1905-4636-b47f-6f0873dc97f8}';
 
 function targetPatch(browser) {
 	if (browser === 'firefox') {
-		// Use FIREFOX_EXTENSION_ID env var if set, otherwise use dev ID
-		const firefoxId = process.env['FIREFOX_EXTENSION_ID'] || FIREFOX_DEV_ID;
+		const isProd = (process.env['BUILD_MODE'] ?? 'production') === 'production';
+		const firefoxId = process.env['FIREFOX_EXTENSION_ID'] || (isProd ? FIREFOX_PROD_ID : FIREFOX_DEV_ID);
 		return {
 			browser_specific_settings: {
 				gecko: { id: firefoxId },
 			},
 			background: { scripts: ['assets/background.js'] },
-			// Firefox MV3 differences frequently land here
 		};
 	}
 	if (browser === 'safari') {

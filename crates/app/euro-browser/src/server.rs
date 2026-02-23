@@ -59,6 +59,7 @@ pub struct BrowserBridgeService {
     pub app_from_tx: broadcast::Sender<Frame>,
     pub frames_from_messengers_tx: broadcast::Sender<(u32, Frame)>,
     events_tx: broadcast::Sender<(u32, EventFrame)>,
+    disconnects_tx: broadcast::Sender<u32>,
     pending_requests: Arc<DashMap<u32, PendingRequest>>,
     request_id_counter: Arc<AtomicU32>,
     frame_handler_handle: Arc<OnceCell<tokio::task::JoinHandle<()>>>,
@@ -69,12 +70,14 @@ impl BrowserBridgeService {
         let (app_from_tx, _) = broadcast::channel(100);
         let (frames_from_messengers_tx, _) = broadcast::channel(100);
         let (events_tx, _) = broadcast::channel(100);
+        let (disconnects_tx, _) = broadcast::channel(32);
 
         Self {
             registry: Arc::new(RwLock::new(HashMap::new())),
             app_from_tx,
             frames_from_messengers_tx,
             events_tx,
+            disconnects_tx,
             pending_requests: Arc::new(DashMap::new()),
             request_id_counter: Arc::new(AtomicU32::new(1)),
             frame_handler_handle: Arc::new(OnceCell::new()),
@@ -89,7 +92,15 @@ impl BrowserBridgeService {
 
         let handle = tokio::spawn(async move {
             tracing::debug!("Frame handler task started");
-            while let Ok((browser_pid, frame)) = frames_rx.recv().await {
+            loop {
+                let (browser_pid, frame) = match frames_rx.recv().await {
+                    Ok(val) => val,
+                    Err(broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!("Frame handler lagged by {} frames, resuming", n);
+                        continue;
+                    }
+                    Err(broadcast::error::RecvError::Closed) => break,
+                };
                 let kind = match &frame.kind {
                     Some(k) => k.clone(),
                     None => {
@@ -184,9 +195,11 @@ impl BrowserBridgeService {
     }
 
     pub async fn get_or_init() -> &'static BrowserBridgeService {
-        GLOBAL_SERVICE
+        let service = GLOBAL_SERVICE
             .get_or_init(|| async { BrowserBridgeService::new() })
-            .await
+            .await;
+        service.start_frame_handler();
+        service
     }
 
     pub async fn start_server(&self) {
@@ -255,6 +268,10 @@ impl BrowserBridgeService {
 
     pub fn subscribe_to_events(&self) -> broadcast::Receiver<(u32, EventFrame)> {
         self.events_tx.subscribe()
+    }
+
+    pub fn subscribe_to_disconnects(&self) -> broadcast::Receiver<u32> {
+        self.disconnects_tx.subscribe()
     }
 
     pub async fn is_registered(&self, browser_pid: u32) -> bool {
@@ -345,16 +362,6 @@ impl BrowserBridgeService {
         self.send_request(browser_pid, "GET_METADATA", None).await
     }
 
-    pub async fn generate_assets(&self, browser_pid: u32) -> Result<ResponseFrame, Status> {
-        self.send_request(browser_pid, "GENERATE_ASSETS", None)
-            .await
-    }
-
-    pub async fn generate_snapshot(&self, browser_pid: u32) -> Result<ResponseFrame, Status> {
-        self.send_request(browser_pid, "GENERATE_SNAPSHOT", None)
-            .await
-    }
-
     pub async fn connection_count(&self) -> usize {
         let registry = self.registry.read().await;
         registry.len()
@@ -425,6 +432,7 @@ impl BrowserBridge for BrowserBridgeService {
         }
         let registry = self.registry.clone();
         let frames_tx = self.frames_from_messengers_tx.clone();
+        let disconnects_tx = self.disconnects_tx.clone();
 
         tokio::spawn(async move {
             tracing::info!(
@@ -469,6 +477,7 @@ impl BrowserBridge for BrowserBridgeService {
                 .is_some_and(|m| m.host_pid == host_pid)
             {
                 registry.remove(&browser_pid);
+                let _ = disconnects_tx.send(browser_pid);
                 tracing::info!(
                     "Unregistered native messenger for browser PID {} and host PID {}. Remaining: {}",
                     browser_pid,
