@@ -31,17 +31,20 @@ jobs:
             - name: Fetch nightly version
               shell: bash
               run: |
-                  VERSION="$(curl --silent "https://api.eurora-labs.com/releases/nightly" | jq -r '.version' | tr -d '\r')"
-                  if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                    echo "Invalid or missing nightly version: '$VERSION'"
+                  NIGHTLY="$(curl --silent "https://api.eurora-labs.com/releases/nightly" | jq -r '.version' | tr -d '\r')"
+                  if ! [[ "$NIGHTLY" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                    echo "Invalid or missing nightly version: '$NIGHTLY'"
                     exit 1
                   fi
+                  # Browser extensions use 1.0.X while the desktop app uses 0.0.X
+                  PATCH="${NIGHTLY##*.}"
+                  VERSION="1.0.${PATCH}"
                   {
                     echo 'version<<EOF'
                     echo "$VERSION"
                     echo 'EOF'
                   } >> "$GITHUB_ENV"
-                  echo "Browser extension version: $VERSION (from nightly)"
+                  echo "Browser extension version: $VERSION (from nightly $NIGHTLY)"
 
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
