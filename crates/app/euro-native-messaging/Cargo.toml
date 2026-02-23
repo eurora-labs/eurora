@@ -13,6 +13,7 @@ async-stream = "0.3"
 backon = { workspace = true }
 base64 = { workspace = true }
 enum_dispatch = { workspace = true }
+euro-process = { workspace = true }
 image = { workspace = true, features = ["default"] }
 prost = { workspace = true }
 prost-types = { workspace = true }

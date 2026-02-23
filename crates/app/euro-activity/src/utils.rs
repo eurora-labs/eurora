@@ -1,5 +1,3 @@
-use cfg_if::cfg_if;
-
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use image::{ImageBuffer, Rgba};
 use resvg::render;
@@ -7,16 +5,6 @@ use tiny_skia::Pixmap;
 use usvg::{Options, Tree};
 
 use crate::error::{ActivityError, ActivityResult};
-
-#[inline(always)]
-pub fn os_pick<'a>(_windows: &'a str, _linux: &'a str, _macos: &'a str) -> &'a str {
-    cfg_if! {
-        if #[cfg(target_os = "windows")] { _windows }
-        else if #[cfg(target_os = "linux")] { _linux }
-        else if #[cfg(target_os = "macos")] { _macos }
-        else { compile_error!("Unsupported target OS"); }
-    }
-}
 
 pub fn convert_svg_to_rgba(svg: &str) -> ActivityResult<image::RgbaImage> {
     let b64 = svg
