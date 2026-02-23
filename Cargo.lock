@@ -3399,13 +3399,13 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.22.1",
- "cfg-if",
  "chrono",
  "enum_dispatch",
  "euro-auth",
  "euro-browser",
  "euro-encrypt",
  "euro-native-messaging",
+ "euro-process",
  "focus-tracker",
  "humantime-serde",
  "image",
@@ -3526,6 +3526,7 @@ dependencies = [
  "backon",
  "base64 0.22.1",
  "enum_dispatch",
+ "euro-process",
  "image",
  "prost",
  "prost-types",
@@ -3544,6 +3545,13 @@ dependencies = [
  "tracing-subscriber",
  "usvg",
  "winreg 0.55.0",
+]
+
+[[package]]
+name = "euro-process"
+version = "0.0.0"
+dependencies = [
+ "cfg-if",
 ]
 
 [[package]]

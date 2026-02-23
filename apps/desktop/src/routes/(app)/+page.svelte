@@ -150,34 +150,29 @@
 	}
 </script>
 
-<Conversation>
-	{#if messages.length > 0}
-		<ConversationContent>
-			{#each messages as message}
-				{@const content = getMessageContent(message)}
-				{@const isUser = isUserMessage(message)}
-				{#if content.length > 0 || !isUser}
-					<Message from={isUser ? 'user' : 'assistant'}>
-						<MessageContent>
-							{#if content.trim().length > 0}
-								<MessageResponse {content} />
-							{:else}
-								<Shimmer>Thinking</Shimmer>
-							{/if}
-						</MessageContent>
-					</Message>
-				{/if}
-			{/each}
-		</ConversationContent>
-	{/if}
-	<div
-		class={[
-			'flex justify-center',
-			messages.length > 0
-				? 'fixed bottom-4 left-(--sidebar-width) right-0 z-10'
-				: 'h-full items-center',
-		]}
-	>
+<div class="flex h-svh flex-col overflow-hidden">
+	<Conversation class="min-h-0 flex-1">
+		{#if messages.length > 0}
+			<ConversationContent>
+				{#each messages as message}
+					{@const content = getMessageContent(message)}
+					{@const isUser = isUserMessage(message)}
+					{#if content.length > 0 || !isUser}
+						<Message from={isUser ? 'user' : 'assistant'}>
+							<MessageContent>
+								{#if content.trim().length > 0}
+									<MessageResponse {content} />
+								{:else}
+									<Shimmer>Thinking</Shimmer>
+								{/if}
+							</MessageContent>
+						</Message>
+					{/if}
+				{/each}
+			</ConversationContent>
+		{/if}
+	</Conversation>
+	<div class="flex shrink-0 justify-center p-4">
 		<Launcher.Root
 			class="h-fit rounded-2xl shadow-none flex flex-col p-4 w-[90%] bg-card text-card-foreground border border-border"
 		>
@@ -190,4 +185,4 @@
 			/>
 		</Launcher.Root>
 	</div>
-</Conversation>
+</div>
