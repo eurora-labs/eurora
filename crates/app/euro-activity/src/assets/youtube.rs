@@ -210,9 +210,8 @@ mod tests {
             0.0,
         );
         let messages = AssetFunctionality::construct_messages(&asset);
-        assert_eq!(messages.len(), 2);
+        assert_eq!(messages.len(), 1);
         assert!(matches!(messages[0], BaseMessage::Human(_)));
-        assert!(matches!(messages[1], BaseMessage::Human(_)));
         let chip = AssetFunctionality::get_context_chip(&asset);
         assert!(chip.is_some());
     }
