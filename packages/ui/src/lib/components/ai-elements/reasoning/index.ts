@@ -1,5 +1,15 @@
-export { default as Reasoning } from './Reasoning.svelte';
-export { default as ReasoningTrigger } from './ReasoningTrigger.svelte';
-export { default as ReasoningContent } from './ReasoningContent.svelte';
-export { default as Response } from './Response.svelte';
-export * from './reasoning-context.svelte.js';
+import Root from './reasoning.svelte';
+import Trigger from './reasoning-trigger.svelte';
+import Content from './reasoning-content.svelte';
+
+export {
+	Root,
+	Trigger,
+	Content,
+	//
+	Root as Reasoning,
+	Trigger as ReasoningTrigger,
+	Content as ReasoningContent,
+};
+
+export { getReasoningContext, setReasoningContext, ReasoningState } from './reasoning-context.svelte.js';
