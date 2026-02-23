@@ -36,8 +36,81 @@ pub fn get_parent_pid() -> u32 {
 
 #[cfg(target_os = "linux")]
 fn get_parent_pid_impl() -> u32 {
+    use euro_process::{Chrome, Firefox, Librewolf, ProcessFunctionality};
     use std::os::unix::process::parent_id;
-    parent_id()
+
+    let browser_names: &[&str] = &[Firefox.get_name(), Chrome.get_name(), Librewolf.get_name()];
+
+    let direct_ppid = parent_id();
+
+    if is_browser_process(direct_ppid, browser_names) {
+        return direct_ppid;
+    }
+
+    // The direct parent may be an intermediary (e.g. xdg-desktop-portal
+    // when Firefox uses the freedesktop portal to launch native messaging
+    // hosts). In that case the browser is a sibling of our parent, sharing
+    // the same grandparent (typically systemd --user).
+    if let Some((grandparent, _)) = read_proc_stat(direct_ppid)
+        && grandparent > 1
+        && let Some(browser_pid) = find_browser_child(grandparent, browser_names)
+    {
+        tracing::info!(
+            "Found browser as sibling of parent: browser_pid={}, direct_parent={}, grandparent={}",
+            browser_pid,
+            direct_ppid,
+            grandparent
+        );
+        return browser_pid;
+    }
+
+    tracing::debug!(
+        "No browser found in process tree, using direct parent PID {}",
+        direct_ppid
+    );
+    direct_ppid
+}
+
+#[cfg(target_os = "linux")]
+fn is_browser_process(pid: u32, browser_names: &[&str]) -> bool {
+    read_proc_stat(pid).is_some_and(|(_, name)| browser_names.iter().any(|b| name == *b))
+}
+
+/// Scans `/proc` for any process whose parent is `parent_pid` and whose
+/// comm matches a known browser name.
+#[cfg(target_os = "linux")]
+fn find_browser_child(parent_pid: u32, browser_names: &[&str]) -> Option<u32> {
+    let proc_dir = std::fs::read_dir("/proc").ok()?;
+    for entry in proc_dir.flatten() {
+        let Some(pid) = entry
+            .file_name()
+            .to_str()
+            .and_then(|s| s.parse::<u32>().ok())
+        else {
+            continue;
+        };
+        if let Some((ppid, name)) = read_proc_stat(pid)
+            && ppid == parent_pid
+            && browser_names.iter().any(|b| name == *b)
+        {
+            return Some(pid);
+        }
+    }
+    None
+}
+
+/// Reads `/proc/<pid>/stat` and returns `(ppid, comm)`.
+#[cfg(target_os = "linux")]
+fn read_proc_stat(pid: u32) -> Option<(u32, String)> {
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    // Format: "<pid> (<comm>) <state> <ppid> ..."
+    // comm can contain spaces and parentheses, so find the last ')'.
+    let comm_start = stat.find('(')? + 1;
+    let comm_end = stat.rfind(')')?;
+    let comm = stat[comm_start..comm_end].to_string();
+    let rest = &stat[comm_end + 2..];
+    let ppid: u32 = rest.split_whitespace().nth(1)?.parse().ok()?;
+    Some((ppid, comm))
 }
 
 #[cfg(target_os = "macos")]
