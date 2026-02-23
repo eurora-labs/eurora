@@ -8,7 +8,7 @@ use std::time::Duration;
 use uuid::Uuid;
 
 use crate::{
-    MessageType, PaginationParams,
+    MessageType, PaginationParams, SortOrder,
     error::{DbError, DbResult},
     types::{
         Activity, ActivityAsset, Asset, AssetStatus, LoginToken, Message, OAuthCredentials,
@@ -580,18 +580,24 @@ impl DatabaseManager {
         user_id: Uuid,
         params: PaginationParams,
     ) -> DbResult<Vec<Activity>> {
-        let query = format!(
-            r#"
+        let query = match params.order() {
+            SortOrder::Asc => r#"
             SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             FROM activities
             WHERE user_id = $1
-            ORDER BY started_at {}
+            ORDER BY started_at ASC
             LIMIT $2 OFFSET $3
             "#,
-            params.order()
-        );
+            SortOrder::Desc => r#"
+            SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
+            FROM activities
+            WHERE user_id = $1
+            ORDER BY started_at DESC
+            LIMIT $2 OFFSET $3
+            "#,
+        };
 
-        let activities = sqlx::query_as::<_, Activity>(&query)
+        let activities = sqlx::query_as::<_, Activity>(query)
             .bind(user_id)
             .bind(params.limit())
             .bind(params.offset())
@@ -713,20 +719,28 @@ impl DatabaseManager {
         end_time: DateTime<Utc>,
         params: PaginationParams,
     ) -> DbResult<Vec<Activity>> {
-        let query = format!(
-            r#"
+        let query = match params.order() {
+            SortOrder::Asc => r#"
             SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             FROM activities
             WHERE user_id = $1
               AND started_at >= $2
               AND started_at <= $3
-            ORDER BY started_at {}
+            ORDER BY started_at ASC
             LIMIT $4 OFFSET $5
             "#,
-            params.order()
-        );
+            SortOrder::Desc => r#"
+            SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
+            FROM activities
+            WHERE user_id = $1
+              AND started_at >= $2
+              AND started_at <= $3
+            ORDER BY started_at DESC
+            LIMIT $4 OFFSET $5
+            "#,
+        };
 
-        let activities = sqlx::query_as::<_, Activity>(&query)
+        let activities = sqlx::query_as::<_, Activity>(query)
             .bind(user_id)
             .bind(start_time)
             .bind(end_time)
@@ -888,18 +902,24 @@ impl DatabaseManager {
         user_id: Uuid,
         params: PaginationParams,
     ) -> DbResult<Vec<Thread>> {
-        let query = format!(
-            r#"
+        let query = match params.order() {
+            SortOrder::Asc => r#"
             SELECT id, user_id, title, created_at, updated_at
             FROM threads
             WHERE user_id = $1
-            ORDER BY id {}
+            ORDER BY id ASC
             LIMIT $2 OFFSET $3
             "#,
-            params.order()
-        );
+            SortOrder::Desc => r#"
+            SELECT id, user_id, title, created_at, updated_at
+            FROM threads
+            WHERE user_id = $1
+            ORDER BY id DESC
+            LIMIT $2 OFFSET $3
+            "#,
+        };
 
-        let threads = sqlx::query_as::<_, Thread>(&query)
+        let threads = sqlx::query_as::<_, Thread>(query)
             .bind(user_id)
             .bind(params.limit())
             .bind(params.offset())
@@ -978,17 +998,23 @@ impl DatabaseManager {
         let messages = match only_visible {
             Some(visible) => {
                 let hidden_from_ui = !visible;
-                let query = format!(
-                    r#"
+                let query = match params.order() {
+                    SortOrder::Asc => r#"
                     SELECT m.id, m.thread_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.hidden_from_ui, m.created_at, m.updated_at
                     FROM messages m
                     WHERE m.thread_id = $1 AND m.user_id = $2 AND m.hidden_from_ui = $3
-                    ORDER BY m.id {}
+                    ORDER BY m.id ASC
                     LIMIT $4 OFFSET $5
                     "#,
-                    params.order()
-                );
-                sqlx::query_as::<_, Message>(&query)
+                    SortOrder::Desc => r#"
+                    SELECT m.id, m.thread_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.hidden_from_ui, m.created_at, m.updated_at
+                    FROM messages m
+                    WHERE m.thread_id = $1 AND m.user_id = $2 AND m.hidden_from_ui = $3
+                    ORDER BY m.id DESC
+                    LIMIT $4 OFFSET $5
+                    "#,
+                };
+                sqlx::query_as::<_, Message>(query)
                     .bind(thread_id)
                     .bind(user_id)
                     .bind(hidden_from_ui)
@@ -998,17 +1024,23 @@ impl DatabaseManager {
                     .await?
             }
             None => {
-                let query = format!(
-                    r#"
+                let query = match params.order() {
+                    SortOrder::Asc => r#"
                     SELECT m.id, m.thread_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.hidden_from_ui, m.created_at, m.updated_at
                     FROM messages m
                     WHERE m.thread_id = $1 AND m.user_id = $2
-                    ORDER BY m.id {}
+                    ORDER BY m.id ASC
                     LIMIT $3 OFFSET $4
                     "#,
-                    params.order()
-                );
-                sqlx::query_as::<_, Message>(&query)
+                    SortOrder::Desc => r#"
+                    SELECT m.id, m.thread_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.hidden_from_ui, m.created_at, m.updated_at
+                    FROM messages m
+                    WHERE m.thread_id = $1 AND m.user_id = $2
+                    ORDER BY m.id DESC
+                    LIMIT $3 OFFSET $4
+                    "#,
+                };
+                sqlx::query_as::<_, Message>(query)
                     .bind(thread_id)
                     .bind(user_id)
                     .bind(params.limit())

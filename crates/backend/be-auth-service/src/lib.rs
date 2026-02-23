@@ -197,7 +197,7 @@ impl AuthService {
             role,
         };
 
-        let header = Header::new(Algorithm::HS256);
+        let header = Header::new(Algorithm::ES256);
 
         let access_token = encode(
             &header,
