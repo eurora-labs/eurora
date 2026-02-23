@@ -10,45 +10,29 @@ const lastUrl = new Map<number, string>();
 export function initFocusTracker(port: browser.Runtime.Port): void {
 	activeNativePort = port;
 
-	browser.windows.onFocusChanged.addListener(onWindowFocusChanged);
 	browser.tabs.onActivated.addListener(onTabActivated);
 	browser.tabs.onUpdated.addListener(onTabUpdated);
+	browser.tabs.onRemoved.addListener(onTabRemoved);
 
-	browser.windows
-		.getLastFocused()
-		.then((win) => {
-			if (win && win.focused && win.id !== browser.windows.WINDOW_ID_NONE) {
-				collectAndSend().catch(console.error);
-				startCollectionInterval();
-			}
-		})
-		.catch(console.error);
+	collectAndSend().catch(console.error);
+	startCollectionInterval();
 }
 
 export function destroyFocusTracker(): void {
 	stopCollectionInterval();
 	activeNativePort = null;
 
-	browser.windows.onFocusChanged.removeListener(onWindowFocusChanged);
 	browser.tabs.onActivated.removeListener(onTabActivated);
 	browser.tabs.onUpdated.removeListener(onTabUpdated);
+	browser.tabs.onRemoved.removeListener(onTabRemoved);
 }
 
 export function setNativePort(port: browser.Runtime.Port | null): void {
 	activeNativePort = port;
 }
 
-export async function onRemoved(tabId: number): Promise<void> {
+function onTabRemoved(tabId: number): void {
 	lastUrl.delete(tabId);
-}
-
-async function onWindowFocusChanged(windowId: number): Promise<void> {
-	if (windowId === browser.windows.WINDOW_ID_NONE) {
-		stopCollectionInterval();
-	} else {
-		await collectAndSend();
-		startCollectionInterval();
-	}
 }
 
 async function onTabActivated(_activeInfo: browser.Tabs.OnActivatedActiveInfoType): Promise<void> {

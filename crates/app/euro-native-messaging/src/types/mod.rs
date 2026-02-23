@@ -27,13 +27,4 @@ pub enum NativeMessage {
     NativeTwitterSnapshot,
 
     NativeMetadata,
-    NativeIcon,
-}
-
-#[allow(clippy::enum_variant_names)]
-#[enum_dispatch]
-#[derive(Debug, Clone, Serialize, Deserialize, AsRefStr)]
-#[serde(tag = "kind", content = "data")]
-pub enum ChromeMessage {
-    NativeMetadata,
 }

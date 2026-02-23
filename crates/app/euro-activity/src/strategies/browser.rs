@@ -1,14 +1,3 @@
-//! Browser strategy implementation for the refactored activity system
-//!
-//! This module uses the singleton gRPC server from `euro_browser` crate to accept
-//! connections from multiple native messaging hosts (euro-native-messaging). Each
-//! host registers with its browser PID, allowing the server to route requests to
-//! the correct browser.
-//!
-//! The gRPC server is managed by the TimelineManager and runs as long as the manager
-//! is alive. The BrowserStrategy only connects to the singleton service but does not
-//! manage its lifecycle.
-
 pub use crate::strategies::ActivityStrategyFunctionality;
 pub use crate::strategies::processes::*;
 use crate::strategies::{ActivityReport, StrategyMetadata};
@@ -22,14 +11,107 @@ use async_trait::async_trait;
 use euro_native_messaging::NativeMessage;
 use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use tokio::sync::mpsc;
+use std::collections::HashMap;
+use std::sync::{
+    Arc,
+    atomic::{AtomicU32, Ordering},
+};
+use tokio::sync::{RwLock, mpsc};
 use url::Url;
 
 pub use euro_browser::{
     BrowserBridgeServer, BrowserBridgeService, EventFrame, Frame, FrameKind, RequestFrame,
     ResponseFrame,
 };
+
+#[derive(Clone, Default)]
+struct BrowserCache {
+    metadata: Option<StrategyMetadata>,
+    asset: Option<ActivityAsset>,
+    snapshot: Option<ActivitySnapshot>,
+}
+
+type BrowserCacheMap = Arc<RwLock<HashMap<u32, BrowserCache>>>;
+
+static CACHE: std::sync::OnceLock<BrowserCacheMap> = std::sync::OnceLock::new();
+static CACHE_TASK_STARTED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+fn global_cache() -> &'static BrowserCacheMap {
+    CACHE.get_or_init(|| Arc::new(RwLock::new(HashMap::default())))
+}
+
+fn start_cache_task(service: &'static BrowserBridgeService) {
+    if CACHE_TASK_STARTED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
+    let mut events_rx = service.subscribe_to_events();
+    let mut disconnects_rx = service.subscribe_to_disconnects();
+    let cache = global_cache().clone();
+
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                result = events_rx.recv() => {
+                    let (browser_pid, event_frame) = match result {
+                        Ok(val) => val,
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                            tracing::warn!("Cache task lagged by {} events, resuming", n);
+                            continue;
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    };
+
+                    let Some(payload_str) = event_frame.payload else {
+                        continue;
+                    };
+
+                    let native_message = match serde_json::from_str::<NativeMessage>(&payload_str) {
+                        Ok(msg) => msg,
+                        Err(_) => continue,
+                    };
+
+                    let mut map = cache.write().await;
+                    let entry = map.entry(browser_pid).or_default();
+
+                    match event_frame.action.as_str() {
+                        "TAB_ACTIVATED" => {
+                            let NativeMessage::NativeMetadata(data) = native_message else {
+                                continue;
+                            };
+                            entry.metadata = Some(StrategyMetadata::from(data));
+                        }
+                        "ASSETS" => {
+                            if let Ok(asset) = ActivityAsset::try_from(native_message) {
+                                entry.asset = Some(asset);
+                            }
+                        }
+                        "SNAPSHOT" => {
+                            if let Ok(snapshot) = ActivitySnapshot::try_from(native_message) {
+                                entry.snapshot = Some(snapshot);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                result = disconnects_rx.recv() => {
+                    match result {
+                        Ok(browser_pid) => {
+                            let mut map = cache.write().await;
+                            map.remove(&browser_pid);
+                            tracing::debug!("Removed cache entry for disconnected browser PID {}", browser_pid);
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                            tracing::warn!("Cache disconnect listener lagged by {} events", n);
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+            }
+        }
+    });
+}
 
 #[derive(Clone, Serialize, Deserialize, Default)]
 pub struct BrowserStrategy {
@@ -43,39 +125,28 @@ pub struct BrowserStrategy {
     event_subscription_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
 
     #[serde(skip)]
-    snapshot_collection_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
-
-    #[serde(skip)]
     active_browser: Option<String>,
 
     #[serde(skip)]
-    active_browser_pid: Option<u32>,
+    active_browser_pid: Arc<AtomicU32>,
+
+    #[serde(skip)]
+    last_url: Arc<tokio::sync::Mutex<Option<Url>>>,
 }
 
 impl BrowserStrategy {
-    /// Creates a lightweight clone suitable for spawned worker tasks.
-    /// Copies only the fields needed by retrieve_assets/retrieve_snapshots,
-    /// omitting task handles so that stop_tracking can Arc::try_unwrap them.
-    fn worker_clone(&self) -> Self {
-        BrowserStrategy {
-            sender: self.sender.clone(),
-            bridge_service: self.bridge_service,
-            event_subscription_handle: None,
-            snapshot_collection_handle: None,
-            active_browser: self.active_browser.clone(),
-            active_browser_pid: self.active_browser_pid,
-        }
-    }
-
     async fn initialize_service(&mut self) -> ActivityResult<()> {
         let service = BrowserBridgeService::get_or_init().await;
-
         self.bridge_service = Some(service);
-
+        start_cache_task(service);
         Ok(())
     }
 
-    async fn init_collection(&mut self, focus_window: &FocusedWindow) -> ActivityResult<()> {
+    async fn init_collection(&mut self) -> ActivityResult<()> {
+        if self.event_subscription_handle.is_some() {
+            return Ok(());
+        }
+
         let Some(sender) = self.sender.clone() else {
             return Err(ActivityError::Strategy(
                 "Sender not initialized".to_string(),
@@ -88,20 +159,26 @@ impl BrowserStrategy {
             .ok_or_else(|| ActivityError::Strategy("Bridge service not initialized".to_string()))?;
 
         let mut events_rx = service.subscribe_to_events();
-        let _default_icon = focus_window.icon.clone();
-        let mut strategy = self.worker_clone();
-        let last_url: Arc<tokio::sync::Mutex<Option<Url>>> =
-            Arc::new(tokio::sync::Mutex::new(None));
+        let last_url = Arc::clone(&self.last_url);
+        let active_pid = Arc::clone(&self.active_browser_pid);
 
         let handle = tokio::spawn(async move {
             let last_url = Arc::clone(&last_url);
 
-            while let Ok((browser_pid, event_frame)) = events_rx.recv().await {
-                tracing::debug!(
-                    "Received event from browser PID {}: action={}",
-                    browser_pid,
-                    event_frame.action
-                );
+            loop {
+                let (browser_pid, event_frame) = match events_rx.recv().await {
+                    Ok(val) => val,
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!("Event subscription lagged by {} events, resuming", n);
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                };
+
+                let expected_pid = active_pid.load(Ordering::Relaxed);
+                if expected_pid == 0 || browser_pid != expected_pid {
+                    continue;
+                }
 
                 let Some(payload_str) = event_frame.payload else {
                     continue;
@@ -115,50 +192,78 @@ impl BrowserStrategy {
                     }
                 };
 
-                let metadata = match native_message {
-                    NativeMessage::NativeMetadata(data) => StrategyMetadata::from(data),
-                    _ => {
-                        tracing::debug!("Ignoring non-metadata event");
-                        continue;
+                match event_frame.action.as_str() {
+                    "TAB_ACTIVATED" => {
+                        let NativeMessage::NativeMetadata(data) = native_message else {
+                            continue;
+                        };
+                        let metadata = StrategyMetadata::from(data);
+
+                        let mut prev = last_url.lock().await;
+                        let url = match Url::parse(&metadata.url.clone().unwrap_or_default()) {
+                            Ok(u) => u,
+                            Err(_) => continue,
+                        };
+
+                        if let Some(prev_url) = prev.take()
+                            && prev_url.domain() == url.domain()
+                        {
+                            *prev = Some(url);
+                            continue;
+                        }
+                        *prev = Some(url);
+
+                        let icon = metadata.icon.clone();
+                        let url_str = metadata.url.clone().unwrap_or_default();
+
+                        let activity = Activity::new(url_str, icon, "".to_string(), vec![]);
+
+                        tracing::info!(
+                            "Creating new activity from event: browser_pid={}, name={}",
+                            browser_pid,
+                            activity.name
+                        );
+                        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                            tracing::warn!("Failed to send new activity report - receiver dropped");
+                            break;
+                        }
                     }
-                };
+                    "ASSETS" => {
+                        let asset = match ActivityAsset::try_from(native_message) {
+                            Ok(a) => a,
+                            Err(e) => {
+                                tracing::warn!("Failed to convert asset: {}", e);
+                                continue;
+                            }
+                        };
 
-                let mut prev = last_url.lock().await;
-                let url = match Url::parse(&metadata.url.clone().unwrap_or_default()) {
-                    Ok(u) => u,
-                    Err(_) => continue,
-                };
+                        tracing::debug!("Received asset from browser PID {}", browser_pid);
+                        if sender.send(ActivityReport::Assets(vec![asset])).is_err() {
+                            tracing::warn!("Failed to send assets - receiver dropped");
+                            break;
+                        }
+                    }
+                    "SNAPSHOT" => {
+                        let snapshot = match ActivitySnapshot::try_from(native_message) {
+                            Ok(s) => s,
+                            Err(e) => {
+                                tracing::warn!("Failed to convert snapshot: {}", e);
+                                continue;
+                            }
+                        };
 
-                if let Some(prev_url) = prev.take()
-                    && prev_url.domain() == url.domain()
-                {
-                    *prev = Some(url);
-                    continue;
-                }
-                *prev = Some(url);
-
-                let icon = metadata.icon.clone();
-                let url_str = metadata.url.clone().unwrap_or_default();
-
-                let assets = strategy.retrieve_assets().await.map_err(|e| {
-                    tracing::warn!("Failed to retrieve assets: {}", e);
-                    e
-                });
-
-                let activity =
-                    Activity::new(url_str, icon, "".to_string(), assets.unwrap_or_default());
-
-                tracing::info!(
-                    "Creating new activity from event: browser_pid={}, name={}",
-                    browser_pid,
-                    activity.name
-                );
-                if sender
-                    .send(ActivityReport::NewActivity(activity.clone()))
-                    .is_err()
-                {
-                    tracing::warn!("Failed to send new activity report - receiver dropped");
-                    break;
+                        tracing::debug!("Received snapshot from browser PID {}", browser_pid);
+                        if sender
+                            .send(ActivityReport::Snapshots(vec![snapshot]))
+                            .is_err()
+                        {
+                            tracing::warn!("Failed to send snapshots - receiver dropped");
+                            break;
+                        }
+                    }
+                    other => {
+                        tracing::debug!("Ignoring unknown event action: {}", other);
+                    }
                 }
             }
 
@@ -166,15 +271,50 @@ impl BrowserStrategy {
         });
 
         self.event_subscription_handle = Some(Arc::new(handle));
-
-        self.collect_assets_and_snapshots();
         Ok(())
+    }
+
+    async fn flush_cache(
+        pid: u32,
+        process_name: &str,
+        sender: &mpsc::UnboundedSender<ActivityReport>,
+        last_url: &tokio::sync::Mutex<Option<Url>>,
+    ) -> bool {
+        let cached = {
+            let map = global_cache().read().await;
+            map.get(&pid).cloned()
+        };
+        let Some(cached) = cached else { return false };
+        if cached.metadata.is_none() {
+            return false;
+        }
+
+        if let Some(metadata) = cached.metadata {
+            if let Some(ref url_str) = metadata.url
+                && let Ok(url) = Url::parse(url_str)
+            {
+                *last_url.lock().await = Some(url);
+            }
+            let activity = Activity::new(
+                metadata.url.unwrap_or_default(),
+                metadata.icon,
+                process_name.to_string(),
+                vec![],
+            );
+            let _ = sender.send(ActivityReport::NewActivity(activity));
+        }
+        if let Some(asset) = cached.asset {
+            let _ = sender.send(ActivityReport::Assets(vec![asset]));
+        }
+        if let Some(snapshot) = cached.snapshot {
+            let _ = sender.send(ActivityReport::Snapshots(vec![snapshot]));
+        }
+        true
     }
 
     pub async fn new() -> ActivityResult<Self> {
         let mut strategy = BrowserStrategy::default();
         strategy.initialize_service().await?;
-
         Ok(strategy)
     }
 }
@@ -206,40 +346,52 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         self.sender = Some(sender.clone());
         let process_name = focus_window.process_name.clone();
         self.active_browser = Some(process_name.clone());
-        self.active_browser_pid = Some(focus_window.process_id);
+        self.active_browser_pid
+            .store(focus_window.process_id, Ordering::Relaxed);
 
-        match self.get_metadata().await {
-            Ok(metadata) => {
-                let assets = self.retrieve_assets().await.unwrap_or(vec![]);
-                let activity = Activity::new(
-                    metadata.url.unwrap_or_default(),
-                    metadata.icon,
-                    process_name.clone(),
-                    assets,
-                );
-                if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                    tracing::warn!("Failed to send new activity report - receiver dropped");
-                }
-            }
-            Err(err) => {
-                let activity = Activity::new(
-                    focus_window.process_name.clone(),
-                    focus_window.icon.clone(),
-                    focus_window.process_name.clone(),
-                    vec![],
-                );
-                if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                    tracing::warn!("Failed to send new activity report - receiver dropped");
-                }
+        self.init_collection().await?;
 
-                tracing::warn!("Failed to get metadata: {}", err);
+        if !Self::flush_cache(
+            focus_window.process_id,
+            &process_name,
+            &sender,
+            &self.last_url,
+        )
+        .await
+        {
+            match self.get_metadata().await {
+                Ok(metadata) => {
+                    if let Some(ref url_str) = metadata.url
+                        && let Ok(url) = Url::parse(url_str)
+                    {
+                        *self.last_url.lock().await = Some(url);
+                    }
+                    let activity = Activity::new(
+                        metadata.url.unwrap_or_default(),
+                        metadata.icon,
+                        process_name.clone(),
+                        vec![],
+                    );
+                    if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                        tracing::warn!("Failed to send new activity report - receiver dropped");
+                    }
+                }
+                Err(err) => {
+                    let activity = Activity::new(
+                        focus_window.process_name.clone(),
+                        focus_window.icon.clone(),
+                        focus_window.process_name.clone(),
+                        vec![],
+                    );
+                    if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                        tracing::warn!("Failed to send new activity report - receiver dropped");
+                    }
+                    tracing::warn!("Failed to get metadata: {}", err);
+                }
             }
         }
 
-        self.init_collection(focus_window).await?;
-
         tracing::debug!("Browser strategy starting tracking for: {:?}", process_name);
-
         Ok(())
     }
 
@@ -253,61 +405,18 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         );
 
         if self.can_handle_process(focus_window) {
-            tracing::debug!(
-                "Browser strategy can continue handling: {}",
-                focus_window.process_name
-            );
-            if self.active_browser_pid == Some(focus_window.process_id) {
-                tracing::info!("Detected the same browser. Ignoring...",);
-            } else {
-                self.active_browser_pid = Some(focus_window.process_id);
-                self.active_browser = Some(focus_window.process_name.to_string());
-            }
+            self.active_browser_pid
+                .store(focus_window.process_id, Ordering::Relaxed);
+            self.active_browser = Some(focus_window.process_name.to_string());
 
-            let has_registered_client = if let Some(service) = self.bridge_service.as_ref() {
-                service.is_registered(focus_window.process_id).await
-            } else {
-                false
-            };
-
-            if !has_registered_client {
-                if let Some(sender) = self.sender.clone() {
-                    match self.get_metadata().await {
-                        Ok(metadata) => {
-                            let activity = Activity::new(
-                                metadata.url.unwrap_or_default(),
-                                metadata.icon,
-                                focus_window.process_name.to_string(),
-                                vec![],
-                            );
-                            if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                                tracing::warn!(
-                                    "Failed to send new activity report - receiver dropped"
-                                );
-                            }
-                        }
-                        Err(err) => {
-                            let activity = Activity::new(
-                                focus_window.process_name.clone(),
-                                focus_window.icon.clone(),
-                                focus_window.process_name.clone(),
-                                vec![],
-                            );
-                            if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                                tracing::warn!(
-                                    "Failed to send new activity report - receiver dropped"
-                                );
-                            }
-
-                            tracing::warn!("Failed to get metadata: {}", err);
-                        }
-                    }
-                }
-            } else {
-                tracing::debug!(
-                    "Browser PID {} has registered gRPC client, skipping activity report (will be handled by event subscription)",
-                    focus_window.process_id
-                );
+            if let Some(sender) = &self.sender {
+                Self::flush_cache(
+                    focus_window.process_id,
+                    &focus_window.process_name,
+                    sender,
+                    &self.last_url,
+                )
+                .await;
             }
 
             Ok(true)
@@ -323,81 +432,19 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
     async fn stop_tracking(&mut self) -> ActivityResult<()> {
         tracing::debug!("Browser strategy stopping tracking");
+
         self.active_browser = None;
-        self.active_browser_pid = None;
-
-        if let Some(handle) = self.event_subscription_handle.take()
-            && let Ok(handle) = Arc::try_unwrap(handle)
-        {
-            handle.abort();
-        }
-
-        if let Some(handle) = self.snapshot_collection_handle.take()
-            && let Ok(handle) = Arc::try_unwrap(handle)
-        {
-            handle.abort();
-        }
+        self.active_browser_pid.store(0, Ordering::Relaxed);
 
         Ok(())
     }
 
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
-        tracing::debug!("Retrieving assets for browser strategy");
-
-        let service = self
-            .bridge_service
-            .as_ref()
-            .ok_or_else(|| ActivityError::invalid_data("Bridge service not available"))?;
-
-        let browser_pid = self
-            .active_browser_pid
-            .ok_or_else(|| ActivityError::invalid_data("No active browser PID set"))?;
-
-        let response_frame = service.generate_assets(browser_pid).await.map_err(|e| {
-            ActivityError::invalid_data(format!("Failed to generate assets: {}", e))
-        })?;
-
-        let Some(payload) = response_frame.payload else {
-            tracing::warn!("No payload in assets response");
-            return Ok(vec![]);
-        };
-
-        let native_asset = serde_json::from_str::<NativeMessage>(&payload)
-            .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
-
-        let asset = ActivityAsset::try_from(native_asset)
-            .map_err(|e| -> ActivityError { ActivityError::InvalidAssetType(e.to_string()) })?;
-
-        tracing::debug!("Retrieved 1 asset from browser");
-        Ok(vec![asset])
+        Ok(vec![])
     }
 
     async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        let service = self
-            .bridge_service
-            .as_ref()
-            .ok_or_else(|| ActivityError::invalid_data("Bridge service not available"))?;
-
-        let browser_pid = self
-            .active_browser_pid
-            .ok_or_else(|| ActivityError::invalid_data("No active browser PID set"))?;
-
-        let response_frame = service.generate_snapshot(browser_pid).await.map_err(|e| {
-            ActivityError::invalid_data(format!("Failed to generate snapshot: {}", e))
-        })?;
-
-        let Some(payload) = response_frame.payload else {
-            tracing::warn!("No payload in snapshot response");
-            return Ok(vec![]);
-        };
-
-        let native_message = serde_json::from_str::<NativeMessage>(&payload)
-            .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
-
-        let snapshot = ActivitySnapshot::try_from(native_message)
-            .map_err(|e| -> ActivityError { ActivityError::InvalidSnapshotType(e.to_string()) })?;
-
-        Ok(vec![snapshot])
+        Ok(vec![])
     }
 
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
@@ -408,9 +455,10 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             .as_ref()
             .ok_or_else(|| ActivityError::invalid_data("Bridge service not available"))?;
 
-        let browser_pid = self
-            .active_browser_pid
-            .ok_or_else(|| ActivityError::invalid_data("No active browser PID set"))?;
+        let browser_pid = self.active_browser_pid.load(Ordering::Relaxed);
+        if browser_pid == 0 {
+            return Err(ActivityError::invalid_data("No active browser PID set"));
+        }
 
         let response_frame = service
             .get_metadata(browser_pid)
@@ -441,66 +489,6 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             _ => StrategyMetadata::default(),
         };
         Ok(metadata)
-    }
-}
-
-impl BrowserStrategy {
-    fn collect_assets_and_snapshots(&mut self) {
-        tracing::info!("Starting active collection task");
-        let sender = match self.sender.clone() {
-            Some(sender) => sender,
-            None => {
-                tracing::warn!("No sender available for snapshot collection");
-                return;
-            }
-        };
-
-        let mut worker = self.worker_clone();
-
-        let handle = tokio::spawn(async move {
-            tracing::debug!("Starting snapshot collection task");
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(3));
-
-            loop {
-                interval.tick().await;
-
-                match worker.retrieve_assets().await {
-                    Ok(assets) if !assets.is_empty() => {
-                        tracing::debug!("Collected {} asset(s)", assets.len());
-                        if sender.send(ActivityReport::Assets(assets)).is_err() {
-                            tracing::warn!("Failed to send assets - receiver dropped");
-                            break;
-                        }
-                    }
-                    Ok(_) => {
-                        tracing::debug!("No assets collected");
-                    }
-                    Err(e) => {
-                        tracing::warn!("Failed to retrieve assets: {}", e);
-                    }
-                }
-
-                match worker.retrieve_snapshots().await {
-                    Ok(snapshots) if !snapshots.is_empty() => {
-                        tracing::debug!("Collected {} snapshot(s)", snapshots.len());
-                        if sender.send(ActivityReport::Snapshots(snapshots)).is_err() {
-                            tracing::warn!("Failed to send snapshots - receiver dropped");
-                            break;
-                        }
-                    }
-                    Ok(_) => {
-                        tracing::debug!("No snapshots collected");
-                    }
-                    Err(e) => {
-                        tracing::warn!("Failed to retrieve snapshots: {}", e);
-                    }
-                }
-            }
-
-            tracing::debug!("Snapshot collection task ended");
-        });
-
-        self.snapshot_collection_handle = Some(Arc::new(handle));
     }
 }
 

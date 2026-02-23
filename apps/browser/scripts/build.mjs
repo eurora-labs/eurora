@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 async function main() {
-	const browser = process.env['BROWSER'] ?? 'chrome'; // chrome | firefox | safari
+	const browser = process.env['BROWSER'] ?? 'chrome'; // chrome | firefox | safari | edge
 	const mode = process.env['BUILD_MODE'] ?? 'production'; // development | production
 	const outDir = `dist/${browser}`;
 
@@ -61,6 +61,13 @@ async function main() {
 	await build(backgroundConfig({ browser, outDir, emptyOutDir: false, mode }));
 
 	await writeManifest({ browser, outDir });
+
+	if (process.env['ZIP_OUTPUT'] === 'true') {
+		const zipFile = `dist/${browser}.zip`;
+		fs.rmSync(zipFile, { force: true });
+		execSync(`cd ${outDir} && zip -r ../${browser}.zip .`, { stdio: 'inherit' });
+		console.log(`Created ${zipFile}`);
+	}
 }
 
 function copyDir(src, dest) {

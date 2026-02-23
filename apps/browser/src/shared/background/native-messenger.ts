@@ -1,5 +1,4 @@
 import { initFocusTracker, destroyFocusTracker } from './focus-tracker';
-import { handleMessage } from './messaging';
 import { getCurrentTabIcon } from './tabs';
 import { isSafari } from './util';
 import browser from 'webextension-polyfill';
@@ -34,7 +33,6 @@ function onNativePortDisconnect(port: browser.Runtime.Port) {
 }
 
 async function onNativePortMessage(message: unknown, sender: browser.Runtime.Port) {
-	// Safari's SFSafariApplication.dispatchMessage wraps frames differently
 	const safariMessage = message as {
 		name?: string;
 		userInfo?: { frame?: Frame; frameJson?: string; action?: string; requestId?: string };
@@ -57,7 +55,6 @@ async function onNativePortMessage(message: unknown, sender: browser.Runtime.Por
 	if ('Request' in kind) {
 		const response = await onRequestFrame(kind.Request);
 
-		// Safari dispatch path is unreliable — use sendNativeMessage instead
 		if (isSafari() && safariMessage.name === 'NativeRequest') {
 			try {
 				await browser.runtime.sendNativeMessage(host, response);
@@ -89,26 +86,17 @@ async function onRequestFrame(frame: RequestFrame): Promise<Frame> {
 			}
 			return await onActionMetadata(frame);
 
-		case 'GENERATE_ASSETS':
-		case 'GENERATE_SNAPSHOT': {
-			const response = await handleMessage(frame.action);
-			const responseFrame: ResponseFrame = {
-				id: frame.id,
-				action: frame.action,
-				payload: JSON.stringify(response),
-			};
-			return { kind: { Response: responseFrame } } as Frame;
-		}
-
-		default: {
-			const response = await handleMessage(frame.action);
-			const responseFrame: ResponseFrame = {
-				id: frame.id,
-				action: frame.action,
-				payload: JSON.stringify(response),
-			};
-			return { kind: { Response: responseFrame } } as Frame;
-		}
+		default:
+			return {
+				kind: {
+					Error: {
+						id: frame.id,
+						code: 0,
+						message: `Unknown action: ${frame.action}`,
+						details: null,
+					},
+				},
+			} as Frame;
 	}
 }
 
