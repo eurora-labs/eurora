@@ -4,6 +4,7 @@
 	import type { Snippet } from 'svelte';
 
 	export interface ConversationProps extends WithElementRef<HTMLAttributes<HTMLDivElement>> {
+		class?: string;
 		children?: Snippet;
 		initial?: ScrollBehavior;
 		resize?: ScrollBehavior;
