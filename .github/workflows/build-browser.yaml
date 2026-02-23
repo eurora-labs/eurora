@@ -32,11 +32,15 @@ jobs:
               shell: bash
               run: |
                   VERSION="$(curl --silent "https://api.eurora-labs.com/releases/nightly" | jq -r '.version' | tr -d '\r')"
-                  if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
-                    echo "Failed to fetch nightly version"
+                  if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                    echo "Invalid or missing nightly version: '$VERSION'"
                     exit 1
                   fi
-                  echo "version=$VERSION" >> "$GITHUB_ENV"
+                  {
+                    echo 'version<<EOF'
+                    echo "$VERSION"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
                   echo "Browser extension version: $VERSION (from nightly)"
 
             - name: Init Node Environment
@@ -63,12 +67,13 @@ jobs:
               shell: bash
               env:
                   BROWSER: ${{ matrix.browser }}
+                  VERSION: ${{ env.version }}
               run: |
                   mkdir -p release
                   cd "apps/browser/dist/${BROWSER}"
                   zip -r "../../../../release/${BROWSER}.zip" . -x "*.git*" -x "*.zip"
                   cd ../../../..
-                  echo "${{ env.version }}" > release/version
+                  echo "$VERSION" > release/version
                   echo "Created release/${BROWSER}.zip"
                   ls -lh "release/${BROWSER}.zip"
 
@@ -97,7 +102,15 @@ jobs:
               shell: bash
               run: |
                   VERSION="$(cat release/version)"
-                  echo "version=$VERSION" >> "$GITHUB_ENV"
+                  if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                    echo "Invalid version in artifact: '$VERSION'"
+                    exit 1
+                  fi
+                  {
+                    echo 'version<<EOF'
+                    echo "$VERSION"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
 
             - name: Prepare S3 payload
               shell: bash
