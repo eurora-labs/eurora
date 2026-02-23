@@ -1,8 +1,10 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { cn } from '$lib/utils.js';
 	import { Button, type ButtonProps } from '$lib/components/button/index.js';
 
 	let {
+		class: className,
 		children,
 		...restProps
 	}: ButtonProps & {
@@ -12,7 +14,7 @@
 
 <Button
 	data-slot="confirmation-action"
-	class="h-8 px-3 text-sm"
+	class={cn('h-8 px-3 text-sm', className)}
 	type="button"
 	{...restProps}
 >
