@@ -1,58 +1,50 @@
-// Main component
-export { default as PromptInput } from './PromptInput.svelte';
-export { default as PromptInputProvider } from './PromptInputProvider.svelte';
+export { default as PromptInput } from './prompt-input.svelte';
+export { default as PromptInputProvider } from './prompt-input-provider.svelte';
+export { default as PromptInputBody } from './prompt-input-body.svelte';
+export { default as PromptInputTextarea } from './prompt-input-textarea.svelte';
+export { default as PromptInputHeader } from './prompt-input-header.svelte';
+export { default as PromptInputFooter } from './prompt-input-footer.svelte';
+export { default as PromptInputTools } from './prompt-input-tools.svelte';
+export { default as PromptInputButton } from './prompt-input-button.svelte';
+export { default as PromptInputSubmit } from './prompt-input-submit.svelte';
+export { default as PromptInputActionMenu } from './prompt-input-action-menu.svelte';
+export { default as PromptInputActionMenuTrigger } from './prompt-input-action-menu-trigger.svelte';
+export { default as PromptInputActionMenuContent } from './prompt-input-action-menu-content.svelte';
+export { default as PromptInputActionMenuItem } from './prompt-input-action-menu-item.svelte';
+export { default as PromptInputActionAddAttachments } from './prompt-input-action-add-attachments.svelte';
+export { default as PromptInputSelect } from './prompt-input-select.svelte';
+export { default as PromptInputSelectTrigger } from './prompt-input-select-trigger.svelte';
+export { default as PromptInputSelectContent } from './prompt-input-select-content.svelte';
+export { default as PromptInputSelectItem } from './prompt-input-select-item.svelte';
+export { default as PromptInputSelectValue } from './prompt-input-select-value.svelte';
+export { default as PromptInputHoverCard } from './prompt-input-hover-card.svelte';
+export { default as PromptInputHoverCardTrigger } from './prompt-input-hover-card-trigger.svelte';
+export { default as PromptInputHoverCardContent } from './prompt-input-hover-card-content.svelte';
+export { default as PromptInputTabsList } from './prompt-input-tabs-list.svelte';
+export { default as PromptInputTab } from './prompt-input-tab.svelte';
+export { default as PromptInputTabLabel } from './prompt-input-tab-label.svelte';
+export { default as PromptInputTabBody } from './prompt-input-tab-body.svelte';
+export { default as PromptInputTabItem } from './prompt-input-tab-item.svelte';
+export { default as PromptInputCommand } from './prompt-input-command.svelte';
+export { default as PromptInputCommandInput } from './prompt-input-command-input.svelte';
+export { default as PromptInputCommandList } from './prompt-input-command-list.svelte';
+export { default as PromptInputCommandEmpty } from './prompt-input-command-empty.svelte';
+export { default as PromptInputCommandGroup } from './prompt-input-command-group.svelte';
+export { default as PromptInputCommandItem } from './prompt-input-command-item.svelte';
+export { default as PromptInputCommandSeparator } from './prompt-input-command-separator.svelte';
 
-// Form components
-export { default as PromptInputBody } from './PromptInputBody.svelte';
-export { default as PromptInputTextarea } from './PromptInputTextarea.svelte';
-export { default as PromptInputToolbar } from './PromptInputToolbar.svelte';
-export { default as PromptInputTools } from './PromptInputTools.svelte';
-export { default as PromptInputButton } from './PromptInputButton.svelte';
-
-// Attachment components
-export { default as PromptInputAttachment } from './PromptInputAttachment.svelte';
-export { default as PromptInputAttachments } from './PromptInputAttachments.svelte';
-
-// Action menu components
-export { default as PromptInputActionMenu } from './PromptInputActionMenu.svelte';
-export { default as PromptInputActionMenuTrigger } from './PromptInputActionMenuTrigger.svelte';
-export { default as PromptInputActionMenuContent } from './PromptInputActionMenuContent.svelte';
-export { default as PromptInputActionMenuItem } from './PromptInputActionMenuItem.svelte';
-export { default as PromptInputActionAddAttachments } from './PromptInputActionAddAttachments.svelte';
-
-// Submit component
-export { default as PromptInputSubmit } from './PromptInputSubmit.svelte';
-
-// Model select components
-export { default as PromptInputModelSelect } from './PromptInputModelSelect.svelte';
-export { default as PromptInputModelSelectTrigger } from './PromptInputModelSelectTrigger.svelte';
-export { default as PromptInputModelSelectContent } from './PromptInputModelSelectContent.svelte';
-export { default as PromptInputModelSelectItem } from './PromptInputModelSelectItem.svelte';
-export { default as PromptInputModelSelectValue } from './PromptInputModelSelectValue.svelte';
-
-// Icon components
-export { default as ImageIcon } from './ImageIcon.svelte';
-export { default as Loader2Icon } from './Loader2Icon.svelte';
-export { default as PaperclipIcon } from './PaperclipIcon.svelte';
-export { default as PlusIcon } from './PlusIcon.svelte';
-export { default as SendIcon } from './SendIcon.svelte';
-export { default as SquareIcon } from './SquareIcon.svelte';
-export { default as XIcon } from './XIcon.svelte';
-export { default as GlobeIcon } from './GlobeIcon.svelte';
-export { default as MicIcon } from './MicIcon.svelte';
-
-// Context and types
 export {
-	AttachmentsContext,
-	getAttachmentsContext,
-	setAttachmentsContext,
-	PromptInputController,
-	TextInputController,
-	getPromptInputProvider,
-	getPromptInputController,
-	setPromptInputProvider,
 	type FileUIPart,
-	type FileWithId,
-	type PromptInputMessage,
+	type SourceDocumentUIPart,
 	type ChatStatus,
-} from './attachments-context.svelte.js';
+	type PromptInputMessage,
+	AttachmentsState,
+	TextInputState,
+	ReferencedSourcesState,
+	PromptInputControllerState,
+	usePromptInputController,
+	useOptionalPromptInputController,
+	usePromptInputAttachments,
+	useProviderAttachments,
+	useReferencedSources,
+} from './prompt-input-context.svelte.js';

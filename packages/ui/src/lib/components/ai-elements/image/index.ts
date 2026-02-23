@@ -1,4 +1,3 @@
-import Image from './Image.svelte';
+import Root from './image.svelte';
 
-export { Image };
-export type { ImageProps } from './types';
+export { Root, Root as Image };

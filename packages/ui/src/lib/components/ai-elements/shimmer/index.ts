@@ -1,2 +1,3 @@
-export { default as Shimmer } from './Shimmer.svelte';
-export type { ShimmerProps } from './types';
+import Root from './shimmer.svelte';
+
+export { Root, Root as Shimmer };

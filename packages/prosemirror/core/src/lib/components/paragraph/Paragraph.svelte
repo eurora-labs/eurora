@@ -30,9 +30,3 @@
 </script>
 
 <p data-indent={attrs.indent} data-hole bind:this={ref}></p>
-
-<style lang="postcss">
-	:global(p) {
-		margin-bottom: 1rem;
-	}
-</style>

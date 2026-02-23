@@ -52,6 +52,7 @@ specta = { workspace = true, features = ["derive", "function"] }
 specta-typescript = { version = "0.0.9" }
 tauri = { version = "2.10.2", features = ["tray-icon", "unstable"] }
 tauri-plugin-autostart = "2"
+tauri-plugin-clipboard-manager = "2.3.2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-global-shortcut = "2"
