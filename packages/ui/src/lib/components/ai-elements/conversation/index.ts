@@ -1,14 +1,27 @@
-export { default as Conversation } from './Conversation.svelte';
-export { default as ConversationContent } from './ConversationContent.svelte';
-export { default as ConversationEmptyState } from './ConversationEmptyState.svelte';
-export { default as ConversationScrollButton } from './ConversationScrollButton.svelte';
+import Root from './conversation.svelte';
+import Content from './conversation-content.svelte';
+import EmptyState from './conversation-empty-state.svelte';
+import ScrollButton from './conversation-scroll-button.svelte';
+import Download from './conversation-download.svelte';
+
+export {
+	Root,
+	Content,
+	EmptyState,
+	ScrollButton,
+	Download,
+	//
+	Root as Conversation,
+	Content as ConversationContent,
+	EmptyState as ConversationEmptyState,
+	ScrollButton as ConversationScrollButton,
+	Download as ConversationDownload,
+};
+
 export {
 	getStickToBottomContext,
 	setStickToBottomContext,
 	StickToBottomContext,
-} from './stick-to-bottom-context.svelte.js';
+} from './conversation-context.svelte.js';
 
-export type { ConversationProps } from './Conversation.svelte';
-export type { ConversationContentProps } from './ConversationContent.svelte';
-export type { ConversationEmptyStateProps } from './ConversationEmptyState.svelte';
-export type { ConversationScrollButtonProps } from './ConversationScrollButton.svelte';
+export { type ConversationMessage, messagesToMarkdown } from './conversation-download.svelte';
