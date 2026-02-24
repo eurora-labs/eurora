@@ -32,36 +32,6 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 		return tweets;
 	}
 
-	public listen(
-		obj: TwitterBrowserMessage,
-		sender: browser.Runtime.MessageSender,
-		response: (response?: WatcherResponse) => void,
-	): boolean {
-		const { type } = obj;
-		let promise: Promise<WatcherResponse>;
-
-		switch (type) {
-			case 'NEW':
-				promise = this.handleNew(obj, sender);
-				break;
-			case 'GENERATE_ASSETS':
-				promise = this.handleGenerateAssets(obj, sender);
-				break;
-			case 'GENERATE_SNAPSHOT':
-				promise = this.handleGenerateSnapshot(obj, sender);
-				break;
-			default:
-				response({ kind: 'Error', data: 'Invalid message type' });
-				return false;
-		}
-
-		promise.then((result) => {
-			response(result);
-		});
-
-		return true;
-	}
-
 	public async handleNew(
 		_obj: TwitterBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
@@ -134,7 +104,12 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 	}
 }
 
+let initialized = false;
+
 export function main() {
+	if (initialized) return;
+	initialized = true;
+
 	const watcher = new TwitterWatcher({
 		currentUrl: window.location.href,
 		pageTitle: document.title,
@@ -142,4 +117,6 @@ export function main() {
 	});
 
 	browser.runtime.onMessage.addListener(watcher.listen.bind(watcher));
+	watcher.startChangeDetection();
+	watcher.triggerInitialChange();
 }

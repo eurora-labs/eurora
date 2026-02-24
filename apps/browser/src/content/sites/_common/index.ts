@@ -116,8 +116,12 @@ export class CommonWatcher {
 	}
 }
 
-export function main() {
-	const watcher = new CommonWatcher({});
+let initialized = false;
 
+export function main() {
+	if (initialized) return;
+	initialized = true;
+
+	const watcher = new CommonWatcher({});
 	browser.runtime.onMessage.addListener(watcher.listen.bind(watcher));
 }
