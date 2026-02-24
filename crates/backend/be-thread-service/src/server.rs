@@ -489,16 +489,17 @@ impl ProtoThreadService for ThreadService {
 
         hidden_messages.reverse();
 
-        let visible_messages = self
+        let mut visible_messages = self
             .db
             .list_messages()
             .thread_id(thread_id)
             .user_id(user_id)
             .include_hidden(false)
-            .params(PaginationParams::new(0, 3, "ASC".to_string()))
+            .params(PaginationParams::new(0, 3, "DESC".to_string()))
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
+        visible_messages.reverse();
 
         hidden_messages.extend(visible_messages);
 
