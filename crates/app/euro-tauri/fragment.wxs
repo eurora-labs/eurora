@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
     <Fragment>
-        <DirectoryRef Id="LocalAppDataFolder">
+        <!-- Define LocalAppDataFolder so the linker can resolve it -->
+        <DirectoryRef Id="TARGETDIR">
+            <Directory Id="LocalAppDataFolder" Name="AppData">
                 <Directory Id="EuroraLabsFolder" Name="Eurora Labs">
                     <Directory Id="EuroraFolder" Name="Eurora">
                         <Directory Id="ChromeFolder" Name="chrome">
@@ -50,6 +52,7 @@
                         </Directory>
                     </Directory>
                 </Directory>
+            </Directory>
         </DirectoryRef>
 
         <!-- Registry entries — use [ChromeFolder] etc. so paths always match the actual install location -->
@@ -58,7 +61,8 @@
                 <RegistryKey
                 Root="HKCU"
                 Key="Software\Google\Chrome\NativeMessagingHosts\com.eurora.app"
-                Action="createAndRemoveOnUninstall"
+                ForceCreateOnInstall="yes"
+                ForceDeleteOnUninstall="yes"
                 >
                     <RegistryValue
                         Type="string"
@@ -71,7 +75,8 @@
                 <RegistryKey
                 Root="HKCU"
                 Key="Software\Microsoft\Edge\NativeMessagingHosts\com.eurora.app"
-                Action="createAndRemoveOnUninstall"
+                ForceCreateOnInstall="yes"
+                ForceDeleteOnUninstall="yes"
                 >
                     <RegistryValue
                         Type="string"
@@ -84,7 +89,8 @@
                 <RegistryKey
                 Root="HKCU"
                 Key="Software\Mozilla\NativeMessagingHosts\com.eurora.app"
-                Action="createAndRemoveOnUninstall"
+                ForceCreateOnInstall="yes"
+                ForceDeleteOnUninstall="yes"
                 >
                     <RegistryValue
                         Type="string"
