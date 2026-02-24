@@ -11,7 +11,7 @@
 
 <div
 	data-slot="attachment-empty"
-	class={cn('flex items-center justify-center p-4 text-muted-foreground text-sm', className)}
+	class={cn('flex items-center justify-center p-4 text-muted-foreground', className)}
 	{...restProps}
 >
 	{#if children}
