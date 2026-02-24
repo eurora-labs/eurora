@@ -66,10 +66,11 @@
 
 					<h3 class="mb-2 mt-6 text-lg font-semibold">1.2 Desktop Application data</h3>
 					<p>
-						The Desktop Application is an AI-powered productivity assistant. When you
-						submit a query to the assistant, the application collects contextual
-						information about your current activity to provide relevant responses. This
-						data is collected <strong>only when you actively submit a query</strong> and includes:
+						The Desktop Application is an AI-powered productivity assistant. It
+						continuously collects contextual information about your current activity in
+						the background and stores it locally on your device. This data is
+						<strong>sent to our servers only when you actively submit a query</strong> and
+						includes:
 					</p>
 					<ul class="mt-2 list-disc space-y-1 pl-5">
 						<li>
@@ -106,8 +107,8 @@
 							video frame;
 						</li>
 						<li>
-							<strong>Twitter/X:</strong> page URL, page title, and the text content of
-							tweets visible on the page;
+							<strong>Twitter/X:</strong> page URL, page title, the text content of tweets
+							visible on the page, tweet author names and timestamps;
 						</li>
 						<li>
 							<strong>Selected text:</strong> any text you have highlighted on the page;
@@ -219,7 +220,9 @@
 						We record the number of AI tokens consumed per query for the purpose of
 						enforcing subscription plan limits. Your conversation history (queries and
 						AI responses) is stored on our servers so that you can access it across
-						sessions.
+						sessions. Activity data (application names, window titles and focus
+						timestamps) is also stored on our servers to provide contextual history for
+						your queries.
 					</p>
 					<p class="mt-4">
 						The Desktop Application also offers a local-only mode, in which you can
@@ -367,7 +370,11 @@
 							Authentication tokens and API keys, encrypted using XChaCha20-Poly1305
 							with a master key stored in your operating system's keychain;
 						</li>
-						<li>A local activity database for caching recent activity context;</li>
+						<li>
+							A local activity database for caching recent activity context. When you
+							submit a query, this data is also transmitted to and stored on our
+							servers (see Section 3);
+						</li>
 					</ul>
 					<p class="mt-4">
 						In local-only mode, all data remains exclusively on your device and is not
