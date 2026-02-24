@@ -1,22 +1,16 @@
 import { getContext, setContext } from 'svelte';
 
-const REASONING_CONTEXT_KEY = Symbol('reasoning-context');
+const REASONING_CONTEXT_KEY = Symbol.for('reasoning-context');
 
-export class ReasoningContext {
+export class ReasoningState {
 	#isStreaming = $state(false);
-	#isOpen = $state(true);
-	#duration = $state(0);
+	#isOpen = $state(false);
+	#duration = $state<number | undefined>(undefined);
 
-	constructor(
-		options: {
-			isStreaming?: boolean;
-			isOpen?: boolean;
-			duration?: number;
-		} = {},
-	) {
+	constructor(options: { isStreaming?: boolean; isOpen?: boolean; duration?: number }) {
 		this.#isStreaming = options.isStreaming ?? false;
-		this.#isOpen = options.isOpen ?? true;
-		this.#duration = options.duration ?? 0;
+		this.#isOpen = options.isOpen ?? false;
+		this.#duration = options.duration;
 	}
 
 	get isStreaming() {
@@ -39,21 +33,17 @@ export class ReasoningContext {
 		return this.#duration;
 	}
 
-	set duration(value: number) {
+	set duration(value: number | undefined) {
 		this.#duration = value;
 	}
-
-	setIsOpen(open: boolean) {
-		this.#isOpen = open;
-	}
 }
 
-export function setReasoningContext(context: ReasoningContext) {
-	setContext(REASONING_CONTEXT_KEY, context);
+export function setReasoningContext(state: ReasoningState) {
+	setContext(REASONING_CONTEXT_KEY, state);
 }
 
-export function getReasoningContext(): ReasoningContext {
-	let context = getContext<ReasoningContext | undefined>(REASONING_CONTEXT_KEY);
+export function getReasoningContext(): ReasoningState {
+	const context = getContext<ReasoningState | undefined>(REASONING_CONTEXT_KEY);
 	if (!context) {
 		throw new Error('Reasoning components must be used within Reasoning');
 	}

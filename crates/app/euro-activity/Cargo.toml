@@ -13,13 +13,13 @@ agent-chain-core = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
-cfg-if = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 enum_dispatch = { workspace = true }
 euro-auth = { workspace = true }
 euro-browser = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-native-messaging = { workspace = true }
+euro-process = { workspace = true }
 focus-tracker = { workspace = true, features = ["async"] }
 humantime-serde = { workspace = true }
 image = { workspace = true }

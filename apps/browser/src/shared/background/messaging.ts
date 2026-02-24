@@ -7,11 +7,12 @@ export async function sendMessageWithRetry(
 	maxRetries: number = 5,
 	delayMs: number = 500,
 ): Promise<any> {
+	let lastError: any;
 	for (let attempt = 0; attempt < maxRetries; attempt++) {
 		try {
-			const response = await browser.tabs.sendMessage(tabId, message);
-			return response;
+			return await browser.tabs.sendMessage(tabId, message);
 		} catch (error: any) {
+			lastError = error;
 			const isLastAttempt = attempt === maxRetries - 1;
 			const isConnectionError =
 				error?.message?.includes('Receiving end does not exist') ||
@@ -24,6 +25,7 @@ export async function sendMessageWithRetry(
 			throw error;
 		}
 	}
+	throw lastError ?? new Error('sendMessageWithRetry: no attempts made');
 }
 
 export async function handleMessage(messageType: string) {

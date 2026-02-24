@@ -97,18 +97,12 @@ impl AssetFunctionality for YoutubeAsset {
             .collect::<Vec<_>>()
             .join(" ");
 
-        let recent_content = format!("The professor just said this: {}", last_20);
+        let content = format!(
+            "{}\nThe professor just said this: {}",
+            transcript_content, last_20
+        );
 
-        vec![
-            HumanMessage::builder()
-                .content(transcript_content)
-                .build()
-                .into(),
-            HumanMessage::builder()
-                .content(recent_content)
-                .build()
-                .into(),
-        ]
+        vec![HumanMessage::builder().content(content).build().into()]
     }
 
     fn get_context_chip(&self) -> Option<ContextChip> {
@@ -216,9 +210,8 @@ mod tests {
             0.0,
         );
         let messages = AssetFunctionality::construct_messages(&asset);
-        assert_eq!(messages.len(), 2);
+        assert_eq!(messages.len(), 1);
         assert!(matches!(messages[0], BaseMessage::Human(_)));
-        assert!(matches!(messages[1], BaseMessage::Human(_)));
         let chip = AssetFunctionality::get_context_chip(&asset);
         assert!(chip.is_some());
     }

@@ -26,7 +26,6 @@ agent-chain-core = { path = "crates/common/agent-chain-core" }
 agent-chain-macros = { path = "crates/common/agent-chain-macros" }
 agent-graph = { path = "crates/common/agent-graph" }
 agent-graph-macros = { path = "crates/common/agent-graph-macros" }
-chacha20poly1305 = "0.10.1"
 anyhow = "1.0.99"
 argon2 = "0.5"
 async_from = "0.2.0"
@@ -60,6 +59,7 @@ casbin = { version = "2.20.0", default-features = false, features = [
   "runtime-tokio"
 ] }
 cfg-if = "1.0.4"
+chacha20poly1305 = "0.10.1"
 chrono = "0.4.43"
 co-utils = { path = "crates/common/co-utils" }
 dirs = "6.0"
@@ -73,7 +73,7 @@ euro-encrypt = { path = "crates/app/euro-encrypt" }
 euro-endpoint = { path = "crates/app/euro-endpoint" }
 euro-fs = { path = "crates/app/euro-fs" }
 euro-native-messaging = { path = "crates/app/euro-native-messaging" }
-euro-screen-position = { path = "crates/app/euro-screen-position" }
+euro-process = { path = "crates/app/euro-process" }
 euro-secret = { path = "crates/app/euro-secret" }
 euro-settings = { path = "crates/app/euro-settings" }
 euro-storage = { path = "crates/app/euro-storage" }

@@ -27,11 +27,28 @@
 	import {
 		Message,
 		MessageContent,
+		MessageActions,
+		MessageAction,
 		MessageResponse,
-	} from '@eurora/ui/components/ai-elements/new-message/index';
+	} from '@eurora/ui/components/ai-elements/message/index';
 	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
+	import CheckIcon from '@lucide/svelte/icons/check';
+	import CopyIcon from '@lucide/svelte/icons/copy';
+	import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
+
+	let copiedMessageId = $state<string | null>(null);
+
+	async function copyMessageContent(content: string, messageIndex: number) {
+		await writeText(content);
+
+		const id = String(messageIndex);
+		copiedMessageId = id;
+		setTimeout(() => {
+			if (copiedMessageId === id) copiedMessageId = null;
+		}, 2000);
+	}
 
 	let thread = $state<ThreadView | null>(null);
 	let messages = $state<MessageView[]>([]);
@@ -150,34 +167,43 @@
 	}
 </script>
 
-<Conversation>
-	{#if messages.length > 0}
-		<ConversationContent>
-			{#each messages as message}
-				{@const content = getMessageContent(message)}
-				{@const isUser = isUserMessage(message)}
-				{#if content.length > 0 || !isUser}
-					<Message from={isUser ? 'user' : 'assistant'}>
-						<MessageContent>
-							{#if content.trim().length > 0}
-								<MessageResponse {content} />
-							{:else}
-								<Shimmer>Thinking</Shimmer>
+<div class="flex h-svh flex-col overflow-hidden">
+	<Conversation class="min-h-0 flex-1">
+		{#if messages.length > 0}
+			<ConversationContent>
+				{#each messages as message, i}
+					{@const content = getMessageContent(message)}
+					{@const isUser = isUserMessage(message)}
+					{#if content.length > 0 || !isUser}
+						<Message from={isUser ? 'user' : 'assistant'}>
+							<MessageContent>
+								{#if content.trim().length > 0}
+									<MessageResponse {content} />
+								{:else}
+									<Shimmer>Thinking</Shimmer>
+								{/if}
+							</MessageContent>
+							{#if !isUser && content.trim().length > 0}
+								<MessageActions>
+									<MessageAction
+										tooltip="Copy"
+										onclick={() => copyMessageContent(content, i)}
+									>
+										{#if copiedMessageId === String(i)}
+											<CheckIcon />
+										{:else}
+											<CopyIcon />
+										{/if}
+									</MessageAction>
+								</MessageActions>
 							{/if}
-						</MessageContent>
-					</Message>
-				{/if}
-			{/each}
-		</ConversationContent>
-	{/if}
-	<div
-		class={[
-			'flex justify-center',
-			messages.length > 0
-				? 'fixed bottom-4 left-(--sidebar-width) right-0 z-10'
-				: 'h-full items-center',
-		]}
-	>
+						</Message>
+					{/if}
+				{/each}
+			</ConversationContent>
+		{/if}
+	</Conversation>
+	<div class="flex shrink-0 justify-center p-4">
 		<Launcher.Root
 			class="h-fit rounded-2xl shadow-none flex flex-col p-4 w-[90%] bg-card text-card-foreground border border-border"
 		>
@@ -190,4 +216,4 @@
 			/>
 		</Launcher.Root>
 	</div>
-</Conversation>
+</div>
