@@ -22,10 +22,10 @@
 		{@render children()}
 	{:else}
 		<div
-			class="flex w-full cursor-pointer items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground"
+			class="flex w-full cursor-pointer items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
 		>
 			<Search class="size-4" />
-			<p class="text-sm">{title}</p>
+			<p>{title}</p>
 			<ChevronDown class="size-4 transition-transform group-data-[state=open]:rotate-180" />
 		</div>
 	{/if}

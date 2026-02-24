@@ -13,7 +13,7 @@
 
 <blockquote
 	data-slot="inline-citation-quote"
-	class={cn('border-muted text-muted-foreground border-l-2 pl-3 text-sm italic', className)}
+	class={cn('border-muted text-muted-foreground border-l-2 pl-3 italic', className)}
 	{...rest}
 >
 	{@render children?.()}

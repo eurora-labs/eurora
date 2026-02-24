@@ -6,7 +6,6 @@
 	import { inject } from '@eurora/shared/context';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import { Spinner } from '@eurora/ui/components/spinner/index';
-	import { platform } from '@tauri-apps/plugin-os';
 	import { onMount } from 'svelte';
 
 	let taurpcService = inject(TAURPC_SERVICE);
@@ -14,10 +13,6 @@
 
 	let { children } = $props();
 	onMount(() => {
-		if (document) {
-			document.body.classList.add(`${platform()}-app`);
-		}
-
 		taurpcService.auth
 			.get_role()
 			.then((role) => {
@@ -42,7 +37,7 @@
 		</Sidebar.Inset>
 	</Sidebar.Provider>
 {:else}
-	<div class="flex items-center justify-center h-screen">
+	<div class="flex items-center justify-center h-full">
 		<Spinner class="size-8" />
 	</div>
 {/if}

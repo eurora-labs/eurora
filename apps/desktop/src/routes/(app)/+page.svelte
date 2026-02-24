@@ -171,7 +171,7 @@
 	}
 </script>
 
-<div class="flex h-svh flex-col overflow-hidden">
+<div class="flex h-full flex-col overflow-hidden">
 	<Conversation class="min-h-0 flex-1">
 		{#if messages.length > 0}
 			<ConversationContent>
