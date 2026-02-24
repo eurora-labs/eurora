@@ -971,52 +971,39 @@ impl DatabaseManager {
         thread_id: Uuid,
         user_id: Uuid,
         params: Option<PaginationParams>,
-        only_visible: Option<bool>,
+        include_visible: Option<bool>,
+        include_hidden: Option<bool>,
     ) -> DbResult<Vec<Message>> {
         let params = params.unwrap_or_default();
+        let include_visible = include_visible.unwrap_or(true);
+        let include_hidden = include_hidden.unwrap_or(true);
 
-        let messages = match only_visible {
-            Some(visible) => {
-                let hidden_from_ui = !visible;
-                let query = format!(
-                    r#"
-                    SELECT m.id, m.thread_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.hidden_from_ui, m.created_at, m.updated_at
-                    FROM messages m
-                    WHERE m.thread_id = $1 AND m.user_id = $2 AND m.hidden_from_ui = $3
-                    ORDER BY m.id {}
-                    LIMIT $4 OFFSET $5
-                    "#,
-                    params.order()
-                );
-                sqlx::query_as::<_, Message>(&query)
-                    .bind(thread_id)
-                    .bind(user_id)
-                    .bind(hidden_from_ui)
-                    .bind(params.limit())
-                    .bind(params.offset())
-                    .fetch_all(&self.pool)
-                    .await?
-            }
-            None => {
-                let query = format!(
-                    r#"
-                    SELECT m.id, m.thread_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.hidden_from_ui, m.created_at, m.updated_at
-                    FROM messages m
-                    WHERE m.thread_id = $1 AND m.user_id = $2
-                    ORDER BY m.id {}
-                    LIMIT $3 OFFSET $4
-                    "#,
-                    params.order()
-                );
-                sqlx::query_as::<_, Message>(&query)
-                    .bind(thread_id)
-                    .bind(user_id)
-                    .bind(params.limit())
-                    .bind(params.offset())
-                    .fetch_all(&self.pool)
-                    .await?
-            }
+        let visibility_filter = match (include_visible, include_hidden) {
+            (true, true) => String::new(),
+            (true, false) => " AND m.hidden_from_ui = false".to_string(),
+            (false, true) => " AND m.hidden_from_ui = true".to_string(),
+            (false, false) => " AND false".to_string(),
         };
+
+        let query = format!(
+            r#"
+            SELECT m.id, m.thread_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.hidden_from_ui, m.created_at, m.updated_at
+            FROM messages m
+            WHERE m.thread_id = $1 AND m.user_id = $2{}
+            ORDER BY m.id {}
+            LIMIT $3 OFFSET $4
+            "#,
+            visibility_filter,
+            params.order()
+        );
+
+        let messages = sqlx::query_as::<_, Message>(&query)
+            .bind(thread_id)
+            .bind(user_id)
+            .bind(params.limit())
+            .bind(params.offset())
+            .fetch_all(&self.pool)
+            .await?;
 
         Ok(messages)
     }
