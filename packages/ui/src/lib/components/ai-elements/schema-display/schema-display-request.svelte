@@ -32,7 +32,7 @@
 		<ChevronRight
 			class="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
 		/>
-		<span class="font-medium text-sm">Request Body</span>
+		<span class="font-medium">Request Body</span>
 	</CollapsibleTrigger>
 	<CollapsibleContent>
 		<div class="border-t">

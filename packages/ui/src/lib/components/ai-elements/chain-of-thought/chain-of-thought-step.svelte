@@ -35,7 +35,7 @@
 <div
 	data-slot="chain-of-thought-step"
 	class={cn(
-		'flex gap-2 text-sm',
+		'flex gap-2',
 		stepStatusStyles[status],
 		'fade-in-0 slide-in-from-top-2 animate-in',
 		className,

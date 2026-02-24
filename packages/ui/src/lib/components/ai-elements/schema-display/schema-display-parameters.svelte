@@ -33,7 +33,7 @@
 		<ChevronRight
 			class="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
 		/>
-		<span class="font-medium text-sm">Parameters</span>
+		<span class="font-medium">Parameters</span>
 		<Badge class="ml-auto text-xs" variant="secondary">
 			{ctx.parameters?.length ?? 0}
 		</Badge>

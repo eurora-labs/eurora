@@ -21,7 +21,7 @@
 <CollapsibleTrigger
 	data-slot="reasoning-trigger"
 	class={cn(
-		'text-muted-foreground hover:text-foreground flex w-full items-center gap-2 text-sm transition-colors',
+		'text-muted-foreground hover:text-foreground flex w-full items-center gap-2 transition-colors',
 		className,
 	)}
 	{...rest}

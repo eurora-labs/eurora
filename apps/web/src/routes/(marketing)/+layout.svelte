@@ -55,7 +55,7 @@
 	<div class="flex items-center gap-2">
 		<Button variant="link" href="/" class="decoration-transparent">
 			<EuroraLogo style="width: 2rem; height: 2rem;" />
-			<span class="text-lg font-bold">Eurora</span>
+			<span class="text-lg text-primary-foreground font-bold">Eurora</span>
 		</Button>
 	</div>
 

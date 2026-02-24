@@ -60,10 +60,7 @@
 			{/if}
 		</CollapsibleTrigger>
 		{#if description}
-			<p
-				class="pb-2 text-muted-foreground text-sm"
-				style="padding-left: {paddingLeft + 24}px"
-			>
+			<p class="pb-2 text-muted-foreground" style="padding-left: {paddingLeft + 24}px">
 				{description}
 			</p>
 		{/if}
@@ -117,7 +114,7 @@
 			{/if}
 		</div>
 		{#if description}
-			<p class="mt-1 pl-6 text-muted-foreground text-sm">{description}</p>
+			<p class="mt-1 pl-6 text-muted-foreground">{description}</p>
 		{/if}
 	</div>
 {/if}

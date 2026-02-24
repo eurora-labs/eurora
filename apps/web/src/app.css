@@ -1,6 +1,14 @@
 @import '@eurora/ui/main.css';
 @import 'tailwindcss';
 
+*,
+::after,
+::before,
+::backdrop,
+::file-selector-button {
+	border-color: var(--color-border, currentcolor);
+}
+
 body {
 	margin: 0;
 }

@@ -68,7 +68,7 @@
 >
 	<div class="flex items-center gap-2">
 		<Wrench class="size-4 text-muted-foreground" />
-		<span class="font-medium text-sm">{title ?? derivedName}</span>
+		<span class="font-medium">{title ?? derivedName}</span>
 		<Badge class="gap-1.5 rounded-full text-xs" variant="secondary">
 			{#if state === 'approval-requested'}
 				<Clock class={cn('size-4', statusIconColors[state])} />

@@ -37,6 +37,6 @@
 		{/if}
 	</div>
 	{#if description}
-		<p class="mt-1 text-muted-foreground text-sm">{description}</p>
+		<p class="mt-1 text-muted-foreground">{description}</p>
 	{/if}
 </div>

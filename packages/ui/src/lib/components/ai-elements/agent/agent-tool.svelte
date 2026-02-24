@@ -30,7 +30,7 @@
 	{value}
 	{...restProps}
 >
-	<AccordionTrigger class="px-3 py-2 text-sm hover:no-underline">
+	<AccordionTrigger class="px-3 py-2 hover:no-underline">
 		{description ?? 'No description'}
 	</AccordionTrigger>
 	<AccordionContent class="px-3 pb-3">

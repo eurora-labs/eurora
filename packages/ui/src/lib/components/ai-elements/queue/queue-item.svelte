@@ -15,7 +15,7 @@
 <li
 	data-slot="queue-item"
 	class={cn(
-		'group flex flex-col gap-1 rounded-md px-3 py-1 text-sm transition-colors hover:bg-muted',
+		'group flex flex-col gap-1 rounded-md px-3 py-1 transition-colors hover:bg-muted',
 		className,
 	)}
 	{...restProps}

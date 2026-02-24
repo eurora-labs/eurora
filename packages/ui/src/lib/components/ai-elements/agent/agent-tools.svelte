@@ -19,7 +19,7 @@
 </script>
 
 <div data-slot="agent-tools" class={cn('space-y-2', className)}>
-	<span class="font-medium text-muted-foreground text-sm">Tools</span>
+	<span class="font-medium text-muted-foreground">Tools</span>
 	<Accordion class="rounded-md border" bind:value {type}>
 		{@render children?.()}
 	</Accordion>
