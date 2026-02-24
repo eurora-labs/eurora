@@ -36,8 +36,18 @@ pub(crate) fn init(encryption_key: [u8; 32], data_dir: PathBuf) -> Result<()> {
     let secrets = if path.exists() {
         let data = fs::read(&path)
             .with_context(|| format!("failed to read secret store at {}", path.display()))?;
-        decrypt_store(&key, &data)
-            .with_context(|| format!("failed to decrypt secret store at {}", path.display()))?
+        match decrypt_store(&key, &data) {
+            Ok(secrets) => secrets,
+            Err(e) => {
+                tracing::warn!(
+                    path = %path.display(),
+                    error = %e,
+                    "secret store could not be decrypted (key may have changed), starting fresh",
+                );
+                let _ = fs::remove_file(&path);
+                HashMap::new()
+            }
+        }
     } else {
         HashMap::new()
     };
