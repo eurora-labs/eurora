@@ -505,7 +505,11 @@ impl ProtoThreadService for ThreadService {
 
         let mut messages: Vec<BaseMessage> = hidden_messages
             .into_iter()
-            .map(|msg| convert_db_message_to_base_message(msg).unwrap())
+            .filter_map(|msg| {
+                convert_db_message_to_base_message(msg)
+                    .map_err(|e| tracing::warn!("Skipping unconvertible message: {e}"))
+                    .ok()
+            })
             .collect();
 
         let human_message = HumanMessage::builder().content(req.content.clone()).build();
@@ -754,7 +758,11 @@ impl ProtoThreadService for ThreadService {
 
         let mut messages: Vec<BaseMessage> = hidden_messages
             .into_iter()
-            .map(|msg| convert_db_message_to_base_message(msg).unwrap())
+            .filter_map(|msg| {
+                convert_db_message_to_base_message(msg)
+                    .map_err(|e| tracing::warn!("Skipping unconvertible message: {e}"))
+                    .ok()
+            })
             .collect();
 
         messages.push(HumanMessage::builder().content(req.content).build().into());
