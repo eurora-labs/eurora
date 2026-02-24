@@ -12,6 +12,6 @@
 	} = $props();
 </script>
 
-<div data-slot="task-item" class={cn('text-muted-foreground text-sm', className)} {...restProps}>
+<div data-slot="task-item" class={cn('text-muted-foreground', className)} {...restProps}>
 	{@render children?.()}
 </div>

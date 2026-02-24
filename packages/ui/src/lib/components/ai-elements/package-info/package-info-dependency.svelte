@@ -18,7 +18,7 @@
 
 <div
 	data-slot="package-info-dependency"
-	class={cn('flex items-center justify-between text-sm', className)}
+	class={cn('flex items-center justify-between', className)}
 	{...restProps}
 >
 	{#if children}

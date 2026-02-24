@@ -1,2 +1,37 @@
 @import '@eurora/ui/main.css';
 @import 'tailwindcss';
+
+*,
+::after,
+::before,
+::backdrop,
+::file-selector-button {
+	border-color: var(--color-border, currentcolor);
+}
+
+:root {
+	--titlebar-height: 36px;
+}
+
+body.macos-app {
+	--titlebar-height: 28px;
+}
+
+body.macos-app [data-slot='sidebar-inner'] {
+	padding-top: var(--titlebar-height);
+}
+
+[data-slot='sidebar-wrapper'] {
+	height: 100%;
+	min-height: 0 !important;
+}
+
+[data-slot='sidebar-container'] {
+	position: absolute !important;
+	top: 0 !important;
+	height: 100% !important;
+}
+
+[data-slot='sidebar-inset'] {
+	overflow: hidden;
+}

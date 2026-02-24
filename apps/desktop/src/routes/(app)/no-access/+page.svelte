@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { open } from '@tauri-apps/plugin-shell';
 	import * as Card from '@eurora/ui/components/card/index';
 </script>
 
@@ -23,7 +24,7 @@
 
 	<Card.Root
 		class="flex group cursor-pointer w-full"
-		onclick={() => goto('/onboarding/login/local')}
+		onclick={() => open('https://www.eurora-labs.com/docs/self-hosting')}
 	>
 		<Card.Header class="pb-6 text-left">
 			<Card.Title class="mb-2 text-2xl font-semibold">Run Locally</Card.Title>

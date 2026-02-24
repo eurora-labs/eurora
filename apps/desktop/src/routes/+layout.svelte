@@ -2,11 +2,17 @@
 	import '$styles/styles.css';
 	import { initDependencies } from '$lib/bootstrap/deps.js';
 	import AccessibilityPermission from '$lib/components/AccessibilityPermission.svelte';
+	import Titlebar from '$lib/components/Titlebar.svelte';
 	import UpdateChecker from '$lib/components/UpdateChecker.svelte';
 	import { Toaster } from '@eurora/ui/components/sonner/index';
 	import { openUrl } from '@tauri-apps/plugin-opener';
+	import { platform } from '@tauri-apps/plugin-os';
 	import { ModeWatcher, setMode } from 'mode-watcher';
 	import { onMount } from 'svelte';
+
+	// Set platform class synchronously (before first render) so CSS
+	// variables like --titlebar-height are correct from the start.
+	document.body.classList.add(`${platform()}-app`);
 
 	let { children } = $props();
 
@@ -48,9 +54,12 @@
 
 <ModeWatcher defaultMode="dark" track={false} />
 
-<main class="p-0 m-0 bg-inherit h-screen">
-	{@render children?.()}
-</main>
+<div class="flex flex-col h-screen overflow-hidden">
+	<Titlebar />
+	<main class="flex-1 min-h-0 bg-inherit">
+		{@render children?.()}
+	</main>
+</div>
 
 <AccessibilityPermission />
 <UpdateChecker />

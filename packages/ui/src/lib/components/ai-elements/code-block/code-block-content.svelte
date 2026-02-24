@@ -12,6 +12,13 @@
 		LINE_NUMBER_CLASSES,
 	} from './highlighter.js';
 
+	function toStyleString(style: Record<string, string> | undefined): string | undefined {
+		if (!style) return undefined;
+		return Object.entries(style)
+			.map(([k, v]) => `${k}:${v}`)
+			.join(';');
+	}
+
 	interface Props {
 		code: string;
 		language: BundledLanguage;
@@ -43,14 +50,18 @@
 </script>
 
 <div data-slot="code-block-content" class="relative overflow-auto">
+	<!--
+		All whitespace inside <pre> is significant — every newline/tab between
+		tags renders as a visible text node. Keep <pre>, <code>, and </code>,
+		</pre> tightly collapsed to avoid phantom blank lines.
+	-->
 	<pre
 		class={cn(
 			'dark:!bg-[var(--shiki-dark-bg)] dark:!text-[var(--shiki-dark)] m-0 p-4 text-sm',
 			className,
 		)}
 		style:background-color={tokenized.bg}
-		style:color={tokenized.fg}>
-		<code
+		style:color={tokenized.fg}><code
 			class={cn(
 				'font-mono text-sm',
 				showLineNumbers && '[counter-increment:line_0] [counter-reset:line]',
@@ -65,9 +76,9 @@
 								style:font-weight={isBold(token.fontStyle) ? 'bold' : undefined}
 								style:text-decoration={isUnderline(token.fontStyle)
 									? 'underline'
-									: undefined}>{token.content}</span
+									: undefined}
+								style={toStyleString(token.htmlStyle)}>{token.content}</span
 							>{/each}{/if}</span
 				>{/each}</code
-		>
-	</pre>
+		></pre>
 </div>

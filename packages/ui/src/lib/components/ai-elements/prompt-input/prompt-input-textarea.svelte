@@ -86,7 +86,7 @@
 <textarea
 	data-slot="prompt-input-textarea"
 	class={cn(
-		'field-sizing-content max-h-48 min-h-16 w-full resize-none border-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
+		'field-sizing-content max-h-48 min-h-16 w-full resize-none border-none bg-transparent px-3 py-2 outline-none placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
 		className,
 	)}
 	name="message"
