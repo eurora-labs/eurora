@@ -440,12 +440,21 @@ fn main() {
                                     icon_base64 = euro_vision::rgba_to_base64(icon).ok();
                                 }
 
+                                let icon_bg = primary_icon_color.as_ref().map(|hex| {
+                                    let r = u8::from_str_radix(&hex[1..3], 16).unwrap_or(0);
+                                    let g = u8::from_str_radix(&hex[3..5], 16).unwrap_or(0);
+                                    let b = u8::from_str_radix(&hex[5..7], 16).unwrap_or(0);
+                                    let luminance = 0.299 * r as f64 + 0.587 * g as f64 + 0.114 * b as f64;
+                                    if luminance / 255.0 > 0.7 { "black" } else { "white" }.to_string()
+                                });
+
                                 let _ = TauRpcTimelineApiEventTrigger::new(
                                     activity_timeline_handle.clone(),
                                 )
                                 .new_app_event(TimelineAppEvent {
                                     name: activity_event.name.clone(),
                                     color: primary_icon_color,
+                                    icon_bg,
                                     icon_base64,
                                 });
                             }
