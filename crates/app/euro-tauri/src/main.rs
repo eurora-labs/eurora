@@ -444,8 +444,14 @@ fn main() {
                                     let r = u8::from_str_radix(&hex[1..3], 16).unwrap_or(0);
                                     let g = u8::from_str_radix(&hex[3..5], 16).unwrap_or(0);
                                     let b = u8::from_str_radix(&hex[5..7], 16).unwrap_or(0);
-                                    let luminance = 0.299 * r as f64 + 0.587 * g as f64 + 0.114 * b as f64;
-                                    if luminance / 255.0 > 0.7 { "black" } else { "white" }.to_string()
+                                    let luminance =
+                                        0.299 * r as f64 + 0.587 * g as f64 + 0.114 * b as f64;
+                                    if luminance / 255.0 > 0.5 {
+                                        "black"
+                                    } else {
+                                        "white"
+                                    }
+                                    .to_string()
                                 });
 
                                 let _ = TauRpcTimelineApiEventTrigger::new(

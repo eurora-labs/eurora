@@ -23,8 +23,10 @@ pub fn convert_svg_to_rgba(svg: &str) -> ActivityResult<image::RgbaImage> {
         .map_err(|e| ActivityError::invalid_data(format!("Failed to parse SVG: {}", e)))?;
 
     let size = tree.size();
-    let width = size.width().ceil() as u32;
-    let height = size.height().ceil() as u32;
+    let target = 48.0_f32;
+    let scale = (target / size.width().max(size.height())).max(1.0);
+    let width = (size.width() * scale).ceil() as u32;
+    let height = (size.height() * scale).ceil() as u32;
 
     let mut pixmap = Pixmap::new(width, height).ok_or_else(|| {
         ActivityError::invalid_data(format!(
@@ -33,7 +35,11 @@ pub fn convert_svg_to_rgba(svg: &str) -> ActivityResult<image::RgbaImage> {
         ))
     })?;
 
-    render(&tree, tiny_skia::Transform::default(), &mut pixmap.as_mut());
+    render(
+        &tree,
+        tiny_skia::Transform::from_scale(scale, scale),
+        &mut pixmap.as_mut(),
+    );
 
     let img = ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, pixmap.data().to_vec())
         .ok_or_else(|| {
