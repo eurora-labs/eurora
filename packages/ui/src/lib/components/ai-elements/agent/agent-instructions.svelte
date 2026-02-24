@@ -13,8 +13,8 @@
 </script>
 
 <div data-slot="agent-instructions" class={cn('space-y-2', className)} {...restProps}>
-	<span class="font-medium text-muted-foreground text-sm">Instructions</span>
-	<div class="rounded-md bg-muted/50 p-3 text-muted-foreground text-sm">
+	<span class="font-medium text-muted-foreground">Instructions</span>
+	<div class="rounded-md bg-muted/50 p-3 text-muted-foreground">
 		{@render children?.()}
 	</div>
 </div>
