@@ -477,6 +477,7 @@ impl ProtoThreadService for ThreadService {
             .list_messages()
             .thread_id(thread_id)
             .user_id(user_id)
+            .only_visible(false)
             .params(PaginationParams::new(0, 5, "ASC".to_string()))
             .call()
             .await
