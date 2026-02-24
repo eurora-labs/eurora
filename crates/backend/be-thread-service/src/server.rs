@@ -739,8 +739,24 @@ impl ProtoThreadService for ThreadService {
                 source: e,
             })?;
 
-        let mut messages: Vec<BaseMessage> =
-            vec![HumanMessage::builder().content(req.content).build().into()];
+        let hidden_messages = self
+            .db
+            .list_messages()
+            .thread_id(thread_id)
+            .user_id(user_id)
+            .include_hidden(true)
+            .include_visible(false)
+            .params(PaginationParams::new(0, 2, "DESC".to_string()))
+            .call()
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        let mut messages: Vec<BaseMessage> = hidden_messages
+            .into_iter()
+            .map(|msg| convert_db_message_to_base_message(msg).unwrap())
+            .collect();
+
+        messages.push(HumanMessage::builder().content(req.content).build().into());
 
         messages.push(
             SystemMessage::builder()

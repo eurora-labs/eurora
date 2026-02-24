@@ -84,6 +84,10 @@
 			});
 		});
 
+		taurpc.thread.new_thread_added.on((new_thread) => {
+			thread = new_thread;
+		});
+
 		taurpc.timeline.new_assets_event.on((assets) => {
 			if (!editorRef) return false;
 			clearExtensionNodes(editorRef);
