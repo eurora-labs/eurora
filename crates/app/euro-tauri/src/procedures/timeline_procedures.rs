@@ -5,6 +5,7 @@ use tauri::Runtime;
 pub struct TimelineAppEvent {
     pub name: String,
     pub color: Option<String>,
+    pub icon_bg: Option<String>,
     pub icon_base64: Option<String>,
 }
 

@@ -42,6 +42,7 @@ impl ChatApi for ChatApiImpl {
         query: Query,
     ) -> Result<String, String> {
         let mut thread_id = thread_id;
+        let mut is_new_thread = false;
 
         {
             let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle.state();
@@ -55,6 +56,7 @@ impl ChatApi for ChatApiImpl {
                     .await
                     .expect("Failed to ensure remote thread");
                 thread_id = Some(thread.id().unwrap().to_string());
+                is_new_thread = true;
                 TauRpcThreadApiEventTrigger::new(app_handle.clone())
                     .new_thread_added(thread.into())
                     .expect("Failed to trigger new thread added event");
@@ -99,7 +101,7 @@ impl ChatApi for ChatApiImpl {
         let title_app_handle = app_handle.clone();
         let content = query.text.clone();
         let thread_id_for_title = thread_id.clone();
-        if let Some(id) = thread_id_for_title {
+        if let (true, Some(id)) = (is_new_thread, thread_id_for_title) {
             tokio::spawn(async move {
                 let app_handle = title_app_handle.clone();
                 let thread_state: tauri::State<SharedThreadManager> = app_handle.state();

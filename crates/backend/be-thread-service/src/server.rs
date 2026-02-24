@@ -472,19 +472,44 @@ impl ProtoThreadService for ThreadService {
             thread_id
         );
 
-        let db_messages = self
+        // TODO: this is incorrect. This is essentially
+        // a replacement for proper agent-driven rag
+        // that should be implemented alongside agent-graph.
+        // For now this is fineeee
+        let mut hidden_messages = self
             .db
             .list_messages()
             .thread_id(thread_id)
             .user_id(user_id)
-            .params(PaginationParams::new(0, 5, "ASC".to_string()))
+            .include_visible(false)
+            .params(PaginationParams::new(0, 2, "DESC".to_string()))
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
 
-        let mut messages: Vec<BaseMessage> = db_messages
+        hidden_messages.reverse();
+
+        let mut visible_messages = self
+            .db
+            .list_messages()
+            .thread_id(thread_id)
+            .user_id(user_id)
+            .include_hidden(false)
+            .params(PaginationParams::new(0, 3, "DESC".to_string()))
+            .call()
+            .await
+            .map_err(ThreadServiceError::from)?;
+        visible_messages.reverse();
+
+        hidden_messages.extend(visible_messages);
+
+        let mut messages: Vec<BaseMessage> = hidden_messages
             .into_iter()
-            .map(|msg| convert_db_message_to_base_message(msg).unwrap())
+            .filter_map(|msg| {
+                convert_db_message_to_base_message(msg)
+                    .map_err(|e| tracing::warn!("Skipping unconvertible message: {e}"))
+                    .ok()
+            })
             .collect();
 
         let human_message = HumanMessage::builder().content(req.content.clone()).build();
@@ -665,7 +690,7 @@ impl ProtoThreadService for ThreadService {
                 req.limit,
                 "ASC".to_string(),
             ))
-            .only_visible(true)
+            .include_hidden(false)
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
@@ -719,8 +744,28 @@ impl ProtoThreadService for ThreadService {
                 source: e,
             })?;
 
-        let mut messages: Vec<BaseMessage> =
-            vec![HumanMessage::builder().content(req.content).build().into()];
+        let hidden_messages = self
+            .db
+            .list_messages()
+            .thread_id(thread_id)
+            .user_id(user_id)
+            .include_hidden(true)
+            .include_visible(false)
+            .params(PaginationParams::new(0, 2, "DESC".to_string()))
+            .call()
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        let mut messages: Vec<BaseMessage> = hidden_messages
+            .into_iter()
+            .filter_map(|msg| {
+                convert_db_message_to_base_message(msg)
+                    .map_err(|e| tracing::warn!("Skipping unconvertible message: {e}"))
+                    .ok()
+            })
+            .collect();
+
+        messages.push(HumanMessage::builder().content(req.content).build().into());
 
         messages.push(
             SystemMessage::builder()

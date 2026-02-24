@@ -32,7 +32,7 @@ export type TelemetrySettings = { considered: boolean; anonymousMetrics: boolean
 
 export type ThreadView = { id: string | null; title: string }
 
-export type TimelineAppEvent = { name: string; color: string | null; icon_base64: string | null }
+export type TimelineAppEvent = { name: string; color: string | null; icon_bg: string | null; icon_base64: string | null }
 
 export type UpdateInfo = { version: string; body: string | null }
 
