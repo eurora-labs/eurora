@@ -533,7 +533,14 @@ fn main() {
                 });
 
             #[cfg(not(target_os = "linux"))]
-            let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+            let builder = builder.plugin(
+                tauri_plugin_window_state::Builder::default()
+                    .with_state_flags(
+                        tauri_plugin_window_state::StateFlags::all()
+                            & !tauri_plugin_window_state::StateFlags::DECORATIONS,
+                    )
+                    .build(),
+            );
 
             let router = Router::new()
                 .export_config(
