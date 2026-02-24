@@ -433,6 +433,12 @@
 							<strong>Right to withdraw consent:</strong> where processing is based on consent,
 							you may withdraw it at any time;
 						</li>
+						<li>
+							<strong>Right to lodge a complaint:</strong> you have the right to lodge a
+							complaint with a supervisory authority, in particular in the EU Member State
+							of your habitual residence, place of work or place of the alleged infringement,
+							if you consider that the processing of your personal data infringes the GDPR;
+						</li>
 					</ul>
 					<p class="mt-4">
 						To exercise any of these rights, please contact us at
