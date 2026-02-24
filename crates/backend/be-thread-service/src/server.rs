@@ -472,18 +472,37 @@ impl ProtoThreadService for ThreadService {
             thread_id
         );
 
-        let db_messages = self
+        // TODO: this is incorrect. This is essentially
+        // a replacement for proper agent-driven rag
+        // that should be implemented alongside agent-graph.
+        // For now this is fineeee
+        let mut hidden_messages = self
             .db
             .list_messages()
             .thread_id(thread_id)
             .user_id(user_id)
-            .only_visible(false)
-            .params(PaginationParams::new(0, 5, "ASC".to_string()))
+            .include_visible(false)
+            .params(PaginationParams::new(0, 2, "DESC".to_string()))
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
 
-        let mut messages: Vec<BaseMessage> = db_messages
+        hidden_messages.reverse();
+
+        let visible_messages = self
+            .db
+            .list_messages()
+            .thread_id(thread_id)
+            .user_id(user_id)
+            .include_hidden(false)
+            .params(PaginationParams::new(0, 3, "ASC".to_string()))
+            .call()
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        hidden_messages.extend(visible_messages);
+
+        let mut messages: Vec<BaseMessage> = hidden_messages
             .into_iter()
             .map(|msg| convert_db_message_to_base_message(msg).unwrap())
             .collect();
@@ -666,7 +685,7 @@ impl ProtoThreadService for ThreadService {
                 req.limit,
                 "ASC".to_string(),
             ))
-            .only_visible(true)
+            .include_hidden(false)
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
