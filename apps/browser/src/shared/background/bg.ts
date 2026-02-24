@@ -5,6 +5,13 @@ import browser from 'webextension-polyfill';
 export async function webNavigationListener(tabId: number, url: string, frameId: number) {
 	try {
 		if (frameId !== 0 || !url) return;
+
+		const [check] = await browser.scripting.executeScript({
+			target: { tabId, frameIds: [0] },
+			func: () => document.documentElement.hasAttribute('eurora-ext-ready'),
+		});
+		if (check?.result === true) return;
+
 		const u = new URL(url);
 		const entries = await loadRegistry();
 		const site = matchSite(u.hostname, entries);

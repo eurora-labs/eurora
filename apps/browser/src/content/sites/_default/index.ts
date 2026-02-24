@@ -11,43 +11,6 @@ export class ArticleWatcher extends Watcher<WatcherParams> {
 		super(params);
 	}
 
-	public listen(
-		obj: ArticleBrowserMessage,
-		sender: browser.Runtime.MessageSender,
-		response: (response?: WatcherResponse) => void,
-	): boolean {
-		const { type } = obj;
-
-		let promise: Promise<WatcherResponse>;
-
-		switch (type) {
-			case 'NEW':
-				promise = this.handleNew(obj, sender);
-				break;
-			case 'GENERATE_ASSETS':
-				promise = this.handleGenerateAssets(obj, sender);
-				break;
-			case 'GENERATE_SNAPSHOT':
-				promise = this.handleGenerateSnapshot(obj, sender);
-				break;
-			default:
-				response({ kind: 'Error', data: 'Invalid message type' });
-				return false;
-		}
-
-		promise
-			.then((result) => {
-				response(result);
-			})
-			.catch((error) => {
-				const message = error instanceof Error ? error.message : String(error);
-				console.error('Article watcher failed', { error });
-				response({ kind: 'Error', data: message });
-			});
-
-		return true;
-	}
-
 	public async handleNew(
 		_obj: ArticleBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
@@ -70,8 +33,16 @@ export class ArticleWatcher extends Watcher<WatcherParams> {
 	}
 }
 
-export function main() {
-	const watcher = new ArticleWatcher({});
+let initialized = false;
 
+export function main() {
+	if (initialized) return;
+	initialized = true;
+
+	const watcher = new ArticleWatcher({});
 	browser.runtime.onMessage.addListener(watcher.listen.bind(watcher));
+	watcher.startChangeDetection();
+	watcher.triggerInitialChange();
 }
+
+export { main as mainDefault };

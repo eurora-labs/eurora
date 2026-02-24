@@ -17,6 +17,7 @@ pub const BROWSER_BRIDGE_PORT: &str = "1431";
 
 static GLOBAL_SERVICE: OnceCell<BrowserBridgeService> = OnceCell::const_new();
 static SERVER_STARTED: AtomicBool = AtomicBool::new(false);
+static FRAME_HANDLER_STARTED: AtomicBool = AtomicBool::new(false);
 static SHUTDOWN_TX: OnceCell<watch::Sender<bool>> = OnceCell::const_new();
 
 const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
@@ -62,7 +63,6 @@ pub struct BrowserBridgeService {
     disconnects_tx: broadcast::Sender<u32>,
     pending_requests: Arc<DashMap<u32, PendingRequest>>,
     request_id_counter: Arc<AtomicU32>,
-    frame_handler_handle: Arc<OnceCell<tokio::task::JoinHandle<()>>>,
 }
 
 impl BrowserBridgeService {
@@ -80,17 +80,20 @@ impl BrowserBridgeService {
             disconnects_tx,
             pending_requests: Arc::new(DashMap::new()),
             request_id_counter: Arc::new(AtomicU32::new(1)),
-            frame_handler_handle: Arc::new(OnceCell::new()),
         }
     }
 
     pub fn start_frame_handler(&self) {
+        if FRAME_HANDLER_STARTED.swap(true, Ordering::SeqCst) {
+            return;
+        }
+
         let pending_requests = Arc::clone(&self.pending_requests);
         let frames_from_messengers_tx = self.frames_from_messengers_tx.clone();
         let events_tx = self.events_tx.clone();
         let mut frames_rx = frames_from_messengers_tx.subscribe();
 
-        let handle = tokio::spawn(async move {
+        tokio::spawn(async move {
             tracing::debug!("Frame handler task started");
             loop {
                 let (browser_pid, frame) = match frames_rx.recv().await {
@@ -190,8 +193,6 @@ impl BrowserBridgeService {
             }
             tracing::debug!("Frame handler task ended");
         });
-
-        let _ = self.frame_handler_handle.set(handle);
     }
 
     pub async fn get_or_init() -> &'static BrowserBridgeService {

@@ -1,6 +1,10 @@
 import { YouTubeTranscriptApi } from './transcript/index.js';
 import { createArticleAsset } from '../../../shared/content/extensions/article/util';
-import { Watcher, type WatcherResponse } from '../../../shared/content/extensions/watchers/watcher';
+import {
+	Watcher,
+	type BrowserObj,
+	type WatcherResponse,
+} from '../../../shared/content/extensions/watchers/watcher';
 import { ProtoImageFormat } from '@eurora/shared/proto/shared_pb.js';
 import browser from 'webextension-polyfill';
 import type { YoutubeBrowserMessage, WatcherParams } from './types.js';
@@ -30,36 +34,24 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 	}
 
 	public listen(
-		obj: YoutubeBrowserMessage,
+		obj: BrowserObj,
 		sender: browser.Runtime.MessageSender,
-		response: (response?: WatcherResponse) => void,
+		sendResponse: (response?: any) => void,
 	): boolean {
-		const { type } = obj;
-		let promise: Promise<WatcherResponse>;
-
-		switch (type) {
-			case 'NEW':
-				promise = this.handleNew(obj, sender);
-				break;
-			case 'PLAY':
-				promise = this.handlePlay(obj, sender);
-				break;
-			case 'GENERATE_ASSETS':
-				promise = this.handleGenerateAssets(obj, sender);
-				break;
-			case 'GENERATE_SNAPSHOT':
-				promise = this.handleGenerateSnapshot(obj, sender);
-				break;
-			default:
-				response({ kind: 'Error', data: 'Invalid message type' });
-				return false;
+		if ((obj as YoutubeBrowserMessage).type === 'PLAY') {
+			this.handlePlay(obj as YoutubeBrowserMessage, sender)
+				.then((result) => sendResponse(result))
+				.catch(() => sendResponse());
+			return true;
 		}
+		return super.listen(obj, sender, sendResponse);
+	}
 
-		promise.then((result) => {
-			response(result);
+	public startChangeDetection(): void {
+		super.startChangeDetection();
+		document.addEventListener('yt-navigate-finish', () => {
+			this.onChangeDetected();
 		});
-
-		return true;
 	}
 
 	public async handlePlay(
@@ -217,7 +209,12 @@ function getCurrentVideoId() {
 	return undefined;
 }
 
+let initialized = false;
+
 export function main() {
+	if (initialized) return;
+	initialized = true;
+
 	const watcher = new YoutubeWatcher({
 		videoId: getCurrentVideoId(),
 		videoTranscript: null,
@@ -227,4 +224,6 @@ export function main() {
 	});
 
 	browser.runtime.onMessage.addListener(watcher.listen.bind(watcher));
+	watcher.startChangeDetection();
+	watcher.triggerInitialChange();
 }
