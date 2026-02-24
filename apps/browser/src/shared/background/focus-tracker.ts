@@ -3,9 +3,8 @@ import { getCurrentTabIcon } from './tabs';
 import browser from 'webextension-polyfill';
 import type { NativeMetadata, Frame } from '../content/bindings';
 
-let collectionInterval: ReturnType<typeof setInterval> | null = null;
 let activeNativePort: browser.Runtime.Port | null = null;
-const lastUrl = new Map<number, string>();
+let collectGeneration = 0;
 
 export function initFocusTracker(port: browser.Runtime.Port): void {
 	activeNativePort = port;
@@ -14,12 +13,12 @@ export function initFocusTracker(port: browser.Runtime.Port): void {
 	browser.tabs.onUpdated.addListener(onTabUpdated);
 	browser.tabs.onRemoved.addListener(onTabRemoved);
 
-	collectAndSend().catch(console.error);
-	startCollectionInterval();
+	sendMetadataForActiveTab().catch(console.error);
+	startCollecting().catch(console.error);
 }
 
 export function destroyFocusTracker(): void {
-	stopCollectionInterval();
+	collectGeneration++;
 	activeNativePort = null;
 
 	browser.tabs.onActivated.removeListener(onTabActivated);
@@ -31,14 +30,20 @@ export function setNativePort(port: browser.Runtime.Port | null): void {
 	activeNativePort = port;
 }
 
-function onTabRemoved(tabId: number): void {
-	lastUrl.delete(tabId);
+function onTabRemoved(
+	_tabId: number,
+	removeInfo: browser.Tabs.OnRemovedRemoveInfoType,
+): void {
+	if (removeInfo.isWindowClosing) {
+		collectGeneration++;
+	}
 }
 
 async function onTabActivated(_activeInfo: browser.Tabs.OnActivatedActiveInfoType): Promise<void> {
 	if (!activeNativePort) return;
-	await collectAndSend();
-	startCollectionInterval();
+	collectGeneration++;
+	await sendMetadataForActiveTab();
+	startCollecting().catch(console.error);
 }
 
 async function onTabUpdated(
@@ -49,21 +54,9 @@ async function onTabUpdated(
 	if (changeInfo.status !== 'complete') return;
 	if (!activeNativePort) return;
 	if (!tab.active) return;
-	await collectAndSend();
-}
-
-function startCollectionInterval(): void {
-	stopCollectionInterval();
-	collectionInterval = setInterval(() => {
-		collectAndSend().catch(console.error);
-	}, 3_000);
-}
-
-function stopCollectionInterval(): void {
-	if (collectionInterval !== null) {
-		clearInterval(collectionInterval);
-		collectionInterval = null;
-	}
+	collectGeneration++;
+	await sendMetadataForActiveTab();
+	startCollecting().catch(console.error);
 }
 
 function isRealWebUrl(url: string): boolean {
@@ -71,20 +64,82 @@ function isRealWebUrl(url: string): boolean {
 	return /^https?:\/\//i.test(url);
 }
 
-async function collectAndSend(): Promise<void> {
+async function sendMetadataForActiveTab(): Promise<void> {
 	if (!activeNativePort) return;
-
 	try {
 		const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
 		if (!activeTab || !activeTab.id || !activeTab.url || !isRealWebUrl(activeTab.url)) return;
-
-		const port = activeNativePort;
-
-		await sendMetadataEvent(activeTab, port);
-		await sendAssetsEvent(activeTab.id, port);
-		await sendSnapshotEvent(activeTab.id, port);
+		await sendMetadataEvent(activeTab, activeNativePort);
 	} catch (error) {
-		console.error('collectAndSend failed:', error);
+		console.error('sendMetadataForActiveTab failed:', error);
+	}
+}
+
+async function startCollecting(): Promise<void> {
+	if (!activeNativePort) return;
+
+	const gen = collectGeneration;
+
+	const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+	if (gen !== collectGeneration) return;
+	if (!activeTab || !activeTab.id || !activeTab.url || !isRealWebUrl(activeTab.url)) return;
+
+	const tabId = activeTab.id;
+	let firstRun = true;
+
+	while (gen === collectGeneration && activeNativePort) {
+		try {
+			let assets: any = null;
+			let snapshot: any = null;
+
+			if (firstRun) {
+				firstRun = false;
+				const [a, s] = await Promise.all([
+					sendMessageWithRetry(tabId, { type: 'GENERATE_ASSETS' }),
+					sendMessageWithRetry(tabId, { type: 'GENERATE_SNAPSHOT' }),
+				]);
+				assets = a;
+				snapshot = s;
+			} else {
+				const response = await sendMessageWithRetry(tabId, { type: 'COLLECT' });
+				if (response && response.kind === 'CollectResponse' && response.data) {
+					assets = response.data.assets;
+					snapshot = response.data.snapshot;
+				}
+			}
+
+			if (gen !== collectGeneration || !activeNativePort) break;
+
+			const port = activeNativePort;
+
+			if (assets && assets.kind !== 'Error') {
+				const frame: Frame = {
+					kind: {
+						Event: {
+							action: 'ASSETS',
+							payload: JSON.stringify(assets),
+						},
+					},
+				};
+				port.postMessage(frame);
+			}
+
+			if (snapshot && snapshot.kind !== 'Error') {
+				const frame: Frame = {
+					kind: {
+						Event: {
+							action: 'SNAPSHOT',
+							payload: JSON.stringify(snapshot),
+						},
+					},
+				};
+				port.postMessage(frame);
+			}
+		} catch (error) {
+			if (gen !== collectGeneration) break;
+			console.warn('COLLECT failed, retrying in 1s:', error);
+			await new Promise((resolve) => setTimeout(resolve, 1000));
+		}
 	}
 }
 
@@ -110,51 +165,7 @@ async function sendMetadataEvent(tab: browser.Tabs.Tab, port: browser.Runtime.Po
 		};
 
 		port.postMessage(frame);
-
-		if (tab.id !== undefined && tab.url) {
-			lastUrl.set(tab.id, tab.url);
-		}
 	} catch (error) {
 		console.error('Failed to send metadata event:', error);
-	}
-}
-
-async function sendAssetsEvent(tabId: number, port: browser.Runtime.Port): Promise<void> {
-	try {
-		const response = await sendMessageWithRetry(tabId, { type: 'GENERATE_ASSETS' });
-		if (!response || response.kind === 'Error') return;
-
-		const frame: Frame = {
-			kind: {
-				Event: {
-					action: 'ASSETS',
-					payload: JSON.stringify(response),
-				},
-			},
-		};
-
-		port.postMessage(frame);
-	} catch (error) {
-		console.warn('Failed to collect assets:', error);
-	}
-}
-
-async function sendSnapshotEvent(tabId: number, port: browser.Runtime.Port): Promise<void> {
-	try {
-		const response = await sendMessageWithRetry(tabId, { type: 'GENERATE_SNAPSHOT' });
-		if (!response || response.kind === 'Error') return;
-
-		const frame: Frame = {
-			kind: {
-				Event: {
-					action: 'SNAPSHOT',
-					payload: JSON.stringify(response),
-				},
-			},
-		};
-
-		port.postMessage(frame);
-	} catch (error) {
-		console.warn('Failed to collect snapshot:', error);
 	}
 }
