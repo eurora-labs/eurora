@@ -35,12 +35,12 @@
 			<img
 				src={iconSrc}
 				alt={name}
-				class="w-8 h-8 rounded-full drop-shadow p-1"
+				class="w-8 h-8 rounded-full p-1"
 				style="background-color: {resolvedIconBg};"
 			/>
 		{:else}
 			<div
-				class="w-8 h-8 rounded-full drop-shadow p-1 flex items-center justify-center"
+				class="w-8 h-8 rounded-full p-1 flex items-center justify-center"
 				style="background-color: {resolvedIconBg}; color: {letterColor};"
 			>
 				{name.charAt(0).toUpperCase()}
