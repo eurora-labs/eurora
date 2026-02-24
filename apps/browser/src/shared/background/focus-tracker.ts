@@ -30,10 +30,7 @@ export function setNativePort(port: browser.Runtime.Port | null): void {
 	activeNativePort = port;
 }
 
-function onTabRemoved(
-	_tabId: number,
-	removeInfo: browser.Tabs.OnRemovedRemoveInfoType,
-): void {
+function onTabRemoved(_tabId: number, removeInfo: browser.Tabs.OnRemovedRemoveInfoType): void {
 	if (removeInfo.isWindowClosing) {
 		collectGeneration++;
 	}
