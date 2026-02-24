@@ -10,7 +10,7 @@
                             <Component Id="ChromeNativeMessagingHostJson" Guid="8c7ca6a7-77b0-4738-aaa5-9ba9b4a509fe">
                                 <File Id="ChromeNativeMessagingHostJsonFile"
                                     Name="com.eurora.app.json"
-                                    Source="hosts\windows.chromium.native-messaging.json"
+                                    Source="$(env.TAURI_HOSTS_DIR)\windows.chromium.native-messaging.json"
                                 KeyPath="yes" />
                             </Component>
                             <Component Id="ChromeNativeMessaging" Guid="6adc0a23-d076-44c8-8a93-e22934856bac">
@@ -25,7 +25,7 @@
                             <Component Id="EdgeNativeMessagingHostJson" Guid="a1f3b2c4-5d6e-7f80-9a1b-2c3d4e5f6a7b">
                                 <File Id="EdgeNativeMessagingHostJsonFile"
                                     Name="com.eurora.app.json"
-                                    Source="hosts\windows.edge.native-messaging.json"
+                                    Source="$(env.TAURI_HOSTS_DIR)\windows.edge.native-messaging.json"
                                     KeyPath="yes" />
                             </Component>
                             <Component Id="EdgeNativeMessaging" Guid="b2c3d4e5-6f7a-8b9c-0d1e-2f3a4b5c6d7e">
@@ -40,7 +40,7 @@
                             <Component Id="FirefoxNativeMessagingHostJson" Guid="b4e02a43-35e2-4635-b980-9b87224a33b1">
                                 <File Id="FirefoxNativeMessagingHostJsonFile"
                                     Name="com.eurora.app.json"
-                                    Source="hosts\windows.firefox.native-messaging.json"
+                                    Source="$(env.TAURI_HOSTS_DIR)\windows.firefox.native-messaging.json"
                                     KeyPath="yes" />
                             </Component>
                             <Component Id="FirefoxNativeMessaging" Guid="93829cc0-4c70-4684-9cab-79f0cad6ed9d">

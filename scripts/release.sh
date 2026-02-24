@@ -207,6 +207,12 @@ export CHANNEL
 BINARIES_DIR="$PWD/../crates/app/euro-tauri/binaries"
 mkdir -p "$BINARIES_DIR"
 
+# Export hosts directory for the WiX fragment (Tauri propagates TAURI_-prefixed env vars to candle/light)
+if [ "$OS" = "windows" ]; then
+	export TAURI_HOSTS_DIR
+	TAURI_HOSTS_DIR="$(readlink -f "$PWD/../crates/app/euro-tauri/hosts")"
+fi
+
 # Build the app with release config
 if [ -n "$TARGET" ]; then
 	# Export TARGET for cargo to use
