@@ -220,6 +220,8 @@ if [ -n "$TARGET" ]; then
 	# Tauri expects binaries named like: binary-name-<target-triple>[.exe]
 	if [ "$OS" = "windows" ]; then
 		cp "$PWD/../target/$TARGET/release/euro-native-messaging.exe" "$BINARIES_DIR/euro-native-messaging-$TARGET.exe"
+		export TAURI_NATIVE_MESSAGING_BIN
+		TAURI_NATIVE_MESSAGING_BIN="$(readlink -f "$PWD/../target/$TARGET/release/euro-native-messaging.exe")"
 	elif [ "$OS" = "darwin" ]; then
 		ditto "$PWD/../target/$TARGET/release/euro-native-messaging" "$BINARIES_DIR/euro-native-messaging-$TARGET"
 	else
@@ -249,6 +251,8 @@ else
 	# Copy the binary with the target-triple suffix for Tauri's externalBin
 	if [ "$OS" = "windows" ]; then
 		cp "$PWD/../target/release/euro-native-messaging.exe" "$BINARIES_DIR/euro-native-messaging-$DEFAULT_TARGET.exe"
+		export TAURI_NATIVE_MESSAGING_BIN
+		TAURI_NATIVE_MESSAGING_BIN="$(readlink -f "$PWD/../target/release/euro-native-messaging.exe")"
 	elif [ "$OS" = "darwin" ]; then
 		ditto "$PWD/../target/release/euro-native-messaging" "$BINARIES_DIR/euro-native-messaging-$DEFAULT_TARGET"
 	else
