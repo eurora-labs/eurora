@@ -1,15 +1,25 @@
 <script lang="ts" module>
 	export interface TimelineItemProps {
 		color?: string | null;
+		iconBg?: string | null;
 		highlighted?: boolean;
-		children?: any;
+		iconSrc?: string | null;
+		name?: string;
 	}
 </script>
 
 <script lang="ts">
-	let { color = 'white', highlighted = false, children }: TimelineItemProps = $props();
+	let {
+		color = 'white',
+		iconBg = 'white',
+		highlighted = false,
+		iconSrc,
+		name = '',
+	}: TimelineItemProps = $props();
 
 	let borderColor = $derived(color === 'white' ? 'black' : (color ?? 'black'));
+	let resolvedIconBg = $derived(iconBg ?? 'white');
+	let letterColor = $derived(resolvedIconBg === 'black' ? 'white' : 'black');
 </script>
 
 <div
@@ -21,6 +31,20 @@
 		style="background-color: {color}; border-color: {borderColor};"
 	></div>
 	<div class="relative z-10 flex items-center justify-center w-fit text-sm text-center p-0 m-0">
-		{@render children?.()}
+		{#if iconSrc}
+			<img
+				src={iconSrc}
+				alt={name}
+				class="w-8 h-8 rounded-full drop-shadow p-1"
+				style="background-color: {resolvedIconBg};"
+			/>
+		{:else}
+			<div
+				class="w-8 h-8 rounded-full drop-shadow p-1 flex items-center justify-center"
+				style="background-color: {resolvedIconBg}; color: {letterColor};"
+			>
+				{name.charAt(0).toUpperCase()}
+			</div>
+		{/if}
 	</div>
 </div>

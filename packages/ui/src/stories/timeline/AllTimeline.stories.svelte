@@ -1,7 +1,6 @@
 <script module lang="ts">
-	import * as Timeline from '$lib/custom-components/timeline/index.js';
 	import { Root } from '$lib/custom-components/timeline/index.js';
-	import { SiGithub, SiStackoverflow, SiReddit } from '@icons-pack/svelte-simple-icons';
+	import * as Timeline from '$lib/custom-components/timeline/index.js';
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 
 	const { Story } = defineMeta({
@@ -27,11 +26,11 @@
 		<div class="h-[600px] w-full">
 			<div class="h-full p-6 w-screen">
 				<Timeline.Root class="p-6">
-					<Timeline.Item color="yellow"><SiGithub /></Timeline.Item>
-					<Timeline.Item color="red"><SiStackoverflow /></Timeline.Item>
-					<Timeline.Item color="blue"><SiReddit /></Timeline.Item>
-					<Timeline.Item>Slack</Timeline.Item>
-					<Timeline.Item>Blender</Timeline.Item>
+					<Timeline.Item color="yellow" name="GitHub" />
+					<Timeline.Item color="red" name="StackOverflow" />
+					<Timeline.Item color="blue" name="Reddit" />
+					<Timeline.Item name="Slack" />
+					<Timeline.Item name="Blender" />
 				</Timeline.Root>
 			</div>
 		</div>
