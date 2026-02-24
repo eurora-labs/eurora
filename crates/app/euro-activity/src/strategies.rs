@@ -1,4 +1,4 @@
-use crate::{strategies::safari::SafariStrategy, utils::convert_svg_to_rgba};
+use crate::{strategies::safari::SafariStrategy, utils::render_svg_bytes};
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use enum_dispatch::enum_dispatch;
@@ -51,7 +51,7 @@ impl From<NativeMetadata> for StrategyMetadata {
                     image::load_from_memory(&bytes)
                         .map(|img| Arc::new(img.to_rgba8()))
                         .ok()
-                        .or_else(|| convert_svg_to_rgba(raw).ok().map(Arc::new))
+                        .or_else(|| render_svg_bytes(&bytes).ok().map(Arc::new))
                 })
             }
             None => None,

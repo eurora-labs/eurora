@@ -1,4 +1,3 @@
-use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use image::{ImageBuffer, Rgba};
 use resvg::render;
 use tiny_skia::Pixmap;
@@ -6,20 +5,11 @@ use usvg::{Options, Tree};
 
 use crate::error::{ActivityError, ActivityResult};
 
-pub fn convert_svg_to_rgba(svg: &str) -> ActivityResult<image::RgbaImage> {
-    let b64 = svg
-        .trim()
-        .strip_prefix("data:image/svg+xml;base64,")
-        .unwrap_or(svg);
-
-    let svg_bytes = BASE64_STANDARD
-        .decode(b64)
-        .map_err(|e| ActivityError::invalid_data(format!("Failed to decode base64 SVG: {}", e)))?;
-
+pub fn render_svg_bytes(svg_bytes: &[u8]) -> ActivityResult<image::RgbaImage> {
     let mut opt = Options::default();
     opt.fontdb_mut().load_system_fonts();
 
-    let tree = Tree::from_data(&svg_bytes, &opt)
+    let tree = Tree::from_data(svg_bytes, &opt)
         .map_err(|e| ActivityError::invalid_data(format!("Failed to parse SVG: {}", e)))?;
 
     let size = tree.size();
