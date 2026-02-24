@@ -1,4 +1,4 @@
-use crate::{strategies::safari::SafariStrategy, utils::convert_svg_to_rgba};
+use crate::{strategies::safari::SafariStrategy, utils::render_svg_bytes};
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use enum_dispatch::enum_dispatch;
@@ -41,20 +41,18 @@ impl From<NativeMetadata> for StrategyMetadata {
     fn from(metadata: NativeMetadata) -> Self {
         let icon = match metadata.icon_base64 {
             Some(ref icon) if icon.is_empty() => None,
-            Some(ref icon) if icon.starts_with("data:image/svg+xml;base64") => {
-                convert_svg_to_rgba(icon).ok().map(Arc::new)
-            }
             Some(ref icon) => {
                 let raw = if let Some(pos) = icon.find(',') {
                     &icon[pos + 1..]
                 } else {
                     icon.as_str()
                 };
-                BASE64_STANDARD
-                    .decode(raw.trim())
-                    .ok()
-                    .and_then(|bytes| image::load_from_memory(&bytes).ok())
-                    .map(|img| Arc::new(img.to_rgba8()))
+                BASE64_STANDARD.decode(raw.trim()).ok().and_then(|bytes| {
+                    image::load_from_memory(&bytes)
+                        .map(|img| Arc::new(img.to_rgba8()))
+                        .ok()
+                        .or_else(|| render_svg_bytes(&bytes).ok().map(Arc::new))
+                })
             }
             None => None,
         };

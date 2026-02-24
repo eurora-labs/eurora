@@ -199,22 +199,11 @@
 				{#each visibleTimelineItems as item, i}
 					<Timeline.Item
 						color={item.color}
+						iconBg={item.icon_bg}
 						highlighted={i === visibleTimelineItems.length - 1}
-					>
-						{#if item.icon_base64}
-							<img
-								src={item.icon_base64}
-								alt={item.name}
-								class="w-8 h-8 bg-white rounded-full drop-shadow p-1"
-							/>
-						{:else}
-							<div
-								class="w-8 h-8 bg-white rounded-full drop-shadow p-1 flex items-center justify-center"
-							>
-								{getFirstLetterAndCapitalize(item.name)}
-							</div>
-						{/if}
-					</Timeline.Item>
+						iconSrc={item.icon_base64}
+						name={item.name}
+					/>
 				{/each}
 			</Timeline.Root>
 		</div>
