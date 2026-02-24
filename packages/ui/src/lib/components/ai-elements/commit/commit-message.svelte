@@ -12,6 +12,6 @@
 	} = $props();
 </script>
 
-<span data-slot="commit-message" class={cn('font-medium text-sm', className)} {...restProps}>
+<span data-slot="commit-message" class={cn('font-medium', className)} {...restProps}>
 	{@render children?.()}
 </span>

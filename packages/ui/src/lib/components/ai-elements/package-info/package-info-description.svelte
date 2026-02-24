@@ -14,7 +14,7 @@
 
 <p
 	data-slot="package-info-description"
-	class={cn('mt-2 text-muted-foreground text-sm', className)}
+	class={cn('mt-2 text-muted-foreground', className)}
 	{...restProps}
 >
 	{@render children?.()}

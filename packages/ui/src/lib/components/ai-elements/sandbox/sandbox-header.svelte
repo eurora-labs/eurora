@@ -61,7 +61,7 @@
 >
 	<div class="flex items-center gap-2">
 		<Code class="size-4 text-muted-foreground" />
-		<span class="font-medium text-sm">{title}</span>
+		<span class="font-medium">{title}</span>
 		<Badge class="gap-1.5 rounded-full text-xs" variant="secondary">
 			{#if state === 'approval-requested'}
 				<Clock class={cn('size-4', statusIconColors[state])} />

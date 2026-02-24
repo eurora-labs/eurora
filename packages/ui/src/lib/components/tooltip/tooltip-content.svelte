@@ -8,7 +8,7 @@
 	let {
 		ref = $bindable(null),
 		class: className,
-		sideOffset = 0,
+		sideOffset = 4,
 		side = 'top',
 		children,
 		arrowClasses,

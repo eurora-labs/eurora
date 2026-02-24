@@ -10,10 +10,6 @@
 	}: HTMLAttributes<HTMLParagraphElement> & { children?: Snippet } = $props();
 </script>
 
-<p
-	data-slot="artifact-title"
-	class={cn('font-medium text-foreground text-sm', className)}
-	{...restProps}
->
+<p data-slot="artifact-title" class={cn('font-medium text-foreground', className)} {...restProps}>
 	{@render children?.()}
 </p>

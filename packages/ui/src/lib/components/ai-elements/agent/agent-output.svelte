@@ -15,7 +15,7 @@
 </script>
 
 <div data-slot="agent-output" class={cn('space-y-2', className)} {...restProps}>
-	<span class="font-medium text-muted-foreground text-sm">Output Schema</span>
+	<span class="font-medium text-muted-foreground">Output Schema</span>
 	{#if children}
 		{@render children()}
 	{:else}

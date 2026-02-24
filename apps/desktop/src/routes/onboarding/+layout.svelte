@@ -33,7 +33,7 @@
 	});
 </script>
 
-<div class="flex flex-row h-screen">
+<div class="flex flex-row h-full">
 	<div class="w-1/2">{@render children?.()}</div>
 	<div class="flex flex-col gap-4 w-1/2 justify-center items-center">
 		<EuroraIcon size="128" />

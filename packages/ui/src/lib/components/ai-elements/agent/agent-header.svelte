@@ -25,7 +25,7 @@
 >
 	<div class="flex items-center gap-2">
 		<Bot class="size-4 text-muted-foreground" />
-		<span class="font-medium text-sm">{name}</span>
+		<span class="font-medium">{name}</span>
 		{#if model}
 			<Badge class="font-mono text-xs" variant="secondary">{model}</Badge>
 		{/if}
