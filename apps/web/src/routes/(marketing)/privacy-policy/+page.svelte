@@ -225,6 +225,11 @@
 						your queries.
 					</p>
 					<p class="mt-4">
+						We do not use your data to train, fine-tune or improve AI models. Your
+						queries and contextual data are processed solely to generate responses to
+						your requests.
+					</p>
+					<p class="mt-4">
 						The Desktop Application also offers a local-only mode, in which you can
 						connect a local AI model (e.g., via Ollama). In local-only mode, no
 						conversation data, activity data or contextual data is sent to our servers
@@ -267,7 +272,14 @@
 					</ul>
 					<p class="mt-4">
 						We process your personal data only to the extent necessary to achieve the
-						purposes for which it was collected.
+						purposes for which it was collected. We do not use your personal data for
+						automated decision-making or profiling that produces legal or similarly
+						significant effects.
+					</p>
+					<p class="mt-4">
+						Providing the personal data described in Sections 1.1 and 1.2 is necessary
+						for us to provide the Service. If you choose not to provide this data, we
+						may not be able to offer you all or part of the Service's functionality.
 					</p>
 				</section>
 
@@ -526,6 +538,10 @@
 						5252 CW Vlijmen<br />
 						The Netherlands<br />
 						Chamber of Commerce: 98516167
+					</p>
+					<p class="mt-4">
+						Eurora Labs B.V. has not appointed a Data Protection Officer. For all
+						privacy-related inquiries, please use the contact details above.
 					</p>
 				</section>
 			</div>
