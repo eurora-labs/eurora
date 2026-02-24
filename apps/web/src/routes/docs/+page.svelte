@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import ServerIcon from '@lucide/svelte/icons/server';
 </script>

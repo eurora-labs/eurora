@@ -55,7 +55,7 @@
 				size="icon"
 				class="h-full rounded-none"
 				onclick={toggleMaximize}
-				aria-label="Maximize"
+				aria-label={maximized ? 'Restore' : 'Maximize'}
 			>
 				{#if maximized}
 					<CopyIcon class="size-3" />

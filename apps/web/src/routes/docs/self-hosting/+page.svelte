@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Alert, AlertDescription } from '@eurora/ui/components/alert/index';
 	import * as CodeBlock from '@eurora/ui/components/ai-elements/code-block/index';
+	import { Alert, AlertDescription } from '@eurora/ui/components/alert/index';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 

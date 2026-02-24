@@ -8,11 +8,12 @@
 
 <div class="flex min-h-screen flex-col">
 	<header class="backdrop-blur">
-		<div class="flex h-14 w-full items-center px-6">
+		<div class="flex w-full items-center px-6">
 			<Button
 				variant="link"
 				class="decoration-transparent gap-2.5 p-0 font-semibold"
 				href="/"
+				aria-label="Go to homepage"
 			>
 				<EuroraLogo style="width: 2rem; height: 2rem;" />
 			</Button>

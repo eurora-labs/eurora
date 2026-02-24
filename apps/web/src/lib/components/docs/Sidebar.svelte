@@ -17,6 +17,7 @@
 	{#each items as item (item.title)}
 		<a
 			href={item.url}
+			aria-current={item.isActive ? 'page' : undefined}
 			class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors
 				{item.isActive ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}"
 		>
