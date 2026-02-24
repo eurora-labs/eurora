@@ -9,12 +9,7 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 anyhow = { workspace = true }
 chacha20poly1305 = { workspace = true, features = ["std"] }
 co-utils = { workspace = true }
-keyring = { workspace = true, features = [
-  "apple-native",
-  "crypto-rust",
-  "linux-native",
-  "windows-native",
-] }
+keyring = { workspace = true }
 rand = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
