@@ -1,7 +1,10 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { cn } from '$lib/utils.js';
-	import { InputGroupButton, type InputGroupButtonSize } from '$lib/components/input-group/index.js';
+	import {
+		InputGroupButton,
+		type InputGroupButtonSize,
+	} from '$lib/components/input-group/index.js';
 	import type { ButtonVariant } from '$lib/components/button/index.js';
 	import { Spinner } from '$lib/components/spinner/index.js';
 	import CornerDownLeftIcon from '@lucide/svelte/icons/corner-down-left';
