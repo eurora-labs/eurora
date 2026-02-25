@@ -15,8 +15,6 @@
 		"test:unit": "vitest"
 	},
 	"devDependencies": {
-		"@eurora/prosemirror-core": "workspace:*",
-		"@eurora/prosemirror-view": "workspace:*",
 		"@eurora/shared": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",

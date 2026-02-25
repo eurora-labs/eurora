@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils.js';
+	import { CodeBlock } from '$lib/components/ai-elements/code-block/index.js';
 
 	let {
 		class: className,
@@ -20,7 +21,7 @@
 		{@render children()}
 	{:else}
 		<div class="rounded-md bg-muted/50">
-			<pre class="overflow-x-auto p-3 text-xs"><code>{schema}</code></pre>
+			<CodeBlock code={schema} language="typescript" />
 		</div>
 	{/if}
 </div>

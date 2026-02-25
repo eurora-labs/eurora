@@ -3,6 +3,7 @@
 	import type { HTMLFormAttributes } from 'svelte/elements';
 	import { onMount, onDestroy } from 'svelte';
 	import { cn } from '$lib/utils.js';
+	import { InputGroup } from '$lib/components/input-group/index.js';
 	import { nanoid } from 'nanoid';
 	import {
 		AttachmentsState,
@@ -279,7 +280,7 @@
 	onsubmit={handleSubmit}
 	{...restProps}
 >
-	<div class="overflow-hidden">
+	<InputGroup class="overflow-hidden">
 		{@render children?.()}
-	</div>
+	</InputGroup>
 </form>

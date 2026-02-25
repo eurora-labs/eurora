@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { HTMLTextareaAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils.js';
+	import { InputGroupTextarea } from '$lib/components/input-group/index.js';
 	import {
 		useOptionalPromptInputController,
 		usePromptInputAttachments,
@@ -83,12 +84,8 @@
 	}
 </script>
 
-<textarea
-	data-slot="prompt-input-textarea"
-	class={cn(
-		'field-sizing-content max-h-48 min-h-16 w-full resize-none border-none bg-transparent px-3 py-2 outline-none placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
-		className,
-	)}
+<InputGroupTextarea
+	class={cn('field-sizing-content max-h-48 min-h-16', className)}
 	name="message"
 	{placeholder}
 	oncompositionstart={handleCompositionStart}
@@ -98,4 +95,4 @@
 	oninput={handleInput}
 	value={controller ? controller.textInput.value : undefined}
 	{...restProps}
-></textarea>
+/>

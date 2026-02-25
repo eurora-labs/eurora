@@ -1,7 +1,11 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { cn } from '$lib/utils.js';
-	import { Button, type ButtonVariant, type ButtonSize } from '$lib/components/button/index.js';
+	import {
+		InputGroupButton,
+		type InputGroupButtonSize,
+	} from '$lib/components/input-group/index.js';
+	import type { ButtonVariant } from '$lib/components/button/index.js';
 	import { Spinner } from '$lib/components/spinner/index.js';
 	import CornerDownLeftIcon from '@lucide/svelte/icons/corner-down-left';
 	import SquareIcon from '@lucide/svelte/icons/square';
@@ -11,7 +15,7 @@
 	interface Props {
 		class?: string;
 		variant?: ButtonVariant;
-		size?: ButtonSize;
+		size?: InputGroupButtonSize;
 		disabled?: boolean;
 		status?: ChatStatus;
 		onStop?: () => void;
@@ -42,7 +46,7 @@
 	}
 </script>
 
-<Button
+<InputGroupButton
 	data-slot="prompt-input-submit"
 	aria-label={isGenerating ? 'Stop' : 'Submit'}
 	class={cn(className)}
@@ -63,4 +67,4 @@
 	{:else}
 		<CornerDownLeftIcon class="size-4" />
 	{/if}
-</Button>
+</InputGroupButton>

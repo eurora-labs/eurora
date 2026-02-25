@@ -1,17 +1,24 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { cn } from '$lib/utils.js';
-	import { Button, type ButtonProps } from '$lib/components/button/index.js';
+	import {
+		InputGroupButton,
+		type InputGroupButtonSize,
+	} from '$lib/components/input-group/index.js';
 	import { Tooltip, TooltipTrigger, TooltipContent } from '$lib/components/tooltip/index.js';
+	import type { ButtonVariant } from '$lib/components/button/index.js';
 
 	let {
 		variant = 'ghost',
 		class: className,
-		size = 'icon-sm',
+		size = 'icon-sm' as InputGroupButtonSize,
 		tooltip = undefined,
 		children,
 		...restProps
-	}: ButtonProps & {
+	}: {
+		variant?: ButtonVariant;
+		class?: string;
+		size?: InputGroupButtonSize;
 		tooltip?:
 			| string
 			| {
@@ -20,6 +27,7 @@
 					side?: 'top' | 'bottom' | 'left' | 'right';
 			  };
 		children?: Snippet;
+		[key: string]: unknown;
 	} = $props();
 
 	const tooltipContent = $derived(typeof tooltip === 'string' ? tooltip : tooltip?.content);
@@ -31,17 +39,16 @@
 	<Tooltip>
 		<TooltipTrigger>
 			{#snippet child({ props: triggerProps })}
-				<Button
+				<InputGroupButton
 					data-slot="prompt-input-button"
 					class={cn(className)}
 					{size}
-					type="button"
 					{variant}
 					{...triggerProps}
 					{...restProps}
 				>
 					{@render children?.()}
-				</Button>
+				</InputGroupButton>
 			{/snippet}
 		</TooltipTrigger>
 		<TooltipContent {side}>
@@ -52,14 +59,13 @@
 		</TooltipContent>
 	</Tooltip>
 {:else}
-	<Button
+	<InputGroupButton
 		data-slot="prompt-input-button"
 		class={cn(className)}
 		{size}
-		type="button"
 		{variant}
 		{...restProps}
 	>
 		{@render children?.()}
-	</Button>
+	</InputGroupButton>
 {/if}

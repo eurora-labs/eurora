@@ -1,10 +1,9 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
-	import { cn } from '$lib/utils.js';
+	import { InputGroupAddon } from '$lib/components/input-group/index.js';
 
 	let {
-		class: className,
 		children,
 		...restProps
 	}: HTMLAttributes<HTMLDivElement> & {
@@ -12,10 +11,6 @@
 	} = $props();
 </script>
 
-<div
-	data-slot="snippet-addon"
-	class={cn('flex items-center border-r bg-muted px-3 text-muted-foreground', className)}
-	{...restProps}
->
+<InputGroupAddon data-slot="snippet-addon" {...restProps}>
 	{@render children?.()}
-</div>
+</InputGroupAddon>

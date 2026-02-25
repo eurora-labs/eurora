@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils.js';
+	import { buttonVariants } from '$lib/components/button/index.js';
 
 	interface Props extends HTMLAttributes<HTMLElement> {}
 
@@ -9,9 +10,6 @@
 
 <media-play-button
 	data-slot="audio-player-play-button"
-	class={cn(
-		'inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border bg-transparent text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground',
-		className,
-	)}
+	class={cn(buttonVariants({ variant: 'outline', size: 'icon-sm' }), 'bg-transparent', className)}
 	{...restProps}
 ></media-play-button>
