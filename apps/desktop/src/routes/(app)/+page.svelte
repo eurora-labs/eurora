@@ -9,6 +9,13 @@
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
 	import {
+		Attachments,
+		Attachment,
+		AttachmentPreview,
+		AttachmentInfo,
+		AttachmentRemove,
+	} from '@eurora/ui/components/ai-elements/attachments/index';
+	import {
 		Conversation,
 		ConversationContent,
 	} from '@eurora/ui/components/ai-elements/conversation/index';
@@ -31,13 +38,6 @@
 		type PromptInputMessage,
 		type ChatStatus,
 	} from '@eurora/ui/components/ai-elements/prompt-input/index';
-	import {
-		Attachments,
-		Attachment,
-		AttachmentPreview,
-		AttachmentInfo,
-		AttachmentRemove,
-	} from '@eurora/ui/components/ai-elements/attachments/index';
 	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
 	import { Suggestions, Suggestion } from '@eurora/ui/components/ai-elements/suggestion/index';
 	import CheckIcon from '@lucide/svelte/icons/check';
