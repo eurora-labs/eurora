@@ -106,8 +106,7 @@ impl AssetFunctionality for YoutubeAsset {
     }
 
     fn get_context_chip(&self) -> Option<ContextChip> {
-        let title = self.title.clone();
-        let title = title.chars().take(9).collect::<String>();
+        let title: String = self.title.chars().take(50).collect();
 
         Some(ContextChip {
             id: self.id.clone(),
