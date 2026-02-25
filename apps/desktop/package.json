@@ -19,9 +19,6 @@
 	"devDependencies": {
 		"@eslint/compat": "^1.4.1",
 		"@eslint/js": "^9.39.2",
-		"@eurora/prosemirror-core": "workspace:*",
-		"@eurora/prosemirror-factory": "workspace:*",
-		"@eurora/prosemirror-view": "workspace:*",
 		"@eurora/shared": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"@fltsci/tauri-plugin-tracing": "^0.3.2",
@@ -63,8 +60,6 @@
 		"prettier": "^3.8.1",
 		"prettier-plugin-svelte": "^3.4.1",
 		"prettier-plugin-tailwindcss": "^0.7.2",
-		"prosemirror-model": "^1.25.4",
-		"prosemirror-view": "^1.41.5",
 		"rehype-katex": "^7.0.1",
 		"rehype-raw": "^7.0.0",
 		"rehype-stringify": "^10.0.1",

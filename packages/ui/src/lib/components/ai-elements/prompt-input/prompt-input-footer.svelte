@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils.js';
+	import { InputGroupAddon } from '$lib/components/input-group/index.js';
 
 	let {
 		class: className,
@@ -12,10 +13,11 @@
 	} = $props();
 </script>
 
-<div
+<InputGroupAddon
 	data-slot="prompt-input-footer"
-	class={cn('flex items-center justify-between gap-1', className)}
+	align="block-end"
+	class={cn('justify-between gap-1', className)}
 	{...restProps}
 >
 	{@render children?.()}
-</div>
+</InputGroupAddon>
