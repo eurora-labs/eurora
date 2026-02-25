@@ -263,8 +263,8 @@
 				<PromptInputBody>
 					<PromptInputTextarea placeholder="What can I help you with?" />
 				</PromptInputBody>
-				<PromptInputFooter>
-					<PromptInputTools>
+				<PromptInputFooter class="justify-end">
+					<!-- <PromptInputTools>
 						<PromptInputButton
 							size="sm"
 							onclick={() => (useWebSearch = !useWebSearch)}
@@ -273,7 +273,7 @@
 							<GlobeIcon size={16} />
 							<span>Search</span>
 						</PromptInputButton>
-					</PromptInputTools>
+					</PromptInputTools> -->
 					<PromptInputSubmit status={chatStatus} />
 				</PromptInputFooter>
 			</PromptInput>

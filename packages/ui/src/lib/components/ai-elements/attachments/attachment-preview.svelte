@@ -21,7 +21,10 @@
 	let mediaCategory = $derived(ctx.mediaCategory);
 	let variant = $derived(ctx.variant);
 
-	let iconSize = $derived(variant === 'inline' ? 'size-3' : 'size-4');
+	let iconSize = $derived('size-4');
+	let iconColor = $derived(
+		variant === 'inline' ? 'text-primary-foreground/70' : 'text-muted-foreground',
+	);
 
 	const mediaCategoryIcons = {
 		image: ImageIcon,
@@ -38,7 +41,7 @@
 	class={cn(
 		'flex shrink-0 items-center justify-center overflow-hidden',
 		variant === 'grid' && 'size-full bg-muted',
-		variant === 'inline' && 'size-5 rounded bg-background',
+		variant === 'inline' && 'size-5',
 		variant === 'list' && 'size-12 rounded bg-muted',
 		className,
 	)}
@@ -68,6 +71,6 @@
 		{@render fallbackIcon()}
 	{:else}
 		{@const Icon = mediaCategoryIcons[mediaCategory]}
-		<Icon class={cn(iconSize, 'text-muted-foreground')} />
+		<Icon class={cn(iconSize, iconColor)} />
 	{/if}
 </div>
