@@ -1,14 +1,10 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
-	import {
-		Conversation,
-		ConversationContent,
-		ConversationScrollButton,
-	} from '$lib/components/ai-elements/conversation/index';
+	import * as Conversation from '$lib/components/ai-elements/conversation/index';
 
 	const { Story } = defineMeta({
 		title: 'AI Elements / Chat',
-		component: Conversation,
+		component: Conversation.Root,
 		parameters: {
 			layout: 'fullscreen',
 			controls: { disable: true },
@@ -23,70 +19,18 @@
 </script>
 
 <script lang="ts">
-	import {
-		ConversationContent as ConvContent,
-		ConversationScrollButton as ConvScrollButton,
-	} from '$lib/components/ai-elements/conversation/index';
-	import {
-		Message,
-		MessageBranch,
-		MessageBranchContent,
-		MessageBranchSelector,
-		MessageBranchPrevious,
-		MessageBranchPage,
-		MessageBranchNext,
-		MessageContent,
-		MessageResponse,
-	} from '$lib/components/ai-elements/message/index';
-	import {
-		PromptInput,
-		PromptInputBody,
-		PromptInputTextarea,
-		PromptInputHeader,
-		PromptInputFooter,
-		PromptInputTools,
-		PromptInputButton,
-		PromptInputSubmit,
-		PromptInputActionMenu,
-		PromptInputActionMenuTrigger,
-		PromptInputActionMenuContent,
-		PromptInputActionAddAttachments,
-		usePromptInputAttachments,
-		type PromptInputMessage,
-		type ChatStatus,
+	import * as Message from '$lib/components/ai-elements/message/index';
+	import * as PromptInput from '$lib/components/ai-elements/prompt-input/index';
+	import type {
+		PromptInputMessage,
+		ChatStatus,
 	} from '$lib/components/ai-elements/prompt-input/index';
-	import {
-		Attachments,
-		Attachment,
-		AttachmentPreview,
-		AttachmentRemove,
-	} from '$lib/components/ai-elements/attachments/index';
+	import * as Attachment from '$lib/components/ai-elements/attachments/index';
 	import { Shimmer } from '$lib/components/ai-elements/shimmer/index';
-	import { Suggestions, Suggestion } from '$lib/components/ai-elements/suggestion/index';
-	import {
-		Sources,
-		SourcesTrigger,
-		SourcesContent,
-		Source,
-	} from '$lib/components/ai-elements/sources/index';
-	import {
-		Reasoning,
-		ReasoningTrigger,
-		ReasoningContent,
-	} from '$lib/components/ai-elements/reasoning/index';
-	import {
-		ModelSelector,
-		ModelSelectorTrigger,
-		ModelSelectorContent,
-		ModelSelectorInput,
-		ModelSelectorList,
-		ModelSelectorEmpty,
-		ModelSelectorGroup,
-		ModelSelectorItem,
-		ModelSelectorLogo,
-		ModelSelectorLogoGroup,
-		ModelSelectorName,
-	} from '$lib/components/ai-elements/model-selector/index';
+	import * as Suggestion from '$lib/components/ai-elements/suggestion/index';
+	import * as Sources from '$lib/components/ai-elements/sources/index';
+	import * as Reasoning from '$lib/components/ai-elements/reasoning/index';
+	import * as ModelSelector from '$lib/components/ai-elements/model-selector/index';
 	import { SpeechInput } from '$lib/components/ai-elements/speech-input/index';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import GlobeIcon from '@lucide/svelte/icons/globe';
@@ -391,143 +335,143 @@ Don't overuse these hooks! They come with their own overhead. Only use them when
 	<div
 		class="relative flex h-[700px] w-[900px] flex-col divide-y overflow-hidden rounded-lg border"
 	>
-		<Conversation class="min-h-0 flex-1">
-			<ConvContent>
+		<Conversation.Root class="min-h-0 flex-1">
+			<Conversation.Content>
 				{#each messages as msg (msg.key)}
 					{#if msg.versions.length > 1}
-						<MessageBranch defaultBranch={0}>
-							<MessageBranchContent count={msg.versions.length}>
+						<Message.Branch defaultBranch={0}>
+							<Message.BranchContent count={msg.versions.length}>
 								{#snippet children({ index })}
 									{@const version = msg.versions[index]}
-									<Message from={msg.from}>
-										<MessageContent>
+									<Message.Root from={msg.from}>
+										<Message.Content>
 											{#if version.content.trim().length > 0}
-												<MessageResponse content={version.content} />
+												<Message.Response content={version.content} />
 											{:else}
 												<Shimmer>Thinking</Shimmer>
 											{/if}
-										</MessageContent>
-									</Message>
+										</Message.Content>
+									</Message.Root>
 								{/snippet}
-							</MessageBranchContent>
-							<MessageBranchSelector>
-								<MessageBranchPrevious />
-								<MessageBranchPage />
-								<MessageBranchNext />
-							</MessageBranchSelector>
-						</MessageBranch>
+							</Message.BranchContent>
+							<Message.BranchSelector>
+								<Message.BranchPrevious />
+								<Message.BranchPage />
+								<Message.BranchNext />
+							</Message.BranchSelector>
+						</Message.Branch>
 					{:else}
 						{@const version = msg.versions[0]}
-						<Message from={msg.from}>
+						<Message.Root from={msg.from}>
 							{#if msg.sources?.length}
-								<Sources>
-									<SourcesTrigger count={msg.sources.length} />
-									<SourcesContent>
+								<Sources.Root>
+									<Sources.Trigger count={msg.sources.length} />
+									<Sources.Content>
 										{#each msg.sources as source (source.href)}
-											<Source href={source.href} title={source.title} />
+											<Sources.Item href={source.href} title={source.title} />
 										{/each}
-									</SourcesContent>
-								</Sources>
+									</Sources.Content>
+								</Sources.Root>
 							{/if}
 							{#if msg.reasoning}
-								<Reasoning duration={msg.reasoning.duration}>
-									<ReasoningTrigger />
-									<ReasoningContent children={msg.reasoning.content} />
-								</Reasoning>
+								<Reasoning.Root duration={msg.reasoning.duration}>
+									<Reasoning.Trigger />
+									<Reasoning.Content children={msg.reasoning.content} />
+								</Reasoning.Root>
 							{/if}
-							<MessageContent>
+							<Message.Content>
 								{#if version.content.trim().length > 0}
-									<MessageResponse content={version.content} />
+									<Message.Response content={version.content} />
 								{:else}
 									<Shimmer>Thinking</Shimmer>
 								{/if}
-							</MessageContent>
-						</Message>
+							</Message.Content>
+						</Message.Root>
 					{/if}
 				{/each}
-			</ConvContent>
-			<ConvScrollButton />
-		</Conversation>
+			</Conversation.Content>
+			<Conversation.ScrollButton />
+		</Conversation.Root>
 		<div class="grid shrink-0 gap-4 pt-4">
-			<Suggestions class="px-4">
+			<Suggestion.Root class="px-4">
 				{#each suggestionsList as suggestion}
-					<Suggestion {suggestion} onclick={handleSuggestionClick} />
+					<Suggestion.Item {suggestion} onclick={handleSuggestionClick} />
 				{/each}
-			</Suggestions>
+			</Suggestion.Root>
 			<div class="w-full px-4 pb-4">
-				<PromptInput globalDrop multiple onSubmit={handleSubmit}>
-					<PromptInputHeader />
-					<PromptInputBody>
-						<PromptInputTextarea />
-					</PromptInputBody>
-					<PromptInputFooter>
-						<PromptInputTools>
-							<PromptInputActionMenu>
-								<PromptInputActionMenuTrigger />
-								<PromptInputActionMenuContent>
-									<PromptInputActionAddAttachments />
-								</PromptInputActionMenuContent>
-							</PromptInputActionMenu>
+				<PromptInput.Root globalDrop multiple onSubmit={handleSubmit}>
+					<PromptInput.Header />
+					<PromptInput.Body>
+						<PromptInput.Textarea />
+					</PromptInput.Body>
+					<PromptInput.Footer>
+						<PromptInput.Tools>
+							<PromptInput.ActionMenu>
+								<PromptInput.ActionMenuTrigger />
+								<PromptInput.ActionMenuContent>
+									<PromptInput.ActionAddAttachments />
+								</PromptInput.ActionMenuContent>
+							</PromptInput.ActionMenu>
 							<SpeechInput class="shrink-0" />
-							<PromptInputButton
+							<PromptInput.Button
 								size="sm"
 								onclick={() => (useWebSearch = !useWebSearch)}
 								variant={useWebSearch ? 'default' : 'ghost'}
 							>
 								<GlobeIcon size={16} />
 								<span>Search</span>
-							</PromptInputButton>
-							<ModelSelector bind:open={modelSelectorOpen}>
-								<ModelSelectorTrigger>
-									<PromptInputButton size="sm">
+							</PromptInput.Button>
+							<ModelSelector.Root bind:open={modelSelectorOpen}>
+								<ModelSelector.Trigger>
+									<PromptInput.Button size="sm">
 										{#if selectedModelData?.chefSlug}
-											<ModelSelectorLogo
+											<ModelSelector.Logo
 												provider={selectedModelData.chefSlug}
 											/>
 										{/if}
 										{#if selectedModelData?.name}
-											<ModelSelectorName
-												>{selectedModelData.name}</ModelSelectorName
+											<ModelSelector.Name
+												>{selectedModelData.name}</ModelSelector.Name
 											>
 										{/if}
-									</PromptInputButton>
-								</ModelSelectorTrigger>
-								<ModelSelectorContent>
-									<ModelSelectorInput placeholder="Search models..." />
-									<ModelSelectorList>
-										<ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
+									</PromptInput.Button>
+								</ModelSelector.Trigger>
+								<ModelSelector.Content>
+									<ModelSelector.Input placeholder="Search models..." />
+									<ModelSelector.List>
+										<ModelSelector.Empty>No models found.</ModelSelector.Empty>
 										{#each chefs as chef}
-											<ModelSelectorGroup heading={chef}>
+											<ModelSelector.Group heading={chef}>
 												{#each models.filter((m) => m.chef === chef) as m (m.id)}
-													<ModelSelectorItem
+													<ModelSelector.Item
 														value={m.id}
 														onSelect={() => handleModelSelect(m.id)}
 													>
-														<ModelSelectorLogo provider={m.chefSlug} />
-														<ModelSelectorName
-															>{m.name}</ModelSelectorName
+														<ModelSelector.Logo provider={m.chefSlug} />
+														<ModelSelector.Name
+															>{m.name}</ModelSelector.Name
 														>
-														<ModelSelectorLogoGroup>
+														<ModelSelector.LogoGroup>
 															{#each m.providers as provider}
-																<ModelSelectorLogo {provider} />
+																<ModelSelector.Logo {provider} />
 															{/each}
-														</ModelSelectorLogoGroup>
+														</ModelSelector.LogoGroup>
 														{#if model === m.id}
 															<CheckIcon class="ml-auto size-4" />
 														{:else}
 															<div class="ml-auto size-4"></div>
 														{/if}
-													</ModelSelectorItem>
+													</ModelSelector.Item>
 												{/each}
-											</ModelSelectorGroup>
+											</ModelSelector.Group>
 										{/each}
-									</ModelSelectorList>
-								</ModelSelectorContent>
-							</ModelSelector>
-						</PromptInputTools>
-						<PromptInputSubmit {status} />
-					</PromptInputFooter>
-				</PromptInput>
+									</ModelSelector.List>
+								</ModelSelector.Content>
+							</ModelSelector.Root>
+						</PromptInput.Tools>
+						<PromptInput.Submit {status} />
+					</PromptInput.Footer>
+				</PromptInput.Root>
 			</div>
 		</div>
 	</div>
