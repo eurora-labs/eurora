@@ -4,6 +4,7 @@
 		type Query,
 		type MessageView,
 		type ThreadView,
+		type ContextChip,
 	} from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
@@ -22,6 +23,7 @@
 		PromptInput,
 		PromptInputBody,
 		PromptInputTextarea,
+		PromptInputHeader,
 		PromptInputFooter,
 		PromptInputTools,
 		PromptInputButton,
@@ -29,6 +31,13 @@
 		type PromptInputMessage,
 		type ChatStatus,
 	} from '@eurora/ui/components/ai-elements/prompt-input/index';
+	import {
+		Attachments,
+		Attachment,
+		AttachmentPreview,
+		AttachmentInfo,
+		AttachmentRemove,
+	} from '@eurora/ui/components/ai-elements/attachments/index';
 	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
 	import { Suggestions, Suggestion } from '@eurora/ui/components/ai-elements/suggestion/index';
 	import CheckIcon from '@lucide/svelte/icons/check';
@@ -55,6 +64,9 @@
 	let taurpc = inject(TAURPC_SERVICE);
 	let chatStatus = $state<ChatStatus>('ready');
 	let useWebSearch = $state(true);
+	let assets = $state<ContextChip[]>([]);
+
+	const showSuggestions = $derived(messages.length === 0 && assets.length === 0);
 
 	const suggestions = [
 		'What are the latest trends in AI?',
@@ -85,6 +97,10 @@
 		});
 	}
 
+	function removeAsset(id: string) {
+		assets = assets.filter((a) => a.id !== id);
+	}
+
 	onMount(() => {
 		taurpc.thread.current_thread_changed.on((new_conv) => {
 			thread = new_conv;
@@ -101,6 +117,10 @@
 
 		taurpc.thread.new_thread_added.on((new_thread) => {
 			thread = new_thread;
+		});
+
+		taurpc.timeline.new_assets_event.on((chips) => {
+			assets = chips;
 		});
 	});
 
@@ -129,6 +149,8 @@
 		const text = message.text.trim();
 		if (!text) return;
 
+		const assetIds = assets.map((a) => a.id);
+
 		messages.push({
 			id: null,
 			role: 'human',
@@ -136,7 +158,7 @@
 		});
 
 		chatStatus = 'submitted';
-		askQuestion(text).catch((error) => {
+		askQuestion(text, assetIds).catch((error) => {
 			messages.splice(-2);
 			chatStatus = 'error';
 			toast.error(String(error), {
@@ -146,10 +168,10 @@
 		});
 	}
 
-	async function askQuestion(text: string): Promise<void> {
+	async function askQuestion(text: string, assetIds: string[] = []): Promise<void> {
 		const tauRpcQuery: Query = {
 			text,
-			assets: [],
+			assets: assetIds,
 		};
 
 		let agentMessage: MessageView | undefined;
@@ -192,7 +214,9 @@
 									<Shimmer>Thinking</Shimmer>
 								{/if}
 							</MessageContent>
-							{#if !isUser && content.trim().length > 0}
+							{@const isStreaming =
+								!isUser && i === messages.length - 1 && chatStatus !== 'ready'}
+							{#if !isUser && content.trim().length > 0 && !isStreaming}
 								<MessageActions>
 									<MessageAction
 										tooltip="Copy"
@@ -213,14 +237,32 @@
 		{/if}
 	</Conversation>
 	<div class="grid shrink-0 gap-4 pt-4">
-		<Suggestions class="px-4">
-			{#each suggestions as suggestion}
-				<Suggestion {suggestion} onclick={handleSuggestionClick} />
-			{/each}
-		</Suggestions>
+		{#if showSuggestions}
+			<Suggestions class="px-4">
+				{#each suggestions as suggestion}
+					<Suggestion {suggestion} onclick={handleSuggestionClick} />
+				{/each}
+			</Suggestions>
+		{/if}
 		<div class="flex justify-center px-4 pb-4">
 			<div class="w-[90%]">
 				<PromptInput onSubmit={handleSubmit}>
+					{#if assets.length > 0}
+						<PromptInputHeader>
+							<Attachments variant="inline">
+								{#each assets as asset (asset.id)}
+									<Attachment
+										data={{ type: 'file', id: asset.id, filename: asset.name }}
+										onRemove={() => removeAsset(asset.id)}
+									>
+										<AttachmentPreview />
+										<AttachmentInfo />
+										<AttachmentRemove />
+									</Attachment>
+								{/each}
+							</Attachments>
+						</PromptInputHeader>
+					{/if}
 					<PromptInputBody>
 						<PromptInputTextarea placeholder="What can I help you with?" />
 					</PromptInputBody>
