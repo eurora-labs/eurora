@@ -1,21 +1,67 @@
-export { default as Commit } from './commit.svelte';
-export { default as CommitHeader } from './commit-header.svelte';
-export { default as CommitHash } from './commit-hash.svelte';
-export { default as CommitMessage } from './commit-message.svelte';
-export { default as CommitMetadata } from './commit-metadata.svelte';
-export { default as CommitInfo } from './commit-info.svelte';
-export { default as CommitAuthor } from './commit-author.svelte';
-export { default as CommitAuthorAvatar } from './commit-author-avatar.svelte';
-export { default as CommitTimestamp } from './commit-timestamp.svelte';
-export { default as CommitActions } from './commit-actions.svelte';
-export { default as CommitCopyButton } from './commit-copy-button.svelte';
-export { default as CommitContent } from './commit-content.svelte';
-export { default as CommitFiles } from './commit-files.svelte';
-export { default as CommitFile } from './commit-file.svelte';
-export { default as CommitFileInfo } from './commit-file-info.svelte';
-export { default as CommitFileStatus } from './commit-file-status.svelte';
-export { default as CommitFileIcon } from './commit-file-icon.svelte';
-export { default as CommitFilePath } from './commit-file-path.svelte';
-export { default as CommitFileChanges } from './commit-file-changes.svelte';
-export { default as CommitFileAdditions } from './commit-file-additions.svelte';
-export { default as CommitFileDeletions } from './commit-file-deletions.svelte';
+import Root from './commit.svelte';
+import Header from './commit-header.svelte';
+import Hash from './commit-hash.svelte';
+import Message from './commit-message.svelte';
+import Metadata from './commit-metadata.svelte';
+import Info from './commit-info.svelte';
+import Author from './commit-author.svelte';
+import AuthorAvatar from './commit-author-avatar.svelte';
+import Timestamp from './commit-timestamp.svelte';
+import Actions from './commit-actions.svelte';
+import CopyButton from './commit-copy-button.svelte';
+import Content from './commit-content.svelte';
+import Files from './commit-files.svelte';
+import File from './commit-file.svelte';
+import FileInfo from './commit-file-info.svelte';
+import FileStatus from './commit-file-status.svelte';
+import FileIcon from './commit-file-icon.svelte';
+import FilePath from './commit-file-path.svelte';
+import FileChanges from './commit-file-changes.svelte';
+import FileAdditions from './commit-file-additions.svelte';
+import FileDeletions from './commit-file-deletions.svelte';
+
+export {
+	Root,
+	Header,
+	Hash,
+	Message,
+	Metadata,
+	Info,
+	Author,
+	AuthorAvatar,
+	Timestamp,
+	Actions,
+	CopyButton,
+	Content,
+	Files,
+	File,
+	FileInfo,
+	FileStatus,
+	FileIcon,
+	FilePath,
+	FileChanges,
+	FileAdditions,
+	FileDeletions,
+	//
+	Root as Commit,
+	Header as CommitHeader,
+	Hash as CommitHash,
+	Message as CommitMessage,
+	Metadata as CommitMetadata,
+	Info as CommitInfo,
+	Author as CommitAuthor,
+	AuthorAvatar as CommitAuthorAvatar,
+	Timestamp as CommitTimestamp,
+	Actions as CommitActions,
+	CopyButton as CommitCopyButton,
+	Content as CommitContent,
+	Files as CommitFiles,
+	File as CommitFile,
+	FileInfo as CommitFileInfo,
+	FileStatus as CommitFileStatus,
+	FileIcon as CommitFileIcon,
+	FilePath as CommitFilePath,
+	FileChanges as CommitFileChanges,
+	FileAdditions as CommitFileAdditions,
+	FileDeletions as CommitFileDeletions,
+};

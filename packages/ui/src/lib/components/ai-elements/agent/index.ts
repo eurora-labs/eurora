@@ -1,7 +1,25 @@
-export { default as Agent } from './agent.svelte';
-export { default as AgentHeader } from './agent-header.svelte';
-export { default as AgentContent } from './agent-content.svelte';
-export { default as AgentInstructions } from './agent-instructions.svelte';
-export { default as AgentTools } from './agent-tools.svelte';
-export { default as AgentTool } from './agent-tool.svelte';
-export { default as AgentOutput } from './agent-output.svelte';
+import Root from './agent.svelte';
+import Header from './agent-header.svelte';
+import Content from './agent-content.svelte';
+import Instructions from './agent-instructions.svelte';
+import Tools from './agent-tools.svelte';
+import Tool from './agent-tool.svelte';
+import Output from './agent-output.svelte';
+
+export {
+	Root,
+	Header,
+	Content,
+	Instructions,
+	Tools,
+	Tool,
+	Output,
+	//
+	Root as Agent,
+	Header as AgentHeader,
+	Content as AgentContent,
+	Instructions as AgentInstructions,
+	Tools as AgentTools,
+	Tool as AgentTool,
+	Output as AgentOutput,
+};

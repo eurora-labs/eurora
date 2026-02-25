@@ -1,5 +1,19 @@
-export { default as Snippet } from './snippet.svelte';
-export { default as SnippetAddon } from './snippet-addon.svelte';
-export { default as SnippetText } from './snippet-text.svelte';
-export { default as SnippetInput } from './snippet-input.svelte';
-export { default as SnippetCopyButton } from './snippet-copy-button.svelte';
+import Root from './snippet.svelte';
+import Addon from './snippet-addon.svelte';
+import Text from './snippet-text.svelte';
+import Input from './snippet-input.svelte';
+import CopyButton from './snippet-copy-button.svelte';
+
+export {
+	Root,
+	Addon,
+	Text,
+	Input,
+	CopyButton,
+	//
+	Root as Snippet,
+	Addon as SnippetAddon,
+	Text as SnippetText,
+	Input as SnippetInput,
+	CopyButton as SnippetCopyButton,
+};

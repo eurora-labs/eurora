@@ -8,6 +8,7 @@
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
 	import { useSidebar } from '@eurora/ui/components/sidebar/index';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
+	import * as Empty from '@eurora/ui/components/empty/index';
 	import { Spinner } from '@eurora/ui/components/spinner/index';
 	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
@@ -160,19 +161,25 @@
 			</Sidebar.GroupContent>
 		</Sidebar.Group>
 		{#if sidebarState?.open}
-			<Sidebar.Group>
-				<Sidebar.GroupLabel>Chats</Sidebar.GroupLabel>
-
-				<Sidebar.GroupContent>
-					{#if chatsLoading}
+			{#if chatsLoading}
+				<Sidebar.Group>
+					<Sidebar.GroupLabel>Chats</Sidebar.GroupLabel>
+					<Sidebar.GroupContent>
 						<div class="flex items-center justify-center py-4">
 							<Spinner />
 						</div>
-					{:else if threads.length === 0}
-						<p class="px-3 py-4 text-sm text-muted-foreground text-center">
-							No Chats Yet
-						</p>
-					{:else}
+					</Sidebar.GroupContent>
+				</Sidebar.Group>
+			{:else if threads.length === 0}
+				<Empty.Root>
+					<Empty.Header>
+						<Empty.Title>No chats yet</Empty.Title>
+					</Empty.Header>
+				</Empty.Root>
+			{:else}
+				<Sidebar.Group>
+					<Sidebar.GroupLabel>Chats</Sidebar.GroupLabel>
+					<Sidebar.GroupContent>
 						<Sidebar.Menu>
 							{#each threads as item (item.id)}
 								<Sidebar.MenuItem>
@@ -190,9 +197,9 @@
 								</Sidebar.MenuItem>
 							{/each}
 						</Sidebar.Menu>
-					{/if}
-				</Sidebar.GroupContent>
-			</Sidebar.Group>
+					</Sidebar.GroupContent>
+				</Sidebar.Group>
+			{/if}
 		{/if}
 	</Sidebar.Content>
 	{#if visibleTimelineItems.length > 0}
