@@ -2,6 +2,7 @@
 	import type { Snippet as SvelteSnippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils.js';
+	import { InputGroup } from '$lib/components/input-group/index.js';
 	import { setSnippet } from './snippet-context.svelte.js';
 
 	let {
@@ -17,10 +18,6 @@
 	setSnippet({ code: () => code });
 </script>
 
-<div
-	data-slot="snippet"
-	class={cn('flex items-center rounded-md border font-mono text-sm', className)}
-	{...restProps}
->
+<InputGroup data-slot="snippet" class={cn('font-mono', className)} {...restProps}>
 	{@render children?.()}
-</div>
+</InputGroup>

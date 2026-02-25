@@ -7,6 +7,7 @@
 		AccordionContent,
 	} from '$lib/components/accordion/index.js';
 	import { Accordion as AccordionPrimitive } from 'bits-ui';
+	import { CodeBlock } from '$lib/components/ai-elements/code-block/index.js';
 
 	let {
 		class: className,
@@ -38,7 +39,7 @@
 			{@render children()}
 		{:else}
 			<div class="rounded-md bg-muted/50">
-				<pre class="overflow-x-auto p-3 text-xs"><code>{formatted}</code></pre>
+				<CodeBlock code={formatted} language="json" />
 			</div>
 		{/if}
 	</AccordionContent>
