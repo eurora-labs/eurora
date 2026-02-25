@@ -1,40 +1,38 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import * as Card from '@eurora/ui/components/card/index';
+	import { Button } from '@eurora/ui/components/button/index';
+	import { Separator } from '@eurora/ui/components/separator/index';
+	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import { open } from '@tauri-apps/plugin-shell';
 	import { toast } from 'svelte-sonner';
 </script>
 
-<div class="flex flex-col justify-center items-center h-full p-8 gap-4">
-	<div class="pb-4">
-		<h1 class="text-4xl font-bold drop-shadow-lg pb-2">Subscription Required</h1>
-		<p class="text-muted-foreground">
-			Your current plan does not include cloud access. Upgrade your plan or run Eurora locally
-			with your own models.
-		</p>
+<div class="flex flex-col justify-center items-center h-full p-8">
+	<div class="flex flex-col max-w-md gap-6">
+		<div>
+			<h1 class="text-3xl font-bold pb-2">Subscription Required</h1>
+			<p class="text-muted-foreground">
+				Your current plan does not include cloud access. Upgrade your plan or run Eurora
+				locally with your own models.
+			</p>
+		</div>
+
+		<Button size="lg" class="w-fit" onclick={() => goto('/no-access/upgrade')}>
+			Upgrade Plan
+		</Button>
+
+		<Separator />
+
+		<Button
+			variant="link"
+			class="w-fit text-muted-foreground"
+			onclick={() =>
+				open('https://www.eurora-labs.com/docs/self-hosting').catch((e) =>
+					toast.error(`Failed to open link: ${e}`),
+				)}
+		>
+			Run locally with your own models
+			<ExternalLink class="size-3.5" />
+		</Button>
 	</div>
-
-	<Card.Root class="flex group cursor-pointer w-full" onclick={() => goto('/no-access/upgrade')}>
-		<Card.Header class="pb-6 text-left">
-			<Card.Title class="mb-2 text-2xl font-semibold">Upgrade Plan</Card.Title>
-			<Card.Description>
-				Get access to cloud features and all Eurora has to offer.
-			</Card.Description>
-		</Card.Header>
-	</Card.Root>
-
-	<Card.Root
-		class="flex group cursor-pointer w-full"
-		onclick={() =>
-			open('https://www.eurora-labs.com/docs/self-hosting').catch((e) =>
-				toast.error(`Failed to open link: ${e}`),
-			)}
-	>
-		<Card.Header class="pb-6 text-left">
-			<Card.Title class="mb-2 text-2xl font-semibold">Run Locally</Card.Title>
-			<Card.Description>
-				Use Eurora with your own local models without a subscription.
-			</Card.Description>
-		</Card.Header>
-	</Card.Root>
 </div>
