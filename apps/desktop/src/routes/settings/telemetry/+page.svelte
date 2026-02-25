@@ -3,8 +3,8 @@
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
 	import { Label } from '@eurora/ui/components/label/index';
+	import { Separator } from '@eurora/ui/components/separator/index';
 	import { Switch } from '@eurora/ui/components/switch/index';
-
 	import { onMount } from 'svelte';
 
 	const taurpc = inject(TAURPC_SERVICE);
@@ -26,24 +26,28 @@
 	});
 </script>
 
-<div class="w-full h-full p-6 flex flex-col justify-start items-start gap-2">
-	<h1 class="text-2xl font-bold">Telemetry</h1>
-	<p class="text-sm text-muted-foreground">
-		By enabling telemetry, you agree to share anonymous usage data with the Eurora team to help
-		improve the app.
-	</p>
-
-	<div class="flex w-full items-start justify-start gap-2 py-2">
-		<Switch checked={anonymousMetricsEnabled} />
-		<Label>Send anonymous metrics</Label>
+<div class="flex flex-col gap-8">
+	<div>
+		<h1 class="text-lg font-semibold">Telemetry</h1>
+		<p class="text-sm text-muted-foreground">
+			Control what usage data is shared with the Eurora team.
+		</p>
 	</div>
 
-	<div class="flex w-full items-start justify-start gap-2 py-2">
-		<Switch checked={anonymousErrorsEnabled} />
-		<Label>Send anonymous errors</Label>
-	</div>
-	<div class="flex w-full items-start justify-start gap-2 py-2">
-		<Switch checked={nonAnonymousMetricsEnabled} />
-		<Label>Send non-anonymous metrics</Label>
-	</div>
+	<section class="flex flex-col gap-4">
+		<h2 class="text-sm font-medium text-muted-foreground">Data collection</h2>
+		<Separator />
+		<div class="flex items-center justify-between">
+			<Label for="anon-metrics" class="text-sm">Anonymous metrics</Label>
+			<Switch id="anon-metrics" bind:checked={anonymousMetricsEnabled} />
+		</div>
+		<div class="flex items-center justify-between">
+			<Label for="anon-errors" class="text-sm">Anonymous errors</Label>
+			<Switch id="anon-errors" bind:checked={anonymousErrorsEnabled} />
+		</div>
+		<div class="flex items-center justify-between">
+			<Label for="non-anon-metrics" class="text-sm">Non-anonymous metrics</Label>
+			<Switch id="non-anon-metrics" bind:checked={nonAnonymousMetricsEnabled} />
+		</div>
+	</section>
 </div>
