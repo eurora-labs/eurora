@@ -19,7 +19,12 @@
 	<div data-slot="attachment-info" class={cn('min-w-0 flex-1', className)} {...restProps}>
 		<span class="block truncate">{label}</span>
 		{#if showMediaType && data.mediaType}
-			<span class="block truncate text-muted-foreground text-xs">
+			<span
+				class={cn(
+					'block truncate text-xs',
+					variant === 'inline' ? 'text-primary-foreground/70' : 'text-muted-foreground',
+				)}
+			>
 				{data.mediaType}
 			</span>
 		{/if}
