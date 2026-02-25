@@ -240,8 +240,8 @@
 		{/if}
 		<div class="w-full px-4 pb-4">
 			<PromptInput onSubmit={handleSubmit}>
-				<PromptInputHeader>
-					{#if assets.length > 0}
+				{#if assets.length > 0}
+					<PromptInputHeader>
 						<Attachments variant="inline">
 							{#each assets as asset (asset.id)}
 								<Attachment
@@ -254,8 +254,8 @@
 								</Attachment>
 							{/each}
 						</Attachments>
-					{/if}
-				</PromptInputHeader>
+					</PromptInputHeader>
+				{/if}
 				<PromptInputBody>
 					<PromptInputTextarea placeholder="What can I help you with?" />
 				</PromptInputBody>
