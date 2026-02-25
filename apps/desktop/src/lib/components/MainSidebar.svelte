@@ -11,8 +11,10 @@
 	import { Spinner } from '@eurora/ui/components/spinner/index';
 	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
+	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import LogoutIcon from '@lucide/svelte/icons/log-out';
 	import PowerIcon from '@lucide/svelte/icons/power';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -209,42 +211,37 @@
 		</div>
 	{/if}
 	<Sidebar.Footer>
-		<div class="flex items-center justify-between gap-2">
-			<DropdownMenu.Root>
-				<DropdownMenu.Trigger>
-					{#snippet child({ props })}
-						<Button
-							{...props}
-							variant="ghost"
-							class="flex items-center gap-2 min-w-0 h-auto px-1 py-1 flex-1 justify-start"
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger>
+				{#snippet child({ props })}
+					<Button
+						{...props}
+						variant="ghost"
+						class="flex items-center gap-2 min-w-0 h-auto px-1 py-1 w-full justify-start"
+					>
+						<div
+							class="flex size-7 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground text-xs font-medium"
 						>
-							<div
-								class="flex size-7 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground text-xs font-medium"
-							>
-								{getFirstLetterAndCapitalize(username)}
-							</div>
-							{#if sidebarState?.open}
-								<span class="truncate text-sm">{username}</span>
-							{/if}
-						</Button>
-					{/snippet}
-				</DropdownMenu.Trigger>
-				<DropdownMenu.Content side="top" align="start">
-					<DropdownMenu.Item onclick={() => goto('/settings')}>
-						<span>Settings</span>
-					</DropdownMenu.Item>
-				</DropdownMenu.Content>
-			</DropdownMenu.Root>
-			{#if sidebarState?.open}
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
-						{#snippet child({ props })}
-							<Button {...props} variant="ghost" size="icon" class="size-7 shrink-0">
-								<PowerIcon class="size-4" />
-							</Button>
-						{/snippet}
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content side="top" align="end">
+							{getFirstLetterAndCapitalize(username)}
+						</div>
+						{#if sidebarState?.open}
+							<span class="truncate text-sm flex-1 text-left">{username}</span>
+							<ChevronUpIcon class="size-4 shrink-0" />
+						{/if}
+					</Button>
+				{/snippet}
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content side="top" align="start" class="w-56">
+				<DropdownMenu.Item onclick={() => goto('/settings')}>
+					<SettingsIcon />
+					<span>Settings</span>
+				</DropdownMenu.Item>
+				<DropdownMenu.Sub>
+					<DropdownMenu.SubTrigger>
+						<PowerIcon />
+						<span>Power</span>
+					</DropdownMenu.SubTrigger>
+					<DropdownMenu.SubContent class="w-40">
 						<DropdownMenu.Item
 							onclick={() => {
 								taurpc.auth.logout().then(() => {
@@ -259,10 +256,10 @@
 							<PowerIcon />
 							<span>Quit</span>
 						</DropdownMenu.Item>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
-			{/if}
-		</div>
+					</DropdownMenu.SubContent>
+				</DropdownMenu.Sub>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
 	</Sidebar.Footer>
 </Sidebar.Root>
 

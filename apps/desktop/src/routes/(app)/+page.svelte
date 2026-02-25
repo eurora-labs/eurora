@@ -32,8 +32,6 @@
 		PromptInputTextarea,
 		PromptInputHeader,
 		PromptInputFooter,
-		PromptInputTools,
-		PromptInputButton,
 		PromptInputSubmit,
 		type PromptInputMessage,
 		type ChatStatus,
@@ -42,7 +40,6 @@
 	import { Suggestions, Suggestion } from '@eurora/ui/components/ai-elements/suggestion/index';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import CopyIcon from '@lucide/svelte/icons/copy';
-	import GlobeIcon from '@lucide/svelte/icons/globe';
 	import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -63,7 +60,6 @@
 	let messages = $state<MessageView[]>([]);
 	let taurpc = inject(TAURPC_SERVICE);
 	let chatStatus = $state<ChatStatus>('ready');
-	let useWebSearch = $state(true);
 	let assets = $state<ContextChip[]>([]);
 
 	const showSuggestions = $derived(messages.length === 0 && assets.length === 0);
