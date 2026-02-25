@@ -24,7 +24,7 @@
 
 <div
 	data-slot="transcription"
-	class={cn('flex flex-wrap gap-1 leading-relaxed', className)}
+	class={cn('flex flex-wrap gap-1 text-sm leading-relaxed', className)}
 	{...restProps}
 >
 	{@render children?.()}

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { cn } from '$lib/utils.js';
-	import { Button } from '$lib/components/button/index.js';
+	import { InputGroupButton } from '$lib/components/input-group/index.js';
 	import Check from '@lucide/svelte/icons/check';
 	import Copy from '@lucide/svelte/icons/copy';
 	import { useSnippet } from './snippet-context.svelte.js';
@@ -45,14 +45,13 @@
 	}
 </script>
 
-<Button
+<InputGroupButton
 	data-slot="snippet-copy-button"
-	class={cn('shrink-0 rounded-l-none border-l', className)}
+	class={cn(className)}
 	onclick={copyToClipboard}
 	aria-label="Copy"
 	title="Copy"
-	size="icon"
-	variant="ghost"
+	size="icon-sm"
 	{...restProps}
 >
 	{#if children}
@@ -62,4 +61,4 @@
 	{:else}
 		<Copy class="size-3.5" />
 	{/if}
-</Button>
+</InputGroupButton>
