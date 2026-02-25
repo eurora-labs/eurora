@@ -1,9 +1,31 @@
-export { default as EnvironmentVariables } from './environment-variables.svelte';
-export { default as EnvironmentVariablesHeader } from './environment-variables-header.svelte';
-export { default as EnvironmentVariablesTitle } from './environment-variables-title.svelte';
-export { default as EnvironmentVariablesToggle } from './environment-variables-toggle.svelte';
-export { default as EnvironmentVariable } from './environment-variable.svelte';
-export { default as EnvironmentVariableName } from './environment-variable-name.svelte';
-export { default as EnvironmentVariableValue } from './environment-variable-value.svelte';
-export { default as EnvironmentVariableCopyButton } from './environment-variable-copy-button.svelte';
-export { default as EnvironmentVariableRequired } from './environment-variable-required.svelte';
+import Root from './environment-variables.svelte';
+import Header from './environment-variables-header.svelte';
+import Title from './environment-variables-title.svelte';
+import Toggle from './environment-variables-toggle.svelte';
+import Item from './environment-variable.svelte';
+import Name from './environment-variable-name.svelte';
+import Value from './environment-variable-value.svelte';
+import CopyButton from './environment-variable-copy-button.svelte';
+import Required from './environment-variable-required.svelte';
+
+export {
+	Root,
+	Header,
+	Title,
+	Toggle,
+	Item,
+	Name,
+	Value,
+	CopyButton,
+	Required,
+	//
+	Root as EnvironmentVariables,
+	Header as EnvironmentVariablesHeader,
+	Title as EnvironmentVariablesTitle,
+	Toggle as EnvironmentVariablesToggle,
+	Item as EnvironmentVariable,
+	Name as EnvironmentVariableName,
+	Value as EnvironmentVariableValue,
+	CopyButton as EnvironmentVariableCopyButton,
+	Required as EnvironmentVariableRequired,
+};

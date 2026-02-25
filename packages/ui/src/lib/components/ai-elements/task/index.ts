@@ -1,5 +1,19 @@
-export { default as Task } from './task.svelte';
-export { default as TaskTrigger } from './task-trigger.svelte';
-export { default as TaskContent } from './task-content.svelte';
-export { default as TaskItem } from './task-item.svelte';
-export { default as TaskItemFile } from './task-item-file.svelte';
+import Root from './task.svelte';
+import Trigger from './task-trigger.svelte';
+import Content from './task-content.svelte';
+import Item from './task-item.svelte';
+import ItemFile from './task-item-file.svelte';
+
+export {
+	Root,
+	Trigger,
+	Content,
+	Item,
+	ItemFile,
+	//
+	Root as Task,
+	Trigger as TaskTrigger,
+	Content as TaskContent,
+	Item as TaskItem,
+	ItemFile as TaskItemFile,
+};

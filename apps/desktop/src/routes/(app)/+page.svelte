@@ -5,44 +5,26 @@
 		type MessageView,
 		type ThreadView,
 		type ContextChip,
+		type TimelineAppEvent,
 	} from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
-	import {
-		Attachments,
-		Attachment,
-		AttachmentPreview,
-		AttachmentInfo,
-		AttachmentRemove,
-	} from '@eurora/ui/components/ai-elements/attachments/index';
-	import {
-		Conversation,
-		ConversationContent,
-	} from '@eurora/ui/components/ai-elements/conversation/index';
-	import {
-		Message,
-		MessageContent,
-		MessageActions,
-		MessageAction,
-		MessageResponse,
-	} from '@eurora/ui/components/ai-elements/message/index';
-	import {
-		PromptInput,
-		PromptInputBody,
-		PromptInputTextarea,
-		PromptInputHeader,
-		PromptInputFooter,
-		PromptInputSubmit,
-		type PromptInputMessage,
-		type ChatStatus,
-	} from '@eurora/ui/components/ai-elements/prompt-input/index';
+	import * as Attachment from '@eurora/ui/components/ai-elements/attachments/index';
+	import * as Empty from '@eurora/ui/components/empty/index';
+	import * as Conversation from '@eurora/ui/components/ai-elements/conversation/index';
+	import * as Message from '@eurora/ui/components/ai-elements/message/index';
+	import * as PromptInput from '@eurora/ui/components/ai-elements/prompt-input/index';
 	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
-	import { Suggestions, Suggestion } from '@eurora/ui/components/ai-elements/suggestion/index';
+	import * as Suggestion from '@eurora/ui/components/ai-elements/suggestion/index';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import type {
+		PromptInputMessage,
+		ChatStatus,
+	} from '@eurora/ui/components/ai-elements/prompt-input/index';
 
 	let copiedMessageId = $state<string | null>(null);
 
@@ -61,6 +43,7 @@
 	let taurpc = inject(TAURPC_SERVICE);
 	let chatStatus = $state<ChatStatus>('ready');
 	let assets = $state<ContextChip[]>([]);
+	let latestTimelineItem = $state<TimelineAppEvent | null>(null);
 
 	const showSuggestions = $derived(messages.length === 0 && assets.length === 0);
 
@@ -117,6 +100,10 @@
 
 		taurpc.timeline.new_assets_event.on((chips) => {
 			assets = chips;
+		});
+
+		taurpc.timeline.new_app_event.on((e) => {
+			latestTimelineItem = e;
 		});
 	});
 
@@ -195,25 +182,43 @@
 </script>
 
 <div class="flex h-full flex-col overflow-hidden">
-	<Conversation class="min-h-0 flex-1">
-		<ConversationContent>
+	<Conversation.Root class="min-h-0 flex-1">
+		<Conversation.Content>
+			{#if messages.length === 0}
+				<Empty.Root>
+					<Empty.Header>
+						{#if latestTimelineItem?.icon_base64}
+							<Empty.Title>Currently on</Empty.Title>
+							<Empty.Media variant="icon">
+								<img
+									src={latestTimelineItem.icon_base64}
+									alt=""
+									class="size-full"
+								/>
+							</Empty.Media>
+						{:else}
+							<Empty.Title>No messages yet</Empty.Title>
+						{/if}
+					</Empty.Header>
+				</Empty.Root>
+			{/if}
 			{#each messages as message, i}
 				{@const content = getMessageContent(message)}
 				{@const isUser = isUserMessage(message)}
 				{#if content.length > 0 || !isUser}
-					<Message from={isUser ? 'user' : 'assistant'}>
-						<MessageContent>
+					<Message.Root from={isUser ? 'user' : 'assistant'}>
+						<Message.Content>
 							{#if content.trim().length > 0}
-								<MessageResponse {content} />
+								<Message.Response {content} />
 							{:else}
 								<Shimmer>Thinking</Shimmer>
 							{/if}
-						</MessageContent>
+						</Message.Content>
 						{@const isStreaming =
 							!isUser && i === messages.length - 1 && chatStatus !== 'ready'}
 						{#if !isUser && content.trim().length > 0 && !isStreaming}
-							<MessageActions>
-								<MessageAction
+							<Message.Actions>
+								<Message.Action
 									tooltip="Copy"
 									onclick={() => copyMessageContent(content, i)}
 								>
@@ -222,57 +227,57 @@
 									{:else}
 										<CopyIcon />
 									{/if}
-								</MessageAction>
-							</MessageActions>
+								</Message.Action>
+							</Message.Actions>
 						{/if}
-					</Message>
+					</Message.Root>
 				{/if}
 			{/each}
-		</ConversationContent>
-	</Conversation>
+		</Conversation.Content>
+	</Conversation.Root>
 	<div class="grid shrink-0 gap-4">
 		{#if showSuggestions}
-			<Suggestions class="px-4">
+			<Suggestion.Root class="px-4">
 				{#each suggestions as suggestion}
-					<Suggestion {suggestion} onclick={handleSuggestionClick} />
+					<Suggestion.Item {suggestion} onclick={handleSuggestionClick} />
 				{/each}
-			</Suggestions>
+			</Suggestion.Root>
 		{/if}
 		<div class="w-full px-4 pb-4">
-			<PromptInput onSubmit={handleSubmit}>
+			<PromptInput.Root onSubmit={handleSubmit}>
 				{#if assets.length > 0}
-					<PromptInputHeader>
-						<Attachments variant="inline">
+					<PromptInput.Header>
+						<Attachment.Root variant="inline">
 							{#each assets as asset (asset.id)}
-								<Attachment
+								<Attachment.Item
 									data={{ type: 'file', id: asset.id, filename: asset.name }}
 									onRemove={() => removeAsset(asset.id)}
 								>
-									<AttachmentPreview />
-									<AttachmentInfo />
-									<AttachmentRemove />
-								</Attachment>
+									<Attachment.Preview />
+									<Attachment.Info />
+									<Attachment.Remove />
+								</Attachment.Item>
 							{/each}
-						</Attachments>
-					</PromptInputHeader>
+						</Attachment.Root>
+					</PromptInput.Header>
 				{/if}
-				<PromptInputBody>
-					<PromptInputTextarea placeholder="What can I help you with?" />
-				</PromptInputBody>
-				<PromptInputFooter class="justify-end">
-					<!-- <PromptInputTools>
-						<PromptInputButton
+				<PromptInput.Body>
+					<PromptInput.Textarea placeholder="What can I help you with?" />
+				</PromptInput.Body>
+				<PromptInput.Footer class="justify-end">
+					<!-- <PromptInput.Tools>
+						<PromptInput.Button
 							size="sm"
 							onclick={() => (useWebSearch = !useWebSearch)}
 							variant={useWebSearch ? 'default' : 'ghost'}
 						>
 							<GlobeIcon size={16} />
 							<span>Search</span>
-						</PromptInputButton>
-					</PromptInputTools> -->
-					<PromptInputSubmit status={chatStatus} />
-				</PromptInputFooter>
-			</PromptInput>
+						</PromptInput.Button>
+					</PromptInput.Tools> -->
+					<PromptInput.Submit status={chatStatus} />
+				</PromptInput.Footer>
+			</PromptInput.Root>
 		</div>
 	</div>
 </div>

@@ -1,8 +1,28 @@
-export { default as Plan } from './plan.svelte';
-export { default as PlanHeader } from './plan-header.svelte';
-export { default as PlanTitle } from './plan-title.svelte';
-export { default as PlanDescription } from './plan-description.svelte';
-export { default as PlanAction } from './plan-action.svelte';
-export { default as PlanContent } from './plan-content.svelte';
-export { default as PlanFooter } from './plan-footer.svelte';
-export { default as PlanTrigger } from './plan-trigger.svelte';
+import Root from './plan.svelte';
+import Header from './plan-header.svelte';
+import Title from './plan-title.svelte';
+import Description from './plan-description.svelte';
+import Action from './plan-action.svelte';
+import Content from './plan-content.svelte';
+import Footer from './plan-footer.svelte';
+import Trigger from './plan-trigger.svelte';
+
+export {
+	Root,
+	Header,
+	Title,
+	Description,
+	Action,
+	Content,
+	Footer,
+	Trigger,
+	//
+	Root as Plan,
+	Header as PlanHeader,
+	Title as PlanTitle,
+	Description as PlanDescription,
+	Action as PlanAction,
+	Content as PlanContent,
+	Footer as PlanFooter,
+	Trigger as PlanTrigger,
+};

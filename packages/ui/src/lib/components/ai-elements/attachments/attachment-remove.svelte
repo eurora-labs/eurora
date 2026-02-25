@@ -36,10 +36,9 @@
 				'[&>svg]:size-3',
 			],
 			variant === 'inline' && [
-				'size-6 rounded-md p-0',
-				'text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10',
+				'size-5 rounded p-0',
 				'opacity-0 transition-opacity group-hover:opacity-100',
-				'[&>svg]:size-3',
+				'[&>svg]:size-2.5',
 			],
 			variant === 'list' && ['size-8 shrink-0 rounded p-0', '[&>svg]:size-4'],
 			className,

@@ -1,9 +1,31 @@
-export { default as PackageInfo } from './package-info.svelte';
-export { default as PackageInfoHeader } from './package-info-header.svelte';
-export { default as PackageInfoName } from './package-info-name.svelte';
-export { default as PackageInfoChangeType } from './package-info-change-type.svelte';
-export { default as PackageInfoVersion } from './package-info-version.svelte';
-export { default as PackageInfoDescription } from './package-info-description.svelte';
-export { default as PackageInfoContent } from './package-info-content.svelte';
-export { default as PackageInfoDependencies } from './package-info-dependencies.svelte';
-export { default as PackageInfoDependency } from './package-info-dependency.svelte';
+import Root from './package-info.svelte';
+import Header from './package-info-header.svelte';
+import Name from './package-info-name.svelte';
+import ChangeType from './package-info-change-type.svelte';
+import Version from './package-info-version.svelte';
+import Description from './package-info-description.svelte';
+import Content from './package-info-content.svelte';
+import Dependencies from './package-info-dependencies.svelte';
+import Dependency from './package-info-dependency.svelte';
+
+export {
+	Root,
+	Header,
+	Name,
+	ChangeType,
+	Version,
+	Description,
+	Content,
+	Dependencies,
+	Dependency,
+	//
+	Root as PackageInfo,
+	Header as PackageInfoHeader,
+	Name as PackageInfoName,
+	ChangeType as PackageInfoChangeType,
+	Version as PackageInfoVersion,
+	Description as PackageInfoDescription,
+	Content as PackageInfoContent,
+	Dependencies as PackageInfoDependencies,
+	Dependency as PackageInfoDependency,
+};
