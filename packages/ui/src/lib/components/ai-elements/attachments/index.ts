@@ -1,12 +1,34 @@
-export { default as Attachments } from './attachments.svelte';
-export { default as Attachment } from './attachment.svelte';
-export { default as AttachmentPreview } from './attachment-preview.svelte';
-export { default as AttachmentInfo } from './attachment-info.svelte';
-export { default as AttachmentRemove } from './attachment-remove.svelte';
-export { default as AttachmentHoverCard } from './attachment-hover-card.svelte';
-export { default as AttachmentHoverCardTrigger } from './attachment-hover-card-trigger.svelte';
-export { default as AttachmentHoverCardContent } from './attachment-hover-card-content.svelte';
-export { default as AttachmentEmpty } from './attachment-empty.svelte';
+import Root from './attachments.svelte';
+import Item from './attachment.svelte';
+import Preview from './attachment-preview.svelte';
+import Info from './attachment-info.svelte';
+import Remove from './attachment-remove.svelte';
+import HoverCard from './attachment-hover-card.svelte';
+import HoverCardTrigger from './attachment-hover-card-trigger.svelte';
+import HoverCardContent from './attachment-hover-card-content.svelte';
+import Empty from './attachment-empty.svelte';
+
+export {
+	Root,
+	Item,
+	Preview,
+	Info,
+	Remove,
+	HoverCard,
+	HoverCardTrigger,
+	HoverCardContent,
+	Empty,
+	//
+	Root as Attachments,
+	Item as Attachment,
+	Preview as AttachmentPreview,
+	Info as AttachmentInfo,
+	Remove as AttachmentRemove,
+	HoverCard as AttachmentHoverCard,
+	HoverCardTrigger as AttachmentHoverCardTrigger,
+	HoverCardContent as AttachmentHoverCardContent,
+	Empty as AttachmentEmpty,
+};
 
 export {
 	getMediaCategory,
