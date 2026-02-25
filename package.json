@@ -30,8 +30,6 @@
 		"build:web": "turbo run build --filter @eurora/web...",
 		"prod:web": "pnpm build:web && serve -l 4173 apps/web/dist",
 		"dev:docs": "pnpm --filter @eurora/docs dev",
-		"build:prosemirror-extensions": "turbo run build --filter @eurora/prosemirror-extensions...",
-		"build:prosemirror-view": "turbo run build --filter @eurora/prosemirror-view...",
 		"tauri": "tauri",
 		"dev:internal-tauri": "turbo watch --filter @eurora/desktop dev",
 		"commit": "cz",
@@ -85,7 +83,7 @@
 		"typescript-eslint": "^8.54.0",
 		"web-ext": "^8.10.0"
 	},
-	"packageManager": "pnpm@10.30.0",
+	"packageManager": "pnpm@10.30.2",
 	"engines": {
 		"node": ">=20.11"
 	},
