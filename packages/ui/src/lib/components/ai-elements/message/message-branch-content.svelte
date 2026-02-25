@@ -9,7 +9,7 @@
 		children,
 		count = 0,
 		...restProps
-	}: HTMLAttributes<HTMLDivElement> & {
+	}: Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
 		children?: Snippet<[{ index: number; active: boolean }]>;
 		count?: number;
 	} = $props();
