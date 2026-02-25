@@ -1,15 +1,49 @@
-export { default as Queue } from './queue.svelte';
-export { default as QueueList } from './queue-list.svelte';
-export { default as QueueSection } from './queue-section.svelte';
-export { default as QueueSectionLabel } from './queue-section-label.svelte';
-export { default as QueueSectionTrigger } from './queue-section-trigger.svelte';
-export { default as QueueSectionContent } from './queue-section-content.svelte';
-export { default as QueueItem } from './queue-item.svelte';
-export { default as QueueItemContent } from './queue-item-content.svelte';
-export { default as QueueItemIndicator } from './queue-item-indicator.svelte';
-export { default as QueueItemDescription } from './queue-item-description.svelte';
-export { default as QueueItemFile } from './queue-item-file.svelte';
-export { default as QueueItemImage } from './queue-item-image.svelte';
-export { default as QueueItemAttachment } from './queue-item-attachment.svelte';
-export { default as QueueItemActions } from './queue-item-actions.svelte';
-export { default as QueueItemAction } from './queue-item-action.svelte';
+import Root from './queue.svelte';
+import List from './queue-list.svelte';
+import Section from './queue-section.svelte';
+import SectionLabel from './queue-section-label.svelte';
+import SectionTrigger from './queue-section-trigger.svelte';
+import SectionContent from './queue-section-content.svelte';
+import Item from './queue-item.svelte';
+import ItemContent from './queue-item-content.svelte';
+import ItemIndicator from './queue-item-indicator.svelte';
+import ItemDescription from './queue-item-description.svelte';
+import ItemFile from './queue-item-file.svelte';
+import ItemImage from './queue-item-image.svelte';
+import ItemAttachment from './queue-item-attachment.svelte';
+import ItemActions from './queue-item-actions.svelte';
+import ItemAction from './queue-item-action.svelte';
+
+export {
+	Root,
+	List,
+	Section,
+	SectionLabel,
+	SectionTrigger,
+	SectionContent,
+	Item,
+	ItemContent,
+	ItemIndicator,
+	ItemDescription,
+	ItemFile,
+	ItemImage,
+	ItemAttachment,
+	ItemActions,
+	ItemAction,
+	//
+	Root as Queue,
+	List as QueueList,
+	Section as QueueSection,
+	SectionLabel as QueueSectionLabel,
+	SectionTrigger as QueueSectionTrigger,
+	SectionContent as QueueSectionContent,
+	Item as QueueItem,
+	ItemContent as QueueItemContent,
+	ItemIndicator as QueueItemIndicator,
+	ItemDescription as QueueItemDescription,
+	ItemFile as QueueItemFile,
+	ItemImage as QueueItemImage,
+	ItemAttachment as QueueItemAttachment,
+	ItemActions as QueueItemActions,
+	ItemAction as QueueItemAction,
+};

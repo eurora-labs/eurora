@@ -1,11 +1,32 @@
-export { default as Terminal } from './terminal.svelte';
-export { default as TerminalHeader } from './terminal-header.svelte';
-export { default as TerminalTitle } from './terminal-title.svelte';
-export { default as TerminalStatus } from './terminal-status.svelte';
-export { default as TerminalActions } from './terminal-actions.svelte';
-export { default as TerminalContent } from './terminal-content.svelte';
-export { default as TerminalCopyButton } from './terminal-copy-button.svelte';
-export { default as TerminalClearButton } from './terminal-clear-button.svelte';
+import Root from './terminal.svelte';
+import Header from './terminal-header.svelte';
+import Title from './terminal-title.svelte';
+import Status from './terminal-status.svelte';
+import Actions from './terminal-actions.svelte';
+import Content from './terminal-content.svelte';
+import CopyButton from './terminal-copy-button.svelte';
+import ClearButton from './terminal-clear-button.svelte';
+
+export {
+	Root,
+	Header,
+	Title,
+	Status,
+	Actions,
+	Content,
+	CopyButton,
+	ClearButton,
+	//
+	Root as Terminal,
+	Header as TerminalHeader,
+	Title as TerminalTitle,
+	Status as TerminalStatus,
+	Actions as TerminalActions,
+	Content as TerminalContent,
+	CopyButton as TerminalCopyButton,
+	ClearButton as TerminalClearButton,
+};
+
 export {
 	TerminalState,
 	getTerminalContext,
