@@ -15,7 +15,6 @@
 	import { SiBluesky, SiDiscord, SiGithub, SiReddit, SiX } from '@icons-pack/svelte-simple-icons';
 	import BoltIcon from '@lucide/svelte/icons/bolt';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
-	import ChevronsLeftRightEllipsis from '@lucide/svelte/icons/chevrons-left-right-ellipsis';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import GlobeIcon from '@lucide/svelte/icons/globe';
 	import MailIcon from '@lucide/svelte/icons/mail';
@@ -54,15 +53,15 @@
 			icon: BoltIcon,
 		},
 		{
-			title: 'Telemetry',
-			url: '/settings/telemetry',
-			icon: ChevronsLeftRightEllipsis,
-		},
-		{
 			title: 'API',
 			url: '/settings/api',
 			icon: ServerIcon,
 		},
+		// {
+		// 	title: 'Telemetry',
+		// 	url: '/settings/telemetry',
+		// 	icon: ChevronsLeftRightEllipsis,
+		// },
 	];
 
 	let navigation = $derived(
@@ -71,17 +70,13 @@
 </script>
 
 <Sidebar.Root class="border-none">
+	<Sidebar.Header>
+		<Button variant="ghost" size="sm" class="justify-start gap-2" href="/">
+			<ChevronLeftIcon class="size-4" />
+			<span class="text-sm font-medium">Back</span>
+		</Button>
+	</Sidebar.Header>
 	<Sidebar.Content>
-		<div class="flex items-center gap-2 pt-2">
-			<Button
-				variant="ghost"
-				class="rounded-none w-full flex justify-start text-[24px] font-normal"
-				href="/"
-			>
-				<ChevronLeftIcon class="size-6" />
-				Profile
-			</Button>
-		</div>
 		<Sidebar.Group>
 			<Sidebar.GroupContent>
 				<Sidebar.Menu>
@@ -102,7 +97,10 @@
 		</Sidebar.Group>
 	</Sidebar.Content>
 	<Sidebar.Footer>
-		<Button onclick={() => (contactDialogOpen = true)}>Contact us <MailIcon /></Button>
+		<Button variant="outline" size="sm" onclick={() => (contactDialogOpen = true)}>
+			<MailIcon class="size-4" />
+			Contact us
+		</Button>
 	</Sidebar.Footer>
 </Sidebar.Root>
 
