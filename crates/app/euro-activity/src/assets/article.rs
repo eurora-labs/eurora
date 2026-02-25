@@ -68,12 +68,10 @@ impl AssetFunctionality for ArticleAsset {
     }
 
     fn get_context_chip(&self) -> Option<ContextChip> {
-        let parsed_url = url::Url::parse(&self.url).ok()?;
-        let domain = parsed_url.host_str().unwrap_or_default().to_string();
+        let name: String = self.title.chars().take(50).collect();
         Some(ContextChip {
             id: self.id.clone(),
-            // name: "article".to_string(),
-            name: domain,
+            name,
             extension_id: "309f0906-d48c-4439-9751-7bcf915cdfc5".to_string(),
             attrs: HashMap::new(),
             icon: None,
@@ -147,7 +145,7 @@ mod tests {
 
         let chip = asset.get_context_chip().unwrap();
         assert_eq!(chip.id, "test-id");
-        assert_eq!(chip.name, "example.com");
+        assert_eq!(chip.name, "Test Article");
         assert_eq!(chip.extension_id, "309f0906-d48c-4439-9751-7bcf915cdfc5");
     }
 
