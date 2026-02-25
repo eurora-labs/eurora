@@ -39,10 +39,10 @@
 		'group relative',
 		variant === 'grid' && 'size-24 overflow-hidden rounded-lg',
 		variant === 'inline' && [
-			'flex h-9 cursor-pointer select-none items-center gap-2',
-			'rounded-md bg-primary px-3',
-			'text-sm font-medium text-primary-foreground shadow-xs transition-all duration-150',
-			'hover:bg-primary/90 hover:shadow-md',
+			'flex h-8 cursor-pointer select-none items-center gap-1.5',
+			'rounded-md bg-muted px-2',
+			'font-medium text-sm text-foreground transition-colors',
+			'hover:bg-muted/70',
 		],
 		variant === 'list' && [
 			'flex w-full items-center gap-3 rounded-lg border p-3',
