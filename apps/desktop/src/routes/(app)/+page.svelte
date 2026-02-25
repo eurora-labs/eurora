@@ -200,43 +200,41 @@
 
 <div class="flex h-full flex-col overflow-hidden">
 	<Conversation class="min-h-0 flex-1">
-		{#if messages.length > 0}
-			<ConversationContent>
-				{#each messages as message, i}
-					{@const content = getMessageContent(message)}
-					{@const isUser = isUserMessage(message)}
-					{#if content.length > 0 || !isUser}
-						<Message from={isUser ? 'user' : 'assistant'}>
-							<MessageContent>
-								{#if content.trim().length > 0}
-									<MessageResponse {content} />
-								{:else}
-									<Shimmer>Thinking</Shimmer>
-								{/if}
-							</MessageContent>
-							{@const isStreaming =
-								!isUser && i === messages.length - 1 && chatStatus !== 'ready'}
-							{#if !isUser && content.trim().length > 0 && !isStreaming}
-								<MessageActions>
-									<MessageAction
-										tooltip="Copy"
-										onclick={() => copyMessageContent(content, i)}
-									>
-										{#if copiedMessageId === String(i)}
-											<CheckIcon />
-										{:else}
-											<CopyIcon />
-										{/if}
-									</MessageAction>
-								</MessageActions>
+		<ConversationContent>
+			{#each messages as message, i}
+				{@const content = getMessageContent(message)}
+				{@const isUser = isUserMessage(message)}
+				{#if content.length > 0 || !isUser}
+					<Message from={isUser ? 'user' : 'assistant'}>
+						<MessageContent>
+							{#if content.trim().length > 0}
+								<MessageResponse {content} />
+							{:else}
+								<Shimmer>Thinking</Shimmer>
 							{/if}
-						</Message>
-					{/if}
-				{/each}
-			</ConversationContent>
-		{/if}
+						</MessageContent>
+						{@const isStreaming =
+							!isUser && i === messages.length - 1 && chatStatus !== 'ready'}
+						{#if !isUser && content.trim().length > 0 && !isStreaming}
+							<MessageActions>
+								<MessageAction
+									tooltip="Copy"
+									onclick={() => copyMessageContent(content, i)}
+								>
+									{#if copiedMessageId === String(i)}
+										<CheckIcon />
+									{:else}
+										<CopyIcon />
+									{/if}
+								</MessageAction>
+							</MessageActions>
+						{/if}
+					</Message>
+				{/if}
+			{/each}
+		</ConversationContent>
 	</Conversation>
-	<div class="grid shrink-0 gap-4 pt-4">
+	<div class="grid shrink-0 gap-4">
 		{#if showSuggestions}
 			<Suggestions class="px-4">
 				{#each suggestions as suggestion}
@@ -244,43 +242,41 @@
 				{/each}
 			</Suggestions>
 		{/if}
-		<div class="flex justify-center px-4 pb-4">
-			<div class="w-[90%]">
-				<PromptInput onSubmit={handleSubmit}>
+		<div class="w-full px-4 pb-4">
+			<PromptInput onSubmit={handleSubmit}>
+				<PromptInputHeader>
 					{#if assets.length > 0}
-						<PromptInputHeader>
-							<Attachments variant="inline">
-								{#each assets as asset (asset.id)}
-									<Attachment
-										data={{ type: 'file', id: asset.id, filename: asset.name }}
-										onRemove={() => removeAsset(asset.id)}
-									>
-										<AttachmentPreview />
-										<AttachmentInfo />
-										<AttachmentRemove />
-									</Attachment>
-								{/each}
-							</Attachments>
-						</PromptInputHeader>
+						<Attachments variant="inline">
+							{#each assets as asset (asset.id)}
+								<Attachment
+									data={{ type: 'file', id: asset.id, filename: asset.name }}
+									onRemove={() => removeAsset(asset.id)}
+								>
+									<AttachmentPreview />
+									<AttachmentInfo />
+									<AttachmentRemove />
+								</Attachment>
+							{/each}
+						</Attachments>
 					{/if}
-					<PromptInputBody>
-						<PromptInputTextarea placeholder="What can I help you with?" />
-					</PromptInputBody>
-					<PromptInputFooter>
-						<PromptInputTools>
-							<PromptInputButton
-								size="sm"
-								onclick={() => (useWebSearch = !useWebSearch)}
-								variant={useWebSearch ? 'default' : 'ghost'}
-							>
-								<GlobeIcon size={16} />
-								<span>Search</span>
-							</PromptInputButton>
-						</PromptInputTools>
-						<PromptInputSubmit status={chatStatus} />
-					</PromptInputFooter>
-				</PromptInput>
-			</div>
+				</PromptInputHeader>
+				<PromptInputBody>
+					<PromptInputTextarea placeholder="What can I help you with?" />
+				</PromptInputBody>
+				<PromptInputFooter>
+					<PromptInputTools>
+						<PromptInputButton
+							size="sm"
+							onclick={() => (useWebSearch = !useWebSearch)}
+							variant={useWebSearch ? 'default' : 'ghost'}
+						>
+							<GlobeIcon size={16} />
+							<span>Search</span>
+						</PromptInputButton>
+					</PromptInputTools>
+					<PromptInputSubmit status={chatStatus} />
+				</PromptInputFooter>
+			</PromptInput>
 		</div>
 	</div>
 </div>
