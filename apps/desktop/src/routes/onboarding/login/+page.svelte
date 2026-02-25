@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { open } from '@tauri-apps/plugin-shell';
 	import * as Card from '@eurora/ui/components/card/index';
-	import ExternalLink from '@lucide/svelte/icons/external-link';
 </script>
 
 <div class="flex flex-col justify-center items-center h-full p-8 gap-6">
@@ -23,9 +21,8 @@
 
 	<button
 		class="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-		onclick={() => open('https://www.eurora-labs.com/docs/self-hosting')}
+		onclick={() => goto('/onboarding/login/local')}
 	>
 		Run locally with your own models
-		<ExternalLink class="size-3.5" />
 	</button>
 </div>
