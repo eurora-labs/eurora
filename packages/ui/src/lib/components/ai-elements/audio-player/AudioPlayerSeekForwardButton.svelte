@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils.js';
+	import { buttonVariants } from '$lib/components/button/index.js';
 
 	interface Props extends HTMLAttributes<HTMLElement> {
 		seekoffset?: number;
@@ -12,9 +13,6 @@
 <media-seek-forward-button
 	data-slot="audio-player-seek-forward-button"
 	{seekoffset}
-	class={cn(
-		'inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border bg-transparent text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground',
-		className,
-	)}
+	class={cn(buttonVariants({ variant: 'outline', size: 'icon-sm' }), className)}
 	{...restProps}
 ></media-seek-forward-button>

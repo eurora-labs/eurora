@@ -54,7 +54,7 @@
 	import { Button } from '$lib/components/button/index.js';
 	import MicIcon from '@lucide/svelte/icons/mic';
 	import SquareIcon from '@lucide/svelte/icons/square';
-	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
+	import { Spinner } from '$lib/components/spinner/index.js';
 	import { onMount, onDestroy } from 'svelte';
 
 	let {
@@ -240,7 +240,7 @@
 		onclick={toggleListening}
 	>
 		{#if isProcessing}
-			<LoaderCircleIcon class="size-4 animate-spin" />
+			<Spinner />
 		{:else if isListening}
 			<SquareIcon class="size-4" />
 		{:else}

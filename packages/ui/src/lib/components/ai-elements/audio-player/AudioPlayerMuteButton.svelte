@@ -5,10 +5,13 @@
 	interface Props extends HTMLAttributes<HTMLElement> {}
 
 	let { class: className, ...restProps }: Props = $props();
+
+	const buttonGroupTextBase =
+		"flex items-center gap-2 rounded-md border px-4 text-sm font-medium shadow-xs [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4";
 </script>
 
 <media-mute-button
 	data-slot="audio-player-mute-button"
-	class={cn('bg-transparent', className)}
+	class={cn(buttonGroupTextBase, 'bg-transparent', className)}
 	{...restProps}
 ></media-mute-button>
