@@ -479,20 +479,18 @@ Don't overuse these hooks! They come with their own overhead. Only use them when
 							</PromptInputButton>
 							<ModelSelector bind:open={modelSelectorOpen}>
 								<ModelSelectorTrigger>
-									{#snippet child({ props })}
-										<PromptInputButton size="sm" {...props}>
-											{#if selectedModelData?.chefSlug}
-												<ModelSelectorLogo
-													provider={selectedModelData.chefSlug}
-												/>
-											{/if}
-											{#if selectedModelData?.name}
-												<ModelSelectorName
-													>{selectedModelData.name}</ModelSelectorName
-												>
-											{/if}
-										</PromptInputButton>
-									{/snippet}
+									<PromptInputButton size="sm">
+										{#if selectedModelData?.chefSlug}
+											<ModelSelectorLogo
+												provider={selectedModelData.chefSlug}
+											/>
+										{/if}
+										{#if selectedModelData?.name}
+											<ModelSelectorName
+												>{selectedModelData.name}</ModelSelectorName
+											>
+										{/if}
+									</PromptInputButton>
 								</ModelSelectorTrigger>
 								<ModelSelectorContent>
 									<ModelSelectorInput placeholder="Search models..." />
