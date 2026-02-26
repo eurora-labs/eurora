@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 </script>
 
@@ -19,10 +20,7 @@
 		<div class="h-px flex-1 bg-border"></div>
 	</div>
 
-	<button
-		class="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-		onclick={() => goto('/onboarding/login/local')}
-	>
+	<Button variant="ghost" onclick={() => goto('/onboarding/login/local')}>
 		Run locally with your own models
-	</button>
+	</Button>
 </div>
