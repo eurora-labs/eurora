@@ -6,9 +6,9 @@
 	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
 	import * as Dialog from '@eurora/ui/components/dialog/index';
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
+	import * as Empty from '@eurora/ui/components/empty/index';
 	import { useSidebar } from '@eurora/ui/components/sidebar/index';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
-	import * as Empty from '@eurora/ui/components/empty/index';
 	import { Spinner } from '@eurora/ui/components/spinner/index';
 	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
