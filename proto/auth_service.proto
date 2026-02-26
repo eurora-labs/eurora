@@ -8,7 +8,6 @@ service ProtoAuthService {
   rpc Register(RegisterRequest) returns (TokenResponse);
   rpc RefreshToken(RefreshTokenRequest) returns (TokenResponse);
   rpc GetThirdPartyAuthUrl(ThirdPartyAuthUrlRequest) returns (ThirdPartyAuthUrlResponse);
-  rpc GetLoginToken(google.protobuf.Empty) returns (GetLoginTokenResponse);
   rpc LoginByLoginToken(LoginByLoginTokenRequest) returns (TokenResponse);
 }
 
@@ -62,10 +61,4 @@ message TokenResponse {
 
 message LoginByLoginTokenRequest {
   string token = 1;
-}
-
-message GetLoginTokenResponse {
-  string token = 1;
-  int64 expires_in = 2;
-  string url = 3;
 }

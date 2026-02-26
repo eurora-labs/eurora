@@ -31,6 +31,7 @@ impl GitHubOAuthConfig {
 
 fn build_http_client() -> Result<reqwest::Client, OAuthError> {
     reqwest::ClientBuilder::new()
+        .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_secs(30))
         .build()
         .map_err(|e| OAuthError::HttpClient(e.to_string()))

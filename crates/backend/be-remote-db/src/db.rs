@@ -130,7 +130,7 @@ impl DatabaseManager {
         .bind(&username)
         .bind(&email)
         .bind(&display_name)
-        .bind(false)
+        .bind(true)
         .bind(now)
         .bind(now)
         .fetch_one(&mut *tx)
@@ -576,6 +576,38 @@ impl DatabaseManager {
         .await?;
 
         Ok(login_token)
+    }
+
+    #[builder]
+    pub async fn cleanup_expired_auth_data(&self) -> DbResult<()> {
+        let deleted_states = sqlx::query_scalar::<_, i64>(
+            "WITH deleted AS (DELETE FROM oauth_state WHERE expires_at < now() - interval '1 hour' RETURNING 1) SELECT count(*) FROM deleted",
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        let deleted_login_tokens = sqlx::query_scalar::<_, i64>(
+            "WITH deleted AS (DELETE FROM login_tokens WHERE expires_at < now() - interval '1 hour' RETURNING 1) SELECT count(*) FROM deleted",
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        let deleted_refresh_tokens = sqlx::query_scalar::<_, i64>(
+            "WITH deleted AS (DELETE FROM refresh_tokens WHERE revoked = true AND created_at < now() - interval '30 days' RETURNING 1) SELECT count(*) FROM deleted",
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        if deleted_states > 0 || deleted_login_tokens > 0 || deleted_refresh_tokens > 0 {
+            tracing::info!(
+                "Cleaned up expired auth data: {} oauth_states, {} login_tokens, {} refresh_tokens",
+                deleted_states,
+                deleted_login_tokens,
+                deleted_refresh_tokens,
+            );
+        }
+
+        Ok(())
     }
 
     #[builder]
