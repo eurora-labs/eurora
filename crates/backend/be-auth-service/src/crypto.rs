@@ -1,8 +1,3 @@
-//! Cryptographic utilities for the authentication service.
-//!
-//! This module provides encryption and decryption functionality for sensitive data
-//! that needs to be stored securely, such as PKCE verifiers.
-
 use chacha20poly1305::{
     Key, XChaCha20Poly1305, XNonce,
     aead::{Aead, KeyInit},
@@ -10,7 +5,6 @@ use chacha20poly1305::{
 use rand::RngCore;
 use thiserror::Error;
 
-/// Errors that can occur during cryptographic operations.
 #[derive(Debug, Error)]
 pub enum CryptoError {
     #[error("PKCE_ENCRYPTION_KEY environment variable not set")]
@@ -32,14 +26,9 @@ pub enum CryptoError {
     InvalidFormat,
 }
 
-/// Encrypted data format: [nonce (24 bytes)][ciphertext (variable)]
 const NONCE_SIZE: usize = 24;
 
-/// Get the encryption key from environment variable.
-///
-/// The key should be a 32-byte (256-bit) key encoded as 64 hex characters.
-/// This can be generated with: `openssl rand -hex 32`
-fn get_encryption_key() -> Result<Key, CryptoError> {
+fn parse_encryption_key() -> Result<Key, CryptoError> {
     let key_hex =
         std::env::var("PKCE_ENCRYPTION_KEY").map_err(|_| CryptoError::MissingEncryptionKey)?;
 
@@ -55,40 +44,35 @@ fn get_encryption_key() -> Result<Key, CryptoError> {
     Ok(Key::from(key_array))
 }
 
-/// Encrypt a sensitive string for secure storage.
-///
-/// Uses XChaCha20-Poly1305 authenticated encryption with a random nonce.
-/// The nonce is prepended to the ciphertext for storage.
-///
-/// # Arguments
-///
-/// * `verifier` - The plaintext string to encrypt
-///
-/// # Returns
-///
-/// Returns the encrypted bytes as `[nonce (24 bytes)][ciphertext]`
-///
-/// # Errors
-///
-/// Returns a `CryptoError` if:
-/// - The encryption key is not set or invalid
-/// - Encryption fails
+#[cfg(not(test))]
+fn get_encryption_key() -> Result<Key, CryptoError> {
+    static CACHED_KEY: std::sync::OnceLock<Key> = std::sync::OnceLock::new();
+    if let Some(key) = CACHED_KEY.get() {
+        return Ok(*key);
+    }
+    let key = parse_encryption_key()?;
+    let _ = CACHED_KEY.set(key);
+    Ok(key)
+}
+
+#[cfg(test)]
+fn get_encryption_key() -> Result<Key, CryptoError> {
+    parse_encryption_key()
+}
+
 pub fn encrypt_sensitive_string(verifier: &str) -> Result<Vec<u8>, CryptoError> {
     let key = get_encryption_key()?;
     let cipher = XChaCha20Poly1305::new(&key);
 
-    // Generate a random nonce
     let mut nonce_bytes = [0u8; NONCE_SIZE];
     rand::rng().fill_bytes(&mut nonce_bytes);
     let nonce = XNonce::from_slice(&nonce_bytes);
 
-    // Encrypt the verifier
     let ciphertext = cipher.encrypt(nonce, verifier.as_bytes()).map_err(|e| {
         tracing::error!("PKCE verifier encryption failed: {}", e);
         CryptoError::EncryptionFailed(e.to_string())
     })?;
 
-    // Prepend nonce to ciphertext
     let mut encrypted = Vec::with_capacity(NONCE_SIZE + ciphertext.len());
     encrypted.extend_from_slice(&nonce_bytes);
     encrypted.extend_from_slice(&ciphertext);
@@ -96,22 +80,6 @@ pub fn encrypt_sensitive_string(verifier: &str) -> Result<Vec<u8>, CryptoError> 
     Ok(encrypted)
 }
 
-/// Decrypt a sensitive string from encrypted storage.
-///
-/// # Arguments
-///
-/// * `encrypted` - The encrypted bytes as `[nonce (24 bytes)][ciphertext]`
-///
-/// # Returns
-///
-/// Returns the decrypted plaintext string
-///
-/// # Errors
-///
-/// Returns a `CryptoError` if:
-/// - The encryption key is not set or invalid
-/// - The encrypted data format is invalid
-/// - Decryption fails (e.g., tampered data)
 pub fn decrypt_sensitive_string(encrypted: &[u8]) -> Result<String, CryptoError> {
     if encrypted.len() < NONCE_SIZE {
         return Err(CryptoError::InvalidFormat);
@@ -120,11 +88,9 @@ pub fn decrypt_sensitive_string(encrypted: &[u8]) -> Result<String, CryptoError>
     let key = get_encryption_key()?;
     let cipher = XChaCha20Poly1305::new(&key);
 
-    // Extract nonce and ciphertext
     let (nonce_bytes, ciphertext) = encrypted.split_at(NONCE_SIZE);
     let nonce = XNonce::from_slice(nonce_bytes);
 
-    // Decrypt
     let plaintext = cipher.decrypt(nonce, ciphertext).map_err(|e| {
         tracing::error!("PKCE verifier decryption failed: {}", e);
         CryptoError::DecryptionFailed(e.to_string())
@@ -139,7 +105,6 @@ mod tests {
     use super::*;
     use std::sync::Mutex;
 
-    // Mutex to serialize tests that modify the environment variable
     static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
     const TEST_KEY: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -148,7 +113,6 @@ mod tests {
     fn test_encrypt_decrypt_roundtrip() {
         let _lock = ENV_MUTEX.lock().unwrap();
 
-        // Set a test encryption key
         // SAFETY: This is a test-only operation protected by mutex
         unsafe {
             std::env::set_var("PKCE_ENCRYPTION_KEY", TEST_KEY);
@@ -156,18 +120,12 @@ mod tests {
 
         let verifier = "test_pkce_verifier_12345";
 
-        // Encrypt
         let encrypted = encrypt_sensitive_string(verifier).expect("Encryption should succeed");
-
-        // Verify encrypted data has correct format (nonce + ciphertext)
         assert!(encrypted.len() > NONCE_SIZE);
 
-        // Decrypt
         let decrypted = decrypt_sensitive_string(&encrypted).expect("Decryption should succeed");
-
         assert_eq!(verifier, decrypted);
 
-        // Clean up
         // SAFETY: This is a test-only operation protected by mutex
         unsafe {
             std::env::remove_var("PKCE_ENCRYPTION_KEY");
@@ -186,12 +144,10 @@ mod tests {
         let verifier = "test_pkce_verifier";
         let mut encrypted = encrypt_sensitive_string(verifier).expect("Encryption should succeed");
 
-        // Tamper with the ciphertext
         if let Some(byte) = encrypted.last_mut() {
             *byte ^= 0xFF;
         }
 
-        // Decryption should fail
         let result = decrypt_sensitive_string(&encrypted);
         assert!(result.is_err());
 

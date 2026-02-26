@@ -101,6 +101,69 @@ impl DatabaseManager {
     }
 
     #[builder]
+    pub async fn create_user_with_oauth(
+        &self,
+        username: String,
+        email: String,
+        display_name: Option<String>,
+        provider: OAuthProvider,
+        provider_user_id: String,
+        access_token: Option<Vec<u8>>,
+        refresh_token: Option<Vec<u8>>,
+        access_token_expiry: Option<DateTime<Utc>>,
+        scope: Option<String>,
+    ) -> DbResult<User> {
+        let user_id = Uuid::now_v7();
+        let oauth_cred_id = Uuid::now_v7();
+        let now = Utc::now();
+
+        let mut tx = self.pool.begin().await?;
+
+        let user = sqlx::query_as::<_, User>(
+            r#"
+            INSERT INTO users (id, username, email, display_name, email_verified, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id, username, email, display_name, email_verified, created_at, updated_at
+            "#,
+        )
+        .bind(user_id)
+        .bind(&username)
+        .bind(&email)
+        .bind(&display_name)
+        .bind(false)
+        .bind(now)
+        .bind(now)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO oauth_credentials (
+                id, user_id, provider, provider_user_id, access_token,
+                refresh_token, access_token_expiry, scope, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            "#,
+        )
+        .bind(oauth_cred_id)
+        .bind(user_id)
+        .bind(provider)
+        .bind(&provider_user_id)
+        .bind(&access_token)
+        .bind(&refresh_token)
+        .bind(access_token_expiry)
+        .bind(&scope)
+        .bind(now)
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        Ok(user)
+    }
+
+    #[builder]
     pub async fn get_user(
         &self,
         id: Option<Uuid>,

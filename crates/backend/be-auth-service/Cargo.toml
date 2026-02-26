@@ -15,6 +15,7 @@ chrono = { workspace = true, features = ["serde"] }
 hex = { workspace = true }
 jsonwebtoken = { workspace = true }
 openidconnect = { workspace = true }
+percent-encoding = { workspace = true }
 prost = { workspace = true }
 proto-gen = { workspace = true, features = ["server"] }
 rand = { workspace = true }

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { authService } from '$lib/services/auth-service';
+	import { auth } from '$lib/stores/auth.js';
 	import { create } from '@bufbuild/protobuf';
 	import { LoginRequestSchema, Provider } from '@eurora/shared/proto/auth_service_pb.js';
 	import { onMount } from 'svelte';
@@ -43,7 +44,8 @@
 				},
 			});
 
-			await authService.login(loginData);
+			const tokens = await authService.login(loginData);
+			auth.login(tokens);
 
 			const redirect = sessionStorage.getItem('postLoginRedirect') || '/';
 			sessionStorage.removeItem('postLoginRedirect');
