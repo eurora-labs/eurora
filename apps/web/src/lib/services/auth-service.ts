@@ -18,6 +18,11 @@ if (!VITE_GRPC_API_URL) {
 	throw new Error('VITE_GRPC_API_URL environment variable is required but not defined');
 }
 
+export type EmailCheckResult =
+	| { status: 'password' }
+	| { status: 'oauth'; provider: 'google' | 'github' }
+	| { status: 'not_found' };
+
 class AuthService {
 	private readonly client: Client<typeof ProtoAuthService>;
 	constructor() {
@@ -52,6 +57,11 @@ class AuthService {
 
 	public async loginByLoginToken(data: LoginByLoginTokenRequest): Promise<TokenResponse> {
 		return await this.client.loginByLoginToken(data);
+	}
+
+	// TODO: Wire to backend CheckEmail RPC once implemented
+	public async checkEmail(_email: string): Promise<EmailCheckResult> {
+		return { status: 'password' };
 	}
 }
 
