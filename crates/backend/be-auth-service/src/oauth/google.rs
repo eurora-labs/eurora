@@ -8,36 +8,18 @@ use openidconnect::{
     core::{CoreClient, CoreIdTokenClaims, CoreProviderMetadata, CoreResponseType},
 };
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
-#[derive(Debug, Error)]
-pub enum OAuthError {
-    #[error("Missing environment variable: {0}")]
-    MissingEnvVar(&'static str),
-    #[error("OAuth discovery failed: {0}")]
-    Discovery(String),
-    #[error("Invalid URL: {0}")]
-    InvalidUrl(String),
-    #[error("Code exchange failed: {0}")]
-    CodeExchange(String),
-    #[error("Missing ID token")]
-    MissingIdToken,
-    #[error("Token verification failed: {0}")]
-    TokenVerification(String),
-    #[error("Missing email in claims")]
-    MissingEmail,
-    #[error("HTTP client error: {0}")]
-    HttpClient(String),
-}
+use super::OAuthError;
 
-/// The concrete client type returned by `from_provider_metadata` + `set_redirect_uri`
+/// Concrete client type: the generic params are opaque endpoint-state markers
+/// from `from_provider_metadata` + `set_redirect_uri`.
 type DiscoveredClient = CoreClient<
-    EndpointSet,      // HasAuthUrl
-    EndpointNotSet,   // HasDeviceAuthUrl
-    EndpointNotSet,   // HasIntrospectionUrl
-    EndpointNotSet,   // HasRevocationUrl
-    EndpointMaybeSet, // HasTokenUrl
-    EndpointMaybeSet, // HasUserInfoUrl
+    EndpointSet,
+    EndpointNotSet,
+    EndpointNotSet,
+    EndpointNotSet,
+    EndpointMaybeSet,
+    EndpointMaybeSet,
 >;
 
 #[derive(Debug, Clone)]
@@ -66,6 +48,7 @@ impl GoogleOAuthConfig {
 
 pub struct GoogleOAuthClient {
     client: DiscoveredClient,
+    redirect_uri: String,
 }
 
 fn build_http_client() -> Result<reqwest::Client, OAuthError> {
@@ -90,14 +73,22 @@ impl GoogleOAuthClient {
 
         let client_id = ClientId::new(config.client_id);
         let client_secret = Some(ClientSecret::new(config.client_secret));
-        let redirect_url = RedirectUrl::new(config.redirect_uri)
+        let redirect_uri = config.redirect_uri;
+        let redirect_url = RedirectUrl::new(redirect_uri.clone())
             .map_err(|e| OAuthError::InvalidUrl(e.to_string()))?;
 
         let client =
             CoreClient::from_provider_metadata(provider_metadata, client_id, client_secret)
                 .set_redirect_uri(redirect_url);
 
-        Ok(Self { client })
+        Ok(Self {
+            client,
+            redirect_uri,
+        })
+    }
+
+    pub fn redirect_uri(&self) -> &str {
+        &self.redirect_uri
     }
 
     pub fn get_authorization_url_with_state_and_pkce(
@@ -106,8 +97,6 @@ impl GoogleOAuthClient {
         pkce_verifier: &str,
         nonce: &Nonce,
     ) -> String {
-        tracing::info!("Generating Google OAuth authorization URL with custom state and PKCE");
-
         let pkce_code_verifier = PkceCodeVerifier::new(pkce_verifier.to_string());
         let pkce_challenge = PkceCodeChallenge::from_code_verifier_sha256(&pkce_code_verifier);
 
@@ -128,7 +117,7 @@ impl GoogleOAuthClient {
         authorize_url.to_string()
     }
 
-    /// The `nonce` verifies the ID token's nonce claim (OIDC replay protection).
+    /// `nonce` verifies the ID token's nonce claim (OIDC replay protection).
     pub async fn exchange_code(
         &self,
         code: &str,
@@ -219,9 +208,4 @@ pub struct GoogleUserInfo {
     pub refresh_token: Option<String>,
     #[serde(skip)]
     pub expires_in: Option<std::time::Duration>,
-}
-
-pub async fn create_google_oauth_client() -> Result<GoogleOAuthClient, OAuthError> {
-    let config = GoogleOAuthConfig::from_env()?;
-    GoogleOAuthClient::discover(config).await
 }

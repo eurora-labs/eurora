@@ -1530,6 +1530,7 @@ dependencies = [
  "hex",
  "jsonwebtoken",
  "openidconnect",
+ "percent-encoding",
  "prost",
  "proto-gen",
  "rand 0.9.2",

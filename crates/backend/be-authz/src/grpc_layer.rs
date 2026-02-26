@@ -111,6 +111,13 @@ where
             };
 
             if is_grpc_bypass(&service_full) {
+                if rate_limiter.check_key(&client_ip).is_err() {
+                    tracing::warn!(ip = %client_ip, "Rate limited public service request");
+                    return Ok(
+                        Status::resource_exhausted("Too many requests. Try again later.")
+                            .into_http(),
+                    );
+                }
                 tracing::debug!(path = %path, "Bypassing authorization for public service");
                 return inner.call(req).await;
             }
