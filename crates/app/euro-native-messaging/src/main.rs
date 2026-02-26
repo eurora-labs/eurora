@@ -8,7 +8,7 @@ use euro_native_messaging::{
 };
 use std::{env, sync::Arc, time::Duration};
 use tokio::io::{self};
-use tokio::sync::{broadcast, mpsc, Mutex};
+use tokio::sync::{Mutex, broadcast, mpsc};
 use tonic::transport::Channel;
 
 const RETRY_INTERVAL_SECS: u64 = 2;
@@ -38,7 +38,11 @@ async fn connect_with_retry(server_addr: &str) -> BrowserBridgeClient<Channel> {
                 .map_err(|e| e.to_string())
         }
     })
-    .retry(ConstantBuilder::default().with_delay(Duration::from_secs(RETRY_INTERVAL_SECS)).without_max_times())
+    .retry(
+        ConstantBuilder::default()
+            .with_delay(Duration::from_secs(RETRY_INTERVAL_SECS))
+            .without_max_times(),
+    )
     .sleep(tokio::time::sleep)
     .notify(|err, dur| {
         tracing::warn!("Failed to connect to euro-activity server: {err}. Retrying in {dur:?}...");
@@ -215,7 +219,10 @@ async fn main() -> Result<()> {
                 loop {
                     match inbound_stream.message().await {
                         Ok(Some(frame)) => {
-                            tracing::debug!("Received frame from server: {}", frame_summary(&frame));
+                            tracing::debug!(
+                                "Received frame from server: {}",
+                                frame_summary(&frame)
+                            );
                             if let Err(e) = from_server_tx.send(frame).await {
                                 tracing::error!("Failed to forward frame from server: {}", e);
                                 break;
