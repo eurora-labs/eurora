@@ -9,12 +9,13 @@ use be_auth_core::JwtConfig;
 
 use crate::CasbinAuthz;
 use crate::bypass::is_rest_bypass;
-use crate::rate_limit::AuthFailureRateLimiter;
+use crate::rate_limit::{AuthFailureRateLimiter, HealthCheckRateLimiter};
 
 pub struct AuthzState {
     pub authz: CasbinAuthz,
     pub jwt_config: JwtConfig,
     pub rate_limiter: AuthFailureRateLimiter,
+    pub health_rate_limiter: HealthCheckRateLimiter,
 }
 
 impl AuthzState {
@@ -22,11 +23,13 @@ impl AuthzState {
         authz: CasbinAuthz,
         jwt_config: JwtConfig,
         rate_limiter: AuthFailureRateLimiter,
+        health_rate_limiter: HealthCheckRateLimiter,
     ) -> Self {
         Self {
             authz,
             jwt_config,
             rate_limiter,
+            health_rate_limiter,
         }
     }
 }
@@ -58,12 +61,16 @@ pub async fn authz_middleware(
     let raw_path = req.uri().path().to_string();
     let method = req.method().to_string();
 
+    let client_ip = extract_client_ip(&req);
+
     if is_rest_bypass(&raw_path) {
+        if raw_path == "/health" && state.health_rate_limiter.check_key(&client_ip).is_err() {
+            tracing::warn!(ip = %client_ip, "Rate limited health check request");
+            return too_many_requests_response();
+        }
         tracing::debug!(path = %raw_path, "Bypassing authorization for public route");
         return next.run(req).await;
     }
-
-    let client_ip = extract_client_ip(&req);
 
     if state.rate_limiter.check_key(&client_ip).is_err() {
         tracing::warn!(ip = %client_ip, "Rate limited — too many auth failures");

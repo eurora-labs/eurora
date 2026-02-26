@@ -13,4 +13,7 @@ pub use claims::{extract_claims, parse_user_id};
 pub use enforcer::CasbinAuthz;
 pub use error::AuthzError;
 pub use grpc_layer::GrpcAuthzLayer;
-pub use rate_limit::{AuthFailureRateLimiter, new_auth_failure_rate_limiter};
+pub use rate_limit::{
+    AuthFailureRateLimiter, HealthCheckRateLimiter, new_auth_failure_rate_limiter,
+    new_health_check_rate_limiter,
+};
