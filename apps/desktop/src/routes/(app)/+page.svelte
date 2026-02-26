@@ -10,12 +10,12 @@
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
 	import * as Attachment from '@eurora/ui/components/ai-elements/attachments/index';
-	import * as Empty from '@eurora/ui/components/empty/index';
 	import * as Conversation from '@eurora/ui/components/ai-elements/conversation/index';
 	import * as Message from '@eurora/ui/components/ai-elements/message/index';
 	import * as PromptInput from '@eurora/ui/components/ai-elements/prompt-input/index';
 	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
 	import * as Suggestion from '@eurora/ui/components/ai-elements/suggestion/index';
+	import * as Empty from '@eurora/ui/components/empty/index';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import { writeText } from '@tauri-apps/plugin-clipboard-manager';
@@ -189,7 +189,7 @@
 					<Empty.Header>
 						{#if latestTimelineItem?.icon_base64}
 							<Empty.Title>Currently on</Empty.Title>
-							<Empty.Media variant="icon">
+							<Empty.Media variant="icon" class="bg-transparent">
 								<img
 									src={latestTimelineItem.icon_base64}
 									alt=""
