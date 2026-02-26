@@ -297,6 +297,7 @@ impl AuthService {
         provider: OAuthProvider,
         provider_user_id: &str,
         email: &str,
+        email_verified: bool,
         name: &str,
         username: &str,
         encrypted_access_token: Vec<u8>,
@@ -370,6 +371,7 @@ impl AuthService {
                         .username(final_username.clone())
                         .email(email.to_string())
                         .display_name(name.to_string())
+                        .email_verified(email_verified)
                         .provider(provider)
                         .provider_user_id(provider_user_id.to_string())
                         .access_token(encrypted_access_token.clone())
@@ -562,14 +564,23 @@ impl AuthService {
             .email
             .split('@')
             .next()
+            .filter(|s| !s.is_empty())
             .unwrap_or(&user_info.name)
             .to_string();
+
+        if username.is_empty() {
+            tracing::warn!("Empty username detected");
+            return Err(AuthError::InvalidInput(
+                "Unable to determine username from OAuth profile".into(),
+            ));
+        }
 
         let user = self
             .find_or_create_oauth_user()
             .provider(OAuthProvider::Google)
             .provider_user_id(&user_info.id)
             .email(&user_info.email)
+            .email_verified(user_info.verified_email)
             .name(&user_info.name)
             .username(&username)
             .encrypted_access_token(oauth_access_token)
@@ -650,6 +661,7 @@ impl AuthService {
             .provider(OAuthProvider::Github)
             .provider_user_id(&user_info.id)
             .email(&user_info.email)
+            .email_verified(user_info.verified_email)
             .name(&user_info.name)
             .username(&user_info.username)
             .encrypted_access_token(oauth_access_token)

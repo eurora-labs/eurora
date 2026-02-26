@@ -106,6 +106,7 @@ impl DatabaseManager {
         username: String,
         email: String,
         display_name: Option<String>,
+        email_verified: bool,
         provider: OAuthProvider,
         provider_user_id: String,
         access_token: Option<Vec<u8>>,
@@ -130,7 +131,7 @@ impl DatabaseManager {
         .bind(&username)
         .bind(&email)
         .bind(&display_name)
-        .bind(true)
+        .bind(email_verified)
         .bind(now)
         .bind(now)
         .fetch_one(&mut *tx)
