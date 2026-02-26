@@ -4,6 +4,10 @@ const browserAny = typeof browser !== 'undefined' ? browser : (chrome as typeof 
 
 browserAny.runtime.onMessage.addListener(
 	(msg: any, sender: any, sendResponse: (response?: any) => void) => {
+		if (msg?.type === 'HEARTBEAT') {
+			sendResponse(true);
+			return false;
+		}
 		if (loaded || msg?.type !== 'SITE_LOAD') return false;
 		listener(msg, sender, sendResponse).catch((error) =>
 			console.error('Error in listener:', error),
