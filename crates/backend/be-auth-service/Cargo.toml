@@ -9,12 +9,14 @@ publish = false
 argon2 = { workspace = true }
 auth-core = { workspace = true }
 be-auth-core = { workspace = true }
+bon = { workspace = true }
 be-remote-db = { workspace = true }
 chacha20poly1305 = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 hex = { workspace = true }
 jsonwebtoken = { workspace = true }
 openidconnect = { workspace = true }
+percent-encoding = { workspace = true }
 prost = { workspace = true }
 proto-gen = { workspace = true, features = ["server"] }
 rand = { workspace = true }

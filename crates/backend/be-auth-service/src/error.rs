@@ -21,12 +21,6 @@ pub enum AuthError {
     #[error("Email address is not verified")]
     EmailNotVerified,
 
-    // 409 - AlreadyExists
-    #[error("Username already exists")]
-    UsernameExists,
-    #[error("Email already exists")]
-    EmailExists,
-
     // 500 - Internal
     #[error("Password hashing failed: {0}")]
     PasswordHash(String),
@@ -35,7 +29,7 @@ pub enum AuthError {
     #[error("Database error: {0}")]
     Database(#[from] be_remote_db::DbError),
     #[error("OAuth error: {0}")]
-    OAuth(#[from] crate::oauth::google::OAuthError),
+    OAuth(#[from] crate::oauth::OAuthError),
     #[error("Crypto error: {0}")]
     Crypto(#[from] CryptoError),
     #[error("Internal error: {0}")]
@@ -54,10 +48,6 @@ impl From<AuthError> for tonic::Status {
             | AuthError::InvalidAuthHeader
             | AuthError::InvalidToken
             | AuthError::EmailNotVerified => tonic::Status::unauthenticated(err.to_string()),
-
-            AuthError::UsernameExists | AuthError::EmailExists => {
-                tonic::Status::already_exists(err.to_string())
-            }
 
             AuthError::PasswordHash(ref msg) => {
                 tracing::error!("Password hashing error: {msg}");
