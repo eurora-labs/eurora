@@ -23,5 +23,5 @@ catalogs:
         '@sveltejs/adapter-static': 3.0.10
         '@sveltejs/kit': 2.52.2
         '@sveltejs/vite-plugin-svelte': 5.1.1
-        svelte: 5.53.0
+        svelte: 5.53.5
         svelte-check: 4.4.1
