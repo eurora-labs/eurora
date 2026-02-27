@@ -101,7 +101,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok()
         .filter(|s| !s.is_empty())
     {
-        match posthog_rs::init_global(posthog_key.as_str()).await {
+        let posthog_options = posthog_rs::ClientOptionsBuilder::default()
+            .api_key(posthog_key)
+            .api_endpoint("https://eu.i.posthog.com/i/v0/e/".to_string())
+            .build()
+            .expect("valid posthog client options");
+        match posthog_rs::init_global(posthog_options).await {
             Ok(()) => tracing::info!("PostHog analytics initialized"),
             Err(e) => tracing::warn!("Failed to initialize PostHog: {}", e),
         }
