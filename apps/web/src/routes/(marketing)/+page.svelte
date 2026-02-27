@@ -78,9 +78,10 @@
 				<p
 					class="p-6 text-lg leading-relaxed text-muted-foreground sm:p-10 sm:text-xl lg:p-14"
 				>
-					Native on MacOS, Windows, and Linux. Browser extensions for Chrome, Firefox, and
-					Edge. Your preferences, your history, and your AI — always with you, always in
-					sync, always private. One download and you're set.
+					Native on MacOS, Windows, and Linux. Browser extensions for Chrome, Firefox,
+					Edge, Safari and every other browser. Your preferences, your history, and your
+					AI — always with you, always in sync, always private. One download and you're
+					set.
 				</p>
 			</FeatureSection.Content>
 		</FeatureSection.Root>

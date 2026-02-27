@@ -19,6 +19,7 @@
 				{ name: 'Download', href: '/download' },
 				{ name: 'Pricing', href: '/pricing' },
 				{ name: 'Browser Extension', href: '/download/browser-extension' },
+				{ name: 'Roadmap', href: '/roadmap' },
 			],
 		},
 		company: {
@@ -62,6 +63,7 @@
 	<div class="flex items-center gap-4">
 		<Button variant="ghost" href="/about">About Us</Button>
 		<Button variant="ghost" href="/pricing">Pricing</Button>
+		<Button variant="ghost" href="/roadmap">Roadmap</Button>
 
 		<Button variant="default" href="/download">Download</Button>
 		<Button variant="ghost" size="icon" href="https://github.com/Eurora-Labs/eurora">
