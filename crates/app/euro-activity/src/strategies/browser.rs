@@ -19,6 +19,128 @@ use std::sync::{
 use tokio::sync::{RwLock, mpsc};
 use url::Url;
 
+/// Resolves a browser subprocess PID to the root browser process PID.
+///
+/// Chrome on Windows spawns isolated renderer processes per tab, each with its
+/// own PID. The foreground window may belong to any of these subprocesses, but
+/// the native messaging host registers under the root `chrome.exe` PID. This
+/// function walks the process tree upward to find the topmost ancestor that
+/// shares the same executable name (e.g., `chrome.exe`), which is the root
+/// browser process.
+///
+/// On non-Windows platforms, or if the walk fails, returns the PID unchanged.
+fn resolve_browser_pid(pid: u32, process_name: &str) -> u32 {
+    #[cfg(target_os = "windows")]
+    {
+        resolve_root_browser_pid_windows(pid, process_name)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = process_name;
+        pid
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn resolve_root_browser_pid_windows(pid: u32, process_name: &str) -> u32 {
+    use std::collections::HashMap;
+    use std::ffi::OsString;
+    use std::mem::MaybeUninit;
+    use std::os::windows::ffi::OsStringExt;
+
+    #[repr(C)]
+    #[allow(non_snake_case)]
+    struct PROCESSENTRY32W {
+        dwSize: u32,
+        cntUsage: u32,
+        th32ProcessID: u32,
+        th32DefaultHeapID: usize,
+        th32ModuleID: u32,
+        cntThreads: u32,
+        th32ParentProcessID: u32,
+        pcPriClassBase: i32,
+        dwFlags: u32,
+        szExeFile: [u16; 260],
+    }
+
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn CreateToolhelp32Snapshot(dwFlags: u32, th32ProcessID: u32) -> isize;
+        fn Process32FirstW(hSnapshot: isize, lppe: *mut PROCESSENTRY32W) -> i32;
+        fn Process32NextW(hSnapshot: isize, lppe: *mut PROCESSENTRY32W) -> i32;
+        fn CloseHandle(hObject: isize) -> i32;
+    }
+
+    const TH32CS_SNAPPROCESS: u32 = 0x00000002;
+    const INVALID_HANDLE_VALUE: isize = -1;
+
+    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
+    if snapshot == INVALID_HANDLE_VALUE {
+        tracing::warn!("Failed to create process snapshot for browser PID resolution");
+        return pid;
+    }
+
+    // Build a map of pid -> (parent_pid, exe_name) from the snapshot.
+    let mut process_map: HashMap<u32, (u32, String)> = HashMap::new();
+
+    unsafe {
+        let mut entry: MaybeUninit<PROCESSENTRY32W> = MaybeUninit::uninit();
+        (*entry.as_mut_ptr()).dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+
+        if Process32FirstW(snapshot, entry.as_mut_ptr()) != 0 {
+            loop {
+                let e = entry.assume_init_ref();
+                let name_len = e
+                    .szExeFile
+                    .iter()
+                    .position(|&c| c == 0)
+                    .unwrap_or(e.szExeFile.len());
+                let exe_name = OsString::from_wide(&e.szExeFile[..name_len])
+                    .to_string_lossy()
+                    .into_owned();
+
+                process_map.insert(e.th32ProcessID, (e.th32ParentProcessID, exe_name));
+
+                if Process32NextW(snapshot, entry.as_mut_ptr()) == 0 {
+                    break;
+                }
+            }
+        }
+
+        CloseHandle(snapshot);
+    }
+
+    // Walk up the process tree while the parent shares the same executable name.
+    let mut current = pid;
+    let target_name_lower = process_name.to_lowercase();
+    loop {
+        let Some(&(parent_pid, ref parent_name)) = process_map.get(&current) else {
+            break;
+        };
+
+        if parent_pid == 0 || parent_pid == current {
+            break;
+        }
+
+        if parent_name.to_lowercase() != target_name_lower {
+            break;
+        }
+
+        current = parent_pid;
+    }
+
+    if current != pid {
+        tracing::debug!(
+            "Resolved browser subprocess PID {} to root PID {} ({})",
+            pid,
+            current,
+            process_name
+        );
+    }
+
+    current
+}
+
 pub use euro_browser::{
     BrowserBridgeServer, BrowserBridgeService, EventFrame, Frame, FrameKind, RequestFrame,
     ResponseFrame,
@@ -345,14 +467,16 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     ) -> ActivityResult<()> {
         self.sender = Some(sender.clone());
         let process_name = focus_window.process_name.clone();
+        let browser_pid =
+            resolve_browser_pid(focus_window.process_id, &focus_window.process_name);
         self.active_browser = Some(process_name.clone());
         self.active_browser_pid
-            .store(focus_window.process_id, Ordering::Relaxed);
+            .store(browser_pid, Ordering::Relaxed);
 
         self.init_collection().await?;
 
         if !Self::flush_cache(
-            focus_window.process_id,
+            browser_pid,
             &process_name,
             &sender,
             &self.last_url,
@@ -405,13 +529,15 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         );
 
         if self.can_handle_process(focus_window) {
+            let browser_pid =
+                resolve_browser_pid(focus_window.process_id, &focus_window.process_name);
             self.active_browser_pid
-                .store(focus_window.process_id, Ordering::Relaxed);
+                .store(browser_pid, Ordering::Relaxed);
             self.active_browser = Some(focus_window.process_name.to_string());
 
             if let Some(sender) = &self.sender {
                 Self::flush_cache(
-                    focus_window.process_id,
+                    browser_pid,
                     &focus_window.process_name,
                     sender,
                     &self.last_url,
