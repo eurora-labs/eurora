@@ -3,48 +3,58 @@
 	import GetProButton from '$lib/components/GetProButton.svelte';
 	import { Badge } from '@eurora/ui/components/badge/index';
 	import { Button } from '@eurora/ui/components/button/index';
-	import { Input } from '@eurora/ui/components/input/index';
-	import { Label } from '@eurora/ui/components/label/index';
-	import * as Select from '@eurora/ui/components/select/index';
 	import { Separator } from '@eurora/ui/components/separator/index';
-	import * as Sheet from '@eurora/ui/components/sheet/index';
-	import { Textarea } from '@eurora/ui/components/textarea/index';
-	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import CheckIcon from '@lucide/svelte/icons/check';
-	import MinusIcon from '@lucide/svelte/icons/minus';
-	import countries from 'i18n-iso-countries';
-	import enLocale from 'i18n-iso-countries/langs/en.json';
+	import CopyIcon from '@lucide/svelte/icons/copy';
 
 	const shouldAutoCheckout = page.url.searchParams.get('checkout') === 'true';
 
-	countries.registerLocale(enLocale);
-	const countryNames = Object.values(countries.getNames('en', { select: 'official' })).sort();
+	let copiedEmail = $state(false);
 
-	let contactSheetOpen = $state(false);
-	let step = $state<1 | 2>(1);
-	let companyEmail = $state('');
-	let firstName = $state('');
-	let lastName = $state('');
-	let company = $state('');
-	let country = $state('');
-	let employees = $state('');
-	let details = $state('');
-
-	function resetForm() {
-		step = 1;
-		companyEmail = '';
-		firstName = '';
-		lastName = '';
-		company = '';
-		country = '';
-		employees = '';
-		details = '';
+	async function copyEmail() {
+		await navigator.clipboard.writeText('contact@eurora-labs.com');
+		copiedEmail = true;
+		setTimeout(() => (copiedEmail = false), 2000);
 	}
 
-	function openContactSheet() {
-		resetForm();
-		contactSheetOpen = true;
-	}
+	// TODO: Re-enable contact sales sheet panel
+	// import { Input } from '@eurora/ui/components/input/index';
+	// import { Label } from '@eurora/ui/components/label/index';
+	// import * as Select from '@eurora/ui/components/select/index';
+	// import * as Sheet from '@eurora/ui/components/sheet/index';
+	// import { Textarea } from '@eurora/ui/components/textarea/index';
+	// import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
+	// import countries from 'i18n-iso-countries';
+	// import enLocale from 'i18n-iso-countries/langs/en.json';
+	//
+	// countries.registerLocale(enLocale);
+	// const countryNames = Object.values(countries.getNames('en', { select: 'official' })).sort();
+	//
+	// let contactSheetOpen = $state(false);
+	// let step = $state<1 | 2>(1);
+	// let companyEmail = $state('');
+	// let firstName = $state('');
+	// let lastName = $state('');
+	// let company = $state('');
+	// let country = $state('');
+	// let employees = $state('');
+	// let details = $state('');
+	//
+	// function resetForm() {
+	// 	step = 1;
+	// 	companyEmail = '';
+	// 	firstName = '';
+	// 	lastName = '';
+	// 	company = '';
+	// 	country = '';
+	// 	employees = '';
+	// 	details = '';
+	// }
+	//
+	// function openContactSheet() {
+	// 	resetForm();
+	// 	contactSheetOpen = true;
+	// }
 </script>
 
 <div class="container mx-auto max-w-5xl px-4 pt-16 pb-24">
@@ -157,13 +167,19 @@
 					Everything in Pro
 				</li>
 			</ul>
-			<Button variant="outline" class="w-full" onclick={openContactSheet}
-				>Contact Sales</Button
+			<p class="text-sm font-medium mb-2">Contact Us</p>
+			<Button variant="outline" class="w-full" onclick={copyEmail}>
+				contact@eurora-labs.com
+				<CopyIcon class="h-3.5 w-3.5 text-muted-foreground" />
+				{#if copiedEmail}
+					<span class="text-xs text-primary">Copied!</span>
+				{/if}</Button
 			>
 		</div>
 	</div>
 </div>
 
+<!-- TODO: Re-enable contact sales sheet panel
 <Sheet.Root
 	bind:open={contactSheetOpen}
 	onOpenChange={(open) => {
@@ -267,3 +283,4 @@
 		{/if}
 	</Sheet.Content>
 </Sheet.Root>
+-->
