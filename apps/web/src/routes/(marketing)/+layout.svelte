@@ -24,7 +24,7 @@
 		company: {
 			title: 'Company',
 			links: [
-				{ name: 'About', href: '/about' },
+				// { name: 'About', href: '/about' },
 				// { name: 'Careers', href: '/careers' },
 				{ name: 'Privacy Policy', href: '/privacy-policy' },
 				// { name: 'Terms of Service', href: '/terms' },
@@ -64,7 +64,7 @@
 	</div>
 
 	<div class="flex items-center gap-4">
-		<Button variant="ghost" href="/about">About Us</Button>
+		<!-- <Button variant="ghost" href="/about">About Us</Button> -->
 		<Button variant="ghost" href="/pricing">Pricing</Button>
 		<Button variant="ghost" href="/roadmap">Roadmap</Button>
 
