@@ -10,6 +10,7 @@ service ProtoAuthService {
   rpc GetThirdPartyAuthUrl(ThirdPartyAuthUrlRequest) returns (ThirdPartyAuthUrlResponse);
   rpc LoginByLoginToken(LoginByLoginTokenRequest) returns (TokenResponse);
   rpc CheckEmail(CheckEmailRequest) returns (CheckEmailResponse);
+  rpc Logout(LogoutRequest) returns (google.protobuf.Empty);
 }
 
 message LoginRequest {
@@ -72,3 +73,5 @@ message CheckEmailResponse {
   string status = 1;
   optional Provider provider = 2;
 }
+
+message LogoutRequest {}

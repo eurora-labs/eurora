@@ -19,7 +19,7 @@ impl GitHubOAuthConfig {
         let client_secret = env::var("GITHUB_CLIENT_SECRET")
             .map_err(|_| OAuthError::MissingEnvVar("GITHUB_CLIENT_SECRET"))?;
         let redirect_uri = env::var("GITHUB_REDIRECT_URI")
-            .unwrap_or_else(|_| "http://localhost:5173/auth/github/callback".to_string());
+            .map_err(|_| OAuthError::MissingEnvVar("GITHUB_REDIRECT_URI"))?;
 
         Ok(Self {
             client_id,
