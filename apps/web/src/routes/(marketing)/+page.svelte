@@ -20,6 +20,15 @@
 		src="https://d26xptavrz5c8t.cloudfront.net/video/youtube_demo.mp4"
 		class="rounded-xl"
 	/>
+	<p class="mt-2 text-xs text-muted-foreground/70">
+		Video source: <a
+			href="https://www.youtube.com/watch?v=zkIcLproDGM"
+			target="_blank"
+			rel="noopener noreferrer"
+			class="underline hover:text-muted-foreground transition-colors"
+			>Lecture 1 Part 1: Introduction and Motivation</a
+		> — Alan Edelman, Steven G. Johnson | OCW MIT
+	</p>
 
 	<VideoSection
 		title="Seamless Integration"
