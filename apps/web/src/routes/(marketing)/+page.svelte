@@ -3,6 +3,7 @@
 	import VideoSection from '$lib/components/marketing/video-section.svelte';
 	import { AutoplayVideo } from '@eurora/ui/custom-components/autoplay-video/index';
 	import * as FeatureSection from '@eurora/ui/custom-components/feature-section/index';
+	import { Button } from '@eurora/ui/components/button/index';
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -86,4 +87,28 @@
 			</FeatureSection.Content>
 		</FeatureSection.Root>
 	</div>
+
+	<section
+		class="relative mt-32 mb-16 flex flex-col items-center text-center overflow-hidden rounded-3xl border border-primary/10 bg-gradient-to-b from-primary/5 via-primary/10 to-primary/5 px-6 py-24 sm:px-12 sm:py-32"
+	>
+		<div
+			class="pointer-events-none absolute inset-0 rounded-3xl bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/15 via-transparent to-transparent"
+		></div>
+
+		<h2 class="relative text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+			Ready to get started?
+		</h2>
+		<p
+			class="relative mt-6 max-w-2xl text-lg text-muted-foreground sm:text-xl lg:text-2xl leading-relaxed"
+		>
+			Download Eurora and experience AI on your own terms. Free, private, and open source.
+		</p>
+		<Button
+			size="lg"
+			class="relative mt-10 rounded-full px-12 py-7 text-xl font-semibold shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-shadow"
+			href="/download"
+		>
+			Get Started
+		</Button>
+	</section>
 </div>

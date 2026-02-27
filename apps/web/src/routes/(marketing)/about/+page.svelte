@@ -3,24 +3,32 @@
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Separator } from '@eurora/ui/components/separator/index';
 	import { SiBluesky, SiDiscord, SiGithub, SiReddit, SiX } from '@icons-pack/svelte-simple-icons';
-	import BriefcaseIcon from '@lucide/svelte/icons/briefcase';
-	import CodeIcon from '@lucide/svelte/icons/code';
 	import CopyIcon from '@lucide/svelte/icons/copy';
-	import EyeIcon from '@lucide/svelte/icons/eye';
 	import GithubIcon from '@lucide/svelte/icons/github';
-	import GraduationCapIcon from '@lucide/svelte/icons/graduation-cap';
-	import HeartIcon from '@lucide/svelte/icons/heart';
 	import LinkedinIcon from '@lucide/svelte/icons/linkedin';
 	import MailIcon from '@lucide/svelte/icons/mail';
-	import ShieldIcon from '@lucide/svelte/icons/shield';
 
 	const email = 'contact@eurora-labs.com';
 	let copied = $state(false);
+	let copiedLaura = $state(false);
+	let copiedAndre = $state(false);
 
 	async function copyEmail() {
 		await navigator.clipboard.writeText(email);
 		copied = true;
 		setTimeout(() => (copied = false), 2000);
+	}
+
+	async function copyLauraEmail() {
+		await navigator.clipboard.writeText('laura@eurora-labs.com');
+		copiedLaura = true;
+		setTimeout(() => (copiedLaura = false), 2000);
+	}
+
+	async function copyAndreEmail() {
+		await navigator.clipboard.writeText('andre@eurora-labs.com');
+		copiedAndre = true;
+		setTimeout(() => (copiedAndre = false), 2000);
 	}
 
 	const socials = [
@@ -81,18 +89,14 @@
 
 					<div class="space-y-4">
 						<div>
-							<h3 class="flex items-center gap-2 text-sm font-semibold mb-1">
-								<BriefcaseIcon class="h-3.5 w-3.5 text-primary" /> Background
-							</h3>
+							<h3 class="text-sm font-semibold mb-1">Background</h3>
 							<p class="text-sm text-muted-foreground">
 								Sales leadership to executive management. Built and scaled
 								go-to-market teams across enterprise software and hardware.
 							</p>
 						</div>
 						<div>
-							<h3 class="flex items-center gap-2 text-sm font-semibold mb-1">
-								<GraduationCapIcon class="h-3.5 w-3.5 text-primary" /> Education
-							</h3>
+							<h3 class="text-sm font-semibold mb-1">Education</h3>
 							<p class="text-sm text-muted-foreground">
 								MBA, Pepperdine University. BS Business Administration (Finance
 								minor), University of Southern California.
@@ -103,10 +107,30 @@
 					<Separator class="my-5" />
 
 					<div class="flex gap-2">
-						<Button variant="ghost" size="icon" class="h-8 w-8">
-							<MailIcon class="h-4 w-4" />
-						</Button>
-						<Button variant="ghost" size="icon" class="h-8 w-8">
+						<div class="relative">
+							{#if copiedLaura}
+								<span
+									class="absolute -top-8 left-1/2 -translate-x-1/2 rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground whitespace-nowrap"
+									>Copied!</span
+								>
+							{/if}
+							<Button
+								variant="ghost"
+								size="icon"
+								class="h-8 w-8"
+								onclick={copyLauraEmail}
+							>
+								<MailIcon class="h-4 w-4" />
+							</Button>
+						</div>
+						<Button
+							variant="ghost"
+							size="icon"
+							class="h-8 w-8"
+							href="https://www.linkedin.com/in/laura-thommen-6a40b53/"
+							target="_blank"
+							rel="noopener noreferrer"
+						>
 							<LinkedinIcon class="h-4 w-4" />
 						</Button>
 					</div>
@@ -139,18 +163,14 @@
 
 					<div class="space-y-4">
 						<div>
-							<h3 class="flex items-center gap-2 text-sm font-semibold mb-1">
-								<BriefcaseIcon class="h-3.5 w-3.5 text-primary" /> Background
-							</h3>
+							<h3 class="text-sm font-semibold mb-1">Background</h3>
 							<p class="text-sm text-muted-foreground">
 								Software architecture, machine learning, and computer vision. Built
 								production AI systems from research through deployment.
 							</p>
 						</div>
 						<div>
-							<h3 class="flex items-center gap-2 text-sm font-semibold mb-1">
-								<GraduationCapIcon class="h-3.5 w-3.5 text-primary" /> Education
-							</h3>
+							<h3 class="text-sm font-semibold mb-1">Education</h3>
 							<p class="text-sm text-muted-foreground">
 								BS Computer Science, Avans University. Graduate studies in AI,
 								Maastricht University.
@@ -161,13 +181,40 @@
 					<Separator class="my-5" />
 
 					<div class="flex gap-2">
-						<Button variant="ghost" size="icon" class="h-8 w-8">
-							<MailIcon class="h-4 w-4" />
-						</Button>
-						<Button variant="ghost" size="icon" class="h-8 w-8">
+						<div class="relative">
+							{#if copiedAndre}
+								<span
+									class="absolute -top-8 left-1/2 -translate-x-1/2 rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground whitespace-nowrap"
+									>Copied!</span
+								>
+							{/if}
+							<Button
+								variant="ghost"
+								size="icon"
+								class="h-8 w-8"
+								onclick={copyAndreEmail}
+							>
+								<MailIcon class="h-4 w-4" />
+							</Button>
+						</div>
+						<Button
+							variant="ghost"
+							size="icon"
+							class="h-8 w-8"
+							href="https://www.linkedin.com/in/andre-roelofs/"
+							target="_blank"
+							rel="noopener noreferrer"
+						>
 							<LinkedinIcon class="h-4 w-4" />
 						</Button>
-						<Button variant="ghost" size="icon" class="h-8 w-8">
+						<Button
+							variant="ghost"
+							size="icon"
+							class="h-8 w-8"
+							href="https://github.com/AndreRoelofs"
+							target="_blank"
+							rel="noopener noreferrer"
+						>
 							<GithubIcon class="h-4 w-4" />
 						</Button>
 					</div>
@@ -186,7 +233,6 @@
 
 		<div class="grid grid-cols-1 gap-px bg-border rounded-2xl overflow-hidden md:grid-cols-2">
 			<div class="bg-card p-8">
-				<ShieldIcon class="h-5 w-5 text-primary mb-4" />
 				<h3 class="font-semibold text-lg mb-2">Your data stays yours</h3>
 				<p class="text-sm text-muted-foreground leading-relaxed">
 					All data lives in sovereign European infrastructure. We can't read it, we can't
@@ -194,7 +240,6 @@
 				</p>
 			</div>
 			<div class="bg-card p-8">
-				<CodeIcon class="h-5 w-5 text-primary mb-4" />
 				<h3 class="font-semibold text-lg mb-2">Open source, always</h3>
 				<p class="text-sm text-muted-foreground leading-relaxed">
 					Every line of Eurora's code is public. You don't have to take our word for
@@ -202,7 +247,6 @@
 				</p>
 			</div>
 			<div class="bg-card p-8">
-				<EyeIcon class="h-5 w-5 text-primary mb-4" />
 				<h3 class="font-semibold text-lg mb-2">No hidden motives</h3>
 				<p class="text-sm text-muted-foreground leading-relaxed">
 					We're self-funded. No investors pushing for growth-at-all-costs. Our only
@@ -210,7 +254,6 @@
 				</p>
 			</div>
 			<div class="bg-card p-8">
-				<HeartIcon class="h-5 w-5 text-primary mb-4" />
 				<h3 class="font-semibold text-lg mb-2">Built for people</h3>
 				<p class="text-sm text-muted-foreground leading-relaxed">
 					We design for how people actually work — across platforms, across browsers,
