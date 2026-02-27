@@ -9,6 +9,7 @@ service ProtoAuthService {
   rpc RefreshToken(RefreshTokenRequest) returns (TokenResponse);
   rpc GetThirdPartyAuthUrl(ThirdPartyAuthUrlRequest) returns (ThirdPartyAuthUrlResponse);
   rpc LoginByLoginToken(LoginByLoginTokenRequest) returns (TokenResponse);
+  rpc CheckEmail(CheckEmailRequest) returns (CheckEmailResponse);
 }
 
 message LoginRequest {
@@ -61,4 +62,13 @@ message TokenResponse {
 
 message LoginByLoginTokenRequest {
   string token = 1;
+}
+
+message CheckEmailRequest {
+  string email = 1;
+}
+
+message CheckEmailResponse {
+  string status = 1;
+  optional Provider provider = 2;
 }

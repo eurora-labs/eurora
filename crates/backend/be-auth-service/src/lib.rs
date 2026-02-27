@@ -6,9 +6,9 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{Algorithm, Header, encode};
 use openidconnect::{Nonce, PkceCodeChallenge, PkceCodeVerifier};
 use proto_gen::auth::{
-    EmailPasswordCredentials, LoginByLoginTokenRequest, LoginRequest, Provider,
-    RefreshTokenRequest, RegisterRequest, ThirdPartyAuthUrlRequest, ThirdPartyAuthUrlResponse,
-    ThirdPartyCredentials, TokenResponse, login_request::Credential,
+    CheckEmailRequest, CheckEmailResponse, EmailPasswordCredentials, LoginByLoginTokenRequest,
+    LoginRequest, Provider, RefreshTokenRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
+    ThirdPartyAuthUrlResponse, ThirdPartyCredentials, TokenResponse, login_request::Credential,
     proto_auth_service_server::ProtoAuthService,
 };
 use rand::TryRngCore;
@@ -893,6 +893,63 @@ impl ProtoAuthService for AuthService {
         };
 
         Ok(Response::new(response))
+    }
+
+    async fn check_email(
+        &self,
+        request: Request<CheckEmailRequest>,
+    ) -> Result<Response<CheckEmailResponse>, Status> {
+        let email = request.into_inner().email;
+
+        if email.is_empty() {
+            return Err(Status::invalid_argument("Email is required"));
+        }
+
+        let user = match self.db.get_user().email(email).call().await {
+            Ok(user) => user,
+            Err(_) => {
+                return Ok(Response::new(CheckEmailResponse {
+                    status: "not_found".into(),
+                    provider: None,
+                }));
+            }
+        };
+
+        if self
+            .db
+            .get_password_credentials()
+            .user_id(user.id)
+            .call()
+            .await
+            .is_ok()
+        {
+            return Ok(Response::new(CheckEmailResponse {
+                status: "password".into(),
+                provider: None,
+            }));
+        }
+
+        if let Ok(Some(oauth_provider)) = self
+            .db
+            .get_oauth_provider_for_user()
+            .user_id(user.id)
+            .call()
+            .await
+        {
+            let proto_provider = match oauth_provider {
+                OAuthProvider::Google => Provider::Google,
+                OAuthProvider::Github => Provider::Github,
+            };
+            return Ok(Response::new(CheckEmailResponse {
+                status: "oauth".into(),
+                provider: Some(proto_provider.into()),
+            }));
+        }
+
+        Ok(Response::new(CheckEmailResponse {
+            status: "not_found".into(),
+            provider: None,
+        }))
     }
 }
 

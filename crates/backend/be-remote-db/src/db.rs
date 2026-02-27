@@ -302,6 +302,23 @@ impl DatabaseManager {
     }
 
     #[builder]
+    pub async fn get_oauth_provider_for_user(
+        &self,
+        user_id: Uuid,
+    ) -> DbResult<Option<OAuthProvider>> {
+        let result: Option<(OAuthProvider,)> = sqlx::query_as(
+            r#"
+            SELECT provider FROM oauth_credentials WHERE user_id = $1 LIMIT 1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(result.map(|(p,)| p))
+    }
+
+    #[builder]
     pub async fn update_oauth_credentials(
         &self,
         id: Uuid,
