@@ -101,6 +101,70 @@ impl DatabaseManager {
     }
 
     #[builder]
+    pub async fn create_user_with_oauth(
+        &self,
+        username: String,
+        email: String,
+        display_name: Option<String>,
+        email_verified: bool,
+        provider: OAuthProvider,
+        provider_user_id: String,
+        access_token: Option<Vec<u8>>,
+        refresh_token: Option<Vec<u8>>,
+        access_token_expiry: Option<DateTime<Utc>>,
+        scope: Option<String>,
+    ) -> DbResult<User> {
+        let user_id = Uuid::now_v7();
+        let oauth_cred_id = Uuid::now_v7();
+        let now = Utc::now();
+
+        let mut tx = self.pool.begin().await?;
+
+        let user = sqlx::query_as::<_, User>(
+            r#"
+            INSERT INTO users (id, username, email, display_name, email_verified, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id, username, email, display_name, email_verified, created_at, updated_at
+            "#,
+        )
+        .bind(user_id)
+        .bind(&username)
+        .bind(&email)
+        .bind(&display_name)
+        .bind(email_verified)
+        .bind(now)
+        .bind(now)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO oauth_credentials (
+                id, user_id, provider, provider_user_id, access_token,
+                refresh_token, access_token_expiry, scope, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            "#,
+        )
+        .bind(oauth_cred_id)
+        .bind(user_id)
+        .bind(provider)
+        .bind(&provider_user_id)
+        .bind(&access_token)
+        .bind(&refresh_token)
+        .bind(access_token_expiry)
+        .bind(&scope)
+        .bind(now)
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        Ok(user)
+    }
+
+    #[builder]
     pub async fn get_user(
         &self,
         id: Option<Uuid>,
@@ -235,6 +299,23 @@ impl DatabaseManager {
         .await?;
 
         Ok(oauth_creds)
+    }
+
+    #[builder]
+    pub async fn get_oauth_provider_for_user(
+        &self,
+        user_id: Uuid,
+    ) -> DbResult<Option<OAuthProvider>> {
+        let result: Option<(OAuthProvider,)> = sqlx::query_as(
+            r#"
+            SELECT provider FROM oauth_credentials WHERE user_id = $1 LIMIT 1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(result.map(|(p,)| p))
     }
 
     #[builder]
@@ -513,6 +594,38 @@ impl DatabaseManager {
         .await?;
 
         Ok(login_token)
+    }
+
+    #[builder]
+    pub async fn cleanup_expired_auth_data(&self) -> DbResult<()> {
+        let deleted_states = sqlx::query_scalar::<_, i64>(
+            "WITH deleted AS (DELETE FROM oauth_state WHERE expires_at < now() - interval '1 hour' RETURNING 1) SELECT count(*) FROM deleted",
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        let deleted_login_tokens = sqlx::query_scalar::<_, i64>(
+            "WITH deleted AS (DELETE FROM login_tokens WHERE expires_at < now() - interval '1 hour' RETURNING 1) SELECT count(*) FROM deleted",
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        let deleted_refresh_tokens = sqlx::query_scalar::<_, i64>(
+            "WITH deleted AS (DELETE FROM refresh_tokens WHERE revoked = true AND created_at < now() - interval '30 days' RETURNING 1) SELECT count(*) FROM deleted",
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        if deleted_states > 0 || deleted_login_tokens > 0 || deleted_refresh_tokens > 0 {
+            tracing::info!(
+                "Cleaned up expired auth data: {} oauth_states, {} login_tokens, {} refresh_tokens",
+                deleted_states,
+                deleted_login_tokens,
+                deleted_refresh_tokens,
+            );
+        }
+
+        Ok(())
     }
 
     #[builder]

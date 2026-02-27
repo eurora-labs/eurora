@@ -1,7 +1,7 @@
 use anyhow::{Ok, Result, anyhow};
 use proto_gen::auth::{
-    EmailPasswordCredentials, GetLoginTokenResponse, LoginByLoginTokenRequest, LoginRequest,
-    RefreshTokenRequest, RegisterRequest, TokenResponse, login_request::Credential,
+    EmailPasswordCredentials, LoginByLoginTokenRequest, LoginRequest, RefreshTokenRequest,
+    RegisterRequest, TokenResponse, login_request::Credential,
     proto_auth_service_client::ProtoAuthServiceClient,
 };
 use tokio::sync::watch;
@@ -99,16 +99,6 @@ impl AuthClient {
                 tracing::error!("Login by login token failed: {}", e);
                 anyhow!("Login by login token failed: {}", e)
             })?;
-
-        Ok(response.into_inner())
-    }
-
-    pub async fn get_login_token(&mut self) -> Result<GetLoginTokenResponse> {
-        let mut client = self.client();
-        let response = client.get_login_token(()).await.map_err(|e| {
-            tracing::error!("Get login token failed: {}", e);
-            anyhow!("Get login token failed: {}", e)
-        })?;
 
         Ok(response.into_inner())
     }

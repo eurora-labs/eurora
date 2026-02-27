@@ -14,7 +14,7 @@ use tower::{Layer, Service};
 
 use crate::CasbinAuthz;
 use crate::bypass::is_grpc_bypass;
-use crate::rate_limit::AuthFailureRateLimiter;
+use crate::rate_limit::{AuthFailureRateLimiter, HealthCheckRateLimiter};
 use crate::token_gate;
 
 #[derive(Clone)]
@@ -22,6 +22,7 @@ pub struct GrpcAuthzLayer {
     authz: CasbinAuthz,
     jwt_config: Arc<JwtConfig>,
     rate_limiter: AuthFailureRateLimiter,
+    health_rate_limiter: HealthCheckRateLimiter,
     db: Arc<DatabaseManager>,
 }
 
@@ -30,12 +31,14 @@ impl GrpcAuthzLayer {
         authz: CasbinAuthz,
         jwt_config: JwtConfig,
         rate_limiter: AuthFailureRateLimiter,
+        health_rate_limiter: HealthCheckRateLimiter,
         db: Arc<DatabaseManager>,
     ) -> Self {
         Self {
             authz,
             jwt_config: Arc::new(jwt_config),
             rate_limiter,
+            health_rate_limiter,
             db,
         }
     }
@@ -50,6 +53,7 @@ impl<S> Layer<S> for GrpcAuthzLayer {
             authz: self.authz.clone(),
             jwt_config: Arc::clone(&self.jwt_config),
             rate_limiter: Arc::clone(&self.rate_limiter),
+            health_rate_limiter: Arc::clone(&self.health_rate_limiter),
             db: Arc::clone(&self.db),
         }
     }
@@ -61,6 +65,7 @@ pub struct GrpcAuthzService<S> {
     authz: CasbinAuthz,
     jwt_config: Arc<JwtConfig>,
     rate_limiter: AuthFailureRateLimiter,
+    health_rate_limiter: HealthCheckRateLimiter,
     db: Arc<DatabaseManager>,
 }
 
@@ -92,6 +97,7 @@ where
         let authz = self.authz.clone();
         let jwt_config = Arc::clone(&self.jwt_config);
         let rate_limiter = Arc::clone(&self.rate_limiter);
+        let health_rate_limiter = Arc::clone(&self.health_rate_limiter);
         let db = Arc::clone(&self.db);
         let client_ip = extract_client_ip(&req);
         let inner = self.inner.clone();
@@ -111,6 +117,18 @@ where
             };
 
             if is_grpc_bypass(&service_full) {
+                let limiter_result = if service_full == "grpc.health.v1.Health" {
+                    health_rate_limiter.check_key(&client_ip)
+                } else {
+                    rate_limiter.check_key(&client_ip)
+                };
+                if limiter_result.is_err() {
+                    tracing::warn!(ip = %client_ip, service = %service_full, "Rate limited public service request");
+                    return Ok(
+                        Status::resource_exhausted("Too many requests. Try again later.")
+                            .into_http(),
+                    );
+                }
                 tracing::debug!(path = %path, "Bypassing authorization for public service");
                 return inner.call(req).await;
             }
