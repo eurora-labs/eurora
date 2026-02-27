@@ -5,11 +5,9 @@ import {
 	type LoginRequest,
 	type TokenResponse,
 	type RefreshTokenRequest,
-	type RegisterRequest,
 	Provider,
 	type ThirdPartyAuthUrlResponse,
 	type LoginByLoginTokenRequest,
-	type GetLoginTokenResponse,
 } from '@eurora/shared/proto/auth_service_pb.js';
 
 const VITE_GRPC_API_URL: string = import.meta.env.VITE_GRPC_API_URL;
@@ -34,20 +32,12 @@ class AuthService {
 		return await this.client.login(data);
 	}
 
-	public async register(data: RegisterRequest): Promise<TokenResponse> {
-		return await this.client.register(data);
-	}
-
 	public async refreshToken(data: RefreshTokenRequest): Promise<TokenResponse> {
 		return await this.client.refreshToken(data);
 	}
 
 	public async getThirdPartyAuthUrl(provider: Provider): Promise<ThirdPartyAuthUrlResponse> {
 		return await this.client.getThirdPartyAuthUrl({ provider });
-	}
-
-	public async getLoginToken(): Promise<GetLoginTokenResponse> {
-		return await this.client.getLoginToken({});
 	}
 
 	public async loginByLoginToken(data: LoginByLoginTokenRequest): Promise<TokenResponse> {
@@ -59,10 +49,8 @@ export const authService = new AuthService();
 export type {
 	LoginRequest,
 	TokenResponse,
-	RegisterRequest,
 	RefreshTokenRequest,
 	Provider,
 	ThirdPartyAuthUrlResponse,
-	GetLoginTokenResponse,
 	LoginByLoginTokenRequest,
 };

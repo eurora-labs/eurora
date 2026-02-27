@@ -8,8 +8,9 @@ service ProtoAuthService {
   rpc Register(RegisterRequest) returns (TokenResponse);
   rpc RefreshToken(RefreshTokenRequest) returns (TokenResponse);
   rpc GetThirdPartyAuthUrl(ThirdPartyAuthUrlRequest) returns (ThirdPartyAuthUrlResponse);
-  rpc GetLoginToken(google.protobuf.Empty) returns (GetLoginTokenResponse);
   rpc LoginByLoginToken(LoginByLoginTokenRequest) returns (TokenResponse);
+  rpc CheckEmail(CheckEmailRequest) returns (CheckEmailResponse);
+  rpc Logout(LogoutRequest) returns (google.protobuf.Empty);
 }
 
 message LoginRequest {
@@ -64,8 +65,13 @@ message LoginByLoginTokenRequest {
   string token = 1;
 }
 
-message GetLoginTokenResponse {
-  string token = 1;
-  int64 expires_in = 2;
-  string url = 3;
+message CheckEmailRequest {
+  string email = 1;
 }
+
+message CheckEmailResponse {
+  string status = 1;
+  optional Provider provider = 2;
+}
+
+message LogoutRequest {}
