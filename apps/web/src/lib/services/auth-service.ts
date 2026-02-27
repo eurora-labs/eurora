@@ -9,7 +9,6 @@ import {
 	Provider,
 	type ThirdPartyAuthUrlResponse,
 	type LoginByLoginTokenRequest,
-	type GetLoginTokenResponse,
 } from '@eurora/shared/proto/auth_service_pb.js';
 
 const VITE_GRPC_API_URL: string = import.meta.env.VITE_GRPC_API_URL;
@@ -51,17 +50,20 @@ class AuthService {
 		return await this.client.getThirdPartyAuthUrl({ provider });
 	}
 
-	public async getLoginToken(): Promise<GetLoginTokenResponse> {
-		return await this.client.getLoginToken({});
-	}
-
 	public async loginByLoginToken(data: LoginByLoginTokenRequest): Promise<TokenResponse> {
 		return await this.client.loginByLoginToken(data);
 	}
 
-	// TODO: Wire to backend CheckEmail RPC once implemented
-	public async checkEmail(_email: string): Promise<EmailCheckResult> {
-		return { status: 'password' };
+	public async checkEmail(email: string): Promise<EmailCheckResult> {
+		const res = await this.client.checkEmail({ email });
+		if (res.status === 'oauth' && res.provider !== undefined) {
+			const providerName = res.provider === Provider.GOOGLE ? 'google' : 'github';
+			return { status: 'oauth', provider: providerName };
+		}
+		if (res.status === 'password') {
+			return { status: 'password' };
+		}
+		return { status: 'not_found' };
 	}
 }
 
@@ -73,6 +75,5 @@ export type {
 	RefreshTokenRequest,
 	Provider,
 	ThirdPartyAuthUrlResponse,
-	GetLoginTokenResponse,
 	LoginByLoginTokenRequest,
 };

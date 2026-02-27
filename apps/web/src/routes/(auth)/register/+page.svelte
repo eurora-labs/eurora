@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { authService } from '$lib/services/auth-service';
+	import { auth } from '$lib/stores/auth.js';
 	import { create } from '@bufbuild/protobuf';
 	import { RegisterRequestSchema } from '@eurora/shared/proto/auth_service_pb.js';
 	import { Button } from '@eurora/ui/components/button/index';
@@ -59,8 +60,9 @@
 				password: $formData.password,
 			});
 
-			await authService.register(registerData);
-			goto('/register/verify-email');
+			const tokens = await authService.register(registerData);
+			auth.login(tokens);
+			goto('/settings');
 		} catch (err) {
 			console.error('Registration error:', err);
 			submitError =
