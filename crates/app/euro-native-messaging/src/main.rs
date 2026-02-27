@@ -55,28 +55,28 @@ async fn connect_with_retry(server_addr: &str) -> BrowserBridgeClient<Channel> {
 async fn main() -> Result<()> {
     parent_pid::capture_parent_pid();
 
-    #[cfg(debug_assertions)]
-    {
-        use std::fs;
-        use tracing_subscriber::prelude::*;
+    // #[cfg(debug_assertions)]
+    // {
+    //     use std::fs;
+    //     use tracing_subscriber::prelude::*;
 
-        let log_path = env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|d| d.join("euro-native-messaging.log")))
-            .unwrap_or_else(|| "/tmp/euro-native-messaging.log".into());
-        let log_file = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_path)
-            .expect("failed to open log file");
-        tracing_subscriber::registry()
-            .with(
-                tracing_subscriber::fmt::layer()
-                    .with_writer(std::sync::Mutex::new(log_file))
-                    .with_ansi(false),
-            )
-            .init();
-    }
+    //     let log_path = env::current_exe()
+    //         .ok()
+    //         .and_then(|p| p.parent().map(|d| d.join("euro-native-messaging.log")))
+    //         .unwrap_or_else(|| "/tmp/euro-native-messaging.log".into());
+    //     let log_file = fs::OpenOptions::new()
+    //         .create(true)
+    //         .append(true)
+    //         .open(&log_path)
+    //         .expect("failed to open log file");
+    //     tracing_subscriber::registry()
+    //         .with(
+    //             tracing_subscriber::fmt::layer()
+    //                 .with_writer(std::sync::Mutex::new(log_file))
+    //                 .with_ansi(false),
+    //         )
+    //         .init();
+    // }
 
     let args: Vec<String> = env::args().collect();
 

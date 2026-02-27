@@ -19,34 +19,61 @@ use std::sync::{
 use tokio::sync::{RwLock, mpsc};
 use url::Url;
 
-/// Resolves a browser subprocess PID to the root browser process PID.
+/// Resolves a browser subprocess PID to a registered browser PID.
 ///
-/// Chrome on Windows spawns isolated renderer processes per tab, each with its
-/// own PID. The foreground window may belong to any of these subprocesses, but
-/// the native messaging host registers under the root `chrome.exe` PID. This
-/// function walks the process tree upward to find the topmost ancestor that
-/// shares the same executable name (e.g., `chrome.exe`), which is the root
-/// browser process.
+/// On Windows, Chrome spawns isolated renderer processes per tab. The
+/// foreground window may belong to any of these subprocesses, but the native
+/// messaging host registers under the root browser PID. Rather than trying to
+/// walk the process tree (which is unreliable due to Chrome's complex process
+/// model), this function checks the bridge service registry for a registered
+/// PID that is an ancestor of the given PID.
 ///
-/// On non-Windows platforms, or if the walk fails, returns the PID unchanged.
-fn resolve_browser_pid(pid: u32, process_name: &str) -> u32 {
+/// Falls back to the original PID if no registered ancestor is found.
+async fn resolve_browser_pid(
+    pid: u32,
+    service: &BrowserBridgeService,
+) -> u32 {
+    let registered_pids = service.get_registered_pids().await;
+
+    if registered_pids.is_empty() || registered_pids.contains(&pid) {
+        return pid;
+    }
+
+    // If there's exactly one registered browser, use it directly. This is
+    // the common case (single browser instance with native messaging).
+    if registered_pids.len() == 1 {
+        let registered = registered_pids[0];
+        tracing::debug!(
+            "Resolved browser subprocess PID {} to registered PID {}",
+            pid,
+            registered
+        );
+        return registered;
+    }
+
+    // Multiple registered browsers: verify via the process tree that the
+    // given PID is a descendant of one of the registered PIDs.
     #[cfg(target_os = "windows")]
     {
-        resolve_root_browser_pid_windows(pid, process_name)
+        if let Some(ancestor) = find_registered_ancestor_windows(pid, &registered_pids) {
+            tracing::debug!(
+                "Resolved browser subprocess PID {} to registered ancestor PID {}",
+                pid,
+                ancestor
+            );
+            return ancestor;
+        }
     }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = process_name;
-        pid
-    }
+
+    // Fallback: return the original PID unchanged.
+    pid
 }
 
+/// Walks the process tree upward from `pid` and returns the first PID that
+/// appears in `registered_pids`.
 #[cfg(target_os = "windows")]
-fn resolve_root_browser_pid_windows(pid: u32, process_name: &str) -> u32 {
-    use std::collections::HashMap;
-    use std::ffi::OsString;
+fn find_registered_ancestor_windows(pid: u32, registered_pids: &[u32]) -> Option<u32> {
     use std::mem::MaybeUninit;
-    use std::os::windows::ffi::OsStringExt;
 
     #[repr(C)]
     #[allow(non_snake_case)]
@@ -76,12 +103,11 @@ fn resolve_root_browser_pid_windows(pid: u32, process_name: &str) -> u32 {
 
     let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
     if snapshot == INVALID_HANDLE_VALUE {
-        tracing::warn!("Failed to create process snapshot for browser PID resolution");
-        return pid;
+        return None;
     }
 
-    // Build a map of pid -> (parent_pid, exe_name) from the snapshot.
-    let mut process_map: HashMap<u32, (u32, String)> = HashMap::new();
+    // Build pid -> parent_pid map.
+    let mut parent_map: HashMap<u32, u32> = HashMap::new();
 
     unsafe {
         let mut entry: MaybeUninit<PROCESSENTRY32W> = MaybeUninit::uninit();
@@ -90,16 +116,7 @@ fn resolve_root_browser_pid_windows(pid: u32, process_name: &str) -> u32 {
         if Process32FirstW(snapshot, entry.as_mut_ptr()) != 0 {
             loop {
                 let e = entry.assume_init_ref();
-                let name_len = e
-                    .szExeFile
-                    .iter()
-                    .position(|&c| c == 0)
-                    .unwrap_or(e.szExeFile.len());
-                let exe_name = OsString::from_wide(&e.szExeFile[..name_len])
-                    .to_string_lossy()
-                    .into_owned();
-
-                process_map.insert(e.th32ProcessID, (e.th32ParentProcessID, exe_name));
+                parent_map.insert(e.th32ProcessID, e.th32ParentProcessID);
 
                 if Process32NextW(snapshot, entry.as_mut_ptr()) == 0 {
                     break;
@@ -110,35 +127,20 @@ fn resolve_root_browser_pid_windows(pid: u32, process_name: &str) -> u32 {
         CloseHandle(snapshot);
     }
 
-    // Walk up the process tree while the parent shares the same executable name.
+    // Walk up from pid, checking each ancestor against registered_pids.
     let mut current = pid;
-    let target_name_lower = process_name.to_lowercase();
-    loop {
-        let Some(&(parent_pid, ref parent_name)) = process_map.get(&current) else {
-            break;
-        };
-
-        if parent_pid == 0 || parent_pid == current {
+    let mut visited = std::collections::HashSet::new();
+    while let Some(&parent) = parent_map.get(&current) {
+        if parent == 0 || !visited.insert(current) {
             break;
         }
-
-        if parent_name.to_lowercase() != target_name_lower {
-            break;
+        if registered_pids.contains(&parent) {
+            return Some(parent);
         }
-
-        current = parent_pid;
+        current = parent;
     }
 
-    if current != pid {
-        tracing::debug!(
-            "Resolved browser subprocess PID {} to root PID {} ({})",
-            pid,
-            current,
-            process_name
-        );
-    }
-
-    current
+    None
 }
 
 pub use euro_browser::{
@@ -467,22 +469,17 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     ) -> ActivityResult<()> {
         self.sender = Some(sender.clone());
         let process_name = focus_window.process_name.clone();
-        let browser_pid =
-            resolve_browser_pid(focus_window.process_id, &focus_window.process_name);
+        let service = self
+            .bridge_service
+            .ok_or_else(|| ActivityError::Strategy("Bridge service not initialized".to_string()))?;
+        let browser_pid = resolve_browser_pid(focus_window.process_id, service).await;
         self.active_browser = Some(process_name.clone());
         self.active_browser_pid
             .store(browser_pid, Ordering::Relaxed);
 
         self.init_collection().await?;
 
-        if !Self::flush_cache(
-            browser_pid,
-            &process_name,
-            &sender,
-            &self.last_url,
-        )
-        .await
-        {
+        if !Self::flush_cache(browser_pid, &process_name, &sender, &self.last_url).await {
             match self.get_metadata().await {
                 Ok(metadata) => {
                     if let Some(ref url_str) = metadata.url
@@ -529,8 +526,11 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         );
 
         if self.can_handle_process(focus_window) {
-            let browser_pid =
-                resolve_browser_pid(focus_window.process_id, &focus_window.process_name);
+            let browser_pid = if let Some(service) = self.bridge_service {
+                resolve_browser_pid(focus_window.process_id, service).await
+            } else {
+                focus_window.process_id
+            };
             self.active_browser_pid
                 .store(browser_pid, Ordering::Relaxed);
             self.active_browser = Some(focus_window.process_name.to_string());
