@@ -7,9 +7,9 @@ use jsonwebtoken::{Algorithm, Header, encode};
 use openidconnect::{Nonce, PkceCodeChallenge, PkceCodeVerifier};
 use proto_gen::auth::{
     CheckEmailRequest, CheckEmailResponse, EmailPasswordCredentials, LoginByLoginTokenRequest,
-    LoginRequest, Provider, RefreshTokenRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
-    ThirdPartyAuthUrlResponse, ThirdPartyCredentials, TokenResponse, login_request::Credential,
-    proto_auth_service_server::ProtoAuthService,
+    LoginRequest, LogoutRequest, Provider, RefreshTokenRequest, RegisterRequest,
+    ThirdPartyAuthUrlRequest, ThirdPartyAuthUrlResponse, ThirdPartyCredentials, TokenResponse,
+    login_request::Credential, proto_auth_service_server::ProtoAuthService,
 };
 use rand::TryRngCore;
 use sha2::{Digest, Sha256};
@@ -32,22 +32,36 @@ use error::AuthError;
 use oauth::github::GitHubOAuthClient;
 use oauth::google::GoogleOAuthClient;
 
+const MIN_PASSWORD_LENGTH: usize = 8;
+const MAX_PASSWORD_LENGTH: usize = 128;
+const MIN_USERNAME_LENGTH: usize = 3;
+const MAX_USERNAME_LENGTH: usize = 32;
+const LOGIN_TOKEN_EXPIRY_MINUTES: i64 = 20;
+const OAUTH_STATE_EXPIRY_MINUTES: i64 = 10;
+
 pub struct AuthService {
     db: Arc<DatabaseManager>,
     jwt_config: JwtConfig,
     google_oauth_client: OnceCell<GoogleOAuthClient>,
     github_oauth_client: std::sync::OnceLock<GitHubOAuthClient>,
+    dummy_password_hash: String,
 }
 
 #[bon]
 impl AuthService {
     pub fn new(db: Arc<DatabaseManager>, jwt_config: JwtConfig) -> Self {
         tracing::info!("Creating new AuthService instance");
+        let salt = SaltString::generate(&mut OsRng);
+        let dummy_password_hash = Argon2::default()
+            .hash_password(b"dummy-password-for-timing-resistance", &salt)
+            .expect("Failed to generate dummy password hash")
+            .to_string();
         Self {
             db,
             jwt_config,
             google_oauth_client: OnceCell::new(),
             github_oauth_client: std::sync::OnceLock::new(),
+            dummy_password_hash,
         }
     }
 
@@ -104,6 +118,64 @@ impl AuthService {
         auth_str
             .strip_prefix("Bearer ")
             .ok_or(AuthError::InvalidAuthHeader)
+    }
+
+    fn validate_password(password: &str) -> Result<(), AuthError> {
+        if password.len() < MIN_PASSWORD_LENGTH {
+            return Err(AuthError::InvalidInput(format!(
+                "Password must be at least {} characters",
+                MIN_PASSWORD_LENGTH
+            )));
+        }
+        if password.len() > MAX_PASSWORD_LENGTH {
+            return Err(AuthError::InvalidInput(format!(
+                "Password must be at most {} characters",
+                MAX_PASSWORD_LENGTH
+            )));
+        }
+        Ok(())
+    }
+
+    fn validate_username(username: &str) -> Result<(), AuthError> {
+        if username.len() < MIN_USERNAME_LENGTH {
+            return Err(AuthError::InvalidInput(format!(
+                "Username must be at least {} characters",
+                MIN_USERNAME_LENGTH
+            )));
+        }
+        if username.len() > MAX_USERNAME_LENGTH {
+            return Err(AuthError::InvalidInput(format!(
+                "Username must be at most {} characters",
+                MAX_USERNAME_LENGTH
+            )));
+        }
+        if !username
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        {
+            return Err(AuthError::InvalidInput(
+                "Username may only contain letters, digits, underscores, and dashes".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn validate_email(email: &str) -> Result<(), AuthError> {
+        let at_pos = email.find('@');
+        let valid = match at_pos {
+            Some(pos) => {
+                let local = &email[..pos];
+                let domain = &email[pos + 1..];
+                !local.is_empty() && domain.contains('.') && domain.len() >= 3
+            }
+            None => false,
+        };
+        if !valid {
+            return Err(AuthError::InvalidInput(
+                "Invalid email address format".into(),
+            ));
+        }
+        Ok(())
     }
 
     fn hash_password(&self, password: &str) -> Result<String, AuthError> {
@@ -263,7 +335,7 @@ impl AuthService {
             .create_login_token()
             .token_hash(token_hash)
             .user_id(user.id)
-            .expires_at(Utc::now() + Duration::minutes(20))
+            .expires_at(Utc::now() + Duration::minutes(LOGIN_TOKEN_EXPIRY_MINUTES))
             .call()
             .await
         {
@@ -421,6 +493,10 @@ impl AuthService {
         password: &str,
         display_name: Option<String>,
     ) -> Result<TokenResponse, AuthError> {
+        Self::validate_username(username)?;
+        Self::validate_email(email)?;
+        Self::validate_password(password)?;
+
         if self
             .db
             .user_exists_by_username()
@@ -776,7 +852,7 @@ impl ProtoAuthService for AuthService {
                 let nonce = Nonce::new_random();
                 let nonce_secret = nonce.secret().to_string();
 
-                let expires_at = Utc::now() + Duration::minutes(10);
+                let expires_at = Utc::now() + Duration::minutes(OAUTH_STATE_EXPIRY_MINUTES);
 
                 let encrypted_pkce_verifier = encrypt_sensitive_string(&pkce_verifier_secret)
                     .map_err(|e| Status::from(AuthError::from(e)))?;
@@ -810,7 +886,7 @@ impl ProtoAuthService for AuthService {
                 let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
                 let pkce_verifier_secret = pkce_verifier.secret().to_string();
 
-                let expires_at = Utc::now() + Duration::minutes(10);
+                let expires_at = Utc::now() + Duration::minutes(OAUTH_STATE_EXPIRY_MINUTES);
 
                 let encrypted_pkce_verifier = encrypt_sensitive_string(&pkce_verifier_secret)
                     .map_err(|e| Status::from(AuthError::from(e)))?;
@@ -951,6 +1027,23 @@ impl ProtoAuthService for AuthService {
             provider: None,
         }))
     }
+
+    async fn logout(
+        &self,
+        request: Request<LogoutRequest>,
+    ) -> Result<Response<()>, Status> {
+        let (_, refresh_token) = self.authenticate_request_refresh_token(&request)?;
+        let token_hash = self.hash_refresh_token(&refresh_token);
+
+        self.db
+            .revoke_refresh_token()
+            .token_hash(&token_hash)
+            .call()
+            .await
+            .map_err(|_| Status::from(AuthError::InvalidToken))?;
+
+        Ok(Response::new(()))
+    }
 }
 
 impl AuthService {
@@ -974,21 +1067,29 @@ impl AuthService {
             self.db.get_user().username(login.to_string()).call().await
         };
 
-        let user = user.map_err(|_| {
-            tracing::warn!("Login failed: user not found for {}", login);
-            AuthError::InvalidCredentials
-        })?;
+        let user = match user {
+            Ok(u) => u,
+            Err(_) => {
+                let _ = self.verify_password(&password, &self.dummy_password_hash);
+                tracing::warn!("Login failed: user not found for {}", login);
+                return Err(AuthError::InvalidCredentials);
+            }
+        };
 
-        let password_creds = self
+        let password_creds = match self
             .db
             .get_password_credentials()
             .user_id(user.id)
             .call()
             .await
-            .map_err(|_| {
+        {
+            Ok(creds) => creds,
+            Err(_) => {
+                let _ = self.verify_password(&password, &self.dummy_password_hash);
                 tracing::warn!("Login failed: no password credentials for {}", login);
-                AuthError::InvalidCredentials
-            })?;
+                return Err(AuthError::InvalidCredentials);
+            }
+        };
 
         let password_valid = self.verify_password(&password, &password_creds.password_hash)?;
 

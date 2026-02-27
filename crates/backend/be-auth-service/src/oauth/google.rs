@@ -36,7 +36,7 @@ impl GoogleOAuthConfig {
         let client_secret = env::var("GOOGLE_CLIENT_SECRET")
             .map_err(|_| OAuthError::MissingEnvVar("GOOGLE_CLIENT_SECRET"))?;
         let redirect_uri = env::var("GOOGLE_REDIRECT_URI")
-            .unwrap_or_else(|_| "http://localhost:5173/auth/google/callback".to_string());
+            .map_err(|_| OAuthError::MissingEnvVar("GOOGLE_REDIRECT_URI"))?;
 
         Ok(Self {
             client_id,
