@@ -5,7 +5,6 @@ import {
 	type LoginRequest,
 	type TokenResponse,
 	type RefreshTokenRequest,
-	type RegisterRequest,
 	Provider,
 	type ThirdPartyAuthUrlResponse,
 	type LoginByLoginTokenRequest,
@@ -16,11 +15,6 @@ const VITE_GRPC_API_URL: string = import.meta.env.VITE_GRPC_API_URL;
 if (!VITE_GRPC_API_URL) {
 	throw new Error('VITE_GRPC_API_URL environment variable is required but not defined');
 }
-
-export type EmailCheckResult =
-	| { status: 'password' }
-	| { status: 'oauth'; provider: 'google' | 'github' }
-	| { status: 'not_found' };
 
 class AuthService {
 	private readonly client: Client<typeof ProtoAuthService>;
@@ -38,10 +32,6 @@ class AuthService {
 		return await this.client.login(data);
 	}
 
-	public async register(data: RegisterRequest): Promise<TokenResponse> {
-		return await this.client.register(data);
-	}
-
 	public async refreshToken(data: RefreshTokenRequest): Promise<TokenResponse> {
 		return await this.client.refreshToken(data);
 	}
@@ -53,25 +43,12 @@ class AuthService {
 	public async loginByLoginToken(data: LoginByLoginTokenRequest): Promise<TokenResponse> {
 		return await this.client.loginByLoginToken(data);
 	}
-
-	public async checkEmail(email: string): Promise<EmailCheckResult> {
-		const res = await this.client.checkEmail({ email });
-		if (res.status === 'oauth' && res.provider !== undefined) {
-			const providerName = res.provider === Provider.GOOGLE ? 'google' : 'github';
-			return { status: 'oauth', provider: providerName };
-		}
-		if (res.status === 'password') {
-			return { status: 'password' };
-		}
-		return { status: 'not_found' };
-	}
 }
 
 export const authService = new AuthService();
 export type {
 	LoginRequest,
 	TokenResponse,
-	RegisterRequest,
 	RefreshTokenRequest,
 	Provider,
 	ThirdPartyAuthUrlResponse,

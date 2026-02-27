@@ -6,10 +6,10 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{Algorithm, Header, encode};
 use openidconnect::{Nonce, PkceCodeChallenge, PkceCodeVerifier};
 use proto_gen::auth::{
-    CheckEmailRequest, CheckEmailResponse, EmailPasswordCredentials, LoginByLoginTokenRequest,
-    LoginRequest, LogoutRequest, Provider, RefreshTokenRequest, RegisterRequest,
-    ThirdPartyAuthUrlRequest, ThirdPartyAuthUrlResponse, ThirdPartyCredentials, TokenResponse,
-    login_request::Credential, proto_auth_service_server::ProtoAuthService,
+    CheckEmailRequest, CheckEmailResponse, LoginByLoginTokenRequest, LoginRequest, LogoutRequest,
+    Provider, RefreshTokenRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
+    ThirdPartyAuthUrlResponse, ThirdPartyCredentials, TokenResponse, login_request::Credential,
+    proto_auth_service_server::ProtoAuthService,
 };
 use rand::TryRngCore;
 use sha2::{Digest, Sha256};
@@ -20,7 +20,7 @@ use uuid::Uuid;
 
 use argon2::{
     Argon2,
-    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
+    password_hash::{PasswordHasher, SaltString, rand_core::OsRng},
 };
 
 pub mod crypto;
@@ -44,24 +44,17 @@ pub struct AuthService {
     jwt_config: JwtConfig,
     google_oauth_client: OnceCell<GoogleOAuthClient>,
     github_oauth_client: std::sync::OnceLock<GitHubOAuthClient>,
-    dummy_password_hash: String,
 }
 
 #[bon]
 impl AuthService {
     pub fn new(db: Arc<DatabaseManager>, jwt_config: JwtConfig) -> Self {
         tracing::info!("Creating new AuthService instance");
-        let salt = SaltString::generate(&mut OsRng);
-        let dummy_password_hash = Argon2::default()
-            .hash_password(b"dummy-password-for-timing-resistance", &salt)
-            .expect("Failed to generate dummy password hash")
-            .to_string();
         Self {
             db,
             jwt_config,
             google_oauth_client: OnceCell::new(),
             github_oauth_client: std::sync::OnceLock::new(),
-            dummy_password_hash,
         }
     }
 
@@ -184,14 +177,6 @@ impl AuthService {
             .hash_password(password.as_bytes(), &salt)
             .map_err(|e| AuthError::PasswordHash(e.to_string()))?;
         Ok(hash.to_string())
-    }
-
-    fn verify_password(&self, password: &str, hash: &str) -> Result<bool, AuthError> {
-        let parsed_hash =
-            PasswordHash::new(hash).map_err(|e| AuthError::PasswordHash(e.to_string()))?;
-        Ok(Argon2::default()
-            .verify_password(password.as_bytes(), &parsed_hash)
-            .is_ok())
     }
 
     fn hash_refresh_token(&self, token: &str) -> Vec<u8> {
@@ -782,10 +767,9 @@ impl ProtoAuthService for AuthService {
         })?;
 
         match credential {
-            Credential::EmailPassword(creds) => self
-                .handle_email_password_login(creds)
-                .await
-                .map_err(Into::into),
+            Credential::EmailPassword(_) => Err(Status::unimplemented(
+                "Password authentication is disabled. Please use Google or GitHub to sign in.",
+            )),
             Credential::ThirdParty(creds) => {
                 let provider = Provider::try_from(creds.provider)
                     .map_err(|_| Status::invalid_argument("Invalid provider"))?;
@@ -804,16 +788,11 @@ impl ProtoAuthService for AuthService {
 
     async fn register(
         &self,
-        request: Request<RegisterRequest>,
+        _request: Request<RegisterRequest>,
     ) -> Result<Response<TokenResponse>, Status> {
-        tracing::info!("Register request received");
-        let req = request.into_inner();
-
-        let response = self
-            .register_user(&req.username, &req.email, &req.password, req.display_name)
-            .await?;
-
-        Ok(Response::new(response))
+        Err(Status::unimplemented(
+            "Password registration is disabled. Please use Google or GitHub to sign in.",
+        ))
     }
 
     async fn refresh_token(
@@ -991,20 +970,6 @@ impl ProtoAuthService for AuthService {
             }
         };
 
-        if self
-            .db
-            .get_password_credentials()
-            .user_id(user.id)
-            .call()
-            .await
-            .is_ok()
-        {
-            return Ok(Response::new(CheckEmailResponse {
-                status: "password".into(),
-                provider: None,
-            }));
-        }
-
         if let Ok(Some(oauth_provider)) = self
             .db
             .get_oauth_provider_for_user()
@@ -1028,10 +993,7 @@ impl ProtoAuthService for AuthService {
         }))
     }
 
-    async fn logout(
-        &self,
-        request: Request<LogoutRequest>,
-    ) -> Result<Response<()>, Status> {
+    async fn logout(&self, request: Request<LogoutRequest>) -> Result<Response<()>, Status> {
         let (_, refresh_token) = self.authenticate_request_refresh_token(&request)?;
         let token_hash = self.hash_refresh_token(&refresh_token);
 
@@ -1043,74 +1005,5 @@ impl ProtoAuthService for AuthService {
             .map_err(|_| Status::from(AuthError::InvalidToken))?;
 
         Ok(Response::new(()))
-    }
-}
-
-impl AuthService {
-    async fn handle_email_password_login(
-        &self,
-        creds: EmailPasswordCredentials,
-    ) -> Result<Response<TokenResponse>, AuthError> {
-        let login = creds.login.trim();
-        let password = creds.password;
-
-        if login.is_empty() || password.is_empty() {
-            tracing::warn!("Login attempt with empty credentials");
-            return Err(AuthError::InvalidInput(
-                "Login and password cannot be empty".into(),
-            ));
-        }
-
-        let user = if login.contains('@') {
-            self.db.get_user().email(login.to_string()).call().await
-        } else {
-            self.db.get_user().username(login.to_string()).call().await
-        };
-
-        let user = match user {
-            Ok(u) => u,
-            Err(_) => {
-                let _ = self.verify_password(&password, &self.dummy_password_hash);
-                tracing::warn!("Login failed: user not found for {}", login);
-                return Err(AuthError::InvalidCredentials);
-            }
-        };
-
-        let password_creds = match self
-            .db
-            .get_password_credentials()
-            .user_id(user.id)
-            .call()
-            .await
-        {
-            Ok(creds) => creds,
-            Err(_) => {
-                let _ = self.verify_password(&password, &self.dummy_password_hash);
-                tracing::warn!("Login failed: no password credentials for {}", login);
-                return Err(AuthError::InvalidCredentials);
-            }
-        };
-
-        let password_valid = self.verify_password(&password, &password_creds.password_hash)?;
-
-        if !password_valid {
-            tracing::warn!("Login failed: invalid password for {}", login);
-            return Err(AuthError::InvalidCredentials);
-        }
-
-        let role = self
-            .ensure_plan_and_resolve_role(user.id, &user.email)
-            .await?;
-        let (access_token, refresh_token) = self
-            .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
-            .await?;
-
-        let response = TokenResponse {
-            access_token,
-            refresh_token,
-            expires_in: self.jwt_config.access_token_expiry_hours * 3600,
-        };
-
-        Ok(Response::new(response))
     }
 }

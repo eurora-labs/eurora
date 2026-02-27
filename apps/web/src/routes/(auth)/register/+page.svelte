@@ -1,72 +1,38 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { page } from '$app/state';
+	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
 	import { authService } from '$lib/services/auth-service';
-	import { auth } from '$lib/stores/auth.js';
-	import { create } from '@bufbuild/protobuf';
-	import { RegisterRequestSchema } from '@eurora/shared/proto/auth_service_pb.js';
+	import { Provider } from '@eurora/shared/proto/auth_service_pb.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
-	import * as Form from '@eurora/ui/components/form/index';
-	import { Input } from '@eurora/ui/components/input/index';
-	import EyeIcon from '@lucide/svelte/icons/eye';
-	import EyeOffIcon from '@lucide/svelte/icons/eye-off';
-	import Loader2Icon from '@lucide/svelte/icons/loader-2';
-	import { superForm } from 'sveltekit-superforms';
-	import { zodClient, type ZodObjectType } from 'sveltekit-superforms/adapters';
-	import { z } from 'zod';
 
-	const emailFromUrl = page.url.searchParams.get('email') || '';
-
-	const registerSchema = z
-		.object({
-			email: z.string().email('Valid email is required'),
-			username: z
-				.string()
-				.min(3, 'Username must be at least 3 characters')
-				.max(50, 'Username must be at most 50 characters')
-				.regex(
-					/^[a-zA-Z0-9_]+$/,
-					'Username can only contain letters, numbers, and underscores',
-				),
-			password: z.string().min(8, 'Password must be at least 8 characters'),
-			confirmPassword: z.string().min(1, 'Please confirm your password'),
-		})
-		.refine((data) => data.password === data.confirmPassword, {
-			message: "Passwords don't match",
-			path: ['confirmPassword'],
-		});
-
-	const form = superForm(
-		{ email: emailFromUrl, username: '', password: '', confirmPassword: '' },
-		{
-			validators: zodClient(registerSchema as unknown as ZodObjectType),
-		},
-	);
-
-	const { form: formData, enhance, submitting } = form;
-
-	let showPassword = $state(false);
-	let showConfirmPassword = $state(false);
+	let loading = $state(false);
 	let submitError = $state<string | null>(null);
 
-	async function handleSubmit() {
+	async function handleGoogleLogin() {
+		loading = true;
 		submitError = null;
-
 		try {
-			const registerData = create(RegisterRequestSchema, {
-				username: $formData.username,
-				email: $formData.email,
-				password: $formData.password,
-			});
-
-			const tokens = await authService.register(registerData);
-			auth.login(tokens);
-			goto('/settings');
+			const url = (await authService.getThirdPartyAuthUrl(Provider.GOOGLE)).url;
+			window.location.href = url;
 		} catch (err) {
-			console.error('Registration error:', err);
+			console.error('Google registration error:', err);
 			submitError =
 				err instanceof Error ? err.message : 'Registration failed. Please try again.';
+			loading = false;
+		}
+	}
+
+	async function handleGitHubLogin() {
+		loading = true;
+		submitError = null;
+		try {
+			const url = (await authService.getThirdPartyAuthUrl(Provider.GITHUB)).url;
+			window.location.href = url;
+		} catch (err) {
+			console.error('GitHub registration error:', err);
+			submitError =
+				err instanceof Error ? err.message : 'Registration failed. Please try again.';
+			loading = false;
 		}
 	}
 </script>
@@ -87,127 +53,27 @@
 		</div>
 
 		<Card.Root class="p-6">
-			<form use:enhance method="POST" onsubmit={handleSubmit} class="space-y-4">
-				{#if submitError}
-					<div class="rounded-md bg-red-50 p-4">
-						<p class="text-sm text-red-800">{submitError}</p>
-					</div>
-				{/if}
+			{#if submitError}
+				<div class="mb-4 rounded-md bg-red-50 p-4">
+					<p class="text-sm text-red-800">{submitError}</p>
+				</div>
+			{/if}
 
-				<Form.Field {form} name="email">
-					<Form.Control>
-						{#snippet children({ props })}
-							<Form.Label>Email</Form.Label>
-							<Input
-								{...props}
-								type="email"
-								bind:value={$formData.email}
-								disabled={!!emailFromUrl}
-							/>
-						{/snippet}
-					</Form.Control>
-					<Form.FieldErrors />
-				</Form.Field>
-
-				<Form.Field {form} name="username">
-					<Form.Control>
-						{#snippet children({ props })}
-							<Form.Label>Username</Form.Label>
-							<Input
-								{...props}
-								type="text"
-								placeholder="Choose a username"
-								bind:value={$formData.username}
-								disabled={$submitting}
-							/>
-						{/snippet}
-					</Form.Control>
-					<Form.FieldErrors />
-				</Form.Field>
-
-				<Form.Field {form} name="password">
-					<Form.Control>
-						{#snippet children({ props })}
-							<Form.Label>Password</Form.Label>
-							<div class="relative">
-								<Input
-									{...props}
-									type={showPassword ? 'text' : 'password'}
-									placeholder="At least 8 characters"
-									bind:value={$formData.password}
-									disabled={$submitting}
-								/>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon-sm"
-									class="absolute top-1/2 right-1.5 -translate-y-1/2"
-									onclick={() => (showPassword = !showPassword)}
-									disabled={$submitting}
-									aria-label={showPassword ? 'Hide password' : 'Show password'}
-								>
-									{#if showPassword}
-										<EyeOffIcon class="h-4 w-4" />
-									{:else}
-										<EyeIcon class="h-4 w-4" />
-									{/if}
-								</Button>
-							</div>
-						{/snippet}
-					</Form.Control>
-					<Form.FieldErrors />
-				</Form.Field>
-
-				<Form.Field {form} name="confirmPassword">
-					<Form.Control>
-						{#snippet children({ props })}
-							<Form.Label>Confirm Password</Form.Label>
-							<div class="relative">
-								<Input
-									{...props}
-									type={showConfirmPassword ? 'text' : 'password'}
-									placeholder="Confirm your password"
-									bind:value={$formData.confirmPassword}
-									disabled={$submitting}
-								/>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon-sm"
-									class="absolute top-1/2 right-1.5 -translate-y-1/2"
-									onclick={() => (showConfirmPassword = !showConfirmPassword)}
-									disabled={$submitting}
-									aria-label={showConfirmPassword
-										? 'Hide password'
-										: 'Show password'}
-								>
-									{#if showConfirmPassword}
-										<EyeOffIcon class="h-4 w-4" />
-									{:else}
-										<EyeIcon class="h-4 w-4" />
-									{/if}
-								</Button>
-							</div>
-						{/snippet}
-					</Form.Control>
-					<Form.FieldErrors />
-				</Form.Field>
-
-				<Button type="submit" class="w-full" disabled={$submitting}>
-					{#if $submitting}
-						<Loader2Icon class="mr-2 h-4 w-4 animate-spin" />
-						Creating account...
-					{:else}
-						Create Account
-					{/if}
-				</Button>
-			</form>
+			<SocialAuthButtons
+				mode="register"
+				disabled={loading}
+				onGoogle={handleGoogleLogin}
+				onGitHub={handleGitHubLogin}
+			/>
 		</Card.Root>
 
-		<div class="text-center">
+		<div class="space-y-2 text-center">
 			<p class="text-muted-foreground text-sm">
 				Already have an account?
 				<Button variant="link" href="/login" class="h-auto p-0 font-normal">Sign in</Button>
+			</p>
+			<p class="text-muted-foreground text-sm">
+				Email &amp; password registration is coming soon.
 			</p>
 		</div>
 	</div>
