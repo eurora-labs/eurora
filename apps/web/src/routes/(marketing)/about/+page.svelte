@@ -43,12 +43,13 @@
 	<div class="mb-6">
 		<p class="text-sm font-medium tracking-widest uppercase text-primary mb-3">Who we are</p>
 		<h1 class="text-4xl font-bold mb-4 sm:text-5xl">
-			Two people, one belief:<br />AI should work for you.
+			Two people, one belief:<br />European AI should work for you.
 		</h1>
 		<p class="max-w-2xl text-lg text-muted-foreground leading-relaxed">
-			Eurora isn't backed by venture capital or built by a faceless corporation. It's a
-			company founded by two people who got tired of AI tools that treat your data as the
-			product. We decided to build something better.
+			Eurora is a company based in The Netherlands, founded by two people who got tired of AI
+			tools that treat your data as the product. We're not backed by venture capital or built
+			by a faceless corporation — we decided to build something better, rooted in Europe's
+			strong tradition of privacy and user rights.
 		</p>
 	</div>
 

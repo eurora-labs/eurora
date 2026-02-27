@@ -5,6 +5,7 @@ use be_auth_core::JwtConfig;
 use be_auth_service::AuthService;
 use be_authz::{
     AuthzState, CasbinAuthz, GrpcAuthzLayer, authz_middleware, new_auth_failure_rate_limiter,
+    new_health_check_rate_limiter,
 };
 use be_payment_service::init_payment_service;
 use be_remote_db::DatabaseManager;
@@ -188,11 +189,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let auth_rate_limiter = new_auth_failure_rate_limiter();
+    let health_rate_limiter = new_health_check_rate_limiter();
 
     let grpc_authz_layer = GrpcAuthzLayer::new(
         authz.clone(),
         jwt_config.clone(),
         auth_rate_limiter.clone(),
+        health_rate_limiter.clone(),
         db_manager.clone(),
     );
 
@@ -216,7 +219,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    let authz_state = Arc::new(AuthzState::new(authz, jwt_config, auth_rate_limiter));
+    let authz_state = Arc::new(AuthzState::new(
+        authz,
+        jwt_config,
+        auth_rate_limiter,
+        health_rate_limiter,
+    ));
 
     let health_route = axum::Router::new().route(
         "/health",
