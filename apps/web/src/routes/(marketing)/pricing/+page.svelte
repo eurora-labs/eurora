@@ -1,24 +1,23 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import GetProButton from '$lib/components/GetProButton.svelte';
+	import { Badge } from '@eurora/ui/components/badge/index';
 	import { Button } from '@eurora/ui/components/button/index';
-	import * as Card from '@eurora/ui/components/card/index';
 	import { Input } from '@eurora/ui/components/input/index';
 	import { Label } from '@eurora/ui/components/label/index';
 	import * as Select from '@eurora/ui/components/select/index';
+	import { Separator } from '@eurora/ui/components/separator/index';
 	import * as Sheet from '@eurora/ui/components/sheet/index';
 	import { Textarea } from '@eurora/ui/components/textarea/index';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import CheckIcon from '@lucide/svelte/icons/check';
-	import SparklesIcon from '@lucide/svelte/icons/sparkles';
-	import XIcon from '@lucide/svelte/icons/x';
+	import MinusIcon from '@lucide/svelte/icons/minus';
 	import countries from 'i18n-iso-countries';
 	import enLocale from 'i18n-iso-countries/langs/en.json';
 
 	const shouldAutoCheckout = page.url.searchParams.get('checkout') === 'true';
 
 	countries.registerLocale(enLocale);
-
 	const countryNames = Object.values(countries.getNames('en', { select: 'official' })).sort();
 
 	let contactSheetOpen = $state(false);
@@ -48,294 +47,120 @@
 	}
 </script>
 
-<div class="container mx-auto max-w-5xl px-4 py-16">
-	<div class="mb-12 text-center">
-		<h1 class="mb-4 text-4xl font-bold">Simple, Transparent Pricing</h1>
-		<p class="mx-auto max-w-2xl text-xl text-muted-foreground">
-			Choose the plan that works best for you. All plans include core features with different
-			usage limits.
+<div class="container mx-auto max-w-5xl px-4 pt-16 pb-24">
+	<div class="mb-6">
+		<p class="text-sm font-medium tracking-widest uppercase text-primary mb-3">Pricing</p>
+		<h1 class="text-4xl font-bold mb-4 sm:text-5xl">Use it free. Pay when it matters.</h1>
+		<p class="max-w-2xl text-lg text-muted-foreground leading-relaxed">
+			Eurora is free forever for personal use. Pro allows you to run state of the art models
+			in the cloud. Enterpise is for companies.
 		</p>
 	</div>
 
-	<div class="mb-16 grid grid-cols-1 gap-8 md:grid-cols-3">
-		<Card.Root class="border-t-4 border-border p-6">
-			<Card.Header>
-				<Card.Title>Free</Card.Title>
-				<Card.Description>Perfect for casual users</Card.Description>
-				<div class="mt-4">
-					<span class="text-4xl font-bold">$0</span>
-					<span class="text-muted-foreground">/month</span>
-				</div>
-			</Card.Header>
-			<Card.Content>
-				<ul class="mb-6 space-y-3">
-					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
-						<span>Basic AI assistance</span>
-					</li>
-					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
-						<span>Up to 20 queries per day</span>
-					</li>
-					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
-						<span>Standard response time</span>
-					</li>
-					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
-						<span>Desktop and mobile apps</span>
-					</li>
-					<li class="flex items-start">
-						<XIcon class="mr-2 mt-0.5 h-5 w-5 text-muted-foreground" />
-						<span class="text-muted-foreground">Advanced AI models</span>
-					</li>
-					<li class="flex items-start">
-						<XIcon class="mr-2 mt-0.5 h-5 w-5 text-muted-foreground" />
-						<span class="text-muted-foreground">Priority support</span>
-					</li>
-					<li class="flex items-start">
-						<XIcon class="mr-2 mt-0.5 h-5 w-5 text-muted-foreground" />
-						<span class="text-muted-foreground">Custom integrations</span>
-					</li>
-				</ul>
-				<Button variant="outline" class="w-full" href="/register">Get Started</Button>
-			</Card.Content>
-		</Card.Root>
+	<Separator class="mb-16" />
 
-		<Card.Root class="relative border-t-4 border-primary p-6 shadow-lg">
+	<div class="grid grid-cols-1 gap-6 mb-20 md:grid-cols-3">
+		<div class="rounded-2xl border border-border bg-card p-8 flex flex-col">
+			<div class="mb-6">
+				<h2 class="text-xl font-bold mb-1">Free</h2>
+				<p class="text-sm text-muted-foreground">Forever, no limits. We work for you</p>
+			</div>
+			<div class="mb-6">
+				<span class="text-4xl font-bold">€0</span>
+				<span class="text-muted-foreground text-sm">/forever</span>
+			</div>
+			<ul class="space-y-3 mb-8 flex-1">
+				<li class="flex items-center gap-2.5 text-sm">
+					<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
+					Unlimited local usage
+				</li>
+				<li class="flex items-center gap-2.5 text-sm">
+					<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
+					Desktop & browser apps
+				</li>
+				<li class="flex items-center gap-2.5 text-sm">
+					<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
+					Bring your own API keys or local models
+				</li>
+			</ul>
+			<Button variant="outline" class="w-full" href="/download">Download</Button>
+		</div>
+
+		<div class="group relative">
 			<div
-				class="absolute right-0 top-0 rounded-bl-md bg-primary px-3 py-1 text-sm font-medium text-primary-foreground"
+				class="absolute -inset-px rounded-2xl bg-gradient-to-b from-primary/30 via-primary/10 to-transparent"
+			></div>
+			<div
+				class="relative rounded-2xl border border-primary/40 bg-card p-8 flex flex-col h-full"
 			>
-				Popular
-			</div>
-			<Card.Header>
-				<Card.Title>Pro</Card.Title>
-				<Card.Description>For power users and professionals</Card.Description>
-				<div class="mt-4">
-					<span class="text-4xl font-bold">$20</span>
-					<span class="text-muted-foreground">/month</span>
-				</div>
-			</Card.Header>
-			<Card.Content>
-				<ul class="mb-6 space-y-3">
-					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
-						<span>Advanced AI assistance</span>
-					</li>
-					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
-						<span>Unlimited queries</span>
-					</li>
-					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
-						<span>Faster response time</span>
-					</li>
-					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
-						<span>Desktop and mobile apps</span>
-					</li>
-					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
-						<span>Access to premium AI models</span>
-					</li>
-					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
-						<span>Priority email support</span>
-					</li>
-					<li class="flex items-start">
-						<XIcon class="mr-2 mt-0.5 h-5 w-5 text-muted-foreground" />
-						<span class="text-muted-foreground">Custom integrations</span>
-					</li>
-				</ul>
-				<GetProButton class="w-full" autoTrigger={shouldAutoCheckout}>Get</GetProButton>
-			</Card.Content>
-		</Card.Root>
-
-		<Card.Root class="border-t-4 border-primary p-6">
-			<Card.Header>
-				<Card.Title>Enterprise</Card.Title>
-				<Card.Description>For teams and organizations</Card.Description>
-				<div class="mt-4">
-					<span class="text-4xl font-bold">$29</span>
-					<span class="text-muted-foreground">/user/month</span>
-				</div>
-			</Card.Header>
-			<Card.Content>
-				<ul class="mb-6 space-y-3">
-					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
-						<span>Enterprise-grade AI assistance</span>
-					</li>
-					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
-						<span>Unlimited queries with higher rate limits</span>
-					</li>
-					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
-						<span>Fastest response time</span>
-					</li>
-					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
-						<span>All apps and platforms</span>
-					</li>
-					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
-						<span>Access to all AI models</span>
-					</li>
-					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
-						<span>24/7 dedicated support</span>
-					</li>
-					<li class="flex items-start">
-						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-primary" />
-						<span>Custom integrations & API access</span>
-					</li>
-				</ul>
-				<Button variant="outline" class="w-full" onclick={openContactSheet}
-					>Contact Sales</Button
-				>
-			</Card.Content>
-		</Card.Root>
-	</div>
-
-	<Card.Root class="mb-16 p-6">
-		<Card.Header>
-			<Card.Title>Compare Plans</Card.Title>
-			<Card.Description>Detailed feature comparison across all plans</Card.Description>
-		</Card.Header>
-		<Card.Content>
-			<div class="overflow-x-auto">
-				<table class="w-full">
-					<thead>
-						<tr class="border-b">
-							<th class="px-4 py-3 text-left">Feature</th>
-							<th class="px-4 py-3 text-center">Free</th>
-							<th class="px-4 py-3 text-center">Pro</th>
-							<th class="px-4 py-3 text-center">Enterprise</th>
-						</tr>
-					</thead>
-					<tbody>
-						<tr class="border-b">
-							<td class="px-4 py-3 font-medium">Daily Query Limit</td>
-							<td class="px-4 py-3 text-center">20</td>
-							<td class="px-4 py-3 text-center">Unlimited</td>
-							<td class="px-4 py-3 text-center">Unlimited</td>
-						</tr>
-						<tr class="border-b">
-							<td class="px-4 py-3 font-medium">AI Models</td>
-							<td class="px-4 py-3 text-center">Basic</td>
-							<td class="px-4 py-3 text-center">Premium</td>
-							<td class="px-4 py-3 text-center">All Models</td>
-						</tr>
-						<tr class="border-b">
-							<td class="px-4 py-3 font-medium">Response Time</td>
-							<td class="px-4 py-3 text-center">Standard</td>
-							<td class="px-4 py-3 text-center">Fast</td>
-							<td class="px-4 py-3 text-center">Fastest</td>
-						</tr>
-						<tr class="border-b">
-							<td class="px-4 py-3 font-medium">History Retention</td>
-							<td class="px-4 py-3 text-center">7 days</td>
-							<td class="px-4 py-3 text-center">90 days</td>
-							<td class="px-4 py-3 text-center">Unlimited</td>
-						</tr>
-						<tr class="border-b">
-							<td class="px-4 py-3 font-medium">File Upload Size</td>
-							<td class="px-4 py-3 text-center">5MB</td>
-							<td class="px-4 py-3 text-center">50MB</td>
-							<td class="px-4 py-3 text-center">500MB</td>
-						</tr>
-						<tr class="border-b">
-							<td class="px-4 py-3 font-medium">Team Collaboration</td>
-							<td class="px-4 py-3 text-center">
-								<XIcon class="mx-auto h-5 w-5 text-muted-foreground" />
-							</td>
-							<td class="px-4 py-3 text-center">
-								<XIcon class="mx-auto h-5 w-5 text-muted-foreground" />
-							</td>
-							<td class="px-4 py-3 text-center">
-								<CheckIcon class="mx-auto h-5 w-5 text-primary" />
-							</td>
-						</tr>
-						<tr class="border-b">
-							<td class="px-4 py-3 font-medium">API Access</td>
-							<td class="px-4 py-3 text-center">
-								<XIcon class="mx-auto h-5 w-5 text-muted-foreground" />
-							</td>
-							<td class="px-4 py-3 text-center">Limited</td>
-							<td class="px-4 py-3 text-center">Full Access</td>
-						</tr>
-						<tr class="border-b">
-							<td class="px-4 py-3 font-medium">Support</td>
-							<td class="px-4 py-3 text-center">Community</td>
-							<td class="px-4 py-3 text-center">Email Priority</td>
-							<td class="px-4 py-3 text-center">24/7 Dedicated</td>
-						</tr>
-					</tbody>
-				</table>
-			</div>
-		</Card.Content>
-	</Card.Root>
-
-	<div class="grid grid-cols-1 gap-8 md:grid-cols-2">
-		<Card.Root class="p-6">
-			<Card.Header>
-				<div class="flex items-center gap-2">
-					<SparklesIcon class="h-6 w-6 text-primary" />
-					<Card.Title>Frequently Asked Questions</Card.Title>
-				</div>
-			</Card.Header>
-			<Card.Content>
-				<div class="space-y-4">
+				<div class="flex items-center gap-2 mb-6">
 					<div>
-						<h3 class="mb-1 text-lg font-medium">Can I change plans later?</h3>
-						<p class="text-muted-foreground">
-							Yes, you can upgrade or downgrade your plan at any time. Changes take
-							effect at the start of your next billing cycle.
+						<h2 class="text-xl font-bold mb-1">Pro</h2>
+						<p class="text-sm text-muted-foreground">
+							Get access to fully private and secure European cloud
 						</p>
 					</div>
-					<div>
-						<h3 class="mb-1 text-lg font-medium">
-							Is there a free trial for paid plans?
-						</h3>
-						<p class="text-muted-foreground">
-							Yes, both Pro and Enterprise plans come with a 14-day free trial. No
-							credit card required to start.
-						</p>
-					</div>
-					<div>
-						<h3 class="mb-1 text-lg font-medium">
-							What payment methods do you accept?
-						</h3>
-						<p class="text-muted-foreground">
-							We accept all major credit cards, PayPal, and for Enterprise customers,
-							we also offer invoicing.
-						</p>
-					</div>
+					<Badge class="ml-auto">Popular</Badge>
 				</div>
-			</Card.Content>
-		</Card.Root>
-
-		<Card.Root class="p-6">
-			<Card.Header>
-				<Card.Title>Need Help Choosing?</Card.Title>
-				<Card.Description>Our team is here to help you find the right plan</Card.Description
-				>
-			</Card.Header>
-			<Card.Content>
-				<p class="mb-6 text-muted-foreground">
-					Not sure which plan is right for you? Our team can help you assess your needs
-					and recommend the best option for your use case.
+				<div class="mb-2">
+					<span class="text-4xl font-bold">€9.99</span>
+					<span class="text-muted-foreground text-sm">/first month</span>
+				</div>
+				<p class="text-sm text-muted-foreground mb-6">
+					<span class="line-through">€19.99</span> — 50% off your first month
 				</p>
-				<div class="space-y-4">
-					<Button variant="outline" class="w-full">Schedule a Demo</Button>
-					<Button variant="outline" class="w-full">Contact Sales</Button>
-					<p class="mt-2 text-center text-sm text-muted-foreground">
-						Or email us at <span class="text-primary">sales@eurora-labs.com</span>
-					</p>
-				</div>
-			</Card.Content>
-		</Card.Root>
+				<ul class="space-y-3 mb-8 flex-1">
+					<li class="flex items-center gap-2.5 text-sm">
+						<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
+						Unlimited queries
+					</li>
+					<li class="flex items-center gap-2.5 text-sm">
+						<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
+						All AI models
+					</li>
+					<li class="flex items-center gap-2.5 text-sm">
+						<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
+						Priority support
+					</li>
+					<li class="flex items-center gap-2.5 text-sm">
+						<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
+						Everything in Free
+					</li>
+				</ul>
+				<GetProButton class="w-full" autoTrigger={shouldAutoCheckout}>Get Pro</GetProButton>
+			</div>
+		</div>
+
+		<div class="rounded-2xl border border-border bg-card p-8 flex flex-col">
+			<div class="mb-6">
+				<h2 class="text-xl font-bold mb-1">Enterprise</h2>
+				<p class="text-sm text-muted-foreground">For companies of any size</p>
+			</div>
+			<div class="mb-6">
+				<span class="text-4xl font-bold">Custom</span>
+			</div>
+			<ul class="space-y-3 mb-8 flex-1">
+				<li class="flex items-center gap-2.5 text-sm">
+					<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
+					API access & integrations
+				</li>
+				<li class="flex items-center gap-2.5 text-sm">
+					<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
+					Isolated deployment on your own cloud
+				</li>
+				<li class="flex items-center gap-2.5 text-sm">
+					<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
+					Dedicated support
+				</li>
+				<li class="flex items-center gap-2.5 text-sm">
+					<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
+					Everything in Pro
+				</li>
+			</ul>
+			<Button variant="outline" class="w-full" onclick={openContactSheet}
+				>Contact Sales</Button
+			>
+		</div>
 	</div>
 </div>
 
