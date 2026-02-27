@@ -72,7 +72,7 @@
 		</div>
 	{/if}
 	{#if ended}
-		<Button variant="outline" size="icon-sm" class="absolute top-3 left-3">
+		<Button variant="outline" size="icon-sm" class="absolute top-3 left-3 backdrop-blur-2xl">
 			<RotateCcwIcon />
 		</Button>
 	{/if}
