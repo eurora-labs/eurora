@@ -1,136 +1,165 @@
 <script lang="ts">
+	import { Badge } from '@eurora/ui/components/badge/index';
 	import { Button } from '@eurora/ui/components/button/index';
-	import * as Card from '@eurora/ui/components/card/index';
+	import { Separator } from '@eurora/ui/components/separator/index';
+	import { SiBluesky, SiDiscord, SiGithub, SiReddit, SiX } from '@icons-pack/svelte-simple-icons';
 	import BriefcaseIcon from '@lucide/svelte/icons/briefcase';
+	import CodeIcon from '@lucide/svelte/icons/code';
+	import CopyIcon from '@lucide/svelte/icons/copy';
+	import EyeIcon from '@lucide/svelte/icons/eye';
 	import GithubIcon from '@lucide/svelte/icons/github';
 	import GraduationCapIcon from '@lucide/svelte/icons/graduation-cap';
+	import HeartIcon from '@lucide/svelte/icons/heart';
 	import LinkedinIcon from '@lucide/svelte/icons/linkedin';
 	import MailIcon from '@lucide/svelte/icons/mail';
-	import UsersIcon from '@lucide/svelte/icons/users';
-	const laura_thommen_img = '/images/avatars/laura_thommen.jpg';
-	const andre_roelofs_img = '/images/avatars/andre_roelofs.jpg';
-	const linda_rosner_img = '/images/avatars/linda_rosner.jpg';
+	import ShieldIcon from '@lucide/svelte/icons/shield';
+
+	const email = 'contact@eurora-labs.com';
+	let copied = $state(false);
+
+	async function copyEmail() {
+		await navigator.clipboard.writeText(email);
+		copied = true;
+		setTimeout(() => (copied = false), 2000);
+	}
+
+	const socials = [
+		{ name: 'GitHub', href: 'https://github.com/eurora-labs/eurora', icon: SiGithub },
+		{ name: 'Discord', href: 'https://discord.gg/xRT9EpBEwc', icon: SiDiscord },
+		{ name: 'Reddit', href: 'https://reddit.com/r/eurora', icon: SiReddit },
+		{
+			name: 'Bluesky',
+			href: 'https://bsky.app/profile/euroralabs.bsky.social',
+			icon: SiBluesky,
+		},
+		{ name: 'X', href: 'https://x.com/euroralabs', icon: SiX },
+	];
+
+	const laura_thommen_img = 'https://d26xptavrz5c8t.cloudfront.net/image/laura.png';
+	const andre_roelofs_img = 'https://d26xptavrz5c8t.cloudfront.net/image/andre.png';
 </script>
 
-<div class="container mx-auto max-w-5xl px-4 py-16">
-	<div class="mb-12 text-center">
-		<h1 class="mb-4 text-4xl font-bold">About Us</h1>
-		<p class="mx-auto max-w-2xl text-xl text-muted-foreground">
-			Meet the team behind Eurora. We're passionate about creating intelligent AI solutions
-			that respect your privacy.
+<div class="container mx-auto max-w-5xl px-4 pt-16 pb-24">
+	<div class="mb-6">
+		<p class="text-sm font-medium tracking-widest uppercase text-primary mb-3">Who we are</p>
+		<h1 class="text-4xl font-bold mb-4 sm:text-5xl">
+			Two people, one belief:<br />AI should work for you.
+		</h1>
+		<p class="max-w-2xl text-lg text-muted-foreground leading-relaxed">
+			Eurora isn't backed by venture capital or built by a faceless corporation. It's a
+			company founded by two people who got tired of AI tools that treat your data as the
+			product. We decided to build something better.
 		</p>
 	</div>
 
-	<Card.Root class="mb-12 p-6">
-		<Card.Header>
-			<div class="flex items-center gap-2">
-				<UsersIcon class="h-6 w-6 text-primary" />
-				<Card.Title>Our Mission</Card.Title>
-			</div>
-		</Card.Header>
-		<Card.Content>
-			<p class="mb-4 text-muted-foreground">
-				At Eurora, we believe in intelligence without compromise. Our mission is to create
-				AI tools that enhance human capabilities while maintaining the highest standards of
-				privacy and security. We're committed to developing technology that works for
-				people, not the other way around.
-			</p>
-			<p class="text-muted-foreground">
-				Founded in 2025, our team brings together expertise in artificial intelligence,
-				privacy engineering, and user experience design to build the next generation of AI
-				assistants that you can truly trust.
-			</p>
-		</Card.Content>
-	</Card.Root>
+	<Separator class="mb-16" />
 
-	<h2 class="mb-8 text-3xl font-bold">Leadership Team</h2>
-
-	<div class="mb-16 grid grid-cols-1 gap-8 md:grid-cols-3">
-		<Card.Root class="p-6">
-			<Card.Header>
-				<div class="mb-4 flex flex-col items-center">
+	<div class="grid grid-cols-1 gap-6 mb-20 md:grid-cols-2">
+		<div class="group relative">
+			<div
+				class="absolute -inset-px rounded-2xl bg-gradient-to-b from-primary/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
+			></div>
+			<div class="relative rounded-2xl border border-border bg-card overflow-hidden">
+				<div class="overflow-hidden bg-muted">
 					<img
 						src={laura_thommen_img}
 						alt="Laura Thommen"
-						class="mb-4 h-32 w-32 rounded-full object-cover"
+						class="w-full transition-transform duration-500 group-hover:scale-[1.02]"
 					/>
-
-					<Card.Title>Laura Thommen</Card.Title>
-					<p class="font-medium text-primary">Chief Executive Officer</p>
 				</div>
-			</Card.Header>
-			<Card.Content>
-				<div class="space-y-4">
-					<div>
-						<h3 class="flex items-center gap-2 font-medium">
-							<BriefcaseIcon class="h-4 w-4 text-primary" /> Experience
-						</h3>
-						<p class="text-muted-foreground">
-							Demonstrated breadth of experience from sales to management, driving new
-							product adoption and revenue growth with over 30 years of experience
-							working for manufacturers such as Apple, Adobe, Avid, DDN Storage and
-							Northrop Grumman.
-						</p>
+				<div class="p-6 sm:p-8">
+					<div class="flex items-center gap-3 mb-3">
+						<h2 class="text-2xl font-bold">Laura Thommen</h2>
+						<Badge variant="secondary">CEO</Badge>
 					</div>
-					<div>
-						<h3 class="flex items-center gap-2 font-medium">
-							<GraduationCapIcon class="h-4 w-4 text-primary" /> Education
-						</h3>
-						<p class="text-muted-foreground">
-							MBA from Pepperdine University, BS in Business Administration with a
-							minor in Finance from the University of Southern California.
-						</p>
+					<p class="text-muted-foreground mb-6 leading-relaxed">
+						30+ years driving product adoption at Apple, Adobe, Avid, DDN Storage and
+						Northrop Grumman. Laura has seen firsthand how technology succeeds when it
+						puts people first — and fails when it doesn't.
+					</p>
+
+					<div class="space-y-4">
+						<div>
+							<h3 class="flex items-center gap-2 text-sm font-semibold mb-1">
+								<BriefcaseIcon class="h-3.5 w-3.5 text-primary" /> Background
+							</h3>
+							<p class="text-sm text-muted-foreground">
+								Sales leadership to executive management. Built and scaled
+								go-to-market teams across enterprise software and hardware.
+							</p>
+						</div>
+						<div>
+							<h3 class="flex items-center gap-2 text-sm font-semibold mb-1">
+								<GraduationCapIcon class="h-3.5 w-3.5 text-primary" /> Education
+							</h3>
+							<p class="text-sm text-muted-foreground">
+								MBA, Pepperdine University. BS Business Administration (Finance
+								minor), University of Southern California.
+							</p>
+						</div>
 					</div>
-					<div class="mt-4 flex justify-center gap-3">
+
+					<Separator class="my-5" />
+
+					<div class="flex gap-2">
 						<Button variant="ghost" size="icon" class="h-8 w-8">
 							<MailIcon class="h-4 w-4" />
 						</Button>
 						<Button variant="ghost" size="icon" class="h-8 w-8">
 							<LinkedinIcon class="h-4 w-4" />
 						</Button>
-						<Button variant="ghost" size="icon" class="h-8 w-8">
-							<GithubIcon class="h-4 w-4" />
-						</Button>
 					</div>
 				</div>
-			</Card.Content>
-		</Card.Root>
+			</div>
+		</div>
 
-		<Card.Root class="p-6">
-			<Card.Header>
-				<div class="mb-4 flex flex-col items-center">
+		<div class="group relative">
+			<div
+				class="absolute -inset-px rounded-2xl bg-gradient-to-b from-primary/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
+			></div>
+			<div class="relative rounded-2xl border border-border bg-card overflow-hidden">
+				<div class="overflow-hidden bg-muted">
 					<img
 						src={andre_roelofs_img}
 						alt="Andre Roelofs"
-						class="mb-4 h-32 w-32 rounded-full object-cover"
+						class="w-full transition-transform duration-500 group-hover:scale-[1.02]"
 					/>
-					<Card.Title>Andre Roelofs</Card.Title>
-					<p class="font-medium text-primary">Chief Technology Officer</p>
 				</div>
-			</Card.Header>
-			<Card.Content>
-				<div class="space-y-4">
-					<div>
-						<h3 class="flex items-center gap-2 font-medium">
-							<BriefcaseIcon class="h-4 w-4 text-primary" /> Experience
-						</h3>
-						<p class="text-muted-foreground">
-							Founder and CTO of Eurora Labs, previously Head of Engineering and
-							Machine Learning at Cuebric. Led development of award-winning AI
-							solutions, specializing in software architecture, machine learning, and
-							computer vision.
-						</p>
+				<div class="p-6 sm:p-8">
+					<div class="flex items-center gap-3 mb-3">
+						<h2 class="text-2xl font-bold">Andre Roelofs</h2>
+						<Badge variant="secondary">CTO</Badge>
 					</div>
-					<div>
-						<h3 class="flex items-center gap-2 font-medium">
-							<GraduationCapIcon class="h-4 w-4 text-primary" /> Education
-						</h3>
-						<p class="text-muted-foreground">
-							BS in Computer Science from Avans University of Applied Sciences;
-							graduate studies in AI at Maastricht University.
-						</p>
+					<p class="text-muted-foreground mb-6 leading-relaxed">
+						Former Head of Engineering & ML at Cuebric, where he led development of
+						award-winning AI solutions. Andre founded Eurora because he believed the
+						best AI tools shouldn't require giving up your privacy.
+					</p>
+
+					<div class="space-y-4">
+						<div>
+							<h3 class="flex items-center gap-2 text-sm font-semibold mb-1">
+								<BriefcaseIcon class="h-3.5 w-3.5 text-primary" /> Background
+							</h3>
+							<p class="text-sm text-muted-foreground">
+								Software architecture, machine learning, and computer vision. Built
+								production AI systems from research through deployment.
+							</p>
+						</div>
+						<div>
+							<h3 class="flex items-center gap-2 text-sm font-semibold mb-1">
+								<GraduationCapIcon class="h-3.5 w-3.5 text-primary" /> Education
+							</h3>
+							<p class="text-sm text-muted-foreground">
+								BS Computer Science, Avans University. Graduate studies in AI,
+								Maastricht University.
+							</p>
+						</div>
 					</div>
-					<div class="mt-4 flex justify-center gap-3">
+
+					<Separator class="my-5" />
+
+					<div class="flex gap-2">
 						<Button variant="ghost" size="icon" class="h-8 w-8">
 							<MailIcon class="h-4 w-4" />
 						</Button>
@@ -142,127 +171,99 @@
 						</Button>
 					</div>
 				</div>
-			</Card.Content>
-		</Card.Root>
-
-		<Card.Root class="p-6">
-			<Card.Header>
-				<div class="mb-4 flex flex-col items-center">
-					<img
-						src={linda_rosner_img}
-						alt="Laura Thommen"
-						class="mb-4 h-32 w-32 rounded-full object-cover"
-					/>
-
-					<Card.Title>Linda Rosner</Card.Title>
-					<p class="font-medium text-primary">Chief Operations Officer</p>
-				</div>
-			</Card.Header>
-			<Card.Content>
-				<div class="space-y-4">
-					<div>
-						<h3 class="flex items-center gap-2 font-medium">
-							<BriefcaseIcon class="h-4 w-4 text-primary" /> Experience
-						</h3>
-						<p class="text-muted-foreground">
-							Co-founder of ArtisansPR, with deep expertise in media, entertainment,
-							and tech communications. Serves on HPA’s Awards Committee and formerly
-							chaired SMPTE Hollywood’s Board. Founding Board Member of EIPMA and
-							frequent panel moderator for NAB, SMPTE, and others.
-						</p>
-					</div>
-					<div>
-						<h3 class="flex items-center gap-2 font-medium">
-							<GraduationCapIcon class="h-4 w-4 text-primary" /> Education
-						</h3>
-						<p class="text-muted-foreground">BA in Theater from UCLA.</p>
-					</div>
-					<div class="mt-4 flex justify-center gap-3">
-						<Button variant="ghost" size="icon" class="h-8 w-8">
-							<MailIcon class="h-4 w-4" />
-						</Button>
-						<Button variant="ghost" size="icon" class="h-8 w-8">
-							<LinkedinIcon class="h-4 w-4" />
-						</Button>
-						<Button variant="ghost" size="icon" class="h-8 w-8">
-							<GithubIcon class="h-4 w-4" />
-						</Button>
-					</div>
-				</div>
-			</Card.Content>
-		</Card.Root>
+			</div>
+		</div>
 	</div>
 
-	<Card.Root class="mb-16 border-none bg-muted p-6">
-		<Card.Content class="text-center">
-			<h2 class="mb-4 text-2xl font-bold">Join Our Team</h2>
-			<p class="mx-auto mb-6 max-w-2xl text-muted-foreground">
-				We're always looking for talented individuals who are passionate about AI, privacy,
-				and creating exceptional user experiences. Check out our open positions and become
-				part of our journey.
-			</p>
-			<Button href="/contact" variant="default">View Open Positions</Button>
-		</Card.Content>
-	</Card.Root>
+	<div class="mb-20">
+		<h2 class="text-3xl font-bold mb-3">Why we built this</h2>
+		<p class="text-muted-foreground max-w-2xl mb-10 leading-relaxed">
+			Every AI assistant we tried had the same trade-off: convenience in exchange for your
+			data. We started Eurora to prove that's a false choice. Here's what drives every
+			decision we make.
+		</p>
 
-	<h2 class="mb-8 text-3xl font-bold">Our Values</h2>
-	<div class="mb-16 grid grid-cols-1 gap-8 md:grid-cols-2">
-		<Card.Root class="p-6">
-			<Card.Header>
-				<Card.Title>Privacy First</Card.Title>
-			</Card.Header>
-			<Card.Content>
-				<p class="text-muted-foreground">
-					We believe that privacy is a fundamental right. All our products are designed
-					with privacy as a core principle, not an afterthought.
+		<div class="grid grid-cols-1 gap-px bg-border rounded-2xl overflow-hidden md:grid-cols-2">
+			<div class="bg-card p-8">
+				<ShieldIcon class="h-5 w-5 text-primary mb-4" />
+				<h3 class="font-semibold text-lg mb-2">Your data stays yours</h3>
+				<p class="text-sm text-muted-foreground leading-relaxed">
+					All data lives in sovereign European infrastructure. We can't read it, we can't
+					sell it, and we architected the system so we never could.
 				</p>
-			</Card.Content>
-		</Card.Root>
-
-		<Card.Root class="p-6">
-			<Card.Header>
-				<Card.Title>User-Centered Design</Card.Title>
-			</Card.Header>
-			<Card.Content>
-				<p class="text-muted-foreground">
-					We create technology that adapts to how people work, not the other way around.
-					Our products are intuitive, accessible, and designed for real human needs.
+			</div>
+			<div class="bg-card p-8">
+				<CodeIcon class="h-5 w-5 text-primary mb-4" />
+				<h3 class="font-semibold text-lg mb-2">Open source, always</h3>
+				<p class="text-sm text-muted-foreground leading-relaxed">
+					Every line of Eurora's code is public. You don't have to take our word for
+					anything — read the source, audit it, run it yourself.
 				</p>
-			</Card.Content>
-		</Card.Root>
-
-		<Card.Root class="p-6">
-			<Card.Header>
-				<Card.Title>Ethical AI</Card.Title>
-			</Card.Header>
-			<Card.Content>
-				<p class="text-muted-foreground">
-					We're committed to developing AI that is fair, transparent, and beneficial to
-					society. We actively work to identify and mitigate biases in our systems.
+			</div>
+			<div class="bg-card p-8">
+				<EyeIcon class="h-5 w-5 text-primary mb-4" />
+				<h3 class="font-semibold text-lg mb-2">No hidden motives</h3>
+				<p class="text-sm text-muted-foreground leading-relaxed">
+					We're self-funded. No investors pushing for growth-at-all-costs. Our only
+					incentive is to build something you genuinely want to use.
 				</p>
-			</Card.Content>
-		</Card.Root>
-
-		<Card.Root class="p-6">
-			<Card.Header>
-				<Card.Title>Continuous Innovation</Card.Title>
-			</Card.Header>
-			<Card.Content>
-				<p class="text-muted-foreground">
-					We're never satisfied with the status quo. We continuously push the boundaries
-					of what's possible to deliver ever-improving experiences to our users.
+			</div>
+			<div class="bg-card p-8">
+				<HeartIcon class="h-5 w-5 text-primary mb-4" />
+				<h3 class="font-semibold text-lg mb-2">Built for people</h3>
+				<p class="text-sm text-muted-foreground leading-relaxed">
+					We design for how people actually work — across platforms, across browsers,
+					without friction. Technology should adapt to you, never the reverse.
 				</p>
-			</Card.Content>
-		</Card.Root>
+			</div>
+		</div>
 	</div>
 
-	<Card.Root class="border-none bg-muted p-8">
-		<Card.Content class="text-center">
-			<h2 class="mb-4 text-3xl font-bold">Want to Learn More?</h2>
-			<p class="mx-auto mb-6 max-w-2xl text-xl text-muted-foreground">
-				Have questions about our team or company? We'd love to hear from you.
-			</p>
-			<Button href="/contact" size="lg" class="px-8">Contact Us</Button>
-		</Card.Content>
-	</Card.Root>
+	<div class="mb-20">
+		<h2 class="text-3xl font-bold mb-3">Where we stand</h2>
+		<p class="text-muted-foreground max-w-2xl mb-10 leading-relaxed">
+			Eurora is young, self-funded, and growing. We're transparent about where we are because
+			trust is built on honesty, not marketing.
+		</p>
+
+		<div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+			{#each [{ value: '2025', label: 'Founded' }, { value: '100%', label: 'Open Source' }, { value: 'EU', label: 'Data Residency' }, { value: '$0', label: 'VC Funding' }] as stat}
+				<div class="rounded-xl border border-border bg-card p-5 text-center">
+					<p class="text-2xl font-bold text-primary">{stat.value}</p>
+					<p class="text-sm text-muted-foreground mt-1">{stat.label}</p>
+				</div>
+			{/each}
+		</div>
+	</div>
+
+	<div class="rounded-2xl bg-foreground/5 p-8 sm:p-12 text-center">
+		<MailIcon class="h-8 w-8 text-primary mx-auto mb-4" />
+		<h2 class="text-2xl font-bold mb-3">Want to talk?</h2>
+		<p class="text-muted-foreground max-w-lg mx-auto mb-6">
+			Whether you have questions, feedback, or just want to say hello — we read every message.
+		</p>
+
+		<Button variant="outline" onclick={copyEmail} class="font-mono text-sm mb-6">
+			{email}
+			<CopyIcon class="h-3.5 w-3.5 text-muted-foreground" />
+			{#if copied}
+				<span class="text-xs text-primary">Copied!</span>
+			{/if}
+		</Button>
+
+		<div class="flex items-center justify-center gap-2 flex-wrap">
+			{#each socials as social}
+				<Button
+					variant="outline"
+					href={social.href}
+					target="_blank"
+					rel="noopener noreferrer"
+					aria-label={social.name}
+					class="size-12"
+				>
+					<social.icon size={20} />
+				</Button>
+			{/each}
+		</div>
+	</div>
 </div>

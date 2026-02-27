@@ -15,37 +15,41 @@
 		product: {
 			title: 'Product',
 			links: [
-				{ name: 'Features', href: '/features' },
 				{ name: 'Download', href: '/download' },
 				{ name: 'Pricing', href: '/pricing' },
 				{ name: 'Browser Extension', href: '/download/browser-extension' },
+				{ name: 'Roadmap', href: '/roadmap' },
 			],
 		},
 		company: {
 			title: 'Company',
 			links: [
 				{ name: 'About', href: '/about' },
-				{ name: 'Careers', href: '/careers' },
+				// { name: 'Careers', href: '/careers' },
 				{ name: 'Privacy Policy', href: '/privacy-policy' },
-				{ name: 'Terms of Service', href: '/terms' },
+				// { name: 'Terms of Service', href: '/terms' },
 			],
 		},
 		resources: {
 			title: 'Resources & Support',
 			links: [
 				{ name: 'Documentation', href: '/docs' },
-				{ name: 'Help Center', href: '/help' },
+				// { name: 'Help Center', href: '/help' },
 				{ name: 'Contact', href: '/contact' },
-				{ name: 'Blog', href: '/blog' },
+				// { name: 'Blog', href: '/blog' },
 			],
 		},
 		social: {
 			title: 'Social',
 			links: [
-				{ name: 'GitHub', href: 'https://github.com/Eurora-Labs/eurora', external: true },
-				{ name: 'X (Twitter)', href: 'https://x.com/eurora', external: true },
-				{ name: 'Discord', href: 'https://discord.gg/eurora', external: true },
-				{ name: 'LinkedIn', href: 'https://linkedin.com/company/eurora', external: true },
+				{ name: 'GitHub', href: 'https://github.com/eurora-labs/eurora', external: true },
+				{ name: 'X (Twitter)', href: 'https://x.com/euroralabs', external: true },
+				{ name: 'Discord', href: 'https://discord.gg/xRT9EpBEwc', external: true },
+				{
+					name: 'LinkedIn',
+					href: 'https://linkedin.com/company/eurora-labs',
+					external: true,
+				},
 			],
 		},
 	};
@@ -62,9 +66,10 @@
 	<div class="flex items-center gap-4">
 		<Button variant="ghost" href="/about">About Us</Button>
 		<Button variant="ghost" href="/pricing">Pricing</Button>
+		<Button variant="ghost" href="/roadmap">Roadmap</Button>
 
 		<Button variant="default" href="/download">Download</Button>
-		<Button variant="ghost" size="icon" href="https://github.com/Eurora-Labs/eurora">
+		<Button variant="ghost" size="icon" href="https://github.com/eurora-labs/eurora">
 			<SiGithub />
 		</Button>
 		{#if $isAuthenticated}
