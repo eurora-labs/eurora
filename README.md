@@ -20,4 +20,4 @@ Main points of Sustainable Use License (SUL) are:
 
 ## Installation
 
-We support Windows, macOS, and Linux (x11). The installation will be available soon.
+Please download the version for your platform on https://www.eurora-labs.com/
