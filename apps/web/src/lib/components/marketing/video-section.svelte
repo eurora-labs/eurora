@@ -12,22 +12,10 @@
 	let { title, subtitle, videoSrc } = $props();
 </script>
 
-<section
-	class="relative w-full mx-auto min-h-[80vh] h-fit flex flex-col items-center justify-center overflow-hidden mt-12 gap-6"
->
-	<div
-		class="flex flex-col h-1/5 w-full text-center text-foreground sm:px-6 lg:px-8 max-w-4xl mx-auto"
-	>
-		<h1 class="text-4xl w-full m-auto sm:text-5xl lg:text-6xl font-bold mb-4 leading-tight">
-			{title}
-		</h1>
-		<p
-			class="text-lg w-full m-auto sm:text-xl lg:text-2xl font-light opacity-90 max-w-3xl mx-auto"
-		>
-			{subtitle}
-		</p>
+<section class="w-full px-4 py-16">
+	<div class="mx-auto mb-6 max-w-4xl text-center">
+		<h2 class="mb-4 text-4xl font-bold sm:text-5xl lg:text-6xl">{title}</h2>
+		<p class="mx-auto max-w-3xl text-xl text-muted-foreground">{subtitle}</p>
 	</div>
-	<div class="flex flex-row h-4/5 w-full p-4">
-		<AutoplayVideo src={videoSrc} class="rounded-xl" />
-	</div>
+	<AutoplayVideo src={videoSrc} class="rounded-xl" />
 </section>
