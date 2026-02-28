@@ -226,8 +226,6 @@ if [ -n "$TARGET" ]; then
 	# Tauri expects binaries named like: binary-name-<target-triple>[.exe]
 	if [ "$OS" = "windows" ]; then
 		cp "$PWD/../target/$TARGET/release/euro-native-messaging.exe" "$BINARIES_DIR/euro-native-messaging-$TARGET.exe"
-		export TAURI_NATIVE_MESSAGING_BIN
-		TAURI_NATIVE_MESSAGING_BIN="$(readlink -f "$PWD/../target/$TARGET/release/euro-native-messaging.exe")"
 	elif [ "$OS" = "darwin" ]; then
 		ditto "$PWD/../target/$TARGET/release/euro-native-messaging" "$BINARIES_DIR/euro-native-messaging-$TARGET"
 	else
@@ -257,8 +255,6 @@ else
 	# Copy the binary with the target-triple suffix for Tauri's externalBin
 	if [ "$OS" = "windows" ]; then
 		cp "$PWD/../target/release/euro-native-messaging.exe" "$BINARIES_DIR/euro-native-messaging-$DEFAULT_TARGET.exe"
-		export TAURI_NATIVE_MESSAGING_BIN
-		TAURI_NATIVE_MESSAGING_BIN="$(readlink -f "$PWD/../target/release/euro-native-messaging.exe")"
 	elif [ "$OS" = "darwin" ]; then
 		ditto "$PWD/../target/release/euro-native-messaging" "$BINARIES_DIR/euro-native-messaging-$DEFAULT_TARGET"
 	else
@@ -326,17 +322,17 @@ elif [ "$OS" = "linux" ]; then
 	info "	- $RELEASE_DIR/$(basename "$RPM")"
 	info "	- $RELEASE_DIR/$(basename "$RPM_SIG")"
 elif [ "$OS" = "windows" ]; then
-	# With createUpdaterArtifacts: true, the MSI installer itself is the
-	# updater artifact (no .zip wrapper). Signature is .msi.sig.
-	WINDOWS_MSI="$(find "$BUNDLE_DIR/msi" -name '*.msi' -not -name '*.sig')"
-	WINDOWS_MSI_SIG="$(find "$BUNDLE_DIR/msi" -name '*.msi.sig')"
+	# With createUpdaterArtifacts: true, the NSIS installer itself is the
+	# updater artifact (no .zip wrapper). Signature is .exe.sig.
+	WINDOWS_EXE="$(find "$BUNDLE_DIR/nsis" -name '*.exe' -not -name '*.sig')"
+	WINDOWS_EXE_SIG="$(find "$BUNDLE_DIR/nsis" -name '*.exe.sig')"
 
-	cp "$WINDOWS_MSI" "$RELEASE_DIR"
-	cp "$WINDOWS_MSI_SIG" "$RELEASE_DIR"
+	cp "$WINDOWS_EXE" "$RELEASE_DIR"
+	cp "$WINDOWS_EXE_SIG" "$RELEASE_DIR"
 
 	info "built:"
-	info "	- $RELEASE_DIR/$(basename "$WINDOWS_MSI")"
-	info "	- $RELEASE_DIR/$(basename "$WINDOWS_MSI_SIG")"
+	info "	- $RELEASE_DIR/$(basename "$WINDOWS_EXE")"
+	info "	- $RELEASE_DIR/$(basename "$WINDOWS_EXE_SIG")"
 else
 	error "unsupported os: $OS"
 fi

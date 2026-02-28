@@ -86,8 +86,6 @@ default = ["custom-protocol", "devtools"]
 custom-protocol = ["tauri/custom-protocol"]
 devtools = ["tauri/devtools"]
 error-context = ["dep:backtrace"]
-# Use mock keyring for testing (e2e tests, CI environments without system keyring)
-mock-keyring = []
 ## A forwarding to all crates that have windows-specific adjustments for testing on non-Windows.
 windows = []
 
