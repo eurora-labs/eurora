@@ -855,7 +855,6 @@ jobs:
                   find release-artifacts -type f \( \
                     -name "*.dmg" -o \
                     -name "*.AppImage" -o \
-                    -name "*.msi" -o \
                     -name "*.exe" -o \
                     -name "*.deb" -o \
                     -name "*.rpm" \

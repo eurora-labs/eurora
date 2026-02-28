@@ -223,7 +223,7 @@ fn install_native_messaging_manifests(app: &tauri::App) {
 fn main() {
     dotenv().ok();
 
-    #[cfg(feature = "mock-keyring")]
+    #[cfg(debug_assertions)]
     {
         use keyring::{mock, set_default_credential_builder};
         set_default_credential_builder(mock::default_credential_builder());
@@ -248,16 +248,23 @@ fn main() {
                 .setup(move |tauri_app| {
                     install_native_messaging_manifests(tauri_app);
 
-                    // Reduces macOS Keychain "Allow" prompts to a single item
-                    // instead of one per secret.
-                    #[cfg(not(feature = "mock-keyring"))]
-                    {
-                        let main_key = euro_encrypt::MainKey::new()
-                            .expect("Failed to initialise encryption key");
-                        let data_dir = tauri_app.path().app_data_dir().unwrap();
-                        euro_secret::secret::init_file_store(*main_key.as_bytes(), data_dir)
-                            .expect("Failed to initialise secret store");
-                    }
+                    // In release builds the main key lives in the OS keychain,
+                    // reducing macOS Keychain "Allow" prompts to a single item.
+                    // In debug builds we use a fixed key so the encrypted file
+                    // store survives restarts (the mock keyring is in-memory
+                    // only, so a keyring-derived key would change every launch).
+                    #[cfg(debug_assertions)]
+                    let main_key = euro_encrypt::MainKey::from_bytes([
+                        0xA4, 0x1B, 0x7E, 0x3C, 0x92, 0xF0, 0x55, 0xD8, 0x6A, 0xC3, 0x11, 0xBF,
+                        0x48, 0xE7, 0x2D, 0x9F, 0x03, 0x86, 0xFA, 0x74, 0xCB, 0x60, 0x1D, 0xA5,
+                        0x39, 0xEE, 0x57, 0x0C, 0xB2, 0x84, 0x63, 0xD1,
+                    ]);
+                    #[cfg(not(debug_assertions))]
+                    let main_key =
+                        euro_encrypt::MainKey::new().expect("Failed to initialise encryption key");
+                    let data_dir = tauri_app.path().app_data_dir().unwrap();
+                    euro_secret::secret::init_file_store(*main_key.as_bytes(), data_dir)
+                        .expect("Failed to initialise secret store");
 
                     let started_by_autostart =
                         std::env::args().any(|arg| arg == "--startup-launch");
