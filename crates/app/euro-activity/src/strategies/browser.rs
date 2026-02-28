@@ -29,10 +29,7 @@ use url::Url;
 /// PID that is an ancestor of the given PID.
 ///
 /// Falls back to the original PID if no registered ancestor is found.
-async fn resolve_browser_pid(
-    pid: u32,
-    service: &BrowserBridgeService,
-) -> u32 {
+async fn resolve_browser_pid(pid: u32, service: &BrowserBridgeService) -> u32 {
     let registered_pids = service.get_registered_pids().await;
 
     if registered_pids.is_empty() || registered_pids.contains(&pid) {
