@@ -8,6 +8,33 @@
 
 !define TAURI_HOSTS_DIR "$%TAURI_HOSTS_DIR%"
 
+!macro NSIS_HOOK_PREINSTALL
+  ; --- Remove previous WiX/MSI installation (one-time migration) ---
+  ; The app previously shipped as a WiX MSI (per-machine, Program Files).
+  ; Now it uses NSIS (per-user, LocalAppData). Detect the old MSI by
+  ; searching the Uninstall registry and offer to remove it.
+  SetRegView 64
+  StrCpy $1 0
+  _wix_enum:
+    EnumRegKey $0 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall" $1
+    StrCmp $0 "" _wix_done
+    ReadRegStr $2 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$0" "DisplayName"
+    StrCmp $2 "${PRODUCTNAME}" 0 _wix_next
+    ; Verify it is an MSI (UninstallString starts with "MsiExec")
+    ReadRegStr $3 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$0" "UninstallString"
+    StrCpy $4 $3 7
+    StrCmp $4 "MsiExec" 0 _wix_next
+    ; Found old WiX/MSI — uninstall it via msiexec.
+    ; /passive shows a progress bar; Windows handles UAC for per-machine MSIs.
+    ExecWait 'msiexec.exe /x $0 /passive /norestart'
+    Goto _wix_done
+  _wix_next:
+    IntOp $1 $1 + 1
+    Goto _wix_enum
+  _wix_done:
+  SetRegView lastused
+!macroend
+
 !macro NSIS_HOOK_POSTINSTALL
   ; --- Chrome ---
   CreateDirectory "$INSTDIR\native-messaging\chrome"
