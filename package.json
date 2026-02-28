@@ -16,7 +16,7 @@
 		"dev:ui": "pnpm --filter @eurora/ui storybook",
 		"check": "turbo run check --no-daemon",
 		"build:ui": "turbo run build --filter @eurora/ui...",
-		"build:test": "pnpm exec tauri build --config crates/app/euro-tauri/tauri.conf.test.json --features mock-keyring -- --profile dev",
+		"build:test": "pnpm exec tauri build --config crates/app/euro-tauri/tauri.conf.test.json -- --profile dev",
 		"build:browser": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:all",
 		"build:firefox": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:firefox",
 		"build:chrome": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:chrome",
