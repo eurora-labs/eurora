@@ -1133,7 +1133,29 @@ impl ChatOpenAI {
         }
 
         if let Some(ref response_format) = self.response_format {
-            payload["text"] = serde_json::json!({"format": response_format});
+            let format_value =
+                if response_format.get("type").and_then(|t| t.as_str()) == Some("json_schema") {
+                    if let Some(json_schema) = response_format.get("json_schema") {
+                        // Flatten: {"type": "json_schema", ...json_schema_fields}
+                        let mut flat = serde_json::json!({"type": "json_schema"});
+                        if let Some(obj) = json_schema.as_object() {
+                            for (k, v) in obj {
+                                flat[k] = v.clone();
+                            }
+                        }
+                        flat
+                    } else {
+                        response_format.clone()
+                    }
+                } else {
+                    response_format.clone()
+                };
+
+            if let Some(text_obj) = payload.get_mut("text").and_then(|t| t.as_object_mut()) {
+                text_obj.insert("format".to_string(), format_value);
+            } else {
+                payload["text"] = serde_json::json!({"format": format_value});
+            }
         }
 
         if let Some(ref prediction) = self.prediction {
@@ -1373,12 +1395,18 @@ impl ChatOpenAI {
                 response_metadata.insert("service_tier".to_string(), serde_json::json!(tier));
             }
 
+            let mut additional_kwargs = HashMap::new();
+            if let Some(ref audio) = choice.message.audio {
+                additional_kwargs.insert("audio".to_string(), audio.clone());
+            }
+
             let ai_message = AIMessage::builder()
                 .content(content)
                 .tool_calls(tool_calls)
                 .invalid_tool_calls(invalid_tool_calls)
                 .maybe_usage_metadata(usage_metadata)
                 .response_metadata(response_metadata)
+                .additional_kwargs(additional_kwargs)
                 .build();
 
             let generation = if generation_info.is_empty() {
@@ -1829,15 +1857,7 @@ impl ChatOpenAI {
 
         if let Some(choice) = tool_choice {
             let choice_json = match choice {
-                ToolChoice::String(s) => {
-                    if s == "any" {
-                        serde_json::json!("required")
-                    } else if WELL_KNOWN_TOOLS.contains(&s.as_str()) {
-                        serde_json::json!({"type": s})
-                    } else {
-                        serde_json::json!(s)
-                    }
-                }
+                ToolChoice::String(s) => format_tool_choice_for_chat_completions(s),
                 ToolChoice::Structured { choice_type, name } => {
                     if choice_type == "tool" || choice_type == "function" {
                         serde_json::json!({
@@ -2028,6 +2048,122 @@ impl BaseLanguageModel for ChatOpenAI {
     }
 }
 
+/// Well-known bare-string values accepted by the OpenAI API for tool_choice.
+const TOOL_CHOICE_BARE_VALUES: &[&str] = &["none", "auto", "required"];
+
+/// Format a tool_choice string for the Chat Completions API.
+/// Matches Python's `bind_tools` logic: tool names are wrapped as
+/// `{"type": "function", "function": {"name": ...}}`, well-known tool types
+/// as `{"type": ...}`, and bare values pass through as strings.
+fn format_tool_choice_for_chat_completions(s: &str) -> serde_json::Value {
+    if s == "any" {
+        serde_json::json!("required")
+    } else if TOOL_CHOICE_BARE_VALUES.contains(&s) {
+        serde_json::json!(s)
+    } else if WELL_KNOWN_TOOLS.contains(&s) {
+        serde_json::json!({"type": s})
+    } else {
+        // Specific function name
+        serde_json::json!({
+            "type": "function",
+            "function": {"name": s}
+        })
+    }
+}
+
+/// Format a tool_choice string for the Responses API.
+/// In the Responses API, function tool_choice uses a flat structure:
+/// `{"type": "function", "name": ...}`.
+fn format_tool_choice_for_responses_api(s: &str) -> serde_json::Value {
+    if s == "any" {
+        serde_json::json!("required")
+    } else if TOOL_CHOICE_BARE_VALUES.contains(&s) {
+        serde_json::json!(s)
+    } else if WELL_KNOWN_TOOLS.contains(&s) {
+        serde_json::json!({"type": s})
+    } else {
+        serde_json::json!({
+            "type": "function",
+            "name": s
+        })
+    }
+}
+
+/// Convert a schema to the OpenAI response_format format.
+/// Matches Python's `_convert_to_openai_response_format`.
+fn convert_to_openai_response_format(
+    schema: serde_json::Value,
+    strict: Option<bool>,
+) -> serde_json::Value {
+    // Already in the correct format
+    if schema.get("type").and_then(|t| t.as_str()) == Some("json_schema")
+        && schema.get("json_schema").is_some()
+    {
+        return schema;
+    }
+
+    // Already has name+schema fields (json_schema inner format)
+    if schema.get("name").is_some() && schema.get("schema").is_some() {
+        return serde_json::json!({
+            "type": "json_schema",
+            "json_schema": schema
+        });
+    }
+
+    // Simple json_object mode
+    if schema == serde_json::json!({"type": "json_object"}) {
+        return schema;
+    }
+
+    // Raw schema — convert to function-like format
+    let name = schema
+        .get("title")
+        .and_then(|t| t.as_str())
+        .unwrap_or("response_format");
+    let description = schema.get("description").and_then(|d| d.as_str());
+    let strict = strict.unwrap_or(false);
+
+    let mut json_schema = serde_json::json!({
+        "name": name,
+        "schema": schema,
+        "strict": strict,
+    });
+    if let Some(desc) = description {
+        json_schema["description"] = serde_json::json!(desc);
+    }
+
+    serde_json::json!({
+        "type": "json_schema",
+        "json_schema": json_schema
+    })
+}
+
+fn update_token_usage(overall: &serde_json::Value, new: &serde_json::Value) -> serde_json::Value {
+    match (new, overall) {
+        (serde_json::Value::Number(n), serde_json::Value::Number(o)) => {
+            let sum = n.as_f64().unwrap_or(0.0) + o.as_f64().unwrap_or(0.0);
+            if sum == (sum as i64) as f64 {
+                serde_json::json!(sum as i64)
+            } else {
+                serde_json::json!(sum)
+            }
+        }
+        (serde_json::Value::Object(new_map), serde_json::Value::Object(overall_map)) => {
+            let mut merged = overall_map.clone();
+            for (k, v) in new_map {
+                let updated = if let Some(existing) = merged.get(k) {
+                    update_token_usage(existing, v)
+                } else {
+                    v.clone()
+                };
+                merged.insert(k.clone(), updated);
+            }
+            serde_json::Value::Object(merged)
+        }
+        _ => new.clone(),
+    }
+}
+
 #[async_trait]
 impl BaseChatModel for ChatOpenAI {
     fn chat_config(&self) -> &ChatModelConfig {
@@ -2036,6 +2172,54 @@ impl BaseChatModel for ChatOpenAI {
 
     fn has_astream_impl(&self) -> bool {
         true
+    }
+
+    fn _combine_llm_outputs(
+        &self,
+        llm_outputs: &[Option<HashMap<String, serde_json::Value>>],
+    ) -> HashMap<String, serde_json::Value> {
+        let mut overall_token_usage: HashMap<String, serde_json::Value> = HashMap::new();
+        let mut system_fingerprint: Option<String> = None;
+
+        for output in llm_outputs {
+            let output = match output {
+                Some(o) => o,
+                None => continue,
+            };
+
+            if let Some(token_usage) = output.get("token_usage")
+                && let Some(usage_map) = token_usage.as_object()
+            {
+                for (k, v) in usage_map {
+                    if v.is_null() {
+                        continue;
+                    }
+                    if let Some(existing) = overall_token_usage.get(k) {
+                        overall_token_usage.insert(k.clone(), update_token_usage(existing, v));
+                    } else {
+                        overall_token_usage.insert(k.clone(), v.clone());
+                    }
+                }
+            }
+
+            if system_fingerprint.is_none()
+                && let Some(fp) = output.get("system_fingerprint")
+                && let Some(fp_str) = fp.as_str()
+            {
+                system_fingerprint = Some(fp_str.to_string());
+            }
+        }
+
+        let mut combined = HashMap::new();
+        combined.insert(
+            "token_usage".to_string(),
+            serde_json::json!(overall_token_usage),
+        );
+        combined.insert("model_name".to_string(), serde_json::json!(self.model));
+        if let Some(fp) = system_fingerprint {
+            combined.insert("system_fingerprint".to_string(), serde_json::json!(fp));
+        }
+        combined
     }
 
     async fn _generate(
@@ -2083,10 +2267,15 @@ impl BaseChatModel for ChatOpenAI {
             while let Some(result) = pinned_stream.next().await {
                 match result {
                     Ok(chat_chunk) => {
+                        let mut response_metadata = chat_chunk.response_metadata.clone();
+                        response_metadata
+                            .entry("model_provider".to_string())
+                            .or_insert_with(|| serde_json::json!("openai"));
                         let message = AIMessage::builder()
                             .content(&chat_chunk.content)
                             .tool_calls(chat_chunk.tool_calls.clone())
                             .maybe_usage_metadata(chat_chunk.usage_metadata.clone())
+                            .response_metadata(response_metadata)
                             .build();
                         yield Ok(ChatGenerationChunk::new(message.into()));
                     }
@@ -2122,8 +2311,6 @@ impl BaseChatModel for ChatOpenAI {
         bound.bound_tool_choice = tool_choice;
         Ok(Box::new(bound))
     }
-
-
 
     fn with_structured_output(
         &self,
@@ -2169,13 +2356,13 @@ impl ChatOpenAI {
         bound.bound_strict = strict;
         bound.bound_parallel_tool_calls = parallel_tool_calls;
         if let Some(fmt) = response_format {
-            bound.response_format = Some(fmt);
+            bound.response_format = Some(convert_to_openai_response_format(fmt, strict));
         }
         Ok(Box::new(bound))
     }
 
     /// Enhanced structured output with method, strict, and tools parameters.
-    /// 
+    ///
     /// `method`: "function_calling" (default) or "json_schema"
     /// `strict`: Whether to enforce strict schema validation
     /// `tools`: Additional tools to combine with structured output
@@ -2190,7 +2377,7 @@ impl ChatOpenAI {
         Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
     > {
         let method = method.unwrap_or("function_calling");
-        
+
         match method {
             "json_schema" => {
                 let mut model = self.clone();
@@ -2212,10 +2399,8 @@ impl ChatOpenAI {
                         .and_then(|js| js.get_mut("schema"))
                         .and_then(|s| s.as_object_mut())
                     {
-                        schema_obj.insert(
-                            "additionalProperties".to_string(),
-                            serde_json::json!(false),
-                        );
+                        schema_obj
+                            .insert("additionalProperties".to_string(), serde_json::json!(false));
                         if let Some(props) = schema_obj.get("properties")
                             && let Some(props_obj) = props.as_object()
                         {
@@ -2225,58 +2410,46 @@ impl ChatOpenAI {
                     }
                 }
                 model.response_format = Some(json_schema);
-                
+
                 if let Some(extra_tools) = tools {
                     model.bound_tools = extra_tools.iter().map(|t| t.to_definition()).collect();
                     model.bound_strict = strict;
                 }
-                
+
                 let parse_json_content = crate::runnables::base::RunnableLambda::new(
                     |ai_msg: AIMessage| -> crate::error::Result<serde_json::Value> {
                         let content = ai_msg.text();
-                        serde_json::from_str(&content)
-                            .map_err(|e| crate::error::Error::other(format!("JSON parse error: {e}")))
+                        serde_json::from_str(&content).map_err(|e| {
+                            crate::error::Error::other(format!("JSON parse error: {e}"))
+                        })
                     },
                 );
 
-                let model_runnable =
-                    ChatModelRunnable::new(std::sync::Arc::from(
-                        Box::new(model) as Box<dyn BaseChatModel>
-                    ));
+                let model_runnable = ChatModelRunnable::new(std::sync::Arc::from(
+                    Box::new(model) as Box<dyn BaseChatModel>
+                ));
                 let chain = crate::runnables::base::pipe(model_runnable, parse_json_content);
                 Ok(Box::new(chain))
             }
             _ => {
-                // function_calling method
+                // function_calling method: bind only the schema as a tool,
+                // with tool_choice set to the tool name and parallel_tool_calls
+                // disabled. Matches Python's function_calling branch where
+                // extra `tools` are not used.
                 let tool_name = extract_tool_name_from_schema(&schema);
                 let tool_like = ToolLike::Schema(schema);
-                let mut all_tools = vec![tool_like];
-                if let Some(extra_tools) = tools {
-                    all_tools.extend(extra_tools.iter().cloned());
-                }
-                let bound_model = if tools.is_some() {
-                    self.bind_tools_with_options(
-                        &all_tools,
-                        Some(ToolChoice::any()),
-                        strict,
-                        None,
-                        None,
-                    )?
-                } else {
-                    self.bind_tools_with_options(
-                        &all_tools,
-                        Some(ToolChoice::any()),
-                        strict,
-                        None,
-                        None,
-                    )?
-                };
+                let bound_model = self.bind_tools_with_options(
+                    &[tool_like],
+                    Some(ToolChoice::String(tool_name.clone())),
+                    strict,
+                    Some(false),
+                    None,
+                )?;
 
                 let output_parser =
                     crate::output_parsers::openai_tools::JsonOutputKeyToolsParser::new(&tool_name)
                         .with_first_tool_only(true);
-                let model_runnable =
-                    ChatModelRunnable::new(std::sync::Arc::from(bound_model));
+                let model_runnable = ChatModelRunnable::new(std::sync::Arc::from(bound_model));
                 if include_raw {
                     Ok(Box::new(
                         crate::language_models::StructuredOutputWithRaw::new(
@@ -2374,8 +2547,25 @@ impl ChatOpenAI {
 
         if self.should_use_responses_api(None) {
             let url = format!("{}/responses", self.api_base);
-            let payload =
+            let mut payload =
                 self.build_responses_api_payload(&messages, stop, Some(&openai_tools), false);
+
+            if let Some(choice) = tool_choice {
+                let choice_json = match choice {
+                    ToolChoice::String(s) => format_tool_choice_for_responses_api(s),
+                    ToolChoice::Structured { choice_type, name } => {
+                        if choice_type == "tool" || choice_type == "function" {
+                            serde_json::json!({
+                                "type": "function",
+                                "name": name
+                            })
+                        } else {
+                            serde_json::json!(choice_type)
+                        }
+                    }
+                };
+                payload["tool_choice"] = choice_json;
+            }
 
             let resp: ResponsesApiResponse = (|| self.send_json_request(&url, &payload))
                 .retry(self.retry_strategy())
@@ -2391,15 +2581,7 @@ impl ChatOpenAI {
 
         if let Some(choice) = tool_choice {
             let choice_json = match choice {
-                ToolChoice::String(s) => {
-                    if s == "any" {
-                        serde_json::json!("required")
-                    } else if WELL_KNOWN_TOOLS.contains(&s.as_str()) {
-                        serde_json::json!({"type": s})
-                    } else {
-                        serde_json::json!(s)
-                    }
-                }
+                ToolChoice::String(s) => format_tool_choice_for_chat_completions(s),
                 ToolChoice::Structured { choice_type, name } => {
                     if choice_type == "tool" || choice_type == "function" {
                         serde_json::json!({
@@ -2446,6 +2628,7 @@ struct OpenAIChoice {
 struct OpenAIMessage {
     content: Option<String>,
     tool_calls: Option<Vec<OpenAIToolCall>>,
+    audio: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
