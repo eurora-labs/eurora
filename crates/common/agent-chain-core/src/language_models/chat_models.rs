@@ -111,6 +111,9 @@ impl ChatChunk {
 pub enum ToolLike {
     Tool(Arc<dyn BaseTool>),
     Schema(Value),
+    /// Raw tool JSON passed through unchanged (e.g. `{"type": "web_search_preview"}`).
+    /// Used for Responses API builtin tools that don't follow the function tool format.
+    Builtin(Value),
 }
 
 impl ToolLike {
@@ -135,6 +138,17 @@ impl ToolLike {
                         .get("parameters")
                         .cloned()
                         .unwrap_or(Value::Object(Default::default())),
+                })
+            }
+            ToolLike::Builtin(json) => {
+                let tool_type = json
+                    .get("type")
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("unknown");
+                Ok(ToolDefinition {
+                    name: tool_type.to_string(),
+                    description: String::new(),
+                    parameters: json.clone(),
                 })
             }
         }
