@@ -183,10 +183,21 @@ jobs:
 
             - name: Set version and channel
               shell: bash
+              env:
+                  BUILD_VERSION: ${{ needs.build-sveltekit.outputs.version }}
+                  BUILD_CHANNEL: ${{ needs.build-sveltekit.outputs.channel }}
               run: |
-                  echo "version=${{ needs.build-sveltekit.outputs.version }}" >> "$GITHUB_ENV"
-                  echo "channel=${{ needs.build-sveltekit.outputs.channel }}" >> "$GITHUB_ENV"
-                  mkdir -p release && echo "${{ needs.build-sveltekit.outputs.version }}" > release/version
+                  {
+                    echo 'version<<EOF'
+                    echo "$BUILD_VERSION"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
+                  {
+                    echo 'channel<<EOF'
+                    echo "$BUILD_CHANNEL"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
+                  mkdir -p release && echo "$BUILD_VERSION" > release/version
 
             - name: Set Cargo build target
               shell: bash
@@ -208,7 +219,7 @@ jobs:
                   shared-key: app-release-build-${{ github.event.inputs.channel || 'nightly' }}${{ matrix.target }}
 
             - name: Cache cargo-about
-              uses: actions/cache@v4
+              uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
               with:
                   path: |
                       ~/.cargo/bin/cargo-about
@@ -474,7 +485,14 @@ jobs:
 
             - name: Set channel
               shell: bash
-              run: echo "channel=${{ needs.build-sveltekit.outputs.channel }}" >> "$GITHUB_ENV"
+              env:
+                  BUILD_CHANNEL: ${{ needs.build-sveltekit.outputs.channel }}
+              run: |
+                  {
+                    echo 'channel<<EOF'
+                    echo "$BUILD_CHANNEL"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
 
             - name: Download Tauri artifacts
               uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
@@ -841,10 +859,10 @@ jobs:
             - name: Create GitHub Release
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  RELEASE_VERSION: ${{ needs.publish-tauri.outputs.version }}
               run: |
-                  VERSION="${{ needs.publish-tauri.outputs.version }}"
-                  TAG="release/${VERSION}"
+                  TAG="release/${RELEASE_VERSION}"
                   gh release create "$TAG" \
-                    --title "v${VERSION}" \
+                    --title "v${RELEASE_VERSION}" \
                     --generate-notes \
                     gh-release/*
