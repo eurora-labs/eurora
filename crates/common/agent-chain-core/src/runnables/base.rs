@@ -2482,10 +2482,7 @@ where
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let rt = tokio::runtime::Handle::try_current()
-            .map_err(|_| Error::other("RunnableGenerator::invoke requires a tokio runtime"))?;
-
-        rt.block_on(async {
+        let collect_stream = async {
             let mut stream = self.stream(input, config);
             let mut final_output: Option<Self::Output> = None;
             while let Some(result) = stream.next().await {
@@ -2496,7 +2493,24 @@ where
                 });
             }
             final_output.ok_or_else(|| Error::other("RunnableGenerator produced no output"))
-        })
+        };
+
+        if tokio::runtime::Handle::try_current().is_ok() {
+            std::thread::scope(|scope| {
+                scope
+                    .spawn(|| {
+                        tokio::runtime::Runtime::new()
+                            .expect("failed to create tokio runtime")
+                            .block_on(collect_stream)
+                    })
+                    .join()
+                    .expect("spawned thread panicked")
+            })
+        } else {
+            tokio::runtime::Runtime::new()
+                .map_err(|e| Error::other(format!("failed to create tokio runtime: {e}")))?
+                .block_on(collect_stream)
+        }
     }
 
     async fn ainvoke(

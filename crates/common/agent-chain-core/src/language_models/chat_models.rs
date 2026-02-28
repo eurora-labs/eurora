@@ -66,6 +66,8 @@ pub struct ChatChunk {
     pub finish_reason: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_calls: Vec<crate::messages::ToolCall>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
 impl ChatChunk {
@@ -76,6 +78,7 @@ impl ChatChunk {
             usage_metadata: None,
             finish_reason: None,
             tool_calls: Vec::new(),
+            response_metadata: HashMap::new(),
         }
     }
 
@@ -88,6 +91,7 @@ impl ChatChunk {
             is_final: true,
             usage_metadata,
             finish_reason,
+            response_metadata: HashMap::new(),
             tool_calls: Vec::new(),
         }
     }
@@ -1596,15 +1600,43 @@ impl std::fmt::Debug for ChatModelRunnable {
     }
 }
 
+/// Run an async future synchronously, safe to call from any context.
+///
+/// When called outside a tokio runtime, creates a temporary runtime on the
+/// current thread. When called from within an existing runtime (e.g. from a
+/// sync `invoke` inside an async test), spawns a new thread with its own
+/// runtime so the calling runtime's I/O driver is not blocked.
+fn run_blocking_async<F, T>(future: F) -> T
+where
+    F: std::future::Future<Output = T> + Send + 'static,
+    T: Send + 'static,
+{
+    if tokio::runtime::Handle::try_current().is_ok() {
+        std::thread::scope(|scope| {
+            scope
+                .spawn(|| {
+                    tokio::runtime::Runtime::new()
+                        .expect("failed to create tokio runtime")
+                        .block_on(future)
+                })
+                .join()
+                .expect("spawned thread panicked")
+        })
+    } else {
+        tokio::runtime::Runtime::new()
+            .expect("failed to create tokio runtime")
+            .block_on(future)
+    }
+}
+
 #[async_trait]
 impl Runnable for ChatModelRunnable {
     type Input = LanguageModelInput;
     type Output = AIMessage;
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let rt = tokio::runtime::Handle::current();
         let model = self.model.clone();
-        rt.block_on(async move { model.invoke(input, config.as_ref()).await })
+        run_blocking_async(async move { model.invoke(input, config.as_ref()).await })
     }
 
     async fn ainvoke(
