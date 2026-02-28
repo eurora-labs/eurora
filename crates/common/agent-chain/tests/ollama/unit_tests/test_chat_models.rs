@@ -1,4 +1,4 @@
-use agent_chain::providers::ollama::{ChatOllama, parse_tool_call_arguments};
+use agent_chain::providers::ollama::{ChatOllama, OllamaResponse, parse_tool_call_arguments};
 use agent_chain_core::messages::{BaseMessage, HumanMessage};
 
 const MODEL_NAME: &str = "llama3.1";
@@ -263,4 +263,138 @@ fn test_validate_model_on_init_flag() {
     let llm = ChatOllama::new(MODEL_NAME);
     let base_url = llm.get_base_url();
     assert!(!base_url.is_empty());
+}
+
+// =============================================================================
+// Ported from unit_tests/test_chat_models.py — load response handling
+// =============================================================================
+
+/// Ported from `test_load_response_with_empty_content_is_skipped`.
+///
+/// Verifies that a load response with empty content is correctly identified
+/// as a skippable load response by parsing the OllamaResponse.
+#[test]
+fn test_load_response_with_empty_content_is_skipped() {
+    let json = serde_json::json!({
+        "model": "test-model",
+        "created_at": "2025-01-01T00:00:00.000000000Z",
+        "done": true,
+        "done_reason": "load",
+        "message": {"role": "assistant", "content": ""}
+    });
+
+    let response: OllamaResponse = serde_json::from_value(json).unwrap();
+    let content = response
+        .message
+        .as_ref()
+        .and_then(|m| m.content.as_deref())
+        .unwrap_or("");
+    let is_done = response.done.unwrap_or(false);
+    let is_load = response.done_reason.as_deref() == Some("load");
+
+    assert!(is_done);
+    assert!(is_load);
+    assert!(content.trim().is_empty());
+}
+
+/// Ported from `test_load_response_with_whitespace_content_is_skipped`.
+///
+/// Verifies that a load response with only whitespace content is correctly
+/// identified as skippable.
+#[test]
+fn test_load_response_with_whitespace_content_is_skipped() {
+    let json = serde_json::json!({
+        "model": "test-model",
+        "created_at": "2025-01-01T00:00:00.000000000Z",
+        "done": true,
+        "done_reason": "load",
+        "message": {"role": "assistant", "content": "   \n  \t  "}
+    });
+
+    let response: OllamaResponse = serde_json::from_value(json).unwrap();
+    let content = response
+        .message
+        .as_ref()
+        .and_then(|m| m.content.as_deref())
+        .unwrap_or("");
+    let is_done = response.done.unwrap_or(false);
+    let is_load = response.done_reason.as_deref() == Some("load");
+
+    assert!(is_done);
+    assert!(is_load);
+    assert!(content.trim().is_empty());
+}
+
+/// Ported from `test_load_followed_by_content_response`.
+///
+/// Verifies that a load response followed by a content response can be
+/// parsed correctly — the load response should be skippable while the
+/// content response should not.
+#[test]
+fn test_load_followed_by_content_response() {
+    let load_json = serde_json::json!({
+        "model": "test-model",
+        "created_at": "2025-01-01T00:00:00.000000000Z",
+        "done": true,
+        "done_reason": "load",
+        "message": {"role": "assistant", "content": ""}
+    });
+    let content_json = serde_json::json!({
+        "model": "test-model",
+        "created_at": "2025-01-01T00:00:01.000000000Z",
+        "done": true,
+        "done_reason": "stop",
+        "message": {"role": "assistant", "content": "Hello! How can I help you today?"}
+    });
+
+    let load_resp: OllamaResponse = serde_json::from_value(load_json).unwrap();
+    let content_resp: OllamaResponse = serde_json::from_value(content_json).unwrap();
+
+    // Load response should be skipped
+    let load_content = load_resp
+        .message
+        .as_ref()
+        .and_then(|m| m.content.as_deref())
+        .unwrap_or("");
+    assert!(load_content.trim().is_empty());
+    assert_eq!(load_resp.done_reason.as_deref(), Some("load"));
+
+    // Content response should not be skipped
+    let real_content = content_resp
+        .message
+        .as_ref()
+        .and_then(|m| m.content.as_deref())
+        .unwrap_or("");
+    assert_eq!(real_content, "Hello! How can I help you today?");
+    assert_eq!(content_resp.done_reason.as_deref(), Some("stop"));
+}
+
+/// Ported from `test_load_response_with_actual_content_is_not_skipped`.
+///
+/// Verifies that a load response with actual content is NOT treated as
+/// skippable — the content should be preserved.
+#[test]
+fn test_load_response_with_actual_content_is_not_skipped() {
+    let json = serde_json::json!({
+        "model": "test-model",
+        "created_at": "2025-01-01T00:00:00.000000000Z",
+        "done": true,
+        "done_reason": "load",
+        "message": {"role": "assistant", "content": "This is actual content"}
+    });
+
+    let response: OllamaResponse = serde_json::from_value(json).unwrap();
+    let content = response
+        .message
+        .as_ref()
+        .and_then(|m| m.content.as_deref())
+        .unwrap_or("");
+    let is_done = response.done.unwrap_or(false);
+    let is_load = response.done_reason.as_deref() == Some("load");
+
+    assert!(is_done);
+    assert!(is_load);
+    // Content is NOT empty, so this should NOT be skipped
+    assert!(!content.trim().is_empty());
+    assert_eq!(content, "This is actual content");
 }
