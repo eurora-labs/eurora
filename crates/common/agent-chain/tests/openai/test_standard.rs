@@ -529,22 +529,23 @@ async fn test_tool_message_error_status() -> Result<(), Box<dyn std::error::Erro
             .tool_calls(vec![
                 ToolCall::builder()
                     .name("my_adder_tool")
-                    .args(serde_json::json!({"a": 1, "b": 2}))
+                    .args(serde_json::json!({"a": 1}))
                     .id("abc123".to_string())
                     .build(),
             ])
             .build()
             .into(),
         ToolMessage::builder()
-            .content("Error: tool execution failed")
+            .content("Error: Missing required argument 'b'.")
             .tool_call_id("abc123")
             .status(agent_chain_core::messages::ToolStatus::Error)
             .build()
             .into(),
     ];
 
-    let result = model_with_tools.invoke(messages.into(), None).await?;
-    assert!(!result.text().is_empty());
+    // Python only asserts isinstance(result, AIMessage), which is guaranteed by the
+    // return type. Verify the invoke succeeds without error.
+    let _result = model_with_tools.invoke(messages.into(), None).await?;
 
     Ok(())
 }
@@ -799,8 +800,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let model = make_model();
-    let model_with_tools =
-        model.bind_tools(&[ToolLike::Schema(weather_tool)], Some(ToolChoice::any()))?;
+    let model_with_tools = model.bind_tools(&[ToolLike::Schema(weather_tool)], None)?;
 
     let input_message: BaseMessage = HumanMessage::builder()
         .content("What is the weather in San Francisco, CA?")

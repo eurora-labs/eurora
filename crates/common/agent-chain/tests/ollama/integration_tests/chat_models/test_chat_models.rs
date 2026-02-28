@@ -5,6 +5,7 @@ use agent_chain_core::messages::{BaseMessage, HumanMessage};
 use futures::StreamExt;
 
 const DEFAULT_MODEL: &str = "llama3.1";
+const REASONING_MODEL: &str = "gpt-oss:20b";
 fn load_env() {
     let _ = dotenv::dotenv();
 }
@@ -98,7 +99,7 @@ async fn test_structured_output_function_calling() -> Result<(), Box<dyn std::er
         "required": ["setup", "punchline"]
     });
 
-    let llm = ChatOllama::new(DEFAULT_MODEL).temperature(0.0);
+    let llm = ChatOllama::new(REASONING_MODEL).temperature(0.0);
     let structured = llm.with_structured_output(joke_schema, false)?;
     let result = structured
         .ainvoke(
@@ -322,7 +323,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
         "required": ["location"]
     });
 
-    let llm = ChatOllama::new(DEFAULT_MODEL).reasoning(serde_json::json!("low"));
+    let llm = ChatOllama::new(REASONING_MODEL).reasoning(serde_json::json!("low"));
     let llm_with_tools = BaseChatModel::bind_tools(&llm, &[ToolLike::Schema(weather_tool)], None)?;
 
     let input_message: BaseMessage = HumanMessage::builder()
@@ -342,7 +343,6 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(tool_call.name, "get_weather");
     assert!(tool_call.args.get("location").is_some());
 
-    // Simulate tool response
     let tool_message: BaseMessage = agent_chain_core::messages::ToolMessage::builder()
         .content("It's sunny and 75 degrees.")
         .tool_call_id(tool_call.id.as_deref().unwrap_or(""))
@@ -361,6 +361,25 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
     assert!(!resp_message.text().is_empty());
+
+    let follow_up: BaseMessage = HumanMessage::builder()
+        .content("Explain why that might be using a reasoning step.")
+        .build()
+        .into();
+
+    let _response = llm_with_tools
+        .invoke(
+            vec![
+                input_message,
+                BaseMessage::AI(tool_call_message),
+                tool_message,
+                BaseMessage::AI(resp_message),
+                follow_up,
+            ]
+            .into(),
+            None,
+        )
+        .await?;
 
     Ok(())
 }
@@ -380,7 +399,7 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
         "required": ["location"]
     });
 
-    let llm = ChatOllama::new(DEFAULT_MODEL)
+    let llm = ChatOllama::new(REASONING_MODEL)
         .output_version("v1")
         .reasoning(serde_json::json!("low"));
     let llm_with_tools = BaseChatModel::bind_tools(&llm, &[ToolLike::Schema(weather_tool)], None)?;
@@ -399,6 +418,9 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let tool_call = &tool_call_message.tool_calls[0];
+    assert_eq!(tool_call.name, "get_weather");
+    assert!(tool_call.args.get("location").is_some());
+
     let tool_message: BaseMessage = agent_chain_core::messages::ToolMessage::builder()
         .content("It's sunny and 75 degrees.")
         .tool_call_id(tool_call.id.as_deref().unwrap_or(""))
@@ -418,7 +440,6 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     assert!(!resp_message.text().is_empty());
 
-    // Follow-up with reasoning
     let follow_up: BaseMessage = HumanMessage::builder()
         .content("Explain why that might be using a reasoning step.")
         .build()
@@ -437,7 +458,24 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
             None,
         )
         .await?;
-    assert!(!response.text().is_empty());
+
+    let content_blocks = response.content_blocks();
+    assert!(
+        !content_blocks.is_empty(),
+        "v1 response should have content_blocks"
+    );
+    assert!(
+        content_blocks
+            .iter()
+            .any(|b| matches!(b, agent_chain_core::messages::ContentBlock::Text(_))),
+        "v1 response should contain a text block"
+    );
+    assert!(
+        content_blocks
+            .iter()
+            .any(|b| matches!(b, agent_chain_core::messages::ContentBlock::Reasoning(_))),
+        "v1 response should contain a reasoning block"
+    );
 
     Ok(())
 }

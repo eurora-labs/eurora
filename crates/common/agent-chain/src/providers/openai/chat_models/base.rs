@@ -260,6 +260,184 @@ impl std::fmt::Debug for ChatOpenAI {
     }
 }
 
+/// Check if the provided content block is a data content block.
+/// Matches Python `is_data_content_block`.
+fn is_data_content_block(block: &serde_json::Value) -> bool {
+    let block_type = match block.get("type").and_then(|t| t.as_str()) {
+        Some(t) => t,
+        None => return false,
+    };
+    if !matches!(block_type, "image" | "audio" | "file") {
+        return false;
+    }
+    if block.get("url").is_some() || block.get("base64").is_some() || block.get("file_id").is_some()
+    {
+        return true;
+    }
+    if let Some(source_type) = block.get("source_type").and_then(|s| s.as_str())
+        && ((source_type == "url" && block.get("url").is_some())
+            || (source_type == "base64" && block.get("data").is_some())
+            || (source_type == "id" && block.get("id").is_some()))
+    {
+        return true;
+    }
+    false
+}
+
+/// Convert a standard image content block to OpenAI image_url format.
+/// Matches Python `convert_to_openai_image_block`.
+fn convert_to_openai_image_block(block: &serde_json::Value) -> serde_json::Value {
+    if let Some(url) = block.get("url").and_then(|u| u.as_str()) {
+        return serde_json::json!({
+            "type": "image_url",
+            "image_url": {"url": url}
+        });
+    }
+    if block.get("base64").is_some()
+        || block.get("source_type").and_then(|s| s.as_str()) == Some("base64")
+    {
+        let mime_type = block
+            .get("mime_type")
+            .and_then(|m| m.as_str())
+            .unwrap_or("image/png");
+        let base64_data = if block.get("source_type").is_some() {
+            block.get("data").and_then(|d| d.as_str()).unwrap_or("")
+        } else {
+            block.get("base64").and_then(|d| d.as_str()).unwrap_or("")
+        };
+        return serde_json::json!({
+            "type": "image_url",
+            "image_url": {
+                "url": format!("data:{mime_type};base64,{base64_data}")
+            }
+        });
+    }
+    block.clone()
+}
+
+/// Convert a standard data content block to OpenAI format.
+/// Matches Python `convert_to_openai_data_block`.
+fn convert_to_openai_data_block(block: &serde_json::Value, api: &str) -> serde_json::Value {
+    let block_type = block.get("type").and_then(|t| t.as_str()).unwrap_or("");
+
+    match block_type {
+        "image" => {
+            let cc_block = convert_to_openai_image_block(block);
+            if api == "responses" {
+                let url = cc_block
+                    .get("image_url")
+                    .and_then(|iu| iu.get("url"))
+                    .and_then(|u| u.as_str())
+                    .unwrap_or("");
+                let mut formatted = serde_json::json!({
+                    "type": "input_image",
+                    "image_url": url
+                });
+                if let Some(detail) = cc_block.get("image_url").and_then(|iu| iu.get("detail")) {
+                    formatted["detail"] = detail.clone();
+                }
+                formatted
+            } else {
+                cc_block
+            }
+        }
+        "file" => {
+            if block.get("base64").is_some()
+                || block.get("source_type").and_then(|s| s.as_str()) == Some("base64")
+            {
+                let base64_data = if block.get("source_type").is_some() {
+                    block.get("data").and_then(|d| d.as_str()).unwrap_or("")
+                } else {
+                    block.get("base64").and_then(|d| d.as_str()).unwrap_or("")
+                };
+                let mime_type = block
+                    .get("mime_type")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("application/octet-stream");
+                let mut file = serde_json::json!({
+                    "file_data": format!("data:{mime_type};base64,{base64_data}")
+                });
+                if let Some(filename) = block
+                    .get("filename")
+                    .and_then(|f| f.as_str())
+                    .or_else(|| {
+                        block
+                            .get("extras")
+                            .and_then(|e| e.get("filename"))
+                            .and_then(|f| f.as_str())
+                    })
+                    .or_else(|| {
+                        block
+                            .get("metadata")
+                            .and_then(|m| m.get("filename"))
+                            .and_then(|f| f.as_str())
+                    })
+                {
+                    file["filename"] = serde_json::json!(filename);
+                }
+                if api == "responses" {
+                    let mut formatted = serde_json::json!({"type": "input_file"});
+                    if let Some(obj) = file.as_object() {
+                        for (key, val) in obj {
+                            formatted[key] = val.clone();
+                        }
+                    }
+                    formatted
+                } else {
+                    serde_json::json!({"type": "file", "file": file})
+                }
+            } else if block.get("file_id").is_some()
+                || block.get("source_type").and_then(|s| s.as_str()) == Some("id")
+            {
+                let file_id = if block.get("source_type").is_some() {
+                    block.get("id").and_then(|i| i.as_str()).unwrap_or("")
+                } else {
+                    block.get("file_id").and_then(|i| i.as_str()).unwrap_or("")
+                };
+                if api == "responses" {
+                    serde_json::json!({"type": "input_file", "file_id": file_id})
+                } else {
+                    serde_json::json!({"type": "file", "file": {"file_id": file_id}})
+                }
+            } else if let Some(url) = block.get("url").and_then(|u| u.as_str()) {
+                if api == "chat/completions" {
+                    block.clone()
+                } else {
+                    serde_json::json!({"type": "input_file", "file_url": url})
+                }
+            } else {
+                block.clone()
+            }
+        }
+        "audio" => {
+            if block.get("base64").is_some()
+                || block.get("source_type").and_then(|s| s.as_str()) == Some("base64")
+            {
+                let base64_data = if block.get("source_type").is_some() {
+                    block.get("data").and_then(|d| d.as_str()).unwrap_or("")
+                } else {
+                    block.get("base64").and_then(|d| d.as_str()).unwrap_or("")
+                };
+                let mime_type = block
+                    .get("mime_type")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("audio/wav");
+                let audio_format = mime_type.rsplit('/').next().unwrap_or("wav");
+                serde_json::json!({
+                    "type": "input_audio",
+                    "input_audio": {
+                        "data": base64_data,
+                        "format": audio_format
+                    }
+                })
+            } else {
+                block.clone()
+            }
+        }
+        _ => block.clone(),
+    }
+}
+
 impl ChatOpenAI {
     /// Create a new ChatOpenAI instance.
     pub fn new(model: impl Into<String>) -> Self {
@@ -506,7 +684,7 @@ impl ChatOpenAI {
     }
 
     pub fn response_format(mut self, format: serde_json::Value) -> Self {
-        self.response_format = Some(format);
+        self.response_format = Some(convert_to_openai_response_format(format, None));
         self
     }
 
@@ -578,7 +756,26 @@ impl ChatOpenAI {
             return true;
         }
 
+        if self.previous_response_id.is_some() {
+            return true;
+        }
+
         if model_prefers_responses_api(&self.model) {
+            return true;
+        }
+
+        // Check model_kwargs for Responses API-only keys
+        let responses_only_keys = [
+            "include",
+            "previous_response_id",
+            "reasoning",
+            "text",
+            "truncation",
+        ];
+        if responses_only_keys
+            .iter()
+            .any(|k| self.model_kwargs.contains_key(*k))
+        {
             return true;
         }
 
@@ -647,19 +844,56 @@ impl ChatOpenAI {
         }
     }
 
-    /// Format message content, filtering out block types not supported by OpenAI.
+    /// Format message content, filtering out block types not supported by OpenAI
+    /// and converting data content blocks to OpenAI format.
     /// Matches Python `_format_message_content`.
-    fn format_message_content(content: &serde_json::Value) -> serde_json::Value {
+    fn format_message_content(
+        content: &serde_json::Value,
+        api: &str,
+        role: Option<&str>,
+    ) -> serde_json::Value {
         if let Some(arr) = content.as_array() {
-            let filtered: Vec<serde_json::Value> = arr
-                .iter()
-                .filter(|block| {
-                    let block_type = block.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                    !matches!(block_type, "tool_use" | "thinking" | "reasoning_content")
-                })
-                .cloned()
-                .collect();
-            serde_json::Value::Array(filtered)
+            let mut formatted: Vec<serde_json::Value> = Vec::new();
+            for block in arr {
+                let block_type = block.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                if matches!(block_type, "tool_use" | "thinking" | "reasoning_content") {
+                    continue;
+                }
+                if is_data_content_block(block)
+                    && !(api == "responses" && role.unwrap_or("").to_lowercase().starts_with("ai"))
+                {
+                    formatted.push(convert_to_openai_data_block(block, api));
+                } else if block_type == "image" {
+                    if let Some(source) = block.get("source").and_then(|s| s.as_object()) {
+                        let source_type = source.get("type").and_then(|t| t.as_str());
+                        if source_type == Some("base64") {
+                            if let (Some(media_type), Some(data)) = (
+                                source.get("media_type").and_then(|m| m.as_str()),
+                                source.get("data").and_then(|d| d.as_str()),
+                            ) {
+                                formatted.push(serde_json::json!({
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": format!("data:{media_type};base64,{data}")
+                                    }
+                                }));
+                            }
+                        } else if source_type == Some("url")
+                            && let Some(url) = source.get("url").and_then(|u| u.as_str())
+                        {
+                            formatted.push(serde_json::json!({
+                                "type": "image_url",
+                                "image_url": {"url": url}
+                            }));
+                        }
+                    } else {
+                        formatted.push(block.clone());
+                    }
+                } else {
+                    formatted.push(block.clone());
+                }
+            }
+            serde_json::Value::Array(formatted)
         } else {
             content.clone()
         }
@@ -724,7 +958,7 @@ impl ChatOpenAI {
                             })
                             .collect();
                         let raw = serde_json::Value::Array(content_parts);
-                        Self::format_message_content(&raw)
+                        Self::format_message_content(&raw, "chat/completions", Some("human"))
                     }
                 };
                 let mut message = serde_json::json!({"role": "user", "content": content});
@@ -784,11 +1018,47 @@ impl ChatOpenAI {
 
                 Some(message)
             }
-            BaseMessage::Tool(m) => Some(serde_json::json!({
-                "role": "tool",
-                "tool_call_id": m.tool_call_id,
-                "content": m.content
-            })),
+            BaseMessage::Tool(m) => {
+                let content = match &m.content {
+                    MessageContent::Parts(parts) => {
+                        let content_parts: Vec<serde_json::Value> = parts
+                            .iter()
+                            .map(|part| match part {
+                                ContentPart::Text { text } => {
+                                    serde_json::json!({"type": "text", "text": text})
+                                }
+                                ContentPart::Image { source, detail } => {
+                                    let url = match source {
+                                        ImageSource::Url { url } => url.clone(),
+                                        ImageSource::Base64 { media_type, data } => {
+                                            format!("data:{media_type};base64,{data}")
+                                        }
+                                        ImageSource::FileId { file_id } => file_id.clone(),
+                                    };
+                                    let mut image_url = serde_json::json!({"url": url});
+                                    if let Some(d) = detail {
+                                        image_url["detail"] = serde_json::json!(match d {
+                                            ImageDetail::Low => "low",
+                                            ImageDetail::High => "high",
+                                            ImageDetail::Auto => "auto",
+                                        });
+                                    }
+                                    serde_json::json!({"type": "image_url", "image_url": image_url})
+                                }
+                                ContentPart::Other(value) => value.clone(),
+                            })
+                            .collect();
+                        let raw = serde_json::Value::Array(content_parts);
+                        Self::format_message_content(&raw, "chat/completions", Some("tool"))
+                    }
+                    other => serde_json::json!(other),
+                };
+                Some(serde_json::json!({
+                    "role": "tool",
+                    "tool_call_id": m.tool_call_id,
+                    "content": content
+                }))
+            }
             BaseMessage::Remove(_) => None,
             BaseMessage::Chat(m) => {
                 let mut message = serde_json::json!({
@@ -863,7 +1133,8 @@ impl ChatOpenAI {
                                     ContentPart::Other(value) => value.clone(),
                                 })
                                 .collect();
-                            serde_json::Value::Array(content_parts)
+                            let raw = serde_json::Value::Array(content_parts);
+                            Self::format_message_content(&raw, "responses", Some("human"))
                         }
                     };
                     input.push(serde_json::json!({"role": "user", "content": content}));
@@ -1487,6 +1758,7 @@ impl ChatOpenAI {
         let mut text_content = String::new();
         let mut tool_calls = Vec::new();
         let mut invalid_tool_calls = Vec::new();
+        let mut tool_outputs: Vec<serde_json::Value> = Vec::new();
 
         for output in &response.output {
             match output {
@@ -1526,8 +1798,22 @@ impl ChatOpenAI {
                 ResponsesOutput::WebSearchCall {}
                 | ResponsesOutput::FileSearchCall {}
                 | ResponsesOutput::CodeInterpreterCall {}
-                | ResponsesOutput::Other => {}
+                | ResponsesOutput::McpApprovalRequest {}
+                | ResponsesOutput::McpCall {}
+                | ResponsesOutput::ComputerCall {}
+                | ResponsesOutput::ImageGenerationCall {}
+                | ResponsesOutput::Other => {
+                    tool_outputs.push(serde_json::to_value(output).unwrap_or_default());
+                }
             }
+        }
+
+        let mut additional_kwargs = HashMap::new();
+        if !tool_outputs.is_empty() {
+            additional_kwargs.insert(
+                "tool_outputs".to_string(),
+                serde_json::Value::Array(tool_outputs),
+            );
         }
 
         let usage_metadata = response
@@ -2798,7 +3084,7 @@ struct ResponsesApiResponse {
     incomplete_details: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 enum ResponsesOutput {
     #[serde(rename = "message")]
@@ -2815,11 +3101,19 @@ enum ResponsesOutput {
     FileSearchCall {},
     #[serde(rename = "code_interpreter_call")]
     CodeInterpreterCall {},
+    #[serde(rename = "mcp_approval_request")]
+    McpApprovalRequest {},
+    #[serde(rename = "mcp_call")]
+    McpCall {},
+    #[serde(rename = "computer_call")]
+    ComputerCall {},
+    #[serde(rename = "image_generation_call")]
+    ImageGenerationCall {},
     #[serde(other)]
     Other,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 enum ResponsesContent {
     #[serde(rename = "output_text")]
@@ -3030,5 +3324,172 @@ mod tests {
             "tools": [{"type": "web_search"}]
         });
         assert!(payload_requires_responses_api(&payload));
+    }
+
+    #[test]
+    fn test_is_data_content_block() {
+        assert!(is_data_content_block(&serde_json::json!({
+            "type": "image", "base64": "abc", "mime_type": "image/png"
+        })));
+        assert!(is_data_content_block(&serde_json::json!({
+            "type": "image", "url": "https://example.com/img.png"
+        })));
+        assert!(is_data_content_block(&serde_json::json!({
+            "type": "audio", "base64": "abc", "mime_type": "audio/wav"
+        })));
+        assert!(is_data_content_block(&serde_json::json!({
+            "type": "file", "base64": "abc", "mime_type": "application/pdf"
+        })));
+        assert!(is_data_content_block(&serde_json::json!({
+            "type": "file", "file_id": "file-123"
+        })));
+        assert!(!is_data_content_block(&serde_json::json!({
+            "type": "text", "text": "hello"
+        })));
+        assert!(!is_data_content_block(&serde_json::json!({
+            "type": "image_url", "image_url": {"url": "https://example.com"}
+        })));
+        assert!(!is_data_content_block(&serde_json::json!({
+            "type": "input_audio", "input_audio": {"data": "abc", "format": "wav"}
+        })));
+    }
+
+    #[test]
+    fn test_convert_to_openai_data_block_audio() {
+        let block = serde_json::json!({
+            "type": "audio",
+            "base64": "audiodata123",
+            "mime_type": "audio/wav"
+        });
+        let result = convert_to_openai_data_block(&block, "chat/completions");
+        assert_eq!(result["type"], "input_audio");
+        assert_eq!(result["input_audio"]["data"], "audiodata123");
+        assert_eq!(result["input_audio"]["format"], "wav");
+    }
+
+    #[test]
+    fn test_convert_to_openai_data_block_file_base64() {
+        let block = serde_json::json!({
+            "type": "file",
+            "base64": "pdfdata123",
+            "mime_type": "application/pdf"
+        });
+        let result = convert_to_openai_data_block(&block, "chat/completions");
+        assert_eq!(result["type"], "file");
+        assert_eq!(
+            result["file"]["file_data"],
+            "data:application/pdf;base64,pdfdata123"
+        );
+    }
+
+    #[test]
+    fn test_convert_to_openai_data_block_file_base64_with_filename() {
+        let block = serde_json::json!({
+            "type": "file",
+            "base64": "pdfdata123",
+            "mime_type": "application/pdf",
+            "filename": "test.pdf"
+        });
+        let result = convert_to_openai_data_block(&block, "chat/completions");
+        assert_eq!(result["file"]["filename"], "test.pdf");
+    }
+
+    #[test]
+    fn test_convert_to_openai_data_block_file_responses_api() {
+        let block = serde_json::json!({
+            "type": "file",
+            "base64": "pdfdata123",
+            "mime_type": "application/pdf"
+        });
+        let result = convert_to_openai_data_block(&block, "responses");
+        assert_eq!(result["type"], "input_file");
+        assert_eq!(
+            result["file_data"],
+            "data:application/pdf;base64,pdfdata123"
+        );
+    }
+
+    #[test]
+    fn test_convert_to_openai_data_block_file_id() {
+        let block = serde_json::json!({
+            "type": "file",
+            "file_id": "file-abc123"
+        });
+        let result = convert_to_openai_data_block(&block, "chat/completions");
+        assert_eq!(result["type"], "file");
+        assert_eq!(result["file"]["file_id"], "file-abc123");
+    }
+
+    #[test]
+    fn test_convert_to_openai_data_block_image() {
+        let block = serde_json::json!({
+            "type": "image",
+            "base64": "imgdata",
+            "mime_type": "image/png"
+        });
+        let result = convert_to_openai_data_block(&block, "chat/completions");
+        assert_eq!(result["type"], "image_url");
+        assert_eq!(result["image_url"]["url"], "data:image/png;base64,imgdata");
+    }
+
+    #[test]
+    fn test_convert_to_openai_data_block_image_responses() {
+        let block = serde_json::json!({
+            "type": "image",
+            "base64": "imgdata",
+            "mime_type": "image/png"
+        });
+        let result = convert_to_openai_data_block(&block, "responses");
+        assert_eq!(result["type"], "input_image");
+        assert_eq!(result["image_url"], "data:image/png;base64,imgdata");
+    }
+
+    #[test]
+    fn test_format_message_content_converts_data_blocks() {
+        let content = serde_json::json!([
+            {"type": "text", "text": "hello"},
+            {"type": "audio", "base64": "audiodata", "mime_type": "audio/wav"},
+            {"type": "file", "base64": "pdfdata", "mime_type": "application/pdf"}
+        ]);
+        let result =
+            ChatOpenAI::format_message_content(&content, "chat/completions", Some("human"));
+        let arr = result.as_array().expect("should be array");
+        assert_eq!(arr.len(), 3);
+        assert_eq!(arr[0]["type"], "text");
+        assert_eq!(arr[1]["type"], "input_audio");
+        assert_eq!(arr[1]["input_audio"]["data"], "audiodata");
+        assert_eq!(arr[2]["type"], "file");
+        assert_eq!(
+            arr[2]["file"]["file_data"],
+            "data:application/pdf;base64,pdfdata"
+        );
+    }
+
+    #[test]
+    fn test_format_message_content_filters_thinking() {
+        let content = serde_json::json!([
+            {"type": "text", "text": "hello"},
+            {"type": "thinking", "thinking": "internal thought"},
+            {"type": "tool_use", "id": "abc"}
+        ]);
+        let result =
+            ChatOpenAI::format_message_content(&content, "chat/completions", Some("human"));
+        let arr = result.as_array().expect("should be array");
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["type"], "text");
+    }
+
+    #[test]
+    fn test_format_message_content_passthrough_openai_format() {
+        let content = serde_json::json!([
+            {"type": "image_url", "image_url": {"url": "https://example.com/img.png"}},
+            {"type": "input_audio", "input_audio": {"data": "abc", "format": "wav"}}
+        ]);
+        let result =
+            ChatOpenAI::format_message_content(&content, "chat/completions", Some("human"));
+        let arr = result.as_array().expect("should be array");
+        assert_eq!(arr.len(), 2);
+        assert_eq!(arr[0]["type"], "image_url");
+        assert_eq!(arr[1]["type"], "input_audio");
     }
 }

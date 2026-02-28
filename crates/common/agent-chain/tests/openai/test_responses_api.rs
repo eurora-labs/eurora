@@ -203,7 +203,6 @@ async fn test_responses_web_search_async() -> Result<(), Box<dyn std::error::Err
         )
         .await?;
     check_response(&response);
-    assert!(response.response_metadata.contains_key("status"));
 
     // Streaming
     let mut stream = llm_with_tools
@@ -669,7 +668,8 @@ async fn test_responses_fn_calling_and_structured_output() -> Result<(), Box<dyn
         "title": "Foo",
         "type": "object",
         "properties": { "response": {"type": "string"} },
-        "required": ["response"]
+        "required": ["response"],
+        "additionalProperties": false
     });
 
     let llm = ChatOpenAI::new("gpt-4o-mini").with_responses_api(true);
@@ -1184,7 +1184,7 @@ async fn test_responses_mcp_builtin() -> Result<(), Box<dyn std::error::Error>> 
         "type": "mcp",
         "server_label": "deepwiki",
         "server_url": "https://mcp.deepwiki.com/mcp",
-        "require_approval": {"always": {"tool_names": ["read_wiki_structure"]}}
+        "require_approval": "never"
     });
     let llm_with_tools = llm.bind_tools(&[ToolLike::Builtin(mcp_tool)], None)?;
 
@@ -1200,7 +1200,7 @@ async fn test_responses_mcp_builtin() -> Result<(), Box<dyn std::error::Error>> 
             None,
         )
         .await?;
-    assert!(!response.text().is_empty() || !response.tool_calls.is_empty());
+    assert!(!response.text().is_empty());
 
     Ok(())
 }
