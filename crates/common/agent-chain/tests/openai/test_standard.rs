@@ -1,11 +1,3 @@
-//! Standard integration tests for chat models.
-//!
-//! Ported from `langchain_tests/integration_tests/chat_models.py`.
-//! These tests exercise the generic ChatModel interface and should work with
-//! any provider. Currently run against OpenAI (gpt-4o-mini).
-//!
-//! Run with: `cargo test --package agent-chain --test standard_integration_tests -- --ignored`
-
 use agent_chain::providers::openai::ChatOpenAI;
 use agent_chain_core::ToolChoice;
 use agent_chain_core::language_models::ToolLike;
@@ -29,7 +21,7 @@ fn make_model() -> ChatOpenAI {
 
 /// Ported from `test_invoke`.
 #[tokio::test]
-#[ignore]
+
 async fn test_invoke() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
@@ -45,7 +37,7 @@ async fn test_invoke() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Ported from `test_ainvoke`.
 #[tokio::test]
-#[ignore]
+
 async fn test_ainvoke() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
@@ -61,7 +53,7 @@ async fn test_ainvoke() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Ported from `test_stream`.
 #[tokio::test]
-#[ignore]
+
 async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
@@ -87,7 +79,7 @@ async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Ported from `test_astream`.
 #[tokio::test]
-#[ignore]
+
 async fn test_astream() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
@@ -113,7 +105,7 @@ async fn test_astream() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Ported from `test_conversation`.
 #[tokio::test]
-#[ignore]
+
 async fn test_conversation() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
@@ -134,7 +126,7 @@ async fn test_conversation() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `test_double_messages_conversation`.
 /// Tests consecutive messages from the same role.
 #[tokio::test]
-#[ignore]
+
 async fn test_double_messages_conversation() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
@@ -154,7 +146,7 @@ async fn test_double_messages_conversation() -> Result<(), Box<dyn std::error::E
 /// Ported from `test_message_with_name`.
 /// Tests HumanMessage with a name field.
 #[tokio::test]
-#[ignore]
+
 async fn test_message_with_name() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
@@ -175,7 +167,7 @@ async fn test_message_with_name() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `test_stop_sequence`.
 /// Tests that the model respects stop sequences passed at invoke time.
 #[tokio::test]
-#[ignore]
+
 async fn test_stop_sequence() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     // stop at invoke time
@@ -219,7 +211,7 @@ async fn test_stop_sequence() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Ported from `test_usage_metadata`.
 #[tokio::test]
-#[ignore]
+
 async fn test_usage_metadata() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
@@ -253,7 +245,7 @@ async fn test_usage_metadata() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Ported from `test_usage_metadata_streaming`.
 #[tokio::test]
-#[ignore]
+
 async fn test_usage_metadata_streaming() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
@@ -314,7 +306,7 @@ fn magic_function_no_args_schema() -> serde_json::Value {
 
 /// Ported from `test_tool_calling`.
 #[tokio::test]
-#[ignore]
+
 async fn test_tool_calling() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
@@ -359,7 +351,7 @@ async fn test_tool_calling() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Ported from `test_tool_calling_async`.
 #[tokio::test]
-#[ignore]
+
 async fn test_tool_calling_async() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
@@ -383,7 +375,7 @@ async fn test_tool_calling_async() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Ported from `test_tool_calling_with_no_arguments`.
 #[tokio::test]
-#[ignore]
+
 async fn test_tool_calling_with_no_arguments() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
@@ -415,7 +407,7 @@ async fn test_tool_calling_with_no_arguments() -> Result<(), Box<dyn std::error:
 /// Ported from `test_tool_message_histories_string_content`.
 /// Tests that models handle message histories with string tool content.
 #[tokio::test]
-#[ignore]
+
 async fn test_tool_message_histories_string_content() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let adder_schema = serde_json::json!({
@@ -463,7 +455,7 @@ async fn test_tool_message_histories_string_content() -> Result<(), Box<dyn std:
 /// Ported from `test_tool_message_histories_list_content`.
 /// Tests that models handle tool message content as list of dicts.
 #[tokio::test]
-#[ignore]
+
 async fn test_tool_message_histories_list_content() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let adder_schema = serde_json::json!({
@@ -511,7 +503,7 @@ async fn test_tool_message_histories_list_content() -> Result<(), Box<dyn std::e
 /// Ported from `test_tool_message_error_status`.
 /// Tests that the model handles ToolMessage with error status.
 #[tokio::test]
-#[ignore]
+
 async fn test_tool_message_error_status() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let adder_schema = serde_json::json!({
@@ -563,7 +555,7 @@ async fn test_tool_message_error_status() -> Result<(), Box<dyn std::error::Erro
 
 /// Ported from `test_structured_output` with json_schema schema type.
 #[tokio::test]
-#[ignore]
+
 async fn test_structured_output() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let joke_schema = serde_json::json!({
@@ -601,7 +593,7 @@ async fn test_structured_output() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Ported from `test_structured_output_async`.
 #[tokio::test]
-#[ignore]
+
 async fn test_structured_output_async() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let joke_schema = serde_json::json!({
@@ -640,7 +632,7 @@ async fn test_structured_output_async() -> Result<(), Box<dyn std::error::Error>
 /// Ported from `test_structured_output_optional_param`.
 /// Tests structured output with optional parameters in the schema.
 #[tokio::test]
-#[ignore]
+
 async fn test_structured_output_optional_param() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let schema = serde_json::json!({
@@ -679,7 +671,7 @@ async fn test_structured_output_optional_param() -> Result<(), Box<dyn std::erro
 /// Ported from `test_structured_few_shot_examples`.
 /// Tests structured output with few-shot examples in the prompt.
 #[tokio::test]
-#[ignore]
+
 async fn test_structured_few_shot_examples() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let joke_schema = serde_json::json!({
@@ -721,7 +713,7 @@ async fn test_structured_few_shot_examples() -> Result<(), Box<dyn std::error::E
 /// Ported from `test_json_mode`.
 /// Tests structured output via JSON mode.
 #[tokio::test]
-#[ignore]
+
 async fn test_json_mode() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
@@ -756,7 +748,7 @@ async fn test_json_mode() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `test_image_inputs`.
 /// Tests that the model can process image inputs in base64 format.
 #[tokio::test]
-#[ignore]
+
 async fn test_image_inputs() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     use agent_chain_core::messages::{ContentPart, MessageContent};
@@ -793,7 +785,7 @@ async fn test_image_inputs() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `test_agent_loop`.
 /// Tests a simple ReAct agent loop: tool call → execute → response.
 #[tokio::test]
-#[ignore]
+
 async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let weather_tool = serde_json::json!({
@@ -850,7 +842,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `test_unicode_tool_call_integration`.
 /// Tests that Unicode characters are preserved in tool call arguments.
 #[tokio::test]
-#[ignore]
+
 async fn test_unicode_tool_call() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let unicode_tool = serde_json::json!({
@@ -900,10 +892,9 @@ async fn test_unicode_tool_call() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `test_batch`.
 /// Tests batch processing of multiple messages.
 #[tokio::test]
-#[ignore]
+
 async fn test_batch() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    use agent_chain_core::language_models::chat_models::BaseChatModel;
     let model = make_model();
 
     let input1 = vec![HumanMessage::builder().content("Hello").build().into()];
@@ -921,7 +912,7 @@ async fn test_batch() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `test_abatch`.
 /// Tests async batch processing of multiple messages.
 #[tokio::test]
-#[ignore]
+
 async fn test_abatch() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
@@ -946,7 +937,7 @@ async fn test_abatch() -> Result<(), Box<dyn std::error::Error>> {
 /// Tests that a different model can be used by constructing a new instance.
 /// Python passes model= as a kwarg to invoke(); Rust requires a new instance.
 #[tokio::test]
-#[ignore]
+
 async fn test_invoke_with_model_override() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let override_model = "gpt-4o";
@@ -975,7 +966,7 @@ async fn test_invoke_with_model_override() -> Result<(), Box<dyn std::error::Err
 
 /// Ported from `test_ainvoke_with_model_override`.
 #[tokio::test]
-#[ignore]
+
 async fn test_ainvoke_with_model_override() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let override_model = "gpt-4o";
@@ -1001,7 +992,7 @@ async fn test_ainvoke_with_model_override() -> Result<(), Box<dyn std::error::Er
 
 /// Ported from `test_stream_with_model_override`.
 #[tokio::test]
-#[ignore]
+
 async fn test_stream_with_model_override() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let override_model = "gpt-4o";
@@ -1027,7 +1018,7 @@ async fn test_stream_with_model_override() -> Result<(), Box<dyn std::error::Err
 
 /// Ported from `test_astream_with_model_override`.
 #[tokio::test]
-#[ignore]
+
 async fn test_astream_with_model_override() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let override_model = "gpt-4o";
@@ -1058,7 +1049,7 @@ async fn test_astream_with_model_override() -> Result<(), Box<dyn std::error::Er
 /// Ported from `test_tool_choice`.
 /// Tests that tool_choice can force specific tool calls.
 #[tokio::test]
-#[ignore]
+
 async fn test_tool_choice() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
@@ -1119,7 +1110,7 @@ async fn test_tool_choice() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `test_pdf_inputs`.
 /// Tests that the model can process PDF file inputs.
 #[tokio::test]
-#[ignore]
+
 async fn test_pdf_inputs() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     use agent_chain_core::messages::{ContentPart, MessageContent};
@@ -1182,7 +1173,7 @@ async fn test_pdf_inputs() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `test_audio_inputs`.
 /// Tests that the model can process audio inputs.
 #[tokio::test]
-#[ignore]
+
 async fn test_audio_inputs() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     use agent_chain_core::messages::{ContentPart, MessageContent};
@@ -1244,7 +1235,7 @@ async fn test_audio_inputs() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `test_image_tool_message`.
 /// Tests ToolMessage with image content (base64).
 #[tokio::test]
-#[ignore]
+
 async fn test_image_tool_message() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     use agent_chain_core::messages::{ContentPart, MessageContent};
@@ -1302,7 +1293,7 @@ async fn test_image_tool_message() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `test_pdf_tool_message`.
 /// Tests ToolMessage with PDF content.
 #[tokio::test]
-#[ignore]
+
 async fn test_pdf_tool_message() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     use agent_chain_core::messages::{ContentPart, MessageContent};
@@ -1371,7 +1362,7 @@ async fn test_pdf_tool_message() -> Result<(), Box<dyn std::error::Error>> {
 /// Tests that the model handles Anthropic-style message histories
 /// (tool_use blocks in AIMessage, tool_result blocks in HumanMessage).
 #[tokio::test]
-#[ignore]
+
 async fn test_anthropic_inputs() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     use agent_chain_core::messages::{ContentPart, MessageContent, SystemMessage};
@@ -1466,7 +1457,7 @@ async fn test_anthropic_inputs() -> Result<(), Box<dyn std::error::Error>> {
 /// Python uses `chain.as_tool()` — Rust has no direct equivalent, so we
 /// bind a schema that mimics what `as_tool` would produce.
 #[tokio::test]
-#[ignore]
+
 async fn test_bind_runnables_as_tools() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();

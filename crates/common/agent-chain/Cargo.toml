@@ -30,3 +30,11 @@ openai = []
 
 [dev-dependencies]
 dotenv = { workspace = true }
+
+[[test]]
+name = "openai"
+path = "tests/openai/mod.rs"
+
+[[test]]
+name = "ollama"
+path = "tests/ollama/mod.rs"
