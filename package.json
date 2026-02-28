@@ -79,11 +79,11 @@
 		"svelte-eslint-parser": "^1.4.1",
 		"tailwindcss": "catalog:",
 		"ts-proto": "^2.11.2",
-		"turbo": "^2.8.11",
+		"turbo": "^2.8.12",
 		"typescript-eslint": "^8.56.0",
 		"web-ext": "^8.10.0"
 	},
-	"packageManager": "pnpm@10.30.2",
+	"packageManager": "pnpm@10.30.3",
 	"engines": {
 		"node": ">=20.11"
 	},
