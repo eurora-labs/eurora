@@ -1280,48 +1280,48 @@ struct OllamaStreamChunk {
 
 /// Ollama API response structure.
 #[derive(Debug, Deserialize)]
-struct OllamaResponse {
-    model: Option<String>,
-    message: Option<OllamaMessage>,
-    done: Option<bool>,
-    done_reason: Option<String>,
+pub struct OllamaResponse {
+    pub model: Option<String>,
+    pub message: Option<OllamaMessage>,
+    pub done: Option<bool>,
+    pub done_reason: Option<String>,
     #[serde(default)]
-    prompt_eval_count: Option<u32>,
+    pub prompt_eval_count: Option<u32>,
     #[serde(default)]
-    eval_count: Option<u32>,
+    pub eval_count: Option<u32>,
     #[serde(default)]
-    total_duration: Option<u64>,
+    pub total_duration: Option<u64>,
     #[serde(default)]
-    load_duration: Option<u64>,
+    pub load_duration: Option<u64>,
     #[serde(default)]
-    prompt_eval_duration: Option<u64>,
+    pub prompt_eval_duration: Option<u64>,
     #[serde(default)]
-    eval_duration: Option<u64>,
+    pub eval_duration: Option<u64>,
     #[serde(default)]
-    created_at: Option<String>,
+    pub created_at: Option<String>,
 }
 
 /// Ollama message in response.
 #[derive(Debug, Deserialize)]
-struct OllamaMessage {
+pub struct OllamaMessage {
     #[allow(dead_code)]
-    role: Option<String>,
-    content: Option<String>,
-    tool_calls: Option<Vec<OllamaToolCall>>,
-    thinking: Option<String>,
+    pub role: Option<String>,
+    pub content: Option<String>,
+    pub tool_calls: Option<Vec<OllamaToolCall>>,
+    pub thinking: Option<String>,
 }
 
 /// Ollama tool call in response.
 #[derive(Debug, Deserialize)]
-struct OllamaToolCall {
-    function: Option<OllamaFunction>,
+pub struct OllamaToolCall {
+    pub function: Option<OllamaFunction>,
 }
 
 /// Ollama function in tool call.
 #[derive(Debug, Deserialize)]
-struct OllamaFunction {
-    name: String,
-    arguments: Option<serde_json::Value>,
+pub struct OllamaFunction {
+    pub name: String,
+    pub arguments: Option<serde_json::Value>,
 }
 
 /// Convert a LangChain ToolCall to OpenAI tool call format.

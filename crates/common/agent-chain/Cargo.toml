@@ -5,6 +5,14 @@ edition.workspace = true
 description = "Agent chain library"
 license = "MIT"
 
+[[test]]
+name = "openai"
+path = "tests/openai/mod.rs"
+
+[[test]]
+name = "ollama"
+path = "tests/ollama/mod.rs"
+
 [dependencies]
 agent-chain-core = { workspace = true }
 agent-chain-macros = { workspace = true }
@@ -22,19 +30,12 @@ tokio-util = { version = "0.7", features = ["io"] }
 tracing = { workspace = true }
 url = { workspace = true }
 
+[dev-dependencies]
+dotenv = { workspace = true }
+
 [features]
 default = ["anthropic", "ollama", "openai"]
 anthropic = []
 ollama = []
+integration-tests = []
 openai = []
-
-[dev-dependencies]
-dotenv = { workspace = true }
-
-[[test]]
-name = "openai"
-path = "tests/openai/mod.rs"
-
-[[test]]
-name = "ollama"
-path = "tests/ollama/mod.rs"
