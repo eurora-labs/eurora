@@ -862,3 +862,66 @@ jobs:
               env:
                   SENTRY_CRONS_URL: ${{ secrets.SENTRY_CRONS }}
               run: curl "${SENTRY_CRONS_URL}?status=ok"
+
+    create-github-release:
+        needs: [build-sveltekit, publish-tauri, create-git-tag]
+        if: needs.build-sveltekit.outputs.channel == 'release'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - name: Download assembled macOS ARM64 artifacts
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: 'assembled-macos-arm64-${{ github.run_number }}'
+                  path: release-artifacts/macos-arm64
+
+            - name: Download assembled macOS x86_64 artifacts
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: 'assembled-macos-x86_64-${{ github.run_number }}'
+                  path: release-artifacts/macos-x86_64
+
+            - name: Download Linux x64 artifacts
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: 'release-ubuntu-22.04-${{ github.run_number }}'
+                  path: release-artifacts/linux-x64
+
+            - name: Download Linux ARM64 artifacts
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: 'release-ubuntu-22.04-arm-${{ github.run_number }}'
+                  path: release-artifacts/linux-arm64
+
+            - name: Download Windows artifacts
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: 'release-windows-latest-${{ github.run_number }}'
+                  path: release-artifacts/windows
+
+            - name: Collect release files
+              shell: bash
+              run: |
+                  mkdir -p gh-release
+                  find release-artifacts -type f \( \
+                    -name "*.dmg" -o \
+                    -name "*.AppImage" -o \
+                    -name "*.msi" -o \
+                    -name "*.exe" -o \
+                    -name "*.deb" -o \
+                    -name "*.rpm" \
+                  \) -exec cp {} gh-release/ \;
+                  echo "Release files:"
+                  ls -lh gh-release/
+
+            - name: Create GitHub Release
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  VERSION="${{ needs.publish-tauri.outputs.version }}"
+                  TAG="release/${VERSION}"
+                  gh release create "$TAG" \
+                    --title "v${VERSION}" \
+                    --generate-notes \
+                    gh-release/*
