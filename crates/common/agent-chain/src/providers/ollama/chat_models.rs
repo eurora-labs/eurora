@@ -403,7 +403,7 @@ impl ChatOllama {
     /// Get the resolved base URL. Checks env var `OLLAMA_HOST` if `base_url` is `None`.
     ///
     /// Uses `parse_url_with_auth` to strip userinfo credentials from the URL.
-    fn get_base_url(&self) -> String {
+    pub fn get_base_url(&self) -> String {
         let raw_url = match &self.base_url {
             Some(url) => url.clone(),
             None => env::var("OLLAMA_HOST").unwrap_or_else(|_| DEFAULT_API_BASE.to_string()),
@@ -486,7 +486,7 @@ impl ChatOllama {
     /// Matches Python's `_convert_messages_to_ollama_messages`.
     /// Pre-processes v1-format AIMessages by converting their content blocks
     /// via `convert_from_v1_to_ollama`.
-    fn format_messages(&self, messages: &[BaseMessage]) -> Result<Vec<serde_json::Value>> {
+    pub fn format_messages(&self, messages: &[BaseMessage]) -> Result<Vec<serde_json::Value>> {
         let messages: Vec<std::borrow::Cow<'_, BaseMessage>> = messages
             .iter()
             .map(|msg| {
@@ -571,7 +571,7 @@ impl ChatOllama {
     }
 
     /// Build the options object for the request.
-    fn build_options(&self, stop: Option<Vec<String>>) -> Result<serde_json::Value> {
+    pub fn build_options(&self, stop: Option<Vec<String>>) -> Result<serde_json::Value> {
         if self.stop.is_some() && stop.is_some() {
             return Err(Error::Other(
                 "`stop` found in both the input and default params.".into(),
@@ -634,7 +634,7 @@ impl ChatOllama {
     /// Build the request payload.
     ///
     /// Matches Python's `_chat_params`.
-    fn build_request_payload(
+    pub fn build_request_payload(
         &self,
         messages: &[BaseMessage],
         stop: Option<Vec<String>>,
@@ -1149,7 +1149,26 @@ impl ChatOllama {
         self.ensure_model_validated().await?;
 
         let client = self.build_client();
-        let payload = self.build_request_payload(&messages, stop, None, true)?;
+        let tools = if !self.bound_tools.is_empty() {
+            let ollama_tools: Vec<serde_json::Value> = self
+                .bound_tools
+                .iter()
+                .map(|t| {
+                    serde_json::json!({
+                        "type": "function",
+                        "function": {
+                            "name": t.name,
+                            "description": t.description,
+                            "parameters": t.parameters
+                        }
+                    })
+                })
+                .collect();
+            Some(ollama_tools)
+        } else {
+            None
+        };
+        let payload = self.build_request_payload(&messages, stop, tools.as_deref(), true)?;
         let base_url = self.get_base_url();
 
         let response = client
@@ -1340,7 +1359,7 @@ fn get_tool_calls_from_response(response: &OllamaResponse) -> Vec<ToolCall> {
 ///
 /// Handles: dict arguments (with nested string-encoded JSON), string arguments
 /// (tries JSON parse), and filters out `functionName` metadata.
-fn parse_tool_call_arguments(
+pub fn parse_tool_call_arguments(
     raw_args: Option<&serde_json::Value>,
     function_name: &str,
 ) -> Result<serde_json::Value> {

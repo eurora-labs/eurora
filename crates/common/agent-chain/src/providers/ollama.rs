@@ -4,7 +4,11 @@
 
 mod chat_models;
 mod compat;
+mod embeddings;
+mod llms;
 mod utils;
 
 pub use chat_models::*;
+pub use embeddings::*;
+pub use llms::*;
 pub use utils::{merge_auth_headers, parse_url_with_auth, validate_model};
