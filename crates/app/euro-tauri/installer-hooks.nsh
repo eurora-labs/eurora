@@ -1,29 +1,31 @@
 ; Native messaging host installation hooks for NSIS installer.
 ; Installs browser-specific JSON manifests and the native messaging binary,
 ; then registers them via HKCU registry entries so no admin is required.
+;
+; The euro-native-messaging binary is already extracted to $INSTDIR by
+; Tauri's externalBin mechanism.  The JSON host manifests are packaged
+; from the hosts/ directory via TAURI_HOSTS_DIR (set by scripts/release.sh).
 
-; Resolve build-time environment variables (set by scripts/release.sh)
 !define TAURI_HOSTS_DIR "$%TAURI_HOSTS_DIR%"
-!define TAURI_NATIVE_MESSAGING_BIN "$%TAURI_NATIVE_MESSAGING_BIN%"
 
 !macro NSIS_HOOK_POSTINSTALL
   ; --- Chrome ---
   CreateDirectory "$INSTDIR\native-messaging\chrome"
   SetOutPath "$INSTDIR\native-messaging\chrome"
   File /oname=com.eurora.app.json "${TAURI_HOSTS_DIR}\windows.chromium.native-messaging.json"
-  File /oname=euro-native-messaging.exe "${TAURI_NATIVE_MESSAGING_BIN}"
+  CopyFiles /SILENT "$INSTDIR\euro-native-messaging.exe" "$INSTDIR\native-messaging\chrome"
 
   ; --- Edge ---
   CreateDirectory "$INSTDIR\native-messaging\edge"
   SetOutPath "$INSTDIR\native-messaging\edge"
   File /oname=com.eurora.app.json "${TAURI_HOSTS_DIR}\windows.edge.native-messaging.json"
-  File /oname=euro-native-messaging.exe "${TAURI_NATIVE_MESSAGING_BIN}"
+  CopyFiles /SILENT "$INSTDIR\euro-native-messaging.exe" "$INSTDIR\native-messaging\edge"
 
   ; --- Firefox ---
   CreateDirectory "$INSTDIR\native-messaging\firefox"
   SetOutPath "$INSTDIR\native-messaging\firefox"
   File /oname=com.eurora.app.json "${TAURI_HOSTS_DIR}\windows.firefox.native-messaging.json"
-  File /oname=euro-native-messaging.exe "${TAURI_NATIVE_MESSAGING_BIN}"
+  CopyFiles /SILENT "$INSTDIR\euro-native-messaging.exe" "$INSTDIR\native-messaging\firefox"
 
   ; Reset output path
   SetOutPath "$INSTDIR"
