@@ -238,6 +238,7 @@ dependencies = [
  "async-trait",
  "backon",
  "base64 0.22.1",
+ "dotenv",
  "futures",
  "percent-encoding",
  "reqwest 0.12.28",

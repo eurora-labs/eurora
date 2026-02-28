@@ -187,7 +187,7 @@ fn payload_requires_responses_api(payload: &serde_json::Value) -> bool {
 ///
 /// Implements the `BaseChatModel` trait for OpenAI's GPT models.
 /// Supports both the Chat Completions API and the Responses API.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ChatOpenAI {
     model: String,
     temperature: Option<f64>,
@@ -228,6 +228,34 @@ pub struct ChatOpenAI {
     bound_tools: Vec<ToolDefinition>,
     /// Tool choice for bound tools.
     bound_tool_choice: Option<ToolChoice>,
+    /// Whether bound tools should be called with strict schema validation.
+    bound_strict: Option<bool>,
+    /// Whether to allow parallel tool calls.
+    bound_parallel_tool_calls: Option<bool>,
+    /// Response format for structured output (e.g., JSON schema).
+    response_format: Option<serde_json::Value>,
+    /// Whether to include response headers in response_metadata.
+    include_response_headers: bool,
+    /// Proxy URL for HTTP requests.
+    proxy: Option<String>,
+    /// Prediction content for predicted output tokens.
+    prediction: Option<serde_json::Value>,
+    /// Callable API key getter function.
+    api_key_fn: Option<std::sync::Arc<dyn Fn() -> String + Send + Sync>>,
+}
+
+impl std::fmt::Debug for ChatOpenAI {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ChatOpenAI")
+            .field("model", &self.model)
+            .field("temperature", &self.temperature)
+            .field("max_tokens", &self.max_tokens)
+            .field("api_base", &self.api_base)
+            .field("streaming", &self.streaming)
+            .field("n", &self.n)
+            .field("api_key_fn", &self.api_key_fn.as_ref().map(|_| "<fn>"))
+            .finish_non_exhaustive()
+    }
 }
 
 impl ChatOpenAI {
@@ -295,6 +323,13 @@ impl ChatOpenAI {
             language_model_config: LanguageModelConfig::new(),
             bound_tools: Vec::new(),
             bound_tool_choice: None,
+            bound_strict: None,
+            bound_parallel_tool_calls: None,
+            response_format: None,
+            include_response_headers: false,
+            proxy: None,
+            prediction: None,
+            api_key_fn: None,
         }
     }
 
@@ -456,6 +491,36 @@ impl ChatOpenAI {
         self
     }
 
+    pub fn model_kwargs(mut self, kwargs: HashMap<String, serde_json::Value>) -> Self {
+        self.model_kwargs = kwargs;
+        self
+    }
+
+    pub fn response_format(mut self, format: serde_json::Value) -> Self {
+        self.response_format = Some(format);
+        self
+    }
+
+    pub fn include_response_headers(mut self, enabled: bool) -> Self {
+        self.include_response_headers = enabled;
+        self
+    }
+
+    pub fn openai_proxy(mut self, proxy_url: impl Into<String>) -> Self {
+        self.proxy = Some(proxy_url.into());
+        self
+    }
+
+    pub fn prediction(mut self, prediction: serde_json::Value) -> Self {
+        self.prediction = Some(prediction);
+        self
+    }
+
+    pub fn api_key_fn(mut self, f: impl Fn() -> String + Send + Sync + 'static) -> Self {
+        self.api_key_fn = Some(std::sync::Arc::new(f));
+        self
+    }
+
     /// Filter out disabled parameters from a payload.
     /// Matches Python `_filter_disabled_params`: supports both `None` (remove entirely)
     /// and a list of disabled values.
@@ -517,19 +582,27 @@ impl ChatOpenAI {
         false
     }
 
-    /// Get the API key, checking environment variable if not set directly.
+    /// Get the API key, checking callable, direct value, or environment variable.
     fn get_api_key(&self) -> Result<String> {
+        if let Some(ref f) = self.api_key_fn {
+            return Ok(f());
+        }
         self.api_key
             .clone()
             .or_else(|| env::var("OPENAI_API_KEY").ok())
             .ok_or_else(|| Error::missing_config("OPENAI_API_KEY"))
     }
 
-    /// Build the HTTP client with configured timeout.
+    /// Build the HTTP client with configured timeout and proxy.
     fn build_client(&self) -> Result<reqwest::Client> {
         let mut builder = reqwest::Client::builder();
         if let Some(timeout) = self.timeout {
             builder = builder.timeout(std::time::Duration::from_secs(timeout));
+        }
+        if let Some(ref proxy_url) = self.proxy {
+            let proxy = reqwest::Proxy::all(proxy_url)
+                .map_err(|e| Error::other(format!("Invalid proxy URL: {e}")))?;
+            builder = builder.proxy(proxy);
         }
         builder
             .build()
@@ -929,6 +1002,18 @@ impl ChatOpenAI {
             payload["store"] = serde_json::json!(store);
         }
 
+        if let Some(ref response_format) = self.response_format {
+            payload["response_format"] = response_format.clone();
+        }
+
+        if let Some(ref prediction) = self.prediction {
+            payload["prediction"] = prediction.clone();
+        }
+
+        if let Some(parallel) = self.bound_parallel_tool_calls {
+            payload["parallel_tool_calls"] = serde_json::json!(parallel);
+        }
+
         if let Some(obj) = payload.as_object_mut() {
             for (k, v) in &self.model_kwargs {
                 obj.insert(k.clone(), v.clone());
@@ -1045,6 +1130,14 @@ impl ChatOpenAI {
 
         if let Some(store) = self.store {
             payload["store"] = serde_json::json!(store);
+        }
+
+        if let Some(ref response_format) = self.response_format {
+            payload["text"] = serde_json::json!({"format": response_format});
+        }
+
+        if let Some(ref prediction) = self.prediction {
+            payload["prediction"] = prediction.clone();
         }
 
         if let Some(obj) = payload.as_object_mut() {
@@ -1432,6 +1525,46 @@ impl ChatOpenAI {
         }
     }
 
+    /// Send an HTTP request and return the response with headers.
+    async fn send_json_request_with_headers<T: serde::de::DeserializeOwned>(
+        &self,
+        url: &str,
+        payload: &serde_json::Value,
+    ) -> Result<(T, HashMap<String, String>)> {
+        let api_key = self.get_api_key()?;
+        let client = self.build_client()?;
+
+        let mut request = client
+            .post(url)
+            .header("Authorization", format!("Bearer {api_key}"))
+            .header("Content-Type", "application/json");
+
+        if let Some(ref org) = self.organization {
+            request = request.header("OpenAI-Organization", org);
+        }
+
+        let resp = request.json(payload).send().await.map_err(Error::Http)?;
+
+        if resp.status().is_success() {
+            let headers: HashMap<String, String> = resp
+                .headers()
+                .iter()
+                .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap_or("").to_string()))
+                .collect();
+            let body = resp.json::<T>().await.map_err(|e| {
+                Error::Json(serde_json::Error::io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    e.to_string(),
+                )))
+            })?;
+            Ok((body, headers))
+        } else {
+            let status = resp.status().as_u16();
+            let error_text = resp.text().await.unwrap_or_default();
+            Err(Error::api(status, error_text))
+        }
+    }
+
     /// Build a retry strategy from `self.max_retries`.
     fn retry_strategy(&self) -> ConstantBuilder {
         ConstantBuilder::default()
@@ -1448,12 +1581,37 @@ impl ChatOpenAI {
         let url = format!("{}/responses", self.api_base);
         let payload = self.build_responses_api_payload(&messages, stop, None, false);
 
-        let resp: ResponsesApiResponse = (|| self.send_json_request(&url, &payload))
-            .retry(self.retry_strategy())
-            .when(|e| e.is_retryable())
-            .await?;
+        if self.include_response_headers {
+            let (resp, headers): (ResponsesApiResponse, HashMap<String, String>) =
+                (|| self.send_json_request_with_headers(&url, &payload))
+                    .retry(self.retry_strategy())
+                    .when(|e| e.is_retryable())
+                    .await?;
+            let mut result = self.parse_responses_api_response(resp)?;
+            self.inject_headers_into_result(&mut result, &headers);
+            Ok(result)
+        } else {
+            let resp: ResponsesApiResponse = (|| self.send_json_request(&url, &payload))
+                .retry(self.retry_strategy())
+                .when(|e| e.is_retryable())
+                .await?;
+            self.parse_responses_api_response(resp)
+        }
+    }
 
-        self.parse_responses_api_response(resp)
+    /// Inject captured HTTP headers into all generations' response_metadata.
+    fn inject_headers_into_result(
+        &self,
+        result: &mut ChatResult,
+        headers: &HashMap<String, String>,
+    ) {
+        let headers_value = serde_json::to_value(headers).unwrap_or_default();
+        for generation in &mut result.generations {
+            if let BaseMessage::AI(ref mut ai) = generation.message {
+                ai.response_metadata
+                    .insert("headers".to_string(), headers_value.clone());
+            }
+        }
     }
 
     /// Create usage metadata from OpenAI token usage.
@@ -1965,6 +2123,8 @@ impl BaseChatModel for ChatOpenAI {
         Ok(Box::new(bound))
     }
 
+
+
     fn with_structured_output(
         &self,
         schema: serde_json::Value,
@@ -1994,6 +2154,144 @@ impl BaseChatModel for ChatOpenAI {
 }
 
 impl ChatOpenAI {
+    /// Bind tools with additional options (strict, parallel_tool_calls, response_format).
+    pub fn bind_tools_with_options(
+        &self,
+        tools: &[ToolLike],
+        tool_choice: Option<ToolChoice>,
+        strict: Option<bool>,
+        parallel_tool_calls: Option<bool>,
+        response_format: Option<serde_json::Value>,
+    ) -> Result<Box<dyn BaseChatModel>> {
+        let mut bound = self.clone();
+        bound.bound_tools = tools.iter().map(|t| t.to_definition()).collect();
+        bound.bound_tool_choice = tool_choice;
+        bound.bound_strict = strict;
+        bound.bound_parallel_tool_calls = parallel_tool_calls;
+        if let Some(fmt) = response_format {
+            bound.response_format = Some(fmt);
+        }
+        Ok(Box::new(bound))
+    }
+
+    /// Enhanced structured output with method, strict, and tools parameters.
+    /// 
+    /// `method`: "function_calling" (default) or "json_schema"
+    /// `strict`: Whether to enforce strict schema validation
+    /// `tools`: Additional tools to combine with structured output
+    pub fn with_structured_output_options(
+        &self,
+        schema: serde_json::Value,
+        include_raw: bool,
+        method: Option<&str>,
+        strict: Option<bool>,
+        tools: Option<&[ToolLike]>,
+    ) -> Result<
+        Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
+    > {
+        let method = method.unwrap_or("function_calling");
+        
+        match method {
+            "json_schema" => {
+                let mut model = self.clone();
+                let schema_name = schema
+                    .get("title")
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("response_format");
+                let mut json_schema = serde_json::json!({
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": schema_name,
+                        "schema": schema
+                    }
+                });
+                if strict == Some(true) {
+                    json_schema["json_schema"]["strict"] = serde_json::json!(true);
+                    if let Some(schema_obj) = json_schema
+                        .get_mut("json_schema")
+                        .and_then(|js| js.get_mut("schema"))
+                        .and_then(|s| s.as_object_mut())
+                    {
+                        schema_obj.insert(
+                            "additionalProperties".to_string(),
+                            serde_json::json!(false),
+                        );
+                        if let Some(props) = schema_obj.get("properties")
+                            && let Some(props_obj) = props.as_object()
+                        {
+                            let all_keys: Vec<String> = props_obj.keys().cloned().collect();
+                            schema_obj.insert("required".to_string(), serde_json::json!(all_keys));
+                        }
+                    }
+                }
+                model.response_format = Some(json_schema);
+                
+                if let Some(extra_tools) = tools {
+                    model.bound_tools = extra_tools.iter().map(|t| t.to_definition()).collect();
+                    model.bound_strict = strict;
+                }
+                
+                let parse_json_content = crate::runnables::base::RunnableLambda::new(
+                    |ai_msg: AIMessage| -> crate::error::Result<serde_json::Value> {
+                        let content = ai_msg.text();
+                        serde_json::from_str(&content)
+                            .map_err(|e| crate::error::Error::other(format!("JSON parse error: {e}")))
+                    },
+                );
+
+                let model_runnable =
+                    ChatModelRunnable::new(std::sync::Arc::from(
+                        Box::new(model) as Box<dyn BaseChatModel>
+                    ));
+                let chain = crate::runnables::base::pipe(model_runnable, parse_json_content);
+                Ok(Box::new(chain))
+            }
+            _ => {
+                // function_calling method
+                let tool_name = extract_tool_name_from_schema(&schema);
+                let tool_like = ToolLike::Schema(schema);
+                let mut all_tools = vec![tool_like];
+                if let Some(extra_tools) = tools {
+                    all_tools.extend(extra_tools.iter().cloned());
+                }
+                let bound_model = if tools.is_some() {
+                    self.bind_tools_with_options(
+                        &all_tools,
+                        Some(ToolChoice::any()),
+                        strict,
+                        None,
+                        None,
+                    )?
+                } else {
+                    self.bind_tools_with_options(
+                        &all_tools,
+                        Some(ToolChoice::any()),
+                        strict,
+                        None,
+                        None,
+                    )?
+                };
+
+                let output_parser =
+                    crate::output_parsers::openai_tools::JsonOutputKeyToolsParser::new(&tool_name)
+                        .with_first_tool_only(true);
+                let model_runnable =
+                    ChatModelRunnable::new(std::sync::Arc::from(bound_model));
+                if include_raw {
+                    Ok(Box::new(
+                        crate::language_models::StructuredOutputWithRaw::new(
+                            model_runnable,
+                            output_parser,
+                        ),
+                    ))
+                } else {
+                    let chain = crate::runnables::base::pipe(model_runnable, output_parser);
+                    Ok(Box::new(chain))
+                }
+            }
+        }
+    }
+
     /// Invoke the model with input and optional stop sequences.
     pub async fn invoke_with_stop(
         &self,
@@ -2019,12 +2317,22 @@ impl ChatOpenAI {
         let url = format!("{}/chat/completions", self.api_base);
         let payload = self.build_request_payload(&messages, stop, None, false);
 
-        let resp: OpenAIResponse = (|| self.send_json_request(&url, &payload))
-            .retry(self.retry_strategy())
-            .when(|e| e.is_retryable())
-            .await?;
-
-        self.parse_response(resp)
+        if self.include_response_headers {
+            let (resp, headers): (OpenAIResponse, HashMap<String, String>) =
+                (|| self.send_json_request_with_headers(&url, &payload))
+                    .retry(self.retry_strategy())
+                    .when(|e| e.is_retryable())
+                    .await?;
+            let mut result = self.parse_response(resp)?;
+            self.inject_headers_into_result(&mut result, &headers);
+            Ok(result)
+        } else {
+            let resp: OpenAIResponse = (|| self.send_json_request(&url, &payload))
+                .retry(self.retry_strategy())
+                .when(|e| e.is_retryable())
+                .await?;
+            self.parse_response(resp)
+        }
     }
 
     /// Internal generate with tools implementation.
@@ -2038,13 +2346,28 @@ impl ChatOpenAI {
         let openai_tools: Vec<serde_json::Value> = tools
             .iter()
             .map(|t| {
+                let mut func = serde_json::json!({
+                    "name": t.name,
+                    "description": t.description,
+                    "parameters": t.parameters
+                });
+                if self.bound_strict == Some(true) {
+                    func["strict"] = serde_json::json!(true);
+                    if let Some(params) = func.get_mut("parameters")
+                        && let Some(obj) = params.as_object_mut()
+                    {
+                        obj.insert("additionalProperties".to_string(), serde_json::json!(false));
+                        if let Some(props) = obj.get("properties")
+                            && let Some(props_obj) = props.as_object()
+                        {
+                            let all_keys: Vec<String> = props_obj.keys().cloned().collect();
+                            obj.insert("required".to_string(), serde_json::json!(all_keys));
+                        }
+                    }
+                }
                 serde_json::json!({
                     "type": "function",
-                    "function": {
-                        "name": t.name,
-                        "description": t.description,
-                        "parameters": t.parameters
-                    }
+                    "function": func
                 })
             })
             .collect();
