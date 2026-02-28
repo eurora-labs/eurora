@@ -41,7 +41,6 @@ class NativeMessagingBridge {
             if !self.isConnected {
                 self.connectIfNeeded()
 
-                // Wait briefly for connection to establish, then retry once
                 self.queue.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                     guard let self else {
                         completion(.failure(BridgeError.bridgeDeallocated))

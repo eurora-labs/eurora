@@ -2,6 +2,7 @@ pub mod proto {
     tonic::include_proto!("browser_bridge");
 }
 
+mod process_name;
 pub mod server;
 
 pub use proto::{
