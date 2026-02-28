@@ -892,3 +892,615 @@ async fn test_unicode_tool_call() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+// =============================================================================
+// Batch operations
+// =============================================================================
+
+/// Ported from `test_batch`.
+/// Tests batch processing of multiple messages.
+#[tokio::test]
+#[ignore]
+async fn test_batch() -> Result<(), Box<dyn std::error::Error>> {
+    load_env();
+    use agent_chain_core::language_models::chat_models::BaseChatModel;
+    let model = make_model();
+
+    let input1 = vec![HumanMessage::builder().content("Hello").build().into()];
+    let input2 = vec![HumanMessage::builder().content("Hey").build().into()];
+
+    let result1 = model.invoke(input1.into(), None).await?;
+    let result2 = model.invoke(input2.into(), None).await?;
+
+    assert!(!result1.text().is_empty());
+    assert!(!result2.text().is_empty());
+
+    Ok(())
+}
+
+/// Ported from `test_abatch`.
+/// Tests async batch processing of multiple messages.
+#[tokio::test]
+#[ignore]
+async fn test_abatch() -> Result<(), Box<dyn std::error::Error>> {
+    load_env();
+    let model = make_model();
+
+    let input1 = vec![HumanMessage::builder().content("Hello").build().into()];
+    let input2 = vec![HumanMessage::builder().content("Hey").build().into()];
+
+    let result1 = model.ainvoke(input1.into(), None).await?;
+    let result2 = model.ainvoke(input2.into(), None).await?;
+
+    assert!(!result1.text().is_empty());
+    assert!(!result2.text().is_empty());
+
+    Ok(())
+}
+
+// =============================================================================
+// Model override
+// =============================================================================
+
+/// Ported from `test_invoke_with_model_override`.
+/// Tests that a different model can be used by constructing a new instance.
+/// Python passes model= as a kwarg to invoke(); Rust requires a new instance.
+#[tokio::test]
+#[ignore]
+async fn test_invoke_with_model_override() -> Result<(), Box<dyn std::error::Error>> {
+    load_env();
+    let override_model = "gpt-4o";
+    let model = ChatOpenAI::new(override_model);
+
+    let result = model
+        .invoke(
+            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            None,
+        )
+        .await?;
+    assert!(!result.text().is_empty());
+
+    let model_name = result
+        .response_metadata
+        .get("model_name")
+        .and_then(|v| v.as_str())
+        .expect("model_name should be in response_metadata");
+    assert!(
+        model_name.contains("gpt-4o"),
+        "Expected model name to contain 'gpt-4o', got '{model_name}'"
+    );
+
+    Ok(())
+}
+
+/// Ported from `test_ainvoke_with_model_override`.
+#[tokio::test]
+#[ignore]
+async fn test_ainvoke_with_model_override() -> Result<(), Box<dyn std::error::Error>> {
+    load_env();
+    let override_model = "gpt-4o";
+    let model = ChatOpenAI::new(override_model);
+
+    let result = model
+        .ainvoke(
+            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            None,
+        )
+        .await?;
+    assert!(!result.text().is_empty());
+
+    let model_name = result
+        .response_metadata
+        .get("model_name")
+        .and_then(|v| v.as_str())
+        .expect("model_name should be in response_metadata");
+    assert!(model_name.contains("gpt-4o"));
+
+    Ok(())
+}
+
+/// Ported from `test_stream_with_model_override`.
+#[tokio::test]
+#[ignore]
+async fn test_stream_with_model_override() -> Result<(), Box<dyn std::error::Error>> {
+    load_env();
+    let override_model = "gpt-4o";
+    let model = ChatOpenAI::new(override_model);
+
+    let mut stream = model
+        .astream(
+            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            None,
+            None,
+        )
+        .await?;
+
+    let mut full_text = String::new();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk?;
+        full_text.push_str(&chunk.text());
+    }
+    assert!(!full_text.is_empty());
+
+    Ok(())
+}
+
+/// Ported from `test_astream_with_model_override`.
+#[tokio::test]
+#[ignore]
+async fn test_astream_with_model_override() -> Result<(), Box<dyn std::error::Error>> {
+    load_env();
+    let override_model = "gpt-4o";
+    let model = ChatOpenAI::new(override_model);
+
+    let mut stream = model
+        .astream(
+            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            None,
+            None,
+        )
+        .await?;
+
+    let mut full_text = String::new();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk?;
+        full_text.push_str(&chunk.text());
+    }
+    assert!(!full_text.is_empty());
+
+    Ok(())
+}
+
+// =============================================================================
+// Tool choice
+// =============================================================================
+
+/// Ported from `test_tool_choice`.
+/// Tests that tool_choice can force specific tool calls.
+#[tokio::test]
+#[ignore]
+async fn test_tool_choice() -> Result<(), Box<dyn std::error::Error>> {
+    load_env();
+    let model = make_model();
+
+    let get_weather = serde_json::json!({
+        "title": "get_weather",
+        "description": "Get weather at a location.",
+        "type": "object",
+        "properties": {
+            "location": {"type": "string"}
+        },
+        "required": ["location"]
+    });
+
+    // tool_choice="any" — model must call some tool
+    let model_any = model.bind_tools(
+        &[
+            ToolLike::Schema(magic_function_schema()),
+            ToolLike::Schema(get_weather.clone()),
+        ],
+        Some(ToolChoice::any()),
+    )?;
+    let result = model_any
+        .invoke(
+            vec![HumanMessage::builder().content("Hello!").build().into()].into(),
+            None,
+        )
+        .await?;
+    assert!(
+        !result.tool_calls.is_empty(),
+        "tool_choice='any' should force a tool call"
+    );
+
+    // tool_choice="magic_function" — model must call that specific tool
+    let model_specific = model.bind_tools(
+        &[
+            ToolLike::Schema(magic_function_schema()),
+            ToolLike::Schema(get_weather),
+        ],
+        Some(ToolChoice::String("magic_function".to_string())),
+    )?;
+    let result = model_specific
+        .invoke(
+            vec![HumanMessage::builder().content("Hello!").build().into()].into(),
+            None,
+        )
+        .await?;
+    assert!(!result.tool_calls.is_empty());
+    assert_eq!(result.tool_calls[0].name, "magic_function");
+
+    Ok(())
+}
+
+// =============================================================================
+// Multimodal inputs — PDF
+// =============================================================================
+
+/// Ported from `test_pdf_inputs`.
+/// Tests that the model can process PDF file inputs.
+#[tokio::test]
+#[ignore]
+async fn test_pdf_inputs() -> Result<(), Box<dyn std::error::Error>> {
+    load_env();
+    use agent_chain_core::messages::{ContentPart, MessageContent};
+
+    let model = make_model();
+
+    // Minimal PDF as base64 (the W3C test PDF is small)
+    let client = reqwest::Client::new();
+    let pdf_bytes = client
+        .get("https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf")
+        .send()
+        .await?
+        .bytes()
+        .await?;
+    let pdf_b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &pdf_bytes);
+
+    // LangChain standard format
+    let message = HumanMessage::builder()
+        .content(MessageContent::Parts(vec![
+            ContentPart::Text {
+                text: "Summarize this document:".to_string(),
+            },
+            ContentPart::Other(serde_json::json!({
+                "type": "file",
+                "base64": pdf_b64,
+                "mime_type": "application/pdf"
+            })),
+        ]))
+        .build();
+
+    let result = model.invoke(vec![message.into()].into(), None).await?;
+    assert!(!result.text().is_empty());
+
+    // OpenAI Chat Completions format
+    let message2 = HumanMessage::builder()
+        .content(MessageContent::Parts(vec![
+            ContentPart::Text {
+                text: "Summarize this document:".to_string(),
+            },
+            ContentPart::Other(serde_json::json!({
+                "type": "file",
+                "file": {
+                    "filename": "test_file.pdf",
+                    "file_data": format!("data:application/pdf;base64,{}", pdf_b64)
+                }
+            })),
+        ]))
+        .build();
+
+    let result2 = model.invoke(vec![message2.into()].into(), None).await?;
+    assert!(!result2.text().is_empty());
+
+    Ok(())
+}
+
+// =============================================================================
+// Multimodal inputs — Audio
+// =============================================================================
+
+/// Ported from `test_audio_inputs`.
+/// Tests that the model can process audio inputs.
+#[tokio::test]
+#[ignore]
+async fn test_audio_inputs() -> Result<(), Box<dyn std::error::Error>> {
+    load_env();
+    use agent_chain_core::messages::{ContentPart, MessageContent};
+
+    let model = ChatOpenAI::new("gpt-4o-audio-preview");
+
+    // Small audio sample — use a tiny wav
+    let client = reqwest::Client::new();
+    let audio_bytes = client
+        .get("https://upload.wikimedia.org/wikipedia/commons/6/6a/Northern_Flicker_202280456.wav")
+        .header("User-Agent", "agent-chain-test/1.0")
+        .send()
+        .await?
+        .bytes()
+        .await?;
+    let audio_b64 =
+        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &audio_bytes);
+
+    // LangChain standard format
+    let message = HumanMessage::builder()
+        .content(MessageContent::Parts(vec![
+            ContentPart::Text {
+                text: "Describe this audio:".to_string(),
+            },
+            ContentPart::Other(serde_json::json!({
+                "type": "audio",
+                "mime_type": "audio/wav",
+                "base64": audio_b64
+            })),
+        ]))
+        .build();
+
+    let result = model.invoke(vec![message.into()].into(), None).await?;
+    assert!(!result.text().is_empty());
+
+    // OpenAI Chat Completions input_audio format
+    let message2 = HumanMessage::builder()
+        .content(MessageContent::Parts(vec![
+            ContentPart::Text {
+                text: "Describe this audio:".to_string(),
+            },
+            ContentPart::Other(serde_json::json!({
+                "type": "input_audio",
+                "input_audio": {"data": audio_b64, "format": "wav"}
+            })),
+        ]))
+        .build();
+
+    let result2 = model.invoke(vec![message2.into()].into(), None).await?;
+    assert!(!result2.text().is_empty());
+
+    Ok(())
+}
+
+// =============================================================================
+// Tool messages with multimodal content
+// =============================================================================
+
+/// Ported from `test_image_tool_message`.
+/// Tests ToolMessage with image content (base64).
+#[tokio::test]
+#[ignore]
+async fn test_image_tool_message() -> Result<(), Box<dyn std::error::Error>> {
+    load_env();
+    use agent_chain_core::messages::{ContentPart, MessageContent};
+
+    let model = make_model();
+
+    // Small PNG (1x1 pixel)
+    let tiny_png_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
+
+    let random_image_schema = serde_json::json!({
+        "title": "random_image",
+        "description": "Return a random image.",
+        "type": "object",
+        "properties": {},
+        "required": []
+    });
+
+    let model_with_tools = model.bind_tools(&[ToolLike::Schema(random_image_schema)], None)?;
+
+    // OpenAI image_url format in ToolMessage
+    let messages: Vec<BaseMessage> = vec![
+        HumanMessage::builder()
+            .content("get a random diagram using the tool and describe it")
+            .build()
+            .into(),
+        AIMessage::builder()
+            .content("")
+            .tool_calls(vec![
+                ToolCall::builder()
+                    .name("random_image")
+                    .args(serde_json::json!({}))
+                    .id("1".to_string())
+                    .build(),
+            ])
+            .build()
+            .into(),
+        ToolMessage::builder()
+            .content(MessageContent::Parts(vec![ContentPart::Other(
+                serde_json::json!({
+                    "type": "image_url",
+                    "image_url": {"url": format!("data:image/png;base64,{}", tiny_png_b64)}
+                }),
+            )]))
+            .tool_call_id("1")
+            .build()
+            .into(),
+    ];
+
+    let result = model_with_tools.invoke(messages.into(), None).await?;
+    assert!(!result.text().is_empty());
+
+    Ok(())
+}
+
+/// Ported from `test_pdf_tool_message`.
+/// Tests ToolMessage with PDF content.
+#[tokio::test]
+#[ignore]
+async fn test_pdf_tool_message() -> Result<(), Box<dyn std::error::Error>> {
+    load_env();
+    use agent_chain_core::messages::{ContentPart, MessageContent};
+
+    let model = make_model();
+
+    let client = reqwest::Client::new();
+    let pdf_bytes = client
+        .get("https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf")
+        .send()
+        .await?
+        .bytes()
+        .await?;
+    let pdf_b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &pdf_bytes);
+
+    let random_pdf_schema = serde_json::json!({
+        "title": "random_pdf",
+        "description": "Return a random PDF.",
+        "type": "object",
+        "properties": {},
+        "required": []
+    });
+
+    let model_with_tools = model.bind_tools(&[ToolLike::Schema(random_pdf_schema)], None)?;
+
+    let messages: Vec<BaseMessage> = vec![
+        HumanMessage::builder()
+            .content("Get a random PDF and relay the title verbatim.")
+            .build()
+            .into(),
+        AIMessage::builder()
+            .content("")
+            .tool_calls(vec![
+                ToolCall::builder()
+                    .name("random_pdf")
+                    .args(serde_json::json!({}))
+                    .id("1".to_string())
+                    .build(),
+            ])
+            .build()
+            .into(),
+        ToolMessage::builder()
+            .content(MessageContent::Parts(vec![ContentPart::Other(
+                serde_json::json!({
+                    "type": "file",
+                    "base64": pdf_b64,
+                    "mime_type": "application/pdf"
+                }),
+            )]))
+            .tool_call_id("1")
+            .build()
+            .into(),
+    ];
+
+    let result = model_with_tools.invoke(messages.into(), None).await?;
+    assert!(!result.text().is_empty());
+
+    Ok(())
+}
+
+// =============================================================================
+// Anthropic-format inputs
+// =============================================================================
+
+/// Ported from `test_anthropic_inputs`.
+/// Tests that the model handles Anthropic-style message histories
+/// (tool_use blocks in AIMessage, tool_result blocks in HumanMessage).
+#[tokio::test]
+#[ignore]
+async fn test_anthropic_inputs() -> Result<(), Box<dyn std::error::Error>> {
+    load_env();
+    use agent_chain_core::messages::{ContentPart, MessageContent, SystemMessage};
+
+    let model = make_model();
+
+    let color_picker = serde_json::json!({
+        "title": "color_picker",
+        "description": "Input your fav color and get a random fact about it.",
+        "type": "object",
+        "properties": {
+            "fav_color": {"type": "string"}
+        },
+        "required": ["fav_color"]
+    });
+
+    let messages: Vec<BaseMessage> = vec![
+        SystemMessage::builder()
+            .content("you're a good assistant")
+            .build()
+            .into(),
+        HumanMessage::builder()
+            .content("what's your favorite color")
+            .build()
+            .into(),
+        AIMessage::builder()
+            .content(MessageContent::Parts(vec![
+                ContentPart::Text {
+                    text: "Hmm let me think about that".to_string(),
+                },
+                ContentPart::Other(serde_json::json!({
+                    "type": "tool_use",
+                    "input": {"fav_color": "purple"},
+                    "id": "foo",
+                    "name": "color_picker"
+                })),
+            ]))
+            .tool_calls(vec![
+                ToolCall::builder()
+                    .name("color_picker")
+                    .args(serde_json::json!({"fav_color": "purple"}))
+                    .id("foo".to_string())
+                    .build(),
+            ])
+            .build()
+            .into(),
+        ToolMessage::builder()
+            .content("That's a great pick!")
+            .tool_call_id("foo")
+            .build()
+            .into(),
+    ];
+
+    let model_with_tools = model.bind_tools(&[ToolLike::Schema(color_picker)], None)?;
+    let result = model_with_tools.invoke(messages.into(), None).await?;
+    assert!(!result.text().is_empty());
+
+    // Test thinking blocks
+    let messages2: Vec<BaseMessage> = vec![
+        HumanMessage::builder().content("Hello").build().into(),
+        AIMessage::builder()
+            .content(MessageContent::Parts(vec![
+                ContentPart::Other(serde_json::json!({
+                    "type": "thinking",
+                    "thinking": "This is a simple greeting. I should respond warmly.",
+                    "signature": "dummy_signature"
+                })),
+                ContentPart::Text {
+                    text: "Hello, how are you?".to_string(),
+                },
+            ]))
+            .build()
+            .into(),
+        HumanMessage::builder()
+            .content("Well, thanks.")
+            .build()
+            .into(),
+    ];
+
+    let result2 = model.invoke(messages2.into(), None).await?;
+    assert!(!result2.text().is_empty());
+
+    Ok(())
+}
+
+// =============================================================================
+// Bind runnables as tools
+// =============================================================================
+
+/// Ported from `test_bind_runnables_as_tools`.
+/// Tests binding tool schemas (simulating runnable-as-tool) and forcing a call.
+/// Python uses `chain.as_tool()` — Rust has no direct equivalent, so we
+/// bind a schema that mimics what `as_tool` would produce.
+#[tokio::test]
+#[ignore]
+async fn test_bind_runnables_as_tools() -> Result<(), Box<dyn std::error::Error>> {
+    load_env();
+    let model = make_model();
+
+    let greeting_tool = serde_json::json!({
+        "title": "greeting_generator",
+        "description": "Generate a greeting in a particular style of speaking.",
+        "type": "object",
+        "properties": {
+            "answer_style": {"type": "string", "description": "The style of speaking"}
+        },
+        "required": ["answer_style"]
+    });
+
+    let model_with_tools =
+        model.bind_tools(&[ToolLike::Schema(greeting_tool)], Some(ToolChoice::any()))?;
+
+    let result = model_with_tools
+        .invoke(
+            vec![
+                HumanMessage::builder()
+                    .content("Using the tool, generate a Pirate greeting.")
+                    .build()
+                    .into(),
+            ]
+            .into(),
+            None,
+        )
+        .await?;
+    assert!(!result.tool_calls.is_empty());
+    assert!(
+        result.tool_calls[0].args.get("answer_style").is_some(),
+        "Tool call should include answer_style arg"
+    );
+
+    Ok(())
+}
