@@ -80,7 +80,7 @@ fn get_process_name_impl(pid: u32) -> Option<String> {
 
 #[cfg(target_os = "macos")]
 fn get_process_name_impl(pid: u32) -> Option<String> {
-    extern "C" {
+    unsafe extern "C" {
         fn proc_pidpath(pid: i32, buffer: *mut u8, buffersize: u32) -> i32;
     }
     let mut buf = [0u8; 4096];
