@@ -27,3 +27,6 @@ default = ["anthropic", "ollama", "openai"]
 anthropic = []
 ollama = []
 openai = []
+
+[dev-dependencies]
+dotenv = { workspace = true }
