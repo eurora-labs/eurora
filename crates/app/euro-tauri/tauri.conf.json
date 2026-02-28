@@ -19,7 +19,7 @@
 			"appimage",
 			"deb",
 			"rpm",
-			"msi"
+			"nsis"
 		],
 		"icon": [
 			"icons/dev/32x32.png",
@@ -30,12 +30,10 @@
 		],
 		"windows": {
 			"certificateThumbprint": null,
-	           "wix": {
-	               "fragmentPaths": [
-	                   "fragment.wxs"
-	               ],
-	               "componentRefs": ["ChromeRegistryEntries", "EdgeRegistryEntries", "FirefoxRegistryEntries", "ChromeNativeMessagingHostJson", "ChromeNativeMessaging", "EdgeNativeMessagingHostJson", "EdgeNativeMessaging", "FirefoxNativeMessagingHostJson", "FirefoxNativeMessaging"]
-	           }
+			"nsis": {
+				"installMode": "currentUser",
+				"installerHooks": "installer-hooks.nsh"
+			}
 		},
 		"linux": {
 			"rpm": {
