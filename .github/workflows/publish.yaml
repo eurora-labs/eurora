@@ -50,7 +50,6 @@ jobs:
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
-                  lfs: true
 
             - name: Consume input variables
               shell: bash
@@ -112,13 +111,6 @@ jobs:
               run: pnpm build:desktop -- --mode "$VITE_MODE"
 
             - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-              name: Upload pnpm-store contents
-              with:
-                  name: pnpm-store
-                  path: /home/runner/setup-pnpm/node_modules/.bin/store/v3
-                  retention-days: 7
-
-            - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
               name: Upload SvelteKit build output
               with:
                   name: sveltekit-build
@@ -137,8 +129,12 @@ jobs:
                 include:
                     - platform: macos-15 # [macOs, ARM64] - default target
                       target: ''
+                      launcher_arch: arm64
+                      xcode_arch: arm64
                     - platform: macos-15 # [macOs, x64] - cross-compile
                       target: x86_64-apple-darwin
+                      launcher_arch: x86_64
+                      xcode_arch: x86_64
                     - platform: ubuntu-22.04 # [linux, x64]
                       target: ''
                     - platform: ubuntu-22.04-arm # [linux, ARM64]
@@ -175,11 +171,33 @@ jobs:
                   $perlPath | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
                   "EOF" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+            - name: Use lld-link on Windows
+              if: runner.os == 'Windows'
+              shell: bash
+              run: echo "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=lld-link" >> "$GITHUB_ENV"
+
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
-                  lfs: true
+
+            - name: Set version and channel
+              shell: bash
+              env:
+                  BUILD_VERSION: ${{ needs.build-sveltekit.outputs.version }}
+                  BUILD_CHANNEL: ${{ needs.build-sveltekit.outputs.channel }}
+              run: |
+                  {
+                    echo 'version<<EOF'
+                    echo "$BUILD_VERSION"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
+                  {
+                    echo 'channel<<EOF'
+                    echo "$BUILD_CHANNEL"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
+                  mkdir -p release && echo "$BUILD_VERSION" > release/version
 
             - name: Set Cargo build target
               shell: bash
@@ -200,6 +218,14 @@ jobs:
               with:
                   shared-key: app-release-build-${{ github.event.inputs.channel || 'nightly' }}${{ matrix.target }}
 
+            - name: Cache cargo-about
+              uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+              with:
+                  path: |
+                      ~/.cargo/bin/cargo-about
+                      ~/.cargo/bin/cargo-about.exe
+                  key: cargo-about-0.8-${{ runner.os }}-${{ runner.arch }}
+
             - name: Install cargo-about
               shell: bash
               run: |
@@ -213,45 +239,6 @@ jobs:
 
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
-
-            - name: Consume input variables
-              shell: bash
-              env:
-                  INPUT_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
-                  INPUT_BUMP: ${{ github.event.inputs.bump || 'patch' }}
-              run: |
-                  {
-                    echo 'channel<<EOF'
-                    echo "$INPUT_CHANNEL"
-                    echo 'EOF'
-                  } >> "$GITHUB_ENV"
-                  {
-                    echo 'bump<<EOF'
-                    echo "$INPUT_BUMP"
-                    echo 'EOF'
-                  } >> "$GITHUB_ENV"
-
-            - name: Calculate next version
-              shell: bash
-              env:
-                  RELEASE_CHANNEL: ${{ env.channel }}
-                  BUMP_TYPE: ${{ env.bump }}
-              run: |
-                  CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/releases/${RELEASE_CHANNEL}" | jq -r '.version' | tr -d '\r')"
-                  NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${BUMP_TYPE}")
-                  {
-                    echo 'version<<EOF'
-                    echo "$NEXT_VERSION"
-                    echo 'EOF'
-                  } >> "$GITHUB_ENV"
-                  mkdir -p release && echo "$NEXT_VERSION" > release/version
-
-            # - name: Import GPG key
-            #   if: runner.os == 'Linux'
-            #   uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6
-            #   with:
-            #       gpg_private_key: ${{ secrets.APPIMAGE_KEY_ID }}
-            #       passphrase: ${{ secrets.APPIMAGE_KEY_PASSPHRASE }}
 
             - name: Install linux dependencies
               shell: bash
@@ -286,6 +273,19 @@ jobs:
 
             - name: Compile Protobuf
               run: pnpm proto:typescript
+
+            - name: Install Swift protoc plugins
+              if: runner.os == 'macOS'
+              run: |
+                  brew install protobuf swift-protobuf protoc-gen-grpc-swift
+
+            - name: Compile Swift Protobuf
+              if: runner.os == 'macOS'
+              run: pnpm proto:swift
+
+            - name: Build Safari browser extension
+              if: runner.os == 'macOS'
+              run: pnpm build:safari
 
             - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
               name: Download SvelteKit build output
@@ -334,6 +334,100 @@ jobs:
                     --dist                       "./release" \
                     --version                    "$RELEASE_VERSION"
 
+            - name: Import Apple certificate
+              if: runner.os == 'macOS'
+              shell: bash
+              env:
+                  APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+                  APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+              run: |
+                  CERTIFICATE_PATH="$RUNNER_TEMP/build_certificate.p12"
+                  KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+                  KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+
+                  echo -n "$APPLE_CERTIFICATE" | base64 --decode -o "$CERTIFICATE_PATH"
+
+                  security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+                  security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+                  security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+                  security import "$CERTIFICATE_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+                  security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+                  security list-keychain -d user -s "$KEYCHAIN_PATH" "$(security list-keychains -d user | tr -d '"' | tr '\n' ' ')"
+
+            - name: Resolve Swift packages
+              if: runner.os == 'macOS'
+              shell: bash
+              working-directory: apps/macos
+              run: xcodebuild -resolvePackageDependencies -project macos.xcodeproj -scheme macos
+
+            - name: Build and archive launcher
+              if: runner.os == 'macOS'
+              shell: bash
+              working-directory: apps/macos
+              env:
+                  APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
+                  XCODE_ARCH: ${{ matrix.xcode_arch }}
+                  APP_VERSION: ${{ env.version }}
+                  RUN_NUMBER: ${{ github.run_number }}
+              run: |
+                  xcodebuild archive \
+                    -project macos.xcodeproj \
+                    -scheme macos \
+                    -configuration Release \
+                    -archivePath "$RUNNER_TEMP/EuroraLauncher.xcarchive" \
+                    -arch "$XCODE_ARCH" \
+                    ONLY_ACTIVE_ARCH=NO \
+                    CODE_SIGN_STYLE=Manual \
+                    CODE_SIGN_IDENTITY="Developer ID Application" \
+                    DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+                    MARKETING_VERSION="$APP_VERSION" \
+                    CURRENT_PROJECT_VERSION="$RUN_NUMBER" \
+                    OTHER_CODE_SIGN_FLAGS="--timestamp"
+
+            - name: Export archive
+              if: runner.os == 'macOS'
+              shell: bash
+              env:
+                  APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
+              run: |
+                  cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+                  <plist version="1.0">
+                  <dict>
+                      <key>method</key>
+                      <string>developer-id</string>
+                      <key>teamID</key>
+                      <string>${APPLE_TEAM_ID}</string>
+                  </dict>
+                  </plist>
+                  PLIST
+
+                  xcodebuild -exportArchive \
+                    -archivePath "$RUNNER_TEMP/EuroraLauncher.xcarchive" \
+                    -exportPath "$RUNNER_TEMP/export" \
+                    -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
+
+            - name: Prepare launcher release artifacts
+              if: runner.os == 'macOS'
+              shell: bash
+              env:
+                  LAUNCHER_ARCH: ${{ matrix.launcher_arch }}
+                  APP_VERSION: ${{ env.version }}
+              run: |
+                  if [ "$LAUNCHER_ARCH" = "arm64" ]; then
+                    ARCH_DIR="aarch64"
+                  else
+                    ARCH_DIR="x86_64"
+                  fi
+
+                  RELEASE_DIR="launcher-release/darwin/$ARCH_DIR"
+                  mkdir -p "$RELEASE_DIR"
+
+                  ditto -c -k --keepParent "$RUNNER_TEMP/export/EuroraLauncher.app" "$RELEASE_DIR/EuroraLauncher.app.zip"
+
+                  echo "$APP_VERSION" > launcher-release/version
+
             - name: Set artifact name suffix
               shell: bash
               env:
@@ -361,167 +455,16 @@ jobs:
                   path: release/
                   if-no-files-found: error
 
-    build-safari-launcher:
-        needs: build-sveltekit
-        runs-on: macos-15
-        strategy:
-            fail-fast: false
-            matrix:
-                include:
-                    - arch: arm64
-                      xcode_arch: arm64
-                    - arch: x86_64
-                      xcode_arch: x86_64
-        steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-              with:
-                  token: ${{ secrets.GITHUB_TOKEN }}
-                  persist-credentials: false
-                  lfs: true
-
-            - name: Consume input variables
-              shell: bash
-              env:
-                  INPUT_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
-                  INPUT_BUMP: ${{ github.event.inputs.bump || 'patch' }}
-              run: |
-                  {
-                    echo 'channel<<EOF'
-                    echo "$INPUT_CHANNEL"
-                    echo 'EOF'
-                  } >> "$GITHUB_ENV"
-                  {
-                    echo 'bump<<EOF'
-                    echo "$INPUT_BUMP"
-                    echo 'EOF'
-                  } >> "$GITHUB_ENV"
-
-            - name: Calculate next version
-              shell: bash
-              env:
-                  RELEASE_CHANNEL: ${{ env.channel }}
-                  BUMP_TYPE: ${{ env.bump }}
-              run: |
-                  CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/releases/${RELEASE_CHANNEL}" | jq -r '.version' | tr -d '\r')"
-                  NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${BUMP_TYPE}")
-                  {
-                    echo 'version<<EOF'
-                    echo "$NEXT_VERSION"
-                    echo 'EOF'
-                  } >> "$GITHUB_ENV"
-
-            - name: Init Node Environment
-              uses: ./.github/actions/init-env-node
-
-            - name: Install Swift protoc plugins
-              run: |
-                  brew install protobuf swift-protobuf protoc-gen-grpc-swift
-
-            - name: Compile Protobuf
-              run: pnpm proto:typescript && pnpm proto:swift
-
-            - name: Build Safari browser extension
-              run: pnpm build:safari
-
-            - name: Import Apple certificate
-              shell: bash
-              env:
-                  APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-                  APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-              run: |
-                  CERTIFICATE_PATH="$RUNNER_TEMP/build_certificate.p12"
-                  KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
-                  KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
-
-                  echo -n "$APPLE_CERTIFICATE" | base64 --decode -o "$CERTIFICATE_PATH"
-
-                  security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-                  security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-                  security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-                  security import "$CERTIFICATE_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
-                  security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-                  security list-keychain -d user -s "$KEYCHAIN_PATH" "$(security list-keychains -d user | tr -d '"' | tr '\n' ' ')"
-
-            - name: Resolve Swift packages
-              shell: bash
-              working-directory: apps/macos
-              run: xcodebuild -resolvePackageDependencies -project macos.xcodeproj -scheme macos
-
-            - name: Build and archive launcher
-              shell: bash
-              working-directory: apps/macos
-              env:
-                  APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
-                  XCODE_ARCH: ${{ matrix.xcode_arch }}
-                  APP_VERSION: ${{ env.version }}
-                  RUN_NUMBER: ${{ github.run_number }}
-              run: |
-                  xcodebuild archive \
-                    -project macos.xcodeproj \
-                    -scheme macos \
-                    -configuration Release \
-                    -archivePath "$RUNNER_TEMP/EuroraLauncher.xcarchive" \
-                    -arch "$XCODE_ARCH" \
-                    ONLY_ACTIVE_ARCH=NO \
-                    CODE_SIGN_STYLE=Manual \
-                    CODE_SIGN_IDENTITY="Developer ID Application" \
-                    DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-                    MARKETING_VERSION="$APP_VERSION" \
-                    CURRENT_PROJECT_VERSION="$RUN_NUMBER" \
-                    OTHER_CODE_SIGN_FLAGS="--timestamp"
-
-            - name: Export archive
-              shell: bash
-              env:
-                  APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
-              run: |
-                  cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-                  <plist version="1.0">
-                  <dict>
-                      <key>method</key>
-                      <string>developer-id</string>
-                      <key>teamID</key>
-                      <string>${APPLE_TEAM_ID}</string>
-                  </dict>
-                  </plist>
-                  PLIST
-
-                  xcodebuild -exportArchive \
-                    -archivePath "$RUNNER_TEMP/EuroraLauncher.xcarchive" \
-                    -exportPath "$RUNNER_TEMP/export" \
-                    -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
-
-            - name: Prepare release artifacts
-              shell: bash
-              env:
-                  MATRIX_ARCH: ${{ matrix.arch }}
-                  APP_VERSION: ${{ env.version }}
-              run: |
-                  if [ "$MATRIX_ARCH" = "arm64" ]; then
-                    ARCH_DIR="aarch64"
-                  else
-                    ARCH_DIR="x86_64"
-                  fi
-
-                  RELEASE_DIR="release/darwin/$ARCH_DIR"
-                  mkdir -p "$RELEASE_DIR"
-
-                  # Zip the exported launcher app (Eurora.app with Safari extension, without Tauri yet)
-                  ditto -c -k --keepParent "$RUNNER_TEMP/export/Eurora.app" "$RELEASE_DIR/EuroraLauncher.app.zip"
-
-                  echo "$APP_VERSION" > release/version
-
             - name: Upload launcher artifacts
+              if: runner.os == 'macOS'
               uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
               with:
-                  name: 'launcher-${{ matrix.arch }}-${{ github.run_number }}'
-                  path: release/
+                  name: 'launcher-${{ matrix.launcher_arch }}-${{ github.run_number }}'
+                  path: launcher-release/
                   if-no-files-found: error
 
     assemble-macos-dmg:
-        needs: [build-sveltekit, build-tauri, build-safari-launcher]
+        needs: [build-sveltekit, build-tauri]
         runs-on: macos-15
         strategy:
             fail-fast: false
@@ -536,19 +479,18 @@ jobs:
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
-                  lfs: true
 
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
 
-            - name: Consume input variables
+            - name: Set channel
               shell: bash
               env:
-                  INPUT_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
+                  BUILD_CHANNEL: ${{ needs.build-sveltekit.outputs.channel }}
               run: |
                   {
                     echo 'channel<<EOF'
-                    echo "$INPUT_CHANNEL"
+                    echo "$BUILD_CHANNEL"
                     echo 'EOF'
                   } >> "$GITHUB_ENV"
 
@@ -751,7 +693,6 @@ jobs:
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
-                  lfs: true
             - name: Set artifact name suffix
               shell: bash
               env:
@@ -848,7 +789,7 @@ jobs:
                   }
                   function create_tag() {
                     git tag --force "$1"
-                    git push --tags
+                    git push origin "refs/tags/$1"
                   }
 
                   fetch_tag "$TAG_NAME" || true
@@ -862,3 +803,66 @@ jobs:
               env:
                   SENTRY_CRONS_URL: ${{ secrets.SENTRY_CRONS }}
               run: curl "${SENTRY_CRONS_URL}?status=ok"
+
+    create-github-release:
+        needs: [build-sveltekit, publish-tauri, create-git-tag]
+        if: needs.build-sveltekit.outputs.channel == 'release'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - name: Download assembled macOS ARM64 artifacts
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: 'assembled-macos-arm64-${{ github.run_number }}'
+                  path: release-artifacts/macos-arm64
+
+            - name: Download assembled macOS x86_64 artifacts
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: 'assembled-macos-x86_64-${{ github.run_number }}'
+                  path: release-artifacts/macos-x86_64
+
+            - name: Download Linux x64 artifacts
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: 'release-ubuntu-22.04-${{ github.run_number }}'
+                  path: release-artifacts/linux-x64
+
+            - name: Download Linux ARM64 artifacts
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: 'release-ubuntu-22.04-arm-${{ github.run_number }}'
+                  path: release-artifacts/linux-arm64
+
+            - name: Download Windows artifacts
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: 'release-windows-latest-${{ github.run_number }}'
+                  path: release-artifacts/windows
+
+            - name: Collect release files
+              shell: bash
+              run: |
+                  mkdir -p gh-release
+                  find release-artifacts -type f \( \
+                    -name "*.dmg" -o \
+                    -name "*.AppImage" -o \
+                    -name "*.msi" -o \
+                    -name "*.exe" -o \
+                    -name "*.deb" -o \
+                    -name "*.rpm" \
+                  \) -exec cp {} gh-release/ \;
+                  echo "Release files:"
+                  ls -lh gh-release/
+
+            - name: Create GitHub Release
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  RELEASE_VERSION: ${{ needs.publish-tauri.outputs.version }}
+              run: |
+                  TAG="release/${RELEASE_VERSION}"
+                  gh release create "$TAG" \
+                    --title "v${RELEASE_VERSION}" \
+                    --generate-notes \
+                    gh-release/*
