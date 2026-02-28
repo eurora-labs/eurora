@@ -218,6 +218,7 @@ pub struct ChatOpenAI {
     truncation: Option<String>,
     use_responses_api: Option<bool>,
     use_previous_response_id: bool,
+    previous_response_id: Option<String>,
     output_version: Option<String>,
     builtin_tools: Vec<BuiltinTool>,
     disabled_params: Option<HashMap<String, Option<serde_json::Value>>>,
@@ -226,6 +227,7 @@ pub struct ChatOpenAI {
     language_model_config: LanguageModelConfig,
     /// Tools bound to this model via `bind_tools()`.
     bound_tools: Vec<ToolDefinition>,
+    bound_builtin_tools: Vec<serde_json::Value>,
     /// Tool choice for bound tools.
     bound_tool_choice: Option<ToolChoice>,
     /// Whether bound tools should be called with strict schema validation.
@@ -315,6 +317,7 @@ impl ChatOpenAI {
             truncation: None,
             use_responses_api: None,
             use_previous_response_id: false,
+            previous_response_id: None,
             output_version: env::var("LC_OUTPUT_VERSION").ok(),
             builtin_tools: Vec::new(),
             disabled_params: None,
@@ -322,6 +325,7 @@ impl ChatOpenAI {
             chat_model_config: ChatModelConfig::new(),
             language_model_config: LanguageModelConfig::new(),
             bound_tools: Vec::new(),
+            bound_builtin_tools: Vec::new(),
             bound_tool_choice: None,
             bound_strict: None,
             bound_parallel_tool_calls: None,
@@ -460,6 +464,11 @@ impl ChatOpenAI {
 
     pub fn use_previous_response_id(mut self, enabled: bool) -> Self {
         self.use_previous_response_id = enabled;
+        self
+    }
+
+    pub fn previous_response_id(mut self, id: impl Into<String>) -> Self {
+        self.previous_response_id = Some(id.into());
         self
     }
 
@@ -1002,6 +1011,10 @@ impl ChatOpenAI {
             payload["store"] = serde_json::json!(store);
         }
 
+        if let Some(ref prev_id) = self.previous_response_id {
+            payload["previous_response_id"] = serde_json::json!(prev_id);
+        }
+
         if let Some(ref response_format) = self.response_format {
             payload["response_format"] = response_format.clone();
         }
@@ -1132,6 +1145,10 @@ impl ChatOpenAI {
             payload["store"] = serde_json::json!(store);
         }
 
+        if let Some(ref prev_id) = self.previous_response_id {
+            payload["previous_response_id"] = serde_json::json!(prev_id);
+        }
+
         if let Some(ref response_format) = self.response_format {
             let format_value =
                 if response_format.get("type").and_then(|t| t.as_str()) == Some("json_schema") {
@@ -1218,6 +1235,8 @@ impl ChatOpenAI {
             let mut finish_reason: Option<String> = None;
             let mut tool_call_acc: std::collections::HashMap<String, (String, String, String)> =
                 std::collections::HashMap::new();
+            let mut stream_response_metadata: std::collections::HashMap<String, serde_json::Value> =
+                std::collections::HashMap::new();
 
             use futures::StreamExt;
 
@@ -1292,9 +1311,28 @@ impl ChatOpenAI {
                                                         resp.service_tier.as_deref(),
                                                     ));
                                                 }
-                                                finish_reason = resp.status;
+                                                finish_reason = resp.status.clone();
+                                                if let Some(ref status) = resp.status {
+                                                    stream_response_metadata.insert(
+                                                        "status".to_string(),
+                                                        serde_json::json!(status),
+                                                    );
+                                                }
+                                                if let Some(ref id) = resp.id {
+                                                    stream_response_metadata.insert(
+                                                        "id".to_string(),
+                                                        serde_json::json!(id),
+                                                    );
+                                                }
+                                                if let Some(ref details) = resp.incomplete_details {
+                                                    stream_response_metadata.insert(
+                                                        "incomplete_details".to_string(),
+                                                        details.clone(),
+                                                    );
+                                                }
                                             }
                                             let mut final_chunk = ChatChunk::final_chunk(usage.take(), finish_reason.take());
+                                            final_chunk.response_metadata = stream_response_metadata.clone();
                                             if !tool_call_acc.is_empty() {
                                                 let tcs: Vec<ToolCall> = tool_call_acc
                                                     .drain()
@@ -1502,6 +1540,9 @@ impl ChatOpenAI {
         response_metadata.insert("model_provider".to_string(), serde_json::json!("openai"));
         if let Some(ref status) = response.status {
             response_metadata.insert("status".to_string(), serde_json::json!(status));
+        }
+        if let Some(ref details) = response.incomplete_details {
+            response_metadata.insert("incomplete_details".to_string(), details.clone());
         }
         if let Some(ref id) = response.id {
             response_metadata.insert("id".to_string(), serde_json::json!(id));
@@ -1820,25 +1861,29 @@ impl ChatOpenAI {
         tool_choice: Option<&ToolChoice>,
     ) -> Result<ChatStream> {
         if self.should_use_responses_api(None) {
-            let openai_tools: Option<Vec<serde_json::Value>> =
-                tools.filter(|t| !t.is_empty()).map(|tools| {
-                    tools
-                        .iter()
-                        .map(|t| {
-                            serde_json::json!({
-                                "type": "function",
-                                "function": {
-                                    "name": t.name,
-                                    "description": t.description,
-                                    "parameters": t.parameters
-                                }
-                            })
-                        })
-                        .collect()
-                });
-            return self
-                .stream_responses_api(messages, stop, openai_tools.as_deref())
-                .await;
+            let mut openai_tools: Vec<serde_json::Value> = tools
+                .unwrap_or_default()
+                .iter()
+                .map(|t| {
+                    serde_json::json!({
+                        "type": "function",
+                        "function": {
+                            "name": t.name,
+                            "description": t.description,
+                            "parameters": t.parameters
+                        }
+                    })
+                })
+                .collect();
+            for bt in &self.bound_builtin_tools {
+                openai_tools.push(bt.clone());
+            }
+            let tools_slice = if openai_tools.is_empty() {
+                None
+            } else {
+                Some(openai_tools.as_slice())
+            };
+            return self.stream_responses_api(messages, stop, tools_slice).await;
         }
 
         let api_key = self.get_api_key()?;
@@ -2240,7 +2285,7 @@ impl BaseChatModel for ChatOpenAI {
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
-        if !self.bound_tools.is_empty() {
+        if !self.bound_tools.is_empty() || !self.bound_builtin_tools.is_empty() {
             let ai_message = self
                 .generate_with_tools_internal(
                     messages,
@@ -2261,7 +2306,7 @@ impl BaseChatModel for ChatOpenAI {
         stop: Option<Vec<String>>,
         _run_manager: Option<&AsyncCallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
-        let chat_stream = if !self.bound_tools.is_empty() {
+        let chat_stream = if !self.bound_tools.is_empty() || !self.bound_builtin_tools.is_empty() {
             self.stream_internal_with_tools(
                 messages,
                 stop,
@@ -2319,10 +2364,23 @@ impl BaseChatModel for ChatOpenAI {
         tool_choice: Option<ToolChoice>,
     ) -> Result<Box<dyn BaseChatModel>> {
         let mut bound = self.clone();
-        bound.bound_tools = tools
+        let (function_tools, builtin_tools): (Vec<_>, Vec<_>) = tools
+            .iter()
+            .partition(|t| !matches!(t, ToolLike::Builtin(_)));
+        bound.bound_tools = function_tools
             .iter()
             .map(|t| t.to_definition())
             .collect::<std::result::Result<Vec<_>, _>>()?;
+        bound.bound_builtin_tools = builtin_tools
+            .iter()
+            .filter_map(|t| {
+                if let ToolLike::Builtin(v) = t {
+                    Some(v.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
         bound.bound_tool_choice = tool_choice;
         Ok(Box::new(bound))
     }
@@ -2366,10 +2424,23 @@ impl ChatOpenAI {
         response_format: Option<serde_json::Value>,
     ) -> Result<Box<dyn BaseChatModel>> {
         let mut bound = self.clone();
-        bound.bound_tools = tools
+        let (function_tools, builtin_tools): (Vec<_>, Vec<_>) = tools
+            .iter()
+            .partition(|t| !matches!(t, ToolLike::Builtin(_)));
+        bound.bound_tools = function_tools
             .iter()
             .map(|t| t.to_definition())
             .collect::<std::result::Result<Vec<_>, _>>()?;
+        bound.bound_builtin_tools = builtin_tools
+            .iter()
+            .filter_map(|t| {
+                if let ToolLike::Builtin(v) = t {
+                    Some(v.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
         bound.bound_tool_choice = tool_choice;
         bound.bound_strict = strict;
         bound.bound_parallel_tool_calls = parallel_tool_calls;
@@ -2568,8 +2639,12 @@ impl ChatOpenAI {
 
         if self.should_use_responses_api(None) {
             let url = format!("{}/responses", self.api_base);
+            let mut all_tools_json = openai_tools.clone();
+            for bt in &self.bound_builtin_tools {
+                all_tools_json.push(bt.clone());
+            }
             let mut payload =
-                self.build_responses_api_payload(&messages, stop, Some(&openai_tools), false);
+                self.build_responses_api_payload(&messages, stop, Some(&all_tools_json), false);
 
             if let Some(choice) = tool_choice {
                 let choice_json = match choice {
@@ -2720,6 +2795,7 @@ struct ResponsesApiResponse {
     usage: Option<ResponsesUsage>,
     status: Option<String>,
     service_tier: Option<String>,
+    incomplete_details: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2790,7 +2866,9 @@ struct ResponsesStreamEvent {
 struct ResponsesStreamResponse {
     usage: Option<ResponsesUsage>,
     status: Option<String>,
+    id: Option<String>,
     service_tier: Option<String>,
+    incomplete_details: Option<serde_json::Value>,
 }
 
 #[cfg(test)]
