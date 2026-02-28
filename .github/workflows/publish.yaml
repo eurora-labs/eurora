@@ -413,7 +413,7 @@ jobs:
                   RELEASE_DIR="launcher-release/darwin/$ARCH_DIR"
                   mkdir -p "$RELEASE_DIR"
 
-                  ditto -c -k --keepParent "$RUNNER_TEMP/export/Eurora.app" "$RELEASE_DIR/EuroraLauncher.app.zip"
+                  ditto -c -k --keepParent "$RUNNER_TEMP/export/EuroraLauncher.app" "$RELEASE_DIR/EuroraLauncher.app.zip"
 
                   echo "$APP_VERSION" > launcher-release/version
 
