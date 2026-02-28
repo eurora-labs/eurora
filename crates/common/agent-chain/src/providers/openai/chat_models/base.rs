@@ -1204,7 +1204,10 @@ impl ChatOpenAI {
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
-            let error_text = response.text().await.unwrap_or_default();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("<failed to read response body: {e}>"));
             return Err(Error::api(status, error_text));
         }
 
@@ -1548,7 +1551,10 @@ impl ChatOpenAI {
             })
         } else {
             let status = resp.status().as_u16();
-            let error_text = resp.text().await.unwrap_or_default();
+            let error_text = resp
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("<failed to read response body: {e}>"));
             Err(Error::api(status, error_text))
         }
     }
@@ -1588,7 +1594,10 @@ impl ChatOpenAI {
             Ok((body, headers))
         } else {
             let status = resp.status().as_u16();
-            let error_text = resp.text().await.unwrap_or_default();
+            let error_text = resp
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("<failed to read response body: {e}>"));
             Err(Error::api(status, error_text))
         }
     }
@@ -1885,7 +1894,10 @@ impl ChatOpenAI {
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
-            let error_text = response.text().await.unwrap_or_default();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("<failed to read response body: {e}>"));
             return Err(Error::api(status, error_text));
         }
 
@@ -2307,7 +2319,10 @@ impl BaseChatModel for ChatOpenAI {
         tool_choice: Option<ToolChoice>,
     ) -> Result<Box<dyn BaseChatModel>> {
         let mut bound = self.clone();
-        bound.bound_tools = tools.iter().map(|t| t.to_definition()).collect();
+        bound.bound_tools = tools
+            .iter()
+            .map(|t| t.to_definition())
+            .collect::<std::result::Result<Vec<_>, _>>()?;
         bound.bound_tool_choice = tool_choice;
         Ok(Box::new(bound))
     }
@@ -2319,7 +2334,7 @@ impl BaseChatModel for ChatOpenAI {
     ) -> Result<
         Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
     > {
-        let tool_name = extract_tool_name_from_schema(&schema);
+        let tool_name = extract_tool_name_from_schema(&schema)?;
         let tool_like = ToolLike::Schema(schema);
         let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
 
@@ -2351,7 +2366,10 @@ impl ChatOpenAI {
         response_format: Option<serde_json::Value>,
     ) -> Result<Box<dyn BaseChatModel>> {
         let mut bound = self.clone();
-        bound.bound_tools = tools.iter().map(|t| t.to_definition()).collect();
+        bound.bound_tools = tools
+            .iter()
+            .map(|t| t.to_definition())
+            .collect::<std::result::Result<Vec<_>, _>>()?;
         bound.bound_tool_choice = tool_choice;
         bound.bound_strict = strict;
         bound.bound_parallel_tool_calls = parallel_tool_calls;
@@ -2412,7 +2430,10 @@ impl ChatOpenAI {
                 model.response_format = Some(json_schema);
 
                 if let Some(extra_tools) = tools {
-                    model.bound_tools = extra_tools.iter().map(|t| t.to_definition()).collect();
+                    model.bound_tools = extra_tools
+                        .iter()
+                        .map(|t| t.to_definition())
+                        .collect::<std::result::Result<Vec<_>, _>>()?;
                     model.bound_strict = strict;
                 }
 
@@ -2436,7 +2457,7 @@ impl ChatOpenAI {
                 // with tool_choice set to the tool name and parallel_tool_calls
                 // disabled. Matches Python's function_calling branch where
                 // extra `tools` are not used.
-                let tool_name = extract_tool_name_from_schema(&schema);
+                let tool_name = extract_tool_name_from_schema(&schema)?;
                 let tool_like = ToolLike::Schema(schema);
                 let bound_model = self.bind_tools_with_options(
                     &[tool_like],
@@ -2729,12 +2750,10 @@ enum ResponsesContent {
     OutputText {
         text: String,
         #[serde(default)]
-        #[allow(dead_code)]
-        annotations: Vec<TextAnnotation>,
+        _annotations: Vec<TextAnnotation>,
     },
     #[serde(rename = "refusal")]
-    #[allow(dead_code)]
-    Refusal { refusal: String },
+    Refusal { _refusal: String },
     #[serde(other)]
     Other,
 }
@@ -2760,8 +2779,8 @@ struct ResponsesStreamEvent {
     event_type: String,
     delta: Option<String>,
     response: Option<ResponsesStreamResponse>,
-    #[allow(dead_code)]
-    annotation: Option<TextAnnotation>,
+    #[serde(rename = "annotation")]
+    _annotation: Option<TextAnnotation>,
     call_id: Option<String>,
     item_id: Option<String>,
     item: Option<serde_json::Value>,
