@@ -120,6 +120,7 @@ pub struct ChatOllama {
     /// Controls reasoning/thinking mode for supported models.
     /// Supports `true`/`false` or string intensities like `"low"`, `"medium"`, `"high"`.
     reasoning: Option<serde_json::Value>,
+    output_version: Option<String>,
     /// Additional kwargs to pass to the HTTP clients. Pass headers in here.
     /// These arguments are passed to both synchronous and async clients.
     client_kwargs: HashMap<String, serde_json::Value>,
@@ -163,6 +164,7 @@ impl Clone for ChatOllama {
             format: self.format.clone(),
             keep_alive: self.keep_alive.clone(),
             reasoning: self.reasoning.clone(),
+            output_version: self.output_version.clone(),
             client_kwargs: self.client_kwargs.clone(),
             async_client_kwargs: self.async_client_kwargs.clone(),
             sync_client_kwargs: self.sync_client_kwargs.clone(),
@@ -219,6 +221,7 @@ impl ChatOllama {
             format: None,
             keep_alive: None,
             reasoning: None,
+            output_version: None,
             client_kwargs: HashMap::new(),
             async_client_kwargs: HashMap::new(),
             sync_client_kwargs: HashMap::new(),
@@ -362,6 +365,11 @@ impl ChatOllama {
     /// `"low"`, `"medium"`, `"high"` for supported models.
     pub fn reasoning(mut self, value: impl Into<serde_json::Value>) -> Self {
         self.reasoning = Some(value.into());
+        self
+    }
+
+    pub fn output_version(mut self, version: impl Into<String>) -> Self {
+        self.output_version = Some(version.into());
         self
     }
 
