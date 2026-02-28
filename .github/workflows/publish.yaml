@@ -789,7 +789,7 @@ jobs:
                   }
                   function create_tag() {
                     git tag --force "$1"
-                    git push --tags
+                    git push origin "refs/tags/$1"
                   }
 
                   fetch_tag "$TAG_NAME" || true
