@@ -972,7 +972,10 @@ impl BaseChatModel for ChatOllama {
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
-            let error_text = response.text().await.unwrap_or_default();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("<failed to read response body: {e}>"));
             return Err(Error::api(status, error_text));
         }
 
@@ -992,7 +995,10 @@ impl BaseChatModel for ChatOllama {
         tool_choice: Option<ToolChoice>,
     ) -> Result<Box<dyn BaseChatModel>> {
         let mut bound = self.clone();
-        bound.bound_tools = tools.iter().map(|t| t.to_definition()).collect();
+        bound.bound_tools = tools
+            .iter()
+            .map(|t| t.to_definition())
+            .collect::<std::result::Result<Vec<_>, _>>()?;
         bound.bound_tool_choice = tool_choice;
         Ok(Box::new(bound))
     }
@@ -1004,7 +1010,7 @@ impl BaseChatModel for ChatOllama {
     ) -> Result<
         Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
     > {
-        let tool_name = crate::language_models::extract_tool_name_from_schema(&schema);
+        let tool_name = crate::language_models::extract_tool_name_from_schema(&schema)?;
         let tool_like = ToolLike::Schema(schema);
         let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
 
@@ -1148,7 +1154,10 @@ impl ChatOllama {
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
-            let error_text = response.text().await.unwrap_or_default();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("<failed to read response body: {e}>"));
             return Err(Error::api(status, error_text));
         }
 

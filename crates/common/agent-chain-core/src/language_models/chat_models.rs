@@ -114,13 +114,13 @@ pub enum ToolLike {
 }
 
 impl ToolLike {
-    pub fn to_definition(&self) -> ToolDefinition {
+    pub fn to_definition(&self) -> Result<ToolDefinition> {
         match self {
-            ToolLike::Tool(tool) => tool.definition(),
+            ToolLike::Tool(tool) => Ok(tool.definition()),
             ToolLike::Schema(schema) => {
-                let openai_tool = convert_to_openai_tool(schema, None);
+                let openai_tool = convert_to_openai_tool(schema, None)?;
                 let function = openai_tool.get("function").cloned().unwrap_or_default();
-                ToolDefinition {
+                Ok(ToolDefinition {
                     name: function
                         .get("name")
                         .and_then(|n| n.as_str())
@@ -135,7 +135,7 @@ impl ToolLike {
                         .get("parameters")
                         .cloned()
                         .unwrap_or(Value::Object(Default::default())),
-                }
+                })
             }
         }
     }
@@ -1079,8 +1079,11 @@ pub trait BaseChatModel: BaseLanguageModel {
         ))
     }
 
-    fn get_tool_definitions(&self, tools: &[ToolLike]) -> Vec<ToolDefinition> {
-        tools.iter().map(|t| t.to_definition()).collect()
+    fn get_tool_definitions(&self, tools: &[ToolLike]) -> Result<Vec<ToolDefinition>> {
+        tools
+            .iter()
+            .map(|t| t.to_definition())
+            .collect::<Result<Vec<_>>>()
     }
 
     async fn stream(
@@ -1435,7 +1438,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         schema: Value,
         include_raw: bool,
     ) -> Result<Box<dyn Runnable<Input = LanguageModelInput, Output = Value> + Send + Sync>> {
-        let tool_name = extract_tool_name_from_schema(&schema);
+        let tool_name = extract_tool_name_from_schema(&schema)?;
 
         let tool_like = ToolLike::Schema(schema);
         let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
@@ -1572,14 +1575,14 @@ pub fn format_ls_structured_output(
     HashMap::new()
 }
 
-pub fn extract_tool_name_from_schema(schema: &Value) -> String {
-    let openai_tool = convert_to_openai_tool(schema, None);
-    openai_tool
+pub fn extract_tool_name_from_schema(schema: &Value) -> Result<String> {
+    let openai_tool = convert_to_openai_tool(schema, None)?;
+    Ok(openai_tool
         .get("function")
         .and_then(|f| f.get("name"))
         .and_then(|n| n.as_str())
         .unwrap_or("unknown")
-        .to_string()
+        .to_string())
 }
 
 pub struct ChatModelRunnable {
@@ -1615,7 +1618,9 @@ where
         std::thread::scope(|scope| {
             scope
                 .spawn(|| {
-                    tokio::runtime::Runtime::new()
+                    tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
                         .expect("failed to create tokio runtime")
                         .block_on(future)
                 })
@@ -1623,7 +1628,9 @@ where
                 .expect("spawned thread panicked")
         })
     } else {
-        tokio::runtime::Runtime::new()
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
             .expect("failed to create tokio runtime")
             .block_on(future)
     }
