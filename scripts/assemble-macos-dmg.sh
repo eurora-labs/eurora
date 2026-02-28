@@ -55,16 +55,14 @@ if [ ! -f "$LAUNCHER_ZIP" ]; then
     exit 1
 fi
 ditto -x -k "$LAUNCHER_ZIP" assembled/
-if [ ! -d "assembled/Eurora.app" ]; then
-    echo "ERROR: Eurora.app not found after extracting launcher"
+if [ ! -d "assembled/EuroraLauncher.app" ]; then
+    echo "ERROR: EuroraLauncher.app not found after extracting launcher"
     ls -la assembled/
     exit 1
 fi
 
-if [ "$APP_NAME" != "Eurora.app" ]; then
-    mv "assembled/Eurora.app" "$ASSEMBLED_APP"
-    echo "  Renamed launcher to: $APP_NAME"
-fi
+mv "assembled/EuroraLauncher.app" "$ASSEMBLED_APP"
+echo "  Renamed launcher to: $APP_NAME"
 echo "  Launcher extracted: $ASSEMBLED_APP"
 
 echo "--- Applying channel branding ($CHANNEL) ---"
