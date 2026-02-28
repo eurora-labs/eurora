@@ -614,7 +614,7 @@
 					SafariServices,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.eurora-labs.eurora.macos";
-				PRODUCT_NAME = Eurora;
+				PRODUCT_NAME = EuroraLauncher;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = YES;
@@ -674,7 +674,7 @@
 					SafariServices,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.eurora-labs.eurora.macos";
-				PRODUCT_NAME = Eurora;
+				PRODUCT_NAME = EuroraLauncher;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = YES;
