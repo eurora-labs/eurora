@@ -52,6 +52,7 @@ pub struct RegisteredMessenger {
     pub tx: mpsc::Sender<Result<Frame, Status>>,
     pub host_pid: u32,
     pub browser_pid: u32,
+    pub browser_name: String,
 }
 
 #[derive(Clone)]
@@ -363,6 +364,14 @@ impl BrowserBridgeService {
         self.send_request(browser_pid, "GET_METADATA", None).await
     }
 
+    pub async fn find_pid_by_browser_name(&self, browser_name: &str) -> Option<u32> {
+        let registry = self.registry.read().await;
+        registry
+            .values()
+            .find(|m| m.browser_name == browser_name)
+            .map(|m| m.browser_pid)
+    }
+
     pub async fn connection_count(&self) -> usize {
         let registry = self.registry.read().await;
         registry.len()
@@ -411,6 +420,8 @@ impl BrowserBridge for BrowserBridgeService {
 
         let browser_pid = register_frame.browser_pid;
         let host_pid = register_frame.host_pid;
+        let browser_name = crate::process_name::get_process_name(browser_pid)
+            .unwrap_or_else(|| format!("unknown_{}", browser_pid));
 
         let (tx_to_client, rx_to_client) = mpsc::channel::<Result<Frame, Status>>(32);
 
@@ -422,10 +433,12 @@ impl BrowserBridge for BrowserBridgeService {
                     tx: tx_to_client.clone(),
                     host_pid,
                     browser_pid,
+                    browser_name: browser_name.clone(),
                 },
             );
             tracing::debug!(
-                "Registered browser with browser_pid: {} and host_pid: {}. Total registered browsers: {}",
+                "Registered browser {:?} with browser_pid: {} and host_pid: {}. Total registered browsers: {}",
+                browser_name,
                 browser_pid,
                 host_pid,
                 registry.len()
