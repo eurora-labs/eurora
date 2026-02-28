@@ -2,9 +2,6 @@ use std::sync::OnceLock;
 
 static PARENT_PID: OnceLock<u32> = OnceLock::new();
 
-/// On Safari/macOS, the Swift bridge passes the actual Safari PID via
-/// EURORA_BROWSER_PID since the native messaging host's parent would be
-/// the Swift bridge app, not Safari.
 pub fn capture_parent_pid() {
     let ppid = if let Ok(env_pid) = std::env::var("EURORA_BROWSER_PID") {
         if let Ok(pid) = env_pid.parse::<u32>() {
@@ -47,10 +44,8 @@ fn get_parent_pid_impl() -> u32 {
         return direct_ppid;
     }
 
-    // The direct parent may be an intermediary (e.g. xdg-desktop-portal
-    // when Firefox uses the freedesktop portal to launch native messaging
-    // hosts). In that case the browser is a sibling of our parent, sharing
-    // the same grandparent (typically systemd --user).
+    // Direct parent may be an intermediary (e.g. xdg-desktop-portal),
+    // so check siblings sharing the same grandparent.
     if let Some((grandparent, _)) = read_proc_stat(direct_ppid)
         && grandparent > 1
         && let Some(browser_pid) = find_browser_child(grandparent, browser_names)
@@ -76,8 +71,6 @@ fn is_browser_process(pid: u32, browser_names: &[&str]) -> bool {
     read_proc_stat(pid).is_some_and(|(_, name)| browser_names.iter().any(|b| name == *b))
 }
 
-/// Scans `/proc` for any process whose parent is `parent_pid` and whose
-/// comm matches a known browser name.
 #[cfg(target_os = "linux")]
 fn find_browser_child(parent_pid: u32, browser_names: &[&str]) -> Option<u32> {
     let proc_dir = std::fs::read_dir("/proc").ok()?;
@@ -99,11 +92,9 @@ fn find_browser_child(parent_pid: u32, browser_names: &[&str]) -> Option<u32> {
     None
 }
 
-/// Reads `/proc/<pid>/stat` and returns `(ppid, comm)`.
 #[cfg(target_os = "linux")]
 fn read_proc_stat(pid: u32) -> Option<(u32, String)> {
     let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
-    // Format: "<pid> (<comm>) <state> <ppid> ..."
     // comm can contain spaces and parentheses, so find the last ')'.
     let comm_start = stat.find('(')? + 1;
     let comm_end = stat.rfind(')')?;
@@ -121,6 +112,8 @@ fn get_parent_pid_impl() -> u32 {
 
 #[cfg(target_os = "windows")]
 fn get_parent_pid_impl() -> u32 {
+    use euro_process::{Chrome, Firefox, Librewolf, ProcessFunctionality};
+    use std::collections::{HashMap, HashSet};
     use std::mem::MaybeUninit;
     use std::process;
 
@@ -147,10 +140,19 @@ fn get_parent_pid_impl() -> u32 {
         fn CloseHandle(hObject: isize) -> i32;
     }
 
+    fn exe_name(entry: &PROCESSENTRY32W) -> String {
+        let raw = &entry.szExeFile;
+        let len = raw.iter().position(|&c| c == 0).unwrap_or(raw.len());
+        String::from_utf16_lossy(&raw[..len])
+    }
+
     const TH32CS_SNAPPROCESS: u32 = 0x00000002;
     const INVALID_HANDLE_VALUE: isize = -1;
 
+    let browser_names: &[&str] = &[Firefox.get_name(), Chrome.get_name(), Librewolf.get_name()];
     let current_pid = process::id();
+
+    let mut parent_map: HashMap<u32, (u32, String)> = HashMap::new();
 
     unsafe {
         let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -162,30 +164,47 @@ fn get_parent_pid_impl() -> u32 {
         let mut entry: MaybeUninit<PROCESSENTRY32W> = MaybeUninit::uninit();
         (*entry.as_mut_ptr()).dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
 
-        if Process32FirstW(snapshot, entry.as_mut_ptr()) == 0 {
-            CloseHandle(snapshot);
-            tracing::error!("Failed to get first process entry");
-            return 0;
-        }
+        if Process32FirstW(snapshot, entry.as_mut_ptr()) != 0 {
+            loop {
+                let e = entry.assume_init_ref();
+                parent_map.insert(e.th32ProcessID, (e.th32ParentProcessID, exe_name(e)));
 
-        loop {
-            let entry_ref = entry.assume_init_ref();
-            if entry_ref.th32ProcessID == current_pid {
-                let parent_pid = entry_ref.th32ParentProcessID;
-                CloseHandle(snapshot);
-                return parent_pid;
-            }
-
-            if Process32NextW(snapshot, entry.as_mut_ptr()) == 0 {
-                break;
+                if Process32NextW(snapshot, entry.as_mut_ptr()) == 0 {
+                    break;
+                }
             }
         }
 
         CloseHandle(snapshot);
     }
 
-    tracing::error!("Could not find current process in snapshot");
-    0
+    let mut current = current_pid;
+    let mut visited = HashSet::new();
+    while let Some(&(parent, ref name)) = parent_map.get(&current) {
+        if parent == 0 || !visited.insert(current) {
+            break;
+        }
+        if browser_names.iter().any(|b| b.eq_ignore_ascii_case(name)) {
+            tracing::info!(
+                "Found browser ancestor: pid={}, name={:?} (walked from pid={})",
+                current,
+                name,
+                current_pid
+            );
+            return current;
+        }
+        current = parent;
+    }
+
+    let direct_parent = parent_map
+        .get(&current_pid)
+        .map(|(ppid, _)| *ppid)
+        .unwrap_or(0);
+    tracing::debug!(
+        "No browser ancestor found, using direct parent PID {}",
+        direct_parent
+    );
+    direct_parent
 }
 
 #[cfg(test)]

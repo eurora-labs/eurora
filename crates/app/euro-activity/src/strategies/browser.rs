@@ -312,6 +312,17 @@ impl BrowserStrategy {
         true
     }
 
+    /// Resolves the registered messenger PID for a given process name.
+    /// Falls back to the provided `fallback_pid` if no messenger is registered.
+    async fn resolve_messenger_pid(&self, process_name: &str, fallback_pid: u32) -> u32 {
+        if let Some(service) = &self.bridge_service
+            && let Some(pid) = service.find_pid_by_browser_name(process_name).await
+        {
+            return pid;
+        }
+        fallback_pid
+    }
+
     pub async fn new() -> ActivityResult<Self> {
         let mut strategy = BrowserStrategy::default();
         strategy.initialize_service().await?;
@@ -346,19 +357,16 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         self.sender = Some(sender.clone());
         let process_name = focus_window.process_name.clone();
         self.active_browser = Some(process_name.clone());
+
+        let messenger_pid = self
+            .resolve_messenger_pid(&process_name, focus_window.process_id)
+            .await;
         self.active_browser_pid
-            .store(focus_window.process_id, Ordering::Relaxed);
+            .store(messenger_pid, Ordering::Relaxed);
 
         self.init_collection().await?;
 
-        if !Self::flush_cache(
-            focus_window.process_id,
-            &process_name,
-            &sender,
-            &self.last_url,
-        )
-        .await
-        {
+        if !Self::flush_cache(messenger_pid, &process_name, &sender, &self.last_url).await {
             match self.get_metadata().await {
                 Ok(metadata) => {
                     if let Some(ref url_str) = metadata.url
@@ -405,13 +413,16 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         );
 
         if self.can_handle_process(focus_window) {
+            let messenger_pid = self
+                .resolve_messenger_pid(&focus_window.process_name, focus_window.process_id)
+                .await;
             self.active_browser_pid
-                .store(focus_window.process_id, Ordering::Relaxed);
+                .store(messenger_pid, Ordering::Relaxed);
             self.active_browser = Some(focus_window.process_name.to_string());
 
             if let Some(sender) = &self.sender {
                 Self::flush_cache(
-                    focus_window.process_id,
+                    messenger_pid,
                     &focus_window.process_name,
                     sender,
                     &self.last_url,
