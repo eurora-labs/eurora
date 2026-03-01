@@ -20,7 +20,7 @@ sqlx = { version = "0.8.6", features = [
   "migrate",
   "postgres",
   "runtime-tokio",
-  "tls-native-tls",
+  "tls-rustls-aws-lc-rs",
   "uuid",
 ] }
 thiserror = { workspace = true }
