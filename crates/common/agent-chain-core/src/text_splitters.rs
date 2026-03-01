@@ -6,6 +6,9 @@ pub mod latex;
 pub mod markdown;
 pub mod python;
 
+#[cfg(feature = "tiktoken")]
+pub mod token;
+
 pub use base::{
     CharacterTextSplitter, CharacterTextSplitterConfig, join_docs, merge_splits,
     split_text_with_regex,
@@ -18,6 +21,9 @@ pub use markdown::{
     ExperimentalMarkdownSyntaxTextSplitter, MarkdownHeaderTextSplitter, MarkdownTextSplitter,
 };
 pub use python::PythonCodeTextSplitter;
+
+#[cfg(feature = "tiktoken")]
+pub use token::{TokenTextSplitter, resolve_tiktoken_bpe, tiktoken_length_function};
 
 use crate::documents::{BaseDocumentTransformer, Document};
 use async_trait::async_trait;

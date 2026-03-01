@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use regex::Regex;
+use fancy_regex::Regex;
 use serde_json::Value;
 
 use crate::documents::{BaseDocumentTransformer, Document};
@@ -64,7 +64,7 @@ impl RecursiveCharacterTextSplitter {
                 break;
             }
             if let Ok(re) = Regex::new(&separator_pattern) {
-                if re.is_match(text) {
+                if re.is_match(text).unwrap_or(false) {
                     separator = s.clone();
                     new_separators = &separators[i + 1..];
                     break;
