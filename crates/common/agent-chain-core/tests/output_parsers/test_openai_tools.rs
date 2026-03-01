@@ -17,7 +17,7 @@ fn make_additional_kwargs_generation(tool_calls: Value) -> ChatGeneration {
         .additional_kwargs(additional_kwargs)
         .build();
 
-    ChatGeneration::new(message.into())
+    ChatGeneration::builder().message(message.into()).build()
 }
 
 fn make_tool_calls_generation(
@@ -28,7 +28,7 @@ fn make_tool_calls_generation(
         .tool_calls(tool_calls)
         .build();
 
-    ChatGeneration::new(message.into())
+    ChatGeneration::builder().message(message.into()).build()
 }
 
 fn make_tool_call(id: &str, name: &str, args: Value) -> agent_chain_core::messages::ToolCall {
@@ -54,7 +54,7 @@ fn test_json_output_tools_parser_additional_kwargs() {
     ]);
 
     let generation = make_additional_kwargs_generation(raw_tool_calls);
-    let parser = JsonOutputToolsParser::new();
+    let parser = JsonOutputToolsParser::builder().build();
     let result = parser.parse_result(&[generation], false).unwrap();
 
     let expected = json!([{
@@ -81,7 +81,7 @@ fn test_json_output_tools_parser_return_id_additional_kwargs() {
     ]);
 
     let generation = make_additional_kwargs_generation(raw_tool_calls);
-    let parser = JsonOutputToolsParser::new().with_return_id(true);
+    let parser = JsonOutputToolsParser::builder().return_id(true).build();
     let result = parser.parse_result(&[generation], false).unwrap();
 
     let expected = json!([{
@@ -104,7 +104,7 @@ fn test_json_output_tools_parser_tool_calls() {
     )];
 
     let generation = make_tool_calls_generation(tool_calls);
-    let parser = JsonOutputToolsParser::new();
+    let parser = JsonOutputToolsParser::builder().build();
     let result = parser.parse_result(&[generation], false).unwrap();
 
     let expected = json!([{
@@ -126,7 +126,7 @@ fn test_json_output_tools_parser_return_id_tool_calls() {
     )];
 
     let generation = make_tool_calls_generation(tool_calls);
-    let parser = JsonOutputToolsParser::new().with_return_id(true);
+    let parser = JsonOutputToolsParser::builder().return_id(true).build();
     let result = parser.parse_result(&[generation], false).unwrap();
 
     let expected = json!([{
@@ -151,7 +151,9 @@ fn test_json_output_key_tools_parser_additional_kwargs() {
     ]);
 
     let generation = make_additional_kwargs_generation(raw_tool_calls);
-    let parser = JsonOutputKeyToolsParser::new("NameCollector");
+    let parser = JsonOutputKeyToolsParser::builder()
+        .key_name("NameCollector")
+        .build();
     let result = parser.parse_result(&[generation], false).unwrap();
 
     let expected = json!([{"names": ["suzy"]}]);
@@ -172,7 +174,10 @@ fn test_json_output_key_tools_parser_first_only_additional_kwargs() {
     ]);
 
     let generation = make_additional_kwargs_generation(raw_tool_calls);
-    let parser = JsonOutputKeyToolsParser::new("NameCollector").with_first_tool_only(true);
+    let parser = JsonOutputKeyToolsParser::builder()
+        .key_name("NameCollector")
+        .first_tool_only(true)
+        .build();
     let result = parser.parse_result(&[generation], false).unwrap();
 
     let expected = json!({"names": ["suzy"]});
@@ -188,7 +193,9 @@ fn test_json_output_key_tools_parser_tool_calls() {
     )];
 
     let generation = make_tool_calls_generation(tool_calls);
-    let parser = JsonOutputKeyToolsParser::new("NameCollector");
+    let parser = JsonOutputKeyToolsParser::builder()
+        .key_name("NameCollector")
+        .build();
     let result = parser.parse_result(&[generation], false).unwrap();
 
     let expected = json!([{"names": ["suzy"]}]);
@@ -204,7 +211,10 @@ fn test_json_output_key_tools_parser_first_only_tool_calls() {
     )];
 
     let generation = make_tool_calls_generation(tool_calls);
-    let parser = JsonOutputKeyToolsParser::new("NameCollector").with_first_tool_only(true);
+    let parser = JsonOutputKeyToolsParser::builder()
+        .key_name("NameCollector")
+        .first_tool_only(true)
+        .build();
     let result = parser.parse_result(&[generation], false).unwrap();
 
     let expected = json!({"names": ["suzy"]});
@@ -234,9 +244,11 @@ fn run_multiple_tools_first_only_test(use_tool_calls: bool) {
 
     let result = vec![generation];
 
-    let parser = JsonOutputKeyToolsParser::new("func")
-        .with_first_tool_only(true)
-        .with_return_id(true);
+    let parser = JsonOutputKeyToolsParser::builder()
+        .key_name("func")
+        .first_tool_only(true)
+        .return_id(true)
+        .build();
     let output = parser.parse_result(&result, false).unwrap();
 
     assert!(!output.is_null());
@@ -244,9 +256,11 @@ fn run_multiple_tools_first_only_test(use_tool_calls: bool) {
     assert_eq!(output["args"], json!({"a": 1}));
     assert!(output.get("id").is_some());
 
-    let parser_no_id = JsonOutputKeyToolsParser::new("func")
-        .with_first_tool_only(true)
-        .with_return_id(false);
+    let parser_no_id = JsonOutputKeyToolsParser::builder()
+        .key_name("func")
+        .first_tool_only(true)
+        .return_id(false)
+        .build();
     let output_no_id = parser_no_id.parse_result(&result, false).unwrap();
 
     assert_eq!(output_no_id, json!({"a": 1}));
@@ -285,15 +299,19 @@ fn run_multiple_tools_no_match_test(use_tool_calls: bool) {
 
     let result = vec![generation];
 
-    let parser = JsonOutputKeyToolsParser::new("nonexistent")
-        .with_first_tool_only(true)
-        .with_return_id(true);
+    let parser = JsonOutputKeyToolsParser::builder()
+        .key_name("nonexistent")
+        .first_tool_only(true)
+        .return_id(true)
+        .build();
     let output = parser.parse_result(&result, false).unwrap();
     assert!(output.is_null());
 
-    let parser_no_id = JsonOutputKeyToolsParser::new("nonexistent")
-        .with_first_tool_only(true)
-        .with_return_id(false);
+    let parser_no_id = JsonOutputKeyToolsParser::builder()
+        .key_name("nonexistent")
+        .first_tool_only(true)
+        .return_id(false)
+        .build();
     let output_no_id = parser_no_id.parse_result(&result, false).unwrap();
     assert!(output_no_id.is_null());
 }
@@ -337,18 +355,22 @@ fn run_multiple_matching_tools_test(use_tool_calls: bool) {
 
     let result = vec![generation];
 
-    let parser = JsonOutputKeyToolsParser::new("func")
-        .with_first_tool_only(true)
-        .with_return_id(true);
+    let parser = JsonOutputKeyToolsParser::builder()
+        .key_name("func")
+        .first_tool_only(true)
+        .return_id(true)
+        .build();
     let output = parser.parse_result(&result, false).unwrap();
 
     assert!(!output.is_null());
     assert_eq!(output["type"], "func");
     assert_eq!(output["args"], json!({"a": 1}));
 
-    let parser_all = JsonOutputKeyToolsParser::new("func")
-        .with_first_tool_only(false)
-        .with_return_id(true);
+    let parser_all = JsonOutputKeyToolsParser::builder()
+        .key_name("func")
+        .first_tool_only(false)
+        .return_id(true)
+        .build();
     let output_all = parser_all.parse_result(&result, false).unwrap();
 
     let arr = output_all.as_array().unwrap();
@@ -376,15 +398,19 @@ fn run_empty_results_test(use_tool_calls: bool) {
 
     let result = vec![generation];
 
-    let parser = JsonOutputKeyToolsParser::new("func")
-        .with_first_tool_only(true)
-        .with_return_id(true);
+    let parser = JsonOutputKeyToolsParser::builder()
+        .key_name("func")
+        .first_tool_only(true)
+        .return_id(true)
+        .build();
     let output = parser.parse_result(&result, false).unwrap();
     assert!(output.is_null());
 
-    let parser_all = JsonOutputKeyToolsParser::new("func")
-        .with_first_tool_only(false)
-        .with_return_id(true);
+    let parser_all = JsonOutputKeyToolsParser::builder()
+        .key_name("func")
+        .first_tool_only(false)
+        .return_id(true)
+        .build();
     let output_all = parser_all.parse_result(&result, false).unwrap();
     assert_eq!(output_all, json!([]));
 }
@@ -428,23 +454,29 @@ fn run_parameter_combinations_test(use_tool_calls: bool) {
 
     let result = vec![generation];
 
-    let parser1 = JsonOutputKeyToolsParser::new("func")
-        .with_first_tool_only(true)
-        .with_return_id(true);
+    let parser1 = JsonOutputKeyToolsParser::builder()
+        .key_name("func")
+        .first_tool_only(true)
+        .return_id(true)
+        .build();
     let output1 = parser1.parse_result(&result, false).unwrap();
     assert_eq!(output1["type"], "func");
     assert_eq!(output1["args"], json!({"a": 1}));
     assert!(output1.get("id").is_some());
 
-    let parser2 = JsonOutputKeyToolsParser::new("func")
-        .with_first_tool_only(true)
-        .with_return_id(false);
+    let parser2 = JsonOutputKeyToolsParser::builder()
+        .key_name("func")
+        .first_tool_only(true)
+        .return_id(false)
+        .build();
     let output2 = parser2.parse_result(&result, false).unwrap();
     assert_eq!(output2, json!({"a": 1}));
 
-    let parser3 = JsonOutputKeyToolsParser::new("func")
-        .with_first_tool_only(false)
-        .with_return_id(true);
+    let parser3 = JsonOutputKeyToolsParser::builder()
+        .key_name("func")
+        .first_tool_only(false)
+        .return_id(true)
+        .build();
     let output3 = parser3.parse_result(&result, false).unwrap();
     let arr3 = output3.as_array().unwrap();
     assert_eq!(arr3.len(), 2);
@@ -452,9 +484,11 @@ fn run_parameter_combinations_test(use_tool_calls: bool) {
     assert_eq!(arr3[0]["args"], json!({"a": 1}));
     assert_eq!(arr3[1]["args"], json!({"a": 3}));
 
-    let parser4 = JsonOutputKeyToolsParser::new("func")
-        .with_first_tool_only(false)
-        .with_return_id(false);
+    let parser4 = JsonOutputKeyToolsParser::builder()
+        .key_name("func")
+        .first_tool_only(false)
+        .return_id(false)
+        .build();
     let output4 = parser4.parse_result(&result, false).unwrap();
     assert_eq!(output4, json!([{"a": 1}, {"a": 3}]));
 }
@@ -1082,7 +1116,9 @@ fn test_pydantic_tools_parser_empty_list() {
 
 #[test]
 fn test_json_output_tools_parser_first_tool_only() {
-    let parser = JsonOutputToolsParser::new().with_first_tool_only(true);
+    let parser = JsonOutputToolsParser::builder()
+        .first_tool_only(true)
+        .build();
 
     let generation = make_tool_calls_generation(vec![
         make_tool_call("call_1", "func1", json!({"a": 1})),
@@ -1098,7 +1134,9 @@ fn test_json_output_tools_parser_first_tool_only() {
 
 #[test]
 fn test_json_output_tools_parser_first_tool_only_empty() {
-    let parser = JsonOutputToolsParser::new().with_first_tool_only(true);
+    let parser = JsonOutputToolsParser::builder()
+        .first_tool_only(true)
+        .build();
 
     let generation = make_tool_calls_generation(vec![]);
     let result = parser.parse_result(&[generation], false).unwrap();
@@ -1109,9 +1147,9 @@ fn test_json_output_tools_parser_first_tool_only_empty() {
 #[test]
 fn test_json_output_tools_parser_no_tool_calls_no_kwargs() {
     let message = AIMessage::builder().content("Hello").build();
-    let generation = ChatGeneration::new(message.into());
+    let generation = ChatGeneration::builder().message(message.into()).build();
 
-    let parser = JsonOutputToolsParser::new();
+    let parser = JsonOutputToolsParser::builder().build();
     let result = parser.parse_result(&[generation], false).unwrap();
 
     assert_eq!(result, json!([]));

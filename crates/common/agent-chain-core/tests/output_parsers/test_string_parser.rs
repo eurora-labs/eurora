@@ -73,7 +73,7 @@ async fn test_str_output_parser_ainvoke_with_message() {
 #[test]
 fn test_str_output_parser_parse_result_with_generation() {
     let parser = StrOutputParser::new();
-    let generation = Generation::new("Generated text");
+    let generation = Generation::builder().text("Generated text").build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result, "Generated text");
 }
@@ -82,8 +82,10 @@ fn test_str_output_parser_parse_result_with_generation() {
 fn test_str_output_parser_parse_result_with_chat_generation() {
     let parser = StrOutputParser::new();
     let message = AIMessage::builder().content("Chat generated text").build();
-    let chat_generation = ChatGeneration::new(BaseMessage::AI(message));
-    let generation = Generation::new(&chat_generation.text);
+    let chat_generation = ChatGeneration::builder()
+        .message(BaseMessage::AI(message))
+        .build();
+    let generation = Generation::builder().text(&chat_generation.text).build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result, "Chat generated text");
 }
@@ -264,9 +266,9 @@ fn test_str_output_parser_with_xml_string() {
 fn test_str_output_parser_multiple_generations() {
     let parser = StrOutputParser::new();
     let generations = vec![
-        Generation::new("First generation"),
-        Generation::new("Second generation"),
-        Generation::new("Third generation"),
+        Generation::builder().text("First generation").build(),
+        Generation::builder().text("Second generation").build(),
+        Generation::builder().text("Third generation").build(),
     ];
     let result = parser.parse_result(&generations, false).unwrap();
     assert_eq!(result, "First generation");

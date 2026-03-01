@@ -309,17 +309,26 @@ fn test_secret_from_env_with_custom_error_message() {
 fn test_generation_chunk_addition_combines_metadata() {
     let mut info1 = HashMap::new();
     info1.insert("len".to_string(), json!(0));
-    let chunk1 = GenerationChunk::with_info("", info1);
+    let chunk1 = GenerationChunk::builder()
+        .text("")
+        .generation_info(info1)
+        .build();
 
     let mut info2 = HashMap::new();
     info2.insert("len".to_string(), json!(14));
-    let chunk2 = GenerationChunk::with_info("Non-empty text", info2);
+    let chunk2 = GenerationChunk::builder()
+        .text("Non-empty text")
+        .generation_info(info2)
+        .build();
 
     let result = chunk1 + chunk2;
 
     let mut expected_info = HashMap::new();
     expected_info.insert("len".to_string(), json!(14));
-    let expected = GenerationChunk::with_info("Non-empty text", expected_info);
+    let expected = GenerationChunk::builder()
+        .text("Non-empty text")
+        .generation_info(expected_info)
+        .build();
 
     assert_eq!(result.text, expected.text);
     assert_eq!(result.generation_info, expected.generation_info);

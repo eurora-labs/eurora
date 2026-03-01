@@ -500,8 +500,8 @@ impl ChatOpenAI {
             builtin_tools: Vec::new(),
             disabled_params: None,
             extra_body: None,
-            chat_model_config: ChatModelConfig::new(),
-            language_model_config: LanguageModelConfig::new(),
+            chat_model_config: ChatModelConfig::builder().build(),
+            language_model_config: LanguageModelConfig::builder().build(),
             bound_tools: Vec::new(),
             bound_builtin_tools: Vec::new(),
             bound_tool_choice: None,
@@ -1550,7 +1550,7 @@ impl ChatOpenAI {
                                     match event.event_type.as_str() {
                                         "response.output_text.delta" => {
                                             if let Some(delta) = event.delta {
-                                                yield Ok(ChatChunk::new(delta));
+                                                yield Ok(ChatChunk::builder().content(delta).build());
                                             }
                                         }
                                         "response.output_text.annotation.added" => {
@@ -1623,7 +1623,7 @@ impl ChatOpenAI {
                                         }
                                         "response.refusal.delta" => {
                                             if let Some(delta) = event.delta {
-                                                yield Ok(ChatChunk::new(delta));
+                                                yield Ok(ChatChunk::builder().content(delta).build());
                                             }
                                         }
                                         _ => {}
@@ -1722,9 +1722,14 @@ impl ChatOpenAI {
                 .build();
 
             let generation = if generation_info.is_empty() {
-                ChatGeneration::new(BaseMessage::AI(ai_message))
+                ChatGeneration::builder()
+                    .message(BaseMessage::AI(ai_message))
+                    .build()
             } else {
-                ChatGeneration::with_info(BaseMessage::AI(ai_message), generation_info)
+                ChatGeneration::builder()
+                    .message(BaseMessage::AI(ai_message))
+                    .generation_info(generation_info)
+                    .build()
             };
             generations.push(generation);
         }
@@ -1749,7 +1754,10 @@ impl ChatOpenAI {
             );
         }
 
-        Ok(ChatResult::with_llm_output(generations, llm_output))
+        Ok(ChatResult::builder()
+            .generations(generations)
+            .llm_output(llm_output)
+            .build())
     }
 
     /// Parse a Responses API response.
@@ -1845,8 +1853,10 @@ impl ChatOpenAI {
             .response_metadata(response_metadata)
             .build();
 
-        let generation = ChatGeneration::new(BaseMessage::AI(ai_message));
-        Ok(ChatResult::new(vec![generation]))
+        let generation = ChatGeneration::builder()
+            .message(BaseMessage::AI(ai_message))
+            .build();
+        Ok(ChatResult::builder().generations(vec![generation]).build())
     }
 
     /// Send an HTTP request and deserialize the JSON response.
@@ -2280,7 +2290,7 @@ impl ChatOpenAI {
                                         Ok(chunk) => {
                                             if let Some(choice) = chunk.choices.first() {
                                                 if let Some(ref content) = choice.delta.content {
-                                                    yield Ok(ChatChunk::new(content.clone()));
+                                                    yield Ok(ChatChunk::builder().content(content.clone()).build());
                                                 }
                                                 if let Some(ref tcs) = choice.delta.tool_calls {
                                                     for tc in tcs {
@@ -2356,7 +2366,7 @@ impl BaseLanguageModel for ChatOpenAI {
                 .await?;
             all_generations.push(result.generations.into_iter().map(|g| g.into()).collect());
         }
-        Ok(LLMResult::new(all_generations))
+        Ok(LLMResult::builder().generations(all_generations).build())
     }
 
     fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
@@ -2580,8 +2590,8 @@ impl BaseChatModel for ChatOpenAI {
                     stop,
                 )
                 .await?;
-            let generation = ChatGeneration::new(ai_message.into());
-            return Ok(ChatResult::new(vec![generation]));
+            let generation = ChatGeneration::builder().message(ai_message.into()).build();
+            return Ok(ChatResult::builder().generations(vec![generation]).build());
         }
         self._generate_internal(messages, stop, None).await
     }
@@ -2620,7 +2630,7 @@ impl BaseChatModel for ChatOpenAI {
                             .maybe_usage_metadata(chat_chunk.usage_metadata.clone())
                             .response_metadata(response_metadata)
                             .build();
-                        yield Ok(ChatGenerationChunk::new(message.into()));
+                        yield Ok(ChatGenerationChunk::builder().message(message.into()).build());
                     }
                     Err(e) => {
                         yield Err(e);
@@ -2683,8 +2693,10 @@ impl BaseChatModel for ChatOpenAI {
         let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
 
         let output_parser =
-            crate::output_parsers::openai_tools::JsonOutputKeyToolsParser::new(&tool_name)
-                .with_first_tool_only(true);
+            crate::output_parsers::openai_tools::JsonOutputKeyToolsParser::builder()
+                .key_name(&tool_name)
+                .first_tool_only(true)
+                .build();
 
         let model_runnable = ChatModelRunnable::new(std::sync::Arc::from(bound_model));
 
@@ -2794,14 +2806,16 @@ impl ChatOpenAI {
                     model.bound_strict = strict;
                 }
 
-                let parse_json_content = crate::runnables::base::RunnableLambda::new(
-                    |ai_msg: AIMessage| -> crate::error::Result<serde_json::Value> {
-                        let content = ai_msg.text();
-                        serde_json::from_str(&content).map_err(|e| {
-                            crate::error::Error::other(format!("JSON parse error: {e}"))
-                        })
-                    },
-                );
+                let parse_json_content = crate::runnables::base::RunnableLambda::builder()
+                    .func(
+                        |ai_msg: AIMessage| -> crate::error::Result<serde_json::Value> {
+                            let content = ai_msg.text();
+                            serde_json::from_str(&content).map_err(|e| {
+                                crate::error::Error::other(format!("JSON parse error: {e}"))
+                            })
+                        },
+                    )
+                    .build();
 
                 let model_runnable = ChatModelRunnable::new(std::sync::Arc::from(
                     Box::new(model) as Box<dyn BaseChatModel>
@@ -2825,8 +2839,10 @@ impl ChatOpenAI {
                 )?;
 
                 let output_parser =
-                    crate::output_parsers::openai_tools::JsonOutputKeyToolsParser::new(&tool_name)
-                        .with_first_tool_only(true);
+                    crate::output_parsers::openai_tools::JsonOutputKeyToolsParser::builder()
+                        .key_name(&tool_name)
+                        .first_tool_only(true)
+                        .build();
                 let model_runnable = ChatModelRunnable::new(std::sync::Arc::from(bound_model));
                 if include_raw {
                     Ok(Box::new(

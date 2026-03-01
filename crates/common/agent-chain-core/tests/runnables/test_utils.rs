@@ -197,7 +197,7 @@ async fn test_gather_with_concurrency_empty() {
 
 #[test]
 fn test_configurable_field_defaults() {
-    let field = ConfigurableField::new("test_id");
+    let field = ConfigurableField::builder().id("test_id").build();
     assert_eq!(field.id, "test_id");
     assert_eq!(field.name, None);
     assert_eq!(field.description, None);
@@ -207,11 +207,13 @@ fn test_configurable_field_defaults() {
 
 #[test]
 fn test_configurable_field_with_values() {
-    let field = ConfigurableField::new("temp")
-        .with_name("Temperature")
-        .with_description("The LLM temperature")
-        .with_annotation("float")
-        .with_shared(true);
+    let field = ConfigurableField::builder()
+        .id("temp")
+        .name("Temperature")
+        .description("The LLM temperature")
+        .annotation("float")
+        .is_shared(true)
+        .build();
 
     assert_eq!(field.id, "temp");
     assert_eq!(field.name, Some("Temperature".to_string()));
@@ -230,9 +232,18 @@ fn test_configurable_field_hash() {
         hasher.finish()
     }
 
-    let f1 = ConfigurableField::new("a").with_annotation("int");
-    let f2 = ConfigurableField::new("a").with_annotation("int");
-    let f3 = ConfigurableField::new("b").with_annotation("int");
+    let f1 = ConfigurableField::builder()
+        .id("a")
+        .annotation("int")
+        .build();
+    let f2 = ConfigurableField::builder()
+        .id("a")
+        .annotation("int")
+        .build();
+    let f3 = ConfigurableField::builder()
+        .id("b")
+        .annotation("int")
+        .build();
 
     assert_eq!(compute_hash(&f1), compute_hash(&f2));
     assert_ne!(compute_hash(&f1), compute_hash(&f3));
@@ -247,7 +258,11 @@ fn test_configurable_field_single_option() {
     .into_iter()
     .collect();
 
-    let field = ConfigurableFieldSingleOption::new("model", options, "gpt4");
+    let field = ConfigurableFieldSingleOption::builder()
+        .id("model")
+        .options(options)
+        .default("gpt4")
+        .build();
 
     assert_eq!(field.id, "model");
     assert_eq!(field.default, "gpt4");
@@ -270,8 +285,16 @@ fn test_configurable_field_single_option_hash() {
             .into_iter()
             .collect();
 
-    let f1 = ConfigurableFieldSingleOption::new("m", options.clone(), "a");
-    let f2 = ConfigurableFieldSingleOption::new("m", options, "a");
+    let f1 = ConfigurableFieldSingleOption::builder()
+        .id("m")
+        .options(options.clone())
+        .default("a")
+        .build();
+    let f2 = ConfigurableFieldSingleOption::builder()
+        .id("m")
+        .options(options)
+        .default("a")
+        .build();
 
     assert_eq!(compute_hash(&f1), compute_hash(&f2));
 }
@@ -285,7 +308,11 @@ fn test_configurable_field_multi_option() {
     .into_iter()
     .collect();
 
-    let field = ConfigurableFieldMultiOption::new("tools", options, vec!["search".to_string()]);
+    let field = ConfigurableFieldMultiOption::builder()
+        .id("tools")
+        .options(options)
+        .default(vec!["search".to_string()])
+        .build();
 
     assert_eq!(field.id, "tools");
     assert_eq!(field.default, vec!["search".to_string()]);
@@ -305,15 +332,26 @@ fn test_configurable_field_multi_option_hash() {
 
     let options: HashMap<String, Value> = [("a".to_string(), json!(1))].into_iter().collect();
 
-    let f1 = ConfigurableFieldMultiOption::new("t", options.clone(), vec!["a".to_string()]);
-    let f2 = ConfigurableFieldMultiOption::new("t", options, vec!["a".to_string()]);
+    let f1 = ConfigurableFieldMultiOption::builder()
+        .id("t")
+        .options(options.clone())
+        .default(vec!["a".to_string()])
+        .build();
+    let f2 = ConfigurableFieldMultiOption::builder()
+        .id("t")
+        .options(options)
+        .default(vec!["a".to_string()])
+        .build();
 
     assert_eq!(compute_hash(&f1), compute_hash(&f2));
 }
 
 #[test]
 fn test_configurable_field_spec_defaults() {
-    let spec = ConfigurableFieldSpec::new("s", "str");
+    let spec = ConfigurableFieldSpec::builder()
+        .id("s")
+        .annotation("str")
+        .build();
     assert_eq!(spec.id, "s");
     assert_eq!(spec.annotation, "str");
     assert_eq!(spec.name, None);
@@ -325,7 +363,10 @@ fn test_configurable_field_spec_defaults() {
 
 #[test]
 fn test_configurable_field_spec_with_dependencies() {
-    let mut spec = ConfigurableFieldSpec::new("s", "str");
+    let mut spec = ConfigurableFieldSpec::builder()
+        .id("s")
+        .annotation("str")
+        .build();
     spec.dependencies = Some(vec!["dep1".to_string(), "dep2".to_string()]);
     assert_eq!(
         spec.dependencies,
@@ -336,8 +377,14 @@ fn test_configurable_field_spec_with_dependencies() {
 #[test]
 fn test_get_unique_config_specs_no_duplicates() {
     let specs = vec![
-        ConfigurableFieldSpec::new("a", "str"),
-        ConfigurableFieldSpec::new("b", "int"),
+        ConfigurableFieldSpec::builder()
+            .id("a")
+            .annotation("str")
+            .build(),
+        ConfigurableFieldSpec::builder()
+            .id("b")
+            .annotation("int")
+            .build(),
     ];
     let result = get_unique_config_specs(specs).unwrap();
     assert_eq!(result.len(), 2);
@@ -345,7 +392,10 @@ fn test_get_unique_config_specs_no_duplicates() {
 
 #[test]
 fn test_get_unique_config_specs_identical_duplicates() {
-    let spec = ConfigurableFieldSpec::new("a", "str");
+    let spec = ConfigurableFieldSpec::builder()
+        .id("a")
+        .annotation("str")
+        .build();
     let result = get_unique_config_specs(vec![spec.clone(), spec]).unwrap();
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].id, "a");
@@ -353,8 +403,14 @@ fn test_get_unique_config_specs_identical_duplicates() {
 
 #[test]
 fn test_get_unique_config_specs_conflicting_raises() {
-    let s1 = ConfigurableFieldSpec::new("a", "str");
-    let mut s2 = ConfigurableFieldSpec::new("a", "int");
+    let s1 = ConfigurableFieldSpec::builder()
+        .id("a")
+        .annotation("str")
+        .build();
+    let mut s2 = ConfigurableFieldSpec::builder()
+        .id("a")
+        .annotation("int")
+        .build();
     s2.default = Some(json!("y"));
 
     let result = get_unique_config_specs(vec![s1, s2]);

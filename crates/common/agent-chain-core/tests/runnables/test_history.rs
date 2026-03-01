@@ -398,15 +398,12 @@ fn test_dict_input_with_history_messages_key() {
         serde_json::to_value(&output).map_err(|e| Error::Other(format!("ser: {}", e)))
     });
 
-    let with_history = RunnableWithMessageHistory::new(
-        runnable,
-        None,
-        factory,
-        Some("question".to_string()),
-        None,
-        Some("history".to_string()),
-        None,
-    );
+    let with_history = RunnableWithMessageHistory::builder()
+        .runnable(runnable)
+        .get_session_history(factory)
+        .input_messages_key("question".to_string())
+        .history_messages_key("history".to_string())
+        .build();
 
     let cfg = config_with(&[("session_id", "dict1")]);
 
@@ -480,15 +477,11 @@ fn test_dict_input_with_output_messages_key() {
         Ok(serde_json::json!({"answer": [response_value], "extra": "data"}))
     });
 
-    let with_history = RunnableWithMessageHistory::new(
-        runnable,
-        None,
-        factory,
-        None,
-        Some("answer".to_string()),
-        None,
-        None,
-    );
+    let with_history = RunnableWithMessageHistory::builder()
+        .runnable(runnable)
+        .get_session_history(factory)
+        .output_messages_key("answer".to_string())
+        .build();
 
     let cfg = config_with(&[("session_id", "out1")]);
 
@@ -532,15 +525,10 @@ fn test_get_input_messages_normalization() {
     let factory = make_session_factory(store);
     let dummy_runnable: HistoryInvokeFn = Arc::new(|_input, _config| Ok(Value::Array(vec![])));
 
-    let rwmh = RunnableWithMessageHistory::new(
-        dummy_runnable.clone(),
-        None,
-        factory.clone(),
-        None,
-        None,
-        None,
-        None,
-    );
+    let rwmh = RunnableWithMessageHistory::builder()
+        .runnable(dummy_runnable.clone())
+        .get_session_history(factory.clone())
+        .build();
 
     let msgs = rwmh
         .get_input_messages(&Value::String("hello".to_string()))
@@ -561,15 +549,11 @@ fn test_get_input_messages_normalization() {
     assert_eq!(msgs[0].content(), "a");
     assert_eq!(msgs[1].content(), "b");
 
-    let rwmh2 = RunnableWithMessageHistory::new(
-        dummy_runnable.clone(),
-        None,
-        factory.clone(),
-        Some("question".to_string()),
-        None,
-        None,
-        None,
-    );
+    let rwmh2 = RunnableWithMessageHistory::builder()
+        .runnable(dummy_runnable.clone())
+        .get_session_history(factory.clone())
+        .input_messages_key("question".to_string())
+        .build();
     let dict_input = serde_json::json!({"question": [human_as_value("what?")], "other": "data"});
     let msgs = rwmh2
         .get_input_messages(&dict_input)
@@ -587,15 +571,10 @@ fn test_get_output_messages_normalization() {
     let factory = make_session_factory(store);
     let dummy: HistoryInvokeFn = Arc::new(|_input, _config| Ok(Value::Array(vec![])));
 
-    let rwmh = RunnableWithMessageHistory::new(
-        dummy.clone(),
-        None,
-        factory.clone(),
-        None,
-        None,
-        None,
-        None,
-    );
+    let rwmh = RunnableWithMessageHistory::builder()
+        .runnable(dummy.clone())
+        .get_session_history(factory.clone())
+        .build();
 
     let msgs = rwmh
         .get_output_messages(&Value::String("response".to_string()))
@@ -616,15 +595,11 @@ fn test_get_output_messages_normalization() {
     assert_eq!(msgs[0].content(), "first");
     assert_eq!(msgs[1].content(), "second");
 
-    let rwmh2 = RunnableWithMessageHistory::new(
-        dummy.clone(),
-        None,
-        factory.clone(),
-        None,
-        Some("answer".to_string()),
-        None,
-        None,
-    );
+    let rwmh2 = RunnableWithMessageHistory::builder()
+        .runnable(dummy.clone())
+        .get_session_history(factory.clone())
+        .output_messages_key("answer".to_string())
+        .build();
     let dict_output = serde_json::json!({"answer": [ai_as_value("42")], "meta": "info"});
     let msgs = rwmh2
         .get_output_messages(&dict_output)

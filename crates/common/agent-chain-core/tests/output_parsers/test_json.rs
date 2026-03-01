@@ -386,7 +386,7 @@ fn expected_streamed_json_diff() -> Vec<Value> {
 
 #[tokio::test]
 async fn test_partial_text_json_output_parser() {
-    let parser = SimpleJsonOutputParser::new();
+    let parser = SimpleJsonOutputParser::builder().build();
     let tokens = streamed_tokens();
 
     let input_stream = futures::stream::iter(tokens.into_iter().map(BaseMessage::from));
@@ -412,7 +412,7 @@ async fn test_partial_text_json_output_parser() {
 
 #[tokio::test]
 async fn test_partial_text_json_output_parser_diff() {
-    let parser = SimpleJsonOutputParser::new().with_diff();
+    let parser = SimpleJsonOutputParser::builder().diff(true).build();
     let tokens = streamed_tokens();
 
     let input_stream = futures::stream::iter(tokens.into_iter().map(BaseMessage::from));
@@ -438,7 +438,7 @@ async fn test_partial_text_json_output_parser_diff() {
 
 #[tokio::test]
 async fn test_partial_text_json_output_parser_async() {
-    let parser = SimpleJsonOutputParser::new();
+    let parser = SimpleJsonOutputParser::builder().build();
     let tokens = streamed_tokens();
 
     let input_stream = futures::stream::iter(tokens.into_iter().map(BaseMessage::from));
@@ -458,7 +458,7 @@ async fn test_partial_text_json_output_parser_async() {
 
 #[tokio::test]
 async fn test_partial_text_json_output_parser_diff_async() {
-    let parser = SimpleJsonOutputParser::new().with_diff();
+    let parser = SimpleJsonOutputParser::builder().diff(true).build();
     let tokens = streamed_tokens();
 
     let input_stream = futures::stream::iter(tokens.into_iter().map(BaseMessage::from));
@@ -478,7 +478,7 @@ async fn test_partial_text_json_output_parser_diff_async() {
 
 #[test]
 fn test_raises_error() {
-    let parser = SimpleJsonOutputParser::new();
+    let parser = SimpleJsonOutputParser::builder().build();
     let result = parser.parse("hi");
     assert!(result.is_err(), "Parsing 'hi' should produce an error");
 }
@@ -517,7 +517,7 @@ async fn test_partial_text_json_output_parser_with_json_code_block() {
         " up",
     ];
 
-    let parser = SimpleJsonOutputParser::new();
+    let parser = SimpleJsonOutputParser::builder().build();
 
     let input_stream = futures::stream::iter(tokens.into_iter().map(BaseMessage::from));
 

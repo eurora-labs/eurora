@@ -1,3 +1,4 @@
+use bon::bon;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -151,7 +152,9 @@ pub struct Comparison {
     pub value: serde_json::Value,
 }
 
+#[bon]
 impl Comparison {
+    #[builder]
     pub fn new(
         comparator: Comparator,
         attribute: impl Into<String>,
@@ -183,7 +186,9 @@ pub struct Operation {
     pub arguments: Vec<FilterDirectiveEnum>,
 }
 
+#[bon]
 impl Operation {
+    #[builder]
     pub fn new(operator: Operator, arguments: Vec<FilterDirectiveEnum>) -> Self {
         Operation {
             operator,
@@ -192,15 +197,24 @@ impl Operation {
     }
 
     pub fn and(arguments: Vec<FilterDirectiveEnum>) -> Self {
-        Self::new(Operator::And, arguments)
+        Self::builder()
+            .operator(Operator::And)
+            .arguments(arguments)
+            .build()
     }
 
     pub fn or(arguments: Vec<FilterDirectiveEnum>) -> Self {
-        Self::new(Operator::Or, arguments)
+        Self::builder()
+            .operator(Operator::Or)
+            .arguments(arguments)
+            .build()
     }
 
     pub fn not(argument: FilterDirectiveEnum) -> Self {
-        Self::new(Operator::Not, vec![argument])
+        Self::builder()
+            .operator(Operator::Not)
+            .arguments(vec![argument])
+            .build()
     }
 }
 
@@ -269,7 +283,9 @@ pub struct StructuredQuery {
     pub limit: Option<usize>,
 }
 
+#[bon]
 impl StructuredQuery {
+    #[builder]
     pub fn new(
         query: impl Into<String>,
         filter: Option<FilterDirectiveEnum>,
@@ -283,11 +299,11 @@ impl StructuredQuery {
     }
 
     pub fn query_only(query: impl Into<String>) -> Self {
-        Self::new(query, None, None)
+        Self::builder().query(query).build()
     }
 
     pub fn with_filter(query: impl Into<String>, filter: impl Into<FilterDirectiveEnum>) -> Self {
-        Self::new(query, Some(filter.into()), None)
+        Self::builder().query(query).filter(filter.into()).build()
     }
 }
 
@@ -349,7 +365,11 @@ mod tests {
 
     #[test]
     fn test_comparison_creation() {
-        let comparison = Comparison::new(Comparator::Eq, "field", "value");
+        let comparison = Comparison::builder()
+            .comparator(Comparator::Eq)
+            .attribute("field")
+            .value("value")
+            .build();
         assert_eq!(comparison.comparator, Comparator::Eq);
         assert_eq!(comparison.attribute, "field");
         assert_eq!(comparison.value, serde_json::json!("value"));
@@ -357,7 +377,11 @@ mod tests {
 
     #[test]
     fn test_operation_creation() {
-        let comparison = Comparison::new(Comparator::Gt, "age", 18);
+        let comparison = Comparison::builder()
+            .comparator(Comparator::Gt)
+            .attribute("age")
+            .value(18)
+            .build();
         let operation = Operation::and(vec![comparison.into()]);
         assert_eq!(operation.operator, Operator::And);
         assert_eq!(operation.arguments.len(), 1);
@@ -365,7 +389,11 @@ mod tests {
 
     #[test]
     fn test_structured_query_creation() {
-        let filter = Comparison::new(Comparator::Eq, "status", "active");
+        let filter = Comparison::builder()
+            .comparator(Comparator::Eq)
+            .attribute("status")
+            .value("active")
+            .build();
         let query = StructuredQuery::with_filter("search term", filter);
         assert_eq!(query.query, "search term");
         assert!(query.filter.is_some());
@@ -437,7 +465,11 @@ mod tests {
     fn test_visitor_accept() {
         let visitor = TestVisitor::new();
 
-        let comparison = Comparison::new(Comparator::Eq, "field", "value");
+        let comparison = Comparison::builder()
+            .comparator(Comparator::Eq)
+            .attribute("field")
+            .value("value")
+            .build();
         let result = comparison.accept(&visitor).unwrap();
         assert_eq!(result, "comparison:field:eq");
 
@@ -448,7 +480,11 @@ mod tests {
 
     #[test]
     fn test_serialization() {
-        let comparison = Comparison::new(Comparator::Eq, "field", "value");
+        let comparison = Comparison::builder()
+            .comparator(Comparator::Eq)
+            .attribute("field")
+            .value("value")
+            .build();
         let json = serde_json::to_string(&comparison).unwrap();
         let deserialized: Comparison = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.comparator, comparison.comparator);

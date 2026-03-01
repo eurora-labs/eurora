@@ -111,7 +111,7 @@ fn test_runnable_lambda_callback_lifecycle() {
 
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
 
-    let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
+    let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
 
     let config = RunnableConfig {
         callbacks: Some(Callbacks::from_handlers(vec![handler])),
@@ -129,9 +129,11 @@ fn test_runnable_lambda_callback_error_lifecycle() {
 
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
 
-    let runnable = RunnableLambda::new(|_x: i32| -> agent_chain_core::error::Result<i32> {
-        Err(agent_chain_core::error::Error::other("test error"))
-    });
+    let runnable = RunnableLambda::builder()
+        .func(|_x: i32| -> agent_chain_core::error::Result<i32> {
+            Err(agent_chain_core::error::Error::other("test error"))
+        })
+        .build();
 
     let config = RunnableConfig {
         callbacks: Some(Callbacks::from_handlers(vec![handler])),

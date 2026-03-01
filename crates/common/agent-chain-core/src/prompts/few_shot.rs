@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use async_trait::async_trait;
+use bon::bon;
 
 use crate::error::{Error, Result};
 use crate::messages::{BaseMessage, get_buffer_string};
@@ -109,24 +110,29 @@ pub struct FewShotPromptTemplate {
     validate_template: bool,
 }
 
+#[bon]
 impl FewShotPromptTemplate {
+    #[builder]
     pub fn new(
         examples: Vec<HashMap<String, String>>,
         example_prompt: PromptTemplate,
         suffix: String,
         prefix: Option<String>,
+        #[builder(default = "\n\n".to_string())] example_separator: String,
+        #[builder(default)] template_format: PromptTemplateFormat,
+        #[builder(default)] validate_template: bool,
     ) -> Result<Self> {
         let mut template = Self {
             examples: Some(examples),
             example_selector: None,
             example_prompt,
             suffix,
-            example_separator: "\n\n".to_string(),
+            example_separator,
             prefix: prefix.unwrap_or_default(),
-            template_format: PromptTemplateFormat::FString,
+            template_format,
             input_variables: Vec::new(),
             partial_variables: HashMap::new(),
-            validate_template: false,
+            validate_template,
         };
         template.infer_input_variables();
         Ok(template)
@@ -152,22 +158,6 @@ impl FewShotPromptTemplate {
         };
         template.infer_input_variables();
         Ok(template)
-    }
-
-    pub fn with_separator(mut self, separator: impl Into<String>) -> Self {
-        self.example_separator = separator.into();
-        self
-    }
-
-    pub fn with_format(mut self, format: PromptTemplateFormat) -> Self {
-        self.template_format = format;
-        self.infer_input_variables();
-        self
-    }
-
-    pub fn with_validate_template(mut self, validate: bool) -> Self {
-        self.validate_template = validate;
-        self
     }
 
     fn infer_input_variables(&mut self) {
@@ -590,13 +580,12 @@ mod tests {
 
         let example_prompt = PromptTemplate::from_template("Q: {input}\nA: {output}").unwrap();
 
-        let few_shot = FewShotPromptTemplate::new(
-            examples,
-            example_prompt,
-            "Q: {question}\nA:".to_string(),
-            None,
-        )
-        .unwrap();
+        let few_shot = FewShotPromptTemplate::builder()
+            .examples(examples)
+            .example_prompt(example_prompt)
+            .suffix("Q: {question}\nA:".to_string())
+            .build()
+            .unwrap();
 
         let mut kwargs = HashMap::new();
         kwargs.insert("question".to_string(), "2+4".to_string());
@@ -618,13 +607,13 @@ mod tests {
 
         let example_prompt = PromptTemplate::from_template("{input} -> {output}").unwrap();
 
-        let few_shot = FewShotPromptTemplate::new(
-            examples,
-            example_prompt,
-            "{query}".to_string(),
-            Some("Examples:".to_string()),
-        )
-        .unwrap();
+        let few_shot = FewShotPromptTemplate::builder()
+            .examples(examples)
+            .example_prompt(example_prompt)
+            .suffix("{query}".to_string())
+            .prefix("Examples:".to_string())
+            .build()
+            .unwrap();
 
         let mut kwargs = HashMap::new();
         kwargs.insert("query".to_string(), "bye".to_string());
@@ -641,13 +630,13 @@ mod tests {
 
         let example_prompt = PromptTemplate::from_template("{input}").unwrap();
 
-        let few_shot = FewShotPromptTemplate::new(
-            examples,
-            example_prompt,
-            "Answer: {question}".to_string(),
-            Some("Context: {context}".to_string()),
-        )
-        .unwrap();
+        let few_shot = FewShotPromptTemplate::builder()
+            .examples(examples)
+            .example_prompt(example_prompt)
+            .suffix("Answer: {question}".to_string())
+            .prefix("Context: {context}".to_string())
+            .build()
+            .unwrap();
 
         let mut vars = few_shot.input_variables.clone();
         vars.sort();

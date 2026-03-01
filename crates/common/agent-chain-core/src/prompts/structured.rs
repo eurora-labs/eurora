@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use bon::bon;
 use serde_json::Value;
 
 use async_trait::async_trait;
@@ -22,21 +23,14 @@ pub struct StructuredPrompt {
     pub structured_output_kwargs: HashMap<String, Value>,
 }
 
+#[bon]
 impl StructuredPrompt {
-    pub fn new(messages: Vec<MessageLikeRepresentation>, schema: Value) -> Result<Self> {
-        Self::with_kwargs(
-            messages,
-            schema,
-            HashMap::new(),
-            PromptTemplateFormat::FString,
-        )
-    }
-
-    pub fn with_kwargs(
+    #[builder]
+    pub fn new(
         messages: Vec<MessageLikeRepresentation>,
         schema: Value,
-        structured_output_kwargs: HashMap<String, Value>,
-        template_format: PromptTemplateFormat,
+        #[builder(default)] structured_output_kwargs: HashMap<String, Value>,
+        #[builder(default)] template_format: PromptTemplateFormat,
     ) -> Result<Self> {
         warn_beta(
             BetaParams {
@@ -69,7 +63,7 @@ impl StructuredPrompt {
         messages: Vec<MessageLikeRepresentation>,
         schema: Value,
     ) -> Result<Self> {
-        Self::new(messages, schema)
+        Self::builder().messages(messages).schema(schema).build()
     }
 
     pub fn chat_template(&self) -> &ChatPromptTemplate {
@@ -172,14 +166,14 @@ mod tests {
             }
         });
 
-        let prompt = StructuredPrompt::new(
-            vec![
+        let prompt = StructuredPrompt::builder()
+            .messages(vec![
                 ("system", "Extract structured data.").into(),
                 ("human", "{input}").into(),
-            ],
-            schema.clone(),
-        )
-        .unwrap();
+            ])
+            .schema(schema.clone())
+            .build()
+            .unwrap();
 
         assert_eq!(prompt.input_variables(), &["input"]);
         assert_eq!(prompt.schema, schema);
@@ -189,14 +183,14 @@ mod tests {
     fn test_structured_prompt_format_messages() {
         let schema = json!({"type": "object"});
 
-        let prompt = StructuredPrompt::new(
-            vec![
+        let prompt = StructuredPrompt::builder()
+            .messages(vec![
                 ("system", "You extract data.").into(),
                 ("human", "{text}").into(),
-            ],
-            schema,
-        )
-        .unwrap();
+            ])
+            .schema(schema)
+            .build()
+            .unwrap();
 
         let mut kwargs = HashMap::new();
         kwargs.insert("text".to_string(), "Hello world".to_string());
@@ -209,10 +203,16 @@ mod tests {
 
     #[test]
     fn test_structured_prompt_rejects_empty_schema() {
-        let result = StructuredPrompt::new(vec![("human", "test").into()], json!({}));
+        let result = StructuredPrompt::builder()
+            .messages(vec![("human", "test").into()])
+            .schema(json!({}))
+            .build();
         assert!(result.is_err());
 
-        let result = StructuredPrompt::new(vec![("human", "test").into()], Value::Null);
+        let result = StructuredPrompt::builder()
+            .messages(vec![("human", "test").into()])
+            .schema(Value::Null)
+            .build();
         assert!(result.is_err());
     }
 

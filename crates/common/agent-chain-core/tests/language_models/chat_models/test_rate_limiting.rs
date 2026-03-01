@@ -17,7 +17,9 @@ fn make_rate_limited_model(
         check_every_n_seconds,
         max_bucket_size,
     }));
-    let config = ChatModelConfig::new().with_rate_limiter(rate_limiter);
+    let config = ChatModelConfig::builder()
+        .rate_limiter(rate_limiter)
+        .build();
     GenericFakeChatModel::from_vec(messages).with_config(config)
 }
 
@@ -106,9 +108,10 @@ async fn test_rate_limit_skips_cache() {
         check_every_n_seconds: 0.1,
         max_bucket_size: 1.0,
     }));
-    let config = ChatModelConfig::new()
-        .with_rate_limiter(rate_limiter)
-        .with_cache_instance(cache.clone());
+    let config = ChatModelConfig::builder()
+        .rate_limiter(rate_limiter)
+        .cache_instance(cache.clone())
+        .build();
 
     let model = GenericFakeChatModel::from_vec(vec![
         AIMessage::builder().content("hello").build(),
@@ -244,9 +247,10 @@ async fn test_rate_limit_skips_cache_async() {
         check_every_n_seconds: 0.1,
         max_bucket_size: 1.0,
     }));
-    let config = ChatModelConfig::new()
-        .with_rate_limiter(rate_limiter)
-        .with_cache_instance(cache.clone());
+    let config = ChatModelConfig::builder()
+        .rate_limiter(rate_limiter)
+        .cache_instance(cache.clone())
+        .build();
 
     let model = GenericFakeChatModel::from_vec(vec![
         AIMessage::builder().content("hello").build(),

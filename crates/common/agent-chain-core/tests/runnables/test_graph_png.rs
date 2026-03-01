@@ -16,7 +16,10 @@ fn test_png_drawer_initialization_custom() {
         nodes: HashMap::from([("node1".into(), "CustomNode1".into())]),
         edges: HashMap::from([("edge1".into(), "CustomEdge1".into())]),
     };
-    let drawer = PngDrawer::new(Some("helvetica"), Some(custom_labels));
+    let drawer = PngDrawer::builder()
+        .maybe_fontname(Some("helvetica").map(|s: &str| s.to_string()))
+        .maybe_labels(Some(custom_labels))
+        .build();
 
     assert_eq!(drawer.fontname, "helvetica");
     assert_eq!(drawer.labels.nodes["node1"], "CustomNode1");
@@ -36,7 +39,10 @@ fn test_png_drawer_get_node_label_custom() {
         nodes: HashMap::from([("test_node".into(), "Custom Label".into())]),
         edges: HashMap::new(),
     };
-    let drawer = PngDrawer::new(None, Some(custom_labels));
+    let drawer = PngDrawer::builder()
+        .maybe_fontname(None.map(|s: &str| s.to_string()))
+        .maybe_labels(Some(custom_labels))
+        .build();
     let label = drawer.get_node_label("test_node");
     assert!(label.contains("<B>Custom Label</B>"));
 }
@@ -54,7 +60,10 @@ fn test_png_drawer_get_edge_label_custom() {
         nodes: HashMap::new(),
         edges: HashMap::from([("test_edge".into(), "Custom Edge".into())]),
     };
-    let drawer = PngDrawer::new(None, Some(custom_labels));
+    let drawer = PngDrawer::builder()
+        .maybe_fontname(None.map(|s: &str| s.to_string()))
+        .maybe_labels(Some(custom_labels))
+        .build();
     let label = drawer.get_edge_label("test_edge");
     assert!(label.contains("<U>Custom Edge</U>"));
 }
@@ -105,7 +114,10 @@ fn test_png_drawer_draw_method() {
 #[test]
 fn test_png_drawer_with_empty_labels() {
     let labels = LabelsDict::default();
-    let drawer = PngDrawer::new(None, Some(labels));
+    let drawer = PngDrawer::builder()
+        .maybe_fontname(None.map(|s: &str| s.to_string()))
+        .maybe_labels(Some(labels))
+        .build();
 
     assert_eq!(drawer.get_node_label("test"), "<<B>test</B>>");
     assert_eq!(drawer.get_edge_label("test"), "<<U>test</U>>");
@@ -250,7 +262,10 @@ fn test_png_drawer_multiple_custom_labels() {
             ("e2".into(), "Edge Two".into()),
         ]),
     };
-    let drawer = PngDrawer::new(None, Some(custom_labels));
+    let drawer = PngDrawer::builder()
+        .maybe_fontname(None.map(|s: &str| s.to_string()))
+        .maybe_labels(Some(custom_labels))
+        .build();
 
     assert_eq!(drawer.get_node_label("n1"), "<<B>Node One</B>>");
     assert_eq!(drawer.get_node_label("n2"), "<<B>Node Two</B>>");
@@ -272,7 +287,10 @@ fn test_graph_draw_png_returns_error_when_no_path() {
 fn test_png_drawer_font_names() {
     let fonts = ["arial", "helvetica", "courier", "times"];
     for font in &fonts {
-        let drawer = PngDrawer::new(Some(font), None);
+        let drawer = PngDrawer::builder()
+            .maybe_fontname(Some(font.to_string()))
+            .maybe_labels(None)
+            .build();
         assert_eq!(drawer.fontname, *font);
     }
 }
@@ -319,7 +337,10 @@ fn test_png_drawer_labels_with_special_chars() {
         ]),
         edges: HashMap::from([("e1".into(), "Edge \"quoted\"".into())]),
     };
-    let drawer = PngDrawer::new(None, Some(custom_labels));
+    let drawer = PngDrawer::builder()
+        .maybe_fontname(None.map(|s: &str| s.to_string()))
+        .maybe_labels(Some(custom_labels))
+        .build();
 
     let label1 = drawer.get_node_label("n1");
     assert!(label1.contains("Node & Test"));
@@ -404,7 +425,10 @@ fn test_labels_dict_partial_labels() {
         nodes: HashMap::from([("node1".into(), "Custom1".into())]),
         edges: HashMap::new(),
     };
-    let drawer = PngDrawer::new(None, Some(labels));
+    let drawer = PngDrawer::builder()
+        .maybe_fontname(None.map(|s: &str| s.to_string()))
+        .maybe_labels(Some(labels))
+        .build();
 
     assert!(drawer.get_node_label("node1").contains("Custom1"));
     assert!(drawer.get_node_label("node2").contains("node2"));
@@ -414,7 +438,10 @@ fn test_labels_dict_partial_labels() {
 fn test_png_drawer_fontname_used() {
     let fonts = ["arial", "helvetica", "times", "courier", "verdana"];
     for font in &fonts {
-        let drawer = PngDrawer::new(Some(font), None);
+        let drawer = PngDrawer::builder()
+            .maybe_fontname(Some(font.to_string()))
+            .maybe_labels(None)
+            .build();
         assert_eq!(drawer.fontname, *font);
     }
 }
@@ -585,7 +612,10 @@ fn test_png_drawer_node_attrs_label() {
         nodes: HashMap::from([("x".into(), "CustomX".into())]),
         edges: HashMap::new(),
     };
-    let drawer = PngDrawer::new(None, Some(custom_labels));
+    let drawer = PngDrawer::builder()
+        .maybe_fontname(None.map(|s: &str| s.to_string()))
+        .maybe_labels(Some(custom_labels))
+        .build();
     let attrs = drawer.node_attrs("x");
     assert_eq!(attrs["label"], "<<B>CustomX</B>>");
 }

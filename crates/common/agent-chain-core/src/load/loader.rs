@@ -27,37 +27,29 @@ impl Default for ReviverConfig {
     }
 }
 
+#[bon::bon]
 impl ReviverConfig {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_secrets_map(mut self, secrets_map: HashMap<String, String>) -> Self {
-        self.secrets_map = secrets_map;
-        self
-    }
-
-    pub fn with_valid_namespaces(mut self, namespaces: Vec<String>) -> Self {
-        self.valid_namespaces.extend(namespaces);
-        self
-    }
-
-    pub fn with_secrets_from_env(mut self, secrets_from_env: bool) -> Self {
-        self.secrets_from_env = secrets_from_env;
-        self
-    }
-
-    pub fn with_additional_import_mappings(
-        mut self,
-        mappings: HashMap<Vec<String>, Vec<String>>,
+    #[builder]
+    pub fn new(
+        secrets_map: Option<HashMap<String, String>>,
+        valid_namespaces: Option<Vec<String>>,
+        #[builder(default = true)] secrets_from_env: bool,
+        additional_import_mappings: Option<HashMap<Vec<String>, Vec<String>>>,
+        #[builder(default)] ignore_unserializable_fields: bool,
     ) -> Self {
-        self.additional_import_mappings = mappings;
-        self
-    }
+        let mut default_namespaces: Vec<String> =
+            DEFAULT_NAMESPACES.iter().map(|s| s.to_string()).collect();
+        if let Some(extra) = valid_namespaces {
+            default_namespaces.extend(extra);
+        }
 
-    pub fn with_ignore_unserializable_fields(mut self, ignore: bool) -> Self {
-        self.ignore_unserializable_fields = ignore;
-        self
+        Self {
+            secrets_map: secrets_map.unwrap_or_default(),
+            valid_namespaces: default_namespaces,
+            secrets_from_env,
+            additional_import_mappings: additional_import_mappings.unwrap_or_default(),
+            ignore_unserializable_fields,
+        }
     }
 }
 
@@ -273,12 +265,14 @@ fn load_recursive(obj: &Value, reviver: &Reviver) -> Result<Value> {
 }
 
 pub fn loads_with_secrets(text: &str, secrets_map: HashMap<String, String>) -> Result<Value> {
-    let config = ReviverConfig::new().with_secrets_map(secrets_map);
+    let config = ReviverConfig::builder().secrets_map(secrets_map).build();
     loads(text, Some(config))
 }
 
 pub fn loads_with_namespaces(text: &str, namespaces: Vec<String>) -> Result<Value> {
-    let config = ReviverConfig::new().with_valid_namespaces(namespaces);
+    let config = ReviverConfig::builder()
+        .valid_namespaces(namespaces)
+        .build();
     loads(text, Some(config))
 }
 
@@ -380,10 +374,12 @@ mod tests {
 
     #[test]
     fn test_revive_secret_from_map() {
-        let config = ReviverConfig::new().with_secrets_map(HashMap::from([(
-            "MY_SECRET".to_string(),
-            "secret_value".to_string(),
-        )]));
+        let config = ReviverConfig::builder()
+            .secrets_map(HashMap::from([(
+                "MY_SECRET".to_string(),
+                "secret_value".to_string(),
+            )]))
+            .build();
         let reviver = Reviver::new(config);
 
         let value = serde_json::json!({
@@ -401,7 +397,7 @@ mod tests {
 
     #[test]
     fn test_revive_missing_secret() {
-        let config = ReviverConfig::new().with_secrets_from_env(false);
+        let config = ReviverConfig::builder().secrets_from_env(false).build();
         let reviver = Reviver::new(config);
 
         let value = serde_json::json!({
@@ -431,7 +427,9 @@ mod tests {
 
     #[test]
     fn test_revive_not_implemented_ignored() {
-        let config = ReviverConfig::new().with_ignore_unserializable_fields(true);
+        let config = ReviverConfig::builder()
+            .ignore_unserializable_fields(true)
+            .build();
         let reviver = Reviver::new(config);
 
         let value = serde_json::json!({
@@ -534,10 +532,12 @@ mod tests {
             }
         }"#;
 
-        let config = ReviverConfig::new().with_secrets_map(HashMap::from([(
-            "TEST_KEY".to_string(),
-            "resolved".to_string(),
-        )]));
+        let config = ReviverConfig::builder()
+            .secrets_map(HashMap::from([(
+                "TEST_KEY".to_string(),
+                "resolved".to_string(),
+            )]))
+            .build();
 
         let result = loads(json, Some(config)).unwrap();
         assert_eq!(
@@ -553,10 +553,12 @@ mod tests {
             {"lc": 1, "type": "secret", "id": ["KEY2"]}
         ]"#;
 
-        let config = ReviverConfig::new().with_secrets_map(HashMap::from([
-            ("KEY1".to_string(), "value1".to_string()),
-            ("KEY2".to_string(), "value2".to_string()),
-        ]));
+        let config = ReviverConfig::builder()
+            .secrets_map(HashMap::from([
+                ("KEY1".to_string(), "value1".to_string()),
+                ("KEY2".to_string(), "value2".to_string()),
+            ]))
+            .build();
 
         let result = loads(json, Some(config)).unwrap();
         let arr = result.as_array().unwrap();

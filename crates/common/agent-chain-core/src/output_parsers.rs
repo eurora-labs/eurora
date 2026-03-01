@@ -54,7 +54,7 @@ mod tests {
 
     #[test]
     fn test_json_parser_export() {
-        let parser = JsonOutputParser::new();
+        let parser = JsonOutputParser::builder().build();
         let result = parser.parse(r#"{"key": "value"}"#).unwrap();
         assert_eq!(result["key"], "value");
     }

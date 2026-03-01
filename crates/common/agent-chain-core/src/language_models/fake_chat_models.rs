@@ -35,24 +35,20 @@ impl Clone for FakeMessagesListChatModel {
     }
 }
 
+#[bon::bon]
 impl FakeMessagesListChatModel {
-    pub fn new(responses: Vec<BaseMessage>) -> Self {
+    #[builder]
+    pub fn new(
+        responses: Vec<BaseMessage>,
+        sleep: Option<Duration>,
+        config: Option<ChatModelConfig>,
+    ) -> Self {
         Self {
             responses,
-            sleep: None,
+            sleep,
             index: AtomicUsize::new(0),
-            config: ChatModelConfig::default(),
+            config: config.unwrap_or_default(),
         }
-    }
-
-    pub fn with_sleep(mut self, duration: Duration) -> Self {
-        self.sleep = Some(duration);
-        self
-    }
-
-    pub fn with_config(mut self, config: ChatModelConfig) -> Self {
-        self.config = config;
-        self
     }
 
     pub fn current_index(&self) -> usize {
@@ -106,7 +102,7 @@ impl BaseLanguageModel for FakeMessagesListChatModel {
             );
         }
 
-        Ok(LLMResult::new(generations))
+        Ok(LLMResult::builder().generations(generations).build())
     }
 }
 
@@ -140,8 +136,8 @@ impl BaseChatModel for FakeMessagesListChatModel {
         };
         self.index.store(next_i, Ordering::SeqCst);
 
-        let generation = ChatGeneration::new(response);
-        Ok(ChatResult::new(vec![generation]))
+        let generation = ChatGeneration::builder().message(response).build();
+        Ok(ChatResult::builder().generations(vec![generation]).build())
     }
 }
 
@@ -170,48 +166,31 @@ impl Clone for FakeListChatModel {
     }
 }
 
+#[bon::bon]
 impl FakeListChatModel {
-    pub fn new(responses: Vec<String>) -> Self {
+    #[builder]
+    pub fn new(
+        responses: Vec<String>,
+        sleep: Option<Duration>,
+        config: Option<ChatModelConfig>,
+        error_on_chunk: Option<usize>,
+        cache_instance: Option<std::sync::Arc<dyn crate::caches::BaseCache>>,
+        cache: Option<bool>,
+    ) -> Self {
+        let mut config = config.unwrap_or_default();
+        if let Some(instance) = cache_instance {
+            config.cache_instance = Some(instance);
+        }
+        if let Some(cache) = cache {
+            config.base.cache = Some(cache);
+        }
         Self {
             responses,
-            sleep: None,
+            sleep,
             index: AtomicUsize::new(0),
-            error_on_chunk_number: None,
-            config: ChatModelConfig::default(),
+            error_on_chunk_number: error_on_chunk,
+            config,
         }
-    }
-
-    pub fn with_sleep(mut self, duration: Duration) -> Self {
-        self.sleep = Some(duration);
-        self
-    }
-
-    pub fn with_config(mut self, config: ChatModelConfig) -> Self {
-        self.config = config;
-        self
-    }
-
-    pub fn with_error_on_chunk(mut self, chunk_number: usize) -> Self {
-        self.error_on_chunk_number = Some(chunk_number);
-        self
-    }
-
-    pub fn with_cache_instance(
-        mut self,
-        cache: std::sync::Arc<dyn crate::caches::BaseCache>,
-    ) -> Self {
-        self.config.cache_instance = Some(cache);
-        self
-    }
-
-    pub fn with_cache_disabled(mut self) -> Self {
-        self.config.base.cache = Some(false);
-        self
-    }
-
-    pub fn with_cache_enabled(mut self) -> Self {
-        self.config.base.cache = Some(true);
-        self
     }
 
     pub fn current_index(&self) -> usize {
@@ -299,7 +278,7 @@ impl BaseLanguageModel for FakeListChatModel {
             );
         }
 
-        Ok(LLMResult::new(generations))
+        Ok(LLMResult::builder().generations(generations).build())
     }
 
     fn identifying_params(&self) -> HashMap<String, Value> {
@@ -330,8 +309,8 @@ impl BaseChatModel for FakeListChatModel {
 
         let response = self.get_next_response();
         let message = AIMessage::builder().content(&response).build();
-        let generation = ChatGeneration::new(message.into());
-        Ok(ChatResult::new(vec![generation]))
+        let generation = ChatGeneration::builder().message(message.into()).build();
+        Ok(ChatResult::builder().generations(vec![generation]).build())
     }
 
     fn has_stream_impl(&self) -> bool {
@@ -373,7 +352,7 @@ impl BaseChatModel for FakeListChatModel {
                 let mut ai_chunk = AIMessageChunk::builder().content(c.to_string()).build();
                 ai_chunk.set_chunk_position(chunk_position);
 
-                let chunk = ChatGenerationChunk::new(ai_chunk.to_message().into());
+                let chunk = ChatGenerationChunk::builder().message(ai_chunk.to_message().into()).build();
                 yield Ok(chunk);
             }
         };
@@ -388,15 +367,14 @@ pub struct FakeChatModel {
     config: ChatModelConfig,
 }
 
+#[bon::bon]
 #[allow(dead_code)]
 impl FakeChatModel {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_config(mut self, config: ChatModelConfig) -> Self {
-        self.config = config;
-        self
+    #[builder]
+    pub fn new(config: Option<ChatModelConfig>) -> Self {
+        Self {
+            config: config.unwrap_or_default(),
+        }
     }
 }
 
@@ -442,7 +420,7 @@ impl BaseLanguageModel for FakeChatModel {
             );
         }
 
-        Ok(LLMResult::new(generations))
+        Ok(LLMResult::builder().generations(generations).build())
     }
 
     fn identifying_params(&self) -> HashMap<String, Value> {
@@ -465,8 +443,8 @@ impl BaseChatModel for FakeChatModel {
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
         let message = AIMessage::builder().content("fake response").build();
-        let generation = ChatGeneration::new(message.into());
-        Ok(ChatResult::new(vec![generation]))
+        let generation = ChatGeneration::builder().message(message.into()).build();
+        Ok(ChatResult::builder().generations(vec![generation]).build())
     }
 }
 
@@ -484,6 +462,7 @@ impl fmt::Debug for GenericFakeChatModel {
     }
 }
 
+// Cannot use bon: function-level generic on new()
 impl GenericFakeChatModel {
     pub fn new<I>(messages: I) -> Self
     where
@@ -573,7 +552,7 @@ impl BaseLanguageModel for GenericFakeChatModel {
             );
         }
 
-        Ok(LLMResult::new(generations))
+        Ok(LLMResult::builder().generations(generations).build())
     }
 }
 
@@ -599,8 +578,8 @@ impl BaseChatModel for GenericFakeChatModel {
                 .unwrap_or_else(|| AIMessage::builder().content("").build())
         };
 
-        let generation = ChatGeneration::new(message.into());
-        Ok(ChatResult::new(vec![generation]))
+        let generation = ChatGeneration::builder().message(message.into()).build();
+        Ok(ChatResult::builder().generations(vec![generation]).build())
     }
 
     fn has_stream_impl(&self) -> bool {
@@ -669,7 +648,7 @@ impl BaseChatModel for GenericFakeChatModel {
                         chunk_msg.set_chunk_position(Some(ChunkPosition::Last));
                     }
 
-                    let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
+                    let chunk = ChatGenerationChunk::builder().message(chunk_msg.to_message().into()).build();
 
                     if let Some(run_id) = callback_run_id {
                         for handler in &callback_handlers {
@@ -713,7 +692,7 @@ impl BaseChatModel for GenericFakeChatModel {
                                             .additional_kwargs(ak)
                                             .build();
 
-                                        let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
+                                        let chunk = ChatGenerationChunk::builder().message(chunk_msg.to_message().into()).build();
 
                                         if let Some(run_id) = callback_run_id {
                                             for handler in &callback_handlers {
@@ -735,7 +714,7 @@ impl BaseChatModel for GenericFakeChatModel {
                                         .additional_kwargs(ak)
                                         .build();
 
-                                    let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
+                                    let chunk = ChatGenerationChunk::builder().message(chunk_msg.to_message().into()).build();
 
                                     if let Some(run_id) = callback_run_id {
                                         for handler in &callback_handlers {
@@ -757,7 +736,7 @@ impl BaseChatModel for GenericFakeChatModel {
                             .additional_kwargs(ak)
                             .build();
 
-                        let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
+                        let chunk = ChatGenerationChunk::builder().message(chunk_msg.to_message().into()).build();
 
                         if let Some(run_id) = callback_run_id {
                             for handler in &callback_handlers {
@@ -780,14 +759,13 @@ pub struct ParrotFakeChatModel {
     config: ChatModelConfig,
 }
 
+#[bon::bon]
 impl ParrotFakeChatModel {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_config(mut self, config: ChatModelConfig) -> Self {
-        self.config = config;
-        self
+    #[builder]
+    pub fn new(config: Option<ChatModelConfig>) -> Self {
+        Self {
+            config: config.unwrap_or_default(),
+        }
     }
 }
 
@@ -833,7 +811,7 @@ impl BaseLanguageModel for ParrotFakeChatModel {
             );
         }
 
-        Ok(LLMResult::new(generations))
+        Ok(LLMResult::builder().generations(generations).build())
     }
 }
 
@@ -854,8 +832,8 @@ impl BaseChatModel for ParrotFakeChatModel {
             .cloned()
             .unwrap_or_else(|| BaseMessage::AI(AIMessage::builder().content("").build()));
 
-        let generation = ChatGeneration::new(last_message);
-        Ok(ChatResult::new(vec![generation]))
+        let generation = ChatGeneration::builder().message(last_message).build();
+        Ok(ChatResult::builder().generations(vec![generation]).build())
     }
 }
 
@@ -866,10 +844,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_fake_messages_list_chat_model() {
-        let llm = FakeMessagesListChatModel::new(vec![
-            BaseMessage::AI(AIMessage::builder().content("Response 1").build()),
-            BaseMessage::AI(AIMessage::builder().content("Response 2").build()),
-        ]);
+        let llm = FakeMessagesListChatModel::builder()
+            .responses(vec![
+                BaseMessage::AI(AIMessage::builder().content("Response 1").build()),
+                BaseMessage::AI(AIMessage::builder().content("Response 2").build()),
+            ])
+            .build();
 
         let result = llm._generate(vec![], None, None).await.unwrap();
         assert_eq!(result.generations[0].message.content(), "Response 1");
@@ -883,7 +863,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_fake_list_chat_model() {
-        let llm = FakeListChatModel::new(vec!["Response 1".to_string(), "Response 2".to_string()]);
+        let llm = FakeListChatModel::builder()
+            .responses(vec!["Response 1".to_string(), "Response 2".to_string()])
+            .build();
 
         let result = llm._generate(vec![], None, None).await.unwrap();
         assert_eq!(result.generations[0].message.content(), "Response 1");
@@ -896,7 +878,9 @@ mod tests {
     async fn test_fake_list_chat_model_stream() {
         use futures::StreamExt;
 
-        let llm = FakeListChatModel::new(vec!["Hello".to_string()]);
+        let llm = FakeListChatModel::builder()
+            .responses(vec!["Hello".to_string()])
+            .build();
 
         let mut stream = llm._stream(vec![], None, None).unwrap();
 
@@ -911,7 +895,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fake_chat_model() {
-        let llm = FakeChatModel::new();
+        let llm = FakeChatModel::builder().build();
 
         let result = llm._generate(vec![], None, None).await.unwrap();
         assert_eq!(result.generations[0].message.content(), "fake response");
@@ -933,7 +917,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_parrot_fake_chat_model() {
-        let llm = ParrotFakeChatModel::new();
+        let llm = ParrotFakeChatModel::builder().build();
 
         let messages = vec![BaseMessage::Human(
             HumanMessage::builder().content("Hello, parrot!").build(),
@@ -945,7 +929,9 @@ mod tests {
 
     #[test]
     fn test_fake_list_chat_model_identifying_params() {
-        let llm = FakeListChatModel::new(vec!["Response".to_string()]);
+        let llm = FakeListChatModel::builder()
+            .responses(vec!["Response".to_string()])
+            .build();
         let params = llm.identifying_params();
 
         assert!(params.contains_key("responses"));
@@ -953,7 +939,7 @@ mod tests {
 
     #[test]
     fn test_fake_chat_model_identifying_params() {
-        let llm = FakeChatModel::new();
+        let llm = FakeChatModel::builder().build();
         let params = llm.identifying_params();
 
         assert_eq!(params.get("key").unwrap(), "fake");

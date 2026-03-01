@@ -24,52 +24,31 @@ pub struct ToolConfig {
     pub extras: Option<HashMap<String, Value>>,
 }
 
+#[bon::bon]
 impl ToolConfig {
-    pub fn new() -> Self {
+    #[builder]
+    pub fn new(
+        #[builder(into)] name: Option<String>,
+        #[builder(into)] description: Option<String>,
+        #[builder(default)] return_direct: bool,
+        args_schema: Option<ArgsSchema>,
+        #[builder(default = true)] infer_schema: bool,
+        #[builder(default)] response_format: ResponseFormat,
+        #[builder(default)] parse_docstring: bool,
+        #[builder(default)] error_on_invalid_docstring: bool,
+        extras: Option<HashMap<String, Value>>,
+    ) -> Self {
         Self {
-            infer_schema: true,
-            ..Default::default()
+            name,
+            description,
+            return_direct,
+            args_schema,
+            infer_schema,
+            response_format,
+            parse_docstring,
+            error_on_invalid_docstring,
+            extras,
         }
-    }
-
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
-
-    pub fn with_description(mut self, description: impl Into<String>) -> Self {
-        self.description = Some(description.into());
-        self
-    }
-
-    pub fn with_return_direct(mut self, return_direct: bool) -> Self {
-        self.return_direct = return_direct;
-        self
-    }
-
-    pub fn with_args_schema(mut self, schema: ArgsSchema) -> Self {
-        self.args_schema = Some(schema);
-        self
-    }
-
-    pub fn with_infer_schema(mut self, infer_schema: bool) -> Self {
-        self.infer_schema = infer_schema;
-        self
-    }
-
-    pub fn with_response_format(mut self, format: ResponseFormat) -> Self {
-        self.response_format = format;
-        self
-    }
-
-    pub fn with_parse_docstring(mut self, parse: bool) -> Self {
-        self.parse_docstring = parse;
-        self
-    }
-
-    pub fn with_extras(mut self, extras: HashMap<String, Value>) -> Self {
-        self.extras = Some(extras);
-        self
     }
 }
 
@@ -135,17 +114,15 @@ where
     let description = config.description.unwrap_or_default();
     let args_schema = config.args_schema.unwrap_or_default();
 
-    let mut tool = StructuredTool::from_function(func, name, description, args_schema);
-
-    if config.return_direct {
-        tool = tool.with_return_direct(true);
-    }
-
-    tool = tool.with_response_format(config.response_format);
-
-    if let Some(extras) = config.extras {
-        tool = tool.with_extras(extras);
-    }
+    let tool = StructuredTool::builder()
+        .name(name)
+        .description(description)
+        .args_schema(args_schema)
+        .func(Arc::new(func))
+        .return_direct(config.return_direct)
+        .response_format(config.response_format)
+        .maybe_extras(config.extras)
+        .build();
 
     Ok(tool)
 }
@@ -251,11 +228,12 @@ mod tests {
 
     #[test]
     fn test_tool_config() {
-        let config = ToolConfig::new()
-            .with_name("test")
-            .with_description("A test tool")
-            .with_return_direct(true)
-            .with_response_format(ResponseFormat::ContentAndArtifact);
+        let config = ToolConfig::builder()
+            .name("test")
+            .description("A test tool")
+            .return_direct(true)
+            .response_format(ResponseFormat::ContentAndArtifact)
+            .build();
 
         assert_eq!(config.name, Some("test".to_string()));
         assert!(config.return_direct);
@@ -264,15 +242,16 @@ mod tests {
 
     #[test]
     fn test_create_tool_with_config() {
-        let config = ToolConfig::new()
-            .with_name("configured_tool")
-            .with_description("A configured tool")
-            .with_args_schema(ArgsSchema::JsonSchema(serde_json::json!({
+        let config = ToolConfig::builder()
+            .name("configured_tool")
+            .description("A configured tool")
+            .args_schema(ArgsSchema::JsonSchema(serde_json::json!({
                 "type": "object",
                 "properties": {
                     "input": {"type": "string"}
                 }
-            })));
+            })))
+            .build();
 
         let tool = create_tool_with_config(
             |args| Ok(args.get("input").cloned().unwrap_or(Value::Null)),

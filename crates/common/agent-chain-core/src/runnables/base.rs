@@ -807,7 +807,7 @@ pub trait Runnable: Send + Sync + Debug {
         Self: Sized,
         R2: Runnable<Input = Self::Output>,
     {
-        RunnableSequence::new(self, other)
+        RunnableSequence::builder().first(self).last(other).build()
     }
 
     fn bind(self, kwargs: HashMap<String, Value>) -> RunnableBinding<Self>
@@ -1166,34 +1166,25 @@ where
     }
 }
 
+#[bon::bon]
 impl<F, I, O> RunnableLambda<F, I, O>
 where
     F: Fn(I) -> Result<O> + Send + Sync,
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    pub fn new(func: F) -> Self {
+    #[builder]
+    pub fn new(
+        func: F,
+        #[builder(into)] name: Option<String>,
+        #[builder(default)] deps: Vec<Arc<dyn GraphProvider>>,
+    ) -> Self {
         Self {
             func,
-            name: None,
-            deps: Vec::new(),
+            name,
+            deps,
             _phantom: std::marker::PhantomData,
         }
-    }
-
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
-
-    pub fn with_dep(mut self, dep: Arc<dyn GraphProvider>) -> Self {
-        self.deps.push(dep);
-        self
-    }
-
-    pub fn with_deps(mut self, deps: Vec<Arc<dyn GraphProvider>>) -> Self {
-        self.deps.extend(deps);
-        self
     }
 }
 
@@ -1332,7 +1323,7 @@ where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    RunnableLambda::new(func)
+    RunnableLambda::builder().func(func).build()
 }
 
 pub struct RunnableLambdaWithConfig<I, O>
@@ -1359,27 +1350,43 @@ where
     }
 }
 
+#[bon::bon]
 impl<I, O> RunnableLambdaWithConfig<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    pub fn new(func: impl Fn(I) -> Result<O> + Send + Sync + 'static) -> Self {
+    #[builder]
+    pub fn new(func: VariableArgsFn<I, Result<O>>, #[builder(into)] name: Option<String>) -> Self {
         Self {
-            func: Some(VariableArgsFn::InputOnly(Box::new(func))),
+            func: Some(func),
             afunc: None,
-            name: None,
+            name,
         }
+    }
+
+    pub fn from_func(func: impl Fn(I) -> Result<O> + Send + Sync + 'static) -> Self {
+        Self::builder()
+            .func(VariableArgsFn::InputOnly(Box::new(func)))
+            .build()
+    }
+
+    pub fn from_func_named(
+        func: impl Fn(I) -> Result<O> + Send + Sync + 'static,
+        name: impl Into<String>,
+    ) -> Self {
+        Self::builder()
+            .func(VariableArgsFn::InputOnly(Box::new(func)))
+            .name(name)
+            .build()
     }
 
     pub fn new_with_config(
         func: impl Fn(I, &RunnableConfig) -> Result<O> + Send + Sync + 'static,
     ) -> Self {
-        Self {
-            func: Some(VariableArgsFn::WithConfig(Box::new(func))),
-            afunc: None,
-            name: None,
-        }
+        Self::builder()
+            .func(VariableArgsFn::WithConfig(Box::new(func)))
+            .build()
     }
 
     pub fn new_async<F, Fut>(afunc: F) -> Self
@@ -1408,11 +1415,6 @@ where
             ))),
             name: None,
         }
-    }
-
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
     }
 
     pub fn with_afunc<F, Fut>(mut self, afunc: F) -> Self
@@ -1601,22 +1603,15 @@ where
     }
 }
 
+#[bon::bon]
 impl<R1, R2> RunnableSequence<R1, R2>
 where
     R1: Runnable,
     R2: Runnable<Input = R1::Output>,
 {
-    pub fn new(first: R1, last: R2) -> Self {
-        Self {
-            first,
-            last,
-            name: None,
-        }
-    }
-
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
+    #[builder]
+    pub fn new(first: R1, last: R2, #[builder(into)] name: Option<String>) -> Self {
+        Self { first, last, name }
     }
 }
 
@@ -1845,7 +1840,10 @@ where
     R1: Runnable,
     R2: Runnable<Input = R1::Output>,
 {
-    RunnableSequence::new(first, second)
+    RunnableSequence::builder()
+        .first(first)
+        .last(second)
+        .build()
 }
 
 pub struct RunnableParallel<I>
@@ -1870,14 +1868,16 @@ where
 
 pub type RunnableMap<I> = RunnableParallel<I>;
 
+#[bon::bon]
 impl<I> RunnableParallel<I>
 where
     I: Send + Sync + Clone + Debug + 'static,
 {
-    pub fn new() -> Self {
+    #[builder]
+    pub fn new(#[builder(into)] name: Option<String>) -> Self {
         Self {
             steps: HashMap::new(),
-            name: None,
+            name,
         }
     }
 
@@ -1888,11 +1888,6 @@ where
         self.steps.insert(key.into(), Arc::new(runnable));
         self
     }
-
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
 }
 
 impl<I> Default for RunnableParallel<I>
@@ -1900,7 +1895,7 @@ where
     I: Send + Sync + Clone + Debug + 'static,
 {
     fn default() -> Self {
-        Self::new()
+        Self::builder().build()
     }
 }
 
@@ -2211,7 +2206,7 @@ where
 {
     bound: R,
     kwargs: HashMap<String, Value>,
-    config: Option<RunnableConfig>,
+    pub config: Option<RunnableConfig>,
     config_factories: Vec<ConfigFactory>,
 }
 
@@ -2605,7 +2600,7 @@ where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    RunnableLambda::new(func)
+    RunnableLambda::builder().func(func).build()
 }
 
 pub fn coerce_map_to_runnable<I>(
@@ -2623,7 +2618,7 @@ where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    RunnableLambda::new(func).with_name(name)
+    RunnableLambda::builder().func(func).name(name).build()
 }
 
 #[cfg(test)]
@@ -2634,22 +2629,28 @@ mod tests {
 
     #[test]
     fn test_runnable_lambda() {
-        let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
+        let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let result = runnable.invoke(1, None).unwrap();
         assert_eq!(result, 2);
     }
 
     #[test]
     fn test_runnable_lambda_with_name() {
-        let runnable = RunnableLambda::new(|x: i32| Ok(x + 1)).with_name("add_one");
+        let runnable = RunnableLambda::builder()
+            .func(|x: i32| Ok(x + 1))
+            .name("add_one")
+            .build();
         assert_eq!(runnable.name(), Some("add_one".to_string()));
     }
 
     #[test]
     fn test_runnable_sequence() {
-        let first = RunnableLambda::new(|x: i32| Ok(x + 1));
-        let second = RunnableLambda::new(|x: i32| Ok(x * 2));
-        let sequence = RunnableSequence::new(first, second);
+        let first = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
+        let second = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
+        let sequence = RunnableSequence::builder()
+            .first(first)
+            .last(second)
+            .build();
 
         let result = sequence.invoke(1, None).unwrap();
         assert_eq!(result, 4); // (1 + 1) * 2 = 4
@@ -2657,7 +2658,7 @@ mod tests {
 
     #[test]
     fn test_runnable_each() {
-        let runnable = RunnableLambda::new(|x: i32| Ok(x * 2));
+        let runnable = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
         let each = RunnableEach::new(runnable);
 
         let result = each.invoke(vec![1, 2, 3], None).unwrap();
@@ -2666,8 +2667,10 @@ mod tests {
 
     #[test]
     fn test_runnable_binding() {
-        let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
-        let config = RunnableConfig::new().with_tags(vec!["test".to_string()]);
+        let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
+        let config = RunnableConfig::builder()
+            .tags(vec!["test".to_string()])
+            .build();
         let bound = RunnableBinding::new(runnable, HashMap::new(), Some(config));
 
         let result = bound.invoke(1, None).unwrap();
@@ -2676,7 +2679,7 @@ mod tests {
 
     #[test]
     fn test_runnable_passthrough() {
-        let runnable: RunnablePassthrough<i32> = RunnablePassthrough::new();
+        let runnable: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
         let result = runnable.invoke(42, None).unwrap();
         assert_eq!(result, 42);
     }
@@ -2685,7 +2688,7 @@ mod tests {
     fn test_runnable_retry() {
         use crate::runnables::retry::RunnableRetry;
 
-        let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
+        let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let retry = RunnableRetry::with_simple(runnable, 3, false);
 
         let result = retry.invoke(1, None).unwrap();
@@ -2707,8 +2710,8 @@ mod tests {
 
     #[test]
     fn test_pipe() {
-        let first = RunnableLambda::new(|x: i32| Ok(x + 1));
-        let second = RunnableLambda::new(|x: i32| Ok(x * 2));
+        let first = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
+        let second = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
         let sequence = pipe(first, second);
 
         let result = sequence.invoke(1, None).unwrap();
@@ -2717,16 +2720,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_runnable_lambda_async() {
-        let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
+        let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let result = runnable.ainvoke(1, None).await.unwrap();
         assert_eq!(result, 2);
     }
 
     #[tokio::test]
     async fn test_runnable_sequence_async() {
-        let first = RunnableLambda::new(|x: i32| Ok(x + 1));
-        let second = RunnableLambda::new(|x: i32| Ok(x * 2));
-        let sequence = RunnableSequence::new(first, second);
+        let first = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
+        let second = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
+        let sequence = RunnableSequence::builder()
+            .first(first)
+            .last(second)
+            .build();
 
         let result = sequence.ainvoke(1, None).await.unwrap();
         assert_eq!(result, 4);
@@ -2793,7 +2799,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_runnable_lambda_stream() {
-        let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
+        let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let chunks: Vec<_> = runnable.stream(1, None).collect::<Vec<_>>().await;
 
         assert_eq!(chunks.len(), 1);
@@ -2802,7 +2808,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_runnable_lambda_transform() {
-        let runnable = RunnableLambda::new(|x: i32| Ok(x * 10));
+        let runnable = RunnableLambda::builder().func(|x: i32| Ok(x * 10)).build();
         let input = Box::pin(futures::stream::iter(vec![1, 2, 3]));
         let chunks: Vec<_> = runnable.transform(input, None).collect::<Vec<_>>().await;
 
@@ -2812,8 +2818,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_runnable_sequence_stream_pipes_correctly() {
-        let first = RunnableLambda::new(|x: i32| Ok(x + 1));
-        let second = RunnableLambda::new(|x: i32| Ok(x * 2));
+        let first = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
+        let second = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
         let sequence = pipe(first, second);
 
         let chunks: Vec<_> = sequence.stream(1, None).collect::<Vec<_>>().await;
@@ -2824,8 +2830,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_runnable_sequence_transform() {
-        let first = RunnableLambda::new(|x: i32| Ok(x + 1));
-        let second = RunnableLambda::new(|x: i32| Ok(x * 2));
+        let first = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
+        let second = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
         let sequence = pipe(first, second);
 
         let input = Box::pin(futures::stream::iter(vec![5]));
@@ -2837,9 +2843,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_nested_sequence_stream() {
-        let a = RunnableLambda::new(|x: i32| Ok(x + 1));
-        let b = RunnableLambda::new(|x: i32| Ok(x * 2));
-        let c = RunnableLambda::new(|x: i32| Ok(x + 10));
+        let a = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
+        let b = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
+        let c = RunnableLambda::builder().func(|x: i32| Ok(x + 10)).build();
         let chain = pipe(pipe(a, b), c);
 
         let chunks: Vec<_> = chain.stream(1, None).collect::<Vec<_>>().await;
@@ -2850,20 +2856,25 @@ mod tests {
 
     #[tokio::test]
     async fn test_runnable_parallel_stream() {
-        let parallel = RunnableParallel::<Value>::new()
+        let parallel = RunnableParallel::<Value>::builder()
+            .build()
             .add(
                 "double",
-                RunnableLambda::new(|x: Value| {
-                    let n = x.as_i64().unwrap_or(0);
-                    Ok(serde_json::json!(n * 2))
-                }),
+                RunnableLambda::builder()
+                    .func(|x: Value| {
+                        let n = x.as_i64().unwrap_or(0);
+                        Ok(serde_json::json!(n * 2))
+                    })
+                    .build(),
             )
             .add(
                 "triple",
-                RunnableLambda::new(|x: Value| {
-                    let n = x.as_i64().unwrap_or(0);
-                    Ok(serde_json::json!(n * 3))
-                }),
+                RunnableLambda::builder()
+                    .func(|x: Value| {
+                        let n = x.as_i64().unwrap_or(0);
+                        Ok(serde_json::json!(n * 3))
+                    })
+                    .build(),
             );
 
         let chunks: Vec<_> = parallel
@@ -2885,14 +2896,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_runnable_parallel_stream_matches_invoke() {
-        let parallel = RunnableParallel::<Value>::new()
+        let parallel = RunnableParallel::<Value>::builder()
+            .build()
             .add(
                 "a",
-                RunnableLambda::new(|x: Value| Ok(serde_json::json!(x.as_i64().unwrap_or(0) + 1))),
+                RunnableLambda::builder()
+                    .func(|x: Value| Ok(serde_json::json!(x.as_i64().unwrap_or(0) + 1)))
+                    .build(),
             )
             .add(
                 "b",
-                RunnableLambda::new(|x: Value| Ok(serde_json::json!(x.as_i64().unwrap_or(0) * 2))),
+                RunnableLambda::builder()
+                    .func(|x: Value| Ok(serde_json::json!(x.as_i64().unwrap_or(0) * 2)))
+                    .build(),
             );
 
         let invoke_result = parallel.invoke(serde_json::json!(3), None).unwrap();
@@ -2912,7 +2928,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_generator_in_sequence() {
-        let lambda = RunnableLambda::new(|x: i32| Ok(x + 1));
+        let lambda = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let generator = RunnableGenerator::<i32, String>::new(|input_stream| {
             Box::pin(async_stream::stream! {
                 use futures::StreamExt;
@@ -2932,10 +2948,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_sequence_stream_error_propagation() {
-        let first = RunnableLambda::new(|_x: i32| -> Result<i32> {
-            Err(Error::other("first step failed"))
-        });
-        let second = RunnableLambda::new(|x: i32| Ok(x * 2));
+        let first = RunnableLambda::builder()
+            .func(|_x: i32| -> Result<i32> { Err(Error::other("first step failed")) })
+            .build();
+        let second = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
         let sequence = pipe(first, second);
 
         let chunks: Vec<_> = sequence.stream(1, None).collect::<Vec<_>>().await;

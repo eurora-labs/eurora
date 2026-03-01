@@ -158,7 +158,7 @@ fn test_sha1_deterministic_hash() {
 fn test_different_algorithms_produce_different_results() {
     use agent_chain_core::indexing::get_document_with_hash;
 
-    let doc = Document::new("test content");
+    let doc = Document::builder().page_content("test content").build();
 
     let sha1_enc = KeyEncoder::Algorithm(HashAlgorithm::Sha1);
     let sha256_enc = KeyEncoder::Algorithm(HashAlgorithm::Sha256);
@@ -179,7 +179,7 @@ fn test_different_algorithms_produce_different_results() {
 fn test_custom_key_encoder() {
     use agent_chain_core::indexing::get_document_with_hash;
 
-    let doc = Document::new("hello world");
+    let doc = Document::builder().page_content("hello world").build();
     let encoder = KeyEncoder::Custom(Box::new(|doc: &Document| {
         format!("custom-{}", doc.page_content.len())
     }));
@@ -196,8 +196,12 @@ fn test_indexing_same_content() {
     let config = sha256_config();
 
     let docs = vec![
-        Document::new("This is a test document."),
-        Document::new("This is another document."),
+        Document::builder()
+            .page_content("This is a test document.")
+            .build(),
+        Document::builder()
+            .page_content("This is another document.")
+            .build(),
     ];
 
     let result = index(docs.clone(), &manager, &dest, &config).unwrap();
@@ -234,8 +238,12 @@ async fn test_aindexing_same_content() {
     let config = sha256_config();
 
     let docs = vec![
-        Document::new("This is a test document."),
-        Document::new("This is another document."),
+        Document::builder()
+            .page_content("This is a test document.")
+            .build(),
+        Document::builder()
+            .page_content("This is another document.")
+            .build(),
     ];
 
     let result = aindex(docs.clone(), &manager, &dest, &config)
@@ -258,8 +266,12 @@ fn test_index_simple_delete_full() {
     let dest = IndexDestination::VectorStore(&store);
 
     let docs = vec![
-        Document::new("This is a test document."),
-        Document::new("This is another document."),
+        Document::builder()
+            .page_content("This is a test document.")
+            .build(),
+        Document::builder()
+            .page_content("This is another document.")
+            .build(),
     ];
 
     manager.set_time_override(Some(1609459200.0)); // 2021-01-01
@@ -276,8 +288,12 @@ fn test_index_simple_delete_full() {
     assert_eq!(result.num_deleted, 0);
 
     let docs2 = vec![
-        Document::new("mutated document 1"),
-        Document::new("This is another document."),
+        Document::builder()
+            .page_content("mutated document 1")
+            .build(),
+        Document::builder()
+            .page_content("This is another document.")
+            .build(),
     ];
 
     manager.set_time_override(Some(1609545600.0)); // 2021-01-02
@@ -312,14 +328,25 @@ fn test_incremental_fails_with_bad_source_ids() {
         key_encoder: KeyEncoder::Algorithm(HashAlgorithm::Sha256),
         ..Default::default()
     };
-    let result = index(vec![Document::new("test")], &manager, &dest, &config);
+    let result = index(
+        vec![Document::builder().page_content("test").build()],
+        &manager,
+        &dest,
+        &config,
+    );
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();
     assert!(err.contains("Source id key is required"));
 
     let docs = vec![
-        Document::new("test").with_metadata(HashMap::from([("source".to_string(), json!("1"))])),
-        Document::new("test2").with_metadata(HashMap::from([("source".to_string(), json!(null))])),
+        Document::builder()
+            .page_content("test")
+            .metadata(HashMap::from([("source".to_string(), json!("1"))]))
+            .build(),
+        Document::builder()
+            .page_content("test2")
+            .metadata(HashMap::from([("source".to_string(), json!(null))]))
+            .build(),
     ];
     let config = IndexConfig {
         cleanup: Some(CleanupMode::Incremental),
@@ -340,11 +367,22 @@ fn test_index_simple_delete_scoped_full() {
     let dest = IndexDestination::VectorStore(&store);
 
     let docs = vec![
-        Document::new("doc1").with_metadata(HashMap::from([("source".to_string(), json!("1"))])),
-        Document::new("doc2").with_metadata(HashMap::from([("source".to_string(), json!("1"))])),
-        Document::new("doc3").with_metadata(HashMap::from([("source".to_string(), json!("1"))])),
-        Document::new("doc_other")
-            .with_metadata(HashMap::from([("source".to_string(), json!("2"))])),
+        Document::builder()
+            .page_content("doc1")
+            .metadata(HashMap::from([("source".to_string(), json!("1"))]))
+            .build(),
+        Document::builder()
+            .page_content("doc2")
+            .metadata(HashMap::from([("source".to_string(), json!("1"))]))
+            .build(),
+        Document::builder()
+            .page_content("doc3")
+            .metadata(HashMap::from([("source".to_string(), json!("1"))]))
+            .build(),
+        Document::builder()
+            .page_content("doc_other")
+            .metadata(HashMap::from([("source".to_string(), json!("2"))]))
+            .build(),
     ];
 
     manager.set_time_override(Some(1.0));
@@ -362,9 +400,14 @@ fn test_index_simple_delete_scoped_full() {
     assert_eq!(result.num_skipped, 4);
 
     let docs2 = vec![
-        Document::new("mutated doc")
-            .with_metadata(HashMap::from([("source".to_string(), json!("1"))])),
-        Document::new("doc2").with_metadata(HashMap::from([("source".to_string(), json!("1"))])),
+        Document::builder()
+            .page_content("mutated doc")
+            .metadata(HashMap::from([("source".to_string(), json!("1"))]))
+            .build(),
+        Document::builder()
+            .page_content("doc2")
+            .metadata(HashMap::from([("source".to_string(), json!("1"))]))
+            .build(),
     ];
     manager.set_time_override(Some(3.0));
     let result = index(docs2.clone(), &manager, &dest, &config).unwrap();
@@ -408,9 +451,13 @@ fn test_deduplication() {
     let config = sha256_config();
 
     let docs = vec![
-        Document::new("duplicate content"),
-        Document::new("duplicate content"),
-        Document::new("unique content"),
+        Document::builder()
+            .page_content("duplicate content")
+            .build(),
+        Document::builder()
+            .page_content("duplicate content")
+            .build(),
+        Document::builder().page_content("unique content").build(),
     ];
 
     let result = index(docs, &manager, &dest, &config).unwrap();
@@ -425,7 +472,7 @@ fn test_indexing_force_update() {
     let store = make_vector_store();
     let dest = IndexDestination::VectorStore(&store);
 
-    let docs = vec![Document::new("some content")];
+    let docs = vec![Document::builder().page_content("some content").build()];
 
     let config = sha256_config();
     let result = index(docs.clone(), &manager, &dest, &config).unwrap();
@@ -451,7 +498,10 @@ fn test_index_into_document_index() {
     let dest = IndexDestination::DocumentIndex(&doc_index);
     let config = sha256_config();
 
-    let docs = vec![Document::new("doc one"), Document::new("doc two")];
+    let docs = vec![
+        Document::builder().page_content("doc one").build(),
+        Document::builder().page_content("doc two").build(),
+    ];
 
     let result = index(docs.clone(), &manager, &dest, &config).unwrap();
     assert_eq!(result.num_added, 2);
@@ -468,8 +518,11 @@ fn test_document_index_upsert_and_get() {
 
     let index = InMemoryDocumentIndex::default();
     let docs = vec![
-        Document::new("hello world").with_id("id1"),
-        Document::new("foo bar"),
+        Document::builder()
+            .page_content("hello world")
+            .id("id1")
+            .build(),
+        Document::builder().page_content("foo bar").build(),
     ];
 
     let response = index.upsert(&docs).unwrap();
@@ -492,9 +545,9 @@ fn test_document_index_delete() {
 
     let index = InMemoryDocumentIndex::default();
     let docs = vec![
-        Document::new("a").with_id("1"),
-        Document::new("b").with_id("2"),
-        Document::new("c").with_id("3"),
+        Document::builder().page_content("a").id("1").build(),
+        Document::builder().page_content("b").id("2").build(),
+        Document::builder().page_content("c").id("3").build(),
     ];
     index.upsert(&docs).unwrap();
 
@@ -515,9 +568,18 @@ fn test_document_index_retriever_ordering() {
 
     let idx = InMemoryDocumentIndex::new(2);
     let docs = vec![
-        Document::new("the cat sat on the mat").with_id("1"),
-        Document::new("the the the the the").with_id("2"),
-        Document::new("dog walks in park").with_id("3"),
+        Document::builder()
+            .page_content("the cat sat on the mat")
+            .id("1")
+            .build(),
+        Document::builder()
+            .page_content("the the the the the")
+            .id("2")
+            .build(),
+        Document::builder()
+            .page_content("dog walks in park")
+            .id("3")
+            .build(),
     ];
     idx.upsert(&docs).unwrap();
 
@@ -534,8 +596,14 @@ fn test_scoped_full_empty_loader() {
     let dest = IndexDestination::VectorStore(&store);
 
     let docs = vec![
-        Document::new("doc1").with_metadata(HashMap::from([("source".to_string(), json!("1"))])),
-        Document::new("doc2").with_metadata(HashMap::from([("source".to_string(), json!("2"))])),
+        Document::builder()
+            .page_content("doc1")
+            .metadata(HashMap::from([("source".to_string(), json!("1"))]))
+            .build(),
+        Document::builder()
+            .page_content("doc2")
+            .metadata(HashMap::from([("source".to_string(), json!("2"))]))
+            .build(),
     ];
 
     manager.set_time_override(Some(1.0));

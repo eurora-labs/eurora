@@ -1,3 +1,4 @@
+use bon::bon;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -24,23 +25,15 @@ fn default_chat_generation_type() -> String {
     "ChatGeneration".to_string()
 }
 
+#[bon]
 impl ChatGeneration {
-    pub fn new(message: BaseMessage) -> Self {
+    #[builder]
+    pub fn new(message: BaseMessage, generation_info: Option<HashMap<String, Value>>) -> Self {
         let text = extract_text_from_message(&message);
         Self {
             text,
             message,
-            generation_info: None,
-            generation_type: "ChatGeneration".to_string(),
-        }
-    }
-
-    pub fn with_info(message: BaseMessage, generation_info: HashMap<String, Value>) -> Self {
-        let text = extract_text_from_message(&message);
-        Self {
-            text,
-            message,
-            generation_info: Some(generation_info),
+            generation_info,
             generation_type: "ChatGeneration".to_string(),
         }
     }
@@ -97,23 +90,15 @@ fn default_chat_generation_chunk_type() -> String {
     "ChatGenerationChunk".to_string()
 }
 
+#[bon]
 impl ChatGenerationChunk {
-    pub fn new(message: BaseMessage) -> Self {
+    #[builder]
+    pub fn new(message: BaseMessage, generation_info: Option<HashMap<String, Value>>) -> Self {
         let text = extract_text_from_message(&message);
         Self {
             text,
             message,
-            generation_info: None,
-            generation_type: "ChatGenerationChunk".to_string(),
-        }
-    }
-
-    pub fn with_info(message: BaseMessage, generation_info: HashMap<String, Value>) -> Self {
-        let text = extract_text_from_message(&message);
-        Self {
-            text,
-            message,
-            generation_info: Some(generation_info),
+            generation_info,
             generation_type: "ChatGenerationChunk".to_string(),
         }
     }
@@ -214,7 +199,7 @@ mod tests {
     #[test]
     fn test_chat_generation_new() {
         let msg = AIMessage::builder().content("Hello, world!").build();
-        let chat_gen = ChatGeneration::new(msg.into());
+        let chat_gen = ChatGeneration::builder().message(msg.into()).build();
         assert_eq!(chat_gen.text, "Hello, world!");
         assert!(chat_gen.generation_info.is_none());
         assert_eq!(chat_gen.generation_type, "ChatGeneration");
@@ -225,7 +210,10 @@ mod tests {
         let msg = AIMessage::builder().content("Hello").build();
         let mut info = HashMap::new();
         info.insert("finish_reason".to_string(), json!("stop"));
-        let chat_gen = ChatGeneration::with_info(msg.into(), info.clone());
+        let chat_gen = ChatGeneration::builder()
+            .message(msg.into())
+            .generation_info(info.clone())
+            .build();
         assert_eq!(chat_gen.text, "Hello");
         assert_eq!(chat_gen.generation_info, Some(info));
     }
@@ -234,8 +222,8 @@ mod tests {
     fn test_chat_generation_chunk_add() {
         let msg1 = AIMessage::builder().content("Hello, ").build();
         let msg2 = AIMessage::builder().content("world!").build();
-        let chunk1 = ChatGenerationChunk::new(msg1.into());
-        let chunk2 = ChatGenerationChunk::new(msg2.into());
+        let chunk1 = ChatGenerationChunk::builder().message(msg1.into()).build();
+        let chunk2 = ChatGenerationChunk::builder().message(msg2.into()).build();
         let result = chunk1 + chunk2;
         assert_eq!(result.text, "Hello, world!");
     }
@@ -249,7 +237,7 @@ mod tests {
     #[test]
     fn test_merge_chat_generation_chunks_single() {
         let msg = AIMessage::builder().content("Hello").build();
-        let chunk = ChatGenerationChunk::new(msg.into());
+        let chunk = ChatGenerationChunk::builder().message(msg.into()).build();
         let result = merge_chat_generation_chunks(vec![chunk.clone()]);
         assert!(result.is_some());
         assert_eq!(result.unwrap().text, "Hello");
@@ -261,9 +249,9 @@ mod tests {
         let msg2 = AIMessage::builder().content("world").build();
         let msg3 = AIMessage::builder().content("!").build();
         let chunks = vec![
-            ChatGenerationChunk::new(msg1.into()),
-            ChatGenerationChunk::new(msg2.into()),
-            ChatGenerationChunk::new(msg3.into()),
+            ChatGenerationChunk::builder().message(msg1.into()).build(),
+            ChatGenerationChunk::builder().message(msg2.into()).build(),
+            ChatGenerationChunk::builder().message(msg3.into()).build(),
         ];
         let result = merge_chat_generation_chunks(chunks);
         assert!(result.is_some());

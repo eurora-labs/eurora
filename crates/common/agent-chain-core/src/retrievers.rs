@@ -224,9 +224,9 @@ mod tests {
     #[test]
     fn test_retriever_get_relevant_documents() {
         let docs = vec![
-            Document::new("Hello world"),
-            Document::new("Goodbye world"),
-            Document::new("Hello again"),
+            Document::builder().page_content("Hello world").build(),
+            Document::builder().page_content("Goodbye world").build(),
+            Document::builder().page_content("Hello again").build(),
         ];
 
         let retriever = TestRetriever {
@@ -243,7 +243,10 @@ mod tests {
 
     #[test]
     fn test_retriever_invoke() {
-        let docs = vec![Document::new("Hello world"), Document::new("Goodbye world")];
+        let docs = vec![
+            Document::builder().page_content("Hello world").build(),
+            Document::builder().page_content("Goodbye world").build(),
+        ];
 
         let retriever = TestRetriever { docs, k: 5 };
 
@@ -254,7 +257,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_retriever_ainvoke() {
-        let docs = vec![Document::new("Hello world"), Document::new("Goodbye world")];
+        let docs = vec![
+            Document::builder().page_content("Hello world").build(),
+            Document::builder().page_content("Goodbye world").build(),
+        ];
 
         let retriever = TestRetriever { docs, k: 5 };
 

@@ -35,27 +35,21 @@ pub struct BetaParams {
     pub addendum: Option<String>,
 }
 
+#[bon::bon]
 impl BetaParams {
-    pub fn new(name: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(
+        #[builder(into)] name: Option<String>,
+        #[builder(into)] message: Option<String>,
+        #[builder(into)] obj_type: Option<String>,
+        #[builder(into)] addendum: Option<String>,
+    ) -> Self {
         Self {
-            name: Some(name.into()),
-            ..Default::default()
+            name,
+            message,
+            obj_type,
+            addendum,
         }
-    }
-
-    pub fn with_message(mut self, message: impl Into<String>) -> Self {
-        self.message = Some(message.into());
-        self
-    }
-
-    pub fn with_obj_type(mut self, obj_type: impl Into<String>) -> Self {
-        self.obj_type = Some(obj_type.into());
-        self
-    }
-
-    pub fn with_addendum(mut self, addendum: impl Into<String>) -> Self {
-        self.addendum = Some(addendum.into());
-        self
     }
 }
 
@@ -91,23 +85,23 @@ pub fn warn_beta(params: BetaParams, caller_module: &str) {
 #[macro_export]
 macro_rules! beta {
     ($name:expr) => {
-        $crate::api::warn_beta($crate::api::BetaParams::new($name), module_path!())
+        $crate::api::warn_beta($crate::api::BetaParams::builder().name($name).build(), module_path!())
     };
     ($name:expr, $($key:ident = $value:expr),+ $(,)?) => {{
-        let mut params = $crate::api::BetaParams::new($name);
+        let mut params = $crate::api::BetaParams::builder().name($name).build();
         $(
-            params = $crate::api::beta!(@set params, $key, $value);
+            $crate::api::beta!(@set params, $key, $value);
         )+
         $crate::api::warn_beta(params, module_path!())
     }};
     (@set $params:expr, message, $value:expr) => {
-        $params.with_message($value)
+        $params.message = Some($value.into())
     };
     (@set $params:expr, obj_type, $value:expr) => {
-        $params.with_obj_type($value)
+        $params.obj_type = Some($value.into())
     };
     (@set $params:expr, addendum, $value:expr) => {
-        $params.with_addendum($value)
+        $params.addendum = Some($value.into())
     };
 }
 
@@ -124,9 +118,11 @@ mod tests {
 
     #[test]
     fn test_beta_params_builder() {
-        let params = BetaParams::new("test_function")
-            .with_obj_type("function")
-            .with_addendum("Consider using other_function.");
+        let params = BetaParams::builder()
+            .name("test_function")
+            .obj_type("function")
+            .addendum("Consider using other_function.")
+            .build();
 
         assert_eq!(params.name, Some("test_function".to_string()));
         assert_eq!(params.obj_type, Some("function".to_string()));

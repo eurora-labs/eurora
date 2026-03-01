@@ -139,7 +139,7 @@ impl OllamaLLM {
             async_client_kwargs: HashMap::new(),
             sync_client_kwargs: HashMap::new(),
             llm_config: LLMConfig::default(),
-            language_model_config: LanguageModelConfig::new(),
+            language_model_config: LanguageModelConfig::builder().build(),
             model_validated: std::sync::atomic::AtomicBool::new(false),
         }
     }
@@ -549,9 +549,12 @@ impl OllamaLLM {
             };
 
             let chunk = if let Some(info) = generation_info {
-                GenerationChunk::with_info(text, info)
+                GenerationChunk::builder()
+                    .text(text)
+                    .generation_info(info)
+                    .build()
             } else {
-                GenerationChunk::new(text)
+                GenerationChunk::builder().text(text).build()
             };
 
             if let Some(rm) = run_manager {
@@ -661,15 +664,16 @@ impl BaseLanguageModel for OllamaLLM {
     }
 
     fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
-        let mut params = LangSmithParams::new()
-            .with_provider("ollama")
-            .with_model_name(&self.model);
+        let mut params = LangSmithParams::builder()
+            .provider("ollama")
+            .model_name(&self.model)
+            .build();
 
         if let Some(num_predict) = self.num_predict {
-            params = params.with_max_tokens(num_predict as u32);
+            params.ls_max_tokens = Some(num_predict as u32);
         }
         if let Some(stop) = stop {
-            params = params.with_stop(stop.to_vec());
+            params.ls_stop = Some(stop.to_vec());
         }
 
         params
@@ -695,7 +699,7 @@ impl BaseLLM for OllamaLLM {
                 .await?;
             generations.push(vec![GenerationType::GenerationChunk(chunk)]);
         }
-        Ok(LLMResult::new(generations))
+        Ok(LLMResult::builder().generations(generations).build())
     }
 
     async fn stream_prompt(
@@ -736,7 +740,7 @@ impl BaseLLM for OllamaLLM {
                     generation_info.extend(done_info);
                 }
 
-                let chunk = GenerationChunk::with_info(text, generation_info);
+                let chunk = GenerationChunk::builder().text(text).generation_info(generation_info).build();
 
                 yield chunk;
             }

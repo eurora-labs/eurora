@@ -103,8 +103,8 @@ impl ChatAnthropic {
             timeout: None,
             max_retries: 2,
             model_kwargs: HashMap::new(),
-            chat_model_config: ChatModelConfig::new(),
-            language_model_config: LanguageModelConfig::new(),
+            chat_model_config: ChatModelConfig::builder().build(),
+            language_model_config: LanguageModelConfig::builder().build(),
             bound_tools: Vec::new(),
             bound_tool_choice: None,
         }
@@ -336,8 +336,8 @@ impl ChatAnthropic {
             .tool_calls(tool_calls)
             .build();
 
-        let generation = ChatGeneration::new(message.into());
-        ChatResult::new(vec![generation])
+        let generation = ChatGeneration::builder().message(message.into()).build();
+        ChatResult::builder().generations(vec![generation]).build()
     }
 
     /// Extract AIMessage from ChatResult.
@@ -380,7 +380,7 @@ impl BaseLanguageModel for ChatAnthropic {
                 .await?;
             all_generations.push(result.generations.into_iter().map(|g| g.into()).collect());
         }
-        Ok(LLMResult::new(all_generations))
+        Ok(LLMResult::builder().generations(all_generations).build())
     }
 
     fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
@@ -416,8 +416,8 @@ impl BaseChatModel for ChatAnthropic {
                     stop,
                 )
                 .await?;
-            let generation = ChatGeneration::new(ai_message.into());
-            return Ok(ChatResult::new(vec![generation]));
+            let generation = ChatGeneration::builder().message(ai_message.into()).build();
+            return Ok(ChatResult::builder().generations(vec![generation]).build());
         }
         self._generate_internal(messages, stop, None).await
     }
@@ -459,8 +459,10 @@ impl BaseChatModel for ChatAnthropic {
         let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
 
         let output_parser =
-            crate::output_parsers::openai_tools::JsonOutputKeyToolsParser::new(&tool_name)
-                .with_first_tool_only(true);
+            crate::output_parsers::openai_tools::JsonOutputKeyToolsParser::builder()
+                .key_name(&tool_name)
+                .first_tool_only(true)
+                .build();
 
         let model_runnable = ChatModelRunnable::new(std::sync::Arc::from(bound_model));
 

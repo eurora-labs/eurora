@@ -134,24 +134,19 @@ pub struct JsonOutputToolsParser {
     pub first_tool_only: bool,
 }
 
+#[bon::bon]
 impl JsonOutputToolsParser {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_return_id(mut self, return_id: bool) -> Self {
-        self.return_id = return_id;
-        self
-    }
-
-    pub fn with_first_tool_only(mut self, first_tool_only: bool) -> Self {
-        self.first_tool_only = first_tool_only;
-        self
-    }
-
-    pub fn with_strict(mut self, strict: bool) -> Self {
-        self.strict = strict;
-        self
+    #[builder]
+    pub fn new(
+        #[builder(default)] strict: bool,
+        #[builder(default)] return_id: bool,
+        #[builder(default)] first_tool_only: bool,
+    ) -> Self {
+        Self {
+            strict,
+            return_id,
+            first_tool_only,
+        }
     }
 
     pub fn parse_result(&self, result: &[ChatGeneration], partial: bool) -> Result<Value> {
@@ -223,7 +218,7 @@ impl Runnable for JsonOutputToolsParser {
 
     fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
         let message = crate::messages::BaseMessage::AI(input);
-        let generation = ChatGeneration::new(message);
+        let generation = ChatGeneration::builder().message(message).build();
         self.parse_result(&[generation], false)
     }
 }
@@ -236,29 +231,21 @@ pub struct JsonOutputKeyToolsParser {
     pub first_tool_only: bool,
 }
 
+#[bon::bon]
 impl JsonOutputKeyToolsParser {
-    pub fn new(key_name: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(
+        #[builder(into)] key_name: String,
+        #[builder(default)] strict: bool,
+        #[builder(default)] return_id: bool,
+        #[builder(default)] first_tool_only: bool,
+    ) -> Self {
         Self {
-            key_name: key_name.into(),
-            strict: false,
-            return_id: false,
-            first_tool_only: false,
+            key_name,
+            strict,
+            return_id,
+            first_tool_only,
         }
-    }
-
-    pub fn with_return_id(mut self, return_id: bool) -> Self {
-        self.return_id = return_id;
-        self
-    }
-
-    pub fn with_first_tool_only(mut self, first_tool_only: bool) -> Self {
-        self.first_tool_only = first_tool_only;
-        self
-    }
-
-    pub fn with_strict(mut self, strict: bool) -> Self {
-        self.strict = strict;
-        self
     }
 
     pub fn parse_result(&self, result: &[ChatGeneration], partial: bool) -> Result<Value> {
@@ -369,7 +356,7 @@ impl Runnable for JsonOutputKeyToolsParser {
 
     fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
         let message = crate::messages::BaseMessage::AI(input);
-        let generation = ChatGeneration::new(message);
+        let generation = ChatGeneration::builder().message(message).build();
         self.parse_result(&[generation], false)
     }
 }
@@ -398,7 +385,7 @@ impl PydanticToolsParser {
         Self {
             name_dict,
             first_tool_only,
-            inner: JsonOutputToolsParser::new(),
+            inner: JsonOutputToolsParser::builder().build(),
         }
     }
 
@@ -496,7 +483,7 @@ impl Runnable for PydanticToolsParser {
 
     fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
         let message = crate::messages::BaseMessage::AI(input);
-        let generation = ChatGeneration::new(message);
+        let generation = ChatGeneration::builder().message(message).build();
         self.parse_result(&[generation], false)
     }
 }
