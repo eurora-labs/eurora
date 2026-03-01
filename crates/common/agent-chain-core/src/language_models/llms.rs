@@ -35,32 +35,24 @@ impl std::fmt::Debug for LLMConfig {
     }
 }
 
+#[bon::bon]
 impl LLMConfig {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_cache(mut self, cache: bool) -> Self {
-        self.base.cache = Some(cache);
-        self
-    }
-
-    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
-        self.base.tags = Some(tags);
-        self
-    }
-
-    pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
-        self.base.metadata = Some(metadata);
-        self
-    }
-
-    pub fn with_cache_instance(
-        mut self,
-        cache: std::sync::Arc<dyn crate::caches::BaseCache>,
+    #[builder]
+    pub fn new(
+        cache: Option<bool>,
+        tags: Option<Vec<String>>,
+        metadata: Option<HashMap<String, Value>>,
+        cache_instance: Option<std::sync::Arc<dyn crate::caches::BaseCache>>,
     ) -> Self {
-        self.cache_instance = Some(cache);
-        self
+        Self {
+            base: LanguageModelConfig {
+                cache,
+                tags,
+                metadata,
+                ..Default::default()
+            },
+            cache_instance,
+        }
     }
 }
 
@@ -1074,9 +1066,10 @@ mod tests {
 
     #[test]
     fn test_llm_config_builder() {
-        let config = LLMConfig::new()
-            .with_cache(true)
-            .with_tags(vec!["test".to_string()]);
+        let config = LLMConfig::builder()
+            .cache(true)
+            .tags(vec!["test".to_string()])
+            .build();
 
         assert_eq!(config.base.cache, Some(true));
         assert_eq!(config.base.tags, Some(vec!["test".to_string()]));

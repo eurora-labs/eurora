@@ -678,7 +678,7 @@ fn test_get_graph_sequence_draws_mermaid() {
 fn test_get_graph_parallel() {
     use agent_chain_core::runnables::base::RunnableParallel;
 
-    let par = RunnableParallel::<String>::new()
+    let par = RunnableParallel::<String>::builder().build()
         .add(
             "a",
             runnable_lambda(|x: String| Ok(serde_json::Value::String(x.clone()))),
@@ -712,7 +712,7 @@ fn test_get_graph_parallel() {
 fn test_get_graph_parallel_draws_mermaid() {
     use agent_chain_core::runnables::base::RunnableParallel;
 
-    let par = RunnableParallel::<String>::new()
+    let par = RunnableParallel::<String>::builder().build()
         .add(
             "a",
             runnable_lambda(|x: String| Ok(serde_json::Value::String(x.clone()))),

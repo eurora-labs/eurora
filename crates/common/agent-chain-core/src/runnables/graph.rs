@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use bon::bon;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
@@ -18,23 +19,29 @@ pub struct Edge {
     pub conditional: bool,
 }
 
+#[bon]
 impl Edge {
-    pub fn new(source: impl Into<String>, target: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(
+        source: impl Into<String>,
+        target: impl Into<String>,
+        data: Option<String>,
+        #[builder(default)] conditional: bool,
+    ) -> Self {
         Self {
             source: source.into(),
             target: target.into(),
-            data: None,
-            conditional: false,
+            data,
+            conditional,
         }
     }
 
     pub fn conditional(source: impl Into<String>, target: impl Into<String>) -> Self {
-        Self {
-            source: source.into(),
-            target: target.into(),
-            data: None,
-            conditional: true,
-        }
+        Self::builder()
+            .source(source)
+            .target(target)
+            .conditional(true)
+            .build()
     }
 
     pub fn copy(&self, source: Option<&str>, target: Option<&str>) -> Self {
@@ -116,26 +123,21 @@ pub struct Node {
     pub metadata: Option<HashMap<String, Value>>,
 }
 
+#[bon]
 impl Node {
-    pub fn new(id: impl Into<String>, name: impl Into<String>) -> Self {
-        let id = id.into();
-        let name = name.into();
+    #[builder]
+    pub fn new(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        data: Option<NodeData>,
+        metadata: Option<HashMap<String, Value>>,
+    ) -> Self {
         Self {
-            id,
-            name,
-            data: None,
-            metadata: None,
+            id: id.into(),
+            name: name.into(),
+            data,
+            metadata,
         }
-    }
-
-    pub fn with_data(mut self, data: NodeData) -> Self {
-        self.data = Some(data);
-        self
-    }
-
-    pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
-        self.metadata = Some(metadata);
-        self
     }
 
     pub fn copy(&self, id: Option<&str>, name: Option<&str>) -> Self {

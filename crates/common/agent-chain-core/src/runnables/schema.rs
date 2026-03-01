@@ -18,29 +18,21 @@ pub struct EventData {
     pub chunk: Option<Value>,
 }
 
+#[bon::bon]
 impl EventData {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_input(mut self, input: Value) -> Self {
-        self.input = Some(input);
-        self
-    }
-
-    pub fn with_error(mut self, error: impl Into<String>) -> Self {
-        self.error = Some(error.into());
-        self
-    }
-
-    pub fn with_output(mut self, output: Value) -> Self {
-        self.output = Some(output);
-        self
-    }
-
-    pub fn with_chunk(mut self, chunk: Value) -> Self {
-        self.chunk = Some(chunk);
-        self
+    #[builder]
+    pub fn new(
+        input: Option<Value>,
+        #[builder(into)] error: Option<String>,
+        output: Option<Value>,
+        chunk: Option<Value>,
+    ) -> Self {
+        Self {
+            input,
+            error,
+            output,
+            chunk,
+        }
     }
 }
 
@@ -60,30 +52,23 @@ pub struct BaseStreamEvent {
     pub parent_ids: Vec<String>,
 }
 
+#[bon::bon]
 impl BaseStreamEvent {
-    pub fn new(event: impl Into<String>, run_id: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(
+        #[builder(into)] event: String,
+        #[builder(into)] run_id: String,
+        #[builder(default)] tags: Vec<String>,
+        #[builder(default)] metadata: HashMap<String, Value>,
+        #[builder(default)] parent_ids: Vec<String>,
+    ) -> Self {
         Self {
-            event: event.into(),
-            run_id: run_id.into(),
-            tags: Vec::new(),
-            metadata: HashMap::new(),
-            parent_ids: Vec::new(),
+            event,
+            run_id,
+            tags,
+            metadata,
+            parent_ids,
         }
-    }
-
-    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
-        self.tags = tags;
-        self
-    }
-
-    pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
-        self.metadata = metadata;
-        self
-    }
-
-    pub fn with_parent_ids(mut self, parent_ids: Vec<String>) -> Self {
-        self.parent_ids = parent_ids;
-        self
     }
 }
 
@@ -97,37 +82,29 @@ pub struct StandardStreamEvent {
     pub name: String,
 }
 
+#[bon::bon]
 impl StandardStreamEvent {
+    #[builder]
     pub fn new(
-        event: impl Into<String>,
-        run_id: impl Into<String>,
-        name: impl Into<String>,
+        #[builder(into)] event: String,
+        #[builder(into)] run_id: String,
+        #[builder(into)] name: String,
+        #[builder(default)] data: EventData,
+        #[builder(default)] tags: Vec<String>,
+        #[builder(default)] metadata: HashMap<String, Value>,
+        #[builder(default)] parent_ids: Vec<String>,
     ) -> Self {
         Self {
-            base: BaseStreamEvent::new(event, run_id),
-            data: EventData::new(),
-            name: name.into(),
+            base: BaseStreamEvent::builder()
+                .event(event)
+                .run_id(run_id)
+                .tags(tags)
+                .metadata(metadata)
+                .parent_ids(parent_ids)
+                .build(),
+            data,
+            name,
         }
-    }
-
-    pub fn with_data(mut self, data: EventData) -> Self {
-        self.data = data;
-        self
-    }
-
-    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
-        self.base.tags = tags;
-        self
-    }
-
-    pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
-        self.base.metadata = metadata;
-        self
-    }
-
-    pub fn with_parent_ids(mut self, parent_ids: Vec<String>) -> Self {
-        self.base.parent_ids = parent_ids;
-        self
     }
 }
 
@@ -143,28 +120,28 @@ pub struct CustomStreamEvent {
     pub data: Value,
 }
 
+#[bon::bon]
 impl CustomStreamEvent {
-    pub fn new(run_id: impl Into<String>, name: impl Into<String>, data: Value) -> Self {
+    #[builder]
+    pub fn new(
+        #[builder(into)] run_id: String,
+        #[builder(into)] name: String,
+        data: Value,
+        #[builder(default)] tags: Vec<String>,
+        #[builder(default)] metadata: HashMap<String, Value>,
+        #[builder(default)] parent_ids: Vec<String>,
+    ) -> Self {
         Self {
-            base: BaseStreamEvent::new(CUSTOM_EVENT_TYPE, run_id),
-            name: name.into(),
+            base: BaseStreamEvent::builder()
+                .event(CUSTOM_EVENT_TYPE)
+                .run_id(run_id)
+                .tags(tags)
+                .metadata(metadata)
+                .parent_ids(parent_ids)
+                .build(),
+            name,
             data,
         }
-    }
-
-    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
-        self.base.tags = tags;
-        self
-    }
-
-    pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
-        self.base.metadata = metadata;
-        self
-    }
-
-    pub fn with_parent_ids(mut self, parent_ids: Vec<String>) -> Self {
-        self.base.parent_ids = parent_ids;
-        self
     }
 }
 
@@ -245,9 +222,10 @@ mod tests {
 
     #[test]
     fn test_event_data() {
-        let data = EventData::new()
-            .with_input(serde_json::json!("hello"))
-            .with_output(serde_json::json!("world"));
+        let data = EventData::builder()
+            .input(serde_json::json!("hello"))
+            .output(serde_json::json!("world"))
+            .build();
 
         assert_eq!(data.input, Some(serde_json::json!("hello")));
         assert_eq!(data.output, Some(serde_json::json!("world")));
@@ -257,9 +235,13 @@ mod tests {
 
     #[test]
     fn test_standard_stream_event() {
-        let event = StandardStreamEvent::new("on_chain_start", "run-123", "my_chain")
-            .with_tags(vec!["tag1".to_string()])
-            .with_data(EventData::new().with_input(serde_json::json!({"key": "value"})));
+        let event = StandardStreamEvent::builder()
+            .event("on_chain_start")
+            .run_id("run-123")
+            .name("my_chain")
+            .tags(vec!["tag1".to_string()])
+            .data(EventData::builder().input(serde_json::json!({"key": "value"})).build())
+            .build();
 
         assert_eq!(event.base.event, "on_chain_start");
         assert_eq!(event.base.run_id, "run-123");
@@ -270,13 +252,13 @@ mod tests {
 
     #[test]
     fn test_custom_stream_event() {
-        let event = CustomStreamEvent::new(
-            "run-456",
-            "my_custom_event",
-            serde_json::json!({
+        let event = CustomStreamEvent::builder()
+            .run_id("run-456")
+            .name("my_custom_event")
+            .data(serde_json::json!({
                 "custom_field": "custom_value"
-            }),
-        );
+            }))
+            .build();
 
         assert_eq!(event.base.event, CUSTOM_EVENT_TYPE);
         assert_eq!(event.base.run_id, "run-456");
@@ -290,12 +272,12 @@ mod tests {
     #[test]
     fn test_stream_event_enum() {
         let standard =
-            StreamEvent::Standard(StandardStreamEvent::new("on_chain_end", "run-1", "chain"));
-        let custom = StreamEvent::Custom(CustomStreamEvent::new(
-            "run-2",
-            "custom",
-            serde_json::json!(null),
-        ));
+            StreamEvent::Standard(StandardStreamEvent::builder().event("on_chain_end").run_id("run-1").name("chain").build());
+        let custom = StreamEvent::Custom(CustomStreamEvent::builder()
+            .run_id("run-2")
+            .name("custom")
+            .data(serde_json::json!(null))
+            .build());
 
         assert!(standard.is_standard());
         assert!(!standard.is_custom());
@@ -310,8 +292,12 @@ mod tests {
 
     #[test]
     fn test_stream_event_serialization() {
-        let event = StandardStreamEvent::new("on_chain_start", "run-123", "test_chain")
-            .with_data(EventData::new().with_input(serde_json::json!("input")));
+        let event = StandardStreamEvent::builder()
+            .event("on_chain_start")
+            .run_id("run-123")
+            .name("test_chain")
+            .data(EventData::builder().input(serde_json::json!("input")).build())
+            .build();
 
         let json = serde_json::to_string(&event).unwrap();
         assert!(json.contains("on_chain_start"));

@@ -39,26 +39,23 @@ pub struct SerializedConstructor {
     pub graph: Option<HashMap<String, Value>>,
 }
 
+#[bon::bon]
 impl SerializedConstructor {
-    pub fn new(id: Vec<String>, kwargs: HashMap<String, Value>) -> Self {
+    #[builder]
+    pub fn new(
+        id: Vec<String>,
+        kwargs: HashMap<String, Value>,
+        #[builder(into)] name: Option<String>,
+        graph: Option<HashMap<String, Value>>,
+    ) -> Self {
         Self {
             lc: LC_VERSION,
             type_: "constructor".to_string(),
             id,
             kwargs,
-            name: None,
-            graph: None,
+            name,
+            graph,
         }
-    }
-
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
-
-    pub fn with_graph(mut self, graph: HashMap<String, Value>) -> Self {
-        self.graph = Some(graph);
-        self
     }
 }
 
@@ -104,21 +101,21 @@ pub struct SerializedNotImplemented {
     pub graph: Option<HashMap<String, Value>>,
 }
 
+#[bon::bon]
 impl SerializedNotImplemented {
-    pub fn new(id: Vec<String>) -> Self {
+    #[builder]
+    pub fn new(
+        id: Vec<String>,
+        #[builder(into)] repr: Option<String>,
+    ) -> Self {
         Self {
             lc: LC_VERSION,
             type_: "not_implemented".to_string(),
             id,
-            repr: None,
+            repr,
             name: None,
             graph: None,
         }
-    }
-
-    pub fn with_repr(mut self, repr: impl Into<String>) -> Self {
-        self.repr = Some(repr.into());
-        self
     }
 }
 
@@ -268,7 +265,11 @@ pub trait Serializable: Any + Send + Sync {
             final_kwargs.insert(key, value);
         }
 
-        SerializedConstructor::new(Self::lc_id(), final_kwargs).into()
+        SerializedConstructor::builder()
+            .id(Self::lc_id())
+            .kwargs(final_kwargs)
+            .build()
+            .into()
     }
 
     fn to_json_not_implemented(&self) -> Serialized {
@@ -283,12 +284,11 @@ fn is_field_useful(_key: &str, value: &Value) -> bool {
 pub fn to_json_not_implemented_value(type_name: &str, repr: Option<String>) -> Serialized {
     let id: Vec<String> = type_name.split("::").map(|s| s.to_string()).collect();
 
-    let mut result = SerializedNotImplemented::new(id);
-    if let Some(r) = repr {
-        result = result.with_repr(r);
-    }
-
-    result.into()
+    SerializedNotImplemented::builder()
+        .id(id)
+        .maybe_repr(repr)
+        .build()
+        .into()
 }
 
 pub fn to_json_not_implemented(value: &Value) -> Serialized {
@@ -350,14 +350,14 @@ mod tests {
         let mut kwargs = HashMap::new();
         kwargs.insert("name".to_string(), Value::String("test".to_string()));
 
-        let constructor = SerializedConstructor::new(
-            vec![
+        let constructor = SerializedConstructor::builder()
+            .id(vec![
                 "langchain".to_string(),
                 "llms".to_string(),
                 "OpenAI".to_string(),
-            ],
-            kwargs,
-        );
+            ])
+            .kwargs(kwargs)
+            .build();
 
         assert_eq!(constructor.lc, 1);
         assert_eq!(constructor.type_, "constructor");
@@ -375,9 +375,10 @@ mod tests {
 
     #[test]
     fn test_serialized_not_implemented() {
-        let not_impl =
-            SerializedNotImplemented::new(vec!["my_module".to_string(), "MyClass".to_string()])
-                .with_repr("MyClass(...)".to_string());
+        let not_impl = SerializedNotImplemented::builder()
+            .id(vec!["my_module".to_string(), "MyClass".to_string()])
+            .repr("MyClass(...)")
+            .build();
 
         assert_eq!(not_impl.lc, 1);
         assert_eq!(not_impl.type_, "not_implemented");

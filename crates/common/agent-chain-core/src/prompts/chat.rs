@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use bon::bon;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
@@ -30,23 +31,19 @@ pub struct MessagesPlaceholder {
     pub n_messages: Option<usize>,
 }
 
+#[bon]
 impl MessagesPlaceholder {
-    pub fn new(variable_name: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(
+        variable_name: impl Into<String>,
+        #[builder(default)] optional: bool,
+        n_messages: Option<usize>,
+    ) -> Self {
         Self {
             variable_name: variable_name.into(),
-            optional: false,
-            n_messages: None,
+            optional,
+            n_messages,
         }
-    }
-
-    pub fn optional(mut self, optional: bool) -> Self {
-        self.optional = optional;
-        self
-    }
-
-    pub fn n_messages(mut self, n: usize) -> Self {
-        self.n_messages = Some(n);
-        self
     }
 
     pub fn format_with_messages(
@@ -139,12 +136,18 @@ pub struct ChatMessagePromptTemplate {
     pub additional_kwargs: HashMap<String, serde_json::Value>,
 }
 
+#[bon]
 impl ChatMessagePromptTemplate {
-    pub fn new(prompt: PromptTemplate, role: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(
+        prompt: PromptTemplate,
+        role: impl Into<String>,
+        #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
+    ) -> Self {
         Self {
             prompt,
             role: role.into(),
-            additional_kwargs: HashMap::new(),
+            additional_kwargs,
         }
     }
 
@@ -154,7 +157,7 @@ impl ChatMessagePromptTemplate {
         template_format: PromptTemplateFormat,
     ) -> Result<Self> {
         let prompt = PromptTemplate::from_template_with_format(template, template_format)?;
-        Ok(Self::new(prompt, role))
+        Ok(Self::builder().prompt(prompt).role(role).build())
     }
 }
 
@@ -207,11 +210,16 @@ pub struct HumanMessagePromptTemplate {
     pub additional_kwargs: HashMap<String, serde_json::Value>,
 }
 
+#[bon]
 impl HumanMessagePromptTemplate {
-    pub fn new(prompt: PromptTemplate) -> Self {
+    #[builder]
+    pub fn new(
+        prompt: PromptTemplate,
+        #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
+    ) -> Self {
         Self {
             prompt,
-            additional_kwargs: HashMap::new(),
+            additional_kwargs,
         }
     }
 
@@ -224,12 +232,12 @@ impl HumanMessagePromptTemplate {
         template_format: PromptTemplateFormat,
     ) -> Result<Self> {
         let prompt = PromptTemplate::from_template_with_format(template, template_format)?;
-        Ok(Self::new(prompt))
+        Ok(Self::builder().prompt(prompt).build())
     }
 
     pub fn from_template_file(template_file: impl AsRef<Path>) -> Result<Self> {
         let prompt = PromptTemplate::from_file(template_file)?;
-        Ok(Self::new(prompt))
+        Ok(Self::builder().prompt(prompt).build())
     }
 }
 
@@ -275,11 +283,16 @@ pub struct AIMessagePromptTemplate {
     pub additional_kwargs: HashMap<String, serde_json::Value>,
 }
 
+#[bon]
 impl AIMessagePromptTemplate {
-    pub fn new(prompt: PromptTemplate) -> Self {
+    #[builder]
+    pub fn new(
+        prompt: PromptTemplate,
+        #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
+    ) -> Self {
         Self {
             prompt,
-            additional_kwargs: HashMap::new(),
+            additional_kwargs,
         }
     }
 
@@ -292,12 +305,12 @@ impl AIMessagePromptTemplate {
         template_format: PromptTemplateFormat,
     ) -> Result<Self> {
         let prompt = PromptTemplate::from_template_with_format(template, template_format)?;
-        Ok(Self::new(prompt))
+        Ok(Self::builder().prompt(prompt).build())
     }
 
     pub fn from_template_file(template_file: impl AsRef<Path>) -> Result<Self> {
         let prompt = PromptTemplate::from_file(template_file)?;
-        Ok(Self::new(prompt))
+        Ok(Self::builder().prompt(prompt).build())
     }
 }
 

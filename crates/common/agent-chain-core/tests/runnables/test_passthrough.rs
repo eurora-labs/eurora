@@ -17,32 +17,32 @@ fn make_input(pairs: &[(&str, Value)]) -> HashMap<String, Value> {
 
 #[test]
 fn test_passthrough_identity() {
-    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
+    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
     assert_eq!(passthrough.invoke(5, None).unwrap(), 5);
 
-    let passthrough_str: RunnablePassthrough<String> = RunnablePassthrough::new();
+    let passthrough_str: RunnablePassthrough<String> = RunnablePassthrough::builder().build();
     assert_eq!(
         passthrough_str.invoke("hello".to_string(), None).unwrap(),
         "hello"
     );
 
-    let passthrough_vec: RunnablePassthrough<Vec<i32>> = RunnablePassthrough::new();
+    let passthrough_vec: RunnablePassthrough<Vec<i32>> = RunnablePassthrough::builder().build();
     assert_eq!(
         passthrough_vec.invoke(vec![1, 2, 3], None).unwrap(),
         vec![1, 2, 3]
     );
 
-    let passthrough_map: RunnablePassthrough<HashMap<String, Value>> = RunnablePassthrough::new();
+    let passthrough_map: RunnablePassthrough<HashMap<String, Value>> = RunnablePassthrough::builder().build();
     let input = make_input(&[("key", json!("value"))]);
     assert_eq!(passthrough_map.invoke(input.clone(), None).unwrap(), input);
 }
 
 #[tokio::test]
 async fn test_passthrough_identity_async() {
-    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
+    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
     assert_eq!(passthrough.ainvoke(5, None).await.unwrap(), 5);
 
-    let passthrough_str: RunnablePassthrough<String> = RunnablePassthrough::new();
+    let passthrough_str: RunnablePassthrough<String> = RunnablePassthrough::builder().build();
     assert_eq!(
         passthrough_str
             .ainvoke("hello".to_string(), None)
@@ -51,7 +51,7 @@ async fn test_passthrough_identity_async() {
         "hello"
     );
 
-    let passthrough_map: RunnablePassthrough<HashMap<String, Value>> = RunnablePassthrough::new();
+    let passthrough_map: RunnablePassthrough<HashMap<String, Value>> = RunnablePassthrough::builder().build();
     let input = make_input(&[("key", json!("value"))]);
     assert_eq!(
         passthrough_map.ainvoke(input.clone(), None).await.unwrap(),
@@ -99,7 +99,7 @@ async fn test_passthrough_with_afunc() {
 
 #[tokio::test]
 async fn test_passthrough_stream() {
-    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
+    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
     let result: Vec<i32> = passthrough
         .stream(42, None)
         .filter_map(|r| async { r.ok() })
@@ -110,7 +110,7 @@ async fn test_passthrough_stream() {
 
 #[tokio::test]
 async fn test_passthrough_astream() {
-    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
+    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
     let result: Vec<i32> = passthrough
         .stream(42, None)
         .filter_map(|r| async { r.ok() })
@@ -121,7 +121,7 @@ async fn test_passthrough_astream() {
 
 #[test]
 fn test_passthrough_batch() {
-    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
+    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
     let inputs = vec![1, 2, 3, 4, 5];
     let results: Vec<i32> = inputs
         .into_iter()
@@ -132,7 +132,7 @@ fn test_passthrough_batch() {
 
 #[tokio::test]
 async fn test_passthrough_transform() {
-    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
+    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
     let input_stream = futures::stream::iter(vec![1, 2, 3]);
     let result: Vec<i32> = passthrough
         .transform(Box::pin(input_stream), None)
@@ -144,7 +144,7 @@ async fn test_passthrough_transform() {
 
 #[tokio::test]
 async fn test_passthrough_atransform() {
-    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
+    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
     let input_stream = futures::stream::iter(vec![1, 2, 3]);
     let result: Vec<i32> = passthrough
         .atransform(Box::pin(input_stream), None)
@@ -198,23 +198,23 @@ fn test_passthrough_with_side_effect_batch() {
 
 #[test]
 fn test_passthrough_repr() {
-    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
+    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
     let repr_str = format!("{:?}", passthrough);
     assert!(repr_str.contains("RunnablePassthrough"));
 }
 
 #[test]
 fn test_passthrough_with_none_func() {
-    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
+    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
     let result = passthrough.invoke(42, None).unwrap();
     assert_eq!(result, 42);
 }
 
 #[test]
 fn test_passthrough_in_parallel() {
-    let parallel = RunnableParallel::<i32>::new()
-        .add("original", RunnableLambda::new(|x: i32| Ok(json!(x))))
-        .add("modified", RunnableLambda::new(|x: i32| Ok(json!(x + 1))));
+    let parallel = RunnableParallel::<i32>::builder().build()
+        .add("original", RunnableLambda::builder().func(|x: i32| Ok(json!(x))).build())
+        .add("modified", RunnableLambda::builder().func(|x: i32| Ok(json!(x + 1))).build());
 
     let result = parallel.invoke(5, None).unwrap();
     assert_eq!(result["original"], json!(5));
@@ -246,14 +246,14 @@ async fn test_passthrough_transform_with_func() {
 
 #[test]
 fn test_assign_basic() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
         "new_key",
-        RunnableLambda::new(|x: HashMap<String, Value>| {
+        RunnableLambda::builder().func(|x: HashMap<String, Value>| {
             let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
             Ok(json!(val * 2))
-        }),
+        }).build(),
     );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("value", json!(5))]);
     let result = assign.invoke(input, None).unwrap();
@@ -264,14 +264,14 @@ fn test_assign_basic() {
 
 #[tokio::test]
 async fn test_assign_basic_async() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
         "new_key",
-        RunnableLambda::new(|x: HashMap<String, Value>| {
+        RunnableLambda::builder().func(|x: HashMap<String, Value>| {
             let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
             Ok(json!(val * 2))
-        }),
+        }).build(),
     );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("value", json!(5))]);
     let result = assign.ainvoke(input, None).await.unwrap();
@@ -282,29 +282,29 @@ async fn test_assign_basic_async() {
 
 #[test]
 fn test_assign_multiple_keys() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new()
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build()
         .add(
             "doubled",
-            RunnableLambda::new(|x: HashMap<String, Value>| {
+            RunnableLambda::builder().func(|x: HashMap<String, Value>| {
                 let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
                 Ok(json!(val * 2))
-            }),
+            }).build(),
         )
         .add(
             "tripled",
-            RunnableLambda::new(|x: HashMap<String, Value>| {
+            RunnableLambda::builder().func(|x: HashMap<String, Value>| {
                 let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
                 Ok(json!(val * 3))
-            }),
+            }).build(),
         )
         .add(
             "quadrupled",
-            RunnableLambda::new(|x: HashMap<String, Value>| {
+            RunnableLambda::builder().func(|x: HashMap<String, Value>| {
                 let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
                 Ok(json!(val * 4))
-            }),
+            }).build(),
         );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("value", json!(5))]);
     let result = assign.invoke(input, None).unwrap();
@@ -317,14 +317,14 @@ fn test_assign_multiple_keys() {
 
 #[test]
 fn test_assign_overwrite_existing() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
         "value",
-        RunnableLambda::new(|x: HashMap<String, Value>| {
+        RunnableLambda::builder().func(|x: HashMap<String, Value>| {
             let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
             Ok(json!(val * 2))
-        }),
+        }).build(),
     );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("value", json!(5)), ("other", json!("data"))]);
     let result = assign.invoke(input, None).unwrap();
@@ -335,12 +335,12 @@ fn test_assign_overwrite_existing() {
 
 #[test]
 fn test_assign_with_runnable() {
-    let double = RunnableLambda::new(|x: HashMap<String, Value>| {
+    let double = RunnableLambda::builder().func(|x: HashMap<String, Value>| {
         let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
         Ok(json!(val * 2))
-    });
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new().add("new_key", double);
-    let assign = RunnableAssign::new(mapper);
+    }).build();
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build().add("new_key", double);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("value", json!(5))]);
     let result = assign.invoke(input, None).unwrap();
@@ -351,14 +351,14 @@ fn test_assign_with_runnable() {
 
 #[test]
 fn test_assign_batch() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
         "new_key",
-        RunnableLambda::new(|x: HashMap<String, Value>| {
+        RunnableLambda::builder().func(|x: HashMap<String, Value>| {
             let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
             Ok(json!(val * 2))
-        }),
+        }).build(),
     );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let inputs = vec![
         make_input(&[("value", json!(1))]),
@@ -381,14 +381,14 @@ fn test_assign_batch() {
 
 #[tokio::test]
 async fn test_assign_stream() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
         "doubled",
-        RunnableLambda::new(|x: HashMap<String, Value>| {
+        RunnableLambda::builder().func(|x: HashMap<String, Value>| {
             let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
             Ok(json!(val * 2))
-        }),
+        }).build(),
     );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("value", json!(5))]);
     let chunks: Vec<HashMap<String, Value>> = assign
@@ -408,14 +408,14 @@ async fn test_assign_stream() {
 
 #[tokio::test]
 async fn test_assign_transform() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
         "doubled",
-        RunnableLambda::new(|x: HashMap<String, Value>| {
+        RunnableLambda::builder().func(|x: HashMap<String, Value>| {
             let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
             Ok(json!(val * 2))
-        }),
+        }).build(),
     );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input_stream = futures::stream::iter(vec![make_input(&[("value", json!(5))])]);
     let chunks: Vec<HashMap<String, Value>> = assign
@@ -435,11 +435,11 @@ async fn test_assign_transform() {
 
 #[test]
 fn test_assign_empty_dict() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
         "new_key",
-        RunnableLambda::new(|_x: HashMap<String, Value>| Ok(json!(42))),
+        RunnableLambda::builder().func(|_x: HashMap<String, Value>| Ok(json!(42))).build(),
     );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let result = assign.invoke(HashMap::new(), None).unwrap();
     assert_eq!(result["new_key"], json!(42));
@@ -447,15 +447,15 @@ fn test_assign_empty_dict() {
 
 #[test]
 fn test_assign_preserves_original_order() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
         "z",
-        RunnableLambda::new(|x: HashMap<String, Value>| {
+        RunnableLambda::builder().func(|x: HashMap<String, Value>| {
             let a = x.get("a").and_then(|v| v.as_i64()).unwrap_or(0);
             let b = x.get("b").and_then(|v| v.as_i64()).unwrap_or(0);
             Ok(json!(a + b))
-        }),
+        }).build(),
     );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("a", json!(1)), ("b", json!(2)), ("c", json!(3))]);
     let result = assign.invoke(input, None).unwrap();
@@ -471,15 +471,15 @@ fn test_assign_with_config_propagation() {
     let configs_seen = Arc::new(AtomicI32::new(0));
     let configs_clone = configs_seen.clone();
 
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
         "new_key",
-        RunnableLambda::new(move |x: HashMap<String, Value>| {
+        RunnableLambda::builder().func(move |x: HashMap<String, Value>| {
             configs_clone.fetch_add(1, Ordering::SeqCst);
             let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
             Ok(json!(val * 2))
-        }),
+        }).build(),
     );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let mut config = RunnableConfig::default();
     config.tags.push("my-tag".to_string());
@@ -494,32 +494,32 @@ fn test_assign_with_config_propagation() {
 
 #[test]
 fn test_assign_with_multiple_parallel_ops() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new()
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build()
         .add(
             "sum",
-            RunnableLambda::new(|x: HashMap<String, Value>| {
+            RunnableLambda::builder().func(|x: HashMap<String, Value>| {
                 let a = x.get("a").and_then(|v| v.as_i64()).unwrap_or(0);
                 let b = x.get("b").and_then(|v| v.as_i64()).unwrap_or(0);
                 Ok(json!(a + b))
-            }),
+            }).build(),
         )
         .add(
             "product",
-            RunnableLambda::new(|x: HashMap<String, Value>| {
+            RunnableLambda::builder().func(|x: HashMap<String, Value>| {
                 let a = x.get("a").and_then(|v| v.as_i64()).unwrap_or(0);
                 let b = x.get("b").and_then(|v| v.as_i64()).unwrap_or(0);
                 Ok(json!(a * b))
-            }),
+            }).build(),
         )
         .add(
             "difference",
-            RunnableLambda::new(|x: HashMap<String, Value>| {
+            RunnableLambda::builder().func(|x: HashMap<String, Value>| {
                 let a = x.get("a").and_then(|v| v.as_i64()).unwrap_or(0);
                 let b = x.get("b").and_then(|v| v.as_i64()).unwrap_or(0);
                 Ok(json!(a - b))
-            }),
+            }).build(),
         );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("a", json!(10)), ("b", json!(3))]);
     let result = assign.invoke(input, None).unwrap();
@@ -533,14 +533,14 @@ fn test_assign_with_multiple_parallel_ops() {
 
 #[test]
 fn test_assign_direct_instantiation() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
         "new_field",
-        RunnableLambda::new(|x: HashMap<String, Value>| {
+        RunnableLambda::builder().func(|x: HashMap<String, Value>| {
             let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
             Ok(json!(val * 2))
-        }),
+        }).build(),
     );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("value", json!(5))]);
     let result = assign.invoke(input, None).unwrap();
@@ -551,23 +551,23 @@ fn test_assign_direct_instantiation() {
 
 #[test]
 fn test_assign_nested() {
-    let mapper1 = RunnableParallel::<HashMap<String, Value>>::new().add(
+    let mapper1 = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
         "step1",
-        RunnableLambda::new(|x: HashMap<String, Value>| {
+        RunnableLambda::builder().func(|x: HashMap<String, Value>| {
             let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
             Ok(json!(val + 1))
-        }),
+        }).build(),
     );
-    let assign1 = RunnableAssign::new(mapper1);
+    let assign1 = RunnableAssign::builder().mapper(mapper1).build();
 
-    let mapper2 = RunnableParallel::<HashMap<String, Value>>::new().add(
+    let mapper2 = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
         "step2",
-        RunnableLambda::new(|x: HashMap<String, Value>| {
+        RunnableLambda::builder().func(|x: HashMap<String, Value>| {
             let val = x.get("step1").and_then(|v| v.as_i64()).unwrap_or(0);
             Ok(json!(val * 2))
-        }),
+        }).build(),
     );
-    let assign2 = RunnableAssign::new(mapper2);
+    let assign2 = RunnableAssign::builder().mapper(mapper2).build();
 
     let input = make_input(&[("value", json!(5))]);
     let intermediate = assign1.invoke(input, None).unwrap();
@@ -580,22 +580,22 @@ fn test_assign_nested() {
 
 #[test]
 fn test_assign_with_parallel() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new()
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build()
         .add(
             "doubled",
-            RunnableLambda::new(|x: HashMap<String, Value>| {
+            RunnableLambda::builder().func(|x: HashMap<String, Value>| {
                 let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
                 Ok(json!(val * 2))
-            }),
+            }).build(),
         )
         .add(
             "tripled",
-            RunnableLambda::new(|x: HashMap<String, Value>| {
+            RunnableLambda::builder().func(|x: HashMap<String, Value>| {
                 let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
                 Ok(json!(val * 3))
-            }),
+            }).build(),
         );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("value", json!(5))]);
     let result = assign.invoke(input, None).unwrap();
@@ -607,7 +607,7 @@ fn test_assign_with_parallel() {
 
 #[test]
 fn test_pick_single_key() {
-    let pick = RunnablePick::new_single("name");
+    let pick = RunnablePick::new_single_builder().key("name").build();
 
     let input = make_input(&[
         ("name", json!("Alice")),
@@ -638,7 +638,7 @@ fn test_pick_multiple_keys() {
 
 #[tokio::test]
 async fn test_pick_single_key_async() {
-    let pick = RunnablePick::new_single("name");
+    let pick = RunnablePick::new_single_builder().key("name").build();
 
     let input = make_input(&[("name", json!("Alice")), ("age", json!(30))]);
     let result = pick.ainvoke(input, None).await.unwrap();
@@ -663,7 +663,7 @@ async fn test_pick_multiple_keys_async() {
 
 #[test]
 fn test_pick_missing_key() {
-    let pick = RunnablePick::new_single("missing");
+    let pick = RunnablePick::new_single_builder().key("missing").build();
 
     let input = make_input(&[("name", json!("Alice"))]);
     let result = pick.invoke(input, None);
@@ -693,7 +693,7 @@ fn test_pick_all_missing_keys() {
 
 #[test]
 fn test_pick_batch() {
-    let pick = RunnablePick::new_single("name");
+    let pick = RunnablePick::new_single_builder().key("name").build();
 
     let inputs = vec![
         make_input(&[("name", json!("Alice"))]),
@@ -714,7 +714,7 @@ fn test_pick_batch() {
 
 #[tokio::test]
 async fn test_pick_stream() {
-    let pick = RunnablePick::new_single("value");
+    let pick = RunnablePick::new_single_builder().key("value").build();
 
     let input = make_input(&[("value", json!(42)), ("other", json!("data"))]);
     let result: Vec<Value> = pick
@@ -728,7 +728,7 @@ async fn test_pick_stream() {
 
 #[tokio::test]
 async fn test_pick_transform() {
-    let pick = RunnablePick::new_single("value");
+    let pick = RunnablePick::new_single_builder().key("value").build();
 
     let chunks = vec![
         make_input(&[("value", json!(1))]),
@@ -747,7 +747,7 @@ async fn test_pick_transform() {
 
 #[test]
 fn test_pick_get_name() {
-    let pick_single = RunnablePick::new_single("key");
+    let pick_single = RunnablePick::new_single_builder().key("key").build();
     assert_eq!(pick_single.name(), Some("RunnablePick<key>".to_string()));
 
     let pick_multiple = RunnablePick::new_multi(vec!["key1", "key2", "key3"]);
@@ -779,7 +779,7 @@ fn test_pick_maintains_types() {
 
 #[test]
 fn test_pick_direct_instantiation() {
-    let pick = RunnablePick::new_single("selected");
+    let pick = RunnablePick::new_single_builder().key("selected").build();
 
     let input = make_input(&[("selected", json!("yes")), ("others", json!("no"))]);
     let result = pick.invoke(input, None).unwrap();
@@ -795,24 +795,24 @@ fn test_pick_empty_dict() {
 
 #[test]
 fn test_passthrough_assign_pick_combination() {
-    let passthrough: RunnablePassthrough<HashMap<String, Value>> = RunnablePassthrough::new();
+    let passthrough: RunnablePassthrough<HashMap<String, Value>> = RunnablePassthrough::builder().build();
 
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new()
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build()
         .add(
             "doubled",
-            RunnableLambda::new(|x: HashMap<String, Value>| {
+            RunnableLambda::builder().func(|x: HashMap<String, Value>| {
                 let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
                 Ok(json!(val * 2))
-            }),
+            }).build(),
         )
         .add(
             "tripled",
-            RunnableLambda::new(|x: HashMap<String, Value>| {
+            RunnableLambda::builder().func(|x: HashMap<String, Value>| {
                 let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
                 Ok(json!(val * 3))
-            }),
+            }).build(),
         );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let pick = RunnablePick::new_multi(vec!["value", "doubled"]);
 
@@ -829,23 +829,23 @@ fn test_passthrough_assign_pick_combination() {
 
 #[test]
 fn test_assign_with_dependencies() {
-    let mapper1 = RunnableParallel::<HashMap<String, Value>>::new().add(
+    let mapper1 = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
         "step1",
-        RunnableLambda::new(|x: HashMap<String, Value>| {
+        RunnableLambda::builder().func(|x: HashMap<String, Value>| {
             let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
             Ok(json!(val + 1))
-        }),
+        }).build(),
     );
-    let assign1 = RunnableAssign::new(mapper1);
+    let assign1 = RunnableAssign::builder().mapper(mapper1).build();
 
-    let mapper2 = RunnableParallel::<HashMap<String, Value>>::new().add(
+    let mapper2 = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
         "step2",
-        RunnableLambda::new(|x: HashMap<String, Value>| {
+        RunnableLambda::builder().func(|x: HashMap<String, Value>| {
             let val = x.get("step1").and_then(|v| v.as_i64()).unwrap_or(0);
             Ok(json!(val * 2))
-        }),
+        }).build(),
     );
-    let assign2 = RunnableAssign::new(mapper2);
+    let assign2 = RunnableAssign::builder().mapper(mapper2).build();
 
     let input = make_input(&[("value", json!(5))]);
     let intermediate = assign1.invoke(input, None).unwrap();
@@ -858,7 +858,7 @@ fn test_assign_with_dependencies() {
 
 #[tokio::test]
 async fn test_pick_transform_filters_each_chunk() {
-    let pick = RunnablePick::new_single("wanted");
+    let pick = RunnablePick::new_single_builder().key("wanted").build();
 
     let chunks = vec![
         make_input(&[("wanted", json!(1)), ("unwanted", json!(10))]),
@@ -880,10 +880,10 @@ fn test_assign_builder() {
     let assign = RunnablePassthrough::<HashMap<String, Value>>::assign()
         .add(
             "new_key",
-            RunnableLambda::new(|x: HashMap<String, Value>| {
+            RunnableLambda::builder().func(|x: HashMap<String, Value>| {
                 let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
                 Ok(json!(val * 2))
-            }),
+            }).build(),
         )
         .build();
 
@@ -895,32 +895,32 @@ fn test_assign_builder() {
 
 #[test]
 fn test_assign_with_name() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
         "x",
-        RunnableLambda::new(|_: HashMap<String, Value>| Ok(json!(1))),
+        RunnableLambda::builder().func(|_: HashMap<String, Value>| Ok(json!(1))).build(),
     );
-    let assign = RunnableAssign::new(mapper).with_name("my_assign");
+    let assign = RunnableAssign::builder().mapper(mapper).name("my_assign").build();
     assert_eq!(assign.name(), Some("my_assign".to_string()));
 }
 
 #[test]
 fn test_pick_with_name() {
-    let pick = RunnablePick::new_single("key").with_name("my_pick");
+    let pick = RunnablePick::new_single_builder().key("key").name("my_pick").build();
     assert_eq!(pick.name(), Some("my_pick".to_string()));
 }
 
 #[test]
 fn test_assign_mapper_accessor() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new()
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build()
         .add(
             "a",
-            RunnableLambda::new(|_: HashMap<String, Value>| Ok(json!(1))),
+            RunnableLambda::builder().func(|_: HashMap<String, Value>| Ok(json!(1))).build(),
         )
         .add(
             "b",
-            RunnableLambda::new(|_: HashMap<String, Value>| Ok(json!(2))),
+            RunnableLambda::builder().func(|_: HashMap<String, Value>| Ok(json!(2))).build(),
         );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let _mapper_ref = assign.mapper();
 }
@@ -933,7 +933,7 @@ fn test_passthrough_default() {
 
 #[test]
 fn test_passthrough_clone() {
-    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
+    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
     let cloned = passthrough.clone();
     assert_eq!(cloned.invoke(42, None).unwrap(), 42);
 }
@@ -947,14 +947,14 @@ fn test_graph_passthrough() {
 
 #[test]
 fn test_assign_input_output_schema() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
         "new_key",
-        RunnableLambda::new(|x: HashMap<String, Value>| {
+        RunnableLambda::builder().func(|x: HashMap<String, Value>| {
             let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
             Ok(json!(val * 2))
-        }),
+        }).build(),
     );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input_schema = assign.get_input_schema(None);
     assert_eq!(input_schema["type"], "object");
@@ -966,16 +966,16 @@ fn test_assign_input_output_schema() {
 
 #[test]
 fn test_assign_get_name() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new()
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build()
         .add(
             "key1",
-            RunnableLambda::new(|x: HashMap<String, Value>| Ok(json!(x))),
+            RunnableLambda::builder().func(|x: HashMap<String, Value>| Ok(json!(x))).build(),
         )
         .add(
             "key2",
-            RunnableLambda::new(|x: HashMap<String, Value>| Ok(json!(x))),
+            RunnableLambda::builder().func(|x: HashMap<String, Value>| Ok(json!(x))).build(),
         );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let name = assign.name().unwrap();
     assert_eq!(name, "RunnableAssign");
@@ -983,43 +983,43 @@ fn test_assign_get_name() {
 
 #[test]
 fn test_assign_graph_structure() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
         "new_key",
-        RunnableLambda::new(|x: HashMap<String, Value>| Ok(json!(x.get("value")))),
+        RunnableLambda::builder().func(|x: HashMap<String, Value>| Ok(json!(x.get("value")))).build(),
     );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let _mapper = assign.mapper();
 }
 
 #[test]
 fn test_passthrough_serialization() {
-    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
+    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
     let debug = format!("{:?}", passthrough);
     assert!(debug.contains("RunnablePassthrough"));
 }
 
 #[test]
 fn test_assign_serialization() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::new().add(
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
         "x",
-        RunnableLambda::new(|_: HashMap<String, Value>| Ok(json!(1))),
+        RunnableLambda::builder().func(|_: HashMap<String, Value>| Ok(json!(1))).build(),
     );
-    let assign = RunnableAssign::new(mapper);
+    let assign = RunnableAssign::builder().mapper(mapper).build();
     let debug = format!("{:?}", assign);
     assert!(debug.contains("RunnableAssign"));
 }
 
 #[test]
 fn test_pick_serialization() {
-    let pick = RunnablePick::new_single("key");
+    let pick = RunnablePick::new_single_builder().key("key").build();
     let debug = format!("{:?}", pick);
     assert!(debug.contains("RunnablePick"));
 }
 
 #[test]
 fn test_passthrough_schema_identity() {
-    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
+    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
     let input_schema = passthrough.get_input_schema(None);
     let output_schema = passthrough.get_output_schema(None);
     assert_eq!(input_schema["type"], "object");

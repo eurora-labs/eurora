@@ -4,6 +4,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
+use bon::bon;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -18,8 +19,10 @@ pub struct BaseMedia {
     pub metadata: HashMap<String, Value>,
 }
 
+#[bon]
 impl BaseMedia {
-    pub fn new(id: Option<String>, metadata: HashMap<String, Value>) -> Self {
+    #[builder]
+    pub fn new(id: Option<String>, #[builder(default)] metadata: HashMap<String, Value>) -> Self {
         Self { id, metadata }
     }
 }
@@ -301,24 +304,20 @@ fn document_type_default() -> String {
     "Document".to_string()
 }
 
+#[bon]
 impl Document {
-    pub fn new(page_content: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(
+        page_content: impl Into<String>,
+        id: Option<String>,
+        #[builder(default)] metadata: HashMap<String, Value>,
+    ) -> Self {
         Self {
             page_content: page_content.into(),
-            id: None,
-            metadata: HashMap::new(),
+            id,
+            metadata,
             type_: "Document".to_string(),
         }
-    }
-
-    pub fn with_id(mut self, id: impl Into<String>) -> Self {
-        self.id = Some(id.into());
-        self
-    }
-
-    pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
-        self.metadata = metadata;
-        self
     }
 }
 

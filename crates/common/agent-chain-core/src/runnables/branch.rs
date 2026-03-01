@@ -35,14 +35,17 @@ where
     }
 }
 
+#[bon::bon]
 impl<I, O> RunnableBranch<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
+    #[builder]
     pub fn new(
         branches: Vec<(DynRunnable<I, bool>, DynRunnable<I, O>)>,
         default: DynRunnable<I, O>,
+        #[builder(into)] name: Option<String>,
     ) -> Result<Self> {
         if branches.is_empty() {
             return Err(Error::Other(
@@ -53,13 +56,8 @@ where
         Ok(Self {
             branches,
             default,
-            name: None,
+            name,
         })
-    }
-
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
     }
 }
 
@@ -89,8 +87,8 @@ where
         CF: Fn(I) -> Result<bool> + Send + Sync + 'static,
         RF: Fn(I) -> Result<O> + Send + Sync + 'static,
     {
-        let condition_runnable: DynRunnable<I, bool> = Arc::new(RunnableLambda::new(condition));
-        let branch_runnable: DynRunnable<I, O> = Arc::new(RunnableLambda::new(runnable));
+        let condition_runnable: DynRunnable<I, bool> = Arc::new(RunnableLambda::builder().func(condition).build());
+        let branch_runnable: DynRunnable<I, O> = Arc::new(RunnableLambda::builder().func(runnable).build());
         self.branches.push((condition_runnable, branch_runnable));
         self
     }
@@ -108,12 +106,12 @@ where
     where
         DF: Fn(I) -> Result<O> + Send + Sync + 'static,
     {
-        let default_runnable: DynRunnable<I, O> = Arc::new(RunnableLambda::new(default_fn));
-        RunnableBranch::new(self.branches, default_runnable)
+        let default_runnable: DynRunnable<I, O> = Arc::new(RunnableLambda::builder().func(default_fn).build());
+        RunnableBranch::builder().branches(self.branches).default(default_runnable).build()
     }
 
     pub fn default_arc(self, default: DynRunnable<I, O>) -> Result<RunnableBranch<I, O>> {
-        RunnableBranch::new(self.branches, default)
+        RunnableBranch::builder().branches(self.branches).default(default).build()
     }
 }
 
@@ -411,11 +409,18 @@ mod tests {
 
     #[test]
     fn test_runnable_branch_name() {
-        let branch = RunnableBranchBuilder::new()
-            .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x.to_string()))
-            .default(|_: i32| Ok("default".to_string()))
-            .unwrap()
-            .with_name("my_branch");
+        let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 0)).build());
+        let branch_runnable: DynRunnable<i32, String> =
+            Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x.to_string())).build());
+        let default: DynRunnable<i32, String> =
+            Arc::new(RunnableLambda::builder().func(|_: i32| Ok("default".to_string())).build());
+
+        let branch = RunnableBranch::builder()
+            .branches(vec![(condition, branch_runnable)])
+            .default(default)
+            .name("my_branch")
+            .build()
+            .unwrap();
 
         assert_eq!(branch.name(), Some("my_branch".to_string()));
     }
@@ -432,13 +437,13 @@ mod tests {
 
     #[test]
     fn test_runnable_branch_with_arc_runnables() {
-        let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::new(|x: i32| Ok(x > 10)));
+        let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 10)).build());
         let branch_runnable: DynRunnable<i32, String> =
-            Arc::new(RunnableLambda::new(|x: i32| Ok(format!("big: {}", x))));
+            Arc::new(RunnableLambda::builder().func(|x: i32| Ok(format!("big: {}", x))).build());
         let default: DynRunnable<i32, String> =
-            Arc::new(RunnableLambda::new(|x: i32| Ok(format!("small: {}", x))));
+            Arc::new(RunnableLambda::builder().func(|x: i32| Ok(format!("small: {}", x))).build());
 
-        let branch = RunnableBranch::new(vec![(condition, branch_runnable)], default).unwrap();
+        let branch = RunnableBranch::builder().branches(vec![(condition, branch_runnable)]).default(default).build().unwrap();
 
         assert_eq!(branch.invoke(15, None).unwrap(), "big: 15");
         assert_eq!(branch.invoke(5, None).unwrap(), "small: 5");

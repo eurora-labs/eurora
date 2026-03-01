@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use bon::bon;
 use serde_json::Value;
 
 use async_trait::async_trait;
@@ -22,21 +23,14 @@ pub struct StructuredPrompt {
     pub structured_output_kwargs: HashMap<String, Value>,
 }
 
+#[bon]
 impl StructuredPrompt {
-    pub fn new(messages: Vec<MessageLikeRepresentation>, schema: Value) -> Result<Self> {
-        Self::with_kwargs(
-            messages,
-            schema,
-            HashMap::new(),
-            PromptTemplateFormat::FString,
-        )
-    }
-
-    pub fn with_kwargs(
+    #[builder]
+    pub fn new(
         messages: Vec<MessageLikeRepresentation>,
         schema: Value,
-        structured_output_kwargs: HashMap<String, Value>,
-        template_format: PromptTemplateFormat,
+        #[builder(default)] structured_output_kwargs: HashMap<String, Value>,
+        #[builder(default)] template_format: PromptTemplateFormat,
     ) -> Result<Self> {
         warn_beta(
             BetaParams {
@@ -69,7 +63,7 @@ impl StructuredPrompt {
         messages: Vec<MessageLikeRepresentation>,
         schema: Value,
     ) -> Result<Self> {
-        Self::new(messages, schema)
+        Self::builder().messages(messages).schema(schema).build()
     }
 
     pub fn chat_template(&self) -> &ChatPromptTemplate {

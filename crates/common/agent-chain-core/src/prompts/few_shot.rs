@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use bon::bon;
 use async_trait::async_trait;
 
 use crate::error::{Error, Result};
@@ -109,24 +110,29 @@ pub struct FewShotPromptTemplate {
     validate_template: bool,
 }
 
+#[bon]
 impl FewShotPromptTemplate {
+    #[builder]
     pub fn new(
         examples: Vec<HashMap<String, String>>,
         example_prompt: PromptTemplate,
         suffix: String,
         prefix: Option<String>,
+        #[builder(default = "\n\n".to_string())] example_separator: String,
+        #[builder(default)] template_format: PromptTemplateFormat,
+        #[builder(default)] validate_template: bool,
     ) -> Result<Self> {
         let mut template = Self {
             examples: Some(examples),
             example_selector: None,
             example_prompt,
             suffix,
-            example_separator: "\n\n".to_string(),
+            example_separator,
             prefix: prefix.unwrap_or_default(),
-            template_format: PromptTemplateFormat::FString,
+            template_format,
             input_variables: Vec::new(),
             partial_variables: HashMap::new(),
-            validate_template: false,
+            validate_template,
         };
         template.infer_input_variables();
         Ok(template)
@@ -152,22 +158,6 @@ impl FewShotPromptTemplate {
         };
         template.infer_input_variables();
         Ok(template)
-    }
-
-    pub fn with_separator(mut self, separator: impl Into<String>) -> Self {
-        self.example_separator = separator.into();
-        self
-    }
-
-    pub fn with_format(mut self, format: PromptTemplateFormat) -> Self {
-        self.template_format = format;
-        self.infer_input_variables();
-        self
-    }
-
-    pub fn with_validate_template(mut self, validate: bool) -> Self {
-        self.validate_template = validate;
-        self
     }
 
     fn infer_input_variables(&mut self) {
