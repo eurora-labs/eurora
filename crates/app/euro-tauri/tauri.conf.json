@@ -31,7 +31,6 @@
 		"windows": {
 			"certificateThumbprint": null,
 	           "wix": {
-	               "template": "main.wxs",
 	               "fragmentPaths": [
 	                   "fragment.wxs"
 	               ],
