@@ -136,7 +136,13 @@ pub use documents::{
     Document,
 };
 
-pub use text_splitters::TextSplitter;
+pub use text_splitters::{
+    CharacterTextSplitter, CharacterTextSplitterConfig, ExperimentalMarkdownSyntaxTextSplitter,
+    JSFrameworkTextSplitter, KeepSeparator, Language, LatexTextSplitter, LengthFunction,
+    MarkdownHeaderTextSplitter, MarkdownTextSplitter, PythonCodeTextSplitter,
+    RecursiveCharacterTextSplitter, RecursiveJsonSplitter, TextSplitter, TextSplitterConfig,
+    Tokenizer, split_text_on_tokens,
+};
 
 pub use retrievers::{BaseRetriever, LangSmithRetrieverParams, RetrieverInput, RetrieverOutput};
 
