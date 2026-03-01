@@ -20,7 +20,7 @@ quick-xml = "0.37"
 rand = { workspace = true }
 rand_distr = { workspace = true }
 regex = { workspace = true }
-reqwest = { version = "0.12", features = ["json", "stream"] }
+reqwest = { workspace = true, features = ["json", "stream"] }
 rust-sugiyama = "0.4"
 rustc_version_runtime = "0.3.0"
 scraper = { workspace = true }
