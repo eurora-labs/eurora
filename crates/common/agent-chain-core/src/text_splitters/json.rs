@@ -118,10 +118,10 @@ impl RecursiveJsonSplitter {
         let mut chunks = vec![Value::Object(Map::new())];
         self.json_split(&data, &[], &mut chunks);
 
-        if let Some(last) = chunks.last() {
-            if last == &Value::Object(Map::new()) {
-                chunks.pop();
-            }
+        if let Some(last) = chunks.last()
+            && last == &Value::Object(Map::new())
+        {
+            chunks.pop();
         }
 
         Ok(chunks)

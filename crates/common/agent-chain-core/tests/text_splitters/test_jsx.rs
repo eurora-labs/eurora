@@ -14,7 +14,7 @@ fn test_jsx_text_splitter() {
     let splitter = JSFrameworkTextSplitter::new(None, config);
     let splits = splitter.split_text(FAKE_JSX_TEXT).unwrap();
 
-    let expected_splits = vec![
+    let expected_splits = [
         "\nimport React from 'react';\nimport OtherComponent from './OtherComponent';\n",
         "\nfunction MyComponent() {\n  const [count, setCount] = React.useState(0);",
         "\n\n  const handleClick = () => {\n    setCount(count + 1);\n  };",
@@ -41,7 +41,7 @@ fn test_vue_text_splitter() {
     let splitter = JSFrameworkTextSplitter::new(None, config);
     let splits = splitter.split_text(FAKE_VUE_TEXT).unwrap();
 
-    let expected_splits = vec![
+    let expected_splits = [
         "<template>",
         "<div>",
         "<h1>{{ title }}</h1>",
@@ -67,7 +67,7 @@ fn test_svelte_text_splitter() {
     let splitter = JSFrameworkTextSplitter::new(None, config);
     let splits = splitter.split_text(FAKE_SVELTE_TEXT).unwrap();
 
-    let expected_splits = vec![
+    let expected_splits = [
         "<script>\n  let count = 0",
         "\n\n  function increment() {\n    count += 1\n  }\n</script>",
         "<main>",
