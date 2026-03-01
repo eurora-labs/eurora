@@ -1,4 +1,5 @@
 import { initFocusTracker, destroyFocusTracker } from './focus-tracker';
+import { startSafariPoller, stopSafariPoller } from './safari-poller';
 import { getCurrentTabIcon } from './tabs';
 import { isSafari } from './util';
 import browser from 'webextension-polyfill';
@@ -18,6 +19,7 @@ function connect() {
 	nativePort.onDisconnect.addListener(onNativePortDisconnect);
 	nativePort.onMessage.addListener(onNativePortMessage);
 	initFocusTracker(nativePort);
+	startSafariPoller();
 }
 
 function onNativePortDisconnect(port: browser.Runtime.Port) {
@@ -25,6 +27,7 @@ function onNativePortDisconnect(port: browser.Runtime.Port) {
 	console.error('Native port disconnected:', error || 'Unknown error');
 
 	destroyFocusTracker();
+	stopSafariPoller();
 	nativePort = null;
 
 	setTimeout(() => {
@@ -66,7 +69,11 @@ async function onNativePortMessage(message: unknown, sender: browser.Runtime.Por
 			sender.postMessage(response);
 		}
 	} else if ('Response' in kind) {
-		console.warn('Unexpected response frame:', kind.Response);
+		const resp = kind.Response as { action?: string };
+		const pollerActions = ['POLL_REQUESTS', 'GET_METADATA', 'GET_ASSETS', 'GET_SNAPSHOT'];
+		if (!pollerActions.includes(resp.action ?? '')) {
+			console.warn('Unexpected response frame:', kind.Response);
+		}
 	} else if ('Event' in kind) {
 		console.warn('Received event frame from native host:', kind.Event);
 	} else if ('Error' in kind) {
