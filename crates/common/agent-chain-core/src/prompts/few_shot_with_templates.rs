@@ -3,6 +3,8 @@ use std::path::Path;
 
 use async_trait::async_trait;
 
+use bon::bon;
+
 use crate::error::{Error, Result};
 use crate::prompt_values::StringPromptValue;
 use crate::runnables::base::Runnable;
@@ -36,12 +38,17 @@ pub struct FewShotPromptWithTemplates {
     validate_template: bool,
 }
 
+#[bon]
 impl FewShotPromptWithTemplates {
+    #[builder]
     pub fn new(
         examples: Vec<HashMap<String, String>>,
         example_prompt: PromptTemplate,
         suffix: PromptTemplate,
         prefix: Option<PromptTemplate>,
+        #[builder(default = "\n\n".to_string())] example_separator: String,
+        #[builder(default)] template_format: PromptTemplateFormat,
+        #[builder(default)] validate_template: bool,
     ) -> Result<Self> {
         let mut input_variables = std::collections::HashSet::new();
 
@@ -63,12 +70,12 @@ impl FewShotPromptWithTemplates {
             example_selector: None,
             example_prompt,
             suffix,
-            example_separator: "\n\n".to_string(),
+            example_separator,
             prefix,
-            template_format: PromptTemplateFormat::FString,
+            template_format,
             input_variables,
             partial_variables: HashMap::new(),
-            validate_template: false,
+            validate_template,
         };
         result.validate_template_variables()?;
         Ok(result)
@@ -109,16 +116,6 @@ impl FewShotPromptWithTemplates {
         };
         result.validate_template_variables()?;
         Ok(result)
-    }
-
-    pub fn with_separator(mut self, separator: impl Into<String>) -> Self {
-        self.example_separator = separator.into();
-        self
-    }
-
-    pub fn with_format(mut self, format: PromptTemplateFormat) -> Self {
-        self.template_format = format;
-        self
     }
 
     fn get_examples(
@@ -373,9 +370,13 @@ mod tests {
         let suffix = PromptTemplate::from_template("Q: {question}\nA:").unwrap();
         let prefix = PromptTemplate::from_template("You are a {role}.").unwrap();
 
-        let few_shot =
-            FewShotPromptWithTemplates::new(examples, example_prompt, suffix, Some(prefix))
-                .unwrap();
+        let few_shot = FewShotPromptWithTemplates::builder()
+            .examples(examples)
+            .example_prompt(example_prompt)
+            .suffix(suffix)
+            .prefix(prefix)
+            .build()
+            .unwrap();
 
         let mut kwargs = HashMap::new();
         kwargs.insert("role".to_string(), "math tutor".to_string());
@@ -399,8 +400,12 @@ mod tests {
         let example_prompt = PromptTemplate::from_template("{x} + {y}").unwrap();
         let suffix = PromptTemplate::from_template("{a} + {b} = ?").unwrap();
 
-        let few_shot =
-            FewShotPromptWithTemplates::new(examples, example_prompt, suffix, None).unwrap();
+        let few_shot = FewShotPromptWithTemplates::builder()
+            .examples(examples)
+            .example_prompt(example_prompt)
+            .suffix(suffix)
+            .build()
+            .unwrap();
 
         let mut kwargs = HashMap::new();
         kwargs.insert("a".to_string(), "3".to_string());
@@ -419,9 +424,13 @@ mod tests {
         let suffix = PromptTemplate::from_template("{suffix_var}").unwrap();
         let prefix = PromptTemplate::from_template("{prefix_var}").unwrap();
 
-        let few_shot =
-            FewShotPromptWithTemplates::new(examples, example_prompt, suffix, Some(prefix))
-                .unwrap();
+        let few_shot = FewShotPromptWithTemplates::builder()
+            .examples(examples)
+            .example_prompt(example_prompt)
+            .suffix(suffix)
+            .prefix(prefix)
+            .build()
+            .unwrap();
 
         let vars = BasePromptTemplate::input_variables(&few_shot);
         assert!(vars.contains(&"suffix_var".to_string()));

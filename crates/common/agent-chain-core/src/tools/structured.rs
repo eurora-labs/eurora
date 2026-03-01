@@ -5,6 +5,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bon::bon;
 use serde_json::Value;
 
 use crate::callbacks::base::Callbacks;
@@ -54,78 +55,42 @@ impl Debug for StructuredTool {
     }
 }
 
+#[bon]
 impl StructuredTool {
+    #[builder]
     pub fn new(
         name: impl Into<String>,
         description: impl Into<String>,
         args_schema: ArgsSchema,
+        func: Option<StructuredToolFunc>,
+        coroutine: Option<AsyncStructuredToolFunc>,
+        #[builder(default)] return_direct: bool,
+        #[builder(default)] verbose: bool,
+        #[builder(default = HandleToolError::Bool(false))] handle_tool_error: HandleToolError,
+        #[builder(default = HandleValidationError::Bool(false))]
+        handle_validation_error: HandleValidationError,
+        #[builder(default)] response_format: ResponseFormat,
+        tags: Option<Vec<String>>,
+        metadata: Option<HashMap<String, Value>>,
+        extras: Option<HashMap<String, Value>>,
+        callbacks: Option<Callbacks>,
     ) -> Self {
         Self {
             name: name.into(),
             description: description.into(),
-            func: None,
-            coroutine: None,
+            func,
+            coroutine,
             args_schema,
-            return_direct: false,
-            verbose: false,
-            handle_tool_error: HandleToolError::Bool(false),
-            handle_validation_error: HandleValidationError::Bool(false),
-            response_format: ResponseFormat::Content,
-            tags: None,
-            metadata: None,
-            extras: None,
-            callbacks: None,
+            return_direct,
+            verbose,
+            handle_tool_error,
+            handle_validation_error,
+            response_format,
+            tags,
+            metadata,
+            extras,
+            callbacks,
         }
-    }
-
-    pub fn with_func(mut self, func: StructuredToolFunc) -> Self {
-        self.func = Some(func);
-        self
-    }
-
-    pub fn with_coroutine(mut self, coroutine: AsyncStructuredToolFunc) -> Self {
-        self.coroutine = Some(coroutine);
-        self
-    }
-
-    pub fn with_return_direct(mut self, return_direct: bool) -> Self {
-        self.return_direct = return_direct;
-        self
-    }
-
-    pub fn with_response_format(mut self, format: ResponseFormat) -> Self {
-        self.response_format = format;
-        self
-    }
-
-    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
-        self.tags = Some(tags);
-        self
-    }
-
-    pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
-        self.metadata = Some(metadata);
-        self
-    }
-
-    pub fn with_extras(mut self, extras: HashMap<String, Value>) -> Self {
-        self.extras = Some(extras);
-        self
-    }
-
-    pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
-        self.callbacks = Some(callbacks);
-        self
-    }
-
-    pub fn with_handle_tool_error(mut self, handler: HandleToolError) -> Self {
-        self.handle_tool_error = handler;
-        self
-    }
-
-    pub fn with_handle_validation_error(mut self, handler: HandleValidationError) -> Self {
-        self.handle_validation_error = handler;
-        self
     }
 
     pub fn from_function<F>(
@@ -137,7 +102,12 @@ impl StructuredTool {
     where
         F: Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync + 'static,
     {
-        Self::new(name, description, args_schema).with_func(Arc::new(func))
+        Self::builder()
+            .name(name)
+            .description(description)
+            .args_schema(args_schema)
+            .func(Arc::new(func))
+            .build()
     }
 
     pub fn from_function_with_async<F, AF, Fut>(
@@ -152,9 +122,13 @@ impl StructuredTool {
         AF: Fn(HashMap<String, Value>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Value>> + Send + 'static,
     {
-        Self::new(name, description, args_schema)
-            .with_func(Arc::new(func))
-            .with_coroutine(Arc::new(move |args| Box::pin(coroutine(args))))
+        Self::builder()
+            .name(name)
+            .description(description)
+            .args_schema(args_schema)
+            .func(Arc::new(func))
+            .coroutine(Arc::new(move |args| Box::pin(coroutine(args))))
+            .build()
     }
 
     fn extract_args(&self, input: ToolInput) -> Result<HashMap<String, Value>> {

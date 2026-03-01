@@ -77,7 +77,7 @@ fn create_chat_result(content: &str, model_name: &str, usage: &UsageMetadata) ->
         .build();
 
     ChatResult {
-        generations: vec![ChatGeneration::new(ai_msg.into())],
+        generations: vec![ChatGeneration::builder().message(ai_msg.into()).build()],
         llm_output: None,
     }
 }
@@ -208,7 +208,7 @@ fn test_usage_callback_no_model_name() {
         .build();
 
     let result = ChatResult {
-        generations: vec![ChatGeneration::new(ai_msg.into())],
+        generations: vec![ChatGeneration::builder().message(ai_msg.into()).build()],
         llm_output: None,
     };
 
@@ -230,7 +230,7 @@ fn test_usage_callback_no_usage_metadata() {
         .build();
 
     let result = ChatResult {
-        generations: vec![ChatGeneration::new(ai_msg.into())],
+        generations: vec![ChatGeneration::builder().message(ai_msg.into()).build()],
         llm_output: None,
     };
 

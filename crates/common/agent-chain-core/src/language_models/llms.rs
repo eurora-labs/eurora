@@ -35,32 +35,24 @@ impl std::fmt::Debug for LLMConfig {
     }
 }
 
+#[bon::bon]
 impl LLMConfig {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_cache(mut self, cache: bool) -> Self {
-        self.base.cache = Some(cache);
-        self
-    }
-
-    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
-        self.base.tags = Some(tags);
-        self
-    }
-
-    pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
-        self.base.metadata = Some(metadata);
-        self
-    }
-
-    pub fn with_cache_instance(
-        mut self,
-        cache: std::sync::Arc<dyn crate::caches::BaseCache>,
+    #[builder]
+    pub fn new(
+        cache: Option<bool>,
+        tags: Option<Vec<String>>,
+        metadata: Option<HashMap<String, Value>>,
+        cache_instance: Option<std::sync::Arc<dyn crate::caches::BaseCache>>,
     ) -> Self {
-        self.cache_instance = Some(cache);
-        self
+        Self {
+            base: LanguageModelConfig {
+                cache,
+                tags,
+                metadata,
+                ..Default::default()
+            },
+            cache_instance,
+        }
     }
 }
 
@@ -99,10 +91,10 @@ fn llm_result_to_chat_result(result: &LLMResult) -> ChatResult {
         .map(|g| {
             let text = extract_text(g);
             let msg = crate::messages::AIMessage::builder().content(&text).build();
-            ChatGeneration::new(msg.into())
+            ChatGeneration::builder().message(msg.into()).build()
         })
         .collect();
-    ChatResult::new(generations)
+    ChatResult::builder().generations(generations).build()
 }
 
 fn extract_text(generation: &GenerationType) -> String {
@@ -139,7 +131,7 @@ pub trait BaseLLM: BaseLanguageModel {
             && let Some(generation) = generations.first()
         {
             let text = extract_text(generation);
-            let chunk = GenerationChunk::new(text);
+            let chunk = GenerationChunk::builder().text(text).build();
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
@@ -257,7 +249,7 @@ pub trait BaseLLM: BaseLanguageModel {
                             .collect()
                     })
                     .collect();
-                return Ok(LLMResult::new(generations));
+                return Ok(LLMResult::builder().generations(generations).build());
             }
 
             let run_managers = callback_manager.on_llm_start(&params, &missing_prompts, run_id);
@@ -286,7 +278,7 @@ pub trait BaseLLM: BaseLanguageModel {
                 })
                 .collect();
 
-            let mut output = LLMResult::new(generations);
+            let mut output = LLMResult::builder().generations(generations).build();
 
             if !run_managers.is_empty() {
                 output.run = Some(
@@ -468,7 +460,7 @@ pub trait BaseLLM: BaseLanguageModel {
             if let Some(ref rm) = run_manager
                 && let Some(merged) = crate::outputs::merge_generation_chunks(chunks) {
                     let generation: Generation = merged.into();
-                    let result = LLMResult::new(vec![vec![GenerationType::Generation(generation)]]);
+                    let result = LLMResult::builder().generations(vec![vec![GenerationType::Generation(generation)]]).build();
                     let chat_result = llm_result_to_chat_result(&result);
                     rm.on_llm_end(&chat_result);
                 }
@@ -562,7 +554,7 @@ pub trait BaseLLM: BaseLanguageModel {
             if let Some(ref rm) = run_manager
                 && let Some(merged) = crate::outputs::merge_generation_chunks(chunks) {
                     let generation: Generation = merged.into();
-                    let result = LLMResult::new(vec![vec![GenerationType::Generation(generation)]]);
+                    let result = LLMResult::builder().generations(vec![vec![GenerationType::Generation(generation)]]).build();
                     let chat_result = llm_result_to_chat_result(&result);
                     rm.on_llm_end(&chat_result).await;
                 }
@@ -663,7 +655,7 @@ pub trait BaseLLM: BaseLanguageModel {
                             .collect()
                     })
                     .collect();
-                return Ok(LLMResult::new(generations));
+                return Ok(LLMResult::builder().generations(generations).build());
             }
 
             let run_managers = callback_manager
@@ -695,7 +687,7 @@ pub trait BaseLLM: BaseLanguageModel {
                 })
                 .collect();
 
-            let mut output = LLMResult::new(generations);
+            let mut output = LLMResult::builder().generations(generations).build();
 
             if !run_managers.is_empty() {
                 output.run = Some(
@@ -1074,9 +1066,10 @@ mod tests {
 
     #[test]
     fn test_llm_config_builder() {
-        let config = LLMConfig::new()
-            .with_cache(true)
-            .with_tags(vec!["test".to_string()]);
+        let config = LLMConfig::builder()
+            .cache(true)
+            .tags(vec!["test".to_string()])
+            .build();
 
         assert_eq!(config.base.cache, Some(true));
         assert_eq!(config.base.tags, Some(vec!["test".to_string()]));

@@ -10,8 +10,10 @@ async fn test_local_cache_sync() {
     let local_cache = Arc::new(InMemoryCache::unbounded());
     set_llm_cache(Some(global_cache.clone()));
 
-    let model = FakeListChatModel::new(vec!["hello".to_string(), "goodbye".to_string()])
-        .with_cache_instance(local_cache.clone());
+    let model = FakeListChatModel::builder()
+        .responses(vec!["hello".to_string(), "goodbye".to_string()])
+        .cache_instance(local_cache.clone())
+        .build();
 
     let result = model
         .invoke(LanguageModelInput::from("How are you?"), None)
@@ -40,8 +42,10 @@ async fn test_local_cache_async() {
     let local_cache = Arc::new(InMemoryCache::unbounded());
     set_llm_cache(Some(global_cache.clone()));
 
-    let model = FakeListChatModel::new(vec!["hello".to_string(), "goodbye".to_string()])
-        .with_cache_instance(local_cache.clone());
+    let model = FakeListChatModel::builder()
+        .responses(vec!["hello".to_string(), "goodbye".to_string()])
+        .cache_instance(local_cache.clone())
+        .build();
 
     let result = model
         .ainvoke(LanguageModelInput::from("How are you?"), None)
@@ -68,13 +72,15 @@ async fn test_local_cache_async() {
 async fn test_global_cache_sync() {
     let cache = Arc::new(InMemoryCache::unbounded());
 
-    let model = FakeListChatModel::new(vec![
-        "hello".to_string(),
-        "goodbye".to_string(),
-        "meow".to_string(),
-        "woof".to_string(),
-    ])
-    .with_cache_instance(cache.clone());
+    let model = FakeListChatModel::builder()
+        .responses(vec![
+            "hello".to_string(),
+            "goodbye".to_string(),
+            "meow".to_string(),
+            "woof".to_string(),
+        ])
+        .cache_instance(cache.clone())
+        .build();
 
     let result = model
         .invoke(LanguageModelInput::from("How are you?"), None)
@@ -99,13 +105,15 @@ async fn test_global_cache_sync() {
 async fn test_global_cache_async() {
     let cache = Arc::new(InMemoryCache::unbounded());
 
-    let model = FakeListChatModel::new(vec![
-        "hello".to_string(),
-        "goodbye".to_string(),
-        "meow".to_string(),
-        "woof".to_string(),
-    ])
-    .with_cache_instance(cache.clone());
+    let model = FakeListChatModel::builder()
+        .responses(vec![
+            "hello".to_string(),
+            "goodbye".to_string(),
+            "meow".to_string(),
+            "woof".to_string(),
+        ])
+        .cache_instance(cache.clone())
+        .build();
 
     let result = model
         .ainvoke(LanguageModelInput::from("How are you?"), None)
@@ -131,8 +139,10 @@ async fn test_no_cache_sync() {
     let global_cache = Arc::new(InMemoryCache::unbounded());
     set_llm_cache(Some(global_cache.clone()));
 
-    let model = FakeListChatModel::new(vec!["hello".to_string(), "goodbye".to_string()])
-        .with_cache_disabled();
+    let model = FakeListChatModel::builder()
+        .responses(vec!["hello".to_string(), "goodbye".to_string()])
+        .cache(false)
+        .build();
 
     let result = model
         .invoke(LanguageModelInput::from("How are you?"), None)
@@ -154,8 +164,10 @@ async fn test_no_cache_async() {
     let global_cache = Arc::new(InMemoryCache::unbounded());
     set_llm_cache(Some(global_cache.clone()));
 
-    let model = FakeListChatModel::new(vec!["hello".to_string(), "goodbye".to_string()])
-        .with_cache_disabled();
+    let model = FakeListChatModel::builder()
+        .responses(vec!["hello".to_string(), "goodbye".to_string()])
+        .cache(false)
+        .build();
 
     let result = model
         .ainvoke(LanguageModelInput::from("How are you?"), None)
@@ -176,8 +188,10 @@ async fn test_no_cache_async() {
 async fn test_can_swap_caches() {
     let cache = Arc::new(InMemoryCache::unbounded());
 
-    let model = FakeListChatModel::new(vec!["hello".to_string(), "goodbye".to_string()])
-        .with_cache_instance(cache.clone());
+    let model = FakeListChatModel::builder()
+        .responses(vec!["hello".to_string(), "goodbye".to_string()])
+        .cache_instance(cache.clone())
+        .build();
 
     let result = model
         .invoke(LanguageModelInput::from("foo"), None)
@@ -186,8 +200,10 @@ async fn test_can_swap_caches() {
     assert_eq!(result.content, "hello");
 
     let new_cache = Arc::new(InMemoryCache::unbounded());
-    let model2 = FakeListChatModel::new(vec!["different".to_string()])
-        .with_cache_instance(new_cache.clone());
+    let model2 = FakeListChatModel::builder()
+        .responses(vec!["different".to_string()])
+        .cache_instance(new_cache.clone())
+        .build();
 
     let result = model2
         .invoke(LanguageModelInput::from("foo"), None)
@@ -202,8 +218,10 @@ async fn test_cache_with_generation_objects() {
 
     let cache = Arc::new(InMemoryCache::unbounded());
 
-    let model =
-        FakeListChatModel::new(vec!["hello".to_string()]).with_cache_instance(cache.clone());
+    let model = FakeListChatModel::builder()
+        .responses(vec!["hello".to_string()])
+        .cache_instance(cache.clone())
+        .build();
 
     let result = model
         .invoke(LanguageModelInput::from("test prompt"), None)
@@ -222,8 +240,10 @@ async fn test_cache_with_generation_objects() {
 async fn test_cache_preserves_message_through_round_trip() {
     let cache = Arc::new(InMemoryCache::unbounded());
 
-    let model =
-        FakeListChatModel::new(vec!["cached hello".to_string()]).with_cache_instance(cache.clone());
+    let model = FakeListChatModel::builder()
+        .responses(vec!["cached hello".to_string()])
+        .cache_instance(cache.clone())
+        .build();
 
     let result = model
         .invoke(LanguageModelInput::from("round trip test"), None)
@@ -250,8 +270,10 @@ async fn test_convert_cached_generations_legacy_format() {
 
     let cache = Arc::new(InMemoryCache::unbounded());
 
-    let model = FakeListChatModel::new(vec!["first".to_string(), "second".to_string()])
-        .with_cache_instance(cache.clone());
+    let model = FakeListChatModel::builder()
+        .responses(vec!["first".to_string(), "second".to_string()])
+        .cache_instance(cache.clone())
+        .build();
 
     let result = model
         .invoke(LanguageModelInput::from("legacy test"), None)
@@ -265,7 +287,7 @@ async fn test_convert_cached_generations_legacy_format() {
     let prompt_key = serde_json::to_string(&messages).unwrap();
     let llm_string = model._get_llm_string(None, None);
 
-    let legacy_generations = vec![Generation::new("legacy text")];
+    let legacy_generations = vec![Generation::builder().text("legacy text").build()];
     cache.update(&prompt_key, &llm_string, legacy_generations);
 
     let result = model
@@ -277,7 +299,9 @@ async fn test_convert_cached_generations_legacy_format() {
 
 #[test]
 fn test_cache_key_determinism() {
-    let model = FakeListChatModel::new(vec!["test".to_string()]);
+    let model = FakeListChatModel::builder()
+        .responses(vec!["test".to_string()])
+        .build();
     let key1 = model._get_llm_string(None, None);
     let key2 = model._get_llm_string(None, None);
     assert_eq!(key1, key2, "Cache key should be deterministic");

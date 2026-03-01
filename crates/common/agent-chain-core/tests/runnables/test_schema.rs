@@ -8,16 +8,17 @@ use serde_json::json;
 
 #[test]
 fn test_event_data_structure() {
-    let data = EventData::new()
-        .with_input(json!({"question": "test"}))
-        .with_output(json!({"answer": "response"}))
-        .with_chunk(json!({"partial": "data"}));
+    let data = EventData::builder()
+        .input(json!({"question": "test"}))
+        .output(json!({"answer": "response"}))
+        .chunk(json!({"partial": "data"}))
+        .build();
 
     assert_eq!(data.input, Some(json!({"question": "test"})));
     assert_eq!(data.output, Some(json!({"answer": "response"})));
     assert_eq!(data.chunk, Some(json!({"partial": "data"})));
 
-    let minimal = EventData::new();
+    let minimal = EventData::builder().build();
     assert!(minimal.input.is_none());
     assert!(minimal.output.is_none());
     assert!(minimal.chunk.is_none());
@@ -26,9 +27,10 @@ fn test_event_data_structure() {
 
 #[test]
 fn test_event_data_with_error() {
-    let data = EventData::new()
-        .with_input(json!("test"))
-        .with_error("Test error");
+    let data = EventData::builder()
+        .input(json!("test"))
+        .error("Test error")
+        .build();
 
     assert_eq!(data.error, Some("Test error".to_string()));
     assert_eq!(data.input, Some(json!("test")));
@@ -36,55 +38,60 @@ fn test_event_data_with_error() {
 
 #[test]
 fn test_event_data_empty() {
-    let data = EventData::new();
+    let data = EventData::builder().build();
     let json_str = serde_json::to_string(&data).unwrap();
     assert_eq!(json_str, "{}");
 }
 
 #[test]
 fn test_event_data_chunk_field() {
-    let data = EventData::new().with_chunk(json!("partial output"));
+    let data = EventData::builder().chunk(json!("partial output")).build();
     assert_eq!(data.chunk, Some(json!("partial output")));
 
-    let chunk_list = EventData::new().with_chunk(json!([1, 2, 3]));
+    let chunk_list = EventData::builder().chunk(json!([1, 2, 3])).build();
     assert_eq!(chunk_list.chunk, Some(json!([1, 2, 3])));
 }
 
 #[test]
 fn test_event_data_supports_various_input_types() {
-    let data1 = EventData::new().with_input(json!("simple string"));
+    let data1 = EventData::builder().input(json!("simple string")).build();
     assert_eq!(data1.input, Some(json!("simple string")));
 
-    let data2 = EventData::new().with_input(json!({"key": "value"}));
+    let data2 = EventData::builder().input(json!({"key": "value"})).build();
     assert_eq!(data2.input.as_ref().unwrap()["key"], json!("value"));
 
-    let data3 = EventData::new().with_input(json!([1, 2, 3]));
+    let data3 = EventData::builder().input(json!([1, 2, 3])).build();
     assert_eq!(data3.input, Some(json!([1, 2, 3])));
 
-    let data4 = EventData::new().with_input(json!({"field1": "test", "field2": 42}));
+    let data4 = EventData::builder()
+        .input(json!({"field1": "test", "field2": 42}))
+        .build();
     assert_eq!(data4.input.as_ref().unwrap()["field1"], json!("test"));
     assert_eq!(data4.input.as_ref().unwrap()["field2"], json!(42));
 }
 
 #[test]
 fn test_event_data_supports_various_output_types() {
-    let data1 = EventData::new().with_output(json!("result"));
+    let data1 = EventData::builder().output(json!("result")).build();
     assert_eq!(data1.output, Some(json!("result")));
 
-    let data2 = EventData::new().with_output(json!({"result": "value"}));
+    let data2 = EventData::builder()
+        .output(json!({"result": "value"}))
+        .build();
     assert_eq!(data2.output.as_ref().unwrap()["result"], json!("value"));
 
-    let data3 = EventData::new().with_output(json!([1, 2, 3]));
+    let data3 = EventData::builder().output(json!([1, 2, 3])).build();
     assert_eq!(data3.output, Some(json!([1, 2, 3])));
 }
 
 #[test]
 fn test_standard_event_with_all_data_fields() {
-    let data = EventData::new()
-        .with_input(json!({"query": "test"}))
-        .with_output(json!({"result": "answer"}))
-        .with_chunk(json!({"partial": "data"}))
-        .with_error("test error");
+    let data = EventData::builder()
+        .input(json!({"query": "test"}))
+        .output(json!({"result": "answer"}))
+        .chunk(json!({"partial": "data"}))
+        .error("test error")
+        .build();
 
     assert!(data.input.is_some());
     assert!(data.output.is_some());
@@ -103,10 +110,11 @@ fn test_event_data_with_messages() {
     let output_val = serde_json::to_value(&ai).unwrap();
     let chunk_val = serde_json::to_value(&ai).unwrap();
 
-    let data = EventData::new()
-        .with_input(input_val.clone())
-        .with_output(output_val.clone())
-        .with_chunk(chunk_val);
+    let data = EventData::builder()
+        .input(input_val.clone())
+        .output(output_val.clone())
+        .chunk(chunk_val)
+        .build();
 
     assert!(data.input.is_some());
     assert!(data.output.is_some());
@@ -116,10 +124,10 @@ fn test_event_data_with_messages() {
 #[test]
 fn test_event_with_multiple_chunks() {
     let chunks = [
-        EventData::new().with_chunk(json!("Hello")),
-        EventData::new().with_chunk(json!(" ")),
-        EventData::new().with_chunk(json!("World")),
-        EventData::new().with_chunk(json!("!")),
+        EventData::builder().chunk(json!("Hello")).build(),
+        EventData::builder().chunk(json!(" ")).build(),
+        EventData::builder().chunk(json!("World")).build(),
+        EventData::builder().chunk(json!("!")).build(),
     ];
 
     let accumulated: String = chunks
@@ -131,7 +139,10 @@ fn test_event_with_multiple_chunks() {
 
 #[test]
 fn test_base_stream_event_structure() {
-    let event = BaseStreamEvent::new("on_chain_start", "test-run-id");
+    let event = BaseStreamEvent::builder()
+        .event("on_chain_start")
+        .run_id("test-run-id")
+        .build();
     assert_eq!(event.event, "on_chain_start");
     assert_eq!(event.run_id, "test-run-id");
     assert!(event.parent_ids.is_empty());
@@ -139,10 +150,13 @@ fn test_base_stream_event_structure() {
 
 #[test]
 fn test_base_stream_event_with_optional_fields() {
-    let event = BaseStreamEvent::new("on_chain_end", "test-run-id")
-        .with_parent_ids(vec!["parent-1".into(), "parent-2".into()])
-        .with_tags(vec!["tag1".into(), "tag2".into()])
-        .with_metadata(HashMap::from([("key".into(), json!("value"))]));
+    let event = BaseStreamEvent::builder()
+        .event("on_chain_end")
+        .run_id("test-run-id")
+        .parent_ids(vec!["parent-1".into(), "parent-2".into()])
+        .tags(vec!["tag1".into(), "tag2".into()])
+        .metadata(HashMap::from([("key".into(), json!("value"))]))
+        .build();
 
     assert_eq!(event.tags, vec!["tag1", "tag2"]);
     assert_eq!(event.metadata["key"], json!("value"));
@@ -151,15 +165,24 @@ fn test_base_stream_event_with_optional_fields() {
 
 #[test]
 fn test_parent_ids_hierarchy() {
-    let root = BaseStreamEvent::new("on_chain_start", "root-id");
+    let root = BaseStreamEvent::builder()
+        .event("on_chain_start")
+        .run_id("root-id")
+        .build();
     assert!(root.parent_ids.is_empty());
 
-    let child =
-        BaseStreamEvent::new("on_chain_start", "child-id").with_parent_ids(vec!["root-id".into()]);
+    let child = BaseStreamEvent::builder()
+        .event("on_chain_start")
+        .run_id("child-id")
+        .parent_ids(vec!["root-id".into()])
+        .build();
     assert_eq!(child.parent_ids, vec!["root-id"]);
 
-    let grandchild = BaseStreamEvent::new("on_chain_start", "grandchild-id")
-        .with_parent_ids(vec!["root-id".into(), "child-id".into()]);
+    let grandchild = BaseStreamEvent::builder()
+        .event("on_chain_start")
+        .run_id("grandchild-id")
+        .parent_ids(vec!["root-id".into(), "child-id".into()])
+        .build();
     assert_eq!(grandchild.parent_ids, vec!["root-id", "child-id"]);
 }
 
@@ -167,7 +190,11 @@ fn test_parent_ids_hierarchy() {
 fn test_event_parent_ids_can_be_nested() {
     let parent_chain: Vec<String> = (0..10).map(|i| format!("parent-{i}")).collect();
 
-    let event = BaseStreamEvent::new("on_chain_start", "leaf-id").with_parent_ids(parent_chain);
+    let event = BaseStreamEvent::builder()
+        .event("on_chain_start")
+        .run_id("leaf-id")
+        .parent_ids(parent_chain)
+        .build();
 
     assert_eq!(event.parent_ids.len(), 10);
     assert_eq!(event.parent_ids[0], "parent-0");
@@ -177,15 +204,22 @@ fn test_event_parent_ids_can_be_nested() {
 #[test]
 fn test_event_run_id_format() {
     let run_id = uuid::Uuid::new_v4().to_string();
-    let event = BaseStreamEvent::new("on_chain_start", &run_id);
+    let event = BaseStreamEvent::builder()
+        .event("on_chain_start")
+        .run_id(&run_id)
+        .build();
     assert_eq!(event.run_id, run_id);
     assert!(uuid::Uuid::parse_str(&event.run_id).is_ok());
 }
 
 #[test]
 fn test_standard_stream_event_structure() {
-    let event = StandardStreamEvent::new("on_llm_start", "test-run-id", "TestLLM")
-        .with_data(EventData::new().with_input(json!("test input")));
+    let event = StandardStreamEvent::builder()
+        .event("on_llm_start")
+        .run_id("test-run-id")
+        .name("TestLLM")
+        .data(EventData::builder().input(json!("test input")).build())
+        .build();
 
     assert_eq!(event.name, "TestLLM");
     assert_eq!(event.data.input, Some(json!("test input")));
@@ -214,7 +248,11 @@ fn test_standard_stream_event_types() {
     ];
 
     for event_type in &event_types {
-        let event = StandardStreamEvent::new(*event_type, "test-id", "test");
+        let event = StandardStreamEvent::builder()
+            .event(*event_type)
+            .run_id("test-id")
+            .name("test")
+            .build();
         assert_eq!(event.base.event, *event_type);
     }
 }
@@ -258,8 +296,12 @@ fn test_metadata_serializable() {
         ("list".into(), json!([1, 2, 3])),
     ]);
 
-    let event =
-        StandardStreamEvent::new("on_chain_start", "id", "test").with_metadata(metadata.clone());
+    let event = StandardStreamEvent::builder()
+        .event("on_chain_start")
+        .run_id("id")
+        .name("test")
+        .metadata(metadata.clone())
+        .build();
 
     let serialized = serde_json::to_string(&event.base.metadata).unwrap();
     let deserialized: HashMap<String, serde_json::Value> =
@@ -273,11 +315,12 @@ fn test_metadata_serializable() {
 
 #[test]
 fn test_tags_list_of_strings() {
-    let event = StandardStreamEvent::new("on_chain_start", "id", "test").with_tags(vec![
-        "tag1".into(),
-        "tag2".into(),
-        "tag3".into(),
-    ]);
+    let event = StandardStreamEvent::builder()
+        .event("on_chain_start")
+        .run_id("id")
+        .name("test")
+        .tags(vec!["tag1".into(), "tag2".into(), "tag3".into()])
+        .build();
 
     assert_eq!(event.base.tags.len(), 3);
     for tag in &event.base.tags {
@@ -287,46 +330,71 @@ fn test_tags_list_of_strings() {
 
 #[test]
 fn test_event_metadata_empty_dict() {
-    let event =
-        StandardStreamEvent::new("on_chain_start", "id", "test").with_metadata(HashMap::new());
+    let event = StandardStreamEvent::builder()
+        .event("on_chain_start")
+        .run_id("id")
+        .name("test")
+        .metadata(HashMap::new())
+        .build();
     assert!(event.base.metadata.is_empty());
 }
 
 #[test]
 fn test_event_tags_empty_list() {
-    let event = StandardStreamEvent::new("on_chain_start", "id", "test").with_tags(vec![]);
+    let event = StandardStreamEvent::builder()
+        .event("on_chain_start")
+        .run_id("id")
+        .name("test")
+        .tags(vec![])
+        .build();
     assert!(event.base.tags.is_empty());
 }
 
 #[test]
 fn test_event_minimal_required_fields() {
-    let base = BaseStreamEvent::new("on_chain_start", "id");
+    let base = BaseStreamEvent::builder()
+        .event("on_chain_start")
+        .run_id("id")
+        .build();
     assert_eq!(base.event, "on_chain_start");
     assert_eq!(base.run_id, "id");
 
-    let standard = StandardStreamEvent::new("on_chain_start", "id", "test");
+    let standard = StandardStreamEvent::builder()
+        .event("on_chain_start")
+        .run_id("id")
+        .name("test")
+        .build();
     assert_eq!(standard.name, "test");
     assert!(standard.data.input.is_none());
 
-    let custom = CustomStreamEvent::new("id", "custom", json!("any"));
+    let custom = CustomStreamEvent::builder()
+        .run_id("id")
+        .name("custom")
+        .data(json!("any"))
+        .build();
     assert_eq!(custom.base.event, "on_custom_event");
 }
 
 #[test]
 fn test_event_all_optional_fields() {
-    let event = StandardStreamEvent::new("on_chain_start", "test-run-id", "TestChain")
-        .with_parent_ids(vec!["parent-1".into(), "parent-2".into()])
-        .with_tags(vec!["tag1".into(), "tag2".into()])
-        .with_metadata(HashMap::from([
+    let event = StandardStreamEvent::builder()
+        .event("on_chain_start")
+        .run_id("test-run-id")
+        .name("TestChain")
+        .parent_ids(vec!["parent-1".into(), "parent-2".into()])
+        .tags(vec!["tag1".into(), "tag2".into()])
+        .metadata(HashMap::from([
             ("version".into(), json!("1.0")),
             ("environment".into(), json!("test")),
         ]))
-        .with_data(
-            EventData::new()
-                .with_input(json!({"query": "test"}))
-                .with_output(json!({"response": "result"}))
-                .with_chunk(json!({"partial": "data"})),
-        );
+        .data(
+            EventData::builder()
+                .input(json!({"query": "test"}))
+                .output(json!({"response": "result"}))
+                .chunk(json!({"partial": "data"}))
+                .build(),
+        )
+        .build();
 
     assert_eq!(event.base.parent_ids.len(), 2);
     assert_eq!(event.base.tags.len(), 2);
@@ -359,7 +427,12 @@ fn test_event_metadata_nested_structure() {
         ),
     ]);
 
-    let event = StandardStreamEvent::new("on_llm_start", "id", "llm").with_metadata(metadata);
+    let event = StandardStreamEvent::builder()
+        .event("on_llm_start")
+        .run_id("id")
+        .name("llm")
+        .metadata(metadata)
+        .build();
 
     assert_eq!(
         event.base.metadata["model_info"]["provider"],
@@ -370,18 +443,30 @@ fn test_event_metadata_nested_structure() {
 
 #[test]
 fn test_standard_event_data_field_required() {
-    let event = StandardStreamEvent::new("on_chain_start", "id", "test");
+    let event = StandardStreamEvent::builder()
+        .event("on_chain_start")
+        .run_id("id")
+        .name("test")
+        .build();
     let _ = &event.data;
 }
 
 #[test]
 fn test_event_tags_inherited_from_parent() {
-    let _parent = StandardStreamEvent::new("on_chain_start", "parent", "parent")
-        .with_tags(vec!["parent-tag".into()]);
+    let _parent = StandardStreamEvent::builder()
+        .event("on_chain_start")
+        .run_id("parent")
+        .name("parent")
+        .tags(vec!["parent-tag".into()])
+        .build();
 
-    let child = StandardStreamEvent::new("on_chain_start", "child", "child")
-        .with_parent_ids(vec!["parent".into()])
-        .with_tags(vec!["parent-tag".into(), "child-tag".into()]);
+    let child = StandardStreamEvent::builder()
+        .event("on_chain_start")
+        .run_id("child")
+        .name("child")
+        .parent_ids(vec!["parent".into()])
+        .tags(vec!["parent-tag".into(), "child-tag".into()])
+        .build();
 
     assert!(child.base.tags.contains(&"parent-tag".to_string()));
     assert!(child.base.tags.contains(&"child-tag".to_string()));
@@ -389,11 +474,11 @@ fn test_event_tags_inherited_from_parent() {
 
 #[test]
 fn test_custom_stream_event_structure() {
-    let event = CustomStreamEvent::new(
-        "test-run-id",
-        "my_custom_event",
-        json!({"custom_field": "custom_value"}),
-    );
+    let event = CustomStreamEvent::builder()
+        .run_id("test-run-id")
+        .name("my_custom_event")
+        .data(json!({"custom_field": "custom_value"}))
+        .build();
 
     assert_eq!(event.base.event, "on_custom_event");
     assert_eq!(event.name, "my_custom_event");
@@ -402,23 +487,35 @@ fn test_custom_stream_event_structure() {
 
 #[test]
 fn test_custom_stream_event_with_any_data() {
-    let event1 = CustomStreamEvent::new("id1", "event1", json!("string data"));
+    let event1 = CustomStreamEvent::builder()
+        .run_id("id1")
+        .name("event1")
+        .data(json!("string data"))
+        .build();
     assert_eq!(event1.data, json!("string data"));
 
-    let event2 = CustomStreamEvent::new("id2", "event2", json!([1, 2, 3]));
+    let event2 = CustomStreamEvent::builder()
+        .run_id("id2")
+        .name("event2")
+        .data(json!([1, 2, 3]))
+        .build();
     assert_eq!(event2.data, json!([1, 2, 3]));
 
-    let event3 = CustomStreamEvent::new(
-        "id3",
-        "event3",
-        json!({"nested": {"deeply": {"value": 42}}}),
-    );
+    let event3 = CustomStreamEvent::builder()
+        .run_id("id3")
+        .name("event3")
+        .data(json!({"nested": {"deeply": {"value": 42}}}))
+        .build();
     assert_eq!(event3.data["nested"]["deeply"]["value"], json!(42));
 }
 
 #[test]
 fn test_custom_event_must_be_on_custom_event() {
-    let event = CustomStreamEvent::new("id", "my_event", json!({}));
+    let event = CustomStreamEvent::builder()
+        .run_id("id")
+        .name("my_event")
+        .data(json!({}))
+        .build();
     assert_eq!(event.base.event, CUSTOM_EVENT_TYPE);
     assert_eq!(event.base.event, "on_custom_event");
 }
@@ -434,31 +531,52 @@ fn test_custom_event_name_can_be_any_string() {
     ];
 
     for name in &names {
-        let event = CustomStreamEvent::new("id", *name, json!({}));
+        let event = CustomStreamEvent::builder()
+            .run_id("id")
+            .name(*name)
+            .data(json!({}))
+            .build();
         assert_eq!(event.name, *name);
     }
 }
 
 #[test]
 fn test_custom_event_data_can_be_none() {
-    let event = CustomStreamEvent::new("id", "event", json!(null));
+    let event = CustomStreamEvent::builder()
+        .run_id("id")
+        .name("event")
+        .data(json!(null))
+        .build();
     assert_eq!(event.data, json!(null));
 }
 
 #[test]
 fn test_custom_event_data_field_required() {
-    let event = CustomStreamEvent::new("id", "test", json!({"info": "required"}));
+    let event = CustomStreamEvent::builder()
+        .run_id("id")
+        .name("test")
+        .data(json!({"info": "required"}))
+        .build();
     assert_eq!(event.data["info"], json!("required"));
 }
 
 #[test]
 fn test_stream_event_union_type() {
-    let standard: StreamEvent = StandardStreamEvent::new("on_chain_start", "id", "chain")
-        .with_data(EventData::new().with_input(json!("test")))
+    let standard: StreamEvent = StandardStreamEvent::builder()
+        .event("on_chain_start")
+        .run_id("id")
+        .name("chain")
+        .data(EventData::builder().input(json!("test")).build())
+        .build()
         .into();
     assert_eq!(standard.event(), "on_chain_start");
 
-    let custom: StreamEvent = CustomStreamEvent::new("id", "custom", json!("anything")).into();
+    let custom: StreamEvent = CustomStreamEvent::builder()
+        .run_id("id")
+        .name("custom")
+        .data(json!("anything"))
+        .build()
+        .into();
     assert_eq!(custom.event(), "on_custom_event");
 }
 
@@ -468,8 +586,18 @@ fn test_stream_event_can_be_either_type() {
         event.event()
     }
 
-    let standard: StreamEvent = StandardStreamEvent::new("on_llm_start", "id", "llm").into();
-    let custom: StreamEvent = CustomStreamEvent::new("id", "custom", json!({})).into();
+    let standard: StreamEvent = StandardStreamEvent::builder()
+        .event("on_llm_start")
+        .run_id("id")
+        .name("llm")
+        .build()
+        .into();
+    let custom: StreamEvent = CustomStreamEvent::builder()
+        .run_id("id")
+        .name("custom")
+        .data(json!({}))
+        .build()
+        .into();
 
     assert_eq!(process_event(&standard), "on_llm_start");
     assert_eq!(process_event(&custom), "on_custom_event");
