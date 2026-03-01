@@ -10,36 +10,47 @@ use futures::StreamExt;
 
 #[test]
 fn test_fake_list_llm_initialization() {
-    let llm = FakeListLLM::new(vec!["response1".to_string(), "response2".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["response1".to_string(), "response2".to_string()])
+        .build();
     assert_eq!(llm.current_index(), 0);
 }
 
 #[test]
 fn test_fake_list_llm_initialization_with_sleep() {
-    let llm = FakeListLLM::new(vec!["response".to_string()]).with_sleep(Duration::from_millis(100));
+    let llm = FakeListLLM::builder()
+        .responses(vec!["response".to_string()])
+        .sleep(Duration::from_millis(100))
+        .build();
     assert_eq!(llm.current_index(), 0);
 }
 
 #[test]
 fn test_fake_list_llm_type() {
-    let llm = FakeListLLM::new(vec!["response".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["response".to_string()])
+        .build();
     assert_eq!(llm.llm_type(), "fake-list");
 }
 
 #[tokio::test]
 async fn test_fake_list_llm_invoke_single_response() {
-    let llm = FakeListLLM::new(vec!["hello".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["hello".to_string()])
+        .build();
     let result = llm.invoke("any prompt".into(), None).await.unwrap();
     assert_eq!(result, "hello");
 }
 
 #[tokio::test]
 async fn test_fake_list_llm_invoke_cycles_through_responses() {
-    let llm = FakeListLLM::new(vec![
-        "first".to_string(),
-        "second".to_string(),
-        "third".to_string(),
-    ]);
+    let llm = FakeListLLM::builder()
+        .responses(vec![
+            "first".to_string(),
+            "second".to_string(),
+            "third".to_string(),
+        ])
+        .build();
 
     let result = llm.call("prompt1".to_string(), None, None).await.unwrap();
     assert_eq!(result, "first");
@@ -59,7 +70,9 @@ async fn test_fake_list_llm_invoke_cycles_through_responses() {
 
 #[tokio::test]
 async fn test_fake_list_llm_single_response_stays_at_same() {
-    let llm = FakeListLLM::new(vec!["only".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["only".to_string()])
+        .build();
 
     let result = llm.call("prompt1".to_string(), None, None).await.unwrap();
     assert_eq!(result, "only");
@@ -72,14 +85,18 @@ async fn test_fake_list_llm_single_response_stays_at_same() {
 
 #[tokio::test]
 async fn test_fake_list_llm_ainvoke_single_response() {
-    let llm = FakeListLLM::new(vec!["async hello".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["async hello".to_string()])
+        .build();
     let result = llm.invoke("any prompt".into(), None).await.unwrap();
     assert_eq!(result, "async hello");
 }
 
 #[tokio::test]
 async fn test_fake_list_llm_ainvoke_cycles_through_responses() {
-    let llm = FakeListLLM::new(vec!["first".to_string(), "second".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["first".to_string(), "second".to_string()])
+        .build();
 
     let result = llm.invoke("prompt1".into(), None).await.unwrap();
     assert_eq!(result, "first");
@@ -91,7 +108,9 @@ async fn test_fake_list_llm_ainvoke_cycles_through_responses() {
 
 #[test]
 fn test_fake_list_llm_identifying_params() {
-    let llm = FakeListLLM::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+        .build();
     let params = llm.identifying_params();
     assert_eq!(
         params.get("responses").unwrap(),
@@ -101,7 +120,9 @@ fn test_fake_list_llm_identifying_params() {
 
 #[tokio::test]
 async fn test_fake_list_llm_generate_returns_llm_result() {
-    let llm = FakeListLLM::new(vec!["response".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["response".to_string()])
+        .build();
     let result = llm
         .generate_prompts(vec!["prompt".to_string()], None, None)
         .await
@@ -119,14 +140,18 @@ async fn test_fake_list_llm_generate_returns_llm_result() {
 
 #[tokio::test]
 async fn test_fake_list_llm_call_method() {
-    let llm = FakeListLLM::new(vec!["direct call".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["direct call".to_string()])
+        .build();
     let result = llm.call("prompt".to_string(), None, None).await.unwrap();
     assert_eq!(result, "direct call");
 }
 
 #[tokio::test]
 async fn test_fake_list_llm_acall_method() {
-    let llm = FakeListLLM::new(vec!["async direct call".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["async direct call".to_string()])
+        .build();
     let result = llm.call("prompt".to_string(), None, None).await.unwrap();
     assert_eq!(result, "async direct call");
 }
@@ -145,19 +170,26 @@ fn test_fake_list_llm_error_is_exception() {
 
 #[test]
 fn test_fake_streaming_initialization() {
-    let llm = FakeStreamingListLLM::new(vec!["response".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["response".to_string()])
+        .build();
     assert_eq!(llm.current_index(), 0);
 }
 
 #[test]
 fn test_fake_streaming_initialization_with_error_on_chunk() {
-    let llm = FakeStreamingListLLM::new(vec!["response".to_string()]).with_error_on_chunk(2);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["response".to_string()])
+        .error_on_chunk(2)
+        .build();
     assert_eq!(llm.current_index(), 0);
 }
 
 #[tokio::test]
 async fn test_fake_streaming_stream_yields_characters() {
-    let llm = FakeStreamingListLLM::new(vec!["hello".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["hello".to_string()])
+        .build();
     let mut stream = llm
         .stream_prompt("prompt".to_string(), None, None)
         .await
@@ -172,7 +204,9 @@ async fn test_fake_streaming_stream_yields_characters() {
 
 #[tokio::test]
 async fn test_fake_streaming_stream_cycles_through_responses() {
-    let llm = FakeStreamingListLLM::new(vec!["ab".to_string(), "cd".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["ab".to_string(), "cd".to_string()])
+        .build();
 
     let mut stream = llm
         .stream_prompt("p1".to_string(), None, None)
@@ -207,7 +241,10 @@ async fn test_fake_streaming_stream_cycles_through_responses() {
 
 #[tokio::test]
 async fn test_fake_streaming_stream_error_on_chunk() {
-    let llm = FakeStreamingListLLM::new(vec!["hello".to_string()]).with_error_on_chunk(2);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["hello".to_string()])
+        .error_on_chunk(2)
+        .build();
 
     let mut stream = llm
         .stream_prompt("prompt".to_string(), None, None)
@@ -224,7 +261,10 @@ async fn test_fake_streaming_stream_error_on_chunk() {
 
 #[tokio::test]
 async fn test_fake_streaming_stream_error_on_first_chunk() {
-    let llm = FakeStreamingListLLM::new(vec!["hello".to_string()]).with_error_on_chunk(0);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["hello".to_string()])
+        .error_on_chunk(0)
+        .build();
 
     let mut stream = llm
         .stream_prompt("prompt".to_string(), None, None)
@@ -237,20 +277,26 @@ async fn test_fake_streaming_stream_error_on_first_chunk() {
 
 #[tokio::test]
 async fn test_fake_streaming_invoke_returns_full_response() {
-    let llm = FakeStreamingListLLM::new(vec!["hello world".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["hello world".to_string()])
+        .build();
     let result = llm.call("prompt".to_string(), None, None).await.unwrap();
     assert_eq!(result, "hello world");
 }
 
 #[test]
 fn test_fake_streaming_llm_type() {
-    let llm = FakeStreamingListLLM::new(vec!["test".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["test".to_string()])
+        .build();
     assert_eq!(llm.llm_type(), "fake-list");
 }
 
 #[tokio::test]
 async fn test_fake_streaming_stream_empty_response() {
-    let llm = FakeStreamingListLLM::new(vec!["".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["".to_string()])
+        .build();
     let mut stream = llm
         .stream_prompt("prompt".to_string(), None, None)
         .await
@@ -265,7 +311,9 @@ async fn test_fake_streaming_stream_empty_response() {
 
 #[tokio::test]
 async fn test_fake_streaming_stream_unicode_characters() {
-    let llm = FakeStreamingListLLM::new(vec!["你好".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["你好".to_string()])
+        .build();
     let mut stream = llm
         .stream_prompt("prompt".to_string(), None, None)
         .await
@@ -280,7 +328,9 @@ async fn test_fake_streaming_stream_unicode_characters() {
 
 #[tokio::test]
 async fn test_fake_streaming_stream_with_spaces() {
-    let llm = FakeStreamingListLLM::new(vec!["a b".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["a b".to_string()])
+        .build();
     let mut stream = llm
         .stream_prompt("prompt".to_string(), None, None)
         .await
@@ -295,7 +345,9 @@ async fn test_fake_streaming_stream_with_spaces() {
 
 #[tokio::test]
 async fn test_fake_streaming_stream_with_newlines() {
-    let llm = FakeStreamingListLLM::new(vec!["a\nb".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["a\nb".to_string()])
+        .build();
     let mut stream = llm
         .stream_prompt("prompt".to_string(), None, None)
         .await
@@ -310,11 +362,13 @@ async fn test_fake_streaming_stream_with_newlines() {
 
 #[tokio::test]
 async fn test_generate_with_multiple_prompts() {
-    let llm = FakeListLLM::new(vec![
-        "alpha".to_string(),
-        "beta".to_string(),
-        "gamma".to_string(),
-    ]);
+    let llm = FakeListLLM::builder()
+        .responses(vec![
+            "alpha".to_string(),
+            "beta".to_string(),
+            "gamma".to_string(),
+        ])
+        .build();
     let result = llm
         .generate_prompts(
             vec!["p1".to_string(), "p2".to_string(), "p3".to_string()],
@@ -341,7 +395,9 @@ async fn test_generate_with_multiple_prompts() {
 
 #[tokio::test]
 async fn test_generate_with_more_prompts_than_responses() {
-    let llm = FakeListLLM::new(vec!["first".to_string(), "second".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["first".to_string(), "second".to_string()])
+        .build();
     let result = llm
         .generate_prompts(
             vec!["p1".to_string(), "p2".to_string(), "p3".to_string()],
@@ -368,7 +424,9 @@ async fn test_generate_with_more_prompts_than_responses() {
 
 #[tokio::test]
 async fn test_two_responses_exact_counter_state() {
-    let llm = FakeListLLM::new(vec!["a".to_string(), "b".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["a".to_string(), "b".to_string()])
+        .build();
     assert_eq!(llm.current_index(), 0);
 
     let result = llm.call("p1".to_string(), None, None).await.unwrap();
@@ -390,7 +448,9 @@ async fn test_two_responses_exact_counter_state() {
 
 #[tokio::test]
 async fn test_call_resets_counter_at_end() {
-    let llm = FakeListLLM::new(vec!["only_one".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["only_one".to_string()])
+        .build();
     assert_eq!(llm.current_index(), 0);
 
     let result = llm.call("prompt".to_string(), None, None).await.unwrap();
@@ -400,7 +460,9 @@ async fn test_call_resets_counter_at_end() {
 
 #[tokio::test]
 async fn test_generate_returns_proper_llm_result_structure() {
-    let llm = FakeListLLM::new(vec!["hello".to_string(), "world".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["hello".to_string(), "world".to_string()])
+        .build();
     let result = llm
         .generate_prompts(
             vec!["prompt1".to_string(), "prompt2".to_string()],
@@ -426,7 +488,9 @@ async fn test_generate_returns_proper_llm_result_structure() {
 
 #[tokio::test]
 async fn test_generate_single_prompt_structure() {
-    let llm = FakeListLLM::new(vec!["single response".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["single response".to_string()])
+        .build();
     let result = llm
         .generate_prompts(vec!["one prompt".to_string()], None, None)
         .await
@@ -442,7 +506,9 @@ async fn test_generate_single_prompt_structure() {
 
 #[tokio::test]
 async fn test_stream_single_character() {
-    let llm = FakeStreamingListLLM::new(vec!["x".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["x".to_string()])
+        .build();
     let mut stream = llm
         .stream_prompt("prompt".to_string(), None, None)
         .await
@@ -458,7 +524,10 @@ async fn test_stream_single_character() {
 
 #[tokio::test]
 async fn test_stream_error_on_exact_last_chunk() {
-    let llm = FakeStreamingListLLM::new(vec!["abc".to_string()]).with_error_on_chunk(2);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["abc".to_string()])
+        .error_on_chunk(2)
+        .build();
 
     let mut stream = llm
         .stream_prompt("prompt".to_string(), None, None)
@@ -476,7 +545,10 @@ async fn test_stream_error_on_exact_last_chunk() {
 
 #[tokio::test]
 async fn test_stream_error_on_last_chunk_single_char() {
-    let llm = FakeStreamingListLLM::new(vec!["z".to_string()]).with_error_on_chunk(0);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["z".to_string()])
+        .error_on_chunk(0)
+        .build();
 
     let mut stream = llm
         .stream_prompt("prompt".to_string(), None, None)
@@ -494,7 +566,9 @@ async fn test_stream_error_on_last_chunk_single_char() {
 
 #[tokio::test]
 async fn test_stream_advances_counter() {
-    let llm = FakeStreamingListLLM::new(vec!["ab".to_string(), "cd".to_string(), "ef".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["ab".to_string(), "cd".to_string(), "ef".to_string()])
+        .build();
 
     let mut stream = llm
         .stream_prompt("p1".to_string(), None, None)
@@ -532,7 +606,9 @@ async fn test_stream_advances_counter() {
 
 #[test]
 fn test_streaming_identifying_params_inherited() {
-    let llm = FakeStreamingListLLM::new(vec!["hello".to_string(), "world".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["hello".to_string(), "world".to_string()])
+        .build();
     let params = llm.identifying_params();
     assert_eq!(
         params.get("responses").unwrap(),
@@ -542,7 +618,9 @@ fn test_streaming_identifying_params_inherited() {
 
 #[tokio::test]
 async fn test_invoke_with_human_message_list() {
-    let llm = FakeListLLM::new(vec!["message response".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["message response".to_string()])
+        .build();
     let messages = vec![BaseMessage::Human(
         HumanMessage::builder().content("Hello").build(),
     )];
@@ -553,7 +631,9 @@ async fn test_invoke_with_human_message_list() {
 
 #[tokio::test]
 async fn test_stream_with_tabs() {
-    let llm = FakeStreamingListLLM::new(vec!["a\tb".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["a\tb".to_string()])
+        .build();
     let mut stream = llm
         .stream_prompt("prompt".to_string(), None, None)
         .await
@@ -568,7 +648,9 @@ async fn test_stream_with_tabs() {
 
 #[tokio::test]
 async fn test_stream_with_carriage_return() {
-    let llm = FakeStreamingListLLM::new(vec!["a\r\nb".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["a\r\nb".to_string()])
+        .build();
     let mut stream = llm
         .stream_prompt("prompt".to_string(), None, None)
         .await
@@ -583,7 +665,9 @@ async fn test_stream_with_carriage_return() {
 
 #[tokio::test]
 async fn test_stream_with_null_byte() {
-    let llm = FakeStreamingListLLM::new(vec!["a\x00b".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["a\x00b".to_string()])
+        .build();
     let mut stream = llm
         .stream_prompt("prompt".to_string(), None, None)
         .await
@@ -598,7 +682,9 @@ async fn test_stream_with_null_byte() {
 
 #[tokio::test]
 async fn test_stream_with_emoji() {
-    let llm = FakeStreamingListLLM::new(vec!["hi\u{1f600}".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["hi\u{1f600}".to_string()])
+        .build();
     let mut stream = llm
         .stream_prompt("prompt".to_string(), None, None)
         .await
@@ -613,7 +699,10 @@ async fn test_stream_with_emoji() {
 
 #[tokio::test]
 async fn test_sleep_stored_but_does_not_affect_call() {
-    let llm = FakeListLLM::new(vec!["response".to_string()]).with_sleep(Duration::from_secs(10));
+    let llm = FakeListLLM::builder()
+        .responses(vec!["response".to_string()])
+        .sleep(Duration::from_secs(10))
+        .build();
 
     let start = std::time::Instant::now();
     let result = llm.call("prompt".to_string(), None, None).await.unwrap();
@@ -625,8 +714,10 @@ async fn test_sleep_stored_but_does_not_affect_call() {
 
 #[tokio::test]
 async fn test_stream_with_sleep() {
-    let llm =
-        FakeStreamingListLLM::new(vec!["ab".to_string()]).with_sleep(Duration::from_millis(10));
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["ab".to_string()])
+        .sleep(Duration::from_millis(10))
+        .build();
 
     let start = std::time::Instant::now();
     let mut stream = llm
@@ -645,7 +736,9 @@ async fn test_stream_with_sleep() {
 
 #[tokio::test]
 async fn test_batch_processing() {
-    let llm = FakeListLLM::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()])
+        .build();
     let results = llm
         .batch(
             vec![
@@ -662,7 +755,9 @@ async fn test_batch_processing() {
 
 #[tokio::test]
 async fn test_abatch_processing() {
-    let llm = FakeListLLM::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()])
+        .build();
     let results = llm
         .batch(
             vec![
@@ -679,7 +774,9 @@ async fn test_abatch_processing() {
 
 #[tokio::test]
 async fn test_batch_cycles_correctly_and_updates_counter() {
-    let llm = FakeListLLM::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()])
+        .build();
     let results = llm
         .batch(
             vec![
@@ -697,7 +794,9 @@ async fn test_batch_cycles_correctly_and_updates_counter() {
 
 #[tokio::test]
 async fn test_batch_partial_cycle_updates_counter() {
-    let llm = FakeListLLM::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()])
+        .build();
     let results = llm
         .batch(vec![LanguageModelInput::from("p1")], None)
         .await
@@ -708,7 +807,9 @@ async fn test_batch_partial_cycle_updates_counter() {
 
 #[tokio::test]
 async fn test_call_resets_counter_at_end_multiple_responses() {
-    let llm = FakeListLLM::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+        .build();
     let _ = llm.call("p".to_string(), None, None).await;
     let _ = llm.call("p".to_string(), None, None).await;
     assert_eq!(llm.current_index(), 2);
@@ -720,9 +821,11 @@ async fn test_call_resets_counter_at_end_multiple_responses() {
 
 #[test]
 fn test_identifying_params_with_extra_attributes() {
-    let llm = FakeStreamingListLLM::new(vec!["test".to_string()])
-        .with_error_on_chunk(5)
-        .with_sleep(Duration::from_millis(500));
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["test".to_string()])
+        .error_on_chunk(5)
+        .sleep(Duration::from_millis(500))
+        .build();
     let params = llm.identifying_params();
     assert_eq!(
         params.get("responses").unwrap(),
@@ -734,7 +837,9 @@ fn test_identifying_params_with_extra_attributes() {
 
 #[tokio::test]
 async fn test_multiple_sequential_streams_cycle() {
-    let llm = FakeStreamingListLLM::new(vec!["AB".to_string(), "CD".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["AB".to_string(), "CD".to_string()])
+        .build();
 
     async fn collect(llm: &FakeStreamingListLLM, prompt: &str) -> Vec<String> {
         use futures::StreamExt;
@@ -759,7 +864,9 @@ async fn test_multiple_sequential_streams_cycle() {
 async fn test_invoke_with_multiple_messages() {
     use agent_chain_core::messages::SystemMessage;
 
-    let llm = FakeListLLM::new(vec!["multi message response".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["multi message response".to_string()])
+        .build();
     let messages = vec![
         BaseMessage::System(
             SystemMessage::builder()
@@ -777,7 +884,9 @@ async fn test_invoke_with_multiple_messages() {
 
 #[tokio::test]
 async fn test_ainvoke_with_human_message_list() {
-    let llm = FakeListLLM::new(vec!["async message response".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["async message response".to_string()])
+        .build();
     let messages = vec![BaseMessage::Human(
         HumanMessage::builder().content("Hello").build(),
     )];
@@ -790,14 +899,18 @@ async fn test_ainvoke_with_human_message_list() {
 
 #[tokio::test]
 async fn test_streaming_ainvoke_returns_full_response() {
-    let llm = FakeStreamingListLLM::new(vec!["hello world".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["hello world".to_string()])
+        .build();
     let result = llm.call("prompt".to_string(), None, None).await.unwrap();
     assert_eq!(result, "hello world");
 }
 
 #[tokio::test]
 async fn test_stream_with_mixed_special_characters() {
-    let llm = FakeStreamingListLLM::new(vec!["\u{1f44d}\n\t".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["\u{1f44d}\n\t".to_string()])
+        .build();
     let mut stream = llm
         .stream_prompt("prompt".to_string(), None, None)
         .await
@@ -811,8 +924,10 @@ async fn test_stream_with_mixed_special_characters() {
 
 #[tokio::test]
 async fn test_astream_sleep_delays_proportional_to_chunks() {
-    let llm =
-        FakeStreamingListLLM::new(vec!["abcde".to_string()]).with_sleep(Duration::from_millis(20));
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["abcde".to_string()])
+        .sleep(Duration::from_millis(20))
+        .build();
 
     let start = std::time::Instant::now();
     let mut stream = llm
@@ -831,7 +946,9 @@ async fn test_astream_sleep_delays_proportional_to_chunks() {
 
 #[tokio::test]
 async fn test_astream_no_sleep_is_fast() {
-    let llm = FakeStreamingListLLM::new(vec!["abcde".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["abcde".to_string()])
+        .build();
 
     let start = std::time::Instant::now();
     let mut stream = llm

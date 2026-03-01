@@ -216,7 +216,7 @@ mod tests {
     #[test]
     fn test_pydantic_parse_result_partial() {
         let parser = person_parser();
-        let generations = vec![Generation::new(r#"{"name": "Alice"#)];
+        let generations = vec![Generation::builder().text(r#"{"name": "Alice"#).build()];
         let result = parser.parse_result(&generations, true);
         assert!(result.is_err());
     }
@@ -224,7 +224,11 @@ mod tests {
     #[test]
     fn test_pydantic_parse_result_partial_complete() {
         let parser = person_parser();
-        let generations = vec![Generation::new(r#"{"name": "Alice", "age": 30}"#)];
+        let generations = vec![
+            Generation::builder()
+                .text(r#"{"name": "Alice", "age": 30}"#)
+                .build(),
+        ];
         let result = parser.parse_result(&generations, true).unwrap();
         assert_eq!(result.name, "Alice");
         assert_eq!(result.age, 30);

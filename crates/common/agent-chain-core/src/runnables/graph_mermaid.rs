@@ -4,6 +4,8 @@ use std::path::Path;
 use base64::Engine;
 use serde_json::Value;
 
+use bon::builder;
+
 use crate::error::{Error, Result};
 
 use super::graph::{Edge, MermaidDrawMethod, Node, NodeStyles};
@@ -63,16 +65,16 @@ fn scalar_to_yaml(value: &Value) -> String {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[builder]
 pub fn draw_mermaid(
     nodes: &HashMap<String, Node>,
     edges: &[Edge],
     first_node: Option<&str>,
     last_node: Option<&str>,
-    with_styles: bool,
+    #[builder(default = true)] with_styles: bool,
     curve_style: &super::graph::CurveStyle,
     node_styles: &NodeStyles,
-    wrap_label_n_words: usize,
+    #[builder(default = 10)] wrap_label_n_words: usize,
     frontmatter_config: Option<&HashMap<String, Value>>,
 ) -> Result<String> {
     let original_config = frontmatter_config.cloned().unwrap_or_default();
@@ -372,13 +374,14 @@ pub fn generate_mermaid_graph_styles(node_colors: &NodeStyles) -> String {
     styles
 }
 
+#[builder]
 pub async fn draw_mermaid_png(
     mermaid_syntax: &str,
     output_file_path: Option<&Path>,
     draw_method: MermaidDrawMethod,
     background_color: Option<&str>,
-    max_retries: usize,
-    retry_delay_secs: f64,
+    #[builder(default = 3)] max_retries: usize,
+    #[builder(default = 1.0)] retry_delay_secs: f64,
     base_url: Option<&str>,
 ) -> Result<Vec<u8>> {
     match draw_method {

@@ -34,39 +34,25 @@ pub struct LangSmithParams {
     pub ls_stop: Option<Vec<String>>,
 }
 
+#[bon::bon]
 impl LangSmithParams {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_provider(mut self, provider: impl Into<String>) -> Self {
-        self.ls_provider = Some(provider.into());
-        self
-    }
-
-    pub fn with_model_name(mut self, model_name: impl Into<String>) -> Self {
-        self.ls_model_name = Some(model_name.into());
-        self
-    }
-
-    pub fn with_model_type(mut self, model_type: impl Into<String>) -> Self {
-        self.ls_model_type = Some(model_type.into());
-        self
-    }
-
-    pub fn with_temperature(mut self, temperature: f64) -> Self {
-        self.ls_temperature = Some(temperature);
-        self
-    }
-
-    pub fn with_max_tokens(mut self, max_tokens: u32) -> Self {
-        self.ls_max_tokens = Some(max_tokens);
-        self
-    }
-
-    pub fn with_stop(mut self, stop: Vec<String>) -> Self {
-        self.ls_stop = Some(stop);
-        self
+    #[builder]
+    pub fn new(
+        #[builder(into)] provider: Option<String>,
+        #[builder(into)] model_name: Option<String>,
+        #[builder(into)] model_type: Option<String>,
+        temperature: Option<f64>,
+        max_tokens: Option<u32>,
+        stop: Option<Vec<String>>,
+    ) -> Self {
+        Self {
+            ls_provider: provider,
+            ls_model_name: model_name,
+            ls_model_type: model_type,
+            ls_temperature: temperature,
+            ls_max_tokens: max_tokens,
+            ls_stop: stop,
+        }
     }
 }
 
@@ -217,39 +203,25 @@ pub struct LanguageModelConfig {
     pub callbacks: Option<Callbacks>,
 }
 
+#[bon::bon]
 impl LanguageModelConfig {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_cache(mut self, cache: bool) -> Self {
-        self.cache = Some(cache);
-        self
-    }
-
-    pub fn with_verbose(mut self, verbose: bool) -> Self {
-        self.verbose = Some(verbose);
-        self
-    }
-
-    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
-        self.tags = Some(tags);
-        self
-    }
-
-    pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
-        self.metadata = Some(metadata);
-        self
-    }
-
-    pub fn with_custom_get_token_ids(mut self, tokenizer: CustomGetTokenIds) -> Self {
-        self.custom_get_token_ids = Some(tokenizer);
-        self
-    }
-
-    pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
-        self.callbacks = Some(callbacks);
-        self
+    #[builder]
+    pub fn new(
+        cache: Option<bool>,
+        verbose: Option<bool>,
+        tags: Option<Vec<String>>,
+        metadata: Option<HashMap<String, Value>>,
+        custom_get_token_ids: Option<CustomGetTokenIds>,
+        callbacks: Option<Callbacks>,
+    ) -> Self {
+        Self {
+            cache,
+            verbose,
+            tags,
+            metadata,
+            custom_get_token_ids,
+            callbacks,
+        }
     }
 }
 
@@ -281,8 +253,6 @@ pub trait BaseLanguageModel: Send + Sync {
     ) -> Result<LLMResult>;
 
     fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
-        let mut params = LangSmithParams::new();
-
         let llm_type = self.llm_type();
         let provider = if llm_type.starts_with("Chat") {
             llm_type
@@ -298,14 +268,11 @@ pub trait BaseLanguageModel: Send + Sync {
             llm_type.to_lowercase()
         };
 
-        params.ls_provider = Some(provider);
-        params.ls_model_name = Some(self.model_name().to_string());
-
-        if let Some(stop) = stop {
-            params.ls_stop = Some(stop.to_vec());
-        }
-
-        params
+        LangSmithParams::builder()
+            .provider(provider)
+            .model_name(self.model_name().to_string())
+            .maybe_stop(stop.map(|s| s.to_vec()))
+            .build()
     }
 
     fn identifying_params(&self) -> HashMap<String, Value> {
@@ -362,13 +329,14 @@ mod tests {
 
     #[test]
     fn test_langsmith_params_builder() {
-        let params = LangSmithParams::new()
-            .with_provider("openai")
-            .with_model_name("gpt-4")
-            .with_model_type("chat")
-            .with_temperature(0.7)
-            .with_max_tokens(1000)
-            .with_stop(vec!["STOP".to_string()]);
+        let params = LangSmithParams::builder()
+            .provider("openai")
+            .model_name("gpt-4")
+            .model_type("chat")
+            .temperature(0.7)
+            .max_tokens(1000)
+            .stop(vec!["STOP".to_string()])
+            .build();
 
         assert_eq!(params.ls_provider, Some("openai".to_string()));
         assert_eq!(params.ls_model_name, Some("gpt-4".to_string()));
@@ -396,9 +364,10 @@ mod tests {
 
     #[test]
     fn test_language_model_config_builder() {
-        let config = LanguageModelConfig::new()
-            .with_cache(true)
-            .with_tags(vec!["test".to_string()]);
+        let config = LanguageModelConfig::builder()
+            .cache(true)
+            .tags(vec!["test".to_string()])
+            .build();
 
         assert_eq!(config.cache, Some(true));
         assert_eq!(config.tags, Some(vec!["test".to_string()]));

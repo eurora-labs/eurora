@@ -200,7 +200,7 @@ mod tests {
     #[test]
     fn test_in_memory_cache_update_and_lookup() {
         let cache = InMemoryCache::new(None).unwrap();
-        let generations = vec![Generation::new("Hello, world!")];
+        let generations = vec![Generation::builder().text("Hello, world!").build()];
 
         cache.update("prompt", "llm_string", generations.clone());
 
@@ -214,7 +214,7 @@ mod tests {
     #[test]
     fn test_in_memory_cache_clear() {
         let cache = InMemoryCache::new(None).unwrap();
-        let generations = vec![Generation::new("Hello")];
+        let generations = vec![Generation::builder().text("Hello").build()];
 
         cache.update("prompt1", "llm", generations.clone());
         cache.update("prompt2", "llm", generations.clone());
@@ -232,13 +232,25 @@ mod tests {
     fn test_in_memory_cache_maxsize() {
         let cache = InMemoryCache::new(Some(2)).unwrap();
 
-        cache.update("prompt1", "llm", vec![Generation::new("1")]);
-        cache.update("prompt2", "llm", vec![Generation::new("2")]);
+        cache.update(
+            "prompt1",
+            "llm",
+            vec![Generation::builder().text("1").build()],
+        );
+        cache.update(
+            "prompt2",
+            "llm",
+            vec![Generation::builder().text("2").build()],
+        );
 
         assert!(cache.lookup("prompt1", "llm").is_some());
         assert!(cache.lookup("prompt2", "llm").is_some());
 
-        cache.update("prompt3", "llm", vec![Generation::new("3")]);
+        cache.update(
+            "prompt3",
+            "llm",
+            vec![Generation::builder().text("3").build()],
+        );
 
         assert!(cache.lookup("prompt1", "llm").is_none()); // Evicted
         assert!(cache.lookup("prompt2", "llm").is_some());
@@ -249,11 +261,19 @@ mod tests {
     fn test_in_memory_cache_update_existing_key() {
         let cache = InMemoryCache::new(None).unwrap();
 
-        cache.update("prompt", "llm", vec![Generation::new("first")]);
+        cache.update(
+            "prompt",
+            "llm",
+            vec![Generation::builder().text("first").build()],
+        );
         let result = cache.lookup("prompt", "llm").unwrap();
         assert_eq!(result[0].text, "first");
 
-        cache.update("prompt", "llm", vec![Generation::new("second")]);
+        cache.update(
+            "prompt",
+            "llm",
+            vec![Generation::builder().text("second").build()],
+        );
         let result = cache.lookup("prompt", "llm").unwrap();
         assert_eq!(result[0].text, "second");
     }
@@ -262,8 +282,16 @@ mod tests {
     fn test_in_memory_cache_different_llm_strings() {
         let cache = InMemoryCache::new(None).unwrap();
 
-        cache.update("prompt", "llm1", vec![Generation::new("from llm1")]);
-        cache.update("prompt", "llm2", vec![Generation::new("from llm2")]);
+        cache.update(
+            "prompt",
+            "llm1",
+            vec![Generation::builder().text("from llm1").build()],
+        );
+        cache.update(
+            "prompt",
+            "llm2",
+            vec![Generation::builder().text("from llm2").build()],
+        );
 
         let result1 = cache.lookup("prompt", "llm1").unwrap();
         assert_eq!(result1[0].text, "from llm1");
@@ -275,7 +303,7 @@ mod tests {
     #[tokio::test]
     async fn test_in_memory_cache_alookup() {
         let cache = InMemoryCache::new(None).unwrap();
-        let generations = vec![Generation::new("async test")];
+        let generations = vec![Generation::builder().text("async test").build()];
 
         cache.update("prompt", "llm", generations);
 
@@ -287,7 +315,7 @@ mod tests {
     #[tokio::test]
     async fn test_in_memory_cache_aupdate() {
         let cache = InMemoryCache::new(None).unwrap();
-        let generations = vec![Generation::new("async update")];
+        let generations = vec![Generation::builder().text("async update").build()];
 
         cache.aupdate("prompt", "llm", generations).await;
 
@@ -300,7 +328,11 @@ mod tests {
     async fn test_in_memory_cache_aclear() {
         let cache = InMemoryCache::new(None).unwrap();
 
-        cache.update("prompt", "llm", vec![Generation::new("test")]);
+        cache.update(
+            "prompt",
+            "llm",
+            vec![Generation::builder().text("test").build()],
+        );
         assert!(cache.lookup("prompt", "llm").is_some());
 
         cache.aclear().await;
@@ -311,12 +343,28 @@ mod tests {
     fn test_in_memory_cache_maxsize_update_refreshes_position() {
         let cache = InMemoryCache::new(Some(2)).unwrap();
 
-        cache.update("prompt1", "llm", vec![Generation::new("1")]);
-        cache.update("prompt2", "llm", vec![Generation::new("2")]);
+        cache.update(
+            "prompt1",
+            "llm",
+            vec![Generation::builder().text("1").build()],
+        );
+        cache.update(
+            "prompt2",
+            "llm",
+            vec![Generation::builder().text("2").build()],
+        );
 
-        cache.update("prompt1", "llm", vec![Generation::new("1 updated")]);
+        cache.update(
+            "prompt1",
+            "llm",
+            vec![Generation::builder().text("1 updated").build()],
+        );
 
-        cache.update("prompt3", "llm", vec![Generation::new("3")]);
+        cache.update(
+            "prompt3",
+            "llm",
+            vec![Generation::builder().text("3").build()],
+        );
 
         assert!(cache.lookup("prompt1", "llm").is_some()); // Still present
         assert!(cache.lookup("prompt2", "llm").is_none()); // Evicted
@@ -327,9 +375,9 @@ mod tests {
     fn test_in_memory_cache_multiple_generations() {
         let cache = InMemoryCache::new(None).unwrap();
         let generations = vec![
-            Generation::new("First generation"),
-            Generation::new("Second generation"),
-            Generation::new("Third generation"),
+            Generation::builder().text("First generation").build(),
+            Generation::builder().text("Second generation").build(),
+            Generation::builder().text("Third generation").build(),
         ];
 
         cache.update("prompt", "llm", generations);

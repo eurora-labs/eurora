@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use bon::bon;
+
 use super::graph::{Graph, LabelsDict};
 
 #[derive(Debug, Clone)]
@@ -18,12 +20,14 @@ impl Default for PngDrawer {
     }
 }
 
+#[bon]
 impl PngDrawer {
-    pub fn new(fontname: Option<&str>, labels: Option<LabelsDict>) -> Self {
-        Self {
-            fontname: fontname.unwrap_or("arial").to_string(),
-            labels: labels.unwrap_or_default(),
-        }
+    #[builder]
+    pub fn new(
+        #[builder(default = "arial".to_string())] fontname: String,
+        #[builder(default)] labels: LabelsDict,
+    ) -> Self {
+        Self { fontname, labels }
     }
 
     pub fn get_node_label(&self, label: &str) -> String {

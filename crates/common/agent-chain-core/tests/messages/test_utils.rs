@@ -608,8 +608,11 @@ fn test_trim_messages_first_30() {
         ),
     ];
 
-    let config =
-        TrimMessagesConfig::new(30, dummy_token_counter).with_strategy(TrimStrategy::First);
+    let config = TrimMessagesConfig::builder()
+        .max_tokens(30)
+        .token_counter(dummy_token_counter)
+        .strategy(TrimStrategy::First)
+        .build();
 
     let actual = trim_messages(&messages, &config);
 
@@ -649,9 +652,12 @@ fn test_trim_messages_first_30_allow_partial() {
     ];
     let messages_copy = messages.clone();
 
-    let config = TrimMessagesConfig::new(30, dummy_token_counter)
-        .with_strategy(TrimStrategy::First)
-        .with_allow_partial(true);
+    let config = TrimMessagesConfig::builder()
+        .max_tokens(30)
+        .token_counter(dummy_token_counter)
+        .strategy(TrimStrategy::First)
+        .allow_partial(true)
+        .build();
 
     let actual = trim_messages(&messages, &config);
 
@@ -716,9 +722,12 @@ fn test_trim_messages_last_30_include_system() {
         ),
     ];
 
-    let config = TrimMessagesConfig::new(30, dummy_token_counter)
-        .with_strategy(TrimStrategy::Last)
-        .with_include_system(true);
+    let config = TrimMessagesConfig::builder()
+        .max_tokens(30)
+        .token_counter(dummy_token_counter)
+        .strategy(TrimStrategy::Last)
+        .include_system(true)
+        .build();
 
     let actual = trim_messages(&messages, &config);
 
@@ -1292,8 +1301,11 @@ fn test_count_tokens_approximately_tool_message_includes_tool_call_id() {
 #[test]
 fn test_trim_messages_empty_messages() {
     let messages: Vec<BaseMessage> = vec![];
-    let config =
-        TrimMessagesConfig::new(100, dummy_token_counter).with_strategy(TrimStrategy::First);
+    let config = TrimMessagesConfig::builder()
+        .max_tokens(100)
+        .token_counter(dummy_token_counter)
+        .strategy(TrimStrategy::First)
+        .build();
     let actual = trim_messages(&messages, &config);
     assert!(actual.is_empty());
 }
@@ -1306,8 +1318,11 @@ fn test_trim_messages_exact_token_boundary() {
         BaseMessage::Human(HumanMessage::builder().content("msg3").build()),
     ];
 
-    let config =
-        TrimMessagesConfig::new(20, dummy_token_counter).with_strategy(TrimStrategy::First);
+    let config = TrimMessagesConfig::builder()
+        .max_tokens(20)
+        .token_counter(dummy_token_counter)
+        .strategy(TrimStrategy::First)
+        .build();
     let actual = trim_messages(&messages, &config);
     assert_eq!(actual.len(), 2);
     assert_eq!(actual[0].content(), "msg1");
@@ -1323,9 +1338,12 @@ fn test_trim_messages_last_without_include_system() {
         BaseMessage::Human(HumanMessage::builder().content("human2").build()),
     ];
 
-    let config = TrimMessagesConfig::new(20, dummy_token_counter)
-        .with_strategy(TrimStrategy::Last)
-        .with_include_system(false);
+    let config = TrimMessagesConfig::builder()
+        .max_tokens(20)
+        .token_counter(dummy_token_counter)
+        .strategy(TrimStrategy::Last)
+        .include_system(false)
+        .build();
     let actual = trim_messages(&messages, &config);
     assert_eq!(actual.len(), 2);
     assert_eq!(actual[0].content(), "ai1");
@@ -1536,10 +1554,13 @@ fn test_trim_messages_first_30_allow_partial_end_on_human() {
     ];
     let messages_copy = messages.clone();
 
-    let config = TrimMessagesConfig::new(30, dummy_token_counter)
-        .with_strategy(TrimStrategy::First)
-        .with_allow_partial(true)
-        .with_end_on(vec!["human".to_string()]);
+    let config = TrimMessagesConfig::builder()
+        .max_tokens(30)
+        .token_counter(dummy_token_counter)
+        .strategy(TrimStrategy::First)
+        .allow_partial(true)
+        .end_on(vec!["human".to_string()])
+        .build();
 
     let actual = trim_messages(&messages, &config);
 
@@ -1585,10 +1606,13 @@ fn test_trim_messages_last_40_include_system_allow_partial() {
     ];
     let messages_copy = messages.clone();
 
-    let config = TrimMessagesConfig::new(40, dummy_token_counter)
-        .with_strategy(TrimStrategy::Last)
-        .with_allow_partial(true)
-        .with_include_system(true);
+    let config = TrimMessagesConfig::builder()
+        .max_tokens(40)
+        .token_counter(dummy_token_counter)
+        .strategy(TrimStrategy::Last)
+        .allow_partial(true)
+        .include_system(true)
+        .build();
 
     let actual = trim_messages(&messages, &config);
 
@@ -1633,11 +1657,14 @@ fn test_trim_messages_last_30_include_system_allow_partial_end_on_human() {
     ];
     let messages_copy = messages.clone();
 
-    let config = TrimMessagesConfig::new(30, dummy_token_counter)
-        .with_strategy(TrimStrategy::Last)
-        .with_allow_partial(true)
-        .with_include_system(true)
-        .with_end_on(vec!["human".to_string()]);
+    let config = TrimMessagesConfig::builder()
+        .max_tokens(30)
+        .token_counter(dummy_token_counter)
+        .strategy(TrimStrategy::Last)
+        .allow_partial(true)
+        .include_system(true)
+        .end_on(vec!["human".to_string()])
+        .build();
 
     let actual = trim_messages(&messages, &config);
 
@@ -1682,11 +1709,14 @@ fn test_trim_messages_last_40_include_system_allow_partial_start_on_human() {
     ];
     let messages_copy = messages.clone();
 
-    let config = TrimMessagesConfig::new(30, dummy_token_counter)
-        .with_strategy(TrimStrategy::Last)
-        .with_allow_partial(true)
-        .with_include_system(true)
-        .with_start_on(vec!["human".to_string()]);
+    let config = TrimMessagesConfig::builder()
+        .max_tokens(30)
+        .token_counter(dummy_token_counter)
+        .strategy(TrimStrategy::Last)
+        .allow_partial(true)
+        .include_system(true)
+        .start_on(vec!["human".to_string()])
+        .build();
 
     let actual = trim_messages(&messages, &config);
 
@@ -1706,12 +1736,15 @@ fn test_trim_messages_allow_partial_one_message() {
             .build(),
     )];
 
-    let config = TrimMessagesConfig::new(2, |msgs: &[BaseMessage]| -> usize {
-        msgs.iter().map(|m| m.content().len()).sum()
-    })
-    .with_strategy(TrimStrategy::First)
-    .with_allow_partial(true)
-    .with_text_splitter(|text: &str| text.chars().map(|c| c.to_string()).collect());
+    let config = TrimMessagesConfig::builder()
+        .max_tokens(2)
+        .token_counter(|msgs: &[BaseMessage]| -> usize {
+            msgs.iter().map(|m| m.content().len()).sum()
+        })
+        .strategy(TrimStrategy::First)
+        .allow_partial(true)
+        .build()
+        .with_text_splitter(|text: &str| text.chars().map(|c| c.to_string()).collect());
 
     let actual = trim_messages(&messages, &config);
 
@@ -1728,12 +1761,15 @@ fn test_trim_messages_last_allow_partial_one_message() {
             .build(),
     )];
 
-    let config = TrimMessagesConfig::new(2, |msgs: &[BaseMessage]| -> usize {
-        msgs.iter().map(|m| m.content().len()).sum()
-    })
-    .with_strategy(TrimStrategy::Last)
-    .with_allow_partial(true)
-    .with_text_splitter(|text: &str| text.chars().map(|c| c.to_string()).collect());
+    let config = TrimMessagesConfig::builder()
+        .max_tokens(2)
+        .token_counter(|msgs: &[BaseMessage]| -> usize {
+            msgs.iter().map(|m| m.content().len()).sum()
+        })
+        .strategy(TrimStrategy::Last)
+        .allow_partial(true)
+        .build()
+        .with_text_splitter(|text: &str| text.chars().map(|c| c.to_string()).collect());
 
     let actual = trim_messages(&messages, &config);
 
@@ -1790,9 +1826,12 @@ fn test_trim_messages_allow_partial_text_splitter() {
         result
     }
 
-    let config = TrimMessagesConfig::new(10, count_words)
-        .with_strategy(TrimStrategy::Last)
-        .with_allow_partial(true)
+    let config = TrimMessagesConfig::builder()
+        .max_tokens(10)
+        .token_counter(count_words)
+        .strategy(TrimStrategy::Last)
+        .allow_partial(true)
+        .build()
         .with_text_splitter(split_on_space);
 
     let actual = trim_messages(&messages, &config);
@@ -1820,9 +1859,12 @@ fn test_trim_messages_partial_text_splitting() {
         text.chars().map(|c| c.to_string()).collect()
     }
 
-    let config = TrimMessagesConfig::new(10, count_characters)
-        .with_strategy(TrimStrategy::First)
-        .with_allow_partial(true)
+    let config = TrimMessagesConfig::builder()
+        .max_tokens(10)
+        .token_counter(count_characters)
+        .strategy(TrimStrategy::First)
+        .allow_partial(true)
+        .build()
         .with_text_splitter(char_splitter);
 
     let actual = trim_messages(&messages, &config);
@@ -1866,9 +1908,12 @@ fn test_trim_messages_mixed_content_with_partial() {
         total
     }
 
-    let config = TrimMessagesConfig::new(20, count_text_length)
-        .with_strategy(TrimStrategy::First)
-        .with_allow_partial(true);
+    let config = TrimMessagesConfig::builder()
+        .max_tokens(20)
+        .token_counter(count_text_length)
+        .strategy(TrimStrategy::First)
+        .allow_partial(true)
+        .build();
 
     let actual = trim_messages(&messages, &config);
 
@@ -1900,10 +1945,13 @@ fn test_trim_messages_start_on_with_allow_partial() {
     ];
     let messages_copy = messages.clone();
 
-    let config = TrimMessagesConfig::new(20, dummy_token_counter)
-        .with_strategy(TrimStrategy::Last)
-        .with_allow_partial(true)
-        .with_start_on(vec!["human".to_string()]);
+    let config = TrimMessagesConfig::builder()
+        .max_tokens(20)
+        .token_counter(dummy_token_counter)
+        .strategy(TrimStrategy::Last)
+        .allow_partial(true)
+        .start_on(vec!["human".to_string()])
+        .build();
 
     let actual = trim_messages(&messages, &config);
 
@@ -1915,9 +1963,12 @@ fn test_trim_messages_start_on_with_allow_partial() {
 #[test]
 fn test_trim_messages_include_system_strategy_last_empty_messages() {
     let messages: Vec<BaseMessage> = vec![];
-    let config = TrimMessagesConfig::new(10, dummy_token_counter)
-        .with_strategy(TrimStrategy::Last)
-        .with_include_system(true);
+    let config = TrimMessagesConfig::builder()
+        .max_tokens(10)
+        .token_counter(dummy_token_counter)
+        .strategy(TrimStrategy::Last)
+        .include_system(true)
+        .build();
 
     let actual = trim_messages(&messages, &config);
     assert!(actual.is_empty());

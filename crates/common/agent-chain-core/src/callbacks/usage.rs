@@ -172,7 +172,7 @@ mod tests {
             .response_metadata(response_metadata)
             .build();
 
-        let generation = ChatGeneration::new(ai_msg.into());
+        let generation = ChatGeneration::builder().message(ai_msg.into()).build();
 
         ChatResult {
             generations: vec![generation],

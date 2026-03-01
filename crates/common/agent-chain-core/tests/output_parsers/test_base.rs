@@ -106,7 +106,10 @@ fn test_parse_with_whitespace() {
 #[test]
 fn test_parse_result_uses_first_generation() {
     let parser = IntParser;
-    let generations = vec![Generation::new("10"), Generation::new("20")];
+    let generations = vec![
+        Generation::builder().text("10").build(),
+        Generation::builder().text("20").build(),
+    ];
     let result = parser.parse_result(&generations, false).unwrap();
     assert_eq!(result, 10);
 }
@@ -115,7 +118,7 @@ fn test_parse_result_uses_first_generation() {
 fn test_parse_result_single_generation() {
     let parser = IntParser;
     let result = parser
-        .parse_result(&[Generation::new("99")], false)
+        .parse_result(&[Generation::builder().text("99").build()], false)
         .unwrap();
     assert_eq!(result, 99);
 }
@@ -124,8 +127,8 @@ fn test_parse_result_single_generation() {
 fn test_parse_result_with_chat_generation() {
     let parser = IntParser;
     let message: BaseMessage = AIMessage::builder().content("55").build().into();
-    let chat_gen = ChatGeneration::new(message);
-    let generation = Generation::new(&chat_gen.text);
+    let chat_gen = ChatGeneration::builder().message(message).build();
+    let generation = Generation::builder().text(&chat_gen.text).build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result, 55);
 }
@@ -191,7 +194,7 @@ async fn test_aparse() {
 async fn test_aparse_result() {
     let parser = IntParser;
     let result = parser
-        .aparse_result(&[Generation::new("42")], false)
+        .aparse_result(&[Generation::builder().text("42").build()], false)
         .await
         .unwrap();
     assert_eq!(result, 42);
@@ -201,7 +204,7 @@ async fn test_aparse_result() {
 async fn test_aparse_result_partial_flag() {
     let parser = IntParser;
     let result = parser
-        .aparse_result(&[Generation::new("42")], true)
+        .aparse_result(&[Generation::builder().text("42").build()], true)
         .await
         .unwrap();
     assert_eq!(result, 42);
@@ -264,7 +267,7 @@ impl BaseLLMOutputParser for SimpleParser {
 async fn test_base_llm_aparse_result_delegates_to_sync() {
     let parser = SimpleParser;
     let result = parser
-        .aparse_result(&[Generation::new("hello")], false)
+        .aparse_result(&[Generation::builder().text("hello").build()], false)
         .await
         .unwrap();
     assert_eq!(result, "HELLO");
@@ -296,7 +299,7 @@ impl BaseLLMOutputParser for PartialTracker {
 async fn test_base_llm_aparse_result_partial_flag() {
     let parser = PartialTracker::new();
     parser
-        .aparse_result(&[Generation::new("test")], true)
+        .aparse_result(&[Generation::builder().text("test").build()], true)
         .await
         .unwrap();
     assert!(parser.received_partial.load(Ordering::SeqCst));

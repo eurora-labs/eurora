@@ -189,19 +189,25 @@ impl AstreamEventsCallbackHandler {
             Self::get_parent_ids(&state.parent_map, run_id)
         };
 
-        let event = StandardStreamEvent::new("on_chat_model_start", run_id.to_string(), &name_)
-            .with_tags(tags.unwrap_or_default())
-            .with_metadata(metadata.unwrap_or_default())
-            .with_parent_ids(parent_ids)
-            .with_data(
-                EventData::new().with_input(
-                    serde_json::to_value(HashMap::from([(
-                        "messages",
-                        serde_json::to_value(messages).unwrap_or_default(),
-                    )]))
-                    .unwrap_or_default(),
-                ),
-            );
+        let event = StandardStreamEvent::builder()
+            .event("on_chat_model_start")
+            .run_id(run_id.to_string())
+            .name(&name_)
+            .tags(tags.unwrap_or_default())
+            .metadata(metadata.unwrap_or_default())
+            .parent_ids(parent_ids)
+            .data(
+                EventData::builder()
+                    .input(
+                        serde_json::to_value(HashMap::from([(
+                            "messages",
+                            serde_json::to_value(messages).unwrap_or_default(),
+                        )]))
+                        .unwrap_or_default(),
+                    )
+                    .build(),
+            )
+            .build();
 
         self.send(StreamEvent::Standard(event), run_type);
     }
@@ -236,19 +242,25 @@ impl AstreamEventsCallbackHandler {
             Self::get_parent_ids(&state.parent_map, run_id)
         };
 
-        let event = StandardStreamEvent::new("on_llm_start", run_id.to_string(), &name_)
-            .with_tags(tags.unwrap_or_default())
-            .with_metadata(metadata.unwrap_or_default())
-            .with_parent_ids(parent_ids)
-            .with_data(
-                EventData::new().with_input(
-                    serde_json::to_value(HashMap::from([(
-                        "prompts",
-                        serde_json::to_value(prompts).unwrap_or_default(),
-                    )]))
-                    .unwrap_or_default(),
-                ),
-            );
+        let event = StandardStreamEvent::builder()
+            .event("on_llm_start")
+            .run_id(run_id.to_string())
+            .name(&name_)
+            .tags(tags.unwrap_or_default())
+            .metadata(metadata.unwrap_or_default())
+            .parent_ids(parent_ids)
+            .data(
+                EventData::builder()
+                    .input(
+                        serde_json::to_value(HashMap::from([(
+                            "prompts",
+                            serde_json::to_value(prompts).unwrap_or_default(),
+                        )]))
+                        .unwrap_or_default(),
+                    )
+                    .build(),
+            )
+            .build();
 
         self.send(StreamEvent::Standard(event), run_type);
     }
@@ -266,10 +278,14 @@ impl AstreamEventsCallbackHandler {
             Self::get_parent_ids(&state.parent_map, run_id)
         };
 
-        let event = CustomStreamEvent::new(name, run_id.to_string(), data.clone())
-            .with_tags(tags.unwrap_or_default())
-            .with_metadata(metadata.unwrap_or_default())
-            .with_parent_ids(parent_ids);
+        let event = CustomStreamEvent::builder()
+            .run_id(name)
+            .name(run_id.to_string())
+            .data(data.clone())
+            .tags(tags.unwrap_or_default())
+            .metadata(metadata.unwrap_or_default())
+            .parent_ids(parent_ids)
+            .build();
 
         self.send(StreamEvent::Custom(event), name);
     }
@@ -318,11 +334,15 @@ impl AstreamEventsCallbackHandler {
 
         let parent_ids = Self::get_parent_ids(&state.parent_map, run_id);
 
-        let event = StandardStreamEvent::new(event_name, run_id.to_string(), &run_info.name)
-            .with_tags(run_info.tags.clone())
-            .with_metadata(run_info.metadata.clone())
-            .with_parent_ids(parent_ids)
-            .with_data(EventData::new().with_chunk(chunk_value));
+        let event = StandardStreamEvent::builder()
+            .event(event_name)
+            .run_id(run_id.to_string())
+            .name(&run_info.name)
+            .tags(run_info.tags.clone())
+            .metadata(run_info.metadata.clone())
+            .parent_ids(parent_ids)
+            .data(EventData::builder().chunk(chunk_value).build())
+            .build();
 
         let run_type = run_info.run_type.clone();
         drop(state);
@@ -402,16 +422,20 @@ impl AstreamEventsCallbackHandler {
             return Err(format!("Unexpected run type: {}", run_info.run_type));
         };
 
-        let mut data = EventData::new().with_output(output);
+        let mut data = EventData::builder().output(output).build();
         if let Some(inp) = inputs {
-            data = data.with_input(inp);
+            data.input = Some(inp);
         }
 
-        let event = StandardStreamEvent::new(event_name, run_id.to_string(), &run_info.name)
-            .with_tags(run_info.tags.clone())
-            .with_metadata(run_info.metadata.clone())
-            .with_parent_ids(parent_ids)
-            .with_data(data);
+        let event = StandardStreamEvent::builder()
+            .event(event_name)
+            .run_id(run_id.to_string())
+            .name(&run_info.name)
+            .tags(run_info.tags.clone())
+            .metadata(run_info.metadata.clone())
+            .parent_ids(parent_ids)
+            .data(data)
+            .build();
 
         self.send(StreamEvent::Standard(event), &run_info.run_type);
         Ok(())
@@ -432,13 +456,13 @@ impl AstreamEventsCallbackHandler {
         let name_ = assign_name(name, Some(serialized));
         let run_type_ = run_type.unwrap_or("chain");
 
-        let mut data = EventData::new();
+        let mut data = EventData::builder().build();
         let mut stored_inputs = None;
 
         let is_empty_placeholder =
             inputs.len() == 1 && inputs.get("input") == Some(&Value::String(String::new()));
         if !is_empty_placeholder {
-            data = data.with_input(serde_json::to_value(inputs).unwrap_or_default());
+            data.input = Some(serde_json::to_value(inputs).unwrap_or_default());
             stored_inputs = Some(serde_json::to_value(inputs).unwrap_or_default());
         }
 
@@ -457,15 +481,15 @@ impl AstreamEventsCallbackHandler {
             Self::get_parent_ids(&state.parent_map, run_id)
         };
 
-        let event = StandardStreamEvent::new(
-            format!("on_{}_start", run_type_),
-            run_id.to_string(),
-            &name_,
-        )
-        .with_tags(tags.unwrap_or_default())
-        .with_metadata(metadata.unwrap_or_default())
-        .with_parent_ids(parent_ids)
-        .with_data(data);
+        let event = StandardStreamEvent::builder()
+            .event(format!("on_{}_start", run_type_))
+            .run_id(run_id.to_string())
+            .name(&name_)
+            .tags(tags.unwrap_or_default())
+            .metadata(metadata.unwrap_or_default())
+            .parent_ids(parent_ids)
+            .data(data)
+            .build();
 
         self.send(StreamEvent::Standard(event), run_type_);
     }
@@ -494,15 +518,20 @@ impl AstreamEventsCallbackHandler {
             .or(run_info.inputs.clone())
             .unwrap_or(Value::Object(Default::default()));
 
-        let data = EventData::new()
-            .with_output(serde_json::to_value(outputs).unwrap_or_default())
-            .with_input(resolved_inputs);
+        let data = EventData::builder()
+            .output(serde_json::to_value(outputs).unwrap_or_default())
+            .input(resolved_inputs)
+            .build();
 
-        let event = StandardStreamEvent::new(&event_name, run_id.to_string(), &run_info.name)
-            .with_tags(run_info.tags.clone())
-            .with_metadata(run_info.metadata.clone())
-            .with_parent_ids(parent_ids)
-            .with_data(data);
+        let event = StandardStreamEvent::builder()
+            .event(&event_name)
+            .run_id(run_id.to_string())
+            .name(&run_info.name)
+            .tags(run_info.tags.clone())
+            .metadata(run_info.metadata.clone())
+            .parent_ids(parent_ids)
+            .data(data)
+            .build();
 
         self.send(StreamEvent::Standard(event), run_type);
         Ok(())
@@ -539,14 +568,19 @@ impl AstreamEventsCallbackHandler {
             Self::get_parent_ids(&state.parent_map, run_id)
         };
 
-        let event = StandardStreamEvent::new("on_tool_start", run_id.to_string(), &name_)
-            .with_tags(tags.unwrap_or_default())
-            .with_metadata(metadata.unwrap_or_default())
-            .with_parent_ids(parent_ids)
-            .with_data(
-                EventData::new()
-                    .with_input(inputs_value.unwrap_or(Value::Object(Default::default()))),
-            );
+        let event = StandardStreamEvent::builder()
+            .event("on_tool_start")
+            .run_id(run_id.to_string())
+            .name(&name_)
+            .tags(tags.unwrap_or_default())
+            .metadata(metadata.unwrap_or_default())
+            .parent_ids(parent_ids)
+            .data(
+                EventData::builder()
+                    .input(inputs_value.unwrap_or(Value::Object(Default::default())))
+                    .build(),
+            )
+            .build();
 
         self.send(StreamEvent::Standard(event), "tool");
     }
@@ -577,13 +611,17 @@ impl AstreamEventsCallbackHandler {
             Self::remove_tool_run_info_with_inputs(&mut state, run_id)?
         };
 
-        let data = EventData::new().with_error(error).with_input(inputs);
+        let data = EventData::builder().error(error).input(inputs).build();
 
-        let event = StandardStreamEvent::new("on_tool_error", run_id.to_string(), &run_info.name)
-            .with_tags(run_info.tags.clone())
-            .with_metadata(run_info.metadata.clone())
-            .with_parent_ids(parent_ids)
-            .with_data(data);
+        let event = StandardStreamEvent::builder()
+            .event("on_tool_error")
+            .run_id(run_id.to_string())
+            .name(&run_info.name)
+            .tags(run_info.tags.clone())
+            .metadata(run_info.metadata.clone())
+            .parent_ids(parent_ids)
+            .data(data)
+            .build();
 
         self.send(StreamEvent::Standard(event), "tool");
         Ok(())
@@ -595,13 +633,17 @@ impl AstreamEventsCallbackHandler {
             Self::remove_tool_run_info_with_inputs(&mut state, run_id)?
         };
 
-        let data = EventData::new().with_output(output).with_input(inputs);
+        let data = EventData::builder().output(output).input(inputs).build();
 
-        let event = StandardStreamEvent::new("on_tool_end", run_id.to_string(), &run_info.name)
-            .with_tags(run_info.tags.clone())
-            .with_metadata(run_info.metadata.clone())
-            .with_parent_ids(parent_ids)
-            .with_data(data);
+        let event = StandardStreamEvent::builder()
+            .event("on_tool_end")
+            .run_id(run_id.to_string())
+            .name(&run_info.name)
+            .tags(run_info.tags.clone())
+            .metadata(run_info.metadata.clone())
+            .parent_ids(parent_ids)
+            .data(data)
+            .build();
 
         self.send(StreamEvent::Standard(event), "tool");
         Ok(())
@@ -636,11 +678,19 @@ impl AstreamEventsCallbackHandler {
             Self::get_parent_ids(&state.parent_map, run_id)
         };
 
-        let event = StandardStreamEvent::new("on_retriever_start", run_id.to_string(), &name_)
-            .with_tags(tags.unwrap_or_default())
-            .with_metadata(metadata.unwrap_or_default())
-            .with_parent_ids(parent_ids)
-            .with_data(EventData::new().with_input(serde_json::json!({"query": query})));
+        let event = StandardStreamEvent::builder()
+            .event("on_retriever_start")
+            .run_id(run_id.to_string())
+            .name(&name_)
+            .tags(tags.unwrap_or_default())
+            .metadata(metadata.unwrap_or_default())
+            .parent_ids(parent_ids)
+            .data(
+                EventData::builder()
+                    .input(serde_json::json!({"query": query}))
+                    .build(),
+            )
+            .build();
 
         self.send(StreamEvent::Standard(event), run_type);
     }
@@ -656,17 +706,20 @@ impl AstreamEventsCallbackHandler {
             (run_info, parent_ids)
         };
 
-        let mut data = EventData::new().with_output(documents);
+        let mut data = EventData::builder().output(documents).build();
         if let Some(inputs) = run_info.inputs.clone() {
-            data = data.with_input(inputs);
+            data.input = Some(inputs);
         }
 
-        let event =
-            StandardStreamEvent::new("on_retriever_end", run_id.to_string(), &run_info.name)
-                .with_tags(run_info.tags.clone())
-                .with_metadata(run_info.metadata.clone())
-                .with_parent_ids(parent_ids)
-                .with_data(data);
+        let event = StandardStreamEvent::builder()
+            .event("on_retriever_end")
+            .run_id(run_id.to_string())
+            .name(&run_info.name)
+            .tags(run_info.tags.clone())
+            .metadata(run_info.metadata.clone())
+            .parent_ids(parent_ids)
+            .data(data)
+            .build();
 
         self.send(StreamEvent::Standard(event), &run_info.run_type);
         Ok(())
@@ -948,12 +1001,15 @@ impl StreamingCallbackHandler<crate::error::Result<Value>> for AstreamEventsCall
 
         Box::pin(output.map(move |chunk| {
             if let Ok(ref value) = chunk {
-                let event =
-                    StandardStreamEvent::new(&event_name, run_id.to_string(), &run_info.name)
-                        .with_tags(run_info.tags.clone())
-                        .with_metadata(run_info.metadata.clone())
-                        .with_parent_ids(parent_ids.clone())
-                        .with_data(EventData::new().with_chunk(value.clone()));
+                let event = StandardStreamEvent::builder()
+                    .event(&event_name)
+                    .run_id(run_id.to_string())
+                    .name(&run_info.name)
+                    .tags(run_info.tags.clone())
+                    .metadata(run_info.metadata.clone())
+                    .parent_ids(parent_ids.clone())
+                    .data(EventData::builder().chunk(value.clone()).build())
+                    .build();
 
                 let (name, tags) = (run_info.name.as_str(), run_info.tags.as_slice());
                 if root_event_filter.include_event(name, tags, &run_type)

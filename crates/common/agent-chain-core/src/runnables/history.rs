@@ -4,6 +4,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
+use bon::bon;
 use serde_json::Value;
 
 use async_trait::async_trait;
@@ -90,7 +91,9 @@ impl fmt::Debug for RunnableWithMessageHistory {
     }
 }
 
+#[bon]
 impl RunnableWithMessageHistory {
+    #[builder]
     pub fn new(
         runnable: HistoryInvokeFn,
         runnable_async: Option<HistoryAInvokeFn>,
@@ -151,15 +154,14 @@ impl RunnableWithMessageHistory {
             })
         };
 
-        Self::new(
-            runnable,
-            None,
-            get_session_history,
-            input_messages_key,
-            output_messages_key,
-            history_messages_key,
-            history_factory_config,
-        )
+        Self::builder()
+            .runnable(runnable)
+            .get_session_history(get_session_history)
+            .maybe_input_messages_key(input_messages_key)
+            .maybe_output_messages_key(output_messages_key)
+            .maybe_history_messages_key(history_messages_key)
+            .maybe_history_factory_config(history_factory_config)
+            .build()
     }
 
     pub fn from_history_runnable(
@@ -184,15 +186,14 @@ impl RunnableWithMessageHistory {
             })
         };
 
-        Self::new(
-            invoke_fn,
-            None,
-            get_session_history,
-            input_messages_key,
-            output_messages_key,
-            history_messages_key,
-            history_factory_config,
-        )
+        Self::builder()
+            .runnable(invoke_fn)
+            .get_session_history(get_session_history)
+            .maybe_input_messages_key(input_messages_key)
+            .maybe_output_messages_key(output_messages_key)
+            .maybe_history_messages_key(history_messages_key)
+            .maybe_history_factory_config(history_factory_config)
+            .build()
     }
 
     pub fn config_specs(&self) -> &[ConfigurableFieldSpec] {

@@ -6,4 +6,5 @@ mod messages;
 mod output_parsers;
 mod outputs;
 mod runnables;
+mod text_splitters;
 mod utils;

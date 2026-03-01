@@ -24,10 +24,11 @@ fn test_ensure_config_none_returns_defaults() {
 
 #[test]
 fn test_ensure_config_preserves_custom_values() {
-    let custom = RunnableConfig::new()
-        .with_recursion_limit(10)
-        .with_tags(vec!["tag1".into()])
-        .with_run_name("my_run");
+    let custom = RunnableConfig::builder()
+        .recursion_limit(10)
+        .tags(vec!["tag1".into()])
+        .run_name("my_run")
+        .build();
 
     let config = ensure_config(Some(custom));
     assert_eq!(config.recursion_limit, 10);
@@ -68,7 +69,7 @@ fn test_ensure_config_copies_tags_metadata_configurable() {
 
 #[test]
 fn test_get_config_list_single_config_replicated() {
-    let config = RunnableConfig::new().with_tags(vec!["a".into()]);
+    let config = RunnableConfig::builder().tags(vec!["a".into()]).build();
     let configs = get_config_list(Some(ConfigOrList::Single(Box::new(config))), 3).unwrap();
     assert_eq!(configs.len(), 3);
     for c in &configs {
@@ -88,8 +89,8 @@ fn test_get_config_list_none_config() {
 
 #[test]
 fn test_get_config_list_sequence_of_configs() {
-    let config_a = RunnableConfig::new().with_tags(vec!["a".into()]);
-    let config_b = RunnableConfig::new().with_tags(vec!["b".into()]);
+    let config_a = RunnableConfig::builder().tags(vec!["a".into()]).build();
+    let config_b = RunnableConfig::builder().tags(vec!["b".into()]).build();
 
     let configs = get_config_list(Some(ConfigOrList::List(vec![config_a, config_b])), 2).unwrap();
     assert_eq!(configs.len(), 2);
@@ -99,7 +100,7 @@ fn test_get_config_list_sequence_of_configs() {
 
 #[test]
 fn test_get_config_list_sequence_length_mismatch_raises() {
-    let config_a = RunnableConfig::new().with_tags(vec!["a".into()]);
+    let config_a = RunnableConfig::builder().tags(vec!["a".into()]).build();
     let err = get_config_list(Some(ConfigOrList::List(vec![config_a])), 3).unwrap_err();
     assert!(err.to_string().contains("same length"));
 }
@@ -113,7 +114,7 @@ fn test_get_config_list_zero_length() {
 #[test]
 fn test_get_config_list_run_id_warning() {
     let run_id = uuid::Uuid::new_v4();
-    let config = RunnableConfig::new().with_run_id(run_id);
+    let config = RunnableConfig::builder().run_id(run_id).build();
     let configs = get_config_list(Some(ConfigOrList::Single(Box::new(config))), 3).unwrap();
 
     assert_eq!(configs[0].run_id, Some(run_id));
@@ -124,7 +125,7 @@ fn test_get_config_list_run_id_warning() {
 #[test]
 fn test_get_config_list_run_id_single_no_issue() {
     let run_id = uuid::Uuid::new_v4();
-    let config = RunnableConfig::new().with_run_id(run_id);
+    let config = RunnableConfig::builder().run_id(run_id).build();
     let configs = get_config_list(Some(ConfigOrList::Single(Box::new(config))), 1).unwrap();
     assert_eq!(configs.len(), 1);
     assert_eq!(configs[0].run_id, Some(run_id));
@@ -139,7 +140,7 @@ fn test_patch_config_none_input() {
 
 #[test]
 fn test_patch_config_sets_recursion_limit() {
-    let config = RunnableConfig::new().with_recursion_limit(10);
+    let config = RunnableConfig::builder().recursion_limit(10).build();
     let patched = patch_config(Some(config), None, None, None, Some(50), None);
     assert_eq!(patched.recursion_limit, 50);
 }
@@ -177,9 +178,10 @@ fn test_patch_config_configurable_merges() {
 #[test]
 fn test_patch_config_callbacks_clears_run_name_and_run_id() {
     let run_id = uuid::Uuid::new_v4();
-    let config = RunnableConfig::new()
-        .with_run_name("old_name")
-        .with_run_id(run_id);
+    let config = RunnableConfig::builder()
+        .run_name("old_name")
+        .run_id(run_id)
+        .build();
 
     let callback_mgr = CallbackManager::new();
     let patched = patch_config(Some(config), Some(callback_mgr), None, None, None, None);
@@ -190,8 +192,10 @@ fn test_patch_config_callbacks_clears_run_name_and_run_id() {
 
 #[test]
 fn test_merge_configs_tags_are_deduplicated_and_sorted() {
-    let c1 = RunnableConfig::new().with_tags(vec!["b".into(), "a".into()]);
-    let c2 = RunnableConfig::new().with_tags(vec!["a".into(), "c".into()]);
+    let mut c1 = RunnableConfig::builder().build();
+    c1.tags = vec!["b".into(), "a".into()];
+    let mut c2 = RunnableConfig::builder().build();
+    c2.tags = vec!["a".into(), "c".into()];
     let merged = merge_configs(vec![Some(c1), Some(c2)]);
     assert_eq!(merged.tags, vec!["a", "b", "c"]);
 }
@@ -242,24 +246,24 @@ fn test_merge_configs_configurable_is_merged() {
 
 #[test]
 fn test_merge_configs_recursion_limit_non_default_wins() {
-    let c1 = RunnableConfig::new().with_recursion_limit(10);
-    let c2 = RunnableConfig::new().with_recursion_limit(50);
+    let c1 = RunnableConfig::builder().recursion_limit(10).build();
+    let c2 = RunnableConfig::builder().recursion_limit(50).build();
     let merged = merge_configs(vec![Some(c1), Some(c2)]);
     assert_eq!(merged.recursion_limit, 50);
 }
 
 #[test]
 fn test_merge_configs_recursion_limit_default_does_not_override() {
-    let c1 = RunnableConfig::new().with_recursion_limit(50);
-    let c2 = RunnableConfig::new().with_recursion_limit(25);
+    let c1 = RunnableConfig::builder().recursion_limit(50).build();
+    let c2 = RunnableConfig::builder().recursion_limit(25).build();
     let merged = merge_configs(vec![Some(c1), Some(c2)]);
     assert_eq!(merged.recursion_limit, 50);
 }
 
 #[test]
 fn test_merge_configs_none_configs_skipped() {
-    let c1 = RunnableConfig::new().with_tags(vec!["a".into()]);
-    let c2 = RunnableConfig::new().with_tags(vec!["b".into()]);
+    let c1 = RunnableConfig::builder().tags(vec!["a".into()]).build();
+    let c2 = RunnableConfig::builder().tags(vec!["b".into()]).build();
     let merged = merge_configs(vec![None, Some(c1), None, Some(c2)]);
     assert!(merged.tags.contains(&"a".to_string()));
     assert!(merged.tags.contains(&"b".to_string()));
@@ -268,10 +272,11 @@ fn test_merge_configs_none_configs_skipped() {
 #[test]
 fn test_merge_configs_run_name_and_run_id() {
     let run_id = uuid::Uuid::new_v4();
-    let c1 = RunnableConfig::new().with_run_name("first");
-    let c2 = RunnableConfig::new()
-        .with_run_name("second")
-        .with_run_id(run_id);
+    let c1 = RunnableConfig::builder().run_name("first").build();
+    let c2 = RunnableConfig::builder()
+        .run_name("second")
+        .run_id(run_id)
+        .build();
     let merged = merge_configs(vec![Some(c1), Some(c2)]);
     assert_eq!(merged.run_name, Some("second".to_string()));
     assert_eq!(merged.run_id, Some(run_id));
@@ -432,9 +437,8 @@ fn test_get_callback_manager_for_config_basic() {
 
 #[test]
 fn test_get_callback_manager_for_config_with_tags_and_metadata() {
-    let config = RunnableConfig::new()
-        .with_tags(vec!["a".into()])
-        .with_metadata(HashMap::from([("k".to_string(), serde_json::json!("v"))]));
+    let mut config = RunnableConfig::builder().tags(vec!["a".into()]).build();
+    config.metadata = HashMap::from([("k".to_string(), serde_json::json!("v"))]);
     let mgr = get_callback_manager_for_config(&config);
     assert!(mgr.inheritable_tags.contains(&"a".to_string()));
     assert_eq!(
@@ -452,9 +456,8 @@ fn test_get_async_callback_manager_for_config_basic() {
 
 #[test]
 fn test_get_async_callback_manager_for_config_with_tags_and_metadata() {
-    let config = RunnableConfig::new()
-        .with_tags(vec!["a".into()])
-        .with_metadata(HashMap::from([("k".to_string(), serde_json::json!("v"))]));
+    let mut config = RunnableConfig::builder().tags(vec!["a".into()]).build();
+    config.metadata = HashMap::from([("k".to_string(), serde_json::json!("v"))]);
     let mgr = get_async_callback_manager_for_config(&config);
 
     let _ = mgr;
@@ -463,7 +466,7 @@ fn test_get_async_callback_manager_for_config_with_tags_and_metadata() {
 #[test]
 fn test_runnable_config_with_run_id() {
     let run_id = uuid::Uuid::new_v4();
-    let config = RunnableConfig::new().with_run_id(run_id);
+    let config = RunnableConfig::builder().run_id(run_id).build();
     assert_eq!(config.run_id, Some(run_id));
 }
 
@@ -471,7 +474,7 @@ fn test_runnable_config_with_run_id() {
 fn test_runnable_config_with_callbacks() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(StdOutCallbackHandler::new());
     let callbacks = Callbacks::from_handlers(vec![handler]);
-    let config = RunnableConfig::new().with_callbacks(callbacks);
+    let config = RunnableConfig::builder().callbacks(callbacks).build();
     assert!(config.callbacks.is_some());
 }
 
@@ -479,13 +482,13 @@ fn test_runnable_config_with_callbacks() {
 fn test_runnable_config_with_configurable() {
     let mut configurable = HashMap::new();
     configurable.insert("model".to_string(), serde_json::json!("gpt-4"));
-    let config = RunnableConfig::new().with_configurable(configurable);
+    let config = RunnableConfig::builder().configurable(configurable).build();
     assert_eq!(config.configurable["model"], serde_json::json!("gpt-4"));
 }
 
 #[test]
 fn test_config_or_list_from_single() {
-    let config = RunnableConfig::new().with_recursion_limit(10);
+    let config = RunnableConfig::builder().recursion_limit(10).build();
     let col: ConfigOrList = config.into();
     match col {
         ConfigOrList::Single(c) => assert_eq!(c.recursion_limit, 10),
@@ -496,8 +499,8 @@ fn test_config_or_list_from_single() {
 #[test]
 fn test_config_or_list_from_vec() {
     let configs = vec![
-        RunnableConfig::new().with_recursion_limit(10),
-        RunnableConfig::new().with_recursion_limit(20),
+        RunnableConfig::builder().recursion_limit(10).build(),
+        RunnableConfig::builder().recursion_limit(20).build(),
     ];
     let col: ConfigOrList = configs.into();
     match col {
@@ -512,11 +515,12 @@ fn test_config_or_list_from_vec() {
 
 #[test]
 fn test_runnable_config_serialization_roundtrip() {
-    let config = RunnableConfig::new()
-        .with_tags(vec!["tag1".into(), "tag2".into()])
-        .with_run_name("test_run")
-        .with_max_concurrency(4)
-        .with_recursion_limit(10);
+    let config = RunnableConfig::builder()
+        .tags(vec!["tag1".into(), "tag2".into()])
+        .run_name("test_run")
+        .max_concurrency(4)
+        .recursion_limit(10)
+        .build();
 
     let json = serde_json::to_string(&config).expect("serialization should succeed");
     let deserialized: RunnableConfig =
@@ -542,17 +546,18 @@ fn test_runnable_config_deserialization_defaults() {
 
 #[test]
 fn test_merge_configs_max_concurrency_last_wins() {
-    let c1 = RunnableConfig::new().with_max_concurrency(2);
-    let c2 = RunnableConfig::new().with_max_concurrency(8);
+    let c1 = RunnableConfig::builder().max_concurrency(2).build();
+    let c2 = RunnableConfig::builder().max_concurrency(8).build();
     let merged = merge_configs(vec![Some(c1), Some(c2)]);
     assert_eq!(merged.max_concurrency, Some(8));
 }
 
 #[test]
 fn test_merge_configs_single_config() {
-    let config = RunnableConfig::new()
-        .with_tags(vec!["only".into()])
-        .with_recursion_limit(42);
+    let config = RunnableConfig::builder()
+        .tags(vec!["only".into()])
+        .recursion_limit(42)
+        .build();
     let merged = merge_configs(vec![Some(config)]);
     assert_eq!(merged.tags, vec!["only"]);
     assert_eq!(merged.recursion_limit, 42);
@@ -567,7 +572,9 @@ fn test_merge_configs_all_none() {
 
 #[test]
 fn test_patch_config_preserves_existing_tags() {
-    let config = RunnableConfig::new().with_tags(vec!["existing".into()]);
+    let config = RunnableConfig::builder()
+        .tags(vec!["existing".into()])
+        .build();
     let patched = patch_config(Some(config), None, None, None, None, None);
     assert_eq!(patched.tags, vec!["existing"]);
 }
@@ -575,10 +582,11 @@ fn test_patch_config_preserves_existing_tags() {
 #[test]
 fn test_patch_config_preserves_callbacks_when_not_replaced() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(StdOutCallbackHandler::new());
-    let config = RunnableConfig::new()
-        .with_callbacks(Callbacks::from_handlers(vec![handler]))
-        .with_run_name("keep_me")
-        .with_run_id(uuid::Uuid::new_v4());
+    let config = RunnableConfig::builder()
+        .callbacks(Callbacks::from_handlers(vec![handler]))
+        .run_name("keep_me")
+        .run_id(uuid::Uuid::new_v4())
+        .build();
 
     let patched = patch_config(Some(config), None, None, None, Some(99), None);
 
@@ -589,9 +597,10 @@ fn test_patch_config_preserves_callbacks_when_not_replaced() {
 
 #[test]
 fn test_get_config_list_single_with_length_one() {
-    let config = RunnableConfig::new()
-        .with_recursion_limit(42)
-        .with_tags(vec!["solo".into()]);
+    let config = RunnableConfig::builder()
+        .recursion_limit(42)
+        .tags(vec!["solo".into()])
+        .build();
     let configs = get_config_list(Some(ConfigOrList::Single(Box::new(config))), 1).unwrap();
     assert_eq!(configs.len(), 1);
     assert_eq!(configs[0].recursion_limit, 42);
@@ -607,12 +616,13 @@ fn test_get_config_list_empty_list() {
 #[test]
 fn test_get_config_list_preserves_all_fields() {
     let run_id = uuid::Uuid::new_v4();
-    let config = RunnableConfig::new()
-        .with_tags(vec!["t1".into()])
-        .with_run_name("run")
-        .with_max_concurrency(3)
-        .with_recursion_limit(15)
-        .with_run_id(run_id);
+    let config = RunnableConfig::builder()
+        .tags(vec!["t1".into()])
+        .run_name("run")
+        .max_concurrency(3)
+        .recursion_limit(15)
+        .run_id(run_id)
+        .build();
 
     let configs = get_config_list(Some(ConfigOrList::Single(Box::new(config))), 1).unwrap();
     assert_eq!(configs.len(), 1);

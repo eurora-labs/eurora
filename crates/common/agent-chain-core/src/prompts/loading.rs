@@ -218,7 +218,12 @@ fn load_few_shot_prompt(
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
-    let few_shot = FewShotPromptTemplate::new(examples, example_prompt, suffix, prefix)?;
+    let few_shot = FewShotPromptTemplate::builder()
+        .examples(examples)
+        .example_prompt(example_prompt)
+        .suffix(suffix)
+        .maybe_prefix(prefix)
+        .build()?;
 
     Ok(Box::new(few_shot))
 }

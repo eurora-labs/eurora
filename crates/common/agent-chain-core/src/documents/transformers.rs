@@ -38,7 +38,10 @@ mod tests {
             Ok(documents
                 .into_iter()
                 .map(|doc| {
-                    Document::new(doc.page_content.to_uppercase()).with_metadata(doc.metadata)
+                    Document::builder()
+                        .page_content(doc.page_content.to_uppercase())
+                        .metadata(doc.metadata)
+                        .build()
                 })
                 .collect())
         }
@@ -47,7 +50,10 @@ mod tests {
     #[test]
     fn test_transform_documents() {
         let transformer = UppercaseTransformer;
-        let documents = vec![Document::new("hello world"), Document::new("goodbye world")];
+        let documents = vec![
+            Document::builder().page_content("hello world").build(),
+            Document::builder().page_content("goodbye world").build(),
+        ];
 
         let result = transformer
             .transform_documents(documents, HashMap::new())
@@ -61,7 +67,7 @@ mod tests {
     #[tokio::test]
     async fn test_atransform_documents() {
         let transformer = UppercaseTransformer;
-        let documents = vec![Document::new("hello world")];
+        let documents = vec![Document::builder().page_content("hello world").build()];
 
         let result = transformer
             .atransform_documents(documents, HashMap::new())

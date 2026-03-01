@@ -11,7 +11,9 @@ use serde_json::json;
 
 #[tokio::test]
 async fn test_batch() {
-    let llm = FakeListLLM::new(vec!["foo".to_string(); 3]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["foo".to_string(); 3])
+        .build();
     let output = llm
         .batch(
             vec![
@@ -28,7 +30,9 @@ async fn test_batch() {
 
 #[tokio::test]
 async fn test_abatch() {
-    let llm = FakeListLLM::new(vec!["foo".to_string(); 3]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["foo".to_string(); 3])
+        .build();
     let output = llm
         .batch(
             vec![
@@ -45,21 +49,27 @@ async fn test_abatch() {
 
 #[tokio::test]
 async fn test_batch_empty_inputs_returns_empty_list() {
-    let llm = FakeListLLM::new(vec!["a".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["a".to_string()])
+        .build();
     let result = llm.batch(vec![], None).await.unwrap();
     assert!(result.is_empty());
 }
 
 #[tokio::test]
 async fn test_abatch_empty_inputs_returns_empty_list() {
-    let llm = FakeListLLM::new(vec!["a".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["a".to_string()])
+        .build();
     let result = llm.batch(vec![], None).await.unwrap();
     assert!(result.is_empty());
 }
 
 #[test]
 fn test_convert_string_input() {
-    let llm = FakeListLLM::new(vec!["r".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["r".to_string()])
+        .build();
     let result = llm
         .convert_input(LanguageModelInput::from("hello world"))
         .unwrap();
@@ -70,7 +80,9 @@ fn test_convert_string_input() {
 fn test_convert_prompt_value_input() {
     use agent_chain_core::prompt_values::StringPromptValue;
 
-    let llm = FakeListLLM::new(vec!["r".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["r".to_string()])
+        .build();
     let pv = StringPromptValue::new("already a prompt value");
     let result = llm.convert_input(LanguageModelInput::from(pv)).unwrap();
     assert_eq!(result, "already a prompt value");
@@ -80,7 +92,9 @@ fn test_convert_prompt_value_input() {
 fn test_convert_message_sequence_input() {
     use agent_chain_core::messages::{BaseMessage, HumanMessage};
 
-    let llm = FakeListLLM::new(vec!["r".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["r".to_string()])
+        .build();
     let messages = vec![BaseMessage::Human(
         HumanMessage::builder().content("hi").build(),
     )];
@@ -92,7 +106,9 @@ fn test_convert_message_sequence_input() {
 
 #[tokio::test]
 async fn test_generate_single_prompt() {
-    let llm = FakeListLLM::new(vec!["result".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["result".to_string()])
+        .build();
     let result = llm
         .generate_prompts(vec!["prompt1".to_string()], None, None)
         .await
@@ -106,11 +122,13 @@ async fn test_generate_single_prompt() {
 
 #[tokio::test]
 async fn test_generate_multiple_prompts() {
-    let llm = FakeListLLM::new(vec![
-        "out1".to_string(),
-        "out2".to_string(),
-        "out3".to_string(),
-    ]);
+    let llm = FakeListLLM::builder()
+        .responses(vec![
+            "out1".to_string(),
+            "out2".to_string(),
+            "out3".to_string(),
+        ])
+        .build();
     let result = llm
         .generate_prompts(
             vec!["p1".to_string(), "p2".to_string(), "p3".to_string()],
@@ -127,14 +145,18 @@ async fn test_generate_multiple_prompts() {
 
 #[tokio::test]
 async fn test_generate_empty_prompts() {
-    let llm = FakeListLLM::new(vec!["out".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["out".to_string()])
+        .build();
     let result = llm.generate_prompts(vec![], None, None).await.unwrap();
     assert_eq!(result.generations.len(), 0);
 }
 
 #[tokio::test]
 async fn test_agenerate_single_prompt() {
-    let llm = FakeListLLM::new(vec!["async_result".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["async_result".to_string()])
+        .build();
     let result = llm
         .generate_prompts(vec!["prompt1".to_string()], None, None)
         .await
@@ -148,7 +170,9 @@ async fn test_agenerate_single_prompt() {
 
 #[tokio::test]
 async fn test_agenerate_multiple_prompts() {
-    let llm = FakeListLLM::new(vec!["out1".to_string(), "out2".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["out1".to_string(), "out2".to_string()])
+        .build();
     let result = llm
         .generate_prompts(vec!["p1".to_string(), "p2".to_string()], None, None)
         .await
@@ -164,7 +188,9 @@ async fn test_agenerate_multiple_prompts() {
 
 #[tokio::test]
 async fn test_astream_fallback_to_ainvoke() {
-    let llm = FakeListLLM::new(vec!["hello".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["hello".to_string()])
+        .build();
     let mut stream = llm
         .stream_prompt("anything".to_string(), None, None)
         .await
@@ -179,7 +205,9 @@ async fn test_astream_fallback_to_ainvoke() {
 
 #[tokio::test]
 async fn test_astream_implementation_uses_stream() {
-    let llm = FakeStreamingListLLM::new(vec!["ab".to_string()]);
+    let llm = FakeStreamingListLLM::builder()
+        .responses(vec!["ab".to_string()])
+        .build();
     let mut stream = llm
         .stream_prompt("anything".to_string(), None, None)
         .await
@@ -194,7 +222,9 @@ async fn test_astream_implementation_uses_stream() {
 
 #[test]
 fn test_get_ls_params() {
-    let llm = FakeListLLM::new(vec!["foo".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["foo".to_string()])
+        .build();
 
     let params = llm.get_llm_ls_params(None);
     assert_eq!(params.ls_model_type, Some("llm".to_string()));
@@ -233,7 +263,7 @@ fn test_get_prompts_with_cache_partial_hit() {
     let cache = InMemoryCache::unbounded();
     let params = HashMap::from([("model".to_string(), json!("test"))]);
     let llm_string = serde_json::to_string(&params).unwrap();
-    let cached_generation = vec![Generation::new("cached".to_string())];
+    let cached_generation = vec![Generation::builder().text("cached".to_string()).build()];
     cache.update("p1", &llm_string, cached_generation.clone());
 
     let (existing, _, missing_idxs, missing) =
@@ -250,8 +280,16 @@ fn test_get_prompts_with_cache_all_hit() {
     let cache = InMemoryCache::unbounded();
     let params = HashMap::from([("model".to_string(), json!("test"))]);
     let llm_string = serde_json::to_string(&params).unwrap();
-    cache.update("p1", &llm_string, vec![Generation::new("c1".to_string())]);
-    cache.update("p2", &llm_string, vec![Generation::new("c2".to_string())]);
+    cache.update(
+        "p1",
+        &llm_string,
+        vec![Generation::builder().text("c1".to_string()).build()],
+    );
+    cache.update(
+        "p2",
+        &llm_string,
+        vec![Generation::builder().text("c2".to_string()).build()],
+    );
 
     let (existing, _, missing_idxs, missing) =
         get_prompts_from_cache(&params, &["p1".to_string(), "p2".to_string()], Some(&cache));
@@ -265,14 +303,16 @@ fn test_get_prompts_with_cache_all_hit() {
 fn test_update_cache_stores_results() {
     let cache = InMemoryCache::unbounded();
     let llm_string = "test_llm";
-    let new_results = LLMResult::new(vec![
-        vec![GenerationType::Generation(Generation::new(
-            "r1".to_string(),
-        ))],
-        vec![GenerationType::Generation(Generation::new(
-            "r2".to_string(),
-        ))],
-    ]);
+    let new_results = LLMResult::builder()
+        .generations(vec![
+            vec![GenerationType::Generation(
+                Generation::builder().text("r1".to_string()).build(),
+            )],
+            vec![GenerationType::Generation(
+                Generation::builder().text("r2".to_string()).build(),
+            )],
+        ])
+        .build();
     let mut existing: HashMap<usize, Vec<Generation>> = HashMap::new();
 
     let _ = update_cache(
@@ -293,9 +333,11 @@ fn test_update_cache_stores_results() {
 
 #[test]
 fn test_update_cache_with_none_does_not_store() {
-    let new_results = LLMResult::new(vec![vec![GenerationType::Generation(Generation::new(
-        "r1".to_string(),
-    ))]]);
+    let new_results = LLMResult::builder()
+        .generations(vec![vec![GenerationType::Generation(
+            Generation::builder().text("r1".to_string()).build(),
+        )]])
+        .build();
     let mut existing: HashMap<usize, Vec<Generation>> = HashMap::new();
 
     let _ = update_cache(
@@ -312,7 +354,9 @@ fn test_update_cache_with_none_does_not_store() {
 
 #[tokio::test]
 async fn test_generate_prompt_converts_prompt_values() {
-    let llm = FakeListLLM::new(vec!["resp1".to_string(), "resp2".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["resp1".to_string(), "resp2".to_string()])
+        .build();
     let result = llm
         .generate_prompt(
             vec![
@@ -337,7 +381,9 @@ async fn test_generate_prompt_converts_prompt_values() {
 
 #[tokio::test]
 async fn test_agenerate_prompt_converts_prompt_values() {
-    let llm = FakeListLLM::new(vec!["async_resp".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["async_resp".to_string()])
+        .build();
     let result = llm
         .generate_prompt(vec![LanguageModelInput::from("hello")], None, None)
         .await
@@ -353,7 +399,9 @@ async fn test_agenerate_prompt_converts_prompt_values() {
 async fn test_generate_prompt_with_message_input() {
     use agent_chain_core::messages::{BaseMessage, HumanMessage};
 
-    let llm = FakeListLLM::new(vec!["chat_resp".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["chat_resp".to_string()])
+        .build();
     let messages = vec![BaseMessage::Human(
         HumanMessage::builder().content("hi there").build(),
     )];
@@ -370,14 +418,18 @@ async fn test_generate_prompt_with_message_input() {
 
 #[test]
 fn test_str_representation() {
-    let llm = FakeListLLM::new(vec!["foo".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["foo".to_string()])
+        .build();
     let result = format!("{:?}", llm);
     assert!(result.contains("FakeListLLM"));
 }
 
 #[test]
 fn test_dict_contains_type_and_identifying_params() {
-    let llm = FakeListLLM::new(vec!["a".to_string(), "b".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["a".to_string(), "b".to_string()])
+        .build();
     let params = llm.identifying_params();
     assert!(params.contains_key("_type"));
     assert_eq!(params["_type"], json!("fake-list"));
@@ -387,7 +439,9 @@ fn test_dict_contains_type_and_identifying_params() {
 
 #[tokio::test]
 async fn test_invoke() {
-    let llm = FakeListLLM::new(vec!["hello".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["hello".to_string()])
+        .build();
     let result = llm
         .invoke(LanguageModelInput::from("prompt"), None)
         .await
@@ -397,7 +451,9 @@ async fn test_invoke() {
 
 #[tokio::test]
 async fn test_call_method() {
-    let llm = FakeListLLM::new(vec!["direct".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["direct".to_string()])
+        .build();
     let result = llm.call("prompt".to_string(), None, None).await.unwrap();
     assert_eq!(result, "direct");
 }
@@ -527,7 +583,9 @@ fn test_resolve_cache_false() {
 
 #[tokio::test]
 async fn test_batch_with_exceptions() {
-    let llm = FakeListLLM::new(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()])
+        .build();
     let results = llm
         .batch_with_exceptions(
             vec![
@@ -550,7 +608,9 @@ async fn test_batch_with_exceptions() {
 fn test_save_json() {
     use agent_chain_core::language_models::save_llm;
 
-    let llm = FakeListLLM::new(vec!["a".to_string(), "b".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["a".to_string(), "b".to_string()])
+        .build();
     let params = llm.identifying_params();
 
     let dir = std::env::temp_dir().join(format!("test_save_{}", uuid::Uuid::new_v4()));
@@ -572,7 +632,9 @@ fn test_save_json() {
 fn test_save_invalid_extension_raises() {
     use agent_chain_core::language_models::save_llm;
 
-    let llm = FakeListLLM::new(vec!["a".to_string()]);
+    let llm = FakeListLLM::builder()
+        .responses(vec!["a".to_string()])
+        .build();
     let params = llm.identifying_params();
 
     let dir = std::env::temp_dir().join(format!("test_save_{}", uuid::Uuid::new_v4()));
