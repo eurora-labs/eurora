@@ -67,6 +67,8 @@ pub trait SystemApi {
         app_handle: tauri::AppHandle<R>,
         ollama_model: String,
     ) -> Result<LocalBackendInfo, String>;
+
+    async fn get_browser_connection_count() -> Result<usize, String>;
 }
 
 fn resolve_docker_compose_path<R: Runtime>(
@@ -470,6 +472,12 @@ impl SystemApi for SystemApiImpl {
             http_port,
             postgres_port,
         })
+    }
+
+    async fn get_browser_connection_count(self) -> Result<usize, String> {
+        let service = euro_browser::BrowserBridgeService::get_or_init().await;
+        let count = service.connection_count().await;
+        Ok(count)
     }
 }
 
