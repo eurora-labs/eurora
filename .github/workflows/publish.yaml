@@ -336,6 +336,36 @@ jobs:
                     --dist                       "./release" \
                     --version                    "$RELEASE_VERSION"
 
+            - name: Sign Windows executables with Azure Trusted Signing
+              if: runner.os == 'Windows'
+              uses: azure/trusted-signing-action@87c2e83e6868da99d3380aa309851b32ed9a8346 # v1.1.0
+              with:
+                  azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+                  azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+                  azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+                  endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+                  trusted-signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
+                  certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
+                  files-folder: ${{ github.workspace }}/release
+                  files-folder-filter: exe
+                  files-folder-recurse: true
+                  file-digest: SHA256
+                  timestamp-rfc3161: http://timestamp.acs.microsoft.com
+                  timestamp-digest: SHA256
+
+            - name: Re-sign code-signed exe with Tauri updater key
+              if: runner.os == 'Windows'
+              shell: bash
+              env:
+                  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+                  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+              run: |
+                  for exe in release/windows/x86_64/*.exe; do
+                    [ -f "$exe" ] || continue
+                    rm -f "${exe}.sig"
+                    pnpm tauri signer sign "$exe"
+                  done
+
             - name: Import Apple certificate
               if: runner.os == 'macOS'
               shell: bash
