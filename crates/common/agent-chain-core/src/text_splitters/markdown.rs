@@ -121,7 +121,7 @@ impl MarkdownHeaderTextSplitter {
                 if last.metadata == line.metadata {
                     true
                 } else if last.metadata.len() < line.metadata.len() && !self.strip_headers {
-                    if let Some(last_line) = last.content.split('\n').last() {
+                    if let Some(last_line) = last.content.split('\n').next_back() {
                         last_line.starts_with('#')
                     } else {
                         false

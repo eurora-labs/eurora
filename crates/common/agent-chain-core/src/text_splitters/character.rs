@@ -63,12 +63,12 @@ impl RecursiveCharacterTextSplitter {
                 separator = s.clone();
                 break;
             }
-            if let Ok(re) = Regex::new(&separator_pattern) {
-                if re.is_match(text).unwrap_or(false) {
-                    separator = s.clone();
-                    new_separators = &separators[i + 1..];
-                    break;
-                }
+            if let Ok(re) = Regex::new(&separator_pattern)
+                && re.is_match(text).unwrap_or(false)
+            {
+                separator = s.clone();
+                new_separators = &separators[i + 1..];
+                break;
             }
         }
 

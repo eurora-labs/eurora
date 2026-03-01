@@ -32,17 +32,12 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum KeepSeparator {
+    #[default]
     None,
     Start,
     End,
-}
-
-impl Default for KeepSeparator {
-    fn default() -> Self {
-        KeepSeparator::None
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

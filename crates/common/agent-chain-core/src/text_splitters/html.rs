@@ -77,10 +77,10 @@ impl HTMLHeaderTextSplitter {
             let dom_depth = element_ref.ancestors().count();
 
             if self.header_tags.contains(&tag_name) {
-                if !self.return_each_element {
-                    if let Some(doc) = finalize_chunk(&mut current_chunk, &active_headers) {
-                        results.push(doc);
-                    }
+                if !self.return_each_element
+                    && let Some(doc) = finalize_chunk(&mut current_chunk, &active_headers)
+                {
+                    results.push(doc);
                 }
 
                 let level = tag_name[1..].parse::<u32>().unwrap_or(9999);
@@ -115,10 +115,10 @@ impl HTMLHeaderTextSplitter {
             }
         }
 
-        if !self.return_each_element {
-            if let Some(doc) = finalize_chunk(&mut current_chunk, &active_headers) {
-                results.push(doc);
-            }
+        if !self.return_each_element
+            && let Some(doc) = finalize_chunk(&mut current_chunk, &active_headers)
+        {
+            results.push(doc);
         }
 
         results
@@ -302,8 +302,7 @@ impl HTMLSectionSplitter {
             let section_text: Vec<&str> = all_text_nodes
                 .iter()
                 .filter(|(elem_idx, _)| {
-                    *elem_idx >= *target_idx
-                        && next_target_idx.map_or(true, |next| *elem_idx < next)
+                    *elem_idx >= *target_idx && next_target_idx.is_none_or(|next| *elem_idx < next)
                 })
                 .map(|(_, text)| text.as_str())
                 .collect();
@@ -330,12 +329,11 @@ struct HtmlSection {
 
 /// Recursively collect nodes that have font-size > 20px in their style attribute.
 fn collect_font_size_nodes(node: &libxml::tree::Node, result: &mut Vec<libxml::tree::Node>) {
-    if let Some(style) = node.get_attribute("style") {
-        if let Some(font_size) = extract_font_size_px(&style) {
-            if font_size > 20.0 {
-                result.push(node.clone());
-            }
-        }
+    if let Some(style) = node.get_attribute("style")
+        && let Some(font_size) = extract_font_size_px(&style)
+        && font_size > 20.0
+    {
+        result.push(node.clone());
     }
     for child in node.get_child_elements() {
         collect_font_size_nodes(&child, result);
