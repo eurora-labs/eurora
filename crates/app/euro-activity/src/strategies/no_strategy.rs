@@ -4,6 +4,7 @@
 //! (Eurora) to avoid unnecessary snapshot retrieval calls.
 
 use async_trait::async_trait;
+use euro_process::EuroraNightly;
 use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -24,7 +25,7 @@ pub struct NoStrategy;
 #[async_trait]
 impl StrategySupport for NoStrategy {
     fn get_supported_processes() -> Vec<&'static str> {
-        vec![Eurora.get_name()]
+        vec![Eurora.get_name(), EuroraNightly.get_name()]
     }
 
     async fn create() -> ActivityResult<ActivityStrategy> {
