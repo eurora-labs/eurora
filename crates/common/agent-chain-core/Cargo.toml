@@ -31,6 +31,8 @@ uuid = { workspace = true, features = ["serde", "v4", "v5", "v7"] }
 sha1 = { workspace = true }
 sha2 = { workspace = true }
 blake2 = { workspace = true }
+tiktoken-rs = { version = "0.9", optional = true }
+fancy-regex = "0.17"
 
 [dev-dependencies]
 serial_test = "3"
@@ -39,3 +41,4 @@ tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "time"] 
 
 [features]
 default = []
+tiktoken = ["tiktoken-rs"]

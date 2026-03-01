@@ -1,7 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 
 use async_trait::async_trait;
-use regex::Regex;
+use fancy_regex::Regex;
 use serde_json::Value;
 
 use crate::documents::{BaseDocumentTransformer, Document};
@@ -21,67 +21,72 @@ pub fn split_text_with_regex(
         Err(_) => return vec![text.to_string()],
     };
 
+    let matches: Vec<_> = regex.find_iter(text).filter_map(|m| m.ok()).collect();
+    if matches.is_empty() {
+        return if text.is_empty() {
+            vec![]
+        } else {
+            vec![text.to_string()]
+        };
+    }
+
+    let mut splits = Vec::new();
+
     match keep_separator {
-        KeepSeparator::None => regex
-            .split(text)
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
-            .collect(),
-
-        KeepSeparator::Start | KeepSeparator::End => {
-            let matches: Vec<_> = regex.find_iter(text).collect();
-            if matches.is_empty() {
-                return if text.is_empty() {
-                    vec![]
+        KeepSeparator::None => {
+            let mut last_end = 0;
+            for m in &matches {
+                let piece = &text[last_end..m.start()];
+                if !piece.is_empty() {
+                    splits.push(piece.to_string());
+                }
+                last_end = m.end();
+            }
+            if last_end < text.len() {
+                let remainder = &text[last_end..];
+                if !remainder.is_empty() {
+                    splits.push(remainder.to_string());
+                }
+            }
+        }
+        KeepSeparator::End => {
+            let mut last_end = 0;
+            for m in &matches {
+                let piece = &text[last_end..m.end()];
+                if !piece.is_empty() {
+                    splits.push(piece.to_string());
+                }
+                last_end = m.end();
+            }
+            if last_end < text.len() {
+                let remainder = &text[last_end..];
+                if !remainder.is_empty() {
+                    splits.push(remainder.to_string());
+                }
+            }
+        }
+        KeepSeparator::Start => {
+            if matches[0].start() > 0 {
+                let prefix = &text[..matches[0].start()];
+                if !prefix.is_empty() {
+                    splits.push(prefix.to_string());
+                }
+            }
+            for (i, m) in matches.iter().enumerate() {
+                let end = if i + 1 < matches.len() {
+                    matches[i + 1].start()
                 } else {
-                    vec![text.to_string()]
+                    text.len()
                 };
-            }
-
-            let mut splits = Vec::new();
-
-            match keep_separator {
-                KeepSeparator::End => {
-                    let mut last_end = 0;
-                    for m in &matches {
-                        let piece = &text[last_end..m.end()];
-                        if !piece.is_empty() {
-                            splits.push(piece.to_string());
-                        }
-                        last_end = m.end();
-                    }
-                    if last_end < text.len() {
-                        let remainder = &text[last_end..];
-                        if !remainder.is_empty() {
-                            splits.push(remainder.to_string());
-                        }
-                    }
+                let piece = &text[m.start()..end];
+                if !piece.is_empty() {
+                    splits.push(piece.to_string());
                 }
-                KeepSeparator::Start => {
-                    if matches[0].start() > 0 {
-                        let prefix = &text[..matches[0].start()];
-                        if !prefix.is_empty() {
-                            splits.push(prefix.to_string());
-                        }
-                    }
-                    for (i, m) in matches.iter().enumerate() {
-                        let end = if i + 1 < matches.len() {
-                            matches[i + 1].start()
-                        } else {
-                            text.len()
-                        };
-                        let piece = &text[m.start()..end];
-                        if !piece.is_empty() {
-                            splits.push(piece.to_string());
-                        }
-                    }
-                }
-                KeepSeparator::None => unreachable!(),
             }
-
-            splits.into_iter().filter(|s| !s.is_empty()).collect()
         }
     }
+
+    splits
 }
 
 pub fn join_docs(docs: &[String], separator: &str, strip_whitespace: bool) -> Option<String> {

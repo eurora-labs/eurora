@@ -144,6 +144,9 @@ pub use text_splitters::{
     Tokenizer, split_text_on_tokens,
 };
 
+#[cfg(feature = "tiktoken")]
+pub use text_splitters::{TokenTextSplitter, resolve_tiktoken_bpe, tiktoken_length_function};
+
 pub use retrievers::{BaseRetriever, LangSmithRetrieverParams, RetrieverInput, RetrieverOutput};
 
 pub use stores::{

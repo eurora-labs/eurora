@@ -83,29 +83,34 @@ impl MarkdownHeaderTextSplitter {
     }
 
     fn is_custom_header(&self, line: &str, sep: &str) -> bool {
-        let level = match self.custom_header_patterns.get(sep) {
-            Some(level) => *level,
+        if !self.custom_header_patterns.contains_key(sep) {
+            return false;
+        }
+        let sep_len = sep.len();
+        if line.len() < sep_len * 2 + 1 || !line.starts_with(sep) || !line.ends_with(sep) {
+            return false;
+        }
+        let sep_first_char = match sep.chars().next() {
+            Some(c) => c,
             Option::None => return false,
         };
-        let _ = level;
-
-        let escaped_sep = regex::escape(sep);
-        let pattern =
-            format!("^{escaped_sep}(?!{escaped_sep})(.+?)(?<!{escaped_sep}){escaped_sep}$");
-
-        if let Ok(re) = Regex::new(&pattern) {
-            if let Some(captures) = re.captures(line) {
-                if let Some(content_match) = captures.get(1) {
-                    let content = content_match.as_str().trim();
-                    if !content.is_empty() {
-                        let only_sep_chars =
-                            content.replace(' ', "").chars().all(|c| sep.contains(c));
-                        return !only_sep_chars;
-                    }
-                }
-            }
+        // The char immediately after the opening sep must NOT be the same as sep's first char
+        // (to distinguish ** from ***)
+        if line[sep_len..].starts_with(sep_first_char) {
+            return false;
         }
-        false
+        // The char immediately before the closing sep must NOT be the same
+        let before_closing = line.len() - sep_len;
+        if before_closing > 0 && line[..before_closing].ends_with(sep_first_char) {
+            return false;
+        }
+        let inner = &line[sep_len..line.len() - sep_len];
+        let inner = inner.trim();
+        if inner.is_empty() {
+            return false;
+        }
+        let only_sep_chars = inner.replace(' ', "").chars().all(|c| sep.contains(c));
+        !only_sep_chars
     }
 
     pub fn aggregate_lines_to_chunks(&self, lines: Vec<LineType>) -> Vec<Document> {
@@ -172,7 +177,21 @@ impl MarkdownHeaderTextSplitter {
             let stripped_line = line.trim();
             let stripped_line: String = stripped_line
                 .chars()
-                .filter(|c| !c.is_control() || *c == '\t' || *c == '\n')
+                .filter(|c| {
+                    if *c == '\t' || *c == '\n' {
+                        return true;
+                    }
+                    if c.is_control() {
+                        return false;
+                    }
+                    // Filter common Unicode format characters (Cf category)
+                    // to match Python's str.isprintable() behavior
+                    !matches!(*c, '\u{ad}' | '\u{600}'..='\u{605}' | '\u{61c}' |
+                        '\u{6dd}' | '\u{70f}' | '\u{180e}' |
+                        '\u{200b}'..='\u{200f}' | '\u{202a}'..='\u{202e}' |
+                        '\u{2060}'..='\u{2064}' | '\u{2066}'..='\u{206f}' |
+                        '\u{feff}' | '\u{fff9}'..='\u{fffb}')
+                })
                 .collect();
 
             if !in_code_block {
@@ -342,10 +361,10 @@ impl ExperimentalMarkdownSyntaxTextSplitter {
 
     fn match_code(line: &str) -> Option<String> {
         if let Some(rest) = line.strip_prefix("```") {
-            return Some(rest.to_string());
+            return Some(rest.trim().to_string());
         }
         if let Some(rest) = line.strip_prefix("~~~") {
-            return Some(rest.to_string());
+            return Some(rest.trim().to_string());
         }
         Option::None
     }
