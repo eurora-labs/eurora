@@ -1,3 +1,4 @@
+mod test_html;
 mod test_json;
 mod test_jsx;
 mod test_markdown;

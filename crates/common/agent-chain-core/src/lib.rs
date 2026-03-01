@@ -138,10 +138,10 @@ pub use documents::{
 
 pub use text_splitters::{
     CharacterTextSplitter, CharacterTextSplitterConfig, ExperimentalMarkdownSyntaxTextSplitter,
-    JSFrameworkTextSplitter, KeepSeparator, Language, LatexTextSplitter, LengthFunction,
-    MarkdownHeaderTextSplitter, MarkdownTextSplitter, PythonCodeTextSplitter,
-    RecursiveCharacterTextSplitter, RecursiveJsonSplitter, TextSplitter, TextSplitterConfig,
-    Tokenizer, split_text_on_tokens,
+    HTMLHeaderTextSplitter, HTMLSectionSplitter, JSFrameworkTextSplitter, KeepSeparator, Language,
+    LatexTextSplitter, LengthFunction, MarkdownHeaderTextSplitter, MarkdownTextSplitter,
+    PythonCodeTextSplitter, RecursiveCharacterTextSplitter, RecursiveJsonSplitter, TextSplitter,
+    TextSplitterConfig, Tokenizer, split_text_on_tokens,
 };
 
 #[cfg(feature = "tiktoken")]
