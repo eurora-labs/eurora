@@ -26,7 +26,9 @@ fn test_md_header_text_splitter_1() {
         ("#".to_string(), "Header 1".to_string()),
         ("##".to_string(), "Header 2".to_string()),
     ];
-    let splitter = MarkdownHeaderTextSplitter::new(headers, false, true, None);
+    let splitter = MarkdownHeaderTextSplitter::builder()
+        .headers_to_split_on(headers)
+        .build();
     let output = splitter.split_text(markdown_document).unwrap();
 
     assert_eq!(
@@ -52,7 +54,9 @@ fn test_md_header_text_splitter_2() {
         ("##".to_string(), "Header 2".to_string()),
         ("###".to_string(), "Header 3".to_string()),
     ];
-    let splitter = MarkdownHeaderTextSplitter::new(headers, false, true, None);
+    let splitter = MarkdownHeaderTextSplitter::builder()
+        .headers_to_split_on(headers)
+        .build();
     let output = splitter.split_text(markdown_document).unwrap();
 
     assert_eq!(
@@ -87,7 +91,9 @@ fn test_md_header_text_splitter_3() {
         ("###".to_string(), "Header 3".to_string()),
         ("####".to_string(), "Header 4".to_string()),
     ];
-    let splitter = MarkdownHeaderTextSplitter::new(headers, false, true, None);
+    let splitter = MarkdownHeaderTextSplitter::builder()
+        .headers_to_split_on(headers)
+        .build();
     let output = splitter.split_text(markdown_document).unwrap();
 
     assert_eq!(
@@ -126,7 +132,10 @@ fn test_md_header_text_splitter_3() {
 fn test_md_header_text_splitter_preserve_headers_1() {
     let markdown_document = "# Foo\n\n    ## Bat\n\nHi this is Jim\n\nHi Joe\n\n## Baz\n\n# Bar\n\nThis is Alice\n\nThis is Bob";
     let headers = vec![("#".to_string(), "Header 1".to_string())];
-    let splitter = MarkdownHeaderTextSplitter::new(headers, false, false, None);
+    let splitter = MarkdownHeaderTextSplitter::builder()
+        .headers_to_split_on(headers)
+        .strip_headers(false)
+        .build();
     let output = splitter.split_text(markdown_document).unwrap();
 
     assert_eq!(
@@ -152,7 +161,10 @@ fn test_md_header_text_splitter_preserve_headers_2() {
         ("##".to_string(), "Header 2".to_string()),
         ("###".to_string(), "Header 3".to_string()),
     ];
-    let splitter = MarkdownHeaderTextSplitter::new(headers, false, false, None);
+    let splitter = MarkdownHeaderTextSplitter::builder()
+        .headers_to_split_on(headers)
+        .strip_headers(false)
+        .build();
     let output = splitter.split_text(markdown_document).unwrap();
 
     assert_eq!(
@@ -187,7 +199,9 @@ fn test_md_header_text_splitter_fenced_code_block_backticks() {
         ("#".to_string(), "Header 1".to_string()),
         ("##".to_string(), "Header 2".to_string()),
     ];
-    let splitter = MarkdownHeaderTextSplitter::new(headers, false, true, None);
+    let splitter = MarkdownHeaderTextSplitter::builder()
+        .headers_to_split_on(headers)
+        .build();
     let output = splitter.split_text(markdown_document).unwrap();
 
     assert_eq!(
@@ -206,7 +220,9 @@ fn test_md_header_text_splitter_fenced_code_block_tildes() {
         ("#".to_string(), "Header 1".to_string()),
         ("##".to_string(), "Header 2".to_string()),
     ];
-    let splitter = MarkdownHeaderTextSplitter::new(headers, false, true, None);
+    let splitter = MarkdownHeaderTextSplitter::builder()
+        .headers_to_split_on(headers)
+        .build();
     let output = splitter.split_text(markdown_document).unwrap();
 
     assert_eq!(
@@ -226,7 +242,9 @@ fn test_md_header_text_splitter_fenced_code_block_interleaved_backticks_tildes()
         ("#".to_string(), "Header 1".to_string()),
         ("##".to_string(), "Header 2".to_string()),
     ];
-    let splitter = MarkdownHeaderTextSplitter::new(headers, false, true, None);
+    let splitter = MarkdownHeaderTextSplitter::builder()
+        .headers_to_split_on(headers)
+        .build();
     let output = splitter.split_text(markdown_document).unwrap();
 
     assert_eq!(
@@ -246,7 +264,9 @@ fn test_md_header_text_splitter_fenced_code_block_interleaved_tildes_backticks()
         ("#".to_string(), "Header 1".to_string()),
         ("##".to_string(), "Header 2".to_string()),
     ];
-    let splitter = MarkdownHeaderTextSplitter::new(headers, false, true, None);
+    let splitter = MarkdownHeaderTextSplitter::builder()
+        .headers_to_split_on(headers)
+        .build();
     let output = splitter.split_text(markdown_document).unwrap();
 
     assert_eq!(
@@ -265,7 +285,9 @@ fn test_md_header_text_splitter_with_invisible_characters() {
         ("#".to_string(), "Header 1".to_string()),
         ("##".to_string(), "Header 2".to_string()),
     ];
-    let splitter = MarkdownHeaderTextSplitter::new(headers, false, true, None);
+    let splitter = MarkdownHeaderTextSplitter::builder()
+        .headers_to_split_on(headers)
+        .build();
     let output = splitter.split_text(markdown_document).unwrap();
 
     assert_eq!(
@@ -286,8 +308,10 @@ fn test_md_header_text_splitter_with_custom_headers() {
     ];
     let custom_header_patterns =
         HashMap::from([("**".to_string(), 1usize), ("***".to_string(), 2usize)]);
-    let splitter =
-        MarkdownHeaderTextSplitter::new(headers, false, true, Some(custom_header_patterns));
+    let splitter = MarkdownHeaderTextSplitter::builder()
+        .headers_to_split_on(headers)
+        .custom_header_patterns(custom_header_patterns)
+        .build();
     let output = splitter.split_text(markdown_document).unwrap();
 
     assert_eq!(
@@ -330,8 +354,10 @@ fn test_md_header_text_splitter_mixed_headers() {
     ];
     let custom_header_patterns =
         HashMap::from([("**".to_string(), 1usize), ("***".to_string(), 2usize)]);
-    let splitter =
-        MarkdownHeaderTextSplitter::new(headers, false, true, Some(custom_header_patterns));
+    let splitter = MarkdownHeaderTextSplitter::builder()
+        .headers_to_split_on(headers)
+        .custom_header_patterns(custom_header_patterns)
+        .build();
     let output = splitter.split_text(markdown_document).unwrap();
 
     assert_eq!(
@@ -371,7 +397,7 @@ const EXPERIMENTAL_MARKDOWN_DOCUMENT: &str = "# My Header 1\nContent for header 
 
 #[test]
 fn test_experimental_markdown_syntax_text_splitter() {
-    let splitter = ExperimentalMarkdownSyntaxTextSplitter::new(None, false, true);
+    let splitter = ExperimentalMarkdownSyntaxTextSplitter::builder().build();
     let output = splitter.split_text(EXPERIMENTAL_MARKDOWN_DOCUMENT).unwrap();
 
     assert_eq!(
@@ -417,7 +443,9 @@ fn test_experimental_markdown_syntax_text_splitter() {
 #[test]
 fn test_experimental_markdown_syntax_text_splitter_header_configuration() {
     let headers = vec![("#".to_string(), "Encabezamiento 1".to_string())];
-    let splitter = ExperimentalMarkdownSyntaxTextSplitter::new(Some(headers), false, true);
+    let splitter = ExperimentalMarkdownSyntaxTextSplitter::builder()
+        .headers_to_split_on(headers)
+        .build();
     let output = splitter.split_text(EXPERIMENTAL_MARKDOWN_DOCUMENT).unwrap();
 
     assert_eq!(
@@ -445,7 +473,9 @@ fn test_experimental_markdown_syntax_text_splitter_header_configuration() {
 
 #[test]
 fn test_experimental_markdown_syntax_text_splitter_with_headers() {
-    let splitter = ExperimentalMarkdownSyntaxTextSplitter::new(None, false, false);
+    let splitter = ExperimentalMarkdownSyntaxTextSplitter::builder()
+        .strip_headers(false)
+        .build();
     let output = splitter.split_text(EXPERIMENTAL_MARKDOWN_DOCUMENT).unwrap();
 
     assert_eq!(
@@ -493,7 +523,9 @@ fn test_experimental_markdown_syntax_text_splitter_with_headers() {
 
 #[test]
 fn test_experimental_markdown_syntax_text_splitter_split_lines() {
-    let splitter = ExperimentalMarkdownSyntaxTextSplitter::new(None, true, true);
+    let splitter = ExperimentalMarkdownSyntaxTextSplitter::builder()
+        .return_each_line(true)
+        .build();
     let output = splitter.split_text(EXPERIMENTAL_MARKDOWN_DOCUMENT).unwrap();
 
     assert_eq!(
@@ -577,7 +609,7 @@ fn experimental_markdown_documents() -> Vec<String> {
 
 #[test]
 fn test_experimental_markdown_syntax_text_splitter_on_multi_files() {
-    let splitter = ExperimentalMarkdownSyntaxTextSplitter::new(None, false, true);
+    let splitter = ExperimentalMarkdownSyntaxTextSplitter::builder().build();
     let mut output = Vec::new();
     for document in experimental_markdown_documents() {
         output.extend(splitter.split_text(&document).unwrap());
@@ -646,7 +678,9 @@ fn test_experimental_markdown_syntax_text_splitter_on_multi_files() {
 
 #[test]
 fn test_experimental_markdown_syntax_text_splitter_split_lines_on_multi_files() {
-    let splitter = ExperimentalMarkdownSyntaxTextSplitter::new(None, true, true);
+    let splitter = ExperimentalMarkdownSyntaxTextSplitter::builder()
+        .return_each_line(true)
+        .build();
     let mut output = Vec::new();
     for document in experimental_markdown_documents() {
         output.extend(splitter.split_text(&document).unwrap());
@@ -771,7 +805,9 @@ fn test_experimental_markdown_syntax_text_splitter_split_lines_on_multi_files() 
 
 #[test]
 fn test_experimental_markdown_syntax_text_splitter_with_header_on_multi_files() {
-    let splitter = ExperimentalMarkdownSyntaxTextSplitter::new(None, false, false);
+    let splitter = ExperimentalMarkdownSyntaxTextSplitter::builder()
+        .strip_headers(false)
+        .build();
     let mut output = Vec::new();
     for document in experimental_markdown_documents() {
         output.extend(splitter.split_text(&document).unwrap());
@@ -841,7 +877,9 @@ fn test_experimental_markdown_syntax_text_splitter_with_header_on_multi_files() 
 #[test]
 fn test_experimental_markdown_syntax_text_splitter_header_config_on_multi_files() {
     let headers = vec![("#".to_string(), "Encabezamiento 1".to_string())];
-    let splitter = ExperimentalMarkdownSyntaxTextSplitter::new(Some(headers), false, true);
+    let splitter = ExperimentalMarkdownSyntaxTextSplitter::builder()
+        .headers_to_split_on(headers)
+        .build();
     let mut output = Vec::new();
     for document in experimental_markdown_documents() {
         output.extend(splitter.split_text(&document).unwrap());

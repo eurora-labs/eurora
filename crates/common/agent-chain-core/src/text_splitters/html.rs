@@ -1,4 +1,5 @@
 use crate::documents::Document;
+use bon::bon;
 use scraper::{Html, Node};
 use std::collections::HashMap;
 
@@ -13,8 +14,13 @@ pub struct HTMLHeaderTextSplitter {
     return_each_element: bool,
 }
 
+#[bon]
 impl HTMLHeaderTextSplitter {
-    pub fn new(headers_to_split_on: Vec<(String, String)>, return_each_element: bool) -> Self {
+    #[builder]
+    pub fn new(
+        headers_to_split_on: Vec<(String, String)>,
+        #[builder(default)] return_each_element: bool,
+    ) -> Self {
         let mut sorted = headers_to_split_on;
         sorted.sort_by_key(|(tag, _)| tag[1..].parse::<u32>().unwrap_or(9999));
         let header_mapping: HashMap<String, String> = sorted.iter().cloned().collect();

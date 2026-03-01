@@ -1,3 +1,4 @@
+use bon::bon;
 use std::collections::HashMap;
 
 use async_trait::async_trait;
@@ -14,7 +15,9 @@ pub struct RecursiveCharacterTextSplitter {
     is_separator_regex: bool,
 }
 
+#[bon]
 impl RecursiveCharacterTextSplitter {
+    #[builder]
     pub fn new(
         separators: Option<Vec<String>>,
         is_separator_regex: Option<bool>,
@@ -583,11 +586,10 @@ mod tests {
     fn test_recursive_character_text_splitter_keep_separator_start() {
         let config =
             TextSplitterConfig::new(10, 0, None, Some(KeepSeparator::Start), None, None).unwrap();
-        let splitter = RecursiveCharacterTextSplitter::new(
-            Some(vec![",".to_string(), ".".to_string()]),
-            None,
-            config,
-        );
+        let splitter = RecursiveCharacterTextSplitter::builder()
+            .separators(vec![",".to_string(), ".".to_string()])
+            .config(config)
+            .build();
         let result = splitter
             .split_text("Apple,banana,orange and tomato.")
             .unwrap();
@@ -598,11 +600,10 @@ mod tests {
     fn test_recursive_character_text_splitter_keep_separator_end() {
         let config =
             TextSplitterConfig::new(10, 0, None, Some(KeepSeparator::End), None, None).unwrap();
-        let splitter = RecursiveCharacterTextSplitter::new(
-            Some(vec![",".to_string(), ".".to_string()]),
-            None,
-            config,
-        );
+        let splitter = RecursiveCharacterTextSplitter::builder()
+            .separators(vec![",".to_string(), ".".to_string()])
+            .config(config)
+            .build();
         let result = splitter
             .split_text("Apple,banana,orange and tomato.")
             .unwrap();
@@ -612,7 +613,9 @@ mod tests {
     #[test]
     fn test_recursive_character_text_splitter_basic() {
         let config = TextSplitterConfig::new(10, 1, None, None, None, None).unwrap();
-        let splitter = RecursiveCharacterTextSplitter::new(None, None, config);
+        let splitter = RecursiveCharacterTextSplitter::builder()
+            .config(config)
+            .build();
         let text =
             "Hi.\n\nI'm Harrison.\n\nHow? Are? You?\nOkay then f f f f.\nThis is a long sentence.";
         let result = splitter.split_text(text).unwrap();

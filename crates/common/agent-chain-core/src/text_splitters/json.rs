@@ -1,3 +1,4 @@
+use bon::bon;
 use std::collections::HashMap;
 
 use serde_json::{self, Map, Value};
@@ -9,7 +10,9 @@ pub struct RecursiveJsonSplitter {
     min_chunk_size: usize,
 }
 
+#[bon]
 impl RecursiveJsonSplitter {
+    #[builder]
     pub fn new(max_chunk_size: usize, min_chunk_size: Option<usize>) -> Self {
         let min_chunk_size =
             min_chunk_size.unwrap_or_else(|| max_chunk_size.saturating_sub(200).max(50));
@@ -169,7 +172,7 @@ mod tests {
 
     #[test]
     fn test_recursive_json_splitter_basic() {
-        let splitter = RecursiveJsonSplitter::new(100, None);
+        let splitter = RecursiveJsonSplitter::builder().max_chunk_size(100).build();
         let data = serde_json::json!({
             "name": "John",
             "age": 30,
@@ -184,7 +187,7 @@ mod tests {
 
     #[test]
     fn test_recursive_json_splitter_large() {
-        let splitter = RecursiveJsonSplitter::new(50, None);
+        let splitter = RecursiveJsonSplitter::builder().max_chunk_size(50).build();
         let data = serde_json::json!({
             "key1": "a".repeat(30),
             "key2": "b".repeat(30),
@@ -196,7 +199,7 @@ mod tests {
 
     #[test]
     fn test_recursive_json_splitter_convert_lists() {
-        let splitter = RecursiveJsonSplitter::new(200, None);
+        let splitter = RecursiveJsonSplitter::builder().max_chunk_size(200).build();
         let data = serde_json::json!({
             "items": ["apple", "banana", "cherry"]
         });
@@ -209,7 +212,7 @@ mod tests {
 
     #[test]
     fn test_recursive_json_splitter_split_text() {
-        let splitter = RecursiveJsonSplitter::new(200, None);
+        let splitter = RecursiveJsonSplitter::builder().max_chunk_size(200).build();
         let data = serde_json::json!({"key": "value"});
         let texts = splitter.split_text(&data, false).unwrap();
         assert_eq!(texts.len(), 1);
@@ -219,7 +222,7 @@ mod tests {
 
     #[test]
     fn test_recursive_json_splitter_create_documents() {
-        let splitter = RecursiveJsonSplitter::new(200, None);
+        let splitter = RecursiveJsonSplitter::builder().max_chunk_size(200).build();
         let data = vec![serde_json::json!({"key": "value"})];
         let docs = splitter.create_documents(&data, false, None).unwrap();
         assert_eq!(docs.len(), 1);
