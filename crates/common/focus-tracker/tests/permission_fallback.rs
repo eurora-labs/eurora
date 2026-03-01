@@ -19,7 +19,7 @@ use util::*;
 #[cfg(target_os = "macos")]
 #[test]
 #[serial]
-#[ignore] // Only run when AX_ALLOWED=1 is set
+// Only run when AX_ALLOWED=1 is set
 fn test_macos_accessibility_permission() {
     if env::var("AX_ALLOWED").unwrap_or_default() != "1" {
         tracing::info!("Skipping macOS accessibility test - AX_ALLOWED=1 not set");

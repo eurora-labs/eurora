@@ -168,7 +168,10 @@ where
             }
         }
 
-        let configs = get_config_list(config, keys.len());
+        let configs = match get_config_list(config, keys.len()) {
+            Ok(c) => c,
+            Err(e) => return vec![Err(e)],
+        };
 
         let _return_exceptions = return_exceptions; // Vec<Result<O>> already captures exceptions per-item
         let results: Vec<Result<O>> = keys
@@ -210,7 +213,10 @@ where
             }
         }
 
-        let configs = get_config_list(config, keys.len());
+        let configs = match get_config_list(config, keys.len()) {
+            Ok(c) => c,
+            Err(e) => return vec![Err(e)],
+        };
         let max_concurrency = configs.first().and_then(|c| c.max_concurrency);
 
         let _return_exceptions = return_exceptions; // Vec<Result<O>> already captures exceptions per-item
