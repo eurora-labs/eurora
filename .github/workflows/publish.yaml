@@ -336,6 +336,14 @@ jobs:
                     --dist                       "./release" \
                     --version                    "$RELEASE_VERSION"
 
+            - name: Patch MSI for per-user install (no UAC)
+              if: runner.os == 'Windows'
+              shell: pwsh
+              run: |
+                  Get-ChildItem -Path release -Filter *.msi -Recurse | ForEach-Object {
+                      & "${{ github.workspace }}/scripts/msi-set-peruser.ps1" -MsiPath $_.FullName
+                  }
+
             - name: Sign Windows executables with Azure Trusted Signing
               if: runner.os == 'Windows'
               uses: azure/trusted-signing-action@87c2e83e6868da99d3380aa309851b32ed9a8346 # v1.1.0
