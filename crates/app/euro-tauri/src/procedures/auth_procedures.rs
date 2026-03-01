@@ -98,6 +98,12 @@ impl AuthApi for AuthApiImpl {
     async fn poll_for_login<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
         if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
             let mut controller = user_state.lock().await;
+
+            if controller.get_or_refresh_access_token().await.is_ok() {
+                let _ = secret::delete(LOGIN_CODE_VERIFIER);
+                return Ok(true);
+            }
+
             let login_token = secret::retrieve(LOGIN_CODE_VERIFIER)
                 .map_err(|e| format!("Failed to retrieve login token: {}", e))?
                 .ok_or_else(|| "Login token not found".to_string())?;

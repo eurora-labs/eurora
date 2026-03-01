@@ -910,26 +910,15 @@ impl ProtoAuthService for AuthService {
         let code_challenge = self.code_verifier_to_challenge(&code_verifier);
         let token_hash = self.hash_login_token(&code_challenge);
 
-        let login_token = self
+        let (_, user) = self
             .db
-            .consume_login_token()
+            .consume_login_token_with_user()
             .token_hash(&token_hash)
             .call()
             .await
-            .map_err(|_| {
-                tracing::warn!("Login token not found, expired, or already consumed");
-                Status::from(AuthError::InvalidToken)
-            })?;
-
-        let user = self
-            .db
-            .get_user()
-            .id(login_token.user_id)
-            .call()
-            .await
             .map_err(|e| {
-                tracing::error!("User not found for login token: {}", e);
-                Status::from(AuthError::Internal("User not found".into()))
+                tracing::warn!("Failed to consume login token: {}", e);
+                Status::from(AuthError::InvalidToken)
             })?;
 
         let role = self
