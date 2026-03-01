@@ -57,7 +57,17 @@ mod tests {
         }
     }
 
-    struct HalfSplitter;
+    struct HalfSplitter {
+        config: crate::text_splitters::TextSplitterConfig,
+    }
+
+    impl HalfSplitter {
+        fn new() -> Self {
+            Self {
+                config: crate::text_splitters::TextSplitterConfig::default(),
+            }
+        }
+    }
 
     #[async_trait]
     impl crate::documents::BaseDocumentTransformer for HalfSplitter {
@@ -72,6 +82,10 @@ mod tests {
 
     #[async_trait]
     impl TextSplitter for HalfSplitter {
+        fn config(&self) -> &crate::text_splitters::TextSplitterConfig {
+            &self.config
+        }
+
         fn split_text(
             &self,
             text: &str,
@@ -106,7 +120,7 @@ mod tests {
                 Document::builder().page_content("1234").build(),
             ],
         };
-        let splitter = HalfSplitter;
+        let splitter = HalfSplitter::new();
         let docs = loader.load_and_split(&splitter).unwrap();
         assert_eq!(docs.len(), 4);
         assert_eq!(docs[0].page_content, "abc");
