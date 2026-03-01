@@ -18,9 +18,9 @@ ignored = [
 
 [dependencies]
 anyhow = { workspace = true }
-async-stripe = { version = "1.0.0-rc.1", features = [
+async-stripe = { version = "1.0.0-rc.1", default-features = false, features = [
   "rustls-aws-lc-rs",
-  "rustls-tls-native",
+  "rustls-tls-webpki-roots",
   "uuid"
 ] }
 async-stripe-billing = { version = "1.0.0-rc.1", features = [
@@ -52,9 +52,9 @@ async-stripe-webhook = { version = "1.0.0-rc.1", features = [
 axum = { workspace = true, features = ["macros"] }
 be-auth-core = { workspace = true }
 be-remote-db = { workspace = true }
+posthog-rs = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-posthog-rs = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt"] }
 tower = { workspace = true }
