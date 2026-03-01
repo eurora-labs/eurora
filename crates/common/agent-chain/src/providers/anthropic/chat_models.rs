@@ -5,18 +5,14 @@
 
 use std::collections::HashMap;
 use std::env;
-use std::pin::Pin;
 
 use async_trait::async_trait;
 use backon::{ConstantBuilder, Retryable};
-use futures::Stream;
 use serde::Deserialize;
 
 use crate::ToolChoice;
 use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
-use crate::chat_models::{
-    BaseChatModel, ChatChunk, ChatModelConfig, ChatStream, LangSmithParams, UsageMetadata,
-};
+use crate::chat_models::{BaseChatModel, ChatModelConfig, LangSmithParams};
 use crate::error::{Error, Result};
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
 use crate::language_models::{ChatModelRunnable, ToolLike, extract_tool_name_from_schema};
@@ -81,9 +77,6 @@ pub struct ChatAnthropic {
     chat_model_config: ChatModelConfig,
     /// Language model configuration.
     language_model_config: LanguageModelConfig,
-    /// HTTP client.
-    #[allow(dead_code)]
-    client: reqwest::Client,
     /// Tools bound to this model via `bind_tools()`.
     bound_tools: Vec<ToolDefinition>,
     /// Tool choice for bound tools.
@@ -112,7 +105,6 @@ impl ChatAnthropic {
             model_kwargs: HashMap::new(),
             chat_model_config: ChatModelConfig::new(),
             language_model_config: LanguageModelConfig::new(),
-            client: reqwest::Client::new(),
             bound_tools: Vec::new(),
             bound_tool_choice: None,
         }
@@ -447,7 +439,10 @@ impl BaseChatModel for ChatAnthropic {
         tool_choice: Option<ToolChoice>,
     ) -> Result<Box<dyn BaseChatModel>> {
         let mut bound = self.clone();
-        bound.bound_tools = tools.iter().map(|t| t.to_definition()).collect();
+        bound.bound_tools = tools
+            .iter()
+            .map(|t| t.to_definition())
+            .collect::<std::result::Result<Vec<_>, _>>()?;
         bound.bound_tool_choice = tool_choice;
         Ok(Box::new(bound))
     }
@@ -459,7 +454,7 @@ impl BaseChatModel for ChatAnthropic {
     ) -> Result<
         Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
     > {
-        let tool_name = extract_tool_name_from_schema(&schema);
+        let tool_name = extract_tool_name_from_schema(&schema)?;
         let tool_like = ToolLike::Schema(schema);
         let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
 
@@ -512,7 +507,10 @@ impl ChatAnthropic {
             })
         } else {
             let status = resp.status().as_u16();
-            let error_text = resp.text().await.unwrap_or_default();
+            let error_text = resp
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("<failed to read response body: {e}>"));
             Err(Error::api(status, error_text))
         }
     }
@@ -594,95 +592,6 @@ impl ChatAnthropic {
         let result = self.parse_response(resp);
         Self::extract_ai_message(result)
     }
-
-    /// Internal stream implementation.
-    #[allow(dead_code)]
-    async fn stream_internal(
-        &self,
-        messages: Vec<BaseMessage>,
-        stop: Option<Vec<String>>,
-    ) -> Result<ChatStream> {
-        let api_key = self.get_api_key()?;
-        let client = self.build_client();
-        let mut payload = self.build_request_payload(&messages, stop, None);
-
-        payload["stream"] = serde_json::json!(true);
-
-        let response = client
-            .post(format!("{}/messages", self.api_base))
-            .header("x-api-key", &api_key)
-            .header("anthropic-version", &self.api_version)
-            .header("content-type", "application/json")
-            .json(&payload)
-            .send()
-            .await
-            .map_err(Error::Http)?;
-
-        if !response.status().is_success() {
-            let status = response.status().as_u16();
-            let error_text = response.text().await.unwrap_or_default();
-            return Err(Error::api(status, error_text));
-        }
-
-        let stream = async_stream::stream! {
-            let mut bytes_stream = response.bytes_stream();
-            let mut buffer = String::new();
-            let mut usage: Option<UsageMetadata> = None;
-            let mut stop_reason: Option<String> = None;
-
-            use futures::StreamExt;
-
-            while let Some(chunk_result) = bytes_stream.next().await {
-                match chunk_result {
-                    Ok(bytes) => {
-                        buffer.push_str(&String::from_utf8_lossy(&bytes));
-
-                        while let Some(event_end) = buffer.find("\n\n") {
-                            let event_data = buffer[..event_end].to_string();
-                            buffer = buffer[event_end + 2..].to_string();
-
-                            for line in event_data.lines() {
-                                if let Some(data) = line.strip_prefix("data: ") {
-                                    if data == "[DONE]" {
-                                        continue;
-                                    }
-
-                                    if let Ok(event) = serde_json::from_str::<AnthropicStreamEvent>(data) {
-                                        match event {
-                                            AnthropicStreamEvent::ContentBlockDelta { delta, .. } => {
-                                                if let Some(text) = delta.text {
-                                                    yield Ok(ChatChunk::new(text));
-                                                }
-                                            }
-                                            AnthropicStreamEvent::MessageDelta { delta, usage: u } => {
-                                                stop_reason = delta.stop_reason;
-                                                if let Some(u) = u {
-                                                    usage = Some(UsageMetadata::new(
-                                                        u.input_tokens.unwrap_or(0) as i64,
-                                                        u.output_tokens as i64,
-                                                    ));
-                                                }
-                                            }
-                                            AnthropicStreamEvent::MessageStop => {
-                                                yield Ok(ChatChunk::final_chunk(usage.take(), stop_reason.take()));
-                                            }
-                                            _ => {}
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        yield Err(Error::Http(e));
-                        break;
-                    }
-                }
-            }
-        };
-
-        Ok(Box::pin(stream) as Pin<Box<dyn Stream<Item = Result<ChatChunk>> + Send>>)
-    }
 }
 
 /// Anthropic API response structure.
@@ -720,35 +629,22 @@ struct AnthropicUsage {
 /// Anthropic streaming event types.
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
+#[allow(dead_code)]
 enum AnthropicStreamEvent {
     #[serde(rename = "message_start")]
-    MessageStart {
-        #[allow(dead_code)]
-        message: serde_json::Value,
-    },
+    MessageStart { message: serde_json::Value },
     #[serde(rename = "content_block_start")]
     ContentBlockStart {
-        #[allow(dead_code)]
         index: u32,
-        #[allow(dead_code)]
         content_block: serde_json::Value,
     },
     #[serde(rename = "content_block_delta")]
-    ContentBlockDelta {
-        #[allow(dead_code)]
-        index: u32,
-        delta: ContentDelta,
-    },
+    ContentBlockDelta { index: u32, delta: ContentDelta },
     #[serde(rename = "content_block_stop")]
-    ContentBlockStop {
-        #[allow(dead_code)]
-        index: u32,
-    },
+    ContentBlockStop { index: u32 },
     #[serde(rename = "message_delta")]
     MessageDelta {
-        #[allow(dead_code)]
         delta: MessageDelta,
-        #[allow(dead_code)]
         usage: Option<StreamUsage>,
     },
     #[serde(rename = "message_stop")]
@@ -761,6 +657,7 @@ enum AnthropicStreamEvent {
 
 /// Content delta in streaming.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ContentDelta {
     #[serde(rename = "type")]
     _type: Option<String>,
