@@ -6,6 +6,8 @@ use async_trait::async_trait;
 use futures::stream::BoxStream;
 use serde_json::Value;
 
+use bon::bon;
+
 use crate::error::{Error, Result};
 
 use super::base::Runnable;
@@ -157,48 +159,36 @@ where
     }
 }
 
+#[bon]
 impl<I, O> RunnableConfigurableFields<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
+    #[builder]
+    #[allow(clippy::type_complexity)]
     pub fn new(
         default: Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>,
         fields: HashMap<String, AnyConfigurableField>,
-    ) -> Self {
-        Self {
-            default,
-            fields,
-            config: None,
-            reconfigure_fn: None,
-        }
-    }
-
-    #[allow(clippy::type_complexity)]
-    pub fn with_reconfigure_fn(
-        default: Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>,
-        fields: HashMap<String, AnyConfigurableField>,
-        reconfigure_fn: Arc<
-            dyn Fn(
-                    &dyn Runnable<Input = I, Output = O>,
-                    &HashMap<String, Value>,
-                )
-                    -> Option<Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>>
-                + Send
-                + Sync,
+        config: Option<RunnableConfig>,
+        reconfigure_fn: Option<
+            Arc<
+                dyn Fn(
+                        &dyn Runnable<Input = I, Output = O>,
+                        &HashMap<String, Value>,
+                    )
+                        -> Option<Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>>
+                    + Send
+                    + Sync,
+            >,
         >,
     ) -> Self {
         Self {
             default,
             fields,
-            config: None,
-            reconfigure_fn: Some(reconfigure_fn),
+            config,
+            reconfigure_fn,
         }
-    }
-
-    pub fn with_config(mut self, config: RunnableConfig) -> Self {
-        self.config = Some(config);
-        self
     }
 
     fn prepare_internal(
@@ -531,17 +521,20 @@ where
     }
 }
 
+#[bon]
 impl<I, O> RunnableConfigurableAlternatives<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
+    #[builder]
     pub fn new(
         which: ConfigurableField,
         default: Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>,
         alternatives: HashMap<String, Alternative<I, O>>,
         default_key: impl Into<String>,
-        prefix_keys: bool,
+        #[builder(default)] prefix_keys: bool,
+        config: Option<RunnableConfig>,
     ) -> Self {
         Self {
             which,
@@ -549,13 +542,8 @@ where
             alternatives,
             default_key: default_key.into(),
             prefix_keys,
-            config: None,
+            config,
         }
-    }
-
-    pub fn with_config(mut self, config: RunnableConfig) -> Self {
-        self.config = Some(config);
-        self
     }
 
     fn prepare_internal(
@@ -839,7 +827,10 @@ pub trait ConfigurableRunnable: Runnable + Sized {
     where
         Self: Send + Sync + 'static,
     {
-        RunnableConfigurableFields::new(Arc::new(self), fields)
+        RunnableConfigurableFields::builder()
+            .default(Arc::new(self))
+            .fields(fields)
+            .build()
     }
 
     fn configurable_fields_reconfigurable(
@@ -862,7 +853,11 @@ pub trait ConfigurableRunnable: Runnable + Sized {
             let default_clone = self.clone();
             Arc::new(move |_runnable, fields| default_clone.reconfigure(fields))
         };
-        RunnableConfigurableFields::with_reconfigure_fn(Arc::new(self), fields, reconfigure_fn)
+        RunnableConfigurableFields::builder()
+            .default(Arc::new(self))
+            .fields(fields)
+            .reconfigure_fn(reconfigure_fn)
+            .build()
     }
 
     fn configurable_alternatives(
@@ -875,13 +870,13 @@ pub trait ConfigurableRunnable: Runnable + Sized {
     where
         Self: Send + Sync + 'static,
     {
-        RunnableConfigurableAlternatives::new(
-            which,
-            Arc::new(self),
-            alternatives,
-            default_key,
-            prefix_keys,
-        )
+        RunnableConfigurableAlternatives::builder()
+            .which(which)
+            .default(Arc::new(self))
+            .alternatives(alternatives)
+            .default_key(default_key)
+            .prefix_keys(prefix_keys)
+            .build()
     }
 }
 
@@ -956,7 +951,7 @@ mod tests {
 
     #[test]
     fn test_configurable_fields_invoke() {
-        let runnable = RunnableLambda::new(|x: i32| Ok(x * 2));
+        let runnable = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
         let fields = HashMap::new();
         let configurable = runnable.configurable_fields(fields);
 
@@ -966,14 +961,14 @@ mod tests {
 
     #[test]
     fn test_configurable_alternatives_invoke() {
-        let default = RunnableLambda::new(|x: i32| Ok(x * 2));
-        let alt = RunnableLambda::new(|x: i32| Ok(x * 3));
+        let default = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
+        let alt = RunnableLambda::builder().func(|x: i32| Ok(x * 3)).build();
 
         let mut alternatives = HashMap::new();
         alternatives.insert("triple".to_string(), Alternative::Runnable(Arc::new(alt)));
 
         let configurable = default.configurable_alternatives(
-            ConfigurableField::new("multiplier"),
+            ConfigurableField::builder().id("multiplier").build(),
             alternatives,
             "double",
             false,
@@ -993,11 +988,11 @@ mod tests {
 
     #[test]
     fn test_configurable_alternatives_unknown() {
-        let default = RunnableLambda::new(|x: i32| Ok(x * 2));
+        let default = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
         let alternatives = HashMap::new();
 
         let configurable = default.configurable_alternatives(
-            ConfigurableField::new("multiplier"),
+            ConfigurableField::builder().id("multiplier").build(),
             alternatives,
             "double",
             false,
@@ -1015,7 +1010,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_configurable_fields_ainvoke() {
-        let runnable = RunnableLambda::new(|x: i32| Ok(x * 2));
+        let runnable = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
         let fields = HashMap::new();
         let configurable = runnable.configurable_fields(fields);
 
@@ -1025,8 +1020,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_configurable_alternatives_ainvoke() {
-        let default = RunnableLambda::new(|x: i32| Ok(x * 2));
-        let alt = RunnableLambda::new(|x: i32| Ok(x + 100));
+        let default = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
+        let alt = RunnableLambda::builder().func(|x: i32| Ok(x + 100)).build();
 
         let mut alternatives = HashMap::new();
         alternatives.insert(
@@ -1035,7 +1030,7 @@ mod tests {
         );
 
         let configurable = default.configurable_alternatives(
-            ConfigurableField::new("operation"),
+            ConfigurableField::builder().id("operation").build(),
             alternatives,
             "double",
             false,
@@ -1053,19 +1048,19 @@ mod tests {
 
     #[test]
     fn test_configurable_with_factory() {
-        let default = RunnableLambda::new(|x: i32| Ok(x * 2));
+        let default = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
 
         let mut alternatives = HashMap::new();
         alternatives.insert(
             "triple".to_string(),
             Alternative::Factory(Arc::new(|| {
-                Arc::new(RunnableLambda::new(|x: i32| Ok(x * 3)))
+                Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x * 3)).build())
                     as Arc<dyn Runnable<Input = i32, Output = i32> + Send + Sync>
             })),
         );
 
         let configurable = default.configurable_alternatives(
-            ConfigurableField::new("multiplier"),
+            ConfigurableField::builder().id("multiplier").build(),
             alternatives,
             "double",
             false,

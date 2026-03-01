@@ -67,7 +67,11 @@ impl Serializable for StrOutputParser {
     where
         Self: Sized + serde::Serialize,
     {
-        SerializedConstructor::new(Self::lc_id(), std::collections::HashMap::new()).into()
+        SerializedConstructor::builder()
+            .id(Self::lc_id())
+            .kwargs(std::collections::HashMap::new())
+            .build()
+            .into()
     }
 }
 

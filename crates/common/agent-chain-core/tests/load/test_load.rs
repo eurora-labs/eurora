@@ -79,8 +79,9 @@ fn test_reviver_init_default_properties() {
 
 #[test]
 fn test_reviver_init_custom_namespaces() {
-    let config =
-        ReviverConfig::new().with_valid_namespaces(vec!["tests".to_string(), "custom".to_string()]);
+    let config = ReviverConfig::builder()
+        .valid_namespaces(vec!["tests".to_string(), "custom".to_string()])
+        .build();
     let reviver = Reviver::new(config);
 
     let test_langchain = json!({
@@ -109,7 +110,7 @@ fn test_reviver_init_custom_namespaces() {
 fn test_reviver_init_with_secrets_map() {
     let mut secrets = HashMap::new();
     secrets.insert("API_KEY".to_string(), "secret_value".to_string());
-    let config = ReviverConfig::new().with_secrets_map(secrets);
+    let config = ReviverConfig::builder().secrets_map(secrets).build();
     let reviver = Reviver::new(config);
 
     let value = json!({
@@ -139,9 +140,10 @@ fn test_reviver_init_with_additional_import_mappings() {
             "Class".to_string(),
         ],
     );
-    let config = ReviverConfig::new()
-        .with_valid_namespaces(vec!["custom".to_string()])
-        .with_additional_import_mappings(mappings.clone());
+    let config = ReviverConfig::builder()
+        .valid_namespaces(vec!["custom".to_string()])
+        .additional_import_mappings(mappings.clone())
+        .build();
     let reviver = Reviver::new(config);
 
     let value = json!({
@@ -170,7 +172,7 @@ fn test_reviver_init_with_additional_import_mappings() {
 fn test_reviver_secret_from_map() {
     let mut secrets = HashMap::new();
     secrets.insert("API_KEY".to_string(), "secret_value".to_string());
-    let config = ReviverConfig::new().with_secrets_map(secrets);
+    let config = ReviverConfig::builder().secrets_map(secrets).build();
     let reviver = Reviver::new(config);
 
     let value = json!({
@@ -190,7 +192,7 @@ fn test_reviver_secret_from_env() {
     let key = "TEST_REVIVER_SECRET_FROM_ENV_KEY";
     unsafe { std::env::set_var(key, "env_secret_value") };
 
-    let config = ReviverConfig::new().with_secrets_from_env(true);
+    let config = ReviverConfig::builder().secrets_from_env(true).build();
     let reviver = Reviver::new(config);
 
     let value = json!({
@@ -212,7 +214,7 @@ fn test_reviver_secret_not_in_env_returns_none() {
     let key = "REVIVER_TEST_DEFINITELY_MISSING_KEY";
     unsafe { std::env::remove_var(key) };
 
-    let config = ReviverConfig::new().with_secrets_from_env(true);
+    let config = ReviverConfig::builder().secrets_from_env(true).build();
     let reviver = Reviver::new(config);
 
     let value = json!({
@@ -229,7 +231,7 @@ fn test_reviver_secret_from_env_disabled() {
     let key = "TEST_REVIVER_SECRET_ENV_DISABLED_KEY";
     unsafe { std::env::set_var(key, "env_value") };
 
-    let config = ReviverConfig::new().with_secrets_from_env(false);
+    let config = ReviverConfig::builder().secrets_from_env(false).build();
     let reviver = Reviver::new(config);
 
     let value = json!({
@@ -262,7 +264,9 @@ fn test_reviver_not_implemented_raises_error() {
 
 #[test]
 fn test_reviver_not_implemented_with_ignore_flag() {
-    let config = ReviverConfig::new().with_ignore_unserializable_fields(true);
+    let config = ReviverConfig::builder()
+        .ignore_unserializable_fields(true)
+        .build();
     let reviver = Reviver::new(config);
 
     let value = json!({
@@ -276,7 +280,9 @@ fn test_reviver_not_implemented_with_ignore_flag() {
 
 #[test]
 fn test_reviver_constructor_deserialization() {
-    let config = ReviverConfig::new().with_valid_namespaces(vec!["langchain_core".to_string()]);
+    let config = ReviverConfig::builder()
+        .valid_namespaces(vec!["langchain_core".to_string()])
+        .build();
     let reviver = Reviver::new(config);
 
     let value = json!({
@@ -354,9 +360,10 @@ fn test_reviver_with_import_mapping() {
             "AIMessage".to_string(),
         ],
     );
-    let config = ReviverConfig::new()
-        .with_valid_namespaces(vec!["old".to_string()])
-        .with_additional_import_mappings(mappings);
+    let config = ReviverConfig::builder()
+        .valid_namespaces(vec!["old".to_string()])
+        .additional_import_mappings(mappings)
+        .build();
     let reviver = Reviver::new(config);
 
     let value = json!({
@@ -436,7 +443,7 @@ fn test_loads_with_secrets_map() {
 
     let mut secrets = HashMap::new();
     secrets.insert("API_KEY".to_string(), "secret_value".to_string());
-    let config = ReviverConfig::new().with_secrets_map(secrets);
+    let config = ReviverConfig::builder().secrets_map(secrets).build();
 
     let result = loads(&json_str, Some(config)).unwrap();
     assert_eq!(result.as_str(), Some("secret_value"));
@@ -454,7 +461,7 @@ fn test_loads_with_secrets_from_env() {
     })
     .to_string();
 
-    let config = ReviverConfig::new().with_secrets_from_env(true);
+    let config = ReviverConfig::builder().secrets_from_env(true).build();
     let result = loads(&json_str, Some(config)).unwrap();
     assert_eq!(result.as_str(), Some("env_value"));
 
@@ -486,9 +493,10 @@ fn test_loads_with_additional_import_mappings() {
     })
     .to_string();
 
-    let config = ReviverConfig::new()
-        .with_valid_namespaces(vec!["old".to_string()])
-        .with_additional_import_mappings(mappings);
+    let config = ReviverConfig::builder()
+        .valid_namespaces(vec!["old".to_string()])
+        .additional_import_mappings(mappings)
+        .build();
 
     let result = loads(&json_str, Some(config)).unwrap();
     assert!(result.is_object());
@@ -503,7 +511,9 @@ fn test_loads_with_ignore_unserializable_fields() {
     })
     .to_string();
 
-    let config = ReviverConfig::new().with_ignore_unserializable_fields(true);
+    let config = ReviverConfig::builder()
+        .ignore_unserializable_fields(true)
+        .build();
     let result = loads(&json_str, Some(config)).unwrap();
     assert!(result.is_null());
 }
@@ -549,7 +559,7 @@ fn test_load_with_secrets_map() {
 
     let mut secrets = HashMap::new();
     secrets.insert("API_KEY".to_string(), "secret_value".to_string());
-    let config = ReviverConfig::new().with_secrets_map(secrets);
+    let config = ReviverConfig::builder().secrets_map(secrets).build();
 
     let result = load(obj, Some(config)).unwrap();
     assert_eq!(result.as_str(), Some("secret_value"));
@@ -566,7 +576,7 @@ fn test_load_with_secrets_from_env() {
         "id": [key]
     });
 
-    let config = ReviverConfig::new().with_secrets_from_env(true);
+    let config = ReviverConfig::builder().secrets_from_env(true).build();
     let result = load(obj, Some(config)).unwrap();
     assert_eq!(result.as_str(), Some("env_value"));
 
@@ -597,9 +607,10 @@ fn test_load_with_additional_import_mappings() {
         "kwargs": {"content": "hello"}
     });
 
-    let config = ReviverConfig::new()
-        .with_valid_namespaces(vec!["old".to_string()])
-        .with_additional_import_mappings(mappings);
+    let config = ReviverConfig::builder()
+        .valid_namespaces(vec!["old".to_string()])
+        .additional_import_mappings(mappings)
+        .build();
 
     let result = load(obj, Some(config)).unwrap();
     assert!(result.is_object());
@@ -613,7 +624,9 @@ fn test_load_with_ignore_unserializable_fields() {
         "id": ["some", "module", "Class"]
     });
 
-    let config = ReviverConfig::new().with_ignore_unserializable_fields(true);
+    let config = ReviverConfig::builder()
+        .ignore_unserializable_fields(true)
+        .build();
     let result = load(obj, Some(config)).unwrap();
     assert!(result.is_null());
 }
@@ -720,7 +733,7 @@ fn test_load_with_empty_env_string() {
         "id": [key]
     });
 
-    let config = ReviverConfig::new().with_secrets_from_env(true);
+    let config = ReviverConfig::builder().secrets_from_env(true).build();
     let result = load(obj, Some(config)).unwrap();
     assert!(result.is_null());
 
@@ -756,7 +769,9 @@ fn test_round_trip_with_loads_dumps() {
     let json_str = dumps(&original, false).unwrap();
     assert!(json_str.contains("constructor"));
 
-    let config = ReviverConfig::new().with_valid_namespaces(vec!["tests".to_string()]);
+    let config = ReviverConfig::builder()
+        .valid_namespaces(vec!["tests".to_string()])
+        .build();
     let loaded = loads(&json_str, Some(config)).unwrap();
     assert!(loaded.is_object());
 }
@@ -840,7 +855,9 @@ fn test_reviver_constructor_without_id_passthrough() {
 
 #[test]
 fn test_reviver_constructor_with_empty_kwargs() {
-    let config = ReviverConfig::new().with_valid_namespaces(vec!["langchain_core".to_string()]);
+    let config = ReviverConfig::builder()
+        .valid_namespaces(vec!["langchain_core".to_string()])
+        .build();
     let reviver = Reviver::new(config);
 
     let value = json!({
@@ -862,7 +879,9 @@ fn test_reviver_constructor_with_empty_kwargs() {
 
 #[test]
 fn test_reviver_constructor_missing_kwargs_key() {
-    let config = ReviverConfig::new().with_valid_namespaces(vec!["langchain_core".to_string()]);
+    let config = ReviverConfig::builder()
+        .valid_namespaces(vec!["langchain_core".to_string()])
+        .build();
     let reviver = Reviver::new(config);
 
     let value = json!({
@@ -888,9 +907,10 @@ fn test_reviver_secret_map_takes_priority_over_env() {
 
     let mut secrets = HashMap::new();
     secrets.insert(key.to_string(), "from_map".to_string());
-    let config = ReviverConfig::new()
-        .with_secrets_map(secrets)
-        .with_secrets_from_env(true);
+    let config = ReviverConfig::builder()
+        .secrets_map(secrets)
+        .secrets_from_env(true)
+        .build();
     let reviver = Reviver::new(config);
 
     let value = json!({
@@ -909,7 +929,9 @@ fn test_reviver_secret_map_takes_priority_over_env() {
 
 #[test]
 fn test_reviver_valid_namespaces_merged_with_defaults() {
-    let config = ReviverConfig::new().with_valid_namespaces(vec!["my_custom_ns".to_string()]);
+    let config = ReviverConfig::builder()
+        .valid_namespaces(vec!["my_custom_ns".to_string()])
+        .build();
 
     for ns in DEFAULT_NAMESPACES {
         assert!(
@@ -945,9 +967,10 @@ fn test_reviver_additional_import_mappings_override() {
     let mut custom_mapping = HashMap::new();
     custom_mapping.insert(custom_key.clone(), custom_value.clone());
 
-    let config = ReviverConfig::new()
-        .with_valid_namespaces(vec!["tests".to_string()])
-        .with_additional_import_mappings(custom_mapping);
+    let config = ReviverConfig::builder()
+        .valid_namespaces(vec!["tests".to_string()])
+        .additional_import_mappings(custom_mapping)
+        .build();
     let reviver = Reviver::new(config);
 
     let value = json!({
@@ -1098,9 +1121,10 @@ fn test_loads_secret_not_in_map_or_env() {
     })
     .to_string();
 
-    let config = ReviverConfig::new()
-        .with_secrets_map(HashMap::new())
-        .with_secrets_from_env(true);
+    let config = ReviverConfig::builder()
+        .secrets_map(HashMap::new())
+        .secrets_from_env(true)
+        .build();
     let result = loads(&json_str, Some(config)).unwrap();
     assert!(result.is_null());
 }
@@ -1117,7 +1141,7 @@ fn test_loads_with_secrets_from_env_false() {
     })
     .to_string();
 
-    let config = ReviverConfig::new().with_secrets_from_env(false);
+    let config = ReviverConfig::builder().secrets_from_env(false).build();
     let result = loads(&json_str, Some(config)).unwrap();
     assert!(result.is_null());
 
@@ -1190,7 +1214,7 @@ fn test_load_nested_secrets() {
         }
     });
 
-    let config = ReviverConfig::new().with_secrets_from_env(true);
+    let config = ReviverConfig::builder().secrets_from_env(true).build();
     let result = load(obj, Some(config)).unwrap();
     assert_eq!(
         result.get("content").and_then(|v| v.as_str()),
@@ -1246,7 +1270,9 @@ fn test_round_trip_preserves_all_fields() {
         Some("round_trip_test")
     );
 
-    let config = ReviverConfig::new().with_valid_namespaces(vec!["tests".to_string()]);
+    let config = ReviverConfig::builder()
+        .valid_namespaces(vec!["tests".to_string()])
+        .build();
     let loaded = load(serialized, Some(config)).unwrap();
     assert!(loaded.is_object());
 }
@@ -1276,9 +1302,10 @@ fn test_round_trip_with_secrets() {
 
     let mut secrets = HashMap::new();
     secrets.insert("MY_API_KEY".to_string(), "secret123".to_string());
-    let config = ReviverConfig::new()
-        .with_valid_namespaces(vec!["tests".to_string()])
-        .with_secrets_map(secrets);
+    let config = ReviverConfig::builder()
+        .valid_namespaces(vec!["tests".to_string()])
+        .secrets_map(secrets)
+        .build();
     let loaded = load(serialized, Some(config)).unwrap();
     assert!(loaded.is_object());
 
@@ -1360,12 +1387,13 @@ fn test_reviver_config_builder_chain() {
     let mut mappings = HashMap::new();
     mappings.insert(vec!["old".to_string()], vec!["new".to_string()]);
 
-    let config = ReviverConfig::new()
-        .with_secrets_map(secrets.clone())
-        .with_valid_namespaces(vec!["custom".to_string()])
-        .with_secrets_from_env(false)
-        .with_additional_import_mappings(mappings.clone())
-        .with_ignore_unserializable_fields(true);
+    let config = ReviverConfig::builder()
+        .secrets_map(secrets.clone())
+        .valid_namespaces(vec!["custom".to_string()])
+        .secrets_from_env(false)
+        .additional_import_mappings(mappings.clone())
+        .ignore_unserializable_fields(true)
+        .build();
 
     assert_eq!(config.secrets_map, secrets);
     assert!(config.valid_namespaces.contains(&"custom".to_string()));
@@ -1438,7 +1466,7 @@ fn test_load_recursive_processes_kwargs_secrets() {
     })
     .to_string();
 
-    let config = ReviverConfig::new().with_secrets_from_env(true);
+    let config = ReviverConfig::builder().secrets_from_env(true).build();
     let result = loads(&json_str, Some(config)).unwrap();
 
     let wrapper = result.get("wrapper").unwrap();
@@ -1482,7 +1510,7 @@ fn test_disallow_load_from_path_contents() {
 fn test_round_trip_document() {
     use agent_chain_core::documents::Document;
 
-    let doc = Document::new("Hello, World!");
+    let doc = Document::builder().page_content("Hello, World!").build();
     let serialized = dumps(&doc, false).unwrap();
     let loaded = loads(&serialized, None).unwrap();
 
@@ -1497,10 +1525,13 @@ fn test_round_trip_document() {
 fn test_round_trip_document_with_metadata() {
     use agent_chain_core::documents::Document;
 
-    let doc = Document::new("Test content").with_metadata(HashMap::from([(
-        "source".to_string(),
-        serde_json::Value::String("test.txt".to_string()),
-    )]));
+    let doc = Document::builder()
+        .page_content("Test content")
+        .metadata(HashMap::from([(
+            "source".to_string(),
+            serde_json::Value::String("test.txt".to_string()),
+        )]))
+        .build();
 
     let serialized = dumpd(&doc).unwrap();
     let loaded = load(serialized, None).unwrap();
@@ -1745,7 +1776,10 @@ fn test_round_trip_system_message_prompt_template() {
 fn test_round_trip_messages_placeholder() {
     use agent_chain_core::prompts::MessagesPlaceholder;
 
-    let placeholder = MessagesPlaceholder::new("history").optional(true);
+    let placeholder = MessagesPlaceholder::builder()
+        .variable_name("history")
+        .optional(true)
+        .build();
     let serialized = dumpd(&placeholder).unwrap();
     let loaded = load(serialized, None).unwrap();
 

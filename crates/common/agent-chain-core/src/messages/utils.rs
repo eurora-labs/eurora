@@ -910,46 +910,31 @@ where
     pub text_splitter: Option<S>,
 }
 
+#[bon::bon]
 impl<F> TrimMessagesConfig<F>
 where
     F: Fn(&[BaseMessage]) -> usize,
 {
-    pub fn new(max_tokens: usize, token_counter: F) -> Self {
+    #[builder]
+    pub fn new(
+        max_tokens: usize,
+        token_counter: F,
+        #[builder(default)] strategy: TrimStrategy,
+        #[builder(default)] allow_partial: bool,
+        #[builder(default)] include_system: bool,
+        end_on: Option<Vec<String>>,
+        start_on: Option<Vec<String>>,
+    ) -> Self {
         Self {
             max_tokens,
             token_counter,
-            strategy: TrimStrategy::Last,
-            allow_partial: false,
-            include_system: false,
-            end_on: None,
-            start_on: None,
+            strategy,
+            allow_partial,
+            include_system,
+            end_on,
+            start_on,
             text_splitter: None,
         }
-    }
-
-    pub fn with_strategy(mut self, strategy: TrimStrategy) -> Self {
-        self.strategy = strategy;
-        self
-    }
-
-    pub fn with_allow_partial(mut self, allow_partial: bool) -> Self {
-        self.allow_partial = allow_partial;
-        self
-    }
-
-    pub fn with_include_system(mut self, include_system: bool) -> Self {
-        self.include_system = include_system;
-        self
-    }
-
-    pub fn with_end_on(mut self, end_on: Vec<String>) -> Self {
-        self.end_on = Some(end_on);
-        self
-    }
-
-    pub fn with_start_on(mut self, start_on: Vec<String>) -> Self {
-        self.start_on = Some(start_on);
-        self
     }
 
     pub fn with_text_splitter<S2: Fn(&str) -> Vec<String>>(
@@ -1246,48 +1231,50 @@ pub fn filter_messages_runnable(
     exclude_ids: Option<Vec<String>>,
     exclude_tool_calls: Option<ExcludeToolCalls>,
 ) -> RunnableLambdaWithConfig<Vec<BaseMessage>, Vec<BaseMessage>> {
-    RunnableLambdaWithConfig::new(move |messages: Vec<BaseMessage>| {
-        let include_names_refs: Option<Vec<&str>> = include_names
-            .as_ref()
-            .map(|v| v.iter().map(|s| s.as_str()).collect());
-        let exclude_names_refs: Option<Vec<&str>> = exclude_names
-            .as_ref()
-            .map(|v| v.iter().map(|s| s.as_str()).collect());
-        let include_types_refs: Option<Vec<&str>> = include_types
-            .as_ref()
-            .map(|v| v.iter().map(|s| s.as_str()).collect());
-        let exclude_types_refs: Option<Vec<&str>> = exclude_types
-            .as_ref()
-            .map(|v| v.iter().map(|s| s.as_str()).collect());
-        let include_ids_refs: Option<Vec<&str>> = include_ids
-            .as_ref()
-            .map(|v| v.iter().map(|s| s.as_str()).collect());
-        let exclude_ids_refs: Option<Vec<&str>> = exclude_ids
-            .as_ref()
-            .map(|v| v.iter().map(|s| s.as_str()).collect());
+    RunnableLambdaWithConfig::from_func_named(
+        move |messages: Vec<BaseMessage>| {
+            let include_names_refs: Option<Vec<&str>> = include_names
+                .as_ref()
+                .map(|v| v.iter().map(|s| s.as_str()).collect());
+            let exclude_names_refs: Option<Vec<&str>> = exclude_names
+                .as_ref()
+                .map(|v| v.iter().map(|s| s.as_str()).collect());
+            let include_types_refs: Option<Vec<&str>> = include_types
+                .as_ref()
+                .map(|v| v.iter().map(|s| s.as_str()).collect());
+            let exclude_types_refs: Option<Vec<&str>> = exclude_types
+                .as_ref()
+                .map(|v| v.iter().map(|s| s.as_str()).collect());
+            let include_ids_refs: Option<Vec<&str>> = include_ids
+                .as_ref()
+                .map(|v| v.iter().map(|s| s.as_str()).collect());
+            let exclude_ids_refs: Option<Vec<&str>> = exclude_ids
+                .as_ref()
+                .map(|v| v.iter().map(|s| s.as_str()).collect());
 
-        Ok(filter_messages(
-            &messages,
-            include_names_refs.as_deref(),
-            exclude_names_refs.as_deref(),
-            include_types_refs.as_deref(),
-            exclude_types_refs.as_deref(),
-            include_ids_refs.as_deref(),
-            exclude_ids_refs.as_deref(),
-            exclude_tool_calls.as_ref(),
-        ))
-    })
-    .with_name("filter_messages")
+            Ok(filter_messages(
+                &messages,
+                include_names_refs.as_deref(),
+                exclude_names_refs.as_deref(),
+                include_types_refs.as_deref(),
+                exclude_types_refs.as_deref(),
+                include_ids_refs.as_deref(),
+                exclude_ids_refs.as_deref(),
+                exclude_tool_calls.as_ref(),
+            ))
+        },
+        "filter_messages",
+    )
 }
 
 pub fn merge_message_runs_runnable(
     chunk_separator: Option<String>,
 ) -> RunnableLambdaWithConfig<Vec<BaseMessage>, Vec<BaseMessage>> {
     let separator = chunk_separator.unwrap_or_else(|| "\n".to_string());
-    RunnableLambdaWithConfig::new(move |messages: Vec<BaseMessage>| {
-        Ok(merge_message_runs(&messages, &separator))
-    })
-    .with_name("merge_message_runs")
+    RunnableLambdaWithConfig::from_func_named(
+        move |messages: Vec<BaseMessage>| Ok(merge_message_runs(&messages, &separator)),
+        "merge_message_runs",
+    )
 }
 
 pub fn trim_messages_runnable<F, S>(
@@ -1298,8 +1285,8 @@ where
     S: Fn(&str) -> Vec<String> + Send + Sync + 'static,
 {
     let config = Arc::new(config);
-    RunnableLambdaWithConfig::new(move |messages: Vec<BaseMessage>| {
-        Ok(trim_messages(&messages, &config))
-    })
-    .with_name("trim_messages")
+    RunnableLambdaWithConfig::from_func_named(
+        move |messages: Vec<BaseMessage>| Ok(trim_messages(&messages, &config)),
+        "trim_messages",
+    )
 }

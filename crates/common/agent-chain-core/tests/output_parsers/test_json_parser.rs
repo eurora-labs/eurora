@@ -6,28 +6,28 @@ use serde_json::json;
 
 #[test]
 fn test_parse_valid_json() {
-    let parser = JsonOutputParser::new();
+    let parser = JsonOutputParser::builder().build();
     let result = parser.parse(r#"{"foo": "bar"}"#).unwrap();
     assert_eq!(result, json!({"foo": "bar"}));
 }
 
 #[test]
 fn test_parse_json_in_code_block() {
-    let parser = JsonOutputParser::new();
+    let parser = JsonOutputParser::builder().build();
     let result = parser.parse("```json\n{\"foo\": \"bar\"}\n```").unwrap();
     assert_eq!(result, json!({"foo": "bar"}));
 }
 
 #[test]
 fn test_parse_json_in_plain_code_block() {
-    let parser = JsonOutputParser::new();
+    let parser = JsonOutputParser::builder().build();
     let result = parser.parse("```\n{\"foo\": \"bar\"}\n```").unwrap();
     assert_eq!(result, json!({"foo": "bar"}));
 }
 
 #[test]
 fn test_parse_json_with_surrounding_text() {
-    let parser = JsonOutputParser::new();
+    let parser = JsonOutputParser::builder().build();
     let result = parser
         .parse("Some text\n```\n{\"foo\": \"bar\"}\n```\nMore text")
         .unwrap();
@@ -36,7 +36,7 @@ fn test_parse_json_with_surrounding_text() {
 
 #[test]
 fn test_parse_invalid_json_raises() {
-    let parser = JsonOutputParser::new();
+    let parser = JsonOutputParser::builder().build();
     let result = parser.parse("not json at all");
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
@@ -48,7 +48,7 @@ fn test_parse_invalid_json_raises() {
 
 #[test]
 fn test_parse_nested_json() {
-    let parser = JsonOutputParser::new();
+    let parser = JsonOutputParser::builder().build();
     let result = parser
         .parse(r#"{"outer": {"inner": {"deep": "value"}}}"#)
         .unwrap();
@@ -57,7 +57,7 @@ fn test_parse_nested_json() {
 
 #[test]
 fn test_parse_json_with_array() {
-    let parser = JsonOutputParser::new();
+    let parser = JsonOutputParser::builder().build();
     let result = parser
         .parse(r#"{"items": [1, 2, 3], "name": "test"}"#)
         .unwrap();
@@ -66,28 +66,28 @@ fn test_parse_json_with_array() {
 
 #[test]
 fn test_parse_json_with_newlines_in_values() {
-    let parser = JsonOutputParser::new();
+    let parser = JsonOutputParser::builder().build();
     let result = parser.parse(r#"{"code": "line1\nline2"}"#).unwrap();
     assert_eq!(result, json!({"code": "line1\nline2"}));
 }
 
 #[test]
 fn test_parse_json_with_unicode() {
-    let parser = JsonOutputParser::new();
+    let parser = JsonOutputParser::builder().build();
     let result = parser.parse(r#"{"name": "你好世界"}"#).unwrap();
     assert_eq!(result, json!({"name": "你好世界"}));
 }
 
 #[test]
 fn test_parse_json_with_whitespace() {
-    let parser = JsonOutputParser::new();
+    let parser = JsonOutputParser::builder().build();
     let result = parser.parse("  \n  {\"foo\": \"bar\"}  \n  ").unwrap();
     assert_eq!(result, json!({"foo": "bar"}));
 }
 
 #[test]
 fn test_parse_json_with_boolean_and_null() {
-    let parser = JsonOutputParser::new();
+    let parser = JsonOutputParser::builder().build();
     let result = parser
         .parse(r#"{"active": true, "deleted": false, "metadata": null}"#)
         .unwrap();
@@ -99,7 +99,7 @@ fn test_parse_json_with_boolean_and_null() {
 
 #[test]
 fn test_parse_json_numeric_values() {
-    let parser = JsonOutputParser::new();
+    let parser = JsonOutputParser::builder().build();
     let result = parser
         .parse(r#"{"int": 42, "float": 3.15, "negative": -1}"#)
         .unwrap();
@@ -108,39 +108,39 @@ fn test_parse_json_numeric_values() {
 
 #[test]
 fn test_parse_result_full() {
-    let parser = JsonOutputParser::new();
-    let generation = Generation::new(r#"{"key": "value"}"#);
+    let parser = JsonOutputParser::builder().build();
+    let generation = Generation::builder().text(r#"{"key": "value"}"#).build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result, json!({"key": "value"}));
 }
 
 #[test]
 fn test_parse_result_partial_valid() {
-    let parser = JsonOutputParser::new();
-    let generation = Generation::new(r#"{"key": "val"#);
+    let parser = JsonOutputParser::builder().build();
+    let generation = Generation::builder().text(r#"{"key": "val"#).build();
     let result = parser.parse_result(&[generation], true).unwrap();
     assert_eq!(result, json!({"key": "val"}));
 }
 
 #[test]
 fn test_parse_result_partial_returns_err_for_unparseable() {
-    let parser = JsonOutputParser::new();
-    let generation = Generation::new("not json");
+    let parser = JsonOutputParser::builder().build();
+    let generation = Generation::builder().text("not json").build();
     let result = parser.parse_result(&[generation], true);
     assert!(result.is_err());
 }
 
 #[test]
 fn test_parse_result_non_partial_raises_on_invalid() {
-    let parser = JsonOutputParser::new();
-    let generation = Generation::new("not json");
+    let parser = JsonOutputParser::builder().build();
+    let generation = Generation::builder().text("not json").build();
     let result = parser.parse_result(&[generation], false);
     assert!(result.is_err());
 }
 
 #[test]
 fn test_format_instructions_no_schema() {
-    let parser = JsonOutputParser::new();
+    let parser = JsonOutputParser::builder().build();
     let instructions = parser.get_format_instructions().unwrap();
     assert_eq!(instructions, "Return a JSON object.");
 }
@@ -227,7 +227,7 @@ fn test_format_instructions_do_not_alter_schema() {
 
 #[test]
 fn test_parser_type() {
-    let parser = JsonOutputParser::new();
+    let parser = JsonOutputParser::builder().build();
     assert_eq!(parser.parser_type(), "simple_json_output_parser");
 }
 
@@ -256,15 +256,15 @@ fn test_get_schema_with_properties() {
 
 #[test]
 fn test_simple_json_output_parser_parse() {
-    let parser = SimpleJsonOutputParser::new();
+    let parser = SimpleJsonOutputParser::builder().build();
     let result = parser.parse(r#"{"a": 1}"#).unwrap();
     assert_eq!(result, json!({"a": 1}));
 }
 
 #[test]
 fn test_simple_json_output_parser_is_same_type() {
-    let json_parser = JsonOutputParser::new();
-    let simple_parser = SimpleJsonOutputParser::new();
+    let json_parser = JsonOutputParser::builder().build();
+    let simple_parser = SimpleJsonOutputParser::builder().build();
 
     let input = r#"{"key": "value"}"#;
     assert_eq!(
@@ -276,7 +276,7 @@ fn test_simple_json_output_parser_is_same_type() {
 
 #[test]
 fn test_diff_add_key() {
-    let parser = JsonOutputParser::new().with_diff();
+    let parser = JsonOutputParser::builder().diff(true).build();
     let prev = json!({"a": 1});
     let next = json!({"a": 1, "b": 2});
     let diff = parser
@@ -293,7 +293,7 @@ fn test_diff_add_key() {
 
 #[test]
 fn test_diff_replace_value() {
-    let parser = JsonOutputParser::new().with_diff();
+    let parser = JsonOutputParser::builder().diff(true).build();
     let prev = json!({"a": 1});
     let next = json!({"a": 2});
     let diff = parser
@@ -308,7 +308,7 @@ fn test_diff_replace_value() {
 
 #[test]
 fn test_diff_remove_key() {
-    let parser = JsonOutputParser::new().with_diff();
+    let parser = JsonOutputParser::builder().diff(true).build();
     let prev = json!({"a": 1, "b": 2});
     let next = json!({"a": 1});
     let diff = parser
@@ -325,7 +325,7 @@ fn test_diff_remove_key() {
 
 #[test]
 fn test_diff_from_none() {
-    let parser = JsonOutputParser::new().with_diff();
+    let parser = JsonOutputParser::builder().diff(true).build();
     let next = json!({"a": 1});
     let diff = parser
         .compute_diff(None, next)
@@ -336,7 +336,7 @@ fn test_diff_from_none() {
 
 #[test]
 fn test_diff_no_change() {
-    let parser = JsonOutputParser::new().with_diff();
+    let parser = JsonOutputParser::builder().diff(true).build();
     let prev = json!({"a": 1});
     let next = json!({"a": 1});
     let diff = parser

@@ -76,8 +76,9 @@ mod tests {
         let obj = CustomSerializable { value: 42 };
         let json = dumps(&obj, false).unwrap();
 
-        let config =
-            ReviverConfig::new().with_valid_namespaces(vec!["custom_namespace".to_string()]);
+        let config = ReviverConfig::builder()
+            .valid_namespaces(vec!["custom_namespace".to_string()])
+            .build();
         let loaded = loads(&json, Some(config)).unwrap();
         assert!(loaded.is_object());
     }
