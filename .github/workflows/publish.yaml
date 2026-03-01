@@ -122,7 +122,7 @@ jobs:
         needs: build-sveltekit
         runs-on: ubuntu-latest
         strategy:
-            fail-fast: false
+            fail-fast: true
             matrix:
                 browser: [chrome, firefox, edge]
         steps:
@@ -137,15 +137,11 @@ jobs:
               env:
                   BUILD_VERSION: ${{ needs.build-sveltekit.outputs.version }}
               run: |
-                  # Browser extensions use 1.0.X while the desktop app uses 0.0.X
-                  PATCH="${BUILD_VERSION##*.}"
-                  VERSION="1.0.${PATCH}"
                   {
                     echo 'version<<EOF'
-                    echo "$VERSION"
+                    echo "$BUILD_VERSION"
                     echo 'EOF'
                   } >> "$GITHUB_ENV"
-                  echo "Browser extension version: $VERSION (from desktop $BUILD_VERSION)"
 
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
@@ -988,10 +984,12 @@ jobs:
 
                   mkdir -p extensions
                   for browser in chrome firefox edge; do
-                    if [ -f "release-artifacts/browser-${browser}/${browser}.zip" ]; then
-                      mkdir -p "extensions/${browser}"
-                      unzip -q "release-artifacts/browser-${browser}/${browser}.zip" -d "extensions/${browser}"
+                    if [ ! -f "release-artifacts/browser-${browser}/${browser}.zip" ]; then
+                      echo "ERROR: Missing browser extension artifact for ${browser}"
+                      exit 1
                     fi
+                    mkdir -p "extensions/${browser}"
+                    unzip -q "release-artifacts/browser-${browser}/${browser}.zip" -d "extensions/${browser}"
                   done
                   cd extensions && zip -r ../gh-release/extensions.zip . && cd ..
 
