@@ -9,8 +9,8 @@ publish = false
 argon2 = { workspace = true }
 auth-core = { workspace = true }
 be-auth-core = { workspace = true }
-bon = { workspace = true }
 be-remote-db = { workspace = true }
+bon = { workspace = true }
 chacha20poly1305 = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 hex = { workspace = true }
@@ -20,7 +20,7 @@ percent-encoding = { workspace = true }
 prost = { workspace = true }
 proto-gen = { workspace = true, features = ["server"] }
 rand = { workspace = true }
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { workspace = true, features = ["json"] }
 serde = { workspace = true, features = ["derive"] }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
