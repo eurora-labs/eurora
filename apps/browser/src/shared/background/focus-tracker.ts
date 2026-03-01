@@ -12,6 +12,7 @@ export function initFocusTracker(port: browser.Runtime.Port): void {
 	browser.tabs.onActivated.addListener(onTabActivated);
 	browser.tabs.onUpdated.addListener(onTabUpdated);
 	browser.tabs.onRemoved.addListener(onTabRemoved);
+	browser.windows.onFocusChanged.addListener(onWindowFocusChanged);
 
 	sendMetadataForActiveTab().catch(console.error);
 	startCollecting().catch(console.error);
@@ -24,6 +25,7 @@ export function destroyFocusTracker(): void {
 	browser.tabs.onActivated.removeListener(onTabActivated);
 	browser.tabs.onUpdated.removeListener(onTabUpdated);
 	browser.tabs.onRemoved.removeListener(onTabRemoved);
+	browser.windows.onFocusChanged.removeListener(onWindowFocusChanged);
 }
 
 export function setNativePort(port: browser.Runtime.Port | null): void {
@@ -51,6 +53,14 @@ async function onTabUpdated(
 	if (changeInfo.status !== 'complete') return;
 	if (!activeNativePort) return;
 	if (!tab.active) return;
+	collectGeneration++;
+	await sendMetadataForActiveTab();
+	startCollecting().catch(console.error);
+}
+
+async function onWindowFocusChanged(windowId: number): Promise<void> {
+	if (windowId === browser.windows.WINDOW_ID_NONE) return;
+	if (!activeNativePort) return;
 	collectGeneration++;
 	await sendMetadataForActiveTab();
 	startCollecting().catch(console.error);
