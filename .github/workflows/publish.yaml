@@ -118,6 +118,72 @@ jobs:
                   retention-days: 1
                   if-no-files-found: error
 
+    build-browser:
+        needs: build-sveltekit
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: true
+            matrix:
+                browser: [chrome, firefox, edge]
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  persist-credentials: false
+                  lfs: true
+
+            - name: Set version
+              shell: bash
+              env:
+                  BUILD_VERSION: ${{ needs.build-sveltekit.outputs.version }}
+              run: |
+                  {
+                    echo 'version<<EOF'
+                    echo "$BUILD_VERSION"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
+
+            - name: Init Node Environment
+              uses: ./.github/actions/init-env-node
+
+            - name: Install Protoc
+              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+              with:
+                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Compile Protobuf
+              run: pnpm proto:typescript
+
+            - name: Build extension
+              shell: bash
+              env:
+                  NODE_ENV: production
+                  VERSION: ${{ env.version }}
+                  BROWSER: ${{ matrix.browser }}
+              run: |
+                  pnpm run "build:${BROWSER}"
+
+            - name: Create extension zip
+              shell: bash
+              env:
+                  BROWSER: ${{ matrix.browser }}
+                  VERSION: ${{ env.version }}
+              run: |
+                  mkdir -p release
+                  cd "apps/browser/dist/${BROWSER}"
+                  zip -r "../../../../release/${BROWSER}.zip" . -x "*.git*" -x "*.zip"
+                  cd ../../../..
+                  echo "$VERSION" > release/version
+                  echo "Created release/${BROWSER}.zip"
+                  ls -lh "release/${BROWSER}.zip"
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+              with:
+                  name: 'browser-${{ matrix.browser }}-${{ github.run_number }}'
+                  path: release/
+                  if-no-files-found: error
+
     build-tauri:
         needs: build-sveltekit
         env:
@@ -345,7 +411,7 @@ jobs:
                   }
 
             - name: Sign Windows executables with Azure Trusted Signing
-              if: runner.os == 'Windows'
+              if: runner.os == 'Windows' && env.channel == 'release'
               uses: azure/trusted-signing-action@87c2e83e6868da99d3380aa309851b32ed9a8346 # v1.1.0
               with:
                   azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -362,7 +428,7 @@ jobs:
                   timestamp-digest: SHA256
 
             - name: Re-sign code-signed MSI with Tauri updater key
-              if: runner.os == 'Windows'
+              if: runner.os == 'Windows' && env.channel == 'release'
               shell: bash
               env:
                   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
@@ -776,7 +842,7 @@ jobs:
               run: curl "${SENTRY_CRONS_URL}?status=ok"
 
     create-github-release:
-        needs: [build-sveltekit, publish-tauri, create-git-tag]
+        needs: [build-sveltekit, publish-tauri, create-git-tag, build-browser]
         if: needs.build-sveltekit.outputs.channel == 'release'
         runs-on: ubuntu-latest
         permissions:
@@ -817,6 +883,24 @@ jobs:
                   name: 'release-windows-latest-${{ github.run_number }}'
                   path: release-artifacts/windows
 
+            - name: Download Chrome extension artifact
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: 'browser-chrome-${{ github.run_number }}'
+                  path: release-artifacts/browser-chrome
+
+            - name: Download Firefox extension artifact
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: 'browser-firefox-${{ github.run_number }}'
+                  path: release-artifacts/browser-firefox
+
+            - name: Download Edge extension artifact
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: 'browser-edge-${{ github.run_number }}'
+                  path: release-artifacts/browser-edge
+
             - name: Collect release files
               shell: bash
               run: |
@@ -828,6 +912,18 @@ jobs:
                     -name "*.deb" -o \
                     -name "*.rpm" \
                   \) -exec cp {} gh-release/ \;
+
+                  mkdir -p extensions
+                  for browser in chrome firefox edge; do
+                    if [ ! -f "release-artifacts/browser-${browser}/${browser}.zip" ]; then
+                      echo "ERROR: Missing browser extension artifact for ${browser}"
+                      exit 1
+                    fi
+                    mkdir -p "extensions/${browser}"
+                    unzip -q "release-artifacts/browser-${browser}/${browser}.zip" -d "extensions/${browser}"
+                  done
+                  cd extensions && zip -r ../gh-release/extensions.zip . && cd ..
+
                   echo "Release files:"
                   ls -lh gh-release/
 
