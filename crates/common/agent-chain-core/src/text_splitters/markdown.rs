@@ -1,3 +1,4 @@
+use bon::bon;
 use std::collections::HashMap;
 
 use async_trait::async_trait;
@@ -17,7 +18,11 @@ impl MarkdownTextSplitter {
         let separators =
             RecursiveCharacterTextSplitter::get_separators_for_language(Language::Markdown);
         Self {
-            inner: RecursiveCharacterTextSplitter::new(Some(separators), Some(true), config),
+            inner: RecursiveCharacterTextSplitter::builder()
+                .separators(separators)
+                .is_separator_regex(true)
+                .config(config)
+                .build(),
         }
     }
 }
@@ -65,11 +70,13 @@ pub struct MarkdownHeaderTextSplitter {
     custom_header_patterns: HashMap<String, usize>,
 }
 
+#[bon]
 impl MarkdownHeaderTextSplitter {
+    #[builder]
     pub fn new(
         headers_to_split_on: Vec<(String, String)>,
-        return_each_line: bool,
-        strip_headers: bool,
+        #[builder(default)] return_each_line: bool,
+        #[builder(default = true)] strip_headers: bool,
         custom_header_patterns: Option<HashMap<String, usize>>,
     ) -> Self {
         let mut headers = headers_to_split_on;
@@ -318,6 +325,7 @@ pub struct ExperimentalMarkdownSyntaxTextSplitter {
     return_each_line: bool,
 }
 
+#[bon]
 impl ExperimentalMarkdownSyntaxTextSplitter {
     const DEFAULT_HEADER_KEYS: &[(&str, &str)] = &[
         ("#", "Header 1"),
@@ -328,10 +336,11 @@ impl ExperimentalMarkdownSyntaxTextSplitter {
         ("######", "Header 6"),
     ];
 
+    #[builder]
     pub fn new(
         headers_to_split_on: Option<Vec<(String, String)>>,
-        return_each_line: bool,
-        strip_headers: bool,
+        #[builder(default)] return_each_line: bool,
+        #[builder(default = true)] strip_headers: bool,
     ) -> Self {
         let splittable_headers = if let Some(headers) = headers_to_split_on {
             headers.into_iter().collect()
@@ -526,16 +535,13 @@ mod tests {
 
     #[test]
     fn test_markdown_header_text_splitter_basic() {
-        let splitter = MarkdownHeaderTextSplitter::new(
-            vec![
+        let splitter = MarkdownHeaderTextSplitter::builder()
+            .headers_to_split_on(vec![
                 ("#".to_string(), "Header 1".to_string()),
                 ("##".to_string(), "Header 2".to_string()),
                 ("###".to_string(), "Header 3".to_string()),
-            ],
-            false,
-            true,
-            None,
-        );
+            ])
+            .build();
 
         let text = "# Foo\n\nBar\n## Baz\n\nQux\n### Quux\n\nCorge";
         let docs = splitter.split_text(text).unwrap();
@@ -546,15 +552,12 @@ mod tests {
 
     #[test]
     fn test_markdown_header_text_splitter_with_code_blocks() {
-        let splitter = MarkdownHeaderTextSplitter::new(
-            vec![
+        let splitter = MarkdownHeaderTextSplitter::builder()
+            .headers_to_split_on(vec![
                 ("#".to_string(), "Header 1".to_string()),
                 ("##".to_string(), "Header 2".to_string()),
-            ],
-            false,
-            true,
-            None,
-        );
+            ])
+            .build();
 
         let text = "# Title\n\n```\n# Not a header\n```\n\nSome text";
         let docs = splitter.split_text(text).unwrap();
@@ -563,12 +566,10 @@ mod tests {
 
     #[test]
     fn test_markdown_header_text_splitter_return_each_line() {
-        let splitter = MarkdownHeaderTextSplitter::new(
-            vec![("#".to_string(), "Header 1".to_string())],
-            true,
-            true,
-            None,
-        );
+        let splitter = MarkdownHeaderTextSplitter::builder()
+            .headers_to_split_on(vec![("#".to_string(), "Header 1".to_string())])
+            .return_each_line(true)
+            .build();
 
         let text = "# Foo\n\nBar\nBaz\n\nQux";
         let docs = splitter.split_text(text).unwrap();
@@ -592,7 +593,7 @@ mod tests {
 
     #[test]
     fn test_experimental_markdown_splitter_basic() {
-        let splitter = ExperimentalMarkdownSyntaxTextSplitter::new(None, false, true);
+        let splitter = ExperimentalMarkdownSyntaxTextSplitter::builder().build();
         let text = "# Title\n\nSome content\n\n## Subtitle\n\nMore content\n";
         let docs = splitter.split_text(text).unwrap();
         assert!(!docs.is_empty());
@@ -601,7 +602,7 @@ mod tests {
 
     #[test]
     fn test_experimental_markdown_splitter_code_blocks() {
-        let splitter = ExperimentalMarkdownSyntaxTextSplitter::new(None, false, true);
+        let splitter = ExperimentalMarkdownSyntaxTextSplitter::builder().build();
         let text = "# Title\n\n```python\nprint('hello')\n```\n\nSome text\n";
         let docs = splitter.split_text(text).unwrap();
         assert!(docs.len() >= 2);
@@ -611,7 +612,7 @@ mod tests {
 
     #[test]
     fn test_experimental_markdown_splitter_horizontal_rule() {
-        let splitter = ExperimentalMarkdownSyntaxTextSplitter::new(None, false, true);
+        let splitter = ExperimentalMarkdownSyntaxTextSplitter::builder().build();
         let text = "Part 1\n---\nPart 2\n";
         let docs = splitter.split_text(text).unwrap();
         assert_eq!(docs.len(), 2);
@@ -619,7 +620,9 @@ mod tests {
 
     #[test]
     fn test_experimental_markdown_splitter_return_each_line() {
-        let splitter = ExperimentalMarkdownSyntaxTextSplitter::new(None, true, true);
+        let splitter = ExperimentalMarkdownSyntaxTextSplitter::builder()
+            .return_each_line(true)
+            .build();
         let text = "# Title\n\nLine 1\nLine 2\n";
         let docs = splitter.split_text(text).unwrap();
         assert!(docs.len() >= 2);

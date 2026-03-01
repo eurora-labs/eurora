@@ -5,7 +5,9 @@ use agent_chain_core::RecursiveJsonSplitter;
 #[test]
 fn test_split_json() {
     let max_chunk = 800;
-    let splitter = RecursiveJsonSplitter::new(max_chunk, None);
+    let splitter = RecursiveJsonSplitter::builder()
+        .max_chunk_size(max_chunk)
+        .build();
 
     let mut val1 = serde_json::Map::new();
     for i in 0..100 {
@@ -39,7 +41,9 @@ fn test_split_json() {
 #[test]
 fn test_split_json_with_lists() {
     let max_chunk = 800;
-    let splitter = RecursiveJsonSplitter::new(max_chunk, None);
+    let splitter = RecursiveJsonSplitter::builder()
+        .max_chunk_size(max_chunk)
+        .build();
 
     let mut val1 = serde_json::Map::new();
     for i in 0..100 {
@@ -68,7 +72,9 @@ fn test_split_json_with_lists() {
 
 #[test]
 fn test_split_json_many_calls() {
-    let splitter = RecursiveJsonSplitter::new(2000, None);
+    let splitter = RecursiveJsonSplitter::builder()
+        .max_chunk_size(2000)
+        .build();
 
     let x = json!({"a": 1, "b": 2});
     let y = json!({"c": 3, "d": 4});

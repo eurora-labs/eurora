@@ -48,13 +48,13 @@ fn assert_docs_eq(actual: &[Document], expected: &[Document], test_case: &str) {
 // Test Case 1: Split on h1 and h2
 #[test]
 fn test_html_header_splitter_simple() {
-    let splitter = HTMLHeaderTextSplitter::new(
-        vec![
+    let splitter = HTMLHeaderTextSplitter::builder()
+        .headers_to_split_on(vec![
             ("h1".to_string(), "Header 1".to_string()),
             ("h2".to_string(), "Header 2".to_string()),
-        ],
-        true,
-    );
+        ])
+        .return_each_element(true)
+        .build();
 
     let html = r#"
         <html>
@@ -95,14 +95,14 @@ fn test_html_header_splitter_simple() {
 // Test Case 2: Nested headers with h1, h2, h3
 #[test]
 fn test_html_header_splitter_nested() {
-    let splitter = HTMLHeaderTextSplitter::new(
-        vec![
+    let splitter = HTMLHeaderTextSplitter::builder()
+        .headers_to_split_on(vec![
             ("h1".to_string(), "Header 1".to_string()),
             ("h2".to_string(), "Header 2".to_string()),
             ("h3".to_string(), "Header 3".to_string()),
-        ],
-        true,
-    );
+        ])
+        .return_each_element(true)
+        .build();
 
     let html = r#"
         <html>
@@ -168,8 +168,9 @@ fn test_html_header_splitter_nested() {
 // Test Case 3: No headers (aggregated)
 #[test]
 fn test_html_header_splitter_no_headers() {
-    let splitter =
-        HTMLHeaderTextSplitter::new(vec![("h1".to_string(), "Header 1".to_string())], false);
+    let splitter = HTMLHeaderTextSplitter::builder()
+        .headers_to_split_on(vec![("h1".to_string(), "Header 1".to_string())])
+        .build();
 
     let html = r#"
         <html>
@@ -196,8 +197,10 @@ fn test_html_header_splitter_no_headers() {
 // Test Case 4: Multiple headers of the same level
 #[test]
 fn test_html_header_splitter_same_level() {
-    let splitter =
-        HTMLHeaderTextSplitter::new(vec![("h1".to_string(), "Header 1".to_string())], true);
+    let splitter = HTMLHeaderTextSplitter::builder()
+        .headers_to_split_on(vec![("h1".to_string(), "Header 1".to_string())])
+        .return_each_element(true)
+        .build();
 
     let html = r#"
         <html>
@@ -229,13 +232,13 @@ fn test_html_header_splitter_same_level() {
 // Test Case 5: Headers with no content
 #[test]
 fn test_html_header_splitter_headers_no_content() {
-    let splitter = HTMLHeaderTextSplitter::new(
-        vec![
+    let splitter = HTMLHeaderTextSplitter::builder()
+        .headers_to_split_on(vec![
             ("h1".to_string(), "Header 1".to_string()),
             ("h2".to_string(), "Header 2".to_string()),
-        ],
-        true,
-    );
+        ])
+        .return_each_element(true)
+        .build();
 
     let html = r#"
         <html>
@@ -264,14 +267,13 @@ fn test_html_header_splitter_headers_no_content() {
 // Test Case A: Complex nested with h1, h2, h3 (aggregated, return_each_element=false)
 #[test]
 fn test_html_header_splitter_complex_nested() {
-    let splitter = HTMLHeaderTextSplitter::new(
-        vec![
+    let splitter = HTMLHeaderTextSplitter::builder()
+        .headers_to_split_on(vec![
             ("h1".to_string(), "Header 1".to_string()),
             ("h2".to_string(), "Header 2".to_string()),
             ("h3".to_string(), "Header 3".to_string()),
-        ],
-        false,
-    );
+        ])
+        .build();
 
     let html = r#"
         <!DOCTYPE html>
@@ -357,8 +359,9 @@ fn test_html_header_splitter_complex_nested() {
 // Test Case B: No headers, three paragraphs (aggregated)
 #[test]
 fn test_html_header_splitter_no_headers_three_paragraphs() {
-    let splitter =
-        HTMLHeaderTextSplitter::new(vec![("h1".to_string(), "Header 1".to_string())], false);
+    let splitter = HTMLHeaderTextSplitter::builder()
+        .headers_to_split_on(vec![("h1".to_string(), "Header 1".to_string())])
+        .build();
 
     let html = r#"
         <html>
@@ -383,14 +386,13 @@ fn test_html_header_splitter_no_headers_three_paragraphs() {
 // Test Case C: No headers with multiple splitter headers configured
 #[test]
 fn test_html_no_headers_with_multiple_splitters() {
-    let splitter = HTMLHeaderTextSplitter::new(
-        vec![
+    let splitter = HTMLHeaderTextSplitter::builder()
+        .headers_to_split_on(vec![
             ("h1".to_string(), "Header 1".to_string()),
             ("h2".to_string(), "Header 2".to_string()),
             ("h3".to_string(), "Header 3".to_string()),
-        ],
-        false,
-    );
+        ])
+        .build();
 
     let html = r#"
         <html>

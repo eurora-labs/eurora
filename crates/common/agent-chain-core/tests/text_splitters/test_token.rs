@@ -4,7 +4,7 @@ use agent_chain_core::text_splitters::{TextSplitterConfig, TokenTextSplitter};
 #[test]
 fn test_token_text_splitter() {
     let config = TextSplitterConfig::new(5, 0, None, None, None, None).unwrap();
-    let splitter = TokenTextSplitter::new(None, None, config).unwrap();
+    let splitter = TokenTextSplitter::builder().config(config).build().unwrap();
     // "abcdef" repeated 5 times = 30 chars
     // With gpt2 encoding, each "abcdef" may encode to different token counts
     // The Python test uses default gpt2 encoding with chunk_size=5, chunk_overlap=0
@@ -16,7 +16,7 @@ fn test_token_text_splitter() {
 #[test]
 fn test_token_text_splitter_overlap() {
     let config = TextSplitterConfig::new(5, 1, None, None, None, None).unwrap();
-    let splitter = TokenTextSplitter::new(None, None, config).unwrap();
+    let splitter = TokenTextSplitter::builder().config(config).build().unwrap();
     let output = splitter.split_text(&"abcdef".repeat(5)).unwrap();
     let expected = vec!["abcdefabcdefabc", "abcdefabcdefabc", "abcdef"];
     assert_eq!(output, expected);

@@ -102,8 +102,10 @@ impl TextSplitter for JSFrameworkTextSplitter {
         text: &str,
     ) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
         let separators = self.build_separators(text);
-        let inner =
-            RecursiveCharacterTextSplitter::new(Some(separators), None, self.config.clone());
+        let inner = RecursiveCharacterTextSplitter::builder()
+            .separators(separators)
+            .config(self.config.clone())
+            .build();
         inner.split_text(text)
     }
 }

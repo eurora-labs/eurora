@@ -16,7 +16,11 @@ impl PythonCodeTextSplitter {
         let separators =
             RecursiveCharacterTextSplitter::get_separators_for_language(Language::Python);
         Self {
-            inner: RecursiveCharacterTextSplitter::new(Some(separators), Some(true), config),
+            inner: RecursiveCharacterTextSplitter::builder()
+                .separators(separators)
+                .is_separator_regex(true)
+                .config(config)
+                .build(),
         }
     }
 }

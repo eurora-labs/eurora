@@ -1,3 +1,4 @@
+use bon::bon;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -72,12 +73,9 @@ pub struct TokenTextSplitter {
     tokenizer: Arc<CoreBPE>,
 }
 
+#[bon]
 impl TokenTextSplitter {
-    /// Create a new `TokenTextSplitter` with the given configuration and tiktoken encoding.
-    ///
-    /// - `encoding_name`: Name of the tiktoken encoding (e.g., "gpt2", "cl100k_base"). Defaults to "gpt2".
-    /// - `model_name`: If provided, resolves the encoding from the model name (e.g., "gpt-3.5-turbo").
-    /// - `config`: Text splitter configuration. `chunk_size` controls tokens per chunk, `chunk_overlap` controls token overlap.
+    #[builder]
     pub fn new(
         encoding_name: Option<&str>,
         model_name: Option<&str>,

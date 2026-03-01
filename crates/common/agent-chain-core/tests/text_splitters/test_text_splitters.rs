@@ -261,14 +261,20 @@ fn test_recursive_character_text_splitter_keep_separators() {
     // start
     let config =
         TextSplitterConfig::new(10, 0, None, Some(KeepSeparator::Start), None, None).unwrap();
-    let splitter = RecursiveCharacterTextSplitter::new(Some(split_tags.clone()), None, config);
+    let splitter = RecursiveCharacterTextSplitter::builder()
+        .separators(split_tags.clone())
+        .config(config)
+        .build();
     let result = splitter.split_text(query).unwrap();
     assert_eq!(result, vec!["Apple", ",banana", ",orange and tomato", "."]);
 
     // end
     let config2 =
         TextSplitterConfig::new(10, 0, None, Some(KeepSeparator::End), None, None).unwrap();
-    let splitter2 = RecursiveCharacterTextSplitter::new(Some(split_tags), None, config2);
+    let splitter2 = RecursiveCharacterTextSplitter::builder()
+        .separators(split_tags)
+        .config(config2)
+        .build();
     let result2 = splitter2.split_text(query).unwrap();
     assert_eq!(result2, vec!["Apple,", "banana,", "orange and tomato."]);
 }
@@ -371,16 +377,15 @@ fn test_create_documents_with_start_index_character() {
 #[test]
 fn test_create_documents_with_start_index_recursive() {
     let config = TextSplitterConfig::new(6, 0, None, None, Some(true), None).unwrap();
-    let splitter = RecursiveCharacterTextSplitter::new(
-        Some(vec![
+    let splitter = RecursiveCharacterTextSplitter::builder()
+        .separators(vec![
             "\n\n".to_string(),
             "\n".to_string(),
             " ".to_string(),
             String::new(),
-        ]),
-        None,
-        config,
-    );
+        ])
+        .config(config)
+        .build();
     let text = "w1 w1 w1 w1 w1 w1 w1 w1 w1";
     let docs = splitter
         .create_documents(&[text.to_string()], None)
@@ -448,11 +453,10 @@ fn run_iterative_text_splitter(chunk_size: usize, keep_separator: bool) -> Vec<S
     };
     let config =
         TextSplitterConfig::new(effective_chunk_size, 0, None, Some(keep), None, None).unwrap();
-    let splitter = RecursiveCharacterTextSplitter::new(
-        Some(vec!["X".to_string(), "Y".to_string()]),
-        None,
-        config,
-    );
+    let splitter = RecursiveCharacterTextSplitter::builder()
+        .separators(vec!["X".to_string(), "Y".to_string()])
+        .config(config)
+        .build();
     let text = "....5X..3Y...4X....5Y...";
     let output = splitter.split_text(text).unwrap();
     for chunk in &output {
@@ -482,7 +486,9 @@ fn test_iterative_text_splitter() {
     let text = "Hi.\n\nI'm Harrison.\n\nHow? Are? You?\nOkay then f f f f.\nThis is a weird text to write, but gotta test the splittingggg some how.\n\nBye!\n\n-H.";
     let config =
         TextSplitterConfig::new(10, 1, None, Some(KeepSeparator::Start), None, None).unwrap();
-    let splitter = RecursiveCharacterTextSplitter::new(None, None, config);
+    let splitter = RecursiveCharacterTextSplitter::builder()
+        .config(config)
+        .build();
     let output = splitter.split_text(text).unwrap();
     let expected = vec![
         "Hi.",
