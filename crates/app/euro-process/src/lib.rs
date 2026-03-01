@@ -27,6 +27,15 @@ impl ProcessFunctionality for Eurora {
 }
 
 #[derive(Debug, Clone)]
+pub struct EuroraNightly;
+
+impl ProcessFunctionality for EuroraNightly {
+    fn get_name(&self) -> &str {
+        os_pick("eurora-nightly.exe", "eurora-nightly", "Eurora Nightly")
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Librewolf;
 
 impl ProcessFunctionality for Librewolf {
