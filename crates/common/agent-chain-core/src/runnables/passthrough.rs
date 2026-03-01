@@ -61,17 +61,21 @@ where
     I: Send + Sync + Clone + Debug + 'static,
 {
     fn default() -> Self {
-        Self::new()
+        Self::builder().build()
     }
 }
 
+#[bon::bon]
 impl<I> RunnablePassthrough<I>
 where
     I: Send + Sync + Clone + Debug + 'static,
 {
-    pub fn new() -> Self {
+    #[builder]
+    pub fn new(
+        #[builder(into)] name: Option<String>,
+    ) -> Self {
         Self {
-            name: None,
+            name,
             func: None,
             afunc: None,
             _phantom: std::marker::PhantomData,
@@ -103,11 +107,6 @@ where
             })),
             _phantom: std::marker::PhantomData,
         }
-    }
-
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
     }
 
     pub fn assign() -> RunnableAssignBuilder {
@@ -269,7 +268,7 @@ pub struct RunnableAssignBuilder {
 impl RunnableAssignBuilder {
     fn new() -> Self {
         Self {
-            mapper: RunnableParallel::new(),
+            mapper: RunnableParallel::builder().build(),
         }
     }
 
@@ -282,7 +281,7 @@ impl RunnableAssignBuilder {
     }
 
     pub fn build(self) -> RunnableAssign {
-        RunnableAssign::new(self.mapper)
+        RunnableAssign::builder().mapper(self.mapper).build()
     }
 }
 
@@ -300,14 +299,14 @@ impl Debug for RunnableAssign {
     }
 }
 
+#[bon::bon]
 impl RunnableAssign {
-    pub fn new(mapper: RunnableParallel<HashMap<String, Value>>) -> Self {
-        Self { mapper, name: None }
-    }
-
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
+    #[builder]
+    pub fn new(
+        mapper: RunnableParallel<HashMap<String, Value>>,
+        #[builder(into)] name: Option<String>,
+    ) -> Self {
+        Self { mapper, name }
     }
 
     pub fn mapper(&self) -> &RunnableParallel<HashMap<String, Value>> {
@@ -564,24 +563,27 @@ impl From<PickKeys> for RunnablePick {
     }
 }
 
+#[bon::bon]
 impl RunnablePick {
-    pub fn new_single(key: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new_single(
+        #[builder(into)] key: String,
+        #[builder(into)] name: Option<String>,
+    ) -> Self {
         Self {
-            keys: PickKeys::Single(key.into()),
-            name: None,
+            keys: PickKeys::Single(key),
+            name,
         }
     }
 
-    pub fn new_multi(keys: impl IntoIterator<Item = impl Into<String>>) -> Self {
+    pub fn new_multi(
+        keys: impl IntoIterator<Item = impl Into<String>>,
+        name: Option<String>,
+    ) -> Self {
         Self {
             keys: PickKeys::Multiple(keys.into_iter().map(Into::into).collect()),
-            name: None,
+            name,
         }
-    }
-
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
     }
 
     fn pick(&self, input: &HashMap<String, Value>) -> Option<Value> {
@@ -706,7 +708,7 @@ pub fn graph_passthrough<I>() -> RunnablePassthrough<I>
 where
     I: Send + Sync + Clone + Debug + 'static,
 {
-    RunnablePassthrough::new()
+    RunnablePassthrough::builder().build()
 }
 
 #[cfg(test)]
@@ -715,7 +717,7 @@ mod tests {
 
     #[test]
     fn test_runnable_passthrough() {
-        let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
+        let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
         let result = passthrough.invoke(42, None).unwrap();
         assert_eq!(result, 42);
     }
@@ -723,7 +725,7 @@ mod tests {
     #[test]
     fn test_runnable_passthrough_with_name() {
         let passthrough: RunnablePassthrough<i32> =
-            RunnablePassthrough::new().with_name("test_passthrough");
+            RunnablePassthrough::builder().name("test_passthrough").build();
         assert_eq!(passthrough.name(), Some("test_passthrough".to_string()));
     }
 
@@ -747,7 +749,7 @@ mod tests {
 
     #[test]
     fn test_runnable_pick_single() {
-        let pick = RunnablePick::new_single("name");
+        let pick = RunnablePick::new_single_builder().key("name").build();
 
         let mut input = HashMap::new();
         input.insert("name".to_string(), serde_json::json!("John"));
@@ -759,7 +761,7 @@ mod tests {
 
     #[test]
     fn test_runnable_pick_multiple() {
-        let pick = RunnablePick::new_multi(vec!["name", "age"]);
+        let pick = RunnablePick::new_multi(vec!["name", "age"], None);
 
         let mut input = HashMap::new();
         input.insert("name".to_string(), serde_json::json!("John"));
@@ -775,10 +777,10 @@ mod tests {
 
     #[test]
     fn test_runnable_pick_name() {
-        let pick_single = RunnablePick::new_single("name");
+        let pick_single = RunnablePick::new_single_builder().key("name").build();
         assert_eq!(pick_single.name(), Some("RunnablePick<name>".to_string()));
 
-        let pick_multi = RunnablePick::new_multi(vec!["name", "age"]);
+        let pick_multi = RunnablePick::new_multi(vec!["name", "age"], None);
         assert_eq!(
             pick_multi.name(),
             Some("RunnablePick<name,age>".to_string())
@@ -787,14 +789,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_runnable_passthrough_async() {
-        let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::new();
+        let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
         let result = passthrough.ainvoke(42, None).await.unwrap();
         assert_eq!(result, 42);
     }
 
     #[tokio::test]
     async fn test_runnable_pick_async() {
-        let pick = RunnablePick::new_single("name");
+        let pick = RunnablePick::new_single_builder().key("name").build();
 
         let mut input = HashMap::new();
         input.insert("name".to_string(), serde_json::json!("John"));

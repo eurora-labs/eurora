@@ -2,6 +2,7 @@ use std::fmt::Debug;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use bon::bon;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
@@ -56,29 +57,21 @@ impl Default for ExponentialJitterParams {
     }
 }
 
+#[bon]
 impl ExponentialJitterParams {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_initial(mut self, initial: f64) -> Self {
-        self.initial = initial;
-        self
-    }
-
-    pub fn with_max(mut self, max: f64) -> Self {
-        self.max = max;
-        self
-    }
-
-    pub fn with_exp_base(mut self, exp_base: f64) -> Self {
-        self.exp_base = exp_base;
-        self
-    }
-
-    pub fn with_jitter(mut self, jitter: f64) -> Self {
-        self.jitter = jitter;
-        self
+    #[builder]
+    pub fn new(
+        #[builder(default = 1.0)] initial: f64,
+        #[builder(default = 60.0)] max: f64,
+        #[builder(default = 2.0)] exp_base: f64,
+        #[builder(default = 1.0)] jitter: f64,
+    ) -> Self {
+        Self {
+            initial,
+            max,
+            exp_base,
+            jitter,
+        }
     }
 
     pub fn calculate_wait(&self, attempt: usize) -> Duration {
@@ -150,29 +143,21 @@ impl Default for RunnableRetryConfig {
     }
 }
 
+#[bon]
 impl RunnableRetryConfig {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_retry_predicate(mut self, predicate: RetryErrorPredicate) -> Self {
-        self.retry_predicate = predicate;
-        self
-    }
-
-    pub fn with_wait_exponential_jitter(mut self, wait: bool) -> Self {
-        self.wait_exponential_jitter = wait;
-        self
-    }
-
-    pub fn with_exponential_jitter_params(mut self, params: ExponentialJitterParams) -> Self {
-        self.exponential_jitter_params = Some(params);
-        self
-    }
-
-    pub fn with_max_attempt_number(mut self, max: usize) -> Self {
-        self.max_attempt_number = max;
-        self
+    #[builder]
+    pub fn new(
+        #[builder(default)] retry_predicate: RetryErrorPredicate,
+        #[builder(default = true)] wait_exponential_jitter: bool,
+        exponential_jitter_params: Option<ExponentialJitterParams>,
+        #[builder(default = 3)] max_attempt_number: usize,
+    ) -> Self {
+        Self {
+            retry_predicate,
+            wait_exponential_jitter,
+            exponential_jitter_params,
+            max_attempt_number,
+        }
     }
 }
 
@@ -212,11 +197,10 @@ where
     pub fn with_simple(bound: R, max_attempts: usize, wait_exponential_jitter: bool) -> Self {
         Self {
             bound,
-            config: RunnableRetryConfig {
-                max_attempt_number: max_attempts,
-                wait_exponential_jitter,
-                ..Default::default()
-            },
+            config: RunnableRetryConfig::builder()
+                .max_attempt_number(max_attempts)
+                .wait_exponential_jitter(wait_exponential_jitter)
+                .build(),
         }
     }
 
@@ -646,7 +630,7 @@ mod tests {
 
     #[test]
     fn test_retry_succeeds_first_attempt() {
-        let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
+        let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let config = RunnableRetryConfig::new()
             .with_max_attempt_number(3)
             .with_wait_exponential_jitter(false);
@@ -661,14 +645,14 @@ mod tests {
         let counter = Arc::new(AtomicUsize::new(0));
         let counter_clone = counter.clone();
 
-        let runnable = RunnableLambda::new(move |x: i32| {
+        let runnable = RunnableLambda::builder().func(move |x: i32| {
             let count = counter_clone.fetch_add(1, Ordering::SeqCst);
             if count < 2 {
                 Err(Error::other("transient failure"))
             } else {
                 Ok(x * 2)
             }
-        });
+        }).build();
 
         let config = RunnableRetryConfig::new()
             .with_max_attempt_number(5)
@@ -685,10 +669,10 @@ mod tests {
         let counter = Arc::new(AtomicUsize::new(0));
         let counter_clone = counter.clone();
 
-        let runnable = RunnableLambda::new(move |_x: i32| {
+        let runnable = RunnableLambda::builder().func(move |_x: i32| {
             counter_clone.fetch_add(1, Ordering::SeqCst);
             Err::<i32, _>(Error::other("always fails"))
-        });
+        }).build();
 
         let config = RunnableRetryConfig::new()
             .with_max_attempt_number(3)
@@ -705,10 +689,10 @@ mod tests {
         let counter = Arc::new(AtomicUsize::new(0));
         let counter_clone = counter.clone();
 
-        let runnable = RunnableLambda::new(move |_x: i32| {
+        let runnable = RunnableLambda::builder().func(move |_x: i32| {
             counter_clone.fetch_add(1, Ordering::SeqCst);
             Err::<i32, _>(Error::other("not an HTTP error"))
-        });
+        }).build();
 
         let config = RunnableRetryConfig::new()
             .with_max_attempt_number(3)
@@ -753,7 +737,7 @@ mod tests {
 
     #[test]
     fn test_retry_ext_trait() {
-        let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
+        let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let config = RunnableRetryConfig::new().with_max_attempt_number(3);
         let retry = runnable.with_retry_config(config);
 
@@ -763,7 +747,7 @@ mod tests {
 
     #[test]
     fn test_retry_with_simple() {
-        let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
+        let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let retry = runnable.with_retry(3, false);
 
         let result = retry.invoke(1, None).unwrap();
@@ -775,14 +759,14 @@ mod tests {
         let counter = Arc::new(AtomicUsize::new(0));
         let counter_clone = counter.clone();
 
-        let runnable = RunnableLambda::new(move |x: i32| {
+        let runnable = RunnableLambda::builder().func(move |x: i32| {
             let count = counter_clone.fetch_add(1, Ordering::SeqCst);
             if x < 0 && count < 4 {
                 Err(Error::other("negative input"))
             } else {
                 Ok(x * 2)
             }
-        });
+        }).build();
 
         let config = RunnableRetryConfig::new()
             .with_max_attempt_number(3)
@@ -800,14 +784,14 @@ mod tests {
         let counter = Arc::new(AtomicUsize::new(0));
         let counter_clone = counter.clone();
 
-        let runnable = RunnableLambda::new(move |x: i32| {
+        let runnable = RunnableLambda::builder().func(move |x: i32| {
             let count = counter_clone.fetch_add(1, Ordering::SeqCst);
             if count < 1 {
                 Err(Error::other("transient failure"))
             } else {
                 Ok(x * 2)
             }
-        });
+        }).build();
 
         let config = RunnableRetryConfig::new()
             .with_max_attempt_number(3)

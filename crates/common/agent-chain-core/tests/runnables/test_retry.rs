@@ -11,7 +11,7 @@ use agent_chain_core::runnables::retry::{
 
 #[test]
 fn test_retry_initialization() {
-    let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
+    let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
 
     let config = RunnableRetryConfig::new();
     assert_eq!(config.max_attempt_number, 3);
@@ -24,7 +24,7 @@ fn test_retry_initialization() {
 
 #[test]
 fn test_retry_initialization_custom() {
-    let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
+    let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
 
     let config = RunnableRetryConfig::new()
         .with_max_attempt_number(5)
@@ -46,10 +46,10 @@ fn test_retry_invoke_success_no_retry() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
-    let runnable = RunnableLambda::new(move |x: i32| {
+    let runnable = RunnableLambda::builder().func(move |x: i32| {
         counter.fetch_add(1, Ordering::SeqCst);
         Ok(x * 2)
-    });
+    }).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -68,14 +68,14 @@ fn test_retry_invoke_with_retryable_exception() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
-    let runnable = RunnableLambda::new(move |x: i32| {
+    let runnable = RunnableLambda::builder().func(move |x: i32| {
         let count = counter.fetch_add(1, Ordering::SeqCst) + 1;
         if count < 3 {
             Err(Error::other(format!("Attempt {count} failed")))
         } else {
             Ok(x * 2)
         }
-    });
+    }).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -94,10 +94,10 @@ fn test_retry_invoke_exhausts_retries() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
-    let runnable = RunnableLambda::new(move |_x: i32| {
+    let runnable = RunnableLambda::builder().func(move |_x: i32| {
         counter.fetch_add(1, Ordering::SeqCst);
         Err::<i32, _>(Error::other("Always fails"))
-    });
+    }).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -117,10 +117,10 @@ fn test_retry_invoke_non_retryable_exception() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
-    let runnable = RunnableLambda::new(move |_x: i32| {
+    let runnable = RunnableLambda::builder().func(move |_x: i32| {
         counter.fetch_add(1, Ordering::SeqCst);
         Err::<i32, _>(Error::InvalidConfig("Runtime error".into()))
-    });
+    }).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -141,10 +141,10 @@ async fn test_retry_ainvoke_success_no_retry() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
-    let runnable = RunnableLambda::new(move |x: i32| {
+    let runnable = RunnableLambda::builder().func(move |x: i32| {
         counter.fetch_add(1, Ordering::SeqCst);
         Ok(x * 2)
-    });
+    }).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -163,14 +163,14 @@ async fn test_retry_ainvoke_with_retryable_exception() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
-    let runnable = RunnableLambda::new(move |x: i32| {
+    let runnable = RunnableLambda::builder().func(move |x: i32| {
         let count = counter.fetch_add(1, Ordering::SeqCst) + 1;
         if count < 3 {
             Err(Error::other(format!("Attempt {count} failed")))
         } else {
             Ok(x * 2)
         }
-    });
+    }).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -186,7 +186,7 @@ async fn test_retry_ainvoke_with_retryable_exception() {
 
 #[tokio::test]
 async fn test_retry_ainvoke_exhausts_retries() {
-    let runnable = RunnableLambda::new(|_x: i32| Err::<i32, _>(Error::other("Always fails")));
+    let runnable = RunnableLambda::builder().func(|_x: i32| Err::<i32, _>(Error::other("Always fails"))).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -206,7 +206,7 @@ fn test_retry_batch_partial_failures() {
         Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
     let counts = call_counts.clone();
 
-    let runnable = RunnableLambda::new(move |x: i32| {
+    let runnable = RunnableLambda::builder().func(move |x: i32| {
         let mut map = counts.lock().unwrap();
         let count = map.entry(x).or_insert(0);
         *count += 1;
@@ -215,7 +215,7 @@ fn test_retry_batch_partial_failures() {
         } else {
             Ok(x * 2)
         }
-    });
+    }).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -239,13 +239,13 @@ fn test_retry_batch_partial_failures() {
 
 #[test]
 fn test_retry_batch_with_return_exceptions() {
-    let runnable = RunnableLambda::new(|x: i32| {
+    let runnable = RunnableLambda::builder().func(|x: i32| {
         if x == 1 {
             Err(Error::other("Always fails on 1"))
         } else {
             Ok(x * 2)
         }
-    });
+    }).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -273,7 +273,7 @@ async fn test_retry_abatch_partial_failures() {
         Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
     let counts = call_counts.clone();
 
-    let runnable = RunnableLambda::new(move |x: i32| {
+    let runnable = RunnableLambda::builder().func(move |x: i32| {
         let mut map = counts.lock().unwrap();
         let count = map.entry(x).or_insert(0);
         *count += 1;
@@ -282,7 +282,7 @@ async fn test_retry_abatch_partial_failures() {
         } else {
             Ok(x * 2)
         }
-    });
+    }).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -300,13 +300,13 @@ async fn test_retry_abatch_partial_failures() {
 
 #[tokio::test]
 async fn test_retry_abatch_with_return_exceptions() {
-    let runnable = RunnableLambda::new(|x: i32| {
+    let runnable = RunnableLambda::builder().func(|x: i32| {
         if x == 1 {
             Err(Error::other("Always fails on 1"))
         } else {
             Ok(x * 2)
         }
-    });
+    }).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -326,14 +326,14 @@ fn test_retry_with_exponential_jitter() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
-    let runnable = RunnableLambda::new(move |_x: i32| {
+    let runnable = RunnableLambda::builder().func(move |_x: i32| {
         let count = counter.fetch_add(1, Ordering::SeqCst) + 1;
         if count == 1 {
             Err(Error::other("First attempt fails"))
         } else {
             Ok(42)
         }
-    });
+    }).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -358,14 +358,14 @@ async fn test_retry_async_with_exponential_jitter() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
-    let runnable = RunnableLambda::new(move |_x: i32| {
+    let runnable = RunnableLambda::builder().func(move |_x: i32| {
         let count = counter.fetch_add(1, Ordering::SeqCst) + 1;
         if count == 1 {
             Err(Error::other("First attempt fails"))
         } else {
             Ok(42)
         }
-    });
+    }).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -387,7 +387,7 @@ async fn test_retry_async_with_exponential_jitter() {
 
 #[test]
 fn test_retry_with_config() {
-    let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
+    let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -411,14 +411,14 @@ fn test_retry_config_propagation() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
-    let runnable = RunnableLambda::new(move |x: i32| {
+    let runnable = RunnableLambda::builder().func(move |x: i32| {
         let count = counter.fetch_add(1, Ordering::SeqCst) + 1;
         if count < 2 {
             Err(Error::other("First attempt fails"))
         } else {
             Ok(x * 2)
         }
-    });
+    }).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -440,7 +440,7 @@ fn test_retry_multiple_exception_types() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
-    let runnable = RunnableLambda::new(move |x: i32| {
+    let runnable = RunnableLambda::builder().func(move |x: i32| {
         let count = counter.fetch_add(1, Ordering::SeqCst) + 1;
         if count == 1 {
             Err(Error::other("ValueError"))
@@ -449,7 +449,7 @@ fn test_retry_multiple_exception_types() {
         } else {
             Ok(x * 2)
         }
-    });
+    }).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -472,7 +472,7 @@ fn test_retry_batch_preserves_order() {
         Arc::new(std::sync::Mutex::new(std::collections::HashSet::from([1])));
     let fail_set = first_fail.clone();
 
-    let runnable = RunnableLambda::new(move |x: i32| {
+    let runnable = RunnableLambda::builder().func(move |x: i32| {
         let mut set = fail_set.lock().unwrap();
         if set.contains(&x) {
             set.remove(&x);
@@ -480,7 +480,7 @@ fn test_retry_batch_preserves_order() {
         } else {
             Ok(x)
         }
-    });
+    }).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -501,7 +501,7 @@ async fn test_retry_abatch_preserves_order() {
         Arc::new(std::sync::Mutex::new(std::collections::HashSet::from([1])));
     let fail_set = first_fail.clone();
 
-    let runnable = RunnableLambda::new(move |x: i32| {
+    let runnable = RunnableLambda::builder().func(move |x: i32| {
         let mut set = fail_set.lock().unwrap();
         if set.contains(&x) {
             set.remove(&x);
@@ -509,7 +509,7 @@ async fn test_retry_abatch_preserves_order() {
         } else {
             Ok(x)
         }
-    });
+    }).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -526,7 +526,7 @@ async fn test_retry_abatch_preserves_order() {
 
 #[test]
 fn test_retry_batch_all_fail() {
-    let runnable = RunnableLambda::new(|_x: i32| Err::<i32, _>(Error::other("Always fails")));
+    let runnable = RunnableLambda::builder().func(|_x: i32| Err::<i32, _>(Error::other("Always fails"))).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -541,7 +541,7 @@ fn test_retry_batch_all_fail() {
 
 #[test]
 fn test_retry_batch_empty_input() {
-    let runnable = RunnableLambda::new(|x: i32| Ok(x));
+    let runnable = RunnableLambda::builder().func(|x: i32| Ok(x)).build();
 
     let retry = RunnableRetry::new(runnable, RunnableRetryConfig::new());
 
@@ -551,7 +551,7 @@ fn test_retry_batch_empty_input() {
 
 #[tokio::test]
 async fn test_retry_abatch_empty_input() {
-    let runnable = RunnableLambda::new(|x: i32| Ok(x));
+    let runnable = RunnableLambda::builder().func(|x: i32| Ok(x)).build();
 
     let retry = RunnableRetry::new(runnable, RunnableRetryConfig::new());
 
@@ -564,14 +564,14 @@ async fn test_retry_stream_uses_invoke_with_retries() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
-    let runnable = RunnableLambda::new(move |x: i32| {
+    let runnable = RunnableLambda::builder().func(move |x: i32| {
         let count = counter.fetch_add(1, Ordering::SeqCst) + 1;
         if count == 1 {
             Err(Error::other("First attempt fails"))
         } else {
             Ok(x * 2)
         }
-    });
+    }).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -592,16 +592,16 @@ fn test_retry_chain_composition() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
-    let reliable_step_1 = RunnableLambda::new(|x: i32| Ok(x + 1));
+    let reliable_step_1 = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
 
-    let unreliable_step = RunnableLambda::new(move |x: i32| {
+    let unreliable_step = RunnableLambda::builder().func(move |x: i32| {
         let count = counter.fetch_add(1, Ordering::SeqCst) + 1;
         if count == 1 {
             Err(Error::other("First attempt fails"))
         } else {
             Ok(x * 2)
         }
-    });
+    }).build();
     let unreliable_with_retry = RunnableRetry::new(
         unreliable_step,
         RunnableRetryConfig::new()
@@ -609,7 +609,7 @@ fn test_retry_chain_composition() {
             .with_wait_exponential_jitter(false),
     );
 
-    let reliable_step_2 = RunnableLambda::new(|x: i32| Ok(x + 1));
+    let reliable_step_2 = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
 
     let step1_result = reliable_step_1.invoke(5, None).unwrap();
     let step2_result = unreliable_with_retry.invoke(step1_result, None).unwrap();
@@ -629,7 +629,7 @@ fn test_retry_batch_individual_tracking() {
         ])));
     let tracker = call_tracker.clone();
 
-    let runnable = RunnableLambda::new(move |x: i32| {
+    let runnable = RunnableLambda::builder().func(move |x: i32| {
         let mut map = tracker.lock().unwrap();
         let calls = map.entry(x).or_default();
         calls.push(x);
@@ -641,7 +641,7 @@ fn test_retry_batch_individual_tracking() {
         } else {
             Ok(x * 2)
         }
-    });
+    }).build();
 
     let retry = RunnableRetry::new(
         runnable,
@@ -702,7 +702,7 @@ fn test_exponential_jitter_defaults() {
 
 #[test]
 fn test_retry_ext_trait() {
-    let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
+    let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
     let config = RunnableRetryConfig::new().with_max_attempt_number(3);
     let retry = runnable.with_retry_config(config);
 
@@ -712,7 +712,7 @@ fn test_retry_ext_trait() {
 
 #[test]
 fn test_with_retry_convenience() {
-    let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
+    let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
     let retry = runnable.with_retry(3, false);
 
     let result = retry.invoke(1, None).unwrap();
@@ -721,7 +721,7 @@ fn test_with_retry_convenience() {
 
 #[test]
 fn test_retry_debug() {
-    let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
+    let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
     let retry = RunnableRetry::new(runnable, RunnableRetryConfig::new());
 
     let debug_str = format!("{:?}", retry);
@@ -731,7 +731,7 @@ fn test_retry_debug() {
 
 #[test]
 fn test_retry_name_propagation() {
-    let runnable = RunnableLambda::new(|x: i32| Ok(x + 1)).with_name("my_step");
+    let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).name("my_step").build();
     let retry = RunnableRetry::new(runnable, RunnableRetryConfig::new());
 
     assert_eq!(retry.name(), Some("my_step".to_string()));
@@ -739,8 +739,8 @@ fn test_retry_name_propagation() {
 
 #[test]
 fn test_retry_preserves_schemas() {
-    let runnable_for_schema = RunnableLambda::new(|x: i32| Ok(x.to_string()));
-    let runnable_for_retry = RunnableLambda::new(|x: i32| Ok(x.to_string()));
+    let runnable_for_schema = RunnableLambda::builder().func(|x: i32| Ok(x.to_string())).build();
+    let runnable_for_retry = RunnableLambda::builder().func(|x: i32| Ok(x.to_string())).build();
 
     let retry_runnable = RunnableRetry::new(runnable_for_retry, RunnableRetryConfig::new());
 

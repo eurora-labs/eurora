@@ -72,17 +72,14 @@ impl Default for JsonOutputFunctionsParser {
     }
 }
 
+#[bon::bon]
 impl JsonOutputFunctionsParser {
-    pub fn new(args_only: bool) -> Self {
-        Self {
-            strict: false,
-            args_only,
-        }
-    }
-
-    pub fn with_strict(mut self, strict: bool) -> Self {
-        self.strict = strict;
-        self
+    #[builder]
+    pub fn new(
+        args_only: bool,
+        #[builder(default)] strict: bool,
+    ) -> Self {
+        Self { strict, args_only }
     }
 
     pub fn parser_type(&self) -> &str {
@@ -306,17 +303,20 @@ pub struct JsonKeyOutputFunctionsParser {
     inner: JsonOutputFunctionsParser,
 }
 
+#[bon::bon]
 impl JsonKeyOutputFunctionsParser {
-    pub fn new(key_name: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(
+        #[builder(into)] key_name: String,
+        #[builder(default)] strict: bool,
+    ) -> Self {
         Self {
-            key_name: key_name.into(),
-            inner: JsonOutputFunctionsParser::default(),
+            key_name,
+            inner: JsonOutputFunctionsParser::builder()
+                .args_only(true)
+                .strict(strict)
+                .build(),
         }
-    }
-
-    pub fn with_strict(mut self, strict: bool) -> Self {
-        self.inner.strict = strict;
-        self
     }
 
     pub fn parse_result_with_partial(

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use bon::bon;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -13,7 +14,9 @@ pub struct AgentAction {
     pub log: String,
 }
 
+#[bon]
 impl AgentAction {
+    #[builder]
     pub fn new(
         tool: impl Into<String>,
         tool_input: impl Into<ToolInput>,
@@ -80,7 +83,9 @@ pub struct AgentActionMessageLog {
     pub message_log: Vec<BaseMessage>,
 }
 
+#[bon]
 impl AgentActionMessageLog {
+    #[builder]
     pub fn new(
         tool: impl Into<String>,
         tool_input: impl Into<ToolInput>,
@@ -106,7 +111,9 @@ pub struct AgentStep {
     pub observation: Value,
 }
 
+#[bon]
 impl AgentStep {
+    #[builder]
     pub fn new(action: AgentAction, observation: Value) -> Self {
         Self {
             action,
@@ -125,7 +132,9 @@ pub struct AgentFinish {
     pub log: String,
 }
 
+#[bon]
 impl AgentFinish {
+    #[builder]
     pub fn new(return_values: HashMap<String, Value>, log: impl Into<String>) -> Self {
         Self {
             return_values,

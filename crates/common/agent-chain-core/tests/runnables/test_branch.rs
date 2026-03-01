@@ -35,7 +35,7 @@ fn test_branch_requires_minimum_branches() {
 #[test]
 fn test_branch_requires_minimum_branches_new() {
     let result: agent_chain_core::error::Result<RunnableBranch<i32, i32>> =
-        RunnableBranch::new(vec![], Arc::new(RunnableLambda::new(|x: i32| Ok(x))));
+        RunnableBranch::new(vec![], Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x)).build()));
 
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
@@ -208,9 +208,9 @@ async fn test_branch_astream() {
 
 #[test]
 fn test_branch_with_runnable_objects() {
-    let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::new(|x: i32| Ok(x > 0)));
-    let action_true: DynRunnable<i32, i32> = Arc::new(RunnableLambda::new(|x: i32| Ok(x + 1)));
-    let action_false: DynRunnable<i32, i32> = Arc::new(RunnableLambda::new(|x: i32| Ok(x - 1)));
+    let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 0)).build());
+    let action_true: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build());
+    let action_false: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x - 1)).build());
 
     let branch = RunnableBranch::new(vec![(condition, action_true)], action_false).unwrap();
 
@@ -334,29 +334,29 @@ fn test_branch_conditions_evaluated_in_order() {
     let eval2 = evaluations.clone();
     let eval3 = evaluations.clone();
 
-    let condition1 = Arc::new(RunnableLambda::new(move |x: i32| {
+    let condition1 = Arc::new(RunnableLambda::builder().func(move |x: i32| {
         eval1.lock().unwrap().push(1);
         Ok(x > 10)
-    })) as DynRunnable<i32, bool>;
+    }).build()) as DynRunnable<i32, bool>;
 
-    let condition2 = Arc::new(RunnableLambda::new(move |x: i32| {
+    let condition2 = Arc::new(RunnableLambda::builder().func(move |x: i32| {
         eval2.lock().unwrap().push(2);
         Ok(x > 5)
-    })) as DynRunnable<i32, bool>;
+    }).build()) as DynRunnable<i32, bool>;
 
-    let condition3 = Arc::new(RunnableLambda::new(move |x: i32| {
+    let condition3 = Arc::new(RunnableLambda::builder().func(move |x: i32| {
         eval3.lock().unwrap().push(3);
         Ok(x > 0)
-    })) as DynRunnable<i32, bool>;
+    }).build()) as DynRunnable<i32, bool>;
 
     let action1: DynRunnable<i32, String> =
-        Arc::new(RunnableLambda::new(|_: i32| Ok("first".to_string())));
+        Arc::new(RunnableLambda::builder().func(|_: i32| Ok("first".to_string())).build());
     let action2: DynRunnable<i32, String> =
-        Arc::new(RunnableLambda::new(|_: i32| Ok("second".to_string())));
+        Arc::new(RunnableLambda::builder().func(|_: i32| Ok("second".to_string())).build());
     let action3: DynRunnable<i32, String> =
-        Arc::new(RunnableLambda::new(|_: i32| Ok("third".to_string())));
+        Arc::new(RunnableLambda::builder().func(|_: i32| Ok("third".to_string())).build());
     let default: DynRunnable<i32, String> =
-        Arc::new(RunnableLambda::new(|_: i32| Ok("default".to_string())));
+        Arc::new(RunnableLambda::builder().func(|_: i32| Ok("default".to_string())).build());
 
     let branch = RunnableBranch::new(
         vec![
@@ -397,25 +397,25 @@ fn test_branch_short_circuit_evaluation() {
     let calls2 = condition_calls.clone();
     let calls3 = condition_calls.clone();
 
-    let condition1: DynRunnable<i32, bool> = Arc::new(RunnableLambda::new(move |x: i32| {
+    let condition1: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(move |x: i32| {
         calls1.lock().unwrap().push("first".to_string());
         Ok(x > 0)
-    }));
+    }).build());
 
-    let condition2: DynRunnable<i32, bool> = Arc::new(RunnableLambda::new(move |x: i32| {
+    let condition2: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(move |x: i32| {
         calls2.lock().unwrap().push("second".to_string());
         Ok(x > 0)
-    }));
+    }).build());
 
-    let condition3: DynRunnable<i32, bool> = Arc::new(RunnableLambda::new(move |x: i32| {
+    let condition3: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(move |x: i32| {
         calls3.lock().unwrap().push("third".to_string());
         Ok(x > 0)
-    }));
+    }).build());
 
-    let action1: DynRunnable<i32, i32> = Arc::new(RunnableLambda::new(|x: i32| Ok(x + 1)));
-    let action2: DynRunnable<i32, i32> = Arc::new(RunnableLambda::new(|x: i32| Ok(x + 2)));
-    let action3: DynRunnable<i32, i32> = Arc::new(RunnableLambda::new(|x: i32| Ok(x + 3)));
-    let default: DynRunnable<i32, i32> = Arc::new(RunnableLambda::new(|x: i32| Ok(x)));
+    let action1: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build());
+    let action2: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x + 2)).build());
+    let action3: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x + 3)).build());
+    let default: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x)).build());
 
     let branch = RunnableBranch::new(
         vec![
@@ -455,9 +455,9 @@ fn test_branch_with_complex_conditions() {
 
 #[test]
 fn test_branch_config_propagation() {
-    let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::new(|x: i32| Ok(x > 0)));
-    let action: DynRunnable<i32, i32> = Arc::new(RunnableLambda::new(|x: i32| Ok(x + 1)));
-    let default: DynRunnable<i32, i32> = Arc::new(RunnableLambda::new(|x: i32| Ok(x)));
+    let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 0)).build());
+    let action: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build());
+    let default: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x)).build());
 
     let branch = RunnableBranch::new(vec![(condition, action)], default).unwrap();
 
@@ -552,7 +552,7 @@ fn test_branch_with_type_annotations() {
 
 #[test]
 fn test_branch_with_runnables_in_chain() {
-    let preprocess = RunnableLambda::new(|x: (i32,)| Ok(x.0));
+    let preprocess = RunnableLambda::builder().func(|x: (i32,)| Ok(x.0)).build();
 
     let branch = RunnableBranchBuilder::new()
         .branch(|x: i32| Ok(x > 10), |x: i32| Ok(x * 2))
@@ -560,7 +560,7 @@ fn test_branch_with_runnables_in_chain() {
         .default(|x: i32| Ok(x - 10))
         .unwrap();
 
-    let postprocess = RunnableLambda::new(|x: i32| Ok(format!("Result: {x}")));
+    let postprocess = RunnableLambda::builder().func(|x: i32| Ok(format!("Result: {x}"))).build();
 
     let chain = pipe(pipe(preprocess, branch), postprocess);
 
@@ -588,11 +588,18 @@ fn test_branch_with_none_output() {
 
 #[test]
 fn test_branch_name() {
-    let branch = RunnableBranchBuilder::new()
-        .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x.to_string()))
-        .default(|_: i32| Ok("default".to_string()))
-        .unwrap()
-        .with_name("my_branch");
+    let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 0)).build());
+    let branch_runnable: DynRunnable<i32, String> =
+        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x.to_string())).build());
+    let default: DynRunnable<i32, String> =
+        Arc::new(RunnableLambda::builder().func(|_: i32| Ok("default".to_string())).build());
+
+    let branch = RunnableBranch::builder()
+        .branches(vec![(condition, branch_runnable)])
+        .default(default)
+        .name("my_branch")
+        .build()
+        .unwrap();
 
     assert_eq!(branch.name(), Some("my_branch".to_string()));
 }
@@ -692,13 +699,13 @@ async fn test_branch_ainvoke_multiple_sequential() {
     let call_count = Arc::new(AtomicUsize::new(0));
 
     let count = call_count.clone();
-    let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::new(move |x: i32| {
+    let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(move |x: i32| {
         count.fetch_add(1, Ordering::SeqCst);
         Ok(x > 0)
-    }));
+    }).build());
 
-    let action: DynRunnable<i32, i32> = Arc::new(RunnableLambda::new(|x: i32| Ok(x + 1)));
-    let default: DynRunnable<i32, i32> = Arc::new(RunnableLambda::new(|x: i32| Ok(x - 1)));
+    let action: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build());
+    let default: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x - 1)).build());
 
     let branch = RunnableBranch::new(vec![(condition, action)], default).unwrap();
 
@@ -712,11 +719,11 @@ async fn test_branch_ainvoke_multiple_sequential() {
 
 #[test]
 fn test_branch_builder_branch_arc() {
-    let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::new(|x: i32| Ok(x > 10)));
+    let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 10)).build());
     let action: DynRunnable<i32, String> =
-        Arc::new(RunnableLambda::new(|x: i32| Ok(format!("big: {x}"))));
+        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(format!("big: {x}"))).build());
     let default: DynRunnable<i32, String> =
-        Arc::new(RunnableLambda::new(|x: i32| Ok(format!("small: {x}"))));
+        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(format!("small: {x}"))).build());
 
     let branch = RunnableBranchBuilder::new()
         .branch_arc(condition, action)

@@ -4,6 +4,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use futures::stream::{Stream, StreamExt};
+use bon::bon;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::Semaphore;
@@ -207,35 +208,23 @@ pub struct ConfigurableField {
     pub is_shared: bool,
 }
 
+#[bon]
 impl ConfigurableField {
-    pub fn new(id: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(
+        id: impl Into<String>,
+        name: Option<String>,
+        description: Option<String>,
+        annotation: Option<String>,
+        #[builder(default)] is_shared: bool,
+    ) -> Self {
         Self {
             id: id.into(),
-            name: None,
-            description: None,
-            annotation: None,
-            is_shared: false,
+            name,
+            description,
+            annotation,
+            is_shared,
         }
-    }
-
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
-
-    pub fn with_description(mut self, description: impl Into<String>) -> Self {
-        self.description = Some(description.into());
-        self
-    }
-
-    pub fn with_annotation(mut self, annotation: impl Into<String>) -> Self {
-        self.annotation = Some(annotation.into());
-        self
-    }
-
-    pub fn with_shared(mut self, is_shared: bool) -> Self {
-        self.is_shared = is_shared;
-        self
     }
 }
 
@@ -261,19 +250,24 @@ impl std::hash::Hash for ConfigurableFieldSingleOption {
     }
 }
 
+#[bon]
 impl ConfigurableFieldSingleOption {
+    #[builder]
     pub fn new(
         id: impl Into<String>,
         options: HashMap<String, serde_json::Value>,
         default: impl Into<String>,
+        name: Option<String>,
+        description: Option<String>,
+        #[builder(default)] is_shared: bool,
     ) -> Self {
         Self {
             id: id.into(),
             options,
             default: default.into(),
-            name: None,
-            description: None,
-            is_shared: false,
+            name,
+            description,
+            is_shared,
         }
     }
 }
@@ -302,19 +296,24 @@ impl std::hash::Hash for ConfigurableFieldMultiOption {
     }
 }
 
+#[bon]
 impl ConfigurableFieldMultiOption {
+    #[builder]
     pub fn new(
         id: impl Into<String>,
         options: HashMap<String, serde_json::Value>,
         default: Vec<String>,
+        name: Option<String>,
+        description: Option<String>,
+        #[builder(default)] is_shared: bool,
     ) -> Self {
         Self {
             id: id.into(),
             options,
             default,
-            name: None,
-            description: None,
-            is_shared: false,
+            name,
+            description,
+            is_shared,
         }
     }
 }
@@ -337,16 +336,26 @@ pub struct ConfigurableFieldSpec {
     pub dependencies: Option<Vec<String>>,
 }
 
+#[bon]
 impl ConfigurableFieldSpec {
-    pub fn new(id: impl Into<String>, annotation: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(
+        id: impl Into<String>,
+        annotation: impl Into<String>,
+        name: Option<String>,
+        description: Option<String>,
+        default: Option<serde_json::Value>,
+        #[builder(default)] is_shared: bool,
+        dependencies: Option<Vec<String>>,
+    ) -> Self {
         Self {
             id: id.into(),
             annotation: annotation.into(),
-            name: None,
-            description: None,
-            default: None,
-            is_shared: false,
-            dependencies: None,
+            name,
+            description,
+            default,
+            is_shared,
+            dependencies,
         }
     }
 }

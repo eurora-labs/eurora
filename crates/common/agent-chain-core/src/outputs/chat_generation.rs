@@ -1,3 +1,4 @@
+use bon::bon;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -24,23 +25,18 @@ fn default_chat_generation_type() -> String {
     "ChatGeneration".to_string()
 }
 
+#[bon]
 impl ChatGeneration {
-    pub fn new(message: BaseMessage) -> Self {
+    #[builder]
+    pub fn new(
+        message: BaseMessage,
+        generation_info: Option<HashMap<String, Value>>,
+    ) -> Self {
         let text = extract_text_from_message(&message);
         Self {
             text,
             message,
-            generation_info: None,
-            generation_type: "ChatGeneration".to_string(),
-        }
-    }
-
-    pub fn with_info(message: BaseMessage, generation_info: HashMap<String, Value>) -> Self {
-        let text = extract_text_from_message(&message);
-        Self {
-            text,
-            message,
-            generation_info: Some(generation_info),
+            generation_info,
             generation_type: "ChatGeneration".to_string(),
         }
     }
@@ -97,23 +93,18 @@ fn default_chat_generation_chunk_type() -> String {
     "ChatGenerationChunk".to_string()
 }
 
+#[bon]
 impl ChatGenerationChunk {
-    pub fn new(message: BaseMessage) -> Self {
+    #[builder]
+    pub fn new(
+        message: BaseMessage,
+        generation_info: Option<HashMap<String, Value>>,
+    ) -> Self {
         let text = extract_text_from_message(&message);
         Self {
             text,
             message,
-            generation_info: None,
-            generation_type: "ChatGenerationChunk".to_string(),
-        }
-    }
-
-    pub fn with_info(message: BaseMessage, generation_info: HashMap<String, Value>) -> Self {
-        let text = extract_text_from_message(&message);
-        Self {
-            text,
-            message,
-            generation_info: Some(generation_info),
+            generation_info,
             generation_type: "ChatGenerationChunk".to_string(),
         }
     }

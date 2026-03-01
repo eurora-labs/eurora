@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 
+use bon::bon;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -57,49 +58,29 @@ impl Default for RunnableConfig {
     }
 }
 
+#[bon]
 impl RunnableConfig {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
-        self.tags = tags;
-        self
-    }
-
-    pub fn with_metadata(mut self, metadata: HashMap<String, serde_json::Value>) -> Self {
-        self.metadata = metadata;
-        self
-    }
-
-    pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
-        self.callbacks = Some(callbacks);
-        self
-    }
-
-    pub fn with_run_name(mut self, run_name: impl Into<String>) -> Self {
-        self.run_name = Some(run_name.into());
-        self
-    }
-
-    pub fn with_max_concurrency(mut self, max_concurrency: usize) -> Self {
-        self.max_concurrency = Some(max_concurrency);
-        self
-    }
-
-    pub fn with_recursion_limit(mut self, recursion_limit: i32) -> Self {
-        self.recursion_limit = recursion_limit;
-        self
-    }
-
-    pub fn with_configurable(mut self, configurable: HashMap<String, serde_json::Value>) -> Self {
-        self.configurable = configurable;
-        self
-    }
-
-    pub fn with_run_id(mut self, run_id: Uuid) -> Self {
-        self.run_id = Some(run_id);
-        self
+    #[builder]
+    pub fn new(
+        #[builder(default)] tags: Vec<String>,
+        #[builder(default)] metadata: HashMap<String, serde_json::Value>,
+        callbacks: Option<Callbacks>,
+        run_name: Option<String>,
+        max_concurrency: Option<usize>,
+        #[builder(default = DEFAULT_RECURSION_LIMIT)] recursion_limit: i32,
+        #[builder(default)] configurable: HashMap<String, serde_json::Value>,
+        run_id: Option<Uuid>,
+    ) -> Self {
+        Self {
+            tags,
+            metadata,
+            callbacks,
+            run_name,
+            max_concurrency,
+            recursion_limit,
+            configurable,
+            run_id,
+        }
     }
 }
 

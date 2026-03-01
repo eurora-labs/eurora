@@ -1,3 +1,4 @@
+use bon::bon;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -57,23 +58,16 @@ fn default_llm_result_type() -> String {
     "LLMResult".to_string()
 }
 
+#[bon]
 impl LLMResult {
-    pub fn new(generations: Vec<Vec<GenerationType>>) -> Self {
-        Self {
-            generations,
-            llm_output: None,
-            run: None,
-            result_type: "LLMResult".to_string(),
-        }
-    }
-
-    pub fn with_llm_output(
+    #[builder]
+    pub fn new(
         generations: Vec<Vec<GenerationType>>,
-        llm_output: HashMap<String, Value>,
+        llm_output: Option<HashMap<String, Value>>,
     ) -> Self {
         Self {
             generations,
-            llm_output: Some(llm_output),
+            llm_output,
             run: None,
             result_type: "LLMResult".to_string(),
         }

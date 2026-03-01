@@ -1,3 +1,4 @@
+use bon::bon;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -20,19 +21,16 @@ fn default_generation_type() -> String {
     "Generation".to_string()
 }
 
+#[bon]
 impl Generation {
-    pub fn new(text: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(
+        text: impl Into<String>,
+        generation_info: Option<HashMap<String, Value>>,
+    ) -> Self {
         Self {
             text: text.into(),
-            generation_info: None,
-            generation_type: "Generation".to_string(),
-        }
-    }
-
-    pub fn with_info(text: impl Into<String>, generation_info: HashMap<String, Value>) -> Self {
-        Self {
-            text: text.into(),
-            generation_info: Some(generation_info),
+            generation_info,
             generation_type: "Generation".to_string(),
         }
     }
@@ -67,19 +65,16 @@ pub struct GenerationChunk {
     pub generation_type: String,
 }
 
+#[bon]
 impl GenerationChunk {
-    pub fn new(text: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(
+        text: impl Into<String>,
+        generation_info: Option<HashMap<String, Value>>,
+    ) -> Self {
         Self {
             text: text.into(),
-            generation_info: None,
-            generation_type: "Generation".to_string(),
-        }
-    }
-
-    pub fn with_info(text: impl Into<String>, generation_info: HashMap<String, Value>) -> Self {
-        Self {
-            text: text.into(),
-            generation_info: Some(generation_info),
+            generation_info,
             generation_type: "Generation".to_string(),
         }
     }

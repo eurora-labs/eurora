@@ -21,24 +21,18 @@ pub struct JsonOutputParser {
     pub diff: bool,
 }
 
+#[bon::bon]
 impl JsonOutputParser {
-    pub fn new() -> Self {
-        Self {
-            schema: None,
-            diff: false,
-        }
+    #[builder]
+    pub fn new(
+        schema: Option<Value>,
+        #[builder(default)] diff: bool,
+    ) -> Self {
+        Self { schema, diff }
     }
 
     pub fn with_schema(schema: Value) -> Self {
-        Self {
-            schema: Some(schema),
-            diff: false,
-        }
-    }
-
-    pub fn with_diff(mut self) -> Self {
-        self.diff = true;
-        self
+        Self::builder().schema(schema).build()
     }
 
     pub fn get_schema(&self) -> Option<&Value> {
@@ -226,14 +220,14 @@ mod tests {
 
     #[test]
     fn test_json_output_parser_simple() {
-        let parser = JsonOutputParser::new();
+        let parser = JsonOutputParser::builder().build();
         let result = parser.parse(r#"{"key": "value"}"#).unwrap();
         assert_eq!(result["key"], "value");
     }
 
     #[test]
     fn test_json_output_parser_markdown() {
-        let parser = JsonOutputParser::new();
+        let parser = JsonOutputParser::builder().build();
         let result = parser
             .parse(
                 r#"```json
@@ -246,7 +240,7 @@ mod tests {
 
     #[test]
     fn test_json_output_parser_array() {
-        let parser = JsonOutputParser::new();
+        let parser = JsonOutputParser::builder().build();
         let result = parser.parse(r#"[1, 2, 3]"#).unwrap();
         assert!(result.is_array());
         assert_eq!(result[0], 1);
@@ -254,21 +248,21 @@ mod tests {
 
     #[test]
     fn test_json_output_parser_nested() {
-        let parser = JsonOutputParser::new();
+        let parser = JsonOutputParser::builder().build();
         let result = parser.parse(r#"{"outer": {"inner": "value"}}"#).unwrap();
         assert_eq!(result["outer"]["inner"], "value");
     }
 
     #[test]
     fn test_json_output_parser_invalid() {
-        let parser = JsonOutputParser::new();
+        let parser = JsonOutputParser::builder().build();
         let result = parser.parse("not json");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_json_output_parser_format_instructions_no_schema() {
-        let parser = JsonOutputParser::new();
+        let parser = JsonOutputParser::builder().build();
         let instructions = parser
             .get_format_instructions()
             .expect("should return format instructions");
@@ -295,7 +289,7 @@ mod tests {
 
     #[test]
     fn test_json_output_parser_partial() {
-        let parser = JsonOutputParser::new();
+        let parser = JsonOutputParser::builder().build();
         let generations = vec![Generation::new(r#"{"key": "val"#)];
         let result = parser.parse_result(&generations, true).unwrap();
         assert_eq!(result["key"], "val");
@@ -314,7 +308,7 @@ mod tests {
 
     #[test]
     fn test_parser_type() {
-        let parser = JsonOutputParser::new();
+        let parser = JsonOutputParser::builder().build();
         assert_eq!(parser.parser_type(), "simple_json_output_parser");
     }
 }

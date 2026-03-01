@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use bon::bon;
 use serde::{Deserialize, Serialize};
 
 use async_trait::async_trait;
@@ -42,41 +43,16 @@ pub struct PromptTemplate {
     pub tags: Option<Vec<String>>,
 }
 
+#[bon]
 impl PromptTemplate {
-    pub fn new(template: impl Into<String>, template_format: PromptTemplateFormat) -> Result<Self> {
-        let template = template.into();
-        let input_variables = get_template_variables(&template, template_format)?;
-
-        let prompt = Self {
-            template,
-            input_variables,
-            optional_variables: Vec::new(),
-            template_format,
-            validate_template: false,
-            partial_variables: HashMap::new(),
-            metadata: None,
-            tags: None,
-        };
-
-        prompt.validate()?;
-        Ok(prompt)
-    }
-
-    pub fn from_template(template: impl Into<String>) -> Result<Self> {
-        Self::from_template_with_format(template, PromptTemplateFormat::FString)
-    }
-
-    pub fn from_template_with_format(
+    #[builder]
+    pub fn new(
         template: impl Into<String>,
-        template_format: PromptTemplateFormat,
-    ) -> Result<Self> {
-        Self::new(template, template_format)
-    }
-
-    pub fn from_template_with_partials(
-        template: impl Into<String>,
-        template_format: PromptTemplateFormat,
-        partial_variables: HashMap<String, String>,
+        #[builder(default)] template_format: PromptTemplateFormat,
+        #[builder(default)] partial_variables: HashMap<String, String>,
+        metadata: Option<HashMap<String, serde_json::Value>>,
+        tags: Option<Vec<String>>,
+        #[builder(default)] validate_template: bool,
     ) -> Result<Self> {
         let template = template.into();
         let all_variables = get_template_variables(&template, template_format)?;
@@ -91,14 +67,37 @@ impl PromptTemplate {
             input_variables,
             optional_variables: Vec::new(),
             template_format,
-            validate_template: false,
+            validate_template,
             partial_variables,
-            metadata: None,
-            tags: None,
+            metadata,
+            tags,
         };
 
         prompt.validate()?;
         Ok(prompt)
+    }
+
+    pub fn from_template(template: impl Into<String>) -> Result<Self> {
+        Self::builder().template(template).build()
+    }
+
+    pub fn from_template_with_format(
+        template: impl Into<String>,
+        template_format: PromptTemplateFormat,
+    ) -> Result<Self> {
+        Self::builder().template(template).template_format(template_format).build()
+    }
+
+    pub fn from_template_with_partials(
+        template: impl Into<String>,
+        template_format: PromptTemplateFormat,
+        partial_variables: HashMap<String, String>,
+    ) -> Result<Self> {
+        Self::builder()
+            .template(template)
+            .template_format(template_format)
+            .partial_variables(partial_variables)
+            .build()
     }
 
     pub fn from_file(template_file: impl AsRef<Path>) -> Result<Self> {
@@ -163,20 +162,7 @@ impl PromptTemplate {
         Ok(())
     }
 
-    pub fn with_validation(mut self, validate: bool) -> Self {
-        self.validate_template = validate;
-        self
-    }
 
-    pub fn with_metadata(mut self, metadata: HashMap<String, serde_json::Value>) -> Self {
-        self.metadata = Some(metadata);
-        self
-    }
-
-    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
-        self.tags = Some(tags);
-        self
-    }
 }
 
 impl BasePromptTemplate for PromptTemplate {

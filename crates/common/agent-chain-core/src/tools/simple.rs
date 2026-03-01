@@ -5,6 +5,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bon::bon;
 use serde_json::Value;
 
 use crate::callbacks::base::Callbacks;
@@ -50,68 +51,41 @@ impl Debug for Tool {
     }
 }
 
+#[bon]
 impl Tool {
+    #[builder]
     pub fn new(
         name: impl Into<String>,
-        func: Option<ToolFunc>,
         description: impl Into<String>,
+        func: Option<ToolFunc>,
+        coroutine: Option<AsyncToolFunc>,
+        args_schema: Option<ArgsSchema>,
+        #[builder(default)] return_direct: bool,
+        #[builder(default)] verbose: bool,
+        #[builder(default = HandleToolError::Bool(false))] handle_tool_error: HandleToolError,
+        #[builder(default = HandleValidationError::Bool(false))] handle_validation_error: HandleValidationError,
+        #[builder(default)] response_format: ResponseFormat,
+        tags: Option<Vec<String>>,
+        metadata: Option<HashMap<String, Value>>,
+        extras: Option<HashMap<String, Value>>,
+        callbacks: Option<Callbacks>,
     ) -> Self {
         Self {
             name: name.into(),
             description: description.into(),
             func,
-            coroutine: None,
-            args_schema: None,
-            return_direct: false,
-            verbose: false,
-            handle_tool_error: HandleToolError::Bool(false),
-            handle_validation_error: HandleValidationError::Bool(false),
-            response_format: ResponseFormat::Content,
-            tags: None,
-            metadata: None,
-            extras: None,
-            callbacks: None,
+            coroutine,
+            args_schema,
+            return_direct,
+            verbose,
+            handle_tool_error,
+            handle_validation_error,
+            response_format,
+            tags,
+            metadata,
+            extras,
+            callbacks,
         }
-    }
-
-    pub fn with_coroutine(mut self, coroutine: AsyncToolFunc) -> Self {
-        self.coroutine = Some(coroutine);
-        self
-    }
-
-    pub fn with_args_schema(mut self, schema: ArgsSchema) -> Self {
-        self.args_schema = Some(schema);
-        self
-    }
-
-    pub fn with_return_direct(mut self, return_direct: bool) -> Self {
-        self.return_direct = return_direct;
-        self
-    }
-
-    pub fn with_response_format(mut self, format: ResponseFormat) -> Self {
-        self.response_format = format;
-        self
-    }
-
-    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
-        self.tags = Some(tags);
-        self
-    }
-
-    pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
-        self.metadata = Some(metadata);
-        self
-    }
-
-    pub fn with_extras(mut self, extras: HashMap<String, Value>) -> Self {
-        self.extras = Some(extras);
-        self
-    }
-
-    pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
-        self.callbacks = Some(callbacks);
-        self
     }
 
     pub fn from_function<F>(
@@ -122,7 +96,11 @@ impl Tool {
     where
         F: Fn(String) -> Result<String> + Send + Sync + 'static,
     {
-        Self::new(name, Some(Arc::new(func)), description)
+        Self::builder()
+            .name(name)
+            .description(description)
+            .func(Arc::new(func))
+            .build()
     }
 
     pub fn from_function_full<F>(
@@ -136,11 +114,14 @@ impl Tool {
     where
         F: Fn(String) -> Result<String> + Send + Sync + 'static,
     {
-        let mut tool = Self::new(name, Some(Arc::new(func)), description);
-        tool.return_direct = return_direct;
-        tool.args_schema = args_schema;
-        tool.coroutine = coroutine;
-        tool
+        Self::builder()
+            .name(name)
+            .description(description)
+            .func(Arc::new(func))
+            .return_direct(return_direct)
+            .maybe_args_schema(args_schema)
+            .maybe_coroutine(coroutine)
+            .build()
     }
 
     pub fn from_function_with_async<F, AF, Fut>(
@@ -154,8 +135,12 @@ impl Tool {
         AF: Fn(String) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<String>> + Send + 'static,
     {
-        Self::new(name, Some(Arc::new(func)), description)
-            .with_coroutine(Arc::new(move |input| Box::pin(coroutine(input))))
+        Self::builder()
+            .name(name)
+            .description(description)
+            .func(Arc::new(func))
+            .coroutine(Arc::new(move |input| Box::pin(coroutine(input))))
+            .build()
     }
 
     fn extract_single_input(&self, input: ToolInput) -> Result<String> {

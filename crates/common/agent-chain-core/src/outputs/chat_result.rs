@@ -1,3 +1,4 @@
+use bon::bon;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -12,21 +13,16 @@ pub struct ChatResult {
     pub llm_output: Option<HashMap<String, Value>>,
 }
 
+#[bon]
 impl ChatResult {
-    pub fn new(generations: Vec<ChatGeneration>) -> Self {
-        Self {
-            generations,
-            llm_output: None,
-        }
-    }
-
-    pub fn with_llm_output(
+    #[builder]
+    pub fn new(
         generations: Vec<ChatGeneration>,
-        llm_output: HashMap<String, Value>,
+        llm_output: Option<HashMap<String, Value>>,
     ) -> Self {
         Self {
             generations,
-            llm_output: Some(llm_output),
+            llm_output,
         }
     }
 

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use bon::bon;
 use serde::{Deserialize, Serialize};
 
 use async_trait::async_trait;
@@ -20,18 +21,13 @@ pub struct ImageURL {
     pub detail: Option<String>,
 }
 
+#[bon]
 impl ImageURL {
-    pub fn new(url: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(url: impl Into<String>, detail: Option<String>) -> Self {
         Self {
             url: url.into(),
-            detail: None,
-        }
-    }
-
-    pub fn with_detail(url: impl Into<String>, detail: impl Into<String>) -> Self {
-        Self {
-            url: url.into(),
-            detail: Some(detail.into()),
+            detail,
         }
     }
 }
@@ -49,7 +45,9 @@ pub struct ImagePromptTemplate {
     pub partial_variables: HashMap<String, String>,
 }
 
+#[bon]
 impl ImagePromptTemplate {
+    #[builder]
     pub fn new(template: HashMap<String, String>, input_variables: Vec<String>) -> Result<Self> {
         let reserved = ["url", "path", "detail"];
         let overlap: Vec<_> = input_variables
@@ -81,11 +79,6 @@ impl ImagePromptTemplate {
         template.insert("url".to_string(), url_template);
 
         Self::new(template, input_variables)
-    }
-
-    pub fn with_format(mut self, format: PromptTemplateFormat) -> Self {
-        self.template_format = format;
-        self
     }
 
     pub fn format_image(&self, kwargs: &HashMap<String, String>) -> Result<ImageURL> {

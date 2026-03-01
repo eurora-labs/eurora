@@ -70,15 +70,24 @@ pub struct ChatChunk {
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
+#[bon::bon]
 impl ChatChunk {
-    pub fn new(content: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(
+        #[builder(into)] content: String,
+        #[builder(default)] is_final: bool,
+        usage_metadata: Option<UsageMetadata>,
+        #[builder(into)] finish_reason: Option<String>,
+        #[builder(default)] tool_calls: Vec<crate::messages::ToolCall>,
+        #[builder(default)] response_metadata: HashMap<String, serde_json::Value>,
+    ) -> Self {
         Self {
-            content: content.into(),
-            is_final: false,
-            usage_metadata: None,
-            finish_reason: None,
-            tool_calls: Vec::new(),
-            response_metadata: HashMap::new(),
+            content,
+            is_final,
+            usage_metadata,
+            finish_reason,
+            tool_calls,
+            response_metadata,
         }
     }
 
@@ -86,24 +95,12 @@ impl ChatChunk {
         usage_metadata: Option<UsageMetadata>,
         finish_reason: Option<String>,
     ) -> Self {
-        Self {
-            content: String::new(),
-            is_final: true,
-            usage_metadata,
-            finish_reason,
-            response_metadata: HashMap::new(),
-            tool_calls: Vec::new(),
-        }
-    }
-
-    pub fn with_usage_metadata(mut self, usage: UsageMetadata) -> Self {
-        self.usage_metadata = Some(usage);
-        self
-    }
-
-    pub fn with_finish_reason(mut self, reason: impl Into<String>) -> Self {
-        self.finish_reason = Some(reason.into());
-        self
+        Self::builder()
+            .content("")
+            .is_final(true)
+            .maybe_usage_metadata(usage_metadata)
+            .maybe_finish_reason(finish_reason)
+            .build()
     }
 }
 
@@ -262,59 +259,32 @@ impl std::fmt::Debug for ChatModelConfig {
     }
 }
 
+#[bon::bon]
 impl ChatModelConfig {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_rate_limiter(mut self, rate_limiter: Arc<dyn BaseRateLimiter>) -> Self {
-        self.rate_limiter = Some(rate_limiter);
-        self
-    }
-
-    pub fn with_cache_instance(mut self, cache: Arc<dyn crate::caches::BaseCache>) -> Self {
-        self.cache_instance = Some(cache);
-        self
-    }
-
-    pub fn with_cache_disabled(mut self) -> Self {
-        self.base.cache = Some(false);
-        self
-    }
-
-    pub fn with_cache_enabled(mut self) -> Self {
-        self.base.cache = Some(true);
-        self
-    }
-
-    pub fn with_disable_streaming(mut self, disable: impl Into<DisableStreaming>) -> Self {
-        self.disable_streaming = disable.into();
-        self
-    }
-
-    pub fn with_output_version(mut self, version: impl Into<String>) -> Self {
-        self.output_version = Some(version.into());
-        self
-    }
-
-    pub fn with_profile(mut self, profile: ModelProfile) -> Self {
-        self.profile = Some(profile);
-        self
-    }
-
-    pub fn with_cache(mut self, cache: bool) -> Self {
-        self.base.cache = Some(cache);
-        self
-    }
-
-    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
-        self.base.tags = Some(tags);
-        self
-    }
-
-    pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
-        self.base.metadata = Some(metadata);
-        self
+    #[builder]
+    pub fn new(
+        rate_limiter: Option<Arc<dyn BaseRateLimiter>>,
+        cache_instance: Option<Arc<dyn crate::caches::BaseCache>>,
+        cache: Option<bool>,
+        #[builder(default)] disable_streaming: DisableStreaming,
+        #[builder(into)] output_version: Option<String>,
+        profile: Option<ModelProfile>,
+        tags: Option<Vec<String>>,
+        metadata: Option<HashMap<String, Value>>,
+    ) -> Self {
+        Self {
+            base: LanguageModelConfig {
+                cache,
+                tags,
+                metadata,
+                ..Default::default()
+            },
+            rate_limiter,
+            disable_streaming,
+            output_version,
+            profile,
+            cache_instance,
+        }
     }
 }
 
@@ -1457,7 +1427,10 @@ pub trait BaseChatModel: BaseLanguageModel {
         let tool_like = ToolLike::Schema(schema);
         let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
 
-        let output_parser = JsonOutputKeyToolsParser::new(&tool_name).with_first_tool_only(true);
+        let output_parser = JsonOutputKeyToolsParser::builder()
+            .key_name(tool_name)
+            .first_tool_only(true)
+            .build();
 
         let model_runnable = ChatModelRunnable::new(Arc::from(bound_model));
 
@@ -1858,10 +1831,11 @@ mod tests {
 
     #[test]
     fn test_chat_model_config_builder() {
-        let config = ChatModelConfig::new()
-            .with_cache(true)
-            .with_disable_streaming(true)
-            .with_output_version("v1");
+        let config = ChatModelConfig::builder()
+            .cache(true)
+            .disable_streaming(DisableStreaming::Bool(true))
+            .output_version("v1")
+            .build();
 
         assert_eq!(config.base.cache, Some(true));
         assert_eq!(config.disable_streaming, DisableStreaming::Bool(true));
