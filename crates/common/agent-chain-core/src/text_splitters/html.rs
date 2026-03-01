@@ -168,9 +168,8 @@ fn finalize_chunk(
 
 /// Splits HTML files based on specified headers and font sizes.
 ///
-/// Uses libxml for DOM manipulation to convert elements with font-size > 20px
-/// to h1 headers (equivalent to the Python XSLT transformation), then splits
-/// the resulting HTML by header tags.
+/// Elements with font-size > 20px are treated as h1 headers during splitting,
+/// equivalent to the Python XSLT transformation.
 pub struct HTMLSectionSplitter {
     headers_to_split_on: HashMap<String, String>,
 }
@@ -186,8 +185,7 @@ impl HTMLSectionSplitter {
         &self,
         text: &str,
     ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
-        let converted = self.convert_possible_tags_to_header(text)?;
-        let sections = self.split_html_by_headers(&converted);
+        let sections = self.split_html_by_headers(text);
 
         Ok(sections
             .into_iter()
@@ -213,39 +211,8 @@ impl HTMLSectionSplitter {
             .collect())
     }
 
-    /// Convert elements with font-size > 20px to h1 headers using libxml.
-    fn convert_possible_tags_to_header(
-        &self,
-        html_content: &str,
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        let parser = libxml::parser::Parser::default_html();
-        let doc = parser.parse_string(html_content.as_bytes()).map_err(|e| {
-            Box::new(crate::Error::ValidationError(format!(
-                "Failed to parse HTML: {:?}",
-                e
-            ))) as Box<dyn std::error::Error + Send + Sync>
-        })?;
-
-        let root = match doc.get_root_element() {
-            Some(r) => r,
-            None => return Ok(html_content.to_string()),
-        };
-
-        let mut nodes_to_rename: Vec<libxml::tree::Node> = Vec::new();
-        collect_font_size_nodes(&root, &mut nodes_to_rename);
-
-        for mut node in nodes_to_rename {
-            node.set_name("h1").map_err(|_| {
-                Box::new(crate::Error::ValidationError(
-                    "Failed to set node name".to_string(),
-                )) as Box<dyn std::error::Error + Send + Sync>
-            })?;
-        }
-
-        Ok(doc.node_to_string(&root))
-    }
-
     /// Split HTML by header tags into sections.
+    /// Elements with font-size > 20px are treated as h1 headers.
     fn split_html_by_headers(&self, html_doc: &str) -> Vec<HtmlSection> {
         let document = Html::parse_document(html_doc);
         let header_names: Vec<&str> = self
@@ -267,6 +234,9 @@ impl HTMLSectionSplitter {
                 let name = el.value().name().to_lowercase();
                 if name == "body" || header_names.contains(&name.as_str()) {
                     Some((idx, name))
+                } else if has_large_font_size(el) {
+                    // Treat elements with font-size > 20px as h1 headers
+                    Some((idx, "h1".to_string()))
                 } else {
                     None
                 }
@@ -333,17 +303,12 @@ struct HtmlSection {
     tag_name: Option<String>,
 }
 
-/// Recursively collect nodes that have font-size > 20px in their style attribute.
-fn collect_font_size_nodes(node: &libxml::tree::Node, result: &mut Vec<libxml::tree::Node>) {
-    if let Some(style) = node.get_attribute("style")
-        && let Some(font_size) = extract_font_size_px(&style)
-        && font_size > 20.0
-    {
-        result.push(node.clone());
-    }
-    for child in node.get_child_elements() {
-        collect_font_size_nodes(&child, result);
-    }
+/// Check if an element has font-size > 20px in its style attribute.
+fn has_large_font_size(el: &scraper::ElementRef) -> bool {
+    el.value()
+        .attr("style")
+        .and_then(extract_font_size_px)
+        .is_some_and(|size| size > 20.0)
 }
 
 /// Extract font-size value in px from a CSS style string.
