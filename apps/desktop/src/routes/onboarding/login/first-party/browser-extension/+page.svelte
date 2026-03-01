@@ -55,8 +55,8 @@
 			<div>
 				<h1 class="text-3xl font-bold mb-2">Browser Extension</h1>
 				<p class="text-sm text-muted-foreground">
-					Eurora uses a browser extension to understand your browsing context, enabling deeper
-					integration and more relevant assistance as you work.
+					Eurora uses a browser extension to understand your browsing context, enabling
+					deeper integration and more relevant assistance as you work.
 				</p>
 			</div>
 
@@ -73,7 +73,10 @@
 						<ol class="mt-2 list-decimal list-inside space-y-1">
 							<li>Open <span class="font-medium">Safari Settings</span> (⌘,)</li>
 							<li>Click the <span class="font-medium">Extensions</span> tab</li>
-							<li>Find <span class="font-medium">Eurora</span> and check the box to enable it</li>
+							<li>
+								Find <span class="font-medium">Eurora</span> and check the box to enable
+								it
+							</li>
 							<li>Click <span class="font-medium">"Turn On"</span> to confirm</li>
 						</ol>
 					</AlertDescription>
@@ -112,7 +115,8 @@
 						intervalId = null;
 					}
 					downloaded = false;
-				}}>Cancel</Button>
+				}}>Cancel</Button
+			>
 			{#if connected}
 				<Button onclick={() => goto('/')}>Continue</Button>
 			{/if}
