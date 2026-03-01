@@ -104,7 +104,7 @@ impl Default for TextSplitterConfig {
         Self {
             chunk_size: 4000,
             chunk_overlap: 200,
-            length_function: Arc::new(|s: &str| s.len()),
+            length_function: Arc::new(|s: &str| s.chars().count()),
             keep_separator: KeepSeparator::None,
             add_start_index: false,
             strip_whitespace: true,
@@ -136,7 +136,8 @@ impl TextSplitterConfig {
         Ok(Self {
             chunk_size,
             chunk_overlap,
-            length_function: length_function.unwrap_or_else(|| Arc::new(|s: &str| s.len())),
+            length_function: length_function
+                .unwrap_or_else(|| Arc::new(|s: &str| s.chars().count())),
             keep_separator: keep_separator.unwrap_or_default(),
             add_start_index: add_start_index.unwrap_or(false),
             strip_whitespace: strip_whitespace.unwrap_or(true),

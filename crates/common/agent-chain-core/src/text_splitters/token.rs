@@ -60,7 +60,7 @@ pub fn tiktoken_length_function(
 ) -> Result<LengthFunction, Box<dyn std::error::Error + Send + Sync>> {
     let bpe = Arc::new(resolve_tiktoken_bpe(encoding_name, model_name)?);
     Ok(Arc::new(move |text: &str| -> usize {
-        bpe.encode_with_special_tokens(text).len()
+        bpe.encode_ordinary(text).len()
     }))
 }
 
@@ -102,9 +102,8 @@ impl TokenTextSplitter {
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let bpe = Arc::new(resolve_tiktoken_bpe(encoding_name, model_name)?);
         let bpe_for_length = bpe.clone();
-        config.length_function = Arc::new(move |text: &str| -> usize {
-            bpe_for_length.encode_with_special_tokens(text).len()
-        });
+        config.length_function =
+            Arc::new(move |text: &str| -> usize { bpe_for_length.encode_ordinary(text).len() });
         Ok(Self {
             config,
             tokenizer: bpe,
@@ -135,7 +134,7 @@ impl TextSplitter for TokenTextSplitter {
             tokens_per_chunk: self.config.chunk_size,
             encode: Box::new(move |text: &str| {
                 tokenizer_ref
-                    .encode_with_special_tokens(text)
+                    .encode_ordinary(text)
                     .into_iter()
                     .map(|rank| rank as i64)
                     .collect()
