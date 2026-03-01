@@ -66,6 +66,8 @@ pub struct ChatChunk {
     pub finish_reason: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_calls: Vec<crate::messages::ToolCall>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
 impl ChatChunk {
@@ -76,6 +78,7 @@ impl ChatChunk {
             usage_metadata: None,
             finish_reason: None,
             tool_calls: Vec::new(),
+            response_metadata: HashMap::new(),
         }
     }
 
@@ -88,6 +91,7 @@ impl ChatChunk {
             is_final: true,
             usage_metadata,
             finish_reason,
+            response_metadata: HashMap::new(),
             tool_calls: Vec::new(),
         }
     }
@@ -107,16 +111,19 @@ impl ChatChunk {
 pub enum ToolLike {
     Tool(Arc<dyn BaseTool>),
     Schema(Value),
+    /// Raw tool JSON passed through unchanged (e.g. `{"type": "web_search_preview"}`).
+    /// Used for Responses API builtin tools that don't follow the function tool format.
+    Builtin(Value),
 }
 
 impl ToolLike {
-    pub fn to_definition(&self) -> ToolDefinition {
+    pub fn to_definition(&self) -> Result<ToolDefinition> {
         match self {
-            ToolLike::Tool(tool) => tool.definition(),
+            ToolLike::Tool(tool) => Ok(tool.definition()),
             ToolLike::Schema(schema) => {
-                let openai_tool = convert_to_openai_tool(schema, None);
+                let openai_tool = convert_to_openai_tool(schema, None)?;
                 let function = openai_tool.get("function").cloned().unwrap_or_default();
-                ToolDefinition {
+                Ok(ToolDefinition {
                     name: function
                         .get("name")
                         .and_then(|n| n.as_str())
@@ -131,7 +138,18 @@ impl ToolLike {
                         .get("parameters")
                         .cloned()
                         .unwrap_or(Value::Object(Default::default())),
-                }
+                })
+            }
+            ToolLike::Builtin(json) => {
+                let tool_type = json
+                    .get("type")
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("unknown");
+                Ok(ToolDefinition {
+                    name: tool_type.to_string(),
+                    description: String::new(),
+                    parameters: json.clone(),
+                })
             }
         }
     }
@@ -1075,8 +1093,11 @@ pub trait BaseChatModel: BaseLanguageModel {
         ))
     }
 
-    fn get_tool_definitions(&self, tools: &[ToolLike]) -> Vec<ToolDefinition> {
-        tools.iter().map(|t| t.to_definition()).collect()
+    fn get_tool_definitions(&self, tools: &[ToolLike]) -> Result<Vec<ToolDefinition>> {
+        tools
+            .iter()
+            .map(|t| t.to_definition())
+            .collect::<Result<Vec<_>>>()
     }
 
     async fn stream(
@@ -1431,7 +1452,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         schema: Value,
         include_raw: bool,
     ) -> Result<Box<dyn Runnable<Input = LanguageModelInput, Output = Value> + Send + Sync>> {
-        let tool_name = extract_tool_name_from_schema(&schema);
+        let tool_name = extract_tool_name_from_schema(&schema)?;
 
         let tool_like = ToolLike::Schema(schema);
         let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
@@ -1568,14 +1589,14 @@ pub fn format_ls_structured_output(
     HashMap::new()
 }
 
-pub fn extract_tool_name_from_schema(schema: &Value) -> String {
-    let openai_tool = convert_to_openai_tool(schema, None);
-    openai_tool
+pub fn extract_tool_name_from_schema(schema: &Value) -> Result<String> {
+    let openai_tool = convert_to_openai_tool(schema, None)?;
+    Ok(openai_tool
         .get("function")
         .and_then(|f| f.get("name"))
         .and_then(|n| n.as_str())
         .unwrap_or("unknown")
-        .to_string()
+        .to_string())
 }
 
 pub struct ChatModelRunnable {
@@ -1596,15 +1617,47 @@ impl std::fmt::Debug for ChatModelRunnable {
     }
 }
 
+/// Run an async future synchronously, safe to call from any context.
+///
+/// When called outside a tokio runtime, creates a temporary runtime on the
+/// current thread. When called from within an existing runtime (e.g. from a
+/// sync `invoke` inside an async test), spawns a new thread with its own
+/// runtime so the calling runtime's I/O driver is not blocked.
+fn run_blocking_async<F, T>(future: F) -> T
+where
+    F: std::future::Future<Output = T> + Send + 'static,
+    T: Send + 'static,
+{
+    if tokio::runtime::Handle::try_current().is_ok() {
+        std::thread::scope(|scope| {
+            scope
+                .spawn(|| {
+                    tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .expect("failed to create tokio runtime")
+                        .block_on(future)
+                })
+                .join()
+                .expect("spawned thread panicked")
+        })
+    } else {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("failed to create tokio runtime")
+            .block_on(future)
+    }
+}
+
 #[async_trait]
 impl Runnable for ChatModelRunnable {
     type Input = LanguageModelInput;
     type Output = AIMessage;
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let rt = tokio::runtime::Handle::current();
         let model = self.model.clone();
-        rt.block_on(async move { model.invoke(input, config.as_ref()).await })
+        run_blocking_async(async move { model.invoke(input, config.as_ref()).await })
     }
 
     async fn ainvoke(

@@ -69,7 +69,7 @@ fn test_ensure_config_copies_tags_metadata_configurable() {
 #[test]
 fn test_get_config_list_single_config_replicated() {
     let config = RunnableConfig::new().with_tags(vec!["a".into()]);
-    let configs = get_config_list(Some(ConfigOrList::Single(Box::new(config))), 3);
+    let configs = get_config_list(Some(ConfigOrList::Single(Box::new(config))), 3).unwrap();
     assert_eq!(configs.len(), 3);
     for c in &configs {
         assert_eq!(c.tags, vec!["a"]);
@@ -79,7 +79,7 @@ fn test_get_config_list_single_config_replicated() {
 
 #[test]
 fn test_get_config_list_none_config() {
-    let configs = get_config_list(None, 2);
+    let configs = get_config_list(None, 2).unwrap();
     assert_eq!(configs.len(), 2);
     for c in &configs {
         assert!(c.tags.is_empty());
@@ -91,22 +91,22 @@ fn test_get_config_list_sequence_of_configs() {
     let config_a = RunnableConfig::new().with_tags(vec!["a".into()]);
     let config_b = RunnableConfig::new().with_tags(vec!["b".into()]);
 
-    let configs = get_config_list(Some(ConfigOrList::List(vec![config_a, config_b])), 2);
+    let configs = get_config_list(Some(ConfigOrList::List(vec![config_a, config_b])), 2).unwrap();
     assert_eq!(configs.len(), 2);
     assert_eq!(configs[0].tags, vec!["a"]);
     assert_eq!(configs[1].tags, vec!["b"]);
 }
 
 #[test]
-#[should_panic(expected = "same length")]
 fn test_get_config_list_sequence_length_mismatch_raises() {
     let config_a = RunnableConfig::new().with_tags(vec!["a".into()]);
-    get_config_list(Some(ConfigOrList::List(vec![config_a])), 3);
+    let err = get_config_list(Some(ConfigOrList::List(vec![config_a])), 3).unwrap_err();
+    assert!(err.to_string().contains("same length"));
 }
 
 #[test]
 fn test_get_config_list_zero_length() {
-    let configs = get_config_list(None, 0);
+    let configs = get_config_list(None, 0).unwrap();
     assert!(configs.is_empty());
 }
 
@@ -114,7 +114,7 @@ fn test_get_config_list_zero_length() {
 fn test_get_config_list_run_id_warning() {
     let run_id = uuid::Uuid::new_v4();
     let config = RunnableConfig::new().with_run_id(run_id);
-    let configs = get_config_list(Some(ConfigOrList::Single(Box::new(config))), 3);
+    let configs = get_config_list(Some(ConfigOrList::Single(Box::new(config))), 3).unwrap();
 
     assert_eq!(configs[0].run_id, Some(run_id));
     assert!(configs[1].run_id.is_none());
@@ -125,7 +125,7 @@ fn test_get_config_list_run_id_warning() {
 fn test_get_config_list_run_id_single_no_issue() {
     let run_id = uuid::Uuid::new_v4();
     let config = RunnableConfig::new().with_run_id(run_id);
-    let configs = get_config_list(Some(ConfigOrList::Single(Box::new(config))), 1);
+    let configs = get_config_list(Some(ConfigOrList::Single(Box::new(config))), 1).unwrap();
     assert_eq!(configs.len(), 1);
     assert_eq!(configs[0].run_id, Some(run_id));
 }
@@ -592,7 +592,7 @@ fn test_get_config_list_single_with_length_one() {
     let config = RunnableConfig::new()
         .with_recursion_limit(42)
         .with_tags(vec!["solo".into()]);
-    let configs = get_config_list(Some(ConfigOrList::Single(Box::new(config))), 1);
+    let configs = get_config_list(Some(ConfigOrList::Single(Box::new(config))), 1).unwrap();
     assert_eq!(configs.len(), 1);
     assert_eq!(configs[0].recursion_limit, 42);
     assert_eq!(configs[0].tags, vec!["solo"]);
@@ -600,7 +600,7 @@ fn test_get_config_list_single_with_length_one() {
 
 #[test]
 fn test_get_config_list_empty_list() {
-    let configs = get_config_list(Some(ConfigOrList::List(vec![])), 0);
+    let configs = get_config_list(Some(ConfigOrList::List(vec![])), 0).unwrap();
     assert!(configs.is_empty());
 }
 
@@ -614,7 +614,7 @@ fn test_get_config_list_preserves_all_fields() {
         .with_recursion_limit(15)
         .with_run_id(run_id);
 
-    let configs = get_config_list(Some(ConfigOrList::Single(Box::new(config))), 1);
+    let configs = get_config_list(Some(ConfigOrList::Single(Box::new(config))), 1).unwrap();
     assert_eq!(configs.len(), 1);
     assert_eq!(configs[0].tags, vec!["t1"]);
     assert_eq!(configs[0].run_name, Some("run".to_string()));

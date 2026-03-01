@@ -407,7 +407,10 @@ where
             return Vec::new();
         }
 
-        let configs = get_config_list(config, inputs.len());
+        let configs = match get_config_list(config, inputs.len()) {
+            Ok(c) => c,
+            Err(e) => return vec![Err(e)],
+        };
         let n = inputs.len();
 
         let run_managers: Vec<CallbackManagerForChainRun> = configs
@@ -518,7 +521,10 @@ where
             return Vec::new();
         }
 
-        let configs = get_config_list(config, inputs.len());
+        let configs = match get_config_list(config, inputs.len()) {
+            Ok(c) => c,
+            Err(e) => return vec![Err(e)],
+        };
         let n = inputs.len();
 
         let run_managers: Vec<CallbackManagerForChainRun> = configs
