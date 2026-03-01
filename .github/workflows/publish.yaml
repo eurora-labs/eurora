@@ -468,114 +468,13 @@ jobs:
 
                   echo "$APP_VERSION" > launcher-release/version
 
-            - name: Set artifact name suffix
-              shell: bash
-              env:
-                  BUILD_TARGET: ${{ matrix.target }}
-              run: |
-                  # Only add suffix for macOS x86_64 to distinguish from ARM64
-                  if [ "$BUILD_TARGET" = "x86_64-apple-darwin" ]; then
-                    {
-                      echo 'artifact_suffix<<EOF'
-                      echo "-x86_64"
-                      echo 'EOF'
-                    } >> "$GITHUB_ENV"
-                  else
-                    {
-                      echo 'artifact_suffix<<EOF'
-                      echo ""
-                      echo 'EOF'
-                    } >> "$GITHUB_ENV"
-                  fi
-
-            - name: Upload Artifacts
-              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-              with:
-                  name: '${{ env.channel }}-${{ matrix.platform }}${{ env.artifact_suffix }}-${{ github.run_number }}'
-                  path: release/
-                  if-no-files-found: error
-
-            - name: Upload launcher artifacts
+            - name: Prepare for macOS assembly
               if: runner.os == 'macOS'
-              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-              with:
-                  name: 'launcher-${{ matrix.launcher_arch }}-${{ github.run_number }}'
-                  path: launcher-release/
-                  if-no-files-found: error
-
-    assemble-macos-dmg:
-        needs: [build-sveltekit, build-tauri]
-        runs-on: macos-15
-        strategy:
-            fail-fast: false
-            matrix:
-                include:
-                    - arch: arm64
-                      tauri_suffix: ''
-                    - arch: x86_64
-                      tauri_suffix: '-x86_64'
-        steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-              with:
-                  token: ${{ secrets.GITHUB_TOKEN }}
-                  persist-credentials: false
-
-            - name: Init Node Environment
-              uses: ./.github/actions/init-env-node
-
-            - name: Set channel
               shell: bash
-              env:
-                  BUILD_CHANNEL: ${{ needs.build-sveltekit.outputs.channel }}
-              run: |
-                  {
-                    echo 'channel<<EOF'
-                    echo "$BUILD_CHANNEL"
-                    echo 'EOF'
-                  } >> "$GITHUB_ENV"
-
-            - name: Download Tauri artifacts
-              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
-              with:
-                  name: '${{ needs.build-sveltekit.outputs.channel }}-macos-15${{ matrix.tauri_suffix }}-${{ github.run_number }}'
-                  path: tauri-release
-
-            - name: Download launcher artifacts
-              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
-              with:
-                  name: 'launcher-${{ matrix.arch }}-${{ github.run_number }}'
-                  path: launcher-release
-
-            - name: Extract version
-              shell: bash
-              run: |
-                  VERSION="$(cat tauri-release/version)"
-                  {
-                    echo 'version<<EOF'
-                    echo "$VERSION"
-                    echo 'EOF'
-                  } >> "$GITHUB_ENV"
-
-            - name: Import Apple certificate
-              shell: bash
-              env:
-                  APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-                  APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-              run: |
-                  CERTIFICATE_PATH="$RUNNER_TEMP/build_certificate.p12"
-                  KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
-                  KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
-
-                  echo -n "$APPLE_CERTIFICATE" | base64 --decode -o "$CERTIFICATE_PATH"
-
-                  security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-                  security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-                  security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-                  security import "$CERTIFICATE_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
-                  security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-                  security list-keychain -d user -s "$KEYCHAIN_PATH" "$(security list-keychains -d user | tr -d '"' | tr '\n' ' ')"
+              run: mv release tauri-release
 
             - name: Compute app name from channel
+              if: runner.os == 'macOS'
               shell: bash
               env:
                   CHANNEL: ${{ env.channel }}
@@ -592,15 +491,17 @@ jobs:
                   } >> "$GITHUB_ENV"
 
             - name: Assemble unified app
+              if: runner.os == 'macOS'
               shell: bash
               env:
-                  ARCH: ${{ matrix.arch }}
+                  ARCH: ${{ matrix.launcher_arch }}
                   APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
                   VERSION: ${{ env.version }}
                   CHANNEL: ${{ env.channel }}
               run: ./scripts/assemble-macos-dmg.sh
 
             - name: Notarize assembled app
+              if: runner.os == 'macOS'
               shell: bash
               env:
                   APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -619,10 +520,11 @@ jobs:
                   xcrun stapler staple "assembled/$APP_NAME"
 
             - name: Create DMG from notarized app
+              if: runner.os == 'macOS'
               shell: bash
               env:
                   APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
-                  MATRIX_ARCH: ${{ matrix.arch }}
+                  MATRIX_ARCH: ${{ matrix.launcher_arch }}
                   APP_VERSION: ${{ env.version }}
                   APP_NAME: ${{ env.app_name }}
                   CHANNEL: ${{ env.channel }}
@@ -665,9 +567,10 @@ jobs:
                   echo "$APP_VERSION" > release/version
 
             - name: Create updater tar.gz from notarized app
+              if: runner.os == 'macOS'
               shell: bash
               env:
-                  MATRIX_ARCH: ${{ matrix.arch }}
+                  MATRIX_ARCH: ${{ matrix.launcher_arch }}
                   APP_VERSION: ${{ env.version }}
                   APP_NAME: ${{ env.app_name }}
                   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
@@ -681,7 +584,6 @@ jobs:
 
                   RELEASE_DIR="release/darwin/${ARCH_DIR}"
 
-                  # Reuse the original Tauri tar.gz filename so the update API keeps the same S3 key
                   ORIG_TARGZ=$(find "tauri-release/darwin/${ARCH_DIR}" -maxdepth 1 -name '*.tar.gz' -not -name '*.sig' | head -1)
                   TARGZ_NAME=$(basename "$ORIG_TARGZ")
 
@@ -693,15 +595,44 @@ jobs:
                   echo "Updater tar.gz created and signed:"
                   ls -la "$RELEASE_DIR/$TARGZ_NAME" "$RELEASE_DIR/${TARGZ_NAME}.sig"
 
-            - name: Upload assembled artifacts
+            - name: Set artifact name suffix
+              shell: bash
+              env:
+                  BUILD_TARGET: ${{ matrix.target }}
+              run: |
+                  # Only add suffix for macOS x86_64 to distinguish from ARM64
+                  if [ "$BUILD_TARGET" = "x86_64-apple-darwin" ]; then
+                    {
+                      echo 'artifact_suffix<<EOF'
+                      echo "-x86_64"
+                      echo 'EOF'
+                    } >> "$GITHUB_ENV"
+                  else
+                    {
+                      echo 'artifact_suffix<<EOF'
+                      echo ""
+                      echo 'EOF'
+                    } >> "$GITHUB_ENV"
+                  fi
+
+            - name: Upload Artifacts
+              if: runner.os != 'macOS'
               uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
               with:
-                  name: 'assembled-macos-${{ matrix.arch }}-${{ github.run_number }}'
+                  name: '${{ env.channel }}-${{ matrix.platform }}${{ env.artifact_suffix }}-${{ github.run_number }}'
+                  path: release/
+                  if-no-files-found: error
+
+            - name: Upload assembled macOS artifacts
+              if: runner.os == 'macOS'
+              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+              with:
+                  name: 'assembled-macos-${{ matrix.launcher_arch }}-${{ github.run_number }}'
                   path: release/
                   if-no-files-found: error
 
     publish-tauri:
-        needs: [build-sveltekit, build-tauri, assemble-macos-dmg]
+        needs: [build-sveltekit, build-tauri]
         runs-on: ubuntu-latest
         outputs:
             version: ${{ env.version }}
