@@ -1,5 +1,6 @@
 pub mod base;
 pub mod character;
+pub mod html;
 pub mod json;
 pub mod jsx;
 pub mod latex;
@@ -14,6 +15,7 @@ pub use base::{
     split_text_with_regex,
 };
 pub use character::RecursiveCharacterTextSplitter;
+pub use html::{HTMLHeaderTextSplitter, HTMLSectionSplitter};
 pub use json::RecursiveJsonSplitter;
 pub use jsx::JSFrameworkTextSplitter;
 pub use latex::LatexTextSplitter;
