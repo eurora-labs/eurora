@@ -375,8 +375,11 @@ pub trait BaseChatModel: BaseLanguageModel {
                     .filter(|info| !info.is_empty());
 
                 match generation_info {
-                    Some(info) => ChatGeneration::with_info(message, info),
-                    None => ChatGeneration::new(message),
+                    Some(info) => ChatGeneration::builder()
+                        .message(message)
+                        .generation_info(info)
+                        .build(),
+                    None => ChatGeneration::builder().message(message).build(),
                 }
             })
             .collect()
@@ -577,7 +580,9 @@ pub trait BaseChatModel: BaseLanguageModel {
                 && let Some(generation) = gen_list.first()
                 && let GenerationType::ChatGeneration(chat_gen) = generation
             {
-                let chat_result = crate::outputs::ChatResult::new(vec![chat_gen.clone()]);
+                let chat_result = crate::outputs::ChatResult::builder()
+                    .generations(vec![chat_gen.clone()])
+                    .build();
                 run_manager.on_llm_end(&chat_result);
             }
             run_infos.push(RunInfo::new(run_manager.run_id()));
@@ -714,7 +719,9 @@ pub trait BaseChatModel: BaseLanguageModel {
                 && let Some(generation) = gen_list.first()
                 && let GenerationType::ChatGeneration(chat_gen) = generation
             {
-                let chat_result = crate::outputs::ChatResult::new(vec![chat_gen.clone()]);
+                let chat_result = crate::outputs::ChatResult::builder()
+                    .generations(vec![chat_gen.clone()])
+                    .build();
                 run_manager.on_llm_end(&chat_result).await;
             }
             run_infos.push(RunInfo::new(run_manager.run_id()));
@@ -758,7 +765,9 @@ pub trait BaseChatModel: BaseLanguageModel {
             let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
             if let Some(cached) = cache.lookup(&prompt_key, &llm_string) {
                 let generations = self._convert_cached_generations(cached);
-                return Ok(crate::outputs::ChatResult::new(generations));
+                return Ok(crate::outputs::ChatResult::builder()
+                    .generations(generations)
+                    .build());
             }
         }
 
@@ -851,7 +860,9 @@ pub trait BaseChatModel: BaseLanguageModel {
             let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
             if let Some(cached) = cache.alookup(&prompt_key, &llm_string).await {
                 let generations = self._convert_cached_generations(cached);
-                return Ok(crate::outputs::ChatResult::new(generations));
+                return Ok(crate::outputs::ChatResult::builder()
+                    .generations(generations)
+                    .build());
             }
         }
         if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
@@ -1203,9 +1214,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 final_chunk.set_chunk_position(Some(ChunkPosition::Last));
 
                 if let Some(ref rm) = run_manager {
-                    let msg_chunk = ChatGenerationChunk::new(
-                        BaseMessage::AI(crate::messages::AIMessage::builder().content("").build())
-                    );
+                    let msg_chunk = ChatGenerationChunk::builder().message(BaseMessage::AI(crate::messages::AIMessage::builder().content("").build())).build();
                     let chunk_json = serde_json::to_value(&msg_chunk).ok();
                     rm.on_llm_new_token("", chunk_json.as_ref());
                 }
@@ -1216,7 +1225,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             if let Some(ref rm) = run_manager
                 && let Some(merged) = crate::outputs::merge_chat_generation_chunks(chunks) {
                     let chat_gen: ChatGeneration = merged.into();
-                    let chat_result = ChatResult::new(vec![chat_gen]);
+                    let chat_result = ChatResult::builder().generations(vec![chat_gen]).build();
                     rm.on_llm_end(&chat_result);
                 }
         };
@@ -1359,9 +1368,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 final_chunk.set_chunk_position(Some(ChunkPosition::Last));
 
                 if let Some(ref rm) = run_manager {
-                    let msg_chunk = ChatGenerationChunk::new(
-                        BaseMessage::AI(crate::messages::AIMessage::builder().content("").build())
-                    );
+                    let msg_chunk = ChatGenerationChunk::builder().message(BaseMessage::AI(crate::messages::AIMessage::builder().content("").build())).build();
                     let chunk_json = serde_json::to_value(&msg_chunk).ok();
                     rm.on_llm_new_token("", chunk_json.as_ref()).await;
                 }
@@ -1372,7 +1379,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             if let Some(ref rm) = run_manager
                 && let Some(merged) = crate::outputs::merge_chat_generation_chunks(chunks) {
                     let chat_gen: ChatGeneration = merged.into();
-                    let chat_result = ChatResult::new(vec![chat_gen]);
+                    let chat_result = ChatResult::builder().generations(vec![chat_gen]).build();
                     rm.on_llm_end(&chat_result).await;
                 }
         };
@@ -1395,7 +1402,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             }
 
             let message = result.generations[0].message.clone();
-            let chunk = ChatGenerationChunk::new(message);
+            let chunk = ChatGenerationChunk::builder().message(message).build();
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
@@ -1491,7 +1498,10 @@ fn _chat_generations_to_cache(generations: &[ChatGeneration]) -> Vec<Generation>
             if let Ok(msg_val) = serde_json::to_value(&chat_gen.message) {
                 info.insert("message".to_string(), msg_val);
             }
-            Generation::with_info(&chat_gen.text, info)
+            Generation::builder()
+                .text(&chat_gen.text)
+                .generation_info(info)
+                .build()
         })
         .collect()
 }
@@ -1518,12 +1528,16 @@ pub fn generate_response_from_error(error: &crate::error::Error) -> Vec<ChatGene
         _ => return Vec::new(),
     }
 
-    vec![ChatGeneration::new(BaseMessage::AI(
-        AIMessage::builder()
-            .content("")
-            .response_metadata(metadata)
+    vec![
+        ChatGeneration::builder()
+            .message(BaseMessage::AI(
+                AIMessage::builder()
+                    .content("")
+                    .response_metadata(metadata)
+                    .build(),
+            ))
             .build(),
-    ))]
+    ]
 }
 
 pub fn format_for_tracing(messages: &[BaseMessage]) -> Vec<BaseMessage> {
@@ -1725,8 +1739,8 @@ impl<T: SimpleChatModel> BaseChatModel for T {
     ) -> Result<ChatResult> {
         let output_str = self._call(messages, stop, run_manager).await?;
         let message = AIMessage::builder().content(output_str).build();
-        let generation = ChatGeneration::new(message.into());
-        Ok(ChatResult::new(vec![generation]))
+        let generation = ChatGeneration::builder().message(message.into()).build();
+        Ok(ChatResult::builder().generations(vec![generation]).build())
     }
 }
 
@@ -1744,7 +1758,9 @@ where
     }
 
     let chat_generation: ChatGeneration = generation.into();
-    Ok(ChatResult::new(vec![chat_generation]))
+    Ok(ChatResult::builder()
+        .generations(vec![chat_generation])
+        .build())
 }
 
 pub async fn agenerate_from_stream(
@@ -1902,8 +1918,12 @@ mod tests {
     #[test]
     fn test_generate_from_stream() {
         let chunks = vec![
-            ChatGenerationChunk::new(AIMessage::builder().content("Hello, ").build().into()),
-            ChatGenerationChunk::new(AIMessage::builder().content("world!").build().into()),
+            ChatGenerationChunk::builder()
+                .message(AIMessage::builder().content("Hello, ").build().into())
+                .build(),
+            ChatGenerationChunk::builder()
+                .message(AIMessage::builder().content("world!").build().into())
+                .build(),
         ];
 
         let result = generate_from_stream(chunks.into_iter()).unwrap();
@@ -1921,12 +1941,12 @@ mod tests {
     #[tokio::test]
     async fn test_agenerate_from_stream() {
         let chunks = vec![
-            Ok(ChatGenerationChunk::new(
-                AIMessage::builder().content("Hello, ").build().into(),
-            )),
-            Ok(ChatGenerationChunk::new(
-                AIMessage::builder().content("world!").build().into(),
-            )),
+            Ok(ChatGenerationChunk::builder()
+                .message(AIMessage::builder().content("Hello, ").build().into())
+                .build()),
+            Ok(ChatGenerationChunk::builder()
+                .message(AIMessage::builder().content("world!").build().into())
+                .build()),
         ];
 
         let stream = futures::stream::iter(chunks);
@@ -1938,15 +1958,15 @@ mod tests {
     #[tokio::test]
     async fn test_collect_and_merge_stream() {
         let chunks = vec![
-            Ok(ChatGenerationChunk::new(
-                AIMessage::builder().content("a").build().into(),
-            )),
-            Ok(ChatGenerationChunk::new(
-                AIMessage::builder().content("b").build().into(),
-            )),
-            Ok(ChatGenerationChunk::new(
-                AIMessage::builder().content("c").build().into(),
-            )),
+            Ok(ChatGenerationChunk::builder()
+                .message(AIMessage::builder().content("a").build().into())
+                .build()),
+            Ok(ChatGenerationChunk::builder()
+                .message(AIMessage::builder().content("b").build().into())
+                .build()),
+            Ok(ChatGenerationChunk::builder()
+                .message(AIMessage::builder().content("c").build().into())
+                .build()),
         ];
 
         let stream = futures::stream::iter(chunks);

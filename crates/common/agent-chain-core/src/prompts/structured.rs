@@ -166,14 +166,14 @@ mod tests {
             }
         });
 
-        let prompt = StructuredPrompt::new(
-            vec![
+        let prompt = StructuredPrompt::builder()
+            .messages(vec![
                 ("system", "Extract structured data.").into(),
                 ("human", "{input}").into(),
-            ],
-            schema.clone(),
-        )
-        .unwrap();
+            ])
+            .schema(schema.clone())
+            .build()
+            .unwrap();
 
         assert_eq!(prompt.input_variables(), &["input"]);
         assert_eq!(prompt.schema, schema);
@@ -183,14 +183,14 @@ mod tests {
     fn test_structured_prompt_format_messages() {
         let schema = json!({"type": "object"});
 
-        let prompt = StructuredPrompt::new(
-            vec![
+        let prompt = StructuredPrompt::builder()
+            .messages(vec![
                 ("system", "You extract data.").into(),
                 ("human", "{text}").into(),
-            ],
-            schema,
-        )
-        .unwrap();
+            ])
+            .schema(schema)
+            .build()
+            .unwrap();
 
         let mut kwargs = HashMap::new();
         kwargs.insert("text".to_string(), "Hello world".to_string());
@@ -203,10 +203,16 @@ mod tests {
 
     #[test]
     fn test_structured_prompt_rejects_empty_schema() {
-        let result = StructuredPrompt::new(vec![("human", "test").into()], json!({}));
+        let result = StructuredPrompt::builder()
+            .messages(vec![("human", "test").into()])
+            .schema(json!({}))
+            .build();
         assert!(result.is_err());
 
-        let result = StructuredPrompt::new(vec![("human", "test").into()], Value::Null);
+        let result = StructuredPrompt::builder()
+            .messages(vec![("human", "test").into()])
+            .schema(Value::Null)
+            .build();
         assert!(result.is_err());
     }
 

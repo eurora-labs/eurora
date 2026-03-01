@@ -85,7 +85,10 @@ impl PromptTemplate {
         template: impl Into<String>,
         template_format: PromptTemplateFormat,
     ) -> Result<Self> {
-        Self::builder().template(template).template_format(template_format).build()
+        Self::builder()
+            .template(template)
+            .template_format(template_format)
+            .build()
     }
 
     pub fn from_template_with_partials(
@@ -161,8 +164,6 @@ impl PromptTemplate {
 
         Ok(())
     }
-
-
 }
 
 impl BasePromptTemplate for PromptTemplate {

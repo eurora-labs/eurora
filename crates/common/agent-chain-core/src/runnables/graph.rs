@@ -421,7 +421,10 @@ impl Graph {
             edges: labels.as_ref().map(|l| l.edges.clone()).unwrap_or_default(),
         };
 
-        let drawer = super::graph_png::PngDrawer::new(fontname, Some(merged_labels));
+        let drawer = super::graph_png::PngDrawer::builder()
+            .maybe_fontname(fontname.map(|s| s.to_string()))
+            .labels(merged_labels)
+            .build();
         drawer.draw(self, output_file_path)
     }
 
@@ -469,17 +472,17 @@ impl Graph {
         let first_node = graph.first_node().map(|n| n.id.clone());
         let last_node = graph.last_node().map(|n| n.id.clone());
 
-        super::graph_mermaid::draw_mermaid(
-            &graph.nodes,
-            &graph.edges,
-            first_node.as_deref(),
-            last_node.as_deref(),
-            opts.with_styles,
-            &opts.curve_style,
-            &opts.node_styles.unwrap_or_default(),
-            opts.wrap_label_n_words,
-            opts.frontmatter_config.as_ref(),
-        )
+        super::graph_mermaid::draw_mermaid()
+            .nodes(&graph.nodes)
+            .edges(&graph.edges)
+            .maybe_first_node(first_node.as_deref())
+            .maybe_last_node(last_node.as_deref())
+            .with_styles(opts.with_styles)
+            .curve_style(&opts.curve_style)
+            .node_styles(&opts.node_styles.unwrap_or_default())
+            .wrap_label_n_words(opts.wrap_label_n_words)
+            .maybe_frontmatter_config(opts.frontmatter_config.as_ref())
+            .call()
     }
 
     pub async fn draw_mermaid_png(
@@ -493,16 +496,16 @@ impl Graph {
         base_url: Option<&str>,
     ) -> crate::error::Result<Vec<u8>> {
         let mermaid_syntax = self.draw_mermaid(options)?;
-        super::graph_mermaid::draw_mermaid_png(
-            &mermaid_syntax,
-            output_file_path,
-            draw_method,
-            background_color,
-            max_retries,
-            retry_delay_secs,
-            base_url,
-        )
-        .await
+        super::graph_mermaid::draw_mermaid_png()
+            .mermaid_syntax(&mermaid_syntax)
+            .maybe_output_file_path(output_file_path)
+            .draw_method(draw_method)
+            .maybe_background_color(background_color)
+            .max_retries(max_retries)
+            .retry_delay_secs(retry_delay_secs)
+            .maybe_base_url(base_url)
+            .call()
+            .await
     }
 
     pub fn draw_ascii(&self) -> Result<String, String> {

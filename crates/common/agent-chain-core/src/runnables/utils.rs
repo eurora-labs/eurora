@@ -3,8 +3,8 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use futures::stream::{Stream, StreamExt};
 use bon::bon;
+use futures::stream::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::Semaphore;
@@ -213,9 +213,9 @@ impl ConfigurableField {
     #[builder]
     pub fn new(
         id: impl Into<String>,
-        name: Option<String>,
-        description: Option<String>,
-        annotation: Option<String>,
+        #[builder(into)] name: Option<String>,
+        #[builder(into)] description: Option<String>,
+        #[builder(into)] annotation: Option<String>,
         #[builder(default)] is_shared: bool,
     ) -> Self {
         Self {
@@ -537,10 +537,12 @@ mod tests {
 
     #[test]
     fn test_configurable_field() {
-        let field = ConfigurableField::new("test_id")
-            .with_name("Test Field")
-            .with_description("A test field")
-            .with_shared(true);
+        let field = ConfigurableField::builder()
+            .id("test_id")
+            .name("Test Field")
+            .description("A test field")
+            .is_shared(true)
+            .build();
 
         assert_eq!(field.id, "test_id");
         assert_eq!(field.name, Some("Test Field".to_string()));
@@ -550,9 +552,18 @@ mod tests {
 
     #[test]
     fn test_get_unique_config_specs() {
-        let spec1 = ConfigurableFieldSpec::new("id1", "String");
-        let spec2 = ConfigurableFieldSpec::new("id1", "String");
-        let spec3 = ConfigurableFieldSpec::new("id2", "Int");
+        let spec1 = ConfigurableFieldSpec::builder()
+            .id("id1")
+            .annotation("String")
+            .build();
+        let spec2 = ConfigurableFieldSpec::builder()
+            .id("id1")
+            .annotation("String")
+            .build();
+        let spec3 = ConfigurableFieldSpec::builder()
+            .id("id2")
+            .annotation("Int")
+            .build();
 
         let specs = vec![spec1, spec2, spec3];
         let result = get_unique_config_specs(specs).unwrap();
@@ -564,8 +575,14 @@ mod tests {
 
     #[test]
     fn test_get_unique_config_specs_conflict() {
-        let spec1 = ConfigurableFieldSpec::new("id1", "String");
-        let mut spec2 = ConfigurableFieldSpec::new("id1", "String");
+        let spec1 = ConfigurableFieldSpec::builder()
+            .id("id1")
+            .annotation("String")
+            .build();
+        let mut spec2 = ConfigurableFieldSpec::builder()
+            .id("id1")
+            .annotation("String")
+            .build();
         spec2.description = Some("Different".to_string());
 
         let specs = vec![spec1, spec2];

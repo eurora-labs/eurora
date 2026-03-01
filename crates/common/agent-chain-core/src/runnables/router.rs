@@ -59,9 +59,7 @@ where
     O: Send + Sync + Clone + Debug + 'static,
 {
     #[builder]
-    pub fn new(
-        #[builder(into)] name: Option<String>,
-    ) -> Self {
+    pub fn new(#[builder(into)] name: Option<String>) -> Self {
         Self {
             runnables: HashMap::new(),
             name,
@@ -350,7 +348,10 @@ mod tests {
         let add = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let square = RunnableLambda::builder().func(|x: i32| Ok(x * x)).build();
 
-        let router = RouterRunnable::builder().build().add("add", add).add("square", square);
+        let router = RouterRunnable::builder()
+            .build()
+            .add("add", add)
+            .add("square", square);
 
         let result = router.invoke(RouterInput::new("add", 5), None).unwrap();
         assert_eq!(result, 6);
@@ -379,7 +380,10 @@ mod tests {
         let add = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let square = RunnableLambda::builder().func(|x: i32| Ok(x * x)).build();
 
-        let router = RouterRunnable::builder().build().add("add", add).add("square", square);
+        let router = RouterRunnable::builder()
+            .build()
+            .add("add", add)
+            .add("square", square);
 
         let inputs = vec![
             RouterInput::new("add", 5),
@@ -398,7 +402,10 @@ mod tests {
     fn test_router_runnable_name() {
         let add = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
 
-        let router = RouterRunnable::builder().name("my_router").build().add("add", add);
+        let router = RouterRunnable::builder()
+            .name("my_router")
+            .build()
+            .add("add", add);
 
         assert_eq!(router.name(), Some("my_router".to_string()));
     }
@@ -408,7 +415,10 @@ mod tests {
         let add = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let square = RunnableLambda::builder().func(|x: i32| Ok(x * x)).build();
 
-        let router = RouterRunnable::builder().build().add("add", add).add("square", square);
+        let router = RouterRunnable::builder()
+            .build()
+            .add("add", add)
+            .add("square", square);
 
         let name = router.name().unwrap();
         assert!(name.starts_with("RouterRunnable<"));
@@ -420,7 +430,10 @@ mod tests {
         let add = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let square = RunnableLambda::builder().func(|x: i32| Ok(x * x)).build();
 
-        let router = RouterRunnable::builder().build().add("add", add).add("square", square);
+        let router = RouterRunnable::builder()
+            .build()
+            .add("add", add)
+            .add("square", square);
 
         let result = router
             .ainvoke(RouterInput::new("add", 5), None)
@@ -440,7 +453,10 @@ mod tests {
         let add = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let square = RunnableLambda::builder().func(|x: i32| Ok(x * x)).build();
 
-        let router = RouterRunnable::builder().build().add("add", add).add("square", square);
+        let router = RouterRunnable::builder()
+            .build()
+            .add("add", add)
+            .add("square", square);
 
         let inputs = vec![RouterInput::new("add", 5), RouterInput::new("square", 4)];
 

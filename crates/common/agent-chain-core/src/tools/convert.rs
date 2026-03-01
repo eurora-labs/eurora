@@ -114,17 +114,15 @@ where
     let description = config.description.unwrap_or_default();
     let args_schema = config.args_schema.unwrap_or_default();
 
-    let mut tool = StructuredTool::from_function(func, name, description, args_schema);
-
-    if config.return_direct {
-        tool = tool.with_return_direct(true);
-    }
-
-    tool = tool.with_response_format(config.response_format);
-
-    if let Some(extras) = config.extras {
-        tool = tool.with_extras(extras);
-    }
+    let tool = StructuredTool::builder()
+        .name(name)
+        .description(description)
+        .args_schema(args_schema)
+        .func(Arc::new(func))
+        .return_direct(config.return_direct)
+        .response_format(config.response_format)
+        .maybe_extras(config.extras)
+        .build();
 
     Ok(tool)
 }

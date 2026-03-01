@@ -75,10 +75,7 @@ impl Default for JsonOutputFunctionsParser {
 #[bon::bon]
 impl JsonOutputFunctionsParser {
     #[builder]
-    pub fn new(
-        args_only: bool,
-        #[builder(default)] strict: bool,
-    ) -> Self {
+    pub fn new(args_only: bool, #[builder(default)] strict: bool) -> Self {
         Self { strict, args_only }
     }
 
@@ -306,10 +303,7 @@ pub struct JsonKeyOutputFunctionsParser {
 #[bon::bon]
 impl JsonKeyOutputFunctionsParser {
     #[builder]
-    pub fn new(
-        #[builder(into)] key_name: String,
-        #[builder(default)] strict: bool,
-    ) -> Self {
+    pub fn new(#[builder(into)] key_name: String, #[builder(default)] strict: bool) -> Self {
         Self {
             key_name,
             inner: JsonOutputFunctionsParser::builder()
@@ -524,7 +518,7 @@ impl BaseLLMOutputParser for OutputFunctionsParser {
 #[async_trait]
 impl BaseGenerationOutputParser for OutputFunctionsParser {
     fn invoke(&self, input: BaseMessage, _config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let chat_gen = ChatGeneration::new(input);
+        let chat_gen = ChatGeneration::builder().message(input).build();
         self.parse_result(&[chat_gen])
     }
 }

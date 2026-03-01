@@ -26,14 +26,19 @@ fn test_runnable_lambda_invoke() {
 
 #[test]
 fn test_runnable_lambda_named() {
-    let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).name("add_one").build();
+    let runnable = RunnableLambda::builder()
+        .func(|x: i32| Ok(x + 1))
+        .name("add_one")
+        .build();
     assert_eq!(runnable.name(), Some("add_one".to_string()));
     assert_eq!(runnable.invoke(5, None).unwrap(), 6);
 }
 
 #[test]
 fn test_runnable_lambda_error() {
-    let runnable = RunnableLambda::builder().func(|_x: i32| Err::<i32, _>(Error::other("boom"))).build();
+    let runnable = RunnableLambda::builder()
+        .func(|_x: i32| Err::<i32, _>(Error::other("boom")))
+        .build();
     let result = runnable.invoke(5, None);
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("boom"));
@@ -91,7 +96,9 @@ fn test_sequence_three_steps() {
 
 #[test]
 fn test_sequence_first_step_error() {
-    let fail = RunnableLambda::builder().func(|_x: i32| Err::<i32, _>(Error::other("first failed"))).build();
+    let fail = RunnableLambda::builder()
+        .func(|_x: i32| Err::<i32, _>(Error::other("first failed")))
+        .build();
     let double = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
     let seq = pipe(fail, double);
 
@@ -103,7 +110,9 @@ fn test_sequence_first_step_error() {
 #[test]
 fn test_sequence_second_step_error() {
     let add_one = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
-    let fail = RunnableLambda::builder().func(|_x: i32| Err::<i32, _>(Error::other("second failed"))).build();
+    let fail = RunnableLambda::builder()
+        .func(|_x: i32| Err::<i32, _>(Error::other("second failed")))
+        .build();
     let seq = pipe(add_one, fail);
 
     let result = seq.invoke(5, None);
@@ -159,9 +168,19 @@ async fn test_runnable_sequence_atransform() {
 
 #[test]
 fn test_sequence_name() {
-    let add = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).name("add").build();
-    let double = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).name("double").build();
-    let seq = RunnableSequence::builder().first(add).last(double).name("my_seq").build();
+    let add = RunnableLambda::builder()
+        .func(|x: i32| Ok(x + 1))
+        .name("add")
+        .build();
+    let double = RunnableLambda::builder()
+        .func(|x: i32| Ok(x * 2))
+        .name("double")
+        .build();
+    let seq = RunnableSequence::builder()
+        .first(add)
+        .last(double)
+        .name("my_seq")
+        .build();
 
     assert_eq!(seq.name(), Some("my_seq".to_string()));
 }
@@ -230,9 +249,20 @@ fn test_with_config_merge_at_invoke() {
 
 #[test]
 fn test_parallel_invoke() {
-    let parallel = RunnableParallel::<i32>::builder().build()
-        .add("doubled", RunnableLambda::builder().func(|x: i32| Ok(json!(x * 2))).build())
-        .add("tripled", RunnableLambda::builder().func(|x: i32| Ok(json!(x * 3))).build());
+    let parallel = RunnableParallel::<i32>::builder()
+        .build()
+        .add(
+            "doubled",
+            RunnableLambda::builder()
+                .func(|x: i32| Ok(json!(x * 2)))
+                .build(),
+        )
+        .add(
+            "tripled",
+            RunnableLambda::builder()
+                .func(|x: i32| Ok(json!(x * 3)))
+                .build(),
+        );
 
     let result = parallel.invoke(5, None).unwrap();
     assert_eq!(result["doubled"], json!(10));
@@ -241,9 +271,20 @@ fn test_parallel_invoke() {
 
 #[tokio::test]
 async fn test_parallel_ainvoke() {
-    let parallel = RunnableParallel::<i32>::builder().build()
-        .add("doubled", RunnableLambda::builder().func(|x: i32| Ok(json!(x * 2))).build())
-        .add("tripled", RunnableLambda::builder().func(|x: i32| Ok(json!(x * 3))).build());
+    let parallel = RunnableParallel::<i32>::builder()
+        .build()
+        .add(
+            "doubled",
+            RunnableLambda::builder()
+                .func(|x: i32| Ok(json!(x * 2)))
+                .build(),
+        )
+        .add(
+            "tripled",
+            RunnableLambda::builder()
+                .func(|x: i32| Ok(json!(x * 3)))
+                .build(),
+        );
 
     let result = parallel.ainvoke(5, None).await.unwrap();
     assert_eq!(result["doubled"], json!(10));
@@ -252,9 +293,20 @@ async fn test_parallel_ainvoke() {
 
 #[test]
 fn test_parallel_name() {
-    let parallel = RunnableParallel::<i32>::builder().build()
-        .add("a", RunnableLambda::builder().func(|x: i32| Ok(json!(x))).build())
-        .add("b", RunnableLambda::builder().func(|x: i32| Ok(json!(x))).build());
+    let parallel = RunnableParallel::<i32>::builder()
+        .build()
+        .add(
+            "a",
+            RunnableLambda::builder()
+                .func(|x: i32| Ok(json!(x)))
+                .build(),
+        )
+        .add(
+            "b",
+            RunnableLambda::builder()
+                .func(|x: i32| Ok(json!(x)))
+                .build(),
+        );
 
     let name = parallel.name().unwrap();
     assert!(name.starts_with("RunnableParallel<"));
@@ -264,11 +316,19 @@ fn test_parallel_name() {
 
 #[test]
 fn test_parallel_error_in_branch() {
-    let parallel = RunnableParallel::<i32>::builder().build()
-        .add("ok", RunnableLambda::builder().func(|x: i32| Ok(json!(x))).build())
+    let parallel = RunnableParallel::<i32>::builder()
+        .build()
+        .add(
+            "ok",
+            RunnableLambda::builder()
+                .func(|x: i32| Ok(json!(x)))
+                .build(),
+        )
         .add(
             "fail",
-            RunnableLambda::builder().func(|_: i32| Err::<Value, _>(Error::other("branch error"))).build(),
+            RunnableLambda::builder()
+                .func(|_: i32| Err::<Value, _>(Error::other("branch error")))
+                .build(),
         );
 
     let result = parallel.invoke(5, None);
@@ -306,13 +366,15 @@ fn test_map_nested() {
 
 #[test]
 fn test_each_error() {
-    let fail_on_3 = RunnableLambda::builder().func(|x: i32| {
-        if x == 3 {
-            Err(Error::other("no threes"))
-        } else {
-            Ok(x * 2)
-        }
-    }).build();
+    let fail_on_3 = RunnableLambda::builder()
+        .func(|x: i32| {
+            if x == 3 {
+                Err(Error::other("no threes"))
+            } else {
+                Ok(x * 2)
+            }
+        })
+        .build();
     let each = RunnableEach::new(fail_on_3);
 
     let result = each.invoke(vec![1, 2, 3, 4], None);
@@ -321,20 +383,36 @@ fn test_each_error() {
 
 #[test]
 fn test_each_name() {
-    let named = RunnableLambda::builder().func(|x: i32| Ok(x)).name("identity").build();
+    let named = RunnableLambda::builder()
+        .func(|x: i32| Ok(x))
+        .name("identity")
+        .build();
     let each = named.map();
     assert_eq!(each.name(), Some("RunnableEach<identity>".to_string()));
 }
 
 #[test]
 fn test_combining_sequences() {
-    let parallel = RunnableParallel::<i32>::builder().build()
-        .add("doubled", RunnableLambda::builder().func(|x: i32| Ok(json!(x * 2))).build())
-        .add("tripled", RunnableLambda::builder().func(|x: i32| Ok(json!(x * 3))).build());
+    let parallel = RunnableParallel::<i32>::builder()
+        .build()
+        .add(
+            "doubled",
+            RunnableLambda::builder()
+                .func(|x: i32| Ok(json!(x * 2)))
+                .build(),
+        )
+        .add(
+            "tripled",
+            RunnableLambda::builder()
+                .func(|x: i32| Ok(json!(x * 3)))
+                .build(),
+        );
 
-    let pick = RunnableLambda::builder().func(|m: HashMap<String, Value>| {
-        Ok(m.get("doubled").and_then(|v| v.as_i64()).unwrap_or(0) as i32)
-    }).build();
+    let pick = RunnableLambda::builder()
+        .func(|m: HashMap<String, Value>| {
+            Ok(m.get("doubled").and_then(|v| v.as_i64()).unwrap_or(0) as i32)
+        })
+        .build();
 
     let chain = pipe(parallel, pick);
     assert_eq!(chain.invoke(5, None).unwrap(), 10);
@@ -342,7 +420,9 @@ fn test_combining_sequences() {
 
 #[tokio::test]
 async fn test_transform_of_runnable_lambda_with_dicts() {
-    let runnable = RunnableLambda::builder().func(|x: HashMap<String, Value>| Ok(x)).build();
+    let runnable = RunnableLambda::builder()
+        .func(|x: HashMap<String, Value>| Ok(x))
+        .build();
 
     let chunks = vec![make_input(&[("foo", json!("n"))])];
     let input_stream = futures::stream::iter(chunks);
@@ -358,8 +438,12 @@ async fn test_transform_of_runnable_lambda_with_dicts() {
 
 #[tokio::test]
 async fn test_transform_sequence_with_dicts() {
-    let identity1 = RunnableLambda::builder().func(|x: HashMap<String, Value>| Ok(x)).build();
-    let identity2 = RunnableLambda::builder().func(|x: HashMap<String, Value>| Ok(x)).build();
+    let identity1 = RunnableLambda::builder()
+        .func(|x: HashMap<String, Value>| Ok(x))
+        .build();
+    let identity2 = RunnableLambda::builder()
+        .func(|x: HashMap<String, Value>| Ok(x))
+        .build();
     let seq = pipe(identity1, identity2);
 
     let chunks = vec![make_input(&[("foo", json!("n"))])];
@@ -422,13 +506,15 @@ fn test_sequence_batch() {
 
 #[test]
 fn test_seq_batch_return_exceptions() {
-    let maybe_fail = RunnableLambda::builder().func(|x: i32| {
-        if x == 2 {
-            Err(Error::other("fail on 2"))
-        } else {
-            Ok(x + 1)
-        }
-    }).build();
+    let maybe_fail = RunnableLambda::builder()
+        .func(|x: i32| {
+            if x == 2 {
+                Err(Error::other("fail on 2"))
+            } else {
+                Ok(x + 1)
+            }
+        })
+        .build();
     let double = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
     let seq = pipe(maybe_fail, double);
 
@@ -468,13 +554,17 @@ async fn test_sequence_abatch() {
 
 #[test]
 fn test_runnable_assign() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::builder().build().add(
-        "add_step",
-        RunnableLambda::builder().func(|x: HashMap<String, Value>| {
-            let input_val = x.get("input").and_then(|v| v.as_i64()).unwrap_or(0);
-            Ok(json!({"added": input_val + 10}))
-        }).build(),
-    );
+    let mapper = RunnableParallel::<HashMap<String, Value>>::builder()
+        .build()
+        .add(
+            "add_step",
+            RunnableLambda::builder()
+                .func(|x: HashMap<String, Value>| {
+                    let input_val = x.get("input").and_then(|v| v.as_i64()).unwrap_or(0);
+                    Ok(json!({"added": input_val + 10}))
+                })
+                .build(),
+        );
     let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("input", json!(5))]);
@@ -497,13 +587,27 @@ fn test_representation_of_runnables() {
     let repr = format!("{:?}", seq);
     assert!(repr.contains("RunnableSequence"));
 
-    let parallel = RunnableParallel::<i32>::builder().build()
-        .add("a", RunnableLambda::builder().func(|x: i32| Ok(json!(x))).build())
-        .add("b", RunnableLambda::builder().func(|x: i32| Ok(json!(x))).build());
+    let parallel = RunnableParallel::<i32>::builder()
+        .build()
+        .add(
+            "a",
+            RunnableLambda::builder()
+                .func(|x: i32| Ok(json!(x)))
+                .build(),
+        )
+        .add(
+            "b",
+            RunnableLambda::builder()
+                .func(|x: i32| Ok(json!(x)))
+                .build(),
+        );
     let repr = format!("{:?}", parallel);
     assert!(repr.contains("RunnableParallel"));
 
-    let binding = RunnableLambda::builder().func(|x: i32| Ok(x)).build().with_config(RunnableConfig::default());
+    let binding = RunnableLambda::builder()
+        .func(|x: i32| Ok(x))
+        .build()
+        .with_config(RunnableConfig::default());
     let repr = format!("{:?}", binding);
     assert!(repr.contains("RunnableBinding"));
 
@@ -543,8 +647,14 @@ async fn test_default_method_implementations_async() {
 
 #[test]
 fn test_sequence_schema() {
-    let step1 = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).name("step1").build();
-    let step2 = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).name("step2").build();
+    let step1 = RunnableLambda::builder()
+        .func(|x: i32| Ok(x + 1))
+        .name("step1")
+        .build();
+    let step2 = RunnableLambda::builder()
+        .func(|x: i32| Ok(x * 2))
+        .name("step2")
+        .build();
     let seq = pipe(step1, step2);
 
     let input_schema = seq.get_input_schema(None);
@@ -556,8 +666,12 @@ fn test_sequence_schema() {
 
 #[test]
 fn test_parallel_schema() {
-    let parallel =
-        RunnableParallel::<i32>::builder().build().add("a", RunnableLambda::builder().func(|x: i32| Ok(json!(x))).build());
+    let parallel = RunnableParallel::<i32>::builder().build().add(
+        "a",
+        RunnableLambda::builder()
+            .func(|x: i32| Ok(json!(x)))
+            .build(),
+    );
 
     let input_schema = parallel.get_input_schema(None);
     assert_eq!(input_schema["type"], "object");
@@ -565,10 +679,16 @@ fn test_parallel_schema() {
 
 #[test]
 fn test_binding_schema_delegation() {
-    let inner = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).name("inner").build();
+    let inner = RunnableLambda::builder()
+        .func(|x: i32| Ok(x + 1))
+        .name("inner")
+        .build();
     let bound = inner.with_config(RunnableConfig::default());
 
-    let inner_schema = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).name("inner").build()
+    let inner_schema = RunnableLambda::builder()
+        .func(|x: i32| Ok(x + 1))
+        .name("inner")
+        .build()
         .get_input_schema(None);
 
     assert_eq!(bound.get_input_schema(None), inner_schema);
@@ -576,21 +696,30 @@ fn test_binding_schema_delegation() {
 
 #[test]
 fn test_get_name_with_suffix() {
-    let runnable = RunnableLambda::builder().func(|x: i32| Ok(x)).name("MyRunnable").build();
+    let runnable = RunnableLambda::builder()
+        .func(|x: i32| Ok(x))
+        .name("MyRunnable")
+        .build();
     let name = runnable.get_name(Some("Input"), None);
     assert_eq!(name, "MyRunnableInput");
 }
 
 #[test]
 fn test_get_name_lowercase_with_suffix() {
-    let runnable = RunnableLambda::builder().func(|x: i32| Ok(x)).name("my_runnable").build();
+    let runnable = RunnableLambda::builder()
+        .func(|x: i32| Ok(x))
+        .name("my_runnable")
+        .build();
     let name = runnable.get_name(Some("input"), None);
     assert_eq!(name, "my_runnable_input");
 }
 
 #[test]
 fn test_get_name_override() {
-    let runnable = RunnableLambda::builder().func(|x: i32| Ok(x)).name("original").build();
+    let runnable = RunnableLambda::builder()
+        .func(|x: i32| Ok(x))
+        .name("original")
+        .build();
     let name = runnable.get_name(None, Some("override"));
     assert_eq!(name, "override");
 }
@@ -600,10 +729,12 @@ fn test_each_call_count() {
     let counter = Arc::new(AtomicUsize::new(0));
     let c = counter.clone();
 
-    let runnable = RunnableLambda::builder().func(move |x: i32| {
-        c.fetch_add(1, Ordering::SeqCst);
-        Ok(x)
-    }).build();
+    let runnable = RunnableLambda::builder()
+        .func(move |x: i32| {
+            c.fetch_add(1, Ordering::SeqCst);
+            Ok(x)
+        })
+        .build();
 
     let each = RunnableEach::new(runnable);
     let _ = each.invoke(vec![1, 2, 3, 4, 5], None).unwrap();
@@ -617,14 +748,18 @@ fn test_sequence_step_count() {
     let c1 = counter1.clone();
     let c2 = counter2.clone();
 
-    let step1 = RunnableLambda::builder().func(move |x: i32| {
-        c1.fetch_add(1, Ordering::SeqCst);
-        Ok(x + 1)
-    }).build();
-    let step2 = RunnableLambda::builder().func(move |x: i32| {
-        c2.fetch_add(1, Ordering::SeqCst);
-        Ok(x * 2)
-    }).build();
+    let step1 = RunnableLambda::builder()
+        .func(move |x: i32| {
+            c1.fetch_add(1, Ordering::SeqCst);
+            Ok(x + 1)
+        })
+        .build();
+    let step2 = RunnableLambda::builder()
+        .func(move |x: i32| {
+            c2.fetch_add(1, Ordering::SeqCst);
+            Ok(x * 2)
+        })
+        .build();
 
     let seq = pipe(step1, step2);
     let _ = seq.invoke(5, None).unwrap();
@@ -640,20 +775,25 @@ fn test_parallel_call_count() {
     let ca = counter_a.clone();
     let cb = counter_b.clone();
 
-    let parallel = RunnableParallel::<i32>::builder().build()
+    let parallel = RunnableParallel::<i32>::builder()
+        .build()
         .add(
             "a",
-            RunnableLambda::builder().func(move |x: i32| {
-                ca.fetch_add(1, Ordering::SeqCst);
-                Ok(json!(x))
-            }).build(),
+            RunnableLambda::builder()
+                .func(move |x: i32| {
+                    ca.fetch_add(1, Ordering::SeqCst);
+                    Ok(json!(x))
+                })
+                .build(),
         )
         .add(
             "b",
-            RunnableLambda::builder().func(move |x: i32| {
-                cb.fetch_add(1, Ordering::SeqCst);
-                Ok(json!(x))
-            }).build(),
+            RunnableLambda::builder()
+                .func(move |x: i32| {
+                    cb.fetch_add(1, Ordering::SeqCst);
+                    Ok(json!(x))
+                })
+                .build(),
         );
 
     let _ = parallel.invoke(5, None).unwrap();
@@ -688,12 +828,14 @@ fn test_binding_debug() {
 fn test_pick_single_key() {
     use agent_chain_core::runnables::passthrough::PickKeys;
 
-    let runnable = RunnableLambda::builder().func(|_x: i32| {
-        let mut map = HashMap::new();
-        map.insert("name".to_string(), json!("Alice"));
-        map.insert("age".to_string(), json!(30));
-        Ok(map)
-    }).build();
+    let runnable = RunnableLambda::builder()
+        .func(|_x: i32| {
+            let mut map = HashMap::new();
+            map.insert("name".to_string(), json!("Alice"));
+            map.insert("age".to_string(), json!(30));
+            Ok(map)
+        })
+        .build();
 
     let picked = runnable.pick(PickKeys::Single("name".to_string()));
     let result = picked.invoke(1, None).unwrap();
@@ -704,13 +846,15 @@ fn test_pick_single_key() {
 fn test_pick_multiple_keys() {
     use agent_chain_core::runnables::passthrough::PickKeys;
 
-    let runnable = RunnableLambda::builder().func(|_x: i32| {
-        let mut map = HashMap::new();
-        map.insert("name".to_string(), json!("Alice"));
-        map.insert("age".to_string(), json!(30));
-        map.insert("city".to_string(), json!("NYC"));
-        Ok(map)
-    }).build();
+    let runnable = RunnableLambda::builder()
+        .func(|_x: i32| {
+            let mut map = HashMap::new();
+            map.insert("name".to_string(), json!("Alice"));
+            map.insert("age".to_string(), json!(30));
+            map.insert("city".to_string(), json!("NYC"));
+            Ok(map)
+        })
+        .build();
 
     let picked = runnable.pick(PickKeys::Multiple(vec![
         "name".to_string(),
@@ -725,15 +869,17 @@ fn test_pick_multiple_keys() {
 
 #[test]
 fn test_assign_convenience() {
-    let passthrough = RunnablePassthrough::<HashMap<String, serde_json::Value>>::new();
+    let passthrough = RunnablePassthrough::<HashMap<String, serde_json::Value>>::builder().build();
 
     let mapper = RunnablePassthrough::<HashMap<String, serde_json::Value>>::assign()
         .add(
             "doubled",
-            RunnableLambda::builder().func(|input: HashMap<String, serde_json::Value>| {
-                let val = input.get("x").and_then(|v| v.as_i64()).unwrap_or(0);
-                Ok(json!(val * 2))
-            }).build(),
+            RunnableLambda::builder()
+                .func(|input: HashMap<String, serde_json::Value>| {
+                    let val = input.get("x").and_then(|v| v.as_i64()).unwrap_or(0);
+                    Ok(json!(val * 2))
+                })
+                .build(),
         )
         .build();
 
@@ -749,11 +895,13 @@ fn test_assign_convenience() {
 
 #[test]
 fn test_with_fallbacks_convenience() {
-    let primary = RunnableLambda::builder().func(|_x: i32| -> Result<i32, Error> {
-        Err(Error::other("primary failed"))
-    }).build();
+    let primary = RunnableLambda::builder()
+        .func(|_x: i32| -> Result<i32, Error> { Err(Error::other("primary failed")) })
+        .build();
 
-    let fallback = RunnableLambda::builder().func(|x: i32| -> Result<i32, Error> { Ok(x * 2) }).build();
+    let fallback = RunnableLambda::builder()
+        .func(|x: i32| -> Result<i32, Error> { Ok(x * 2) })
+        .build();
 
     let with_fallbacks = primary.with_fallbacks(vec![Arc::new(fallback)]);
     let result = with_fallbacks.invoke(5, None).unwrap();
@@ -762,9 +910,13 @@ fn test_with_fallbacks_convenience() {
 
 #[test]
 fn test_with_fallbacks_primary_succeeds() {
-    let primary = RunnableLambda::builder().func(|x: i32| -> Result<i32, Error> { Ok(x + 1) }).build();
+    let primary = RunnableLambda::builder()
+        .func(|x: i32| -> Result<i32, Error> { Ok(x + 1) })
+        .build();
 
-    let fallback = RunnableLambda::builder().func(|x: i32| -> Result<i32, Error> { Ok(x * 100) }).build();
+    let fallback = RunnableLambda::builder()
+        .func(|x: i32| -> Result<i32, Error> { Ok(x * 100) })
+        .build();
 
     let with_fallbacks = primary.with_fallbacks(vec![Arc::new(fallback)]);
     let result = with_fallbacks.invoke(5, None).unwrap();
@@ -800,23 +952,30 @@ fn test_with_listeners_convenience() {
 fn test_chaining_pick_with_fallbacks() {
     use agent_chain_core::runnables::passthrough::PickKeys;
 
-    let runnable = RunnableLambda::builder().func(|_x: i32| {
-        let mut map = HashMap::new();
-        map.insert("name".to_string(), json!("Alice"));
-        map.insert("age".to_string(), json!(30));
-        Ok(map)
-    }).build();
+    let runnable = RunnableLambda::builder()
+        .func(|_x: i32| {
+            let mut map = HashMap::new();
+            map.insert("name".to_string(), json!("Alice"));
+            map.insert("age".to_string(), json!(30));
+            Ok(map)
+        })
+        .build();
 
     let picked = runnable.pick(PickKeys::Single("name".to_string()));
 
     let fallback_picked = {
-        let fallback_inner = RunnableLambda::builder().func(|_x: i32| {
-            let mut map = HashMap::new();
-            map.insert("name".to_string(), json!("Fallback"));
-            Ok(map)
-        }).build();
+        let fallback_inner = RunnableLambda::builder()
+            .func(|_x: i32| {
+                let mut map = HashMap::new();
+                map.insert("name".to_string(), json!("Fallback"));
+                Ok(map)
+            })
+            .build();
         use agent_chain_core::runnables::passthrough::RunnablePick;
-        pipe(fallback_inner, RunnablePick::new_single_builder().key("name").build())
+        pipe(
+            fallback_inner,
+            RunnablePick::new_single().key("name").call(),
+        )
     };
 
     let with_fallbacks = picked.with_fallbacks(vec![Arc::new(fallback_picked)]);

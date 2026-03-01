@@ -24,10 +24,7 @@ pub struct JsonOutputParser {
 #[bon::bon]
 impl JsonOutputParser {
     #[builder]
-    pub fn new(
-        schema: Option<Value>,
-        #[builder(default)] diff: bool,
-    ) -> Self {
+    pub fn new(schema: Option<Value>, #[builder(default)] diff: bool) -> Self {
         Self { schema, diff }
     }
 
@@ -290,7 +287,7 @@ mod tests {
     #[test]
     fn test_json_output_parser_partial() {
         let parser = JsonOutputParser::builder().build();
-        let generations = vec![Generation::new(r#"{"key": "val"#)];
+        let generations = vec![Generation::builder().text(r#"{"key": "val"#).build()];
         let result = parser.parse_result(&generations, true).unwrap();
         assert_eq!(result["key"], "val");
     }

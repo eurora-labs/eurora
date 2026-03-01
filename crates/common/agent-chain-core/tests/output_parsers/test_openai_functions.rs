@@ -21,7 +21,7 @@ fn make_function_call_generation(function_name: &str, arguments: &str) -> ChatGe
         .additional_kwargs(additional_kwargs)
         .build();
 
-    ChatGeneration::new(message.into())
+    ChatGeneration::builder().message(message.into()).build()
 }
 
 #[test]
@@ -29,7 +29,9 @@ fn test_json_output_function_parser() {
     let chat_generation =
         make_function_call_generation("function_name", "{\"arg1\": \"code\\ncode\"}");
 
-    let parser = JsonOutputFunctionsParser::new(false);
+    let parser = JsonOutputFunctionsParser::builder()
+        .args_only(false)
+        .build();
     let result = parser
         .parse_result(std::slice::from_ref(&chat_generation))
         .unwrap();
@@ -38,7 +40,7 @@ fn test_json_output_function_parser() {
         Some(json!({"arguments": {"arg1": "code\ncode"}, "name": "function_name"}))
     );
 
-    let parser = JsonOutputFunctionsParser::new(true);
+    let parser = JsonOutputFunctionsParser::builder().args_only(true).build();
     let result = parser
         .parse_result(std::slice::from_ref(&chat_generation))
         .unwrap();
@@ -59,7 +61,10 @@ fn test_json_output_function_parser() {
 fn test_json_output_function_parser_strictness_full_output() {
     let chat_generation = make_function_call_generation("function_name", "{\"arg1\": \"value1\"}");
 
-    let parser = JsonOutputFunctionsParser::new(false).with_strict(false);
+    let parser = JsonOutputFunctionsParser::builder()
+        .args_only(false)
+        .strict(false)
+        .build();
     let result = parser.parse_result(&[chat_generation]).unwrap();
     assert_eq!(
         result,
@@ -71,7 +76,10 @@ fn test_json_output_function_parser_strictness_full_output() {
 fn test_json_output_function_parser_strictness_args_only() {
     let chat_generation = make_function_call_generation("function_name", "{\"arg1\": \"value1\"}");
 
-    let parser = JsonOutputFunctionsParser::new(true).with_strict(false);
+    let parser = JsonOutputFunctionsParser::builder()
+        .args_only(true)
+        .strict(false)
+        .build();
     let result = parser.parse_result(&[chat_generation]).unwrap();
     assert_eq!(result, Some(json!({"arg1": "value1"})));
 }
@@ -81,7 +89,10 @@ fn test_json_output_function_parser_strictness_newline_lenient() {
     let chat_generation =
         make_function_call_generation("function_name", "{\"code\": \"print(2+\n2)\"}");
 
-    let parser = JsonOutputFunctionsParser::new(true).with_strict(false);
+    let parser = JsonOutputFunctionsParser::builder()
+        .args_only(true)
+        .strict(false)
+        .build();
     let result = parser.parse_result(&[chat_generation]).unwrap();
     assert_eq!(result, Some(json!({"code": "print(2+\n2)"})));
 }
@@ -90,7 +101,10 @@ fn test_json_output_function_parser_strictness_newline_lenient() {
 fn test_json_output_function_parser_strictness_unicode() {
     let chat_generation = make_function_call_generation("function_name", "{\"code\": \"你好)\"}");
 
-    let parser = JsonOutputFunctionsParser::new(true).with_strict(false);
+    let parser = JsonOutputFunctionsParser::builder()
+        .args_only(true)
+        .strict(false)
+        .build();
     let result = parser.parse_result(&[chat_generation]).unwrap();
     assert_eq!(result, Some(json!({"code": "你好)"})));
 }
@@ -100,7 +114,10 @@ fn test_json_output_function_parser_strictness_strict_rejects_newline() {
     let chat_generation =
         make_function_call_generation("function_name", "{\"code\": \"print(2+\n2)\"}");
 
-    let parser = JsonOutputFunctionsParser::new(true).with_strict(true);
+    let parser = JsonOutputFunctionsParser::builder()
+        .args_only(true)
+        .strict(true)
+        .build();
     let result = parser.parse_result(&[chat_generation]);
     assert!(result.is_err());
 }
@@ -110,7 +127,7 @@ fn test_exception_human_message() {
     let message = HumanMessage::builder()
         .content("This is a test message")
         .build();
-    let chat_generation = ChatGeneration::new(message.into());
+    let chat_generation = ChatGeneration::builder().message(message.into()).build();
 
     let parser = JsonOutputFunctionsParser::default();
     let result = parser.parse_result(&[chat_generation]);
@@ -122,7 +139,7 @@ fn test_exception_ai_message_no_function_call() {
     let message = AIMessage::builder()
         .content("This is a test message")
         .build();
-    let chat_generation = ChatGeneration::new(message.into());
+    let chat_generation = ChatGeneration::builder().message(message.into()).build();
 
     let parser = JsonOutputFunctionsParser::default();
     let result = parser.parse_result(&[chat_generation]);
@@ -144,7 +161,7 @@ fn test_exception_arguments_not_string() {
         .content("This is a test message")
         .additional_kwargs(additional_kwargs)
         .build();
-    let chat_generation = ChatGeneration::new(message.into());
+    let chat_generation = ChatGeneration::builder().message(message.into()).build();
 
     let parser = JsonOutputFunctionsParser::default();
     let result = parser.parse_result(&[chat_generation]);

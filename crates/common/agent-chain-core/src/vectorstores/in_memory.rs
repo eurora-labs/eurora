@@ -337,9 +337,9 @@ mod tests {
     fn test_add_and_search() {
         let store = make_store();
         let docs = vec![
-            Document::new("foo").with_id("1"),
-            Document::new("bar").with_id("2"),
-            Document::new("baz").with_id("3"),
+            Document::builder().page_content("foo").id("1").build(),
+            Document::builder().page_content("bar").id("2").build(),
+            Document::builder().page_content("baz").id("3").build(),
         ];
         let ids = store.add_documents(docs, None).unwrap();
         assert_eq!(ids.len(), 3);
@@ -353,8 +353,8 @@ mod tests {
     fn test_delete() {
         let store = make_store();
         let docs = vec![
-            Document::new("foo").with_id("1"),
-            Document::new("bar").with_id("2"),
+            Document::builder().page_content("foo").id("1").build(),
+            Document::builder().page_content("bar").id("2").build(),
         ];
         store.add_documents(docs, None).unwrap();
         store.delete(Some(vec!["1".into()])).unwrap();
@@ -370,8 +370,8 @@ mod tests {
     fn test_get_by_ids() {
         let store = make_store();
         let docs = vec![
-            Document::new("foo").with_id("1"),
-            Document::new("bar").with_id("2"),
+            Document::builder().page_content("foo").id("1").build(),
+            Document::builder().page_content("bar").id("2").build(),
         ];
         store.add_documents(docs, None).unwrap();
 
@@ -385,8 +385,14 @@ mod tests {
     fn test_similarity_search_with_score() {
         let store = make_store();
         let docs = vec![
-            Document::new("hello world").with_id("1"),
-            Document::new("goodbye world").with_id("2"),
+            Document::builder()
+                .page_content("hello world")
+                .id("1")
+                .build(),
+            Document::builder()
+                .page_content("goodbye world")
+                .id("2")
+                .build(),
         ];
         store.add_documents(docs, None).unwrap();
 
@@ -400,10 +406,10 @@ mod tests {
     #[test]
     fn test_similarity_search_with_filter() {
         let store = make_store();
-        let mut doc1 = Document::new("foo").with_id("1");
+        let mut doc1 = Document::builder().page_content("foo").id("1").build();
         doc1.metadata
             .insert("category".into(), Value::String("a".into()));
-        let mut doc2 = Document::new("bar").with_id("2");
+        let mut doc2 = Document::builder().page_content("bar").id("2").build();
         doc2.metadata
             .insert("category".into(), Value::String("b".into()));
         store.add_documents(vec![doc1, doc2], None).unwrap();
@@ -420,9 +426,9 @@ mod tests {
     fn test_mmr_search() {
         let store = make_store();
         let docs = vec![
-            Document::new("apple").with_id("1"),
-            Document::new("banana").with_id("2"),
-            Document::new("cherry").with_id("3"),
+            Document::builder().page_content("apple").id("1").build(),
+            Document::builder().page_content("banana").id("2").build(),
+            Document::builder().page_content("cherry").id("3").build(),
         ];
         store.add_documents(docs, None).unwrap();
 
@@ -436,8 +442,14 @@ mod tests {
     fn test_dump_and_load() {
         let store = make_store();
         let docs = vec![
-            Document::new("hello world").with_id("1"),
-            Document::new("goodbye world").with_id("2"),
+            Document::builder()
+                .page_content("hello world")
+                .id("1")
+                .build(),
+            Document::builder()
+                .page_content("goodbye world")
+                .id("2")
+                .build(),
         ];
         store.add_documents(docs, None).unwrap();
 
@@ -473,7 +485,10 @@ mod tests {
     #[test]
     fn test_add_with_explicit_ids() {
         let store = make_store();
-        let docs = vec![Document::new("foo"), Document::new("bar")];
+        let docs = vec![
+            Document::builder().page_content("foo").build(),
+            Document::builder().page_content("bar").build(),
+        ];
         let ids = store
             .add_documents(docs, Some(vec!["custom1".into(), "custom2".into()]))
             .unwrap();

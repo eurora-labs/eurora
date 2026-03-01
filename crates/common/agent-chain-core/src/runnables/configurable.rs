@@ -827,7 +827,10 @@ pub trait ConfigurableRunnable: Runnable + Sized {
     where
         Self: Send + Sync + 'static,
     {
-        RunnableConfigurableFields::new(Arc::new(self), fields)
+        RunnableConfigurableFields::builder()
+            .default(Arc::new(self))
+            .fields(fields)
+            .build()
     }
 
     fn configurable_fields_reconfigurable(
@@ -850,7 +853,11 @@ pub trait ConfigurableRunnable: Runnable + Sized {
             let default_clone = self.clone();
             Arc::new(move |_runnable, fields| default_clone.reconfigure(fields))
         };
-        RunnableConfigurableFields::with_reconfigure_fn(Arc::new(self), fields, reconfigure_fn)
+        RunnableConfigurableFields::builder()
+            .default(Arc::new(self))
+            .fields(fields)
+            .reconfigure_fn(reconfigure_fn)
+            .build()
     }
 
     fn configurable_alternatives(
@@ -863,13 +870,13 @@ pub trait ConfigurableRunnable: Runnable + Sized {
     where
         Self: Send + Sync + 'static,
     {
-        RunnableConfigurableAlternatives::new(
-            which,
-            Arc::new(self),
-            alternatives,
-            default_key,
-            prefix_keys,
-        )
+        RunnableConfigurableAlternatives::builder()
+            .which(which)
+            .default(Arc::new(self))
+            .alternatives(alternatives)
+            .default_key(default_key)
+            .prefix_keys(prefix_keys)
+            .build()
     }
 }
 
@@ -961,7 +968,7 @@ mod tests {
         alternatives.insert("triple".to_string(), Alternative::Runnable(Arc::new(alt)));
 
         let configurable = default.configurable_alternatives(
-            ConfigurableField::new("multiplier"),
+            ConfigurableField::builder().id("multiplier").build(),
             alternatives,
             "double",
             false,
@@ -985,7 +992,7 @@ mod tests {
         let alternatives = HashMap::new();
 
         let configurable = default.configurable_alternatives(
-            ConfigurableField::new("multiplier"),
+            ConfigurableField::builder().id("multiplier").build(),
             alternatives,
             "double",
             false,
@@ -1023,7 +1030,7 @@ mod tests {
         );
 
         let configurable = default.configurable_alternatives(
-            ConfigurableField::new("operation"),
+            ConfigurableField::builder().id("operation").build(),
             alternatives,
             "double",
             false,
@@ -1053,7 +1060,7 @@ mod tests {
         );
 
         let configurable = default.configurable_alternatives(
-            ConfigurableField::new("multiplier"),
+            ConfigurableField::builder().id("multiplier").build(),
             alternatives,
             "double",
             false,

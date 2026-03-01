@@ -21,7 +21,10 @@ pub trait TextSplitter: BaseDocumentTransformer {
         for (i, text) in texts.iter().enumerate() {
             let metadata = metadatas.get(i).cloned().unwrap_or_default();
             for chunk in self.split_text(text)? {
-                let doc = Document::new(chunk).with_metadata(metadata.clone());
+                let doc = Document::builder()
+                    .page_content(chunk)
+                    .metadata(metadata.clone())
+                    .build();
                 documents.push(doc);
             }
         }
@@ -105,8 +108,8 @@ mod tests {
     fn test_split_documents() {
         let splitter = NewlineSplitter;
         let input_docs = vec![
-            Document::new("hello\nworld"),
-            Document::new("foo\nbar\nbaz"),
+            Document::builder().page_content("hello\nworld").build(),
+            Document::builder().page_content("foo\nbar\nbaz").build(),
         ];
         let result = splitter.split_documents(&input_docs).unwrap();
         assert_eq!(result.len(), 5);
@@ -122,7 +125,12 @@ mod tests {
         let splitter = NewlineSplitter;
         let mut metadata = HashMap::new();
         metadata.insert("key".to_string(), serde_json::json!("value"));
-        let input_docs = vec![Document::new("a\nb").with_metadata(metadata)];
+        let input_docs = vec![
+            Document::builder()
+                .page_content("a\nb")
+                .metadata(metadata)
+                .build(),
+        ];
         let result = splitter.split_documents(&input_docs).unwrap();
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].metadata["key"], "value");
@@ -132,7 +140,7 @@ mod tests {
     #[test]
     fn test_transform_documents_delegates_to_split() {
         let splitter = NewlineSplitter;
-        let docs = vec![Document::new("x\ny")];
+        let docs = vec![Document::builder().page_content("x\ny").build()];
         let result = splitter.transform_documents(docs, HashMap::new()).unwrap();
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].page_content, "x");

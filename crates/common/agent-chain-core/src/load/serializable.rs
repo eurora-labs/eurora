@@ -104,10 +104,7 @@ pub struct SerializedNotImplemented {
 #[bon::bon]
 impl SerializedNotImplemented {
     #[builder]
-    pub fn new(
-        id: Vec<String>,
-        #[builder(into)] repr: Option<String>,
-    ) -> Self {
+    pub fn new(id: Vec<String>, #[builder(into)] repr: Option<String>) -> Self {
         Self {
             lc: LC_VERSION,
             type_: "not_implemented".to_string(),

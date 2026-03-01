@@ -102,7 +102,7 @@ impl BaseLanguageModel for FakeMessagesListChatModel {
             );
         }
 
-        Ok(LLMResult::new(generations))
+        Ok(LLMResult::builder().generations(generations).build())
     }
 }
 
@@ -136,8 +136,8 @@ impl BaseChatModel for FakeMessagesListChatModel {
         };
         self.index.store(next_i, Ordering::SeqCst);
 
-        let generation = ChatGeneration::new(response);
-        Ok(ChatResult::new(vec![generation]))
+        let generation = ChatGeneration::builder().message(response).build();
+        Ok(ChatResult::builder().generations(vec![generation]).build())
     }
 }
 
@@ -278,7 +278,7 @@ impl BaseLanguageModel for FakeListChatModel {
             );
         }
 
-        Ok(LLMResult::new(generations))
+        Ok(LLMResult::builder().generations(generations).build())
     }
 
     fn identifying_params(&self) -> HashMap<String, Value> {
@@ -309,8 +309,8 @@ impl BaseChatModel for FakeListChatModel {
 
         let response = self.get_next_response();
         let message = AIMessage::builder().content(&response).build();
-        let generation = ChatGeneration::new(message.into());
-        Ok(ChatResult::new(vec![generation]))
+        let generation = ChatGeneration::builder().message(message.into()).build();
+        Ok(ChatResult::builder().generations(vec![generation]).build())
     }
 
     fn has_stream_impl(&self) -> bool {
@@ -352,7 +352,7 @@ impl BaseChatModel for FakeListChatModel {
                 let mut ai_chunk = AIMessageChunk::builder().content(c.to_string()).build();
                 ai_chunk.set_chunk_position(chunk_position);
 
-                let chunk = ChatGenerationChunk::new(ai_chunk.to_message().into());
+                let chunk = ChatGenerationChunk::builder().message(ai_chunk.to_message().into()).build();
                 yield Ok(chunk);
             }
         };
@@ -420,7 +420,7 @@ impl BaseLanguageModel for FakeChatModel {
             );
         }
 
-        Ok(LLMResult::new(generations))
+        Ok(LLMResult::builder().generations(generations).build())
     }
 
     fn identifying_params(&self) -> HashMap<String, Value> {
@@ -443,8 +443,8 @@ impl BaseChatModel for FakeChatModel {
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
         let message = AIMessage::builder().content("fake response").build();
-        let generation = ChatGeneration::new(message.into());
-        Ok(ChatResult::new(vec![generation]))
+        let generation = ChatGeneration::builder().message(message.into()).build();
+        Ok(ChatResult::builder().generations(vec![generation]).build())
     }
 }
 
@@ -552,7 +552,7 @@ impl BaseLanguageModel for GenericFakeChatModel {
             );
         }
 
-        Ok(LLMResult::new(generations))
+        Ok(LLMResult::builder().generations(generations).build())
     }
 }
 
@@ -578,8 +578,8 @@ impl BaseChatModel for GenericFakeChatModel {
                 .unwrap_or_else(|| AIMessage::builder().content("").build())
         };
 
-        let generation = ChatGeneration::new(message.into());
-        Ok(ChatResult::new(vec![generation]))
+        let generation = ChatGeneration::builder().message(message.into()).build();
+        Ok(ChatResult::builder().generations(vec![generation]).build())
     }
 
     fn has_stream_impl(&self) -> bool {
@@ -648,7 +648,7 @@ impl BaseChatModel for GenericFakeChatModel {
                         chunk_msg.set_chunk_position(Some(ChunkPosition::Last));
                     }
 
-                    let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
+                    let chunk = ChatGenerationChunk::builder().message(chunk_msg.to_message().into()).build();
 
                     if let Some(run_id) = callback_run_id {
                         for handler in &callback_handlers {
@@ -692,7 +692,7 @@ impl BaseChatModel for GenericFakeChatModel {
                                             .additional_kwargs(ak)
                                             .build();
 
-                                        let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
+                                        let chunk = ChatGenerationChunk::builder().message(chunk_msg.to_message().into()).build();
 
                                         if let Some(run_id) = callback_run_id {
                                             for handler in &callback_handlers {
@@ -714,7 +714,7 @@ impl BaseChatModel for GenericFakeChatModel {
                                         .additional_kwargs(ak)
                                         .build();
 
-                                    let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
+                                    let chunk = ChatGenerationChunk::builder().message(chunk_msg.to_message().into()).build();
 
                                     if let Some(run_id) = callback_run_id {
                                         for handler in &callback_handlers {
@@ -736,7 +736,7 @@ impl BaseChatModel for GenericFakeChatModel {
                             .additional_kwargs(ak)
                             .build();
 
-                        let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
+                        let chunk = ChatGenerationChunk::builder().message(chunk_msg.to_message().into()).build();
 
                         if let Some(run_id) = callback_run_id {
                             for handler in &callback_handlers {
@@ -811,7 +811,7 @@ impl BaseLanguageModel for ParrotFakeChatModel {
             );
         }
 
-        Ok(LLMResult::new(generations))
+        Ok(LLMResult::builder().generations(generations).build())
     }
 }
 
@@ -832,8 +832,8 @@ impl BaseChatModel for ParrotFakeChatModel {
             .cloned()
             .unwrap_or_else(|| BaseMessage::AI(AIMessage::builder().content("").build()));
 
-        let generation = ChatGeneration::new(last_message);
-        Ok(ChatResult::new(vec![generation]))
+        let generation = ChatGeneration::builder().message(last_message).build();
+        Ok(ChatResult::builder().generations(vec![generation]).build())
     }
 }
 

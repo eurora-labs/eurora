@@ -540,10 +540,13 @@ mod tests {
 
     #[test]
     fn test_fallback_on_error() {
-        let primary =
-            RunnableLambda::builder().func(|_x: i32| -> Result<i32> { Err(Error::other("primary failed")) }).build();
+        let primary = RunnableLambda::builder()
+            .func(|_x: i32| -> Result<i32> { Err(Error::other("primary failed")) })
+            .build();
 
-        let fallback = RunnableLambda::builder().func(|x: i32| -> Result<i32> { Ok(x * 2) }).build();
+        let fallback = RunnableLambda::builder()
+            .func(|x: i32| -> Result<i32> { Ok(x * 2) })
+            .build();
 
         let with_fallbacks = RunnableWithFallbacks::new(primary, vec![Arc::new(fallback)]);
 
@@ -553,9 +556,13 @@ mod tests {
 
     #[test]
     fn test_primary_succeeds() {
-        let primary = RunnableLambda::builder().func(|x: i32| -> Result<i32> { Ok(x + 1) }).build();
+        let primary = RunnableLambda::builder()
+            .func(|x: i32| -> Result<i32> { Ok(x + 1) })
+            .build();
 
-        let fallback = RunnableLambda::builder().func(|x: i32| -> Result<i32> { Ok(x * 2) }).build();
+        let fallback = RunnableLambda::builder()
+            .func(|x: i32| -> Result<i32> { Ok(x * 2) })
+            .build();
 
         let with_fallbacks = RunnableWithFallbacks::new(primary, vec![Arc::new(fallback)]);
 
@@ -565,11 +572,13 @@ mod tests {
 
     #[test]
     fn test_all_fail() {
-        let primary =
-            RunnableLambda::builder().func(|_x: i32| -> Result<i32> { Err(Error::other("primary failed")) }).build();
+        let primary = RunnableLambda::builder()
+            .func(|_x: i32| -> Result<i32> { Err(Error::other("primary failed")) })
+            .build();
 
-        let fallback =
-            RunnableLambda::builder().func(|_x: i32| -> Result<i32> { Err(Error::other("fallback failed")) }).build();
+        let fallback = RunnableLambda::builder()
+            .func(|_x: i32| -> Result<i32> { Err(Error::other("fallback failed")) })
+            .build();
 
         let with_fallbacks = RunnableWithFallbacks::new(primary, vec![Arc::new(fallback)]);
 
@@ -579,13 +588,17 @@ mod tests {
 
     #[test]
     fn test_multiple_fallbacks() {
-        let primary =
-            RunnableLambda::builder().func(|_x: i32| -> Result<i32> { Err(Error::other("primary failed")) }).build();
+        let primary = RunnableLambda::builder()
+            .func(|_x: i32| -> Result<i32> { Err(Error::other("primary failed")) })
+            .build();
 
-        let fallback1 =
-            RunnableLambda::builder().func(|_x: i32| -> Result<i32> { Err(Error::other("fallback1 failed")) }).build();
+        let fallback1 = RunnableLambda::builder()
+            .func(|_x: i32| -> Result<i32> { Err(Error::other("fallback1 failed")) })
+            .build();
 
-        let fallback2 = RunnableLambda::builder().func(|x: i32| -> Result<i32> { Ok(x * 3) }).build();
+        let fallback2 = RunnableLambda::builder()
+            .func(|x: i32| -> Result<i32> { Ok(x * 3) })
+            .build();
 
         let with_fallbacks =
             RunnableWithFallbacks::new(primary, vec![Arc::new(fallback1), Arc::new(fallback2)]);
@@ -596,10 +609,13 @@ mod tests {
 
     #[test]
     fn test_with_fallbacks_ext() {
-        let primary =
-            RunnableLambda::builder().func(|_x: i32| -> Result<i32> { Err(Error::other("primary failed")) }).build();
+        let primary = RunnableLambda::builder()
+            .func(|_x: i32| -> Result<i32> { Err(Error::other("primary failed")) })
+            .build();
 
-        let fallback = RunnableLambda::builder().func(|x: i32| -> Result<i32> { Ok(x * 2) }).build();
+        let fallback = RunnableLambda::builder()
+            .func(|x: i32| -> Result<i32> { Ok(x * 2) })
+            .build();
 
         let with_fallbacks = primary.with_fallbacks(vec![Arc::new(fallback)]);
 
@@ -609,10 +625,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_fallback_async() {
-        let primary =
-            RunnableLambda::builder().func(|_x: i32| -> Result<i32> { Err(Error::other("primary failed")) }).build();
+        let primary = RunnableLambda::builder()
+            .func(|_x: i32| -> Result<i32> { Err(Error::other("primary failed")) })
+            .build();
 
-        let fallback = RunnableLambda::builder().func(|x: i32| -> Result<i32> { Ok(x * 2) }).build();
+        let fallback = RunnableLambda::builder()
+            .func(|x: i32| -> Result<i32> { Ok(x * 2) })
+            .build();
 
         let with_fallbacks = RunnableWithFallbacks::new(primary, vec![Arc::new(fallback)]);
 
@@ -622,15 +641,19 @@ mod tests {
 
     #[test]
     fn test_batch_fallback() {
-        let primary = RunnableLambda::builder().func(|x: i32| -> Result<i32> {
-            if x > 5 {
-                Err(Error::other("too large"))
-            } else {
-                Ok(x + 1)
-            }
-        }).build();
+        let primary = RunnableLambda::builder()
+            .func(|x: i32| -> Result<i32> {
+                if x > 5 {
+                    Err(Error::other("too large"))
+                } else {
+                    Ok(x + 1)
+                }
+            })
+            .build();
 
-        let fallback = RunnableLambda::builder().func(|x: i32| -> Result<i32> { Ok(x * 2) }).build();
+        let fallback = RunnableLambda::builder()
+            .func(|x: i32| -> Result<i32> { Ok(x * 2) })
+            .build();
 
         let with_fallbacks = RunnableWithFallbacks::new(primary, vec![Arc::new(fallback)]);
 
@@ -645,10 +668,13 @@ mod tests {
     async fn test_stream_fallback() {
         use futures::StreamExt;
 
-        let primary =
-            RunnableLambda::builder().func(|_x: i32| -> Result<i32> { Err(Error::other("primary failed")) }).build();
+        let primary = RunnableLambda::builder()
+            .func(|_x: i32| -> Result<i32> { Err(Error::other("primary failed")) })
+            .build();
 
-        let fallback = RunnableLambda::builder().func(|x: i32| -> Result<i32> { Ok(x * 2) }).build();
+        let fallback = RunnableLambda::builder()
+            .func(|x: i32| -> Result<i32> { Ok(x * 2) })
+            .build();
 
         let with_fallbacks = RunnableWithFallbacks::new(primary, vec![Arc::new(fallback)]);
 
@@ -659,9 +685,15 @@ mod tests {
 
     #[test]
     fn test_runnables_iterator() {
-        let primary = RunnableLambda::builder().func(|x: i32| -> Result<i32> { Ok(x) }).build();
-        let fallback1 = RunnableLambda::builder().func(|x: i32| -> Result<i32> { Ok(x) }).build();
-        let fallback2 = RunnableLambda::builder().func(|x: i32| -> Result<i32> { Ok(x) }).build();
+        let primary = RunnableLambda::builder()
+            .func(|x: i32| -> Result<i32> { Ok(x) })
+            .build();
+        let fallback1 = RunnableLambda::builder()
+            .func(|x: i32| -> Result<i32> { Ok(x) })
+            .build();
+        let fallback2 = RunnableLambda::builder()
+            .func(|x: i32| -> Result<i32> { Ok(x) })
+            .build();
 
         let with_fallbacks =
             RunnableWithFallbacks::new(primary, vec![Arc::new(fallback1), Arc::new(fallback2)]);

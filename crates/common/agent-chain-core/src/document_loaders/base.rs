@@ -87,7 +87,10 @@ mod tests {
     #[test]
     fn test_load() {
         let loader = TestLoader {
-            docs: vec![Document::new("hello"), Document::new("world")],
+            docs: vec![
+                Document::builder().page_content("hello").build(),
+                Document::builder().page_content("world").build(),
+            ],
         };
         let docs = loader.load();
         assert_eq!(docs.len(), 2);
@@ -98,7 +101,10 @@ mod tests {
     #[test]
     fn test_load_and_split() {
         let loader = TestLoader {
-            docs: vec![Document::new("abcdef"), Document::new("1234")],
+            docs: vec![
+                Document::builder().page_content("abcdef").build(),
+                Document::builder().page_content("1234").build(),
+            ],
         };
         let splitter = HalfSplitter;
         let docs = loader.load_and_split(&splitter).unwrap();
@@ -112,7 +118,7 @@ mod tests {
     #[tokio::test]
     async fn test_aload() {
         let loader = TestLoader {
-            docs: vec![Document::new("async doc")],
+            docs: vec![Document::builder().page_content("async doc").build()],
         };
         let docs = loader.aload().await;
         assert_eq!(docs.len(), 1);
@@ -124,7 +130,11 @@ mod tests {
         use futures::StreamExt;
 
         let loader = TestLoader {
-            docs: vec![Document::new("a"), Document::new("b"), Document::new("c")],
+            docs: vec![
+                Document::builder().page_content("a").build(),
+                Document::builder().page_content("b").build(),
+                Document::builder().page_content("c").build(),
+            ],
         };
         let mut stream = loader.alazy_load().await;
         let first = stream.next().await;

@@ -197,15 +197,24 @@ impl Operation {
     }
 
     pub fn and(arguments: Vec<FilterDirectiveEnum>) -> Self {
-        Self::builder().operator(Operator::And).arguments(arguments).build()
+        Self::builder()
+            .operator(Operator::And)
+            .arguments(arguments)
+            .build()
     }
 
     pub fn or(arguments: Vec<FilterDirectiveEnum>) -> Self {
-        Self::builder().operator(Operator::Or).arguments(arguments).build()
+        Self::builder()
+            .operator(Operator::Or)
+            .arguments(arguments)
+            .build()
     }
 
     pub fn not(argument: FilterDirectiveEnum) -> Self {
-        Self::builder().operator(Operator::Not).arguments(vec![argument]).build()
+        Self::builder()
+            .operator(Operator::Not)
+            .arguments(vec![argument])
+            .build()
     }
 }
 
@@ -356,7 +365,11 @@ mod tests {
 
     #[test]
     fn test_comparison_creation() {
-        let comparison = Comparison::new(Comparator::Eq, "field", "value");
+        let comparison = Comparison::builder()
+            .comparator(Comparator::Eq)
+            .attribute("field")
+            .value("value")
+            .build();
         assert_eq!(comparison.comparator, Comparator::Eq);
         assert_eq!(comparison.attribute, "field");
         assert_eq!(comparison.value, serde_json::json!("value"));
@@ -364,7 +377,11 @@ mod tests {
 
     #[test]
     fn test_operation_creation() {
-        let comparison = Comparison::new(Comparator::Gt, "age", 18);
+        let comparison = Comparison::builder()
+            .comparator(Comparator::Gt)
+            .attribute("age")
+            .value(18)
+            .build();
         let operation = Operation::and(vec![comparison.into()]);
         assert_eq!(operation.operator, Operator::And);
         assert_eq!(operation.arguments.len(), 1);
@@ -372,7 +389,11 @@ mod tests {
 
     #[test]
     fn test_structured_query_creation() {
-        let filter = Comparison::new(Comparator::Eq, "status", "active");
+        let filter = Comparison::builder()
+            .comparator(Comparator::Eq)
+            .attribute("status")
+            .value("active")
+            .build();
         let query = StructuredQuery::with_filter("search term", filter);
         assert_eq!(query.query, "search term");
         assert!(query.filter.is_some());
@@ -444,7 +465,11 @@ mod tests {
     fn test_visitor_accept() {
         let visitor = TestVisitor::new();
 
-        let comparison = Comparison::new(Comparator::Eq, "field", "value");
+        let comparison = Comparison::builder()
+            .comparator(Comparator::Eq)
+            .attribute("field")
+            .value("value")
+            .build();
         let result = comparison.accept(&visitor).unwrap();
         assert_eq!(result, "comparison:field:eq");
 
@@ -455,7 +480,11 @@ mod tests {
 
     #[test]
     fn test_serialization() {
-        let comparison = Comparison::new(Comparator::Eq, "field", "value");
+        let comparison = Comparison::builder()
+            .comparator(Comparator::Eq)
+            .attribute("field")
+            .value("value")
+            .build();
         let json = serde_json::to_string(&comparison).unwrap();
         let deserialized: Comparison = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.comparator, comparison.comparator);

@@ -240,7 +240,11 @@ mod tests {
             .run_id("run-123")
             .name("my_chain")
             .tags(vec!["tag1".to_string()])
-            .data(EventData::builder().input(serde_json::json!({"key": "value"})).build())
+            .data(
+                EventData::builder()
+                    .input(serde_json::json!({"key": "value"}))
+                    .build(),
+            )
             .build();
 
         assert_eq!(event.base.event, "on_chain_start");
@@ -271,13 +275,20 @@ mod tests {
 
     #[test]
     fn test_stream_event_enum() {
-        let standard =
-            StreamEvent::Standard(StandardStreamEvent::builder().event("on_chain_end").run_id("run-1").name("chain").build());
-        let custom = StreamEvent::Custom(CustomStreamEvent::builder()
-            .run_id("run-2")
-            .name("custom")
-            .data(serde_json::json!(null))
-            .build());
+        let standard = StreamEvent::Standard(
+            StandardStreamEvent::builder()
+                .event("on_chain_end")
+                .run_id("run-1")
+                .name("chain")
+                .build(),
+        );
+        let custom = StreamEvent::Custom(
+            CustomStreamEvent::builder()
+                .run_id("run-2")
+                .name("custom")
+                .data(serde_json::json!(null))
+                .build(),
+        );
 
         assert!(standard.is_standard());
         assert!(!standard.is_custom());
@@ -296,7 +307,11 @@ mod tests {
             .event("on_chain_start")
             .run_id("run-123")
             .name("test_chain")
-            .data(EventData::builder().input(serde_json::json!("input")).build())
+            .data(
+                EventData::builder()
+                    .input(serde_json::json!("input"))
+                    .build(),
+            )
             .build();
 
         let json = serde_json::to_string(&event).unwrap();

@@ -18,7 +18,10 @@ pub struct DictPromptTemplate {
 #[bon]
 impl DictPromptTemplate {
     #[builder]
-    pub fn new(template: serde_json::Value, #[builder(default)] template_format: PromptTemplateFormat) -> Self {
+    pub fn new(
+        template: serde_json::Value,
+        #[builder(default)] template_format: PromptTemplateFormat,
+    ) -> Self {
         Self {
             template,
             template_format,
@@ -210,7 +213,10 @@ mod tests {
             "greeting": "Hello, {{name}}!"
         });
 
-        let dict_template = DictPromptTemplate::new(template, PromptTemplateFormat::Mustache);
+        let dict_template = DictPromptTemplate::builder()
+            .template(template)
+            .template_format(PromptTemplateFormat::Mustache)
+            .build();
 
         let mut kwargs = HashMap::new();
         kwargs.insert("name".to_string(), "World".to_string());
