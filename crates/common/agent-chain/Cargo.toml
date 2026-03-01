@@ -34,7 +34,7 @@ url = { workspace = true }
 dotenv = { workspace = true }
 
 [features]
-default = ["anthropic", "ollama", "openai"]
+default = []
 anthropic = []
 integration-tests = []
 ollama = []
