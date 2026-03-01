@@ -347,23 +347,23 @@ jobs:
                   trusted-signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
                   certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
                   files-folder: ${{ github.workspace }}/release
-                  files-folder-filter: exe
+                  files-folder-filter: msi
                   files-folder-recurse: true
                   file-digest: SHA256
                   timestamp-rfc3161: http://timestamp.acs.microsoft.com
                   timestamp-digest: SHA256
 
-            - name: Re-sign code-signed exe with Tauri updater key
+            - name: Re-sign code-signed MSI with Tauri updater key
               if: runner.os == 'Windows'
               shell: bash
               env:
                   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
                   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
               run: |
-                  for exe in release/windows/x86_64/*.exe; do
-                    [ -f "$exe" ] || continue
-                    rm -f "${exe}.sig"
-                    pnpm tauri signer sign "$exe"
+                  for msi in release/windows/x86_64/*.msi; do
+                    [ -f "$msi" ] || continue
+                    rm -f "${msi}.sig"
+                    pnpm tauri signer sign "$msi"
                   done
 
             - name: Import Apple certificate
@@ -885,7 +885,7 @@ jobs:
                   find release-artifacts -type f \( \
                     -name "*.dmg" -o \
                     -name "*.AppImage" -o \
-                    -name "*.exe" -o \
+                    -name "*.msi" -o \
                     -name "*.deb" -o \
                     -name "*.rpm" \
                   \) -exec cp {} gh-release/ \;
