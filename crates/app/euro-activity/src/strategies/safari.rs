@@ -5,15 +5,17 @@
 //! host registers with its browser PID, allowing the server to route requests to
 //! the correct browser.
 //!
-//! ## Push-based collection model
+//! ## Hybrid push/pull collection model
 //!
 //! The browser extension proactively sends metadata, assets and snapshots as
-//! Event frames whenever the browser window is focused.  The strategy simply
-//! subscribes to these events and forwards them through the `ActivityReport`
-//! channel.  This avoids the previous pull-based model where the server sent
-//! Request frames (GENERATE_ASSETS, GENERATE_SNAPSHOT, GET_METADATA) that had
-//! to be routed back to the extension – a path that was unreliable on Safari
-//! due to `SFSafariApplication.dispatchMessage` limitations.
+//! Event frames whenever the browser window is focused.  The strategy subscribes
+//! to these events and forwards them through the `ActivityReport` channel.
+//!
+//! When Safari is re-focused (same browser PID), the strategy also sends a
+//! `GET_METADATA` request via the gRPC stream.  The Safari extension picks this
+//! up through its 500ms polling loop (`safari-poller.ts`) and responds with the
+//! current tab metadata.  This avoids the unreliable
+//! `SFSafariApplication.dispatchMessage` path.
 
 pub use crate::strategies::ActivityStrategyFunctionality;
 pub use crate::strategies::processes::*;
@@ -221,6 +223,32 @@ impl SafariStrategy {
         Ok(())
     }
 
+    async fn request_assets_and_snapshots(&mut self) {
+        let Some(sender) = self.sender.clone() else {
+            return;
+        };
+
+        match self.retrieve_assets().await {
+            Ok(assets) if !assets.is_empty() => {
+                if sender.send(ActivityReport::Assets(assets)).is_err() {
+                    tracing::warn!("Failed to send assets report - receiver dropped");
+                }
+            }
+            Err(e) => tracing::debug!("Failed to retrieve assets: {}", e),
+            _ => {}
+        }
+
+        match self.retrieve_snapshots().await {
+            Ok(snapshots) if !snapshots.is_empty() => {
+                if sender.send(ActivityReport::Snapshots(snapshots)).is_err() {
+                    tracing::warn!("Failed to send snapshots report - receiver dropped");
+                }
+            }
+            Err(e) => tracing::debug!("Failed to retrieve snapshots: {}", e),
+            _ => {}
+        }
+    }
+
     pub async fn new() -> ActivityResult<Self> {
         let mut strategy = SafariStrategy::default();
         strategy.initialize_service().await?;
@@ -259,6 +287,29 @@ impl ActivityStrategyFunctionality for SafariStrategy {
 
         self.init_collection(focus_window).await?;
 
+        match self.get_metadata().await {
+            Ok(metadata) => {
+                let activity = Activity::new(
+                    metadata.url.unwrap_or_default(),
+                    metadata.icon,
+                    "".to_string(),
+                    vec![],
+                );
+                tracing::info!(
+                    "Safari start_tracking: initial metadata activity: {}",
+                    activity.name
+                );
+                if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                    tracing::warn!("Failed to send initial activity report - receiver dropped");
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Failed to get initial metadata on start_tracking: {}", e);
+            }
+        }
+
+        self.request_assets_and_snapshots().await;
+
         tracing::debug!("Browser strategy starting tracking for: {:?}", process_name);
         Ok(())
     }
@@ -277,38 +328,46 @@ impl ActivityStrategyFunctionality for SafariStrategy {
                 "Browser strategy can continue handling: {}",
                 focus_window.process_name
             );
-            if self.active_browser_pid == Some(focus_window.process_id) {
-                tracing::info!("Detected the same browser. Ignoring...");
-            } else {
+            if self.active_browser_pid != Some(focus_window.process_id) {
                 self.active_browser_pid = Some(focus_window.process_id);
                 self.active_browser = Some(focus_window.process_name.to_string());
             }
 
-            let has_registered_client = if let Some(service) = self.bridge_service.as_ref() {
-                service.is_registered(focus_window.process_id).await
-            } else {
-                false
-            };
-
-            if !has_registered_client {
-                if let Some(sender) = self.sender.clone() {
-                    let activity = Activity::new(
-                        focus_window.process_name.clone(),
-                        focus_window.icon.clone(),
-                        focus_window.process_name.clone(),
-                        vec![],
-                    );
-                    if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                        tracing::warn!("Failed to send new activity report - receiver dropped");
+            match self.get_metadata().await {
+                Ok(metadata) => {
+                    if let Some(sender) = &self.sender {
+                        let activity = Activity::new(
+                            metadata.url.unwrap_or_default(),
+                            metadata.icon,
+                            "".to_string(),
+                            vec![],
+                        );
+                        tracing::info!(
+                            "Safari refocus: created activity from metadata: {}",
+                            activity.name
+                        );
+                        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                            tracing::warn!("Failed to send new activity report - receiver dropped");
+                        }
                     }
                 }
-            } else {
-                tracing::debug!(
-                    "Browser PID {} has registered gRPC client, skipping activity report \
-                     (will be handled by event subscription)",
-                    focus_window.process_id
-                );
+                Err(e) => {
+                    tracing::warn!("Failed to get metadata on Safari refocus: {}", e);
+                    if let Some(sender) = &self.sender {
+                        let activity = Activity::new(
+                            focus_window.process_name.clone(),
+                            focus_window.icon.clone(),
+                            focus_window.process_name.clone(),
+                            vec![],
+                        );
+                        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                            tracing::warn!("Failed to send new activity report - receiver dropped");
+                        }
+                    }
+                }
             }
+
+            self.request_assets_and_snapshots().await;
 
             Ok(true)
         } else {
@@ -336,18 +395,93 @@ impl ActivityStrategyFunctionality for SafariStrategy {
     }
 
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
-        tracing::debug!("retrieve_assets called (no-op in push model)");
-        Ok(vec![])
+        let service = self
+            .bridge_service
+            .as_ref()
+            .ok_or_else(|| ActivityError::invalid_data("Bridge service not available"))?;
+
+        let browser_pid = self
+            .active_browser_pid
+            .ok_or_else(|| ActivityError::invalid_data("No active browser PID set"))?;
+
+        let response_frame = service
+            .send_request(browser_pid, "GET_ASSETS", None)
+            .await
+            .map_err(|e| ActivityError::invalid_data(format!("Failed to get assets: {}", e)))?;
+
+        let Some(payload) = response_frame.payload else {
+            return Ok(vec![]);
+        };
+
+        let native_message = serde_json::from_str::<NativeMessage>(&payload)
+            .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
+
+        match ActivityAsset::try_from(native_message) {
+            Ok(asset) => Ok(vec![asset]),
+            Err(e) => {
+                tracing::warn!("Failed to convert asset response: {}", e);
+                Ok(vec![])
+            }
+        }
     }
 
     async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        tracing::debug!("retrieve_snapshots called (no-op in push model)");
-        Ok(vec![])
+        let service = self
+            .bridge_service
+            .as_ref()
+            .ok_or_else(|| ActivityError::invalid_data("Bridge service not available"))?;
+
+        let browser_pid = self
+            .active_browser_pid
+            .ok_or_else(|| ActivityError::invalid_data("No active browser PID set"))?;
+
+        let response_frame = service
+            .send_request(browser_pid, "GET_SNAPSHOT", None)
+            .await
+            .map_err(|e| ActivityError::invalid_data(format!("Failed to get snapshot: {}", e)))?;
+
+        let Some(payload) = response_frame.payload else {
+            return Ok(vec![]);
+        };
+
+        let native_message = serde_json::from_str::<NativeMessage>(&payload)
+            .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
+
+        match ActivitySnapshot::try_from(native_message) {
+            Ok(snapshot) => Ok(vec![snapshot]),
+            Err(e) => {
+                tracing::warn!("Failed to convert snapshot response: {}", e);
+                Ok(vec![])
+            }
+        }
     }
 
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
-        tracing::debug!("get_metadata called (no-op in push model)");
-        Ok(StrategyMetadata::default())
+        let service = self
+            .bridge_service
+            .as_ref()
+            .ok_or_else(|| ActivityError::invalid_data("Bridge service not available"))?;
+
+        let browser_pid = self
+            .active_browser_pid
+            .ok_or_else(|| ActivityError::invalid_data("No active browser PID set"))?;
+
+        let response_frame = service
+            .get_metadata(browser_pid)
+            .await
+            .map_err(|e| ActivityError::invalid_data(format!("Failed to get metadata: {}", e)))?;
+
+        let Some(payload) = response_frame.payload else {
+            return Ok(StrategyMetadata::default());
+        };
+
+        let native_metadata = serde_json::from_str::<NativeMessage>(&payload)
+            .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
+
+        match native_metadata {
+            NativeMessage::NativeMetadata(metadata) => Ok(StrategyMetadata::from(metadata)),
+            _ => Ok(StrategyMetadata::default()),
+        }
     }
 }
 

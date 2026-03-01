@@ -244,6 +244,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
                     return
                 }
             }
+            if let kind = message["kind"] as? [String: Any],
+                let req = kind["Request"] as? [String: Any],
+                let action = req["action"] as? String,
+                action == "POLL_REQUESTS"
+            {
+                self.handlePollRequests(completion: completion)
+                return
+            }
+
             self.forwardExtRequest(message, completion: completion)
         }
     }
@@ -317,38 +326,46 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     private func forwardServerReq(request: BrowserBridge_RequestFrame, frame: BrowserBridge_Frame) {
         let reqIdStr = "\(request.id)"
         let action = request.action
-        pendingServerRequestsLock.lock()
-        pendingServerRequests[reqIdStr] = ["id": Int(request.id), "action": action]
-        pendingServerRequestsLock.unlock()
         guard let dict = Self.dictionaryFromFrame(frame) else {
             sendErrResp(requestId: reqIdStr, action: action, error: "Frame conversion failed")
             return
         }
-        do {
-            let jsonData = try JSONSerialization.data(withJSONObject: dict, options: [])
-            guard let jsonStr = String(data: jsonData, encoding: .utf8) else {
-                sendErrResp(requestId: reqIdStr, action: action, error: "JSON encoding failed")
-                return
-            }
-            let userInfo: [String: Any] = [
-                "frame": dict, "frameJson": jsonStr, "action": action, "requestId": reqIdStr,
-            ]
-            SFSafariApplication.dispatchMessage(
-                withName: "NativeRequest", toExtensionWithIdentifier: extensionBundleIdentifier,
-                userInfo: userInfo
-            ) { [weak self] err in
-                if let err {
-                    // The completion handler runs on an arbitrary thread;
-                    // dispatch to main to synchronize with grpcClient access.
-                    DispatchQueue.main.async {
-                        self?.sendErrResp(
-                            requestId: reqIdStr, action: action, error: err.localizedDescription)
-                    }
-                }
-            }
-        } catch {
-            sendErrResp(requestId: reqIdStr, action: action, error: error.localizedDescription)
+        pendingServerRequestsLock.lock()
+        pendingServerRequests[reqIdStr] = [
+            "frame": dict,
+            "storedAt": Date().timeIntervalSince1970,
+        ]
+        pendingServerRequestsLock.unlock()
+    }
+
+    private func handlePollRequests(completion: @escaping ([String: Any]?) -> Void) {
+        let now = Date().timeIntervalSince1970
+        pendingServerRequestsLock.lock()
+        pendingServerRequests = pendingServerRequests.filter {
+            guard let storedAt = $0.value["storedAt"] as? TimeInterval else { return false }
+            return (now - storedAt) < 10.0
         }
+        let requests = pendingServerRequests.values.compactMap { $0["frame"] as? [String: Any] }
+        pendingServerRequests.removeAll()
+        pendingServerRequestsLock.unlock()
+
+        let payload: String
+        if let data = try? JSONSerialization.data(withJSONObject: requests, options: []),
+            let str = String(data: data, encoding: .utf8)
+        {
+            payload = str
+        } else {
+            payload = "[]"
+        }
+        completion([
+            "kind": [
+                "Response": [
+                    "id": 0,
+                    "action": "POLL_REQUESTS",
+                    "payload": payload,
+                ]
+            ]
+        ])
     }
 
     private func sendErrResp(requestId: String, action: String, error: String) {
