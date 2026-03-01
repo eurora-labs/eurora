@@ -3647,6 +3647,7 @@ dependencies = [
  "dirs 6.0.0",
  "dotenv",
  "euro-activity",
+ "euro-browser",
  "euro-encrypt",
  "euro-endpoint",
  "euro-secret",

@@ -5,20 +5,22 @@
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Spinner } from '@eurora/ui/components/spinner/index';
 	import { open } from '@tauri-apps/plugin-shell';
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 
 	const taurpc = inject(TAURPC_SERVICE);
+	let intervalId: ReturnType<typeof setInterval> | null = null;
+
 	async function openLogin() {
 		const loginToken = await taurpc.auth.get_login_token();
 		await open(loginToken.url);
 
-		const interval = setInterval(async () => {
+		intervalId = setInterval(async () => {
 			const isLoginSuccess = await taurpc.auth.poll_for_login();
 			if (!isLoginSuccess) {
 				return;
 			}
+			clearInterval(intervalId!);
 			goto('/onboarding/login/first-party/browser-extension');
-			clearInterval(interval);
 		}, 5000);
 	}
 
@@ -26,6 +28,10 @@
 		openLogin().catch((err) => {
 			console.error('Error opening login:', err);
 		});
+	});
+
+	onDestroy(() => {
+		if (intervalId) clearInterval(intervalId);
 	});
 </script>
 
