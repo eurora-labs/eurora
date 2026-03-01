@@ -24,7 +24,7 @@ pub struct ImageURL {
 #[bon]
 impl ImageURL {
     #[builder]
-    pub fn new(url: impl Into<String>, detail: Option<String>) -> Self {
+    pub fn new(url: impl Into<String>, #[builder(into)] detail: Option<String>) -> Self {
         Self {
             url: url.into(),
             detail,
@@ -78,7 +78,10 @@ impl ImagePromptTemplate {
         let mut template = HashMap::new();
         template.insert("url".to_string(), url_template);
 
-        Self::new(template, input_variables)
+        Self::builder()
+            .template(template)
+            .input_variables(input_variables)
+            .build()
     }
 
     pub fn format_image(&self, kwargs: &HashMap<String, String>) -> Result<ImageURL> {
@@ -189,11 +192,16 @@ mod tests {
 
     #[test]
     fn test_image_url() {
-        let url = ImageURL::new("https://example.com/image.jpg");
+        let url = ImageURL::builder()
+            .url("https://example.com/image.jpg")
+            .build();
         assert_eq!(url.url, "https://example.com/image.jpg");
         assert!(url.detail.is_none());
 
-        let url_with_detail = ImageURL::with_detail("https://example.com/image.jpg", "high");
+        let url_with_detail = ImageURL::builder()
+            .url("https://example.com/image.jpg")
+            .detail("high")
+            .build();
         assert_eq!(url_with_detail.detail, Some("high".to_string()));
     }
 
@@ -222,7 +230,10 @@ mod tests {
         let mut template = HashMap::new();
         template.insert("url".to_string(), "{url}".to_string());
 
-        let result = ImagePromptTemplate::new(template, vec!["url".to_string()]);
+        let result = ImagePromptTemplate::builder()
+            .template(template)
+            .input_variables(vec!["url".to_string()])
+            .build();
         assert!(result.is_err());
     }
 

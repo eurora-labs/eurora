@@ -91,10 +91,10 @@ fn llm_result_to_chat_result(result: &LLMResult) -> ChatResult {
         .map(|g| {
             let text = extract_text(g);
             let msg = crate::messages::AIMessage::builder().content(&text).build();
-            ChatGeneration::new(msg.into())
+            ChatGeneration::builder().message(msg.into()).build()
         })
         .collect();
-    ChatResult::new(generations)
+    ChatResult::builder().generations(generations).build()
 }
 
 fn extract_text(generation: &GenerationType) -> String {
@@ -131,7 +131,7 @@ pub trait BaseLLM: BaseLanguageModel {
             && let Some(generation) = generations.first()
         {
             let text = extract_text(generation);
-            let chunk = GenerationChunk::new(text);
+            let chunk = GenerationChunk::builder().text(text).build();
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
@@ -249,7 +249,7 @@ pub trait BaseLLM: BaseLanguageModel {
                             .collect()
                     })
                     .collect();
-                return Ok(LLMResult::new(generations));
+                return Ok(LLMResult::builder().generations(generations).build());
             }
 
             let run_managers = callback_manager.on_llm_start(&params, &missing_prompts, run_id);
@@ -278,7 +278,7 @@ pub trait BaseLLM: BaseLanguageModel {
                 })
                 .collect();
 
-            let mut output = LLMResult::new(generations);
+            let mut output = LLMResult::builder().generations(generations).build();
 
             if !run_managers.is_empty() {
                 output.run = Some(
@@ -460,7 +460,7 @@ pub trait BaseLLM: BaseLanguageModel {
             if let Some(ref rm) = run_manager
                 && let Some(merged) = crate::outputs::merge_generation_chunks(chunks) {
                     let generation: Generation = merged.into();
-                    let result = LLMResult::new(vec![vec![GenerationType::Generation(generation)]]);
+                    let result = LLMResult::builder().generations(vec![vec![GenerationType::Generation(generation)]]).build();
                     let chat_result = llm_result_to_chat_result(&result);
                     rm.on_llm_end(&chat_result);
                 }
@@ -554,7 +554,7 @@ pub trait BaseLLM: BaseLanguageModel {
             if let Some(ref rm) = run_manager
                 && let Some(merged) = crate::outputs::merge_generation_chunks(chunks) {
                     let generation: Generation = merged.into();
-                    let result = LLMResult::new(vec![vec![GenerationType::Generation(generation)]]);
+                    let result = LLMResult::builder().generations(vec![vec![GenerationType::Generation(generation)]]).build();
                     let chat_result = llm_result_to_chat_result(&result);
                     rm.on_llm_end(&chat_result).await;
                 }
@@ -655,7 +655,7 @@ pub trait BaseLLM: BaseLanguageModel {
                             .collect()
                     })
                     .collect();
-                return Ok(LLMResult::new(generations));
+                return Ok(LLMResult::builder().generations(generations).build());
             }
 
             let run_managers = callback_manager
@@ -687,7 +687,7 @@ pub trait BaseLLM: BaseLanguageModel {
                 })
                 .collect();
 
-            let mut output = LLMResult::new(generations);
+            let mut output = LLMResult::builder().generations(generations).build();
 
             if !run_managers.is_empty() {
                 output.run = Some(

@@ -27,10 +27,7 @@ impl PngDrawer {
         #[builder(default = "arial".to_string())] fontname: String,
         #[builder(default)] labels: LabelsDict,
     ) -> Self {
-        Self {
-            fontname,
-            labels,
-        }
+        Self { fontname, labels }
     }
 
     pub fn get_node_label(&self, label: &str) -> String {

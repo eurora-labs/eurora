@@ -370,9 +370,13 @@ mod tests {
         let suffix = PromptTemplate::from_template("Q: {question}\nA:").unwrap();
         let prefix = PromptTemplate::from_template("You are a {role}.").unwrap();
 
-        let few_shot =
-            FewShotPromptWithTemplates::new(examples, example_prompt, suffix, Some(prefix))
-                .unwrap();
+        let few_shot = FewShotPromptWithTemplates::builder()
+            .examples(examples)
+            .example_prompt(example_prompt)
+            .suffix(suffix)
+            .prefix(prefix)
+            .build()
+            .unwrap();
 
         let mut kwargs = HashMap::new();
         kwargs.insert("role".to_string(), "math tutor".to_string());
@@ -396,8 +400,12 @@ mod tests {
         let example_prompt = PromptTemplate::from_template("{x} + {y}").unwrap();
         let suffix = PromptTemplate::from_template("{a} + {b} = ?").unwrap();
 
-        let few_shot =
-            FewShotPromptWithTemplates::new(examples, example_prompt, suffix, None).unwrap();
+        let few_shot = FewShotPromptWithTemplates::builder()
+            .examples(examples)
+            .example_prompt(example_prompt)
+            .suffix(suffix)
+            .build()
+            .unwrap();
 
         let mut kwargs = HashMap::new();
         kwargs.insert("a".to_string(), "3".to_string());
@@ -416,9 +424,13 @@ mod tests {
         let suffix = PromptTemplate::from_template("{suffix_var}").unwrap();
         let prefix = PromptTemplate::from_template("{prefix_var}").unwrap();
 
-        let few_shot =
-            FewShotPromptWithTemplates::new(examples, example_prompt, suffix, Some(prefix))
-                .unwrap();
+        let few_shot = FewShotPromptWithTemplates::builder()
+            .examples(examples)
+            .example_prompt(example_prompt)
+            .suffix(suffix)
+            .prefix(prefix)
+            .build()
+            .unwrap();
 
         let vars = BasePromptTemplate::input_variables(&few_shot);
         assert!(vars.contains(&"suffix_var".to_string()));

@@ -24,10 +24,7 @@ fn default_generation_type() -> String {
 #[bon]
 impl Generation {
     #[builder]
-    pub fn new(
-        text: impl Into<String>,
-        generation_info: Option<HashMap<String, Value>>,
-    ) -> Self {
+    pub fn new(text: impl Into<String>, generation_info: Option<HashMap<String, Value>>) -> Self {
         Self {
             text: text.into(),
             generation_info,
@@ -68,10 +65,7 @@ pub struct GenerationChunk {
 #[bon]
 impl GenerationChunk {
     #[builder]
-    pub fn new(
-        text: impl Into<String>,
-        generation_info: Option<HashMap<String, Value>>,
-    ) -> Self {
+    pub fn new(text: impl Into<String>, generation_info: Option<HashMap<String, Value>>) -> Self {
         Self {
             text: text.into(),
             generation_info,
@@ -165,7 +159,7 @@ mod tests {
 
     #[test]
     fn test_generation_new() {
-        let generation = Generation::new("Hello, world!");
+        let generation = Generation::builder().text("Hello, world!").build();
         assert_eq!(generation.text, "Hello, world!");
         assert!(generation.generation_info.is_none());
         assert_eq!(generation.generation_type, "Generation");
@@ -175,15 +169,18 @@ mod tests {
     fn test_generation_with_info() {
         let mut info = HashMap::new();
         info.insert("finish_reason".to_string(), json!("stop"));
-        let generation = Generation::with_info("Hello", info.clone());
+        let generation = Generation::builder()
+            .text("Hello")
+            .generation_info(info.clone())
+            .build();
         assert_eq!(generation.text, "Hello");
         assert_eq!(generation.generation_info, Some(info));
     }
 
     #[test]
     fn test_generation_chunk_add() {
-        let chunk1 = GenerationChunk::new("Hello, ");
-        let chunk2 = GenerationChunk::new("world!");
+        let chunk1 = GenerationChunk::builder().text("Hello, ").build();
+        let chunk2 = GenerationChunk::builder().text("world!").build();
         let result = chunk1 + chunk2;
         assert_eq!(result.text, "Hello, world!");
     }
@@ -192,11 +189,17 @@ mod tests {
     fn test_generation_chunk_add_with_info() {
         let mut info1 = HashMap::new();
         info1.insert("a".to_string(), json!(1));
-        let chunk1 = GenerationChunk::with_info("Hello, ", info1);
+        let chunk1 = GenerationChunk::builder()
+            .text("Hello, ")
+            .generation_info(info1)
+            .build();
 
         let mut info2 = HashMap::new();
         info2.insert("b".to_string(), json!(2));
-        let chunk2 = GenerationChunk::with_info("world!", info2);
+        let chunk2 = GenerationChunk::builder()
+            .text("world!")
+            .generation_info(info2)
+            .build();
 
         let result = chunk1 + chunk2;
         assert_eq!(result.text, "Hello, world!");
@@ -208,7 +211,7 @@ mod tests {
 
     #[test]
     fn test_generation_serialization() {
-        let generation = Generation::new("test");
+        let generation = Generation::builder().text("test").build();
         let json = serde_json::to_string(&generation).unwrap();
         assert!(json.contains("\"type\":\"Generation\""));
 
@@ -223,7 +226,7 @@ mod tests {
 
     #[test]
     fn test_merge_generation_chunks_single() {
-        let chunk = GenerationChunk::new("Hello");
+        let chunk = GenerationChunk::builder().text("Hello").build();
         let result = merge_generation_chunks(vec![chunk.clone()]);
         assert_eq!(result, Some(chunk));
     }
@@ -231,9 +234,9 @@ mod tests {
     #[test]
     fn test_merge_generation_chunks_multiple() {
         let chunks = vec![
-            GenerationChunk::new("Hello"),
-            GenerationChunk::new(", "),
-            GenerationChunk::new("world!"),
+            GenerationChunk::builder().text("Hello").build(),
+            GenerationChunk::builder().text(", ").build(),
+            GenerationChunk::builder().text("world!").build(),
         ];
         let result = merge_generation_chunks(chunks).unwrap();
         assert_eq!(result.text, "Hello, world!");
@@ -247,8 +250,14 @@ mod tests {
         info2.insert("key2".to_string(), json!("val2"));
 
         let chunks = vec![
-            GenerationChunk::with_info("a", info1),
-            GenerationChunk::with_info("b", info2),
+            GenerationChunk::builder()
+                .text("a")
+                .generation_info(info1)
+                .build(),
+            GenerationChunk::builder()
+                .text("b")
+                .generation_info(info2)
+                .build(),
         ];
         let result = merge_generation_chunks(chunks).unwrap();
         assert_eq!(result.text, "ab");

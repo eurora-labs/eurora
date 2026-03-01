@@ -13,13 +13,14 @@ mod test_lang_smith_params {
 
     #[test]
     fn test_langsmith_params_all_fields() {
-        let params = LangSmithParams::new()
-            .with_provider("openai")
-            .with_model_name("gpt-4")
-            .with_model_type("chat")
-            .with_temperature(0.7)
-            .with_max_tokens(1000)
-            .with_stop(vec!["stop1".to_string(), "stop2".to_string()]);
+        let params = LangSmithParams::builder()
+            .provider("openai")
+            .model_name("gpt-4")
+            .model_type("chat")
+            .temperature(0.7)
+            .max_tokens(1000)
+            .stop(vec!["stop1".to_string(), "stop2".to_string()])
+            .build();
 
         assert_eq!(params.ls_provider, Some("openai".to_string()));
         assert_eq!(params.ls_model_name, Some("gpt-4".to_string()));
@@ -34,9 +35,10 @@ mod test_lang_smith_params {
 
     #[test]
     fn test_langsmith_params_partial() {
-        let params = LangSmithParams::new()
-            .with_provider("anthropic")
-            .with_model_type("chat");
+        let params = LangSmithParams::builder()
+            .provider("anthropic")
+            .model_type("chat")
+            .build();
 
         assert_eq!(params.ls_provider, Some("anthropic".to_string()));
         assert_eq!(params.ls_model_type, Some("chat".to_string()));
@@ -57,8 +59,8 @@ mod test_lang_smith_params {
 
     #[test]
     fn test_langsmith_params_model_type_values() {
-        let chat_params = LangSmithParams::new().with_model_type("chat");
-        let llm_params = LangSmithParams::new().with_model_type("llm");
+        let chat_params = LangSmithParams::builder().model_type("chat").build();
+        let llm_params = LangSmithParams::builder().model_type("llm").build();
 
         assert_eq!(chat_params.ls_model_type, Some("chat".to_string()));
         assert_eq!(llm_params.ls_model_type, Some("llm".to_string()));
@@ -66,10 +68,11 @@ mod test_lang_smith_params {
 
     #[test]
     fn test_langsmith_params_builder_pattern() {
-        let params = LangSmithParams::new()
-            .with_provider("openai")
-            .with_model_name("gpt-4")
-            .with_temperature(0.5);
+        let params = LangSmithParams::builder()
+            .provider("openai")
+            .model_name("gpt-4")
+            .temperature(0.5)
+            .build();
 
         assert_eq!(params.ls_provider, Some("openai".to_string()));
         assert_eq!(params.ls_model_name, Some("gpt-4".to_string()));
@@ -78,9 +81,10 @@ mod test_lang_smith_params {
 
     #[test]
     fn test_langsmith_params_serialization() {
-        let params = LangSmithParams::new()
-            .with_provider("openai")
-            .with_model_name("gpt-4");
+        let params = LangSmithParams::builder()
+            .provider("openai")
+            .model_name("gpt-4")
+            .build();
 
         let json = serde_json::to_string(&params).unwrap();
         assert!(json.contains("openai"));
@@ -148,20 +152,21 @@ mod test_language_model_config {
 
     #[test]
     fn test_config_with_cache_true() {
-        let config = LanguageModelConfig::new().with_cache(true);
+        let config = LanguageModelConfig::builder().cache(true).build();
         assert_eq!(config.cache, Some(true));
     }
 
     #[test]
     fn test_config_with_cache_false() {
-        let config = LanguageModelConfig::new().with_cache(false);
+        let config = LanguageModelConfig::builder().cache(false).build();
         assert_eq!(config.cache, Some(false));
     }
 
     #[test]
     fn test_config_with_tags() {
-        let config =
-            LanguageModelConfig::new().with_tags(vec!["tag1".to_string(), "tag2".to_string()]);
+        let config = LanguageModelConfig::builder()
+            .tags(vec!["tag1".to_string(), "tag2".to_string()])
+            .build();
         assert_eq!(
             config.tags,
             Some(vec!["tag1".to_string(), "tag2".to_string()])
@@ -173,15 +178,18 @@ mod test_language_model_config {
         let mut metadata = HashMap::new();
         metadata.insert("key".to_string(), serde_json::json!("value"));
 
-        let config = LanguageModelConfig::new().with_metadata(metadata.clone());
+        let config = LanguageModelConfig::builder()
+            .metadata(metadata.clone())
+            .build();
         assert_eq!(config.metadata, Some(metadata));
     }
 
     #[test]
     fn test_config_builder_chain() {
-        let config = LanguageModelConfig::new()
-            .with_cache(true)
-            .with_tags(vec!["test".to_string()]);
+        let config = LanguageModelConfig::builder()
+            .cache(true)
+            .tags(vec!["test".to_string()])
+            .build();
 
         assert_eq!(config.cache, Some(true));
         assert_eq!(config.tags, Some(vec!["test".to_string()]));
@@ -189,7 +197,7 @@ mod test_language_model_config {
 
     #[test]
     fn test_config_serialization() {
-        let config = LanguageModelConfig::new().with_cache(true);
+        let config = LanguageModelConfig::builder().cache(true).build();
 
         let json = serde_json::to_string(&config).unwrap();
         assert!(json.contains("cache"));
@@ -306,7 +314,7 @@ mod test_language_model_config_serialization {
 
     #[test]
     fn test_cache_serialization() {
-        let config = LanguageModelConfig::new().with_cache(true);
+        let config = LanguageModelConfig::builder().cache(true).build();
         let json = serde_json::to_string(&config).unwrap();
 
         assert!(json.contains("cache"));
@@ -315,7 +323,7 @@ mod test_language_model_config_serialization {
 
     #[test]
     fn test_tags_excluded_when_none() {
-        let config = LanguageModelConfig::new();
+        let config = LanguageModelConfig::builder().build();
         let json = serde_json::to_string(&config).unwrap();
 
         assert!(!json.contains("tags"));
@@ -323,7 +331,7 @@ mod test_language_model_config_serialization {
 
     #[test]
     fn test_metadata_excluded_when_none() {
-        let config = LanguageModelConfig::new();
+        let config = LanguageModelConfig::builder().build();
         let json = serde_json::to_string(&config).unwrap();
 
         assert!(!json.contains("metadata"));
@@ -331,9 +339,10 @@ mod test_language_model_config_serialization {
 
     #[test]
     fn test_deserialization_roundtrip() {
-        let config = LanguageModelConfig::new()
-            .with_cache(true)
-            .with_tags(vec!["test".to_string()]);
+        let config = LanguageModelConfig::builder()
+            .cache(true)
+            .tags(vec!["test".to_string()])
+            .build();
 
         let json = serde_json::to_string(&config).unwrap();
         let deserialized: LanguageModelConfig = serde_json::from_str(&json).unwrap();
@@ -349,9 +358,10 @@ mod test_langsmith_params_additional {
 
     #[test]
     fn test_langsmith_params_clone() {
-        let params = LangSmithParams::new()
-            .with_provider("openai")
-            .with_model_name("gpt-4");
+        let params = LangSmithParams::builder()
+            .provider("openai")
+            .model_name("gpt-4")
+            .build();
 
         let cloned = params.clone();
         assert_eq!(cloned.ls_provider, params.ls_provider);
@@ -360,7 +370,7 @@ mod test_langsmith_params_additional {
 
     #[test]
     fn test_langsmith_params_debug() {
-        let params = LangSmithParams::new().with_provider("openai");
+        let params = LangSmithParams::builder().provider("openai").build();
         let debug_str = format!("{:?}", params);
         assert!(debug_str.contains("openai"));
     }
@@ -391,7 +401,9 @@ mod test_custom_get_token_ids {
 
     #[test]
     fn test_custom_get_token_ids_field() {
-        let config = LanguageModelConfig::new().with_custom_get_token_ids(simple_char_tokenizer);
+        let config = LanguageModelConfig::builder()
+            .custom_get_token_ids(simple_char_tokenizer)
+            .build();
 
         assert!(config.custom_get_token_ids.is_some());
     }
@@ -405,7 +417,9 @@ mod test_custom_get_token_ids {
 
     #[test]
     fn test_custom_tokenizer_function_execution() {
-        let config = LanguageModelConfig::new().with_custom_get_token_ids(fixed_tokenizer);
+        let config = LanguageModelConfig::builder()
+            .custom_get_token_ids(fixed_tokenizer)
+            .build();
 
         let tokenizer = config.custom_get_token_ids.unwrap();
         let result = tokenizer("any text");
@@ -414,7 +428,9 @@ mod test_custom_get_token_ids {
 
     #[test]
     fn test_custom_tokenizer_with_char_encoding() {
-        let config = LanguageModelConfig::new().with_custom_get_token_ids(simple_char_tokenizer);
+        let config = LanguageModelConfig::builder()
+            .custom_get_token_ids(simple_char_tokenizer)
+            .build();
 
         let tokenizer = config.custom_get_token_ids.unwrap();
         let result = tokenizer("Hi");
@@ -424,7 +440,9 @@ mod test_custom_get_token_ids {
 
     #[test]
     fn test_custom_get_token_ids_excluded_from_serialization() {
-        let config = LanguageModelConfig::new().with_custom_get_token_ids(simple_char_tokenizer);
+        let config = LanguageModelConfig::builder()
+            .custom_get_token_ids(simple_char_tokenizer)
+            .build();
 
         let json = serde_json::to_string(&config).unwrap();
 
@@ -438,7 +456,9 @@ mod test_base_language_model_trait {
 
     #[test]
     fn test_get_num_tokens() {
-        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["response".to_string()])
+            .build();
 
         let result = model.get_num_tokens("hello world test foo bar");
         assert_eq!(result, 5); // 5 words
@@ -446,7 +466,9 @@ mod test_base_language_model_trait {
 
     #[test]
     fn test_get_num_tokens_empty_string() {
-        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["response".to_string()])
+            .build();
 
         let result = model.get_num_tokens("");
         assert_eq!(result, 0);
@@ -454,7 +476,9 @@ mod test_base_language_model_trait {
 
     #[test]
     fn test_get_num_tokens_single_word() {
-        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["response".to_string()])
+            .build();
 
         let result = model.get_num_tokens("hello");
         assert_eq!(result, 1);
@@ -462,7 +486,9 @@ mod test_base_language_model_trait {
 
     #[test]
     fn test_get_num_tokens_from_messages() {
-        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["response".to_string()])
+            .build();
 
         let messages = vec![
             BaseMessage::Human(HumanMessage::builder().content("Hi").build()),
@@ -477,7 +503,9 @@ mod test_base_language_model_trait {
 
     #[test]
     fn test_get_num_tokens_from_messages_empty() {
-        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["response".to_string()])
+            .build();
 
         let messages: Vec<BaseMessage> = vec![];
 
@@ -487,7 +515,9 @@ mod test_base_language_model_trait {
 
     #[test]
     fn test_identifying_params() {
-        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["response".to_string()])
+            .build();
 
         let params = model.identifying_params();
 
@@ -504,21 +534,27 @@ mod test_base_language_model_trait {
 
     #[test]
     fn test_llm_type() {
-        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["response".to_string()])
+            .build();
 
         assert_eq!(model.llm_type(), "fake-list");
     }
 
     #[test]
     fn test_model_name() {
-        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["response".to_string()])
+            .build();
 
         assert_eq!(model.model_name(), "fake-list-llm");
     }
 
     #[test]
     fn test_get_token_ids() {
-        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["response".to_string()])
+            .build();
 
         let result = model.get_token_ids("hello world");
 
@@ -528,7 +564,9 @@ mod test_base_language_model_trait {
 
     #[test]
     fn test_get_ls_params() {
-        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["response".to_string()])
+            .build();
 
         let params = model.get_ls_params(Some(&["stop1".to_string(), "stop2".to_string()]));
 
@@ -542,7 +580,9 @@ mod test_base_language_model_trait {
 
     #[test]
     fn test_get_ls_params_without_stop() {
-        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["response".to_string()])
+            .build();
 
         let params = model.get_ls_params(None);
 
@@ -558,14 +598,18 @@ mod test_get_num_tokens_edge_cases {
 
     #[test]
     fn test_get_num_tokens_whitespace_only() {
-        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["response".to_string()])
+            .build();
         let result = model.get_num_tokens("   ");
         assert_eq!(result, 0);
     }
 
     #[test]
     fn test_get_num_tokens_single_token() {
-        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["response".to_string()])
+            .build();
         let result = model.get_num_tokens("a");
         assert_eq!(result, 1);
     }
@@ -577,7 +621,9 @@ mod test_get_num_tokens_from_messages_edge_cases {
 
     #[test]
     fn test_single_message_returns_correct_count() {
-        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["response".to_string()])
+            .build();
         let messages = vec![BaseMessage::Human(
             HumanMessage::builder().content("Hello world").build(),
         )];
@@ -592,7 +638,9 @@ mod test_generate_prompt {
 
     #[tokio::test]
     async fn test_generate_prompt_single_prompt() {
-        let model = FakeListLLM::new(vec!["test response".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["test response".to_string()])
+            .build();
         let prompts = vec![LanguageModelInput::from("Hello")];
         let result = model.generate_prompt(prompts, None, None).await.unwrap();
 
@@ -608,11 +656,13 @@ mod test_generate_prompt {
 
     #[tokio::test]
     async fn test_generate_prompt_multiple_prompts() {
-        let model = FakeListLLM::new(vec![
-            "Response 1".to_string(),
-            "Response 2".to_string(),
-            "Response 3".to_string(),
-        ]);
+        let model = FakeListLLM::builder()
+            .responses(vec![
+                "Response 1".to_string(),
+                "Response 2".to_string(),
+                "Response 3".to_string(),
+            ])
+            .build();
         let prompts = vec![
             LanguageModelInput::from("Prompt 1"),
             LanguageModelInput::from("Prompt 2"),
@@ -628,7 +678,9 @@ mod test_generate_prompt {
 
     #[tokio::test]
     async fn test_generate_prompt_empty_prompts() {
-        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["response".to_string()])
+            .build();
         let result = model.generate_prompt(vec![], None, None).await.unwrap();
 
         assert_eq!(result.generations.len(), 0);
@@ -641,7 +693,9 @@ mod test_agenerate_prompt {
 
     #[tokio::test]
     async fn test_agenerate_prompt_single_prompt() {
-        let model = FakeListLLM::new(vec!["test response".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["test response".to_string()])
+            .build();
         let prompts = vec![LanguageModelInput::from("Hello")];
         let result = model.generate_prompt(prompts, None, None).await.unwrap();
 
@@ -651,7 +705,9 @@ mod test_agenerate_prompt {
 
     #[tokio::test]
     async fn test_agenerate_prompt_multiple_prompts() {
-        let model = FakeListLLM::new(vec!["Response 1".to_string(), "Response 2".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["Response 1".to_string(), "Response 2".to_string()])
+            .build();
         let prompts = vec![
             LanguageModelInput::from("Prompt 1"),
             LanguageModelInput::from("Prompt 2"),
@@ -663,7 +719,9 @@ mod test_agenerate_prompt {
 
     #[tokio::test]
     async fn test_agenerate_prompt_empty_prompts() {
-        let model = FakeListLLM::new(vec!["response".to_string()]);
+        let model = FakeListLLM::builder()
+            .responses(vec!["response".to_string()])
+            .build();
         let result = model.generate_prompt(vec![], None, None).await.unwrap();
 
         assert_eq!(result.generations.len(), 0);
@@ -698,7 +756,7 @@ mod test_callbacks_config {
     fn test_initialization_with_callbacks() {
         let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
         let callbacks = Callbacks::from_handlers(vec![handler]);
-        let config = LanguageModelConfig::new().with_callbacks(callbacks);
+        let config = LanguageModelConfig::builder().callbacks(callbacks).build();
         assert!(config.callbacks.is_some());
     }
 
@@ -706,7 +764,7 @@ mod test_callbacks_config {
     fn test_callbacks_excluded_from_serialization() {
         let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
         let callbacks = Callbacks::from_handlers(vec![handler]);
-        let config = LanguageModelConfig::new().with_callbacks(callbacks);
+        let config = LanguageModelConfig::builder().callbacks(callbacks).build();
 
         let json = serde_json::to_string(&config).unwrap();
         assert!(

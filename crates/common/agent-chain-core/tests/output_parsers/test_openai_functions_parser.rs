@@ -30,7 +30,7 @@ fn make_fn_message_default(name: &str, arguments: &str) -> AIMessage {
 }
 
 fn make_chat_gen(message: AIMessage) -> ChatGeneration {
-    ChatGeneration::new(message.into())
+    ChatGeneration::builder().message(message.into()).build()
 }
 
 #[test]
@@ -80,7 +80,7 @@ fn test_output_functions_parser_does_not_modify_original_message() {
 #[test]
 fn test_json_output_functions_parser_args_only_parses_json() {
     let msg = make_fn_message_default("fn", r#"{"key": "value"}"#);
-    let parser = JsonOutputFunctionsParser::new(true);
+    let parser = JsonOutputFunctionsParser::builder().args_only(true).build();
     let result = parser.parse_result(&[make_chat_gen(msg)]).unwrap();
     assert_eq!(result, Some(json!({"key": "value"})));
 }
@@ -88,7 +88,9 @@ fn test_json_output_functions_parser_args_only_parses_json() {
 #[test]
 fn test_json_output_functions_parser_full_output_parses_arguments() {
     let msg = make_fn_message_default("fn", r#"{"key": "value"}"#);
-    let parser = JsonOutputFunctionsParser::new(false);
+    let parser = JsonOutputFunctionsParser::builder()
+        .args_only(false)
+        .build();
     let result = parser.parse_result(&[make_chat_gen(msg)]).unwrap();
     assert_eq!(
         result,
@@ -99,7 +101,10 @@ fn test_json_output_functions_parser_full_output_parses_arguments() {
 #[test]
 fn test_json_output_functions_parser_non_strict_allows_newlines() {
     let msg = make_fn_message_default("fn", "{\"code\": \"line1\nline2\"}");
-    let parser = JsonOutputFunctionsParser::new(true).with_strict(false);
+    let parser = JsonOutputFunctionsParser::builder()
+        .args_only(true)
+        .strict(false)
+        .build();
     let result = parser.parse_result(&[make_chat_gen(msg)]).unwrap();
     assert_eq!(result, Some(json!({"code": "line1\nline2"})));
 }
@@ -107,7 +112,10 @@ fn test_json_output_functions_parser_non_strict_allows_newlines() {
 #[test]
 fn test_json_output_functions_parser_strict_rejects_newlines() {
     let msg = make_fn_message_default("fn", "{\"code\": \"line1\nline2\"}");
-    let parser = JsonOutputFunctionsParser::new(true).with_strict(true);
+    let parser = JsonOutputFunctionsParser::builder()
+        .args_only(true)
+        .strict(true)
+        .build();
     let result = parser.parse_result(&[make_chat_gen(msg)]);
     assert!(result.is_err());
 }
@@ -115,7 +123,10 @@ fn test_json_output_functions_parser_strict_rejects_newlines() {
 #[test]
 fn test_json_output_functions_parser_non_strict_allows_unicode() {
     let msg = make_fn_message_default("fn", r#"{"text": "你好"}"#);
-    let parser = JsonOutputFunctionsParser::new(true).with_strict(false);
+    let parser = JsonOutputFunctionsParser::builder()
+        .args_only(true)
+        .strict(false)
+        .build();
     let result = parser.parse_result(&[make_chat_gen(msg)]).unwrap();
     assert_eq!(result, Some(json!({"text": "你好"})));
 }
@@ -161,7 +172,9 @@ fn test_json_output_functions_parser_invalid_json_raises() {
 #[test]
 fn test_json_output_functions_parser_invalid_json_full_output_raises() {
     let msg = make_fn_message_default("fn", "bad_json");
-    let parser = JsonOutputFunctionsParser::new(false);
+    let parser = JsonOutputFunctionsParser::builder()
+        .args_only(false)
+        .build();
     let result = parser.parse_result(&[make_chat_gen(msg)]);
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
@@ -195,7 +208,9 @@ fn test_json_output_functions_parser_partial_invalid_json_returns_none() {
 #[test]
 fn test_json_output_functions_parser_partial_full_output() {
     let msg = make_fn_message_default("fn", r#"{"key": "val"#);
-    let parser = JsonOutputFunctionsParser::new(false);
+    let parser = JsonOutputFunctionsParser::builder()
+        .args_only(false)
+        .build();
     let result = parser
         .parse_result_with_partial(&[make_chat_gen(msg)], true)
         .unwrap();
@@ -257,7 +272,9 @@ fn test_json_output_functions_parser_diff_method() {
 #[test]
 fn test_json_key_output_functions_parser_extracts_key() {
     let msg = make_fn_message_default("fn", r#"{"key1": "val1", "key2": "val2"}"#);
-    let parser = JsonKeyOutputFunctionsParser::new("key1");
+    let parser = JsonKeyOutputFunctionsParser::builder()
+        .key_name("key1")
+        .build();
     let result = parser.parse_result(&[make_chat_gen(msg)]).unwrap();
     assert_eq!(result, Some(json!("val1")));
 }
@@ -265,7 +282,9 @@ fn test_json_key_output_functions_parser_extracts_key() {
 #[test]
 fn test_json_key_output_functions_parser_extracts_nested_key() {
     let msg = make_fn_message_default("fn", r#"{"data": {"nested": true}, "other": 1}"#);
-    let parser = JsonKeyOutputFunctionsParser::new("data");
+    let parser = JsonKeyOutputFunctionsParser::builder()
+        .key_name("data")
+        .build();
     let result = parser.parse_result(&[make_chat_gen(msg)]).unwrap();
     assert_eq!(result, Some(json!({"nested": true})));
 }
@@ -273,7 +292,9 @@ fn test_json_key_output_functions_parser_extracts_nested_key() {
 #[test]
 fn test_json_key_output_functions_parser_missing_key_raises() {
     let msg = make_fn_message_default("fn", r#"{"a": 1}"#);
-    let parser = JsonKeyOutputFunctionsParser::new("missing");
+    let parser = JsonKeyOutputFunctionsParser::builder()
+        .key_name("missing")
+        .build();
     let result = parser.parse_result(&[make_chat_gen(msg)]);
     assert!(result.is_err());
 }
@@ -281,7 +302,9 @@ fn test_json_key_output_functions_parser_missing_key_raises() {
 #[test]
 fn test_json_key_output_functions_parser_partial_returns_none_when_key_missing() {
     let msg = make_fn_message_default("fn", r#"{"a": 1}"#);
-    let parser = JsonKeyOutputFunctionsParser::new("missing");
+    let parser = JsonKeyOutputFunctionsParser::builder()
+        .key_name("missing")
+        .build();
     let result = parser
         .parse_result_with_partial(&[make_chat_gen(msg)], true)
         .unwrap();
@@ -291,7 +314,9 @@ fn test_json_key_output_functions_parser_partial_returns_none_when_key_missing()
 #[test]
 fn test_json_key_output_functions_parser_partial_returns_value_when_key_present() {
     let msg = make_fn_message_default("fn", r#"{"target": "val"#);
-    let parser = JsonKeyOutputFunctionsParser::new("target");
+    let parser = JsonKeyOutputFunctionsParser::builder()
+        .key_name("target")
+        .build();
     let result = parser
         .parse_result_with_partial(&[make_chat_gen(msg)], true)
         .unwrap();
@@ -304,7 +329,9 @@ fn test_json_key_output_functions_parser_partial_with_no_function_call_returns_n
         .content("no fn")
         .additional_kwargs(HashMap::new())
         .build();
-    let parser = JsonKeyOutputFunctionsParser::new("key");
+    let parser = JsonKeyOutputFunctionsParser::builder()
+        .key_name("key")
+        .build();
     let result = parser
         .parse_result_with_partial(&[make_chat_gen(msg)], true)
         .unwrap();

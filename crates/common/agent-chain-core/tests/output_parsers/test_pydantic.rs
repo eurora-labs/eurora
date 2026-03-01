@@ -420,7 +420,9 @@ fn test_parser_exception_contains_llm_output() {
 #[test]
 fn test_parse_result_valid() {
     let parser = simple_model_parser();
-    let generation = Generation::new(r#"{"name": "Alice", "age": 30}"#);
+    let generation = Generation::builder()
+        .text(r#"{"name": "Alice", "age": 30}"#)
+        .build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result.name, "Alice");
 }
@@ -428,7 +430,9 @@ fn test_parse_result_valid() {
 #[test]
 fn test_parse_result_partial_valid() {
     let parser = simple_model_parser();
-    let generation = Generation::new(r#"{"name": "Alice", "age": 30}"#);
+    let generation = Generation::builder()
+        .text(r#"{"name": "Alice", "age": 30}"#)
+        .build();
     let result = parser.parse_result(&[generation], true).unwrap();
     assert_eq!(result.name, "Alice");
 }
@@ -436,7 +440,7 @@ fn test_parse_result_partial_valid() {
 #[test]
 fn test_parse_result_partial_invalid_returns_err() {
     let parser = simple_model_parser();
-    let generation = Generation::new("not json");
+    let generation = Generation::builder().text("not json").build();
     let result = parser.parse_result(&[generation], true);
     assert!(result.is_err());
 }
@@ -444,7 +448,7 @@ fn test_parse_result_partial_invalid_returns_err() {
 #[test]
 fn test_parse_result_non_partial_invalid_raises() {
     let parser = simple_model_parser();
-    let generation = Generation::new("not json");
+    let generation = Generation::builder().text("not json").build();
     let result = parser.parse_result(&[generation], false);
     assert!(result.is_err());
 }

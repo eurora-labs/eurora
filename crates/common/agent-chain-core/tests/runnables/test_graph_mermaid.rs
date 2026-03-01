@@ -7,11 +7,11 @@ use agent_chain_core::runnables::graph_mermaid::{generate_mermaid_graph_styles, 
 use serde_json::Value;
 
 fn make_node(id: &str, name: &str) -> Node {
-    Node::new(id, name)
+    Node::builder().id(id).name(name).build()
 }
 
 fn make_node_with_metadata(id: &str, name: &str, metadata: HashMap<String, Value>) -> Node {
-    Node::new(id, name).with_metadata(metadata)
+    Node::builder().id(id).name(name).metadata(metadata).build()
 }
 
 #[test]
@@ -102,7 +102,7 @@ fn test_draw_mermaid_simple_graph() {
     nodes.insert("1".to_string(), make_node("1", "Start"));
     nodes.insert("2".to_string(), make_node("2", "End"));
 
-    let edges = vec![Edge::new("1", "2")];
+    let edges = vec![Edge::builder().source("1").target("2").build()];
     let graph = Graph::from_parts(nodes, edges);
     let result = graph.draw_mermaid(None).unwrap();
 
@@ -118,7 +118,7 @@ fn test_draw_mermaid_without_styles() {
     nodes.insert("1".to_string(), make_node("1", "A"));
     nodes.insert("2".to_string(), make_node("2", "B"));
 
-    let edges = vec![Edge::new("1", "2")];
+    let edges = vec![Edge::builder().source("1").target("2").build()];
     let graph = Graph::from_parts(nodes, edges);
     let result = graph
         .draw_mermaid(Some(MermaidOptions {
@@ -146,7 +146,7 @@ fn test_draw_mermaid_with_conditional_edge() {
             data: Some("yes".to_string()),
             conditional: true,
         },
-        Edge::new("1", "3"),
+        Edge::builder().source("1").target("3").build(),
     ];
     let graph = Graph::from_parts(nodes, edges);
     let result = graph.draw_mermaid(None).unwrap();
@@ -207,7 +207,7 @@ fn test_draw_mermaid_curve_styles() {
     nodes.insert("1".to_string(), make_node("1", "A"));
     nodes.insert("2".to_string(), make_node("2", "B"));
 
-    let edges = vec![Edge::new("1", "2")];
+    let edges = vec![Edge::builder().source("1").target("2").build()];
 
     for curve_style in &CurveStyle::ALL {
         let graph = Graph::from_parts(nodes.clone(), edges.clone());
@@ -232,7 +232,10 @@ fn test_draw_mermaid_first_last_nodes() {
     nodes.insert("middle".to_string(), make_node("middle", "Middle"));
     nodes.insert("end".to_string(), make_node("end", "End"));
 
-    let edges = vec![Edge::new("start", "middle"), Edge::new("middle", "end")];
+    let edges = vec![
+        Edge::builder().source("start").target("middle").build(),
+        Edge::builder().source("middle").target("end").build(),
+    ];
     let graph = Graph::from_parts(nodes, edges);
     let result = graph.draw_mermaid(None).unwrap();
 
@@ -246,7 +249,7 @@ fn test_draw_mermaid_subgraph() {
     nodes.insert("parent".to_string(), make_node("parent", "Parent"));
     nodes.insert("sub:child".to_string(), make_node("sub:child", "Child"));
 
-    let edges = vec![Edge::new("parent", "sub:child")];
+    let edges = vec![Edge::builder().source("parent").target("sub:child").build()];
     let graph = Graph::from_parts(nodes, edges);
     let result = graph.draw_mermaid(None).unwrap();
 
@@ -260,7 +263,7 @@ fn test_draw_mermaid_nested_subgraphs() {
     nodes.insert("root".to_string(), make_node("root", "Root"));
     nodes.insert("a:b:c".to_string(), make_node("a:b:c", "Nested"));
 
-    let edges = vec![Edge::new("root", "a:b:c")];
+    let edges = vec![Edge::builder().source("root").target("a:b:c").build()];
     let graph = Graph::from_parts(nodes, edges);
     let result = graph.draw_mermaid(None).unwrap();
 
@@ -291,7 +294,7 @@ fn test_draw_mermaid_frontmatter_config() {
     nodes.insert("1".to_string(), make_node("1", "A"));
     nodes.insert("2".to_string(), make_node("2", "B"));
 
-    let edges = vec![Edge::new("1", "2")];
+    let edges = vec![Edge::builder().source("1").target("2").build()];
 
     let mut theme_vars = serde_json::Map::new();
     theme_vars.insert(
@@ -324,7 +327,7 @@ fn test_draw_mermaid_markdown_special_chars() {
     nodes.insert("1".to_string(), make_node("1", "*bold*"));
     nodes.insert("2".to_string(), make_node("2", "_italic_"));
 
-    let edges = vec![Edge::new("1", "2")];
+    let edges = vec![Edge::builder().source("1").target("2").build()];
     let graph = Graph::from_parts(nodes, edges);
     let result = graph.draw_mermaid(None).unwrap();
 
@@ -430,7 +433,10 @@ fn test_mermaid_parallel_edges() {
     nodes.insert("2".to_string(), make_node("2", "Target1"));
     nodes.insert("3".to_string(), make_node("3", "Target2"));
 
-    let edges = vec![Edge::new("1", "2"), Edge::new("1", "3")];
+    let edges = vec![
+        Edge::builder().source("1").target("2").build(),
+        Edge::builder().source("1").target("3").build(),
+    ];
     let graph = Graph::from_parts(nodes, edges);
     let result = graph.draw_mermaid(None).unwrap();
 
@@ -445,7 +451,7 @@ fn test_mermaid_self_loop() {
     let mut nodes = HashMap::new();
     nodes.insert("1".to_string(), make_node("1", "SelfLoop"));
 
-    let edges = vec![Edge::new("1", "1")];
+    let edges = vec![Edge::builder().source("1").target("1").build()];
     let graph = Graph::from_parts(nodes, edges);
     let result = graph.draw_mermaid(None).unwrap();
 
@@ -463,8 +469,14 @@ fn test_mermaid_duplicate_subgraph_name_error() {
     );
 
     let edges = vec![
-        Edge::new("sub:node1", "sub:node2"),
-        Edge::new("other:sub:node3", "sub:node1"),
+        Edge::builder()
+            .source("sub:node1")
+            .target("sub:node2")
+            .build(),
+        Edge::builder()
+            .source("other:sub:node3")
+            .target("sub:node1")
+            .build(),
     ];
     let graph = Graph::from_parts(nodes, edges);
 
@@ -562,7 +574,12 @@ fn test_mermaid_empty_subgraph() {
     nodes.insert("sub:node1".to_string(), make_node("sub:node1", "SubNode1"));
     nodes.insert("sub:node2".to_string(), make_node("sub:node2", "SubNode2"));
 
-    let edges = vec![Edge::new("regular", "sub:node1")];
+    let edges = vec![
+        Edge::builder()
+            .source("regular")
+            .target("sub:node1")
+            .build(),
+    ];
     let graph = Graph::from_parts(nodes, edges);
     let result = graph.draw_mermaid(None).unwrap();
 
@@ -648,7 +665,12 @@ fn test_draw_mermaid_special_node_names() {
     nodes.insert("__start__".to_string(), make_node("__start__", "__start__"));
     nodes.insert("__end__".to_string(), make_node("__end__", "__end__"));
 
-    let edges = vec![Edge::new("__start__", "__end__")];
+    let edges = vec![
+        Edge::builder()
+            .source("__start__")
+            .target("__end__")
+            .build(),
+    ];
     let graph = Graph::from_parts(nodes, edges);
     let result = graph.draw_mermaid(None).unwrap();
 
@@ -668,7 +690,7 @@ fn test_draw_mermaid_numeric_node_ids() {
     nodes.insert("1".to_string(), make_node("1", "First"));
     nodes.insert("2".to_string(), make_node("2", "Second"));
 
-    let edges = vec![Edge::new("1", "2")];
+    let edges = vec![Edge::builder().source("1").target("2").build()];
     let graph = Graph::from_parts(nodes, edges);
     let result = graph.draw_mermaid(None).unwrap();
 
@@ -699,7 +721,10 @@ fn test_mermaid_multiple_disconnected_subgraphs() {
     nodes.insert("sub2:c".to_string(), make_node("sub2:c", "C"));
     nodes.insert("sub2:d".to_string(), make_node("sub2:d", "D"));
 
-    let edges = vec![Edge::new("sub1:a", "sub1:b"), Edge::new("sub2:c", "sub2:d")];
+    let edges = vec![
+        Edge::builder().source("sub1:a").target("sub1:b").build(),
+        Edge::builder().source("sub2:c").target("sub2:d").build(),
+    ];
     let graph = Graph::from_parts(nodes, edges);
     let result = graph.draw_mermaid(None).unwrap();
 
@@ -713,7 +738,7 @@ fn test_mermaid_edge_with_none_data() {
     nodes.insert("1".to_string(), make_node("1", "A"));
     nodes.insert("2".to_string(), make_node("2", "B"));
 
-    let edges = vec![Edge::new("1", "2")];
+    let edges = vec![Edge::builder().source("1").target("2").build()];
     let graph = Graph::from_parts(nodes, edges);
     let result = graph.draw_mermaid(None).unwrap();
 
@@ -766,7 +791,7 @@ fn test_mermaid_with_all_features() {
     nodes.insert("end".to_string(), make_node("end", "End"));
 
     let edges = vec![
-        Edge::new("start", "sub:node1"),
+        Edge::builder().source("start").target("sub:node1").build(),
         Edge {
             source: "sub:node1".to_string(),
             target: "sub:node2".to_string(),
@@ -842,7 +867,7 @@ fn test_mermaid_subgraph_single_node() {
     nodes.insert("outer".to_string(), make_node("outer", "Outer"));
     nodes.insert("sub:inner".to_string(), make_node("sub:inner", "Inner"));
 
-    let edges = vec![Edge::new("outer", "sub:inner")];
+    let edges = vec![Edge::builder().source("outer").target("sub:inner").build()];
     let graph = Graph::from_parts(nodes, edges);
     let result = graph.draw_mermaid(None).unwrap();
 

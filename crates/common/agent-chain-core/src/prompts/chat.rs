@@ -813,7 +813,10 @@ fn create_template_from_message_type(
                 )));
             }
             let var_name = &template[1..template.len() - 1];
-            let placeholder = MessagesPlaceholder::new(var_name).optional(true);
+            let placeholder = MessagesPlaceholder::builder()
+                .variable_name(var_name)
+                .optional(true)
+                .build();
             Ok(ChatPromptMessage::Placeholder(placeholder))
         }
         _ => Err(Error::InvalidConfig(format!(
@@ -839,7 +842,7 @@ fn convert_to_message_template(
             variable_name,
             optional,
         } => {
-            let placeholder = MessagesPlaceholder::new(variable_name).optional(optional);
+            let placeholder = MessagesPlaceholder::builder().variable_name(variable_name).optional(optional).build();
             Ok(ChatPromptMessage::Placeholder(placeholder))
         }
         MessageLikeRepresentation::Template(_t) => {
@@ -1029,10 +1032,15 @@ mod tests {
 
     #[test]
     fn test_messages_placeholder() {
-        let placeholder = MessagesPlaceholder::new("history");
+        let placeholder = MessagesPlaceholder::builder()
+            .variable_name("history")
+            .build();
         assert_eq!(placeholder.input_variables(), vec!["history"]);
 
-        let optional_placeholder = MessagesPlaceholder::new("history").optional(true);
+        let optional_placeholder = MessagesPlaceholder::builder()
+            .variable_name("history")
+            .optional(true)
+            .build();
         assert!(optional_placeholder.input_variables().is_empty());
     }
 

@@ -5,11 +5,11 @@ use agent_chain_core::runnables::graph_mermaid::to_safe_id;
 use serde_json::Value;
 
 fn make_node(id: &str, name: &str) -> Node {
-    Node::new(id, name)
+    Node::builder().id(id).name(name).build()
 }
 
 fn make_node_with_metadata(id: &str, name: &str, metadata: HashMap<String, Value>) -> Node {
-    Node::new(id, name).with_metadata(metadata)
+    Node::builder().id(id).name(name).metadata(metadata).build()
 }
 
 #[test]
@@ -151,14 +151,35 @@ fn test_parallel_subgraph_mermaid() {
     nodes.insert("__end__".to_string(), make_node("__end__", "__end__"));
 
     let edges = vec![
-        Edge::new("inner_1:inner_1", "inner_1:inner_2"),
-        Edge::new("inner_2:inner_1", "inner_2:inner_2"),
-        Edge::new("__start__", "outer_1"),
-        Edge::new("inner_1:inner_2", "outer_2"),
-        Edge::new("inner_2:inner_2", "outer_2"),
-        Edge::new("outer_1", "inner_1:inner_1"),
-        Edge::new("outer_1", "inner_2:inner_1"),
-        Edge::new("outer_2", "__end__"),
+        Edge::builder()
+            .source("inner_1:inner_1")
+            .target("inner_1:inner_2")
+            .build(),
+        Edge::builder()
+            .source("inner_2:inner_1")
+            .target("inner_2:inner_2")
+            .build(),
+        Edge::builder()
+            .source("__start__")
+            .target("outer_1")
+            .build(),
+        Edge::builder()
+            .source("inner_1:inner_2")
+            .target("outer_2")
+            .build(),
+        Edge::builder()
+            .source("inner_2:inner_2")
+            .target("outer_2")
+            .build(),
+        Edge::builder()
+            .source("outer_1")
+            .target("inner_1:inner_1")
+            .build(),
+        Edge::builder()
+            .source("outer_1")
+            .target("inner_2:inner_1")
+            .build(),
+        Edge::builder().source("outer_2").target("__end__").build(),
     ];
 
     let graph = Graph::from_parts(nodes, edges);
@@ -199,12 +220,27 @@ fn test_double_nested_subgraph_mermaid() {
     nodes.insert("__end__".to_string(), make_node("__end__", "__end__"));
 
     let edges = vec![
-        Edge::new("child:child_1:grandchild_1", "child:child_1:grandchild_2"),
-        Edge::new("child:child_1:grandchild_2", "child:child_2"),
-        Edge::new("__start__", "parent_1"),
-        Edge::new("child:child_2", "parent_2"),
-        Edge::new("parent_1", "child:child_1:grandchild_1"),
-        Edge::new("parent_2", "__end__"),
+        Edge::builder()
+            .source("child:child_1:grandchild_1")
+            .target("child:child_1:grandchild_2")
+            .build(),
+        Edge::builder()
+            .source("child:child_1:grandchild_2")
+            .target("child:child_2")
+            .build(),
+        Edge::builder()
+            .source("__start__")
+            .target("parent_1")
+            .build(),
+        Edge::builder()
+            .source("child:child_2")
+            .target("parent_2")
+            .build(),
+        Edge::builder()
+            .source("parent_1")
+            .target("child:child_1:grandchild_1")
+            .build(),
+        Edge::builder().source("parent_2").target("__end__").build(),
     ];
 
     let graph = Graph::from_parts(nodes, edges);
@@ -252,19 +288,31 @@ fn test_triple_nested_subgraph_mermaid() {
     nodes.insert("__end__".to_string(), make_node("__end__", "__end__"));
 
     let edges = vec![
-        Edge::new(
-            "child:child_1:grandchild_1",
-            "child:child_1:grandchild_1:greatgrandchild",
-        ),
-        Edge::new(
-            "child:child_1:grandchild_1:greatgrandchild",
-            "child:child_1:grandchild_2",
-        ),
-        Edge::new("child:child_1:grandchild_2", "child:child_2"),
-        Edge::new("__start__", "parent_1"),
-        Edge::new("child:child_2", "parent_2"),
-        Edge::new("parent_1", "child:child_1:grandchild_1"),
-        Edge::new("parent_2", "__end__"),
+        Edge::builder()
+            .source("child:child_1:grandchild_1")
+            .target("child:child_1:grandchild_1:greatgrandchild")
+            .build(),
+        Edge::builder()
+            .source("child:child_1:grandchild_1:greatgrandchild")
+            .target("child:child_1:grandchild_2")
+            .build(),
+        Edge::builder()
+            .source("child:child_1:grandchild_2")
+            .target("child:child_2")
+            .build(),
+        Edge::builder()
+            .source("__start__")
+            .target("parent_1")
+            .build(),
+        Edge::builder()
+            .source("child:child_2")
+            .target("parent_2")
+            .build(),
+        Edge::builder()
+            .source("parent_1")
+            .target("child:child_1:grandchild_1")
+            .build(),
+        Edge::builder().source("parent_2").target("__end__").build(),
     ];
 
     let graph = Graph::from_parts(nodes, edges);
@@ -283,8 +331,11 @@ fn test_single_node_subgraph_mermaid() {
     nodes.insert("__end__".to_string(), make_node("__end__", "__end__"));
 
     let edges = vec![
-        Edge::new("__start__", "sub:meow"),
-        Edge::new("sub:meow", "__end__"),
+        Edge::builder()
+            .source("__start__")
+            .target("sub:meow")
+            .build(),
+        Edge::builder().source("sub:meow").target("__end__").build(),
     ];
 
     let graph = Graph::from_parts(nodes, edges);
@@ -302,7 +353,12 @@ fn test_graph_mermaid_frontmatter_config() {
     nodes.insert("__start__".to_string(), make_node("__start__", "__start__"));
     nodes.insert("my_node".to_string(), make_node("my_node", "my_node"));
 
-    let edges = vec![Edge::new("__start__", "my_node")];
+    let edges = vec![
+        Edge::builder()
+            .source("__start__")
+            .target("my_node")
+            .build(),
+    ];
 
     let graph = Graph::from_parts(nodes, edges);
 
@@ -343,9 +399,9 @@ fn test_graph_mermaid_special_chars() {
     nodes.insert("__end__".to_string(), make_node("__end__", "__end__"));
 
     let edges = vec![
-        Edge::new("__start__", "开始"),
-        Edge::new("开始", "结束"),
-        Edge::new("结束", "__end__"),
+        Edge::builder().source("__start__").target("开始").build(),
+        Edge::builder().source("开始").target("结束").build(),
+        Edge::builder().source("结束").target("__end__").build(),
     ];
 
     let graph = Graph::from_parts(nodes, edges);
@@ -365,8 +421,11 @@ fn test_draw_mermaid_without_styles() {
     nodes.insert("__end__".to_string(), make_node("__end__", "__end__"));
 
     let edges = vec![
-        Edge::new("__start__", "my_node"),
-        Edge::new("my_node", "__end__"),
+        Edge::builder()
+            .source("__start__")
+            .target("my_node")
+            .build(),
+        Edge::builder().source("my_node").target("__end__").build(),
     ];
 
     let graph = Graph::from_parts(nodes, edges);
@@ -510,7 +569,7 @@ fn test_node_with_metadata_renders_in_mermaid() {
     );
     nodes.insert("other".to_string(), make_node("other", "other"));
 
-    let edges = vec![Edge::new("other", "my_node")];
+    let edges = vec![Edge::builder().source("other").target("my_node").build()];
 
     let graph = Graph::from_parts(nodes, edges);
     let mermaid = graph.draw_mermaid(None).unwrap();
@@ -603,7 +662,7 @@ fn test_graph_extend_returns_correct_first_last() {
     assert_eq!(last.unwrap().id, "z");
 }
 
-use agent_chain_core::runnables::base::{Runnable, runnable_lambda};
+use agent_chain_core::runnables::base::{Runnable, RunnableLambda, runnable_lambda};
 
 #[test]
 fn test_get_graph_base_runnable() {
@@ -678,7 +737,8 @@ fn test_get_graph_sequence_draws_mermaid() {
 fn test_get_graph_parallel() {
     use agent_chain_core::runnables::base::RunnableParallel;
 
-    let par = RunnableParallel::<String>::builder().build()
+    let par = RunnableParallel::<String>::builder()
+        .build()
         .add(
             "a",
             runnable_lambda(|x: String| Ok(serde_json::Value::String(x.clone()))),
@@ -712,7 +772,8 @@ fn test_get_graph_parallel() {
 fn test_get_graph_parallel_draws_mermaid() {
     use agent_chain_core::runnables::base::RunnableParallel;
 
-    let par = RunnableParallel::<String>::builder().build()
+    let par = RunnableParallel::<String>::builder()
+        .build()
         .add(
             "a",
             runnable_lambda(|x: String| Ok(serde_json::Value::String(x.clone()))),
@@ -926,7 +987,10 @@ fn test_lambda_with_deps_graph() {
     use std::sync::Arc;
 
     let dep = runnable_lambda(|x: String| Ok(x.to_uppercase()));
-    let r = runnable_lambda(|x: String| Ok(x.len())).with_dep(Arc::new(RunnableGraphProvider(dep)));
+    let r = RunnableLambda::builder()
+        .func(|x: String| Ok(x.len()))
+        .deps(vec![Arc::new(RunnableGraphProvider(dep))])
+        .build();
 
     let graph = r.get_graph(None).unwrap();
     assert!(
@@ -951,10 +1015,13 @@ fn test_lambda_with_multiple_deps_graph() {
 
     let dep1 = runnable_lambda(|x: String| Ok(x.to_uppercase()));
     let dep2 = runnable_lambda(|x: String| Ok(x.to_lowercase()));
-    let r = runnable_lambda(|x: String| Ok(x.len())).with_deps(vec![
-        Arc::new(RunnableGraphProvider(dep1)),
-        Arc::new(RunnableGraphProvider(dep2)),
-    ]);
+    let r = RunnableLambda::builder()
+        .func(|x: String| Ok(x.len()))
+        .deps(vec![
+            Arc::new(RunnableGraphProvider(dep1)),
+            Arc::new(RunnableGraphProvider(dep2)),
+        ])
+        .build();
 
     let graph = r.get_graph(None).unwrap();
     assert!(
@@ -975,7 +1042,10 @@ fn test_lambda_with_deps_draws_mermaid() {
     use std::sync::Arc;
 
     let dep = runnable_lambda(|x: String| Ok(x.to_uppercase()));
-    let r = runnable_lambda(|x: String| Ok(x.len())).with_dep(Arc::new(RunnableGraphProvider(dep)));
+    let r = RunnableLambda::builder()
+        .func(|x: String| Ok(x.len()))
+        .deps(vec![Arc::new(RunnableGraphProvider(dep))])
+        .build();
 
     let graph = r.get_graph(None).unwrap();
     let mermaid = graph.draw_mermaid(None).unwrap();

@@ -67,7 +67,8 @@ impl StructuredTool {
         #[builder(default)] return_direct: bool,
         #[builder(default)] verbose: bool,
         #[builder(default = HandleToolError::Bool(false))] handle_tool_error: HandleToolError,
-        #[builder(default = HandleValidationError::Bool(false))] handle_validation_error: HandleValidationError,
+        #[builder(default = HandleValidationError::Bool(false))]
+        handle_validation_error: HandleValidationError,
         #[builder(default)] response_format: ResponseFormat,
         tags: Option<Vec<String>>,
         metadata: Option<HashMap<String, Value>>,

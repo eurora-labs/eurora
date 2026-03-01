@@ -82,9 +82,11 @@ fn make_my_property_field(id: &str) -> HashMap<String, AnyConfigurableField> {
     fields.insert(
         "my_property".to_string(),
         AnyConfigurableField::Field(
-            ConfigurableField::new(id)
-                .with_name("My property")
-                .with_description("The property to test"),
+            ConfigurableField::builder()
+                .id(id)
+                .name("My property")
+                .description("The property to test")
+                .build(),
         ),
     );
     fields
@@ -212,13 +214,13 @@ fn test_configurable_alternatives_invoke_default() {
     let mut alternatives = HashMap::new();
     alternatives.insert("other".to_string(), Alternative::Runnable(Arc::new(alt)));
 
-    let configurable = RunnableConfigurableAlternatives::new(
-        ConfigurableField::new("which"),
-        Arc::new(default),
-        alternatives,
-        "default",
-        false,
-    );
+    let configurable = RunnableConfigurableAlternatives::builder()
+        .which(ConfigurableField::builder().id("which").build())
+        .default(Arc::new(default))
+        .alternatives(alternatives)
+        .default_key("default")
+        .prefix_keys(false)
+        .build();
 
     let result = configurable.invoke("input_".to_string(), None).unwrap();
     assert_eq!(result, "input_default_val");
@@ -232,19 +234,20 @@ fn test_configurable_alternatives_invoke_alternative() {
     let mut alternatives = HashMap::new();
     alternatives.insert("other".to_string(), Alternative::Runnable(Arc::new(alt)));
 
-    let configurable = RunnableConfigurableAlternatives::new(
-        ConfigurableField::new("which"),
-        Arc::new(default),
-        alternatives,
-        "default",
-        false,
-    );
+    let configurable = RunnableConfigurableAlternatives::builder()
+        .which(ConfigurableField::builder().id("which").build())
+        .default(Arc::new(default))
+        .alternatives(alternatives)
+        .default_key("default")
+        .prefix_keys(false)
+        .build();
 
-    let config = RunnableConfig::default().with_configurable({
+    let mut config = RunnableConfig::default();
+    config.configurable = {
         let mut c = HashMap::new();
         c.insert("which".to_string(), Value::String("other".to_string()));
         c
-    });
+    };
 
     let result = configurable
         .invoke("input_".to_string(), Some(config))
@@ -256,22 +259,23 @@ fn test_configurable_alternatives_invoke_alternative() {
 fn test_configurable_alternatives_unknown_raises() {
     let default = MyRunnable::new("default_val");
 
-    let configurable = RunnableConfigurableAlternatives::new(
-        ConfigurableField::new("which"),
-        Arc::new(default),
-        HashMap::new(),
-        "default",
-        false,
-    );
+    let configurable = RunnableConfigurableAlternatives::builder()
+        .which(ConfigurableField::builder().id("which").build())
+        .default(Arc::new(default))
+        .alternatives(HashMap::new())
+        .default_key("default")
+        .prefix_keys(false)
+        .build();
 
-    let config = RunnableConfig::default().with_configurable({
+    let mut config = RunnableConfig::default();
+    config.configurable = {
         let mut c = HashMap::new();
         c.insert(
             "which".to_string(),
             Value::String("nonexistent".to_string()),
         );
         c
-    });
+    };
 
     let result = configurable.invoke("input_".to_string(), Some(config));
     assert!(result.is_err());
@@ -296,19 +300,20 @@ fn test_configurable_alternatives_with_callable_factory() {
         })),
     );
 
-    let configurable = RunnableConfigurableAlternatives::new(
-        ConfigurableField::new("which"),
-        Arc::new(default),
-        alternatives,
-        "default",
-        false,
-    );
+    let configurable = RunnableConfigurableAlternatives::builder()
+        .which(ConfigurableField::builder().id("which").build())
+        .default(Arc::new(default))
+        .alternatives(alternatives)
+        .default_key("default")
+        .prefix_keys(false)
+        .build();
 
-    let config = RunnableConfig::default().with_configurable({
+    let mut config = RunnableConfig::default();
+    config.configurable = {
         let mut c = HashMap::new();
         c.insert("which".to_string(), Value::String("other".to_string()));
         c
-    });
+    };
 
     let result = configurable
         .invoke("input_".to_string(), Some(config))
@@ -324,13 +329,13 @@ fn test_configurable_alternatives_config_specs() {
     let mut alternatives = HashMap::new();
     alternatives.insert("other".to_string(), Alternative::Runnable(Arc::new(alt)));
 
-    let configurable = RunnableConfigurableAlternatives::new(
-        ConfigurableField::new("which"),
-        Arc::new(default),
-        alternatives,
-        "default",
-        false,
-    );
+    let configurable = RunnableConfigurableAlternatives::builder()
+        .which(ConfigurableField::builder().id("which").build())
+        .default(Arc::new(default))
+        .alternatives(alternatives)
+        .default_key("default")
+        .prefix_keys(false)
+        .build();
 
     let specs = configurable.config_specs().unwrap();
     let spec_ids: Vec<&str> = specs.iter().map(|s| s.id.as_str()).collect();
@@ -346,13 +351,13 @@ fn test_configurable_alternatives_with_prefix_keys() {
     let mut alternatives = HashMap::new();
     alternatives.insert("other".to_string(), Alternative::Runnable(Arc::new(alt)));
 
-    let configurable = RunnableConfigurableAlternatives::new(
-        ConfigurableField::new("which"),
-        Arc::new(configurable_default),
-        alternatives,
-        "default",
-        true,
-    );
+    let configurable = RunnableConfigurableAlternatives::builder()
+        .which(ConfigurableField::builder().id("which").build())
+        .default(Arc::new(configurable_default))
+        .alternatives(alternatives)
+        .default_key("default")
+        .prefix_keys(true)
+        .build();
 
     let specs = configurable.config_specs().unwrap();
     let spec_ids: Vec<&str> = specs.iter().map(|s| s.id.as_str()).collect();
@@ -362,8 +367,11 @@ fn test_configurable_alternatives_with_prefix_keys() {
 #[test]
 fn test_dynamic_runnable_with_config() {
     let configurable = make_configurable_my_runnable("a", "my_property");
-    let new =
-        configurable.with_config(RunnableConfig::default().with_tags(vec!["test_tag".to_string()]));
+    let new = configurable.with_config({
+        let mut c = RunnableConfig::default();
+        c.tags = vec!["test_tag".to_string()];
+        c
+    });
     assert!(new.config.is_some());
     assert!(
         new.config
@@ -396,11 +404,12 @@ fn test_configurable_fields_prepare_no_config() {
 #[test]
 fn test_configurable_fields_prepare_with_override() {
     let configurable = make_configurable_my_runnable("a", "my_property");
-    let config = RunnableConfig::default().with_configurable({
+    let mut config = RunnableConfig::default();
+    config.configurable = {
         let mut c = HashMap::new();
         c.insert("my_property".to_string(), Value::String("b".to_string()));
         c
-    });
+    };
     let result = configurable.invoke("x".to_string(), Some(config)).unwrap();
     assert_eq!(result, "xb");
 }
@@ -409,11 +418,12 @@ fn test_configurable_fields_prepare_with_override() {
 fn test_doubly_set_configurable() {
     let configurable = make_configurable_my_runnable("a", "my_property");
 
-    let config = RunnableConfig::default().with_configurable({
+    let mut config = RunnableConfig::default();
+    config.configurable = {
         let mut c = HashMap::new();
         c.insert("my_property".to_string(), Value::String("c".to_string()));
         c
-    });
+    };
 
     let result = configurable.invoke("d".to_string(), Some(config)).unwrap();
     assert_eq!(result, "dc");
@@ -424,16 +434,24 @@ fn test_configurable_fields_batch() {
     let configurable = make_configurable_my_runnable("a", "my_property");
 
     let configs = vec![
-        RunnableConfig::default().with_configurable({
-            let mut c = HashMap::new();
-            c.insert("my_property".to_string(), Value::String("1".to_string()));
-            c
-        }),
-        RunnableConfig::default().with_configurable({
-            let mut c = HashMap::new();
-            c.insert("my_property".to_string(), Value::String("2".to_string()));
-            c
-        }),
+        {
+            let mut __cfg = RunnableConfig::default();
+            __cfg.configurable = {
+                let mut c = HashMap::new();
+                c.insert("my_property".to_string(), Value::String("1".to_string()));
+                c
+            };
+            __cfg
+        },
+        {
+            let mut __cfg = RunnableConfig::default();
+            __cfg.configurable = {
+                let mut c = HashMap::new();
+                c.insert("my_property".to_string(), Value::String("2".to_string()));
+                c
+            };
+            __cfg
+        },
     ];
 
     let results = configurable.batch(
@@ -453,11 +471,12 @@ fn test_configurable_fields_batch() {
 fn test_configurable_fields_stream() {
     let configurable = make_configurable_my_runnable("a", "my_property");
 
-    let config = RunnableConfig::default().with_configurable({
+    let mut config = RunnableConfig::default();
+    config.configurable = {
         let mut c = HashMap::new();
         c.insert("my_property".to_string(), Value::String("b".to_string()));
         c
-    });
+    };
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     let chunks: Vec<Result<String>> = rt.block_on(async {
@@ -475,11 +494,12 @@ fn test_configurable_fields_chained_configurable_fields() {
     let configurable = make_configurable_my_runnable("a", "my_property");
     let chained = configurable.configurable_fields(HashMap::new());
 
-    let config = RunnableConfig::default().with_configurable({
+    let mut config = RunnableConfig::default();
+    config.configurable = {
         let mut c = HashMap::new();
         c.insert("my_property".to_string(), Value::String("c".to_string()));
         c
-    });
+    };
 
     let result = chained.invoke("x".to_string(), Some(config)).unwrap();
     assert_eq!(result, "xc");
@@ -488,11 +508,12 @@ fn test_configurable_fields_chained_configurable_fields() {
 #[tokio::test]
 async fn test_configurable_fields_ainvoke_with_override() {
     let configurable = make_configurable_my_runnable("a", "my_property");
-    let config = RunnableConfig::default().with_configurable({
+    let mut config = RunnableConfig::default();
+    config.configurable = {
         let mut c = HashMap::new();
         c.insert("my_property".to_string(), Value::String("b".to_string()));
         c
-    });
+    };
     let result = configurable
         .ainvoke("x".to_string(), Some(config))
         .await
@@ -508,13 +529,13 @@ async fn test_configurable_alternatives_ainvoke_default() {
     let mut alternatives = HashMap::new();
     alternatives.insert("other".to_string(), Alternative::Runnable(Arc::new(alt)));
 
-    let configurable = RunnableConfigurableAlternatives::new(
-        ConfigurableField::new("which"),
-        Arc::new(default),
-        alternatives,
-        "default",
-        false,
-    );
+    let configurable = RunnableConfigurableAlternatives::builder()
+        .which(ConfigurableField::builder().id("which").build())
+        .default(Arc::new(default))
+        .alternatives(alternatives)
+        .default_key("default")
+        .prefix_keys(false)
+        .build();
 
     let result = configurable
         .ainvoke("input_".to_string(), None)
@@ -531,19 +552,20 @@ async fn test_configurable_alternatives_ainvoke_alternative() {
     let mut alternatives = HashMap::new();
     alternatives.insert("other".to_string(), Alternative::Runnable(Arc::new(alt)));
 
-    let configurable = RunnableConfigurableAlternatives::new(
-        ConfigurableField::new("which"),
-        Arc::new(default),
-        alternatives,
-        "default",
-        false,
-    );
+    let configurable = RunnableConfigurableAlternatives::builder()
+        .which(ConfigurableField::builder().id("which").build())
+        .default(Arc::new(default))
+        .alternatives(alternatives)
+        .default_key("default")
+        .prefix_keys(false)
+        .build();
 
-    let config = RunnableConfig::default().with_configurable({
+    let mut config = RunnableConfig::default();
+    config.configurable = {
         let mut c = HashMap::new();
         c.insert("which".to_string(), Value::String("other".to_string()));
         c
-    });
+    };
 
     let result = configurable
         .ainvoke("input_".to_string(), Some(config))

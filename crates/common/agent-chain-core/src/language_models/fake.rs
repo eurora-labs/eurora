@@ -141,11 +141,11 @@ impl BaseLLM for FakeListLLM {
 
         for _ in prompts {
             let response = self.get_next_response();
-            let generation = Generation::new(response);
+            let generation = Generation::builder().text(response).build();
             generations.push(vec![GenerationType::Generation(generation)]);
         }
 
-        Ok(LLMResult::new(generations))
+        Ok(LLMResult::builder().generations(generations).build())
     }
 }
 
@@ -286,7 +286,7 @@ impl BaseLLM for FakeStreamingListLLM {
                     return;
                 }
 
-                yield Ok(GenerationChunk::new(c.to_string()));
+                yield Ok(GenerationChunk::builder().text(c.to_string()).build());
             }
         };
 

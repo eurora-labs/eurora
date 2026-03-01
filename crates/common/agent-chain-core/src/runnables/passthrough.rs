@@ -71,9 +71,7 @@ where
     I: Send + Sync + Clone + Debug + 'static,
 {
     #[builder]
-    pub fn new(
-        #[builder(into)] name: Option<String>,
-    ) -> Self {
+    pub fn new(#[builder(into)] name: Option<String>) -> Self {
         Self {
             name,
             func: None,
@@ -109,8 +107,8 @@ where
         }
     }
 
-    pub fn assign() -> RunnableAssignBuilder {
-        RunnableAssignBuilder::new()
+    pub fn assign() -> RunnableAssignFluentBuilder {
+        RunnableAssignFluentBuilder::new()
     }
 }
 
@@ -261,11 +259,11 @@ where
     }
 }
 
-pub struct RunnableAssignBuilder {
+pub struct RunnableAssignFluentBuilder {
     mapper: RunnableParallel<HashMap<String, Value>>,
 }
 
-impl RunnableAssignBuilder {
+impl RunnableAssignFluentBuilder {
     fn new() -> Self {
         Self {
             mapper: RunnableParallel::builder().build(),
@@ -566,10 +564,7 @@ impl From<PickKeys> for RunnablePick {
 #[bon::bon]
 impl RunnablePick {
     #[builder]
-    pub fn new_single(
-        #[builder(into)] key: String,
-        #[builder(into)] name: Option<String>,
-    ) -> Self {
+    pub fn new_single(#[builder(into)] key: String, #[builder(into)] name: Option<String>) -> Self {
         Self {
             keys: PickKeys::Single(key),
             name,
@@ -724,8 +719,9 @@ mod tests {
 
     #[test]
     fn test_runnable_passthrough_with_name() {
-        let passthrough: RunnablePassthrough<i32> =
-            RunnablePassthrough::builder().name("test_passthrough").build();
+        let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder()
+            .name("test_passthrough")
+            .build();
         assert_eq!(passthrough.name(), Some("test_passthrough".to_string()));
     }
 
@@ -749,7 +745,7 @@ mod tests {
 
     #[test]
     fn test_runnable_pick_single() {
-        let pick = RunnablePick::new_single_builder().key("name").build();
+        let pick = RunnablePick::new_single().key("name").call();
 
         let mut input = HashMap::new();
         input.insert("name".to_string(), serde_json::json!("John"));
@@ -777,7 +773,7 @@ mod tests {
 
     #[test]
     fn test_runnable_pick_name() {
-        let pick_single = RunnablePick::new_single_builder().key("name").build();
+        let pick_single = RunnablePick::new_single().key("name").call();
         assert_eq!(pick_single.name(), Some("RunnablePick<name>".to_string()));
 
         let pick_multi = RunnablePick::new_multi(vec!["name", "age"], None);
@@ -796,7 +792,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_runnable_pick_async() {
-        let pick = RunnablePick::new_single_builder().key("name").build();
+        let pick = RunnablePick::new_single().key("name").call();
 
         let mut input = HashMap::new();
         input.insert("name".to_string(), serde_json::json!("John"));

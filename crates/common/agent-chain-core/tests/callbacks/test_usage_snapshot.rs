@@ -19,7 +19,7 @@ fn make_chat_result(content: &str, usage: &UsageMetadata, model_name: &str) -> C
         .build();
 
     ChatResult {
-        generations: vec![ChatGeneration::new(ai_msg.into())],
+        generations: vec![ChatGeneration::builder().message(ai_msg.into()).build()],
         llm_output: None,
     }
 }
@@ -144,7 +144,7 @@ fn test_non_ai_message_ignored() {
     use agent_chain_core::messages::HumanMessage;
 
     let human_msg = HumanMessage::builder().content("hello").build();
-    let generation = ChatGeneration::new(human_msg.into());
+    let generation = ChatGeneration::builder().message(human_msg.into()).build();
 
     let result = ChatResult {
         generations: vec![generation],
@@ -164,7 +164,7 @@ fn test_missing_model_name_ignored() {
         .build();
 
     let result = ChatResult {
-        generations: vec![ChatGeneration::new(ai_msg.into())],
+        generations: vec![ChatGeneration::builder().message(ai_msg.into()).build()],
         llm_output: None,
     };
 
@@ -184,7 +184,7 @@ fn test_missing_usage_metadata_ignored() {
         .build();
 
     let result = ChatResult {
-        generations: vec![ChatGeneration::new(ai_msg.into())],
+        generations: vec![ChatGeneration::builder().message(ai_msg.into()).build()],
         llm_output: None,
     };
 

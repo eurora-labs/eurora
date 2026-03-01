@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use bon::bon;
 use async_trait::async_trait;
+use bon::bon;
 
 use crate::error::{Error, Result};
 use crate::messages::{BaseMessage, get_buffer_string};
@@ -580,13 +580,12 @@ mod tests {
 
         let example_prompt = PromptTemplate::from_template("Q: {input}\nA: {output}").unwrap();
 
-        let few_shot = FewShotPromptTemplate::new(
-            examples,
-            example_prompt,
-            "Q: {question}\nA:".to_string(),
-            None,
-        )
-        .unwrap();
+        let few_shot = FewShotPromptTemplate::builder()
+            .examples(examples)
+            .example_prompt(example_prompt)
+            .suffix("Q: {question}\nA:".to_string())
+            .build()
+            .unwrap();
 
         let mut kwargs = HashMap::new();
         kwargs.insert("question".to_string(), "2+4".to_string());
@@ -608,13 +607,13 @@ mod tests {
 
         let example_prompt = PromptTemplate::from_template("{input} -> {output}").unwrap();
 
-        let few_shot = FewShotPromptTemplate::new(
-            examples,
-            example_prompt,
-            "{query}".to_string(),
-            Some("Examples:".to_string()),
-        )
-        .unwrap();
+        let few_shot = FewShotPromptTemplate::builder()
+            .examples(examples)
+            .example_prompt(example_prompt)
+            .suffix("{query}".to_string())
+            .prefix("Examples:".to_string())
+            .build()
+            .unwrap();
 
         let mut kwargs = HashMap::new();
         kwargs.insert("query".to_string(), "bye".to_string());
@@ -631,13 +630,13 @@ mod tests {
 
         let example_prompt = PromptTemplate::from_template("{input}").unwrap();
 
-        let few_shot = FewShotPromptTemplate::new(
-            examples,
-            example_prompt,
-            "Answer: {question}".to_string(),
-            Some("Context: {context}".to_string()),
-        )
-        .unwrap();
+        let few_shot = FewShotPromptTemplate::builder()
+            .examples(examples)
+            .example_prompt(example_prompt)
+            .suffix("Answer: {question}".to_string())
+            .prefix("Context: {context}".to_string())
+            .build()
+            .unwrap();
 
         let mut vars = few_shot.input_variables.clone();
         vars.sort();

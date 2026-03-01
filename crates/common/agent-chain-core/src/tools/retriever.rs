@@ -108,8 +108,13 @@ where
         }
     };
 
-    StructuredTool::from_function(func, name.clone(), description, retriever_args_schema())
-        .with_response_format(response_format)
+    StructuredTool::builder()
+        .name(name.clone())
+        .description(description)
+        .args_schema(retriever_args_schema())
+        .func(Arc::new(func))
+        .response_format(response_format)
+        .build()
 }
 
 fn format_documents(docs: &[Document], separator: &str) -> String {
@@ -246,8 +251,8 @@ mod tests {
     #[test]
     fn test_format_documents() {
         let docs = vec![
-            Document::new("First document"),
-            Document::new("Second document"),
+            Document::builder().page_content("First document").build(),
+            Document::builder().page_content("Second document").build(),
         ];
 
         let formatted = format_documents(&docs, "\n\n");
@@ -257,9 +262,9 @@ mod tests {
     #[test]
     fn test_format_documents_custom_separator() {
         let docs = vec![
-            Document::new("Doc 1"),
-            Document::new("Doc 2"),
-            Document::new("Doc 3"),
+            Document::builder().page_content("Doc 1").build(),
+            Document::builder().page_content("Doc 2").build(),
+            Document::builder().page_content("Doc 3").build(),
         ];
 
         let formatted = format_documents(&docs, " | ");

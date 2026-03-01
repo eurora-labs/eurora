@@ -5,12 +5,12 @@ use futures::StreamExt;
 
 use agent_chain_core::error::Error;
 use agent_chain_core::runnables::base::{DynRunnable, Runnable, RunnableLambda, pipe};
-use agent_chain_core::runnables::branch::{RunnableBranch, RunnableBranchBuilder};
+use agent_chain_core::runnables::branch::{RunnableBranch, RunnableBranchFluentBuilder};
 use agent_chain_core::runnables::config::RunnableConfig;
 
 #[test]
 fn test_branch_initialization() {
-    let branch = RunnableBranchBuilder::<i32, i32>::new()
+    let branch = RunnableBranchFluentBuilder::<i32, i32>::new()
         .branch(|x| Ok(x > 0), |x| Ok(x + 1))
         .branch(|x| Ok(x < 0), |x| Ok(x - 1))
         .default(Ok)
@@ -22,7 +22,7 @@ fn test_branch_initialization() {
 #[test]
 fn test_branch_requires_minimum_branches() {
     let result: agent_chain_core::error::Result<RunnableBranch<i32, i32>> =
-        RunnableBranchBuilder::new().default(|x: i32| Ok(x));
+        RunnableBranchFluentBuilder::new().default(|x: i32| Ok(x));
 
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
@@ -35,7 +35,12 @@ fn test_branch_requires_minimum_branches() {
 #[test]
 fn test_branch_requires_minimum_branches_new() {
     let result: agent_chain_core::error::Result<RunnableBranch<i32, i32>> =
-        RunnableBranch::new(vec![], Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x)).build()));
+        RunnableBranch::builder()
+            .branches(vec![])
+            .default(Arc::new(
+                RunnableLambda::builder().func(|x: i32| Ok(x)).build(),
+            ))
+            .build();
 
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
@@ -47,7 +52,7 @@ fn test_branch_requires_minimum_branches_new() {
 
 #[test]
 fn test_branch_invoke_first_condition_true() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 1))
         .branch(|x: i32| Ok(x < 0), |x: i32| Ok(x - 1))
         .default(|x: i32| Ok(x * 10))
@@ -59,7 +64,7 @@ fn test_branch_invoke_first_condition_true() {
 
 #[test]
 fn test_branch_invoke_second_condition_true() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 10), |x: i32| Ok(x + 1))
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x * 2))
         .default(|x: i32| Ok(x - 1))
@@ -71,7 +76,7 @@ fn test_branch_invoke_second_condition_true() {
 
 #[test]
 fn test_branch_invoke_default() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 10), |x: i32| Ok(x + 1))
         .branch(|x: i32| Ok(x < 0), |x: i32| Ok(x - 1))
         .default(|x: i32| Ok(x * 100))
@@ -83,7 +88,7 @@ fn test_branch_invoke_default() {
 
 #[tokio::test]
 async fn test_branch_ainvoke_first_condition() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 1))
         .default(|x: i32| Ok(x * 10))
         .unwrap();
@@ -94,7 +99,7 @@ async fn test_branch_ainvoke_first_condition() {
 
 #[tokio::test]
 async fn test_branch_ainvoke_default() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 100), |x: i32| Ok(x + 1))
         .default(|x: i32| Ok(x * 10))
         .unwrap();
@@ -105,7 +110,7 @@ async fn test_branch_ainvoke_default() {
 
 #[test]
 fn test_branch_batch() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 5), |x: i32| Ok(x * 2))
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 10))
         .default(|x: i32| Ok(x - 10))
@@ -121,7 +126,7 @@ fn test_branch_batch() {
 
 #[tokio::test]
 async fn test_branch_abatch() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 5), |x: i32| Ok(x * 2))
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 10))
         .default(|x: i32| Ok(x - 10))
@@ -138,7 +143,7 @@ async fn test_branch_abatch() {
 
 #[test]
 fn test_branch_empty_batch() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 1))
         .default(|x: i32| Ok(x))
         .unwrap();
@@ -149,7 +154,7 @@ fn test_branch_empty_batch() {
 
 #[test]
 fn test_branch_batch_different_routes() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 10), |_: i32| Ok("large".to_string()))
         .branch(|x: i32| Ok(x > 0), |_: i32| Ok("small".to_string()))
         .default(|_: i32| Ok("negative".to_string()))
@@ -168,7 +173,7 @@ fn test_branch_batch_different_routes() {
 
 #[tokio::test]
 async fn test_branch_batch_preserves_order() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 5), |x: i32| Ok(x * 2))
         .default(|x: i32| Ok(x + 1))
         .unwrap();
@@ -186,7 +191,7 @@ async fn test_branch_batch_preserves_order() {
 
 #[tokio::test]
 async fn test_branch_stream() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 1))
         .default(|x: i32| Ok(x - 1))
         .unwrap();
@@ -197,7 +202,7 @@ async fn test_branch_stream() {
 
 #[tokio::test]
 async fn test_branch_astream() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 1))
         .default(|x: i32| Ok(x - 1))
         .unwrap();
@@ -208,11 +213,18 @@ async fn test_branch_astream() {
 
 #[test]
 fn test_branch_with_runnable_objects() {
-    let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 0)).build());
-    let action_true: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build());
-    let action_false: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x - 1)).build());
+    let condition: DynRunnable<i32, bool> =
+        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 0)).build());
+    let action_true: DynRunnable<i32, i32> =
+        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build());
+    let action_false: DynRunnable<i32, i32> =
+        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x - 1)).build());
 
-    let branch = RunnableBranch::new(vec![(condition, action_true)], action_false).unwrap();
+    let branch = RunnableBranch::builder()
+        .branches(vec![(condition, action_true)])
+        .default(action_false)
+        .build()
+        .unwrap();
 
     assert_eq!(branch.invoke(5, None).unwrap(), 6);
     assert_eq!(branch.invoke(-5, None).unwrap(), -6);
@@ -220,7 +232,7 @@ fn test_branch_with_runnable_objects() {
 
 #[test]
 fn test_branch_multiple_conditions() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 100), |_: i32| Ok("very large".to_string()))
         .branch(|x: i32| Ok(x > 50), |_: i32| Ok("large".to_string()))
         .branch(|x: i32| Ok(x > 10), |_: i32| Ok("medium".to_string()))
@@ -242,7 +254,7 @@ fn test_branch_with_hashmap_input() {
 
     type Input = HashMap<String, String>;
 
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(
             |x: Input| Ok(x.get("type").is_some_and(|v| v == "add")),
             |x: Input| {
@@ -283,7 +295,7 @@ fn test_branch_with_hashmap_input() {
 
 #[test]
 fn test_branch_exception_in_condition() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(
             |_: i32| Err(Error::Other("Condition failed".to_string())),
             |x: i32| Ok(x + 1),
@@ -298,7 +310,7 @@ fn test_branch_exception_in_condition() {
 
 #[test]
 fn test_branch_exception_in_action() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(
             |x: i32| Ok(x > 0),
             |_: i32| Err(Error::Other("Action failed".to_string())),
@@ -313,7 +325,7 @@ fn test_branch_exception_in_action() {
 
 #[tokio::test]
 async fn test_branch_exception_in_async_action() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(
             |x: i32| Ok(x > 0),
             |_: i32| Err(Error::Other("Action failed".to_string())),
@@ -334,39 +346,63 @@ fn test_branch_conditions_evaluated_in_order() {
     let eval2 = evaluations.clone();
     let eval3 = evaluations.clone();
 
-    let condition1 = Arc::new(RunnableLambda::builder().func(move |x: i32| {
-        eval1.lock().unwrap().push(1);
-        Ok(x > 10)
-    }).build()) as DynRunnable<i32, bool>;
+    let condition1 = Arc::new(
+        RunnableLambda::builder()
+            .func(move |x: i32| {
+                eval1.lock().unwrap().push(1);
+                Ok(x > 10)
+            })
+            .build(),
+    ) as DynRunnable<i32, bool>;
 
-    let condition2 = Arc::new(RunnableLambda::builder().func(move |x: i32| {
-        eval2.lock().unwrap().push(2);
-        Ok(x > 5)
-    }).build()) as DynRunnable<i32, bool>;
+    let condition2 = Arc::new(
+        RunnableLambda::builder()
+            .func(move |x: i32| {
+                eval2.lock().unwrap().push(2);
+                Ok(x > 5)
+            })
+            .build(),
+    ) as DynRunnable<i32, bool>;
 
-    let condition3 = Arc::new(RunnableLambda::builder().func(move |x: i32| {
-        eval3.lock().unwrap().push(3);
-        Ok(x > 0)
-    }).build()) as DynRunnable<i32, bool>;
+    let condition3 = Arc::new(
+        RunnableLambda::builder()
+            .func(move |x: i32| {
+                eval3.lock().unwrap().push(3);
+                Ok(x > 0)
+            })
+            .build(),
+    ) as DynRunnable<i32, bool>;
 
-    let action1: DynRunnable<i32, String> =
-        Arc::new(RunnableLambda::builder().func(|_: i32| Ok("first".to_string())).build());
-    let action2: DynRunnable<i32, String> =
-        Arc::new(RunnableLambda::builder().func(|_: i32| Ok("second".to_string())).build());
-    let action3: DynRunnable<i32, String> =
-        Arc::new(RunnableLambda::builder().func(|_: i32| Ok("third".to_string())).build());
-    let default: DynRunnable<i32, String> =
-        Arc::new(RunnableLambda::builder().func(|_: i32| Ok("default".to_string())).build());
+    let action1: DynRunnable<i32, String> = Arc::new(
+        RunnableLambda::builder()
+            .func(|_: i32| Ok("first".to_string()))
+            .build(),
+    );
+    let action2: DynRunnable<i32, String> = Arc::new(
+        RunnableLambda::builder()
+            .func(|_: i32| Ok("second".to_string()))
+            .build(),
+    );
+    let action3: DynRunnable<i32, String> = Arc::new(
+        RunnableLambda::builder()
+            .func(|_: i32| Ok("third".to_string()))
+            .build(),
+    );
+    let default: DynRunnable<i32, String> = Arc::new(
+        RunnableLambda::builder()
+            .func(|_: i32| Ok("default".to_string()))
+            .build(),
+    );
 
-    let branch = RunnableBranch::new(
-        vec![
+    let branch = RunnableBranch::builder()
+        .branches(vec![
             (condition1, action1),
             (condition2, action2),
             (condition3, action3),
-        ],
-        default,
-    )
-    .unwrap();
+        ])
+        .default(default)
+        .build()
+        .unwrap();
 
     evaluations.lock().unwrap().clear();
     let result = branch.invoke(15, None).unwrap();
@@ -397,35 +433,51 @@ fn test_branch_short_circuit_evaluation() {
     let calls2 = condition_calls.clone();
     let calls3 = condition_calls.clone();
 
-    let condition1: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(move |x: i32| {
-        calls1.lock().unwrap().push("first".to_string());
-        Ok(x > 0)
-    }).build());
+    let condition1: DynRunnable<i32, bool> = Arc::new(
+        RunnableLambda::builder()
+            .func(move |x: i32| {
+                calls1.lock().unwrap().push("first".to_string());
+                Ok(x > 0)
+            })
+            .build(),
+    );
 
-    let condition2: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(move |x: i32| {
-        calls2.lock().unwrap().push("second".to_string());
-        Ok(x > 0)
-    }).build());
+    let condition2: DynRunnable<i32, bool> = Arc::new(
+        RunnableLambda::builder()
+            .func(move |x: i32| {
+                calls2.lock().unwrap().push("second".to_string());
+                Ok(x > 0)
+            })
+            .build(),
+    );
 
-    let condition3: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(move |x: i32| {
-        calls3.lock().unwrap().push("third".to_string());
-        Ok(x > 0)
-    }).build());
+    let condition3: DynRunnable<i32, bool> = Arc::new(
+        RunnableLambda::builder()
+            .func(move |x: i32| {
+                calls3.lock().unwrap().push("third".to_string());
+                Ok(x > 0)
+            })
+            .build(),
+    );
 
-    let action1: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build());
-    let action2: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x + 2)).build());
-    let action3: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x + 3)).build());
-    let default: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x)).build());
+    let action1: DynRunnable<i32, i32> =
+        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build());
+    let action2: DynRunnable<i32, i32> =
+        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x + 2)).build());
+    let action3: DynRunnable<i32, i32> =
+        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x + 3)).build());
+    let default: DynRunnable<i32, i32> =
+        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x)).build());
 
-    let branch = RunnableBranch::new(
-        vec![
+    let branch = RunnableBranch::builder()
+        .branches(vec![
             (condition1, action1),
             (condition2, action2),
             (condition3, action3),
-        ],
-        default,
-    )
-    .unwrap();
+        ])
+        .default(default)
+        .build()
+        .unwrap();
 
     condition_calls.lock().unwrap().clear();
     let result = branch.invoke(5, None).unwrap();
@@ -435,7 +487,7 @@ fn test_branch_short_circuit_evaluation() {
 
 #[test]
 fn test_branch_with_complex_conditions() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(
             |x: i32| Ok(x > 0 && x % 2 == 0),
             |x: i32| Ok(format!("even: {x}")),
@@ -455,13 +507,22 @@ fn test_branch_with_complex_conditions() {
 
 #[test]
 fn test_branch_config_propagation() {
-    let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 0)).build());
-    let action: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build());
-    let default: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x)).build());
+    let condition: DynRunnable<i32, bool> =
+        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 0)).build());
+    let action: DynRunnable<i32, i32> =
+        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build());
+    let default: DynRunnable<i32, i32> =
+        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x)).build());
 
-    let branch = RunnableBranch::new(vec![(condition, action)], default).unwrap();
+    let branch = RunnableBranch::builder()
+        .branches(vec![(condition, action)])
+        .default(default)
+        .build()
+        .unwrap();
 
-    let config = RunnableConfig::new().with_tags(vec!["my-tag".to_string()]);
+    let config = RunnableConfig::builder()
+        .tags(vec!["my-tag".to_string()])
+        .build();
     let result = branch.invoke(5, Some(config)).unwrap();
     assert_eq!(result, 6);
 }
@@ -479,7 +540,7 @@ fn test_branch_serialization() {
 
 #[test]
 fn test_branch_all_conditions_false_uses_default() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 100), |_: i32| Ok("a".to_string()))
         .branch(|x: i32| Ok(x > 50), |_: i32| Ok("b".to_string()))
         .branch(|x: i32| Ok(x > 25), |_: i32| Ok("c".to_string()))
@@ -492,7 +553,7 @@ fn test_branch_all_conditions_false_uses_default() {
 
 #[test]
 fn test_branch_preserves_intermediate_types() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(
             |x: String| Ok(x.len() > 5),
             |x: String| Ok(x.to_uppercase()),
@@ -509,7 +570,7 @@ fn test_branch_preserves_intermediate_types() {
 
 #[test]
 fn test_branch_with_complex_return_types() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(
             |x: (String, i32)| Ok(x.0 == "list"),
             |x: (String, i32)| Ok(vec![x.1, x.1 * 2]),
@@ -541,7 +602,7 @@ fn test_branch_with_type_annotations() {
         Ok(format!("non-positive: {x}"))
     }
 
-    let branch = RunnableBranchBuilder::<i32, String>::new()
+    let branch = RunnableBranchFluentBuilder::<i32, String>::new()
         .branch(condition_typed, action_typed)
         .default(default_typed)
         .unwrap();
@@ -554,13 +615,15 @@ fn test_branch_with_type_annotations() {
 fn test_branch_with_runnables_in_chain() {
     let preprocess = RunnableLambda::builder().func(|x: (i32,)| Ok(x.0)).build();
 
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 10), |x: i32| Ok(x * 2))
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 10))
         .default(|x: i32| Ok(x - 10))
         .unwrap();
 
-    let postprocess = RunnableLambda::builder().func(|x: i32| Ok(format!("Result: {x}"))).build();
+    let postprocess = RunnableLambda::builder()
+        .func(|x: i32| Ok(format!("Result: {x}")))
+        .build();
 
     let chain = pipe(pipe(preprocess, branch), postprocess);
 
@@ -571,7 +634,7 @@ fn test_branch_with_runnables_in_chain() {
 
 #[test]
 fn test_branch_with_none_output() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(
             |x: String| Ok(x == "return_none"),
             |_: String| Ok(None::<String>),
@@ -588,11 +651,18 @@ fn test_branch_with_none_output() {
 
 #[test]
 fn test_branch_name() {
-    let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 0)).build());
-    let branch_runnable: DynRunnable<i32, String> =
-        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x.to_string())).build());
-    let default: DynRunnable<i32, String> =
-        Arc::new(RunnableLambda::builder().func(|_: i32| Ok("default".to_string())).build());
+    let condition: DynRunnable<i32, bool> =
+        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 0)).build());
+    let branch_runnable: DynRunnable<i32, String> = Arc::new(
+        RunnableLambda::builder()
+            .func(|x: i32| Ok(x.to_string()))
+            .build(),
+    );
+    let default: DynRunnable<i32, String> = Arc::new(
+        RunnableLambda::builder()
+            .func(|_: i32| Ok("default".to_string()))
+            .build(),
+    );
 
     let branch = RunnableBranch::builder()
         .branches(vec![(condition, branch_runnable)])
@@ -606,7 +676,7 @@ fn test_branch_name() {
 
 #[test]
 fn test_branch_default_name() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x.to_string()))
         .default(|_: i32| Ok("default".to_string()))
         .unwrap();
@@ -616,7 +686,7 @@ fn test_branch_default_name() {
 
 #[tokio::test]
 async fn test_branch_stream_condition_error() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(
             |_: i32| Err(Error::Other("stream condition failed".to_string())),
             |x: i32| Ok(x + 1),
@@ -639,7 +709,7 @@ async fn test_branch_stream_condition_error() {
 
 #[tokio::test]
 async fn test_branch_astream_condition_error() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(
             |_: i32| Err(Error::Other("astream condition failed".to_string())),
             |x: i32| Ok(x + 1),
@@ -663,7 +733,7 @@ async fn test_branch_astream_condition_error() {
 
 #[tokio::test]
 async fn test_branch_stream_default_path() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 100), |x: i32| Ok(x + 1))
         .default(|x: i32| Ok(x * 10))
         .unwrap();
@@ -674,7 +744,7 @@ async fn test_branch_stream_default_path() {
 
 #[tokio::test]
 async fn test_branch_astream_default_path() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 100), |x: i32| Ok(x + 1))
         .default(|x: i32| Ok(x * 10))
         .unwrap();
@@ -685,7 +755,7 @@ async fn test_branch_astream_default_path() {
 
 #[test]
 fn test_branch_coerces_conditions_and_actions() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 1))
         .default(|x: i32| Ok(x - 1))
         .unwrap();
@@ -699,15 +769,25 @@ async fn test_branch_ainvoke_multiple_sequential() {
     let call_count = Arc::new(AtomicUsize::new(0));
 
     let count = call_count.clone();
-    let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(move |x: i32| {
-        count.fetch_add(1, Ordering::SeqCst);
-        Ok(x > 0)
-    }).build());
+    let condition: DynRunnable<i32, bool> = Arc::new(
+        RunnableLambda::builder()
+            .func(move |x: i32| {
+                count.fetch_add(1, Ordering::SeqCst);
+                Ok(x > 0)
+            })
+            .build(),
+    );
 
-    let action: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build());
-    let default: DynRunnable<i32, i32> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x - 1)).build());
+    let action: DynRunnable<i32, i32> =
+        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build());
+    let default: DynRunnable<i32, i32> =
+        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x - 1)).build());
 
-    let branch = RunnableBranch::new(vec![(condition, action)], default).unwrap();
+    let branch = RunnableBranch::builder()
+        .branches(vec![(condition, action)])
+        .default(default)
+        .build()
+        .unwrap();
 
     let result1 = branch.ainvoke(5, None).await.unwrap();
     let result2 = branch.ainvoke(-5, None).await.unwrap();
@@ -719,13 +799,20 @@ async fn test_branch_ainvoke_multiple_sequential() {
 
 #[test]
 fn test_branch_builder_branch_arc() {
-    let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 10)).build());
-    let action: DynRunnable<i32, String> =
-        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(format!("big: {x}"))).build());
-    let default: DynRunnable<i32, String> =
-        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(format!("small: {x}"))).build());
+    let condition: DynRunnable<i32, bool> =
+        Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 10)).build());
+    let action: DynRunnable<i32, String> = Arc::new(
+        RunnableLambda::builder()
+            .func(|x: i32| Ok(format!("big: {x}")))
+            .build(),
+    );
+    let default: DynRunnable<i32, String> = Arc::new(
+        RunnableLambda::builder()
+            .func(|x: i32| Ok(format!("small: {x}")))
+            .build(),
+    );
 
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch_arc(condition, action)
         .default_arc(default)
         .unwrap();
@@ -736,7 +823,7 @@ fn test_branch_builder_branch_arc() {
 
 #[test]
 fn test_branch_condition_edge_values() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x != 0), |_: i32| Ok("truthy".to_string()))
         .default(|_: i32| Ok("falsy".to_string()))
         .unwrap();
@@ -748,19 +835,21 @@ fn test_branch_condition_edge_values() {
 
 #[test]
 fn test_branch_with_callbacks() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 1))
         .default(|x: i32| Ok(x - 1))
         .unwrap();
 
-    let config = RunnableConfig::new().with_tags(vec!["test-tag".to_string()]);
+    let config = RunnableConfig::builder()
+        .tags(vec!["test-tag".to_string()])
+        .build();
     let result = branch.invoke(5, Some(config)).unwrap();
     assert_eq!(result, 6);
 }
 
 #[tokio::test]
 async fn test_branch_mixed_sync_async() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 1))
         .default(|x: i32| Ok(x - 1))
         .unwrap();
@@ -774,7 +863,7 @@ async fn test_branch_mixed_sync_async() {
 
 #[test]
 fn test_branch_many_branches() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x == 1), |_: i32| Ok("one".to_string()))
         .branch(|x: i32| Ok(x == 2), |_: i32| Ok("two".to_string()))
         .branch(|x: i32| Ok(x == 3), |_: i32| Ok("three".to_string()))
@@ -797,7 +886,7 @@ fn test_branch_many_branches() {
 
 #[tokio::test]
 async fn test_branch_stream_routes_to_correct_branch() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(
             |x: String| Ok(x == "a"),
             |_: String| Ok("response one".to_string()),
@@ -822,7 +911,7 @@ async fn test_branch_stream_routes_to_correct_branch() {
 
 #[tokio::test]
 async fn test_branch_astream_routes_to_correct_branch() {
-    let branch = RunnableBranchBuilder::new()
+    let branch = RunnableBranchFluentBuilder::new()
         .branch(
             |x: String| Ok(x == "a"),
             |_: String| Ok("response one".to_string()),

@@ -309,7 +309,7 @@ impl Document {
     #[builder]
     pub fn new(
         page_content: impl Into<String>,
-        id: Option<String>,
+        #[builder(into)] id: Option<String>,
         #[builder(default)] metadata: HashMap<String, Value>,
     ) -> Self {
         Self {
@@ -361,7 +361,7 @@ mod tests {
 
     #[test]
     fn test_document_creation() {
-        let doc = Document::new("Hello, world!");
+        let doc = Document::builder().page_content("Hello, world!").build();
         assert_eq!(doc.page_content, "Hello, world!");
         assert!(doc.id.is_none());
         assert!(doc.metadata.is_empty());
@@ -370,12 +370,14 @@ mod tests {
 
     #[test]
     fn test_document_with_metadata() {
-        let doc = Document::new("Test content")
-            .with_id("doc-123")
-            .with_metadata(HashMap::from([(
+        let doc = Document::builder()
+            .page_content("Test content")
+            .id("doc-123")
+            .metadata(HashMap::from([(
                 "source".to_string(),
                 Value::String("test.txt".to_string()),
-            )]));
+            )]))
+            .build();
 
         assert_eq!(doc.id, Some("doc-123".to_string()));
         assert_eq!(
@@ -386,11 +388,13 @@ mod tests {
 
     #[test]
     fn test_document_display() {
-        let doc = Document::new("Hello");
+        let doc = Document::builder().page_content("Hello").build();
         assert_eq!(format!("{}", doc), "page_content='Hello'");
 
-        let doc_with_meta = Document::new("Hello")
-            .with_metadata(HashMap::from([("key".to_string(), Value::Bool(true))]));
+        let doc_with_meta = Document::builder()
+            .page_content("Hello")
+            .metadata(HashMap::from([("key".to_string(), Value::Bool(true))]))
+            .build();
         let display = format!("{}", doc_with_meta);
         assert!(display.contains("page_content='Hello'"));
         assert!(display.contains("metadata="));
@@ -468,12 +472,14 @@ mod tests {
 
     #[test]
     fn test_document_serialization() {
-        let doc = Document::new("Test content")
-            .with_id("doc-123")
-            .with_metadata(HashMap::from([(
+        let doc = Document::builder()
+            .page_content("Test content")
+            .id("doc-123")
+            .metadata(HashMap::from([(
                 "source".to_string(),
                 Value::String("test.txt".to_string()),
-            )]));
+            )]))
+            .build();
 
         let json = serde_json::to_string(&doc).unwrap();
         let deserialized: Document = serde_json::from_str(&json).unwrap();

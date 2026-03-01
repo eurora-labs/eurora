@@ -61,7 +61,7 @@ where
     }
 }
 
-pub struct RunnableBranchBuilder<I, O>
+pub struct RunnableBranchFluentBuilder<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
@@ -70,7 +70,7 @@ where
     _phantom: std::marker::PhantomData<(I, O)>,
 }
 
-impl<I, O> RunnableBranchBuilder<I, O>
+impl<I, O> RunnableBranchFluentBuilder<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
@@ -87,8 +87,10 @@ where
         CF: Fn(I) -> Result<bool> + Send + Sync + 'static,
         RF: Fn(I) -> Result<O> + Send + Sync + 'static,
     {
-        let condition_runnable: DynRunnable<I, bool> = Arc::new(RunnableLambda::builder().func(condition).build());
-        let branch_runnable: DynRunnable<I, O> = Arc::new(RunnableLambda::builder().func(runnable).build());
+        let condition_runnable: DynRunnable<I, bool> =
+            Arc::new(RunnableLambda::builder().func(condition).build());
+        let branch_runnable: DynRunnable<I, O> =
+            Arc::new(RunnableLambda::builder().func(runnable).build());
         self.branches.push((condition_runnable, branch_runnable));
         self
     }
@@ -106,16 +108,23 @@ where
     where
         DF: Fn(I) -> Result<O> + Send + Sync + 'static,
     {
-        let default_runnable: DynRunnable<I, O> = Arc::new(RunnableLambda::builder().func(default_fn).build());
-        RunnableBranch::builder().branches(self.branches).default(default_runnable).build()
+        let default_runnable: DynRunnable<I, O> =
+            Arc::new(RunnableLambda::builder().func(default_fn).build());
+        RunnableBranch::builder()
+            .branches(self.branches)
+            .default(default_runnable)
+            .build()
     }
 
     pub fn default_arc(self, default: DynRunnable<I, O>) -> Result<RunnableBranch<I, O>> {
-        RunnableBranch::builder().branches(self.branches).default(default).build()
+        RunnableBranch::builder()
+            .branches(self.branches)
+            .default(default)
+            .build()
     }
 }
 
-impl<I, O> Default for RunnableBranchBuilder<I, O>
+impl<I, O> Default for RunnableBranchFluentBuilder<I, O>
 where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
@@ -359,7 +368,7 @@ mod tests {
 
     #[test]
     fn test_runnable_branch_invoke_first_condition() {
-        let branch = RunnableBranchBuilder::new()
+        let branch = RunnableBranchFluentBuilder::new()
             .branch(|x: i32| Ok(x > 0), |x: i32| Ok(format!("positive: {}", x)))
             .branch(|x: i32| Ok(x < 0), |x: i32| Ok(format!("negative: {}", x)))
             .default(|_: i32| Ok("zero".to_string()))
@@ -371,7 +380,7 @@ mod tests {
 
     #[test]
     fn test_runnable_branch_invoke_second_condition() {
-        let branch = RunnableBranchBuilder::new()
+        let branch = RunnableBranchFluentBuilder::new()
             .branch(|x: i32| Ok(x > 0), |x: i32| Ok(format!("positive: {}", x)))
             .branch(|x: i32| Ok(x < 0), |x: i32| Ok(format!("negative: {}", x)))
             .default(|_: i32| Ok("zero".to_string()))
@@ -383,7 +392,7 @@ mod tests {
 
     #[test]
     fn test_runnable_branch_invoke_default() {
-        let branch = RunnableBranchBuilder::new()
+        let branch = RunnableBranchFluentBuilder::new()
             .branch(|x: i32| Ok(x > 0), |x: i32| Ok(format!("positive: {}", x)))
             .branch(|x: i32| Ok(x < 0), |x: i32| Ok(format!("negative: {}", x)))
             .default(|_: i32| Ok("zero".to_string()))
@@ -396,7 +405,7 @@ mod tests {
     #[test]
     fn test_runnable_branch_requires_at_least_one_branch() {
         let result: Result<RunnableBranch<i32, String>> =
-            RunnableBranchBuilder::new().default(|_: i32| Ok("default".to_string()));
+            RunnableBranchFluentBuilder::new().default(|_: i32| Ok("default".to_string()));
 
         assert!(result.is_err());
         assert!(
@@ -409,11 +418,18 @@ mod tests {
 
     #[test]
     fn test_runnable_branch_name() {
-        let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 0)).build());
-        let branch_runnable: DynRunnable<i32, String> =
-            Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x.to_string())).build());
-        let default: DynRunnable<i32, String> =
-            Arc::new(RunnableLambda::builder().func(|_: i32| Ok("default".to_string())).build());
+        let condition: DynRunnable<i32, bool> =
+            Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 0)).build());
+        let branch_runnable: DynRunnable<i32, String> = Arc::new(
+            RunnableLambda::builder()
+                .func(|x: i32| Ok(x.to_string()))
+                .build(),
+        );
+        let default: DynRunnable<i32, String> = Arc::new(
+            RunnableLambda::builder()
+                .func(|_: i32| Ok("default".to_string()))
+                .build(),
+        );
 
         let branch = RunnableBranch::builder()
             .branches(vec![(condition, branch_runnable)])
@@ -427,7 +443,7 @@ mod tests {
 
     #[test]
     fn test_runnable_branch_default_name() {
-        let branch = RunnableBranchBuilder::new()
+        let branch = RunnableBranchFluentBuilder::new()
             .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x.to_string()))
             .default(|_: i32| Ok("default".to_string()))
             .unwrap();
@@ -437,13 +453,24 @@ mod tests {
 
     #[test]
     fn test_runnable_branch_with_arc_runnables() {
-        let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 10)).build());
-        let branch_runnable: DynRunnable<i32, String> =
-            Arc::new(RunnableLambda::builder().func(|x: i32| Ok(format!("big: {}", x))).build());
-        let default: DynRunnable<i32, String> =
-            Arc::new(RunnableLambda::builder().func(|x: i32| Ok(format!("small: {}", x))).build());
+        let condition: DynRunnable<i32, bool> =
+            Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 10)).build());
+        let branch_runnable: DynRunnable<i32, String> = Arc::new(
+            RunnableLambda::builder()
+                .func(|x: i32| Ok(format!("big: {}", x)))
+                .build(),
+        );
+        let default: DynRunnable<i32, String> = Arc::new(
+            RunnableLambda::builder()
+                .func(|x: i32| Ok(format!("small: {}", x)))
+                .build(),
+        );
 
-        let branch = RunnableBranch::builder().branches(vec![(condition, branch_runnable)]).default(default).build().unwrap();
+        let branch = RunnableBranch::builder()
+            .branches(vec![(condition, branch_runnable)])
+            .default(default)
+            .build()
+            .unwrap();
 
         assert_eq!(branch.invoke(15, None).unwrap(), "big: 15");
         assert_eq!(branch.invoke(5, None).unwrap(), "small: 5");
@@ -451,7 +478,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_runnable_branch_ainvoke() {
-        let branch = RunnableBranchBuilder::new()
+        let branch = RunnableBranchFluentBuilder::new()
             .branch(|x: i32| Ok(x > 0), |x: i32| Ok(format!("positive: {}", x)))
             .branch(|x: i32| Ok(x < 0), |x: i32| Ok(format!("negative: {}", x)))
             .default(|_: i32| Ok("zero".to_string()))
@@ -469,7 +496,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_runnable_branch_stream() {
-        let branch = RunnableBranchBuilder::new()
+        let branch = RunnableBranchFluentBuilder::new()
             .branch(|x: i32| Ok(x > 0), |x: i32| Ok(format!("positive: {}", x)))
             .default(|_: i32| Ok("non-positive".to_string()))
             .unwrap();
@@ -481,7 +508,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_runnable_branch_astream() {
-        let branch = RunnableBranchBuilder::new()
+        let branch = RunnableBranchFluentBuilder::new()
             .branch(|x: i32| Ok(x > 0), |x: i32| Ok(format!("positive: {}", x)))
             .default(|_: i32| Ok("non-positive".to_string()))
             .unwrap();

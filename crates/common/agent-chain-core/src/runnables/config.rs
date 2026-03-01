@@ -65,7 +65,7 @@ impl RunnableConfig {
         #[builder(default)] tags: Vec<String>,
         #[builder(default)] metadata: HashMap<String, serde_json::Value>,
         callbacks: Option<Callbacks>,
-        run_name: Option<String>,
+        #[builder(into)] run_name: Option<String>,
         max_concurrency: Option<usize>,
         #[builder(default = DEFAULT_RECURSION_LIMIT)] recursion_limit: i32,
         #[builder(default)] configurable: HashMap<String, serde_json::Value>,
@@ -425,11 +425,12 @@ mod tests {
 
     #[test]
     fn test_runnable_config_builder() {
-        let config = RunnableConfig::new()
-            .with_tags(vec!["tag1".to_string(), "tag2".to_string()])
-            .with_run_name("test_run")
-            .with_max_concurrency(4)
-            .with_recursion_limit(10);
+        let config = RunnableConfig::builder()
+            .tags(vec!["tag1".to_string(), "tag2".to_string()])
+            .run_name("test_run".to_string())
+            .max_concurrency(4)
+            .recursion_limit(10)
+            .build();
 
         assert_eq!(config.tags, vec!["tag1", "tag2"]);
         assert_eq!(config.run_name, Some("test_run".to_string()));
@@ -442,7 +443,7 @@ mod tests {
         let config = ensure_config(None);
         assert_eq!(config.recursion_limit, 25);
 
-        let custom = RunnableConfig::new().with_recursion_limit(10);
+        let custom = RunnableConfig::builder().recursion_limit(10).build();
         let config = ensure_config(Some(custom));
         assert_eq!(config.recursion_limit, 10);
     }
@@ -471,9 +472,10 @@ mod tests {
 
     #[test]
     fn test_ensure_config_inherits_from_context() {
-        let parent = RunnableConfig::new()
-            .with_tags(vec!["parent_tag".into()])
-            .with_recursion_limit(10);
+        let parent = RunnableConfig::builder()
+            .tags(vec!["parent_tag".into()])
+            .recursion_limit(10)
+            .build();
         let _guard = set_config_context(parent);
 
         let config = ensure_config(None);
@@ -483,14 +485,16 @@ mod tests {
 
     #[test]
     fn test_ensure_config_provided_overrides_context() {
-        let parent = RunnableConfig::new()
-            .with_tags(vec!["parent".into()])
-            .with_recursion_limit(10);
+        let parent = RunnableConfig::builder()
+            .tags(vec!["parent".into()])
+            .recursion_limit(10)
+            .build();
         let _guard = set_config_context(parent);
 
-        let child = RunnableConfig::new()
-            .with_tags(vec!["child".into()])
-            .with_recursion_limit(50);
+        let child = RunnableConfig::builder()
+            .tags(vec!["child".into()])
+            .recursion_limit(50)
+            .build();
         let config = ensure_config(Some(child));
         assert_eq!(config.tags, vec!["child"]);
         assert_eq!(config.recursion_limit, 50);
@@ -501,7 +505,8 @@ mod tests {
         assert!(get_child_runnable_config().is_none());
 
         {
-            let _guard = set_config_context(RunnableConfig::new().with_tags(vec!["inner".into()]));
+            let _guard =
+                set_config_context(RunnableConfig::builder().tags(vec!["inner".into()]).build());
             let ctx = get_child_runnable_config();
             assert_eq!(ctx.unwrap().tags, vec!["inner"]);
         }
@@ -514,7 +519,7 @@ mod tests {
         let configs = get_config_list(None, 3).unwrap();
         assert_eq!(configs.len(), 3);
 
-        let single = RunnableConfig::new().with_recursion_limit(10);
+        let single = RunnableConfig::builder().recursion_limit(10).build();
         let configs = get_config_list(Some(ConfigOrList::Single(Box::new(single))), 3).unwrap();
         assert_eq!(configs.len(), 3);
         assert!(configs.iter().all(|c| c.recursion_limit == 10));
@@ -522,13 +527,15 @@ mod tests {
 
     #[test]
     fn test_merge_configs() {
-        let config1 = RunnableConfig::new()
-            .with_tags(vec!["tag1".to_string()])
-            .with_recursion_limit(10);
+        let config1 = RunnableConfig::builder()
+            .tags(vec!["tag1".to_string()])
+            .recursion_limit(10)
+            .build();
 
-        let config2 = RunnableConfig::new()
-            .with_tags(vec!["tag2".to_string()])
-            .with_run_name("test");
+        let config2 = RunnableConfig::builder()
+            .tags(vec!["tag2".to_string()])
+            .run_name("test")
+            .build();
 
         let merged = merge_configs(vec![Some(config1), Some(config2)]);
 
@@ -539,7 +546,7 @@ mod tests {
 
     #[test]
     fn test_patch_config() {
-        let config = RunnableConfig::new().with_recursion_limit(10);
+        let config = RunnableConfig::builder().recursion_limit(10).build();
 
         let patched = patch_config(
             Some(config),
@@ -557,9 +564,10 @@ mod tests {
 
     #[test]
     fn test_get_config_list_with_run_id() {
-        let config = RunnableConfig::new()
-            .with_run_id(uuid::Uuid::new_v4())
-            .with_recursion_limit(10);
+        let config = RunnableConfig::builder()
+            .run_id(uuid::Uuid::new_v4())
+            .recursion_limit(10)
+            .build();
 
         let configs =
             get_config_list(Some(ConfigOrList::Single(Box::new(config.clone()))), 3).unwrap();
@@ -575,10 +583,11 @@ mod tests {
     #[test]
     fn test_patch_config_callbacks_clear_run_info() {
         let run_id = uuid::Uuid::new_v4();
-        let config = RunnableConfig::new()
-            .with_run_name("original")
-            .with_run_id(run_id)
-            .with_recursion_limit(10);
+        let config = RunnableConfig::builder()
+            .run_name("original")
+            .run_id(run_id)
+            .recursion_limit(10)
+            .build();
 
         let new_manager = CallbackManager::new();
         let patched = patch_config(Some(config), Some(new_manager), None, None, None, None);

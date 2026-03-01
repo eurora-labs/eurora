@@ -61,7 +61,7 @@ pub trait VectorStore: Send + Sync {
             .zip(metadatas_iter)
             .zip(ids_iter)
             .map(|((text, metadata), id)| {
-                let mut doc = Document::new(text);
+                let mut doc = Document::builder().page_content(text).build();
                 doc.metadata = metadata;
                 doc.id = id;
                 doc
