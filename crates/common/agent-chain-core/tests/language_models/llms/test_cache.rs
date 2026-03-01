@@ -12,8 +12,10 @@ async fn test_local_cache_generate_async() {
 
     set_llm_cache(Some(global_cache.clone()));
 
-    let llm = FakeListLLM::new(vec!["foo".to_string(), "bar".to_string()])
-        .with_cache_instance(local_cache.clone());
+    let llm = FakeListLLM::builder()
+        .responses(vec!["foo".to_string(), "bar".to_string()])
+        .cache_instance(local_cache.clone())
+        .build();
 
     let output = llm
         .generate(
@@ -53,8 +55,10 @@ async fn test_local_cache_generate_sync() {
 
     set_llm_cache(Some(global_cache.clone()));
 
-    let llm = FakeListLLM::new(vec!["foo".to_string(), "bar".to_string()])
-        .with_cache_instance(local_cache.clone());
+    let llm = FakeListLLM::builder()
+        .responses(vec!["foo".to_string(), "bar".to_string()])
+        .cache_instance(local_cache.clone())
+        .build();
 
     let output = llm
         .generate(
@@ -89,7 +93,10 @@ async fn test_no_cache_generate_sync() {
 
     set_llm_cache(Some(global_cache.clone()));
 
-    let llm = FakeListLLM::new(vec!["foo".to_string(), "bar".to_string()]).with_cache_disabled();
+    let llm = FakeListLLM::builder()
+        .responses(vec!["foo".to_string(), "bar".to_string()])
+        .cache(false)
+        .build();
 
     let output = llm
         .generate(
@@ -124,7 +131,10 @@ async fn test_no_cache_generate_async() {
 
     set_llm_cache(Some(global_cache.clone()));
 
-    let llm = FakeListLLM::new(vec!["foo".to_string(), "bar".to_string()]).with_cache_disabled();
+    let llm = FakeListLLM::builder()
+        .responses(vec!["foo".to_string(), "bar".to_string()])
+        .cache(false)
+        .build();
 
     let output = llm
         .generate(

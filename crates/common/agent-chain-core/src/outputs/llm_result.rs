@@ -1,3 +1,4 @@
+use bon::bon;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -57,23 +58,16 @@ fn default_llm_result_type() -> String {
     "LLMResult".to_string()
 }
 
+#[bon]
 impl LLMResult {
-    pub fn new(generations: Vec<Vec<GenerationType>>) -> Self {
-        Self {
-            generations,
-            llm_output: None,
-            run: None,
-            result_type: "LLMResult".to_string(),
-        }
-    }
-
-    pub fn with_llm_output(
+    #[builder]
+    pub fn new(
         generations: Vec<Vec<GenerationType>>,
-        llm_output: HashMap<String, Value>,
+        llm_output: Option<HashMap<String, Value>>,
     ) -> Self {
         Self {
             generations,
-            llm_output: Some(llm_output),
+            llm_output,
             run: None,
             result_type: "LLMResult".to_string(),
         }
@@ -138,8 +132,10 @@ mod tests {
 
     #[test]
     fn test_llm_result_new() {
-        let generation = Generation::new("Hello");
-        let result = LLMResult::new(vec![vec![generation.into()]]);
+        let generation = Generation::builder().text("Hello").build();
+        let result = LLMResult::builder()
+            .generations(vec![vec![generation.into()]])
+            .build();
         assert_eq!(result.generations.len(), 1);
         assert_eq!(result.generations[0].len(), 1);
         assert!(result.llm_output.is_none());
@@ -148,21 +144,23 @@ mod tests {
     #[test]
     fn test_llm_result_with_chat_generation() {
         let msg = AIMessage::builder().content("Hello").build();
-        let chat_gen = ChatGeneration::new(msg.into());
-        let result = LLMResult::new(vec![vec![chat_gen.into()]]);
+        let chat_gen = ChatGeneration::builder().message(msg.into()).build();
+        let result = LLMResult::builder()
+            .generations(vec![vec![chat_gen.into()]])
+            .build();
         assert_eq!(result.generations.len(), 1);
     }
 
     #[test]
     fn test_llm_result_flatten() {
-        let generation1 = Generation::new("First");
-        let generation2 = Generation::new("Second");
+        let generation1 = Generation::builder().text("First").build();
+        let generation2 = Generation::builder().text("Second").build();
         let mut output = HashMap::new();
         output.insert("token_usage".to_string(), json!({"total": 100}));
-        let result = LLMResult::with_llm_output(
-            vec![vec![generation1.into()], vec![generation2.into()]],
-            output,
-        );
+        let result = LLMResult::builder()
+            .generations(vec![vec![generation1.into()], vec![generation2.into()]])
+            .llm_output(output)
+            .build();
 
         let flattened = result.flatten();
         assert_eq!(flattened.len(), 2);
@@ -181,17 +179,23 @@ mod tests {
 
     #[test]
     fn test_llm_result_equality() {
-        let generation1 = Generation::new("Hello");
-        let generation2 = Generation::new("Hello");
-        let result1 = LLMResult::new(vec![vec![generation1.into()]]);
-        let result2 = LLMResult::new(vec![vec![generation2.into()]]);
+        let generation1 = Generation::builder().text("Hello").build();
+        let generation2 = Generation::builder().text("Hello").build();
+        let result1 = LLMResult::builder()
+            .generations(vec![vec![generation1.into()]])
+            .build();
+        let result2 = LLMResult::builder()
+            .generations(vec![vec![generation2.into()]])
+            .build();
         assert_eq!(result1, result2);
     }
 
     #[test]
     fn test_llm_result_serialization() {
-        let generation = Generation::new("test");
-        let result = LLMResult::new(vec![vec![generation.into()]]);
+        let generation = Generation::builder().text("test").build();
+        let result = LLMResult::builder()
+            .generations(vec![vec![generation.into()]])
+            .build();
         let json = serde_json::to_string(&result).unwrap();
         assert!(json.contains("\"type\":\"LLMResult\""));
     }

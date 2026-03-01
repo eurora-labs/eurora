@@ -20,7 +20,7 @@ pub use base::{
     RunnableMap, RunnableParallel, RunnableSequence, RunnableSerializable, TransformFn, chain,
     coerce_map_to_runnable, coerce_to_runnable, pipe, runnable_lambda, to_dyn,
 };
-pub use branch::{RunnableBranch, RunnableBranchBuilder};
+pub use branch::{RunnableBranch, RunnableBranchFluentBuilder};
 pub use config::{
     AsyncVariableArgsFn, ConfigContextGuard, ConfigOrList, DEFAULT_RECURSION_LIMIT, RunnableConfig,
     VariableArgsFn, acall_func_with_variable_args, call_func_with_variable_args, ensure_config,
@@ -45,7 +45,7 @@ pub use history::{
     RunnableWithMessageHistory,
 };
 pub use passthrough::{
-    PickKeys, RunnableAssign, RunnableAssignBuilder, RunnablePassthrough, RunnablePick,
+    PickKeys, RunnableAssign, RunnableAssignFluentBuilder, RunnablePassthrough, RunnablePick,
     graph_passthrough,
 };
 pub use retry::{

@@ -31,37 +31,29 @@ impl Clone for FakeListLLM {
     }
 }
 
+#[bon::bon]
 impl FakeListLLM {
-    pub fn new(responses: Vec<String>) -> Self {
+    #[builder]
+    pub fn new(
+        responses: Vec<String>,
+        sleep: Option<Duration>,
+        config: Option<LLMConfig>,
+        cache_instance: Option<std::sync::Arc<dyn crate::caches::BaseCache>>,
+        cache: Option<bool>,
+    ) -> Self {
+        let mut config = config.unwrap_or_default();
+        if let Some(instance) = cache_instance {
+            config.cache_instance = Some(instance);
+        }
+        if let Some(cache) = cache {
+            config.base.cache = Some(cache);
+        }
         Self {
             responses,
-            sleep: None,
+            sleep,
             index: AtomicUsize::new(0),
-            config: LLMConfig::default(),
+            config,
         }
-    }
-
-    pub fn with_sleep(mut self, duration: Duration) -> Self {
-        self.sleep = Some(duration);
-        self
-    }
-
-    pub fn with_config(mut self, config: LLMConfig) -> Self {
-        self.config = config;
-        self
-    }
-
-    pub fn with_cache_instance(
-        mut self,
-        cache: std::sync::Arc<dyn crate::caches::BaseCache>,
-    ) -> Self {
-        self.config.cache_instance = Some(cache);
-        self
-    }
-
-    pub fn with_cache_disabled(mut self) -> Self {
-        self.config.base.cache = Some(false);
-        self
     }
 
     pub fn current_index(&self) -> usize {
@@ -149,11 +141,11 @@ impl BaseLLM for FakeListLLM {
 
         for _ in prompts {
             let response = self.get_next_response();
-            let generation = Generation::new(response);
+            let generation = Generation::builder().text(response).build();
             generations.push(vec![GenerationType::Generation(generation)]);
         }
 
-        Ok(LLMResult::new(generations))
+        Ok(LLMResult::builder().generations(generations).build())
     }
 }
 
@@ -179,27 +171,23 @@ pub struct FakeStreamingListLLM {
     error_on_chunk_number: Option<usize>,
 }
 
+#[bon::bon]
 impl FakeStreamingListLLM {
-    pub fn new(responses: Vec<String>) -> Self {
+    #[builder]
+    pub fn new(
+        responses: Vec<String>,
+        sleep: Option<Duration>,
+        config: Option<LLMConfig>,
+        error_on_chunk: Option<usize>,
+    ) -> Self {
         Self {
-            inner: FakeListLLM::new(responses),
-            error_on_chunk_number: None,
+            inner: FakeListLLM::builder()
+                .responses(responses)
+                .maybe_sleep(sleep)
+                .maybe_config(config)
+                .build(),
+            error_on_chunk_number: error_on_chunk,
         }
-    }
-
-    pub fn with_sleep(mut self, duration: Duration) -> Self {
-        self.inner = self.inner.with_sleep(duration);
-        self
-    }
-
-    pub fn with_config(mut self, config: LLMConfig) -> Self {
-        self.inner = self.inner.with_config(config);
-        self
-    }
-
-    pub fn with_error_on_chunk(mut self, chunk_number: usize) -> Self {
-        self.error_on_chunk_number = Some(chunk_number);
-        self
     }
 
     pub fn current_index(&self) -> usize {
@@ -298,7 +286,7 @@ impl BaseLLM for FakeStreamingListLLM {
                     return;
                 }
 
-                yield Ok(GenerationChunk::new(c.to_string()));
+                yield Ok(GenerationChunk::builder().text(c.to_string()).build());
             }
         };
 
@@ -324,11 +312,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_fake_list_llm_responses() {
-        let llm = FakeListLLM::new(vec![
-            "Response 1".to_string(),
-            "Response 2".to_string(),
-            "Response 3".to_string(),
-        ]);
+        let llm = FakeListLLM::builder()
+            .responses(vec![
+                "Response 1".to_string(),
+                "Response 2".to_string(),
+                "Response 3".to_string(),
+            ])
+            .build();
 
         let result = llm.call("prompt".to_string(), None, None).await.unwrap();
         assert_eq!(result, "Response 1");
@@ -345,7 +335,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_fake_list_llm_reset() {
-        let llm = FakeListLLM::new(vec!["Response 1".to_string(), "Response 2".to_string()]);
+        let llm = FakeListLLM::builder()
+            .responses(vec!["Response 1".to_string(), "Response 2".to_string()])
+            .build();
 
         let _ = llm.call("prompt".to_string(), None, None).await;
         assert_eq!(llm.current_index(), 1);
@@ -359,7 +351,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_fake_list_llm_generate_prompts() {
-        let llm = FakeListLLM::new(vec!["Response 1".to_string(), "Response 2".to_string()]);
+        let llm = FakeListLLM::builder()
+            .responses(vec!["Response 1".to_string(), "Response 2".to_string()])
+            .build();
 
         let result = llm
             .generate_prompts(
@@ -377,7 +371,9 @@ mod tests {
     async fn test_fake_streaming_list_llm() {
         use futures::StreamExt;
 
-        let llm = FakeStreamingListLLM::new(vec!["Hello".to_string()]);
+        let llm = FakeStreamingListLLM::builder()
+            .responses(vec!["Hello".to_string()])
+            .build();
 
         let mut stream = llm
             .stream_prompt("prompt".to_string(), None, None)
@@ -394,7 +390,9 @@ mod tests {
 
     #[test]
     fn test_fake_list_llm_identifying_params() {
-        let llm = FakeListLLM::new(vec!["Response".to_string()]);
+        let llm = FakeListLLM::builder()
+            .responses(vec!["Response".to_string()])
+            .build();
         let params = llm.identifying_params();
 
         assert!(params.contains_key("responses"));

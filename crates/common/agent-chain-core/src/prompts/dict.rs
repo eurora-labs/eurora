@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use bon::bon;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
@@ -14,8 +15,13 @@ pub struct DictPromptTemplate {
     pub template_format: PromptTemplateFormat,
 }
 
+#[bon]
 impl DictPromptTemplate {
-    pub fn new(template: serde_json::Value, template_format: PromptTemplateFormat) -> Self {
+    #[builder]
+    pub fn new(
+        template: serde_json::Value,
+        #[builder(default)] template_format: PromptTemplateFormat,
+    ) -> Self {
         Self {
             template,
             template_format,
@@ -23,7 +29,7 @@ impl DictPromptTemplate {
     }
 
     pub fn from_dict(template: serde_json::Value) -> Self {
-        Self::new(template, PromptTemplateFormat::FString)
+        Self::builder().template(template).build()
     }
 
     pub fn input_variables(&self) -> Vec<String> {
@@ -207,7 +213,10 @@ mod tests {
             "greeting": "Hello, {{name}}!"
         });
 
-        let dict_template = DictPromptTemplate::new(template, PromptTemplateFormat::Mustache);
+        let dict_template = DictPromptTemplate::builder()
+            .template(template)
+            .template_format(PromptTemplateFormat::Mustache)
+            .build();
 
         let mut kwargs = HashMap::new();
         kwargs.insert("name".to_string(), "World".to_string());

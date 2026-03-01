@@ -25,8 +25,8 @@ pub trait BaseTransformOutputParser: BaseOutputParser {
         Box::pin(async_stream::stream! {
             let mut stream = input;
             while let Some(message) = stream.next().await {
-                let chunk = ChatGenerationChunk::new(message);
-                let generation = Generation::new(chunk.text.clone());
+                let chunk = ChatGenerationChunk::builder().message(message).build();
+                let generation = Generation::builder().text(chunk.text.clone()).build();
                 yield self.parse_result(&[generation], false);
             }
         })
@@ -73,7 +73,7 @@ pub trait BaseCumulativeTransformOutputParser: BaseTransformOutputParser {
             let mut stream = input;
 
             while let Some(message) = stream.next().await {
-                let chunk_gen = GenerationChunk::new(message.text());
+                let chunk_gen = GenerationChunk::builder().text(message.text()).build();
 
                 acc_gen = Some(match acc_gen {
                     None => chunk_gen,
@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn test_transform_parser_parse_generation() {
         let parser = TestTransformParser;
-        let generation = Generation::new("world");
+        let generation = Generation::builder().text("world").build();
         let result = parser.parse_generation(&generation).unwrap();
         assert_eq!(result, "WORLD");
     }

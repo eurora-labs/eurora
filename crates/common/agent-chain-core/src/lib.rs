@@ -136,7 +136,13 @@ pub use documents::{
     Document,
 };
 
-pub use text_splitters::TextSplitter;
+pub use text_splitters::{
+    CharacterTextSplitter, CharacterTextSplitterConfig, ExperimentalMarkdownSyntaxTextSplitter,
+    JSFrameworkTextSplitter, KeepSeparator, Language, LatexTextSplitter, LengthFunction,
+    MarkdownHeaderTextSplitter, MarkdownTextSplitter, PythonCodeTextSplitter,
+    RecursiveCharacterTextSplitter, RecursiveJsonSplitter, TextSplitter, TextSplitterConfig,
+    Tokenizer, split_text_on_tokens,
+};
 
 pub use retrievers::{BaseRetriever, LangSmithRetrieverParams, RetrieverInput, RetrieverOutput};
 
@@ -147,7 +153,7 @@ pub use stores::{
 pub use runnables::{
     AddableDict, BaseStreamEvent, CUSTOM_EVENT_TYPE, ConfigOrList, CustomStreamEvent,
     DynRouterRunnable, DynRunnable, EventData, PickKeys, RouterInput, RouterRunnable, Runnable,
-    RunnableAssign, RunnableAssignBuilder, RunnableBinding, RunnableConfig, RunnableEach,
+    RunnableAssign, RunnableAssignFluentBuilder, RunnableBinding, RunnableConfig, RunnableEach,
     RunnableLambda, RunnableLambdaWithConfig, RunnableParallel, RunnablePassthrough, RunnablePick,
     RunnableRetry, RunnableSequence, RunnableSerializable, StandardStreamEvent, StreamEvent,
     coerce_to_runnable, ensure_config, get_config_list, graph_passthrough, merge_configs,

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use bon::bon;
 use serde::{Deserialize, Serialize};
 
 use async_trait::async_trait;
@@ -20,18 +21,13 @@ pub struct ImageURL {
     pub detail: Option<String>,
 }
 
+#[bon]
 impl ImageURL {
-    pub fn new(url: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(url: impl Into<String>, #[builder(into)] detail: Option<String>) -> Self {
         Self {
             url: url.into(),
-            detail: None,
-        }
-    }
-
-    pub fn with_detail(url: impl Into<String>, detail: impl Into<String>) -> Self {
-        Self {
-            url: url.into(),
-            detail: Some(detail.into()),
+            detail,
         }
     }
 }
@@ -49,7 +45,9 @@ pub struct ImagePromptTemplate {
     pub partial_variables: HashMap<String, String>,
 }
 
+#[bon]
 impl ImagePromptTemplate {
+    #[builder]
     pub fn new(template: HashMap<String, String>, input_variables: Vec<String>) -> Result<Self> {
         let reserved = ["url", "path", "detail"];
         let overlap: Vec<_> = input_variables
@@ -80,12 +78,10 @@ impl ImagePromptTemplate {
         let mut template = HashMap::new();
         template.insert("url".to_string(), url_template);
 
-        Self::new(template, input_variables)
-    }
-
-    pub fn with_format(mut self, format: PromptTemplateFormat) -> Self {
-        self.template_format = format;
-        self
+        Self::builder()
+            .template(template)
+            .input_variables(input_variables)
+            .build()
     }
 
     pub fn format_image(&self, kwargs: &HashMap<String, String>) -> Result<ImageURL> {
@@ -196,11 +192,16 @@ mod tests {
 
     #[test]
     fn test_image_url() {
-        let url = ImageURL::new("https://example.com/image.jpg");
+        let url = ImageURL::builder()
+            .url("https://example.com/image.jpg")
+            .build();
         assert_eq!(url.url, "https://example.com/image.jpg");
         assert!(url.detail.is_none());
 
-        let url_with_detail = ImageURL::with_detail("https://example.com/image.jpg", "high");
+        let url_with_detail = ImageURL::builder()
+            .url("https://example.com/image.jpg")
+            .detail("high")
+            .build();
         assert_eq!(url_with_detail.detail, Some("high".to_string()));
     }
 
@@ -229,7 +230,10 @@ mod tests {
         let mut template = HashMap::new();
         template.insert("url".to_string(), "{url}".to_string());
 
-        let result = ImagePromptTemplate::new(template, vec!["url".to_string()]);
+        let result = ImagePromptTemplate::builder()
+            .template(template)
+            .input_variables(vec!["url".to_string()])
+            .build();
         assert!(result.is_err());
     }
 

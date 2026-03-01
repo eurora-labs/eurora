@@ -1,3 +1,4 @@
+use bon::bon;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -12,21 +13,16 @@ pub struct ChatResult {
     pub llm_output: Option<HashMap<String, Value>>,
 }
 
+#[bon]
 impl ChatResult {
-    pub fn new(generations: Vec<ChatGeneration>) -> Self {
-        Self {
-            generations,
-            llm_output: None,
-        }
-    }
-
-    pub fn with_llm_output(
+    #[builder]
+    pub fn new(
         generations: Vec<ChatGeneration>,
-        llm_output: HashMap<String, Value>,
+        llm_output: Option<HashMap<String, Value>>,
     ) -> Self {
         Self {
             generations,
-            llm_output: Some(llm_output),
+            llm_output,
         }
     }
 
@@ -47,8 +43,8 @@ mod tests {
     #[test]
     fn test_chat_result_new() {
         let msg = AIMessage::builder().content("Hello").build();
-        let chat_gen = ChatGeneration::new(msg.into());
-        let result = ChatResult::new(vec![chat_gen]);
+        let chat_gen = ChatGeneration::builder().message(msg.into()).build();
+        let result = ChatResult::builder().generations(vec![chat_gen]).build();
         assert_eq!(result.generations.len(), 1);
         assert!(result.llm_output.is_none());
     }
@@ -56,10 +52,13 @@ mod tests {
     #[test]
     fn test_chat_result_with_llm_output() {
         let msg = AIMessage::builder().content("Hello").build();
-        let chat_gen = ChatGeneration::new(msg.into());
+        let chat_gen = ChatGeneration::builder().message(msg.into()).build();
         let mut output = HashMap::new();
         output.insert("model".to_string(), json!("gpt-4"));
-        let result = ChatResult::with_llm_output(vec![chat_gen], output.clone());
+        let result = ChatResult::builder()
+            .generations(vec![chat_gen])
+            .llm_output(output.clone())
+            .build();
         assert_eq!(result.generations.len(), 1);
         assert_eq!(result.llm_output, Some(output));
     }
@@ -67,7 +66,7 @@ mod tests {
     #[test]
     fn test_chat_result_from_generation() {
         let msg = AIMessage::builder().content("Hello").build();
-        let chat_gen = ChatGeneration::new(msg.into());
+        let chat_gen = ChatGeneration::builder().message(msg.into()).build();
         let result = ChatResult::from_generation(chat_gen);
         assert_eq!(result.generations.len(), 1);
     }
@@ -75,8 +74,8 @@ mod tests {
     #[test]
     fn test_chat_result_serialization() {
         let msg = AIMessage::builder().content("test").build();
-        let chat_gen = ChatGeneration::new(msg.into());
-        let result = ChatResult::new(vec![chat_gen]);
+        let chat_gen = ChatGeneration::builder().message(msg.into()).build();
+        let result = ChatResult::builder().generations(vec![chat_gen]).build();
         let json = serde_json::to_string(&result).unwrap();
         let deserialized: ChatResult = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.generations.len(), 1);

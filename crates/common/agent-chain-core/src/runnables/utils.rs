@@ -3,6 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
+use bon::bon;
 use futures::stream::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -207,35 +208,23 @@ pub struct ConfigurableField {
     pub is_shared: bool,
 }
 
+#[bon]
 impl ConfigurableField {
-    pub fn new(id: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(
+        id: impl Into<String>,
+        #[builder(into)] name: Option<String>,
+        #[builder(into)] description: Option<String>,
+        #[builder(into)] annotation: Option<String>,
+        #[builder(default)] is_shared: bool,
+    ) -> Self {
         Self {
             id: id.into(),
-            name: None,
-            description: None,
-            annotation: None,
-            is_shared: false,
+            name,
+            description,
+            annotation,
+            is_shared,
         }
-    }
-
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
-
-    pub fn with_description(mut self, description: impl Into<String>) -> Self {
-        self.description = Some(description.into());
-        self
-    }
-
-    pub fn with_annotation(mut self, annotation: impl Into<String>) -> Self {
-        self.annotation = Some(annotation.into());
-        self
-    }
-
-    pub fn with_shared(mut self, is_shared: bool) -> Self {
-        self.is_shared = is_shared;
-        self
     }
 }
 
@@ -261,19 +250,24 @@ impl std::hash::Hash for ConfigurableFieldSingleOption {
     }
 }
 
+#[bon]
 impl ConfigurableFieldSingleOption {
+    #[builder]
     pub fn new(
         id: impl Into<String>,
         options: HashMap<String, serde_json::Value>,
         default: impl Into<String>,
+        name: Option<String>,
+        description: Option<String>,
+        #[builder(default)] is_shared: bool,
     ) -> Self {
         Self {
             id: id.into(),
             options,
             default: default.into(),
-            name: None,
-            description: None,
-            is_shared: false,
+            name,
+            description,
+            is_shared,
         }
     }
 }
@@ -302,19 +296,24 @@ impl std::hash::Hash for ConfigurableFieldMultiOption {
     }
 }
 
+#[bon]
 impl ConfigurableFieldMultiOption {
+    #[builder]
     pub fn new(
         id: impl Into<String>,
         options: HashMap<String, serde_json::Value>,
         default: Vec<String>,
+        name: Option<String>,
+        description: Option<String>,
+        #[builder(default)] is_shared: bool,
     ) -> Self {
         Self {
             id: id.into(),
             options,
             default,
-            name: None,
-            description: None,
-            is_shared: false,
+            name,
+            description,
+            is_shared,
         }
     }
 }
@@ -337,16 +336,26 @@ pub struct ConfigurableFieldSpec {
     pub dependencies: Option<Vec<String>>,
 }
 
+#[bon]
 impl ConfigurableFieldSpec {
-    pub fn new(id: impl Into<String>, annotation: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(
+        id: impl Into<String>,
+        annotation: impl Into<String>,
+        name: Option<String>,
+        description: Option<String>,
+        default: Option<serde_json::Value>,
+        #[builder(default)] is_shared: bool,
+        dependencies: Option<Vec<String>>,
+    ) -> Self {
         Self {
             id: id.into(),
             annotation: annotation.into(),
-            name: None,
-            description: None,
-            default: None,
-            is_shared: false,
-            dependencies: None,
+            name,
+            description,
+            default,
+            is_shared,
+            dependencies,
         }
     }
 }
@@ -528,10 +537,12 @@ mod tests {
 
     #[test]
     fn test_configurable_field() {
-        let field = ConfigurableField::new("test_id")
-            .with_name("Test Field")
-            .with_description("A test field")
-            .with_shared(true);
+        let field = ConfigurableField::builder()
+            .id("test_id")
+            .name("Test Field")
+            .description("A test field")
+            .is_shared(true)
+            .build();
 
         assert_eq!(field.id, "test_id");
         assert_eq!(field.name, Some("Test Field".to_string()));
@@ -541,9 +552,18 @@ mod tests {
 
     #[test]
     fn test_get_unique_config_specs() {
-        let spec1 = ConfigurableFieldSpec::new("id1", "String");
-        let spec2 = ConfigurableFieldSpec::new("id1", "String");
-        let spec3 = ConfigurableFieldSpec::new("id2", "Int");
+        let spec1 = ConfigurableFieldSpec::builder()
+            .id("id1")
+            .annotation("String")
+            .build();
+        let spec2 = ConfigurableFieldSpec::builder()
+            .id("id1")
+            .annotation("String")
+            .build();
+        let spec3 = ConfigurableFieldSpec::builder()
+            .id("id2")
+            .annotation("Int")
+            .build();
 
         let specs = vec![spec1, spec2, spec3];
         let result = get_unique_config_specs(specs).unwrap();
@@ -555,8 +575,14 @@ mod tests {
 
     #[test]
     fn test_get_unique_config_specs_conflict() {
-        let spec1 = ConfigurableFieldSpec::new("id1", "String");
-        let mut spec2 = ConfigurableFieldSpec::new("id1", "String");
+        let spec1 = ConfigurableFieldSpec::builder()
+            .id("id1")
+            .annotation("String")
+            .build();
+        let mut spec2 = ConfigurableFieldSpec::builder()
+            .id("id1")
+            .annotation("String")
+            .build();
         spec2.description = Some("Different".to_string());
 
         let specs = vec![spec1, spec2];

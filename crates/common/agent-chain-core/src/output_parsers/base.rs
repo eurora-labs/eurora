@@ -23,8 +23,8 @@ pub trait BaseLLMOutputParser: Send + Sync + Debug {
 #[async_trait]
 pub trait BaseGenerationOutputParser: BaseLLMOutputParser {
     fn invoke(&self, input: BaseMessage, _config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let chat_gen = ChatGeneration::new(input);
-        self.parse_result(&[Generation::new(&chat_gen.text)], false)
+        let chat_gen = ChatGeneration::builder().message(input).build();
+        self.parse_result(&[Generation::builder().text(&chat_gen.text).build()], false)
     }
 
     async fn ainvoke(
@@ -74,8 +74,8 @@ pub trait BaseOutputParser: Send + Sync + Debug {
     fn parser_type(&self) -> &str;
 
     fn invoke(&self, input: BaseMessage, _config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let chat_gen = ChatGeneration::new(input);
-        self.parse_result(&[Generation::new(&chat_gen.text)], false)
+        let chat_gen = ChatGeneration::builder().message(input).build();
+        self.parse_result(&[Generation::builder().text(&chat_gen.text).build()], false)
     }
 
     async fn ainvoke(
@@ -223,7 +223,7 @@ mod tests {
     #[test]
     fn test_parse_result() {
         let parser = TestParser;
-        let generations = vec![Generation::new("hello")];
+        let generations = vec![Generation::builder().text("hello").build()];
         let result = parser.parse_result(&generations, false).unwrap();
         assert_eq!(result, "HELLO");
     }

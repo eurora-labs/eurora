@@ -19,7 +19,7 @@ fn tool_call_generation(
         .tool_calls(tool_calls)
         .response_metadata(response_metadata)
         .build();
-    ChatGeneration::new(message.into())
+    ChatGeneration::builder().message(message.into()).build()
 }
 
 fn raw_tool_call_generation(raw_tool_calls: Value, content: &str) -> ChatGeneration {
@@ -29,7 +29,7 @@ fn raw_tool_call_generation(raw_tool_calls: Value, content: &str) -> ChatGenerat
         .content(content)
         .additional_kwargs(additional_kwargs)
         .build();
-    ChatGeneration::new(message.into())
+    ChatGeneration::builder().message(message.into()).build()
 }
 
 fn make_tool_call(id: &str, name: &str, args: Value) -> ToolCall {
@@ -268,7 +268,7 @@ fn test_json_output_tools_parser_parses_tool_calls() {
         "",
         HashMap::new(),
     );
-    let parser = JsonOutputToolsParser::new();
+    let parser = JsonOutputToolsParser::builder().build();
     let result = parser.parse_result(&[generation], false).unwrap();
     let arr = result.as_array().unwrap();
     assert_eq!(arr.len(), 1);
@@ -286,7 +286,7 @@ fn test_json_output_tools_parser_multiple_tool_calls() {
         "",
         HashMap::new(),
     );
-    let parser = JsonOutputToolsParser::new();
+    let parser = JsonOutputToolsParser::builder().build();
     let result = parser.parse_result(&[generation], false).unwrap();
     let arr = result.as_array().unwrap();
     assert_eq!(arr.len(), 2);
@@ -301,7 +301,7 @@ fn test_json_output_tools_parser_return_id() {
         "",
         HashMap::new(),
     );
-    let parser = JsonOutputToolsParser::new().with_return_id(true);
+    let parser = JsonOutputToolsParser::builder().return_id(true).build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result[0]["id"], "call_123");
 }
@@ -313,7 +313,7 @@ fn test_json_output_tools_parser_no_return_id() {
         "",
         HashMap::new(),
     );
-    let parser = JsonOutputToolsParser::new().with_return_id(false);
+    let parser = JsonOutputToolsParser::builder().return_id(false).build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert!(result[0].get("id").is_none());
 }
@@ -328,7 +328,9 @@ fn test_json_output_tools_parser_first_tool_only() {
         "",
         HashMap::new(),
     );
-    let parser = JsonOutputToolsParser::new().with_first_tool_only(true);
+    let parser = JsonOutputToolsParser::builder()
+        .first_tool_only(true)
+        .build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert!(result.is_object());
     assert_eq!(result["type"], "fn1");
@@ -337,7 +339,9 @@ fn test_json_output_tools_parser_first_tool_only() {
 #[test]
 fn test_json_output_tools_parser_first_tool_only_empty() {
     let generation = tool_call_generation(vec![], "", HashMap::new());
-    let parser = JsonOutputToolsParser::new().with_first_tool_only(true);
+    let parser = JsonOutputToolsParser::builder()
+        .first_tool_only(true)
+        .build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert!(result.is_null());
 }
@@ -345,7 +349,7 @@ fn test_json_output_tools_parser_first_tool_only_empty() {
 #[test]
 fn test_json_output_tools_parser_empty_tool_calls_returns_empty_list() {
     let generation = tool_call_generation(vec![], "", HashMap::new());
-    let parser = JsonOutputToolsParser::new();
+    let parser = JsonOutputToolsParser::builder().build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result, json!([]));
 }
@@ -360,7 +364,7 @@ fn test_json_output_tools_parser_fallback_to_additional_kwargs() {
         }]),
         "",
     );
-    let parser = JsonOutputToolsParser::new();
+    let parser = JsonOutputToolsParser::builder().build();
     let result = parser.parse_result(&[generation], false).unwrap();
     let arr = result.as_array().unwrap();
     assert_eq!(arr.len(), 1);
@@ -370,8 +374,8 @@ fn test_json_output_tools_parser_fallback_to_additional_kwargs() {
 #[test]
 fn test_json_output_tools_parser_no_tool_calls_or_kwargs_returns_empty() {
     let message = AIMessage::builder().content("no tools").build();
-    let generation = ChatGeneration::new(message.into());
-    let parser = JsonOutputToolsParser::new();
+    let generation = ChatGeneration::builder().message(message.into()).build();
+    let parser = JsonOutputToolsParser::builder().build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result, json!([]));
 }
@@ -386,7 +390,10 @@ fn test_json_output_key_tools_parser_filters_by_key_name() {
         "",
         HashMap::new(),
     );
-    let parser = JsonOutputKeyToolsParser::new("target").with_return_id(false);
+    let parser = JsonOutputKeyToolsParser::builder()
+        .key_name("target")
+        .return_id(false)
+        .build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result, json!([{"a": 1}]));
 }
@@ -398,7 +405,9 @@ fn test_json_output_key_tools_parser_no_match_returns_empty_list() {
         "",
         HashMap::new(),
     );
-    let parser = JsonOutputKeyToolsParser::new("nonexistent");
+    let parser = JsonOutputKeyToolsParser::builder()
+        .key_name("nonexistent")
+        .build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result, json!([]));
 }
@@ -410,9 +419,11 @@ fn test_json_output_key_tools_parser_first_tool_only_returns_args() {
         "",
         HashMap::new(),
     );
-    let parser = JsonOutputKeyToolsParser::new("target")
-        .with_first_tool_only(true)
-        .with_return_id(false);
+    let parser = JsonOutputKeyToolsParser::builder()
+        .key_name("target")
+        .first_tool_only(true)
+        .return_id(false)
+        .build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result, json!({"a": 1}));
 }
@@ -424,9 +435,11 @@ fn test_json_output_key_tools_parser_first_tool_only_with_return_id() {
         "",
         HashMap::new(),
     );
-    let parser = JsonOutputKeyToolsParser::new("target")
-        .with_first_tool_only(true)
-        .with_return_id(true);
+    let parser = JsonOutputKeyToolsParser::builder()
+        .key_name("target")
+        .first_tool_only(true)
+        .return_id(true)
+        .build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result["type"], "target");
     assert_eq!(result["args"], json!({"a": 1}));
@@ -439,7 +452,10 @@ fn test_json_output_key_tools_parser_first_tool_only_no_match_returns_null() {
         "",
         HashMap::new(),
     );
-    let parser = JsonOutputKeyToolsParser::new("missing").with_first_tool_only(true);
+    let parser = JsonOutputKeyToolsParser::builder()
+        .key_name("missing")
+        .first_tool_only(true)
+        .build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert!(result.is_null());
 }
@@ -455,7 +471,10 @@ fn test_json_output_key_tools_parser_multiple_matches_returns_all() {
         "",
         HashMap::new(),
     );
-    let parser = JsonOutputKeyToolsParser::new("fn").with_return_id(false);
+    let parser = JsonOutputKeyToolsParser::builder()
+        .key_name("fn")
+        .return_id(false)
+        .build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result, json!([{"a": 1}, {"a": 3}]));
 }
@@ -463,8 +482,11 @@ fn test_json_output_key_tools_parser_multiple_matches_returns_all() {
 #[test]
 fn test_json_output_key_tools_parser_empty_tool_calls_first_only_returns_null() {
     let message = AIMessage::builder().content("").build();
-    let generation = ChatGeneration::new(message.into());
-    let parser = JsonOutputKeyToolsParser::new("fn").with_first_tool_only(true);
+    let generation = ChatGeneration::builder().message(message.into()).build();
+    let parser = JsonOutputKeyToolsParser::builder()
+        .key_name("fn")
+        .first_tool_only(true)
+        .build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert!(result.is_null());
 }
@@ -472,8 +494,8 @@ fn test_json_output_key_tools_parser_empty_tool_calls_first_only_returns_null() 
 #[test]
 fn test_json_output_key_tools_parser_empty_tool_calls_returns_empty_list() {
     let message = AIMessage::builder().content("").build();
-    let generation = ChatGeneration::new(message.into());
-    let parser = JsonOutputKeyToolsParser::new("fn");
+    let generation = ChatGeneration::builder().message(message.into()).build();
+    let parser = JsonOutputKeyToolsParser::builder().key_name("fn").build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result, json!([]));
 }
