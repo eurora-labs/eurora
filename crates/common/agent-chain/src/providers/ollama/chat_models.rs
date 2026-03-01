@@ -120,6 +120,7 @@ pub struct ChatOllama {
     /// Controls reasoning/thinking mode for supported models.
     /// Supports `true`/`false` or string intensities like `"low"`, `"medium"`, `"high"`.
     reasoning: Option<serde_json::Value>,
+    output_version: Option<String>,
     /// Additional kwargs to pass to the HTTP clients. Pass headers in here.
     /// These arguments are passed to both synchronous and async clients.
     client_kwargs: HashMap<String, serde_json::Value>,
@@ -163,6 +164,7 @@ impl Clone for ChatOllama {
             format: self.format.clone(),
             keep_alive: self.keep_alive.clone(),
             reasoning: self.reasoning.clone(),
+            output_version: self.output_version.clone(),
             client_kwargs: self.client_kwargs.clone(),
             async_client_kwargs: self.async_client_kwargs.clone(),
             sync_client_kwargs: self.sync_client_kwargs.clone(),
@@ -219,6 +221,7 @@ impl ChatOllama {
             format: None,
             keep_alive: None,
             reasoning: None,
+            output_version: None,
             client_kwargs: HashMap::new(),
             async_client_kwargs: HashMap::new(),
             sync_client_kwargs: HashMap::new(),
@@ -365,6 +368,11 @@ impl ChatOllama {
         self
     }
 
+    pub fn output_version(mut self, version: impl Into<String>) -> Self {
+        self.output_version = Some(version.into());
+        self
+    }
+
     /// Set additional client kwargs.
     pub fn client_kwargs(mut self, kwargs: HashMap<String, serde_json::Value>) -> Self {
         self.client_kwargs = kwargs;
@@ -395,7 +403,7 @@ impl ChatOllama {
     /// Get the resolved base URL. Checks env var `OLLAMA_HOST` if `base_url` is `None`.
     ///
     /// Uses `parse_url_with_auth` to strip userinfo credentials from the URL.
-    fn get_base_url(&self) -> String {
+    pub fn get_base_url(&self) -> String {
         let raw_url = match &self.base_url {
             Some(url) => url.clone(),
             None => env::var("OLLAMA_HOST").unwrap_or_else(|_| DEFAULT_API_BASE.to_string()),
@@ -478,7 +486,7 @@ impl ChatOllama {
     /// Matches Python's `_convert_messages_to_ollama_messages`.
     /// Pre-processes v1-format AIMessages by converting their content blocks
     /// via `convert_from_v1_to_ollama`.
-    fn format_messages(&self, messages: &[BaseMessage]) -> Result<Vec<serde_json::Value>> {
+    pub fn format_messages(&self, messages: &[BaseMessage]) -> Result<Vec<serde_json::Value>> {
         let messages: Vec<std::borrow::Cow<'_, BaseMessage>> = messages
             .iter()
             .map(|msg| {
@@ -563,7 +571,7 @@ impl ChatOllama {
     }
 
     /// Build the options object for the request.
-    fn build_options(&self, stop: Option<Vec<String>>) -> Result<serde_json::Value> {
+    pub fn build_options(&self, stop: Option<Vec<String>>) -> Result<serde_json::Value> {
         if self.stop.is_some() && stop.is_some() {
             return Err(Error::Other(
                 "`stop` found in both the input and default params.".into(),
@@ -626,7 +634,7 @@ impl ChatOllama {
     /// Build the request payload.
     ///
     /// Matches Python's `_chat_params`.
-    fn build_request_payload(
+    pub fn build_request_payload(
         &self,
         messages: &[BaseMessage],
         stop: Option<Vec<String>>,
@@ -972,7 +980,10 @@ impl BaseChatModel for ChatOllama {
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
-            let error_text = response.text().await.unwrap_or_default();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("<failed to read response body: {e}>"));
             return Err(Error::api(status, error_text));
         }
 
@@ -992,7 +1003,10 @@ impl BaseChatModel for ChatOllama {
         tool_choice: Option<ToolChoice>,
     ) -> Result<Box<dyn BaseChatModel>> {
         let mut bound = self.clone();
-        bound.bound_tools = tools.iter().map(|t| t.to_definition()).collect();
+        bound.bound_tools = tools
+            .iter()
+            .map(|t| t.to_definition())
+            .collect::<std::result::Result<Vec<_>, _>>()?;
         bound.bound_tool_choice = tool_choice;
         Ok(Box::new(bound))
     }
@@ -1004,7 +1018,7 @@ impl BaseChatModel for ChatOllama {
     ) -> Result<
         Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
     > {
-        let tool_name = crate::language_models::extract_tool_name_from_schema(&schema);
+        let tool_name = crate::language_models::extract_tool_name_from_schema(&schema)?;
         let tool_like = ToolLike::Schema(schema);
         let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
 
@@ -1135,7 +1149,26 @@ impl ChatOllama {
         self.ensure_model_validated().await?;
 
         let client = self.build_client();
-        let payload = self.build_request_payload(&messages, stop, None, true)?;
+        let tools = if !self.bound_tools.is_empty() {
+            let ollama_tools: Vec<serde_json::Value> = self
+                .bound_tools
+                .iter()
+                .map(|t| {
+                    serde_json::json!({
+                        "type": "function",
+                        "function": {
+                            "name": t.name,
+                            "description": t.description,
+                            "parameters": t.parameters
+                        }
+                    })
+                })
+                .collect();
+            Some(ollama_tools)
+        } else {
+            None
+        };
+        let payload = self.build_request_payload(&messages, stop, tools.as_deref(), true)?;
         let base_url = self.get_base_url();
 
         let response = client
@@ -1148,7 +1181,10 @@ impl ChatOllama {
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
-            let error_text = response.text().await.unwrap_or_default();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("<failed to read response body: {e}>"));
             return Err(Error::api(status, error_text));
         }
 
@@ -1244,48 +1280,48 @@ struct OllamaStreamChunk {
 
 /// Ollama API response structure.
 #[derive(Debug, Deserialize)]
-struct OllamaResponse {
-    model: Option<String>,
-    message: Option<OllamaMessage>,
-    done: Option<bool>,
-    done_reason: Option<String>,
+pub struct OllamaResponse {
+    pub model: Option<String>,
+    pub message: Option<OllamaMessage>,
+    pub done: Option<bool>,
+    pub done_reason: Option<String>,
     #[serde(default)]
-    prompt_eval_count: Option<u32>,
+    pub prompt_eval_count: Option<u32>,
     #[serde(default)]
-    eval_count: Option<u32>,
+    pub eval_count: Option<u32>,
     #[serde(default)]
-    total_duration: Option<u64>,
+    pub total_duration: Option<u64>,
     #[serde(default)]
-    load_duration: Option<u64>,
+    pub load_duration: Option<u64>,
     #[serde(default)]
-    prompt_eval_duration: Option<u64>,
+    pub prompt_eval_duration: Option<u64>,
     #[serde(default)]
-    eval_duration: Option<u64>,
+    pub eval_duration: Option<u64>,
     #[serde(default)]
-    created_at: Option<String>,
+    pub created_at: Option<String>,
 }
 
 /// Ollama message in response.
 #[derive(Debug, Deserialize)]
-struct OllamaMessage {
+pub struct OllamaMessage {
     #[allow(dead_code)]
-    role: Option<String>,
-    content: Option<String>,
-    tool_calls: Option<Vec<OllamaToolCall>>,
-    thinking: Option<String>,
+    pub role: Option<String>,
+    pub content: Option<String>,
+    pub tool_calls: Option<Vec<OllamaToolCall>>,
+    pub thinking: Option<String>,
 }
 
 /// Ollama tool call in response.
 #[derive(Debug, Deserialize)]
-struct OllamaToolCall {
-    function: Option<OllamaFunction>,
+pub struct OllamaToolCall {
+    pub function: Option<OllamaFunction>,
 }
 
 /// Ollama function in tool call.
 #[derive(Debug, Deserialize)]
-struct OllamaFunction {
-    name: String,
-    arguments: Option<serde_json::Value>,
+pub struct OllamaFunction {
+    pub name: String,
+    pub arguments: Option<serde_json::Value>,
 }
 
 /// Convert a LangChain ToolCall to OpenAI tool call format.
@@ -1323,7 +1359,7 @@ fn get_tool_calls_from_response(response: &OllamaResponse) -> Vec<ToolCall> {
 ///
 /// Handles: dict arguments (with nested string-encoded JSON), string arguments
 /// (tries JSON parse), and filters out `functionName` metadata.
-fn parse_tool_call_arguments(
+pub fn parse_tool_call_arguments(
     raw_args: Option<&serde_json::Value>,
     function_name: &str,
 ) -> Result<serde_json::Value> {

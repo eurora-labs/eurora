@@ -30,7 +30,10 @@ pub async fn validate_model(
         })?;
 
     if !response.status().is_success() {
-        let error_text = response.text().await.unwrap_or_default();
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|e| format!("<failed to read response body: {e}>"));
         return Err(Error::Other(format!(
             "Received an error from the Ollama API. \
              Please check your Ollama server logs. {}",

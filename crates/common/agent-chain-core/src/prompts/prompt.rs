@@ -43,14 +43,8 @@ pub struct PromptTemplate {
 }
 
 impl PromptTemplate {
-    pub fn new(
-        template: impl Into<String>,
-        input_variables: Option<Vec<String>>,
-        template_format: PromptTemplateFormat,
-    ) -> Result<Self> {
+    pub fn new(template: impl Into<String>, template_format: PromptTemplateFormat) -> Result<Self> {
         let template = template.into();
-
-        let _ = input_variables;
         let input_variables = get_template_variables(&template, template_format)?;
 
         let prompt = Self {
@@ -76,7 +70,7 @@ impl PromptTemplate {
         template: impl Into<String>,
         template_format: PromptTemplateFormat,
     ) -> Result<Self> {
-        Self::new(template, None, template_format)
+        Self::new(template, template_format)
     }
 
     pub fn from_template_with_partials(

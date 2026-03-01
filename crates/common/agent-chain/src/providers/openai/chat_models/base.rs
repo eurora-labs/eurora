@@ -187,7 +187,7 @@ fn payload_requires_responses_api(payload: &serde_json::Value) -> bool {
 ///
 /// Implements the `BaseChatModel` trait for OpenAI's GPT models.
 /// Supports both the Chat Completions API and the Responses API.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ChatOpenAI {
     model: String,
     temperature: Option<f64>,
@@ -218,6 +218,7 @@ pub struct ChatOpenAI {
     truncation: Option<String>,
     use_responses_api: Option<bool>,
     use_previous_response_id: bool,
+    previous_response_id: Option<String>,
     output_version: Option<String>,
     builtin_tools: Vec<BuiltinTool>,
     disabled_params: Option<HashMap<String, Option<serde_json::Value>>>,
@@ -226,8 +227,215 @@ pub struct ChatOpenAI {
     language_model_config: LanguageModelConfig,
     /// Tools bound to this model via `bind_tools()`.
     bound_tools: Vec<ToolDefinition>,
+    bound_builtin_tools: Vec<serde_json::Value>,
     /// Tool choice for bound tools.
     bound_tool_choice: Option<ToolChoice>,
+    /// Whether bound tools should be called with strict schema validation.
+    bound_strict: Option<bool>,
+    /// Whether to allow parallel tool calls.
+    bound_parallel_tool_calls: Option<bool>,
+    /// Response format for structured output (e.g., JSON schema).
+    response_format: Option<serde_json::Value>,
+    /// Whether to include response headers in response_metadata.
+    include_response_headers: bool,
+    /// Proxy URL for HTTP requests.
+    proxy: Option<String>,
+    /// Prediction content for predicted output tokens.
+    prediction: Option<serde_json::Value>,
+    /// Callable API key getter function.
+    api_key_fn: Option<std::sync::Arc<dyn Fn() -> String + Send + Sync>>,
+}
+
+impl std::fmt::Debug for ChatOpenAI {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ChatOpenAI")
+            .field("model", &self.model)
+            .field("temperature", &self.temperature)
+            .field("max_tokens", &self.max_tokens)
+            .field("api_base", &self.api_base)
+            .field("streaming", &self.streaming)
+            .field("n", &self.n)
+            .field("api_key_fn", &self.api_key_fn.as_ref().map(|_| "<fn>"))
+            .finish_non_exhaustive()
+    }
+}
+
+/// Check if the provided content block is a data content block.
+/// Matches Python `is_data_content_block`.
+fn is_data_content_block(block: &serde_json::Value) -> bool {
+    let block_type = match block.get("type").and_then(|t| t.as_str()) {
+        Some(t) => t,
+        None => return false,
+    };
+    if !matches!(block_type, "image" | "audio" | "file") {
+        return false;
+    }
+    if block.get("url").is_some() || block.get("base64").is_some() || block.get("file_id").is_some()
+    {
+        return true;
+    }
+    if let Some(source_type) = block.get("source_type").and_then(|s| s.as_str())
+        && ((source_type == "url" && block.get("url").is_some())
+            || (source_type == "base64" && block.get("data").is_some())
+            || (source_type == "id" && block.get("id").is_some()))
+    {
+        return true;
+    }
+    false
+}
+
+/// Convert a standard image content block to OpenAI image_url format.
+/// Matches Python `convert_to_openai_image_block`.
+fn convert_to_openai_image_block(block: &serde_json::Value) -> serde_json::Value {
+    if let Some(url) = block.get("url").and_then(|u| u.as_str()) {
+        return serde_json::json!({
+            "type": "image_url",
+            "image_url": {"url": url}
+        });
+    }
+    if block.get("base64").is_some()
+        || block.get("source_type").and_then(|s| s.as_str()) == Some("base64")
+    {
+        let mime_type = block
+            .get("mime_type")
+            .and_then(|m| m.as_str())
+            .unwrap_or("image/png");
+        let base64_data = if block.get("source_type").is_some() {
+            block.get("data").and_then(|d| d.as_str()).unwrap_or("")
+        } else {
+            block.get("base64").and_then(|d| d.as_str()).unwrap_or("")
+        };
+        return serde_json::json!({
+            "type": "image_url",
+            "image_url": {
+                "url": format!("data:{mime_type};base64,{base64_data}")
+            }
+        });
+    }
+    block.clone()
+}
+
+/// Convert a standard data content block to OpenAI format.
+/// Matches Python `convert_to_openai_data_block`.
+fn convert_to_openai_data_block(block: &serde_json::Value, api: &str) -> serde_json::Value {
+    let block_type = block.get("type").and_then(|t| t.as_str()).unwrap_or("");
+
+    match block_type {
+        "image" => {
+            let cc_block = convert_to_openai_image_block(block);
+            if api == "responses" {
+                let url = cc_block
+                    .get("image_url")
+                    .and_then(|iu| iu.get("url"))
+                    .and_then(|u| u.as_str())
+                    .unwrap_or("");
+                let mut formatted = serde_json::json!({
+                    "type": "input_image",
+                    "image_url": url
+                });
+                if let Some(detail) = cc_block.get("image_url").and_then(|iu| iu.get("detail")) {
+                    formatted["detail"] = detail.clone();
+                }
+                formatted
+            } else {
+                cc_block
+            }
+        }
+        "file" => {
+            if block.get("base64").is_some()
+                || block.get("source_type").and_then(|s| s.as_str()) == Some("base64")
+            {
+                let base64_data = if block.get("source_type").is_some() {
+                    block.get("data").and_then(|d| d.as_str()).unwrap_or("")
+                } else {
+                    block.get("base64").and_then(|d| d.as_str()).unwrap_or("")
+                };
+                let mime_type = block
+                    .get("mime_type")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("application/octet-stream");
+                let mut file = serde_json::json!({
+                    "file_data": format!("data:{mime_type};base64,{base64_data}")
+                });
+                if let Some(filename) = block
+                    .get("filename")
+                    .and_then(|f| f.as_str())
+                    .or_else(|| {
+                        block
+                            .get("extras")
+                            .and_then(|e| e.get("filename"))
+                            .and_then(|f| f.as_str())
+                    })
+                    .or_else(|| {
+                        block
+                            .get("metadata")
+                            .and_then(|m| m.get("filename"))
+                            .and_then(|f| f.as_str())
+                    })
+                {
+                    file["filename"] = serde_json::json!(filename);
+                }
+                if api == "responses" {
+                    let mut formatted = serde_json::json!({"type": "input_file"});
+                    if let Some(obj) = file.as_object() {
+                        for (key, val) in obj {
+                            formatted[key] = val.clone();
+                        }
+                    }
+                    formatted
+                } else {
+                    serde_json::json!({"type": "file", "file": file})
+                }
+            } else if block.get("file_id").is_some()
+                || block.get("source_type").and_then(|s| s.as_str()) == Some("id")
+            {
+                let file_id = if block.get("source_type").is_some() {
+                    block.get("id").and_then(|i| i.as_str()).unwrap_or("")
+                } else {
+                    block.get("file_id").and_then(|i| i.as_str()).unwrap_or("")
+                };
+                if api == "responses" {
+                    serde_json::json!({"type": "input_file", "file_id": file_id})
+                } else {
+                    serde_json::json!({"type": "file", "file": {"file_id": file_id}})
+                }
+            } else if let Some(url) = block.get("url").and_then(|u| u.as_str()) {
+                if api == "chat/completions" {
+                    block.clone()
+                } else {
+                    serde_json::json!({"type": "input_file", "file_url": url})
+                }
+            } else {
+                block.clone()
+            }
+        }
+        "audio" => {
+            if block.get("base64").is_some()
+                || block.get("source_type").and_then(|s| s.as_str()) == Some("base64")
+            {
+                let base64_data = if block.get("source_type").is_some() {
+                    block.get("data").and_then(|d| d.as_str()).unwrap_or("")
+                } else {
+                    block.get("base64").and_then(|d| d.as_str()).unwrap_or("")
+                };
+                let mime_type = block
+                    .get("mime_type")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("audio/wav");
+                let audio_format = mime_type.rsplit('/').next().unwrap_or("wav");
+                serde_json::json!({
+                    "type": "input_audio",
+                    "input_audio": {
+                        "data": base64_data,
+                        "format": audio_format
+                    }
+                })
+            } else {
+                block.clone()
+            }
+        }
+        _ => block.clone(),
+    }
 }
 
 impl ChatOpenAI {
@@ -287,6 +495,7 @@ impl ChatOpenAI {
             truncation: None,
             use_responses_api: None,
             use_previous_response_id: false,
+            previous_response_id: None,
             output_version: env::var("LC_OUTPUT_VERSION").ok(),
             builtin_tools: Vec::new(),
             disabled_params: None,
@@ -294,7 +503,15 @@ impl ChatOpenAI {
             chat_model_config: ChatModelConfig::new(),
             language_model_config: LanguageModelConfig::new(),
             bound_tools: Vec::new(),
+            bound_builtin_tools: Vec::new(),
             bound_tool_choice: None,
+            bound_strict: None,
+            bound_parallel_tool_calls: None,
+            response_format: None,
+            include_response_headers: false,
+            proxy: None,
+            prediction: None,
+            api_key_fn: None,
         }
     }
 
@@ -428,6 +645,11 @@ impl ChatOpenAI {
         self
     }
 
+    pub fn previous_response_id(mut self, id: impl Into<String>) -> Self {
+        self.previous_response_id = Some(id.into());
+        self
+    }
+
     pub fn output_version(mut self, version: impl Into<String>) -> Self {
         self.output_version = Some(version.into());
         self
@@ -453,6 +675,36 @@ impl ChatOpenAI {
 
     pub fn extra_body(mut self, body: HashMap<String, serde_json::Value>) -> Self {
         self.extra_body = Some(body);
+        self
+    }
+
+    pub fn model_kwargs(mut self, kwargs: HashMap<String, serde_json::Value>) -> Self {
+        self.model_kwargs = kwargs;
+        self
+    }
+
+    pub fn response_format(mut self, format: serde_json::Value) -> Self {
+        self.response_format = Some(convert_to_openai_response_format(format, None));
+        self
+    }
+
+    pub fn include_response_headers(mut self, enabled: bool) -> Self {
+        self.include_response_headers = enabled;
+        self
+    }
+
+    pub fn openai_proxy(mut self, proxy_url: impl Into<String>) -> Self {
+        self.proxy = Some(proxy_url.into());
+        self
+    }
+
+    pub fn prediction(mut self, prediction: serde_json::Value) -> Self {
+        self.prediction = Some(prediction);
+        self
+    }
+
+    pub fn api_key_fn(mut self, f: impl Fn() -> String + Send + Sync + 'static) -> Self {
+        self.api_key_fn = Some(std::sync::Arc::new(f));
         self
     }
 
@@ -504,7 +756,26 @@ impl ChatOpenAI {
             return true;
         }
 
+        if self.previous_response_id.is_some() {
+            return true;
+        }
+
         if model_prefers_responses_api(&self.model) {
+            return true;
+        }
+
+        // Check model_kwargs for Responses API-only keys
+        let responses_only_keys = [
+            "include",
+            "previous_response_id",
+            "reasoning",
+            "text",
+            "truncation",
+        ];
+        if responses_only_keys
+            .iter()
+            .any(|k| self.model_kwargs.contains_key(*k))
+        {
             return true;
         }
 
@@ -517,19 +788,27 @@ impl ChatOpenAI {
         false
     }
 
-    /// Get the API key, checking environment variable if not set directly.
+    /// Get the API key, checking callable, direct value, or environment variable.
     fn get_api_key(&self) -> Result<String> {
+        if let Some(ref f) = self.api_key_fn {
+            return Ok(f());
+        }
         self.api_key
             .clone()
             .or_else(|| env::var("OPENAI_API_KEY").ok())
             .ok_or_else(|| Error::missing_config("OPENAI_API_KEY"))
     }
 
-    /// Build the HTTP client with configured timeout.
+    /// Build the HTTP client with configured timeout and proxy.
     fn build_client(&self) -> Result<reqwest::Client> {
         let mut builder = reqwest::Client::builder();
         if let Some(timeout) = self.timeout {
             builder = builder.timeout(std::time::Duration::from_secs(timeout));
+        }
+        if let Some(ref proxy_url) = self.proxy {
+            let proxy = reqwest::Proxy::all(proxy_url)
+                .map_err(|e| Error::other(format!("Invalid proxy URL: {e}")))?;
+            builder = builder.proxy(proxy);
         }
         builder
             .build()
@@ -565,19 +844,56 @@ impl ChatOpenAI {
         }
     }
 
-    /// Format message content, filtering out block types not supported by OpenAI.
+    /// Format message content, filtering out block types not supported by OpenAI
+    /// and converting data content blocks to OpenAI format.
     /// Matches Python `_format_message_content`.
-    fn format_message_content(content: &serde_json::Value) -> serde_json::Value {
+    fn format_message_content(
+        content: &serde_json::Value,
+        api: &str,
+        role: Option<&str>,
+    ) -> serde_json::Value {
         if let Some(arr) = content.as_array() {
-            let filtered: Vec<serde_json::Value> = arr
-                .iter()
-                .filter(|block| {
-                    let block_type = block.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                    !matches!(block_type, "tool_use" | "thinking" | "reasoning_content")
-                })
-                .cloned()
-                .collect();
-            serde_json::Value::Array(filtered)
+            let mut formatted: Vec<serde_json::Value> = Vec::new();
+            for block in arr {
+                let block_type = block.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                if matches!(block_type, "tool_use" | "thinking" | "reasoning_content") {
+                    continue;
+                }
+                if is_data_content_block(block)
+                    && !(api == "responses" && role.unwrap_or("").to_lowercase().starts_with("ai"))
+                {
+                    formatted.push(convert_to_openai_data_block(block, api));
+                } else if block_type == "image" {
+                    if let Some(source) = block.get("source").and_then(|s| s.as_object()) {
+                        let source_type = source.get("type").and_then(|t| t.as_str());
+                        if source_type == Some("base64") {
+                            if let (Some(media_type), Some(data)) = (
+                                source.get("media_type").and_then(|m| m.as_str()),
+                                source.get("data").and_then(|d| d.as_str()),
+                            ) {
+                                formatted.push(serde_json::json!({
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": format!("data:{media_type};base64,{data}")
+                                    }
+                                }));
+                            }
+                        } else if source_type == Some("url")
+                            && let Some(url) = source.get("url").and_then(|u| u.as_str())
+                        {
+                            formatted.push(serde_json::json!({
+                                "type": "image_url",
+                                "image_url": {"url": url}
+                            }));
+                        }
+                    } else {
+                        formatted.push(block.clone());
+                    }
+                } else {
+                    formatted.push(block.clone());
+                }
+            }
+            serde_json::Value::Array(formatted)
         } else {
             content.clone()
         }
@@ -642,7 +958,7 @@ impl ChatOpenAI {
                             })
                             .collect();
                         let raw = serde_json::Value::Array(content_parts);
-                        Self::format_message_content(&raw)
+                        Self::format_message_content(&raw, "chat/completions", Some("human"))
                     }
                 };
                 let mut message = serde_json::json!({"role": "user", "content": content});
@@ -702,11 +1018,47 @@ impl ChatOpenAI {
 
                 Some(message)
             }
-            BaseMessage::Tool(m) => Some(serde_json::json!({
-                "role": "tool",
-                "tool_call_id": m.tool_call_id,
-                "content": m.content
-            })),
+            BaseMessage::Tool(m) => {
+                let content = match &m.content {
+                    MessageContent::Parts(parts) => {
+                        let content_parts: Vec<serde_json::Value> = parts
+                            .iter()
+                            .map(|part| match part {
+                                ContentPart::Text { text } => {
+                                    serde_json::json!({"type": "text", "text": text})
+                                }
+                                ContentPart::Image { source, detail } => {
+                                    let url = match source {
+                                        ImageSource::Url { url } => url.clone(),
+                                        ImageSource::Base64 { media_type, data } => {
+                                            format!("data:{media_type};base64,{data}")
+                                        }
+                                        ImageSource::FileId { file_id } => file_id.clone(),
+                                    };
+                                    let mut image_url = serde_json::json!({"url": url});
+                                    if let Some(d) = detail {
+                                        image_url["detail"] = serde_json::json!(match d {
+                                            ImageDetail::Low => "low",
+                                            ImageDetail::High => "high",
+                                            ImageDetail::Auto => "auto",
+                                        });
+                                    }
+                                    serde_json::json!({"type": "image_url", "image_url": image_url})
+                                }
+                                ContentPart::Other(value) => value.clone(),
+                            })
+                            .collect();
+                        let raw = serde_json::Value::Array(content_parts);
+                        Self::format_message_content(&raw, "chat/completions", Some("tool"))
+                    }
+                    other => serde_json::json!(other),
+                };
+                Some(serde_json::json!({
+                    "role": "tool",
+                    "tool_call_id": m.tool_call_id,
+                    "content": content
+                }))
+            }
             BaseMessage::Remove(_) => None,
             BaseMessage::Chat(m) => {
                 let mut message = serde_json::json!({
@@ -781,7 +1133,8 @@ impl ChatOpenAI {
                                     ContentPart::Other(value) => value.clone(),
                                 })
                                 .collect();
-                            serde_json::Value::Array(content_parts)
+                            let raw = serde_json::Value::Array(content_parts);
+                            Self::format_message_content(&raw, "responses", Some("human"))
                         }
                     };
                     input.push(serde_json::json!({"role": "user", "content": content}));
@@ -929,6 +1282,22 @@ impl ChatOpenAI {
             payload["store"] = serde_json::json!(store);
         }
 
+        if let Some(ref prev_id) = self.previous_response_id {
+            payload["previous_response_id"] = serde_json::json!(prev_id);
+        }
+
+        if let Some(ref response_format) = self.response_format {
+            payload["response_format"] = response_format.clone();
+        }
+
+        if let Some(ref prediction) = self.prediction {
+            payload["prediction"] = prediction.clone();
+        }
+
+        if let Some(parallel) = self.bound_parallel_tool_calls {
+            payload["parallel_tool_calls"] = serde_json::json!(parallel);
+        }
+
         if let Some(obj) = payload.as_object_mut() {
             for (k, v) in &self.model_kwargs {
                 obj.insert(k.clone(), v.clone());
@@ -1047,6 +1416,40 @@ impl ChatOpenAI {
             payload["store"] = serde_json::json!(store);
         }
 
+        if let Some(ref prev_id) = self.previous_response_id {
+            payload["previous_response_id"] = serde_json::json!(prev_id);
+        }
+
+        if let Some(ref response_format) = self.response_format {
+            let format_value =
+                if response_format.get("type").and_then(|t| t.as_str()) == Some("json_schema") {
+                    if let Some(json_schema) = response_format.get("json_schema") {
+                        // Flatten: {"type": "json_schema", ...json_schema_fields}
+                        let mut flat = serde_json::json!({"type": "json_schema"});
+                        if let Some(obj) = json_schema.as_object() {
+                            for (k, v) in obj {
+                                flat[k] = v.clone();
+                            }
+                        }
+                        flat
+                    } else {
+                        response_format.clone()
+                    }
+                } else {
+                    response_format.clone()
+                };
+
+            if let Some(text_obj) = payload.get_mut("text").and_then(|t| t.as_object_mut()) {
+                text_obj.insert("format".to_string(), format_value);
+            } else {
+                payload["text"] = serde_json::json!({"format": format_value});
+            }
+        }
+
+        if let Some(ref prediction) = self.prediction {
+            payload["prediction"] = prediction.clone();
+        }
+
         if let Some(obj) = payload.as_object_mut() {
             for (k, v) in &self.model_kwargs {
                 obj.insert(k.clone(), v.clone());
@@ -1089,7 +1492,10 @@ impl ChatOpenAI {
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
-            let error_text = response.text().await.unwrap_or_default();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("<failed to read response body: {e}>"));
             return Err(Error::api(status, error_text));
         }
 
@@ -1099,6 +1505,8 @@ impl ChatOpenAI {
             let mut usage: Option<UsageMetadata> = None;
             let mut finish_reason: Option<String> = None;
             let mut tool_call_acc: std::collections::HashMap<String, (String, String, String)> =
+                std::collections::HashMap::new();
+            let mut stream_response_metadata: std::collections::HashMap<String, serde_json::Value> =
                 std::collections::HashMap::new();
 
             use futures::StreamExt;
@@ -1174,9 +1582,28 @@ impl ChatOpenAI {
                                                         resp.service_tier.as_deref(),
                                                     ));
                                                 }
-                                                finish_reason = resp.status;
+                                                finish_reason = resp.status.clone();
+                                                if let Some(ref status) = resp.status {
+                                                    stream_response_metadata.insert(
+                                                        "status".to_string(),
+                                                        serde_json::json!(status),
+                                                    );
+                                                }
+                                                if let Some(ref id) = resp.id {
+                                                    stream_response_metadata.insert(
+                                                        "id".to_string(),
+                                                        serde_json::json!(id),
+                                                    );
+                                                }
+                                                if let Some(ref details) = resp.incomplete_details {
+                                                    stream_response_metadata.insert(
+                                                        "incomplete_details".to_string(),
+                                                        details.clone(),
+                                                    );
+                                                }
                                             }
                                             let mut final_chunk = ChatChunk::final_chunk(usage.take(), finish_reason.take());
+                                            final_chunk.response_metadata = stream_response_metadata.clone();
                                             if !tool_call_acc.is_empty() {
                                                 let tcs: Vec<ToolCall> = tool_call_acc
                                                     .drain()
@@ -1280,12 +1707,18 @@ impl ChatOpenAI {
                 response_metadata.insert("service_tier".to_string(), serde_json::json!(tier));
             }
 
+            let mut additional_kwargs = HashMap::new();
+            if let Some(ref audio) = choice.message.audio {
+                additional_kwargs.insert("audio".to_string(), audio.clone());
+            }
+
             let ai_message = AIMessage::builder()
                 .content(content)
                 .tool_calls(tool_calls)
                 .invalid_tool_calls(invalid_tool_calls)
                 .maybe_usage_metadata(usage_metadata)
                 .response_metadata(response_metadata)
+                .additional_kwargs(additional_kwargs)
                 .build();
 
             let generation = if generation_info.is_empty() {
@@ -1325,6 +1758,7 @@ impl ChatOpenAI {
         let mut text_content = String::new();
         let mut tool_calls = Vec::new();
         let mut invalid_tool_calls = Vec::new();
+        let mut tool_outputs: Vec<serde_json::Value> = Vec::new();
 
         for output in &response.output {
             match output {
@@ -1364,8 +1798,22 @@ impl ChatOpenAI {
                 ResponsesOutput::WebSearchCall {}
                 | ResponsesOutput::FileSearchCall {}
                 | ResponsesOutput::CodeInterpreterCall {}
-                | ResponsesOutput::Other => {}
+                | ResponsesOutput::McpApprovalRequest {}
+                | ResponsesOutput::McpCall {}
+                | ResponsesOutput::ComputerCall {}
+                | ResponsesOutput::ImageGenerationCall {}
+                | ResponsesOutput::Other => {
+                    tool_outputs.push(serde_json::to_value(output).unwrap_or_default());
+                }
             }
+        }
+
+        let mut additional_kwargs = HashMap::new();
+        if !tool_outputs.is_empty() {
+            additional_kwargs.insert(
+                "tool_outputs".to_string(),
+                serde_json::Value::Array(tool_outputs),
+            );
         }
 
         let usage_metadata = response
@@ -1378,6 +1826,9 @@ impl ChatOpenAI {
         response_metadata.insert("model_provider".to_string(), serde_json::json!("openai"));
         if let Some(ref status) = response.status {
             response_metadata.insert("status".to_string(), serde_json::json!(status));
+        }
+        if let Some(ref details) = response.incomplete_details {
+            response_metadata.insert("incomplete_details".to_string(), details.clone());
         }
         if let Some(ref id) = response.id {
             response_metadata.insert("id".to_string(), serde_json::json!(id));
@@ -1427,7 +1878,53 @@ impl ChatOpenAI {
             })
         } else {
             let status = resp.status().as_u16();
-            let error_text = resp.text().await.unwrap_or_default();
+            let error_text = resp
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("<failed to read response body: {e}>"));
+            Err(Error::api(status, error_text))
+        }
+    }
+
+    /// Send an HTTP request and return the response with headers.
+    async fn send_json_request_with_headers<T: serde::de::DeserializeOwned>(
+        &self,
+        url: &str,
+        payload: &serde_json::Value,
+    ) -> Result<(T, HashMap<String, String>)> {
+        let api_key = self.get_api_key()?;
+        let client = self.build_client()?;
+
+        let mut request = client
+            .post(url)
+            .header("Authorization", format!("Bearer {api_key}"))
+            .header("Content-Type", "application/json");
+
+        if let Some(ref org) = self.organization {
+            request = request.header("OpenAI-Organization", org);
+        }
+
+        let resp = request.json(payload).send().await.map_err(Error::Http)?;
+
+        if resp.status().is_success() {
+            let headers: HashMap<String, String> = resp
+                .headers()
+                .iter()
+                .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap_or("").to_string()))
+                .collect();
+            let body = resp.json::<T>().await.map_err(|e| {
+                Error::Json(serde_json::Error::io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    e.to_string(),
+                )))
+            })?;
+            Ok((body, headers))
+        } else {
+            let status = resp.status().as_u16();
+            let error_text = resp
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("<failed to read response body: {e}>"));
             Err(Error::api(status, error_text))
         }
     }
@@ -1448,12 +1945,37 @@ impl ChatOpenAI {
         let url = format!("{}/responses", self.api_base);
         let payload = self.build_responses_api_payload(&messages, stop, None, false);
 
-        let resp: ResponsesApiResponse = (|| self.send_json_request(&url, &payload))
-            .retry(self.retry_strategy())
-            .when(|e| e.is_retryable())
-            .await?;
+        if self.include_response_headers {
+            let (resp, headers): (ResponsesApiResponse, HashMap<String, String>) =
+                (|| self.send_json_request_with_headers(&url, &payload))
+                    .retry(self.retry_strategy())
+                    .when(|e| e.is_retryable())
+                    .await?;
+            let mut result = self.parse_responses_api_response(resp)?;
+            self.inject_headers_into_result(&mut result, &headers);
+            Ok(result)
+        } else {
+            let resp: ResponsesApiResponse = (|| self.send_json_request(&url, &payload))
+                .retry(self.retry_strategy())
+                .when(|e| e.is_retryable())
+                .await?;
+            self.parse_responses_api_response(resp)
+        }
+    }
 
-        self.parse_responses_api_response(resp)
+    /// Inject captured HTTP headers into all generations' response_metadata.
+    fn inject_headers_into_result(
+        &self,
+        result: &mut ChatResult,
+        headers: &HashMap<String, String>,
+    ) {
+        let headers_value = serde_json::to_value(headers).unwrap_or_default();
+        for generation in &mut result.generations {
+            if let BaseMessage::AI(ref mut ai) = generation.message {
+                ai.response_metadata
+                    .insert("headers".to_string(), headers_value.clone());
+            }
+        }
     }
 
     /// Create usage metadata from OpenAI token usage.
@@ -1625,25 +2147,29 @@ impl ChatOpenAI {
         tool_choice: Option<&ToolChoice>,
     ) -> Result<ChatStream> {
         if self.should_use_responses_api(None) {
-            let openai_tools: Option<Vec<serde_json::Value>> =
-                tools.filter(|t| !t.is_empty()).map(|tools| {
-                    tools
-                        .iter()
-                        .map(|t| {
-                            serde_json::json!({
-                                "type": "function",
-                                "function": {
-                                    "name": t.name,
-                                    "description": t.description,
-                                    "parameters": t.parameters
-                                }
-                            })
-                        })
-                        .collect()
-                });
-            return self
-                .stream_responses_api(messages, stop, openai_tools.as_deref())
-                .await;
+            let mut openai_tools: Vec<serde_json::Value> = tools
+                .unwrap_or_default()
+                .iter()
+                .map(|t| {
+                    serde_json::json!({
+                        "type": "function",
+                        "function": {
+                            "name": t.name,
+                            "description": t.description,
+                            "parameters": t.parameters
+                        }
+                    })
+                })
+                .collect();
+            for bt in &self.bound_builtin_tools {
+                openai_tools.push(bt.clone());
+            }
+            let tools_slice = if openai_tools.is_empty() {
+                None
+            } else {
+                Some(openai_tools.as_slice())
+            };
+            return self.stream_responses_api(messages, stop, tools_slice).await;
         }
 
         let api_key = self.get_api_key()?;
@@ -1671,15 +2197,7 @@ impl ChatOpenAI {
 
         if let Some(choice) = tool_choice {
             let choice_json = match choice {
-                ToolChoice::String(s) => {
-                    if s == "any" {
-                        serde_json::json!("required")
-                    } else if WELL_KNOWN_TOOLS.contains(&s.as_str()) {
-                        serde_json::json!({"type": s})
-                    } else {
-                        serde_json::json!(s)
-                    }
-                }
+                ToolChoice::String(s) => format_tool_choice_for_chat_completions(s),
                 ToolChoice::Structured { choice_type, name } => {
                     if choice_type == "tool" || choice_type == "function" {
                         serde_json::json!({
@@ -1707,7 +2225,10 @@ impl ChatOpenAI {
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
-            let error_text = response.text().await.unwrap_or_default();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("<failed to read response body: {e}>"));
             return Err(Error::api(status, error_text));
         }
 
@@ -1870,6 +2391,122 @@ impl BaseLanguageModel for ChatOpenAI {
     }
 }
 
+/// Well-known bare-string values accepted by the OpenAI API for tool_choice.
+const TOOL_CHOICE_BARE_VALUES: &[&str] = &["none", "auto", "required"];
+
+/// Format a tool_choice string for the Chat Completions API.
+/// Matches Python's `bind_tools` logic: tool names are wrapped as
+/// `{"type": "function", "function": {"name": ...}}`, well-known tool types
+/// as `{"type": ...}`, and bare values pass through as strings.
+fn format_tool_choice_for_chat_completions(s: &str) -> serde_json::Value {
+    if s == "any" {
+        serde_json::json!("required")
+    } else if TOOL_CHOICE_BARE_VALUES.contains(&s) {
+        serde_json::json!(s)
+    } else if WELL_KNOWN_TOOLS.contains(&s) {
+        serde_json::json!({"type": s})
+    } else {
+        // Specific function name
+        serde_json::json!({
+            "type": "function",
+            "function": {"name": s}
+        })
+    }
+}
+
+/// Format a tool_choice string for the Responses API.
+/// In the Responses API, function tool_choice uses a flat structure:
+/// `{"type": "function", "name": ...}`.
+fn format_tool_choice_for_responses_api(s: &str) -> serde_json::Value {
+    if s == "any" {
+        serde_json::json!("required")
+    } else if TOOL_CHOICE_BARE_VALUES.contains(&s) {
+        serde_json::json!(s)
+    } else if WELL_KNOWN_TOOLS.contains(&s) {
+        serde_json::json!({"type": s})
+    } else {
+        serde_json::json!({
+            "type": "function",
+            "name": s
+        })
+    }
+}
+
+/// Convert a schema to the OpenAI response_format format.
+/// Matches Python's `_convert_to_openai_response_format`.
+fn convert_to_openai_response_format(
+    schema: serde_json::Value,
+    strict: Option<bool>,
+) -> serde_json::Value {
+    // Already in the correct format
+    if schema.get("type").and_then(|t| t.as_str()) == Some("json_schema")
+        && schema.get("json_schema").is_some()
+    {
+        return schema;
+    }
+
+    // Already has name+schema fields (json_schema inner format)
+    if schema.get("name").is_some() && schema.get("schema").is_some() {
+        return serde_json::json!({
+            "type": "json_schema",
+            "json_schema": schema
+        });
+    }
+
+    // Simple json_object mode
+    if schema == serde_json::json!({"type": "json_object"}) {
+        return schema;
+    }
+
+    // Raw schema — convert to function-like format
+    let name = schema
+        .get("title")
+        .and_then(|t| t.as_str())
+        .unwrap_or("response_format");
+    let description = schema.get("description").and_then(|d| d.as_str());
+    let strict = strict.unwrap_or(false);
+
+    let mut json_schema = serde_json::json!({
+        "name": name,
+        "schema": schema,
+        "strict": strict,
+    });
+    if let Some(desc) = description {
+        json_schema["description"] = serde_json::json!(desc);
+    }
+
+    serde_json::json!({
+        "type": "json_schema",
+        "json_schema": json_schema
+    })
+}
+
+fn update_token_usage(overall: &serde_json::Value, new: &serde_json::Value) -> serde_json::Value {
+    match (new, overall) {
+        (serde_json::Value::Number(n), serde_json::Value::Number(o)) => {
+            let sum = n.as_f64().unwrap_or(0.0) + o.as_f64().unwrap_or(0.0);
+            if sum == (sum as i64) as f64 {
+                serde_json::json!(sum as i64)
+            } else {
+                serde_json::json!(sum)
+            }
+        }
+        (serde_json::Value::Object(new_map), serde_json::Value::Object(overall_map)) => {
+            let mut merged = overall_map.clone();
+            for (k, v) in new_map {
+                let updated = if let Some(existing) = merged.get(k) {
+                    update_token_usage(existing, v)
+                } else {
+                    v.clone()
+                };
+                merged.insert(k.clone(), updated);
+            }
+            serde_json::Value::Object(merged)
+        }
+        _ => new.clone(),
+    }
+}
+
 #[async_trait]
 impl BaseChatModel for ChatOpenAI {
     fn chat_config(&self) -> &ChatModelConfig {
@@ -1880,13 +2517,61 @@ impl BaseChatModel for ChatOpenAI {
         true
     }
 
+    fn _combine_llm_outputs(
+        &self,
+        llm_outputs: &[Option<HashMap<String, serde_json::Value>>],
+    ) -> HashMap<String, serde_json::Value> {
+        let mut overall_token_usage: HashMap<String, serde_json::Value> = HashMap::new();
+        let mut system_fingerprint: Option<String> = None;
+
+        for output in llm_outputs {
+            let output = match output {
+                Some(o) => o,
+                None => continue,
+            };
+
+            if let Some(token_usage) = output.get("token_usage")
+                && let Some(usage_map) = token_usage.as_object()
+            {
+                for (k, v) in usage_map {
+                    if v.is_null() {
+                        continue;
+                    }
+                    if let Some(existing) = overall_token_usage.get(k) {
+                        overall_token_usage.insert(k.clone(), update_token_usage(existing, v));
+                    } else {
+                        overall_token_usage.insert(k.clone(), v.clone());
+                    }
+                }
+            }
+
+            if system_fingerprint.is_none()
+                && let Some(fp) = output.get("system_fingerprint")
+                && let Some(fp_str) = fp.as_str()
+            {
+                system_fingerprint = Some(fp_str.to_string());
+            }
+        }
+
+        let mut combined = HashMap::new();
+        combined.insert(
+            "token_usage".to_string(),
+            serde_json::json!(overall_token_usage),
+        );
+        combined.insert("model_name".to_string(), serde_json::json!(self.model));
+        if let Some(fp) = system_fingerprint {
+            combined.insert("system_fingerprint".to_string(), serde_json::json!(fp));
+        }
+        combined
+    }
+
     async fn _generate(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
-        if !self.bound_tools.is_empty() {
+        if !self.bound_tools.is_empty() || !self.bound_builtin_tools.is_empty() {
             let ai_message = self
                 .generate_with_tools_internal(
                     messages,
@@ -1907,7 +2592,7 @@ impl BaseChatModel for ChatOpenAI {
         stop: Option<Vec<String>>,
         _run_manager: Option<&AsyncCallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
-        let chat_stream = if !self.bound_tools.is_empty() {
+        let chat_stream = if !self.bound_tools.is_empty() || !self.bound_builtin_tools.is_empty() {
             self.stream_internal_with_tools(
                 messages,
                 stop,
@@ -1925,10 +2610,15 @@ impl BaseChatModel for ChatOpenAI {
             while let Some(result) = pinned_stream.next().await {
                 match result {
                     Ok(chat_chunk) => {
+                        let mut response_metadata = chat_chunk.response_metadata.clone();
+                        response_metadata
+                            .entry("model_provider".to_string())
+                            .or_insert_with(|| serde_json::json!("openai"));
                         let message = AIMessage::builder()
                             .content(&chat_chunk.content)
                             .tool_calls(chat_chunk.tool_calls.clone())
                             .maybe_usage_metadata(chat_chunk.usage_metadata.clone())
+                            .response_metadata(response_metadata)
                             .build();
                         yield Ok(ChatGenerationChunk::new(message.into()));
                     }
@@ -1960,7 +2650,23 @@ impl BaseChatModel for ChatOpenAI {
         tool_choice: Option<ToolChoice>,
     ) -> Result<Box<dyn BaseChatModel>> {
         let mut bound = self.clone();
-        bound.bound_tools = tools.iter().map(|t| t.to_definition()).collect();
+        let (function_tools, builtin_tools): (Vec<_>, Vec<_>) = tools
+            .iter()
+            .partition(|t| !matches!(t, ToolLike::Builtin(_)));
+        bound.bound_tools = function_tools
+            .iter()
+            .map(|t| t.to_definition())
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        bound.bound_builtin_tools = builtin_tools
+            .iter()
+            .filter_map(|t| {
+                if let ToolLike::Builtin(v) = t {
+                    Some(v.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
         bound.bound_tool_choice = tool_choice;
         Ok(Box::new(bound))
     }
@@ -1972,7 +2678,7 @@ impl BaseChatModel for ChatOpenAI {
     ) -> Result<
         Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
     > {
-        let tool_name = extract_tool_name_from_schema(&schema);
+        let tool_name = extract_tool_name_from_schema(&schema)?;
         let tool_like = ToolLike::Schema(schema);
         let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
 
@@ -1994,6 +2700,149 @@ impl BaseChatModel for ChatOpenAI {
 }
 
 impl ChatOpenAI {
+    /// Bind tools with additional options (strict, parallel_tool_calls, response_format).
+    pub fn bind_tools_with_options(
+        &self,
+        tools: &[ToolLike],
+        tool_choice: Option<ToolChoice>,
+        strict: Option<bool>,
+        parallel_tool_calls: Option<bool>,
+        response_format: Option<serde_json::Value>,
+    ) -> Result<Box<dyn BaseChatModel>> {
+        let mut bound = self.clone();
+        let (function_tools, builtin_tools): (Vec<_>, Vec<_>) = tools
+            .iter()
+            .partition(|t| !matches!(t, ToolLike::Builtin(_)));
+        bound.bound_tools = function_tools
+            .iter()
+            .map(|t| t.to_definition())
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        bound.bound_builtin_tools = builtin_tools
+            .iter()
+            .filter_map(|t| {
+                if let ToolLike::Builtin(v) = t {
+                    Some(v.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        bound.bound_tool_choice = tool_choice;
+        bound.bound_strict = strict;
+        bound.bound_parallel_tool_calls = parallel_tool_calls;
+        if let Some(fmt) = response_format {
+            bound.response_format = Some(convert_to_openai_response_format(fmt, strict));
+        }
+        Ok(Box::new(bound))
+    }
+
+    /// Enhanced structured output with method, strict, and tools parameters.
+    ///
+    /// `method`: "function_calling" (default) or "json_schema"
+    /// `strict`: Whether to enforce strict schema validation
+    /// `tools`: Additional tools to combine with structured output
+    pub fn with_structured_output_options(
+        &self,
+        schema: serde_json::Value,
+        include_raw: bool,
+        method: Option<&str>,
+        strict: Option<bool>,
+        tools: Option<&[ToolLike]>,
+    ) -> Result<
+        Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
+    > {
+        let method = method.unwrap_or("function_calling");
+
+        match method {
+            "json_schema" => {
+                let mut model = self.clone();
+                let schema_name = schema
+                    .get("title")
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("response_format");
+                let mut json_schema = serde_json::json!({
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": schema_name,
+                        "schema": schema
+                    }
+                });
+                if strict == Some(true) {
+                    json_schema["json_schema"]["strict"] = serde_json::json!(true);
+                    if let Some(schema_obj) = json_schema
+                        .get_mut("json_schema")
+                        .and_then(|js| js.get_mut("schema"))
+                        .and_then(|s| s.as_object_mut())
+                    {
+                        schema_obj
+                            .insert("additionalProperties".to_string(), serde_json::json!(false));
+                        if let Some(props) = schema_obj.get("properties")
+                            && let Some(props_obj) = props.as_object()
+                        {
+                            let all_keys: Vec<String> = props_obj.keys().cloned().collect();
+                            schema_obj.insert("required".to_string(), serde_json::json!(all_keys));
+                        }
+                    }
+                }
+                model.response_format = Some(json_schema);
+
+                if let Some(extra_tools) = tools {
+                    model.bound_tools = extra_tools
+                        .iter()
+                        .map(|t| t.to_definition())
+                        .collect::<std::result::Result<Vec<_>, _>>()?;
+                    model.bound_strict = strict;
+                }
+
+                let parse_json_content = crate::runnables::base::RunnableLambda::new(
+                    |ai_msg: AIMessage| -> crate::error::Result<serde_json::Value> {
+                        let content = ai_msg.text();
+                        serde_json::from_str(&content).map_err(|e| {
+                            crate::error::Error::other(format!("JSON parse error: {e}"))
+                        })
+                    },
+                );
+
+                let model_runnable = ChatModelRunnable::new(std::sync::Arc::from(
+                    Box::new(model) as Box<dyn BaseChatModel>
+                ));
+                let chain = crate::runnables::base::pipe(model_runnable, parse_json_content);
+                Ok(Box::new(chain))
+            }
+            _ => {
+                // function_calling method: bind only the schema as a tool,
+                // with tool_choice set to the tool name and parallel_tool_calls
+                // disabled. Matches Python's function_calling branch where
+                // extra `tools` are not used.
+                let tool_name = extract_tool_name_from_schema(&schema)?;
+                let tool_like = ToolLike::Schema(schema);
+                let bound_model = self.bind_tools_with_options(
+                    &[tool_like],
+                    Some(ToolChoice::String(tool_name.clone())),
+                    strict,
+                    Some(false),
+                    None,
+                )?;
+
+                let output_parser =
+                    crate::output_parsers::openai_tools::JsonOutputKeyToolsParser::new(&tool_name)
+                        .with_first_tool_only(true);
+                let model_runnable = ChatModelRunnable::new(std::sync::Arc::from(bound_model));
+                if include_raw {
+                    Ok(Box::new(
+                        crate::language_models::StructuredOutputWithRaw::new(
+                            model_runnable,
+                            output_parser,
+                        ),
+                    ))
+                } else {
+                    let chain = crate::runnables::base::pipe(model_runnable, output_parser);
+                    Ok(Box::new(chain))
+                }
+            }
+        }
+    }
+
     /// Invoke the model with input and optional stop sequences.
     pub async fn invoke_with_stop(
         &self,
@@ -2019,12 +2868,22 @@ impl ChatOpenAI {
         let url = format!("{}/chat/completions", self.api_base);
         let payload = self.build_request_payload(&messages, stop, None, false);
 
-        let resp: OpenAIResponse = (|| self.send_json_request(&url, &payload))
-            .retry(self.retry_strategy())
-            .when(|e| e.is_retryable())
-            .await?;
-
-        self.parse_response(resp)
+        if self.include_response_headers {
+            let (resp, headers): (OpenAIResponse, HashMap<String, String>) =
+                (|| self.send_json_request_with_headers(&url, &payload))
+                    .retry(self.retry_strategy())
+                    .when(|e| e.is_retryable())
+                    .await?;
+            let mut result = self.parse_response(resp)?;
+            self.inject_headers_into_result(&mut result, &headers);
+            Ok(result)
+        } else {
+            let resp: OpenAIResponse = (|| self.send_json_request(&url, &payload))
+                .retry(self.retry_strategy())
+                .when(|e| e.is_retryable())
+                .await?;
+            self.parse_response(resp)
+        }
     }
 
     /// Internal generate with tools implementation.
@@ -2038,21 +2897,57 @@ impl ChatOpenAI {
         let openai_tools: Vec<serde_json::Value> = tools
             .iter()
             .map(|t| {
+                let mut func = serde_json::json!({
+                    "name": t.name,
+                    "description": t.description,
+                    "parameters": t.parameters
+                });
+                if self.bound_strict == Some(true) {
+                    func["strict"] = serde_json::json!(true);
+                    if let Some(params) = func.get_mut("parameters")
+                        && let Some(obj) = params.as_object_mut()
+                    {
+                        obj.insert("additionalProperties".to_string(), serde_json::json!(false));
+                        if let Some(props) = obj.get("properties")
+                            && let Some(props_obj) = props.as_object()
+                        {
+                            let all_keys: Vec<String> = props_obj.keys().cloned().collect();
+                            obj.insert("required".to_string(), serde_json::json!(all_keys));
+                        }
+                    }
+                }
                 serde_json::json!({
                     "type": "function",
-                    "function": {
-                        "name": t.name,
-                        "description": t.description,
-                        "parameters": t.parameters
-                    }
+                    "function": func
                 })
             })
             .collect();
 
         if self.should_use_responses_api(None) {
             let url = format!("{}/responses", self.api_base);
-            let payload =
-                self.build_responses_api_payload(&messages, stop, Some(&openai_tools), false);
+            let mut all_tools_json = openai_tools.clone();
+            for bt in &self.bound_builtin_tools {
+                all_tools_json.push(bt.clone());
+            }
+            let mut payload =
+                self.build_responses_api_payload(&messages, stop, Some(&all_tools_json), false);
+
+            if let Some(choice) = tool_choice {
+                let choice_json = match choice {
+                    ToolChoice::String(s) => format_tool_choice_for_responses_api(s),
+                    ToolChoice::Structured { choice_type, name } => {
+                        if choice_type == "tool" || choice_type == "function" {
+                            serde_json::json!({
+                                "type": "function",
+                                "name": name
+                            })
+                        } else {
+                            serde_json::json!(choice_type)
+                        }
+                    }
+                };
+                payload["tool_choice"] = choice_json;
+            }
 
             let resp: ResponsesApiResponse = (|| self.send_json_request(&url, &payload))
                 .retry(self.retry_strategy())
@@ -2068,15 +2963,7 @@ impl ChatOpenAI {
 
         if let Some(choice) = tool_choice {
             let choice_json = match choice {
-                ToolChoice::String(s) => {
-                    if s == "any" {
-                        serde_json::json!("required")
-                    } else if WELL_KNOWN_TOOLS.contains(&s.as_str()) {
-                        serde_json::json!({"type": s})
-                    } else {
-                        serde_json::json!(s)
-                    }
-                }
+                ToolChoice::String(s) => format_tool_choice_for_chat_completions(s),
                 ToolChoice::Structured { choice_type, name } => {
                     if choice_type == "tool" || choice_type == "function" {
                         serde_json::json!({
@@ -2123,6 +3010,7 @@ struct OpenAIChoice {
 struct OpenAIMessage {
     content: Option<String>,
     tool_calls: Option<Vec<OpenAIToolCall>>,
+    audio: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2193,9 +3081,10 @@ struct ResponsesApiResponse {
     usage: Option<ResponsesUsage>,
     status: Option<String>,
     service_tier: Option<String>,
+    incomplete_details: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 enum ResponsesOutput {
     #[serde(rename = "message")]
@@ -2212,23 +3101,29 @@ enum ResponsesOutput {
     FileSearchCall {},
     #[serde(rename = "code_interpreter_call")]
     CodeInterpreterCall {},
+    #[serde(rename = "mcp_approval_request")]
+    McpApprovalRequest {},
+    #[serde(rename = "mcp_call")]
+    McpCall {},
+    #[serde(rename = "computer_call")]
+    ComputerCall {},
+    #[serde(rename = "image_generation_call")]
+    ImageGenerationCall {},
     #[serde(other)]
     Other,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 enum ResponsesContent {
     #[serde(rename = "output_text")]
     OutputText {
         text: String,
         #[serde(default)]
-        #[allow(dead_code)]
-        annotations: Vec<TextAnnotation>,
+        _annotations: Vec<TextAnnotation>,
     },
     #[serde(rename = "refusal")]
-    #[allow(dead_code)]
-    Refusal { refusal: String },
+    Refusal { _refusal: String },
     #[serde(other)]
     Other,
 }
@@ -2254,8 +3149,8 @@ struct ResponsesStreamEvent {
     event_type: String,
     delta: Option<String>,
     response: Option<ResponsesStreamResponse>,
-    #[allow(dead_code)]
-    annotation: Option<TextAnnotation>,
+    #[serde(rename = "annotation")]
+    _annotation: Option<TextAnnotation>,
     call_id: Option<String>,
     item_id: Option<String>,
     item: Option<serde_json::Value>,
@@ -2265,7 +3160,9 @@ struct ResponsesStreamEvent {
 struct ResponsesStreamResponse {
     usage: Option<ResponsesUsage>,
     status: Option<String>,
+    id: Option<String>,
     service_tier: Option<String>,
+    incomplete_details: Option<serde_json::Value>,
 }
 
 #[cfg(test)]
@@ -2427,5 +3324,172 @@ mod tests {
             "tools": [{"type": "web_search"}]
         });
         assert!(payload_requires_responses_api(&payload));
+    }
+
+    #[test]
+    fn test_is_data_content_block() {
+        assert!(is_data_content_block(&serde_json::json!({
+            "type": "image", "base64": "abc", "mime_type": "image/png"
+        })));
+        assert!(is_data_content_block(&serde_json::json!({
+            "type": "image", "url": "https://example.com/img.png"
+        })));
+        assert!(is_data_content_block(&serde_json::json!({
+            "type": "audio", "base64": "abc", "mime_type": "audio/wav"
+        })));
+        assert!(is_data_content_block(&serde_json::json!({
+            "type": "file", "base64": "abc", "mime_type": "application/pdf"
+        })));
+        assert!(is_data_content_block(&serde_json::json!({
+            "type": "file", "file_id": "file-123"
+        })));
+        assert!(!is_data_content_block(&serde_json::json!({
+            "type": "text", "text": "hello"
+        })));
+        assert!(!is_data_content_block(&serde_json::json!({
+            "type": "image_url", "image_url": {"url": "https://example.com"}
+        })));
+        assert!(!is_data_content_block(&serde_json::json!({
+            "type": "input_audio", "input_audio": {"data": "abc", "format": "wav"}
+        })));
+    }
+
+    #[test]
+    fn test_convert_to_openai_data_block_audio() {
+        let block = serde_json::json!({
+            "type": "audio",
+            "base64": "audiodata123",
+            "mime_type": "audio/wav"
+        });
+        let result = convert_to_openai_data_block(&block, "chat/completions");
+        assert_eq!(result["type"], "input_audio");
+        assert_eq!(result["input_audio"]["data"], "audiodata123");
+        assert_eq!(result["input_audio"]["format"], "wav");
+    }
+
+    #[test]
+    fn test_convert_to_openai_data_block_file_base64() {
+        let block = serde_json::json!({
+            "type": "file",
+            "base64": "pdfdata123",
+            "mime_type": "application/pdf"
+        });
+        let result = convert_to_openai_data_block(&block, "chat/completions");
+        assert_eq!(result["type"], "file");
+        assert_eq!(
+            result["file"]["file_data"],
+            "data:application/pdf;base64,pdfdata123"
+        );
+    }
+
+    #[test]
+    fn test_convert_to_openai_data_block_file_base64_with_filename() {
+        let block = serde_json::json!({
+            "type": "file",
+            "base64": "pdfdata123",
+            "mime_type": "application/pdf",
+            "filename": "test.pdf"
+        });
+        let result = convert_to_openai_data_block(&block, "chat/completions");
+        assert_eq!(result["file"]["filename"], "test.pdf");
+    }
+
+    #[test]
+    fn test_convert_to_openai_data_block_file_responses_api() {
+        let block = serde_json::json!({
+            "type": "file",
+            "base64": "pdfdata123",
+            "mime_type": "application/pdf"
+        });
+        let result = convert_to_openai_data_block(&block, "responses");
+        assert_eq!(result["type"], "input_file");
+        assert_eq!(
+            result["file_data"],
+            "data:application/pdf;base64,pdfdata123"
+        );
+    }
+
+    #[test]
+    fn test_convert_to_openai_data_block_file_id() {
+        let block = serde_json::json!({
+            "type": "file",
+            "file_id": "file-abc123"
+        });
+        let result = convert_to_openai_data_block(&block, "chat/completions");
+        assert_eq!(result["type"], "file");
+        assert_eq!(result["file"]["file_id"], "file-abc123");
+    }
+
+    #[test]
+    fn test_convert_to_openai_data_block_image() {
+        let block = serde_json::json!({
+            "type": "image",
+            "base64": "imgdata",
+            "mime_type": "image/png"
+        });
+        let result = convert_to_openai_data_block(&block, "chat/completions");
+        assert_eq!(result["type"], "image_url");
+        assert_eq!(result["image_url"]["url"], "data:image/png;base64,imgdata");
+    }
+
+    #[test]
+    fn test_convert_to_openai_data_block_image_responses() {
+        let block = serde_json::json!({
+            "type": "image",
+            "base64": "imgdata",
+            "mime_type": "image/png"
+        });
+        let result = convert_to_openai_data_block(&block, "responses");
+        assert_eq!(result["type"], "input_image");
+        assert_eq!(result["image_url"], "data:image/png;base64,imgdata");
+    }
+
+    #[test]
+    fn test_format_message_content_converts_data_blocks() {
+        let content = serde_json::json!([
+            {"type": "text", "text": "hello"},
+            {"type": "audio", "base64": "audiodata", "mime_type": "audio/wav"},
+            {"type": "file", "base64": "pdfdata", "mime_type": "application/pdf"}
+        ]);
+        let result =
+            ChatOpenAI::format_message_content(&content, "chat/completions", Some("human"));
+        let arr = result.as_array().expect("should be array");
+        assert_eq!(arr.len(), 3);
+        assert_eq!(arr[0]["type"], "text");
+        assert_eq!(arr[1]["type"], "input_audio");
+        assert_eq!(arr[1]["input_audio"]["data"], "audiodata");
+        assert_eq!(arr[2]["type"], "file");
+        assert_eq!(
+            arr[2]["file"]["file_data"],
+            "data:application/pdf;base64,pdfdata"
+        );
+    }
+
+    #[test]
+    fn test_format_message_content_filters_thinking() {
+        let content = serde_json::json!([
+            {"type": "text", "text": "hello"},
+            {"type": "thinking", "thinking": "internal thought"},
+            {"type": "tool_use", "id": "abc"}
+        ]);
+        let result =
+            ChatOpenAI::format_message_content(&content, "chat/completions", Some("human"));
+        let arr = result.as_array().expect("should be array");
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["type"], "text");
+    }
+
+    #[test]
+    fn test_format_message_content_passthrough_openai_format() {
+        let content = serde_json::json!([
+            {"type": "image_url", "image_url": {"url": "https://example.com/img.png"}},
+            {"type": "input_audio", "input_audio": {"data": "abc", "format": "wav"}}
+        ]);
+        let result =
+            ChatOpenAI::format_message_content(&content, "chat/completions", Some("human"));
+        let arr = result.as_array().expect("should be array");
+        assert_eq!(arr.len(), 2);
+        assert_eq!(arr[0]["type"], "image_url");
+        assert_eq!(arr[1]["type"], "input_audio");
     }
 }

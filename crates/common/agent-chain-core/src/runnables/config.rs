@@ -204,17 +204,20 @@ fn merge_into_config(target: &mut RunnableConfig, source: &RunnableConfig) {
     }
 }
 
-pub fn get_config_list(config: Option<ConfigOrList>, length: usize) -> Vec<RunnableConfig> {
+pub fn get_config_list(
+    config: Option<ConfigOrList>,
+    length: usize,
+) -> crate::error::Result<Vec<RunnableConfig>> {
     match config {
         Some(ConfigOrList::List(list)) => {
             if list.len() != length {
-                panic!(
-                    "config must be a list of the same length as inputs, but got {} configs for {} inputs",
+                return Err(crate::error::Error::other(format!(
+                    "config must be a list of the same length as inputs,                      but got {} configs for {} inputs",
                     list.len(),
                     length
-                );
+                )));
             }
-            list.into_iter().map(|c| ensure_config(Some(c))).collect()
+            Ok(list.into_iter().map(|c| ensure_config(Some(c))).collect())
         }
         Some(ConfigOrList::Single(c)) => {
             if length > 1 && c.run_id.is_some() {
@@ -229,14 +232,14 @@ pub fn get_config_list(config: Option<ConfigOrList>, length: usize) -> Vec<Runna
                 for _ in 1..length {
                     configs.push(ensure_config(Some(subsequent.clone())));
                 }
-                configs
+                Ok(configs)
             } else {
-                (0..length)
+                Ok((0..length)
                     .map(|_| ensure_config(Some((*c).clone())))
-                    .collect()
+                    .collect())
             }
         }
-        None => (0..length).map(|_| ensure_config(None)).collect(),
+        None => Ok((0..length).map(|_| ensure_config(None)).collect()),
     }
 }
 
@@ -527,11 +530,11 @@ mod tests {
 
     #[test]
     fn test_get_config_list() {
-        let configs = get_config_list(None, 3);
+        let configs = get_config_list(None, 3).unwrap();
         assert_eq!(configs.len(), 3);
 
         let single = RunnableConfig::new().with_recursion_limit(10);
-        let configs = get_config_list(Some(ConfigOrList::Single(Box::new(single))), 3);
+        let configs = get_config_list(Some(ConfigOrList::Single(Box::new(single))), 3).unwrap();
         assert_eq!(configs.len(), 3);
         assert!(configs.iter().all(|c| c.recursion_limit == 10));
     }
@@ -577,7 +580,8 @@ mod tests {
             .with_run_id(uuid::Uuid::new_v4())
             .with_recursion_limit(10);
 
-        let configs = get_config_list(Some(ConfigOrList::Single(Box::new(config.clone()))), 3);
+        let configs =
+            get_config_list(Some(ConfigOrList::Single(Box::new(config.clone()))), 3).unwrap();
         assert_eq!(configs.len(), 3);
         assert!(configs[0].run_id.is_some());
         assert_eq!(configs[0].recursion_limit, 10);

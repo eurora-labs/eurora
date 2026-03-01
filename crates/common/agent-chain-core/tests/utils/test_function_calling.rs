@@ -92,7 +92,7 @@ fn test_convert_to_openai_function_from_json_schema() {
     let json_schema = expected_json_schema();
     let expected = expected_openai_function();
 
-    let actual = convert_to_openai_function(&json_schema, None);
+    let actual = convert_to_openai_function(&json_schema, None).unwrap();
 
     assert_eq!(actual, expected);
 }
@@ -102,7 +102,7 @@ fn test_convert_to_openai_function_from_json_schema() {
 fn test_convert_to_openai_function_from_anthropic_tool() {
     let expected = expected_openai_function();
 
-    let actual = convert_to_openai_function(&anthropic_tool(), None);
+    let actual = convert_to_openai_function(&anthropic_tool(), None).unwrap();
 
     assert_eq!(actual, expected);
 }
@@ -112,7 +112,7 @@ fn test_convert_to_openai_function_from_anthropic_tool() {
 fn test_convert_to_openai_function_from_bedrock_converse_tool() {
     let expected = expected_openai_function();
 
-    let actual = convert_to_openai_function(&bedrock_converse_tool(), None);
+    let actual = convert_to_openai_function(&bedrock_converse_tool(), None).unwrap();
 
     assert_eq!(actual, expected);
 }
@@ -122,7 +122,7 @@ fn test_convert_to_openai_function_from_bedrock_converse_tool() {
 fn test_convert_to_openai_function_from_openai_function() {
     let expected = expected_openai_function();
 
-    let actual = convert_to_openai_function(&expected, None);
+    let actual = convert_to_openai_function(&expected, None).unwrap();
 
     assert_eq!(actual, expected);
 }
@@ -173,7 +173,7 @@ fn test_convert_to_openai_function_nested() {
         },
     });
 
-    let actual = convert_to_openai_function(&nested_schema, None);
+    let actual = convert_to_openai_function(&nested_schema, None).unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -227,7 +227,7 @@ fn test_convert_to_openai_function_nested_strict() {
         "strict": true,
     });
 
-    let actual = convert_to_openai_function(&nested_schema, Some(true));
+    let actual = convert_to_openai_function(&nested_schema, Some(true)).unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -303,7 +303,7 @@ fn test_convert_to_openai_function_strict_union_of_objects_arg_type() {
         "strict": true,
     });
 
-    let actual = convert_to_openai_function(&schema, Some(true));
+    let actual = convert_to_openai_function(&schema, Some(true)).unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -412,7 +412,7 @@ fn test_convert_to_openai_function_no_description_anthropic() {
         },
     });
 
-    let actual = convert_to_openai_function(&anthropic_tool_no_description(), None);
+    let actual = convert_to_openai_function(&anthropic_tool_no_description(), None).unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -435,7 +435,7 @@ fn test_convert_to_openai_function_no_description_json_schema() {
         },
     });
 
-    let actual = convert_to_openai_function(&json_schema_no_description(), None);
+    let actual = convert_to_openai_function(&json_schema_no_description(), None).unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -458,7 +458,7 @@ fn test_convert_to_openai_function_no_description_bedrock() {
         },
     });
 
-    let actual = convert_to_openai_function(&bedrock_converse_tool_no_description(), None);
+    let actual = convert_to_openai_function(&bedrock_converse_tool_no_description(), None).unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -481,7 +481,7 @@ fn test_convert_to_openai_function_no_description_openai() {
         },
     });
 
-    let actual = convert_to_openai_function(&openai_function_no_description(), None);
+    let actual = convert_to_openai_function(&openai_function_no_description(), None).unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -492,7 +492,7 @@ fn test_convert_to_openai_function_no_description_no_params_json_schema() {
         "name": "dummy_function",
     });
 
-    let actual = convert_to_openai_function(&json_schema_no_description_no_params(), None);
+    let actual = convert_to_openai_function(&json_schema_no_description_no_params(), None).unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -503,7 +503,8 @@ fn test_convert_to_openai_function_no_description_no_params_openai() {
         "name": "dummy_function",
     });
 
-    let actual = convert_to_openai_function(&openai_function_no_description_no_params(), None);
+    let actual =
+        convert_to_openai_function(&openai_function_no_description_no_params(), None).unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -517,7 +518,7 @@ fn test_function_no_params() {
         "properties": {},
     });
 
-    let func = convert_to_openai_function(&schema, None);
+    let func = convert_to_openai_function(&schema, None).unwrap();
     let required = func
         .get("parameters")
         .and_then(|p| p.get("required"))
@@ -541,7 +542,7 @@ fn test_convert_union_type() {
         "required": ["value"],
     });
 
-    let result = convert_to_openai_function(&schema, None);
+    let result = convert_to_openai_function(&schema, None).unwrap();
     let value_prop = result
         .get("parameters")
         .and_then(|p| p.get("properties"))
@@ -565,7 +566,7 @@ fn test_convert_to_openai_function_no_args() {
         "properties": {},
     });
 
-    let actual = convert_to_openai_function(&schema, Some(true));
+    let actual = convert_to_openai_function(&schema, Some(true)).unwrap();
     let expected = json!({
         "name": "empty_tool",
         "description": "No args.",
@@ -618,7 +619,7 @@ fn test_convert_to_openai_function_nested_strict_2() {
         "strict": true,
     });
 
-    let actual = convert_to_openai_function(&schema, Some(true));
+    let actual = convert_to_openai_function(&schema, Some(true)).unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -640,7 +641,7 @@ fn test_convert_to_openai_function_strict_required() {
         "required": ["arg1"],
     });
 
-    let func = convert_to_openai_function(&schema, Some(true));
+    let func = convert_to_openai_function(&schema, Some(true)).unwrap();
     let required = func
         .get("parameters")
         .and_then(|p| p.get("required"))
@@ -857,7 +858,7 @@ fn test_convert_typed_dict_to_openai_function() {
         },
     });
 
-    let actual = convert_typed_dict_to_openai_function(&typed_dict_schema);
+    let actual = convert_typed_dict_to_openai_function(&typed_dict_schema).unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -925,7 +926,7 @@ fn test_convert_to_openai_function_from_structured_tool() {
     );
 
     let expected = expected_openai_function();
-    let actual = convert_to_openai_function(&tool, None);
+    let actual = convert_to_openai_function(&tool, None).unwrap();
 
     assert_eq!(actual, expected);
 }
@@ -954,7 +955,7 @@ fn test_convert_to_openai_function_from_structured_tool_args_schema_dict() {
     );
 
     let expected = expected_openai_function();
-    let actual = convert_to_openai_function(&tool, None);
+    let actual = convert_to_openai_function(&tool, None).unwrap();
 
     assert_eq!(actual, expected);
 }
@@ -976,7 +977,7 @@ fn test_convert_to_openai_function_from_simple_tool() {
         },
     });
 
-    let actual = convert_to_openai_function(&tool, None);
+    let actual = convert_to_openai_function(&tool, None).unwrap();
 
     assert_eq!(actual, expected);
 }
@@ -1033,7 +1034,7 @@ fn test_convert_to_openai_function_comprehensive() {
     ];
 
     for (name, input) in test_inputs {
-        let actual = convert_to_openai_function(&input, None);
+        let actual = convert_to_openai_function(&input, None).unwrap();
         assert_eq!(actual, expected, "Failed for input type: {}", name);
     }
 }
@@ -1056,7 +1057,7 @@ fn test_convert_to_openai_function_from_typing_typed_dict() {
     });
 
     let expected = expected_openai_function();
-    let actual = convert_to_openai_function(&typed_dict_schema, None);
+    let actual = convert_to_openai_function(&typed_dict_schema, None).unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -1078,7 +1079,7 @@ fn test_convert_to_openai_function_from_typing_typed_dict_docstring() {
     });
 
     let expected = expected_openai_function();
-    let actual = convert_to_openai_function(&typed_dict_schema, None);
+    let actual = convert_to_openai_function(&typed_dict_schema, None).unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -1100,7 +1101,7 @@ fn test_convert_to_openai_function_from_extensions_typed_dict() {
     });
 
     let expected = expected_openai_function();
-    let actual = convert_to_openai_function(&typed_dict_schema, None);
+    let actual = convert_to_openai_function(&typed_dict_schema, None).unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -1122,7 +1123,7 @@ fn test_convert_to_openai_function_from_extensions_typed_dict_docstring() {
     });
 
     let expected = expected_openai_function();
-    let actual = convert_to_openai_function(&typed_dict_schema, None);
+    let actual = convert_to_openai_function(&typed_dict_schema, None).unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -1340,7 +1341,7 @@ fn test_convert_typed_dict_to_openai_function_full() {
         },
     });
 
-    let actual = convert_typed_dict_to_openai_function(&typed_dict_schema);
+    let actual = convert_typed_dict_to_openai_function(&typed_dict_schema).unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -1356,7 +1357,7 @@ fn test_convert_typed_dict_to_openai_function_fail() {
         },
     });
 
-    let result = convert_typed_dict_to_openai_function(&invalid_schema);
+    let result = convert_typed_dict_to_openai_function(&invalid_schema).unwrap();
 
     assert!(result.get("name").is_some());
     assert_eq!(result.get("name").unwrap(), "Tool");
@@ -1434,6 +1435,6 @@ fn test_convert_to_openai_function_from_runnable_tool() {
         },
     });
 
-    let actual = convert_to_openai_function(&runnable_tool_schema, None);
+    let actual = convert_to_openai_function(&runnable_tool_schema, None).unwrap();
     assert_eq!(actual, expected);
 }

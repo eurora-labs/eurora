@@ -23,12 +23,6 @@ use super::utils::{Addable, ConfigurableFieldSpec, get_unique_config_specs};
 
 pub type ConfigFactory = Arc<dyn Fn(&RunnableConfig) -> RunnableConfig + Send + Sync>;
 
-#[allow(dead_code)]
-const RUNNABLE_GENERIC_NUM_ARGS: usize = 2;
-
-#[allow(dead_code)]
-const RUNNABLE_SEQUENCE_MIN_STEPS: usize = 2;
-
 #[async_trait]
 pub trait Runnable: Send + Sync + Debug {
     type Input: Send + Sync + Clone + Debug + 'static;
@@ -162,7 +156,10 @@ pub trait Runnable: Send + Sync + Debug {
             return Vec::new();
         }
 
-        let configs = get_config_list(config, inputs.len());
+        let configs = match get_config_list(config, inputs.len()) {
+            Ok(c) => c,
+            Err(e) => return vec![Err(e)],
+        };
 
         let run_managers: Vec<_> = configs
             .iter()
@@ -211,11 +208,11 @@ pub trait Runnable: Send + Sync + Debug {
         if return_exceptions {
             outputs
         } else if let Some(idx) = first_exception {
-            vec![Err(outputs
-                .into_iter()
-                .nth(idx)
-                .expect("idx within bounds")
-                .unwrap_err())]
+            let error = outputs.into_iter().nth(idx).and_then(|r| r.err());
+            match error {
+                Some(e) => vec![Err(e)],
+                None => vec![],
+            }
         } else {
             outputs
         }
@@ -371,7 +368,10 @@ pub trait Runnable: Send + Sync + Debug {
             return Vec::new();
         }
 
-        let configs = get_config_list(config, inputs.len());
+        let configs = match get_config_list(config, inputs.len()) {
+            Ok(c) => c,
+            Err(e) => return vec![Err(e)],
+        };
 
         if inputs.len() == 1 {
             let input = inputs.into_iter().next().expect("checked len == 1");
@@ -473,7 +473,10 @@ pub trait Runnable: Send + Sync + Debug {
             return Vec::new();
         }
 
-        let configs = get_config_list(config, inputs.len());
+        let configs = match get_config_list(config, inputs.len()) {
+            Ok(c) => c,
+            Err(e) => return vec![Err(e)],
+        };
         let max_concurrency = configs[0].max_concurrency;
 
         let results = match max_concurrency {
@@ -526,7 +529,10 @@ pub trait Runnable: Send + Sync + Debug {
             return Vec::new();
         }
 
-        let configs = get_config_list(config, inputs.len());
+        let configs = match get_config_list(config, inputs.len()) {
+            Ok(c) => c,
+            Err(e) => return vec![(0, Err(e))],
+        };
 
         if inputs.len() == 1 {
             let input = inputs.into_iter().next().expect("checked len == 1");
@@ -595,7 +601,10 @@ pub trait Runnable: Send + Sync + Debug {
             return Box::pin(futures::stream::empty());
         }
 
-        let configs = get_config_list(config, inputs.len());
+        let configs = match get_config_list(config, inputs.len()) {
+            Ok(c) => c,
+            Err(e) => return Box::pin(futures::stream::once(async move { (0, Err(e)) })),
+        };
         let max_concurrency = configs[0].max_concurrency;
         let semaphore = max_concurrency.map(|n| Arc::new(Semaphore::new(n)));
 
@@ -2482,10 +2491,7 @@ where
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let rt = tokio::runtime::Handle::try_current()
-            .map_err(|_| Error::other("RunnableGenerator::invoke requires a tokio runtime"))?;
-
-        rt.block_on(async {
+        let collect_stream = async {
             let mut stream = self.stream(input, config);
             let mut final_output: Option<Self::Output> = None;
             while let Some(result) = stream.next().await {
@@ -2496,7 +2502,28 @@ where
                 });
             }
             final_output.ok_or_else(|| Error::other("RunnableGenerator produced no output"))
-        })
+        };
+
+        if tokio::runtime::Handle::try_current().is_ok() {
+            std::thread::scope(|scope| {
+                scope
+                    .spawn(|| {
+                        tokio::runtime::Builder::new_current_thread()
+                            .enable_all()
+                            .build()
+                            .expect("failed to create tokio runtime")
+                            .block_on(collect_stream)
+                    })
+                    .join()
+                    .expect("spawned thread panicked")
+            })
+        } else {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| Error::other(format!("failed to create tokio runtime: {e}")))?
+                .block_on(collect_stream)
+        }
     }
 
     async fn ainvoke(

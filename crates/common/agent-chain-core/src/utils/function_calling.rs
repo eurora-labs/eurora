@@ -151,22 +151,25 @@ fn convert_json_schema_to_openai_function(
 }
 
 pub trait ToOpenAIFunction {
-    fn to_openai_function(&self, strict: Option<bool>) -> Value;
+    fn to_openai_function(&self, strict: Option<bool>) -> crate::error::Result<Value>;
 }
 
 impl ToOpenAIFunction for Value {
-    fn to_openai_function(&self, strict: Option<bool>) -> Value {
+    fn to_openai_function(&self, strict: Option<bool>) -> crate::error::Result<Value> {
         convert_to_openai_function(self, strict)
     }
 }
 
 impl<T: BaseTool> ToOpenAIFunction for T {
-    fn to_openai_function(&self, strict: Option<bool>) -> Value {
+    fn to_openai_function(&self, strict: Option<bool>) -> crate::error::Result<Value> {
         convert_to_openai_function(self, strict)
     }
 }
 
-pub fn convert_to_openai_function<T>(function: &T, strict: Option<bool>) -> Value
+pub fn convert_to_openai_function<T>(
+    function: &T,
+    strict: Option<bool>,
+) -> crate::error::Result<Value>
 where
     T: ConvertibleToOpenAI + ?Sized,
 {
@@ -174,11 +177,11 @@ where
 }
 
 pub trait ConvertibleToOpenAI {
-    fn convert_to_openai_function_impl(&self, strict: Option<bool>) -> Value;
+    fn convert_to_openai_function_impl(&self, strict: Option<bool>) -> crate::error::Result<Value>;
 }
 
 impl ConvertibleToOpenAI for Value {
-    fn convert_to_openai_function_impl(&self, strict: Option<bool>) -> Value {
+    fn convert_to_openai_function_impl(&self, strict: Option<bool>) -> crate::error::Result<Value> {
         let oai_function: Value;
 
         if self.is_object() && self.get("name").is_some() && self.get("input_schema").is_some() {
@@ -255,10 +258,10 @@ impl ConvertibleToOpenAI for Value {
                 && let Some(existing_strict) = existing.get("strict")
                 && existing_strict.as_bool() != Some(strict_val)
             {
-                panic!(
-                    "Tool/function already has a 'strict' key with value {} which is different from the explicit strict arg {}",
+                return Err(crate::error::Error::other(format!(
+                    "Tool/function already has a 'strict' key with value {} which                      is different from the explicit strict arg {}",
                     existing_strict, strict_val
-                );
+                )));
             }
 
             if let Value::Object(ref mut map) = oai_function {
@@ -281,12 +284,12 @@ impl ConvertibleToOpenAI for Value {
             }
         }
 
-        oai_function
+        Ok(oai_function)
     }
 }
 
 impl<T: BaseTool + ?Sized> ConvertibleToOpenAI for T {
-    fn convert_to_openai_function_impl(&self, strict: Option<bool>) -> Value {
+    fn convert_to_openai_function_impl(&self, strict: Option<bool>) -> crate::error::Result<Value> {
         let args_schema = self.args_schema();
 
         let is_simple_tool = args_schema.is_none();
@@ -327,7 +330,7 @@ impl<T: BaseTool + ?Sized> ConvertibleToOpenAI for T {
                 }
             }
 
-            return result;
+            return Ok(result);
         }
 
         let mut result = serde_json::json!({
@@ -352,43 +355,43 @@ impl<T: BaseTool + ?Sized> ConvertibleToOpenAI for T {
             }
         }
 
-        result
+        Ok(result)
     }
 }
 
-pub fn convert_typed_dict_to_openai_function(schema: &Value) -> Value {
+pub fn convert_typed_dict_to_openai_function(schema: &Value) -> crate::error::Result<Value> {
     convert_to_openai_function(schema, None)
 }
 
 pub trait ConvertibleToOpenAITool {
-    fn convert_to_openai_tool_impl(&self, strict: Option<bool>) -> Value;
+    fn convert_to_openai_tool_impl(&self, strict: Option<bool>) -> crate::error::Result<Value>;
 }
 
 impl ConvertibleToOpenAITool for Value {
-    fn convert_to_openai_tool_impl(&self, strict: Option<bool>) -> Value {
+    fn convert_to_openai_tool_impl(&self, strict: Option<bool>) -> crate::error::Result<Value> {
         if self.is_object() && is_well_known_openai_tool(self) {
-            return self.clone();
+            return Ok(self.clone());
         }
 
-        let oai_function = convert_to_openai_function(self, strict);
-        serde_json::json!({
+        let oai_function = convert_to_openai_function(self, strict)?;
+        Ok(serde_json::json!({
             "type": "function",
             "function": oai_function
-        })
+        }))
     }
 }
 
 impl<T: BaseTool + ?Sized> ConvertibleToOpenAITool for T {
-    fn convert_to_openai_tool_impl(&self, strict: Option<bool>) -> Value {
-        let oai_function = convert_to_openai_function(self, strict);
-        serde_json::json!({
+    fn convert_to_openai_tool_impl(&self, strict: Option<bool>) -> crate::error::Result<Value> {
+        let oai_function = convert_to_openai_function(self, strict)?;
+        Ok(serde_json::json!({
             "type": "function",
             "function": oai_function
-        })
+        }))
     }
 }
 
-pub fn convert_to_openai_tool<T>(tool: &T, strict: Option<bool>) -> Value
+pub fn convert_to_openai_tool<T>(tool: &T, strict: Option<bool>) -> crate::error::Result<Value>
 where
     T: ConvertibleToOpenAITool + ?Sized,
 {
@@ -399,7 +402,7 @@ pub fn convert_to_json_schema<T>(schema: &T, strict: Option<bool>) -> crate::Res
 where
     T: ConvertibleToOpenAITool + ?Sized,
 {
-    let openai_tool = convert_to_openai_tool(schema, strict);
+    let openai_tool = convert_to_openai_tool(schema, strict)?;
 
     let function = openai_tool.get("function").ok_or_else(|| {
         crate::Error::InvalidConfig("Input must be a valid OpenAI-format tool".to_string())
@@ -543,7 +546,7 @@ mod tests {
             "required": ["arg1"]
         });
 
-        let result = convert_to_openai_function(&schema, None);
+        let result = convert_to_openai_function(&schema, None).unwrap();
 
         assert_eq!(result.get("name").unwrap(), "TestFunction");
         assert_eq!(result.get("description").unwrap(), "A test function.");
@@ -562,7 +565,7 @@ mod tests {
             }
         });
 
-        let result = convert_to_openai_function(&anthropic_tool, None);
+        let result = convert_to_openai_function(&anthropic_tool, None).unwrap();
 
         assert_eq!(result.get("name").unwrap(), "my_tool");
         assert_eq!(result.get("description").unwrap(), "My tool description");
@@ -581,7 +584,7 @@ mod tests {
             "required": ["arg1"]
         });
 
-        let result = convert_to_openai_function(&schema, Some(true));
+        let result = convert_to_openai_function(&schema, Some(true)).unwrap();
 
         assert_eq!(result.get("strict").unwrap(), true);
     }

@@ -257,7 +257,28 @@ impl AIMessage {
                 };
                 openai_convert(&raw_content, false, Some(&context))
             }
-            _ => raw_content,
+            _ => {
+                let mut blocks = raw_content;
+                // Matches Python's _extract_reasoning_from_additional_kwargs:
+                // extract reasoning_content from additional_kwargs and prepend as a
+                // reasoning block. Used by Ollama, DeepSeek, XAI, Groq, etc.
+                let has_reasoning = blocks
+                    .iter()
+                    .any(|b| b.get("type").and_then(|t| t.as_str()) == Some("reasoning"));
+                if !has_reasoning
+                    && let Some(serde_json::Value::String(reasoning)) =
+                        self.additional_kwargs.get("reasoning_content")
+                {
+                    blocks.insert(
+                        0,
+                        serde_json::json!({
+                            "type": "reasoning",
+                            "reasoning": reasoning,
+                        }),
+                    );
+                }
+                blocks
+            }
         };
 
         use super::content::{
@@ -627,6 +648,23 @@ impl AIMessageChunk {
             }
             _ => {
                 let mut blocks = raw_content;
+
+                // Matches Python's _extract_reasoning_from_additional_kwargs
+                let has_reasoning = blocks
+                    .iter()
+                    .any(|b| b.get("type").and_then(|t| t.as_str()) == Some("reasoning"));
+                if !has_reasoning
+                    && let Some(serde_json::Value::String(reasoning)) =
+                        self.additional_kwargs.get("reasoning_content")
+                {
+                    blocks.insert(
+                        0,
+                        serde_json::json!({
+                            "type": "reasoning",
+                            "reasoning": reasoning,
+                        }),
+                    );
+                }
 
                 for tc in &self.tool_call_chunks {
                     if let Ok(mut chunk_value) = serde_json::to_value(tc) {
