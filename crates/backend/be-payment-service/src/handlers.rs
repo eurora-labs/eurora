@@ -236,7 +236,8 @@ pub async fn get_checkout_status(
                 .as_ref()
                 .and_then(|d| d.email.as_deref())
         })
-        .unwrap_or_default();
+        .filter(|e| !e.is_empty())
+        .ok_or_else(|| PaymentError::MissingField("session email"))?;
     if !session_email.eq_ignore_ascii_case(&claims.email) {
         return Err(PaymentError::Unauthorized(
             "Session does not belong to this user".to_string(),

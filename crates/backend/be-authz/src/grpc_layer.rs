@@ -10,6 +10,7 @@ use be_auth_core::JwtConfig;
 use be_remote_db::DatabaseManager;
 use http::Request;
 use tonic::Status;
+use tonic::transport::server::TcpConnectInfo;
 use tower::{Layer, Service};
 
 use crate::CasbinAuthz;
@@ -95,7 +96,13 @@ where
         let peer_addr = req
             .extensions()
             .get::<ConnectInfo<SocketAddr>>()
-            .map(|ci| ci.0.ip());
+            .map(|ci| ci.0.ip())
+            .or_else(|| {
+                req.extensions()
+                    .get::<TcpConnectInfo>()
+                    .and_then(|ci| ci.remote_addr())
+                    .map(|addr| addr.ip())
+            });
         let client_ip = rate_limit::extract_client_ip(req.headers(), peer_addr);
         let inner = self.inner.clone();
         let mut inner = std::mem::replace(&mut self.inner, inner);
