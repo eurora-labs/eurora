@@ -1,5 +1,5 @@
 use std::future::Future;
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -10,11 +10,12 @@ use be_auth_core::JwtConfig;
 use be_remote_db::DatabaseManager;
 use http::Request;
 use tonic::Status;
+use tonic::transport::server::TcpConnectInfo;
 use tower::{Layer, Service};
 
 use crate::CasbinAuthz;
 use crate::bypass::is_grpc_bypass;
-use crate::rate_limit::{AuthFailureRateLimiter, HealthCheckRateLimiter};
+use crate::rate_limit::{self, AuthFailureRateLimiter, HealthCheckRateLimiter, TrustedProxies};
 use crate::token_gate;
 
 #[derive(Clone)]
@@ -24,6 +25,7 @@ pub struct GrpcAuthzLayer {
     rate_limiter: AuthFailureRateLimiter,
     health_rate_limiter: HealthCheckRateLimiter,
     db: Arc<DatabaseManager>,
+    trusted_proxies: TrustedProxies,
 }
 
 impl GrpcAuthzLayer {
@@ -33,6 +35,7 @@ impl GrpcAuthzLayer {
         rate_limiter: AuthFailureRateLimiter,
         health_rate_limiter: HealthCheckRateLimiter,
         db: Arc<DatabaseManager>,
+        trusted_proxies: TrustedProxies,
     ) -> Self {
         Self {
             authz,
@@ -40,6 +43,7 @@ impl GrpcAuthzLayer {
             rate_limiter,
             health_rate_limiter,
             db,
+            trusted_proxies,
         }
     }
 }
@@ -55,6 +59,7 @@ impl<S> Layer<S> for GrpcAuthzLayer {
             rate_limiter: Arc::clone(&self.rate_limiter),
             health_rate_limiter: Arc::clone(&self.health_rate_limiter),
             db: Arc::clone(&self.db),
+            trusted_proxies: self.trusted_proxies.clone(),
         }
     }
 }
@@ -67,13 +72,7 @@ pub struct GrpcAuthzService<S> {
     rate_limiter: AuthFailureRateLimiter,
     health_rate_limiter: HealthCheckRateLimiter,
     db: Arc<DatabaseManager>,
-}
-
-fn extract_client_ip<B>(req: &Request<B>) -> IpAddr {
-    req.extensions()
-        .get::<ConnectInfo<SocketAddr>>()
-        .map(|ci| ci.0.ip())
-        .unwrap_or(IpAddr::from([127, 0, 0, 1]))
+    trusted_proxies: TrustedProxies,
 }
 
 impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for GrpcAuthzService<S>
@@ -99,7 +98,18 @@ where
         let rate_limiter = Arc::clone(&self.rate_limiter);
         let health_rate_limiter = Arc::clone(&self.health_rate_limiter);
         let db = Arc::clone(&self.db);
-        let client_ip = extract_client_ip(&req);
+        let trusted_proxies = self.trusted_proxies.clone();
+        let peer_addr = req
+            .extensions()
+            .get::<ConnectInfo<SocketAddr>>()
+            .map(|ci| ci.0.ip())
+            .or_else(|| {
+                req.extensions()
+                    .get::<TcpConnectInfo>()
+                    .and_then(|ci| ci.remote_addr())
+                    .map(|addr| addr.ip())
+            });
+        let client_ip = rate_limit::extract_client_ip(req.headers(), peer_addr, &trusted_proxies);
         let inner = self.inner.clone();
         let mut inner = std::mem::replace(&mut self.inner, inner);
 
@@ -133,18 +143,15 @@ where
                 return inner.call(req).await;
             }
 
-            if rate_limiter.check_key(&client_ip).is_err() {
-                tracing::warn!(ip = %client_ip, "Rate limited — too many auth failures");
-                return Ok(Status::resource_exhausted(
-                    "Too many failed requests. Try again later.",
-                )
-                .into_http());
-            }
-
             let claims = match extract_jwt_claims(&req, &jwt_config) {
                 Ok(claims) => claims,
                 Err(status) => {
-                    let _ = rate_limiter.check_key(&client_ip);
+                    if rate_limiter.check_key(&client_ip).is_err() {
+                        return Ok(Status::resource_exhausted(
+                            "Too many failed requests. Try again later.",
+                        )
+                        .into_http());
+                    }
                     return Ok(status.into_http());
                 }
             };
@@ -174,7 +181,12 @@ where
                     inner.call(req).await
                 }
                 Ok(false) => {
-                    let _ = rate_limiter.check_key(&client_ip);
+                    if rate_limiter.check_key(&client_ip).is_err() {
+                        return Ok(Status::resource_exhausted(
+                            "Too many failed requests. Try again later.",
+                        )
+                        .into_http());
+                    }
                     tracing::warn!(role = %role, service = %service_name, method = %method, "gRPC authorization denied");
                     Ok(Status::permission_denied(
                         "Insufficient permissions. Please upgrade your plan.",

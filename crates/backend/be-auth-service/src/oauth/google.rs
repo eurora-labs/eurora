@@ -122,7 +122,7 @@ impl GoogleOAuthClient {
         &self,
         code: &str,
         pkce_verifier: String,
-        nonce: Option<&Nonce>,
+        nonce: &Nonce,
     ) -> Result<GoogleUserInfo, OAuthError> {
         let http_client = build_http_client()?;
 
@@ -140,14 +140,9 @@ impl GoogleOAuthClient {
             .ok_or(OAuthError::MissingIdToken)?;
 
         let verifier = self.client.id_token_verifier();
-        let claims: &CoreIdTokenClaims = match nonce {
-            Some(expected_nonce) => id_token
-                .claims(&verifier, expected_nonce)
-                .map_err(|e| OAuthError::TokenVerification(e.to_string()))?,
-            None => id_token
-                .claims(&verifier, |_: Option<&Nonce>| Ok(()))
-                .map_err(|e| OAuthError::TokenVerification(e.to_string()))?,
-        };
+        let claims: &CoreIdTokenClaims = id_token
+            .claims(&verifier, nonce)
+            .map_err(|e| OAuthError::TokenVerification(e.to_string()))?;
 
         let subject = claims.subject().to_string();
         let email = claims.email().ok_or(OAuthError::MissingEmail)?.to_string();

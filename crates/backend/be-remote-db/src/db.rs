@@ -1158,11 +1158,15 @@ impl DatabaseManager {
     }
 
     #[builder]
-    pub async fn try_claim_webhook_event(
+    pub async fn try_claim_webhook_event<'e, E>(
         &self,
+        executor: E,
         event_id: &str,
         event_type: &str,
-    ) -> DbResult<bool> {
+    ) -> DbResult<bool>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
         let result = sqlx::query(
             r#"
             INSERT INTO stripe.webhook_events (event_id, event_type)
@@ -1172,7 +1176,7 @@ impl DatabaseManager {
         )
         .bind(event_id)
         .bind(event_type)
-        .execute(&self.pool)
+        .execute(executor)
         .await?;
 
         Ok(result.rows_affected() > 0)

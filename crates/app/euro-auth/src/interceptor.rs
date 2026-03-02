@@ -1,4 +1,5 @@
 use crate::AuthManager;
+use euro_secret::ExposeSecret;
 use std::pin::Pin;
 use tonic::{Request, Status, transport::Channel};
 use tonic_async_interceptor::{AsyncInterceptor, async_interceptor};
@@ -33,7 +34,7 @@ impl AsyncInterceptor for AuthInterceptor {
                     Status::unauthenticated(format!("Failed to retrieve access token: {}", e))
                 })?;
 
-            let bearer_value = format!("Bearer {}", token.0);
+            let bearer_value = format!("Bearer {}", token.expose_secret());
             let metadata_value = bearer_value.parse().map_err(|e| {
                 tracing::error!("Failed to parse authorization header: {}", e);
                 Status::internal("Failed to create authorization header")

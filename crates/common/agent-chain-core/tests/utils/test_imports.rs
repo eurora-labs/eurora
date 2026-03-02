@@ -10,6 +10,7 @@ const EXPECTED_EXPORTS: &[&str] = &[
     "secret_from_env",
     "build_model_kwargs", // equivalent to Python's "build_extra_kwargs"
     "SecretString",
+    "ExposeSecret",
     "MockTime",          // equivalent to Python's "mock_now"
     "validate_xor_args", // equivalent to Python's "xor_args"
     "HttpStatusError",
@@ -60,6 +61,8 @@ fn test_all_imports() {
     let _ = convert_to_secret_str("test");
     use agent_chain_core::utils::SecretString;
     let _: SecretString = SecretString::from("test");
+    use agent_chain_core::utils::ExposeSecret;
+    let _ = SecretString::from("test").expose_secret().to_owned();
     use agent_chain_core::utils::from_env;
     let _ = from_env(&["TEST"], None, None);
     use agent_chain_core::utils::secret_from_env;

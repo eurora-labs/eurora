@@ -129,13 +129,13 @@ pub fn init_chat_model(
     model_provider: Option<&str>,
 ) -> Result<Arc<dyn BaseChatModel>> {
     let model = model.into();
-    let (model_name, provider) = parse_model(&model, model_provider)?;
+    let (_model_name, provider) = parse_model(&model, model_provider)?;
 
     match provider.as_str() {
         #[cfg(feature = "anthropic")]
-        "anthropic" => Ok(Arc::new(anthropic::ChatAnthropic::new(model_name))),
+        "anthropic" => Ok(Arc::new(anthropic::ChatAnthropic::new(_model_name))),
         #[cfg(feature = "openai")]
-        "openai" => Ok(Arc::new(openai::ChatOpenAI::new(model_name))),
+        "openai" => Ok(Arc::new(openai::ChatOpenAI::new(_model_name))),
         _ => Err(Error::unsupported_provider(provider)),
     }
 }
@@ -212,12 +212,12 @@ impl ChatModelBuilder {
 
     /// Build the chat model.
     pub fn build(self) -> Result<Arc<dyn BaseChatModel>> {
-        let (model_name, provider) = parse_model(&self.model, self.provider.as_deref())?;
+        let (_model_name, provider) = parse_model(&self.model, self.provider.as_deref())?;
 
         match provider.as_str() {
             #[cfg(feature = "anthropic")]
             "anthropic" => {
-                let mut model = anthropic::ChatAnthropic::new(model_name);
+                let mut model = anthropic::ChatAnthropic::new(_model_name);
                 if let Some(temp) = self.temperature {
                     model = model.temperature(temp);
                 }
@@ -234,7 +234,7 @@ impl ChatModelBuilder {
             }
             #[cfg(feature = "openai")]
             "openai" | "azure_openai" => {
-                let mut model = openai::ChatOpenAI::new(model_name);
+                let mut model = openai::ChatOpenAI::new(_model_name);
                 if let Some(temp) = self.temperature {
                     model = model.temperature(temp);
                 }

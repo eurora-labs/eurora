@@ -1,5 +1,5 @@
 use euro_endpoint::DEFAULT_API_URL;
-use euro_secret::{Sensitive, secret};
+use euro_secret::{ExposeSecret, SecretString, secret};
 use tauri::{AppHandle, Manager, Runtime};
 use url::Url;
 
@@ -83,8 +83,11 @@ impl AuthApi for AuthApiImpl {
             url.query_pairs_mut()
                 .append_pair("code_challenge", &code_challenge)
                 .append_pair("code_challenge_method", "S256");
-            secret::persist(LOGIN_CODE_VERIFIER, &Sensitive(code_verifier.clone()))
-                .map_err(|e| format!("Failed to persist code verifier: {}", e))?;
+            secret::persist(
+                LOGIN_CODE_VERIFIER,
+                &SecretString::from(code_verifier.clone()),
+            )
+            .map_err(|e| format!("Failed to persist code verifier: {}", e))?;
             Ok(LoginToken {
                 code_challenge: code_challenge.to_string(),
                 expires_in,
@@ -109,7 +112,7 @@ impl AuthApi for AuthApiImpl {
                 .ok_or_else(|| "Login token not found".to_string())?;
 
             match controller
-                .login_by_login_token(login_token.into_inner())
+                .login_by_login_token(login_token.expose_secret().to_owned())
                 .await
             {
                 Ok(_) => {
@@ -230,7 +233,7 @@ impl AuthApi for AuthApiImpl {
 
         let mut controller = user_state.lock().await;
         match controller.get_or_refresh_access_token().await {
-            Ok(token) => Ok(!token.is_empty()),
+            Ok(token) => Ok(!token.expose_secret().is_empty()),
             Err(e) => Err(format!("Failed to get or refresh access token: {}", e)),
         }
     }

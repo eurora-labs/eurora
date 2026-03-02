@@ -35,7 +35,12 @@ impl Default for JwtConfig {
             access_token_expiry_hours: 1,
             refresh_token_expiry_days: 7,
 
-            validation: Validation::new(Algorithm::HS256),
+            validation: {
+                let mut v = Validation::new(Algorithm::HS256);
+                v.set_audience(&["eurora"]);
+                v.required_spec_claims.insert("aud".to_string());
+                v
+            },
 
             approved_emails: std::env::var("APPROVED_EMAILS")
                 .unwrap_or_default()
