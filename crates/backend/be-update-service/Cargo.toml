@@ -8,13 +8,13 @@ publish = false
 
 [dependencies]
 anyhow = { workspace = true }
-aws-config = { version = "1.8.12", features = ["behavior-version-latest"] }
-aws-sdk-s3 = "1.121.0"
+aws-config = { version = "1.8.14", features = ["behavior-version-latest"] }
+aws-sdk-s3 = "1.124.0"
 axum = { workspace = true, features = ["macros"] }
 chrono = { workspace = true, features = ["serde"] }
+posthog-rs = { workspace = true }
 semver = "1.0"
 serde = { workspace = true, features = ["derive"] }
-posthog-rs = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt"] }
 tower = { workspace = true }

@@ -236,7 +236,8 @@ pub async fn get_checkout_status(
                 .as_ref()
                 .and_then(|d| d.email.as_deref())
         })
-        .unwrap_or_default();
+        .filter(|e| !e.is_empty())
+        .ok_or_else(|| PaymentError::MissingField("session email"))?;
     if !session_email.eq_ignore_ascii_case(&claims.email) {
         return Err(PaymentError::Unauthorized(
             "Session does not belong to this user".to_string(),
@@ -275,17 +276,29 @@ pub async fn handle_webhook(
     let event_id = event.id.as_str();
     let event_type = event.type_.as_str();
 
-    // Atomic idempotency: try to claim the event before processing.
-    // Returns false if the event was already recorded by a concurrent handler.
-    if !state
+    // Begin a transaction so the idempotency claim and business logic are atomic.
+    // If processing fails, the claim is rolled back and Stripe will retry.
+    let mut tx = state
+        .db
+        .pool
+        .begin()
+        .await
+        .map_err(|e| PaymentError::Internal(anyhow::anyhow!("begin webhook tx: {e}")))?;
+
+    let claimed = state
         .db
         .try_claim_webhook_event()
+        .executor(&mut *tx)
         .event_id(event_id)
         .event_type(event_type)
         .call()
         .await
-        .unwrap_or(false)
-    {
+        .map_err(|e| {
+            tracing::error!(%event_id, error = %e, "Failed to claim webhook event");
+            PaymentError::Internal(anyhow::anyhow!("webhook idempotency check failed: {e}"))
+        })?;
+
+    if !claimed {
         tracing::info!(%event_id, %event_type, "Webhook event already processed — skipping");
         return Ok(StatusCode::OK);
     }
@@ -429,6 +442,10 @@ pub async fn handle_webhook(
             tracing::warn!(%event_id, %event_type, "Unhandled webhook event");
         }
     }
+
+    tx.commit()
+        .await
+        .map_err(|e| PaymentError::Internal(anyhow::anyhow!("commit webhook tx: {e}")))?;
 
     Ok(StatusCode::OK)
 }

@@ -3,6 +3,8 @@ use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
+pub use secrecy::{ExposeSecret, SecretString};
+
 pub fn validate_xor_args<T>(
     arg_groups: &[Vec<&str>],
     values: &HashMap<&str, Option<T>>,
@@ -75,47 +77,8 @@ impl std::fmt::Display for HttpStatusError {
 
 impl std::error::Error for HttpStatusError {}
 
-#[derive(Clone)]
-pub struct SecretString {
-    value: String,
-}
-
-impl SecretString {
-    pub fn new(value: String) -> Self {
-        Self { value }
-    }
-
-    pub fn expose_secret(&self) -> &str {
-        &self.value
-    }
-}
-
-impl std::fmt::Debug for SecretString {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SecretString(***)")
-    }
-}
-
-impl std::fmt::Display for SecretString {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "***")
-    }
-}
-
-impl From<String> for SecretString {
-    fn from(value: String) -> Self {
-        Self::new(value)
-    }
-}
-
-impl From<&str> for SecretString {
-    fn from(value: &str) -> Self {
-        Self::new(value.to_string())
-    }
-}
-
-pub fn convert_to_secret_str<S: Into<SecretString>>(value: S) -> SecretString {
-    value.into()
+pub fn convert_to_secret_str(value: impl Into<String>) -> SecretString {
+    SecretString::from(value.into())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -180,7 +143,7 @@ pub fn secret_from_env<'a>(
     error_message: Option<&'a str>,
 ) -> impl Fn() -> Result<SecretString, EnvError> + 'a {
     let get_value = from_env(keys, default, error_message);
-    move || get_value().map(SecretString::new)
+    move || get_value().map(SecretString::from)
 }
 
 pub const LC_AUTO_PREFIX: &str = "lc_";
@@ -366,10 +329,8 @@ mod tests {
 
     #[test]
     fn test_secret_string() {
-        let secret = SecretString::new("my_secret".to_string());
+        let secret = SecretString::from("my_secret");
         assert_eq!(secret.expose_secret(), "my_secret");
-        assert_eq!(format!("{}", secret), "***");
-        assert_eq!(format!("{:?}", secret), "SecretString(***)");
     }
 
     #[test]
