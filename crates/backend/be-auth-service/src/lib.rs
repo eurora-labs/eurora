@@ -187,10 +187,7 @@ impl AuthService {
 
     fn is_approved_email(&self, email: &str) -> bool {
         let email = email.to_lowercase();
-        self.jwt_config
-            .approved_emails
-            .iter()
-            .any(|approved| approved == "*" || *approved == email)
+        self.jwt_config.approved_emails.contains(&email)
     }
 
     async fn resolve_role(&self, user_id: Uuid) -> Role {

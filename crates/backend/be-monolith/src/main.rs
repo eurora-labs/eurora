@@ -1,5 +1,5 @@
 use axum::extract::DefaultBodyLimit;
-use axum::http::HeaderValue;
+use axum::http::{HeaderValue, Method, header};
 use be_activity_service::{ActivityService, ProtoActivityServiceServer};
 use be_asset_service::{AssetService, ProtoAssetServiceServer};
 use be_auth_core::JwtConfig;
@@ -18,7 +18,7 @@ use proto_gen::auth::proto_auth_service_server::ProtoAuthServiceServer;
 use std::{net::SocketAddr, sync::Arc};
 use tonic::transport::Server;
 use tonic_web::GrpcWebLayer;
-use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer};
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing_subscriber::filter::{LevelFilter, Targets};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -41,8 +41,21 @@ fn build_cors() -> CorsLayer {
 
     CorsLayer::new()
         .allow_origin(AllowOrigin::list(allowed))
-        .allow_methods(AllowMethods::mirror_request())
-        .allow_headers(AllowHeaders::mirror_request())
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
+        .allow_headers([
+            header::AUTHORIZATION,
+            header::CONTENT_TYPE,
+            header::ACCEPT,
+            header::HeaderName::from_static("x-grpc-web"),
+            header::HeaderName::from_static("x-user-agent"),
+            header::HeaderName::from_static("grpc-timeout"),
+        ])
         .allow_credentials(true)
 }
 
