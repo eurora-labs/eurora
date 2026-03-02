@@ -6,8 +6,8 @@
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Spinner } from '@eurora/ui/components/spinner/index';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
-	import { open } from '@tauri-apps/plugin-shell';
 	import { platform } from '@tauri-apps/plugin-os';
+	import { open } from '@tauri-apps/plugin-shell';
 	import { onMount, onDestroy } from 'svelte';
 
 	const isMacos = platform() === 'macos';
