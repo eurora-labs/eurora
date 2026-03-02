@@ -1,11 +1,12 @@
-use axum::http::HeaderValue;
+use axum::extract::DefaultBodyLimit;
+use axum::http::{HeaderValue, Method, header};
 use be_activity_service::{ActivityService, ProtoActivityServiceServer};
 use be_asset_service::{AssetService, ProtoAssetServiceServer};
 use be_auth_core::JwtConfig;
 use be_auth_service::AuthService;
 use be_authz::{
-    AuthzState, CasbinAuthz, GrpcAuthzLayer, authz_middleware, new_auth_failure_rate_limiter,
-    new_health_check_rate_limiter,
+    AuthzState, CasbinAuthz, GrpcAuthzLayer, TrustedProxies, authz_middleware,
+    new_auth_failure_rate_limiter, new_health_check_rate_limiter,
 };
 use be_payment_service::init_payment_service;
 use be_remote_db::DatabaseManager;
@@ -17,10 +18,13 @@ use proto_gen::auth::proto_auth_service_server::ProtoAuthServiceServer;
 use std::{net::SocketAddr, sync::Arc};
 use tonic::transport::Server;
 use tonic_web::GrpcWebLayer;
-use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer};
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing_subscriber::filter::{LevelFilter, Targets};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+
+const GRPC_MAX_DECODE_SIZE: usize = 8 * 1024 * 1024; // 8 MB
+const HTTP_MAX_BODY_SIZE: usize = 2 * 1024 * 1024; // 2 MB
 
 fn build_cors() -> CorsLayer {
     let allowed: Vec<HeaderValue> = std::env::var("CORS_ALLOWED_ORIGINS")
@@ -37,13 +41,30 @@ fn build_cors() -> CorsLayer {
 
     CorsLayer::new()
         .allow_origin(AllowOrigin::list(allowed))
-        .allow_methods(AllowMethods::mirror_request())
-        .allow_headers(AllowHeaders::mirror_request())
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
+        .allow_headers([
+            header::AUTHORIZATION,
+            header::CONTENT_TYPE,
+            header::ACCEPT,
+            header::HeaderName::from_static("x-grpc-web"),
+            header::HeaderName::from_static("x-user-agent"),
+            header::HeaderName::from_static("grpc-timeout"),
+        ])
         .allow_credentials(true)
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("Failed to install default CryptoProvider");
+
     dotenv().ok();
 
     let _sentry_guard = if cfg!(not(debug_assertions)) {
@@ -103,7 +124,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let posthog_options = posthog_rs::ClientOptionsBuilder::default()
             .api_key(posthog_key)
-            .api_endpoint("https://eu.i.posthog.com/i/v0/e/".to_string())
+            .host("https://eu.i.posthog.com")
             .build()
             .expect("valid posthog client options");
         match posthog_rs::init_global(posthog_options).await {
@@ -195,6 +216,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let auth_rate_limiter = new_auth_failure_rate_limiter();
     let health_rate_limiter = new_health_check_rate_limiter();
+    let trusted_proxies = TrustedProxies::from_env();
 
     let grpc_authz_layer = GrpcAuthzLayer::new(
         authz.clone(),
@@ -202,6 +224,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         auth_rate_limiter.clone(),
         health_rate_limiter.clone(),
         db_manager.clone(),
+        trusted_proxies.clone(),
     );
 
     let mut grpc_server = Server::builder()
@@ -210,10 +233,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(GrpcWebLayer::new())
         .layer(grpc_authz_layer)
         .add_service(health_service)
-        .add_service(ProtoAuthServiceServer::new(auth_service))
-        .add_service(ProtoActivityServiceServer::new(activity_service))
-        .add_service(ProtoAssetServiceServer::new(assets_service))
-        .add_service(ProtoThreadServiceServer::new(thread_service));
+        .add_service(
+            ProtoAuthServiceServer::new(auth_service)
+                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE),
+        )
+        .add_service(
+            ProtoActivityServiceServer::new(activity_service)
+                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE),
+        )
+        .add_service(
+            ProtoAssetServiceServer::new(assets_service)
+                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE),
+        )
+        .add_service(
+            ProtoThreadServiceServer::new(thread_service)
+                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE),
+        );
 
     if local_mode {
         let local_settings =
@@ -229,6 +264,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         jwt_config,
         auth_rate_limiter,
         health_rate_limiter,
+        trusted_proxies,
     ));
 
     let health_route = axum::Router::new().route(
@@ -239,6 +275,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let http_router = update_router
         .merge(payment_router)
         .merge(health_route)
+        .layer(DefaultBodyLimit::max(HTTP_MAX_BODY_SIZE))
         .layer(build_cors())
         .layer(axum::middleware::from_fn_with_state(
             authz_state,

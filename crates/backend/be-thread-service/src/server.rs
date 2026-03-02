@@ -19,6 +19,7 @@ use proto_gen::thread::{
     GenerateThreadTitleResponse, GetMessagesRequest, GetMessagesResponse, GetThreadResponse,
     ListThreadsRequest, ListThreadsResponse, Thread,
 };
+use secrecy::ExposeSecret;
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
@@ -69,7 +70,7 @@ fn build_openai(
 ) -> Box<dyn BaseChatModel + Send + Sync> {
     let model = model_override.unwrap_or(&config.model);
     let mut provider = ChatOpenAI::new(model)
-        .api_key(config.api_key.as_str())
+        .api_key(config.api_key.expose_secret())
         .api_base(config.base_url.as_str());
     if web_search {
         provider = provider.with_builtin_tools(vec![BuiltinTool::WebSearch]);

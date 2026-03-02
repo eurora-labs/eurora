@@ -1,7 +1,7 @@
 use crate::{User, storage::Storage};
 use anyhow::{Context, Result};
 use euro_auth::{AuthManager, Claims};
-use euro_secret::{Sensitive, secret};
+use euro_secret::{SecretString, secret};
 use std::path::PathBuf;
 use tokio::sync::watch;
 use tonic::transport::Channel;
@@ -55,7 +55,7 @@ impl Controller {
         username: impl Into<String>,
         email: impl Into<String>,
         password: impl Into<String>,
-    ) -> Result<Sensitive<String>> {
+    ) -> Result<SecretString> {
         self.auth_manager.register(username, email, password).await
     }
 
@@ -63,11 +63,11 @@ impl Controller {
         &mut self,
         login: impl Into<String>,
         password: impl Into<String>,
-    ) -> Result<Sensitive<String>> {
+    ) -> Result<SecretString> {
         self.auth_manager.login(login, password).await
     }
 
-    pub async fn get_or_refresh_access_token(&mut self) -> Result<Sensitive<String>> {
+    pub async fn get_or_refresh_access_token(&mut self) -> Result<SecretString> {
         self.auth_manager.get_or_refresh_access_token().await
     }
 
@@ -79,7 +79,7 @@ impl Controller {
         self.auth_manager.get_refresh_token_payload()
     }
 
-    pub async fn refresh_tokens(&mut self) -> Result<Sensitive<String>> {
+    pub async fn refresh_tokens(&mut self) -> Result<SecretString> {
         self.auth_manager.refresh_tokens().await
     }
 
@@ -90,7 +90,7 @@ impl Controller {
     pub async fn login_by_login_token(
         &mut self,
         login_token: impl Into<String>,
-    ) -> Result<Sensitive<String>> {
+    ) -> Result<SecretString> {
         self.auth_manager
             .login_by_login_token(login_token.into())
             .await
