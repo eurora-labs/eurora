@@ -36,8 +36,28 @@ fn validate_content_matches_mime(content: &[u8], declared_mime: &str) -> bool {
             let bytes = content.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(content);
             std::str::from_utf8(bytes)
                 .map(|s| {
-                    let t = s.trim_start();
-                    t.starts_with("<svg") || t.starts_with("<?xml") || t.starts_with("<!DOCTYPE")
+                    let mut t = s.trim_start();
+                    if t.starts_with("<?xml") {
+                        match t.find("?>") {
+                            Some(end) => t = t[end + 2..].trim_start(),
+                            None => return false,
+                        }
+                    }
+                    if t.get(..9)
+                        .is_some_and(|p| p.eq_ignore_ascii_case("<!doctype"))
+                    {
+                        match t.find('>') {
+                            Some(end) => t = t[end + 1..].trim_start(),
+                            None => return false,
+                        }
+                    }
+                    while t.starts_with("<!--") {
+                        match t.find("-->") {
+                            Some(end) => t = t[end + 3..].trim_start(),
+                            None => return false,
+                        }
+                    }
+                    t.get(..4).is_some_and(|p| p.eq_ignore_ascii_case("<svg"))
                 })
                 .unwrap_or(false)
         }
