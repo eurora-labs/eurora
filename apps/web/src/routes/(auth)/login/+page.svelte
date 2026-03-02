@@ -3,19 +3,21 @@
 	import { page } from '$app/state';
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
 	import { authService } from '$lib/services/auth-service';
-	import { auth, accessToken } from '$lib/stores/auth';
+	import { auth, accessToken, currentUser } from '$lib/stores/auth';
 	import { create } from '@bufbuild/protobuf';
 	import {
 		Provider,
 		AssociateLoginTokenRequestSchema,
 	} from '@eurora/shared/proto/auth_service_pb.js';
+	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { get } from 'svelte/store';
 	import { onMount } from 'svelte';
 
 	let desktopLoginDone = $state(false);
+	let pendingDesktopLogin = $state<string | null>(null);
 
-	onMount(() => {
+	onMount(async () => {
 		try {
 			let loginToken = page.url.searchParams.get('code_challenge');
 			let challengeMethod = page.url.searchParams.get('code_challenge_method');
@@ -28,7 +30,12 @@
 				sessionStorage.setItem('loginToken', loginToken);
 				sessionStorage.setItem('challengeMethod', challengeMethod);
 
-				tryAssociateForLoggedInUser(loginToken);
+				const isValid = await auth.ensureValidToken();
+				if (isValid && get(accessToken)) {
+					pendingDesktopLogin = loginToken;
+				} else {
+					goto('/login');
+				}
 				return;
 			}
 			loginToken = sessionStorage.getItem('loginToken');
@@ -39,30 +46,33 @@
 		}
 	});
 
-	async function tryAssociateForLoggedInUser(codeChallenge: string) {
-		const isValid = await auth.ensureValidToken();
-		if (!isValid) {
-			goto('/login');
-			return;
-		}
+	async function handleConfirmDesktopLogin() {
+		if (!pendingDesktopLogin) return;
+		loading = true;
+		submitError = null;
 
 		const token = get(accessToken);
 		if (!token) {
-			goto('/login');
+			submitError = 'Session expired. Please sign in again.';
+			pendingDesktopLogin = null;
+			loading = false;
 			return;
 		}
 
 		try {
 			const request = create(AssociateLoginTokenRequestSchema, {
-				codeChallenge,
+				codeChallenge: pendingDesktopLogin,
 			});
 			await authService.associateLoginToken(request, token);
 			sessionStorage.removeItem('loginToken');
 			sessionStorage.removeItem('challengeMethod');
 			desktopLoginDone = true;
+			pendingDesktopLogin = null;
 		} catch (err) {
 			console.error('Failed to associate login token:', err);
-			goto('/login');
+			submitError = 'Failed to authorize desktop app. Please try again.';
+		} finally {
+			loading = false;
 		}
 	}
 
@@ -122,6 +132,39 @@
 					You can close this tab and return to the desktop app.
 				</p>
 			</div>
+		{:else if pendingDesktopLogin}
+			<div class="text-center">
+				<h1 class="text-3xl font-bold tracking-tight">Authorize desktop app</h1>
+				<p class="text-muted-foreground mt-2">
+					Sign in to the Eurora desktop app as <strong>{$currentUser?.email}</strong>?
+				</p>
+			</div>
+
+			<Card.Root class="p-6">
+				{#if submitError}
+					<div class="mb-4 rounded-md bg-red-50 p-4">
+						<p class="text-sm text-red-800">{submitError}</p>
+					</div>
+				{/if}
+
+				<div class="flex flex-col gap-3">
+					<Button class="w-full" disabled={loading} onclick={handleConfirmDesktopLogin}>
+						{loading ? 'Authorizing...' : 'Authorize'}
+					</Button>
+					<Button
+						variant="outline"
+						class="w-full"
+						disabled={loading}
+						onclick={() => {
+							sessionStorage.removeItem('loginToken');
+							sessionStorage.removeItem('challengeMethod');
+							pendingDesktopLogin = null;
+						}}
+					>
+						Cancel
+					</Button>
+				</div>
+			</Card.Root>
 		{:else}
 			<div class="text-center">
 				<h1 class="text-3xl font-bold tracking-tight">Welcome back</h1>
