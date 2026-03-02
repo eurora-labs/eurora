@@ -949,12 +949,16 @@ impl ProtoAuthService for AuthService {
         let req = request.into_inner();
         let code_challenge = req.code_challenge;
 
-        if code_challenge.is_empty() {
-            return Err(Status::invalid_argument("Code challenge is required"));
+        if code_challenge.len() != 43
+            || !code_challenge
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+        {
+            return Err(Status::invalid_argument("Invalid code challenge"));
         }
 
         let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|_| Status::internal("Invalid user ID in token"))?;
+            .map_err(|_| Status::unauthenticated("Invalid user ID in token"))?;
 
         let token_hash = self.hash_login_token(&code_challenge);
         self.db
