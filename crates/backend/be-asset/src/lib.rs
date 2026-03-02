@@ -32,8 +32,20 @@ fn validate_content_matches_mime(content: &[u8], declared_mime: &str) -> bool {
         "image/webp" => {
             content.len() >= 12 && &content[..4] == b"RIFF" && &content[8..12] == b"WEBP"
         }
+        "image/svg+xml" => {
+            let bytes = content.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(content);
+            std::str::from_utf8(bytes)
+                .map(|s| {
+                    let t = s.trim_start();
+                    t.starts_with("<svg") || t.starts_with("<?xml") || t.starts_with("<!DOCTYPE")
+                })
+                .unwrap_or(false)
+        }
         "application/pdf" => content.starts_with(b"%PDF"),
-        _ => true,
+        "text/plain" => std::str::from_utf8(content).is_ok(),
+        "application/json" => serde_json::from_slice::<serde_json::Value>(content).is_ok(),
+        "application/octet-stream" => true,
+        _ => false,
     }
 }
 
@@ -100,11 +112,19 @@ impl AssetService {
             return Err(AssetError::MissingMimeType);
         }
 
-        if !ALLOWED_MIME_TYPES.contains(&req.mime_type.as_str()) {
+        let mime_base = req
+            .mime_type
+            .split(';')
+            .next()
+            .unwrap_or("")
+            .trim()
+            .to_ascii_lowercase();
+
+        if !ALLOWED_MIME_TYPES.contains(&mime_base.as_str()) {
             return Err(AssetError::UnsupportedMimeType(req.mime_type));
         }
 
-        if !validate_content_matches_mime(&req.content, &req.mime_type) {
+        if !validate_content_matches_mime(&req.content, &mime_base) {
             return Err(AssetError::MimeTypeMismatch);
         }
 
