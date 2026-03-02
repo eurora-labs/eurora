@@ -14,8 +14,8 @@
 		<section>
 			<h2 class="mb-2 text-2xl font-semibold">AI that knows what you're working on</h2>
 			<p class="text-muted-foreground">
-				Most AI tools start every conversation from scratch. You paste a snippet, explain the
-				context, and hope the model understands. Eurora takes a different approach: it
+				Most AI tools start every conversation from scratch. You paste a snippet, explain
+				the context, and hope the model understands. Eurora takes a different approach: it
 				integrates directly with your operating system and browser to see what you see. When
 				you ask a question, Eurora already knows which application is in focus, what page
 				you're reading, and what files you're working with. No copy-paste, no context
@@ -27,10 +27,10 @@
 			<h2 class="mb-2 text-2xl font-semibold">Your data stays yours</h2>
 			<p class="text-muted-foreground">
 				Every major AI assistant processes your data on servers you don't control, often
-				governed by jurisdictions with weak privacy protections. Eurora stores all cloud data
-				in sovereign European data centers under EU privacy law. But if that's not enough, you
-				can run the entire stack locally — the backend, the database, and the AI model — on
-				your own hardware. Nothing ever leaves your network.
+				governed by jurisdictions with weak privacy protections. Eurora stores all cloud
+				data in sovereign European data centers under EU privacy law. But if that's not
+				enough, you can run the entire stack locally — the backend, the database, and the AI
+				model — on your own hardware. Nothing ever leaves your network.
 			</p>
 			<Alert class="mt-4">
 				<InfoIcon />
@@ -55,7 +55,8 @@
 				extension, and the infrastructure that ties them together. This isn't a marketing
 				claim with an asterisk. You can read the source, audit the encryption, verify that
 				telemetry is opt-in, and build the entire application from scratch. The project is
-				licensed under the Sustainable Use License with an eventual transition to Apache 2.0.
+				licensed under the Sustainable Use License with an eventual transition to Apache
+				2.0.
 			</p>
 		</section>
 
@@ -83,15 +84,17 @@
 		<section>
 			<h2 class="mb-2 text-2xl font-semibold">Flexible by design</h2>
 			<p class="text-muted-foreground">
-				Not everyone has the same requirements. Eurora supports multiple deployment models and
-				AI providers so you can pick what works for you.
+				Not everyone has the same requirements. Eurora supports multiple deployment models
+				and AI providers so you can pick what works for you.
 			</p>
-			<div class="mt-4 grid grid-cols-1 gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-2">
+			<div
+				class="mt-4 grid grid-cols-1 gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-2"
+			>
 				<div class="bg-card p-6">
 					<h3 class="mb-1 font-medium">Eurora Cloud</h3>
 					<p class="text-sm text-muted-foreground">
-						Sign up and start chatting. Data stays in EU data centers. Includes a free tier
-						for local-only use.
+						Sign up and start chatting. Data stays in EU data centers. Includes a free
+						tier for local-only use.
 					</p>
 				</div>
 				<div class="bg-card p-6">

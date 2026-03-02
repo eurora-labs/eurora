@@ -1,9 +1,9 @@
 <script lang="ts">
 	import DownloadButton from '$lib/components/marketing/DownloadButton.svelte';
 	import VideoSection from '$lib/components/marketing/video-section.svelte';
+	import { Button } from '@eurora/ui/components/button/index';
 	import { AutoplayVideo } from '@eurora/ui/custom-components/autoplay-video/index';
 	import * as FeatureSection from '@eurora/ui/custom-components/feature-section/index';
-	import { Button } from '@eurora/ui/components/button/index';
 </script>
 
 <div class="container mx-auto px-4 py-8">
