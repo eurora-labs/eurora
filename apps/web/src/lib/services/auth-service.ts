@@ -8,6 +8,7 @@ import {
 	Provider,
 	type ThirdPartyAuthUrlResponse,
 	type LoginByLoginTokenRequest,
+	type AssociateLoginTokenRequest,
 } from '@eurora/shared/proto/auth_service_pb.js';
 
 const VITE_GRPC_API_URL: string = import.meta.env.VITE_GRPC_API_URL;
@@ -43,6 +44,15 @@ class AuthService {
 	public async loginByLoginToken(data: LoginByLoginTokenRequest): Promise<TokenResponse> {
 		return await this.client.loginByLoginToken(data);
 	}
+
+	public async associateLoginToken(
+		data: AssociateLoginTokenRequest,
+		accessToken: string,
+	): Promise<void> {
+		await this.client.associateLoginToken(data, {
+			headers: new Headers({ authorization: `Bearer ${accessToken}` }),
+		});
+	}
 }
 
 export const authService = new AuthService();
@@ -53,4 +63,5 @@ export type {
 	Provider,
 	ThirdPartyAuthUrlResponse,
 	LoginByLoginTokenRequest,
+	AssociateLoginTokenRequest,
 };
