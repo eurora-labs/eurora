@@ -1,4 +1,4 @@
-use co_utils::Sensitive;
+use secrecy::SecretString;
 use url::Url;
 
 use crate::error::{Error, Result};
@@ -7,7 +7,7 @@ use crate::proto;
 #[derive(Debug, Clone)]
 pub struct OpenAIConfig {
     pub base_url: Url,
-    pub api_key: Sensitive<String>,
+    pub api_key: SecretString,
     pub model: String,
     pub title_model: Option<String>,
 }
@@ -32,7 +32,7 @@ impl TryFrom<proto::OpenAiSettings> for OpenAIConfig {
         };
         Ok(Self {
             base_url: Url::parse(&p.base_url)?,
-            api_key: Sensitive(p.api_key),
+            api_key: SecretString::from(p.api_key),
             model: p.model,
             title_model,
         })
