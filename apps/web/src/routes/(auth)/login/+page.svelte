@@ -3,9 +3,17 @@
 	import { page } from '$app/state';
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
 	import { authService } from '$lib/services/auth-service';
-	import { Provider } from '@eurora/shared/proto/auth_service_pb.js';
+	import { auth, accessToken } from '$lib/stores/auth';
+	import { create } from '@bufbuild/protobuf';
+	import {
+		Provider,
+		AssociateLoginTokenRequestSchema,
+	} from '@eurora/shared/proto/auth_service_pb.js';
 	import * as Card from '@eurora/ui/components/card/index';
+	import { get } from 'svelte/store';
 	import { onMount } from 'svelte';
+
+	let desktopLoginDone = $state(false);
 
 	onMount(() => {
 		try {
@@ -19,7 +27,8 @@
 				}
 				sessionStorage.setItem('loginToken', loginToken);
 				sessionStorage.setItem('challengeMethod', challengeMethod);
-				goto('/login');
+
+				tryAssociateForLoggedInUser(loginToken);
 				return;
 			}
 			loginToken = sessionStorage.getItem('loginToken');
@@ -29,6 +38,33 @@
 			return;
 		}
 	});
+
+	async function tryAssociateForLoggedInUser(codeChallenge: string) {
+		const isValid = await auth.ensureValidToken();
+		if (!isValid) {
+			goto('/login');
+			return;
+		}
+
+		const token = get(accessToken);
+		if (!token) {
+			goto('/login');
+			return;
+		}
+
+		try {
+			const request = create(AssociateLoginTokenRequestSchema, {
+				codeChallenge,
+			});
+			await authService.associateLoginToken(request, token);
+			sessionStorage.removeItem('loginToken');
+			sessionStorage.removeItem('challengeMethod');
+			desktopLoginDone = true;
+		} catch (err) {
+			console.error('Failed to associate login token:', err);
+			goto('/login');
+		}
+	}
 
 	let loading = $state(false);
 	let submitError = $state<string | null>(null);
@@ -79,30 +115,39 @@
 
 <div class="flex min-h-screen items-center justify-center px-4">
 	<div class="w-full max-w-md space-y-8">
-		<div class="text-center">
-			<h1 class="text-3xl font-bold tracking-tight">Welcome back</h1>
-			<p class="text-muted-foreground mt-2">
-				Sign in to your account to continue with Eurora Labs
+		{#if desktopLoginDone}
+			<div class="text-center">
+				<h1 class="text-3xl font-bold tracking-tight">Desktop app connected</h1>
+				<p class="text-muted-foreground mt-2">
+					You can close this tab and return to the desktop app.
+				</p>
+			</div>
+		{:else}
+			<div class="text-center">
+				<h1 class="text-3xl font-bold tracking-tight">Welcome back</h1>
+				<p class="text-muted-foreground mt-2">
+					Sign in to your account to continue with Eurora Labs
+				</p>
+			</div>
+
+			<Card.Root class="p-6">
+				{#if submitError}
+					<div class="mb-4 rounded-md bg-red-50 p-4">
+						<p class="text-sm text-red-800">{submitError}</p>
+					</div>
+				{/if}
+
+				<SocialAuthButtons
+					mode="login"
+					disabled={loading}
+					onGoogle={handleGoogleLogin}
+					onGitHub={handleGitHubLogin}
+				/>
+			</Card.Root>
+
+			<p class="text-muted-foreground text-center text-sm">
+				Email &amp; password login is coming soon.
 			</p>
-		</div>
-
-		<Card.Root class="p-6">
-			{#if submitError}
-				<div class="mb-4 rounded-md bg-red-50 p-4">
-					<p class="text-sm text-red-800">{submitError}</p>
-				</div>
-			{/if}
-
-			<SocialAuthButtons
-				mode="login"
-				disabled={loading}
-				onGoogle={handleGoogleLogin}
-				onGitHub={handleGitHubLogin}
-			/>
-		</Card.Root>
-
-		<p class="text-muted-foreground text-center text-sm">
-			Email &amp; password login is coming soon.
-		</p>
+		{/if}
 	</div>
 </div>

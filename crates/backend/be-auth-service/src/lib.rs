@@ -6,10 +6,10 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{Algorithm, Header, encode};
 use openidconnect::{Nonce, PkceCodeChallenge, PkceCodeVerifier};
 use proto_gen::auth::{
-    CheckEmailRequest, CheckEmailResponse, LoginByLoginTokenRequest, LoginRequest, LogoutRequest,
-    Provider, RefreshTokenRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
-    ThirdPartyAuthUrlResponse, ThirdPartyCredentials, TokenResponse, login_request::Credential,
-    proto_auth_service_server::ProtoAuthService,
+    AssociateLoginTokenRequest, CheckEmailRequest, CheckEmailResponse, LoginByLoginTokenRequest,
+    LoginRequest, LogoutRequest, Provider, RefreshTokenRequest, RegisterRequest,
+    ThirdPartyAuthUrlRequest, ThirdPartyAuthUrlResponse, ThirdPartyCredentials, TokenResponse,
+    login_request::Credential, proto_auth_service_server::ProtoAuthService,
 };
 use rand::TryRngCore;
 use sha2::{Digest, Sha256};
@@ -937,6 +937,34 @@ impl ProtoAuthService for AuthService {
         };
 
         Ok(Response::new(response))
+    }
+
+    async fn associate_login_token(
+        &self,
+        request: Request<AssociateLoginTokenRequest>,
+    ) -> Result<Response<()>, Status> {
+        tracing::info!("Associate login token request received");
+
+        let claims = self.authenticate_request_access_token(&request)?;
+        let req = request.into_inner();
+        let code_challenge = req.code_challenge;
+
+        if code_challenge.is_empty() {
+            return Err(Status::invalid_argument("Code challenge is required"));
+        }
+
+        let user_id = Uuid::parse_str(&claims.sub)
+            .map_err(|_| Status::internal("Invalid user ID in token"))?;
+
+        let user = self.db.get_user().id(user_id).call().await.map_err(|e| {
+            tracing::warn!("Failed to find user for associate_login_token: {}", e);
+            Status::from(AuthError::InvalidToken)
+        })?;
+
+        self.try_associate_login_token_with_user(&user, &code_challenge)
+            .await;
+
+        Ok(Response::new(()))
     }
 
     async fn check_email(
