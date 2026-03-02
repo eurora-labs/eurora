@@ -9,13 +9,14 @@ use be_auth_core::JwtConfig;
 
 use crate::CasbinAuthz;
 use crate::bypass::is_rest_bypass;
-use crate::rate_limit::{self, AuthFailureRateLimiter, HealthCheckRateLimiter};
+use crate::rate_limit::{self, AuthFailureRateLimiter, HealthCheckRateLimiter, TrustedProxies};
 
 pub struct AuthzState {
     pub authz: CasbinAuthz,
     pub jwt_config: JwtConfig,
     pub rate_limiter: AuthFailureRateLimiter,
     pub health_rate_limiter: HealthCheckRateLimiter,
+    pub trusted_proxies: TrustedProxies,
 }
 
 impl AuthzState {
@@ -24,12 +25,14 @@ impl AuthzState {
         jwt_config: JwtConfig,
         rate_limiter: AuthFailureRateLimiter,
         health_rate_limiter: HealthCheckRateLimiter,
+        trusted_proxies: TrustedProxies,
     ) -> Self {
         Self {
             authz,
             jwt_config,
             rate_limiter,
             health_rate_limiter,
+            trusted_proxies,
         }
     }
 }
@@ -58,7 +61,7 @@ pub async fn authz_middleware(
         .extensions()
         .get::<ConnectInfo<SocketAddr>>()
         .map(|ci| ci.0.ip());
-    let client_ip = rate_limit::extract_client_ip(req.headers(), peer_addr);
+    let client_ip = rate_limit::extract_client_ip(req.headers(), peer_addr, &state.trusted_proxies);
 
     if is_rest_bypass(&raw_path) {
         if raw_path == "/health" && state.health_rate_limiter.check_key(&client_ip).is_err() {

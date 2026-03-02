@@ -14,6 +14,6 @@ pub use enforcer::CasbinAuthz;
 pub use error::AuthzError;
 pub use grpc_layer::GrpcAuthzLayer;
 pub use rate_limit::{
-    AuthFailureRateLimiter, HealthCheckRateLimiter, extract_client_ip,
+    AuthFailureRateLimiter, HealthCheckRateLimiter, TrustedProxies, extract_client_ip,
     new_auth_failure_rate_limiter, new_health_check_rate_limiter,
 };

@@ -15,7 +15,7 @@ use tower::{Layer, Service};
 
 use crate::CasbinAuthz;
 use crate::bypass::is_grpc_bypass;
-use crate::rate_limit::{self, AuthFailureRateLimiter, HealthCheckRateLimiter};
+use crate::rate_limit::{self, AuthFailureRateLimiter, HealthCheckRateLimiter, TrustedProxies};
 use crate::token_gate;
 
 #[derive(Clone)]
@@ -25,6 +25,7 @@ pub struct GrpcAuthzLayer {
     rate_limiter: AuthFailureRateLimiter,
     health_rate_limiter: HealthCheckRateLimiter,
     db: Arc<DatabaseManager>,
+    trusted_proxies: TrustedProxies,
 }
 
 impl GrpcAuthzLayer {
@@ -34,6 +35,7 @@ impl GrpcAuthzLayer {
         rate_limiter: AuthFailureRateLimiter,
         health_rate_limiter: HealthCheckRateLimiter,
         db: Arc<DatabaseManager>,
+        trusted_proxies: TrustedProxies,
     ) -> Self {
         Self {
             authz,
@@ -41,6 +43,7 @@ impl GrpcAuthzLayer {
             rate_limiter,
             health_rate_limiter,
             db,
+            trusted_proxies,
         }
     }
 }
@@ -56,6 +59,7 @@ impl<S> Layer<S> for GrpcAuthzLayer {
             rate_limiter: Arc::clone(&self.rate_limiter),
             health_rate_limiter: Arc::clone(&self.health_rate_limiter),
             db: Arc::clone(&self.db),
+            trusted_proxies: self.trusted_proxies.clone(),
         }
     }
 }
@@ -68,6 +72,7 @@ pub struct GrpcAuthzService<S> {
     rate_limiter: AuthFailureRateLimiter,
     health_rate_limiter: HealthCheckRateLimiter,
     db: Arc<DatabaseManager>,
+    trusted_proxies: TrustedProxies,
 }
 
 impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for GrpcAuthzService<S>
@@ -93,6 +98,7 @@ where
         let rate_limiter = Arc::clone(&self.rate_limiter);
         let health_rate_limiter = Arc::clone(&self.health_rate_limiter);
         let db = Arc::clone(&self.db);
+        let trusted_proxies = self.trusted_proxies.clone();
         let peer_addr = req
             .extensions()
             .get::<ConnectInfo<SocketAddr>>()
@@ -103,7 +109,7 @@ where
                     .and_then(|ci| ci.remote_addr())
                     .map(|addr| addr.ip())
             });
-        let client_ip = rate_limit::extract_client_ip(req.headers(), peer_addr);
+        let client_ip = rate_limit::extract_client_ip(req.headers(), peer_addr, &trusted_proxies);
         let inner = self.inner.clone();
         let mut inner = std::mem::replace(&mut self.inner, inner);
 

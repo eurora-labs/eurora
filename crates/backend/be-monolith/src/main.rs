@@ -5,8 +5,8 @@ use be_asset_service::{AssetService, ProtoAssetServiceServer};
 use be_auth_core::JwtConfig;
 use be_auth_service::AuthService;
 use be_authz::{
-    AuthzState, CasbinAuthz, GrpcAuthzLayer, authz_middleware, new_auth_failure_rate_limiter,
-    new_health_check_rate_limiter,
+    AuthzState, CasbinAuthz, GrpcAuthzLayer, TrustedProxies, authz_middleware,
+    new_auth_failure_rate_limiter, new_health_check_rate_limiter,
 };
 use be_payment_service::init_payment_service;
 use be_remote_db::DatabaseManager;
@@ -216,6 +216,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let auth_rate_limiter = new_auth_failure_rate_limiter();
     let health_rate_limiter = new_health_check_rate_limiter();
+    let trusted_proxies = TrustedProxies::from_env();
 
     let grpc_authz_layer = GrpcAuthzLayer::new(
         authz.clone(),
@@ -223,6 +224,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         auth_rate_limiter.clone(),
         health_rate_limiter.clone(),
         db_manager.clone(),
+        trusted_proxies.clone(),
     );
 
     let mut grpc_server = Server::builder()
@@ -262,6 +264,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         jwt_config,
         auth_rate_limiter,
         health_rate_limiter,
+        trusted_proxies,
     ));
 
     let health_route = axum::Router::new().route(
