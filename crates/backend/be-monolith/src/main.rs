@@ -1,3 +1,4 @@
+use axum::extract::DefaultBodyLimit;
 use axum::http::HeaderValue;
 use be_activity_service::{ActivityService, ProtoActivityServiceServer};
 use be_asset_service::{AssetService, ProtoAssetServiceServer};
@@ -21,6 +22,9 @@ use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer};
 use tracing_subscriber::filter::{LevelFilter, Targets};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+
+const GRPC_MAX_DECODE_SIZE: usize = 8 * 1024 * 1024; // 8 MB
+const HTTP_MAX_BODY_SIZE: usize = 2 * 1024 * 1024; // 2 MB
 
 fn build_cors() -> CorsLayer {
     let allowed: Vec<HeaderValue> = std::env::var("CORS_ALLOWED_ORIGINS")
@@ -214,10 +218,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(GrpcWebLayer::new())
         .layer(grpc_authz_layer)
         .add_service(health_service)
-        .add_service(ProtoAuthServiceServer::new(auth_service))
-        .add_service(ProtoActivityServiceServer::new(activity_service))
-        .add_service(ProtoAssetServiceServer::new(assets_service))
-        .add_service(ProtoThreadServiceServer::new(thread_service));
+        .add_service(
+            ProtoAuthServiceServer::new(auth_service)
+                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE),
+        )
+        .add_service(
+            ProtoActivityServiceServer::new(activity_service)
+                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE),
+        )
+        .add_service(
+            ProtoAssetServiceServer::new(assets_service)
+                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE),
+        )
+        .add_service(
+            ProtoThreadServiceServer::new(thread_service)
+                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE),
+        );
 
     if local_mode {
         let local_settings =
@@ -243,6 +259,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let http_router = update_router
         .merge(payment_router)
         .merge(health_route)
+        .layer(DefaultBodyLimit::max(HTTP_MAX_BODY_SIZE))
         .layer(build_cors())
         .layer(axum::middleware::from_fn_with_state(
             authz_state,
