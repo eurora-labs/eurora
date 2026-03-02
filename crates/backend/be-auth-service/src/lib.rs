@@ -6,10 +6,10 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{Algorithm, Header, encode};
 use openidconnect::{Nonce, PkceCodeChallenge, PkceCodeVerifier};
 use proto_gen::auth::{
-    CheckEmailRequest, CheckEmailResponse, LoginByLoginTokenRequest, LoginRequest, LogoutRequest,
-    Provider, RefreshTokenRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
-    ThirdPartyAuthUrlResponse, ThirdPartyCredentials, TokenResponse, login_request::Credential,
-    proto_auth_service_server::ProtoAuthService,
+    AssociateLoginTokenRequest, CheckEmailRequest, CheckEmailResponse, LoginByLoginTokenRequest,
+    LoginRequest, LogoutRequest, Provider, RefreshTokenRequest, RegisterRequest,
+    ThirdPartyAuthUrlRequest, ThirdPartyAuthUrlResponse, ThirdPartyCredentials, TokenResponse,
+    login_request::Credential, proto_auth_service_server::ProtoAuthService,
 };
 use rand::TryRngCore;
 use sha2::{Digest, Sha256};
@@ -187,10 +187,7 @@ impl AuthService {
 
     fn is_approved_email(&self, email: &str) -> bool {
         let email = email.to_lowercase();
-        self.jwt_config
-            .approved_emails
-            .iter()
-            .any(|approved| approved == "*" || *approved == email)
+        self.jwt_config.approved_emails.contains(&email)
     }
 
     async fn resolve_role(&self, user_id: Uuid) -> Role {
@@ -249,6 +246,7 @@ impl AuthService {
             iat: now.timestamp(),
             token_type: "access".to_string(),
             role: role.clone(),
+            aud: "eurora".to_string(),
         };
 
         let refresh_claims = Claims {
@@ -259,6 +257,7 @@ impl AuthService {
             iat: now.timestamp(),
             token_type: "refresh".to_string(),
             role,
+            aud: "eurora".to_string(),
         };
 
         let header = Header::new(Algorithm::HS256);
@@ -584,7 +583,7 @@ impl AuthService {
             .call()
             .await
             .map_err(|_| {
-                tracing::warn!("Invalid or expired OAuth state: {}", state);
+                tracing::warn!("Invalid or expired Google OAuth state");
                 AuthError::InvalidInput("Invalid or expired state parameter".into())
             })?;
 
@@ -593,14 +592,18 @@ impl AuthService {
         let nonce = match &oauth_state.nonce {
             Some(encrypted_nonce) => {
                 let nonce_str = decrypt_sensitive_string(encrypted_nonce)?;
-                Some(Nonce::new(nonce_str))
+                Nonce::new(nonce_str)
             }
-            None => None,
+            None => {
+                return Err(AuthError::InvalidInput(
+                    "Missing nonce for OIDC verification".into(),
+                ));
+            }
         };
 
         let google_client = self.google_oauth_client().await?;
         let user_info = google_client
-            .exchange_code(code, pkce_verifier, nonce.as_ref())
+            .exchange_code(code, pkce_verifier, &nonce)
             .await?;
 
         if !user_info.verified_email {
@@ -698,7 +701,7 @@ impl AuthService {
             .call()
             .await
             .map_err(|_| {
-                tracing::warn!("Invalid or expired OAuth state: {}", state);
+                tracing::warn!("Invalid or expired GitHub OAuth state");
                 AuthError::InvalidInput("Invalid or expired state parameter".into())
             })?;
 
@@ -937,6 +940,43 @@ impl ProtoAuthService for AuthService {
         };
 
         Ok(Response::new(response))
+    }
+
+    async fn associate_login_token(
+        &self,
+        request: Request<AssociateLoginTokenRequest>,
+    ) -> Result<Response<()>, Status> {
+        tracing::info!("Associate login token request received");
+
+        let claims = self.authenticate_request_access_token(&request)?;
+        let req = request.into_inner();
+        let code_challenge = req.code_challenge;
+
+        if code_challenge.len() != 43
+            || !code_challenge
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+        {
+            return Err(Status::invalid_argument("Invalid code challenge"));
+        }
+
+        let user_id = Uuid::parse_str(&claims.sub)
+            .map_err(|_| Status::unauthenticated("Invalid user ID in token"))?;
+
+        let token_hash = self.hash_login_token(&code_challenge);
+        self.db
+            .create_login_token()
+            .token_hash(token_hash)
+            .user_id(user_id)
+            .expires_at(Utc::now() + Duration::minutes(LOGIN_TOKEN_EXPIRY_MINUTES))
+            .call()
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to associate login token: {}", e);
+                Status::internal("Failed to associate login token")
+            })?;
+
+        Ok(Response::new(()))
     }
 
     async fn check_email(

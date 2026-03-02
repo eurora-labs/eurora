@@ -11,6 +11,12 @@ pub enum AssetError {
     #[error("MIME type is required")]
     MissingMimeType,
 
+    #[error("unsupported MIME type: {0}")]
+    UnsupportedMimeType(String),
+
+    #[error("file content does not match declared MIME type")]
+    MimeTypeMismatch,
+
     #[error("invalid asset ID: {0}")]
     InvalidAssetId(#[source] uuid::Error),
 

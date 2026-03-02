@@ -2,7 +2,7 @@ use crate::client::AuthClient;
 use anyhow::{Result, anyhow};
 use auth_core::Claims;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use euro_secret::{Sensitive, secret};
+use euro_secret::{ExposeSecret, SecretString, secret};
 use jsonwebtoken::dangerous::insecure_decode;
 use rand::{TryRngCore, rngs::OsRng};
 use sha2::{Digest, Sha256};
@@ -40,13 +40,13 @@ impl AuthManager {
         &mut self,
         login: impl Into<String>,
         password: impl Into<String>,
-    ) -> Result<Sensitive<String>> {
+    ) -> Result<SecretString> {
         let response = self.auth_client.login_by_password(login, password).await?;
 
         store_access_token(response.access_token.clone())?;
         store_refresh_token(response.refresh_token.clone())?;
 
-        Ok(Sensitive(response.access_token))
+        Ok(SecretString::from(response.access_token))
     }
 
     pub async fn register(
@@ -54,7 +54,7 @@ impl AuthManager {
         username: impl Into<String>,
         email: impl Into<String>,
         password: impl Into<String>,
-    ) -> Result<Sensitive<String>> {
+    ) -> Result<SecretString> {
         let response = self
             .auth_client
             .register(username, email, password, None)
@@ -63,30 +63,30 @@ impl AuthManager {
         store_access_token(response.access_token.clone())?;
         store_refresh_token(response.refresh_token.clone())?;
 
-        Ok(Sensitive(response.access_token))
+        Ok(SecretString::from(response.access_token))
     }
 
-    fn get_access_token(&self) -> Result<Sensitive<String>> {
+    fn get_access_token(&self) -> Result<SecretString> {
         secret::retrieve(ACCESS_TOKEN_HANDLE)?.ok_or_else(|| anyhow!("No access token found"))
     }
 
-    fn get_refresh_token(&self) -> Result<Sensitive<String>> {
+    fn get_refresh_token(&self) -> Result<SecretString> {
         secret::retrieve(REFRESH_TOKEN_HANDLE)?.ok_or_else(|| anyhow!("No refresh token found"))
     }
 
     pub fn get_access_token_payload(&self) -> Result<Claims> {
         let token = self.get_access_token()?;
-        let token = insecure_decode::<Claims>(&token.0)?;
+        let token = insecure_decode::<Claims>(token.expose_secret())?;
         Ok(token.claims)
     }
 
     pub fn get_refresh_token_payload(&self) -> Result<Claims> {
         let token = self.get_refresh_token()?;
-        let token = insecure_decode::<Claims>(&token.0)?;
+        let token = insecure_decode::<Claims>(token.expose_secret())?;
         Ok(token.claims)
     }
 
-    pub async fn get_or_refresh_access_token(&mut self) -> Result<Sensitive<String>> {
+    pub async fn get_or_refresh_access_token(&mut self) -> Result<SecretString> {
         match self.get_access_token_payload() {
             Ok(claims) => {
                 let now = chrono::Utc::now().timestamp();
@@ -113,15 +113,18 @@ impl AuthManager {
         }
     }
 
-    pub async fn refresh_tokens(&mut self) -> Result<Sensitive<String>> {
+    pub async fn refresh_tokens(&mut self) -> Result<SecretString> {
         let refresh_token = self.get_refresh_token()?;
 
-        let response = self.auth_client.refresh_token(&refresh_token.0).await?;
+        let response = self
+            .auth_client
+            .refresh_token(refresh_token.expose_secret())
+            .await?;
 
         store_access_token(response.access_token.clone())?;
         store_refresh_token(response.refresh_token.clone())?;
 
-        Ok(Sensitive(response.access_token))
+        Ok(SecretString::from(response.access_token))
     }
 
     pub async fn get_login_tokens(&self) -> Result<(String, String)> {
@@ -140,22 +143,22 @@ impl AuthManager {
         Ok((code_verifier, code_challenge))
     }
 
-    pub async fn login_by_login_token(&mut self, login_token: String) -> Result<Sensitive<String>> {
+    pub async fn login_by_login_token(&mut self, login_token: String) -> Result<SecretString> {
         let response = self.auth_client.login_by_login_token(login_token).await?;
 
         store_access_token(response.access_token.clone())?;
         store_refresh_token(response.refresh_token.clone())?;
 
-        Ok(Sensitive(response.access_token))
+        Ok(SecretString::from(response.access_token))
     }
 }
 
 fn store_access_token(token: String) -> Result<()> {
-    secret::persist(ACCESS_TOKEN_HANDLE, &Sensitive(token))
+    secret::persist(ACCESS_TOKEN_HANDLE, &SecretString::from(token))
         .map_err(|e| anyhow!("Failed to store access token: {}", e))
 }
 
 fn store_refresh_token(token: String) -> Result<()> {
-    secret::persist(REFRESH_TOKEN_HANDLE, &Sensitive(token))
+    secret::persist(REFRESH_TOKEN_HANDLE, &SecretString::from(token))
         .map_err(|e| anyhow!("Failed to store refresh token: {}", e))
 }

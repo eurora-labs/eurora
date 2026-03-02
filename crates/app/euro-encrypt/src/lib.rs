@@ -5,7 +5,7 @@ use chacha20poly1305::{
     Key, XChaCha20Poly1305, XNonce,
     aead::{Aead, KeyInit, Payload},
 };
-use euro_secret::{self, Sensitive, secret};
+use euro_secret::{self, ExposeSecret, SecretString, secret};
 use hkdf::Hkdf;
 use rand::RngCore;
 use sha2::Sha256;
@@ -58,7 +58,7 @@ impl MainKey {
         match secret::keyring_retrieve(USER_MAIN_KEY_HANDLE) {
             Ok(Some(key)) => {
                 let decoded = BASE64_STANDARD
-                    .decode(&*key)
+                    .decode(key.expose_secret())
                     .map_err(EncryptError::Base64Decode)?;
                 let key_bytes: [u8; 32] = decoded
                     .try_into()
@@ -142,7 +142,7 @@ pub fn generate_new_main_key() -> EncryptResult<MainKey> {
     let mut encoded = Zeroizing::new(BASE64_STANDARD.encode(mk));
     secret::keyring_persist(
         USER_MAIN_KEY_HANDLE,
-        &Sensitive(std::mem::take(&mut *encoded)),
+        &SecretString::from(std::mem::take(&mut *encoded)),
     )
     .map_err(|e| {
         tracing::error!("Failed to persist main key: {}", e);

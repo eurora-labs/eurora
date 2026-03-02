@@ -28,7 +28,7 @@ use opendal::{Operator, services};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum StorageConfig {
     FS {
         root: String,
@@ -40,6 +40,28 @@ pub enum StorageConfig {
         access_key_id: Option<String>,
         secret_access_key: Option<String>,
     },
+}
+
+impl std::fmt::Debug for StorageConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::FS { root } => f.debug_struct("FS").field("root", root).finish(),
+            Self::S3 {
+                bucket,
+                region,
+                endpoint,
+                access_key_id,
+                ..
+            } => f
+                .debug_struct("S3")
+                .field("bucket", bucket)
+                .field("region", region)
+                .field("endpoint", endpoint)
+                .field("access_key_id", access_key_id)
+                .field("secret_access_key", &"[REDACTED]")
+                .finish(),
+        }
+    }
 }
 
 impl Default for StorageConfig {
