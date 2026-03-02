@@ -12,6 +12,31 @@ use uuid::Uuid;
 
 use proto_gen::asset::{Asset, AssetResponse, CreateAssetRequest};
 
+const ALLOWED_MIME_TYPES: &[&str] = &[
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+    "image/svg+xml",
+    "application/pdf",
+    "text/plain",
+    "application/json",
+    "application/octet-stream",
+];
+
+fn validate_content_matches_mime(content: &[u8], declared_mime: &str) -> bool {
+    match declared_mime {
+        "image/png" => content.starts_with(&[0x89, 0x50, 0x4E, 0x47]),
+        "image/jpeg" => content.starts_with(&[0xFF, 0xD8, 0xFF]),
+        "image/gif" => content.starts_with(b"GIF8"),
+        "image/webp" => {
+            content.len() >= 12 && &content[..4] == b"RIFF" && &content[8..12] == b"WEBP"
+        }
+        "application/pdf" => content.starts_with(b"%PDF"),
+        _ => true,
+    }
+}
+
 #[derive(Debug)]
 pub struct AssetService {
     db: Arc<DatabaseManager>,
@@ -73,6 +98,14 @@ impl AssetService {
 
         if req.mime_type.is_empty() {
             return Err(AssetError::MissingMimeType);
+        }
+
+        if !ALLOWED_MIME_TYPES.contains(&req.mime_type.as_str()) {
+            return Err(AssetError::UnsupportedMimeType(req.mime_type));
+        }
+
+        if !validate_content_matches_mime(&req.content, &req.mime_type) {
+            return Err(AssetError::MimeTypeMismatch);
         }
 
         let checksum_sha256 = StorageService::calculate_sha256(&req.content);

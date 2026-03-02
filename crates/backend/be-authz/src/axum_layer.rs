@@ -69,11 +69,6 @@ pub async fn authz_middleware(
         return next.run(req).await;
     }
 
-    if state.rate_limiter.check_key(&client_ip).is_err() {
-        tracing::warn!(ip = %client_ip, "Rate limited — too many auth failures");
-        return too_many_requests_response();
-    }
-
     let policy_path = match req.extensions().get::<MatchedPath>() {
         Some(m) => m.as_str().to_string(),
         None => {
@@ -93,7 +88,9 @@ pub async fn authz_middleware(
     {
         Some(h) => h.to_string(),
         None => {
-            let _ = state.rate_limiter.check_key(&client_ip);
+            if state.rate_limiter.check_key(&client_ip).is_err() {
+                return too_many_requests_response();
+            }
             return (
                 StatusCode::UNAUTHORIZED,
                 axum::Json(serde_json::json!({"error": "Missing authorization header"})),
@@ -105,7 +102,9 @@ pub async fn authz_middleware(
     let token = match auth_header.strip_prefix("Bearer ") {
         Some(t) => t,
         None => {
-            let _ = state.rate_limiter.check_key(&client_ip);
+            if state.rate_limiter.check_key(&client_ip).is_err() {
+                return too_many_requests_response();
+            }
             return (
                 StatusCode::UNAUTHORIZED,
                 axum::Json(
@@ -119,7 +118,9 @@ pub async fn authz_middleware(
     let claims = match state.jwt_config.validate_access_token(token) {
         Ok(c) => c,
         Err(e) => {
-            let _ = state.rate_limiter.check_key(&client_ip);
+            if state.rate_limiter.check_key(&client_ip).is_err() {
+                return too_many_requests_response();
+            }
             tracing::warn!(error = %e, "JWT validation failed");
             return (
                 StatusCode::UNAUTHORIZED,
@@ -138,7 +139,9 @@ pub async fn authz_middleware(
             next.run(req).await
         }
         Ok(false) => {
-            let _ = state.rate_limiter.check_key(&client_ip);
+            if state.rate_limiter.check_key(&client_ip).is_err() {
+                return too_many_requests_response();
+            }
             tracing::warn!(role = %role, path = %raw_path, method = %method, "REST authorization denied");
             (
                 StatusCode::FORBIDDEN,

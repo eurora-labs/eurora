@@ -130,18 +130,15 @@ where
                 return inner.call(req).await;
             }
 
-            if rate_limiter.check_key(&client_ip).is_err() {
-                tracing::warn!(ip = %client_ip, "Rate limited — too many auth failures");
-                return Ok(Status::resource_exhausted(
-                    "Too many failed requests. Try again later.",
-                )
-                .into_http());
-            }
-
             let claims = match extract_jwt_claims(&req, &jwt_config) {
                 Ok(claims) => claims,
                 Err(status) => {
-                    let _ = rate_limiter.check_key(&client_ip);
+                    if rate_limiter.check_key(&client_ip).is_err() {
+                        return Ok(Status::resource_exhausted(
+                            "Too many failed requests. Try again later.",
+                        )
+                        .into_http());
+                    }
                     return Ok(status.into_http());
                 }
             };
@@ -171,7 +168,12 @@ where
                     inner.call(req).await
                 }
                 Ok(false) => {
-                    let _ = rate_limiter.check_key(&client_ip);
+                    if rate_limiter.check_key(&client_ip).is_err() {
+                        return Ok(Status::resource_exhausted(
+                            "Too many failed requests. Try again later.",
+                        )
+                        .into_http());
+                    }
                     tracing::warn!(role = %role, service = %service_name, method = %method, "gRPC authorization denied");
                     Ok(Status::permission_denied(
                         "Insufficient permissions. Please upgrade your plan.",
