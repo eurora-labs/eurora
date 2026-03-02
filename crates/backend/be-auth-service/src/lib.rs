@@ -956,13 +956,18 @@ impl ProtoAuthService for AuthService {
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|_| Status::internal("Invalid user ID in token"))?;
 
-        let user = self.db.get_user().id(user_id).call().await.map_err(|e| {
-            tracing::warn!("Failed to find user for associate_login_token: {}", e);
-            Status::from(AuthError::InvalidToken)
-        })?;
-
-        self.try_associate_login_token_with_user(&user, &code_challenge)
-            .await;
+        let token_hash = self.hash_login_token(&code_challenge);
+        self.db
+            .create_login_token()
+            .token_hash(token_hash)
+            .user_id(user_id)
+            .expires_at(Utc::now() + Duration::minutes(LOGIN_TOKEN_EXPIRY_MINUTES))
+            .call()
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to associate login token: {}", e);
+                Status::internal("Failed to associate login token")
+            })?;
 
         Ok(Response::new(()))
     }
