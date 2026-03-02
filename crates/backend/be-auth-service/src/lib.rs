@@ -246,6 +246,7 @@ impl AuthService {
             iat: now.timestamp(),
             token_type: "access".to_string(),
             role: role.clone(),
+            aud: "eurora".to_string(),
         };
 
         let refresh_claims = Claims {
@@ -256,6 +257,7 @@ impl AuthService {
             iat: now.timestamp(),
             token_type: "refresh".to_string(),
             role,
+            aud: "eurora".to_string(),
         };
 
         let header = Header::new(Algorithm::HS256);
@@ -581,7 +583,7 @@ impl AuthService {
             .call()
             .await
             .map_err(|_| {
-                tracing::warn!("Invalid or expired OAuth state: {}", state);
+                tracing::warn!("Invalid or expired Google OAuth state");
                 AuthError::InvalidInput("Invalid or expired state parameter".into())
             })?;
 
@@ -590,14 +592,18 @@ impl AuthService {
         let nonce = match &oauth_state.nonce {
             Some(encrypted_nonce) => {
                 let nonce_str = decrypt_sensitive_string(encrypted_nonce)?;
-                Some(Nonce::new(nonce_str))
+                Nonce::new(nonce_str)
             }
-            None => None,
+            None => {
+                return Err(AuthError::InvalidInput(
+                    "Missing nonce for OIDC verification".into(),
+                ));
+            }
         };
 
         let google_client = self.google_oauth_client().await?;
         let user_info = google_client
-            .exchange_code(code, pkce_verifier, nonce.as_ref())
+            .exchange_code(code, pkce_verifier, &nonce)
             .await?;
 
         if !user_info.verified_email {
@@ -695,7 +701,7 @@ impl AuthService {
             .call()
             .await
             .map_err(|_| {
-                tracing::warn!("Invalid or expired OAuth state: {}", state);
+                tracing::warn!("Invalid or expired GitHub OAuth state");
                 AuthError::InvalidInput("Invalid or expired state parameter".into())
             })?;
 

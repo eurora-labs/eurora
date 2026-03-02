@@ -38,4 +38,6 @@ pub struct Claims {
     pub iat: i64,
     pub token_type: String,
     pub role: Role,
+    #[serde(default)]
+    pub aud: String,
 }
