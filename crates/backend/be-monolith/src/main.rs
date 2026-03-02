@@ -44,6 +44,10 @@ fn build_cors() -> CorsLayer {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("Failed to install default CryptoProvider");
+
     dotenv().ok();
 
     let _sentry_guard = if cfg!(not(debug_assertions)) {
@@ -103,7 +107,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let posthog_options = posthog_rs::ClientOptionsBuilder::default()
             .api_key(posthog_key)
-            .api_endpoint("https://eu.i.posthog.com/i/v0/e/".to_string())
+            .host("https://eu.i.posthog.com")
             .build()
             .expect("valid posthog client options");
         match posthog_rs::init_global(posthog_options).await {
