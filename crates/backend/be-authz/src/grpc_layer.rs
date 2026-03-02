@@ -1,5 +1,5 @@
 use std::future::Future;
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -14,7 +14,7 @@ use tower::{Layer, Service};
 
 use crate::CasbinAuthz;
 use crate::bypass::is_grpc_bypass;
-use crate::rate_limit::{AuthFailureRateLimiter, HealthCheckRateLimiter};
+use crate::rate_limit::{self, AuthFailureRateLimiter, HealthCheckRateLimiter};
 use crate::token_gate;
 
 #[derive(Clone)]
@@ -69,13 +69,6 @@ pub struct GrpcAuthzService<S> {
     db: Arc<DatabaseManager>,
 }
 
-fn extract_client_ip<B>(req: &Request<B>) -> IpAddr {
-    req.extensions()
-        .get::<ConnectInfo<SocketAddr>>()
-        .map(|ci| ci.0.ip())
-        .unwrap_or(IpAddr::from([127, 0, 0, 1]))
-}
-
 impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for GrpcAuthzService<S>
 where
     S: Service<Request<ReqBody>, Response = http::Response<ResBody>> + Clone + Send + 'static,
@@ -99,7 +92,11 @@ where
         let rate_limiter = Arc::clone(&self.rate_limiter);
         let health_rate_limiter = Arc::clone(&self.health_rate_limiter);
         let db = Arc::clone(&self.db);
-        let client_ip = extract_client_ip(&req);
+        let peer_addr = req
+            .extensions()
+            .get::<ConnectInfo<SocketAddr>>()
+            .map(|ci| ci.0.ip());
+        let client_ip = rate_limit::extract_client_ip(req.headers(), peer_addr);
         let inner = self.inner.clone();
         let mut inner = std::mem::replace(&mut self.inner, inner);
 

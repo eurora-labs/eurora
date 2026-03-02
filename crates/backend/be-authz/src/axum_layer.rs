@@ -1,4 +1,4 @@
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::extract::{ConnectInfo, MatchedPath, Request};
@@ -9,7 +9,7 @@ use be_auth_core::JwtConfig;
 
 use crate::CasbinAuthz;
 use crate::bypass::is_rest_bypass;
-use crate::rate_limit::{AuthFailureRateLimiter, HealthCheckRateLimiter};
+use crate::rate_limit::{self, AuthFailureRateLimiter, HealthCheckRateLimiter};
 
 pub struct AuthzState {
     pub authz: CasbinAuthz,
@@ -34,13 +34,6 @@ impl AuthzState {
     }
 }
 
-fn extract_client_ip(req: &Request) -> IpAddr {
-    req.extensions()
-        .get::<ConnectInfo<SocketAddr>>()
-        .map(|ci| ci.0.ip())
-        .unwrap_or(IpAddr::from([127, 0, 0, 1]))
-}
-
 fn too_many_requests_response() -> Response {
     (
         StatusCode::TOO_MANY_REQUESTS,
@@ -61,7 +54,11 @@ pub async fn authz_middleware(
     let raw_path = req.uri().path().to_string();
     let method = req.method().to_string();
 
-    let client_ip = extract_client_ip(&req);
+    let peer_addr = req
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|ci| ci.0.ip());
+    let client_ip = rate_limit::extract_client_ip(req.headers(), peer_addr);
 
     if is_rest_bypass(&raw_path) {
         if raw_path == "/health" && state.health_rate_limiter.check_key(&client_ip).is_err() {
