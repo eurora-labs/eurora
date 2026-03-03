@@ -1,6 +1,7 @@
 use euro_settings::{APISettings, AppSettings, GeneralSettings, TelemetrySettings};
 use tauri::{Manager, Runtime};
 
+use crate::error::ResultExt;
 use crate::shared_types::{SharedAppSettings, SharedEndpointManager};
 
 #[taurpc::procedures(path = "settings")]
@@ -82,7 +83,7 @@ impl SettingsApi for SettingsApiImpl {
         settings.general = general_settings;
         settings
             .save_to_default_path()
-            .map_err(|e| format!("Failed to persist general settings: {e}"))?;
+            .ctx("Failed to persist general settings")?;
 
         Ok(settings.general.clone())
     }
@@ -98,7 +99,7 @@ impl SettingsApi for SettingsApiImpl {
         settings.telemetry = telemetry_settings;
         settings
             .save_to_default_path()
-            .map_err(|e| format!("Failed to persist telemetry settings: {e}"))?;
+            .ctx("Failed to persist telemetry settings")?;
 
         Ok(settings.telemetry.clone())
     }
@@ -128,17 +129,17 @@ impl SettingsApi for SettingsApiImpl {
             .api
             .sync()
             .await
-            .map_err(|e| format!("Failed to sync provider settings: {e}"))?;
+            .ctx("Failed to sync provider settings")?;
 
         settings
             .save_to_default_path()
-            .map_err(|e| format!("Failed to persist api settings: {e}"))?;
+            .ctx("Failed to persist api settings")?;
 
         if !new_endpoint.is_empty() {
             let endpoint_manager = app_handle.state::<SharedEndpointManager>();
             endpoint_manager
                 .set_global_backend_url(&new_endpoint)
-                .map_err(|e| format!("Failed to switch API endpoint: {e}"))?;
+                .ctx("Failed to switch API endpoint")?;
         }
 
         Ok(settings.api.clone())

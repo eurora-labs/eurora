@@ -17,7 +17,9 @@ impl ContextChipApi for ContextChipApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<Vec<ContextChip>, String> {
-        let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle.state();
+        let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle
+            .try_state()
+            .ok_or_else(|| "Timeline not available".to_string())?;
         let timeline = timeline_state.lock().await;
 
         let activities = timeline.get_context_chips().await;
