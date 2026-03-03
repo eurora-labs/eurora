@@ -14,3 +14,7 @@
 body {
 	margin: 0;
 }
+
+[data-smiz-modal-overlay='visible'] {
+	background-color: var(--background) !important;
+}

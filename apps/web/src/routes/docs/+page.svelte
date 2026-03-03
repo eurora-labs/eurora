@@ -9,6 +9,8 @@
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
+	import Zoom from 'svelte-medium-image-zoom';
+	import 'svelte-medium-image-zoom/dist/styles.css';
 </script>
 
 <div>
@@ -21,16 +23,23 @@
 
 	<div class="flex flex-col gap-12">
 		<section>
-			<h2 class="mb-4 text-2xl font-semibold">What is Eurora?</h2>
+			<h2 class="mb-4 text-2xl font-semibold">Overview</h2>
+			<p class="mb-8 text-muted-foreground">
+				Eurora is the first AI assistant that provides deep context-awareness across every
+				website you visit. Eurora works with every browser across Linux, macOS, and Windows.
+				We aim to provide you with the best possible AI assistant experience.
+			</p>
 			<figure class="mb-6">
-				<img
-					src="https://d26xptavrz5c8t.cloudfront.net/image/linux/youtube_demo.png"
-					alt="Eurora desktop app demo showing AI assistant analyzing a YouTube video"
-					class="w-full rounded-xl border"
-				/>
-				<figcaption class="mt-2 text-center text-sm text-muted-foreground">
+				<Zoom>
+					<img
+						src="https://d26xptavrz5c8t.cloudfront.net/image/linux/youtube_demo.png"
+						alt="Eurora desktop app demo showing AI assistant analyzing a YouTube video"
+					/>
+				</Zoom>
+
+				<figcaption class="mt-2 text-center text-sm text-muted-foreground px-8">
 					Eurora's desktop app providing context-aware AI assistance while browsing
-					YouTube.
+					YouTube. In this case, Eurora picked up the current youtube video as an asset.
 				</figcaption>
 			</figure>
 			<div
