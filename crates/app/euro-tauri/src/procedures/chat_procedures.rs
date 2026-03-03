@@ -5,7 +5,8 @@ use tauri::{Manager, Runtime, ipc::Channel};
 use tokio::sync::Mutex;
 
 use crate::{
-    procedures::thread_procedures::TauRpcThreadApiEventTrigger, shared_types::SharedThreadManager,
+    error::ResultExt, procedures::thread_procedures::TauRpcThreadApiEventTrigger,
+    shared_types::SharedThreadManager,
 };
 
 #[taurpc::ipc_type]
@@ -41,79 +42,79 @@ impl ChatApi for ChatApiImpl {
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String> {
+        let thread_state: tauri::State<SharedThreadManager> = app_handle
+            .try_state()
+            .ok_or_else(|| "Thread manager not available".to_string())?;
+        let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle
+            .try_state()
+            .ok_or_else(|| "Timeline not available".to_string())?;
+
         let mut thread_id = thread_id;
         let mut is_new_thread = false;
 
         {
-            let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle.state();
             let timeline = timeline_state.lock().await;
-            let thread_state: tauri::State<SharedThreadManager> = app_handle.state();
             let mut thread_manager = thread_state.lock().await;
 
             if thread_id.is_none() {
                 let thread = thread_manager
                     .ensure_remote_thread()
                     .await
-                    .expect("Failed to ensure remote thread");
+                    .ctx("Failed to ensure remote thread")?;
                 thread_id = Some(thread.id().unwrap().to_string());
                 is_new_thread = true;
                 TauRpcThreadApiEventTrigger::new(app_handle.clone())
                     .new_thread_added(thread.into())
-                    .expect("Failed to trigger new thread added event");
+                    .ctx("Failed to trigger new thread added event")?;
             }
 
-            if timeline.save_current_activity_to_service().await.is_ok() {
-                // For now, we don't need to save assets to service, that will come later
-                // when there is a way to convert assets to messages directly
-                // if let Ok(infos) = timeline.save_assets_to_service_by_ids(&query.assets).await {
-                //     tracing::info!("Infos: {:?}", infos);
-                // }
+            if timeline.save_current_activity_to_service().await.is_ok() && !query.assets.is_empty()
+            {
+                let mut messages = Vec::new();
+                let asset_messages = timeline.construct_messages_from_last_asset().await;
+                if let Some(last_asset_message) = asset_messages.last() {
+                    messages.push(last_asset_message);
+                }
 
-                let has_assets = !query.assets.is_empty();
+                let snapshot_messages = timeline.construct_messages_from_last_snapshot().await;
+                if let Some(last_snapshot_message) = snapshot_messages.last() {
+                    messages.push(last_snapshot_message);
+                }
 
-                if has_assets {
-                    let mut messages = Vec::new();
-                    let asset_messages = timeline.construct_messages_from_last_asset().await;
-                    if let Some(last_asset_message) = asset_messages.last() {
-                        messages.push(last_asset_message);
-                    }
-
-                    let snapshot_messages = timeline.construct_messages_from_last_snapshot().await;
-
-                    if let Some(last_snapshot_message) = snapshot_messages.last() {
-                        messages.push(last_snapshot_message);
-                    }
-
-                    for message in messages {
-                        match &message {
-                            BaseMessage::System(m) => {
-                                let _ = thread_manager.add_system_message(m).await;
-                            }
-                            BaseMessage::Human(m) => {
-                                let _ = thread_manager.add_hidden_human_message(m).await;
-                            }
-                            _ => todo!(),
+                for message in messages {
+                    match &message {
+                        BaseMessage::System(m) => {
+                            let _ = thread_manager.add_system_message(m).await;
+                        }
+                        BaseMessage::Human(m) => {
+                            let _ = thread_manager.add_hidden_human_message(m).await;
+                        }
+                        _ => {
+                            tracing::warn!("Unexpected message type in asset context");
                         }
                     }
                 }
             }
         }
-        let title_app_handle = app_handle.clone();
+
         let content = query.text.clone();
         let thread_id_for_title = thread_id.clone();
         if let (true, Some(id)) = (is_new_thread, thread_id_for_title) {
+            let title_app_handle = app_handle.clone();
             tokio::spawn(async move {
-                let app_handle = title_app_handle.clone();
-                let thread_state: tauri::State<SharedThreadManager> = app_handle.state();
-                let thread_manager = thread_state.lock().await;
-                let thread = thread_manager
-                    .generate_thread_title(id, content)
-                    .await
-                    .map_err(|e| format!("Failed to generate thread title: {e}"));
-                if let Ok(thread) = thread {
-                    TauRpcThreadApiEventTrigger::new(title_app_handle)
-                        .thread_title_changed(thread.into())
-                        .expect("Failed to send thread title");
+                let result = {
+                    let thread_state: tauri::State<SharedThreadManager> = title_app_handle.state();
+                    let thread_manager = thread_state.lock().await;
+                    thread_manager.generate_thread_title(id, content).await
+                };
+                match result {
+                    Ok(thread) => {
+                        let _ = TauRpcThreadApiEventTrigger::new(title_app_handle)
+                            .thread_title_changed(thread.into());
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to generate thread title: {e}");
+                    }
                 }
             });
         }
@@ -122,7 +123,6 @@ impl ChatApi for ChatApiImpl {
 
         tracing::debug!("Sending chat stream");
         let stream_result = {
-            let thread_state: tauri::State<SharedThreadManager> = app_handle.state();
             let mut thread_manager = thread_state.lock().await;
             thread_manager.chat_stream(query.text.clone()).await
         };
@@ -147,7 +147,7 @@ impl ChatApi for ChatApiImpl {
                                 }
                             }
                             Err(e) => {
-                                return Err(format!("Stream error: {}", e));
+                                return Err(format!("Stream error: {e}"));
                             }
                         }
                     }
@@ -167,7 +167,7 @@ impl ChatApi for ChatApiImpl {
                 }
             }
             Err(e) => {
-                return Err(format!("Failed to create chat stream: {}", e));
+                return Err(format!("Failed to create chat stream: {e}"));
             }
         }
 

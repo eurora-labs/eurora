@@ -3,6 +3,7 @@ use euro_secret::{ExposeSecret, SecretString, secret};
 use tauri::{AppHandle, Manager, Runtime};
 use url::Url;
 
+use crate::error::ResultExt;
 use crate::shared_types::{SharedAppSettings, SharedEndpointManager, SharedUserController};
 
 #[taurpc::ipc_type]
@@ -40,6 +41,14 @@ pub trait AuthApi {
 
 const LOGIN_CODE_VERIFIER: &str = "LOGIN_CODE_VERIFIER";
 
+fn user_controller<R: Runtime>(
+    app_handle: &AppHandle<R>,
+) -> Result<tauri::State<'_, SharedUserController>, String> {
+    app_handle
+        .try_state::<SharedUserController>()
+        .ok_or_else(|| "User controller not available".to_string())
+}
+
 #[derive(Clone)]
 pub struct AuthApiImpl;
 
@@ -49,95 +58,82 @@ impl AuthApi for AuthApiImpl {
         self,
         app_handle: AppHandle<R>,
     ) -> Result<LoginToken, String> {
-        if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
-            // The endpoint should switch to remote in production
-            // as to not let previous settings disturb the
-            // web login flow
-            if !cfg!(debug_assertions) {
-                {
-                    let settings_state = app_handle.state::<SharedAppSettings>();
-                    let mut settings = settings_state.lock().await;
-                    settings.api.endpoint = DEFAULT_API_URL.to_string();
-                    settings
-                        .save_to_default_path()
-                        .map_err(|e| format!("Failed to save settings: {}", e))?;
-                }
+        let user_state = user_controller(&app_handle)?;
 
-                let endpoint_manager = app_handle.state::<SharedEndpointManager>();
-                endpoint_manager
-                    .set_global_backend_url(DEFAULT_API_URL)
-                    .map_err(|e| format!("Failed to switch to cloud endpoint: {}", e))?;
+        if !cfg!(debug_assertions) {
+            {
+                let settings_state = app_handle.state::<SharedAppSettings>();
+                let mut settings = settings_state.lock().await;
+                settings.api.endpoint = DEFAULT_API_URL.to_string();
+                settings
+                    .save_to_default_path()
+                    .ctx("Failed to save settings")?;
             }
 
-            let mut controller = user_state.lock().await;
-            let (code_verifier, code_challenge) = controller
-                .get_login_tokens()
-                .await
-                .map_err(|e| format!("Failed to get login tokens: {}", e))?;
-            let expires_in: i64 = 60 * 20;
-
-            let base_url = std::env::var("AUTH_SERVICE_URL")
-                .unwrap_or("https://www.eurora-labs.com".to_string());
-            let mut url = Url::parse(&format!("{}/login", base_url))
-                .map_err(|e| format!("Invalid AUTH_SERVICE_URL: {}", e))?;
-            url.query_pairs_mut()
-                .append_pair("code_challenge", &code_challenge)
-                .append_pair("code_challenge_method", "S256");
-            secret::persist(
-                LOGIN_CODE_VERIFIER,
-                &SecretString::from(code_verifier.clone()),
-            )
-            .map_err(|e| format!("Failed to persist code verifier: {}", e))?;
-            Ok(LoginToken {
-                code_challenge: code_challenge.to_string(),
-                expires_in,
-                url: url.to_string(),
-            })
-        } else {
-            Err("Auth manager not available".to_string())
+            let endpoint_manager = app_handle.state::<SharedEndpointManager>();
+            endpoint_manager
+                .set_global_backend_url(DEFAULT_API_URL)
+                .ctx("Failed to switch to cloud endpoint")?;
         }
+
+        let mut controller = user_state.lock().await;
+        let (code_verifier, code_challenge) = controller
+            .get_login_tokens()
+            .await
+            .ctx("Failed to get login tokens")?;
+        let expires_in: i64 = 60 * 20;
+
+        let base_url = std::env::var("AUTH_SERVICE_URL")
+            .unwrap_or_else(|_| "https://www.eurora-labs.com".to_string());
+        let mut url = Url::parse(&format!("{base_url}/login")).ctx("Invalid AUTH_SERVICE_URL")?;
+        url.query_pairs_mut()
+            .append_pair("code_challenge", &code_challenge)
+            .append_pair("code_challenge_method", "S256");
+        secret::persist(LOGIN_CODE_VERIFIER, &SecretString::from(code_verifier))
+            .ctx("Failed to persist code verifier")?;
+        Ok(LoginToken {
+            code_challenge: code_challenge.to_string(),
+            expires_in,
+            url: url.to_string(),
+        })
     }
 
     async fn poll_for_login<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
-        if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
-            let mut controller = user_state.lock().await;
+        let user_state = match app_handle.try_state::<SharedUserController>() {
+            Some(s) => s,
+            None => return Ok(false),
+        };
 
-            if controller.get_or_refresh_access_token().await.is_ok() {
-                let _ = secret::delete(LOGIN_CODE_VERIFIER);
-                return Ok(true);
+        let mut controller = user_state.lock().await;
+
+        if controller.get_or_refresh_access_token().await.is_ok() {
+            let _ = secret::delete(LOGIN_CODE_VERIFIER);
+            return Ok(true);
+        }
+
+        let login_token = secret::retrieve(LOGIN_CODE_VERIFIER)
+            .ctx("Failed to retrieve login token")?
+            .ok_or_else(|| "Login token not found".to_string())?;
+
+        match controller
+            .login_by_login_token(login_token.expose_secret().to_owned())
+            .await
+        {
+            Ok(_) => {
+                secret::delete(LOGIN_CODE_VERIFIER).ctx("Failed to remove login token")?;
+
+                let state = app_handle.state::<SharedAppSettings>();
+                let settings = state.lock().await;
+                settings
+                    .save_to_default_path()
+                    .ctx("Failed to save settings")?;
+
+                Ok(true)
             }
-
-            let login_token = secret::retrieve(LOGIN_CODE_VERIFIER)
-                .map_err(|e| format!("Failed to retrieve login token: {}", e))?
-                .ok_or_else(|| "Login token not found".to_string())?;
-
-            match controller
-                .login_by_login_token(login_token.expose_secret().to_owned())
-                .await
-            {
-                Ok(_) => {
-                    secret::delete(LOGIN_CODE_VERIFIER)
-                        .map_err(|e| format!("Failed to remove login token: {}", e))?;
-
-                    let state = app_handle.state::<SharedAppSettings>();
-                    let settings = state.lock().await;
-
-                    settings
-                        .save_to_default_path()
-                        .map_err(|e| format!("Failed to save settings: {}", e))?;
-
-                    Ok(true)
-                }
-                Err(e) => {
-                    tracing::error!("Login by login token failed: {}", e);
-
-                    Ok(false)
-                }
+            Err(e) => {
+                tracing::error!("Login by login token failed: {e}");
+                Ok(false)
             }
-        } else {
-            tracing::error!("Failed to initialize prompt kit service: Invalid configuration");
-
-            Ok(false)
         }
     }
 
@@ -148,21 +144,19 @@ impl AuthApi for AuthApiImpl {
         email: String,
         password: String,
     ) -> Result<(), String> {
-        let user_state = app_handle
-            .try_state::<SharedUserController>()
-            .ok_or_else(|| "User controller not available".to_string())?;
+        let user_state = user_controller(&app_handle)?;
         let mut controller = user_state.lock().await;
 
         controller
             .register(&username, &email, &password)
             .await
-            .map_err(|e| format!("Registration failed: {}", e))?;
+            .ctx("Registration failed")?;
 
         let state = app_handle.state::<SharedAppSettings>();
         let settings = state.lock().await;
         settings
             .save_to_default_path()
-            .map_err(|e| format!("Failed to save settings: {}", e))?;
+            .ctx("Failed to save settings")?;
 
         Ok(())
     }
@@ -173,40 +167,34 @@ impl AuthApi for AuthApiImpl {
         login: String,
         password: String,
     ) -> Result<(), String> {
-        let user_state = app_handle
-            .try_state::<SharedUserController>()
-            .ok_or_else(|| "User controller not available".to_string())?;
+        let user_state = user_controller(&app_handle)?;
         let mut controller = user_state.lock().await;
 
         controller
             .login(&login, &password)
             .await
-            .map_err(|e| format!("Login failed: {}", e))?;
+            .ctx("Login failed")?;
 
         let state = app_handle.state::<SharedAppSettings>();
         let settings = state.lock().await;
         settings
             .save_to_default_path()
-            .map_err(|e| format!("Failed to save settings: {}", e))?;
+            .ctx("Failed to save settings")?;
 
         Ok(())
     }
 
     async fn logout<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<(), String> {
-        let user_state = app_handle
-            .try_state::<SharedUserController>()
-            .ok_or_else(|| "User controller not available".to_string())?;
+        let user_state = user_controller(&app_handle)?;
         let mut controller = user_state.lock().await;
 
-        controller
-            .delete_user()
-            .map_err(|e| format!("Logout failed: {}", e))?;
+        controller.delete_user().ctx("Logout failed")?;
 
         let state = app_handle.state::<SharedAppSettings>();
         let settings = state.lock().await;
         settings
             .save_to_default_path()
-            .map_err(|e| format!("Failed to save settings: {}", e))?;
+            .ctx("Failed to save settings")?;
 
         Ok(())
     }
@@ -234,67 +222,56 @@ impl AuthApi for AuthApiImpl {
         let mut controller = user_state.lock().await;
         match controller.get_or_refresh_access_token().await {
             Ok(token) => Ok(!token.expose_secret().is_empty()),
-            Err(e) => Err(format!("Failed to get or refresh access token: {}", e)),
+            Err(e) => Err(format!("Failed to get or refresh access token: {e}")),
         }
     }
 
     async fn get_role<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<String, String> {
-        if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
-            let mut controller = user_state.lock().await;
-            controller
-                .get_or_refresh_access_token()
-                .await
-                .map_err(|e| format!("Failed to get access token: {}", e))?;
-            let claims = controller
-                .get_access_token_payload()
-                .map_err(|e| format!("Failed to get access token payload: {}", e))?;
-            Ok(claims.role.to_string())
-        } else {
-            Err("User controller not available".to_string())
-        }
+        let user_state = user_controller(&app_handle)?;
+        let mut controller = user_state.lock().await;
+        controller
+            .get_or_refresh_access_token()
+            .await
+            .ctx("Failed to get access token")?;
+        let claims = controller
+            .get_access_token_payload()
+            .ctx("Failed to get access token payload")?;
+        Ok(claims.role.to_string())
     }
 
     async fn get_username<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<String, String> {
-        if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
-            let mut controller = user_state.lock().await;
-            controller
-                .get_or_refresh_access_token()
-                .await
-                .map_err(|e| format!("Failed to get access token: {}", e))?;
-            let claims = controller
-                .get_access_token_payload()
-                .map_err(|e| format!("Failed to get access token payload: {}", e))?;
-            Ok(claims.username)
-        } else {
-            Err("User controller not available".to_string())
-        }
+        let user_state = user_controller(&app_handle)?;
+        let mut controller = user_state.lock().await;
+        controller
+            .get_or_refresh_access_token()
+            .await
+            .ctx("Failed to get access token")?;
+        let claims = controller
+            .get_access_token_payload()
+            .ctx("Failed to get access token payload")?;
+        Ok(claims.username)
     }
 
     async fn refresh_session<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<(), String> {
-        let user_state = app_handle
-            .try_state::<SharedUserController>()
-            .ok_or_else(|| "User controller not available".to_string())?;
+        let user_state = user_controller(&app_handle)?;
         let mut controller = user_state.lock().await;
         controller
             .refresh_tokens()
             .await
-            .map_err(|e| format!("Failed to refresh session: {}", e))?;
+            .ctx("Failed to refresh session")?;
         Ok(())
     }
 
     async fn get_email<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<String, String> {
-        if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
-            let mut controller = user_state.lock().await;
-            controller
-                .get_or_refresh_access_token()
-                .await
-                .map_err(|e| format!("Failed to get access token: {}", e))?;
-            let claims = controller
-                .get_access_token_payload()
-                .map_err(|e| format!("Failed to get access token payload: {}", e))?;
-            Ok(claims.email)
-        } else {
-            Err("User controller not available".to_string())
-        }
+        let user_state = user_controller(&app_handle)?;
+        let mut controller = user_state.lock().await;
+        controller
+            .get_or_refresh_access_token()
+            .await
+            .ctx("Failed to get access token")?;
+        let claims = controller
+            .get_access_token_payload()
+            .ctx("Failed to get access token payload")?;
+        Ok(claims.email)
     }
 }

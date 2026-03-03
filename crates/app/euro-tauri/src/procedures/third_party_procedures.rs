@@ -1,4 +1,7 @@
 use euro_secret::{SecretString, secret};
+
+use crate::error::ResultExt;
+
 #[taurpc::procedures(path = "third_party")]
 pub trait ThirdPartyApi {
     async fn check_api_key_exists() -> Result<bool, String>;
@@ -11,15 +14,14 @@ pub struct ThirdPartyApiImpl;
 #[taurpc::resolvers]
 impl ThirdPartyApi for ThirdPartyApiImpl {
     async fn check_api_key_exists(self) -> Result<bool, String> {
-        let key = secret::retrieve("OPENAI_API_KEY")
-            .map_err(|e| format!("Failed to retrieve API key: {}", e))?;
+        let key = secret::retrieve("OPENAI_API_KEY").ctx("Failed to retrieve API key")?;
 
         Ok(key.is_some())
     }
 
     async fn save_api_key(self, api_key: String) -> Result<(), String> {
         secret::persist("OPENAI_API_KEY", &SecretString::from(api_key))
-            .map_err(|e| format!("Failed to save API key: {}", e))?;
+            .ctx("Failed to save API key")?;
         Ok(())
     }
 }

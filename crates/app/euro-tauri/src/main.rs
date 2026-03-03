@@ -71,9 +71,7 @@ fn install_native_messaging_manifests(app: &tauri::App) {
                 return;
             }
         };
-        // On macOS the sidecar lives next to the main executable inside the .app
-        // bundle. On Linux we copy it to a stable well-known path so that
-        // manifests survive package-manager upgrades that change the install prefix.
+
         #[cfg(target_os = "macos")]
         let manifest_binary_path = binary_path.to_string_lossy().to_string();
 
@@ -116,8 +114,6 @@ fn install_native_messaging_manifests(app: &tauri::App) {
         let manifest_configs: Vec<(&str, Vec<PathBuf>)> = {
             let home = dirs::home_dir().unwrap_or_default();
 
-            // On Linux, copy the sidecar binary to ~/.eurora/native-messaging/
-            // so that browser manifests can reference a stable, well-known path.
             let native_messaging_dir = home.join(".eurora/native-messaging");
             if let Err(e) = std::fs::create_dir_all(&native_messaging_dir) {
                 tracing::warn!(
@@ -220,6 +216,224 @@ fn install_native_messaging_manifests(app: &tauri::App) {
     }
 }
 
+fn init_encryption(data_dir: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(debug_assertions)]
+    let main_key = euro_encrypt::MainKey::from_bytes([
+        0xA4, 0x1B, 0x7E, 0x3C, 0x92, 0xF0, 0x55, 0xD8, 0x6A, 0xC3, 0x11, 0xBF, 0x48, 0xE7, 0x2D,
+        0x9F, 0x03, 0x86, 0xFA, 0x74, 0xCB, 0x60, 0x1D, 0xA5, 0x39, 0xEE, 0x57, 0x0C, 0xB2, 0x84,
+        0x63, 0xD1,
+    ]);
+    #[cfg(not(debug_assertions))]
+    let main_key = euro_encrypt::MainKey::new()?;
+
+    euro_secret::secret::init_file_store(*main_key.as_bytes(), data_dir)?;
+    Ok(())
+}
+
+fn register_autostart(tauri_app: &mut tauri::App, app_settings: &AppSettings) {
+    let should_register = !cfg!(debug_assertions) && !cfg!(target_os = "macos");
+    let started_by_autostart = std::env::args().any(|arg| arg == "--startup-launch");
+
+    if should_register && app_settings.general.autostart && !started_by_autostart {
+        use tauri_plugin_autostart::MacosLauncher;
+        use tauri_plugin_autostart::ManagerExt;
+
+        let _ = tauri_app.handle().plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec!["--startup-launch"]),
+        ));
+
+        let autostart_manager = tauri_app.autolaunch();
+        if !autostart_manager.is_enabled().unwrap_or(false) {
+            match autostart_manager.enable() {
+                Ok(_) => tracing::debug!("Autostart enabled"),
+                Err(e) => tracing::error!("Failed to enable autostart: {e}"),
+            }
+        }
+    }
+}
+
+fn setup_tray(tauri_app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let app_handle = tauri_app.handle().clone();
+    let open_i = MenuItem::with_id(tauri_app, "open", "Open", true, None::<&str>)?;
+    let quit_i = MenuItem::with_id(tauri_app, "quit", "Quit", true, None::<&str>)?;
+    let menu = Menu::with_items(tauri_app, &[&open_i, &quit_i])?;
+
+    let icon = tauri_app
+        .default_window_icon()
+        .ok_or("No default window icon configured")?
+        .clone();
+
+    TrayIconBuilder::new()
+        .icon(icon)
+        .menu(&menu)
+        .show_menu_on_left_click(true)
+        .on_menu_event(move |app, event| {
+            if event.id == "quit" {
+                app.exit(0);
+            }
+            if event.id == "open" {
+                if let Some(main_window) = app_handle.get_webview_window("main") {
+                    let _ = main_window.unminimize();
+                    let _ = main_window.show();
+                } else {
+                    tracing::error!("Main window not found");
+                }
+            }
+        })
+        .build(tauri_app)?;
+
+    Ok(())
+}
+
+fn setup_main_window(
+    tauri_app: &mut tauri::App,
+    started_by_autostart: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let main_window = create_window(tauri_app.handle(), "main", String::new())?;
+
+    if started_by_autostart {
+        let _ = main_window.hide();
+    }
+
+    let handle = tauri_app.handle().clone();
+    main_window.on_window_event(move |event| match event {
+        tauri::WindowEvent::CloseRequested { api, .. } => {
+            if let Some(w) = handle.get_webview_window("main") {
+                let _ = w.hide();
+            }
+            api.prevent_close();
+        }
+        tauri::WindowEvent::Focused(false) => {
+            if let Some(w) = handle.get_webview_window("main")
+                && w.is_minimized().unwrap_or(false)
+            {
+                let _ = w.hide();
+            }
+        }
+        _ => {}
+    });
+
+    Ok(())
+}
+
+fn init_state(
+    tauri_app: &tauri::App,
+    endpoint_manager: &std::sync::Arc<EndpointManager>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let app_handle = tauri_app.handle();
+
+    // ThreadManager — synchronous construction, no I/O
+    let thread_channel_rx = endpoint_manager.subscribe();
+    let thread_manager = euro_thread::ThreadManager::new(thread_channel_rx);
+    app_handle.manage(SharedThreadManager::new(thread_manager));
+
+    // TimelineManager — synchronous construction
+    let timeline_channel_rx = endpoint_manager.subscribe();
+    let timeline = euro_timeline::TimelineManager::builder()
+        .channel_rx(timeline_channel_rx)
+        .build()?;
+    app_handle.manage(Mutex::new(timeline));
+
+    // UserController — synchronous construction
+    let path = tauri_app.path().app_data_dir()?;
+    let user_channel_rx = endpoint_manager.subscribe();
+    let user_controller = euro_user::Controller::new(path, user_channel_rx)?;
+    app_handle.manage(SharedUserController::new(user_controller));
+
+    Ok(())
+}
+
+fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
+    let assets_handle = app_handle.clone();
+    tauri::async_runtime::spawn(async move {
+        let mut asset_receiver = {
+            let tl: tauri::State<'_, Mutex<TimelineManager>> = assets_handle.state();
+            let timeline = tl.lock().await;
+            timeline.subscribe_to_assets_events()
+        };
+        while let Ok(assets_event) = asset_receiver.recv().await {
+            let _ = TauRpcTimelineApiEventTrigger::new(assets_handle.clone())
+                .new_assets_event(assets_event);
+        }
+    });
+
+    let activity_handle = app_handle.clone();
+    tauri::async_runtime::spawn(async move {
+        let mut activity_receiver = {
+            let tl: tauri::State<'_, Mutex<TimelineManager>> = activity_handle.state();
+            let timeline = tl.lock().await;
+            timeline.subscribe_to_activity_events()
+        };
+        while let Ok(activity_event) = activity_receiver.recv().await {
+            tracing::debug!("Activity changed to: {}", activity_event.name);
+
+            let mut primary_icon_color = None;
+            let mut icon_bg = None;
+            let mut icon_base64 = None;
+
+            if let Some(icon) = activity_event.icon.as_ref() {
+                if let Some(c) =
+                    color_thief::get_palette(icon, color_thief::ColorFormat::Rgba, 10, 10)
+                        .ok()
+                        .and_then(|c| c.into_iter().next())
+                {
+                    let (r, g, b) = (c.r, c.g, c.b);
+                    primary_icon_color = Some(format!("#{r:02X}{g:02X}{b:02X}"));
+                    let luminance = 0.299 * r as f64 + 0.587 * g as f64 + 0.114 * b as f64;
+                    icon_bg = Some(
+                        if luminance / 255.0 > 0.5 {
+                            "black"
+                        } else {
+                            "white"
+                        }
+                        .to_string(),
+                    );
+                }
+                icon_base64 = euro_vision::rgba_to_base64(icon).ok();
+            }
+
+            let _ = TauRpcTimelineApiEventTrigger::new(activity_handle.clone()).new_app_event(
+                TimelineAppEvent {
+                    name: activity_event.name.clone(),
+                    color: primary_icon_color,
+                    icon_bg,
+                    icon_base64,
+                },
+            );
+        }
+    });
+
+    tauri::async_runtime::spawn(async move {
+        let tl: tauri::State<'_, Mutex<TimelineManager>> = app_handle.state();
+        let mut timeline = tl.lock().await;
+        if let Err(e) = timeline.start().await {
+            tracing::error!("Failed to start timeline collection: {e}");
+        } else {
+            tracing::debug!("Timeline collection started successfully");
+        }
+    });
+}
+
+fn build_router() -> Router<tauri::Wry> {
+    Router::new()
+        .export_config(
+            specta_typescript::Typescript::default()
+                .bigint(specta_typescript::BigIntExportBehavior::BigInt),
+        )
+        .merge(AuthApiImpl.into_handler())
+        .merge(TimelineApiImpl.into_handler())
+        .merge(ThreadApiImpl.into_handler())
+        .merge(SettingsApiImpl.into_handler())
+        .merge(ThirdPartyApiImpl.into_handler())
+        .merge(MonitorApiImpl.into_handler())
+        .merge(SystemApiImpl.into_handler())
+        .merge(ContextChipApiImpl.into_handler())
+        .merge(PromptApiImpl.into_handler())
+        .merge(OnboardingApiImpl.into_handler())
+        .merge(ChatApiImpl.into_handler())
+}
+
 fn main() {
     dotenv().ok();
 
@@ -236,9 +450,8 @@ fn main() {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
-        .unwrap()
+        .expect("Failed to create tokio runtime")
         .block_on(async {
-            tracing::debug!("Setting tokio runtime");
             tauri::async_runtime::set(tokio::runtime::Handle::current());
 
             let builder = tauri::Builder::default()
@@ -248,246 +461,31 @@ fn main() {
                 .setup(move |tauri_app| {
                     install_native_messaging_manifests(tauri_app);
 
-                    // In release builds the main key lives in the OS keychain,
-                    // reducing macOS Keychain "Allow" prompts to a single item.
-                    // In debug builds we use a fixed key so the encrypted file
-                    // store survives restarts (the mock keyring is in-memory
-                    // only, so a keyring-derived key would change every launch).
-                    #[cfg(debug_assertions)]
-                    let main_key = euro_encrypt::MainKey::from_bytes([
-                        0xA4, 0x1B, 0x7E, 0x3C, 0x92, 0xF0, 0x55, 0xD8, 0x6A, 0xC3, 0x11, 0xBF,
-                        0x48, 0xE7, 0x2D, 0x9F, 0x03, 0x86, 0xFA, 0x74, 0xCB, 0x60, 0x1D, 0xA5,
-                        0x39, 0xEE, 0x57, 0x0C, 0xB2, 0x84, 0x63, 0xD1,
-                    ]);
-                    #[cfg(not(debug_assertions))]
-                    let main_key =
-                        euro_encrypt::MainKey::new().expect("Failed to initialise encryption key");
-                    let data_dir = tauri_app.path().app_data_dir().unwrap();
-                    euro_secret::secret::init_file_store(*main_key.as_bytes(), data_dir)
-                        .expect("Failed to initialise secret store");
+                    let data_dir = tauri_app.path().app_data_dir()?;
+                    init_encryption(data_dir)?;
 
                     let started_by_autostart =
                         std::env::args().any(|arg| arg == "--startup-launch");
 
-                    let app_settings = AppSettings::load_from_default_path_creating().unwrap();
+                    let app_settings = AppSettings::load_from_default_path_creating()?;
                     let endpoint_url = &app_settings.api.endpoint;
                     let endpoint_manager = if endpoint_url.is_empty() {
                         EndpointManager::from_env()
                     } else {
                         EndpointManager::new(endpoint_url)
-                    }
-                    .expect("Failed to initialize API endpoint");
+                    }?;
                     let endpoint_manager = std::sync::Arc::new(endpoint_manager);
+
                     tauri_app.manage(endpoint_manager.clone());
                     tauri_app.manage(Mutex::new(app_settings.clone()));
+                    tauri_app.manage(WindowState::default());
 
-                    // Autostart is never registered in debug builds — during
-                    // development you launch from your IDE or terminal and
-                    // don't want a launch agent or registry entry lingering.
-                    //
-                    // In release builds:
-                    //   • macOS — the Swift launcher (Eurora.app) registers
-                    //     itself as a login item via SMAppService.  The
-                    //     embedded Eurora.app must not create its own
-                    //     launch agent (unstable path, bypasses Safari bridge).
-                    //   • Windows / Linux — the Tauri app is the top-level
-                    //     binary so it registers itself directly.
-                    let should_register_autostart =
-                        !cfg!(debug_assertions) && !cfg!(target_os = "macos");
+                    register_autostart(tauri_app, &app_settings);
+                    setup_main_window(tauri_app, started_by_autostart)?;
+                    setup_tray(tauri_app)?;
 
-                    if should_register_autostart
-                        && app_settings.general.autostart
-                        && !started_by_autostart
-                    {
-                        use tauri_plugin_autostart::MacosLauncher;
-                        use tauri_plugin_autostart::ManagerExt;
-
-                        let _ = tauri_app.handle().plugin(tauri_plugin_autostart::init(
-                            MacosLauncher::LaunchAgent,
-                            Some(vec!["--startup-launch"]),
-                        ));
-
-                        let autostart_manager = tauri_app.autolaunch();
-                        if !autostart_manager.is_enabled().unwrap_or(false) {
-                            match autostart_manager.enable() {
-                                Ok(_) => tracing::debug!("Autostart enabled"),
-                                Err(e) => tracing::error!("Failed to enable autostart: {}", e),
-                            }
-                        }
-                    }
-
-                    let main_window = create_window(tauri_app.handle(), "main", "".into())
-                        .expect("Failed to create main window");
-
-                    if started_by_autostart {
-                        main_window.hide().expect("Failed to hide main window");
-                    }
-
-                    let app_handle = tauri_app.handle();
-
-                    let main_window_handle = app_handle.clone();
-                    main_window.on_window_event(move |event| {
-                        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                            let main_window = main_window_handle
-                                .get_window("main")
-                                .expect("Failed to get main window");
-                            main_window.hide().expect("Failed to hide main window");
-                            api.prevent_close();
-                        }
-                        if let tauri::WindowEvent::Focused(focused) = event {
-                            let main_window = main_window_handle
-                                .get_window("main")
-                                .expect("Failed to get main window");
-                            let minimized = main_window
-                                .is_minimized()
-                                .expect("Failed to get window state");
-                            if !*focused && minimized {
-                                main_window.hide().expect("Failed to hide main window");
-                            }
-                        }
-                    });
-
-                    let open_i = MenuItem::with_id(tauri_app, "open", "Open", true, None::<&str>)?;
-                    let quit_i = MenuItem::with_id(tauri_app, "quit", "Quit", true, None::<&str>)?;
-                    let menu = Menu::with_items(tauri_app, &[&open_i, &quit_i])?;
-                    let tray_icon_handle = app_handle.clone();
-                    TrayIconBuilder::new()
-                        .icon(tauri_app.default_window_icon().unwrap().clone())
-                        .menu(&menu)
-                        .show_menu_on_left_click(true)
-                        .on_menu_event(move |app, event| {
-                            if event.id == "quit" {
-                                app.exit(0);
-                            }
-                            if event.id == "open" {
-                                let main_window = tray_icon_handle
-                                    .get_window("main")
-                                    .expect("Failed to get main window");
-                                main_window
-                                    .unminimize()
-                                    .map_err(|e| {
-                                        tracing::error!("Failed to set window state: {}", e)
-                                    })
-                                    .ok();
-                                main_window
-                                    .show()
-                                    .map_err(|e| {
-                                        tracing::error!("Failed to show main window: {}", e)
-                                    })
-                                    .ok();
-                            }
-                        })
-                        .build(tauri_app)
-                        .expect("Failed to create tray icon");
-
-                    let thread_handle = app_handle.clone();
-                    let thread_channel_rx = endpoint_manager.subscribe();
-                    tauri::async_runtime::spawn(async move {
-                        let thread_manager = euro_thread::ThreadManager::new(thread_channel_rx);
-                        thread_handle.manage(SharedThreadManager::new(thread_manager));
-                    });
-
-                    let timeline_handle = app_handle.clone();
-                    let db_app_handle = app_handle.clone();
-                    let timeline_channel_rx = endpoint_manager.subscribe();
-                    tauri::async_runtime::spawn(async move {
-                        let timeline = euro_timeline::TimelineManager::builder()
-                            .channel_rx(timeline_channel_rx)
-                            .build()
-                            .expect("Failed to create timeline");
-                        timeline_handle.manage(Mutex::new(timeline));
-                        let timeline_mutex = db_app_handle.state::<Mutex<TimelineManager>>();
-
-                        let mut asset_receiver = {
-                            let timeline = timeline_mutex.lock().await;
-                            timeline.subscribe_to_assets_events()
-                        };
-                        let assets_timeline_handle = db_app_handle.clone();
-                        tauri::async_runtime::spawn(async move {
-                            while let Ok(assets_event) = asset_receiver.recv().await {
-                                let _ = TauRpcTimelineApiEventTrigger::new(
-                                    assets_timeline_handle.clone(),
-                                )
-                                .new_assets_event(assets_event);
-                            }
-                        });
-
-                        let mut activity_receiver = {
-                            let timeline = timeline_mutex.lock().await;
-                            timeline.subscribe_to_activity_events()
-                        };
-
-                        let activity_timeline_handle = db_app_handle.clone();
-                        tauri::async_runtime::spawn(async move {
-                            while let Ok(activity_event) = activity_receiver.recv().await {
-                                tracing::debug!(
-                                    "Activity changed to: {}",
-                                    activity_event.name.clone(),
-                                );
-
-                                let mut primary_icon_color = None;
-                                let mut icon_bg = None;
-                                let mut icon_base64 = None;
-
-                                if let Some(icon) = activity_event.icon.as_ref() {
-                                    if let Some(c) = color_thief::get_palette(
-                                        icon,
-                                        color_thief::ColorFormat::Rgba,
-                                        10,
-                                        10,
-                                    )
-                                    .ok()
-                                    .and_then(|c| c.into_iter().next())
-                                    {
-                                        let (r, g, b) = (c.r, c.g, c.b);
-                                        primary_icon_color =
-                                            Some(format!("#{r:02X}{g:02X}{b:02X}"));
-                                        let luminance =
-                                            0.299 * r as f64 + 0.587 * g as f64 + 0.114 * b as f64;
-                                        icon_bg = Some(
-                                            if luminance / 255.0 > 0.5 {
-                                                "black"
-                                            } else {
-                                                "white"
-                                            }
-                                            .to_string(),
-                                        );
-                                    }
-                                    icon_base64 = euro_vision::rgba_to_base64(icon).ok();
-                                }
-
-                                let _ = TauRpcTimelineApiEventTrigger::new(
-                                    activity_timeline_handle.clone(),
-                                )
-                                .new_app_event(TimelineAppEvent {
-                                    name: activity_event.name.clone(),
-                                    color: primary_icon_color,
-                                    icon_bg,
-                                    icon_base64,
-                                });
-                            }
-                        });
-
-                        let mut timeline = timeline_mutex.lock().await;
-                        if let Err(e) = timeline.start().await {
-                            tracing::error!("Failed to start timeline collection: {}", e);
-                        } else {
-                            tracing::debug!("Timeline collection started successfully");
-                        }
-                    });
-
-                    let app_handle_user = app_handle.clone();
-                    let path = tauri_app.path().app_data_dir().unwrap();
-                    let user_channel_rx = endpoint_manager.subscribe();
-                    tauri::async_runtime::spawn(async move {
-                        let user_controller = euro_user::Controller::new(path, user_channel_rx)
-                            .map_err(|e| {
-                                tracing::error!("Failed to create user controller: {}", e);
-                                e
-                            })
-                            .unwrap();
-                        app_handle_user.manage(SharedUserController::new(user_controller));
-                    });
+                    init_state(tauri_app, &endpoint_manager)?;
+                    spawn_timeline_listeners(tauri_app.handle().clone());
 
                     Ok(())
                 })
@@ -514,7 +512,7 @@ fn main() {
                 )
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-                    if let Some(window) = app.get_window("main") {
+                    if let Some(window) = app.get_webview_window("main") {
                         let _ = window.show();
                         let _ = window.unminimize();
                         let _ = window.set_focus();
@@ -524,7 +522,7 @@ fn main() {
                     #[cfg(target_os = "macos")]
                     tauri::WindowEvent::CloseRequested { .. } => {
                         let app_handle = window.app_handle();
-                        if app_handle.windows().len() == 1 {
+                        if app_handle.webview_windows().len() == 1 {
                             app_handle.exit(0);
                         }
                     }
@@ -549,22 +547,7 @@ fn main() {
                     .build(),
             );
 
-            let router = Router::new()
-                .export_config(
-                    specta_typescript::Typescript::default()
-                        .bigint(specta_typescript::BigIntExportBehavior::BigInt),
-                )
-                .merge(AuthApiImpl.into_handler())
-                .merge(TimelineApiImpl.into_handler())
-                .merge(ThreadApiImpl.into_handler())
-                .merge(SettingsApiImpl.into_handler())
-                .merge(ThirdPartyApiImpl.into_handler())
-                .merge(MonitorApiImpl.into_handler())
-                .merge(SystemApiImpl.into_handler())
-                .merge(ContextChipApiImpl.into_handler())
-                .merge(PromptApiImpl.into_handler())
-                .merge(OnboardingApiImpl.into_handler())
-                .merge(ChatApiImpl.into_handler());
+            let router = build_router();
             builder
                 .invoke_handler(router.into_handler())
                 .build(tauri_context)

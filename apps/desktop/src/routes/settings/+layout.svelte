@@ -1,8 +1,8 @@
 <script lang="ts">
 	import SettingsSidebar from '$components/settings/Sidebar.svelte';
 	import { Badge } from '@eurora/ui/components/badge/index';
-	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import { ScrollArea } from '@eurora/ui/components/scroll-area/index';
+	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import { getVersion } from '@tauri-apps/api/app';
 
 	let { children } = $props();

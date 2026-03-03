@@ -9,6 +9,9 @@ use tauri::{Manager, Runtime};
 use tauri_plugin_updater::UpdaterExt;
 use tokio::sync::Mutex;
 
+use crate::error::ResultExt;
+use crate::shared_types::SharedEndpointManager;
+
 #[cfg(target_os = "macos")]
 fn find_outermost_app_bundle() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
@@ -22,8 +25,6 @@ fn find_outermost_app_bundle() -> Option<PathBuf> {
     }
     if count >= 2 { outermost } else { None }
 }
-
-use crate::shared_types::SharedEndpointManager;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 pub struct UpdateInfo {
@@ -88,7 +89,7 @@ fn resolve_docker_compose_path<R: Runtime>(
     let resource_dir = app_handle
         .path()
         .resource_dir()
-        .map_err(|e| format!("Failed to resolve resource directory: {}", e))?;
+        .ctx("Failed to resolve resource directory")?;
 
     let path = resource_dir.join("docker-compose.yml");
     if path.exists() {
@@ -107,11 +108,10 @@ fn find_available_port(preferred: u16) -> Result<u16, String> {
     if TcpListener::bind(("localhost", preferred)).is_ok() {
         return Ok(preferred);
     }
-    let listener = TcpListener::bind("localhost:0")
-        .map_err(|e| format!("Failed to find available port: {}", e))?;
+    let listener = TcpListener::bind("localhost:0").ctx("Failed to find available port")?;
     let port = listener
         .local_addr()
-        .map_err(|e| format!("Failed to get local address: {}", e))?
+        .ctx("Failed to get local address")?
         .port();
     Ok(port)
 }
@@ -119,17 +119,10 @@ fn find_available_port(preferred: u16) -> Result<u16, String> {
 fn host_ids() -> (String, String) {
     #[cfg(unix)]
     {
-        let uid = std::process::Command::new("id")
-            .arg("-u")
-            .output()
-            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-            .unwrap_or_else(|_| "1000".to_string());
-        let gid = std::process::Command::new("id")
-            .arg("-g")
-            .output()
-            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-            .unwrap_or_else(|_| "1000".to_string());
-        (uid, gid)
+        // SAFETY: getuid/getgid are always safe to call.
+        let uid = unsafe { libc::getuid() };
+        let gid = unsafe { libc::getgid() };
+        (uid.to_string(), gid.to_string())
     }
     #[cfg(not(unix))]
     {
@@ -158,8 +151,8 @@ impl SystemApi for SystemApiImpl {
                 Ok("Server is reachable".to_string())
             }
             Err(e) => {
-                let error_msg = format!("Failed to connect to server: {}", e);
-                tracing::debug!("{}", error_msg);
+                let error_msg = format!("Failed to connect to server: {e}");
+                tracing::debug!("{error_msg}");
                 Err(error_msg)
             }
         }
@@ -169,7 +162,9 @@ impl SystemApi for SystemApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<Vec<ContextChip>, String> {
-        let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle.state();
+        let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle
+            .try_state()
+            .ok_or_else(|| "Timeline not available".to_string())?;
         let timeline = timeline_state.lock().await;
         let activities = timeline.get_context_chips().await;
         let limited_activities = activities.into_iter().take(5).collect::<Vec<ContextChip>>();
@@ -184,8 +179,8 @@ impl SystemApi for SystemApiImpl {
         tracing::debug!("Checking for updates...");
 
         let updater = app_handle.updater().map_err(|e| {
-            tracing::error!("Failed to get updater: {}", e);
-            format!("Failed to get updater: {}", e)
+            tracing::error!("Failed to get updater: {e}");
+            format!("Failed to get updater: {e}")
         })?;
 
         match updater.check().await {
@@ -201,8 +196,8 @@ impl SystemApi for SystemApiImpl {
                 Ok(None)
             }
             Err(e) => {
-                tracing::error!("Failed to check for updates: {}", e);
-                Err(format!("Failed to check for updates: {}", e))
+                tracing::error!("Failed to check for updates: {e}");
+                Err(format!("Failed to check for updates: {e}"))
             }
         }
     }
@@ -225,9 +220,6 @@ impl SystemApi for SystemApiImpl {
         let mut builder = app_handle.updater_builder();
 
         if let Some(ref outer) = outer_app {
-            // Point the updater at a path inside the outer bundle so it
-            // resolves EuroraMacOS.app (not Eurora.app) as the bundle
-            // to replace.
             let exe_inside_outer = outer.join("Contents").join("MacOS").join("Eurora");
             tracing::debug!(
                 "Using outer app executable path for updater: {}",
@@ -237,13 +229,13 @@ impl SystemApi for SystemApiImpl {
         }
 
         let updater = builder.build().map_err(|e| {
-            tracing::error!("Failed to build updater: {}", e);
-            format!("Failed to build updater: {}", e)
+            tracing::error!("Failed to build updater: {e}");
+            format!("Failed to build updater: {e}")
         })?;
 
         let update = updater.check().await.map_err(|e| {
-            tracing::error!("Failed to check for updates: {}", e);
-            format!("Failed to check for updates: {}", e)
+            tracing::error!("Failed to check for updates: {e}");
+            format!("Failed to check for updates: {e}")
         })?;
 
         if let Some(update) = update {
@@ -263,8 +255,8 @@ impl SystemApi for SystemApiImpl {
                 )
                 .await
                 .map_err(|e| {
-                    tracing::error!("Failed to download and install update: {}", e);
-                    format!("Failed to download and install update: {}", e)
+                    tracing::error!("Failed to download and install update: {e}");
+                    format!("Failed to download and install update: {e}")
                 })?;
 
             tracing::debug!("Update installed, restarting application");
@@ -274,22 +266,20 @@ impl SystemApi for SystemApiImpl {
             // and Safari extension).  A plain `app_handle.restart()` would
             // only relaunch the inner Tauri binary — the launcher and its
             // TCP bridge would stay dead.
-            //
-            // Strategy: spawn a background shell that waits for the old
-            // processes to exit, then `open`s the new outer app.  We then
-            // exit the current process; the launcher will observe the
-            // termination and shut itself down cleanly.
             if let Some(ref outer) = outer_app {
-                let outer_path = outer.to_string_lossy().to_string();
-                tracing::info!("Scheduling restart of outer app bundle: {}", outer_path);
+                tracing::info!(
+                    "Scheduling restart of outer app bundle: {}",
+                    outer.display()
+                );
+                // Use `open` as a direct command with the path as an
+                // argument — avoids shell interpretation entirely.
                 let _ = std::process::Command::new("sh")
-                    .arg("-c")
-                    .arg(format!("sleep 2 && open {:?}", outer_path))
+                    .args(["-c", "sleep 2 && exec open \"$1\"", "--"])
+                    .arg(outer)
                     .stdin(std::process::Stdio::null())
                     .stdout(std::process::Stdio::null())
                     .stderr(std::process::Stdio::null())
                     .spawn();
-                // Exit immediately so the old launcher can terminate too.
                 std::process::exit(0);
             }
 
@@ -420,8 +410,9 @@ impl SystemApi for SystemApiImpl {
             .ok_or_else(|| "Failed to resolve platform data directory".to_string())?
             .join("eurora")
             .join("assets");
-        std::fs::create_dir_all(&asset_dir)
-            .map_err(|e| format!("Failed to create asset directory: {}", e))?;
+        tokio::fs::create_dir_all(&asset_dir)
+            .await
+            .ctx("Failed to create asset directory")?;
 
         let (uid, gid) = host_ids();
 
@@ -448,22 +439,22 @@ impl SystemApi for SystemApiImpl {
             .env("EURORA_GID", &gid)
             .output()
             .await
-            .map_err(|e| format!("Failed to run docker compose: {}", e))?;
+            .ctx("Failed to run docker compose")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            tracing::error!("docker compose failed: {}", stderr);
-            return Err(format!("docker compose failed: {}", stderr));
+            tracing::error!("docker compose failed: {stderr}");
+            return Err(format!("docker compose failed: {stderr}"));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
-        tracing::info!("docker compose started: {}", stdout);
+        tracing::info!("docker compose started: {stdout}");
 
-        let local_url = format!("http://localhost:{}", grpc_port);
+        let local_url = format!("http://localhost:{grpc_port}");
         let endpoint_manager = app_handle.state::<SharedEndpointManager>();
         endpoint_manager
             .set_global_backend_url(&local_url)
-            .map_err(|e| format!("Failed to switch API endpoint: {e}"))?;
+            .ctx("Failed to switch API endpoint")?;
 
         send_encryption_key(&local_url).await?;
 
@@ -487,13 +478,12 @@ async fn send_encryption_key(backend_url: &str) -> Result<(), String> {
     use proto_gen::local_settings::SetEncryptionKeyRequest;
     use proto_gen::local_settings::proto_local_settings_service_client::ProtoLocalSettingsServiceClient;
 
-    let main_key = euro_encrypt::MainKey::new()
-        .map_err(|e| format!("Failed to retrieve encryption key from keyring: {e}"))?;
+    let main_key =
+        euro_encrypt::MainKey::new().ctx("Failed to retrieve encryption key from keyring")?;
 
     let encoded = BASE64_STANDARD.encode(main_key.as_bytes());
     let url = backend_url.to_string();
 
-    // The backend container needs time to start (postgres health check + boot).
     (|| {
         let encoded = encoded.clone();
         let url = url.clone();

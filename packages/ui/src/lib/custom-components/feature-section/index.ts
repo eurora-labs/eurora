@@ -1,8 +1,8 @@
-import Root from './feature-section-root.svelte';
-import Header from './feature-section-header.svelte';
-import Title from './feature-section-title.svelte';
-import Subtitle from './feature-section-subtitle.svelte';
-import Content from './feature-section-content.svelte';
+import Content from '$lib/custom-components/feature-section/feature-section-content.svelte';
+import Header from '$lib/custom-components/feature-section/feature-section-header.svelte';
+import Root from '$lib/custom-components/feature-section/feature-section-root.svelte';
+import Subtitle from '$lib/custom-components/feature-section/feature-section-subtitle.svelte';
+import Title from '$lib/custom-components/feature-section/feature-section-title.svelte';
 
 export {
 	Root,

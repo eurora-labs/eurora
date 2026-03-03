@@ -28,8 +28,5 @@ fn main() {
         );
     }
 
-    // Needed for the key to be available in production
-    option_env!("POSTHOG_API_KEY");
-
     tauri_build::build();
 }

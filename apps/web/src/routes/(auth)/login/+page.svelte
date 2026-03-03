@@ -11,8 +11,8 @@
 	} from '@eurora/shared/proto/auth_service_pb.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
-	import { get } from 'svelte/store';
 	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
 
 	let desktopLoginDone = $state(false);
 	let pendingDesktopLogin = $state<string | null>(null);

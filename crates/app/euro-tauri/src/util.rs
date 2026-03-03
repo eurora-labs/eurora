@@ -116,9 +116,13 @@ pub fn get_default_shortcut() -> Shortcut {
     return Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
 }
 
-pub fn get_db_path(app_handle: &tauri::AppHandle) -> String {
-    let base_path = app_handle.path().app_data_dir().unwrap();
-    std::fs::create_dir_all(&base_path).unwrap();
+pub fn get_db_path(app_handle: &tauri::AppHandle) -> Result<String, String> {
+    let base_path = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to resolve app data directory: {e}"))?;
+    std::fs::create_dir_all(&base_path)
+        .map_err(|e| format!("Failed to create app data directory: {e}"))?;
     let db_path = base_path.join("personal_database.sqlite");
-    db_path.to_string_lossy().to_string()
+    Ok(db_path.to_string_lossy().to_string())
 }
