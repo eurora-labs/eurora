@@ -21,7 +21,7 @@
 	</header>
 
 	<div class="flex flex-1 flex-col pt-16">
-		<div class="mx-auto flex w-full max-w-5xl items-start gap-12 px-8 py-10">
+		<div class="mx-auto flex w-full max-w-7xl items-start gap-12 px-8 py-10">
 			<DocsSidebar />
 
 			<main class="flex-1">

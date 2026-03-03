@@ -1,57 +1,19 @@
 use tauri::AppHandle;
 
 pub(crate) mod state {
-
-    use std::{collections::BTreeMap, sync::Arc};
-
-    use tauri::AppHandle;
-
-    pub(crate) mod event {
-        use anyhow::{Context, Result};
-        use serde_json;
-        use tauri::Emitter;
-
-        #[derive(Debug, Clone, PartialEq, Eq)]
-        pub struct ChangeForFrontend {
-            name: String,
-            payload: serde_json::Value,
-        }
-
-        impl ChangeForFrontend {
-            pub fn send(&self, app_handle: &tauri::AppHandle) -> Result<()> {
-                app_handle
-                    .emit(&self.name, Some(&self.payload))
-                    .context("emit event")?;
-                tracing::trace!(event_name = self.name);
-                Ok(())
-            }
-        }
-    }
+    use std::{collections::BTreeSet, sync::Arc};
 
     type WindowLabel = String;
     pub(super) type WindowLabelRef = str;
 
-    #[derive(Clone)]
+    #[derive(Clone, Default)]
     pub struct WindowState {
-        _app_handle: AppHandle,
-        state: Arc<parking_lot::Mutex<BTreeMap<WindowLabel, State>>>,
-    }
-
-    struct State {
-        _window_id: String,
+        labels: Arc<parking_lot::Mutex<BTreeSet<WindowLabel>>>,
     }
 
     impl WindowState {
-        pub fn new(app_handle: AppHandle) -> Self {
-            Self {
-                _app_handle: app_handle,
-                state: Default::default(),
-            }
-        }
-
         pub fn remove(&self, window: &WindowLabelRef) {
-            let mut state_by_label = self.state.lock();
-            state_by_label.remove(window);
+            self.labels.lock().remove(window);
         }
     }
 }
