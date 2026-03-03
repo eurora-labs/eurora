@@ -3,29 +3,27 @@
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
+	import { Separator } from '@eurora/ui/components/separator/index';
 	import { Spinner } from '@eurora/ui/components/spinner/index';
+	import ExternalLink from '@lucide/svelte/icons/external-link';
+	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import { open } from '@tauri-apps/plugin-shell';
 	import { onDestroy, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	const taurpc = inject(TAURPC_SERVICE);
-	const pricingUrl = 'https://www.eurora-labs.com/pricing';
 
 	let interval: ReturnType<typeof setInterval> | undefined;
 
-	async function openPricingAndPoll() {
-		try {
-			await open(pricingUrl);
-		} catch {
-			toast.error(`Could not open browser. Please visit: ${pricingUrl}`);
-		}
-
+	function startPolling() {
 		interval = setInterval(async () => {
 			try {
 				await taurpc.auth.refresh_session();
 				const role = await taurpc.auth.get_role();
 				if (role !== 'Tier1') return;
 				clearInterval(interval);
+				const win = getCurrentWindow();
+				await win.setFocus();
 				goto('/');
 			} catch {
 				// keep polling on transient errors
@@ -34,7 +32,7 @@
 	}
 
 	onMount(() => {
-		openPricingAndPoll();
+		startPolling();
 	});
 
 	onDestroy(() => {
@@ -42,12 +40,47 @@
 	});
 </script>
 
-<div class="relative flex h-full w-full flex-col px-8">
-	<div class="flex flex-row justify-center items-center h-full w-full gap-4">
-		<Spinner class="w-8 h-8" />
-		<h1 class="text-4xl font-bold drop-shadow-lg">Waiting for upgrade to complete...</h1>
-	</div>
-	<div class="mb-8">
-		<Button variant="outline" size="default" onclick={() => goto('/no-access')}>Cancel</Button>
+<div class="flex flex-col justify-center items-center h-full p-8">
+	<div class="flex flex-col max-w-md gap-6">
+		<div class="flex items-center gap-3">
+			<Spinner class="w-6 h-6 shrink-0" />
+			<h1 class="text-3xl font-bold">Completing your upgrade</h1>
+		</div>
+
+		<p class="text-muted-foreground">
+			A checkout page has been opened in your browser. Complete the payment there and this
+			page will automatically update once your subscription is active.
+		</p>
+
+		<Separator />
+
+		<div class="flex flex-col gap-3">
+			<p class="text-sm text-muted-foreground">
+				If the page didn't open, click below to try again:
+			</p>
+			<Button
+				variant="outline"
+				class="w-fit"
+				onclick={async () => {
+					try {
+						const url = await taurpc.payment.create_checkout_url();
+						await open(url);
+					} catch (e) {
+						toast.error(`Failed to open checkout: ${e}`);
+					}
+				}}
+			>
+				Open checkout page
+				<ExternalLink class="size-3.5" />
+			</Button>
+		</div>
+
+		<Button
+			variant="ghost"
+			class="w-fit text-muted-foreground"
+			onclick={() => goto('/no-access')}
+		>
+			Cancel
+		</Button>
 	</div>
 </div>
