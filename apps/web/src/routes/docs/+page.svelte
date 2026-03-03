@@ -21,7 +21,18 @@
 
 	<div class="flex flex-col gap-12">
 		<section>
-			<h2 class="mb-4 text-2xl font-semibold">Key principles</h2>
+			<h2 class="mb-4 text-2xl font-semibold">What is Eurora?</h2>
+			<figure class="mb-6">
+				<img
+					src="https://d26xptavrz5c8t.cloudfront.net/image/linux/youtube_demo.png"
+					alt="Eurora desktop app demo showing AI assistant analyzing a YouTube video"
+					class="w-full rounded-xl border"
+				/>
+				<figcaption class="mt-2 text-center text-sm text-muted-foreground">
+					Eurora's desktop app providing context-aware AI assistance while browsing
+					YouTube.
+				</figcaption>
+			</figure>
 			<div
 				class="grid grid-cols-1 gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-2"
 			>
