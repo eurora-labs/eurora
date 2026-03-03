@@ -92,6 +92,12 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn free_can_get_pricing() {
+        let authz = test_authz().await;
+        assert!(authz.enforce("Free", "/payment/pricing", "GET").unwrap());
+    }
+
+    #[tokio::test]
     async fn free_can_post_checkout() {
         let authz = test_authz().await;
         assert!(authz.enforce("Free", "/payment/checkout", "POST").unwrap());
