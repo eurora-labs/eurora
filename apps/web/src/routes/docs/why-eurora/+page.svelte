@@ -31,9 +31,12 @@
 			<p class="text-muted-foreground">
 				I wanted to ask "What do they mean?" and have the AI understand every word. Which
 				application is in focus, what page I'm reading, what files I'm working with. No more
-				tiresome copy-pasting and explaining. Eurora integrates directly with your operating
-				system and browser to see what you see. You don't adapt your workflow to the AI. It
-				adapts to you.
+				tiresome copy-pasting and explaining.
+			</p>
+			<br />
+			<p class="text-muted-foreground">
+				That meant building for every operating system and every browser people actually
+				use. You don't adapt your workflow to Eurora. Eurora adapts to you.
 			</p>
 		</section>
 
