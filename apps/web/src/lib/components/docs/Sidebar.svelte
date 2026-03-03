@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { Button } from '@eurora/ui/components/button/index';
+	import * as Sidebar from '@eurora/ui/components/sidebar/index';
+	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 
 	const navItems = [
 		{ title: 'Welcome', url: '/docs' },
@@ -7,20 +10,35 @@
 		{ title: 'Self-Hosting', url: '/docs/self-hosting' },
 	];
 
-	let items = $derived(
+	let navigation = $derived(
 		navItems.map((item) => ({ ...item, isActive: item.url === page.url.pathname })),
 	);
 </script>
 
-<nav class="flex w-56 shrink-0 flex-col gap-0.5">
-	{#each items as item (item.title)}
-		<a
-			href={item.url}
-			aria-current={item.isActive ? 'page' : undefined}
-			class="rounded-lg px-3 py-2 text-sm font-medium transition-colors
-				{item.isActive ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}"
-		>
-			{item.title}
-		</a>
-	{/each}
-</nav>
+<Sidebar.Root class="border-none">
+	<Sidebar.Header>
+		<Button variant="ghost" size="sm" class="justify-start gap-2" href="/">
+			<ChevronLeftIcon class="size-4" />
+			<span class="text-sm font-medium">Back</span>
+		</Button>
+	</Sidebar.Header>
+	<Sidebar.Content>
+		<Sidebar.Group>
+			<Sidebar.GroupContent>
+				<Sidebar.Menu>
+					{#each navigation as item (item.title)}
+						<Sidebar.MenuItem>
+							<Sidebar.MenuButton isActive={item.isActive}>
+								{#snippet child({ props })}
+									<a href={item.url} {...props}>
+										<span>{item.title}</span>
+									</a>
+								{/snippet}
+							</Sidebar.MenuButton>
+						</Sidebar.MenuItem>
+					{/each}
+				</Sidebar.Menu>
+			</Sidebar.GroupContent>
+		</Sidebar.Group>
+	</Sidebar.Content>
+</Sidebar.Root>
