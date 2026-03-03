@@ -1,14 +1,4 @@
 <script lang="ts">
-	import * as Card from '@eurora/ui/components/card/index';
-	import BrainCircuitIcon from '@lucide/svelte/icons/brain-circuit';
-	import CodeIcon from '@lucide/svelte/icons/code';
-	import GlobeIcon from '@lucide/svelte/icons/globe';
-	import LayersIcon from '@lucide/svelte/icons/layers';
-	import MonitorIcon from '@lucide/svelte/icons/monitor';
-	import PuzzleIcon from '@lucide/svelte/icons/puzzle';
-	import ServerIcon from '@lucide/svelte/icons/server';
-	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
-	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import Zoom from 'svelte-medium-image-zoom';
 	import 'svelte-medium-image-zoom/dist/styles.css';
 </script>
@@ -18,7 +8,7 @@
 	<p class="mb-12 text-lg text-muted-foreground">
 		Eurora is a context-aware, cross-platform, open-source AI platform built in Europe. It
 		integrates with your operating system and browser to give AI full awareness of what you're
-		working on — without sending your data anywhere you don't control.
+		working on — without selling your data or invading your privacy.
 	</p>
 
 	<div class="flex flex-col gap-12">
