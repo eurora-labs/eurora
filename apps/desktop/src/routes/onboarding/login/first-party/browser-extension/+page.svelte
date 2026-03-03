@@ -23,7 +23,9 @@
 			if (count > 0) {
 				goto('/');
 			}
-		} catch (_) {}
+		} catch (_) {
+			// Ignore errors
+		}
 	});
 
 	async function downloadBrowserExtension() {
