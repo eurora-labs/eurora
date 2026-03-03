@@ -44,6 +44,7 @@ pub fn create_router(state: Arc<AppState>) -> Result<Router> {
         .layer(GovernorLayer::new(Arc::new(checkout_governor)));
 
     let authed_routes = Router::new()
+        .route("/payment/pricing", get(handlers::get_pricing))
         .route("/payment/portal", post(handlers::create_portal_session))
         .route(
             "/payment/subscription",
@@ -77,5 +78,5 @@ pub use config::PaymentConfig;
 pub use error::PaymentError;
 pub use types::{
     CheckoutStatusResponse, CreateCheckoutRequest, CreateCheckoutResponse, CreatePortalResponse,
-    SubscriptionStatus,
+    PricingResponse, SubscriptionStatus,
 };
