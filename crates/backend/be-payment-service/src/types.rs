@@ -29,3 +29,8 @@ pub struct SubscriptionStatus {
 pub struct CheckoutStatusResponse {
     pub status: String,
 }
+
+#[derive(Debug, Serialize)]
+pub struct PricingResponse {
+    pub pro_price_id: String,
+}

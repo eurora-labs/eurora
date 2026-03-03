@@ -16,7 +16,7 @@ use crate::error::PaymentError;
 use crate::service::AppState;
 use crate::types::{
     CheckoutStatusResponse, CreateCheckoutRequest, CreateCheckoutResponse, CreatePortalResponse,
-    SubscriptionStatus,
+    PricingResponse, SubscriptionStatus,
 };
 use crate::webhook;
 
@@ -76,6 +76,12 @@ async fn resolve_customer_id(state: &AppState, email: &str) -> Result<String, Pa
     tracing::info!(%customer_id, %email, "Auto-created Stripe customer for new account");
 
     Ok(customer_id)
+}
+
+pub async fn get_pricing(State(state): State<Arc<AppState>>) -> Json<PricingResponse> {
+    Json(PricingResponse {
+        pro_price_id: state.config.pro_price_id.clone(),
+    })
 }
 
 pub async fn create_checkout_session(
