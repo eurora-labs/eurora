@@ -156,7 +156,7 @@
 						<Badge variant="secondary">CTO</Badge>
 					</div>
 					<p class="text-muted-foreground mb-6 leading-relaxed">
-						Former Head of Engineering & ML at Cuebric, where he led development of
+						Former Head of Engineering &amp; ML at Cuebric, where he led development of
 						award-winning AI solutions. Andre founded Eurora because he believed the
 						best AI tools shouldn't require giving up your privacy.
 					</p>
