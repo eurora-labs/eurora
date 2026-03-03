@@ -80,6 +80,9 @@ tauri-build = { version = "2", features = [] }
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "0.10.1"
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [features]
 default = ["custom-protocol", "devtools"]
 # this feature is used used for production builds where `devPath` points to the filesystem

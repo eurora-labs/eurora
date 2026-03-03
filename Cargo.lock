@@ -3786,6 +3786,7 @@ dependencies = [
  "euro-vision",
  "futures",
  "keyring",
+ "libc",
  "parking_lot",
  "proto-gen",
  "serde",
