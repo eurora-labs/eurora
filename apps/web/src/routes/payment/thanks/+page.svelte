@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { auth, accessToken } from '$lib/stores/auth.js';
 	import { Button } from '@eurora/ui/components/button/index';
@@ -6,7 +7,6 @@
 	import AlertCircleIcon from '@lucide/svelte/icons/alert-circle';
 	import CheckIcon from '@lucide/svelte/icons/circle-check';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
-	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 
 	const REST_API_URL = import.meta.env.VITE_REST_API_URL;

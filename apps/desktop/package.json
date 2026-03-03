@@ -44,7 +44,6 @@
 		"@tauri-apps/plugin-updater": "^2.10.0",
 		"@testing-library/jest-dom": "^6.9.1",
 		"@testing-library/svelte": "^5.3.1",
-		"autoprefixer": "^10.4.24",
 		"eslint": "^9.39.2",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^2.46.1",
