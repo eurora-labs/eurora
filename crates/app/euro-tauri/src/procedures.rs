@@ -3,6 +3,7 @@ pub mod chat_procedures;
 pub mod context_chip_procedures;
 pub mod monitor_procedures;
 pub mod onboarding_procedures;
+pub mod payment_procedures;
 pub mod prompt_procedures;
 pub mod settings_procedures;
 pub mod system_procedures;
