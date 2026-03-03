@@ -427,8 +427,8 @@ jobs:
                   timestamp-rfc3161: http://timestamp.acs.microsoft.com
                   timestamp-digest: SHA256
 
-            - name: Re-sign code-signed MSI with Tauri updater key
-              if: runner.os == 'Windows' && env.channel == 'release'
+            - name: Re-sign MSI with Tauri updater key
+              if: runner.os == 'Windows'
               shell: bash
               env:
                   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
