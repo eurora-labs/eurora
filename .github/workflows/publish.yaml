@@ -308,6 +308,13 @@ jobs:
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
 
+            - name: Import GPG key
+              if: runner.os == 'Linux'
+              uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6
+              with:
+                  gpg_private_key: ${{ secrets.APPIMAGE_PRIVATE_KEY }}
+                  passphrase: ${{ secrets.APPIMAGE_KEY_PASSPHRASE }}
+
             - name: Install linux dependencies
               shell: bash
               if: runner.os == 'Linux'
@@ -361,29 +368,12 @@ jobs:
                   name: sveltekit-build
                   path: ./apps/desktop/build/
 
-            - name: Set release build optimization env vars
-              shell: bash
-              if: github.event.inputs.channel == 'release'
-              run: |
-                  {
-                    echo 'CARGO_PROFILE_RELEASE_LTO<<EOF'
-                    echo "fat"
-                    echo 'EOF'
-                  } >> "$GITHUB_ENV"
-                  {
-                    echo 'CARGO_PROFILE_RELEASE_CODEGEN_UNITS<<EOF'
-                    echo "1"
-                    echo 'EOF'
-                  } >> "$GITHUB_ENV"
-                  {
-                    echo 'CARGO_PROFILE_RELEASE_OPT_LEVEL<<EOF'
-                    echo "s"
-                    echo 'EOF'
-                  } >> "$GITHUB_ENV"
-
             - name: Build binary
               shell: bash
               env:
+                  CARGO_PROFILE_RELEASE_LTO: fat
+                  CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
+                  CARGO_PROFILE_RELEASE_OPT_LEVEL: s
                   RELEASE_CHANNEL: ${{ env.channel }}
                   RELEASE_VERSION: ${{ env.version }}
                   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
@@ -400,7 +390,8 @@ jobs:
                   ./scripts/release.sh \
                     --channel                    "$RELEASE_CHANNEL" \
                     --dist                       "./release" \
-                    --version                    "$RELEASE_VERSION"
+                    --version                    "$RELEASE_VERSION" \
+                    --sign
 
             - name: Patch MSI for per-user install (no UAC)
               if: runner.os == 'Windows'
