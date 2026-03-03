@@ -329,14 +329,14 @@ fn main() {
                     main_window.on_window_event(move |event| {
                         if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                             let main_window = main_window_handle
-                                .get_window("main")
+                                .get_webview_window("main")
                                 .expect("Failed to get main window");
                             main_window.hide().expect("Failed to hide main window");
                             api.prevent_close();
                         }
                         if let tauri::WindowEvent::Focused(focused) = event {
                             let main_window = main_window_handle
-                                .get_window("main")
+                                .get_webview_window("main")
                                 .expect("Failed to get main window");
                             let minimized = main_window
                                 .is_minimized()
@@ -361,7 +361,7 @@ fn main() {
                             }
                             if event.id == "open" {
                                 let main_window = tray_icon_handle
-                                    .get_window("main")
+                                    .get_webview_window("main")
                                     .expect("Failed to get main window");
                                 main_window
                                     .unminimize()
@@ -514,7 +514,7 @@ fn main() {
                 )
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-                    if let Some(window) = app.get_window("main") {
+                    if let Some(window) = app.get_webview_window("main") {
                         let _ = window.show();
                         let _ = window.unminimize();
                         let _ = window.set_focus();
@@ -524,7 +524,7 @@ fn main() {
                     #[cfg(target_os = "macos")]
                     tauri::WindowEvent::CloseRequested { .. } => {
                         let app_handle = window.app_handle();
-                        if app_handle.windows().len() == 1 {
+                        if app_handle.webview_windows().len() == 1 {
                             app_handle.exit(0);
                         }
                     }
