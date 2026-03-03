@@ -6,67 +6,67 @@
 <div>
 	<h1 class="mb-4 text-4xl font-bold">Why Eurora</h1>
 	<p class="mb-12 text-lg text-muted-foreground">
-		There are dozens of AI assistants. Here's why we built another one — and why it might be the
+		There are dozens of AI assistants. Here's why I built another one - and why it might be the
 		last one you need.
 	</p>
 
 	<div class="flex flex-col gap-12">
 		<section>
-			<h2 class="mb-2 text-2xl font-semibold">AI that knows what you're working on</h2>
+			<h2 class="mb-2 text-2xl font-semibold">Using AI is slow and painful</h2>
 			<p class="text-muted-foreground">
 				Most AI tools start every conversation from scratch. You paste a snippet, explain
 				the context, and hope the model understands. Eurora takes a different approach: it
 				integrates directly with your operating system and browser to see what you see. When
 				you ask a question, Eurora already knows which application is in focus, what page
-				you're reading, and what files you're working with. No copy-paste, no context
-				switching — just ask.
+				you're reading, and what files you're working with. You don't need to adapt your
+				workflows to fit the AI - Eurora adapts to you.
 			</p>
 		</section>
 
 		<section>
-			<h2 class="mb-2 text-2xl font-semibold">Your data stays yours</h2>
+			<h2 class="mb-2 text-2xl font-semibold">Local AI required compromise</h2>
 			<p class="text-muted-foreground">
-				Every major AI assistant processes your data on servers you don't control, often
-				governed by jurisdictions with weak privacy protections. Eurora stores all cloud
-				data in sovereign European data centers under EU privacy law. But if that's not
-				enough, you can run the entire stack locally — the backend, the database, and the AI
-				model — on your own hardware. Nothing ever leaves your network.
+				Every single local-first AI assistant felt like a compromise. Like I had to use
+				smaller, worse models just to get basic privacy. It felt like I had to use cloud
+				based AI wrapped in proprietary code to actually get my work done.
 			</p>
-			<Alert class="mt-4">
-				<InfoIcon />
-				<AlertDescription>
-					<p>
-						Self-hosting uses Docker Compose and Ollama. See the
-						<a
-							href="/docs/self-hosting"
-							class="text-primary underline underline-offset-4 hover:text-primary/80"
-						>
-							self-hosting guide</a
-						> to get started in minutes.
-					</p>
-				</AlertDescription>
-			</Alert>
-		</section>
-
-		<section>
-			<h2 class="mb-2 text-2xl font-semibold">Open source, not open-washing</h2>
+			<br />
 			<p class="text-muted-foreground">
-				Every line of Eurora's code is public — the desktop app, the backend, the browser
-				extension, and the infrastructure that ties them together. This isn't a marketing
-				claim with an asterisk. You can read the source, audit the encryption, verify that
-				telemetry is opt-in, and build the entire application from scratch. The project is
-				licensed under the Sustainable Use License with an eventual transition to Apache
-				2.0.
+				There were some proprietary and open source apps that leveraged context to some
+				degree. But all of them either ran fully on a single machine, or had a whole set of
+				other issues. Most importantly, their context was limited and their integration with
+				other apps - poor.
 			</p>
 		</section>
 
 		<section>
-			<h2 class="mb-2 text-2xl font-semibold">One app, every platform</h2>
+			<h2 class="mb-2 text-2xl font-semibold">Asking "What is this"</h2>
 			<p class="text-muted-foreground">
-				Eurora ships native desktop apps for macOS, Windows, and Linux — not an Electron
-				wrapper, but a Tauri application backed by a Rust runtime. Browser extensions for
-				Chrome, Firefox, Edge, and Safari feed page content into the same conversation. Your
-				threads, your settings, and your context follow you across devices and platforms.
+				Dissatisfied with current state of things, I built Eurora. It had a few
+				requirements. The most important one of which was: ability to understand what I am
+				doing right now. I wanted to ask "What do they mean?" and have AI have perfect
+				understanding of every word. No more tiresome explaining. Every other requirement
+				stemmed directly from that.
+			</p>
+		</section>
+
+		<section>
+			<h2 class="mb-2 text-2xl font-semibold">
+				Early realizations and commitment to privacy
+			</h2>
+			<p class="text-muted-foreground">
+				As I kept developing Eurora more and more, I asked myself an important question:
+				Would I actually ever use it myself? The answer was a resounding no. At that stage
+				most of the code was proprietary. And I just knew I was not comfortable enough using
+				it. In fact, even if the app was open source I would still never use it deployed on
+				some data center like AWS or Azure.
+			</p>
+			<br />
+			<p class="text-muted-foreground">
+				Clearly I needed something different. The first decision I made was to create my
+				company in The Netherlands. Two reasons made this decision attractive: Strong worker
+				protection laws and European standards for privacy and data protection, which are
+				the highest in the world.
 			</p>
 		</section>
 
@@ -117,6 +117,20 @@
 					</p>
 				</div>
 			</div>
+			<Alert class="mt-4">
+				<InfoIcon />
+				<AlertDescription>
+					<p>
+						Self-hosting uses Docker Compose and Ollama. See the
+						<a
+							href="/docs/self-hosting"
+							class="text-primary underline underline-offset-4 hover:text-primary/80"
+						>
+							self-hosting guide</a
+						> to get started in minutes.
+					</p>
+				</AlertDescription>
+			</Alert>
 		</section>
 	</div>
 </div>
