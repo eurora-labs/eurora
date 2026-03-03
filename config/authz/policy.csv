@@ -24,6 +24,7 @@ p, Tier1, AssetService, CreateAsset
 # Resource = route template path, Action = HTTP method.
 
 # Free: payment endpoints (any authenticated user)
+p, Free, /payment/pricing, GET
 p, Free, /payment/checkout, POST
 p, Free, /payment/portal, POST
 p, Free, /payment/subscription, GET
