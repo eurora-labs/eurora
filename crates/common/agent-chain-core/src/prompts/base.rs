@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 use crate::prompt_values::{PromptValue, StringPromptValue};
+use crate::runnables::config::{RunnableConfig, ensure_config};
 
 pub type FormatOutputType = String;
 
@@ -46,6 +47,26 @@ pub fn resolve_partials(partials: &HashMap<String, PartialValue>) -> HashMap<Str
         .iter()
         .map(|(k, v)| (k.clone(), v.resolve()))
         .collect()
+}
+
+pub(super) fn merge_prompt_config(
+    config: Option<RunnableConfig>,
+    metadata: Option<&HashMap<String, serde_json::Value>>,
+    tags: Option<&[String]>,
+) -> Option<RunnableConfig> {
+    if metadata.is_none() && tags.is_none() {
+        return config;
+    }
+    let mut config = ensure_config(config);
+    if let Some(m) = metadata {
+        config
+            .metadata
+            .extend(m.iter().map(|(k, v)| (k.clone(), v.clone())));
+    }
+    if let Some(t) = tags {
+        config.tags.extend(t.iter().cloned());
+    }
+    Some(config)
 }
 
 #[allow(dead_code)]

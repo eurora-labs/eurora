@@ -16,9 +16,9 @@ use crate::utils::interactive_env::is_interactive_env;
 use async_trait::async_trait;
 
 use crate::runnables::base::Runnable;
-use crate::runnables::config::{RunnableConfig, ensure_config};
+use crate::runnables::config::RunnableConfig;
 
-use super::base::{BasePromptTemplate, PartialValue, resolve_partials};
+use super::base::{BasePromptTemplate, PartialValue, merge_prompt_config, resolve_partials};
 use super::dict::DictPromptTemplate;
 use super::image::ImagePromptTemplate;
 use super::message::{BaseMessagePromptTemplate, get_msg_title_repr};
@@ -874,10 +874,16 @@ impl Runnable for ChatPromptTemplate {
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let _config = ensure_config(config);
-        self.validate_input(&input.variables)?;
-        let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
-        Ok(ChatPromptValue::new(messages))
+        let config = merge_prompt_config(config, self.metadata(), self.tags());
+        self.call_with_config(
+            &|input: ChatPromptInput, _config| {
+                self.validate_input(&input.variables)?;
+                let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
+                Ok(ChatPromptValue::new(messages))
+            },
+            input,
+            config,
+        )
     }
 
     async fn ainvoke(
