@@ -10,9 +10,9 @@ use crate::error::{Error, Result};
 use crate::messages::BaseMessage;
 use crate::prompt_values::{ChatPromptValue, PromptValue};
 use crate::runnables::base::Runnable;
-use crate::runnables::config::{RunnableConfig, ensure_config};
+use crate::runnables::config::RunnableConfig;
 
-use super::base::{BasePromptTemplate, PartialValue};
+use super::base::{BasePromptTemplate, PartialValue, merge_prompt_config};
 use super::chat::{
     BaseChatPromptTemplate, ChatPromptInput, ChatPromptTemplate, MessageLikeRepresentation,
 };
@@ -143,10 +143,16 @@ impl Runnable for StructuredPrompt {
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let _config = ensure_config(config);
-        BasePromptTemplate::validate_input(self, &input.variables)?;
-        let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
-        Ok(ChatPromptValue::new(messages))
+        let config = merge_prompt_config(config, self.metadata(), self.tags());
+        self.call_with_config(
+            &|input: ChatPromptInput, _config| {
+                BasePromptTemplate::validate_input(self, &input.variables)?;
+                let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
+                Ok(ChatPromptValue::new(messages))
+            },
+            input,
+            config,
+        )
     }
 
     async fn ainvoke(
