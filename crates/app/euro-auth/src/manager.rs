@@ -116,10 +116,17 @@ impl AuthManager {
     pub async fn refresh_tokens(&mut self) -> Result<SecretString> {
         let refresh_token = self.get_refresh_token()?;
 
-        let response = self
+        let response = match self
             .auth_client
             .refresh_token(refresh_token.expose_secret())
-            .await?;
+            .await
+        {
+            Ok(resp) => resp,
+            Err(e) => {
+                tracing::warn!("Token refresh failed: {e}");
+                return Err(e);
+            }
+        };
 
         store_access_token(response.access_token.clone())?;
         store_refresh_token(response.refresh_token.clone())?;
