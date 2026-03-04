@@ -4,6 +4,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tokio::sync::RwLock;
 
+use crate::error::Error;
+pub use crate::runnables::run_in_executor;
+
 #[async_trait]
 pub trait BaseStore<K, V>: Send + Sync
 where
@@ -156,6 +159,36 @@ pub type InMemoryStore = InMemoryBaseStore<serde_json::Value>;
 
 pub type InMemoryByteStore = InMemoryBaseStore<Vec<u8>>;
 
+pub struct InvalidKeyException(Error);
+
+impl InvalidKeyException {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self(Error::InvalidKey(message.into()))
+    }
+
+    pub fn into_error(self) -> Error {
+        self.0
+    }
+}
+
+impl From<InvalidKeyException> for Error {
+    fn from(exception: InvalidKeyException) -> Self {
+        exception.0
+    }
+}
+
+impl std::fmt::Display for InvalidKeyException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl std::fmt::Debug for InvalidKeyException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("InvalidKeyException").field(&self.0).finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244,5 +277,12 @@ mod tests {
 
         let keys = store.ayield_keys(None).await;
         assert_eq!(keys, vec!["key2".to_string()]);
+    }
+
+    #[test]
+    fn test_invalid_key_exception() {
+        let exception = InvalidKeyException::new("bad key characters");
+        let error: Error = exception.into();
+        assert!(error.to_string().contains("Invalid key"));
     }
 }
