@@ -3,8 +3,8 @@ use std::pin::Pin;
 use async_trait::async_trait;
 use futures::Stream;
 
+use crate::documents::BaseDocumentTransformer;
 use crate::documents::base::{Blob, Document};
-use crate::text_splitters::TextSplitter;
 
 #[async_trait]
 pub trait BaseLoader: Send + Sync {
@@ -16,10 +16,10 @@ pub trait BaseLoader: Send + Sync {
 
     fn load_and_split(
         &self,
-        text_splitter: &dyn TextSplitter,
+        text_splitter: &dyn BaseDocumentTransformer,
     ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
         let docs = self.load();
-        text_splitter.split_documents(&docs)
+        text_splitter.transform_documents(&docs)
     }
 
     async fn alazy_load(&self) -> Pin<Box<dyn Stream<Item = Document> + Send + '_>> {
@@ -56,15 +56,11 @@ mod tests {
         }
     }
 
-    struct HalfSplitter {
-        config: crate::text_splitters::TextSplitterConfig,
-    }
+    struct HalfSplitter;
 
     impl HalfSplitter {
         fn new() -> Self {
-            Self {
-                config: crate::text_splitters::TextSplitterConfig::default(),
-            }
+            Self
         }
     }
 
@@ -74,25 +70,18 @@ mod tests {
             &self,
             documents: &[Document],
         ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
-            self.split_documents(documents)
-        }
-    }
-
-    #[async_trait]
-    impl TextSplitter for HalfSplitter {
-        fn config(&self) -> &crate::text_splitters::TextSplitterConfig {
-            &self.config
-        }
-
-        fn split_text(
-            &self,
-            text: &str,
-        ) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
-            let mid = text.len() / 2;
-            if mid == 0 {
-                return Ok(vec![text.to_string()]);
+            let mut result = Vec::new();
+            for doc in documents {
+                let text = &doc.page_content;
+                let mid = text.len() / 2;
+                if mid == 0 {
+                    result.push(doc.clone());
+                } else {
+                    result.push(Document::builder().page_content(&text[..mid]).build());
+                    result.push(Document::builder().page_content(&text[mid..]).build());
+                }
             }
-            Ok(vec![text[..mid].to_string(), text[mid..].to_string()])
+            Ok(result)
         }
     }
 
