@@ -6,17 +6,24 @@ use agent_chain_core::language_models::{BaseChatModel, ChatModelConfig, Language
 use agent_chain_core::messages::AIMessage;
 use agent_chain_core::rate_limiters::InMemoryRateLimiter;
 
-fn make_rate_limited_model(
-    messages: Vec<AIMessage>,
-    requests_per_second: f64,
-    check_every_n_seconds: f64,
-    max_bucket_size: f64,
-) -> GenericFakeChatModel {
+// Use a slow rate (4 req/s → 250ms period) so that contention from concurrent
+// tests can never accidentally mask the wait. Governor's GCRA bucket refills
+// after 250ms; even under heavy test load a single call + scheduling overhead
+// won't reach that.
+const RATE: f64 = 4.0;
+const CHECK_INTERVAL: f64 = 0.01;
+// Lower bound for "must have waited" assertions.  Well below the 250ms period
+// but well above any reasonable scheduling jitter.
+const MIN_WAIT: Duration = Duration::from_millis(100);
+// Upper bound for "should be instant" assertions.
+const MAX_INSTANT: Duration = Duration::from_millis(100);
+
+fn make_rate_limited_model(messages: Vec<AIMessage>) -> GenericFakeChatModel {
     let rate_limiter = Arc::new(
         InMemoryRateLimiter::builder()
-            .requests_per_second(requests_per_second)
-            .check_every_n_seconds(check_every_n_seconds)
-            .max_bucket_size(max_bucket_size)
+            .requests_per_second(RATE)
+            .check_every_n_seconds(CHECK_INTERVAL)
+            .max_bucket_size(1.0)
             .build(),
     );
     let config = ChatModelConfig::builder()
@@ -25,17 +32,12 @@ fn make_rate_limited_model(
     GenericFakeChatModel::from_vec(messages).with_config(config)
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_rate_limit_invoke() {
-    let model = make_rate_limited_model(
-        vec![
-            AIMessage::builder().content("hello").build(),
-            AIMessage::builder().content("world").build(),
-        ],
-        20.0,
-        0.1,
-        1.0,
-    );
+    let model = make_rate_limited_model(vec![
+        AIMessage::builder().content("hello").build(),
+        AIMessage::builder().content("world").build(),
+    ]);
 
     let tic = Instant::now();
     let _ = model
@@ -44,9 +46,10 @@ async fn test_rate_limit_invoke() {
         .unwrap();
     let elapsed = tic.elapsed();
     assert!(
-        elapsed < Duration::from_millis(50),
-        "First call took {:?}, expected < 50ms (burst token available)",
-        elapsed
+        elapsed < MAX_INSTANT,
+        "First call took {:?}, expected < {:?} (burst token available)",
+        elapsed,
+        MAX_INSTANT,
     );
 
     let tic = Instant::now();
@@ -56,24 +59,20 @@ async fn test_rate_limit_invoke() {
         .unwrap();
     let elapsed = tic.elapsed();
     assert!(
-        elapsed >= Duration::from_millis(30),
-        "Second call took {:?}, expected >= 30ms (must wait for replenishment)",
-        elapsed
+        elapsed >= MIN_WAIT,
+        "Second call took {:?}, expected >= {:?} (must wait for replenishment)",
+        elapsed,
+        MIN_WAIT,
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_rate_limit_ainvoke() {
-    let model = make_rate_limited_model(
-        vec![
-            AIMessage::builder().content("hello").build(),
-            AIMessage::builder().content("world").build(),
-            AIMessage::builder().content("!").build(),
-        ],
-        20.0,
-        0.1,
-        1.0,
-    );
+    let model = make_rate_limited_model(vec![
+        AIMessage::builder().content("hello").build(),
+        AIMessage::builder().content("world").build(),
+        AIMessage::builder().content("!").build(),
+    ]);
 
     let tic = Instant::now();
     let _ = model
@@ -82,9 +81,10 @@ async fn test_rate_limit_ainvoke() {
         .unwrap();
     let elapsed = tic.elapsed();
     assert!(
-        elapsed < Duration::from_millis(50),
-        "First call took {:?}, expected < 50ms",
-        elapsed
+        elapsed < MAX_INSTANT,
+        "First call took {:?}, expected < {:?}",
+        elapsed,
+        MAX_INSTANT,
     );
 
     let tic = Instant::now();
@@ -94,9 +94,10 @@ async fn test_rate_limit_ainvoke() {
         .unwrap();
     let elapsed = tic.elapsed();
     assert!(
-        elapsed >= Duration::from_millis(30),
-        "Second call took {:?}, expected >= 30ms",
-        elapsed
+        elapsed >= MIN_WAIT,
+        "Second call took {:?}, expected >= {:?} (must wait for replenishment)",
+        elapsed,
+        MIN_WAIT,
     );
 
     let tic = Instant::now();
@@ -106,21 +107,22 @@ async fn test_rate_limit_ainvoke() {
         .unwrap();
     let elapsed = tic.elapsed();
     assert!(
-        elapsed >= Duration::from_millis(30),
-        "Third call took {:?}, expected >= 30ms",
-        elapsed
+        elapsed >= MIN_WAIT,
+        "Third call took {:?}, expected >= {:?} (must wait for replenishment)",
+        elapsed,
+        MIN_WAIT,
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_rate_limit_skips_cache() {
     use agent_chain_core::caches::InMemoryCache;
 
     let cache = Arc::new(InMemoryCache::unbounded());
     let rate_limiter = Arc::new(
         InMemoryRateLimiter::builder()
-            .requests_per_second(20.0)
-            .check_every_n_seconds(0.1)
+            .requests_per_second(RATE)
+            .check_every_n_seconds(CHECK_INTERVAL)
             .build(),
     );
     let config = ChatModelConfig::builder()
@@ -142,9 +144,10 @@ async fn test_rate_limit_skips_cache() {
         .unwrap();
     let elapsed = tic.elapsed();
     assert!(
-        elapsed < Duration::from_millis(50),
-        "First call took {:?}, expected < 50ms (burst token)",
-        elapsed
+        elapsed < MAX_INSTANT,
+        "First call took {:?}, expected < {:?} (burst token)",
+        elapsed,
+        MAX_INSTANT,
     );
 
     for i in 0..2 {
@@ -155,26 +158,22 @@ async fn test_rate_limit_skips_cache() {
             .unwrap();
         let elapsed = tic.elapsed();
         assert!(
-            elapsed < Duration::from_millis(50),
-            "Cache hit {} took {:?}, expected < 50ms",
+            elapsed < MAX_INSTANT,
+            "Cache hit {} took {:?}, expected < {:?}",
             i + 1,
-            elapsed
+            elapsed,
+            MAX_INSTANT,
         );
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_rate_limit_stream() {
-    let model = make_rate_limited_model(
-        vec![
-            AIMessage::builder().content("hello world").build(),
-            AIMessage::builder().content("hello world").build(),
-            AIMessage::builder().content("hello world").build(),
-        ],
-        20.0,
-        0.1,
-        1.0,
-    );
+    let model = make_rate_limited_model(vec![
+        AIMessage::builder().content("hello world").build(),
+        AIMessage::builder().content("hello world").build(),
+        AIMessage::builder().content("hello world").build(),
+    ]);
 
     let tic = Instant::now();
     let result = model
@@ -184,9 +183,10 @@ async fn test_rate_limit_stream() {
     let elapsed = tic.elapsed();
     assert!(result.content.contains("hello"));
     assert!(
-        elapsed < Duration::from_millis(50),
-        "First invoke took {:?}, expected < 50ms",
-        elapsed
+        elapsed < MAX_INSTANT,
+        "First invoke took {:?}, expected < {:?}",
+        elapsed,
+        MAX_INSTANT,
     );
 
     let tic = Instant::now();
@@ -196,9 +196,10 @@ async fn test_rate_limit_stream() {
         .unwrap();
     let elapsed = tic.elapsed();
     assert!(
-        elapsed >= Duration::from_millis(30),
-        "Second invoke took {:?}, expected >= 30ms",
-        elapsed
+        elapsed >= MIN_WAIT,
+        "Second invoke took {:?}, expected >= {:?}",
+        elapsed,
+        MIN_WAIT,
     );
 
     let tic = Instant::now();
@@ -208,24 +209,20 @@ async fn test_rate_limit_stream() {
         .unwrap();
     let elapsed = tic.elapsed();
     assert!(
-        elapsed >= Duration::from_millis(30),
-        "Third invoke took {:?}, expected >= 30ms",
-        elapsed
+        elapsed >= MIN_WAIT,
+        "Third invoke took {:?}, expected >= {:?}",
+        elapsed,
+        MIN_WAIT,
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_rate_limit_astream() {
-    let model = make_rate_limited_model(
-        vec![
-            AIMessage::builder().content("hello world").build(),
-            AIMessage::builder().content("hello world").build(),
-            AIMessage::builder().content("hello world").build(),
-        ],
-        20.0,
-        0.1,
-        1.0,
-    );
+    let model = make_rate_limited_model(vec![
+        AIMessage::builder().content("hello world").build(),
+        AIMessage::builder().content("hello world").build(),
+        AIMessage::builder().content("hello world").build(),
+    ]);
 
     let tic = Instant::now();
     let _ = model
@@ -234,9 +231,10 @@ async fn test_rate_limit_astream() {
         .unwrap();
     let elapsed = tic.elapsed();
     assert!(
-        elapsed < Duration::from_millis(50),
-        "First call took {:?}, expected < 50ms",
-        elapsed
+        elapsed < MAX_INSTANT,
+        "First call took {:?}, expected < {:?}",
+        elapsed,
+        MAX_INSTANT,
     );
 
     let tic = Instant::now();
@@ -246,9 +244,10 @@ async fn test_rate_limit_astream() {
         .unwrap();
     let elapsed = tic.elapsed();
     assert!(
-        elapsed >= Duration::from_millis(30),
-        "Second call took {:?}, expected >= 30ms",
-        elapsed
+        elapsed >= MIN_WAIT,
+        "Second call took {:?}, expected >= {:?}",
+        elapsed,
+        MIN_WAIT,
     );
 
     let tic = Instant::now();
@@ -258,21 +257,22 @@ async fn test_rate_limit_astream() {
         .unwrap();
     let elapsed = tic.elapsed();
     assert!(
-        elapsed >= Duration::from_millis(30),
-        "Third call took {:?}, expected >= 30ms",
-        elapsed
+        elapsed >= MIN_WAIT,
+        "Third call took {:?}, expected >= {:?}",
+        elapsed,
+        MIN_WAIT,
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_rate_limit_skips_cache_async() {
     use agent_chain_core::caches::InMemoryCache;
 
     let cache = Arc::new(InMemoryCache::unbounded());
     let rate_limiter = Arc::new(
         InMemoryRateLimiter::builder()
-            .requests_per_second(20.0)
-            .check_every_n_seconds(0.1)
+            .requests_per_second(RATE)
+            .check_every_n_seconds(CHECK_INTERVAL)
             .build(),
     );
     let config = ChatModelConfig::builder()
@@ -294,9 +294,10 @@ async fn test_rate_limit_skips_cache_async() {
         .unwrap();
     let elapsed = tic.elapsed();
     assert!(
-        elapsed < Duration::from_millis(50),
-        "First call took {:?}, expected < 50ms (burst token)",
-        elapsed
+        elapsed < MAX_INSTANT,
+        "First call took {:?}, expected < {:?} (burst token)",
+        elapsed,
+        MAX_INSTANT,
     );
 
     for i in 0..2 {
@@ -307,10 +308,11 @@ async fn test_rate_limit_skips_cache_async() {
             .unwrap();
         let elapsed = tic.elapsed();
         assert!(
-            elapsed < Duration::from_millis(50),
-            "Cache hit {} took {:?}, expected < 50ms",
+            elapsed < MAX_INSTANT,
+            "Cache hit {} took {:?}, expected < {:?}",
             i + 1,
-            elapsed
+            elapsed,
+            MAX_INSTANT,
         );
     }
 }
