@@ -115,10 +115,11 @@ pub use callbacks::{
 
 pub use prompts::{
     AIMessagePromptTemplate, BaseChatPromptTemplate, BaseMessagePromptTemplate, BasePromptTemplate,
-    ChatMessagePromptTemplate, ChatPromptTemplate, DictPromptTemplate,
+    ChatMessagePromptTemplate, ChatPromptInput, ChatPromptTemplate, DictPromptTemplate,
     FewShotChatMessagePromptTemplate, FewShotPromptTemplate, FewShotPromptWithTemplates,
-    HumanMessagePromptTemplate, ImagePromptTemplate, MessagesPlaceholder, PromptTemplate,
-    PromptTemplateFormat, StringPromptTemplate, SystemMessagePromptTemplate, load_prompt,
+    HumanMessagePromptTemplate, ImagePromptTemplate, MessagePromptContentPart, MessagesPlaceholder,
+    PartialValue, PromptTemplate, PromptTemplateFormat, StringPromptTemplate,
+    SystemMessagePromptTemplate, load_prompt,
 };
 
 pub use load::{

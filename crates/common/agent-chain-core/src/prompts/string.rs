@@ -268,10 +268,8 @@ pub trait StringPromptTemplate: Send + Sync {
         &[]
     }
 
-    fn partial_variables(&self) -> &HashMap<String, String> {
-        static EMPTY: std::sync::LazyLock<HashMap<String, String>> =
-            std::sync::LazyLock::new(HashMap::new);
-        &EMPTY
+    fn partial_variables(&self) -> HashMap<String, String> {
+        HashMap::new()
     }
 
     fn template_format(&self) -> PromptTemplateFormat {

@@ -10,7 +10,7 @@ use crate::prompt_values::StringPromptValue;
 use crate::runnables::base::Runnable;
 use crate::runnables::config::{RunnableConfig, ensure_config};
 
-use super::base::{BasePromptTemplate, FormatOutputType};
+use super::base::{BasePromptTemplate, FormatOutputType, PartialValue, resolve_partials};
 use super::few_shot::ExampleSelectorClone;
 use super::prompt::PromptTemplate;
 use super::string::{PromptTemplateFormat, StringPromptTemplate, format_template};
@@ -33,7 +33,7 @@ pub struct FewShotPromptWithTemplates {
 
     input_variables: Vec<String>,
 
-    partial_variables: HashMap<String, String>,
+    partial_variables: HashMap<String, PartialValue>,
 
     validate_template: bool,
 }
@@ -74,7 +74,7 @@ impl FewShotPromptWithTemplates {
             prefix,
             template_format,
             input_variables,
-            partial_variables: HashMap::new(),
+            partial_variables: HashMap::<String, PartialValue>::new(),
             validate_template,
         };
         result.validate_template_variables()?;
@@ -111,7 +111,7 @@ impl FewShotPromptWithTemplates {
             prefix,
             template_format: PromptTemplateFormat::FString,
             input_variables,
-            partial_variables: HashMap::new(),
+            partial_variables: HashMap::<String, PartialValue>::new(),
             validate_template: false,
         };
         result.validate_template_variables()?;
@@ -186,7 +186,7 @@ impl FewShotPromptWithTemplates {
         &self,
         kwargs: &HashMap<String, String>,
     ) -> HashMap<String, String> {
-        let mut merged = self.partial_variables.clone();
+        let mut merged = resolve_partials(&self.partial_variables);
         merged.extend(kwargs.clone());
         merged
     }
@@ -197,8 +197,8 @@ impl BasePromptTemplate for FewShotPromptWithTemplates {
         &self.input_variables
     }
 
-    fn partial_variables(&self) -> &HashMap<String, String> {
-        &self.partial_variables
+    fn partial_variables(&self) -> HashMap<String, String> {
+        resolve_partials(&self.partial_variables)
     }
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<FormatOutputType> {
@@ -253,7 +253,10 @@ impl BasePromptTemplate for FewShotPromptWithTemplates {
         format_template(&template, self.template_format, &kwargs)
     }
 
-    fn partial(&self, kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>> {
+    fn partial(
+        &self,
+        kwargs: HashMap<String, PartialValue>,
+    ) -> Result<Box<dyn BasePromptTemplate>> {
         let new_vars: Vec<_> = self
             .input_variables
             .iter()
@@ -333,8 +336,8 @@ impl StringPromptTemplate for FewShotPromptWithTemplates {
         &self.input_variables
     }
 
-    fn partial_variables(&self) -> &HashMap<String, String> {
-        &self.partial_variables
+    fn partial_variables(&self) -> HashMap<String, String> {
+        resolve_partials(&self.partial_variables)
     }
 
     fn template_format(&self) -> PromptTemplateFormat {
