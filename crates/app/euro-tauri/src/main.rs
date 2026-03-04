@@ -324,19 +324,16 @@ fn init_state(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let app_handle = tauri_app.handle();
 
-    // ThreadManager — synchronous construction, no I/O
     let thread_channel_rx = endpoint_manager.subscribe();
     let thread_manager = euro_thread::ThreadManager::new(thread_channel_rx);
     app_handle.manage(SharedThreadManager::new(thread_manager));
 
-    // TimelineManager — synchronous construction
     let timeline_channel_rx = endpoint_manager.subscribe();
     let timeline = euro_timeline::TimelineManager::builder()
         .channel_rx(timeline_channel_rx)
         .build()?;
     app_handle.manage(Mutex::new(timeline));
 
-    // UserController — synchronous construction
     let path = tauri_app.path().app_data_dir()?;
     let user_channel_rx = endpoint_manager.subscribe();
     let user_controller = euro_user::Controller::new(path, user_channel_rx)?;

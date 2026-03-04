@@ -115,12 +115,10 @@ fn flush(store: &SecretStore) -> Result<()> {
             .with_context(|| format!("failed to create directory {}", parent.display()))?;
     }
 
-    // Atomic write via temp + rename to avoid half-written files on crash.
     let tmp_path = store.path.with_extension("enc.tmp");
     fs::write(&tmp_path, &encrypted)
         .with_context(|| format!("failed to write temp file {}", tmp_path.display()))?;
 
-    // Restrict file permissions so only the owning user can read the secrets.
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

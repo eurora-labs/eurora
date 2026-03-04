@@ -41,7 +41,6 @@ impl CasbinAuthz {
 mod tests {
     use super::*;
 
-    /// Helper: build an enforcer from the repo's config files.
     async fn test_authz() -> CasbinAuthz {
         let base = env!("CARGO_MANIFEST_DIR");
         let model = format!("{base}/../../../config/authz/model.conf");
@@ -134,9 +133,6 @@ mod tests {
         ("AssetService", "CreateAsset"),
     ];
 
-    /// Every gRPC policy entry in policy.csv must reference a method that
-    /// actually exists in the proto definitions. This catches typos and stale
-    /// policies after proto renames.
     #[tokio::test]
     async fn policy_grpc_actions_match_proto_methods() {
         let base = env!("CARGO_MANIFEST_DIR");

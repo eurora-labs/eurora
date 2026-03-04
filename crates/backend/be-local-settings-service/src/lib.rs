@@ -65,7 +65,7 @@ impl ProtoLocalSettingsService for LocalSettingsService {
             .try_into()
             .map_err(LocalSettingsError::from)?;
 
-        tracing::info!("Provider settings updated: {:?}", provider);
+        tracing::info!("Provider settings updated");
 
         let response_proto: proto::ProviderSettings = (&provider).into();
 

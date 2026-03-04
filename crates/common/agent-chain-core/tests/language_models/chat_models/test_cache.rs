@@ -3,8 +3,10 @@ use std::sync::Arc;
 use agent_chain_core::caches::InMemoryCache;
 use agent_chain_core::language_models::{BaseChatModel, LanguageModelInput};
 use agent_chain_core::{FakeListChatModel, set_llm_cache};
+use serial_test::serial;
 
 #[tokio::test]
+#[serial]
 async fn test_local_cache_sync() {
     let global_cache = Arc::new(InMemoryCache::unbounded());
     let local_cache = Arc::new(InMemoryCache::unbounded());
@@ -37,6 +39,7 @@ async fn test_local_cache_sync() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_local_cache_async() {
     let global_cache = Arc::new(InMemoryCache::unbounded());
     let local_cache = Arc::new(InMemoryCache::unbounded());
@@ -135,6 +138,7 @@ async fn test_global_cache_async() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_no_cache_sync() {
     let global_cache = Arc::new(InMemoryCache::unbounded());
     set_llm_cache(Some(global_cache.clone()));
@@ -160,6 +164,7 @@ async fn test_no_cache_sync() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_no_cache_async() {
     let global_cache = Arc::new(InMemoryCache::unbounded());
     set_llm_cache(Some(global_cache.clone()));

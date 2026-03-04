@@ -66,7 +66,7 @@ pub(crate) async fn check_token_limit(
         })?;
 
     if used >= limit {
-        tracing::warn!(user_id = %user_id, used, limit, "Token limit reached");
+        tracing::warn!(used, limit, "Token limit reached");
         return Err(Status::resource_exhausted(
             "Monthly token limit reached. Please upgrade your plan.",
         ));

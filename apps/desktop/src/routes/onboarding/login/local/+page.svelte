@@ -36,7 +36,7 @@
 			await taurpc.settings.set_api_settings(settings);
 			goto('/onboarding/login/local/auth');
 		} catch (error) {
-			toast.error(`Could not connect to ${endpoint}`);
+			toast.error(`Could not connect to ${endpoint}. Error: ${error}`);
 		} finally {
 			connecting = false;
 		}

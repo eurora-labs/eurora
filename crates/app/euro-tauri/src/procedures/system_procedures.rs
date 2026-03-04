@@ -119,7 +119,6 @@ fn find_available_port(preferred: u16) -> Result<u16, String> {
 fn host_ids() -> (String, String) {
     #[cfg(unix)]
     {
-        // SAFETY: getuid/getgid are always safe to call.
         let uid = unsafe { libc::getuid() };
         let gid = unsafe { libc::getgid() };
         (uid.to_string(), gid.to_string())
@@ -141,7 +140,7 @@ impl SystemApi for SystemApiImpl {
     ) -> Result<String, String> {
         let address = server_address.unwrap_or_else(|| "localhost:50051".to_string());
 
-        tracing::debug!("Checking connection to gRPC server: {}", address);
+        tracing::debug!("Checking connection to gRPC server");
 
         match tokio::net::TcpStream::connect(address.replace("http://", "").replace("https://", ""))
             .await
@@ -208,10 +207,6 @@ impl SystemApi for SystemApiImpl {
     ) -> Result<(), String> {
         tracing::debug!("Installing update...");
 
-        // On macOS, when running inside a nested bundle (Eurora.app wraps
-        // Eurora.app), we must tell the updater to target the
-        // *outermost* .app so it replaces the whole bundle — keeping the
-        // Safari extension and its code signature intact.
         #[cfg(target_os = "macos")]
         let outer_app: Option<PathBuf> = find_outermost_app_bundle();
         #[cfg(not(target_os = "macos"))]
@@ -261,18 +256,11 @@ impl SystemApi for SystemApiImpl {
 
             tracing::debug!("Update installed, restarting application");
 
-            // On macOS with the nested wrapper bundle we must restart the
-            // *outer* Eurora.app (which hosts the launcher, bridge server
-            // and Safari extension).  A plain `app_handle.restart()` would
-            // only relaunch the inner Tauri binary — the launcher and its
-            // TCP bridge would stay dead.
             if let Some(ref outer) = outer_app {
                 tracing::info!(
                     "Scheduling restart of outer app bundle: {}",
                     outer.display()
                 );
-                // Use `open` as a direct command with the path as an
-                // argument — avoids shell interpretation entirely.
                 let _ = std::process::Command::new("sh")
                     .args(["-c", "sleep 2 && exec open \"$1\"", "--"])
                     .arg(outer)
