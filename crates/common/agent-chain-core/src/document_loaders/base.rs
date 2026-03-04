@@ -44,7 +44,6 @@ pub trait BaseBlobParser: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
 
     struct TestLoader {
         docs: Vec<Document>,
@@ -73,10 +72,9 @@ mod tests {
     impl crate::documents::BaseDocumentTransformer for HalfSplitter {
         fn transform_documents(
             &self,
-            documents: Vec<Document>,
-            _kwargs: HashMap<String, serde_json::Value>,
+            documents: &[Document],
         ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
-            self.split_documents(&documents)
+            self.split_documents(documents)
         }
     }
 

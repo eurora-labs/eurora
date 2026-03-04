@@ -304,10 +304,9 @@ mod tests {
     impl BaseDocumentTransformer for NewlineSplitter {
         fn transform_documents(
             &self,
-            documents: Vec<Document>,
-            _kwargs: HashMap<String, serde_json::Value>,
+            documents: &[Document],
         ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
-            self.split_documents(&documents)
+            self.split_documents(documents)
         }
     }
 
@@ -397,7 +396,7 @@ mod tests {
     fn test_transform_documents_delegates_to_split() {
         let splitter = NewlineSplitter::new();
         let docs = vec![Document::builder().page_content("x\ny").build()];
-        let result = splitter.transform_documents(docs, HashMap::new()).unwrap();
+        let result = splitter.transform_documents(&docs).unwrap();
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].page_content, "x");
         assert_eq!(result[1].page_content, "y");
