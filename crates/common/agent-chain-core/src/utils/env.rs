@@ -3,7 +3,13 @@ use std::env;
 
 pub fn env_var_is_set(env_var: &str) -> bool {
     match env::var(env_var) {
-        Ok(value) => !value.is_empty() && value != "0" && value != "false" && value != "False",
+        Ok(value) => {
+            !value.is_empty()
+                && !value.eq_ignore_ascii_case("false")
+                && value != "0"
+                && !value.eq_ignore_ascii_case("no")
+                && !value.eq_ignore_ascii_case("off")
+        }
         Err(_) => false,
     }
 }

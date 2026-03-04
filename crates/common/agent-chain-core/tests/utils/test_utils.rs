@@ -4,7 +4,8 @@ use std::env;
 use serde_json::json;
 
 use agent_chain_core::outputs::GenerationChunk;
-use agent_chain_core::utils::base::{EnvError, ExposeSecret, from_env, secret_from_env};
+use agent_chain_core::utils::EnvError;
+use agent_chain_core::utils::base::{ExposeSecret, from_env, secret_from_env};
 use agent_chain_core::utils::merge::{MergeError, merge_dicts};
 
 struct MergeDictsTestCase {

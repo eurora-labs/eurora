@@ -60,21 +60,21 @@ pub fn parse_partial_json(s: &str, strict: bool) -> Result<Value, JsonParseError
 
     stack.reverse();
 
-    while !new_chars.is_empty() {
-        let mut attempt = new_chars.join("");
-        for closer in &stack {
-            attempt.push(*closer);
-        }
+    let closing: String = stack.iter().collect();
+    let mut attempt = new_chars.join("");
 
-        match serde_json::from_str::<Value>(&attempt) {
+    while !attempt.is_empty() {
+        let full = format!("{}{}", attempt, closing);
+
+        match serde_json::from_str::<Value>(&full) {
             Ok(value) => {
-                if strict && contains_control_chars(&attempt) {
+                if strict && contains_control_chars(&full) {
                     return Err(JsonParseError::ControlCharacters);
                 }
                 return Ok(value);
             }
             Err(_) => {
-                new_chars.pop();
+                attempt.pop();
             }
         }
     }

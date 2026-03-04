@@ -13,14 +13,45 @@ impl StrictFormatter {
         format_string: &str,
         kwargs: &HashMap<String, String>,
     ) -> Result<String, FormattingError> {
-        let placeholders = self.extract_placeholders(format_string);
-        let mut result = format_string.to_string();
+        let mut result = String::new();
+        let mut chars = format_string.chars().peekable();
 
-        for placeholder in &placeholders {
-            if let Some(value) = kwargs.get(placeholder) {
-                result = result.replace(&format!("{{{}}}", placeholder), value);
-            } else {
-                return Err(FormattingError::MissingKey(placeholder.clone()));
+        while let Some(c) = chars.next() {
+            match c {
+                '{' => {
+                    if chars.peek() == Some(&'{') {
+                        chars.next();
+                        result.push('{');
+                        result.push('{');
+                    } else {
+                        let mut placeholder = String::new();
+                        for c in chars.by_ref() {
+                            if c == '}' {
+                                break;
+                            }
+                            placeholder.push(c);
+                        }
+                        let name = placeholder.split(':').next().unwrap_or("");
+                        let name = name.split('!').next().unwrap_or("");
+                        if name.is_empty() {
+                            result.push('{');
+                            result.push_str(&placeholder);
+                            result.push('}');
+                        } else if let Some(value) = kwargs.get(name) {
+                            result.push_str(value);
+                        } else {
+                            return Err(FormattingError::MissingKey(name.to_string()));
+                        }
+                    }
+                }
+                '}' => {
+                    if chars.peek() == Some(&'}') {
+                        chars.next();
+                        result.push('}');
+                    }
+                    result.push('}');
+                }
+                _ => result.push(c),
             }
         }
 
