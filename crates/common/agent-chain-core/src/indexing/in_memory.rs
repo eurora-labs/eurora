@@ -69,17 +69,16 @@ impl DocumentIndex for InMemoryDocumentIndex {
         let mut ok_ids = Vec::with_capacity(items.len());
 
         for item in items {
-            let (id, doc) = if item.id.is_none() {
-                let id = Uuid::new_v4().to_string();
-                let mut doc = item.clone();
-                doc.id = Some(id.clone());
-                (id, doc)
+            let (id, doc) = if let Some(existing_id) = item.id() {
+                (existing_id.to_string(), item.clone())
             } else {
-                let id = match item.id.clone() {
-                    Some(id) => id,
-                    None => continue, // unreachable due to outer if
-                };
-                (id, item.clone())
+                let id = Uuid::new_v4().to_string();
+                let doc = Document::builder()
+                    .page_content(item.page_content())
+                    .id(id.clone())
+                    .metadata(item.metadata().clone())
+                    .build();
+                (id, doc)
             };
 
             store.insert(id.clone(), doc);
@@ -158,7 +157,7 @@ impl BaseRetriever for InMemoryDocumentIndex {
         let mut counts_by_doc: Vec<(Document, usize)> = store
             .values()
             .map(|doc| {
-                let count = doc.page_content.matches(query).count();
+                let count = doc.page_content().matches(query).count();
                 (doc.clone(), count)
             })
             .collect();

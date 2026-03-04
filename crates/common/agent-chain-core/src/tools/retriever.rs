@@ -97,8 +97,8 @@ where
                         .iter()
                         .map(|d| {
                             serde_json::json!({
-                                "page_content": d.page_content,
-                                "metadata": d.metadata
+                                "page_content": d.page_content(),
+                                "metadata": d.metadata()
                             })
                         })
                         .collect();
@@ -119,7 +119,7 @@ where
 
 fn format_documents(docs: &[Document], separator: &str) -> String {
     docs.iter()
-        .map(|doc| doc.page_content.clone())
+        .map(|doc| doc.page_content().to_string())
         .collect::<Vec<_>>()
         .join(separator)
 }

@@ -144,9 +144,7 @@ pub use rate_limiters::{BaseRateLimiter, InMemoryRateLimiter};
 
 pub use agents::{AgentAction, AgentActionMessageLog, AgentFinish, AgentStep, ToolInput};
 
-pub use document_loaders::{
-    BaseBlobParser, BaseLoader as BaseDocumentLoader, BlobLoader, PathLike,
-};
+pub use document_loaders::{BaseBlobParser, BaseLoader as BaseDocumentLoader, BlobLoader};
 
 pub use documents::{
     BaseDocumentCompressor, BaseDocumentTransformer, Blob, BlobBuilder, BlobData, Document,

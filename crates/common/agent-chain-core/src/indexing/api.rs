@@ -163,17 +163,17 @@ pub fn get_document_with_hash(document: &Document, key_encoder: &KeyEncoder) -> 
     let hash = match key_encoder {
         KeyEncoder::Custom(encoder) => encoder(document),
         KeyEncoder::Algorithm(algorithm) => {
-            let content_hash = calculate_hash(&document.page_content, *algorithm);
-            let serialized_meta = sorted_json_string(&document.metadata)?;
+            let content_hash = calculate_hash(document.page_content(), *algorithm);
+            let serialized_meta = sorted_json_string(document.metadata())?;
             let metadata_hash = calculate_hash(&serialized_meta, *algorithm);
             calculate_hash(&format!("{content_hash}{metadata_hash}"), *algorithm)
         }
     };
 
     Ok(Document::builder()
-        .page_content(document.page_content.clone())
+        .page_content(document.page_content())
         .id(hash)
-        .metadata(document.metadata.clone())
+        .metadata(document.metadata().clone())
         .build())
 }
 
@@ -182,8 +182,8 @@ fn deduplicate_in_order(documents: Vec<Document>) -> Vec<Document> {
     documents
         .into_iter()
         .filter(|doc| {
-            if let Some(id) = &doc.id {
-                seen.insert(id.clone())
+            if let Some(id) = doc.id() {
+                seen.insert(id.to_string())
             } else {
                 true
             }
@@ -197,7 +197,7 @@ fn get_source_id_assigner<'a>(
     match source_id_key {
         None => Box::new(|_| None),
         Some(SourceIdKey::MetadataKey(key)) => Box::new(move |doc: &Document| {
-            doc.metadata.get(key).and_then(|v| match v {
+            doc.metadata().get(key).and_then(|v| match v {
                 Value::String(s) => Some(s.clone()),
                 Value::Null => None,
                 other => Some(other.to_string()),
@@ -357,7 +357,7 @@ pub fn index(
                     return Err(Error::InvalidConfig(format!(
                         "Source IDs are required when cleanup mode is incremental or scoped_full. \
                          Document that starts with content: {} was not assigned as source id.",
-                        &hashed_doc.page_content[..hashed_doc.page_content.len().min(100)]
+                        &hashed_doc.page_content()[..hashed_doc.page_content().len().min(100)]
                     )));
                 }
                 if config.cleanup == Some(CleanupMode::ScopedFull) {
@@ -369,8 +369,8 @@ pub fn index(
         let doc_ids: Vec<String> = hashed_docs
             .iter()
             .map(|doc| {
-                doc.id
-                    .clone()
+                doc.id()
+                    .map(String::from)
                     .ok_or_else(|| Error::Indexing("hash should have set document id".to_string()))
             })
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -384,8 +384,8 @@ pub fn index(
 
         for (hashed_doc, doc_exists) in hashed_docs.into_iter().zip(exists_batch) {
             let hashed_id = hashed_doc
-                .id
-                .clone()
+                .id()
+                .map(String::from)
                 .ok_or_else(|| Error::Indexing("hash should have set document id".to_string()))?;
             if doc_exists {
                 if config.force_update {
@@ -528,7 +528,7 @@ pub async fn aindex(
                     return Err(Error::InvalidConfig(format!(
                         "Source IDs are required when cleanup mode is incremental or scoped_full. \
                          Document that starts with content: {} was not assigned as source id.",
-                        &hashed_doc.page_content[..hashed_doc.page_content.len().min(100)]
+                        &hashed_doc.page_content()[..hashed_doc.page_content().len().min(100)]
                     )));
                 }
                 if config.cleanup == Some(CleanupMode::ScopedFull) {
@@ -540,8 +540,8 @@ pub async fn aindex(
         let doc_ids: Vec<String> = hashed_docs
             .iter()
             .map(|doc| {
-                doc.id
-                    .clone()
+                doc.id()
+                    .map(String::from)
                     .ok_or_else(|| Error::Indexing("hash should have set document id".to_string()))
             })
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -555,8 +555,8 @@ pub async fn aindex(
 
         for (hashed_doc, doc_exists) in hashed_docs.into_iter().zip(exists_batch) {
             let hashed_id = hashed_doc
-                .id
-                .clone()
+                .id()
+                .map(String::from)
                 .ok_or_else(|| Error::Indexing("hash should have set document id".to_string()))?;
             if doc_exists {
                 if config.force_update {

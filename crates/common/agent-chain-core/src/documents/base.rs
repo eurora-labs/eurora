@@ -13,6 +13,9 @@ use serde_with::serde_as;
 use crate::error::Error;
 use crate::load::Serializable;
 
+const DEFAULT_ENCODING: &str = "utf-8";
+const DOCUMENT_TYPE: &str = "Document";
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Blob {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -28,19 +31,19 @@ pub struct Blob {
     mimetype: Option<String>,
 
     #[serde(default = "default_encoding")]
-    encoding: String,
+    encoding: Cow<'static, str>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     path: Option<PathBuf>,
 }
 
-fn default_encoding() -> String {
-    "utf-8".to_string()
+fn default_encoding() -> Cow<'static, str> {
+    Cow::Borrowed(DEFAULT_ENCODING)
 }
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(untagged)]
+#[serde(tag = "type", content = "value")]
 pub enum BlobData {
     Text(String),
     Bytes(#[serde_as(as = "serde_with::base64::Base64")] Vec<u8>),
@@ -55,7 +58,7 @@ impl Blob {
         #[builder(into)] text: Option<String>,
         bytes: Option<Vec<u8>>,
         #[builder(into)] mimetype: Option<String>,
-        #[builder(into, default = default_encoding())] encoding: String,
+        #[builder(into, default = default_encoding())] encoding: Cow<'static, str>,
         path: Option<PathBuf>,
     ) -> crate::error::Result<Self> {
         let data = match (text, bytes) {
@@ -89,26 +92,21 @@ impl Blob {
             metadata: HashMap::new(),
             data: Some(BlobData::Text(data.into())),
             mimetype: None,
-            encoding: "utf-8".to_string(),
+            encoding: Cow::Borrowed(DEFAULT_ENCODING),
             path: None,
         }
     }
 
-    pub fn from_path(
-        path: impl AsRef<Path>,
-        mime_type: Option<String>,
-        encoding: Option<String>,
-        metadata: Option<HashMap<String, Value>>,
-    ) -> Self {
+    pub fn from_path(path: impl AsRef<Path>) -> Self {
         let path = path.as_ref();
-        let mimetype = mime_type.or_else(|| guess_mime_type(path));
+        let mimetype = guess_mime_type(path);
 
         Self {
             id: None,
-            metadata: metadata.unwrap_or_default(),
+            metadata: HashMap::new(),
             data: None,
             mimetype,
-            encoding: encoding.unwrap_or_else(|| "utf-8".to_string()),
+            encoding: Cow::Borrowed(DEFAULT_ENCODING),
             path: Some(path.to_path_buf()),
         }
     }
@@ -147,11 +145,11 @@ impl Blob {
     pub fn read_to_string(&self) -> io::Result<String> {
         match &self.data {
             Some(BlobData::Text(s)) => Ok(s.clone()),
-            Some(BlobData::Bytes(b)) => String::from_utf8(b.clone())
-                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e)),
+            Some(BlobData::Bytes(b)) => decode_bytes(b, &self.encoding),
             None => {
                 if let Some(path) = &self.path {
-                    fs::read_to_string(path)
+                    let bytes = fs::read(path)?;
+                    decode_bytes(&bytes, &self.encoding)
                 } else {
                     Err(io::Error::new(
                         io::ErrorKind::InvalidData,
@@ -165,7 +163,7 @@ impl Blob {
     pub fn read_to_bytes(&self) -> io::Result<Vec<u8>> {
         match &self.data {
             Some(BlobData::Bytes(b)) => Ok(b.clone()),
-            Some(BlobData::Text(s)) => Ok(s.as_bytes().to_vec()),
+            Some(BlobData::Text(s)) => encode_string(s, &self.encoding),
             None => {
                 if let Some(path) = &self.path {
                     fs::read(path)
@@ -179,10 +177,10 @@ impl Blob {
         }
     }
 
-    pub fn reader(&self) -> io::Result<Box<dyn Read>> {
+    pub fn reader(&self) -> io::Result<Box<dyn Read + '_>> {
         match &self.data {
-            Some(BlobData::Bytes(b)) => Ok(Box::new(std::io::Cursor::new(b.clone()))),
-            Some(BlobData::Text(s)) => Ok(Box::new(std::io::Cursor::new(s.as_bytes().to_vec()))),
+            Some(BlobData::Bytes(b)) => Ok(Box::new(std::io::Cursor::new(b.as_slice()))),
+            Some(BlobData::Text(s)) => Ok(Box::new(std::io::Cursor::new(s.as_bytes()))),
             None => {
                 if let Some(path) = &self.path {
                     let file = fs::File::open(path)?;
@@ -210,26 +208,59 @@ impl fmt::Display for Blob {
     }
 }
 
+fn resolve_encoding(label: &str) -> io::Result<&'static encoding_rs::Encoding> {
+    encoding_rs::Encoding::for_label(label.as_bytes()).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("Unsupported encoding: {label}"),
+        )
+    })
+}
+
+fn decode_bytes(bytes: &[u8], encoding: &str) -> io::Result<String> {
+    let enc = resolve_encoding(encoding)?;
+    let (decoded, _, had_errors) = enc.decode(bytes);
+    if had_errors {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Failed to decode bytes as {encoding}"),
+        ));
+    }
+    Ok(decoded.into_owned())
+}
+
+fn encode_string(s: &str, encoding: &str) -> io::Result<Vec<u8>> {
+    let enc = resolve_encoding(encoding)?;
+    let (encoded, _, had_errors) = enc.encode(s);
+    if had_errors {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Failed to encode string as {encoding}"),
+        ));
+    }
+    Ok(encoded.into_owned())
+}
+
 fn guess_mime_type(path: &Path) -> Option<String> {
     mime_guess::from_path(path).first().map(|m| m.to_string())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Document {
-    pub page_content: String,
+    page_content: String,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
+    id: Option<String>,
 
     #[serde(default)]
-    pub metadata: HashMap<String, Value>,
+    metadata: HashMap<String, Value>,
 
     #[serde(rename = "type", default = "document_type_default")]
-    type_: String,
+    type_: Cow<'static, str>,
 }
 
-fn document_type_default() -> String {
-    "Document".to_string()
+fn document_type_default() -> Cow<'static, str> {
+    Cow::Borrowed(DOCUMENT_TYPE)
 }
 
 #[bon]
@@ -244,8 +275,28 @@ impl Document {
             page_content: page_content.into(),
             id,
             metadata,
-            type_: "Document".to_string(),
+            type_: Cow::Borrowed(DOCUMENT_TYPE),
         }
+    }
+
+    pub fn page_content(&self) -> &str {
+        &self.page_content
+    }
+
+    pub fn id(&self) -> Option<&str> {
+        self.id.as_deref()
+    }
+
+    pub fn metadata(&self) -> &HashMap<String, Value> {
+        &self.metadata
+    }
+
+    pub fn page_content_mut(&mut self) -> &mut String {
+        &mut self.page_content
+    }
+
+    pub fn metadata_mut(&mut self) -> &mut HashMap<String, Value> {
+        &mut self.metadata
     }
 
     pub fn type_name(&self) -> &str {
@@ -296,9 +347,9 @@ mod tests {
     #[test]
     fn test_document_creation() {
         let doc = Document::builder().page_content("Hello, world!").build();
-        assert_eq!(doc.page_content, "Hello, world!");
-        assert!(doc.id.is_none());
-        assert!(doc.metadata.is_empty());
+        assert_eq!(doc.page_content(), "Hello, world!");
+        assert!(doc.id().is_none());
+        assert!(doc.metadata().is_empty());
         assert_eq!(doc.type_name(), "Document");
     }
 
@@ -313,9 +364,9 @@ mod tests {
             )]))
             .build();
 
-        assert_eq!(doc.id, Some("doc-123".to_string()));
+        assert_eq!(doc.id(), Some("doc-123"));
         assert_eq!(
-            doc.metadata.get("source"),
+            doc.metadata().get("source"),
             Some(&Value::String("test.txt".to_string()))
         );
     }
@@ -373,7 +424,7 @@ mod tests {
 
     #[test]
     fn test_blob_source() {
-        let blob = Blob::from_path("/test/path.txt", None, None, None);
+        let blob = Blob::from_path("/test/path.txt");
         assert_eq!(blob.source().as_deref(), Some("/test/path.txt"));
 
         let blob_with_source = Blob::builder()
@@ -419,5 +470,32 @@ mod tests {
         let deserialized: Document = serde_json::from_str(&json).unwrap();
 
         assert_eq!(doc, deserialized);
+    }
+
+    #[test]
+    fn test_blob_bytes_roundtrip() {
+        let original_bytes = vec![0xFF, 0xFE, 0x00, 0x01];
+        let blob = Blob::builder()
+            .bytes(original_bytes.clone())
+            .mimetype("application/octet-stream")
+            .build()
+            .unwrap();
+
+        let json = serde_json::to_string(&blob).unwrap();
+        let deserialized: Blob = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(blob, deserialized);
+        assert_eq!(deserialized.read_to_bytes().unwrap(), original_bytes);
+    }
+
+    #[test]
+    fn test_blob_text_roundtrip() {
+        let blob = Blob::from_data("Hello, world!");
+
+        let json = serde_json::to_string(&blob).unwrap();
+        let deserialized: Blob = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(blob, deserialized);
+        assert_eq!(deserialized.read_to_string().unwrap(), "Hello, world!");
     }
 }
