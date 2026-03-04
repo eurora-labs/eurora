@@ -12,6 +12,7 @@ use crate::{
 #[taurpc::ipc_type]
 pub struct ResponseChunk {
     chunk: String,
+    reasoning: Option<String>,
 }
 
 #[taurpc::ipc_type]
@@ -136,13 +137,23 @@ impl ChatApi for ChatApiImpl {
                     while let Some(result) = stream.next().await {
                         match result {
                             Ok(chunk) => {
-                                if chunk.is_empty() {
+                                let content = chunk.content.to_string();
+                                let reasoning = chunk
+                                    .additional_kwargs
+                                    .get("reasoning_content")
+                                    .and_then(|v| v.as_str())
+                                    .map(String::from);
+
+                                if content.is_empty() && reasoning.is_none() {
                                     continue;
                                 }
 
-                                complete_response.push_str(&chunk);
+                                complete_response.push_str(&content);
 
-                                if let Err(e) = channel.send(ResponseChunk { chunk }) {
+                                if let Err(e) = channel.send(ResponseChunk {
+                                    chunk: content,
+                                    reasoning,
+                                }) {
                                     return Err(format!("Failed to send response chunk: {e}"));
                                 }
                             }

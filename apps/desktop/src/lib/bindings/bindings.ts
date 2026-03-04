@@ -26,7 +26,7 @@ export type ProviderSettings = { OllamaSettings: OllamaSettings } | { OpenAISett
 
 export type Query = { text: string; assets: string[] }
 
-export type ResponseChunk = { chunk: string }
+export type ResponseChunk = { chunk: string; reasoning: string | null }
 
 export type TelemetrySettings = { considered: boolean; anonymousMetrics: boolean; anonymousErrors: boolean; nonAnonymousMetrics: boolean; distinctId: string | null }
 
