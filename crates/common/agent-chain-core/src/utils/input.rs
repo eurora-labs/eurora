@@ -1,16 +1,18 @@
 use std::collections::HashMap;
 use std::io::{self, Write};
 
+use owo_colors::{AnsiColors, OwoColorize, Style};
+
 pub const AVAILABLE_COLORS: &[&str] = &["blue", "yellow", "pink", "green", "red"];
 
-fn color_code(color: &str) -> Option<&'static str> {
+fn ansi_color(color: &str) -> AnsiColors {
     match color {
-        "blue" => Some("36;1"),
-        "yellow" => Some("33;1"),
-        "pink" => Some("38;5;200"),
-        "green" => Some("32;1"),
-        "red" => Some("31;1"),
-        _ => None,
+        "blue" => AnsiColors::Cyan,
+        "yellow" => AnsiColors::Yellow,
+        "pink" => AnsiColors::BrightMagenta,
+        "green" => AnsiColors::Green,
+        "red" => AnsiColors::Red,
+        _ => AnsiColors::Default,
     }
 }
 
@@ -41,13 +43,12 @@ pub fn get_color_mapping(
 }
 
 pub fn get_colored_text(text: &str, color: &str) -> String {
-    let color_str = color_code(color).unwrap_or("0");
-
-    format!("\x1b[{}m\x1b[1;3m{}\x1b[0m", color_str, text)
+    let style = Style::new().bold().italic().color(ansi_color(color));
+    format!("{}", text.style(style))
 }
 
 pub fn get_bolded_text(text: &str) -> String {
-    format!("\x1b[1m{}\x1b[0m", text)
+    format!("{}", text.bold())
 }
 
 pub fn print_text(text: &str, color: Option<&str>, end: &str, writer: Option<&mut dyn Write>) {
@@ -128,16 +129,16 @@ mod tests {
     #[test]
     fn test_get_colored_text() {
         let colored = get_colored_text("test", "blue");
-        assert!(colored.contains("36;1"));
         assert!(colored.contains("test"));
+        assert!(colored.contains("\x1b["));
         assert!(colored.contains("\x1b[0m"));
     }
 
     #[test]
     fn test_get_bolded_text() {
         let bolded = get_bolded_text("test");
-        assert!(bolded.contains("\x1b[1m"));
         assert!(bolded.contains("test"));
+        assert!(bolded.contains("\x1b["));
         assert!(bolded.contains("\x1b[0m"));
     }
 

@@ -41,8 +41,6 @@ const EXPECTED_EXPORTS: &[&str] = &[
     "merge_dicts",
     "merge_lists",
     "merge_obj",
-    "MustacheValue",
-    "render_mustache",
     "uuid7",
     "UsageError",
     "dict_int_op",
@@ -134,11 +132,6 @@ fn test_all_imports() {
     let _ = merge_lists(None, vec![]);
     use agent_chain_core::utils::merge_obj;
     let _ = merge_obj(serde_json::json!(null), serde_json::json!(null));
-
-    use agent_chain_core::utils::MustacheValue;
-    let _: MustacheValue = MustacheValue::Null;
-    use agent_chain_core::utils::render_mustache;
-    let _ = render_mustache("", &MustacheValue::Null, None);
 
     use agent_chain_core::utils::uuid7;
     let _ = uuid7(None);
