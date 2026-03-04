@@ -12,8 +12,10 @@
 //! use agent_chain_core::providers::ChatOpenAI;
 //! use agent_chain_core::providers::openai::BuiltinTool;
 //!
-//! let model = ChatOpenAI::new("gpt-4o")
-//!     .with_responses_api(true)
+//! let model = ChatOpenAI::builder()
+//!     .model("gpt-4o")
+//!     .use_responses_api(true)
+//!     .build()
 //!     .with_builtin_tools(vec![BuiltinTool::WebSearch]);
 //!
 //! let messages = vec![HumanMessage::builder().content("What is the latest news?").build().into()];
@@ -29,7 +31,9 @@
 //! use agent_chain_core::providers::openai::BuiltinTool;
 //! use futures::StreamExt;
 //!
-//! let model = ChatOpenAI::new("gpt-4o")
+//! let model = ChatOpenAI::builder()
+//!     .model("gpt-4o")
+//!     .build()
 //!     .with_builtin_tools(vec![BuiltinTool::WebSearch]);
 //!
 //! let messages = vec![HumanMessage::builder().content("What is the latest news?").build().into()];
@@ -145,6 +149,13 @@ pub enum ContentBlock {
     Refusal { refusal: String },
 }
 
+fn default_api_base() -> String {
+    env::var("OPENAI_API_BASE")
+        .ok()
+        .or_else(|| env::var("OPENAI_BASE_URL").ok())
+        .unwrap_or_else(|| DEFAULT_API_BASE.to_string())
+}
+
 /// Returns true if the model name indicates an o-series reasoning model.
 fn is_o_series_model(model: &str) -> bool {
     let lower = model.to_lowercase();
@@ -187,12 +198,14 @@ fn payload_requires_responses_api(payload: &serde_json::Value) -> bool {
 ///
 /// Implements the `BaseChatModel` trait for OpenAI's GPT models.
 /// Supports both the Chat Completions API and the Responses API.
-#[derive(Clone)]
+#[derive(Clone, bon::Builder)]
+#[builder(on(String, into))]
 pub struct ChatOpenAI {
     model: String,
     temperature: Option<f64>,
     max_tokens: Option<u32>,
     api_key: Option<String>,
+    #[builder(default = default_api_base())]
     api_base: String,
     organization: Option<String>,
     top_p: Option<f64>,
@@ -200,8 +213,11 @@ pub struct ChatOpenAI {
     presence_penalty: Option<f64>,
     stop: Option<Vec<String>>,
     timeout: Option<u64>,
+    #[builder(default = 2)]
     max_retries: u32,
+    #[builder(default)]
     model_kwargs: HashMap<String, serde_json::Value>,
+    #[builder(default)]
     streaming: bool,
     seed: Option<i32>,
     logprobs: Option<bool>,
@@ -217,32 +233,37 @@ pub struct ChatOpenAI {
     store: Option<bool>,
     truncation: Option<String>,
     use_responses_api: Option<bool>,
+    #[builder(default)]
     use_previous_response_id: bool,
     previous_response_id: Option<String>,
     output_version: Option<String>,
+    #[builder(default)]
     builtin_tools: Vec<BuiltinTool>,
     disabled_params: Option<HashMap<String, Option<serde_json::Value>>>,
     extra_body: Option<HashMap<String, serde_json::Value>>,
-    chat_model_config: ChatModelConfig,
-    language_model_config: LanguageModelConfig,
-    /// Tools bound to this model via `bind_tools()`.
-    bound_tools: Vec<ToolDefinition>,
-    bound_builtin_tools: Vec<serde_json::Value>,
-    /// Tool choice for bound tools.
-    bound_tool_choice: Option<ToolChoice>,
-    /// Whether bound tools should be called with strict schema validation.
-    bound_strict: Option<bool>,
-    /// Whether to allow parallel tool calls.
-    bound_parallel_tool_calls: Option<bool>,
-    /// Response format for structured output (e.g., JSON schema).
-    response_format: Option<serde_json::Value>,
-    /// Whether to include response headers in response_metadata.
+    #[builder(default)]
     include_response_headers: bool,
-    /// Proxy URL for HTTP requests.
     proxy: Option<String>,
-    /// Prediction content for predicted output tokens.
     prediction: Option<serde_json::Value>,
-    /// Callable API key getter function.
+    #[cfg(feature = "tiktoken")]
+    tiktoken_model_name: Option<String>,
+    #[builder(skip)]
+    chat_model_config: ChatModelConfig,
+    #[builder(skip)]
+    language_model_config: LanguageModelConfig,
+    #[builder(skip)]
+    bound_tools: Vec<ToolDefinition>,
+    #[builder(skip)]
+    bound_builtin_tools: Vec<serde_json::Value>,
+    #[builder(skip)]
+    bound_tool_choice: Option<ToolChoice>,
+    #[builder(skip)]
+    bound_strict: Option<bool>,
+    #[builder(skip)]
+    bound_parallel_tool_calls: Option<bool>,
+    #[builder(skip)]
+    response_format: Option<serde_json::Value>,
+    #[builder(skip)]
     api_key_fn: Option<std::sync::Arc<dyn Fn() -> String + Send + Sync>>,
 }
 
@@ -438,226 +459,246 @@ fn convert_to_openai_data_block(block: &serde_json::Value, api: &str) -> serde_j
     }
 }
 
-impl ChatOpenAI {
-    /// Create a new ChatOpenAI instance.
-    pub fn new(model: impl Into<String>) -> Self {
-        let model_name = model.into();
-        let model_lower = model_name.to_lowercase();
+/// Convert Chat Completions content blocks to Responses API format.
+fn convert_cc_block_to_responses(block: &serde_json::Value) -> serde_json::Value {
+    match block.get("type").and_then(|t| t.as_str()) {
+        Some("text") => serde_json::json!({"type": "input_text", "text": block["text"]}),
+        Some("image_url") => {
+            let mut new_block = serde_json::json!({
+                "type": "input_image",
+                "image_url": block["image_url"]["url"]
+            });
+            if let Some(detail) = block["image_url"].get("detail") {
+                new_block["detail"] = detail.clone();
+            }
+            new_block
+        }
+        Some("file") => {
+            let mut new_block = serde_json::json!({"type": "input_file"});
+            if let Some(file) = block.get("file").and_then(|f| f.as_object()) {
+                for (k, v) in file {
+                    new_block[k] = v.clone();
+                }
+            }
+            new_block
+        }
+        _ => block.clone(),
+    }
+}
 
-        let temperature = if model_lower.starts_with("o1") {
+/// Remove `index` and `summary[*].index` keys from a block.
+fn pop_index_and_sub_index(block: &serde_json::Value) -> serde_json::Value {
+    let mut new_block = block.clone();
+    if let Some(obj) = new_block.as_object_mut() {
+        obj.remove("index");
+        if let Some(summary) = obj.get_mut("summary").and_then(|s| s.as_array_mut()) {
+            for sub_block in summary {
+                if let Some(sub_obj) = sub_block.as_object_mut() {
+                    sub_obj.remove("index");
+                }
+            }
+        }
+    }
+    new_block
+}
+
+/// Ensure tool message content is valid for the Responses API.
+fn ensure_valid_tool_message_content(content: &MessageContent) -> serde_json::Value {
+    match content {
+        MessageContent::Text(text) => serde_json::json!(text),
+        MessageContent::Parts(parts) => {
+            let blocks: Vec<serde_json::Value> = parts
+                .iter()
+                .filter_map(|part| match part {
+                    ContentPart::Text { text } => {
+                        Some(serde_json::json!({"type": "input_text", "text": text}))
+                    }
+                    ContentPart::Image { .. } => Some(convert_cc_block_to_responses(
+                        &serde_json::to_value(part).unwrap_or_default(),
+                    )),
+                    ContentPart::Other(value) => {
+                        let block_type = value.get("type").and_then(|t| t.as_str());
+                        match block_type {
+                            Some("input_text" | "input_image" | "input_file") => {
+                                Some(value.clone())
+                            }
+                            Some("text" | "image_url" | "file") => {
+                                Some(convert_cc_block_to_responses(value))
+                            }
+                            _ => None,
+                        }
+                    }
+                })
+                .collect();
+            if blocks.is_empty() {
+                serde_json::json!(content.as_text())
+            } else {
+                serde_json::Value::Array(blocks)
+            }
+        }
+    }
+}
+
+/// Create a computer_call_output from a ToolMessage.
+fn make_computer_call_output(m: &crate::messages::ToolMessage) -> Option<serde_json::Value> {
+    if m.additional_kwargs.get("type").and_then(|v| v.as_str()) != Some("computer_call_output") {
+        return None;
+    }
+    let mut output = None;
+    match &m.content {
+        MessageContent::Parts(parts) => {
+            for part in parts {
+                if let ContentPart::Other(block) = part {
+                    let block_type = block.get("type").and_then(|t| t.as_str());
+                    if block_type == Some("input_image") {
+                        output = Some(serde_json::json!({
+                            "call_id": m.tool_call_id,
+                            "type": "computer_call_output",
+                            "output": block
+                        }));
+                        break;
+                    }
+                    if block_type == Some("non_standard")
+                        && let Some(value) = block.get("value")
+                        && value.get("type").and_then(|t| t.as_str())
+                            == Some("computer_call_output")
+                    {
+                        output = Some(value.clone());
+                        break;
+                    }
+                }
+            }
+        }
+        MessageContent::Text(text) => {
+            output = Some(serde_json::json!({
+                "call_id": m.tool_call_id,
+                "type": "computer_call_output",
+                "output": {"type": "input_image", "image_url": text}
+            }));
+        }
+    }
+    if let Some(ref mut out) = output
+        && let Some(acks) = m.additional_kwargs.get("acknowledged_safety_checks")
+    {
+        out["acknowledged_safety_checks"] = acks.clone();
+    }
+    output
+}
+
+/// Create a custom_tool_call_output from a ToolMessage.
+fn make_custom_tool_output(m: &crate::messages::ToolMessage) -> Option<serde_json::Value> {
+    if let MessageContent::Parts(parts) = &m.content {
+        for part in parts {
+            if let ContentPart::Other(block) = part {
+                let block_type = block.get("type").and_then(|t| t.as_str());
+                if block_type == Some("custom_tool_call_output") {
+                    return Some(serde_json::json!({
+                        "type": "custom_tool_call_output",
+                        "call_id": m.tool_call_id,
+                        "output": block.get("output").cloned().unwrap_or(serde_json::json!(""))
+                    }));
+                }
+                if block_type == Some("non_standard")
+                    && let Some(value) = block.get("value")
+                    && value.get("type").and_then(|t| t.as_str()) == Some("custom_tool_call_output")
+                {
+                    return Some(value.clone());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Rename `index` -> `file_index` for file_citation annotations.
+fn format_annotation_to_lc(annotation: &serde_json::Value) -> serde_json::Value {
+    if annotation.get("type").and_then(|t| t.as_str()) == Some("file_citation")
+        && annotation.get("index").is_some()
+    {
+        let mut new = annotation.clone();
+        if let Some(obj) = new.as_object_mut()
+            && let Some(idx) = obj.remove("index")
+        {
+            obj.insert("file_index".to_string(), idx);
+        }
+        new
+    } else {
+        annotation.clone()
+    }
+}
+
+/// Rename `file_index` -> `index` for file_citation annotations.
+fn format_annotation_from_lc(annotation: &serde_json::Value) -> serde_json::Value {
+    if annotation.get("type").and_then(|t| t.as_str()) == Some("file_citation")
+        && annotation.get("file_index").is_some()
+    {
+        let mut new = annotation.clone();
+        if let Some(obj) = new.as_object_mut()
+            && let Some(idx) = obj.remove("file_index")
+        {
+            obj.insert("index".to_string(), idx);
+        }
+        new
+    } else {
+        annotation.clone()
+    }
+}
+
+/// Get messages after the last AIMessage with a response ID.
+fn get_last_messages(messages: &[BaseMessage]) -> (&[BaseMessage], Option<String>) {
+    for i in (0..messages.len()).rev() {
+        if let BaseMessage::AI(ai_msg) = &messages[i]
+            && let Some(id) = ai_msg.response_metadata.get("id").and_then(|v| v.as_str())
+            && id.starts_with("resp_")
+        {
+            return (&messages[i + 1..], Some(id.to_string()));
+        }
+    }
+    (messages, None)
+}
+
+/// Error raised when OpenAI Structured Outputs API returns a refusal.
+#[derive(Debug, Clone)]
+pub struct OpenAIRefusalError {
+    pub refusal: String,
+}
+
+impl std::fmt::Display for OpenAIRefusalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OpenAI refusal: {}", self.refusal)
+    }
+}
+
+impl std::error::Error for OpenAIRefusalError {}
+
+impl ChatOpenAI {
+    /// Create a new ChatOpenAI instance with environment-aware defaults.
+    pub fn new(model: impl Into<String>) -> Self {
+        let model_name: String = model.into();
+        let temperature = if is_o_series_model(&model_name) {
             Some(1.0)
         } else {
             None
         };
-
         let organization = env::var("OPENAI_ORG_ID")
             .ok()
             .or_else(|| env::var("OPENAI_ORGANIZATION").ok());
-
-        let api_base = env::var("OPENAI_API_BASE")
-            .ok()
-            .or_else(|| env::var("OPENAI_BASE_URL").ok())
-            .unwrap_or_else(|| DEFAULT_API_BASE.to_string());
-
+        let api_base = default_api_base();
         let stream_usage = if api_base == DEFAULT_API_BASE {
             Some(true)
         } else {
             None
         };
+        let output_version = env::var("LC_OUTPUT_VERSION").ok();
 
-        Self {
-            model: model_name,
-            temperature,
-            max_tokens: None,
-            api_key: None,
-            api_base,
-            organization,
-            top_p: None,
-            frequency_penalty: None,
-            presence_penalty: None,
-            stop: None,
-            timeout: None,
-            max_retries: 2,
-            model_kwargs: HashMap::new(),
-            streaming: false,
-            seed: None,
-            logprobs: None,
-            top_logprobs: None,
-            logit_bias: None,
-            n: None,
-            reasoning_effort: None,
-            reasoning: None,
-            verbosity: None,
-            stream_usage,
-            include: None,
-            service_tier: None,
-            store: None,
-            truncation: None,
-            use_responses_api: None,
-            use_previous_response_id: false,
-            previous_response_id: None,
-            output_version: env::var("LC_OUTPUT_VERSION").ok(),
-            builtin_tools: Vec::new(),
-            disabled_params: None,
-            extra_body: None,
-            chat_model_config: ChatModelConfig::builder().build(),
-            language_model_config: LanguageModelConfig::builder().build(),
-            bound_tools: Vec::new(),
-            bound_builtin_tools: Vec::new(),
-            bound_tool_choice: None,
-            bound_strict: None,
-            bound_parallel_tool_calls: None,
-            response_format: None,
-            include_response_headers: false,
-            proxy: None,
-            prediction: None,
-            api_key_fn: None,
-        }
-    }
-
-    pub fn temperature(mut self, temp: f64) -> Self {
-        self.temperature = Some(temp);
-        self
-    }
-
-    pub fn max_tokens(mut self, max: u32) -> Self {
-        self.max_tokens = Some(max);
-        self
-    }
-
-    pub fn api_key(mut self, key: impl Into<String>) -> Self {
-        self.api_key = Some(key.into());
-        self
-    }
-
-    pub fn api_base(mut self, base: impl Into<String>) -> Self {
-        self.api_base = base.into();
-        self
-    }
-
-    pub fn organization(mut self, org: impl Into<String>) -> Self {
-        self.organization = Some(org.into());
-        self
-    }
-
-    pub fn top_p(mut self, p: f64) -> Self {
-        self.top_p = Some(p);
-        self
-    }
-
-    pub fn frequency_penalty(mut self, penalty: f64) -> Self {
-        self.frequency_penalty = Some(penalty);
-        self
-    }
-
-    pub fn presence_penalty(mut self, penalty: f64) -> Self {
-        self.presence_penalty = Some(penalty);
-        self
-    }
-
-    pub fn stop(mut self, sequences: Vec<String>) -> Self {
-        self.stop = Some(sequences);
-        self
-    }
-
-    pub fn timeout(mut self, seconds: u64) -> Self {
-        self.timeout = Some(seconds);
-        self
-    }
-
-    pub fn max_retries(mut self, retries: u32) -> Self {
-        self.max_retries = retries;
-        self
-    }
-
-    pub fn streaming(mut self, enabled: bool) -> Self {
-        self.streaming = enabled;
-        self
-    }
-
-    pub fn seed(mut self, seed: i32) -> Self {
-        self.seed = Some(seed);
-        self
-    }
-
-    pub fn logprobs(mut self, enabled: bool) -> Self {
-        self.logprobs = Some(enabled);
-        self
-    }
-
-    pub fn top_logprobs(mut self, count: u32) -> Self {
-        self.top_logprobs = Some(count);
-        self
-    }
-
-    pub fn logit_bias(mut self, bias: HashMap<i32, i32>) -> Self {
-        self.logit_bias = Some(bias);
-        self
-    }
-
-    pub fn n(mut self, count: u32) -> Self {
-        self.n = Some(count);
-        self
-    }
-
-    pub fn reasoning_effort(mut self, effort: impl Into<String>) -> Self {
-        self.reasoning_effort = Some(effort.into());
-        self
-    }
-
-    pub fn reasoning(mut self, params: HashMap<String, serde_json::Value>) -> Self {
-        self.reasoning = Some(params);
-        self
-    }
-
-    pub fn verbosity(mut self, level: impl Into<String>) -> Self {
-        self.verbosity = Some(level.into());
-        self
-    }
-
-    pub fn stream_usage(mut self, enabled: bool) -> Self {
-        self.stream_usage = Some(enabled);
-        self
-    }
-
-    pub fn include(mut self, fields: Vec<String>) -> Self {
-        self.include = Some(fields);
-        self
-    }
-
-    pub fn service_tier(mut self, tier: impl Into<String>) -> Self {
-        self.service_tier = Some(tier.into());
-        self
-    }
-
-    pub fn store(mut self, enabled: bool) -> Self {
-        self.store = Some(enabled);
-        self
-    }
-
-    pub fn truncation(mut self, strategy: impl Into<String>) -> Self {
-        self.truncation = Some(strategy.into());
-        self
-    }
-
-    pub fn use_previous_response_id(mut self, enabled: bool) -> Self {
-        self.use_previous_response_id = enabled;
-        self
-    }
-
-    pub fn previous_response_id(mut self, id: impl Into<String>) -> Self {
-        self.previous_response_id = Some(id.into());
-        self
-    }
-
-    pub fn output_version(mut self, version: impl Into<String>) -> Self {
-        self.output_version = Some(version.into());
-        self
-    }
-
-    pub fn with_responses_api(mut self, enabled: bool) -> Self {
-        self.use_responses_api = Some(enabled);
-        self
+        ChatOpenAI::builder()
+            .model(model_name)
+            .maybe_temperature(temperature)
+            .maybe_organization(organization)
+            .api_base(api_base)
+            .maybe_stream_usage(stream_usage)
+            .maybe_output_version(output_version)
+            .build()
     }
 
     pub fn with_builtin_tools(mut self, tools: Vec<BuiltinTool>) -> Self {
@@ -668,38 +709,8 @@ impl ChatOpenAI {
         self
     }
 
-    pub fn disabled_params(mut self, params: HashMap<String, Option<serde_json::Value>>) -> Self {
-        self.disabled_params = Some(params);
-        self
-    }
-
-    pub fn extra_body(mut self, body: HashMap<String, serde_json::Value>) -> Self {
-        self.extra_body = Some(body);
-        self
-    }
-
-    pub fn model_kwargs(mut self, kwargs: HashMap<String, serde_json::Value>) -> Self {
-        self.model_kwargs = kwargs;
-        self
-    }
-
     pub fn response_format(mut self, format: serde_json::Value) -> Self {
         self.response_format = Some(convert_to_openai_response_format(format, None));
-        self
-    }
-
-    pub fn include_response_headers(mut self, enabled: bool) -> Self {
-        self.include_response_headers = enabled;
-        self
-    }
-
-    pub fn openai_proxy(mut self, proxy_url: impl Into<String>) -> Self {
-        self.proxy = Some(proxy_url.into());
-        self
-    }
-
-    pub fn prediction(mut self, prediction: serde_json::Value) -> Self {
-        self.prediction = Some(prediction);
         self
     }
 
@@ -1017,6 +1028,31 @@ impl ChatOpenAI {
                     message["name"] = serde_json::json!(name);
                 }
 
+                let mut audio: Option<serde_json::Value> = None;
+                if let MessageContent::Parts(parts) = &m.content {
+                    for part in parts {
+                        if let ContentPart::Other(block) = part
+                            && block.get("type").and_then(|t| t.as_str()) == Some("audio")
+                            && let Some(id) = block.get("id")
+                        {
+                            audio = Some(serde_json::json!({"id": id}));
+                            break;
+                        }
+                    }
+                }
+                if audio.is_none()
+                    && let Some(raw_audio) = m.additional_kwargs.get("audio")
+                {
+                    audio = Some(if raw_audio.get("id").is_some() {
+                        serde_json::json!({"id": raw_audio["id"]})
+                    } else {
+                        raw_audio.clone()
+                    });
+                }
+                if let Some(audio_val) = audio {
+                    message["audio"] = audio_val;
+                }
+
                 Some(message)
             }
             BaseMessage::Tool(m) => {
@@ -1085,6 +1121,8 @@ impl ChatOpenAI {
         &self,
         messages: &[BaseMessage],
     ) -> Vec<serde_json::Value> {
+        use std::collections::HashSet;
+
         let mut input = Vec::new();
 
         for msg in messages {
@@ -1104,11 +1142,13 @@ impl ChatOpenAI {
                     let content = match &m.content {
                         MessageContent::Text(text) => serde_json::json!(text),
                         MessageContent::Parts(parts) => {
-                            let content_parts: Vec<serde_json::Value> = parts
-                                .iter()
-                                .map(|part| match part {
+                            let mut new_blocks = Vec::new();
+                            for part in parts {
+                                match part {
                                     ContentPart::Text { text } => {
-                                        serde_json::json!({"type": "input_text", "text": text})
+                                        new_blocks.push(
+                                            serde_json::json!({"type": "input_text", "text": text}),
+                                        );
                                     }
                                     ContentPart::Image { source, detail } => {
                                         let url = match source {
@@ -1129,44 +1169,187 @@ impl ChatOpenAI {
                                                 ImageDetail::Auto => "auto",
                                             });
                                         }
-                                        block
+                                        new_blocks.push(block);
                                     }
-                                    ContentPart::Other(value) => value.clone(),
-                                })
-                                .collect();
-                            let raw = serde_json::Value::Array(content_parts);
+                                    ContentPart::Other(value) => {
+                                        let block_type = value.get("type").and_then(|t| t.as_str());
+                                        match block_type {
+                                            Some("text") | Some("image_url") | Some("file") => {
+                                                new_blocks
+                                                    .push(convert_cc_block_to_responses(value));
+                                            }
+                                            Some("input_text" | "input_image" | "input_file") => {
+                                                new_blocks.push(value.clone());
+                                            }
+                                            Some("mcp_approval_response") => {
+                                                input.push(value.clone());
+                                            }
+                                            _ => {
+                                                new_blocks.push(value.clone());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            let raw = serde_json::Value::Array(new_blocks);
                             Self::format_message_content(&raw, "responses", Some("human"))
                         }
                     };
-                    input.push(serde_json::json!({"role": "user", "content": content}));
+                    if !content.as_array().map(|a| a.is_empty()).unwrap_or(false) {
+                        input.push(serde_json::json!({"role": "user", "content": content}));
+                    }
                 }
                 BaseMessage::AI(m) => {
-                    if !m.content.is_empty() || m.tool_calls.is_empty() {
-                        input.push(serde_json::json!({
-                            "type": "message",
-                            "role": "assistant",
-                            "content": [{
-                                "type": "output_text",
-                                "text": m.content.as_text(),
-                                "annotations": []
-                            }]
-                        }));
-                    }
+                    let has_structured_blocks = if let MessageContent::Parts(parts) = &m.content {
+                        parts.iter().any(|p| {
+                            if let ContentPart::Other(block) = p {
+                                matches!(
+                                    block.get("type").and_then(|t| t.as_str()),
+                                    Some(
+                                        "output_text"
+                                            | "refusal"
+                                            | "reasoning"
+                                            | "function_call"
+                                            | "web_search_call"
+                                            | "file_search_call"
+                                            | "computer_call"
+                                            | "custom_tool_call"
+                                            | "code_interpreter_call"
+                                            | "mcp_call"
+                                            | "mcp_list_tools"
+                                            | "mcp_approval_request"
+                                            | "image_generation_call"
+                                    )
+                                )
+                            } else {
+                                false
+                            }
+                        })
+                    } else {
+                        false
+                    };
 
-                    for tc in &m.tool_calls {
-                        input.push(serde_json::json!({
-                            "type": "function_call",
-                            "name": tc.name,
-                            "arguments": tc.args.to_string(),
-                            "call_id": tc.id
-                        }));
+                    if has_structured_blocks {
+                        if let MessageContent::Parts(parts) = &m.content {
+                            let mut msg_content_blocks: Vec<serde_json::Value> = Vec::new();
+                            let mut content_call_ids: HashSet<String> = HashSet::new();
+
+                            for part in parts {
+                                if let ContentPart::Other(block) = part {
+                                    let block_type = block.get("type").and_then(|t| t.as_str());
+                                    match block_type {
+                                        Some("output_text" | "text" | "refusal") => {
+                                            let mut b = block.clone();
+                                            if let Some("text") = block_type
+                                                && let Some(obj) = b.as_object_mut()
+                                            {
+                                                obj.insert(
+                                                    "type".to_string(),
+                                                    serde_json::json!("output_text"),
+                                                );
+                                            }
+                                            if let Some(anns) =
+                                                b.get("annotations").and_then(|a| a.as_array())
+                                            {
+                                                let converted: Vec<serde_json::Value> = anns
+                                                    .iter()
+                                                    .map(format_annotation_from_lc)
+                                                    .collect();
+                                                b["annotations"] =
+                                                    serde_json::Value::Array(converted);
+                                            }
+                                            msg_content_blocks.push(b);
+                                        }
+                                        Some(
+                                            "reasoning"
+                                            | "web_search_call"
+                                            | "file_search_call"
+                                            | "computer_call"
+                                            | "custom_tool_call"
+                                            | "code_interpreter_call"
+                                            | "mcp_call"
+                                            | "mcp_list_tools"
+                                            | "mcp_approval_request",
+                                        ) => {
+                                            input.push(pop_index_and_sub_index(block));
+                                        }
+                                        Some("function_call") => {
+                                            if let Some(call_id) =
+                                                block.get("call_id").and_then(|v| v.as_str())
+                                            {
+                                                content_call_ids.insert(call_id.to_string());
+                                            }
+                                            input.push(pop_index_and_sub_index(block));
+                                        }
+                                        Some("image_generation_call") => {
+                                            input.push(serde_json::json!({
+                                                "type": "image_generation_call",
+                                                "id": block["id"]
+                                            }));
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            if !msg_content_blocks.is_empty() {
+                                input.push(serde_json::json!({
+                                    "type": "message",
+                                    "role": "assistant",
+                                    "content": msg_content_blocks
+                                }));
+                            }
+                            for tc in &m.tool_calls {
+                                let tc_id = tc.id.as_deref().unwrap_or("");
+                                if !content_call_ids.contains(tc_id) {
+                                    input.push(serde_json::json!({
+                                        "type": "function_call",
+                                        "name": tc.name,
+                                        "arguments": tc.args.to_string(),
+                                        "call_id": tc.id
+                                    }));
+                                }
+                            }
+                        }
+                    } else {
+                        if !m.content.is_empty() || m.tool_calls.is_empty() {
+                            input.push(serde_json::json!({
+                                "type": "message",
+                                "role": "assistant",
+                                "content": [{
+                                    "type": "output_text",
+                                    "text": m.content.as_text(),
+                                    "annotations": []
+                                }]
+                            }));
+                        }
+
+                        for tc in &m.tool_calls {
+                            input.push(serde_json::json!({
+                                "type": "function_call",
+                                "name": tc.name,
+                                "arguments": tc.args.to_string(),
+                                "call_id": tc.id
+                            }));
+                        }
                     }
                 }
                 BaseMessage::Tool(m) => {
+                    if m.additional_kwargs.get("type").and_then(|v| v.as_str())
+                        == Some("computer_call_output")
+                        && let Some(output) = make_computer_call_output(m)
+                    {
+                        input.push(output);
+                        continue;
+                    }
+                    if let Some(output) = make_custom_tool_output(m) {
+                        input.push(output);
+                        continue;
+                    }
+                    let tool_output = ensure_valid_tool_message_content(&m.content);
                     input.push(serde_json::json!({
                         "type": "function_call_output",
                         "call_id": m.tool_call_id,
-                        "output": m.content
+                        "output": tool_output
                     }));
                 }
                 BaseMessage::Remove(_) => continue,
@@ -1326,7 +1509,18 @@ impl ChatOpenAI {
         tools: Option<&[serde_json::Value]>,
         stream: bool,
     ) -> serde_json::Value {
-        let input = self.format_messages_for_responses_api(messages);
+        let (effective_messages, prev_resp_id) = if self.use_previous_response_id {
+            let (last_msgs, prev_id) = get_last_messages(messages);
+            if prev_id.is_some() {
+                (last_msgs, prev_id)
+            } else {
+                (messages, None)
+            }
+        } else {
+            (messages, None)
+        };
+
+        let input = self.format_messages_for_responses_api(effective_messages);
 
         let mut payload = serde_json::json!({
             "model": self.model,
@@ -1418,6 +1612,8 @@ impl ChatOpenAI {
         }
 
         if let Some(ref prev_id) = self.previous_response_id {
+            payload["previous_response_id"] = serde_json::json!(prev_id);
+        } else if let Some(ref prev_id) = prev_resp_id {
             payload["previous_response_id"] = serde_json::json!(prev_id);
         }
 
@@ -1792,13 +1988,25 @@ impl ChatOpenAI {
         let mut invalid_tool_calls = Vec::new();
         let mut tool_outputs: Vec<serde_json::Value> = Vec::new();
         let mut reasoning_content: Option<serde_json::Value> = None;
+        let mut all_annotations: Vec<serde_json::Value> = Vec::new();
 
         for output in &response.output {
             match output {
                 ResponsesOutput::Message { content, .. } => {
                     for block in content {
-                        if let ResponsesContent::OutputText { text, .. } = block {
+                        if let ResponsesContent::OutputText { text, annotations } = block {
                             text_content.push_str(text);
+                            if !annotations.is_empty() {
+                                let lc_annotations: Vec<serde_json::Value> = annotations
+                                    .iter()
+                                    .map(|a| {
+                                        format_annotation_to_lc(
+                                            &serde_json::to_value(a).unwrap_or_default(),
+                                        )
+                                    })
+                                    .collect();
+                                all_annotations.extend(lc_annotations);
+                            }
                         }
                     }
                 }
@@ -1868,6 +2076,12 @@ impl ChatOpenAI {
             additional_kwargs.insert(
                 "tool_outputs".to_string(),
                 serde_json::Value::Array(tool_outputs),
+            );
+        }
+        if !all_annotations.is_empty() {
+            additional_kwargs.insert(
+                "annotations".to_string(),
+                serde_json::Value::Array(all_annotations),
             );
         }
 
@@ -2397,6 +2611,108 @@ impl ChatOpenAI {
     }
 }
 
+#[cfg(feature = "tiktoken")]
+impl ChatOpenAI {
+    fn get_encoding_model(&self) -> Result<(String, tiktoken_rs::CoreBPE)> {
+        let model = self.tiktoken_model_name.as_deref().unwrap_or(&self.model);
+        match tiktoken_rs::get_bpe_from_model(model) {
+            Ok(encoding) => Ok((model.to_string(), encoding)),
+            Err(_) => {
+                let model_lower = model.to_lowercase();
+                let tokenizer = if model_lower.starts_with("gpt-4o")
+                    || model_lower.starts_with("gpt-4.1")
+                    || model_lower.starts_with("gpt-5")
+                {
+                    tiktoken_rs::tokenizer::Tokenizer::O200kBase
+                } else {
+                    tiktoken_rs::tokenizer::Tokenizer::Cl100kBase
+                };
+                let encoding = tiktoken_rs::get_bpe_from_tokenizer(tokenizer)
+                    .map_err(|e| Error::other(format!("Failed to get tiktoken encoding: {e}")))?;
+                Ok((model.to_string(), encoding))
+            }
+        }
+    }
+
+    pub fn get_token_ids(&self, text: &str) -> Result<Vec<u32>> {
+        let (_, encoding) = self.get_encoding_model()?;
+        Ok(encoding.encode_ordinary(text))
+    }
+
+    pub fn get_num_tokens_from_messages(&self, messages: &[BaseMessage]) -> Result<usize> {
+        let (model, encoding) = self.get_encoding_model()?;
+
+        let (tokens_per_message, tokens_per_name) = if model.starts_with("gpt-3.5-turbo-0301") {
+            (4usize, -1i32)
+        } else if model.starts_with("gpt-3.5-turbo")
+            || model.starts_with("gpt-4")
+            || model.starts_with("gpt-5")
+        {
+            (3, 1)
+        } else {
+            return Err(Error::NotImplemented(format!(
+                "get_num_tokens_from_messages() is not implemented for model {model}"
+            )));
+        };
+
+        let messages_dict = self.format_messages(messages);
+        let mut num_tokens: usize = 0;
+
+        for message in &messages_dict {
+            num_tokens += tokens_per_message;
+            if let Some(obj) = message.as_object() {
+                for (key, value) in obj {
+                    if key == "tool_call_id" {
+                        num_tokens += 3;
+                        continue;
+                    }
+                    if let Some(arr) = value.as_array() {
+                        for val in arr {
+                            if let Some(text) = val.as_str() {
+                                num_tokens += encoding.encode_ordinary(text).len();
+                            } else if val.get("type").and_then(|t| t.as_str()) == Some("text") {
+                                if let Some(text) = val.get("text").and_then(|t| t.as_str()) {
+                                    num_tokens += encoding.encode_ordinary(text).len();
+                                }
+                            } else if val.get("type").and_then(|t| t.as_str()) == Some("image_url")
+                            {
+                                let detail = val
+                                    .get("image_url")
+                                    .and_then(|iu| iu.get("detail"))
+                                    .and_then(|d| d.as_str());
+                                if detail == Some("low") {
+                                    num_tokens += 85;
+                                }
+                            } else if val.get("type").and_then(|t| t.as_str()) == Some("function")
+                                && let Some(func) = val.get("function")
+                            {
+                                if let Some(args) = func.get("arguments").and_then(|a| a.as_str()) {
+                                    num_tokens += encoding.encode_ordinary(args).len();
+                                }
+                                if let Some(name) = func.get("name").and_then(|n| n.as_str()) {
+                                    num_tokens += encoding.encode_ordinary(name).len();
+                                }
+                            }
+                        }
+                    } else if let Some(text) = value.as_str() {
+                        num_tokens += encoding.encode_ordinary(text).len();
+                    } else if value.is_null() || (value.is_string() && value.as_str() == Some("")) {
+                        continue;
+                    } else {
+                        let text = value.to_string();
+                        num_tokens += encoding.encode_ordinary(&text).len();
+                    }
+                    if key == "name" {
+                        num_tokens = (num_tokens as i32 + tokens_per_name) as usize;
+                    }
+                }
+            }
+        }
+        num_tokens += 3;
+        Ok(num_tokens)
+    }
+}
+
 #[async_trait]
 impl BaseLanguageModel for ChatOpenAI {
     fn llm_type(&self) -> &str {
@@ -2810,7 +3126,7 @@ impl ChatOpenAI {
 
     /// Enhanced structured output with method, strict, and tools parameters.
     ///
-    /// `method`: "function_calling" (default) or "json_schema"
+    /// `method`: "function_calling" (default), "json_schema", or "json_mode"
     /// `strict`: Whether to enforce strict schema validation
     /// `tools`: Additional tools to combine with structured output
     pub fn with_structured_output_options(
@@ -2866,6 +3182,48 @@ impl ChatOpenAI {
                     model.bound_strict = strict;
                 }
 
+                let parse_structured_output = crate::runnables::base::RunnableLambda::builder()
+                    .func(
+                        |ai_msg: AIMessage| -> crate::error::Result<serde_json::Value> {
+                            if let Some(parsed) = ai_msg.additional_kwargs.get("parsed")
+                                && !parsed.is_null()
+                            {
+                                return Ok(parsed.clone());
+                            }
+                            if let Some(refusal) = ai_msg.additional_kwargs.get("refusal")
+                                && let Some(s) = refusal.as_str()
+                                && !s.is_empty()
+                            {
+                                return Err(crate::error::Error::other(format!(
+                                    "OpenAI refusal: {s}"
+                                )));
+                            }
+                            let content = ai_msg.text();
+                            if content.is_empty() && !ai_msg.tool_calls.is_empty() {
+                                return Ok(serde_json::Value::Null);
+                            }
+                            serde_json::from_str(&content).map_err(|e| {
+                                crate::error::Error::other(format!("JSON parse error: {e}"))
+                            })
+                        },
+                    )
+                    .build();
+
+                let model_runnable = ChatModelRunnable::new(std::sync::Arc::from(
+                    Box::new(model) as Box<dyn BaseChatModel>
+                ));
+                let chain = crate::runnables::base::pipe(model_runnable, parse_structured_output);
+                Ok(Box::new(chain))
+            }
+            "json_mode" => {
+                if strict.is_some() {
+                    return Err(Error::InvalidConfig(
+                        "Argument `strict` is not supported with method='json_mode'".into(),
+                    ));
+                }
+                let mut model = self.clone();
+                model.response_format = Some(serde_json::json!({"type": "json_object"}));
+
                 let parse_json_content = crate::runnables::base::RunnableLambda::builder()
                     .func(
                         |ai_msg: AIMessage| -> crate::error::Result<serde_json::Value> {
@@ -2883,11 +3241,7 @@ impl ChatOpenAI {
                 let chain = crate::runnables::base::pipe(model_runnable, parse_json_content);
                 Ok(Box::new(chain))
             }
-            _ => {
-                // function_calling method: bind only the schema as a tool,
-                // with tool_choice set to the tool name and parallel_tool_calls
-                // disabled. Matches Python's function_calling branch where
-                // extra `tools` are not used.
+            "function_calling" => {
                 let tool_name = extract_tool_name_from_schema(&schema)?;
                 let tool_like = ToolLike::Schema(schema);
                 let bound_model = self.bind_tools_with_options(
@@ -2916,6 +3270,10 @@ impl ChatOpenAI {
                     Ok(Box::new(chain))
                 }
             }
+            _ => Err(Error::InvalidConfig(format!(
+                "Unrecognized method argument. Expected 'function_calling', 'json_schema', \
+                 or 'json_mode'. Received: '{method}'"
+            ))),
         }
     }
 
@@ -3210,10 +3568,10 @@ enum ResponsesContent {
     OutputText {
         text: String,
         #[serde(default)]
-        _annotations: Vec<TextAnnotation>,
+        annotations: Vec<TextAnnotation>,
     },
     #[serde(rename = "refusal")]
-    Refusal { _refusal: String },
+    Refusal { refusal: String },
     #[serde(other)]
     Other,
 }
@@ -3271,12 +3629,14 @@ mod tests {
 
     #[test]
     fn test_builder_methods() {
-        let model = ChatOpenAI::new("gpt-4o")
+        let model = ChatOpenAI::builder()
+            .model("gpt-4o")
             .temperature(0.7)
-            .max_tokens(1024)
+            .max_tokens(1024u32)
             .api_key("test-key")
             .streaming(true)
-            .seed(42);
+            .seed(42)
+            .build();
 
         assert_eq!(model.temperature, Some(0.7));
         assert_eq!(model.max_tokens, Some(1024));
@@ -3299,10 +3659,16 @@ mod tests {
 
     #[test]
     fn test_should_use_responses_api_explicit() {
-        let model = ChatOpenAI::new("gpt-4o").with_responses_api(true);
+        let model = ChatOpenAI::builder()
+            .model("gpt-4o")
+            .use_responses_api(true)
+            .build();
         assert!(model.should_use_responses_api(None));
 
-        let model = ChatOpenAI::new("gpt-4o").with_responses_api(false);
+        let model = ChatOpenAI::builder()
+            .model("gpt-4o")
+            .use_responses_api(false)
+            .build();
         assert!(!model.should_use_responses_api(None));
     }
 
@@ -3333,7 +3699,10 @@ mod tests {
 
     #[test]
     fn test_build_request_payload_uses_max_completion_tokens() {
-        let model = ChatOpenAI::new("gpt-4o").max_tokens(100);
+        let model = ChatOpenAI::builder()
+            .model("gpt-4o")
+            .max_tokens(100u32)
+            .build();
         let payload = model.build_request_payload(&[], None, None, false);
         assert!(payload.get("max_tokens").is_none());
         assert_eq!(payload["max_completion_tokens"], 100);
@@ -3351,7 +3720,10 @@ mod tests {
 
     #[test]
     fn test_build_request_payload_stream_options() {
-        let model = ChatOpenAI::new("gpt-4o").stream_usage(true);
+        let model = ChatOpenAI::builder()
+            .model("gpt-4o")
+            .stream_usage(true)
+            .build();
         let payload = model.build_request_payload(&[], None, None, true);
         assert_eq!(payload["stream"], true);
         assert_eq!(payload["stream_options"]["include_usage"], true);
@@ -3361,9 +3733,11 @@ mod tests {
     fn test_filter_disabled_params_remove() {
         let mut disabled = HashMap::new();
         disabled.insert("temperature".to_string(), None);
-        let model = ChatOpenAI::new("gpt-4o")
+        let model = ChatOpenAI::builder()
+            .model("gpt-4o")
             .temperature(0.5)
-            .disabled_params(disabled);
+            .disabled_params(disabled)
+            .build();
         let payload = model.build_request_payload(&[], None, None, false);
         assert!(payload.get("temperature").is_none());
     }
@@ -3375,22 +3749,33 @@ mod tests {
             "temperature".to_string(),
             Some(serde_json::json!([0.5, 0.7])),
         );
-        let model = ChatOpenAI::new("gpt-4o")
+        let model = ChatOpenAI::builder()
+            .model("gpt-4o")
             .temperature(0.5)
-            .disabled_params(disabled);
+            .disabled_params(disabled)
+            .build();
         let payload = model.build_request_payload(&[], None, None, false);
         assert!(payload.get("temperature").is_none());
     }
 
     #[test]
     fn test_gpt5_temperature_validation() {
-        let model = ChatOpenAI::new("gpt-5").temperature(0.5);
+        let model = ChatOpenAI::builder()
+            .model("gpt-5")
+            .temperature(0.5)
+            .build();
         assert!(model.effective_temperature().is_none());
 
-        let model = ChatOpenAI::new("gpt-5").temperature(1.0);
+        let model = ChatOpenAI::builder()
+            .model("gpt-5")
+            .temperature(1.0)
+            .build();
         assert_eq!(model.effective_temperature(), Some(1.0));
 
-        let model = ChatOpenAI::new("gpt-5-chat").temperature(0.5);
+        let model = ChatOpenAI::builder()
+            .model("gpt-5-chat")
+            .temperature(0.5)
+            .build();
         assert_eq!(model.effective_temperature(), Some(0.5));
     }
 
