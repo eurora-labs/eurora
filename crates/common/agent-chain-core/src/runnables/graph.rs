@@ -398,7 +398,7 @@ impl Graph {
         output_file_path: Option<&std::path::Path>,
         fontname: Option<&str>,
         labels: Option<LabelsDict>,
-    ) -> Result<Option<Vec<u8>>, super::graph_png::PngDrawError> {
+    ) -> crate::error::Result<Option<Vec<u8>>> {
         let default_node_labels: std::collections::HashMap<String, String> = self
             .nodes
             .values()

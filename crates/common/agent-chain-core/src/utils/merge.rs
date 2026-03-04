@@ -236,61 +236,30 @@ pub fn merge_obj(left: Value, right: Value) -> Result<Value, MergeError> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum MergeError {
+    #[error("Value is not a JSON object")]
     NotAnObject,
+    #[error(
+        "additional_kwargs[\"{key}\"] already exists in this message, but with a different type. Left type: {left_type}, Right type: {right_type}"
+    )]
     TypeMismatch {
         key: String,
         left_type: String,
         right_type: String,
     },
-    UnsupportedType {
-        key: String,
-        value_type: String,
-    },
+    #[error(
+        "Additional kwargs key {key} already exists in left dict and value has unsupported type {value_type}"
+    )]
+    UnsupportedType { key: String, value_type: String },
+    #[error(
+        "Unable to merge {left_type} and {right_type}. Both must be of type str, dict, or list, or else be two equal objects"
+    )]
     UnableToMerge {
         left_type: String,
         right_type: String,
     },
 }
-
-impl std::fmt::Display for MergeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MergeError::NotAnObject => write!(f, "Value is not a JSON object"),
-            MergeError::TypeMismatch {
-                key,
-                left_type,
-                right_type,
-            } => {
-                write!(
-                    f,
-                    "additional_kwargs[\"{}\"] already exists in this message, but with a different type. Left type: {}, Right type: {}",
-                    key, left_type, right_type
-                )
-            }
-            MergeError::UnsupportedType { key, value_type } => {
-                write!(
-                    f,
-                    "Additional kwargs key {} already exists in left dict and value has unsupported type {}",
-                    key, value_type
-                )
-            }
-            MergeError::UnableToMerge {
-                left_type,
-                right_type,
-            } => {
-                write!(
-                    f,
-                    "Unable to merge {} and {}. Both must be of type str, dict, or list, or else be two equal objects",
-                    left_type, right_type
-                )
-            }
-        }
-    }
-}
-
-impl std::error::Error for MergeError {}
 
 fn values_same_type(left: &Value, right: &Value) -> bool {
     matches!(

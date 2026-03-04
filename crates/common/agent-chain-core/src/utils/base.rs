@@ -5,10 +5,12 @@ use uuid::Uuid;
 
 pub use secrecy::{ExposeSecret, SecretString};
 
+use crate::error::{Error, Result};
+
 pub fn validate_xor_args<T>(
     arg_groups: &[Vec<&str>],
     values: &HashMap<&str, Option<T>>,
-) -> Result<(), XorArgsError> {
+) -> Result<()> {
     let mut invalid_groups = Vec::new();
 
     for (i, group) in arg_groups.iter().enumerate() {
@@ -27,55 +29,25 @@ pub fn validate_xor_args<T>(
             .iter()
             .map(|&i| arg_groups[i].join(", "))
             .collect();
-        return Err(XorArgsError {
-            groups: invalid_group_names,
-        });
+        return Err(Error::ValidationError(format!(
+            "Exactly one argument in each of the following groups must be defined: {}",
+            invalid_group_names.join("; ")
+        )));
     }
 
     Ok(())
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct XorArgsError {
-    pub groups: Vec<String>,
-}
-
-impl std::fmt::Display for XorArgsError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Exactly one argument in each of the following groups must be defined: {}",
-            self.groups.join("; ")
-        )
-    }
-}
-
-impl std::error::Error for XorArgsError {}
-
-pub fn raise_for_status_with_text(status: u16, text: &str) -> Result<(), HttpStatusError> {
+pub fn raise_for_status_with_text(status: u16, text: &str) -> Result<()> {
     if (200..300).contains(&status) {
         Ok(())
     } else {
-        Err(HttpStatusError {
+        Err(Error::Api {
             status,
-            text: text.to_string(),
+            message: text.to_string(),
         })
     }
 }
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct HttpStatusError {
-    pub status: u16,
-    pub text: String,
-}
-
-impl std::fmt::Display for HttpStatusError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "HTTP {} error: {}", self.status, self.text)
-    }
-}
-
-impl std::error::Error for HttpStatusError {}
 
 pub fn convert_to_secret_str(value: impl Into<String>) -> SecretString {
     SecretString::from(value.into())
@@ -90,7 +62,7 @@ pub fn from_env<'a>(
     keys: &'a [&'a str],
     default: Option<&'a str>,
     error_message: Option<&'a str>,
-) -> impl Fn() -> Result<String, EnvError> + 'a {
+) -> impl Fn() -> std::result::Result<String, EnvError> + 'a {
     move || {
         for key in keys {
             if let Ok(value) = env::var(key)
@@ -120,7 +92,7 @@ pub fn secret_from_env<'a>(
     keys: &'a [&'a str],
     default: Option<&'a str>,
     error_message: Option<&'a str>,
-) -> impl Fn() -> Result<SecretString, EnvError> + 'a {
+) -> impl Fn() -> std::result::Result<SecretString, EnvError> + 'a {
     let get_value = from_env(keys, default, error_message);
     move || get_value().map(SecretString::from)
 }
@@ -289,8 +261,13 @@ mod tests {
         let result = raise_for_status_with_text(404, "Not Found");
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert_eq!(err.status, 404);
-        assert_eq!(err.text, "Not Found");
+        assert!(matches!(
+            err,
+            Error::Api {
+                status: 404,
+                ref message
+            } if message == "Not Found"
+        ));
 
         let result = raise_for_status_with_text(500, "Internal Server Error");
         assert!(result.is_err());

@@ -3,6 +3,8 @@ use std::io::{self, Write};
 
 use owo_colors::{AnsiColors, OwoColorize, Style};
 
+use crate::error::{Error, Result};
+
 pub const AVAILABLE_COLORS: &[&str] = &["blue", "yellow", "pink", "green", "red"];
 
 fn ansi_color(color: &str) -> AnsiColors {
@@ -19,7 +21,7 @@ fn ansi_color(color: &str) -> AnsiColors {
 pub fn get_color_mapping(
     items: &[String],
     excluded_colors: Option<&[&str]>,
-) -> Result<HashMap<String, String>, InputError> {
+) -> Result<HashMap<String, String>> {
     let colors: Vec<&str> = AVAILABLE_COLORS
         .iter()
         .filter(|c| {
@@ -31,7 +33,9 @@ pub fn get_color_mapping(
         .collect();
 
     if colors.is_empty() {
-        return Err(InputError::NoColorsAvailable);
+        return Err(Error::ValidationError(
+            "No colors available after applying exclusions".to_string(),
+        ));
     }
 
     let mut mapping = HashMap::new();
@@ -74,23 +78,6 @@ pub fn print_text(text: &str, color: Option<&str>, end: &str, writer: Option<&mu
         }
     }
 }
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum InputError {
-    NoColorsAvailable,
-}
-
-impl std::fmt::Display for InputError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InputError::NoColorsAvailable => {
-                write!(f, "No colors available after applying exclusions")
-            }
-        }
-    }
-}
-
-impl std::error::Error for InputError {}
 
 #[cfg(test)]
 mod tests {

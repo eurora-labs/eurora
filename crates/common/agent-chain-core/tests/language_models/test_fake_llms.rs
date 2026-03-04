@@ -1,8 +1,7 @@
 use std::time::Duration;
 
 use agent_chain_core::language_models::{
-    BaseLLM, BaseLanguageModel, FakeListLLM, FakeListLLMError, FakeStreamingListLLM, LLM,
-    LanguageModelInput,
+    BaseLLM, BaseLanguageModel, FakeListLLM, FakeStreamingListLLM, LLM, LanguageModelInput,
 };
 use agent_chain_core::messages::{BaseMessage, HumanMessage};
 use agent_chain_core::outputs::GenerationType;
@@ -154,18 +153,6 @@ async fn test_fake_list_llm_acall_method() {
         .build();
     let result = llm.call("prompt".to_string(), None, None).await.unwrap();
     assert_eq!(result, "async direct call");
-}
-
-#[test]
-fn test_fake_list_llm_error_can_be_raised() {
-    let error = FakeListLLMError;
-    assert_eq!(format!("{}", error), "FakeListLLM error");
-}
-
-#[test]
-fn test_fake_list_llm_error_is_exception() {
-    let error = FakeListLLMError;
-    let _: &dyn std::error::Error = &error;
 }
 
 #[test]

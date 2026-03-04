@@ -170,32 +170,19 @@ pub fn parse_and_check_json_markdown(
     Ok(json_obj)
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum JsonParseError {
+    #[error("Failed to parse JSON: {0}")]
     ParseError(String),
+    #[error("Mismatched bracket in JSON")]
     MismatchedBracket,
+    #[error("Control characters found in JSON")]
     ControlCharacters,
+    #[error("Expected JSON object (dict), but got: {0}")]
     NotAnObject(String),
+    #[error("Missing expected key: {0}")]
     MissingKey(String),
 }
-
-impl std::fmt::Display for JsonParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            JsonParseError::ParseError(msg) => write!(f, "Failed to parse JSON: {}", msg),
-            JsonParseError::MismatchedBracket => write!(f, "Mismatched bracket in JSON"),
-            JsonParseError::ControlCharacters => write!(f, "Control characters found in JSON"),
-            JsonParseError::NotAnObject(got) => {
-                write!(f, "Expected JSON object (dict), but got: {}", got)
-            }
-            JsonParseError::MissingKey(key) => {
-                write!(f, "Missing expected key: {}", key)
-            }
-        }
-    }
-}
-
-impl std::error::Error for JsonParseError {}
 
 #[cfg(test)]
 mod tests {

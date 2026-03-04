@@ -39,7 +39,7 @@ pub use graph::{
     NodeStyles, node_data_json, node_data_str,
 };
 pub use graph_mermaid::{generate_mermaid_graph_styles, to_safe_id};
-pub use graph_png::{PngDrawError, PngDrawer};
+pub use graph_png::PngDrawer;
 pub use history::{
     GetSessionHistoryFn, HistoryAInvokeFn, HistoryInvokeFn, HistoryRunnable,
     RunnableWithMessageHistory,

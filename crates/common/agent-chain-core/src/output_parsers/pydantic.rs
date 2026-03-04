@@ -8,7 +8,7 @@ use crate::error::{Error, Result};
 use crate::outputs::Generation;
 use crate::utils::json::parse_json_markdown;
 
-use super::base::{BaseOutputParser, OutputParserError};
+use super::base::BaseOutputParser;
 use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
 
 use futures::stream::BoxStream;
@@ -42,7 +42,7 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq> PydanticOutp
             "Failed to parse {} from completion {}. Got: {}",
             self.name, json_string, error
         );
-        OutputParserError::parse_error(message, json_string).into()
+        Error::output_parser_with_output(message, json_string)
     }
 
     pub fn get_schema(&self) -> &Value {
@@ -63,7 +63,7 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq> BaseOutputPa
         let text = text.trim();
         let json_object = parse_json_markdown(text).map_err(|e| {
             let message = format!("Invalid json output: {}. Error: {}", text, e);
-            Error::from(OutputParserError::parse_error(&message, text))
+            Error::output_parser_with_output(&message, text)
         })?;
         self.parse_obj(&json_object)
     }
@@ -91,11 +91,10 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq> BaseOutputPa
             let json_object = match parse_json_markdown(text) {
                 Ok(value) => value,
                 Err(e) => {
-                    return Err(OutputParserError::parse_error(
+                    return Err(Error::output_parser_with_output(
                         format!("Invalid json output: {}", e),
                         text,
-                    )
-                    .into());
+                    ));
                 }
             };
             self.parse_obj(&json_object)

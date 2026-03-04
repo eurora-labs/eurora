@@ -94,48 +94,6 @@ pub trait BaseOutputParser: Send + Sync + Debug {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct OutputParserError {
-    pub message: String,
-    pub llm_output: Option<String>,
-    pub send_to_llm: bool,
-    pub observation: Option<String>,
-}
-
-impl OutputParserError {
-    pub fn new(message: impl Into<String>) -> Self {
-        Self {
-            message: message.into(),
-            llm_output: None,
-            send_to_llm: false,
-            observation: None,
-        }
-    }
-
-    pub fn parse_error(message: impl Into<String>, llm_output: impl Into<String>) -> Self {
-        Self {
-            message: message.into(),
-            llm_output: Some(llm_output.into()),
-            send_to_llm: false,
-            observation: None,
-        }
-    }
-}
-
-impl std::fmt::Display for OutputParserError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
-
-impl std::error::Error for OutputParserError {}
-
-impl From<OutputParserError> for Error {
-    fn from(err: OutputParserError) -> Self {
-        Error::Other(err.message)
-    }
-}
-
 pub struct RunnableOutputParser<P> {
     parser: P,
 }
@@ -237,8 +195,17 @@ mod tests {
 
     #[test]
     fn test_output_parser_error() {
-        let err = OutputParserError::parse_error("Invalid JSON", "{invalid}");
-        assert_eq!(err.message, "Invalid JSON");
-        assert_eq!(err.llm_output, Some("{invalid}".to_string()));
+        let err = Error::output_parser_with_output("Invalid JSON", "{invalid}");
+        match err {
+            Error::OutputParser {
+                ref message,
+                ref llm_output,
+                ..
+            } => {
+                assert_eq!(message, "Invalid JSON");
+                assert_eq!(llm_output.as_deref(), Some("{invalid}"));
+            }
+            _ => panic!("Expected OutputParser variant"),
+        }
     }
 }

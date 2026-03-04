@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::error::{Error, Result};
-use crate::utils::formatting::{FORMATTER, FormattingError};
+use crate::utils::formatting::FORMATTER;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PromptTemplateFormat {
@@ -233,17 +233,10 @@ pub fn check_valid_template(
     input_variables: &[String],
 ) -> Result<()> {
     match template_format {
-        PromptTemplateFormat::FString => FORMATTER
-            .validate_input_variables(template, input_variables)
-            .map_err(|e| match e {
-                FormattingError::MissingKey(key) => Error::InvalidConfig(format!(
-                    "Invalid prompt schema; missing input parameter: {}",
-                    key
-                )),
-                FormattingError::InvalidFormat(msg) => {
-                    Error::InvalidConfig(format!("Invalid format string: {}", msg))
-                }
-            }),
+        PromptTemplateFormat::FString => {
+            FORMATTER.validate_input_variables(template, input_variables)?;
+            Ok(())
+        }
         PromptTemplateFormat::Jinja2 => validate_jinja2(template, input_variables),
         PromptTemplateFormat::Mustache => Ok(()),
     }
@@ -289,14 +282,7 @@ pub fn format_template(
     kwargs: &HashMap<String, String>,
 ) -> Result<String> {
     match template_format {
-        PromptTemplateFormat::FString => FORMATTER.format(template, kwargs).map_err(|e| match e {
-            FormattingError::MissingKey(key) => {
-                Error::InvalidConfig(format!("Missing key in format string: {}", key))
-            }
-            FormattingError::InvalidFormat(msg) => {
-                Error::InvalidConfig(format!("Invalid format string: {}", msg))
-            }
-        }),
+        PromptTemplateFormat::FString => FORMATTER.format(template, kwargs),
         PromptTemplateFormat::Mustache => mustache_formatter(template, kwargs),
         PromptTemplateFormat::Jinja2 => jinja2_formatter(template, kwargs),
     }

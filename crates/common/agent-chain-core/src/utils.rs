@@ -14,14 +14,14 @@ pub mod strings;
 pub mod usage;
 pub mod uuid;
 
-pub use env::{EnvError, env_var_is_set, get_from_dict_or_env, get_from_env};
+pub use env::{env_var_is_set, get_from_dict_or_env, get_from_env};
 
 pub use uuid::uuid7;
 
 pub use base::{
-    ExposeSecret, HttpStatusError, LC_AUTO_PREFIX, LC_ID_PREFIX, MockTime, NoDefault, SecretString,
-    XorArgsError, build_model_kwargs, convert_to_secret_str, ensure_id, from_env, now_millis,
-    now_secs, raise_for_status_with_text, secret_from_env, validate_xor_args,
+    ExposeSecret, LC_AUTO_PREFIX, LC_ID_PREFIX, MockTime, NoDefault, SecretString,
+    build_model_kwargs, convert_to_secret_str, ensure_id, from_env, now_millis, now_secs,
+    raise_for_status_with_text, secret_from_env, validate_xor_args,
 };
 
 pub use aiter::{ABatchIterator, AClosing, TeePeer, abatch_iterate, atee};
@@ -32,4 +32,4 @@ pub use json::{parse_and_check_json_markdown, parse_json_markdown, parse_partial
 pub use json_schema::dereference_refs;
 pub use merge::{merge_dicts, merge_lists, merge_obj};
 pub use strings::{comma_list, sanitize_for_postgres, stringify_dict, stringify_value};
-pub use usage::{UsageError, dict_int_op};
+pub use usage::dict_int_op;

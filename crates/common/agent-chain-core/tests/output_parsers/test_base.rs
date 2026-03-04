@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use agent_chain_core::error::{Error, Result};
 use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
-use agent_chain_core::output_parsers::{BaseLLMOutputParser, BaseOutputParser, OutputParserError};
+use agent_chain_core::output_parsers::{BaseLLMOutputParser, BaseOutputParser};
 use agent_chain_core::outputs::{ChatGeneration, Generation};
 use agent_chain_core::prompt_values::StringPromptValue;
 
@@ -15,7 +15,7 @@ impl BaseOutputParser for IntParser {
     fn parse(&self, text: &str) -> Result<i64> {
         text.trim()
             .parse::<i64>()
-            .map_err(|_| OutputParserError::new(format!("Cannot parse '{}' to int", text)).into())
+            .map_err(|_| Error::Other(format!("Cannot parse '{}' to int", text)))
     }
 
     fn parser_type(&self) -> &str {
@@ -49,11 +49,10 @@ impl BaseOutputParser for BoolParser {
         if cleaned == self.false_val.to_uppercase() {
             return Ok(false);
         }
-        Err(OutputParserError::new(format!(
+        Err(Error::Other(format!(
             "Expected {} or {}, got '{}'",
             self.true_val, self.false_val, text
-        ))
-        .into())
+        )))
     }
 
     fn parser_type(&self) -> &str {
