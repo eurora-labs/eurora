@@ -12,8 +12,9 @@ pub use serializable::{
 pub use dump::{dumpd, dumps};
 
 pub use loader::{
-    ConstructorInfo, RevivedValue, Reviver, ReviverConfig, load, loads, loads_with_namespaces,
-    loads_with_secrets, lookup_constructor,
+    ConstructorEntry, ConstructorFn, ConstructorInfo, RevivedValue, Reviver, ReviverConfig,
+    deserialize_constructor, load, loads, loads_with_namespaces, loads_with_secrets,
+    lookup_constructor,
 };
 
 pub use mapping::{

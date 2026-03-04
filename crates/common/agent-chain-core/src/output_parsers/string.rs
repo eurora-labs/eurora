@@ -96,6 +96,8 @@ impl<'de> serde::Deserialize<'de> for StrOutputParser {
     }
 }
 
+submit_constructor!(StrOutputParser);
+
 #[cfg(test)]
 mod tests {
     use super::*;

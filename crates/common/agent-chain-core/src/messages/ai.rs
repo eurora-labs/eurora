@@ -1334,6 +1334,9 @@ impl Serializable for AIMessageChunk {
     }
 }
 
+submit_constructor!(AIMessage);
+submit_constructor!(AIMessageChunk);
+
 #[cfg(test)]
 mod tests {
     use super::*;
