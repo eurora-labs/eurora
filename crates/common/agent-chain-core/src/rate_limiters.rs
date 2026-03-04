@@ -1,6 +1,8 @@
 use async_trait::async_trait;
-use std::sync::Mutex;
-use std::time::Instant;
+use governor::{Quota, RateLimiter, clock::DefaultClock, state::InMemoryState, state::NotKeyed};
+use std::num::NonZeroU32;
+use std::sync::Arc;
+use std::time::Duration;
 
 #[async_trait]
 pub trait BaseRateLimiter: Send + Sync {
@@ -26,60 +28,33 @@ impl Default for InMemoryRateLimiterConfig {
     }
 }
 
-struct InMemoryRateLimiterState {
-    available_tokens: f64,
-    last: Option<Instant>,
-}
-
 pub struct InMemoryRateLimiter {
-    requests_per_second: f64,
-    max_bucket_size: f64,
+    limiter: Arc<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
     check_every_n_seconds: f64,
-    state: Mutex<InMemoryRateLimiterState>,
 }
 
 impl InMemoryRateLimiter {
     pub fn new(config: InMemoryRateLimiterConfig) -> Self {
+        let burst = config.max_bucket_size.ceil().max(1.0) as u32;
+        let burst = NonZeroU32::new(burst).unwrap_or(NonZeroU32::new(1).unwrap());
+
+        let period = Duration::from_secs_f64(1.0 / config.requests_per_second);
+        let quota = Quota::with_period(period)
+            .expect("valid rate limiter period")
+            .allow_burst(burst);
+
+        let limiter = RateLimiter::direct(quota);
+
+        // Drain initial burst tokens to match the old behavior where
+        // no tokens are available until time has passed.
+        for _ in 0..burst.get() {
+            let _ = limiter.check();
+        }
+
         Self {
-            requests_per_second: config.requests_per_second,
-            max_bucket_size: config.max_bucket_size,
+            limiter: Arc::new(limiter),
             check_every_n_seconds: config.check_every_n_seconds,
-            state: Mutex::new(InMemoryRateLimiterState {
-                available_tokens: 0.0,
-                last: None,
-            }),
         }
-    }
-
-    fn consume(&self) -> bool {
-        let mut state = match self.state.lock() {
-            Ok(guard) => guard,
-            Err(error) => {
-                tracing::error!("Rate limiter lock poisoned: {}", error);
-                return false;
-            }
-        };
-        let now = Instant::now();
-
-        if let Some(last) = state.last {
-            let elapsed = now.duration_since(last).as_secs_f64();
-
-            if elapsed * self.requests_per_second >= 1.0 {
-                state.available_tokens += elapsed * self.requests_per_second;
-                state.last = Some(now);
-            }
-        } else {
-            state.last = Some(now);
-        }
-
-        state.available_tokens = state.available_tokens.min(self.max_bucket_size);
-
-        if state.available_tokens >= 1.0 {
-            state.available_tokens -= 1.0;
-            return true;
-        }
-
-        false
     }
 }
 
@@ -87,27 +62,22 @@ impl InMemoryRateLimiter {
 impl BaseRateLimiter for InMemoryRateLimiter {
     fn acquire(&self, blocking: bool) -> bool {
         if !blocking {
-            return self.consume();
+            return self.limiter.check().is_ok();
         }
 
-        while !self.consume() {
-            std::thread::sleep(std::time::Duration::from_secs_f64(
-                self.check_every_n_seconds,
-            ));
+        while self.limiter.check().is_err() {
+            std::thread::sleep(Duration::from_secs_f64(self.check_every_n_seconds));
         }
         true
     }
 
     async fn aacquire(&self, blocking: bool) -> bool {
         if !blocking {
-            return self.consume();
+            return self.limiter.check().is_ok();
         }
 
-        while !self.consume() {
-            tokio::time::sleep(std::time::Duration::from_secs_f64(
-                self.check_every_n_seconds,
-            ))
-            .await;
+        while self.limiter.check().is_err() {
+            tokio::time::sleep(Duration::from_secs_f64(self.check_every_n_seconds)).await;
         }
         true
     }
@@ -116,6 +86,7 @@ impl BaseRateLimiter for InMemoryRateLimiter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Instant;
 
     #[test]
     fn test_rate_limiter_non_blocking() {
@@ -125,6 +96,8 @@ mod tests {
             max_bucket_size: 1.0,
         });
 
+        // Drain the initial burst token
+        let _ = rate_limiter.acquire(false);
         let result = rate_limiter.acquire(false);
         assert!(!result);
     }
@@ -153,6 +126,7 @@ mod tests {
             max_bucket_size: 1.0,
         });
 
+        let _ = rate_limiter.aacquire(false).await;
         let result = rate_limiter.aacquire(false).await;
         assert!(!result);
     }
