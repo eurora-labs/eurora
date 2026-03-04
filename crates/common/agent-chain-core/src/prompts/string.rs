@@ -2,7 +2,6 @@ use std::collections::{HashMap, HashSet};
 
 use crate::error::{Error, Result};
 use crate::utils::formatting::{FORMATTER, FormattingError};
-use crate::utils::mustache::{MustacheValue, render as mustache_render};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PromptTemplateFormat {
@@ -79,12 +78,9 @@ pub fn jinja2_formatter(template: &str, kwargs: &HashMap<String, String>) -> Res
 }
 
 pub fn mustache_formatter(template: &str, kwargs: &HashMap<String, String>) -> Result<String> {
-    let mut data = HashMap::new();
-    for (key, value) in kwargs {
-        data.insert(key.clone(), MustacheValue::String(value.clone()));
-    }
-
-    mustache_render(template, &MustacheValue::Map(data), None)
+    let tmpl = mustache::compile_str(template)
+        .map_err(|e| Error::Other(format!("Mustache error: {}", e)))?;
+    tmpl.render_to_string(kwargs)
         .map_err(|e| Error::Other(format!("Mustache error: {}", e)))
 }
 
