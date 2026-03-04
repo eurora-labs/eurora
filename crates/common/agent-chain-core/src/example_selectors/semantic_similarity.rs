@@ -30,7 +30,7 @@ fn documents_to_examples(
     example_keys: &Option<Vec<String>>,
 ) -> Vec<HashMap<String, Value>> {
     let mut examples: Vec<HashMap<String, Value>> =
-        documents.iter().map(|doc| doc.metadata.clone()).collect();
+        documents.iter().map(|doc| doc.metadata().clone()).collect();
 
     if let Some(keys) = example_keys {
         examples = examples

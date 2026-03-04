@@ -233,8 +233,8 @@ mod tests {
         let result = retriever.get_relevant_documents("test", None).unwrap();
 
         assert_eq!(result.len(), 2);
-        assert_eq!(result[0].page_content, "Hello world");
-        assert_eq!(result[1].page_content, "Goodbye world");
+        assert_eq!(result[0].page_content(), "Hello world");
+        assert_eq!(result[1].page_content(), "Goodbye world");
     }
 
     #[test]

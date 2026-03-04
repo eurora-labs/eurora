@@ -314,9 +314,9 @@ fn test_create_documents() {
     let docs = splitter.create_documents(&texts, None).unwrap();
 
     assert_eq!(docs.len(), 3);
-    assert_eq!(docs[0].page_content, "foo");
-    assert_eq!(docs[1].page_content, "bar");
-    assert_eq!(docs[2].page_content, "baz");
+    assert_eq!(docs[0].page_content(), "foo");
+    assert_eq!(docs[1].page_content(), "bar");
+    assert_eq!(docs[2].page_content(), "baz");
 }
 
 #[test]
@@ -337,12 +337,12 @@ fn test_create_documents_with_metadata() {
     let docs = splitter.create_documents(&texts, Some(&metadatas)).unwrap();
 
     assert_eq!(docs.len(), 3);
-    assert_eq!(docs[0].page_content, "foo");
-    assert_eq!(docs[0].metadata["source"], "1");
-    assert_eq!(docs[1].page_content, "bar");
-    assert_eq!(docs[1].metadata["source"], "1");
-    assert_eq!(docs[2].page_content, "baz");
-    assert_eq!(docs[2].metadata["source"], "2");
+    assert_eq!(docs[0].page_content(), "foo");
+    assert_eq!(docs[0].metadata()["source"], "1");
+    assert_eq!(docs[1].page_content(), "bar");
+    assert_eq!(docs[1].metadata()["source"], "1");
+    assert_eq!(docs[2].page_content(), "baz");
+    assert_eq!(docs[2].metadata()["source"], "2");
 }
 
 #[test]
@@ -361,16 +361,16 @@ fn test_create_documents_with_start_index_character() {
         .unwrap();
 
     assert_eq!(docs.len(), 3);
-    assert_eq!(docs[0].page_content, "foo bar");
-    assert_eq!(docs[0].metadata["start_index"], 0);
-    assert_eq!(docs[1].page_content, "bar baz");
-    assert_eq!(docs[1].metadata["start_index"], 4);
-    assert_eq!(docs[2].page_content, "baz 123");
-    assert_eq!(docs[2].metadata["start_index"], 8);
+    assert_eq!(docs[0].page_content(), "foo bar");
+    assert_eq!(docs[0].metadata()["start_index"], 0);
+    assert_eq!(docs[1].page_content(), "bar baz");
+    assert_eq!(docs[1].metadata()["start_index"], 4);
+    assert_eq!(docs[2].page_content(), "baz 123");
+    assert_eq!(docs[2].metadata()["start_index"], 8);
 
     for doc in &docs {
-        let si = doc.metadata["start_index"].as_u64().unwrap() as usize;
-        assert_eq!(&text[si..si + doc.page_content.len()], doc.page_content);
+        let si = doc.metadata()["start_index"].as_u64().unwrap() as usize;
+        assert_eq!(&text[si..si + doc.page_content().len()], doc.page_content());
     }
 }
 
@@ -392,20 +392,20 @@ fn test_create_documents_with_start_index_recursive() {
         .unwrap();
 
     assert_eq!(docs.len(), 5);
-    assert_eq!(docs[0].page_content, "w1 w1");
-    assert_eq!(docs[0].metadata["start_index"], 0);
-    assert_eq!(docs[1].page_content, "w1 w1");
-    assert_eq!(docs[1].metadata["start_index"], 6);
-    assert_eq!(docs[2].page_content, "w1 w1");
-    assert_eq!(docs[2].metadata["start_index"], 12);
-    assert_eq!(docs[3].page_content, "w1 w1");
-    assert_eq!(docs[3].metadata["start_index"], 18);
-    assert_eq!(docs[4].page_content, "w1");
-    assert_eq!(docs[4].metadata["start_index"], 24);
+    assert_eq!(docs[0].page_content(), "w1 w1");
+    assert_eq!(docs[0].metadata()["start_index"], 0);
+    assert_eq!(docs[1].page_content(), "w1 w1");
+    assert_eq!(docs[1].metadata()["start_index"], 6);
+    assert_eq!(docs[2].page_content(), "w1 w1");
+    assert_eq!(docs[2].metadata()["start_index"], 12);
+    assert_eq!(docs[3].page_content(), "w1 w1");
+    assert_eq!(docs[3].metadata()["start_index"], 18);
+    assert_eq!(docs[4].page_content(), "w1");
+    assert_eq!(docs[4].metadata()["start_index"], 24);
 
     for doc in &docs {
-        let si = doc.metadata["start_index"].as_u64().unwrap() as usize;
-        assert_eq!(&text[si..si + doc.page_content.len()], doc.page_content);
+        let si = doc.metadata()["start_index"].as_u64().unwrap() as usize;
+        assert_eq!(&text[si..si + doc.page_content().len()], doc.page_content());
     }
 }
 
@@ -428,12 +428,12 @@ fn test_metadata_not_shallow() {
 
     assert_eq!(docs.len(), 2);
     docs[0]
-        .metadata
+        .metadata_mut()
         .insert("foo".to_string(), serde_json::json!(1));
-    assert_eq!(docs[0].metadata["source"], "1");
-    assert_eq!(docs[0].metadata["foo"], 1);
-    assert!(!docs[1].metadata.contains_key("foo"));
-    assert_eq!(docs[1].metadata["source"], "1");
+    assert_eq!(docs[0].metadata()["source"], "1");
+    assert_eq!(docs[0].metadata()["foo"], 1);
+    assert!(!docs[1].metadata().contains_key("foo"));
+    assert_eq!(docs[1].metadata()["source"], "1");
 }
 
 // ---------------------------------------------------------------------------
@@ -552,12 +552,12 @@ fn test_split_documents() {
     ];
     let result = splitter.split_documents(&docs).unwrap();
     assert_eq!(result.len(), 9);
-    assert_eq!(result[0].page_content, "f");
-    assert_eq!(result[0].metadata["source"], "1");
-    assert_eq!(result[3].page_content, "b");
-    assert_eq!(result[3].metadata["source"], "2");
-    assert_eq!(result[6].page_content, "b");
-    assert_eq!(result[6].metadata["source"], "1");
+    assert_eq!(result[0].page_content(), "f");
+    assert_eq!(result[0].metadata()["source"], "1");
+    assert_eq!(result[3].page_content(), "b");
+    assert_eq!(result[3].metadata()["source"], "2");
+    assert_eq!(result[6].page_content(), "b");
+    assert_eq!(result[6].metadata()["source"], "1");
 }
 
 // ---------------------------------------------------------------------------

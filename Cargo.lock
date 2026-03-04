@@ -264,6 +264,7 @@ dependencies = [
  "bon",
  "chrono",
  "csv",
+ "encoding_rs",
  "fancy-regex 0.17.0",
  "futures",
  "governor",

@@ -29,10 +29,7 @@ impl MarkdownTextSplitter {
 
 #[async_trait]
 impl BaseDocumentTransformer for MarkdownTextSplitter {
-    fn transform_documents(
-        &self,
-        documents: &[Document],
-    ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
+    fn transform_documents(&self, documents: &[Document]) -> crate::error::Result<Vec<Document>> {
         self.inner.transform_documents(documents)
     }
 }
@@ -510,13 +507,13 @@ impl ExperimentalMarkdownSyntaxTextSplitter {
                 .into_iter()
                 .flat_map(|chunk| {
                     chunk
-                        .page_content
+                        .page_content()
                         .lines()
                         .filter(|line| !line.is_empty() && !line.chars().all(|c| c.is_whitespace()))
                         .map(|line| {
                             Document::builder()
                                 .page_content(line)
-                                .metadata(chunk.metadata.clone())
+                                .metadata(chunk.metadata().clone())
                                 .build()
                         })
                         .collect::<Vec<_>>()
@@ -545,8 +542,8 @@ mod tests {
         let text = "# Foo\n\nBar\n## Baz\n\nQux\n### Quux\n\nCorge";
         let docs = splitter.split_text(text).unwrap();
         assert!(!docs.is_empty());
-        assert_eq!(docs[0].page_content, "Bar");
-        assert_eq!(docs[0].metadata["Header 1"], "Foo");
+        assert_eq!(docs[0].page_content(), "Bar");
+        assert_eq!(docs[0].metadata()["Header 1"], "Foo");
     }
 
     #[test]
@@ -577,7 +574,7 @@ mod tests {
             docs.len() >= 2,
             "Expected at least 2 docs, got {}: {:?}",
             docs.len(),
-            docs.iter().map(|d| &d.page_content).collect::<Vec<_>>()
+            docs.iter().map(|d| d.page_content()).collect::<Vec<_>>()
         );
     }
 
@@ -596,7 +593,7 @@ mod tests {
         let text = "# Title\n\nSome content\n\n## Subtitle\n\nMore content\n";
         let docs = splitter.split_text(text).unwrap();
         assert!(!docs.is_empty());
-        assert_eq!(docs[0].page_content.trim(), "Some content");
+        assert_eq!(docs[0].page_content().trim(), "Some content");
     }
 
     #[test]
@@ -605,7 +602,7 @@ mod tests {
         let text = "# Title\n\n```python\nprint('hello')\n```\n\nSome text\n";
         let docs = splitter.split_text(text).unwrap();
         assert!(docs.len() >= 2);
-        let code_doc = docs.iter().find(|d| d.metadata.contains_key("Code"));
+        let code_doc = docs.iter().find(|d| d.metadata().contains_key("Code"));
         assert!(code_doc.is_some());
     }
 
