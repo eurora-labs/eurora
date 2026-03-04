@@ -1,6 +1,8 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
+use itertools::Itertools;
+
 pub struct NoLock;
 
 impl NoLock {
@@ -21,39 +23,27 @@ impl Default for NoLock {
 
 pub struct NoLockGuard;
 
-pub fn batch_iterate<T, I>(size: Option<usize>, iterable: I) -> BatchIterator<T, I::IntoIter>
+pub fn batch_iterate<T, I>(size: Option<usize>, iterable: I) -> Box<dyn Iterator<Item = Vec<T>>>
 where
+    T: 'static,
     I: IntoIterator<Item = T>,
+    I::IntoIter: 'static,
 {
-    BatchIterator {
-        size,
-        iter: iterable.into_iter(),
-    }
-}
-
-pub struct BatchIterator<T, I>
-where
-    I: Iterator<Item = T>,
-{
-    size: Option<usize>,
-    iter: I,
-}
-
-impl<T, I> Iterator for BatchIterator<T, I>
-where
-    I: Iterator<Item = T>,
-{
-    type Item = Vec<T>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.size {
-            Some(size) => {
-                let batch: Vec<T> = self.iter.by_ref().take(size).collect();
-                if batch.is_empty() { None } else { Some(batch) }
-            }
-            None => {
-                let batch: Vec<T> = self.iter.by_ref().collect();
-                if batch.is_empty() { None } else { Some(batch) }
+    let iter = iterable.into_iter();
+    match size {
+        Some(size) => Box::new(
+            iter.chunks(size)
+                .into_iter()
+                .map(|chunk| chunk.collect())
+                .collect::<Vec<_>>()
+                .into_iter(),
+        ),
+        None => {
+            let all: Vec<T> = iter.collect();
+            if all.is_empty() {
+                Box::new(std::iter::empty())
+            } else {
+                Box::new(std::iter::once(all))
             }
         }
     }

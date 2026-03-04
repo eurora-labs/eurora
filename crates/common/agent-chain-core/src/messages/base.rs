@@ -681,6 +681,4 @@ pub fn extract_reasoning_from_additional_kwargs(
     }
 }
 
-pub fn is_interactive_env() -> bool {
-    false
-}
+pub use crate::utils::interactive_env::is_interactive_env;
