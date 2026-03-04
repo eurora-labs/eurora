@@ -86,7 +86,7 @@
 				</li>
 				<li class="flex items-center gap-2.5 text-sm">
 					<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
-					Desktop & browser apps
+					Desktop &amp; browser apps
 				</li>
 				<li class="flex items-center gap-2.5 text-sm">
 					<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
@@ -152,7 +152,7 @@
 			<ul class="space-y-3 mb-8 flex-1">
 				<li class="flex items-center gap-2.5 text-sm">
 					<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
-					API access & integrations
+					API access &amp; integrations
 				</li>
 				<li class="flex items-center gap-2.5 text-sm">
 					<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
