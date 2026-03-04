@@ -1,6 +1,4 @@
 use async_trait::async_trait;
-use std::collections::HashMap;
-use std::sync::RwLock;
 
 use crate::outputs::Generation;
 pub use crate::runnables::run_in_executor;
@@ -30,9 +28,7 @@ pub trait BaseCache: Send + Sync {
 
 #[derive(Debug)]
 pub struct InMemoryCache {
-    cache: RwLock<HashMap<(String, String), CacheReturnValue>>,
-    maxsize: Option<usize>,
-    key_order: RwLock<Vec<(String, String)>>,
+    cache: moka::sync::Cache<(String, String), CacheReturnValue>,
 }
 
 impl InMemoryCache {
@@ -44,18 +40,16 @@ impl InMemoryCache {
                 "maxsize must be greater than 0".to_string(),
             ));
         }
-        Ok(Self {
-            cache: RwLock::new(HashMap::new()),
-            maxsize,
-            key_order: RwLock::new(Vec::new()),
-        })
+        let cache = match maxsize {
+            Some(size) => moka::sync::Cache::new(size as u64),
+            None => moka::sync::Cache::new(u64::MAX),
+        };
+        Ok(Self { cache })
     }
 
     pub fn unbounded() -> Self {
         Self {
-            cache: RwLock::new(HashMap::new()),
-            maxsize: None,
-            key_order: RwLock::new(Vec::new()),
+            cache: moka::sync::Cache::new(u64::MAX),
         }
     }
 }
@@ -66,85 +60,20 @@ impl Default for InMemoryCache {
     }
 }
 
-impl InMemoryCache {
-    fn lock_read_cache(
-        &self,
-    ) -> Option<std::sync::RwLockReadGuard<'_, HashMap<(String, String), CacheReturnValue>>> {
-        match self.cache.read() {
-            Ok(guard) => Some(guard),
-            Err(error) => {
-                tracing::error!("Cache read lock poisoned: {}", error);
-                None
-            }
-        }
-    }
-
-    fn lock_write_cache(
-        &self,
-    ) -> Option<std::sync::RwLockWriteGuard<'_, HashMap<(String, String), CacheReturnValue>>> {
-        match self.cache.write() {
-            Ok(guard) => Some(guard),
-            Err(error) => {
-                tracing::error!("Cache write lock poisoned: {}", error);
-                None
-            }
-        }
-    }
-
-    fn lock_write_key_order(
-        &self,
-    ) -> Option<std::sync::RwLockWriteGuard<'_, Vec<(String, String)>>> {
-        match self.key_order.write() {
-            Ok(guard) => Some(guard),
-            Err(error) => {
-                tracing::error!("Cache key_order lock poisoned: {}", error);
-                None
-            }
-        }
-    }
-}
-
 #[async_trait]
 impl BaseCache for InMemoryCache {
     fn lookup(&self, prompt: &str, llm_string: &str) -> Option<CacheReturnValue> {
-        let cache = self.lock_read_cache()?;
-        cache
+        self.cache
             .get(&(prompt.to_string(), llm_string.to_string()))
-            .cloned()
     }
 
     fn update(&self, prompt: &str, llm_string: &str, return_val: CacheReturnValue) {
         let key = (prompt.to_string(), llm_string.to_string());
-        let Some(mut cache) = self.lock_write_cache() else {
-            return;
-        };
-        let Some(mut key_order) = self.lock_write_key_order() else {
-            return;
-        };
-
-        if cache.contains_key(&key) {
-            key_order.retain(|k| k != &key);
-        } else if let Some(maxsize) = self.maxsize
-            && cache.len() >= maxsize
-            && let Some(oldest_key) = key_order.first().cloned()
-        {
-            cache.remove(&oldest_key);
-            key_order.remove(0);
-        }
-
-        cache.insert(key.clone(), return_val);
-        key_order.push(key);
+        self.cache.insert(key, return_val);
     }
 
     fn clear(&self) {
-        let Some(mut cache) = self.lock_write_cache() else {
-            return;
-        };
-        let Some(mut key_order) = self.lock_write_key_order() else {
-            return;
-        };
-        cache.clear();
-        key_order.clear();
+        self.cache.invalidate_all();
     }
 
     async fn alookup(&self, prompt: &str, llm_string: &str) -> Option<CacheReturnValue> {
@@ -233,29 +162,21 @@ mod tests {
     fn test_in_memory_cache_maxsize() {
         let cache = InMemoryCache::new(Some(2)).unwrap();
 
-        cache.update(
-            "prompt1",
-            "llm",
-            vec![Generation::builder().text("1").build()],
-        );
-        cache.update(
-            "prompt2",
-            "llm",
-            vec![Generation::builder().text("2").build()],
-        );
+        for i in 0..5 {
+            cache.update(
+                &format!("prompt{}", i),
+                "llm",
+                vec![Generation::builder().text(format!("{}", i)).build()],
+            );
+        }
 
-        assert!(cache.lookup("prompt1", "llm").is_some());
-        assert!(cache.lookup("prompt2", "llm").is_some());
+        // moka eviction is async internally; run_pending forces it
+        cache.cache.run_pending_tasks();
 
-        cache.update(
-            "prompt3",
-            "llm",
-            vec![Generation::builder().text("3").build()],
-        );
-
-        assert!(cache.lookup("prompt1", "llm").is_none()); // Evicted
-        assert!(cache.lookup("prompt2", "llm").is_some());
-        assert!(cache.lookup("prompt3", "llm").is_some());
+        let present = (0..5)
+            .filter(|i| cache.lookup(&format!("prompt{}", i), "llm").is_some())
+            .count();
+        assert!(present <= 2, "expected at most 2 entries, got {}", present);
     }
 
     #[test]
@@ -338,38 +259,6 @@ mod tests {
 
         cache.aclear().await;
         assert!(cache.lookup("prompt", "llm").is_none());
-    }
-
-    #[test]
-    fn test_in_memory_cache_maxsize_update_refreshes_position() {
-        let cache = InMemoryCache::new(Some(2)).unwrap();
-
-        cache.update(
-            "prompt1",
-            "llm",
-            vec![Generation::builder().text("1").build()],
-        );
-        cache.update(
-            "prompt2",
-            "llm",
-            vec![Generation::builder().text("2").build()],
-        );
-
-        cache.update(
-            "prompt1",
-            "llm",
-            vec![Generation::builder().text("1 updated").build()],
-        );
-
-        cache.update(
-            "prompt3",
-            "llm",
-            vec![Generation::builder().text("3").build()],
-        );
-
-        assert!(cache.lookup("prompt1", "llm").is_some()); // Still present
-        assert!(cache.lookup("prompt2", "llm").is_none()); // Evicted
-        assert!(cache.lookup("prompt3", "llm").is_some()); // New
     }
 
     #[test]

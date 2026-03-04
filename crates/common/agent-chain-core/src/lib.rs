@@ -133,7 +133,7 @@ pub use tracers::{
     TracerCore, TracerCoreConfig,
 };
 
-pub use rate_limiters::{BaseRateLimiter, InMemoryRateLimiter, InMemoryRateLimiterConfig};
+pub use rate_limiters::{BaseRateLimiter, InMemoryRateLimiter};
 
 pub use agents::{AgentAction, AgentActionMessageLog, AgentFinish, AgentStep, ToolInput};
 

@@ -3,6 +3,7 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
+use futures::StreamExt as _;
 use futures::stream::Stream;
 
 struct TeeShared<T> {
@@ -93,54 +94,12 @@ impl<S> AClosing<S> {
     }
 }
 
-pub fn abatch_iterate<S, T>(size: usize, source: S) -> ABatchIterator<S>
+pub fn abatch_iterate<S, T>(size: usize, source: S) -> impl Stream<Item = Vec<T>>
 where
-    S: Stream<Item = T>,
+    S: Stream<Item = T> + Sized + Unpin,
+    T: Unpin,
 {
-    ABatchIterator {
-        source,
-        size,
-        batch: Vec::with_capacity(size),
-    }
-}
-
-pub struct ABatchIterator<S: Stream> {
-    source: S,
-    size: usize,
-    batch: Vec<S::Item>,
-}
-
-impl<S> Stream for ABatchIterator<S>
-where
-    S::Item: Unpin,
-    S: Stream + Unpin,
-{
-    type Item = Vec<S::Item>;
-
-    fn poll_next(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.get_mut();
-
-        loop {
-            match Pin::new(&mut this.source).poll_next(context) {
-                Poll::Ready(Some(item)) => {
-                    this.batch.push(item);
-                    if this.batch.len() >= this.size {
-                        let batch =
-                            std::mem::replace(&mut this.batch, Vec::with_capacity(this.size));
-                        return Poll::Ready(Some(batch));
-                    }
-                }
-                Poll::Ready(None) => {
-                    if this.batch.is_empty() {
-                        return Poll::Ready(None);
-                    }
-                    let batch = std::mem::replace(&mut this.batch, Vec::with_capacity(this.size));
-                    return Poll::Ready(Some(batch));
-                }
-                Poll::Pending => return Poll::Pending,
-            }
-        }
-    }
+    source.chunks(size)
 }
 
 #[cfg(test)]

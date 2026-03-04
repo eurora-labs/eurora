@@ -64,17 +64,12 @@ impl<'de> serde::Deserialize<'de> for PromptTemplateFormat {
 }
 
 pub fn jinja2_formatter(template: &str, kwargs: &HashMap<String, String>) -> Result<String> {
-    let mut result = template.to_string();
-
-    for (key, value) in kwargs {
-        let pattern = format!("{{{{ {} }}}}", key);
-        result = result.replace(&pattern, value);
-
-        let pattern_no_space = format!("{{{{{}}}}}", key);
-        result = result.replace(&pattern_no_space, value);
-    }
-
-    Ok(result)
+    let env = minijinja::Environment::new();
+    let tmpl = env
+        .template_from_str(template)
+        .map_err(|e| Error::Other(format!("Jinja2 template error: {}", e)))?;
+    tmpl.render(kwargs)
+        .map_err(|e| Error::Other(format!("Jinja2 render error: {}", e)))
 }
 
 pub fn mustache_formatter(template: &str, kwargs: &HashMap<String, String>) -> Result<String> {
@@ -106,33 +101,11 @@ pub fn validate_jinja2(template: &str, input_variables: &[String]) -> Result<()>
 }
 
 fn get_jinja2_variables(template: &str) -> HashSet<String> {
-    let mut variables = HashSet::new();
-    let mut chars = template.chars().peekable();
-
-    while let Some(c) = chars.next() {
-        if c == '{' && chars.peek() == Some(&'{') {
-            chars.next(); // consume second '{'
-
-            while chars.peek() == Some(&' ') {
-                chars.next();
-            }
-
-            let mut var_name = String::new();
-            while let Some(&c) = chars.peek() {
-                if c == '}' || c == ' ' || c == '|' || c == '.' {
-                    break;
-                }
-                var_name.push(c);
-                chars.next();
-            }
-
-            if !var_name.is_empty() && !var_name.starts_with('%') && !var_name.starts_with('#') {
-                variables.insert(var_name);
-            }
-        }
+    let env = minijinja::Environment::new();
+    match env.template_from_str(template) {
+        Ok(tmpl) => tmpl.undeclared_variables(false),
+        Err(_) => HashSet::new(),
     }
-
-    variables
 }
 
 pub fn mustache_template_vars(template: &str) -> HashSet<String> {

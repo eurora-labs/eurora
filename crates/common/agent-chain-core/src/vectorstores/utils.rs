@@ -1,3 +1,5 @@
+use simsimd::SpatialSimilarity;
+
 use crate::{Error, Result};
 
 pub fn cosine_similarity(x: &[Vec<f32>], y: &[Vec<f32>]) -> Result<Vec<Vec<f32>>> {
@@ -16,20 +18,20 @@ pub fn cosine_similarity(x: &[Vec<f32>], y: &[Vec<f32>]) -> Result<Vec<Vec<f32>>
         }
     }
 
-    let x_norms: Vec<f32> = x.iter().map(|row| l2_norm(row)).collect();
-    let y_norms: Vec<f32> = y.iter().map(|row| l2_norm(row)).collect();
-
     let mut result = Vec::with_capacity(x.len());
-    for (i, x_row) in x.iter().enumerate() {
+    for x_row in x {
         let mut row = Vec::with_capacity(y.len());
-        for (j, y_row) in y.iter().enumerate() {
-            let dot: f32 = x_row.iter().zip(y_row.iter()).map(|(a, b)| a * b).sum();
-            let denom = x_norms[i] * y_norms[j];
-            let sim = if denom == 0.0 { 0.0 } else { dot / denom };
-            let sim = if sim.is_nan() || sim.is_infinite() {
-                0.0
-            } else {
-                sim
+        for y_row in y {
+            let sim = match f32::cosine(x_row, y_row) {
+                Some(distance) => {
+                    let s = 1.0 - distance as f32;
+                    if s.is_nan() || s.is_infinite() {
+                        0.0
+                    } else {
+                        s
+                    }
+                }
+                None => 0.0,
             };
             row.push(sim);
         }
@@ -37,10 +39,6 @@ pub fn cosine_similarity(x: &[Vec<f32>], y: &[Vec<f32>]) -> Result<Vec<Vec<f32>>
     }
 
     Ok(result)
-}
-
-fn l2_norm(v: &[f32]) -> f32 {
-    v.iter().map(|x| x * x).sum::<f32>().sqrt()
 }
 
 pub fn maximal_marginal_relevance(

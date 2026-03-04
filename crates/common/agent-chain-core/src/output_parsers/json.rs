@@ -129,82 +129,16 @@ impl BaseCumulativeTransformOutputParser for JsonOutputParser {
 
     fn compute_diff(&self, prev: Option<&Value>, next: Value) -> Result<Value> {
         Ok(match prev {
-            Some(prev_value) => compute_json_diff(prev_value, &next),
+            Some(prev_value) => {
+                let patch = json_patch::diff(prev_value, &next);
+                serde_json::to_value(&patch).unwrap_or_default()
+            }
             None => Value::Array(vec![serde_json::json!({
                 "op": "replace",
                 "path": "",
                 "value": next,
             })]),
         })
-    }
-}
-
-fn compute_json_diff(prev: &Value, next: &Value) -> Value {
-    let mut patches = Vec::new();
-    compute_json_diff_recursive(prev, next, "", &mut patches);
-    Value::Array(patches)
-}
-
-fn compute_json_diff_recursive(prev: &Value, next: &Value, path: &str, patches: &mut Vec<Value>) {
-    if prev == next {
-        return;
-    }
-
-    match (prev, next) {
-        (Value::Object(prev_obj), Value::Object(next_obj)) => {
-            for key in prev_obj.keys() {
-                if !next_obj.contains_key(key) {
-                    patches.push(serde_json::json!({
-                        "op": "remove",
-                        "path": format!("{}/{}", path, key),
-                    }));
-                }
-            }
-
-            for (key, next_val) in next_obj {
-                let child_path = format!("{}/{}", path, key);
-                match prev_obj.get(key) {
-                    Some(prev_val) if prev_val != next_val => {
-                        compute_json_diff_recursive(prev_val, next_val, &child_path, patches);
-                    }
-                    None => {
-                        patches.push(serde_json::json!({
-                            "op": "add",
-                            "path": child_path,
-                            "value": next_val,
-                        }));
-                    }
-                    _ => {}
-                }
-            }
-        }
-        (Value::Array(prev_arr), Value::Array(next_arr)) => {
-            let common_len = prev_arr.len().min(next_arr.len());
-            for i in 0..common_len {
-                let child_path = format!("{}/{}", path, i);
-                compute_json_diff_recursive(&prev_arr[i], &next_arr[i], &child_path, patches);
-            }
-            for (i, item) in next_arr.iter().enumerate().skip(common_len) {
-                patches.push(serde_json::json!({
-                    "op": "add",
-                    "path": format!("{}/{}", path, i),
-                    "value": item,
-                }));
-            }
-            for i in common_len..prev_arr.len() {
-                patches.push(serde_json::json!({
-                    "op": "remove",
-                    "path": format!("{}/{}", path, i),
-                }));
-            }
-        }
-        _ => {
-            patches.push(serde_json::json!({
-                "op": "replace",
-                "path": path,
-                "value": next,
-            }));
-        }
     }
 }
 
@@ -295,7 +229,8 @@ mod tests {
     fn test_json_diff() {
         let prev = serde_json::json!({"a": 1, "b": 2});
         let next = serde_json::json!({"a": 1, "b": 3, "c": 4});
-        let diff = compute_json_diff(&prev, &next);
+        let patch = json_patch::diff(&prev, &next);
+        let diff = serde_json::to_value(&patch).unwrap();
 
         assert!(diff.is_array());
         let patches = diff.as_array().unwrap();
