@@ -2,12 +2,13 @@ use async_trait::async_trait;
 use std::fmt::Display;
 
 use crate::messages::{AIMessage, BaseMessage, HumanMessage, get_buffer_string};
+pub use crate::runnables::run_in_executor;
 
 #[async_trait]
 pub trait BaseChatMessageHistory: Send + Sync {
     fn messages(&self) -> Vec<BaseMessage>;
 
-    async fn get_messages_async(&self) -> Vec<BaseMessage> {
+    async fn aget_messages(&self) -> Vec<BaseMessage> {
         self.messages()
     }
 
@@ -25,13 +26,13 @@ pub trait BaseChatMessageHistory: Send + Sync {
 
     fn add_messages(&mut self, messages: &[BaseMessage]);
 
-    async fn add_messages_async(&mut self, messages: Vec<BaseMessage>) {
+    async fn aadd_messages(&mut self, messages: Vec<BaseMessage>) {
         self.add_messages(&messages);
     }
 
     fn clear(&mut self);
 
-    async fn clear_async(&mut self) {
+    async fn aclear(&mut self) {
         self.clear();
     }
 
@@ -69,7 +70,7 @@ impl BaseChatMessageHistory for InMemoryChatMessageHistory {
         self.messages.clone()
     }
 
-    async fn get_messages_async(&self) -> Vec<BaseMessage> {
+    async fn aget_messages(&self) -> Vec<BaseMessage> {
         self.messages.clone()
     }
 
@@ -77,7 +78,7 @@ impl BaseChatMessageHistory for InMemoryChatMessageHistory {
         self.messages.extend(messages.iter().cloned());
     }
 
-    async fn add_messages_async(&mut self, messages: Vec<BaseMessage>) {
+    async fn aadd_messages(&mut self, messages: Vec<BaseMessage>) {
         self.add_messages(&messages);
     }
 
@@ -85,7 +86,7 @@ impl BaseChatMessageHistory for InMemoryChatMessageHistory {
         self.messages.clear();
     }
 
-    async fn clear_async(&mut self) {
+    async fn aclear(&mut self) {
         self.clear();
     }
 }
@@ -217,35 +218,35 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_messages_async() {
+    async fn test_aget_messages() {
         let mut history = InMemoryChatMessageHistory::new();
         history.add_user_message(HumanMessage::builder().content("Hello!").build());
 
-        let messages = history.get_messages_async().await;
+        let messages = history.aget_messages().await;
         assert_eq!(messages.len(), 1);
     }
 
     #[tokio::test]
-    async fn test_add_messages_async() {
+    async fn test_aadd_messages() {
         let mut history = InMemoryChatMessageHistory::new();
         let new_messages = vec![
             BaseMessage::Human(HumanMessage::builder().content("Hello").build()),
             BaseMessage::AI(AIMessage::builder().content("Hi").build()),
         ];
-        history.add_messages_async(new_messages).await;
+        history.aadd_messages(new_messages).await;
 
         let messages = history.messages();
         assert_eq!(messages.len(), 2);
     }
 
     #[tokio::test]
-    async fn test_clear_async() {
+    async fn test_aclear() {
         let mut history = InMemoryChatMessageHistory::new();
         history.add_user_message(HumanMessage::builder().content("Hello!").build());
 
         assert_eq!(history.messages().len(), 1);
 
-        history.clear_async().await;
+        history.aclear().await;
         assert!(history.messages().is_empty());
     }
 }

@@ -95,6 +95,9 @@ pub enum Error {
     #[error("Validation error: {0}")]
     ValidationError(String),
 
+    #[error("Invalid key: {0}")]
+    InvalidKey(String),
+
     #[error("Indexing error: {0}")]
     Indexing(String),
 
