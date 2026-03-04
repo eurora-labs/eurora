@@ -62,10 +62,6 @@ impl TryInto<proto_gen::thread::Thread> for Thread {
     }
 }
 
-// =============================================================================
-// Message Conversions
-// =============================================================================
-
 impl From<Message> for ProtoBaseMessage {
     fn from(msg: Message) -> Self {
         let id = Some(msg.id.to_string());
@@ -134,10 +130,7 @@ impl From<Message> for ProtoBaseMessage {
     }
 }
 
-/// Convert JSON content to ProtoMessageContent
-/// Handles both simple text and multipart content
 fn json_to_proto_message_content(content: &serde_json::Value) -> ProtoMessageContent {
-    // Try to parse as MessageContent format: {"Text": "..."} or {"Parts": [...]}
     if let Some(text) = content.get("Text").and_then(|v| v.as_str()) {
         return ProtoMessageContent {
             content: Some(proto_message_content::Content::Text(text.to_string())),
@@ -170,7 +163,6 @@ fn json_to_proto_message_content(content: &serde_json::Value) -> ProtoMessageCon
         };
     }
 
-    // Fallback: treat as plain string or serialize to string
     let text = match content {
         serde_json::Value::String(s) => s.clone(),
         _ => content.to_string(),
@@ -180,7 +172,6 @@ fn json_to_proto_message_content(content: &serde_json::Value) -> ProtoMessageCon
     }
 }
 
-/// Convert JSON tool_calls to Vec<ProtoToolCall>
 fn json_to_proto_tool_calls(tool_calls: &serde_json::Value) -> Vec<ProtoToolCall> {
     let Some(arr) = tool_calls.as_array() else {
         return vec![];

@@ -121,8 +121,6 @@ pub async fn get_release_handler(
     }
 }
 
-/// Serves the correct artifact format based on the Tauri `{{bundle_type}}` variable
-/// (e.g. .deb for deb installs, .AppImage for appimage installs).
 #[tracing::instrument(skip(state), fields(
     channel = %params.channel,
     target_arch = %params.target_arch,
@@ -232,8 +230,6 @@ pub async fn get_extension_release_handler(
     }
 }
 
-/// Redirects to a presigned S3 URL for the latest release artifact.
-/// Used by website download buttons.
 #[tracing::instrument(skip(state), fields(
     channel = %params.channel,
     target_arch = %params.target_arch
@@ -278,7 +274,6 @@ pub async fn download_handler(
     }
 }
 
-/// Redirects to a presigned S3 URL for a specific bundle type (e.g. deb, rpm, dmg).
 #[tracing::instrument(skip(state), fields(
     channel = %params.channel,
     target_arch = %params.target_arch,

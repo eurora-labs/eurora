@@ -82,13 +82,6 @@ impl AssetFunctionality for ArticleAsset {
     fn get_id(&self) -> &str {
         &self.id
     }
-
-    // fn from_native(asset: NativeAsset) -> Self {
-    //     match asset {
-    //         NativeAsset::Article(article) => Self::from(article),
-    //         _ => panic!("Invalid asset type"),
-    //     }
-    // }
 }
 
 #[async_trait]

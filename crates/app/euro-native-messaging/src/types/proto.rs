@@ -4,9 +4,6 @@ mod proto_types {
 
 pub use proto_types::*;
 
-// The code below is useful only to avoid super ugly frame type
-// to parent frame conversions
-
 impl From<RequestFrame> for Frame {
     fn from(value: RequestFrame) -> Self {
         Frame {

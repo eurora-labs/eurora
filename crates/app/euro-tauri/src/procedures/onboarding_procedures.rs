@@ -1,5 +1,3 @@
-//! Authentication procedures for the Tauri application.
-
 #[taurpc::procedures(path = "onboarding")]
 pub trait OnboardingApi {
     async fn get_browser_extension_download_url() -> Result<String, String>;

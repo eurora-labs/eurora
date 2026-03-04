@@ -3,7 +3,6 @@
 	import { Separator } from '@eurora/ui/components/separator/index';
 	import { SiBluesky, SiDiscord, SiGithub, SiReddit, SiX } from '@icons-pack/svelte-simple-icons';
 	import CopyIcon from '@lucide/svelte/icons/copy';
-	import GlobeIcon from '@lucide/svelte/icons/globe';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import MapPinIcon from '@lucide/svelte/icons/map-pin';
 

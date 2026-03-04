@@ -312,8 +312,6 @@ impl BrowserStrategy {
         true
     }
 
-    /// Resolves the registered messenger PID for a given process name.
-    /// Falls back to the provided `fallback_pid` if no messenger is registered.
     async fn resolve_messenger_pid(&self, process_name: &str, fallback_pid: u32) -> u32 {
         if let Some(service) = &self.bridge_service
             && let Some(pid) = service.find_pid_by_browser_name(process_name).await

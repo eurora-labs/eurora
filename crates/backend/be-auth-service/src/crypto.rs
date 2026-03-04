@@ -115,7 +115,6 @@ mod tests {
     fn test_encrypt_decrypt_roundtrip() {
         let _lock = ENV_MUTEX.lock().unwrap();
 
-        // SAFETY: This is a test-only operation protected by mutex
         unsafe {
             std::env::set_var("PKCE_ENCRYPTION_KEY", TEST_KEY);
         }
@@ -128,7 +127,6 @@ mod tests {
         let decrypted = decrypt_sensitive_string(&encrypted).expect("Decryption should succeed");
         assert_eq!(verifier, decrypted);
 
-        // SAFETY: This is a test-only operation protected by mutex
         unsafe {
             std::env::remove_var("PKCE_ENCRYPTION_KEY");
         }
@@ -138,7 +136,6 @@ mod tests {
     fn test_decrypt_tampered_data_fails() {
         let _lock = ENV_MUTEX.lock().unwrap();
 
-        // SAFETY: This is a test-only operation protected by mutex
         unsafe {
             std::env::set_var("PKCE_ENCRYPTION_KEY", TEST_KEY);
         }
@@ -153,7 +150,6 @@ mod tests {
         let result = decrypt_sensitive_string(&encrypted);
         assert!(result.is_err());
 
-        // SAFETY: This is a test-only operation protected by mutex
         unsafe {
             std::env::remove_var("PKCE_ENCRYPTION_KEY");
         }
@@ -163,7 +159,6 @@ mod tests {
     fn test_missing_key_returns_error() {
         let _lock = ENV_MUTEX.lock().unwrap();
 
-        // SAFETY: This is a test-only operation protected by mutex
         unsafe {
             std::env::remove_var("PKCE_ENCRYPTION_KEY");
         }
@@ -176,7 +171,6 @@ mod tests {
     fn test_invalid_key_length_returns_error() {
         let _lock = ENV_MUTEX.lock().unwrap();
 
-        // SAFETY: This is a test-only operation protected by mutex
         unsafe {
             std::env::set_var("PKCE_ENCRYPTION_KEY", "0123456789abcdef"); // Too short
         }
@@ -184,7 +178,6 @@ mod tests {
         let result = encrypt_sensitive_string("test");
         assert!(matches!(result, Err(CryptoError::InvalidKeyLength(_))));
 
-        // SAFETY: This is a test-only operation protected by mutex
         unsafe {
             std::env::remove_var("PKCE_ENCRYPTION_KEY");
         }

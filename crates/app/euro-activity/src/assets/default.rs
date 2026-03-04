@@ -131,7 +131,6 @@ mod tests {
         assert!(asset.icon.is_none());
         assert!(asset.description.is_none());
         assert!(asset.metadata.is_empty());
-        // ID should be generated
         assert!(!asset.id.is_empty());
     }
 

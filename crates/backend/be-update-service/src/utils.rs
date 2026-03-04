@@ -1,8 +1,5 @@
 use crate::error::UpdateServiceError;
 
-/// Parse target_arch into (target, arch) components.
-/// e.g., "linux-x86_64" -> ("linux", "x86_64")
-///       "darwin-aarch64" -> ("darwin", "aarch64")
 pub fn parse_target_arch(target_arch: &str) -> Result<(String, String), UpdateServiceError> {
     let Some((target, arch)) = target_arch.split_once('-') else {
         return Err(UpdateServiceError::InvalidTargetArch(

@@ -46,7 +46,7 @@ impl EndpointManager {
             .send(channel)
             .map_err(|_| EndpointError::NoSubscribers)?;
         *self.current_url.write().unwrap() = url.to_owned();
-        tracing::info!("Switched API endpoint to {}", url);
+        tracing::info!("Switched API endpoint");
         Ok(())
     }
 }

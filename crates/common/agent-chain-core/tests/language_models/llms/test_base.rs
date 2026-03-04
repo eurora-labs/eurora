@@ -519,6 +519,7 @@ fn test_resolve_cache_instance() {
 }
 
 #[test]
+#[serial_test::serial]
 fn test_resolve_cache_none_returns_global() {
     use agent_chain_core::language_models::resolve_cache;
     use agent_chain_core::set_llm_cache;
@@ -534,6 +535,7 @@ fn test_resolve_cache_none_returns_global() {
 }
 
 #[test]
+#[serial_test::serial]
 fn test_resolve_cache_none_no_global_returns_none() {
     use agent_chain_core::language_models::resolve_cache;
     use agent_chain_core::set_llm_cache;
@@ -544,6 +546,7 @@ fn test_resolve_cache_none_no_global_returns_none() {
 }
 
 #[test]
+#[serial_test::serial]
 fn test_resolve_cache_true_with_global() {
     use agent_chain_core::language_models::{CacheValue, resolve_cache};
     use agent_chain_core::set_llm_cache;
@@ -559,6 +562,7 @@ fn test_resolve_cache_true_with_global() {
 }
 
 #[test]
+#[serial_test::serial]
 fn test_resolve_cache_true_without_global_raises() {
     use agent_chain_core::language_models::{CacheValue, resolve_cache};
     use agent_chain_core::set_llm_cache;

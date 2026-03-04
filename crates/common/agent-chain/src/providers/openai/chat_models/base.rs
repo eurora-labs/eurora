@@ -2319,7 +2319,7 @@ impl ChatOpenAI {
                                             }
                                         }
                                         Err(e) => {
-                                            tracing::warn!("Failed to parse SSE chunk: {e}, data: {data}");
+                                            tracing::warn!("Failed to parse SSE chunk: {e}");
                                         }
                                     }
                                 }

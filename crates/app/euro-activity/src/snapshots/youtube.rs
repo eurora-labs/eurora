@@ -41,12 +41,6 @@ impl YoutubeSnapshot {
     }
 
     pub fn try_from(snapshot: NativeYoutubeSnapshot) -> Result<Self, ActivityError> {
-        // let video_frame_image = if let Some(proto_image) = snapshot.video_frame {
-        //     Some(load_image_from_proto(proto_image)?)
-        // } else {
-        //     None
-        // };
-
         let now = chrono::Utc::now().timestamp() as u64;
 
         Ok(YoutubeSnapshot {

@@ -1,7 +1,7 @@
-import { resolve } from 'path';
-import { readdirSync } from 'fs';
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
+import { readdirSync } from 'fs';
+import { resolve } from 'path';
 
 const libDir = resolve(__dirname, 'src/lib');
 

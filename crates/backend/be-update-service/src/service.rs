@@ -73,7 +73,6 @@ impl AppState {
         Ok(versions)
     }
 
-    /// List all objects under an S3 prefix, paginating to collect everything.
     async fn list_all_objects(&self, prefix: &str) -> Result<Vec<Object>, UpdateServiceError> {
         let mut objects = Vec::new();
 
@@ -93,7 +92,6 @@ impl AppState {
         Ok(objects)
     }
 
-    /// List immediate subdirectory names under a given S3 prefix.
     async fn list_subdirectories(&self, prefix: &str) -> Result<Vec<String>, UpdateServiceError> {
         let mut dirs = Vec::new();
 
@@ -272,10 +270,6 @@ impl AppState {
         })
     }
 
-    /// Find download file candidates in the S3 directory, ordered by priority.
-    ///
-    /// Returns the file key, last-modified timestamp, and the signature content.
-    /// Only files that have a corresponding `.sig` signature are considered.
     #[tracing::instrument(skip(self), fields(directory_prefix, target, ?bundle_type))]
     async fn find_signed_download_file(
         &self,
@@ -391,8 +385,6 @@ impl AppState {
         )))
     }
 
-    /// Find a download file without requiring a `.sig` signature file.
-    /// Used for website downloads where Tauri signature verification is not needed.
     #[tracing::instrument(skip(self), fields(directory_prefix, target, ?bundle_type))]
     async fn find_download_file_unsigned(
         &self,
@@ -485,8 +477,6 @@ impl AppState {
         }))
     }
 
-    /// Get all available platforms for a specific version.
-    /// Returns the platforms map and the maximum last_modified date across all platforms.
     #[tracing::instrument(skip(self), fields(channel, version))]
     async fn get_platforms_for_version(
         &self,
@@ -538,9 +528,6 @@ impl AppState {
         Ok((platforms, pub_date))
     }
 
-    /// Get the latest extension versions for all browsers in a specific channel.
-    ///
-    /// S3 structure: extensions/{channel}/{browser}/{version}/
     #[tracing::instrument(skip(self), fields(channel))]
     pub async fn get_extension_release(
         &self,
@@ -706,7 +693,6 @@ fn update_max(current: &mut Option<DateTime<Utc>>, candidate: DateTime<Utc>) {
     }
 }
 
-/// Strip semver pre-release and build metadata, keeping only major.minor.patch.
 fn strip_build_metadata(version_str: &str) -> String {
     match Version::parse(version_str) {
         Ok(v) => format!("{}.{}.{}", v.major, v.minor, v.patch),

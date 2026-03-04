@@ -83,7 +83,6 @@ where
 
     let len = u32::from_le_bytes(len_buf) as usize;
     if len == 0 {
-        // Chrome native messaging always sends valid JSON; empty is invalid.
         return Err(anyhow!("received empty frame (length = 0)"));
     }
 

@@ -1,8 +1,3 @@
-//! No strategy implementation for when snapshots should be skipped
-//!
-//! This strategy is used when the focused process is the application itself
-//! (Eurora) to avoid unnecessary snapshot retrieval calls.
-
 use async_trait::async_trait;
 use euro_process::EuroraNightly;
 use focus_tracker::FocusedWindow;

@@ -110,11 +110,11 @@ impl From<ActivityServiceError> for Status {
             ActivityServiceError::NotFound(_) => {
                 tracing::debug!("Resource not found: {}", message);
             }
-            ActivityServiceError::Database(e) => {
-                tracing::error!("Database error: {} (source: {:?})", message, e);
+            ActivityServiceError::Database(_) => {
+                tracing::error!("Database error: {}", message);
             }
-            ActivityServiceError::Storage(e) => {
-                tracing::error!("Storage error: {} (source: {:?})", message, e);
+            ActivityServiceError::Storage(_) => {
+                tracing::error!("Storage error: {}", message);
             }
             ActivityServiceError::Internal(_) => {
                 tracing::error!("Internal error: {}", message);

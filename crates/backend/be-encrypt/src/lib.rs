@@ -1,14 +1,3 @@
-//! Backend encryption for assets at rest.
-//!
-//! Uses XChaCha20-Poly1305 (AEAD) with HKDF-SHA256 key derivation,
-//! producing a file format byte-compatible with `euro-encrypt`.
-//!
-//! ## File Format
-//!
-//! ```text
-//! [MAGIC:8][VERSION:1][TAG_LEN:2][TAG:variable][SALT:32][NONCE:24][CIPHERTEXT:variable]
-//! ```
-
 mod error;
 
 pub use error::{EncryptError, EncryptResult};
@@ -23,16 +12,12 @@ use rand::RngCore;
 use sha2::Sha256;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-/// Magic bytes identifying encrypted files (shared with `euro-encrypt`).
 pub const MAGIC: &[u8; 8] = b"EURFILES";
 
-/// Current file format version.
 const VERSION: u8 = 1;
 
-/// HKDF info parameter for domain separation (shared with `euro-encrypt`).
 const FEK_INFO: &[u8] = b"EURORA-FEK-v1";
 
-/// Main encryption key (32 bytes). Automatically zeroized on drop.
 #[derive(Zeroize, ZeroizeOnDrop, Clone)]
 pub struct MainKey(pub [u8; 32]);
 
@@ -43,7 +28,6 @@ impl std::fmt::Debug for MainKey {
 }
 
 impl MainKey {
-    /// Generate a new random key.
     pub fn generate() -> EncryptResult<Self> {
         let mut bytes = [0u8; 32];
         rand::rng().fill_bytes(&mut bytes);
@@ -53,7 +37,6 @@ impl MainKey {
         Ok(key)
     }
 
-    /// Decode a key from a base64 string.
     pub fn from_base64(s: &str) -> EncryptResult<Self> {
         let decoded = BASE64_STANDARD
             .decode(s.trim())
@@ -66,12 +49,10 @@ impl MainKey {
         Ok(key)
     }
 
-    /// Encode the key as a base64 string.
     pub fn to_base64(&self) -> String {
         BASE64_STANDARD.encode(self.0)
     }
 
-    /// Validate key is not weak (all zeros or uniform bytes).
     pub fn validate(&self) -> EncryptResult<()> {
         if self.0.iter().all(|&b| b == 0) {
             return Err(EncryptError::Format(
@@ -87,7 +68,6 @@ impl MainKey {
         Ok(())
     }
 
-    /// Derive a per-file encryption key via HKDF-SHA256.
     fn derive_fek(&self, salt: &[u8; 32]) -> EncryptResult<Key> {
         if salt.iter().all(|&b| b == 0) {
             return Err(EncryptError::Format("Salt cannot be all zeros".to_string()));
@@ -106,7 +86,6 @@ impl MainKey {
     }
 }
 
-/// Encrypt plaintext bytes, returning the full encrypted blob (header + ciphertext).
 pub fn encrypt(mk: &MainKey, plaintext: &[u8], tag: &str) -> EncryptResult<Vec<u8>> {
     if tag.is_empty() {
         return Err(EncryptError::Format("Tag cannot be empty".to_string()));
@@ -156,7 +135,6 @@ pub fn encrypt(mk: &MainKey, plaintext: &[u8], tag: &str) -> EncryptResult<Vec<u
     Ok(out)
 }
 
-/// Decrypt an encrypted blob (header + ciphertext), returning the plaintext bytes.
 pub fn decrypt(mk: &MainKey, data: &[u8]) -> EncryptResult<Vec<u8>> {
     let header = parse_header(data)?;
 
@@ -192,7 +170,6 @@ pub fn decrypt(mk: &MainKey, data: &[u8]) -> EncryptResult<Vec<u8>> {
     Ok(plaintext)
 }
 
-/// Check whether a byte slice starts with the encrypted file magic bytes.
 pub fn is_encrypted(bytes: &[u8]) -> bool {
     bytes.len() >= MAGIC.len() && bytes[..MAGIC.len()] == *MAGIC
 }
@@ -232,7 +209,6 @@ fn parse_header(buf: &[u8]) -> EncryptResult<FileHeader> {
         return Err(EncryptError::Format("Header too short".to_string()));
     }
 
-    // Constant-time magic comparison
     let mut magic_match = true;
     for (a, b) in buf[..MAGIC.len()].iter().zip(MAGIC.iter()) {
         if a != b {
@@ -375,7 +351,6 @@ mod tests {
         let key = test_key();
         let mut encrypted = encrypt(&key, b"data", "test").unwrap();
 
-        // Flip a byte in the ciphertext
         let last = encrypted.len() - 1;
         encrypted[last] ^= 0xFF;
 

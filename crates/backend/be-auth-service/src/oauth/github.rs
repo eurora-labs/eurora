@@ -1,23 +1,28 @@
 use std::env;
 use std::time::Duration;
 
+use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
 
 use super::OAuthError;
 
 #[derive(Debug, Clone)]
 pub struct GitHubOAuthConfig {
-    pub client_id: String,
-    pub client_secret: String,
+    pub client_id: SecretString,
+    pub client_secret: SecretString,
     pub redirect_uri: String,
 }
 
 impl GitHubOAuthConfig {
     pub fn from_env() -> Result<Self, OAuthError> {
-        let client_id = env::var("GITHUB_CLIENT_ID")
-            .map_err(|_| OAuthError::MissingEnvVar("GITHUB_CLIENT_ID"))?;
-        let client_secret = env::var("GITHUB_CLIENT_SECRET")
-            .map_err(|_| OAuthError::MissingEnvVar("GITHUB_CLIENT_SECRET"))?;
+        let client_id = SecretString::from(
+            env::var("GITHUB_CLIENT_ID")
+                .map_err(|_| OAuthError::MissingEnvVar("GITHUB_CLIENT_ID"))?,
+        );
+        let client_secret = SecretString::from(
+            env::var("GITHUB_CLIENT_SECRET")
+                .map_err(|_| OAuthError::MissingEnvVar("GITHUB_CLIENT_SECRET"))?,
+        );
         let redirect_uri = env::var("GITHUB_REDIRECT_URI")
             .map_err(|_| OAuthError::MissingEnvVar("GITHUB_REDIRECT_URI"))?;
 
@@ -78,7 +83,7 @@ impl GitHubOAuthClient {
     pub fn get_authorization_url(&self, state: &str, pkce_challenge: &str) -> String {
         format!(
             "https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}&state={}&scope=user:email&code_challenge={}&code_challenge_method=S256",
-            url_encode(&self.config.client_id),
+            url_encode(self.config.client_id.expose_secret()),
             url_encode(&self.config.redirect_uri),
             url_encode(state),
             url_encode(pkce_challenge),
@@ -96,8 +101,8 @@ impl GitHubOAuthClient {
             .post("https://github.com/login/oauth/access_token")
             .header("Accept", "application/json")
             .form(&[
-                ("client_id", self.config.client_id.as_str()),
-                ("client_secret", self.config.client_secret.as_str()),
+                ("client_id", self.config.client_id.expose_secret()),
+                ("client_secret", self.config.client_secret.expose_secret()),
                 ("code", code),
                 ("redirect_uri", self.config.redirect_uri.as_str()),
                 ("code_verifier", pkce_verifier),
@@ -160,7 +165,7 @@ impl GitHubOAuthClient {
             name: user.name.unwrap_or(user.login.clone()),
             username: user.login,
             picture: user.avatar_url,
-            access_token,
+            access_token: SecretString::from(access_token),
             scope,
         })
     }
@@ -174,7 +179,7 @@ pub struct GitHubUserInfo {
     pub name: String,
     pub username: String,
     pub picture: Option<String>,
-    pub access_token: String,
+    pub access_token: SecretString,
     pub scope: String,
 }
 

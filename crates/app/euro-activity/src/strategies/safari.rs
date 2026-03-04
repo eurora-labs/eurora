@@ -1,22 +1,3 @@
-//! Browser strategy implementation for the activity system
-//!
-//! This module uses the singleton gRPC server from `euro_browser` crate to accept
-//! connections from multiple native messaging hosts (euro-native-messaging). Each
-//! host registers with its browser PID, allowing the server to route requests to
-//! the correct browser.
-//!
-//! ## Hybrid push/pull collection model
-//!
-//! The browser extension proactively sends metadata, assets and snapshots as
-//! Event frames whenever the browser window is focused.  The strategy subscribes
-//! to these events and forwards them through the `ActivityReport` channel.
-//!
-//! When Safari is re-focused (same browser PID), the strategy also sends a
-//! `GET_METADATA` request via the gRPC stream.  The Safari extension picks this
-//! up through its 500ms polling loop (`safari-poller.ts`) and responds with the
-//! current tab metadata.  This avoids the unreliable
-//! `SFSafariApplication.dispatchMessage` path.
-
 pub use crate::strategies::ActivityStrategyFunctionality;
 pub use crate::strategies::processes::*;
 use crate::strategies::{ActivityReport, StrategyMetadata};
@@ -64,16 +45,6 @@ impl SafariStrategy {
         Ok(())
     }
 
-    /// Subscribe to the event stream coming from browser extensions.
-    ///
-    /// The extension now pushes three kinds of events:
-    ///
-    /// | `action`         | Payload type       | What we do                          |
-    /// |------------------|--------------------|-------------------------------------|
-    /// | `TAB_UPDATED`    | `NativeMetadata`   | Create a new `Activity`             |
-    /// | `TAB_ACTIVATED`  | `NativeMetadata`   | Create a new `Activity`             |
-    /// | `ASSETS`         | Any asset variant  | Forward as `ActivityReport::Assets` |
-    /// | `SNAPSHOT`       | Any snapshot variant | Forward as `ActivityReport::Snapshots` |
     async fn init_collection(&mut self, _focus_window: &FocusedWindow) -> ActivityResult<()> {
         let Some(sender) = self.sender.clone() else {
             return Err(ActivityError::Strategy(

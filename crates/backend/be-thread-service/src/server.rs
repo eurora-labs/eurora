@@ -33,9 +33,6 @@ use crate::tools::firecrawl_search_tool;
 
 const BASE_NEBUL_URL: &str = "https://api.inference.nebul.io/v1";
 
-/// When running inside Docker (`RUNNING_EURORA_FULLY_LOCAL=true`), rewrite
-/// `localhost` / `127.0.0.1` to `host.docker.internal` so the container can
-/// reach services on the host machine.
 fn resolve_host_url(url: &str) -> String {
     let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
         .map(|v| v.eq_ignore_ascii_case("true"))
@@ -268,7 +265,7 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        tracing::info!("Created thread {} for user {}", thread.id, user_id);
+        tracing::info!("Created thread {}", thread.id);
 
         Ok(Response::new(CreateThreadResponse {
             thread: Some(Self::db_thread_to_proto(thread)),
@@ -299,7 +296,7 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        tracing::info!("Listed {} threads for user {}", threads.len(), user_id);
+        tracing::info!("Listed {} threads", threads.len());
 
         Ok(Response::new(ListThreadsResponse {
             threads: threads.into_iter().map(Self::db_thread_to_proto).collect(),
@@ -343,11 +340,7 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        tracing::info!(
-            "Added human message to thread {} for user {}",
-            thread_id,
-            user_id
-        );
+        tracing::info!("Added human message to thread {}", thread_id);
 
         Ok(Response::new(AddHumanMessageResponse {
             message: Some(message.into()),
@@ -392,11 +385,7 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        tracing::info!(
-            "Added hidden human message to thread {} for user {}",
-            thread_id,
-            user_id
-        );
+        tracing::info!("Added hidden human message to thread {}", thread_id);
 
         Ok(Response::new(AddHiddenHumanMessageResponse {
             message: Some(message.into()),
@@ -440,11 +429,7 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        tracing::info!(
-            "Added system message to thread {} for user {}",
-            thread_id,
-            user_id
-        );
+        tracing::info!("Added system message to thread {}", thread_id);
 
         Ok(Response::new(AddSystemMessageResponse {
             message: Some(message.into()),
@@ -467,16 +452,8 @@ impl ProtoThreadService for ThreadService {
                 source: e,
             })?;
 
-        tracing::debug!(
-            "ChatStream: user_id = {}, thread_id = {}",
-            user_id,
-            thread_id
-        );
+        tracing::debug!("ChatStream: thread_id = {}", thread_id);
 
-        // TODO: this is incorrect. This is essentially
-        // a replacement for proper agent-driven rag
-        // that should be implemented alongside agent-graph.
-        // For now this is fineeee
         let mut hidden_messages = self
             .db
             .list_messages()
@@ -800,7 +777,6 @@ impl ProtoThreadService for ThreadService {
             false => title,
         };
 
-        // Capitalize the first letter of the title
         if let Some(first) = title.chars().next() {
             let rest = &title[first.len_utf8()..];
             title = first.to_uppercase().collect::<String>() + rest;

@@ -6,9 +6,6 @@ pub(crate) const GRPC_BYPASS_SERVICES: &[&str] = &[
     "local_settings_service.ProtoLocalSettingsService",
 ];
 
-/// Normalize a URL path by stripping the query string / fragment, percent-
-/// decoding each segment, and resolving `.` and `..` to prevent bypass via
-/// path traversal—including percent-encoded variants like `%2e%2e`.
 fn normalize_path(path: &str) -> String {
     use percent_encoding::percent_decode_str;
 
@@ -93,15 +90,10 @@ mod tests {
 
     #[test]
     fn rest_bypass_rejects_percent_encoded_traversal() {
-        // %2e = '.', %2f = '/'
         assert!(!is_rest_bypass("/releases/%2e%2e/payment/checkout"));
         assert!(!is_rest_bypass("/extensions/%2e%2e/admin/users"));
-        // %2E%2E resolves to ".." → path becomes /payment/webhook (a legit bypass)
         assert!(is_rest_bypass("/releases/%2E%2E/payment/webhook"));
-        // Mixed literal and encoded
         assert!(!is_rest_bypass("/releases/.%2e/payment/checkout"));
-        // %2f decodes to '/' inside a segment but doesn't create a path split,
-        // so "/.." stays as one segment → path remains under /releases/
         assert!(is_rest_bypass("/releases/%2f%2e%2e/admin"));
     }
 

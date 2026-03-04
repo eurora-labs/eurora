@@ -211,7 +211,7 @@ impl AssetService {
                 })?;
         }
 
-        tracing::debug!("Created asset {} for user {}", asset.id, user_id);
+        tracing::debug!("Created asset {}", asset.id);
 
         Ok(AssetResponse {
             asset: Some(Self::db_asset_to_proto(&asset)),
