@@ -1,6 +1,8 @@
-use serde_json::Value;
 use std::collections::HashMap;
 use std::env;
+use std::sync::LazyLock;
+
+use serde_json::Value;
 
 use super::mapping::{DEFAULT_NAMESPACES, DISALLOW_LOAD_FROM_PATH, get_all_serializable_mappings};
 use super::serializable::LC_VERSION;
@@ -276,69 +278,40 @@ pub fn loads_with_namespaces(text: &str, namespaces: Vec<String>) -> Result<Valu
     loads(text, Some(config))
 }
 
-use std::sync::LazyLock;
+pub type ConstructorFn = fn(&Value) -> Result<Value>;
 
-use crate::agents::{AgentAction, AgentFinish};
-use crate::documents::Document;
-use crate::messages::{
-    AIMessage, AIMessageChunk, ChatMessage, ChatMessageChunk, HumanMessage, HumanMessageChunk,
-    SystemMessage, SystemMessageChunk, ToolMessage,
-};
-use crate::output_parsers::StrOutputParser;
-use crate::prompt_values::{ChatPromptValue, StringPromptValue};
-use crate::prompts::{
-    AIMessagePromptTemplate, ChatMessagePromptTemplate, ChatPromptTemplate,
-    HumanMessagePromptTemplate, MessagesPlaceholder, PromptTemplate, SystemMessagePromptTemplate,
-};
+pub struct ConstructorEntry {
+    pub lc_id: fn() -> Vec<String>,
+    pub constructor: ConstructorFn,
+}
 
-type ConstructorFn = fn(&Value) -> Result<Value>;
+inventory::collect!(ConstructorEntry);
 
-fn register_constructor<T>(registry: &mut HashMap<String, ConstructorFn>)
+pub fn deserialize_constructor<T>(kwargs: &Value) -> Result<Value>
 where
-    T: serde::de::DeserializeOwned + serde::Serialize + super::serializable::Serializable,
+    T: serde::de::DeserializeOwned + serde::Serialize,
 {
-    let id = T::lc_id();
-    let key = id.join(":");
-    let constructor: ConstructorFn = |kwargs| {
-        let obj: T = serde_json::from_value(kwargs.clone())?;
-        let value = serde_json::to_value(&obj)?;
-        Ok(value)
-    };
-    registry.insert(key, constructor);
-
-    let mappings = get_all_serializable_mappings();
-    for (old_path, new_path) in &mappings {
-        if *old_path == id {
-            let mapped_key = new_path.join(":");
-            registry.insert(mapped_key, constructor);
-        }
-    }
+    let obj: T = serde_json::from_value(kwargs.clone())?;
+    Ok(serde_json::to_value(&obj)?)
 }
 
 static CONSTRUCTOR_REGISTRY: LazyLock<HashMap<String, ConstructorFn>> = LazyLock::new(|| {
     let mut registry = HashMap::new();
-    register_constructor::<AIMessage>(&mut registry);
-    register_constructor::<HumanMessage>(&mut registry);
-    register_constructor::<SystemMessage>(&mut registry);
-    register_constructor::<ToolMessage>(&mut registry);
-    register_constructor::<ChatMessage>(&mut registry);
-    register_constructor::<Document>(&mut registry);
-    register_constructor::<PromptTemplate>(&mut registry);
-    register_constructor::<ChatPromptTemplate>(&mut registry);
-    register_constructor::<MessagesPlaceholder>(&mut registry);
-    register_constructor::<HumanMessagePromptTemplate>(&mut registry);
-    register_constructor::<AIMessagePromptTemplate>(&mut registry);
-    register_constructor::<SystemMessagePromptTemplate>(&mut registry);
-    register_constructor::<ChatMessagePromptTemplate>(&mut registry);
-    register_constructor::<StrOutputParser>(&mut registry);
-    register_constructor::<AIMessageChunk>(&mut registry);
-    register_constructor::<HumanMessageChunk>(&mut registry);
-    register_constructor::<SystemMessageChunk>(&mut registry);
-    register_constructor::<ChatMessageChunk>(&mut registry);
-    register_constructor::<StringPromptValue>(&mut registry);
-    register_constructor::<ChatPromptValue>(&mut registry);
-    register_constructor::<AgentAction>(&mut registry);
-    register_constructor::<AgentFinish>(&mut registry);
+    let mappings = get_all_serializable_mappings();
+
+    for entry in inventory::iter::<ConstructorEntry> {
+        let id = (entry.lc_id)();
+        let key = id.join(":");
+        registry.insert(key, entry.constructor);
+
+        for (old_path, new_path) in &mappings {
+            if *old_path == id {
+                let mapped_key = new_path.join(":");
+                registry.insert(mapped_key, entry.constructor);
+            }
+        }
+    }
+
     registry
 });
 

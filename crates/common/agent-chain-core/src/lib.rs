@@ -1,5 +1,17 @@
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
+pub mod load;
+
+#[macro_export]
+macro_rules! submit_constructor {
+    ($ty:ty) => {
+        inventory::submit!($crate::load::ConstructorEntry {
+            lc_id: <$ty as $crate::load::Serializable>::lc_id,
+            constructor: $crate::load::deserialize_constructor::<$ty>,
+        });
+    };
+}
+
 pub mod agents;
 pub mod api;
 pub mod caches;
@@ -16,7 +28,6 @@ pub mod example_selectors;
 pub mod globals;
 pub mod indexing;
 pub mod language_models;
-pub mod load;
 pub mod messages;
 pub mod output_parsers;
 pub mod outputs;

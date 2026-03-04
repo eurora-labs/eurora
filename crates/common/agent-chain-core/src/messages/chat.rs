@@ -557,3 +557,6 @@ impl Serializable for ChatMessageChunk {
         ]
     }
 }
+
+submit_constructor!(ChatMessage);
+submit_constructor!(ChatMessageChunk);

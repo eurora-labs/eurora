@@ -355,6 +355,8 @@ impl Serializable for Document {
     }
 }
 
+submit_constructor!(Document);
+
 #[cfg(test)]
 mod tests {
     use super::*;
