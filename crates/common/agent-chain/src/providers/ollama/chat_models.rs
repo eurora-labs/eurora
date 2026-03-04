@@ -75,68 +75,48 @@ pub enum KeepAlive {
 /// let messages = vec![HumanMessage::builder().content("Hello!").build().into()];
 /// let response = model.generate(messages, GenerateConfig::default()).await?;
 /// ```
-#[derive(Debug)]
+#[derive(Debug, bon::Builder)]
+#[builder(on(String, into))]
 pub struct ChatOllama {
-    /// Model name/identifier.
     model: String,
-    /// Temperature for generation (0.0 - 1.0).
     temperature: Option<f64>,
-    /// Base URL for API requests. `None` means use `OLLAMA_HOST` env var or default.
     base_url: Option<String>,
-    /// Whether to validate the model exists on initialization.
+    #[builder(default)]
     validate_model_on_init: bool,
-    /// Enable Mirostat sampling (0 = disabled, 1 = Mirostat, 2 = Mirostat 2.0).
     mirostat: Option<i32>,
-    /// Mirostat learning rate (eta).
     mirostat_eta: Option<f64>,
-    /// Mirostat target entropy (tau).
     mirostat_tau: Option<f64>,
-    /// Context window size.
     num_ctx: Option<u32>,
-    /// Number of GPUs to use.
     num_gpu: Option<i32>,
-    /// Number of threads.
     num_thread: Option<i32>,
-    /// Maximum tokens to predict.
     num_predict: Option<i32>,
-    /// Repeat last n tokens for penalty.
     repeat_last_n: Option<i32>,
-    /// Repeat penalty.
     repeat_penalty: Option<f64>,
-    /// Random seed.
     seed: Option<i64>,
-    /// Stop sequences.
     stop: Option<Vec<String>>,
-    /// Tail free sampling parameter.
     tfs_z: Option<f64>,
-    /// Top-k sampling.
     top_k: Option<i32>,
-    /// Top-p (nucleus) sampling.
     top_p: Option<f64>,
-    /// Output format (empty string, "json", or JSON schema).
     format: Option<OllamaFormat>,
-    /// How long to keep model in memory.
     keep_alive: Option<KeepAlive>,
-    /// Controls reasoning/thinking mode for supported models.
-    /// Supports `true`/`false` or string intensities like `"low"`, `"medium"`, `"high"`.
+    #[builder(into)]
     reasoning: Option<serde_json::Value>,
     output_version: Option<String>,
-    /// Additional kwargs to pass to the HTTP clients. Pass headers in here.
-    /// These arguments are passed to both synchronous and async clients.
+    #[builder(default)]
     client_kwargs: HashMap<String, serde_json::Value>,
-    /// Additional kwargs for async client only.
+    #[builder(default)]
     async_client_kwargs: HashMap<String, serde_json::Value>,
-    /// Additional kwargs for sync client only.
+    #[builder(default)]
     sync_client_kwargs: HashMap<String, serde_json::Value>,
-    /// Chat model configuration.
+    #[builder(skip)]
     chat_model_config: ChatModelConfig,
-    /// Language model configuration.
+    #[builder(skip)]
     language_model_config: LanguageModelConfig,
-    /// Whether the model has been validated (for lazy validation).
+    #[builder(skip)]
     model_validated: std::sync::atomic::AtomicBool,
-    /// Tools bound to this model via `bind_tools()`.
+    #[builder(skip)]
     bound_tools: Vec<ToolDefinition>,
-    /// Tool choice for bound tools.
+    #[builder(skip)]
     bound_tool_choice: Option<ToolChoice>,
 }
 
@@ -194,151 +174,8 @@ pub enum OllamaFormat {
 
 impl ChatOllama {
     /// Create a new ChatOllama instance.
-    ///
-    /// # Arguments
-    ///
-    /// * `model` - The model name (e.g., "llama3.1", "mistral").
     pub fn new(model: impl Into<String>) -> Self {
-        Self {
-            model: model.into(),
-            temperature: None,
-            base_url: None,
-            validate_model_on_init: false,
-            mirostat: None,
-            mirostat_eta: None,
-            mirostat_tau: None,
-            num_ctx: None,
-            num_gpu: None,
-            num_thread: None,
-            num_predict: None,
-            repeat_last_n: None,
-            repeat_penalty: None,
-            seed: None,
-            stop: None,
-            tfs_z: None,
-            top_k: None,
-            top_p: None,
-            format: None,
-            keep_alive: None,
-            reasoning: None,
-            output_version: None,
-            client_kwargs: HashMap::new(),
-            async_client_kwargs: HashMap::new(),
-            sync_client_kwargs: HashMap::new(),
-            chat_model_config: ChatModelConfig::builder().build(),
-            language_model_config: LanguageModelConfig::builder().build(),
-            model_validated: std::sync::atomic::AtomicBool::new(false),
-            bound_tools: Vec::new(),
-            bound_tool_choice: None,
-        }
-    }
-
-    /// Set the temperature.
-    pub fn temperature(mut self, temp: f64) -> Self {
-        self.temperature = Some(temp);
-        self
-    }
-
-    /// Set the base URL for Ollama API.
-    pub fn base_url(mut self, url: impl Into<String>) -> Self {
-        self.base_url = Some(url.into());
-        self
-    }
-
-    /// Set whether to validate the model on initialization.
-    pub fn validate_model_on_init(mut self, validate: bool) -> Self {
-        self.validate_model_on_init = validate;
-        self
-    }
-
-    /// Set the Mirostat sampling mode.
-    pub fn mirostat(mut self, mode: i32) -> Self {
-        self.mirostat = Some(mode);
-        self
-    }
-
-    /// Set the Mirostat learning rate.
-    pub fn mirostat_eta(mut self, eta: f64) -> Self {
-        self.mirostat_eta = Some(eta);
-        self
-    }
-
-    /// Set the Mirostat target entropy.
-    pub fn mirostat_tau(mut self, tau: f64) -> Self {
-        self.mirostat_tau = Some(tau);
-        self
-    }
-
-    /// Set the context window size.
-    pub fn num_ctx(mut self, ctx: u32) -> Self {
-        self.num_ctx = Some(ctx);
-        self
-    }
-
-    /// Set the number of GPUs.
-    pub fn num_gpu(mut self, gpu: i32) -> Self {
-        self.num_gpu = Some(gpu);
-        self
-    }
-
-    /// Set the number of threads.
-    pub fn num_thread(mut self, thread: i32) -> Self {
-        self.num_thread = Some(thread);
-        self
-    }
-
-    /// Set the maximum tokens to predict.
-    pub fn num_predict(mut self, predict: i32) -> Self {
-        self.num_predict = Some(predict);
-        self
-    }
-
-    /// Set the repeat last n tokens.
-    pub fn repeat_last_n(mut self, n: i32) -> Self {
-        self.repeat_last_n = Some(n);
-        self
-    }
-
-    /// Set the repeat penalty.
-    pub fn repeat_penalty(mut self, penalty: f64) -> Self {
-        self.repeat_penalty = Some(penalty);
-        self
-    }
-
-    /// Set the random seed.
-    pub fn seed(mut self, seed: i64) -> Self {
-        self.seed = Some(seed);
-        self
-    }
-
-    /// Set stop sequences.
-    pub fn stop(mut self, sequences: Vec<String>) -> Self {
-        self.stop = Some(sequences);
-        self
-    }
-
-    /// Set the tail free sampling parameter.
-    pub fn tfs_z(mut self, z: f64) -> Self {
-        self.tfs_z = Some(z);
-        self
-    }
-
-    /// Set top-k sampling.
-    pub fn top_k(mut self, k: i32) -> Self {
-        self.top_k = Some(k);
-        self
-    }
-
-    /// Set top-p sampling.
-    pub fn top_p(mut self, p: f64) -> Self {
-        self.top_p = Some(p);
-        self
-    }
-
-    /// Set the output format.
-    pub fn format(mut self, format: OllamaFormat) -> Self {
-        self.format = Some(format);
-        self
+        ChatOllama::builder().model(model).build()
     }
 
     /// Set JSON mode.
@@ -356,38 +193,6 @@ impl ChatOllama {
     /// Set how long to keep the model in memory (seconds).
     pub fn keep_alive_seconds(mut self, seconds: i64) -> Self {
         self.keep_alive = Some(KeepAlive::Seconds(seconds));
-        self
-    }
-
-    /// Set reasoning/thinking mode.
-    ///
-    /// Accepts `true`/`false` to enable/disable, or a string intensity like
-    /// `"low"`, `"medium"`, `"high"` for supported models.
-    pub fn reasoning(mut self, value: impl Into<serde_json::Value>) -> Self {
-        self.reasoning = Some(value.into());
-        self
-    }
-
-    pub fn output_version(mut self, version: impl Into<String>) -> Self {
-        self.output_version = Some(version.into());
-        self
-    }
-
-    /// Set additional client kwargs.
-    pub fn client_kwargs(mut self, kwargs: HashMap<String, serde_json::Value>) -> Self {
-        self.client_kwargs = kwargs;
-        self
-    }
-
-    /// Set additional async client kwargs.
-    pub fn async_client_kwargs(mut self, kwargs: HashMap<String, serde_json::Value>) -> Self {
-        self.async_client_kwargs = kwargs;
-        self
-    }
-
-    /// Set additional sync client kwargs.
-    pub fn sync_client_kwargs(mut self, kwargs: HashMap<String, serde_json::Value>) -> Self {
-        self.sync_client_kwargs = kwargs;
         self
     }
 
@@ -1600,12 +1405,14 @@ mod tests {
 
     #[test]
     fn test_builder_methods() {
-        let model = ChatOllama::new("llama3.1")
+        let model = ChatOllama::builder()
+            .model("llama3.1")
             .temperature(0.7)
-            .num_ctx(4096)
+            .num_ctx(4096u32)
             .top_p(0.9)
             .repeat_penalty(1.1)
-            .validate_model_on_init(true);
+            .validate_model_on_init(true)
+            .build();
 
         assert_eq!(model.temperature, Some(0.7));
         assert_eq!(model.num_ctx, Some(4096));
@@ -1619,7 +1426,10 @@ mod tests {
         let model = ChatOllama::new("llama3.1");
         assert!(model.base_url.is_none());
 
-        let model = ChatOllama::new("llama3.1").base_url("http://custom:8080");
+        let model = ChatOllama::builder()
+            .model("llama3.1")
+            .base_url("http://custom:8080")
+            .build();
         assert_eq!(model.base_url, Some("http://custom:8080".to_string()));
     }
 
@@ -1632,16 +1442,25 @@ mod tests {
 
     #[test]
     fn test_reasoning_bool() {
-        let model = ChatOllama::new("deepseek-r1").reasoning(true);
+        let model = ChatOllama::builder()
+            .model("deepseek-r1")
+            .reasoning(true)
+            .build();
         assert!(model.is_reasoning_enabled());
 
-        let model = ChatOllama::new("deepseek-r1").reasoning(false);
+        let model = ChatOllama::builder()
+            .model("deepseek-r1")
+            .reasoning(false)
+            .build();
         assert!(!model.is_reasoning_enabled());
     }
 
     #[test]
     fn test_reasoning_string() {
-        let model = ChatOllama::new("deepseek-r1").reasoning("high");
+        let model = ChatOllama::builder()
+            .model("deepseek-r1")
+            .reasoning("high")
+            .build();
         assert!(model.is_reasoning_enabled());
         assert_eq!(
             model.reasoning,
@@ -1651,7 +1470,10 @@ mod tests {
 
     #[test]
     fn test_stop_both_set_errors() {
-        let model = ChatOllama::new("llama3.1").stop(vec!["foo".to_string()]);
+        let model = ChatOllama::builder()
+            .model("llama3.1")
+            .stop(vec!["foo".to_string()])
+            .build();
         let result = model.build_options(Some(vec!["bar".to_string()]));
         assert!(result.is_err());
     }
@@ -1794,7 +1616,10 @@ mod tests {
 
     #[test]
     fn test_get_base_url_explicit() {
-        let model = ChatOllama::new("llama3.1").base_url("http://custom:8080");
+        let model = ChatOllama::builder()
+            .model("llama3.1")
+            .base_url("http://custom:8080")
+            .build();
         let url = model.get_base_url();
         assert_eq!(url, "http://custom:8080");
     }
