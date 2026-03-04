@@ -10,9 +10,7 @@ use crate::prompt_values::StringPromptValue;
 use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
 
-use super::base::{
-    BasePromptTemplate, FormatOutputType, PartialValue, merge_prompt_config, resolve_partials,
-};
+use super::base::{BasePromptTemplate, PartialValue, merge_prompt_config, resolve_partials};
 use super::string::{PromptTemplateFormat, format_template, get_template_variables};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -125,7 +123,7 @@ impl BasePromptTemplate for ImagePromptTemplate {
         &self.input_variables
     }
 
-    fn format(&self, kwargs: &HashMap<String, String>) -> Result<FormatOutputType> {
+    fn format(&self, kwargs: &HashMap<String, String>) -> Result<String> {
         let image_url = self.format_image(kwargs)?;
         serde_json::to_string(&image_url).map_err(|e| Error::Other(e.to_string()))
     }

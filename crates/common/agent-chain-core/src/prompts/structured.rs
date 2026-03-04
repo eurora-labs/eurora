@@ -36,7 +36,7 @@ impl StructuredPrompt {
     ) -> Result<Self> {
         warn_beta(
             BetaParams {
-                message: Some("StructuredPrompt is in beta. It is actively being worked on,                           so the API may change.".to_string()),
+                message: Some("StructuredPrompt is in beta. It is actively being worked on, so the API may change.".to_string()),
                 ..Default::default()
             },
             module_path!(),

@@ -111,7 +111,7 @@ fn get_jinja2_variables(template: &str) -> HashSet<String> {
 pub fn mustache_template_vars(template: &str) -> HashSet<String> {
     let mut variables = HashSet::new();
     let mut chars = template.chars().peekable();
-    let mut section_depth = 0;
+    let mut section_depth: usize = 0;
 
     while let Some(c) = chars.next() {
         if c == '{' && chars.peek() == Some(&'{') {
@@ -130,7 +130,7 @@ pub fn mustache_template_vars(template: &str) -> HashSet<String> {
                     }
                 }
                 Some('/') => {
-                    section_depth -= 1;
+                    section_depth = section_depth.saturating_sub(1);
                     while let Some(&c) = chars.peek() {
                         if c == '}' {
                             break;
@@ -293,17 +293,6 @@ pub trait StringPromptTemplate: Send + Sync {
     }
 }
 
-#[allow(dead_code)]
-pub fn is_subsequence<T: PartialEq>(child: &[T], parent: &[T]) -> bool {
-    if child.is_empty() || parent.is_empty() {
-        return false;
-    }
-    if parent.len() < child.len() {
-        return false;
-    }
-    child.iter().zip(parent.iter()).all(|(c, p)| c == p)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -373,12 +362,5 @@ mod tests {
     fn test_invalid_fstring_variable() {
         let result = get_template_variables("Hello {obj.attr}", PromptTemplateFormat::FString);
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_is_subsequence() {
-        assert!(is_subsequence(&[1, 2], &[1, 2, 3]));
-        assert!(!is_subsequence(&[1, 3], &[1, 2, 3]));
-        assert!(!is_subsequence(&[1, 2, 3, 4], &[1, 2, 3]));
     }
 }

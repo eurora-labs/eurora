@@ -10,9 +10,7 @@ use crate::prompt_values::{ChatPromptValue, StringPromptValue};
 use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
 
-use super::base::{
-    BasePromptTemplate, FormatOutputType, PartialValue, merge_prompt_config, resolve_partials,
-};
+use super::base::{BasePromptTemplate, PartialValue, merge_prompt_config, resolve_partials};
 use super::chat::{BaseChatPromptTemplate, ChatPromptInput};
 use super::message::BaseMessagePromptTemplate;
 use super::prompt::PromptTemplate;
@@ -63,6 +61,22 @@ impl Clone for Box<dyn ExampleSelectorClone + Send + Sync> {
 impl std::fmt::Debug for Box<dyn ExampleSelectorClone + Send + Sync> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "ExampleSelector")
+    }
+}
+
+pub(super) fn resolve_examples(
+    examples: Option<&[HashMap<String, String>]>,
+    selector: Option<&(dyn ExampleSelectorClone + Send + Sync)>,
+    kwargs: &HashMap<String, String>,
+) -> Result<Vec<HashMap<String, String>>> {
+    if let Some(examples) = examples {
+        Ok(examples.to_vec())
+    } else if let Some(selector) = selector {
+        Ok(selector.select_examples(kwargs))
+    } else {
+        Err(Error::InvalidConfig(
+            "One of 'examples' and 'example_selector' should be provided".to_string(),
+        ))
     }
 }
 
@@ -186,40 +200,11 @@ impl FewShotPromptTemplate {
         &self,
         kwargs: &HashMap<String, String>,
     ) -> Result<Vec<HashMap<String, String>>> {
-        if let Some(ref examples) = self.examples {
-            Ok(examples.clone())
-        } else if let Some(ref selector) = self.example_selector {
-            Ok(selector.select_examples(kwargs))
-        } else {
-            Err(Error::InvalidConfig(
-                "One of 'examples' and 'example_selector' should be provided".to_string(),
-            ))
-        }
-    }
-
-    #[allow(dead_code)]
-    async fn aget_examples(
-        &self,
-        kwargs: &HashMap<String, String>,
-    ) -> Result<Vec<HashMap<String, String>>> {
-        if let Some(ref examples) = self.examples {
-            Ok(examples.clone())
-        } else if let Some(ref selector) = self.example_selector {
-            Ok(selector.aselect_examples(kwargs).await)
-        } else {
-            Err(Error::InvalidConfig(
-                "One of 'examples' and 'example_selector' should be provided".to_string(),
-            ))
-        }
-    }
-
-    fn merge_partial_and_user_variables(
-        &self,
-        kwargs: &HashMap<String, String>,
-    ) -> HashMap<String, String> {
-        let mut merged = resolve_partials(&self.partial_variables);
-        merged.extend(kwargs.clone());
-        merged
+        resolve_examples(
+            self.examples.as_deref(),
+            self.example_selector.as_deref(),
+            kwargs,
+        )
     }
 }
 
@@ -232,7 +217,7 @@ impl BasePromptTemplate for FewShotPromptTemplate {
         resolve_partials(&self.partial_variables)
     }
 
-    fn format(&self, kwargs: &HashMap<String, String>) -> Result<FormatOutputType> {
+    fn format(&self, kwargs: &HashMap<String, String>) -> Result<String> {
         let kwargs = self.merge_partial_and_user_variables(kwargs);
 
         let examples = self.get_examples(&kwargs)?;
@@ -448,37 +433,17 @@ impl FewShotChatMessagePromptTemplate {
         &self,
         kwargs: &HashMap<String, String>,
     ) -> Result<Vec<HashMap<String, String>>> {
-        if let Some(ref examples) = self.examples {
-            Ok(examples.clone())
-        } else if let Some(ref selector) = self.example_selector {
-            Ok(selector.select_examples(kwargs))
-        } else {
-            Err(Error::InvalidConfig(
-                "One of 'examples' and 'example_selector' should be provided".to_string(),
-            ))
-        }
-    }
-
-    #[allow(dead_code)]
-    async fn aget_examples(
-        &self,
-        kwargs: &HashMap<String, String>,
-    ) -> Result<Vec<HashMap<String, String>>> {
-        if let Some(ref examples) = self.examples {
-            Ok(examples.clone())
-        } else if let Some(ref selector) = self.example_selector {
-            Ok(selector.aselect_examples(kwargs).await)
-        } else {
-            Err(Error::InvalidConfig(
-                "One of 'examples' and 'example_selector' should be provided".to_string(),
-            ))
-        }
+        resolve_examples(
+            self.examples.as_deref(),
+            self.example_selector.as_deref(),
+            kwargs,
+        )
     }
 }
 
 impl BaseMessagePromptTemplate for FewShotChatMessagePromptTemplate {
-    fn input_variables(&self) -> Vec<String> {
-        self.input_variables.clone()
+    fn input_variables(&self) -> &[String] {
+        &self.input_variables
     }
 
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
