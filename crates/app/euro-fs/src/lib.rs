@@ -45,7 +45,6 @@ pub fn list_files<P: AsRef<Path>>(
     Ok(files)
 }
 
-/// Write atomically — either fully succeeds or fully fails.
 pub fn write<P: AsRef<Path>>(file_path: P, contents: impl AsRef<[u8]>) -> anyhow::Result<()> {
     let file_path = file_path.as_ref();
     let parent_dir = file_path
@@ -67,7 +66,6 @@ pub fn write<P: AsRef<Path>>(file_path: P, contents: impl AsRef<[u8]>) -> anyhow
     Ok(())
 }
 
-/// Write atomically, creating all leading directories.
 pub fn create_dirs_then_write<P: AsRef<Path>>(
     file_path: P,
     contents: impl AsRef<[u8]>,

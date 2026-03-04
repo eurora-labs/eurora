@@ -33,8 +33,6 @@ fn extract_subscription_items(
         .collect()
 }
 
-/// Extract the current billing period from the first subscription item.
-/// Falls back to (0, 0) if there are no items.
 fn extract_period(sub: &Subscription) -> (i64, i64) {
     sub.items
         .data
@@ -97,9 +95,6 @@ pub async fn on_checkout_completed(
         "Checkout completed — provisioning"
     );
 
-    // Look up the application user; if no user exists for this email,
-    // we still upsert the Stripe customer (so the data is captured)
-    // but skip account/subscription provisioning.
     let user = match db.get_user().email(customer_email.clone()).call().await {
         Ok(u) => Some(u),
         Err(e) if e.is_not_found() => {

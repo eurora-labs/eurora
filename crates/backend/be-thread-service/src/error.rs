@@ -1,8 +1,3 @@
-//! Error types for the Thread Service.
-//!
-//! This module provides structured error handling with automatic
-//! conversion to gRPC status codes.
-
 use thiserror::Error;
 use tonic::{Code, Status};
 
@@ -121,7 +116,6 @@ impl From<ThreadServiceError> for Status {
             }
         }
 
-        // For internal errors, don't expose implementation details to clients
         let client_message = match err {
             ThreadServiceError::Database(_) => "Database operation failed".to_string(),
             ThreadServiceError::Internal(_) => "Internal server error".to_string(),

@@ -305,9 +305,6 @@ impl AuthService {
         Ok(hex)
     }
 
-    /// The `token` parameter is a code_challenge (already S256-transformed on the client),
-    /// NOT a raw code_verifier. This matches `login_by_login_token` which converts
-    /// code_verifier -> code_challenge before DB lookup.
     async fn try_associate_login_token_with_user(
         &self,
         user: &be_remote_db::User,

@@ -1,5 +1,3 @@
-//! Error types for the remote database system
-
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -122,14 +120,9 @@ impl From<sqlx::Error> for DbError {
                 id: None,
             },
             sqlx::Error::Database(db_err) => {
-                // PostgreSQL error codes
-                // 23505 = unique_violation
-                // 23503 = foreign_key_violation
-                // 23502 = not_null_violation
                 if let Some(code) = db_err.code() {
                     match code.as_ref() {
                         "23505" => {
-                            // Try to extract constraint name for better error messages
                             let constraint = db_err.constraint().unwrap_or("unknown").to_string();
                             Self::Duplicate {
                                 field: "constraint",

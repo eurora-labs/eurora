@@ -151,10 +151,6 @@ pub struct LoginToken {
     pub updated_at: DateTime<Utc>,
 }
 
-// =============================================================================
-// Asset Types
-// =============================================================================
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
 #[sqlx(type_name = "asset_status", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
@@ -211,10 +207,6 @@ pub struct ActivityAsset {
     pub created_at: DateTime<Utc>,
 }
 
-// =============================================================================
-// Activity Types
-// =============================================================================
-
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Activity {
     pub id: Uuid,
@@ -229,10 +221,6 @@ pub struct Activity {
     pub updated_at: DateTime<Utc>,
 }
 
-// =============================================================================
-// Thread Types
-// =============================================================================
-
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Thread {
     pub id: Uuid,
@@ -241,10 +229,6 @@ pub struct Thread {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
-
-// =============================================================================
-// Message Types
-// =============================================================================
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[sqlx(type_name = "message_type", rename_all = "lowercase")]
@@ -281,20 +265,12 @@ pub struct Message {
     pub updated_at: DateTime<Utc>,
 }
 
-// =============================================================================
-// Junction Types (Activity-Thread)
-// =============================================================================
-
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ActivityThread {
     pub activity_id: Uuid,
     pub thread_id: Uuid,
     pub created_at: DateTime<Utc>,
 }
-
-// =============================================================================
-// Token Usage Types
-// =============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct TokenUsage {

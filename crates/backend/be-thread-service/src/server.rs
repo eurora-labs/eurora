@@ -33,9 +33,6 @@ use crate::tools::firecrawl_search_tool;
 
 const BASE_NEBUL_URL: &str = "https://api.inference.nebul.io/v1";
 
-/// When running inside Docker (`RUNNING_EURORA_FULLY_LOCAL=true`), rewrite
-/// `localhost` / `127.0.0.1` to `host.docker.internal` so the container can
-/// reach services on the host machine.
 fn resolve_host_url(url: &str) -> String {
     let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
         .map(|v| v.eq_ignore_ascii_case("true"))
@@ -457,10 +454,6 @@ impl ProtoThreadService for ThreadService {
 
         tracing::debug!("ChatStream: thread_id = {}", thread_id);
 
-        // TODO: this is incorrect. This is essentially
-        // a replacement for proper agent-driven rag
-        // that should be implemented alongside agent-graph.
-        // For now this is fineeee
         let mut hidden_messages = self
             .db
             .list_messages()
@@ -784,7 +777,6 @@ impl ProtoThreadService for ThreadService {
             false => title,
         };
 
-        // Capitalize the first letter of the title
         if let Some(first) = title.chars().next() {
             let rest = &title[first.len_utf8()..];
             title = first.to_uppercase().collect::<String>() + rest;

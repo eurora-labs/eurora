@@ -1,5 +1,3 @@
-//! Error types for the storage service
-
 use thiserror::Error;
 
 #[derive(Error, Debug)]
