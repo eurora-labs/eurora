@@ -325,17 +325,15 @@ fn test_merge_config_callbacks_manager_with_handlers() {
     let handler2: Arc<dyn BaseCallbackHandler> = Arc::new(StreamingStdOutCallbackHandler::new());
 
     let c1 = RunnableConfig {
-        callbacks: Some(Callbacks::Manager(
-            agent_chain_core::callbacks::BaseCallbackManager::with_handlers(
-                mgr.handlers.clone(),
-                Some(mgr.inheritable_handlers.clone()),
-                mgr.parent_run_id,
-                Some(mgr.tags.clone()),
-                Some(mgr.inheritable_tags.clone()),
-                Some(mgr.metadata.clone()),
-                Some(mgr.inheritable_metadata.clone()),
-            ),
-        )),
+        callbacks: Some(Callbacks::Manager(CallbackManager {
+            handlers: mgr.handlers.clone(),
+            inheritable_handlers: mgr.inheritable_handlers.clone(),
+            parent_run_id: mgr.parent_run_id,
+            tags: mgr.tags.clone(),
+            inheritable_tags: mgr.inheritable_tags.clone(),
+            metadata: mgr.metadata.clone(),
+            inheritable_metadata: mgr.inheritable_metadata.clone(),
+        })),
         ..Default::default()
     };
     let c2 = RunnableConfig {
@@ -369,17 +367,15 @@ fn test_merge_config_callbacks_handlers_with_manager() {
         ..Default::default()
     };
     let c2 = RunnableConfig {
-        callbacks: Some(Callbacks::Manager(
-            agent_chain_core::callbacks::BaseCallbackManager::with_handlers(
-                mgr.handlers.clone(),
-                Some(mgr.inheritable_handlers.clone()),
-                mgr.parent_run_id,
-                Some(mgr.tags.clone()),
-                Some(mgr.inheritable_tags.clone()),
-                Some(mgr.metadata.clone()),
-                Some(mgr.inheritable_metadata.clone()),
-            ),
-        )),
+        callbacks: Some(Callbacks::Manager(CallbackManager {
+            handlers: mgr.handlers.clone(),
+            inheritable_handlers: mgr.inheritable_handlers.clone(),
+            parent_run_id: mgr.parent_run_id,
+            tags: mgr.tags.clone(),
+            inheritable_tags: mgr.inheritable_tags.clone(),
+            metadata: mgr.metadata.clone(),
+            inheritable_metadata: mgr.inheritable_metadata.clone(),
+        })),
         ..Default::default()
     };
 

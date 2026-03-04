@@ -1,8 +1,5 @@
+use agent_chain_core::callbacks::BaseCallbackHandler;
 use agent_chain_core::callbacks::Callbacks;
-use agent_chain_core::callbacks::base::{
-    BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
-    RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
-};
 use agent_chain_core::callbacks::manager::{
     AsyncCallbackManager, CallbackManager, adispatch_custom_event, dispatch_custom_event,
 };
@@ -13,13 +10,6 @@ use std::sync::Arc;
 
 #[derive(Debug, Default)]
 struct FakeHandler;
-
-impl LLMManagerMixin for FakeHandler {}
-impl ChainManagerMixin for FakeHandler {}
-impl ToolManagerMixin for FakeHandler {}
-impl RetrieverManagerMixin for FakeHandler {}
-impl CallbackManagerMixin for FakeHandler {}
-impl RunManagerMixin for FakeHandler {}
 
 impl BaseCallbackHandler for FakeHandler {
     fn name(&self) -> &str {

@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use bon::bon;
 use serde_json::Value;
 
-use crate::callbacks::base::Callbacks;
+use crate::callbacks::Callbacks;
 use crate::callbacks::manager::CallbackManagerForToolRun;
 use crate::error::{Error, Result};
 use crate::runnables::RunnableConfig;

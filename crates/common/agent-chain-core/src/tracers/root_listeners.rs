@@ -4,10 +4,7 @@ use std::fmt;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::callbacks::base::{
-    BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
-    RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
-};
+use crate::callbacks::BaseCallbackHandler;
 use crate::runnables::RunnableConfig;
 use crate::tracers::base::{AsyncBaseTracer, BaseTracer};
 use crate::tracers::core::{SchemaFormat, TracerCore, TracerCoreConfig};
@@ -131,13 +128,6 @@ impl BaseTracer for RootListenersTracer {
     fn persist_run_impl(&mut self, _run: &Run) {}
 }
 
-impl LLMManagerMixin for RootListenersTracer {}
-impl ChainManagerMixin for RootListenersTracer {}
-impl ToolManagerMixin for RootListenersTracer {}
-impl RetrieverManagerMixin for RootListenersTracer {}
-impl CallbackManagerMixin for RootListenersTracer {}
-impl RunManagerMixin for RootListenersTracer {}
-
 impl BaseCallbackHandler for RootListenersTracer {
     fn name(&self) -> &str {
         "RootListenersTracer"
@@ -254,13 +244,6 @@ impl AsyncBaseTracer for AsyncRootListenersTracer {
         }
     }
 }
-
-impl LLMManagerMixin for AsyncRootListenersTracer {}
-impl ChainManagerMixin for AsyncRootListenersTracer {}
-impl ToolManagerMixin for AsyncRootListenersTracer {}
-impl RetrieverManagerMixin for AsyncRootListenersTracer {}
-impl CallbackManagerMixin for AsyncRootListenersTracer {}
-impl RunManagerMixin for AsyncRootListenersTracer {}
 
 impl BaseCallbackHandler for AsyncRootListenersTracer {
     fn name(&self) -> &str {

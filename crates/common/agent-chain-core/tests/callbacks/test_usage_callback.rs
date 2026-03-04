@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use agent_chain_core::callbacks::base::LLMManagerMixin;
+use agent_chain_core::callbacks::BaseCallbackHandler;
 use agent_chain_core::callbacks::usage::{
     UsageMetadataCallbackHandler, get_usage_metadata_callback,
 };

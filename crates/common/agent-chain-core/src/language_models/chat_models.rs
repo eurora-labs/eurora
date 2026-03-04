@@ -515,15 +515,15 @@ pub trait BaseChatModel: BaseLanguageModel {
             inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
         }
 
-        let callback_manager = CallbackManager::configure(
-            callbacks,
-            self.callbacks().cloned(),
-            self.verbose(),
-            tags,
-            self.config().tags.clone(),
-            Some(inheritable_metadata),
-            self.config().metadata.clone(),
-        );
+        let callback_manager = CallbackManager::configure()
+            .maybe_inheritable_callbacks(callbacks)
+            .maybe_local_callbacks(self.callbacks().cloned())
+            .verbose(self.verbose())
+            .maybe_inheritable_tags(tags)
+            .maybe_local_tags(self.config().tags.clone())
+            .inheritable_metadata(inheritable_metadata)
+            .maybe_local_metadata(self.config().metadata.clone())
+            .call();
 
         let run_managers = callback_manager.on_chat_model_start(&params, &messages, run_id);
 
@@ -640,15 +640,15 @@ pub trait BaseChatModel: BaseLanguageModel {
             inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
         }
 
-        let callback_manager = AsyncCallbackManager::configure(
-            callbacks,
-            self.callbacks().cloned(),
-            self.verbose(),
-            tags,
-            self.config().tags.clone(),
-            Some(inheritable_metadata),
-            self.config().metadata.clone(),
-        );
+        let callback_manager = AsyncCallbackManager::configure()
+            .maybe_inheritable_callbacks(callbacks)
+            .maybe_local_callbacks(self.callbacks().cloned())
+            .verbose(self.verbose())
+            .maybe_inheritable_tags(tags)
+            .maybe_local_tags(self.config().tags.clone())
+            .inheritable_metadata(inheritable_metadata)
+            .maybe_local_metadata(self.config().metadata.clone())
+            .call();
 
         let run_managers = callback_manager
             .on_chat_model_start(&params, &messages, run_id)
@@ -1128,15 +1128,15 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
 
         let params = self._get_invocation_params(stop.as_deref(), None);
-        let callback_manager = crate::callbacks::CallbackManager::configure(
-            callbacks,
-            self.callbacks().cloned(),
-            self.verbose(),
-            tags,
-            self.config().tags.clone(),
-            Some(inheritable_metadata),
-            self.config().metadata.clone(),
-        );
+        let callback_manager = crate::callbacks::CallbackManager::configure()
+            .maybe_inheritable_callbacks(callbacks)
+            .maybe_local_callbacks(self.callbacks().cloned())
+            .verbose(self.verbose())
+            .maybe_inheritable_tags(tags)
+            .maybe_local_tags(self.config().tags.clone())
+            .inheritable_metadata(inheritable_metadata)
+            .maybe_local_metadata(self.config().metadata.clone())
+            .call();
         let run_managers =
             callback_manager.on_chat_model_start(&params, std::slice::from_ref(&messages), run_id);
         let run_manager = run_managers.into_iter().next();
@@ -1281,15 +1281,15 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
 
         let params = self._get_invocation_params(stop.as_deref(), None);
-        let callback_manager = crate::callbacks::AsyncCallbackManager::configure(
-            callbacks,
-            self.callbacks().cloned(),
-            self.verbose(),
-            tags,
-            self.config().tags.clone(),
-            Some(inheritable_metadata),
-            self.config().metadata.clone(),
-        );
+        let callback_manager = crate::callbacks::AsyncCallbackManager::configure()
+            .maybe_inheritable_callbacks(callbacks)
+            .maybe_local_callbacks(self.callbacks().cloned())
+            .verbose(self.verbose())
+            .maybe_inheritable_tags(tags)
+            .maybe_local_tags(self.config().tags.clone())
+            .inheritable_metadata(inheritable_metadata)
+            .maybe_local_metadata(self.config().metadata.clone())
+            .call();
         let run_managers = callback_manager
             .on_chat_model_start(&params, std::slice::from_ref(&messages), run_id)
             .await;

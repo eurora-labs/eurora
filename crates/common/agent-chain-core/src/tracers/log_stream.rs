@@ -690,7 +690,15 @@ impl fmt::Debug for LogStreamCallbackHandlerBridge {
     }
 }
 
-impl crate::callbacks::base::LLMManagerMixin for LogStreamCallbackHandlerBridge {
+impl crate::callbacks::BaseCallbackHandler for LogStreamCallbackHandlerBridge {
+    fn name(&self) -> &str {
+        "LogStreamCallbackHandler"
+    }
+
+    fn run_inline(&self) -> bool {
+        true
+    }
+
     fn on_llm_new_token(
         &self,
         token: &str,
@@ -746,9 +754,7 @@ impl crate::callbacks::base::LLMManagerMixin for LogStreamCallbackHandlerBridge 
             tracing::warn!("LogStreamCallbackHandlerBridge on_llm_error error: {:?}", e);
         }
     }
-}
 
-impl crate::callbacks::base::ChainManagerMixin for LogStreamCallbackHandlerBridge {
     fn on_chain_end(
         &self,
         outputs: &HashMap<String, serde_json::Value>,
@@ -775,9 +781,7 @@ impl crate::callbacks::base::ChainManagerMixin for LogStreamCallbackHandlerBridg
             );
         }
     }
-}
 
-impl crate::callbacks::base::ToolManagerMixin for LogStreamCallbackHandlerBridge {
     fn on_tool_end(
         &self,
         output: &str,
@@ -807,9 +811,7 @@ impl crate::callbacks::base::ToolManagerMixin for LogStreamCallbackHandlerBridge
             );
         }
     }
-}
 
-impl crate::callbacks::base::RetrieverManagerMixin for LogStreamCallbackHandlerBridge {
     fn on_retriever_end(
         &self,
         documents: &[serde_json::Value],
@@ -839,9 +841,7 @@ impl crate::callbacks::base::RetrieverManagerMixin for LogStreamCallbackHandlerB
             );
         }
     }
-}
 
-impl crate::callbacks::base::CallbackManagerMixin for LogStreamCallbackHandlerBridge {
     fn on_llm_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -963,18 +963,6 @@ impl crate::callbacks::base::CallbackManagerMixin for LogStreamCallbackHandlerBr
     }
 }
 
-impl crate::callbacks::base::RunManagerMixin for LogStreamCallbackHandlerBridge {}
-
-impl crate::callbacks::base::BaseCallbackHandler for LogStreamCallbackHandlerBridge {
-    fn name(&self) -> &str {
-        "LogStreamCallbackHandler"
-    }
-
-    fn run_inline(&self) -> bool {
-        true
-    }
-}
-
 pub fn astream_log_implementation<'a, R>(
     runnable: &'a R,
     input: R::Input,
@@ -992,7 +980,7 @@ where
     R: crate::runnables::base::Runnable + 'static,
     R::Output: serde::Serialize,
 {
-    use crate::callbacks::base::Callbacks;
+    use crate::callbacks::Callbacks;
     use crate::runnables::config::ensure_config;
     use futures::StreamExt;
 
@@ -1011,7 +999,7 @@ where
 
     let mut config = ensure_config(config);
 
-    let cb_handler: Arc<dyn crate::callbacks::base::BaseCallbackHandler> = bridge.clone();
+    let cb_handler: Arc<dyn crate::callbacks::BaseCallbackHandler> = bridge.clone();
     match &mut config.callbacks {
         None => {
             config.callbacks = Some(Callbacks::Handlers(vec![cb_handler]));
@@ -1219,9 +1207,9 @@ mod tests {
     fn test_log_stream_bridge_implements_base_callback_handler() {
         let handler = LogStreamCallbackHandler::new(LogStreamConfig::default());
         let bridge = LogStreamCallbackHandlerBridge::new(handler);
-        let _handler_ref: &dyn crate::callbacks::base::BaseCallbackHandler = &bridge;
+        let _handler_ref: &dyn crate::callbacks::BaseCallbackHandler = &bridge;
         assert_eq!(
-            crate::callbacks::base::BaseCallbackHandler::name(&bridge),
+            crate::callbacks::BaseCallbackHandler::name(&bridge),
             "LogStreamCallbackHandler"
         );
     }

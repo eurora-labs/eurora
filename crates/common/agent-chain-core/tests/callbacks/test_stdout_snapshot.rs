@@ -2,9 +2,7 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 
-use agent_chain_core::callbacks::base::{
-    BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, RunManagerMixin, ToolManagerMixin,
-};
+use agent_chain_core::callbacks::BaseCallbackHandler;
 use agent_chain_core::callbacks::stdout::StdOutCallbackHandler;
 use uuid::Uuid;
 

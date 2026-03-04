@@ -101,10 +101,16 @@ pub use outputs::{
 };
 
 pub use callbacks::{
-    AsyncCallbackHandler, AsyncCallbackManager, AsyncCallbackManagerForChainRun,
-    AsyncCallbackManagerForLLMRun, BaseCallbackHandler, BaseCallbackManager, CallbackManager,
-    CallbackManagerForChainRun, CallbackManagerForLLMRun, Callbacks, StdOutCallbackHandler,
-    StreamingStdOutCallbackHandler, UsageMetadataCallbackHandler,
+    ArcCallbackHandler, AsyncCallbackManager, AsyncCallbackManagerForChainGroup,
+    AsyncCallbackManagerForChainRun, AsyncCallbackManagerForLLMRun,
+    AsyncCallbackManagerForRetrieverRun, AsyncCallbackManagerForToolRun, AsyncParentRunManager,
+    AsyncRunManager, BaseCallbackHandler, BaseRunManager, BoxedCallbackHandler, CallbackManager,
+    CallbackManagerForChainGroup, CallbackManagerForChainRun, CallbackManagerForLLMRun,
+    CallbackManagerForRetrieverRun, CallbackManagerForToolRun, Callbacks, FileCallbackHandler,
+    FileMode, ParentRunManager, RunManager, RunManagerCore, StdOutCallbackHandler,
+    StreamingStdOutCallbackHandler, UsageMetadataCallbackHandler, UsageMetadataCallbackWrapper,
+    adispatch_custom_event, atrace_as_chain_group, dispatch_custom_event,
+    get_usage_metadata_callback, resolve_chain_name, trace_as_chain_group,
 };
 
 pub use prompts::{

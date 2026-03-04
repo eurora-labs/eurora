@@ -4,10 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use uuid::Uuid;
 
-use super::base::{
-    BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
-    RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
-};
+use super::base::{BaseCallbackHandler, resolve_chain_name};
 
 pub mod colors {
     pub const RESET: &str = "\x1b[0m";
@@ -84,10 +81,11 @@ impl StdOutCallbackHandler {
     }
 }
 
-impl LLMManagerMixin for StdOutCallbackHandler {}
-impl RetrieverManagerMixin for StdOutCallbackHandler {}
+impl BaseCallbackHandler for StdOutCallbackHandler {
+    fn name(&self) -> &str {
+        "StdOutCallbackHandler"
+    }
 
-impl ToolManagerMixin for StdOutCallbackHandler {
     fn on_tool_end(
         &self,
         output: &str,
@@ -106,9 +104,7 @@ impl ToolManagerMixin for StdOutCallbackHandler {
             write_text(&self.writer, &format!("\n{}", prefix), None, "");
         }
     }
-}
 
-impl RunManagerMixin for StdOutCallbackHandler {
     fn on_text(
         &self,
         text: &str,
@@ -120,9 +116,7 @@ impl RunManagerMixin for StdOutCallbackHandler {
         let effective_color = color.or(self.get_color());
         write_text(&self.writer, text, effective_color, end);
     }
-}
 
-impl CallbackManagerMixin for StdOutCallbackHandler {
     fn on_chain_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -133,21 +127,7 @@ impl CallbackManagerMixin for StdOutCallbackHandler {
         _metadata: Option<&HashMap<String, serde_json::Value>>,
         name: Option<&str>,
     ) {
-        let name = name
-            .or_else(|| {
-                if !serialized.is_empty() {
-                    serialized.get("name").and_then(|v| v.as_str()).or_else(|| {
-                        serialized.get("id").and_then(|v| {
-                            v.as_array()
-                                .and_then(|arr| arr.last())
-                                .and_then(|v| v.as_str())
-                        })
-                    })
-                } else {
-                    None
-                }
-            })
-            .unwrap_or("<unknown>");
+        let name = resolve_chain_name(serialized, name);
 
         if let Ok(mut w) = self.writer.lock() {
             if let Err(e) = writeln!(
@@ -164,9 +144,7 @@ impl CallbackManagerMixin for StdOutCallbackHandler {
             }
         }
     }
-}
 
-impl ChainManagerMixin for StdOutCallbackHandler {
     fn on_chain_end(
         &self,
         _outputs: &HashMap<String, serde_json::Value>,
@@ -207,12 +185,6 @@ impl ChainManagerMixin for StdOutCallbackHandler {
             let effective_color = color.or(self.get_color());
             write_text(&self.writer, log, effective_color, "\n");
         }
-    }
-}
-
-impl BaseCallbackHandler for StdOutCallbackHandler {
-    fn name(&self) -> &str {
-        "StdOutCallbackHandler"
     }
 }
 

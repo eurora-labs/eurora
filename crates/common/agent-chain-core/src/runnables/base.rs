@@ -925,7 +925,7 @@ pub trait Runnable: Send + Sync + Debug {
         });
 
         let factory: ConfigFactory = Arc::new(move |config: &super::config::RunnableConfig| {
-            use crate::callbacks::base::Callbacks;
+            use crate::callbacks::Callbacks;
             use crate::tracers::root_listeners::RootListenersTracer;
 
             let tracer = RootListenersTracer::new(
@@ -961,7 +961,7 @@ pub trait Runnable: Send + Sync + Debug {
 
             super::config::RunnableConfig {
                 callbacks: Some(Callbacks::Handlers(vec![
-                    Arc::new(tracer) as Arc<dyn crate::callbacks::base::BaseCallbackHandler>
+                    Arc::new(tracer) as Arc<dyn crate::callbacks::BaseCallbackHandler>
                 ])),
                 ..Default::default()
             }
@@ -1044,7 +1044,7 @@ pub trait Runnable: Send + Sync + Debug {
         });
 
         let factory: ConfigFactory = Arc::new(move |config: &super::config::RunnableConfig| {
-            use crate::callbacks::base::Callbacks;
+            use crate::callbacks::Callbacks;
             use crate::tracers::root_listeners::AsyncRootListenersTracer;
 
             let tracer = AsyncRootListenersTracer::new(
@@ -1083,7 +1083,7 @@ pub trait Runnable: Send + Sync + Debug {
 
             super::config::RunnableConfig {
                 callbacks: Some(Callbacks::Handlers(vec![
-                    Arc::new(tracer) as Arc<dyn crate::callbacks::base::BaseCallbackHandler>
+                    Arc::new(tracer) as Arc<dyn crate::callbacks::BaseCallbackHandler>
                 ])),
                 ..Default::default()
             }

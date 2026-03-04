@@ -1,4 +1,4 @@
-use agent_chain_core::callbacks::base::BaseCallbackHandler;
+use agent_chain_core::callbacks::BaseCallbackHandler;
 use agent_chain_core::callbacks::manager::AsyncCallbackManager;
 use agent_chain_core::messages::HumanMessage;
 use agent_chain_core::outputs::ChatResult;
@@ -7,13 +7,6 @@ use std::sync::Arc;
 
 #[derive(Debug, Default)]
 struct FakeHandler;
-
-impl agent_chain_core::callbacks::base::LLMManagerMixin for FakeHandler {}
-impl agent_chain_core::callbacks::base::ChainManagerMixin for FakeHandler {}
-impl agent_chain_core::callbacks::base::ToolManagerMixin for FakeHandler {}
-impl agent_chain_core::callbacks::base::RetrieverManagerMixin for FakeHandler {}
-impl agent_chain_core::callbacks::base::CallbackManagerMixin for FakeHandler {}
-impl agent_chain_core::callbacks::base::RunManagerMixin for FakeHandler {}
 
 impl BaseCallbackHandler for FakeHandler {
     fn name(&self) -> &str {
@@ -243,13 +236,6 @@ async fn test_async_callback_manager_ignore_llm() {
     #[derive(Debug)]
     struct IgnoreLLMHandler;
 
-    impl agent_chain_core::callbacks::base::LLMManagerMixin for IgnoreLLMHandler {}
-    impl agent_chain_core::callbacks::base::ChainManagerMixin for IgnoreLLMHandler {}
-    impl agent_chain_core::callbacks::base::ToolManagerMixin for IgnoreLLMHandler {}
-    impl agent_chain_core::callbacks::base::RetrieverManagerMixin for IgnoreLLMHandler {}
-    impl agent_chain_core::callbacks::base::CallbackManagerMixin for IgnoreLLMHandler {}
-    impl agent_chain_core::callbacks::base::RunManagerMixin for IgnoreLLMHandler {}
-
     impl BaseCallbackHandler for IgnoreLLMHandler {
         fn name(&self) -> &str {
             "IgnoreLLMHandler"
@@ -274,13 +260,6 @@ async fn test_async_callback_manager_ignore_llm() {
 async fn test_async_callback_manager_ignore_chain() {
     #[derive(Debug)]
     struct IgnoreChainHandler;
-
-    impl agent_chain_core::callbacks::base::LLMManagerMixin for IgnoreChainHandler {}
-    impl agent_chain_core::callbacks::base::ChainManagerMixin for IgnoreChainHandler {}
-    impl agent_chain_core::callbacks::base::ToolManagerMixin for IgnoreChainHandler {}
-    impl agent_chain_core::callbacks::base::RetrieverManagerMixin for IgnoreChainHandler {}
-    impl agent_chain_core::callbacks::base::CallbackManagerMixin for IgnoreChainHandler {}
-    impl agent_chain_core::callbacks::base::RunManagerMixin for IgnoreChainHandler {}
 
     impl BaseCallbackHandler for IgnoreChainHandler {
         fn name(&self) -> &str {

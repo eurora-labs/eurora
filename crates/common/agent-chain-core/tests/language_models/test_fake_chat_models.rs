@@ -1108,11 +1108,9 @@ mod test_generic_fake_chat_model_run_manager {
     use std::sync::{Arc, Mutex};
 
     use agent_chain_core::GenericFakeChatModel;
+    use agent_chain_core::callbacks::BaseCallbackHandler;
     use agent_chain_core::callbacks::CallbackManagerForLLMRun;
-    use agent_chain_core::callbacks::base::{
-        BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
-        RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
-    };
+    use agent_chain_core::callbacks::manager::RunManagerCore;
     use agent_chain_core::language_models::BaseChatModel;
     use agent_chain_core::messages::AIMessage;
     use futures::StreamExt;
@@ -1135,7 +1133,11 @@ mod test_generic_fake_chat_model_run_manager {
         }
     }
 
-    impl LLMManagerMixin for TokenRecorder {
+    impl BaseCallbackHandler for TokenRecorder {
+        fn name(&self) -> &str {
+            "TokenRecorder"
+        }
+
         fn on_llm_new_token(
             &self,
             token: &str,
@@ -1144,18 +1146,6 @@ mod test_generic_fake_chat_model_run_manager {
             _chunk: Option<&serde_json::Value>,
         ) {
             self.tokens.lock().unwrap().push(token.to_string());
-        }
-    }
-
-    impl ChainManagerMixin for TokenRecorder {}
-    impl ToolManagerMixin for TokenRecorder {}
-    impl RetrieverManagerMixin for TokenRecorder {}
-    impl CallbackManagerMixin for TokenRecorder {}
-    impl RunManagerMixin for TokenRecorder {}
-
-    impl BaseCallbackHandler for TokenRecorder {
-        fn name(&self) -> &str {
-            "TokenRecorder"
         }
     }
 
@@ -1168,14 +1158,10 @@ mod test_generic_fake_chat_model_run_manager {
         let handler: Arc<dyn BaseCallbackHandler> = Arc::new(recorder.clone());
 
         let run_manager = CallbackManagerForLLMRun::new(
-            Uuid::new_v4(),
-            vec![handler],
-            vec![],
-            None,
-            None,
-            None,
-            None,
-            None,
+            RunManagerCore::builder()
+                .run_id(Uuid::new_v4())
+                .handlers(vec![handler])
+                .build(),
         );
 
         let mut stream = model._stream(vec![], None, Some(&run_manager)).unwrap();
