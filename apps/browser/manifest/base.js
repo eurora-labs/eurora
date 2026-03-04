@@ -16,6 +16,7 @@ export const base = {
 		48: 'icon-48x48.png',
 		128: 'icon-128x128.png',
 	},
+	incognito: 'not_allowed',
 	host_permissions: ['<all_urls>'],
 	// Content scripts are managed programmatically by the background script
 	// using browser.scripting.executeScript, not declared here
