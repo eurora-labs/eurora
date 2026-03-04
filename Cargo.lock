@@ -296,6 +296,7 @@ dependencies = [
 name = "agent-chain-macros"
 version = "0.0.2"
 dependencies = [
+ "proc-macro2",
  "quote",
  "syn 2.0.117",
 ]
