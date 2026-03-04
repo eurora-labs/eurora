@@ -558,15 +558,13 @@ fn extract_doc_comment(func: &ItemFn) -> Option<String> {
         .attrs
         .iter()
         .filter_map(|attr| {
-            if attr.path().is_ident("doc") {
-                if let Meta::NameValue(nv) = &attr.meta {
-                    if let Expr::Lit(ExprLit {
-                        lit: Lit::Str(s), ..
-                    }) = &nv.value
-                    {
-                        return Some(s.value());
-                    }
-                }
+            if attr.path().is_ident("doc")
+                && let Meta::NameValue(nv) = &attr.meta
+                && let Expr::Lit(ExprLit {
+                    lit: Lit::Str(s), ..
+                }) = &nv.value
+            {
+                return Some(s.value());
             }
             None
         })
@@ -599,34 +597,31 @@ fn is_result_type(ret: &ReturnType) -> bool {
 }
 
 fn type_is_result(ty: &Type) -> bool {
-    if let Type::Path(type_path) = ty {
-        if let Some(segment) = type_path.path.segments.last() {
-            return segment.ident == "Result";
-        }
+    if let Type::Path(type_path) = ty
+        && let Some(segment) = type_path.path.segments.last()
+    {
+        return segment.ident == "Result";
     }
     false
 }
 
 fn is_option_type(ty: &Type) -> bool {
-    if let Type::Path(type_path) = ty {
-        if let Some(segment) = type_path.path.segments.last() {
-            return segment.ident == "Option";
-        }
+    if let Type::Path(type_path) = ty
+        && let Some(segment) = type_path.path.segments.last()
+    {
+        return segment.ident == "Option";
     }
     false
 }
 
 fn extract_option_inner(ty: &Type) -> Option<Type> {
-    if let Type::Path(type_path) = ty {
-        if let Some(segment) = type_path.path.segments.last() {
-            if segment.ident == "Option" {
-                if let PathArguments::AngleBracketed(args) = &segment.arguments {
-                    if let Some(GenericArgument::Type(inner)) = args.args.first() {
-                        return Some(inner.clone());
-                    }
-                }
-            }
-        }
+    if let Type::Path(type_path) = ty
+        && let Some(segment) = type_path.path.segments.last()
+        && segment.ident == "Option"
+        && let PathArguments::AngleBracketed(args) = &segment.arguments
+        && let Some(GenericArgument::Type(inner)) = args.args.first()
+    {
+        return Some(inner.clone());
     }
     None
 }
@@ -666,10 +661,10 @@ fn get_json_schema(ty: &Type) -> proc_macro2::TokenStream {
         return quote! { serde_json::json!({ "type": "object" }) };
     }
 
-    if type_str.starts_with("Option<") {
-        if let Some(inner) = extract_option_inner(ty) {
-            return get_json_schema(&inner);
-        }
+    if type_str.starts_with("Option<")
+        && let Some(inner) = extract_option_inner(ty)
+    {
+        return get_json_schema(&inner);
     }
 
     let json_type = match type_str.as_str() {
@@ -685,37 +680,34 @@ fn get_json_schema(ty: &Type) -> proc_macro2::TokenStream {
 }
 
 fn extract_generic_inner(ty: &Type) -> Option<Type> {
-    if let Type::Path(type_path) = ty {
-        if let Some(segment) = type_path.path.segments.last() {
-            if let PathArguments::AngleBracketed(args) = &segment.arguments {
-                if let Some(GenericArgument::Type(inner)) = args.args.first() {
-                    return Some(inner.clone());
-                }
-            }
-        }
+    if let Type::Path(type_path) = ty
+        && let Some(segment) = type_path.path.segments.last()
+        && let PathArguments::AngleBracketed(args) = &segment.arguments
+        && let Some(GenericArgument::Type(inner)) = args.args.first()
+    {
+        return Some(inner.clone());
     }
     None
 }
 
 fn extract_hashmap_value_type(ty: &Type) -> Option<Type> {
-    if let Type::Path(type_path) = ty {
-        if let Some(segment) = type_path.path.segments.last() {
-            if let PathArguments::AngleBracketed(args) = &segment.arguments {
-                let type_args: Vec<_> = args
-                    .args
-                    .iter()
-                    .filter_map(|a| {
-                        if let GenericArgument::Type(t) = a {
-                            Some(t.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                if type_args.len() == 2 {
-                    return Some(type_args[1].clone());
+    if let Type::Path(type_path) = ty
+        && let Some(segment) = type_path.path.segments.last()
+        && let PathArguments::AngleBracketed(args) = &segment.arguments
+    {
+        let type_args: Vec<_> = args
+            .args
+            .iter()
+            .filter_map(|a| {
+                if let GenericArgument::Type(t) = a {
+                    Some(t.clone())
+                } else {
+                    None
                 }
-            }
+            })
+            .collect();
+        if type_args.len() == 2 {
+            return Some(type_args[1].clone());
         }
     }
     None
