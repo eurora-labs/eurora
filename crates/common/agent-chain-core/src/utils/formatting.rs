@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::error::{Error, Result};
+
 #[derive(Debug, Clone, Default)]
 pub struct StrictFormatter;
 
@@ -8,11 +10,7 @@ impl StrictFormatter {
         Self
     }
 
-    pub fn format(
-        &self,
-        format_string: &str,
-        kwargs: &HashMap<String, String>,
-    ) -> Result<String, FormattingError> {
+    pub fn format(&self, format_string: &str, kwargs: &HashMap<String, String>) -> Result<String> {
         let mut result = String::new();
         let mut chars = format_string.chars().peekable();
 
@@ -40,7 +38,10 @@ impl StrictFormatter {
                         } else if let Some(value) = kwargs.get(name) {
                             result.push_str(value);
                         } else {
-                            return Err(FormattingError::MissingKey(name.to_string()));
+                            return Err(Error::InvalidConfig(format!(
+                                "Missing key in format string: {}",
+                                name
+                            )));
                         }
                     }
                 }
@@ -62,7 +63,7 @@ impl StrictFormatter {
         &self,
         format_string: &str,
         input_variables: &[String],
-    ) -> Result<(), FormattingError> {
+    ) -> Result<()> {
         let mut dummy_inputs = HashMap::new();
         for var in input_variables {
             dummy_inputs.insert(var.clone(), "foo".to_string());
@@ -117,33 +118,9 @@ impl StrictFormatter {
 pub static FORMATTER: std::sync::LazyLock<StrictFormatter> =
     std::sync::LazyLock::new(StrictFormatter::new);
 
-pub fn format_string(
-    format_string: &str,
-    kwargs: &HashMap<String, String>,
-) -> Result<String, FormattingError> {
+pub fn format_string(format_string: &str, kwargs: &HashMap<String, String>) -> Result<String> {
     FORMATTER.format(format_string, kwargs)
 }
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum FormattingError {
-    MissingKey(String),
-    InvalidFormat(String),
-}
-
-impl std::fmt::Display for FormattingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FormattingError::MissingKey(key) => {
-                write!(f, "Missing key in format string: {}", key)
-            }
-            FormattingError::InvalidFormat(msg) => {
-                write!(f, "Invalid format string: {}", msg)
-            }
-        }
-    }
-}
-
-impl std::error::Error for FormattingError {}
 
 #[cfg(test)]
 mod tests {
@@ -176,7 +153,7 @@ mod tests {
         let kwargs = HashMap::new();
 
         let result = formatter.format("Hello, {name}!", &kwargs);
-        assert!(matches!(result, Err(FormattingError::MissingKey(_))));
+        assert!(matches!(result, Err(Error::InvalidConfig(_))));
     }
 
     #[test]

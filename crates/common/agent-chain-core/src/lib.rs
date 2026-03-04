@@ -51,13 +51,12 @@ pub use error::{Error, Result};
 pub use language_models::{
     AIMessageChunkStream, BaseChatModel, BaseLLM, BaseLanguageModel, ChatChunk,
     ChatGenerationStream, ChatModelConfig, ChatStream, DisableStreaming, FakeChatModel,
-    FakeListChatModel, FakeListChatModelError, FakeListLLM, FakeListLLMError,
-    FakeMessagesListChatModel, FakeStreamingListLLM, GenericFakeChatModel, LLM, LLMConfig,
-    LangSmithParams, LanguageModelConfig, LanguageModelInput, LanguageModelOutput, ModelProfile,
-    ModelProfileRegistry, OpenAiDataBlockFilter, ParrotFakeChatModel, ParsedDataUri,
-    SimpleChatModel, ToolChoice, UsageMetadata, agenerate_from_stream, collect_and_merge_stream,
-    generate_from_stream, get_prompts_from_cache, is_openai_data_block, parse_data_uri,
-    update_cache,
+    FakeListChatModel, FakeListLLM, FakeMessagesListChatModel, FakeStreamingListLLM,
+    GenericFakeChatModel, LLM, LLMConfig, LangSmithParams, LanguageModelConfig, LanguageModelInput,
+    LanguageModelOutput, ModelProfile, ModelProfileRegistry, OpenAiDataBlockFilter,
+    ParrotFakeChatModel, ParsedDataUri, SimpleChatModel, ToolChoice, UsageMetadata,
+    agenerate_from_stream, collect_and_merge_stream, generate_from_stream, get_prompts_from_cache,
+    is_openai_data_block, parse_data_uri, update_cache,
 };
 
 pub use messages::{
@@ -81,8 +80,8 @@ pub use globals::{get_debug, get_llm_cache, get_verbose, set_debug, set_llm_cach
 pub use output_parsers::{
     BaseCumulativeTransformOutputParser, BaseLLMOutputParser, BaseOutputParser,
     BaseTransformOutputParser, CommaSeparatedListOutputParser, JsonOutputParser, ListOutputParser,
-    MarkdownListOutputParser, NumberedListOutputParser, OutputParserError, ParseMatch,
-    PydanticOutputParser, SimpleJsonOutputParser, StrOutputParser, XMLOutputParser, drop_last_n,
+    MarkdownListOutputParser, NumberedListOutputParser, ParseMatch, PydanticOutputParser,
+    SimpleJsonOutputParser, StrOutputParser, XMLOutputParser, drop_last_n,
 };
 
 pub use outputs::{
@@ -120,7 +119,7 @@ pub use tracers::{
     AsyncBaseTracer, AsyncListener, AsyncRootListenersTracer, BaseTracer, ConsoleCallbackHandler,
     FunctionCallbackHandler, Listener, PassthroughStreamingHandler, RootListenersTracer, Run,
     RunCollectorCallbackHandler, RunEvent, RunType, SchemaFormat, StreamingCallbackHandler,
-    TracerCore, TracerCoreConfig, TracerError,
+    TracerCore, TracerCoreConfig,
 };
 
 pub use rate_limiters::{BaseRateLimiter, InMemoryRateLimiter, InMemoryRateLimiterConfig};
@@ -149,9 +148,7 @@ pub use text_splitters::{TokenTextSplitter, resolve_tiktoken_bpe, tiktoken_lengt
 
 pub use retrievers::{BaseRetriever, LangSmithRetrieverParams, RetrieverInput, RetrieverOutput};
 
-pub use stores::{
-    BaseStore, InMemoryBaseStore, InMemoryByteStore, InMemoryStore, InvalidKeyException,
-};
+pub use stores::{BaseStore, InMemoryBaseStore, InMemoryByteStore, InMemoryStore};
 
 pub use runnables::{
     AddableDict, BaseStreamEvent, CUSTOM_EVENT_TYPE, ConfigOrList, CustomStreamEvent,

@@ -13,7 +13,6 @@ const EXPECTED_EXPORTS: &[&str] = &[
     "ExposeSecret",
     "MockTime",          // equivalent to Python's "mock_now"
     "validate_xor_args", // equivalent to Python's "xor_args"
-    "HttpStatusError",
     "NoDefault",
     "LC_AUTO_PREFIX",
     "LC_ID_PREFIX",
@@ -100,7 +99,7 @@ fn test_all_imports() {
     let _ = get_from_dict_or_env(&data, &["key"], "ENV_KEY", None);
     use agent_chain_core::utils::get_from_env;
     let _ = get_from_env("key", "ENV_KEY", None);
-    use agent_chain_core::utils::EnvError;
+    use agent_chain_core::utils::env::EnvError;
     let _: Option<EnvError> = None;
     use agent_chain_core::utils::env_var_is_set;
     let _ = env_var_is_set("TEST");
@@ -136,7 +135,7 @@ fn test_all_imports() {
     use agent_chain_core::utils::uuid7;
     let _ = uuid7(None);
 
-    use agent_chain_core::utils::UsageError;
+    use agent_chain_core::utils::usage::UsageError;
     let _: Option<UsageError> = None;
     use agent_chain_core::utils::dict_int_op;
     let _ = dict_int_op(

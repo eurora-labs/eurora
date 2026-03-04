@@ -2,11 +2,6 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use thiserror::Error;
-
 use crate::callbacks::base::Callbacks;
 use crate::callbacks::manager::{
     AsyncCallbackManager, AsyncCallbackManagerForToolRun, CallbackManager,
@@ -16,6 +11,9 @@ use crate::error::{Error, Result};
 use crate::messages::{BaseMessage, ToolCall, ToolMessage};
 use crate::runnables::config::patch_config;
 use crate::runnables::{RunnableConfig, ensure_config};
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 pub const FILTERED_ARGS: &[&str] = &["run_manager", "callbacks"];
 
@@ -29,30 +27,6 @@ pub const TOOL_MESSAGE_BLOCK_TYPES: &[&str] = &[
     "document",
     "file",
 ];
-
-#[derive(Debug, Error)]
-#[error("Schema annotation error: {message}")]
-pub struct SchemaAnnotationError {
-    pub message: String,
-}
-
-impl SchemaAnnotationError {
-    pub fn new(message: impl Into<String>) -> Self {
-        Self {
-            message: message.into(),
-        }
-    }
-}
-
-#[derive(Debug, Error)]
-#[error("{0}")]
-pub struct ToolException(pub String);
-
-impl ToolException {
-    pub fn new(message: impl Into<String>) -> Self {
-        Self(message.into())
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -113,7 +87,7 @@ pub struct ToolDefinition {
 pub enum HandleToolError {
     Bool(bool),
     Message(String),
-    Handler(Arc<dyn Fn(&ToolException) -> String + Send + Sync>),
+    Handler(Arc<dyn Fn(&str) -> String + Send + Sync>),
 }
 
 impl Debug for HandleToolError {
@@ -436,19 +410,19 @@ pub trait BaseTool: Send + Sync + Debug {
                 Ok(formatted)
             }
             Err(e) => {
-                if let Some(tool_err_msg) = e.as_tool_exception() {
-                    let exc = ToolException::new(tool_err_msg);
-                    if let Some(handled) = handle_tool_error_impl(&exc, self.handle_tool_error()) {
-                        let formatted = format_output(
-                            ToolOutput::String(handled.clone()),
-                            None,
-                            tool_call_id.as_deref(),
-                            self.name(),
-                            "error",
-                        );
-                        run_manager.on_tool_end(&handled);
-                        return Ok(formatted);
-                    }
+                if let Some(tool_err_msg) = e.as_tool_exception()
+                    && let Some(handled) =
+                        handle_tool_error_impl(tool_err_msg, self.handle_tool_error())
+                {
+                    let formatted = format_output(
+                        ToolOutput::String(handled.clone()),
+                        None,
+                        tool_call_id.as_deref(),
+                        self.name(),
+                        "error",
+                    );
+                    run_manager.on_tool_end(&handled);
+                    return Ok(formatted);
                 }
                 if let Some(validation_msg) = e.as_validation_error()
                     && let Some(handled) =
@@ -560,19 +534,19 @@ pub trait BaseTool: Send + Sync + Debug {
                 Ok(formatted)
             }
             Err(e) => {
-                if let Some(tool_err_msg) = e.as_tool_exception() {
-                    let exc = ToolException::new(tool_err_msg);
-                    if let Some(handled) = handle_tool_error_impl(&exc, self.handle_tool_error()) {
-                        let formatted = format_output(
-                            ToolOutput::String(handled.clone()),
-                            None,
-                            tool_call_id.as_deref(),
-                            self.name(),
-                            "error",
-                        );
-                        run_manager.on_tool_end(&handled).await;
-                        return Ok(formatted);
-                    }
+                if let Some(tool_err_msg) = e.as_tool_exception()
+                    && let Some(handled) =
+                        handle_tool_error_impl(tool_err_msg, self.handle_tool_error())
+                {
+                    let formatted = format_output(
+                        ToolOutput::String(handled.clone()),
+                        None,
+                        tool_call_id.as_deref(),
+                        self.name(),
+                        "error",
+                    );
+                    run_manager.on_tool_end(&handled).await;
+                    return Ok(formatted);
                 }
                 if let Some(validation_msg) = e.as_validation_error()
                     && let Some(handled) =
@@ -695,14 +669,14 @@ pub fn is_tool_call(input: &Value) -> bool {
     input.get("type").and_then(|t| t.as_str()) == Some("tool_call")
 }
 
-pub fn handle_tool_error_impl(e: &ToolException, flag: &HandleToolError) -> Option<String> {
+pub fn handle_tool_error_impl(e: &str, flag: &HandleToolError) -> Option<String> {
     match flag {
         HandleToolError::Bool(false) => None,
         HandleToolError::Bool(true) => {
-            if e.0.is_empty() {
+            if e.is_empty() {
                 Some("Tool execution error".to_string())
             } else {
-                Some(e.0.clone())
+                Some(e.to_string())
             }
         }
         HandleToolError::Message(msg) => Some(msg.clone()),
@@ -870,15 +844,16 @@ mod tests {
 
     #[test]
     fn test_handle_tool_error() {
-        let exc = ToolException::new("test error");
-
-        let result = handle_tool_error_impl(&exc, &HandleToolError::Bool(false));
+        let result = handle_tool_error_impl("test error", &HandleToolError::Bool(false));
         assert!(result.is_none());
 
-        let result = handle_tool_error_impl(&exc, &HandleToolError::Bool(true));
+        let result = handle_tool_error_impl("test error", &HandleToolError::Bool(true));
         assert_eq!(result, Some("test error".to_string()));
 
-        let result = handle_tool_error_impl(&exc, &HandleToolError::Message("custom".to_string()));
+        let result = handle_tool_error_impl(
+            "test error",
+            &HandleToolError::Message("custom".to_string()),
+        );
         assert_eq!(result, Some("custom".to_string()));
     }
 }
