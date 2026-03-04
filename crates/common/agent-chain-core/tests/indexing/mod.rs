@@ -137,12 +137,10 @@ fn test_sha1_deterministic_hash() {
     let mut metadata = HashMap::new();
     metadata.insert("key".to_string(), json!("value"));
 
-    let doc = Document {
-        page_content: "Lorem ipsum dolor sit amet".to_string(),
-        id: None,
-        metadata,
-        type_: "Document".to_string(),
-    };
+    let doc = Document::builder()
+        .page_content("Lorem ipsum dolor sit amet")
+        .metadata(metadata)
+        .build();
 
     let encoder = KeyEncoder::Algorithm(HashAlgorithm::Sha1);
     let hashed = get_document_with_hash(&doc, &encoder).unwrap();

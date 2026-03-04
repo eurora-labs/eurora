@@ -8,7 +8,6 @@ use crate::documents::{BaseDocumentTransformer, Document};
 use crate::text_splitters::{
     LengthFunction, TextSplitter, TextSplitterConfig, Tokenizer, split_text_on_tokens,
 };
-use std::collections::HashMap;
 
 /// Resolves a tiktoken encoding name string to the corresponding `tiktoken_rs::tokenizer::Tokenizer` enum variant.
 fn encoding_name_to_tokenizer(name: &str) -> Option<tiktoken_rs::tokenizer::Tokenizer> {
@@ -151,9 +150,8 @@ impl TextSplitter for TokenTextSplitter {
 impl BaseDocumentTransformer for TokenTextSplitter {
     fn transform_documents(
         &self,
-        documents: Vec<Document>,
-        _kwargs: HashMap<String, serde_json::Value>,
+        documents: &[Document],
     ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
-        self.split_documents(&documents)
+        self.split_documents(documents)
     }
 }

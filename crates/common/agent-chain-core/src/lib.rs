@@ -142,8 +142,7 @@ pub use document_loaders::{
 };
 
 pub use documents::{
-    BaseDocumentCompressor, BaseDocumentTransformer, BaseMedia, Blob, BlobBuilder, BlobData,
-    Document,
+    BaseDocumentCompressor, BaseDocumentTransformer, Blob, BlobBuilder, BlobData, Document,
 };
 
 pub use text_splitters::{

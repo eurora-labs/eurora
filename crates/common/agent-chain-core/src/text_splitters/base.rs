@@ -1,8 +1,7 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 
 use async_trait::async_trait;
 use fancy_regex::Regex;
-use serde_json::Value;
 
 use crate::documents::{BaseDocumentTransformer, Document};
 use crate::text_splitters::{KeepSeparator, TextSplitter, TextSplitterConfig};
@@ -209,10 +208,9 @@ impl CharacterTextSplitter {
 impl BaseDocumentTransformer for CharacterTextSplitter {
     fn transform_documents(
         &self,
-        documents: Vec<Document>,
-        _kwargs: HashMap<String, Value>,
+        documents: &[Document],
     ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
-        self.split_documents(&documents)
+        self.split_documents(documents)
     }
 }
 
@@ -252,6 +250,8 @@ impl TextSplitter for CharacterTextSplitter {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
 
     #[test]
