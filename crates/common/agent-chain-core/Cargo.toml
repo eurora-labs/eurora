@@ -9,6 +9,7 @@ license = "MIT"
 async-stream = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
+mime_guess = "2"
 blake2 = { workspace = true }
 bon = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
@@ -29,6 +30,7 @@ rustc_version_runtime = "0.3.0"
 scraper = { workspace = true }
 secrecy = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_with = { version = "3", features = ["base64"] }
 serde_json = { workspace = true }
 sha1 = { workspace = true }
 sha2 = { workspace = true }

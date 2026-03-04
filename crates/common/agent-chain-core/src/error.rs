@@ -119,6 +119,9 @@ pub enum Error {
     #[error(transparent)]
     Usage(#[from] crate::utils::usage::UsageError),
 
+    #[error("Deserialization error for {id:?}: {reason}")]
+    Deserialization { id: Vec<String>, reason: String },
+
     #[error("{0}")]
     Other(String),
 }
