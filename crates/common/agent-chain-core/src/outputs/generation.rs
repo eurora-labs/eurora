@@ -5,7 +5,8 @@ use std::collections::HashMap;
 use std::ops::Add;
 
 use crate::load::Serializable;
-use crate::utils::merge::merge_dicts;
+
+pub const GENERATION_TYPE: &str = "Generation";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Generation {
@@ -19,7 +20,7 @@ pub struct Generation {
 }
 
 fn default_generation_type() -> String {
-    "Generation".to_string()
+    GENERATION_TYPE.to_string()
 }
 
 #[bon]
@@ -29,7 +30,7 @@ impl Generation {
         Self {
             text: text.into(),
             generation_info,
-            generation_type: "Generation".to_string(),
+            generation_type: GENERATION_TYPE.to_string(),
         }
     }
 }
@@ -49,7 +50,7 @@ impl Default for Generation {
         Self {
             text: String::new(),
             generation_info: None,
-            generation_type: "Generation".to_string(),
+            generation_type: GENERATION_TYPE.to_string(),
         }
     }
 }
@@ -72,7 +73,7 @@ impl GenerationChunk {
         Self {
             text: text.into(),
             generation_info,
-            generation_type: "Generation".to_string(),
+            generation_type: GENERATION_TYPE.to_string(),
         }
     }
 }
@@ -92,7 +93,7 @@ impl Default for GenerationChunk {
         Self {
             text: String::new(),
             generation_info: None,
-            generation_type: "Generation".to_string(),
+            generation_type: GENERATION_TYPE.to_string(),
         }
     }
 }
@@ -101,32 +102,13 @@ impl Add for GenerationChunk {
     type Output = GenerationChunk;
 
     fn add(self, other: GenerationChunk) -> Self::Output {
-        let generation_info = match (self.generation_info, other.generation_info) {
-            (Some(left), Some(right)) => {
-                let left_value =
-                    serde_json::to_value(&left).unwrap_or(Value::Object(Default::default()));
-                let right_value =
-                    serde_json::to_value(&right).unwrap_or(Value::Object(Default::default()));
-                match merge_dicts(left_value, vec![right_value]) {
-                    Ok(Value::Object(map)) => {
-                        let result: HashMap<String, Value> = map.into_iter().collect();
-                        if result.is_empty() {
-                            None
-                        } else {
-                            Some(result)
-                        }
-                    }
-                    _ => None,
-                }
-            }
-            (Some(info), None) | (None, Some(info)) => Some(info),
-            (None, None) => None,
-        };
+        let generation_info =
+            super::merge_generation_info(self.generation_info, other.generation_info);
 
         GenerationChunk {
             text: self.text + &other.text,
             generation_info,
-            generation_type: "Generation".to_string(),
+            generation_type: GENERATION_TYPE.to_string(),
         }
     }
 }
@@ -136,7 +118,7 @@ impl From<Generation> for GenerationChunk {
         GenerationChunk {
             text: generation.text,
             generation_info: generation.generation_info,
-            generation_type: "Generation".to_string(),
+            generation_type: GENERATION_TYPE.to_string(),
         }
     }
 }
@@ -146,20 +128,12 @@ impl From<GenerationChunk> for Generation {
         Generation {
             text: chunk.text,
             generation_info: chunk.generation_info,
-            generation_type: "Generation".to_string(),
+            generation_type: GENERATION_TYPE.to_string(),
         }
     }
 }
 
 pub fn merge_generation_chunks(chunks: Vec<GenerationChunk>) -> Option<GenerationChunk> {
-    if chunks.is_empty() {
-        return None;
-    }
-
-    if chunks.len() == 1 {
-        return chunks.into_iter().next();
-    }
-
     let mut iter = chunks.into_iter();
     let first = iter.next()?;
     Some(iter.fold(first, |acc, chunk| acc + chunk))
@@ -175,7 +149,7 @@ mod tests {
         let generation = Generation::builder().text("Hello, world!").build();
         assert_eq!(generation.text, "Hello, world!");
         assert!(generation.generation_info.is_none());
-        assert_eq!(generation.generation_type, "Generation");
+        assert_eq!(generation.generation_type, GENERATION_TYPE);
     }
 
     #[test]
