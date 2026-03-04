@@ -29,8 +29,6 @@ impl Default for BaseSerialized {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SerializedConstructor {
     pub lc: i32,
-    #[serde(rename = "type")]
-    pub type_: String,
     pub id: Vec<String>,
     pub kwargs: HashMap<String, Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -39,22 +37,14 @@ pub struct SerializedConstructor {
     pub graph: Option<HashMap<String, Value>>,
 }
 
-#[bon::bon]
 impl SerializedConstructor {
-    #[builder]
-    pub fn new(
-        id: Vec<String>,
-        kwargs: HashMap<String, Value>,
-        #[builder(into)] name: Option<String>,
-        graph: Option<HashMap<String, Value>>,
-    ) -> Self {
+    pub fn new(id: Vec<String>, kwargs: HashMap<String, Value>) -> Self {
         Self {
             lc: LC_VERSION,
-            type_: "constructor".to_string(),
             id,
             kwargs,
-            name,
-            graph,
+            name: None,
+            graph: None,
         }
     }
 }
@@ -62,8 +52,6 @@ impl SerializedConstructor {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SerializedSecret {
     pub lc: i32,
-    #[serde(rename = "type")]
-    pub type_: String,
     pub id: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
@@ -75,7 +63,6 @@ impl SerializedSecret {
     pub fn new(id: Vec<String>) -> Self {
         Self {
             lc: LC_VERSION,
-            type_: "secret".to_string(),
             id,
             name: None,
             graph: None,
@@ -90,8 +77,6 @@ impl SerializedSecret {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SerializedNotImplemented {
     pub lc: i32,
-    #[serde(rename = "type")]
-    pub type_: String,
     pub id: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub repr: Option<String>,
@@ -101,13 +86,10 @@ pub struct SerializedNotImplemented {
     pub graph: Option<HashMap<String, Value>>,
 }
 
-#[bon::bon]
 impl SerializedNotImplemented {
-    #[builder]
-    pub fn new(id: Vec<String>, #[builder(into)] repr: Option<String>) -> Self {
+    pub fn new(id: Vec<String>, repr: Option<String>) -> Self {
         Self {
             lc: LC_VERSION,
-            type_: "not_implemented".to_string(),
             id,
             repr,
             name: None,
@@ -120,79 +102,11 @@ impl SerializedNotImplemented {
 #[serde(tag = "type")]
 pub enum Serialized {
     #[serde(rename = "constructor")]
-    Constructor(SerializedConstructorData),
+    Constructor(SerializedConstructor),
     #[serde(rename = "secret")]
-    Secret(SerializedSecretData),
+    Secret(SerializedSecret),
     #[serde(rename = "not_implemented")]
-    NotImplemented(SerializedNotImplementedData),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct SerializedConstructorData {
-    pub lc: i32,
-    pub id: Vec<String>,
-    pub kwargs: HashMap<String, Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub graph: Option<HashMap<String, Value>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct SerializedSecretData {
-    pub lc: i32,
-    pub id: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub graph: Option<HashMap<String, Value>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct SerializedNotImplementedData {
-    pub lc: i32,
-    pub id: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub repr: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub graph: Option<HashMap<String, Value>>,
-}
-
-impl From<SerializedConstructor> for Serialized {
-    fn from(s: SerializedConstructor) -> Self {
-        Serialized::Constructor(SerializedConstructorData {
-            lc: s.lc,
-            id: s.id,
-            kwargs: s.kwargs,
-            name: s.name,
-            graph: s.graph,
-        })
-    }
-}
-
-impl From<SerializedSecret> for Serialized {
-    fn from(s: SerializedSecret) -> Self {
-        Serialized::Secret(SerializedSecretData {
-            lc: s.lc,
-            id: s.id,
-            name: s.name,
-            graph: s.graph,
-        })
-    }
-}
-
-impl From<SerializedNotImplemented> for Serialized {
-    fn from(s: SerializedNotImplemented) -> Self {
-        Serialized::NotImplemented(SerializedNotImplementedData {
-            lc: s.lc,
-            id: s.id,
-            repr: s.repr,
-            name: s.name,
-            graph: s.graph,
-        })
-    }
+    NotImplemented(SerializedNotImplemented),
 }
 
 pub trait Serializable: Any + Send + Sync {
@@ -243,10 +157,7 @@ pub trait Serializable: Any + Send + Sync {
         }
 
         let kwargs: HashMap<String, Value> = match serde_json::to_value(self) {
-            Ok(Value::Object(map)) => map
-                .into_iter()
-                .filter(|(k, v)| is_field_useful(k, v))
-                .collect(),
+            Ok(Value::Object(map)) => map.into_iter().filter(|(_, v)| !v.is_null()).collect(),
             _ => HashMap::new(),
         };
 
@@ -262,11 +173,7 @@ pub trait Serializable: Any + Send + Sync {
             final_kwargs.insert(key, value);
         }
 
-        SerializedConstructor::builder()
-            .id(Self::lc_id())
-            .kwargs(final_kwargs)
-            .build()
-            .into()
+        Serialized::Constructor(SerializedConstructor::new(Self::lc_id(), final_kwargs))
     }
 
     fn to_json_not_implemented(&self) -> Serialized {
@@ -274,23 +181,21 @@ pub trait Serializable: Any + Send + Sync {
     }
 }
 
-fn is_field_useful(_key: &str, value: &Value) -> bool {
-    !value.is_null()
-}
-
 pub fn to_json_not_implemented_value(type_name: &str, repr: Option<String>) -> Serialized {
     let id: Vec<String> = type_name.split("::").map(|s| s.to_string()).collect();
-
-    SerializedNotImplemented::builder()
-        .id(id)
-        .maybe_repr(repr)
-        .build()
-        .into()
+    Serialized::NotImplemented(SerializedNotImplemented::new(id, repr))
 }
 
 pub fn to_json_not_implemented(value: &Value) -> Serialized {
     let repr = serde_json::to_string_pretty(value).ok();
     to_json_not_implemented_value("serde_json::Value", repr)
+}
+
+fn secret_value(secret_id: &str) -> Value {
+    serde_json::to_value(Serialized::Secret(SerializedSecret::from_secret_id(
+        secret_id,
+    )))
+    .expect("Serialized serialization cannot fail")
 }
 
 fn replace_secrets(
@@ -302,11 +207,7 @@ fn replace_secrets(
 
         if parts.len() == 1 {
             if kwargs.contains_key(path) {
-                kwargs.insert(
-                    path.clone(),
-                    serde_json::to_value(SerializedSecret::from_secret_id(secret_id))
-                        .expect("SerializedSecret serialization"),
-                );
+                kwargs.insert(path.clone(), secret_value(secret_id));
             }
         } else {
             replace_nested_secret(&mut kwargs, &parts, secret_id);
@@ -324,17 +225,30 @@ fn replace_nested_secret(current: &mut HashMap<String, Value>, parts: &[&str], s
 
     if parts.len() == 1 {
         if current.contains_key(key) {
-            current.insert(
-                key.to_string(),
-                serde_json::to_value(SerializedSecret::from_secret_id(secret_id))
-                    .expect("SerializedSecret serialization"),
-            );
+            current.insert(key.to_string(), secret_value(secret_id));
         }
     } else if let Some(Value::Object(map)) = current.get_mut(key) {
-        let mut nested: HashMap<String, Value> =
-            map.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-        replace_nested_secret(&mut nested, &parts[1..], secret_id);
-        *map = nested.into_iter().collect();
+        replace_nested_secret_in_map(map, &parts[1..], secret_id);
+    }
+}
+
+fn replace_nested_secret_in_map(
+    map: &mut serde_json::Map<String, Value>,
+    parts: &[&str],
+    secret_id: &str,
+) {
+    if parts.is_empty() {
+        return;
+    }
+
+    let key = parts[0];
+
+    if parts.len() == 1 {
+        if map.contains_key(key) {
+            map.insert(key.to_string(), secret_value(secret_id));
+        }
+    } else if let Some(Value::Object(nested)) = map.get_mut(key) {
+        replace_nested_secret_in_map(nested, &parts[1..], secret_id);
     }
 }
 
@@ -347,17 +261,16 @@ mod tests {
         let mut kwargs = HashMap::new();
         kwargs.insert("name".to_string(), Value::String("test".to_string()));
 
-        let constructor = SerializedConstructor::builder()
-            .id(vec![
+        let constructor = SerializedConstructor::new(
+            vec![
                 "langchain".to_string(),
                 "llms".to_string(),
                 "OpenAI".to_string(),
-            ])
-            .kwargs(kwargs)
-            .build();
+            ],
+            kwargs,
+        );
 
         assert_eq!(constructor.lc, 1);
-        assert_eq!(constructor.type_, "constructor");
         assert_eq!(constructor.id.len(), 3);
     }
 
@@ -366,20 +279,43 @@ mod tests {
         let secret = SerializedSecret::from_secret_id("OPENAI_API_KEY");
 
         assert_eq!(secret.lc, 1);
-        assert_eq!(secret.type_, "secret");
         assert_eq!(secret.id, vec!["OPENAI_API_KEY".to_string()]);
     }
 
     #[test]
     fn test_serialized_not_implemented() {
-        let not_impl = SerializedNotImplemented::builder()
-            .id(vec!["my_module".to_string(), "MyClass".to_string()])
-            .repr("MyClass(...)")
-            .build();
+        let not_impl = SerializedNotImplemented::new(
+            vec!["my_module".to_string(), "MyClass".to_string()],
+            Some("MyClass(...)".to_string()),
+        );
 
         assert_eq!(not_impl.lc, 1);
-        assert_eq!(not_impl.type_, "not_implemented");
         assert_eq!(not_impl.repr, Some("MyClass(...)".to_string()));
+    }
+
+    #[test]
+    fn test_serialized_roundtrip() {
+        let constructor = Serialized::Constructor(SerializedConstructor::new(
+            vec!["test".into()],
+            HashMap::new(),
+        ));
+        let json = serde_json::to_value(&constructor).unwrap();
+        assert_eq!(
+            json.get("type").and_then(|v| v.as_str()),
+            Some("constructor")
+        );
+
+        let secret = Serialized::Secret(SerializedSecret::from_secret_id("KEY"));
+        let json = serde_json::to_value(&secret).unwrap();
+        assert_eq!(json.get("type").and_then(|v| v.as_str()), Some("secret"));
+
+        let not_impl =
+            Serialized::NotImplemented(SerializedNotImplemented::new(vec!["test".into()], None));
+        let json = serde_json::to_value(&not_impl).unwrap();
+        assert_eq!(
+            json.get("type").and_then(|v| v.as_str()),
+            Some("not_implemented")
+        );
     }
 
     #[test]

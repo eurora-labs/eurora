@@ -440,3 +440,6 @@ impl Serializable for HumanMessageChunk {
         ]
     }
 }
+
+submit_constructor!(HumanMessage);
+submit_constructor!(HumanMessageChunk);

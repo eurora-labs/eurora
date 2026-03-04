@@ -1,3 +1,4 @@
+use agent_chain_core::Serializable;
 use agent_chain_core::outputs::{Generation, GenerationChunk};
 use serde_json::json;
 use std::collections::HashMap;
@@ -41,7 +42,11 @@ mod generation_tests {
 
     #[test]
     fn test_get_lc_namespace() {
-        let expected_namespace = vec!["langchain", "schema", "output"];
+        let expected_namespace = vec![
+            "langchain".to_string(),
+            "schema".to_string(),
+            "output".to_string(),
+        ];
         assert_eq!(Generation::get_lc_namespace(), expected_namespace);
     }
 
@@ -155,7 +160,11 @@ mod test_generation_chunk {
 
     #[test]
     fn test_get_lc_namespace_inherited() {
-        let expected_namespace = vec!["langchain", "schema", "output"];
+        let expected_namespace = vec![
+            "langchain".to_string(),
+            "schema".to_string(),
+            "output".to_string(),
+        ];
         assert_eq!(Generation::get_lc_namespace(), expected_namespace);
     }
 

@@ -1026,6 +1026,13 @@ impl Serializable for ChatPromptTemplate {
     }
 }
 
+submit_constructor!(MessagesPlaceholder);
+submit_constructor!(HumanMessagePromptTemplate);
+submit_constructor!(AIMessagePromptTemplate);
+submit_constructor!(SystemMessagePromptTemplate);
+submit_constructor!(ChatMessagePromptTemplate);
+submit_constructor!(ChatPromptTemplate);
+
 #[cfg(test)]
 mod tests {
     use super::*;

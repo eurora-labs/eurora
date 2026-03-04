@@ -13,7 +13,6 @@ const EXPECTED_EXPORTS: &[&str] = &[
     "ExposeSecret",
     "MockTime",          // equivalent to Python's "mock_now"
     "validate_xor_args", // equivalent to Python's "xor_args"
-    "HttpStatusError",
     "NoDefault",
     "LC_AUTO_PREFIX",
     "LC_ID_PREFIX",
@@ -41,8 +40,6 @@ const EXPECTED_EXPORTS: &[&str] = &[
     "merge_dicts",
     "merge_lists",
     "merge_obj",
-    "MustacheValue",
-    "render_mustache",
     "uuid7",
     "UsageError",
     "dict_int_op",
@@ -102,7 +99,7 @@ fn test_all_imports() {
     let _ = get_from_dict_or_env(&data, &["key"], "ENV_KEY", None);
     use agent_chain_core::utils::get_from_env;
     let _ = get_from_env("key", "ENV_KEY", None);
-    use agent_chain_core::utils::EnvError;
+    use agent_chain_core::utils::env::EnvError;
     let _: Option<EnvError> = None;
     use agent_chain_core::utils::env_var_is_set;
     let _ = env_var_is_set("TEST");
@@ -135,15 +132,10 @@ fn test_all_imports() {
     use agent_chain_core::utils::merge_obj;
     let _ = merge_obj(serde_json::json!(null), serde_json::json!(null));
 
-    use agent_chain_core::utils::MustacheValue;
-    let _: MustacheValue = MustacheValue::Null;
-    use agent_chain_core::utils::render_mustache;
-    let _ = render_mustache("", &MustacheValue::Null, None);
-
     use agent_chain_core::utils::uuid7;
     let _ = uuid7(None);
 
-    use agent_chain_core::utils::UsageError;
+    use agent_chain_core::utils::usage::UsageError;
     let _: Option<UsageError> = None;
     use agent_chain_core::utils::dict_int_op;
     let _ = dict_int_op(

@@ -11,7 +11,7 @@ pub mod schemas;
 pub mod stdout;
 pub mod streaming;
 
-pub use core::{SchemaFormat, TracerCore, TracerCoreConfig, TracerError};
+pub use core::{SchemaFormat, TracerCore, TracerCoreConfig};
 
 pub use schemas::{Run, RunEvent, RunType};
 

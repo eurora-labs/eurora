@@ -5,15 +5,16 @@ mod serializable;
 
 pub use serializable::{
     BaseSerialized, LC_VERSION, Serializable, Serialized, SerializedConstructor,
-    SerializedConstructorData, SerializedNotImplemented, SerializedNotImplementedData,
-    SerializedSecret, SerializedSecretData, to_json_not_implemented, to_json_not_implemented_value,
+    SerializedNotImplemented, SerializedSecret, to_json_not_implemented,
+    to_json_not_implemented_value,
 };
 
 pub use dump::{dumpd, dumps};
 
 pub use loader::{
-    ConstructorInfo, RevivedValue, Reviver, ReviverConfig, load, loads, loads_with_namespaces,
-    loads_with_secrets, lookup_constructor,
+    ConstructorEntry, ConstructorFn, ConstructorInfo, RevivedValue, Reviver, ReviverConfig,
+    deserialize_constructor, load, loads, loads_with_namespaces, loads_with_secrets,
+    lookup_constructor,
 };
 
 pub use mapping::{

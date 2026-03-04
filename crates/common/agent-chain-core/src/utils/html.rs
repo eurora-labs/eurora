@@ -7,9 +7,9 @@ pub const SUFFIXES_TO_IGNORE: &[&str] = &[
     ".css", ".js", ".ico", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".csv", ".bz2", ".zip", ".epub",
 ];
 
-pub fn default_link_regex() -> Regex {
+static DEFAULT_LINK_REGEX: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
     Regex::new(r#"href=["']([^"'#]+)["'#]"#).expect("Failed to compile default link regex")
-}
+});
 
 fn should_ignore_prefix(link: &str) -> bool {
     PREFIXES_TO_IGNORE
@@ -24,16 +24,17 @@ fn should_ignore_suffix(link: &str) -> bool {
 }
 
 pub fn find_all_links(raw_html: &str, pattern: Option<&Regex>) -> Vec<String> {
-    let default_regex = default_link_regex();
-    let regex = pattern.unwrap_or(&default_regex);
+    let regex = pattern.unwrap_or(&DEFAULT_LINK_REGEX);
 
-    regex
+    let mut links: Vec<String> = regex
         .captures_iter(raw_html)
         .filter_map(|cap| cap.get(1).map(|m| m.as_str().to_string()))
         .filter(|link| !should_ignore_prefix(link) && !should_ignore_suffix(link))
         .collect::<HashSet<_>>()
         .into_iter()
-        .collect()
+        .collect();
+    links.sort();
+    links
 }
 
 pub fn extract_sub_links(

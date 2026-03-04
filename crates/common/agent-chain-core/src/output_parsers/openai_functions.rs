@@ -5,9 +5,7 @@ use serde_json::Value;
 
 use async_trait::async_trait;
 
-use super::base::{
-    BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser, OutputParserError,
-};
+use super::base::{BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser};
 use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
 use crate::error::{Error, Result};
 use crate::messages::BaseMessage;
@@ -34,12 +32,12 @@ impl OutputFunctionsParser {
         let additional_kwargs = generation
             .message
             .additional_kwargs()
-            .ok_or_else(|| OutputParserError::new("Message has no additional_kwargs"))?;
+            .ok_or_else(|| Error::output_parser_simple("Message has no additional_kwargs"))?;
 
         let function_call = additional_kwargs
             .get("function_call")
             .ok_or_else(|| {
-                OutputParserError::new(
+                Error::output_parser_simple(
                     "Could not parse function call: 'function_call' key not found",
                 )
             })?
@@ -47,7 +45,7 @@ impl OutputFunctionsParser {
 
         if self.args_only {
             let arguments = function_call.get("arguments").ok_or_else(|| {
-                OutputParserError::new("Could not parse function call: missing 'arguments'")
+                Error::output_parser_simple("Could not parse function call: missing 'arguments'")
             })?;
             Ok(arguments.clone())
         } else {
@@ -101,16 +99,17 @@ impl JsonOutputFunctionsParser {
         partial: bool,
     ) -> Result<Option<Value>> {
         if result.len() != 1 {
-            return Err(OutputParserError::new(format!(
+            return Err(Error::output_parser_simple(format!(
                 "Expected exactly one result, but got {}",
                 result.len()
-            ))
-            .into());
+            )));
         }
 
         let generation = &result[0];
         let additional_kwargs = generation.message.additional_kwargs().ok_or_else(|| {
-            OutputParserError::new("This output parser can only be used with a chat generation.")
+            Error::output_parser_simple(
+                "This output parser can only be used with a chat generation.",
+            )
         })?;
 
         let function_call = match additional_kwargs.get("function_call") {
@@ -119,10 +118,9 @@ impl JsonOutputFunctionsParser {
                 if partial {
                     return Ok(None);
                 }
-                return Err(OutputParserError::new(
+                return Err(Error::output_parser_simple(
                     "Could not parse function call: 'function_call' key not found",
-                )
-                .into());
+                ));
             }
         };
 
@@ -137,10 +135,9 @@ impl JsonOutputFunctionsParser {
                 if partial {
                     return Ok(None);
                 }
-                return Err(OutputParserError::new(
+                return Err(Error::output_parser_simple(
                     "Could not parse function call data: 'arguments' is not a string",
-                )
-                .into());
+                ));
             }
         };
 
@@ -161,17 +158,17 @@ impl JsonOutputFunctionsParser {
         } else {
             let parsed_arguments = if self.strict {
                 serde_json::from_str::<Value>(arguments_str).map_err(|e| {
-                    Error::from(OutputParserError::new(format!(
+                    Error::output_parser_simple(format!(
                         "Could not parse function call data: {}",
                         e
-                    )))
+                    ))
                 })?
             } else {
                 parse_json_lenient(arguments_str).map_err(|e| {
-                    Error::from(OutputParserError::new(format!(
+                    Error::output_parser_simple(format!(
                         "Could not parse function call data: {}",
                         e
-                    )))
+                    ))
                 })?
             };
 
@@ -230,10 +227,10 @@ impl<T: Send + Sync + 'static> PydanticSchema<T> {
                 None => raw.to_string(),
             };
             let parsed: D = serde_json::from_str(&json_str).map_err(|e| {
-                Error::from(OutputParserError::new(format!(
+                Error::output_parser_simple(format!(
                     "Could not parse function call into schema: {}",
                     e
-                )))
+                ))
             })?;
             Ok(parsed.into())
         })))
@@ -281,12 +278,14 @@ impl<T: Send + Sync + Clone + Debug + 'static> PydanticOutputFunctionsParser<T> 
                 let base_parser = OutputFunctionsParser::new(false);
                 let raw = base_parser.parse_result(result)?;
                 let function_name = raw.get("name").and_then(|v| v.as_str()).ok_or_else(|| {
-                    OutputParserError::new("Missing function name in function call")
+                    Error::output_parser_simple("Missing function name in function call")
                 })?;
                 let arguments = raw
                     .get("arguments")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| OutputParserError::new("Missing arguments in function call"))?;
+                    .ok_or_else(|| {
+                        Error::output_parser_simple("Missing arguments in function call")
+                    })?;
                 resolver(function_name, arguments)
             }
         }

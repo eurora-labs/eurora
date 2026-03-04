@@ -9,6 +9,7 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 be-encrypt = { workspace = true, optional = true }
 bon = { workspace = true }
 hex = { workspace = true }
+mime_guess = "2"
 opendal = { version = "0.55.0", features = ["services-fs", "services-s3"] }
 secrecy = { workspace = true }
 sha2 = { workspace = true }

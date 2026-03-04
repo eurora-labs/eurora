@@ -1,21 +1,11 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::Arc;
 
 use bon::bon;
 use futures::stream::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::sync::Semaphore;
-
-pub async fn gated_coro<T>(semaphore: Arc<Semaphore>, fut: impl Future<Output = T>) -> T {
-    let _permit = semaphore
-        .acquire()
-        .await
-        .expect("semaphore should not be closed");
-    fut.await
-}
 
 pub async fn gather_with_concurrency<T: Send + 'static>(
     n: Option<usize>,
@@ -27,15 +17,10 @@ pub async fn gather_with_concurrency<T: Send + 'static>(
 
     match n {
         Some(limit) if limit > 0 => {
-            let semaphore = Arc::new(Semaphore::new(limit));
-            let gated_futures: Vec<_> = futures
-                .into_iter()
-                .map(|fut| {
-                    let sem = semaphore.clone();
-                    Box::pin(gated_coro(sem, fut)) as Pin<Box<dyn Future<Output = T> + Send>>
-                })
-                .collect();
-            futures::future::join_all(gated_futures).await
+            futures::stream::iter(futures)
+                .buffered(limit)
+                .collect()
+                .await
         }
         _ => futures::future::join_all(futures).await,
     }
