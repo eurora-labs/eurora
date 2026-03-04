@@ -8,10 +8,7 @@ use uuid::Uuid;
 use crate::messages::{BaseMessage, UsageMetadata};
 use crate::outputs::ChatResult;
 
-use super::base::{
-    BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
-    RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
-};
+use super::base::BaseCallbackHandler;
 
 #[derive(Debug, Clone)]
 pub struct UsageMetadataCallbackHandler {
@@ -51,7 +48,11 @@ impl fmt::Display for UsageMetadataCallbackHandler {
     }
 }
 
-impl LLMManagerMixin for UsageMetadataCallbackHandler {
+impl BaseCallbackHandler for UsageMetadataCallbackHandler {
+    fn name(&self) -> &str {
+        "UsageMetadataCallbackHandler"
+    }
+
     fn on_llm_end(&self, response: &ChatResult, _run_id: Uuid, _parent_run_id: Option<Uuid>) {
         let first_generation = response.generations.first();
 
@@ -89,23 +90,11 @@ impl LLMManagerMixin for UsageMetadataCallbackHandler {
     }
 }
 
-impl ChainManagerMixin for UsageMetadataCallbackHandler {}
-impl ToolManagerMixin for UsageMetadataCallbackHandler {}
-impl RetrieverManagerMixin for UsageMetadataCallbackHandler {}
-impl CallbackManagerMixin for UsageMetadataCallbackHandler {}
-impl RunManagerMixin for UsageMetadataCallbackHandler {}
-
-impl BaseCallbackHandler for UsageMetadataCallbackHandler {
-    fn name(&self) -> &str {
-        "UsageMetadataCallbackHandler"
-    }
-}
-
-pub struct UsageMetadataCallbackGuard {
+pub struct UsageMetadataCallbackWrapper {
     handler: UsageMetadataCallbackHandler,
 }
 
-impl UsageMetadataCallbackGuard {
+impl UsageMetadataCallbackWrapper {
     fn new() -> Self {
         Self {
             handler: UsageMetadataCallbackHandler::new(),
@@ -129,7 +118,7 @@ impl UsageMetadataCallbackGuard {
     }
 }
 
-impl Deref for UsageMetadataCallbackGuard {
+impl Deref for UsageMetadataCallbackWrapper {
     type Target = UsageMetadataCallbackHandler;
 
     fn deref(&self) -> &Self::Target {
@@ -137,14 +126,14 @@ impl Deref for UsageMetadataCallbackGuard {
     }
 }
 
-impl DerefMut for UsageMetadataCallbackGuard {
+impl DerefMut for UsageMetadataCallbackWrapper {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.handler
     }
 }
 
-pub fn get_usage_metadata_callback() -> UsageMetadataCallbackGuard {
-    UsageMetadataCallbackGuard::new()
+pub fn get_usage_metadata_callback() -> UsageMetadataCallbackWrapper {
+    UsageMetadataCallbackWrapper::new()
 }
 
 #[cfg(test)]

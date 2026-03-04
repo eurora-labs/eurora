@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use crate::callbacks::base::Callbacks;
+use crate::callbacks::Callbacks;
 use crate::callbacks::manager::{
     AsyncCallbackManager, AsyncCallbackManagerForToolRun, CallbackManager,
     CallbackManagerForToolRun,
@@ -331,15 +331,15 @@ pub trait BaseTool: Send + Sync + Debug {
     ) -> Result<ToolOutput> {
         let config = ensure_config(config);
 
-        let callback_manager = CallbackManager::configure(
-            config.callbacks.clone(),
-            self.callbacks().cloned(),
-            self.verbose(),
-            Some(config.tags.clone()),
-            self.tags().map(|t| t.to_vec()),
-            Some(config.metadata.clone()),
-            self.metadata().cloned(),
-        );
+        let callback_manager = CallbackManager::configure()
+            .maybe_inheritable_callbacks(config.callbacks.clone())
+            .maybe_local_callbacks(self.callbacks().cloned())
+            .verbose(self.verbose())
+            .inheritable_tags(config.tags.clone())
+            .maybe_local_tags(self.tags().map(|t| t.to_vec()))
+            .inheritable_metadata(config.metadata.clone())
+            .maybe_local_metadata(self.metadata().cloned())
+            .call();
 
         let mut serialized = HashMap::new();
         serialized.insert(
@@ -452,15 +452,15 @@ pub trait BaseTool: Send + Sync + Debug {
     ) -> Result<ToolOutput> {
         let config = ensure_config(config);
 
-        let async_callback_manager = AsyncCallbackManager::configure(
-            config.callbacks.clone(),
-            self.callbacks().cloned(),
-            self.verbose(),
-            Some(config.tags.clone()),
-            self.tags().map(|t| t.to_vec()),
-            Some(config.metadata.clone()),
-            self.metadata().cloned(),
-        );
+        let async_callback_manager = AsyncCallbackManager::configure()
+            .maybe_inheritable_callbacks(config.callbacks.clone())
+            .maybe_local_callbacks(self.callbacks().cloned())
+            .verbose(self.verbose())
+            .inheritable_tags(config.tags.clone())
+            .maybe_local_tags(self.tags().map(|t| t.to_vec()))
+            .inheritable_metadata(config.metadata.clone())
+            .maybe_local_metadata(self.metadata().cloned())
+            .call();
 
         let mut serialized = HashMap::new();
         serialized.insert(

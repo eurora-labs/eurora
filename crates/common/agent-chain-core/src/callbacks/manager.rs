@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::future::Future;
+use std::ops::Deref;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
 
@@ -9,7 +10,7 @@ use uuid::Uuid;
 use crate::messages::BaseMessage;
 use crate::outputs::ChatResult;
 
-use super::base::{BaseCallbackHandler, BaseCallbackManager, Callbacks};
+use super::base::BaseCallbackHandler;
 use super::stdout::StdOutCallbackHandler;
 use crate::globals::get_debug;
 use crate::tracers::context::{
@@ -18,6 +19,10 @@ use crate::tracers::context::{
 use crate::tracers::stdout::ConsoleCallbackHandler;
 use crate::utils::env::env_var_is_set;
 use crate::utils::uuid::uuid7;
+
+// ---------------------------------------------------------------------------
+// Event dispatch
+// ---------------------------------------------------------------------------
 
 pub fn handle_event<F>(
     handlers: &[Arc<dyn BaseCallbackHandler>],
@@ -83,14 +88,18 @@ pub async fn ahandle_event<F, Fut>(
                 true
             }
         })
-        .map(event_fn)
+        .map(&event_fn)
         .collect();
 
     futures::future::join_all(non_inline_futures).await;
 }
 
+// ---------------------------------------------------------------------------
+// RunManagerCore — shared data for all run manager types
+// ---------------------------------------------------------------------------
+
 #[derive(Debug, Clone)]
-pub struct BaseRunManager {
+pub struct RunManagerCore {
     pub run_id: Uuid,
     pub handlers: Vec<Arc<dyn BaseCallbackHandler>>,
     pub inheritable_handlers: Vec<Arc<dyn BaseCallbackHandler>>,
@@ -101,31 +110,8 @@ pub struct BaseRunManager {
     pub inheritable_metadata: HashMap<String, serde_json::Value>,
 }
 
-impl BaseRunManager {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        run_id: Uuid,
-        handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-        inheritable_handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-        parent_run_id: Option<Uuid>,
-        tags: Option<Vec<String>>,
-        inheritable_tags: Option<Vec<String>>,
-        metadata: Option<HashMap<String, serde_json::Value>>,
-        inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
-    ) -> Self {
-        Self {
-            run_id,
-            handlers,
-            inheritable_handlers,
-            parent_run_id,
-            tags: tags.unwrap_or_default(),
-            inheritable_tags: inheritable_tags.unwrap_or_default(),
-            metadata: metadata.unwrap_or_default(),
-            inheritable_metadata: inheritable_metadata.unwrap_or_default(),
-        }
-    }
-
-    pub fn get_noop_manager() -> Self {
+impl Default for RunManagerCore {
+    fn default() -> Self {
         Self {
             run_id: uuid7(None),
             handlers: Vec::new(),
@@ -139,156 +125,185 @@ impl BaseRunManager {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct RunManager {
-    inner: BaseRunManager,
-}
-
-impl RunManager {
-    #[allow(clippy::too_many_arguments)]
+#[bon]
+impl RunManagerCore {
+    #[builder]
     pub fn new(
+        run_id: Uuid,
+        #[builder(default)] handlers: Vec<Arc<dyn BaseCallbackHandler>>,
+        #[builder(default)] inheritable_handlers: Vec<Arc<dyn BaseCallbackHandler>>,
+        parent_run_id: Option<Uuid>,
+        #[builder(default)] tags: Vec<String>,
+        #[builder(default)] inheritable_tags: Vec<String>,
+        #[builder(default)] metadata: HashMap<String, serde_json::Value>,
+        #[builder(default)] inheritable_metadata: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        Self {
+            run_id,
+            handlers,
+            inheritable_handlers,
+            parent_run_id,
+            tags,
+            inheritable_tags,
+            metadata,
+            inheritable_metadata,
+        }
+    }
+
+    pub fn from_handlers(
         run_id: Uuid,
         handlers: Vec<Arc<dyn BaseCallbackHandler>>,
         inheritable_handlers: Vec<Arc<dyn BaseCallbackHandler>>,
         parent_run_id: Option<Uuid>,
-        tags: Option<Vec<String>>,
-        inheritable_tags: Option<Vec<String>>,
-        metadata: Option<HashMap<String, serde_json::Value>>,
-        inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
     ) -> Self {
-        Self {
-            inner: BaseRunManager::new(
-                run_id,
-                handlers,
-                inheritable_handlers,
-                parent_run_id,
-                tags,
-                inheritable_tags,
-                metadata,
-                inheritable_metadata,
-            ),
-        }
+        Self::builder()
+            .run_id(run_id)
+            .handlers(handlers)
+            .inheritable_handlers(inheritable_handlers)
+            .maybe_parent_run_id(parent_run_id)
+            .build()
+    }
+
+    pub fn noop() -> Self {
+        Self::default()
     }
 
     pub fn run_id(&self) -> Uuid {
-        self.inner.run_id
+        self.run_id
     }
 
     pub fn parent_run_id(&self) -> Option<Uuid> {
-        self.inner.parent_run_id
+        self.parent_run_id
     }
 
     pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
-        &self.inner.handlers
+        &self.handlers
     }
 
     pub fn tags(&self) -> &[String] {
-        &self.inner.tags
+        &self.tags
+    }
+
+    fn dispatch(
+        &self,
+        ignore: Option<fn(&dyn BaseCallbackHandler) -> bool>,
+        f: impl FnMut(&Arc<dyn BaseCallbackHandler>),
+    ) {
+        if !self.handlers.is_empty() {
+            handle_event(&self.handlers, ignore, f);
+        }
+    }
+
+    pub fn get_child_manager(&self, tag: Option<&str>) -> CallbackManager {
+        let mut manager = CallbackManager::new();
+        manager.parent_run_id = Some(self.run_id);
+        manager.set_handlers(self.inheritable_handlers.clone(), true);
+        manager.add_tags(self.inheritable_tags.clone(), true);
+        manager.add_metadata(self.inheritable_metadata.clone(), true);
+        if let Some(tag) = tag {
+            manager.add_tags(vec![tag.to_string()], false);
+        }
+        manager
+    }
+}
+
+pub type BaseRunManager = RunManagerCore;
+
+// ---------------------------------------------------------------------------
+// RunManager — adds on_text / on_retry
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct RunManager {
+    core: RunManagerCore,
+}
+
+impl Deref for RunManager {
+    type Target = RunManagerCore;
+    fn deref(&self) -> &Self::Target {
+        &self.core
+    }
+}
+
+impl RunManager {
+    pub fn new(core: RunManagerCore) -> Self {
+        Self { core }
+    }
+
+    pub fn noop() -> Self {
+        Self {
+            core: RunManagerCore::noop(),
+        }
+    }
+
+    #[doc(hidden)]
+    pub fn get_noop_manager() -> Self {
+        Self::noop()
     }
 
     pub fn on_text(&self, text: &str) {
-        if self.inner.handlers.is_empty() {
-            return;
-        }
-        let run_id = self.inner.run_id;
-        let parent_run_id = self.inner.parent_run_id;
-        let _tags = self.inner.tags.clone();
-        handle_event(&self.inner.handlers, None, |handler| {
+        let run_id = self.core.run_id;
+        let parent_run_id = self.core.parent_run_id;
+        self.core.dispatch(None, |handler| {
             handler.on_text(text, run_id, parent_run_id, None, "");
         });
     }
 
     pub fn on_retry(&self, retry_state: &serde_json::Value) {
-        if self.inner.handlers.is_empty() {
-            return;
-        }
-        let run_id = self.inner.run_id;
-        let parent_run_id = self.inner.parent_run_id;
-        let _tags = self.inner.tags.clone();
-        handle_event(
-            &self.inner.handlers,
+        let run_id = self.core.run_id;
+        let parent_run_id = self.core.parent_run_id;
+        self.core.dispatch(
             Some(|h: &dyn BaseCallbackHandler| h.ignore_retry()),
             |handler| {
                 handler.on_retry(retry_state, run_id, parent_run_id);
             },
         );
     }
-
-    pub fn get_noop_manager() -> Self {
-        Self {
-            inner: BaseRunManager::get_noop_manager(),
-        }
-    }
 }
+
+// ---------------------------------------------------------------------------
+// AsyncRunManager
+// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 pub struct AsyncRunManager {
-    inner: BaseRunManager,
+    core: RunManagerCore,
+}
+
+impl Deref for AsyncRunManager {
+    type Target = RunManagerCore;
+    fn deref(&self) -> &Self::Target {
+        &self.core
+    }
 }
 
 impl AsyncRunManager {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        run_id: Uuid,
-        handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-        inheritable_handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-        parent_run_id: Option<Uuid>,
-        tags: Option<Vec<String>>,
-        inheritable_tags: Option<Vec<String>>,
-        metadata: Option<HashMap<String, serde_json::Value>>,
-        inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn new(core: RunManagerCore) -> Self {
+        Self { core }
+    }
+
+    pub fn noop() -> Self {
         Self {
-            inner: BaseRunManager::new(
-                run_id,
-                handlers,
-                inheritable_handlers,
-                parent_run_id,
-                tags,
-                inheritable_tags,
-                metadata,
-                inheritable_metadata,
-            ),
+            core: RunManagerCore::noop(),
         }
+    }
+
+    #[doc(hidden)]
+    pub fn get_noop_manager() -> Self {
+        Self::noop()
     }
 
     pub fn get_sync(&self) -> RunManager {
-        RunManager::new(
-            self.inner.run_id,
-            self.inner.handlers.clone(),
-            self.inner.inheritable_handlers.clone(),
-            self.inner.parent_run_id,
-            Some(self.inner.tags.clone()),
-            Some(self.inner.inheritable_tags.clone()),
-            Some(self.inner.metadata.clone()),
-            Some(self.inner.inheritable_metadata.clone()),
-        )
-    }
-
-    pub fn run_id(&self) -> Uuid {
-        self.inner.run_id
-    }
-
-    pub fn parent_run_id(&self) -> Option<Uuid> {
-        self.inner.parent_run_id
-    }
-
-    pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
-        &self.inner.handlers
-    }
-
-    pub fn tags(&self) -> &[String] {
-        &self.inner.tags
+        RunManager::new(self.core.clone())
     }
 
     pub async fn on_text(&self, text: &str) {
-        if self.inner.handlers.is_empty() {
+        if self.core.handlers.is_empty() {
             return;
         }
-        let run_id = self.inner.run_id;
-        let parent_run_id = self.inner.parent_run_id;
-        let _tags = self.inner.tags.clone();
-        ahandle_event(&self.inner.handlers, None, |handler| {
+        let run_id = self.core.run_id;
+        let parent_run_id = self.core.parent_run_id;
+        ahandle_event(&self.core.handlers, None, |handler| {
             handler.on_text(text, run_id, parent_run_id, None, "");
             async {}
         })
@@ -296,14 +311,13 @@ impl AsyncRunManager {
     }
 
     pub async fn on_retry(&self, retry_state: &serde_json::Value) {
-        if self.inner.handlers.is_empty() {
+        if self.core.handlers.is_empty() {
             return;
         }
-        let run_id = self.inner.run_id;
-        let parent_run_id = self.inner.parent_run_id;
-        let _tags = self.inner.tags.clone();
+        let run_id = self.core.run_id;
+        let parent_run_id = self.core.parent_run_id;
         ahandle_event(
-            &self.inner.handlers,
+            &self.core.handlers,
             Some(|h: &dyn BaseCallbackHandler| h.ignore_retry()),
             |handler| {
                 handler.on_retry(retry_state, run_id, parent_run_id);
@@ -312,215 +326,122 @@ impl AsyncRunManager {
         )
         .await;
     }
-
-    pub fn get_noop_manager() -> Self {
-        Self {
-            inner: BaseRunManager::get_noop_manager(),
-        }
-    }
 }
 
-#[derive(Debug, Clone)]
-pub struct AsyncParentRunManager {
-    inner: AsyncRunManager,
-}
-
-impl AsyncParentRunManager {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        run_id: Uuid,
-        handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-        inheritable_handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-        parent_run_id: Option<Uuid>,
-        tags: Option<Vec<String>>,
-        inheritable_tags: Option<Vec<String>>,
-        metadata: Option<HashMap<String, serde_json::Value>>,
-        inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
-    ) -> Self {
-        Self {
-            inner: AsyncRunManager::new(
-                run_id,
-                handlers,
-                inheritable_handlers,
-                parent_run_id,
-                tags,
-                inheritable_tags,
-                metadata,
-                inheritable_metadata,
-            ),
-        }
-    }
-
-    pub fn get_child(&self, tag: Option<&str>) -> AsyncCallbackManager {
-        let mut manager = AsyncCallbackManager::new();
-        manager.inner.parent_run_id = Some(self.inner.run_id());
-        manager.set_handlers(self.inner.inner.inheritable_handlers.clone(), true);
-        manager.add_tags(self.inner.inner.inheritable_tags.clone(), true);
-        manager.add_metadata(self.inner.inner.inheritable_metadata.clone(), true);
-        if let Some(tag) = tag {
-            manager.add_tags(vec![tag.to_string()], false);
-        }
-        manager
-    }
-
-    pub fn get_sync(&self) -> ParentRunManager {
-        ParentRunManager::new(
-            self.inner.inner.run_id,
-            self.inner.inner.handlers.clone(),
-            self.inner.inner.inheritable_handlers.clone(),
-            self.inner.inner.parent_run_id,
-            Some(self.inner.inner.tags.clone()),
-            Some(self.inner.inner.inheritable_tags.clone()),
-            Some(self.inner.inner.metadata.clone()),
-            Some(self.inner.inner.inheritable_metadata.clone()),
-        )
-    }
-
-    pub fn run_id(&self) -> Uuid {
-        self.inner.run_id()
-    }
-
-    pub fn parent_run_id(&self) -> Option<Uuid> {
-        self.inner.parent_run_id()
-    }
-
-    pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
-        self.inner.handlers()
-    }
-
-    pub fn tags(&self) -> &[String] {
-        self.inner.tags()
-    }
-
-    pub fn get_noop_manager() -> Self {
-        Self {
-            inner: AsyncRunManager::get_noop_manager(),
-        }
-    }
-}
+// ---------------------------------------------------------------------------
+// ParentRunManager — adds get_child
+// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 pub struct ParentRunManager {
-    inner: RunManager,
+    core: RunManagerCore,
+}
+
+impl Deref for ParentRunManager {
+    type Target = RunManagerCore;
+    fn deref(&self) -> &Self::Target {
+        &self.core
+    }
 }
 
 impl ParentRunManager {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        run_id: Uuid,
-        handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-        inheritable_handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-        parent_run_id: Option<Uuid>,
-        tags: Option<Vec<String>>,
-        inheritable_tags: Option<Vec<String>>,
-        metadata: Option<HashMap<String, serde_json::Value>>,
-        inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn new(core: RunManagerCore) -> Self {
+        Self { core }
+    }
+
+    pub fn noop() -> Self {
         Self {
-            inner: RunManager::new(
-                run_id,
-                handlers,
-                inheritable_handlers,
-                parent_run_id,
-                tags,
-                inheritable_tags,
-                metadata,
-                inheritable_metadata,
-            ),
+            core: RunManagerCore::noop(),
         }
+    }
+
+    #[doc(hidden)]
+    pub fn get_noop_manager() -> Self {
+        Self::noop()
     }
 
     pub fn get_child(&self, tag: Option<&str>) -> CallbackManager {
-        let mut manager = CallbackManager::new();
-        manager.parent_run_id = Some(self.inner.run_id());
-        manager.set_handlers(self.inner.inner.inheritable_handlers.clone(), true);
-        manager.add_tags(self.inner.inner.inheritable_tags.clone(), true);
-        manager.add_metadata(self.inner.inner.inheritable_metadata.clone(), true);
-        if let Some(tag) = tag {
-            manager.add_tags(vec![tag.to_string()], false);
-        }
-        manager
-    }
-
-    pub fn run_id(&self) -> Uuid {
-        self.inner.run_id()
-    }
-
-    pub fn parent_run_id(&self) -> Option<Uuid> {
-        self.inner.parent_run_id()
-    }
-
-    pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
-        self.inner.handlers()
-    }
-
-    pub fn tags(&self) -> &[String] {
-        self.inner.tags()
-    }
-
-    pub fn get_noop_manager() -> Self {
-        Self {
-            inner: RunManager::get_noop_manager(),
-        }
+        self.core.get_child_manager(tag)
     }
 }
+
+// ---------------------------------------------------------------------------
+// AsyncParentRunManager
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct AsyncParentRunManager {
+    core: RunManagerCore,
+}
+
+impl Deref for AsyncParentRunManager {
+    type Target = RunManagerCore;
+    fn deref(&self) -> &Self::Target {
+        &self.core
+    }
+}
+
+impl AsyncParentRunManager {
+    pub fn new(core: RunManagerCore) -> Self {
+        Self { core }
+    }
+
+    pub fn noop() -> Self {
+        Self {
+            core: RunManagerCore::noop(),
+        }
+    }
+
+    #[doc(hidden)]
+    pub fn get_noop_manager() -> Self {
+        Self::noop()
+    }
+
+    pub fn get_child(&self, tag: Option<&str>) -> AsyncCallbackManager {
+        AsyncCallbackManager::from_callback_manager(self.core.get_child_manager(tag))
+    }
+
+    pub fn get_sync(&self) -> ParentRunManager {
+        ParentRunManager::new(self.core.clone())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CallbackManagerForLLMRun
+// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 pub struct CallbackManagerForLLMRun {
-    inner: RunManager,
+    core: RunManagerCore,
+}
+
+impl Deref for CallbackManagerForLLMRun {
+    type Target = RunManagerCore;
+    fn deref(&self) -> &Self::Target {
+        &self.core
+    }
 }
 
 impl CallbackManagerForLLMRun {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        run_id: Uuid,
-        handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-        inheritable_handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-        parent_run_id: Option<Uuid>,
-        tags: Option<Vec<String>>,
-        inheritable_tags: Option<Vec<String>>,
-        metadata: Option<HashMap<String, serde_json::Value>>,
-        inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn new(core: RunManagerCore) -> Self {
+        Self { core }
+    }
+
+    pub fn noop() -> Self {
         Self {
-            inner: RunManager::new(
-                run_id,
-                handlers,
-                inheritable_handlers,
-                parent_run_id,
-                tags,
-                inheritable_tags,
-                metadata,
-                inheritable_metadata,
-            ),
+            core: RunManagerCore::noop(),
         }
     }
 
-    pub fn run_id(&self) -> Uuid {
-        self.inner.run_id()
-    }
-
-    pub fn parent_run_id(&self) -> Option<Uuid> {
-        self.inner.parent_run_id()
-    }
-
-    pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
-        self.inner.handlers()
-    }
-
-    pub fn tags(&self) -> &[String] {
-        self.inner.tags()
+    #[doc(hidden)]
+    pub fn get_noop_manager() -> Self {
+        Self::noop()
     }
 
     pub fn on_llm_new_token(&self, token: &str, chunk: Option<&serde_json::Value>) {
-        if self.inner.inner.handlers.is_empty() {
-            return;
-        }
-        let run_id = self.inner.run_id();
-        let parent_run_id = self.inner.parent_run_id();
-        let _tags = self.inner.tags().to_vec();
-        handle_event(
-            self.inner.handlers(),
+        let run_id = self.core.run_id;
+        let parent_run_id = self.core.parent_run_id;
+        self.core.dispatch(
             Some(|h: &dyn BaseCallbackHandler| h.ignore_llm()),
             |handler| {
                 handler.on_llm_new_token(token, run_id, parent_run_id, chunk);
@@ -529,14 +450,9 @@ impl CallbackManagerForLLMRun {
     }
 
     pub fn on_llm_end(&self, response: &ChatResult) {
-        if self.inner.inner.handlers.is_empty() {
-            return;
-        }
-        let run_id = self.inner.run_id();
-        let parent_run_id = self.inner.parent_run_id();
-        let _tags = self.inner.tags().to_vec();
-        handle_event(
-            self.inner.handlers(),
+        let run_id = self.core.run_id;
+        let parent_run_id = self.core.parent_run_id;
+        self.core.dispatch(
             Some(|h: &dyn BaseCallbackHandler| h.ignore_llm()),
             |handler| {
                 handler.on_llm_end(response, run_id, parent_run_id);
@@ -545,88 +461,57 @@ impl CallbackManagerForLLMRun {
     }
 
     pub fn on_llm_error(&self, error: &dyn std::error::Error) {
-        if self.inner.inner.handlers.is_empty() {
-            return;
-        }
-        let run_id = self.inner.run_id();
-        let parent_run_id = self.inner.parent_run_id();
-        let _tags = self.inner.tags().to_vec();
-        handle_event(
-            self.inner.handlers(),
+        let run_id = self.core.run_id;
+        let parent_run_id = self.core.parent_run_id;
+        self.core.dispatch(
             Some(|h: &dyn BaseCallbackHandler| h.ignore_llm()),
             |handler| {
                 handler.on_llm_error(error, run_id, parent_run_id);
             },
         );
     }
-
-    pub fn get_noop_manager() -> Self {
-        Self {
-            inner: RunManager::get_noop_manager(),
-        }
-    }
 }
+
+// ---------------------------------------------------------------------------
+// CallbackManagerForChainRun
+// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 pub struct CallbackManagerForChainRun {
-    inner: ParentRunManager,
+    core: RunManagerCore,
+}
+
+impl Deref for CallbackManagerForChainRun {
+    type Target = RunManagerCore;
+    fn deref(&self) -> &Self::Target {
+        &self.core
+    }
 }
 
 impl CallbackManagerForChainRun {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        run_id: Uuid,
-        handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-        inheritable_handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-        parent_run_id: Option<Uuid>,
-        tags: Option<Vec<String>>,
-        inheritable_tags: Option<Vec<String>>,
-        metadata: Option<HashMap<String, serde_json::Value>>,
-        inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn new(core: RunManagerCore) -> Self {
+        Self { core }
+    }
+
+    pub fn noop() -> Self {
         Self {
-            inner: ParentRunManager::new(
-                run_id,
-                handlers,
-                inheritable_handlers,
-                parent_run_id,
-                tags,
-                inheritable_tags,
-                metadata,
-                inheritable_metadata,
-            ),
+            core: RunManagerCore::noop(),
         }
     }
 
-    pub fn run_id(&self) -> Uuid {
-        self.inner.run_id()
-    }
-
-    pub fn parent_run_id(&self) -> Option<Uuid> {
-        self.inner.parent_run_id()
-    }
-
-    pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
-        self.inner.handlers()
-    }
-
-    pub fn tags(&self) -> &[String] {
-        self.inner.tags()
+    #[doc(hidden)]
+    pub fn get_noop_manager() -> Self {
+        Self::noop()
     }
 
     pub fn get_child(&self, tag: Option<&str>) -> CallbackManager {
-        self.inner.get_child(tag)
+        self.core.get_child_manager(tag)
     }
 
     pub fn on_chain_end(&self, outputs: &HashMap<String, serde_json::Value>) {
-        if self.inner.inner.inner.handlers.is_empty() {
-            return;
-        }
-        let run_id = self.inner.run_id();
-        let parent_run_id = self.inner.parent_run_id();
-        let _tags = self.inner.tags().to_vec();
-        handle_event(
-            self.inner.handlers(),
+        let run_id = self.core.run_id;
+        let parent_run_id = self.core.parent_run_id;
+        self.core.dispatch(
             Some(|h: &dyn BaseCallbackHandler| h.ignore_chain()),
             |handler| {
                 handler.on_chain_end(outputs, run_id, parent_run_id);
@@ -635,14 +520,9 @@ impl CallbackManagerForChainRun {
     }
 
     pub fn on_chain_error(&self, error: &dyn std::error::Error) {
-        if self.inner.inner.inner.handlers.is_empty() {
-            return;
-        }
-        let run_id = self.inner.run_id();
-        let parent_run_id = self.inner.parent_run_id();
-        let _tags = self.inner.tags().to_vec();
-        handle_event(
-            self.inner.handlers(),
+        let run_id = self.core.run_id;
+        let parent_run_id = self.core.parent_run_id;
+        self.core.dispatch(
             Some(|h: &dyn BaseCallbackHandler| h.ignore_chain()),
             |handler| {
                 handler.on_chain_error(error, run_id, parent_run_id);
@@ -651,14 +531,9 @@ impl CallbackManagerForChainRun {
     }
 
     pub fn on_agent_action(&self, action: &serde_json::Value) {
-        if self.inner.inner.inner.handlers.is_empty() {
-            return;
-        }
-        let run_id = self.inner.run_id();
-        let parent_run_id = self.inner.parent_run_id();
-        let _tags = self.inner.tags().to_vec();
-        handle_event(
-            self.inner.handlers(),
+        let run_id = self.core.run_id;
+        let parent_run_id = self.core.parent_run_id;
+        self.core.dispatch(
             Some(|h: &dyn BaseCallbackHandler| h.ignore_agent()),
             |handler| {
                 handler.on_agent_action(action, run_id, parent_run_id, None);
@@ -667,89 +542,58 @@ impl CallbackManagerForChainRun {
     }
 
     pub fn on_agent_finish(&self, finish: &serde_json::Value) {
-        if self.inner.inner.inner.handlers.is_empty() {
-            return;
-        }
-        let run_id = self.inner.run_id();
-        let parent_run_id = self.inner.parent_run_id();
-        let _tags = self.inner.tags().to_vec();
-        handle_event(
-            self.inner.handlers(),
+        let run_id = self.core.run_id;
+        let parent_run_id = self.core.parent_run_id;
+        self.core.dispatch(
             Some(|h: &dyn BaseCallbackHandler| h.ignore_agent()),
             |handler| {
                 handler.on_agent_finish(finish, run_id, parent_run_id, None);
             },
         );
     }
-
-    pub fn get_noop_manager() -> Self {
-        Self {
-            inner: ParentRunManager::get_noop_manager(),
-        }
-    }
 }
+
+// ---------------------------------------------------------------------------
+// CallbackManagerForToolRun
+// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 pub struct CallbackManagerForToolRun {
-    inner: ParentRunManager,
+    core: RunManagerCore,
+}
+
+impl Deref for CallbackManagerForToolRun {
+    type Target = RunManagerCore;
+    fn deref(&self) -> &Self::Target {
+        &self.core
+    }
 }
 
 impl CallbackManagerForToolRun {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        run_id: Uuid,
-        handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-        inheritable_handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-        parent_run_id: Option<Uuid>,
-        tags: Option<Vec<String>>,
-        inheritable_tags: Option<Vec<String>>,
-        metadata: Option<HashMap<String, serde_json::Value>>,
-        inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn new(core: RunManagerCore) -> Self {
+        Self { core }
+    }
+
+    pub fn noop() -> Self {
         Self {
-            inner: ParentRunManager::new(
-                run_id,
-                handlers,
-                inheritable_handlers,
-                parent_run_id,
-                tags,
-                inheritable_tags,
-                metadata,
-                inheritable_metadata,
-            ),
+            core: RunManagerCore::noop(),
         }
     }
 
-    pub fn run_id(&self) -> Uuid {
-        self.inner.run_id()
-    }
-
-    pub fn parent_run_id(&self) -> Option<Uuid> {
-        self.inner.parent_run_id()
-    }
-
-    pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
-        self.inner.handlers()
-    }
-
-    pub fn tags(&self) -> &[String] {
-        self.inner.tags()
+    #[doc(hidden)]
+    pub fn get_noop_manager() -> Self {
+        Self::noop()
     }
 
     pub fn get_child(&self, tag: Option<&str>) -> CallbackManager {
-        self.inner.get_child(tag)
+        self.core.get_child_manager(tag)
     }
 
     pub fn on_tool_end(&self, output: &str) {
-        if self.inner.inner.inner.handlers.is_empty() {
-            return;
-        }
-        let run_id = self.inner.run_id();
-        let parent_run_id = self.inner.parent_run_id();
-        let _tags = self.inner.tags().to_vec();
-        handle_event(
-            self.inner.handlers(),
-            Some(|h: &dyn BaseCallbackHandler| h.ignore_agent()),
+        let run_id = self.core.run_id;
+        let parent_run_id = self.core.parent_run_id;
+        self.core.dispatch(
+            Some(|h: &dyn BaseCallbackHandler| h.ignore_tool()),
             |handler| {
                 handler.on_tool_end(output, run_id, parent_run_id, None, None, None);
             },
@@ -757,88 +601,57 @@ impl CallbackManagerForToolRun {
     }
 
     pub fn on_tool_error(&self, error: &dyn std::error::Error) {
-        if self.inner.inner.inner.handlers.is_empty() {
-            return;
-        }
-        let run_id = self.inner.run_id();
-        let parent_run_id = self.inner.parent_run_id();
-        let _tags = self.inner.tags().to_vec();
-        handle_event(
-            self.inner.handlers(),
-            Some(|h: &dyn BaseCallbackHandler| h.ignore_agent()),
+        let run_id = self.core.run_id;
+        let parent_run_id = self.core.parent_run_id;
+        self.core.dispatch(
+            Some(|h: &dyn BaseCallbackHandler| h.ignore_tool()),
             |handler| {
                 handler.on_tool_error(error, run_id, parent_run_id);
             },
         );
     }
-
-    pub fn get_noop_manager() -> Self {
-        Self {
-            inner: ParentRunManager::get_noop_manager(),
-        }
-    }
 }
+
+// ---------------------------------------------------------------------------
+// CallbackManagerForRetrieverRun
+// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 pub struct CallbackManagerForRetrieverRun {
-    inner: ParentRunManager,
+    core: RunManagerCore,
+}
+
+impl Deref for CallbackManagerForRetrieverRun {
+    type Target = RunManagerCore;
+    fn deref(&self) -> &Self::Target {
+        &self.core
+    }
 }
 
 impl CallbackManagerForRetrieverRun {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        run_id: Uuid,
-        handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-        inheritable_handlers: Vec<Arc<dyn BaseCallbackHandler>>,
-        parent_run_id: Option<Uuid>,
-        tags: Option<Vec<String>>,
-        inheritable_tags: Option<Vec<String>>,
-        metadata: Option<HashMap<String, serde_json::Value>>,
-        inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn new(core: RunManagerCore) -> Self {
+        Self { core }
+    }
+
+    pub fn noop() -> Self {
         Self {
-            inner: ParentRunManager::new(
-                run_id,
-                handlers,
-                inheritable_handlers,
-                parent_run_id,
-                tags,
-                inheritable_tags,
-                metadata,
-                inheritable_metadata,
-            ),
+            core: RunManagerCore::noop(),
         }
     }
 
-    pub fn run_id(&self) -> Uuid {
-        self.inner.run_id()
-    }
-
-    pub fn parent_run_id(&self) -> Option<Uuid> {
-        self.inner.parent_run_id()
-    }
-
-    pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
-        self.inner.handlers()
-    }
-
-    pub fn tags(&self) -> &[String] {
-        self.inner.tags()
+    #[doc(hidden)]
+    pub fn get_noop_manager() -> Self {
+        Self::noop()
     }
 
     pub fn get_child(&self, tag: Option<&str>) -> CallbackManager {
-        self.inner.get_child(tag)
+        self.core.get_child_manager(tag)
     }
 
     pub fn on_retriever_end(&self, documents: &[serde_json::Value]) {
-        if self.inner.inner.inner.handlers.is_empty() {
-            return;
-        }
-        let run_id = self.inner.run_id();
-        let parent_run_id = self.inner.parent_run_id();
-        let _tags = self.inner.tags().to_vec();
-        handle_event(
-            self.inner.handlers(),
+        let run_id = self.core.run_id;
+        let parent_run_id = self.core.parent_run_id;
+        self.core.dispatch(
             Some(|h: &dyn BaseCallbackHandler| h.ignore_retriever()),
             |handler| {
                 handler.on_retriever_end(documents, run_id, parent_run_id);
@@ -847,27 +660,20 @@ impl CallbackManagerForRetrieverRun {
     }
 
     pub fn on_retriever_error(&self, error: &dyn std::error::Error) {
-        if self.inner.inner.inner.handlers.is_empty() {
-            return;
-        }
-        let run_id = self.inner.run_id();
-        let parent_run_id = self.inner.parent_run_id();
-        let _tags = self.inner.tags().to_vec();
-        handle_event(
-            self.inner.handlers(),
+        let run_id = self.core.run_id;
+        let parent_run_id = self.core.parent_run_id;
+        self.core.dispatch(
             Some(|h: &dyn BaseCallbackHandler| h.ignore_retriever()),
             |handler| {
                 handler.on_retriever_error(error, run_id, parent_run_id);
             },
         );
     }
-
-    pub fn get_noop_manager() -> Self {
-        Self {
-            inner: ParentRunManager::get_noop_manager(),
-        }
-    }
 }
+
+// ---------------------------------------------------------------------------
+// CallbackManager — top-level configuration type
+// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Default)]
 pub struct CallbackManager {
@@ -885,16 +691,17 @@ impl CallbackManager {
         Self::default()
     }
 
-    pub fn from_base(base: BaseCallbackManager) -> Self {
-        Self {
-            handlers: base.handlers,
-            inheritable_handlers: base.inheritable_handlers,
-            parent_run_id: base.parent_run_id,
-            tags: base.tags,
-            inheritable_tags: base.inheritable_tags,
-            metadata: base.metadata,
-            inheritable_metadata: base.inheritable_metadata,
-        }
+    fn make_run_core(&self, run_id: Uuid) -> RunManagerCore {
+        RunManagerCore::builder()
+            .run_id(run_id)
+            .handlers(self.handlers.clone())
+            .inheritable_handlers(self.inheritable_handlers.clone())
+            .maybe_parent_run_id(self.parent_run_id)
+            .tags(self.tags.clone())
+            .inheritable_tags(self.inheritable_tags.clone())
+            .metadata(self.metadata.clone())
+            .inheritable_metadata(self.inheritable_metadata.clone())
+            .build()
     }
 
     pub fn set_handlers(&mut self, handlers: Vec<Arc<dyn BaseCallbackHandler>>, inherit: bool) {
@@ -933,15 +740,15 @@ impl CallbackManager {
         self.inheritable_handlers
             .retain(|h| !std::ptr::eq(h.as_ref(), handler.as_ref()));
     }
+
     pub fn add_tags(&mut self, tags: Vec<String>, inherit: bool) {
-        for tag in &tags {
-            if self.tags.contains(tag) {
-                self.remove_tags(std::slice::from_ref(tag));
+        for tag in tags {
+            if !self.tags.contains(&tag) {
+                self.tags.push(tag.clone());
             }
-        }
-        self.tags.extend(tags.clone());
-        if inherit {
-            self.inheritable_tags.extend(tags);
+            if inherit && !self.inheritable_tags.contains(&tag) {
+                self.inheritable_tags.push(tag);
+            }
         }
     }
 
@@ -998,16 +805,7 @@ impl CallbackManager {
                 },
             );
 
-            managers.push(CallbackManagerForLLMRun::new(
-                run_id,
-                self.handlers.clone(),
-                self.inheritable_handlers.clone(),
-                self.parent_run_id,
-                Some(self.tags.clone()),
-                Some(self.inheritable_tags.clone()),
-                Some(self.metadata.clone()),
-                Some(self.inheritable_metadata.clone()),
-            ));
+            managers.push(CallbackManagerForLLMRun::new(self.make_run_core(run_id)));
         }
 
         managers
@@ -1041,16 +839,7 @@ impl CallbackManager {
                 },
             );
 
-            managers.push(CallbackManagerForLLMRun::new(
-                run_id,
-                self.handlers.clone(),
-                self.inheritable_handlers.clone(),
-                self.parent_run_id,
-                Some(self.tags.clone()),
-                Some(self.inheritable_tags.clone()),
-                Some(self.metadata.clone()),
-                Some(self.inheritable_metadata.clone()),
-            ));
+            managers.push(CallbackManagerForLLMRun::new(self.make_run_core(run_id)));
         }
 
         managers
@@ -1067,7 +856,7 @@ impl CallbackManager {
 
         handle_event(
             &self.handlers,
-            Some(|h: &dyn BaseCallbackHandler| h.ignore_agent()),
+            Some(|h: &dyn BaseCallbackHandler| h.ignore_tool()),
             |handler| {
                 handler.on_tool_start(
                     serialized,
@@ -1081,16 +870,7 @@ impl CallbackManager {
             },
         );
 
-        CallbackManagerForToolRun::new(
-            run_id,
-            self.handlers.clone(),
-            self.inheritable_handlers.clone(),
-            self.parent_run_id,
-            Some(self.tags.clone()),
-            Some(self.inheritable_tags.clone()),
-            Some(self.metadata.clone()),
-            Some(self.inheritable_metadata.clone()),
-        )
+        CallbackManagerForToolRun::new(self.make_run_core(run_id))
     }
 
     pub fn on_custom_event(&self, name: &str, data: &serde_json::Value, run_id: Option<Uuid>) {
@@ -1107,18 +887,6 @@ impl CallbackManager {
                 handler.on_custom_event(name, data, run_id, None, None);
             },
         );
-    }
-
-    pub fn copy(&self) -> Self {
-        Self {
-            handlers: self.handlers.clone(),
-            inheritable_handlers: self.inheritable_handlers.clone(),
-            parent_run_id: self.parent_run_id,
-            tags: self.tags.clone(),
-            inheritable_tags: self.inheritable_tags.clone(),
-            metadata: self.metadata.clone(),
-            inheritable_metadata: self.inheritable_metadata.clone(),
-        }
     }
 
     pub fn merge(&self, other: &CallbackManager) -> Self {
@@ -1176,30 +944,58 @@ impl CallbackManager {
 
         manager
     }
+}
 
-    pub fn configure(
-        inheritable_callbacks: Option<Callbacks>,
-        local_callbacks: Option<Callbacks>,
-        verbose: bool,
-        inheritable_tags: Option<Vec<String>>,
-        local_tags: Option<Vec<String>>,
-        inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
-        local_metadata: Option<HashMap<String, serde_json::Value>>,
-    ) -> Self {
-        _configure(
-            inheritable_callbacks,
-            local_callbacks,
-            verbose,
-            inheritable_tags,
-            local_tags,
-            inheritable_metadata,
-            local_metadata,
-        )
+// ---------------------------------------------------------------------------
+// Callbacks enum
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub enum Callbacks {
+    Handlers(Vec<Arc<dyn BaseCallbackHandler>>),
+    Manager(CallbackManager),
+}
+
+impl Callbacks {
+    pub fn from_handlers(handlers: Vec<Arc<dyn BaseCallbackHandler>>) -> Self {
+        Callbacks::Handlers(handlers)
+    }
+
+    pub fn from_manager(manager: CallbackManager) -> Self {
+        Callbacks::Manager(manager)
+    }
+
+    pub fn into_manager(self) -> CallbackManager {
+        match self {
+            Callbacks::Handlers(handlers) => {
+                let mut manager = CallbackManager::new();
+                manager.inheritable_handlers = handlers.clone();
+                manager.handlers = handlers;
+                manager
+            }
+            Callbacks::Manager(manager) => manager,
+        }
     }
 }
 
+impl From<Vec<Arc<dyn BaseCallbackHandler>>> for Callbacks {
+    fn from(handlers: Vec<Arc<dyn BaseCallbackHandler>>) -> Self {
+        Callbacks::Handlers(handlers)
+    }
+}
+
+impl From<CallbackManager> for Callbacks {
+    fn from(manager: CallbackManager) -> Self {
+        Callbacks::Manager(manager)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// configure_impl
+// ---------------------------------------------------------------------------
+
 #[allow(clippy::too_many_arguments)]
-fn _configure(
+fn configure_impl(
     inheritable_callbacks: Option<Callbacks>,
     local_callbacks: Option<Callbacks>,
     verbose: bool,
@@ -1208,12 +1004,7 @@ fn _configure(
     inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
     local_metadata: Option<HashMap<String, serde_json::Value>>,
 ) -> CallbackManager {
-    let tracing_metadata: HashMap<String, serde_json::Value> = HashMap::new();
-    let tracing_tags: Vec<String> = Vec::new();
-    let parent_run_id: Option<Uuid> = None;
-
     let mut callback_manager = CallbackManager::new();
-    callback_manager.parent_run_id = parent_run_id;
 
     if let Some(callbacks) = inheritable_callbacks {
         match callbacks {
@@ -1222,14 +1013,9 @@ fn _configure(
                 callback_manager.inheritable_handlers = handlers;
             }
             Callbacks::Manager(manager) => {
-                let parent_run_id_ = if parent_run_id.is_some() {
-                    parent_run_id
-                } else {
-                    manager.parent_run_id
-                };
+                callback_manager.parent_run_id = manager.parent_run_id;
                 callback_manager.handlers = manager.handlers.clone();
                 callback_manager.inheritable_handlers = manager.inheritable_handlers.clone();
-                callback_manager.parent_run_id = parent_run_id_;
                 callback_manager.tags = manager.tags.clone();
                 callback_manager.inheritable_tags = manager.inheritable_tags.clone();
                 callback_manager.metadata = manager.metadata.clone();
@@ -1261,20 +1047,15 @@ fn _configure(
         callback_manager.add_metadata(metadata, false);
     }
 
-    if !tracing_metadata.is_empty() {
-        callback_manager.add_metadata(tracing_metadata, true);
-    }
-    if !tracing_tags.is_empty() {
-        callback_manager.add_tags(tracing_tags, true);
-    }
-
     let v1_tracing_enabled =
         env_var_is_set("LANGCHAIN_TRACING") || env_var_is_set("LANGCHAIN_HANDLER");
     let tracing_v2_enabled = tracing_v2_is_enabled();
 
     if v1_tracing_enabled && !tracing_v2_enabled {
         tracing::warn!(
-            "Tracing using LangChainTracerV1 is no longer supported.              Please set the LANGCHAIN_TRACING_V2 environment variable to enable              tracing instead."
+            "Tracing using LangChainTracerV1 is no longer supported. \
+             Please set the LANGCHAIN_TRACING_V2 environment variable to enable \
+             tracing instead."
         );
     }
 
@@ -1308,12 +1089,14 @@ fn _configure(
         {
             if let Some(_tracer) = get_tracing_callback() {
                 tracing::debug!(
-                    "Tracing is enabled but LangChainTracer is not yet                      implemented in Rust. Tracing callbacks will not be sent."
+                    "Tracing is enabled but LangChainTracer is not yet \
+                     implemented in Rust. Tracing callbacks will not be sent."
                 );
             } else {
                 let tracer_project = get_tracer_project();
                 tracing::debug!(
-                    "Tracing is enabled (project: {}) but LangChainTracer is not yet                      implemented in Rust. Tracing callbacks will not be sent.",
+                    "Tracing is enabled (project: {}) but LangChainTracer is not yet \
+                     implemented in Rust. Tracing callbacks will not be sent.",
                     tracer_project
                 );
             }
@@ -1353,10 +1136,9 @@ fn _configure(
     callback_manager
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct AsyncCallbackManager {
-    inner: CallbackManager,
-}
+// ---------------------------------------------------------------------------
+// CallbackManager builder methods (bon)
+// ---------------------------------------------------------------------------
 
 #[bon]
 impl CallbackManager {
@@ -1386,16 +1168,7 @@ impl CallbackManager {
             },
         );
 
-        CallbackManagerForChainRun::new(
-            run_id,
-            self.handlers.clone(),
-            self.inheritable_handlers.clone(),
-            self.parent_run_id,
-            Some(self.tags.clone()),
-            Some(self.inheritable_tags.clone()),
-            Some(self.metadata.clone()),
-            Some(self.inheritable_metadata.clone()),
-        )
+        CallbackManagerForChainRun::new(self.make_run_core(run_id))
     }
 
     #[builder]
@@ -1424,16 +1197,82 @@ impl CallbackManager {
             },
         );
 
-        CallbackManagerForRetrieverRun::new(
-            run_id,
-            self.handlers.clone(),
-            self.inheritable_handlers.clone(),
-            self.parent_run_id,
-            Some(self.tags.clone()),
-            Some(self.inheritable_tags.clone()),
-            Some(self.metadata.clone()),
-            Some(self.inheritable_metadata.clone()),
+        CallbackManagerForRetrieverRun::new(self.make_run_core(run_id))
+    }
+
+    #[builder]
+    pub fn configure(
+        inheritable_callbacks: Option<Callbacks>,
+        local_callbacks: Option<Callbacks>,
+        #[builder(default)] verbose: bool,
+        inheritable_tags: Option<Vec<String>>,
+        local_tags: Option<Vec<String>>,
+        inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
+        local_metadata: Option<HashMap<String, serde_json::Value>>,
+    ) -> Self {
+        configure_impl(
+            inheritable_callbacks,
+            local_callbacks,
+            verbose,
+            inheritable_tags,
+            local_tags,
+            inheritable_metadata,
+            local_metadata,
         )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AsyncCallbackManager
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Default)]
+pub struct AsyncCallbackManager {
+    pub(crate) inner: CallbackManager,
+}
+
+#[bon]
+impl AsyncCallbackManager {
+    #[builder]
+    pub async fn on_retriever_start(
+        &self,
+        serialized: &HashMap<String, serde_json::Value>,
+        query: &str,
+        run_id: Option<Uuid>,
+        name: Option<&str>,
+    ) -> AsyncCallbackManagerForRetrieverRun {
+        AsyncCallbackManagerForRetrieverRun::from_sync(
+            self.inner
+                .on_retriever_start()
+                .serialized(serialized)
+                .query(query)
+                .maybe_run_id(run_id)
+                .maybe_name(name)
+                .call(),
+        )
+    }
+
+    #[builder]
+    pub fn configure(
+        inheritable_callbacks: Option<Callbacks>,
+        local_callbacks: Option<Callbacks>,
+        #[builder(default)] verbose: bool,
+        inheritable_tags: Option<Vec<String>>,
+        local_tags: Option<Vec<String>>,
+        inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
+        local_metadata: Option<HashMap<String, serde_json::Value>>,
+    ) -> Self {
+        Self {
+            inner: configure_impl(
+                inheritable_callbacks,
+                local_callbacks,
+                verbose,
+                inheritable_tags,
+                local_tags,
+                inheritable_metadata,
+                local_metadata,
+            ),
+        }
     }
 }
 
@@ -1476,10 +1315,6 @@ impl AsyncCallbackManager {
 
     pub fn add_metadata(&mut self, metadata: HashMap<String, serde_json::Value>, inherit: bool) {
         self.inner.add_metadata(metadata, inherit);
-    }
-
-    pub fn is_async(&self) -> bool {
-        true
     }
 
     pub async fn on_llm_start(
@@ -1559,55 +1394,15 @@ impl AsyncCallbackManager {
             },
         );
     }
-
-    pub fn configure(
-        inheritable_callbacks: Option<Callbacks>,
-        local_callbacks: Option<Callbacks>,
-        verbose: bool,
-        inheritable_tags: Option<Vec<String>>,
-        local_tags: Option<Vec<String>>,
-        inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
-        local_metadata: Option<HashMap<String, serde_json::Value>>,
-    ) -> Self {
-        Self {
-            inner: _configure(
-                inheritable_callbacks,
-                local_callbacks,
-                verbose,
-                inheritable_tags,
-                local_tags,
-                inheritable_metadata,
-                local_metadata,
-            ),
-        }
-    }
 }
+
+// ---------------------------------------------------------------------------
+// Async run manager types
+// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 pub struct AsyncCallbackManagerForLLMRun {
     inner: CallbackManagerForLLMRun,
-}
-
-#[bon]
-impl AsyncCallbackManager {
-    #[builder]
-    pub async fn on_retriever_start(
-        &self,
-        serialized: &HashMap<String, serde_json::Value>,
-        query: &str,
-        run_id: Option<Uuid>,
-        name: Option<&str>,
-    ) -> AsyncCallbackManagerForRetrieverRun {
-        AsyncCallbackManagerForRetrieverRun::from_sync(
-            self.inner
-                .on_retriever_start()
-                .serialized(serialized)
-                .query(query)
-                .maybe_run_id(run_id)
-                .maybe_name(name)
-                .call(),
-        )
-    }
 }
 
 impl AsyncCallbackManagerForLLMRun {
@@ -1631,6 +1426,10 @@ impl AsyncCallbackManagerForLLMRun {
         self.inner.handlers()
     }
 
+    pub fn tags(&self) -> &[String] {
+        self.inner.tags()
+    }
+
     pub async fn on_llm_new_token(&self, token: &str, chunk: Option<&serde_json::Value>) {
         self.inner.on_llm_new_token(token, chunk);
     }
@@ -1643,10 +1442,15 @@ impl AsyncCallbackManagerForLLMRun {
         self.inner.on_llm_error(error);
     }
 
-    pub fn get_noop_manager() -> Self {
+    pub fn noop() -> Self {
         Self {
-            inner: CallbackManagerForLLMRun::get_noop_manager(),
+            inner: CallbackManagerForLLMRun::noop(),
         }
+    }
+
+    #[doc(hidden)]
+    pub fn get_noop_manager() -> Self {
+        Self::noop()
     }
 }
 
@@ -1696,10 +1500,15 @@ impl AsyncCallbackManagerForChainRun {
         self.inner.on_agent_finish(finish);
     }
 
-    pub fn get_noop_manager() -> Self {
+    pub fn noop() -> Self {
         Self {
-            inner: CallbackManagerForChainRun::get_noop_manager(),
+            inner: CallbackManagerForChainRun::noop(),
         }
+    }
+
+    #[doc(hidden)]
+    pub fn get_noop_manager() -> Self {
+        Self::noop()
     }
 }
 
@@ -1741,10 +1550,15 @@ impl AsyncCallbackManagerForToolRun {
         self.inner.on_tool_error(error);
     }
 
-    pub fn get_noop_manager() -> Self {
+    pub fn noop() -> Self {
         Self {
-            inner: CallbackManagerForToolRun::get_noop_manager(),
+            inner: CallbackManagerForToolRun::noop(),
         }
+    }
+
+    #[doc(hidden)]
+    pub fn get_noop_manager() -> Self {
+        Self::noop()
     }
 }
 
@@ -1786,105 +1600,21 @@ impl AsyncCallbackManagerForRetrieverRun {
         self.inner.on_retriever_error(error);
     }
 
-    pub fn get_noop_manager() -> Self {
+    pub fn noop() -> Self {
         Self {
-            inner: CallbackManagerForRetrieverRun::get_noop_manager(),
+            inner: CallbackManagerForRetrieverRun::noop(),
         }
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_callback_manager_on_chain_start() {
-        let manager = CallbackManager::new();
-        let run_manager = manager
-            .on_chain_start()
-            .serialized(&HashMap::new())
-            .inputs(&HashMap::new())
-            .call();
-
-        assert!(!run_manager.run_id().is_nil());
-    }
-
-    #[test]
-    fn test_callback_manager_configure() {
-        let manager = CallbackManager::configure(
-            None,
-            None,
-            false,
-            Some(vec!["tag1".to_string()]),
-            Some(vec!["tag2".to_string()]),
-            None,
-            None,
-        );
-
-        assert!(manager.tags.contains(&"tag1".to_string()));
-        assert!(manager.tags.contains(&"tag2".to_string()));
-        assert!(manager.inheritable_tags.contains(&"tag1".to_string()));
-        assert!(!manager.inheritable_tags.contains(&"tag2".to_string()));
-    }
-
-    #[test]
-    fn test_configure_with_verbose() {
-        crate::globals::set_debug(false);
-
-        let manager = CallbackManager::configure(None, None, true, None, None, None, None);
-        assert!(
-            manager
-                .handlers
-                .iter()
-                .any(|h| h.name() == "StdOutCallbackHandler"),
-            "StdOutCallbackHandler should be added when verbose=true"
-        );
-    }
-
-    // #[test]
-    // fn test_configure_verbose_not_added_when_debug() {
-    //     crate::globals::set_debug(true);
-
-    //     let manager = CallbackManager::configure(None, None, true, None, None, None, None);
-    //     assert!(
-    //         !manager
-    //             .handlers
-    //             .iter()
-    //             .any(|h| h.name() == "StdOutCallbackHandler"),
-    //         "StdOutCallbackHandler should NOT be added when debug=true (debug supersedes verbose)"
-    //     );
-    //     assert!(
-    //         manager
-    //             .handlers
-    //             .iter()
-    //             .any(|h| h.name() == "ConsoleCallbackHandler"),
-    //         "ConsoleCallbackHandler should be added when debug=true"
-    //     );
-
-    //     crate::globals::set_debug(false);
-    // }
-
-    #[test]
-    fn test_configure_deduplication() {
-        crate::globals::set_debug(false);
-
-        let handler: Arc<dyn BaseCallbackHandler> = Arc::new(StdOutCallbackHandler::new());
-        let callbacks = Callbacks::Handlers(vec![handler]);
-
-        let manager =
-            CallbackManager::configure(Some(callbacks), None, true, None, None, None, None);
-
-        let stdout_count = manager
-            .handlers
-            .iter()
-            .filter(|h| h.name() == "StdOutCallbackHandler")
-            .count();
-        assert_eq!(
-            stdout_count, 1,
-            "Should not duplicate StdOutCallbackHandler"
-        );
+    #[doc(hidden)]
+    pub fn get_noop_manager() -> Self {
+        Self::noop()
     }
 }
+
+// ---------------------------------------------------------------------------
+// Chain group types
+// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 pub struct CallbackManagerForChainGroup {
@@ -1893,8 +1623,9 @@ pub struct CallbackManagerForChainGroup {
     pub ended: bool,
 }
 
+#[bon]
 impl CallbackManagerForChainGroup {
-    #[allow(clippy::too_many_arguments)]
+    #[builder]
     pub fn new(
         handlers: Vec<Arc<dyn BaseCallbackHandler>>,
         inheritable_handlers: Option<Vec<Arc<dyn BaseCallbackHandler>>>,
@@ -1905,14 +1636,15 @@ impl CallbackManagerForChainGroup {
         metadata: Option<HashMap<String, serde_json::Value>>,
         inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
     ) -> Self {
-        let mut inner = CallbackManager::new();
-        inner.handlers = handlers;
-        inner.inheritable_handlers = inheritable_handlers.unwrap_or_default();
-        inner.parent_run_id = parent_run_id;
-        inner.tags = tags.unwrap_or_default();
-        inner.inheritable_tags = inheritable_tags.unwrap_or_default();
-        inner.metadata = metadata.unwrap_or_default();
-        inner.inheritable_metadata = inheritable_metadata.unwrap_or_default();
+        let inner = CallbackManager {
+            handlers,
+            inheritable_handlers: inheritable_handlers.unwrap_or_default(),
+            parent_run_id,
+            tags: tags.unwrap_or_default(),
+            inheritable_tags: inheritable_tags.unwrap_or_default(),
+            metadata: metadata.unwrap_or_default(),
+            inheritable_metadata: inheritable_metadata.unwrap_or_default(),
+        };
 
         Self {
             inner,
@@ -1931,14 +1663,6 @@ impl CallbackManagerForChainGroup {
 
     pub fn tags(&self) -> &[String] {
         &self.inner.tags
-    }
-
-    pub fn copy(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-            parent_run_manager: self.parent_run_manager.clone(),
-            ended: self.ended,
-        }
     }
 
     pub fn merge(&self, other: &CallbackManager) -> Self {
@@ -2063,8 +1787,9 @@ pub struct AsyncCallbackManagerForChainGroup {
     pub ended: bool,
 }
 
+#[bon]
 impl AsyncCallbackManagerForChainGroup {
-    #[allow(clippy::too_many_arguments)]
+    #[builder]
     pub fn new(
         handlers: Vec<Arc<dyn BaseCallbackHandler>>,
         inheritable_handlers: Option<Vec<Arc<dyn BaseCallbackHandler>>>,
@@ -2075,14 +1800,15 @@ impl AsyncCallbackManagerForChainGroup {
         metadata: Option<HashMap<String, serde_json::Value>>,
         inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
     ) -> Self {
-        let mut inner_sync = CallbackManager::new();
-        inner_sync.handlers = handlers;
-        inner_sync.inheritable_handlers = inheritable_handlers.unwrap_or_default();
-        inner_sync.parent_run_id = parent_run_id;
-        inner_sync.tags = tags.unwrap_or_default();
-        inner_sync.inheritable_tags = inheritable_tags.unwrap_or_default();
-        inner_sync.metadata = metadata.unwrap_or_default();
-        inner_sync.inheritable_metadata = inheritable_metadata.unwrap_or_default();
+        let inner_sync = CallbackManager {
+            handlers,
+            inheritable_handlers: inheritable_handlers.unwrap_or_default(),
+            parent_run_id,
+            tags: tags.unwrap_or_default(),
+            inheritable_tags: inheritable_tags.unwrap_or_default(),
+            metadata: metadata.unwrap_or_default(),
+            inheritable_metadata: inheritable_metadata.unwrap_or_default(),
+        };
 
         Self {
             inner: AsyncCallbackManager::from_callback_manager(inner_sync),
@@ -2097,14 +1823,6 @@ impl AsyncCallbackManagerForChainGroup {
 
     pub fn parent_run_id(&self) -> Option<Uuid> {
         self.inner.parent_run_id()
-    }
-
-    pub fn copy(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-            parent_run_manager: self.parent_run_manager.clone(),
-            ended: self.ended,
-        }
     }
 
     pub fn merge(&self, other: &CallbackManager) -> Self {
@@ -2222,6 +1940,10 @@ impl AsyncCallbackManagerForChainGroup {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Free functions
+// ---------------------------------------------------------------------------
+
 pub fn trace_as_chain_group<F, R>(
     group_name: &str,
     callback_manager: Option<CallbackManager>,
@@ -2235,15 +1957,10 @@ where
     F: FnOnce(&mut CallbackManagerForChainGroup) -> R,
 {
     let cm = callback_manager.unwrap_or_else(|| {
-        CallbackManager::configure(
-            None,
-            None,
-            false,
-            tags.clone(),
-            None,
-            metadata.clone(),
-            None,
-        )
+        CallbackManager::configure()
+            .maybe_inheritable_tags(tags.clone())
+            .maybe_inheritable_metadata(metadata.clone())
+            .call()
     });
 
     let mut serialized = HashMap::new();
@@ -2261,16 +1978,16 @@ where
         .call();
     let child_cm = run_manager.get_child(None);
 
-    let mut group_cm = CallbackManagerForChainGroup::new(
-        child_cm.handlers.clone(),
-        Some(child_cm.inheritable_handlers.clone()),
-        child_cm.parent_run_id,
-        run_manager.clone(),
-        Some(child_cm.tags.clone()),
-        Some(child_cm.inheritable_tags.clone()),
-        Some(child_cm.metadata.clone()),
-        Some(child_cm.inheritable_metadata.clone()),
-    );
+    let mut group_cm = CallbackManagerForChainGroup::builder()
+        .handlers(child_cm.handlers.clone())
+        .inheritable_handlers(child_cm.inheritable_handlers.clone())
+        .maybe_parent_run_id(child_cm.parent_run_id)
+        .parent_run_manager(run_manager.clone())
+        .tags(child_cm.tags.clone())
+        .inheritable_tags(child_cm.inheritable_tags.clone())
+        .metadata(child_cm.metadata.clone())
+        .inheritable_metadata(child_cm.inheritable_metadata.clone())
+        .build();
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&mut group_cm)));
 
@@ -2337,19 +2054,14 @@ pub async fn atrace_as_chain_group<F, Fut, R>(
     f: F,
 ) -> R
 where
-    F: FnOnce(AsyncCallbackManagerForChainGroup) -> Fut,
+    F: FnOnce(&mut AsyncCallbackManagerForChainGroup) -> Fut,
     Fut: Future<Output = R>,
 {
     let cm = callback_manager.unwrap_or_else(|| {
-        AsyncCallbackManager::configure(
-            None,
-            None,
-            false,
-            tags.clone(),
-            None,
-            metadata.clone(),
-            None,
-        )
+        AsyncCallbackManager::configure()
+            .maybe_inheritable_tags(tags.clone())
+            .maybe_inheritable_metadata(metadata.clone())
+            .call()
     });
 
     let mut serialized = HashMap::new();
@@ -2368,18 +2080,18 @@ where
         .await;
     let child_cm = run_manager.get_child(None);
 
-    let group_cm = AsyncCallbackManagerForChainGroup::new(
-        child_cm.handlers().to_vec(),
-        Some(child_cm.inner.inheritable_handlers.clone()),
-        child_cm.parent_run_id(),
-        run_manager.clone(),
-        Some(child_cm.inner.tags.clone()),
-        Some(child_cm.inner.inheritable_tags.clone()),
-        Some(child_cm.inner.metadata.clone()),
-        Some(child_cm.inner.inheritable_metadata.clone()),
-    );
+    let mut group_cm = AsyncCallbackManagerForChainGroup::builder()
+        .handlers(child_cm.handlers().to_vec())
+        .inheritable_handlers(child_cm.inner.inheritable_handlers.clone())
+        .maybe_parent_run_id(child_cm.parent_run_id())
+        .parent_run_manager(run_manager.clone())
+        .tags(child_cm.inner.tags.clone())
+        .inheritable_tags(child_cm.inner.inheritable_tags.clone())
+        .metadata(child_cm.inner.metadata.clone())
+        .inheritable_metadata(child_cm.inner.inheritable_metadata.clone())
+        .build();
 
-    let result = f(group_cm.clone()).await;
+    let result = f(&mut group_cm).await;
 
     if !group_cm.ended {
         run_manager.on_chain_end(&HashMap::new()).await;
@@ -2412,4 +2124,75 @@ pub async fn adispatch_custom_event(
     );
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_callback_manager_on_chain_start() {
+        let manager = CallbackManager::new();
+        let run_manager = manager
+            .on_chain_start()
+            .serialized(&HashMap::new())
+            .inputs(&HashMap::new())
+            .call();
+
+        assert!(!run_manager.run_id().is_nil());
+    }
+
+    #[test]
+    fn test_callback_manager_configure() {
+        let manager = CallbackManager::configure()
+            .inheritable_tags(vec!["tag1".to_string()])
+            .local_tags(vec!["tag2".to_string()])
+            .call();
+
+        assert!(manager.tags.contains(&"tag1".to_string()));
+        assert!(manager.tags.contains(&"tag2".to_string()));
+        assert!(manager.inheritable_tags.contains(&"tag1".to_string()));
+        assert!(!manager.inheritable_tags.contains(&"tag2".to_string()));
+    }
+
+    #[test]
+    fn test_configure_with_verbose() {
+        crate::globals::set_debug(false);
+
+        let manager = CallbackManager::configure().verbose(true).call();
+        assert!(
+            manager
+                .handlers
+                .iter()
+                .any(|h| h.name() == "StdOutCallbackHandler"),
+            "StdOutCallbackHandler should be added when verbose=true"
+        );
+    }
+
+    #[test]
+    fn test_configure_deduplication() {
+        crate::globals::set_debug(false);
+
+        let handler: Arc<dyn BaseCallbackHandler> = Arc::new(StdOutCallbackHandler::new());
+        let callbacks = Callbacks::Handlers(vec![handler]);
+
+        let manager = CallbackManager::configure()
+            .inheritable_callbacks(callbacks)
+            .verbose(true)
+            .call();
+
+        let stdout_count = manager
+            .handlers
+            .iter()
+            .filter(|h| h.name() == "StdOutCallbackHandler")
+            .count();
+        assert_eq!(
+            stdout_count, 1,
+            "Should not duplicate StdOutCallbackHandler"
+        );
+    }
 }

@@ -116,15 +116,13 @@ pub trait BaseRetriever: Send + Sync + Debug {
         let mut inheritable_metadata = config.metadata.clone();
         inheritable_metadata.extend(self.get_ls_params().to_metadata());
 
-        let callback_manager = CallbackManager::configure(
-            config.callbacks.clone(),
-            None,
-            false,
-            Some(config.tags.clone()),
-            self.tags().map(|t| t.to_vec()),
-            Some(inheritable_metadata),
-            self.metadata().cloned(),
-        );
+        let callback_manager = CallbackManager::configure()
+            .maybe_inheritable_callbacks(config.callbacks.clone())
+            .inheritable_tags(config.tags.clone())
+            .maybe_local_tags(self.tags().map(|t| t.to_vec()))
+            .inheritable_metadata(inheritable_metadata)
+            .maybe_local_metadata(self.metadata().cloned())
+            .call();
 
         let run_manager = callback_manager
             .on_retriever_start()
@@ -157,15 +155,13 @@ pub trait BaseRetriever: Send + Sync + Debug {
         let mut inheritable_metadata = config.metadata.clone();
         inheritable_metadata.extend(self.get_ls_params().to_metadata());
 
-        let callback_manager = AsyncCallbackManager::configure(
-            config.callbacks.clone(),
-            None,
-            false,
-            Some(config.tags.clone()),
-            self.tags().map(|t| t.to_vec()),
-            Some(inheritable_metadata),
-            self.metadata().cloned(),
-        );
+        let callback_manager = AsyncCallbackManager::configure()
+            .maybe_inheritable_callbacks(config.callbacks.clone())
+            .inheritable_tags(config.tags.clone())
+            .maybe_local_tags(self.tags().map(|t| t.to_vec()))
+            .inheritable_metadata(inheritable_metadata)
+            .maybe_local_metadata(self.metadata().cloned())
+            .call();
 
         let run_manager = callback_manager
             .on_retriever_start()

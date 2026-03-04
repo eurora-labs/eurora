@@ -7,7 +7,6 @@ use bon::bon;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::callbacks::base::BaseCallbackManager;
 use crate::callbacks::{AsyncCallbackManager, CallbackManager, Callbacks};
 
 pub const DEFAULT_RECURSION_LIMIT: i32 = 25;
@@ -235,7 +234,7 @@ pub fn patch_config(
     let mut config = ensure_config(config);
 
     if let Some(cb) = callbacks {
-        config.callbacks = Some(Callbacks::Manager(BaseCallbackManager {
+        config.callbacks = Some(Callbacks::Manager(CallbackManager {
             handlers: cb.handlers,
             inheritable_handlers: cb.inheritable_handlers,
             parent_run_id: cb.parent_run_id,
@@ -298,14 +297,14 @@ pub fn merge_configs(configs: Vec<Option<RunnableConfig>>) -> RunnableConfig {
                 base.callbacks = Some(Callbacks::Handlers(merged));
             }
             (Some(Callbacks::Manager(base_mgr)), Some(Callbacks::Handlers(new_handlers))) => {
-                let mut merged = base_mgr.copy();
+                let mut merged = base_mgr.clone();
                 for handler in new_handlers {
                     merged.add_handler(handler.clone(), true);
                 }
                 base.callbacks = Some(Callbacks::Manager(merged));
             }
             (Some(Callbacks::Handlers(base_handlers)), Some(Callbacks::Manager(new_mgr))) => {
-                let mut merged = new_mgr.copy();
+                let mut merged = new_mgr.clone();
                 for handler in base_handlers {
                     merged.add_handler(handler.clone(), true);
                 }
@@ -373,27 +372,19 @@ pub async fn acall_func_with_variable_args<I, O>(
 }
 
 pub fn get_callback_manager_for_config(config: &RunnableConfig) -> CallbackManager {
-    CallbackManager::configure(
-        config.callbacks.clone(),
-        None,
-        false,
-        Some(config.tags.clone()),
-        None,
-        Some(config.metadata.clone()),
-        None,
-    )
+    CallbackManager::configure()
+        .maybe_inheritable_callbacks(config.callbacks.clone())
+        .inheritable_tags(config.tags.clone())
+        .inheritable_metadata(config.metadata.clone())
+        .call()
 }
 
 pub fn get_async_callback_manager_for_config(config: &RunnableConfig) -> AsyncCallbackManager {
-    AsyncCallbackManager::configure(
-        config.callbacks.clone(),
-        None,
-        false,
-        Some(config.tags.clone()),
-        None,
-        Some(config.metadata.clone()),
-        None,
-    )
+    AsyncCallbackManager::configure()
+        .maybe_inheritable_callbacks(config.callbacks.clone())
+        .inheritable_tags(config.tags.clone())
+        .inheritable_metadata(config.metadata.clone())
+        .call()
 }
 
 pub async fn run_in_executor<F, T>(func: F) -> T
@@ -599,8 +590,8 @@ mod tests {
 
     #[test]
     fn test_merge_configs_manager_plus_manager_uses_merge() {
-        let mgr1 = BaseCallbackManager::default();
-        let mgr2 = BaseCallbackManager::default();
+        let mgr1 = CallbackManager::default();
+        let mgr2 = CallbackManager::default();
 
         let c1 = RunnableConfig {
             callbacks: Some(Callbacks::Manager(mgr1)),

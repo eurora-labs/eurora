@@ -602,11 +602,10 @@ impl BaseChatModel for GenericFakeChatModel {
         let message_id = message.id;
         let additional_kwargs = message.additional_kwargs.clone();
 
-        let callback_handlers: Vec<
-            std::sync::Arc<dyn crate::callbacks::base::BaseCallbackHandler>,
-        > = run_manager
-            .map(|rm| rm.handlers().to_vec())
-            .unwrap_or_default();
+        let callback_handlers: Vec<std::sync::Arc<dyn crate::callbacks::BaseCallbackHandler>> =
+            run_manager
+                .map(|rm| rm.handlers().to_vec())
+                .unwrap_or_default();
         let callback_run_id = run_manager.map(|rm| rm.run_id());
         let callback_parent_run_id = run_manager.and_then(|rm| rm.parent_run_id());
 

@@ -5,30 +5,29 @@ pub mod stdout;
 pub mod streaming_stdout;
 pub mod usage;
 
-pub use base::{
-    ArcCallbackHandler, AsyncCallbackHandler, BaseCallbackHandler, BaseCallbackManager,
-    BoxedCallbackHandler, CallbackManagerMixin, Callbacks, ChainManagerMixin, LLMManagerMixin,
-    RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
-};
+pub use base::{ArcCallbackHandler, BaseCallbackHandler, BoxedCallbackHandler, resolve_chain_name};
 
 pub use manager::{
     AsyncCallbackManager, AsyncCallbackManagerForChainGroup, AsyncCallbackManagerForChainRun,
     AsyncCallbackManagerForLLMRun, AsyncCallbackManagerForRetrieverRun,
     AsyncCallbackManagerForToolRun, AsyncParentRunManager, AsyncRunManager, BaseRunManager,
     CallbackManager, CallbackManagerForChainGroup, CallbackManagerForChainRun,
-    CallbackManagerForLLMRun, CallbackManagerForRetrieverRun, CallbackManagerForToolRun,
-    ParentRunManager, RunManager, adispatch_custom_event, ahandle_event, atrace_as_chain_group,
-    dispatch_custom_event, handle_event, trace_as_chain_group,
+    CallbackManagerForLLMRun, CallbackManagerForRetrieverRun, CallbackManagerForToolRun, Callbacks,
+    ParentRunManager, RunManager, RunManagerCore, adispatch_custom_event, ahandle_event,
+    atrace_as_chain_group, dispatch_custom_event, handle_event, trace_as_chain_group,
 };
 
-pub use file::FileCallbackHandler;
+pub use file::{FileCallbackHandler, FileMode};
 
 pub use stdout::{StdOutCallbackHandler, colors};
 pub use streaming_stdout::StreamingStdOutCallbackHandler;
 
 pub use usage::{
-    UsageMetadataCallbackGuard, UsageMetadataCallbackHandler, get_usage_metadata_callback,
+    UsageMetadataCallbackHandler, UsageMetadataCallbackWrapper, get_usage_metadata_callback,
 };
+
+#[deprecated(note = "renamed to UsageMetadataCallbackWrapper")]
+pub type UsageMetadataCallbackGuard = UsageMetadataCallbackWrapper;
 
 #[cfg(test)]
 mod tests {
@@ -72,7 +71,7 @@ mod tests {
         let handler: Arc<dyn BaseCallbackHandler> = Arc::new(StdOutCallbackHandler::new());
         let callbacks = Callbacks::from_handlers(vec![handler]);
 
-        let manager = callbacks.to_manager();
+        let manager = callbacks.into_manager();
         assert_eq!(manager.handlers.len(), 1);
     }
 }

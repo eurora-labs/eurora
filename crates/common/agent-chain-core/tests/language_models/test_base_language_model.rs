@@ -730,22 +730,13 @@ mod test_agenerate_prompt {
 
 #[cfg(test)]
 mod test_callbacks_config {
+    use agent_chain_core::callbacks::BaseCallbackHandler;
     use agent_chain_core::callbacks::Callbacks;
-    use agent_chain_core::callbacks::base::{
-        BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
-        RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
-    };
     use agent_chain_core::language_models::LanguageModelConfig;
     use std::sync::Arc;
 
     #[derive(Debug)]
     struct TestHandler;
-    impl LLMManagerMixin for TestHandler {}
-    impl ChainManagerMixin for TestHandler {}
-    impl ToolManagerMixin for TestHandler {}
-    impl RetrieverManagerMixin for TestHandler {}
-    impl CallbackManagerMixin for TestHandler {}
-    impl RunManagerMixin for TestHandler {}
     impl BaseCallbackHandler for TestHandler {
         fn name(&self) -> &str {
             "TestHandler"
