@@ -62,9 +62,9 @@ pub struct Reviver {
 }
 
 impl Reviver {
-    pub fn new(config: ReviverConfig) -> Self {
+    pub fn new(mut config: ReviverConfig) -> Self {
         let mut import_mappings = get_all_serializable_mappings();
-        import_mappings.extend(config.additional_import_mappings.clone());
+        import_mappings.extend(std::mem::take(&mut config.additional_import_mappings));
 
         Self {
             config,
@@ -83,14 +83,15 @@ impl Reviver {
 
         let lc = obj.get("lc").and_then(|v| v.as_i64());
         let type_ = obj.get("type").and_then(|v| v.as_str());
-        let id = obj.get("id").and_then(|v| v.as_array());
+        let Some(id_arr) = obj.get("id").and_then(|v| v.as_array()) else {
+            return Ok(RevivedValue::Value(value.clone()));
+        };
 
-        if lc != Some(LC_VERSION as i64) || id.is_none() {
+        if lc != Some(LC_VERSION as i64) {
             return Ok(RevivedValue::Value(value.clone()));
         }
 
-        let id: Vec<String> = id
-            .expect("checked is_none above")
+        let id: Vec<String> = id_arr
             .iter()
             .filter_map(|v| v.as_str().map(|s| s.to_string()))
             .collect();
@@ -104,11 +105,9 @@ impl Reviver {
     }
 
     fn revive_secret(&self, id: &[String]) -> Result<RevivedValue> {
-        if id.is_empty() {
+        let Some(key) = id.first() else {
             return Ok(RevivedValue::None);
-        }
-
-        let key = &id[0];
+        };
 
         if let Some(secret) = self.config.secrets_map.get(key) {
             return Ok(RevivedValue::String(secret.clone()));
@@ -129,10 +128,12 @@ impl Reviver {
             return Ok(RevivedValue::None);
         }
 
-        Err(Error::Other(format!(
-            "Trying to load an object that doesn't implement serialization: {:?}",
-            value
-        )))
+        Err(Error::Deserialization {
+            id: vec![],
+            reason: format!(
+                "Trying to load an object that doesn't implement serialization: {value:?}"
+            ),
+        })
     }
 
     fn revive_constructor(
@@ -141,16 +142,22 @@ impl Reviver {
         obj: &serde_json::Map<String, Value>,
     ) -> Result<RevivedValue> {
         if id.is_empty() {
-            return Err(Error::Other("Constructor id cannot be empty".to_string()));
+            return Err(Error::Deserialization {
+                id: vec![],
+                reason: "Constructor id cannot be empty".to_string(),
+            });
         }
 
-        let namespace: Vec<String> = id[..id.len() - 1].to_vec();
-        let name = id.last().expect("checked non-empty above").clone();
+        let namespace = &id[..id.len() - 1];
+        let name = id.last().unwrap().clone();
 
         let root_namespace = namespace.first().map(|s| s.as_str()).unwrap_or("");
 
-        if namespace == vec!["langchain".to_string()] {
-            return Err(Error::Other(format!("Invalid namespace: {:?}", id)));
+        if namespace.len() == 1 && namespace[0] == "langchain" {
+            return Err(Error::Deserialization {
+                id: id.to_vec(),
+                reason: "Invalid namespace".to_string(),
+            });
         }
 
         if !self
@@ -159,18 +166,20 @@ impl Reviver {
             .iter()
             .any(|ns| ns == root_namespace)
         {
-            return Err(Error::Other(format!("Invalid namespace: {:?}", id)));
+            return Err(Error::Deserialization {
+                id: id.to_vec(),
+                reason: format!("Invalid namespace: {root_namespace}"),
+            });
         }
 
         let mapping_key: Vec<String> = id.to_vec();
         let resolved_path = if let Some(import_path) = self.import_mappings.get(&mapping_key) {
             import_path.clone()
         } else if DISALLOW_LOAD_FROM_PATH.contains(&root_namespace) {
-            return Err(Error::Other(format!(
-                "Trying to deserialize something that cannot be deserialized \
-                 in current version of langchain-core: {:?}",
-                mapping_key
-            )));
+            return Err(Error::Deserialization {
+                id: mapping_key,
+                reason: "cannot be deserialized in current version".to_string(),
+            });
         } else {
             id.to_vec()
         };
@@ -207,10 +216,10 @@ pub enum RevivedValue {
 }
 
 impl RevivedValue {
-    pub fn to_value(&self) -> Value {
+    pub fn into_value(self) -> Value {
         match self {
-            RevivedValue::Value(v) => v.clone(),
-            RevivedValue::String(s) => Value::String(s.clone()),
+            RevivedValue::Value(v) => v,
+            RevivedValue::String(s) => Value::String(s),
             RevivedValue::Constructor(info) => {
                 serde_json::json!({
                     "_type": "constructor",
@@ -255,7 +264,7 @@ fn load_recursive(obj: &Value, reviver: &Reviver) -> Result<Value> {
 
             let loaded_value = Value::Object(loaded_obj);
             let revived = reviver.revive(&loaded_value)?;
-            Ok(revived.to_value())
+            Ok(revived.into_value())
         }
         Value::Array(arr) => {
             let loaded: Result<Vec<Value>> =

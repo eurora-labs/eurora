@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use bon::bon;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use serde_with::serde_as;
 
 use crate::load::Serializable;
 
@@ -52,38 +53,43 @@ fn default_encoding() -> String {
     "utf-8".to_string()
 }
 
+#[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum BlobData {
     Text(String),
-    #[serde(with = "serde_bytes_base64")]
-    Bytes(Vec<u8>),
+    Bytes(#[serde_as(as = "serde_with::base64::Base64")] Vec<u8>),
 }
 
-mod serde_bytes_base64 {
-    use base64::{Engine as _, engine::general_purpose::STANDARD};
-    use serde::{self, Deserialize, Deserializer, Serializer};
-
-    pub fn serialize<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let s = STANDARD.encode(bytes);
-        serializer.serialize_str(&s)
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        STANDARD.decode(&s).map_err(serde::de::Error::custom)
-    }
-}
-
+#[bon]
 impl Blob {
-    pub fn builder() -> BlobBuilder {
-        BlobBuilder::default()
+    #[builder]
+    pub fn new(
+        id: Option<String>,
+        #[builder(default)] metadata: HashMap<String, Value>,
+        #[builder(into)] text: Option<String>,
+        bytes: Option<Vec<u8>>,
+        #[builder(into)] mimetype: Option<String>,
+        #[builder(into, default = default_encoding())] encoding: String,
+        path: Option<PathBuf>,
+    ) -> Result<Self, &'static str> {
+        let data = match (text, bytes) {
+            (Some(t), None) => Some(BlobData::Text(t)),
+            (None, Some(b)) => Some(BlobData::Bytes(b)),
+            (Some(_), Some(_)) => return Err("Cannot provide both text and bytes"),
+            (None, None) => None,
+        };
+        if data.is_none() && path.is_none() {
+            return Err("Either data/bytes or path must be provided");
+        }
+        Ok(Self {
+            id,
+            metadata,
+            data,
+            mimetype,
+            encoding,
+            path,
+        })
     }
 
     pub fn from_data(data: impl Into<String>) -> Self {
@@ -187,103 +193,8 @@ impl fmt::Display for Blob {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct BlobBuilder {
-    id: Option<String>,
-    metadata: HashMap<String, Value>,
-    data: Option<BlobData>,
-    mimetype: Option<String>,
-    encoding: String,
-    path: Option<PathBuf>,
-}
-
-impl BlobBuilder {
-    pub fn id(mut self, id: impl Into<String>) -> Self {
-        self.id = Some(id.into());
-        self
-    }
-
-    pub fn metadata(mut self, metadata: HashMap<String, Value>) -> Self {
-        self.metadata = metadata;
-        self
-    }
-
-    pub fn data(mut self, data: impl Into<String>) -> Self {
-        self.data = Some(BlobData::Text(data.into()));
-        self
-    }
-
-    pub fn bytes(mut self, data: Vec<u8>) -> Self {
-        self.data = Some(BlobData::Bytes(data));
-        self
-    }
-
-    pub fn mime_type(mut self, mime_type: impl Into<String>) -> Self {
-        self.mimetype = Some(mime_type.into());
-        self
-    }
-
-    pub fn encoding(mut self, encoding: impl Into<String>) -> Self {
-        self.encoding = encoding.into();
-        self
-    }
-
-    pub fn path(mut self, path: impl AsRef<Path>) -> Self {
-        self.path = Some(path.as_ref().to_path_buf());
-        self
-    }
-
-    pub fn build(self) -> Result<Blob, &'static str> {
-        if self.data.is_none() && self.path.is_none() {
-            return Err("Either data or path must be provided");
-        }
-
-        Ok(Blob {
-            id: self.id,
-            metadata: self.metadata,
-            data: self.data,
-            mimetype: self.mimetype,
-            encoding: if self.encoding.is_empty() {
-                "utf-8".to_string()
-            } else {
-                self.encoding
-            },
-            path: self.path,
-        })
-    }
-}
-
 fn guess_mime_type(path: &Path) -> Option<String> {
-    path.extension().and_then(|ext| {
-        let ext = ext.to_string_lossy().to_lowercase();
-        match ext.as_str() {
-            "txt" => Some("text/plain".to_string()),
-            "html" | "htm" => Some("text/html".to_string()),
-            "css" => Some("text/css".to_string()),
-            "js" => Some("application/javascript".to_string()),
-            "json" => Some("application/json".to_string()),
-            "xml" => Some("application/xml".to_string()),
-            "pdf" => Some("application/pdf".to_string()),
-            "png" => Some("image/png".to_string()),
-            "jpg" | "jpeg" => Some("image/jpeg".to_string()),
-            "gif" => Some("image/gif".to_string()),
-            "svg" => Some("image/svg+xml".to_string()),
-            "mp3" => Some("audio/mpeg".to_string()),
-            "wav" => Some("audio/wav".to_string()),
-            "mp4" => Some("video/mp4".to_string()),
-            "webm" => Some("video/webm".to_string()),
-            "zip" => Some("application/zip".to_string()),
-            "gz" | "gzip" => Some("application/gzip".to_string()),
-            "tar" => Some("application/x-tar".to_string()),
-            "csv" => Some("text/csv".to_string()),
-            "md" => Some("text/markdown".to_string()),
-            "yaml" | "yml" => Some("application/x-yaml".to_string()),
-            "toml" => Some("application/toml".to_string()),
-            "rs" => Some("text/x-rust".to_string()),
-            "py" => Some("text/x-python".to_string()),
-            _ => None,
-        }
-    })
+    mime_guess::from_path(path).first().map(|m| m.to_string())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -422,8 +333,8 @@ mod tests {
     #[test]
     fn test_blob_builder() {
         let blob = Blob::builder()
-            .data("Test data")
-            .mime_type("text/plain")
+            .text("Test data")
+            .mimetype("text/plain")
             .encoding("utf-8")
             .build()
             .unwrap();
@@ -445,7 +356,7 @@ mod tests {
         assert_eq!(blob.source(), Some("/test/path.txt".to_string()));
 
         let blob_with_source = Blob::builder()
-            .data("test")
+            .text("test")
             .metadata(HashMap::from([(
                 "source".to_string(),
                 Value::String("custom_source".to_string()),

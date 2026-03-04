@@ -5,8 +5,8 @@ mod serializable;
 
 pub use serializable::{
     BaseSerialized, LC_VERSION, Serializable, Serialized, SerializedConstructor,
-    SerializedConstructorData, SerializedNotImplemented, SerializedNotImplementedData,
-    SerializedSecret, SerializedSecretData, to_json_not_implemented, to_json_not_implemented_value,
+    SerializedNotImplemented, SerializedSecret, to_json_not_implemented,
+    to_json_not_implemented_value,
 };
 
 pub use dump::{dumpd, dumps};
