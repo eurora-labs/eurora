@@ -1,23 +1,25 @@
 use std::collections::HashMap;
 use std::io::{self, Write};
 
-pub static TEXT_COLOR_MAPPING: std::sync::LazyLock<HashMap<&'static str, &'static str>> =
-    std::sync::LazyLock::new(|| {
-        let mut m = HashMap::new();
-        m.insert("blue", "36;1");
-        m.insert("yellow", "33;1");
-        m.insert("pink", "38;5;200");
-        m.insert("green", "32;1");
-        m.insert("red", "31;1");
-        m
-    });
+pub const AVAILABLE_COLORS: &[&str] = &["blue", "yellow", "pink", "green", "red"];
+
+fn color_code(color: &str) -> Option<&'static str> {
+    match color {
+        "blue" => Some("36;1"),
+        "yellow" => Some("33;1"),
+        "pink" => Some("38;5;200"),
+        "green" => Some("32;1"),
+        "red" => Some("31;1"),
+        _ => None,
+    }
+}
 
 pub fn get_color_mapping(
     items: &[String],
     excluded_colors: Option<&[&str]>,
 ) -> Result<HashMap<String, String>, InputError> {
-    let colors: Vec<&str> = TEXT_COLOR_MAPPING
-        .keys()
+    let colors: Vec<&str> = AVAILABLE_COLORS
+        .iter()
         .filter(|c| {
             excluded_colors
                 .map(|excluded| !excluded.contains(c))
@@ -39,7 +41,7 @@ pub fn get_color_mapping(
 }
 
 pub fn get_colored_text(text: &str, color: &str) -> String {
-    let color_str = TEXT_COLOR_MAPPING.get(color).copied().unwrap_or("0");
+    let color_str = color_code(color).unwrap_or("0");
 
     format!("\x1b[{}m\x1b[1;3m{}\x1b[0m", color_str, text)
 }

@@ -84,28 +84,7 @@ pub fn convert_to_secret_str(value: impl Into<String>) -> SecretString {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NoDefault;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum EnvError {
-    NotFound { key: String, env_key: String },
-    Custom(String),
-}
-
-impl std::fmt::Display for EnvError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            EnvError::NotFound { key, env_key } => {
-                write!(
-                    f,
-                    "Did not find {}, please add an environment variable `{}` which contains it, or pass `{}` as a named parameter.",
-                    key, env_key, key
-                )
-            }
-            EnvError::Custom(msg) => write!(f, "{}", msg),
-        }
-    }
-}
-
-impl std::error::Error for EnvError {}
+pub use super::env::EnvError;
 
 pub fn from_env<'a>(
     keys: &'a [&'a str],
@@ -212,23 +191,13 @@ impl MockTime {
         minute: u32,
         second: u32,
     ) -> Self {
-        let days_before_month: [u32; 12] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-
-        let year_days = (year - 1970) as u64 * 365
-            + ((year - 1969) / 4) as u64 // leap years
-            - ((year - 1901) / 100) as u64 // century adjustment
-            + ((year - 1601) / 400) as u64; // 400-year adjustment
-
-        let month_days = days_before_month[(month - 1) as usize] as u64;
-        let is_leap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
-        let leap_adjustment = if is_leap && month > 2 { 1 } else { 0 };
-
-        let total_days = year_days + month_days + (day - 1) as u64 + leap_adjustment;
-        let timestamp_secs =
-            total_days * 86400 + hour as u64 * 3600 + minute as u64 * 60 + second as u64;
-
+        use chrono::TimeZone;
+        let dt = chrono::Utc
+            .with_ymd_and_hms(year, month, day, hour, minute, second)
+            .single()
+            .expect("invalid date/time components");
         Self {
-            timestamp_secs,
+            timestamp_secs: dt.timestamp() as u64,
             nanos: 0,
         }
     }

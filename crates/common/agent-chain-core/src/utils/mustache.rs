@@ -190,14 +190,22 @@ fn tokenize(template: &str, l_del: &str, r_del: &str) -> Result<Vec<Token>, Must
                     }
                     '/' => {
                         let key = tag[1..].trim().to_string();
-                        if let Some((expected, _)) = open_sections.pop()
-                            && expected != key
-                        {
-                            return Err(MustacheError::MismatchedSection {
-                                expected,
-                                got: key,
-                                line: current_line,
-                            });
+                        match open_sections.pop() {
+                            Some((expected, _)) if expected != key => {
+                                return Err(MustacheError::MismatchedSection {
+                                    expected,
+                                    got: key,
+                                    line: current_line,
+                                });
+                            }
+                            None => {
+                                return Err(MustacheError::MismatchedSection {
+                                    expected: String::new(),
+                                    got: key,
+                                    line: current_line,
+                                });
+                            }
+                            _ => {}
                         }
                         (TokenType::End, key)
                     }
@@ -250,6 +258,7 @@ fn html_escape(s: &str) -> String {
             '<' => result.push_str("&lt;"),
             '>' => result.push_str("&gt;"),
             '"' => result.push_str("&quot;"),
+            '\'' => result.push_str("&#39;"),
             _ => result.push(c),
         }
     }

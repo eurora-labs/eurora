@@ -43,6 +43,27 @@ fn is_well_known_openai_tool(tool: &Value) -> bool {
     false
 }
 
+fn apply_strict_mode(value: &mut Value, strict_val: bool) {
+    if let Value::Object(map) = value {
+        map.insert("strict".to_string(), Value::Bool(strict_val));
+
+        if strict_val && let Some(Value::Object(params)) = map.get_mut("parameters") {
+            let mut params_value = Value::Object(params.clone());
+            recursive_set_additional_properties_false(&mut params_value);
+            *params = params_value.as_object().cloned().unwrap_or_default();
+
+            if let Some(properties) = params.get("properties").cloned()
+                && let Some(props_obj) = properties.as_object()
+                && !props_obj.is_empty()
+            {
+                let required: Vec<Value> =
+                    props_obj.keys().map(|k| Value::String(k.clone())).collect();
+                params.insert("required".to_string(), Value::Array(required));
+            }
+        }
+    }
+}
+
 fn recursive_set_additional_properties_false(schema: &mut Value) {
     if let Value::Object(map) = schema {
         let has_required = map.contains_key("required");
@@ -182,75 +203,75 @@ pub trait ConvertibleToOpenAI {
 
 impl ConvertibleToOpenAI for Value {
     fn convert_to_openai_function_impl(&self, strict: Option<bool>) -> crate::error::Result<Value> {
-        let oai_function: Value;
-
-        if self.is_object() && self.get("name").is_some() && self.get("input_schema").is_some() {
-            let mut result = Map::new();
-            result.insert(
-                "name".to_string(),
-                self.get("name").cloned().unwrap_or(Value::Null),
-            );
-            result.insert(
-                "parameters".to_string(),
-                self.get("input_schema").cloned().unwrap_or(Value::Null),
-            );
-            if let Some(desc) = self.get("description") {
-                result.insert("description".to_string(), desc.clone());
-            }
-            oai_function = Value::Object(result);
-        } else if self.is_object()
-            && let Some(tool_spec) = self.get("toolSpec")
-        {
-            let mut result = Map::new();
-            result.insert(
-                "name".to_string(),
-                tool_spec.get("name").cloned().unwrap_or(Value::Null),
-            );
-            result.insert(
-                "parameters".to_string(),
-                tool_spec
-                    .get("inputSchema")
-                    .and_then(|is| is.get("json"))
-                    .cloned()
-                    .unwrap_or(Value::Null),
-            );
-            if let Some(desc) = tool_spec.get("description") {
-                result.insert("description".to_string(), desc.clone());
-            }
-            oai_function = Value::Object(result);
-        } else if self.is_object() && self.get("name").is_some() {
-            let mut result = Map::new();
-            if let Some(obj) = self.as_object() {
-                for (k, v) in obj {
-                    if k == "name" || k == "description" || k == "parameters" || k == "strict" {
-                        result.insert(k.clone(), v.clone());
+        let oai_function =
+            if self.is_object() && self.get("name").is_some() && self.get("input_schema").is_some()
+            {
+                let mut result = Map::new();
+                result.insert(
+                    "name".to_string(),
+                    self.get("name").cloned().unwrap_or(Value::Null),
+                );
+                result.insert(
+                    "parameters".to_string(),
+                    self.get("input_schema").cloned().unwrap_or(Value::Null),
+                );
+                if let Some(desc) = self.get("description") {
+                    result.insert("description".to_string(), desc.clone());
+                }
+                Value::Object(result)
+            } else if self.is_object()
+                && let Some(tool_spec) = self.get("toolSpec")
+            {
+                let mut result = Map::new();
+                result.insert(
+                    "name".to_string(),
+                    tool_spec.get("name").cloned().unwrap_or(Value::Null),
+                );
+                result.insert(
+                    "parameters".to_string(),
+                    tool_spec
+                        .get("inputSchema")
+                        .and_then(|is| is.get("json"))
+                        .cloned()
+                        .unwrap_or(Value::Null),
+                );
+                if let Some(desc) = tool_spec.get("description") {
+                    result.insert("description".to_string(), desc.clone());
+                }
+                Value::Object(result)
+            } else if self.is_object() && self.get("name").is_some() {
+                let mut result = Map::new();
+                if let Some(obj) = self.as_object() {
+                    for (k, v) in obj {
+                        if k == "name" || k == "description" || k == "parameters" || k == "strict" {
+                            result.insert(k.clone(), v.clone());
+                        }
                     }
                 }
-            }
-            oai_function = Value::Object(result);
-        } else if self.is_object() && self.get("title").is_some() {
-            let mut function_copy = self.clone();
-            let mut result = Map::new();
+                Value::Object(result)
+            } else if self.is_object() && self.get("title").is_some() {
+                let mut function_copy = self.clone();
+                let mut result = Map::new();
 
-            if let Value::Object(ref mut map) = function_copy {
-                if let Some(title) = map.remove("title") {
-                    result.insert("name".to_string(), title);
+                if let Value::Object(ref mut map) = function_copy {
+                    if let Some(title) = map.remove("title") {
+                        result.insert("name".to_string(), title);
+                    }
+                    if let Some(description) = map.remove("description") {
+                        result.insert("description".to_string(), description);
+                    }
+                    if !map.is_empty() && map.contains_key("properties") {
+                        result.insert("parameters".to_string(), function_copy);
+                    }
                 }
-                if let Some(description) = map.remove("description") {
-                    result.insert("description".to_string(), description);
-                }
-                if !map.is_empty() && map.contains_key("properties") {
-                    result.insert("parameters".to_string(), function_copy);
-                }
-            }
-            oai_function = Value::Object(result);
-        } else {
-            oai_function = serde_json::json!({
-                "name": "unknown",
-                "description": "",
-                "parameters": {}
-            });
-        }
+                Value::Object(result)
+            } else {
+                serde_json::json!({
+                    "name": "unknown",
+                    "description": "",
+                    "parameters": {}
+                })
+            };
 
         let mut oai_function = oai_function;
         if let Some(strict_val) = strict {
@@ -259,29 +280,12 @@ impl ConvertibleToOpenAI for Value {
                 && existing_strict.as_bool() != Some(strict_val)
             {
                 return Err(crate::error::Error::other(format!(
-                    "Tool/function already has a 'strict' key with value {} which                      is different from the explicit strict arg {}",
+                    "Tool/function already has a 'strict' key with value {} which is different from the explicit strict arg {}",
                     existing_strict, strict_val
                 )));
             }
 
-            if let Value::Object(ref mut map) = oai_function {
-                map.insert("strict".to_string(), Value::Bool(strict_val));
-
-                if strict_val && let Some(Value::Object(params)) = map.get_mut("parameters") {
-                    let mut params_value = Value::Object(params.clone());
-                    recursive_set_additional_properties_false(&mut params_value);
-                    *params = params_value.as_object().cloned().unwrap_or_default();
-
-                    if let Some(properties) = params.get("properties").cloned()
-                        && let Some(props_obj) = properties.as_object()
-                        && !props_obj.is_empty()
-                    {
-                        let required: Vec<Value> =
-                            props_obj.keys().map(|k| Value::String(k.clone())).collect();
-                        params.insert("required".to_string(), Value::Array(required));
-                    }
-                }
-            }
+            apply_strict_mode(&mut oai_function, strict_val);
         }
 
         Ok(oai_function)
@@ -309,25 +313,8 @@ impl<T: BaseTool + ?Sized> ConvertibleToOpenAI for T {
                 "parameters": func_desc.parameters
             });
 
-            if let Some(strict_val) = strict
-                && let Value::Object(ref mut map) = result
-            {
-                map.insert("strict".to_string(), Value::Bool(strict_val));
-
-                if strict_val && let Some(Value::Object(params)) = map.get_mut("parameters") {
-                    let mut params_value = Value::Object(params.clone());
-                    recursive_set_additional_properties_false(&mut params_value);
-                    *params = params_value.as_object().cloned().unwrap_or_default();
-
-                    if let Some(properties) = params.get("properties").cloned()
-                        && let Some(props_obj) = properties.as_object()
-                        && !props_obj.is_empty()
-                    {
-                        let required: Vec<Value> =
-                            props_obj.keys().map(|k| Value::String(k.clone())).collect();
-                        params.insert("required".to_string(), Value::Array(required));
-                    }
-                }
+            if let Some(strict_val) = strict {
+                apply_strict_mode(&mut result, strict_val);
             }
 
             return Ok(result);
@@ -345,14 +332,8 @@ impl<T: BaseTool + ?Sized> ConvertibleToOpenAI for T {
             }
         });
 
-        if let Some(strict_val) = strict
-            && let Value::Object(ref mut map) = result
-        {
-            map.insert("strict".to_string(), Value::Bool(strict_val));
-
-            if strict_val && let Some(Value::Object(params)) = map.get_mut("parameters") {
-                params.insert("additionalProperties".to_string(), Value::Bool(false));
-            }
+        if let Some(strict_val) = strict {
+            apply_strict_mode(&mut result, strict_val);
         }
 
         Ok(result)

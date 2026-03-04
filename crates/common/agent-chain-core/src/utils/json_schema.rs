@@ -10,16 +10,9 @@ pub fn dereference_refs(
     let keys_to_skip: Vec<&str> = skip_keys
         .map(|k| k.to_vec())
         .unwrap_or_else(|| vec!["$defs"]);
-    let shallow = skip_keys.is_none();
     let mut processed_refs = HashSet::new();
 
-    dereference_refs_helper(
-        schema_obj,
-        full,
-        &mut processed_refs,
-        &keys_to_skip,
-        shallow,
-    )
+    dereference_refs_helper(schema_obj, full, &mut processed_refs, &keys_to_skip)
 }
 
 fn dereference_refs_helper(
@@ -27,7 +20,6 @@ fn dereference_refs_helper(
     full_schema: &Value,
     processed_refs: &mut HashSet<String>,
     skip_keys: &[&str],
-    shallow_refs: bool,
 ) -> Value {
     match obj {
         Value::Object(map) if map.contains_key("$ref") => {
@@ -45,20 +37,14 @@ fn dereference_refs_helper(
                     full_schema,
                     processed_refs,
                     skip_keys,
-                    shallow_refs,
                 ));
             }
 
             processed_refs.insert(ref_path.to_string());
 
             let referenced_object = retrieve_ref(ref_path, full_schema);
-            let resolved_reference = dereference_refs_helper(
-                &referenced_object,
-                full_schema,
-                processed_refs,
-                skip_keys,
-                shallow_refs,
-            );
+            let resolved_reference =
+                dereference_refs_helper(&referenced_object, full_schema, processed_refs, skip_keys);
 
             processed_refs.remove(ref_path);
 
@@ -78,7 +64,6 @@ fn dereference_refs_helper(
                 full_schema,
                 processed_refs,
                 skip_keys,
-                shallow_refs,
             );
             for (k, v) in processed_additional {
                 merged_result.insert(k, v);
@@ -91,20 +76,11 @@ fn dereference_refs_helper(
             full_schema,
             processed_refs,
             skip_keys,
-            shallow_refs,
         )),
         Value::Array(arr) => {
             let processed: Vec<Value> = arr
                 .iter()
-                .map(|item| {
-                    dereference_refs_helper(
-                        item,
-                        full_schema,
-                        processed_refs,
-                        skip_keys,
-                        shallow_refs,
-                    )
-                })
+                .map(|item| dereference_refs_helper(item, full_schema, processed_refs, skip_keys))
                 .collect();
             Value::Array(processed)
         }
@@ -117,7 +93,6 @@ fn process_dict_properties(
     full_schema: &Value,
     processed_refs: &mut HashSet<String>,
     skip_keys: &[&str],
-    shallow_refs: bool,
 ) -> Map<String, Value> {
     let mut result = Map::new();
 
@@ -129,13 +104,7 @@ fn process_dict_properties(
                 Value::Object(_) | Value::Array(_) => {
                     result.insert(
                         key.clone(),
-                        dereference_refs_helper(
-                            value,
-                            full_schema,
-                            processed_refs,
-                            skip_keys,
-                            shallow_refs,
-                        ),
+                        dereference_refs_helper(value, full_schema, processed_refs, skip_keys),
                     );
                 }
                 _ => {
