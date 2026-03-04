@@ -58,7 +58,12 @@ fn build_ollama(
 ) -> Box<dyn BaseChatModel + Send + Sync> {
     let model = model_override.unwrap_or(&config.model);
     let base_url = resolve_host_url(config.base_url.as_str());
-    Box::new(ChatOllama::new(model).base_url(&base_url))
+    Box::new(
+        ChatOllama::builder()
+            .model(model)
+            .base_url(&base_url)
+            .build(),
+    )
 }
 
 fn build_openai(
@@ -114,9 +119,9 @@ fn build_env_fallback() -> Option<Providers> {
         let host = std::env::var("OLLAMA_HOST")
             .unwrap_or_else(|_| "http://host.docker.internal:11434".to_string());
         let chat: Arc<dyn BaseChatModel + Send + Sync> =
-            Arc::new(ChatOllama::new(&model).base_url(&host));
+            Arc::new(ChatOllama::builder().model(&model).base_url(&host).build());
         let title: Arc<dyn BaseChatModel + Send + Sync> =
-            Arc::new(ChatOllama::new(&model).base_url(&host));
+            Arc::new(ChatOllama::builder().model(&model).base_url(&host).build());
         Some(Providers {
             chat,
             title,
