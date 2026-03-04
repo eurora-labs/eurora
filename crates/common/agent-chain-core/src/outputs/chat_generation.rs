@@ -4,6 +4,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::ops::Add;
 
+use crate::load::Serializable;
 use crate::messages::BaseMessage;
 use crate::utils::merge::merge_dicts;
 
@@ -37,13 +38,15 @@ impl ChatGeneration {
             generation_type: "ChatGeneration".to_string(),
         }
     }
+}
 
-    pub fn is_lc_serializable() -> bool {
+impl Serializable for ChatGeneration {
+    fn is_lc_serializable() -> bool {
         true
     }
 
-    pub fn get_lc_namespace() -> Vec<&'static str> {
-        vec!["langchain", "schema", "output"]
+    fn get_lc_namespace() -> Vec<String> {
+        vec!["langchain".into(), "schema".into(), "output".into()]
     }
 }
 
@@ -101,6 +104,16 @@ impl ChatGenerationChunk {
             generation_info,
             generation_type: "ChatGenerationChunk".to_string(),
         }
+    }
+}
+
+impl Serializable for ChatGenerationChunk {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec!["langchain".into(), "schema".into(), "output".into()]
     }
 }
 

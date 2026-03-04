@@ -134,25 +134,6 @@ mod test_fake_messages_list_chat_model {
 }
 
 #[cfg(test)]
-mod test_fake_list_chat_model_error {
-
-    use agent_chain_core::FakeListChatModelError;
-    use std::error::Error;
-
-    #[test]
-    fn test_error_can_be_raised() {
-        let error = FakeListChatModelError;
-        assert_eq!(error.to_string(), "FakeListChatModelError");
-    }
-
-    #[test]
-    fn test_error_is_exception() {
-        let error = FakeListChatModelError;
-        let _: &dyn Error = &error;
-    }
-}
-
-#[cfg(test)]
 mod test_fake_list_chat_model {
 
     use agent_chain_core::FakeListChatModel;

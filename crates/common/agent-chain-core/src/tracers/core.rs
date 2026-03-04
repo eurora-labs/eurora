@@ -100,7 +100,7 @@ pub trait TracerCore: Send + Sync + Debug {
         self.run_map_mut().remove(&run.id.to_string());
     }
 
-    fn get_run(&self, run_id: Uuid, run_type: Option<&[&str]>) -> Result<Run, TracerError> {
+    fn get_run(&self, run_id: Uuid, run_type: Option<&[&str]>) -> crate::error::Result<Run> {
         let run = self
             .run_map()
             .get(&run_id.to_string())
@@ -114,7 +114,8 @@ pub trait TracerCore: Send + Sync + Debug {
                 run_id,
                 expected: expected_types.iter().map(|s| s.to_string()).collect(),
                 actual: run.run_type.clone(),
-            });
+            }
+            .into());
         }
 
         Ok(run)
@@ -135,14 +136,15 @@ pub trait TracerCore: Send + Sync + Debug {
         metadata: Option<HashMap<String, Value>>,
         name: Option<String>,
         extra: HashMap<String, Value>,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let schema_format = self.config().schema_format;
         if schema_format != SchemaFormat::StreamingEvents
             && schema_format != SchemaFormat::OriginalChat
         {
             return Err(TracerError::UnsupportedSchemaFormat(
                 "Chat model tracing is not supported in original format".to_string(),
-            ));
+            )
+            .into());
         }
 
         let start_time = Utc::now();
@@ -252,7 +254,7 @@ pub trait TracerCore: Send + Sync + Debug {
         run_id: Uuid,
         chunk: Option<&dyn std::any::Any>,
         _parent_run_id: Option<Uuid>,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let run = self
             .run_map_mut()
             .get_mut(&run_id.to_string())
@@ -263,7 +265,8 @@ pub trait TracerCore: Send + Sync + Debug {
                 run_id,
                 expected: vec!["llm".to_string(), "chat_model".to_string()],
                 actual: run.run_type.clone(),
-            });
+            }
+            .into());
         }
 
         let mut event_kwargs: HashMap<String, Value> = HashMap::new();
@@ -293,7 +296,7 @@ pub trait TracerCore: Send + Sync + Debug {
         &mut self,
         retry_state: &HashMap<String, Value>,
         run_id: Uuid,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let run = self
             .run_map_mut()
             .get_mut(&run_id.to_string())
@@ -305,7 +308,11 @@ pub trait TracerCore: Send + Sync + Debug {
         Ok(run.clone())
     }
 
-    fn complete_llm_run(&mut self, response: &LLMResult, run_id: Uuid) -> Result<Run, TracerError> {
+    fn complete_llm_run(
+        &mut self,
+        response: &LLMResult,
+        run_id: Uuid,
+    ) -> crate::error::Result<Run> {
         let run = self
             .run_map_mut()
             .get_mut(&run_id.to_string())
@@ -316,7 +323,8 @@ pub trait TracerCore: Send + Sync + Debug {
                 run_id,
                 expected: vec!["llm".to_string(), "chat_model".to_string()],
                 actual: run.run_type.clone(),
-            });
+            }
+            .into());
         }
 
         if run.outputs.is_none() {
@@ -352,7 +360,7 @@ pub trait TracerCore: Send + Sync + Debug {
         error: &dyn std::error::Error,
         run_id: Uuid,
         response: Option<&LLMResult>,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let run = self
             .run_map_mut()
             .get_mut(&run_id.to_string())
@@ -363,7 +371,8 @@ pub trait TracerCore: Send + Sync + Debug {
                 run_id,
                 expected: vec!["llm".to_string(), "chat_model".to_string()],
                 actual: run.run_type.clone(),
-            });
+            }
+            .into());
         }
 
         run.error = Some(Self::get_stacktrace(error));
@@ -473,7 +482,7 @@ pub trait TracerCore: Send + Sync + Debug {
         outputs: HashMap<String, Value>,
         run_id: Uuid,
         inputs: Option<HashMap<String, Value>>,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let processed_outputs = self.get_chain_outputs(outputs);
         let processed_inputs = inputs.map(|i| self.get_chain_inputs(i));
 
@@ -514,7 +523,7 @@ pub trait TracerCore: Send + Sync + Debug {
         error: &dyn std::error::Error,
         run_id: Uuid,
         inputs: Option<HashMap<String, Value>>,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let processed_inputs = inputs.map(|i| self.get_chain_inputs(i));
 
         let run = self
@@ -594,7 +603,7 @@ pub trait TracerCore: Send + Sync + Debug {
         }
     }
 
-    fn complete_tool_run(&mut self, output: Value, run_id: Uuid) -> Result<Run, TracerError> {
+    fn complete_tool_run(&mut self, output: Value, run_id: Uuid) -> crate::error::Result<Run> {
         let run = self
             .run_map_mut()
             .get_mut(&run_id.to_string())
@@ -605,7 +614,8 @@ pub trait TracerCore: Send + Sync + Debug {
                 run_id,
                 expected: vec!["tool".to_string()],
                 actual: run.run_type.clone(),
-            });
+            }
+            .into());
         }
 
         if run.outputs.is_none() {
@@ -635,7 +645,7 @@ pub trait TracerCore: Send + Sync + Debug {
         &mut self,
         error: &dyn std::error::Error,
         run_id: Uuid,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let run = self
             .run_map_mut()
             .get_mut(&run_id.to_string())
@@ -646,7 +656,8 @@ pub trait TracerCore: Send + Sync + Debug {
                 run_id,
                 expected: vec!["tool".to_string()],
                 actual: run.run_type.clone(),
-            });
+            }
+            .into());
         }
 
         run.error = Some(Self::get_stacktrace(error));
@@ -711,7 +722,7 @@ pub trait TracerCore: Send + Sync + Debug {
         &mut self,
         documents: Vec<Value>,
         run_id: Uuid,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let run = self
             .run_map_mut()
             .get_mut(&run_id.to_string())
@@ -722,7 +733,8 @@ pub trait TracerCore: Send + Sync + Debug {
                 run_id,
                 expected: vec!["retriever".to_string()],
                 actual: run.run_type.clone(),
-            });
+            }
+            .into());
         }
 
         if run.outputs.is_none() {
@@ -752,7 +764,7 @@ pub trait TracerCore: Send + Sync + Debug {
         &mut self,
         error: &dyn std::error::Error,
         run_id: Uuid,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let run = self
             .run_map_mut()
             .get_mut(&run_id.to_string())
@@ -763,7 +775,8 @@ pub trait TracerCore: Send + Sync + Debug {
                 run_id,
                 expected: vec!["retriever".to_string()],
                 actual: run.run_type.clone(),
-            });
+            }
+            .into());
         }
 
         run.error = Some(Self::get_stacktrace(error));
@@ -809,36 +822,19 @@ pub trait TracerCore: Send + Sync + Debug {
     fn on_retriever_error(&mut self, _run: &Run) {}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum TracerError {
+    #[error("No indexed run ID {0}")]
     RunNotFound(Uuid),
+    #[error("Found {actual} run at ID {run_id}, but expected {expected:?} run")]
     WrongRunType {
         run_id: Uuid,
         expected: Vec<String>,
         actual: String,
     },
+    #[error("{0}")]
     UnsupportedSchemaFormat(String),
 }
-
-impl std::fmt::Display for TracerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TracerError::RunNotFound(id) => write!(f, "No indexed run ID {}", id),
-            TracerError::WrongRunType {
-                run_id,
-                expected,
-                actual,
-            } => write!(
-                f,
-                "Found {} run at ID {}, but expected {:?} run",
-                actual, run_id, expected
-            ),
-            TracerError::UnsupportedSchemaFormat(msg) => write!(f, "{}", msg),
-        }
-    }
-}
-
-impl std::error::Error for TracerError {}
 
 #[cfg(test)]
 mod tests {

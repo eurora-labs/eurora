@@ -7,23 +7,10 @@ use crate::callbacks::Callbacks;
 pub trait BaseDocumentCompressor: Send + Sync {
     async fn compress_documents(
         &self,
-        documents: Vec<Document>,
+        documents: &[Document],
         query: &str,
         callbacks: Option<Callbacks>,
     ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>>;
-
-    fn compress_documents_sync(
-        &self,
-        documents: Vec<Document>,
-        query: &str,
-        callbacks: Option<Callbacks>,
-    ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>>
-    where
-        Self: Sized,
-    {
-        let _ = (documents, query, callbacks);
-        Err("Sync version not implemented - use compress_documents instead".into())
-    }
 }
 
 #[cfg(test)]
@@ -36,13 +23,14 @@ mod tests {
     impl BaseDocumentCompressor for TestCompressor {
         async fn compress_documents(
             &self,
-            documents: Vec<Document>,
+            documents: &[Document],
             query: &str,
             _callbacks: Option<Callbacks>,
         ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
             Ok(documents
-                .into_iter()
+                .iter()
                 .filter(|doc| doc.page_content.contains(query))
+                .cloned()
                 .collect())
         }
     }
@@ -57,7 +45,7 @@ mod tests {
         ];
 
         let result = compressor
-            .compress_documents(documents, "Hello", None)
+            .compress_documents(&documents, "Hello", None)
             .await
             .unwrap();
 

@@ -161,10 +161,6 @@ impl LLM for FakeListLLM {
     }
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
-#[error("FakeListLLM error")]
-pub struct FakeListLLMError;
-
 #[derive(Debug)]
 pub struct FakeStreamingListLLM {
     inner: FakeListLLM,

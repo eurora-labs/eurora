@@ -171,7 +171,7 @@
 
 		{#if hasPaidPlan}
 			<div>
-				<h3 class="mb-3 text-base font-semibold">Payment & Invoices</h3>
+				<h3 class="mb-3 text-base font-semibold">Payment &amp; Invoices</h3>
 				<p class="mb-4 text-sm text-muted-foreground">
 					View invoices, update your payment method, or cancel your subscription through
 					the billing portal.

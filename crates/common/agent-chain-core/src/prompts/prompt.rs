@@ -371,6 +371,8 @@ impl Serializable for PromptTemplate {
     }
 }
 
+submit_constructor!(PromptTemplate);
+
 #[cfg(test)]
 mod tests {
     use super::*;

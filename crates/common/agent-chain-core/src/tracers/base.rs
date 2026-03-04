@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::messages::BaseMessage;
 use crate::outputs::LLMResult;
-use crate::tracers::core::{TracerCore, TracerError};
+use crate::tracers::core::TracerCore;
 use crate::tracers::schemas::Run;
 
 pub trait BaseTracer: TracerCore {
@@ -36,7 +36,7 @@ pub trait BaseTracer: TracerCore {
         metadata: Option<HashMap<String, Value>>,
         name: Option<String>,
         extra: HashMap<String, Value>,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let mut chat_model_run = self.create_chat_model_run(
             serialized,
             messages,
@@ -85,7 +85,7 @@ pub trait BaseTracer: TracerCore {
         run_id: Uuid,
         chunk: Option<&dyn std::any::Any>,
         parent_run_id: Option<Uuid>,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let llm_run = self.llm_run_with_token_event(token, run_id, chunk, parent_run_id)?;
         self.on_llm_new_token(&llm_run, token, chunk);
         Ok(llm_run)
@@ -95,11 +95,11 @@ pub trait BaseTracer: TracerCore {
         &mut self,
         retry_state: &HashMap<String, Value>,
         run_id: Uuid,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         self.llm_run_with_retry_event(retry_state, run_id)
     }
 
-    fn handle_llm_end(&mut self, response: &LLMResult, run_id: Uuid) -> Result<Run, TracerError> {
+    fn handle_llm_end(&mut self, response: &LLMResult, run_id: Uuid) -> crate::error::Result<Run> {
         let llm_run = self.complete_llm_run(response, run_id)?;
         self.end_trace_impl(&llm_run);
         self.on_llm_end(&llm_run);
@@ -111,7 +111,7 @@ pub trait BaseTracer: TracerCore {
         error: &dyn std::error::Error,
         run_id: Uuid,
         response: Option<&LLMResult>,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let llm_run = self.errored_llm_run(error, run_id, response)?;
         self.end_trace_impl(&llm_run);
         self.on_llm_error(&llm_run);
@@ -152,7 +152,7 @@ pub trait BaseTracer: TracerCore {
         outputs: HashMap<String, Value>,
         run_id: Uuid,
         inputs: Option<HashMap<String, Value>>,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let chain_run = self.complete_chain_run(outputs, run_id, inputs)?;
         self.end_trace_impl(&chain_run);
         self.on_chain_end(&chain_run);
@@ -164,7 +164,7 @@ pub trait BaseTracer: TracerCore {
         error: &dyn std::error::Error,
         run_id: Uuid,
         inputs: Option<HashMap<String, Value>>,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let chain_run = self.errored_chain_run(error, run_id, inputs)?;
         self.end_trace_impl(&chain_run);
         self.on_chain_error(&chain_run);
@@ -200,7 +200,7 @@ pub trait BaseTracer: TracerCore {
         tool_run
     }
 
-    fn handle_tool_end(&mut self, output: Value, run_id: Uuid) -> Result<Run, TracerError> {
+    fn handle_tool_end(&mut self, output: Value, run_id: Uuid) -> crate::error::Result<Run> {
         let tool_run = self.complete_tool_run(output, run_id)?;
         self.end_trace_impl(&tool_run);
         self.on_tool_end(&tool_run);
@@ -211,7 +211,7 @@ pub trait BaseTracer: TracerCore {
         &mut self,
         error: &dyn std::error::Error,
         run_id: Uuid,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let tool_run = self.errored_tool_run(error, run_id)?;
         self.end_trace_impl(&tool_run);
         self.on_tool_error(&tool_run);
@@ -249,7 +249,7 @@ pub trait BaseTracer: TracerCore {
         &mut self,
         documents: Vec<Value>,
         run_id: Uuid,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let retrieval_run = self.complete_retrieval_run(documents, run_id)?;
         self.end_trace_impl(&retrieval_run);
         self.on_retriever_end(&retrieval_run);
@@ -260,7 +260,7 @@ pub trait BaseTracer: TracerCore {
         &mut self,
         error: &dyn std::error::Error,
         run_id: Uuid,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let retrieval_run = self.errored_retrieval_run(error, run_id)?;
         self.end_trace_impl(&retrieval_run);
         self.on_retriever_error(&retrieval_run);
@@ -296,7 +296,7 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         metadata: Option<HashMap<String, Value>>,
         name: Option<String>,
         extra: HashMap<String, Value>,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let mut chat_model_run = self.create_chat_model_run(
             serialized,
             messages,
@@ -349,7 +349,7 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         run_id: Uuid,
         chunk: Option<&(dyn std::any::Any + Send + Sync)>,
         parent_run_id: Option<Uuid>,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let llm_run = self.llm_run_with_token_event(
             token,
             run_id,
@@ -364,7 +364,7 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         &mut self,
         retry_state: &HashMap<String, Value>,
         run_id: Uuid,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         self.llm_run_with_retry_event(retry_state, run_id)
     }
 
@@ -372,7 +372,7 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         &mut self,
         response: &LLMResult,
         run_id: Uuid,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let llm_run = self.complete_llm_run(response, run_id)?;
 
         self.on_llm_end_async(&llm_run).await;
@@ -386,7 +386,7 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         error: &(dyn std::error::Error + Send + Sync),
         run_id: Uuid,
         response: Option<&LLMResult>,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let llm_run = self.errored_llm_run(error, run_id, response)?;
 
         self.on_llm_error_async(&llm_run).await;
@@ -431,7 +431,7 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         outputs: HashMap<String, Value>,
         run_id: Uuid,
         inputs: Option<HashMap<String, Value>>,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let chain_run = self.complete_chain_run(outputs, run_id, inputs)?;
 
         self.end_trace_async(&chain_run).await;
@@ -445,7 +445,7 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         error: &(dyn std::error::Error + Send + Sync),
         run_id: Uuid,
         inputs: Option<HashMap<String, Value>>,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let chain_run = self.errored_chain_run(error, run_id, inputs)?;
 
         self.end_trace_async(&chain_run).await;
@@ -489,7 +489,7 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         &mut self,
         output: Value,
         run_id: Uuid,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let tool_run = self.complete_tool_run(output, run_id)?;
 
         self.end_trace_async(&tool_run).await;
@@ -502,7 +502,7 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         &mut self,
         error: &(dyn std::error::Error + Send + Sync),
         run_id: Uuid,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let tool_run = self.errored_tool_run(error, run_id)?;
 
         self.end_trace_async(&tool_run).await;
@@ -544,7 +544,7 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         &mut self,
         documents: Vec<Value>,
         run_id: Uuid,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let retrieval_run = self.complete_retrieval_run(documents, run_id)?;
 
         self.end_trace_async(&retrieval_run).await;
@@ -557,7 +557,7 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         &mut self,
         error: &(dyn std::error::Error + Send + Sync),
         run_id: Uuid,
-    ) -> Result<Run, TracerError> {
+    ) -> crate::error::Result<Run> {
         let retrieval_run = self.errored_retrieval_run(error, run_id)?;
 
         self.end_trace_async(&retrieval_run).await;

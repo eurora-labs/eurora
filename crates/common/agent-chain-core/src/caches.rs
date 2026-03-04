@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 
 use crate::outputs::Generation;
+pub use crate::runnables::run_in_executor;
 
 pub type CacheReturnValue = Vec<Generation>;
 

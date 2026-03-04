@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
-use agent_chain_core::utils::formatting::{
-    FORMATTER, FormattingError, StrictFormatter, format_string,
-};
+use agent_chain_core::error::Error;
+use agent_chain_core::utils::formatting::{FORMATTER, StrictFormatter, format_string};
 
 #[test]
 fn test_format_basic() {
@@ -31,10 +30,10 @@ fn test_format_missing_key() {
     let kwargs = HashMap::new();
 
     let result = formatter.format("Hello, {name}!", &kwargs);
-    assert!(matches!(result, Err(FormattingError::MissingKey(_))));
+    assert!(matches!(result, Err(Error::InvalidConfig(_))));
 
-    if let Err(FormattingError::MissingKey(key)) = result {
-        assert_eq!(key, "name");
+    if let Err(Error::InvalidConfig(msg)) = result {
+        assert!(msg.contains("name"));
     }
 }
 
@@ -182,11 +181,11 @@ fn test_formatter_default() {
 
 #[test]
 fn test_formatting_error_display() {
-    let error = FormattingError::MissingKey("name".to_string());
-    assert_eq!(error.to_string(), "Missing key in format string: name");
-
-    let error = FormattingError::InvalidFormat("bad format".to_string());
-    assert_eq!(error.to_string(), "Invalid format string: bad format");
+    let error = Error::InvalidConfig("Missing key in format string: name".to_string());
+    assert_eq!(
+        error.to_string(),
+        "Invalid configuration: Missing key in format string: name"
+    );
 }
 
 #[test]

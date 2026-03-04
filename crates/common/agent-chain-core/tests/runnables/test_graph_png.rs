@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
+use agent_chain_core::error::Error;
 use agent_chain_core::runnables::graph::{Graph, LabelsDict};
-use agent_chain_core::runnables::graph_png::{PngDrawError, PngDrawer};
+use agent_chain_core::runnables::graph_png::PngDrawer;
 
 #[test]
 fn test_png_drawer_initialization() {
@@ -78,7 +79,7 @@ fn test_graph_draw_png_returns_missing_dependency_error() {
     let result = graph.draw_png(None, None, None);
     assert!(result.is_err());
     match result.unwrap_err() {
-        PngDrawError::MissingDependency(msg) => {
+        Error::NotImplemented(msg) => {
             assert!(msg.to_lowercase().contains("graphviz"));
         }
         other => panic!("expected MissingDependency, got: {other}"),
@@ -152,7 +153,7 @@ fn test_graph_draw_png_with_labels() {
     };
 
     let result = graph.draw_png(None, None, Some(custom_labels));
-    assert!(matches!(result, Err(PngDrawError::MissingDependency(_))));
+    assert!(matches!(result, Err(Error::NotImplemented(_))));
 }
 
 #[test]
@@ -163,7 +164,7 @@ fn test_graph_draw_png_with_fontname() {
     graph.add_edge(&node1, &node2, None, false);
 
     let result = graph.draw_png(None, Some("courier"), None);
-    assert!(matches!(result, Err(PngDrawError::MissingDependency(_))));
+    assert!(matches!(result, Err(Error::NotImplemented(_))));
 }
 
 #[test]
@@ -393,7 +394,7 @@ fn test_graph_draw_png_complex_structure() {
     graph.add_edge(&nodes[3], &nodes[4], None, false);
 
     let result = graph.draw_png(None, None, None);
-    assert!(matches!(result, Err(PngDrawError::MissingDependency(_))));
+    assert!(matches!(result, Err(Error::NotImplemented(_))));
 }
 
 #[test]
@@ -407,7 +408,7 @@ fn test_png_drawer_with_subgraphs() {
     graph.add_edge(&parent, &child2, None, false);
 
     let result = graph.draw_png(None, None, None);
-    assert!(matches!(result, Err(PngDrawError::MissingDependency(_))));
+    assert!(matches!(result, Err(Error::NotImplemented(_))));
 }
 
 #[test]
@@ -457,7 +458,7 @@ fn test_graph_draw_png_with_conditional_edges() {
     graph.add_edge(&node1, &node3, None, true);
 
     let result = graph.draw_png(None, None, None);
-    assert!(matches!(result, Err(PngDrawError::MissingDependency(_))));
+    assert!(matches!(result, Err(Error::NotImplemented(_))));
 }
 
 #[test]
@@ -469,7 +470,7 @@ fn test_png_drawer_edge_with_data() {
     graph.add_edge(&node1, &node2, Some("edge_label".into()), false);
 
     let result = graph.draw_png(None, None, None);
-    assert!(matches!(result, Err(PngDrawError::MissingDependency(_))));
+    assert!(matches!(result, Err(Error::NotImplemented(_))));
 }
 
 #[test]
@@ -516,7 +517,7 @@ fn test_graph_draw_png_returns_error_when_path_specified() {
         None,
         None,
     );
-    assert!(matches!(result, Err(PngDrawError::MissingDependency(_))));
+    assert!(matches!(result, Err(Error::NotImplemented(_))));
 }
 
 #[test]
@@ -567,7 +568,7 @@ fn test_graph_draw_png_with_metadata() {
     graph.add_edge(&node1, &node2, None, false);
 
     let result = graph.draw_png(None, None, None);
-    assert!(matches!(result, Err(PngDrawError::MissingDependency(_))));
+    assert!(matches!(result, Err(Error::NotImplemented(_))));
 }
 
 #[test]

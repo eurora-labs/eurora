@@ -10,7 +10,7 @@ use crate::error::{Error, Result};
 use crate::outputs::Generation;
 use crate::utils::json::{parse_json_markdown, parse_partial_json};
 
-use super::base::{BaseOutputParser, OutputParserError};
+use super::base::BaseOutputParser;
 use super::format_instructions::JSON_FORMAT_INSTRUCTIONS;
 use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
 
@@ -68,11 +68,10 @@ impl BaseOutputParser for JsonOutputParser {
         } else {
             match parse_json_markdown(text) {
                 Ok(value) => Ok(value),
-                Err(e) => Err(OutputParserError::parse_error(
+                Err(e) => Err(Error::output_parser_with_output(
                     format!("Invalid json output: {}", e),
                     text,
-                )
-                .into()),
+                )),
             }
         }
     }

@@ -1353,20 +1353,20 @@ fn test_loads_with_namespaces_convenience() {
 #[test]
 fn test_revived_value_to_value() {
     let rv = RevivedValue::Value(json!({"key": "value"}));
-    assert_eq!(rv.to_value(), json!({"key": "value"}));
+    assert_eq!(rv.into_value(), json!({"key": "value"}));
 
     let rv = RevivedValue::String("hello".to_string());
-    assert_eq!(rv.to_value(), json!("hello"));
+    assert_eq!(rv.into_value(), json!("hello"));
 
     let rv = RevivedValue::None;
-    assert!(rv.to_value().is_null());
+    assert!(rv.into_value().is_null());
 
     let rv = RevivedValue::Constructor(ConstructorInfo {
         path: vec!["langchain_core".to_string(), "AIMessage".to_string()],
         name: "AIMessage".to_string(),
         kwargs: json!({"content": "hello"}),
     });
-    let v = rv.to_value();
+    let v = rv.into_value();
     assert!(v.is_object());
     assert_eq!(v.get("_type").and_then(|v| v.as_str()), Some("constructor"));
     assert_eq!(v.get("name").and_then(|v| v.as_str()), Some("AIMessage"));

@@ -48,8 +48,8 @@ pub enum Error {
     #[error("{0}")]
     General(String),
 
-    #[error("Tracer error: {0}")]
-    Tracer(String),
+    #[error(transparent)]
+    Tracer(#[from] crate::tracers::core::TracerError),
 
     #[error("{message}")]
     OutputParser {
@@ -64,6 +64,9 @@ pub enum Error {
 
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
+
+    #[error(transparent)]
+    JsonParse(#[from] crate::utils::json::JsonParseError),
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
@@ -92,6 +95,9 @@ pub enum Error {
     #[error("Validation error: {0}")]
     ValidationError(String),
 
+    #[error("Invalid key: {0}")]
+    InvalidKey(String),
+
     #[error("Indexing error: {0}")]
     Indexing(String),
 
@@ -106,6 +112,18 @@ pub enum Error {
 
     #[error("Lock poisoned: {0}")]
     LockPoisoned(String),
+
+    #[error(transparent)]
+    Merge(#[from] crate::utils::merge::MergeError),
+
+    #[error(transparent)]
+    Env(#[from] crate::utils::env::EnvError),
+
+    #[error(transparent)]
+    Usage(#[from] crate::utils::usage::UsageError),
+
+    #[error("Deserialization error for {id:?}: {reason}")]
+    Deserialization { id: Vec<String>, reason: String },
 
     #[error("{0}")]
     Other(String),
@@ -169,6 +187,27 @@ impl Error {
 
     pub fn other(message: impl Into<String>) -> Self {
         Self::Other(message.into())
+    }
+
+    pub fn output_parser_simple(message: impl Into<String>) -> Self {
+        Self::OutputParser {
+            message: message.into(),
+            observation: None,
+            llm_output: None,
+            send_to_llm: false,
+        }
+    }
+
+    pub fn output_parser_with_output(
+        message: impl Into<String>,
+        llm_output: impl Into<String>,
+    ) -> Self {
+        Self::OutputParser {
+            message: message.into(),
+            observation: None,
+            llm_output: Some(llm_output.into()),
+            send_to_llm: false,
+        }
     }
 
     pub fn is_retryable(&self) -> bool {

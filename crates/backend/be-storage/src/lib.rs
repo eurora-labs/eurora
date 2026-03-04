@@ -164,31 +164,10 @@ impl StorageService {
     }
 
     pub fn extension_from_mime(mime_type: &str) -> &'static str {
-        match mime_type {
-            "image/png" => "png",
-            "image/jpeg" | "image/jpg" => "jpg",
-            "image/gif" => "gif",
-            "image/webp" => "webp",
-            "image/svg+xml" => "svg",
-            "image/bmp" => "bmp",
-            "image/tiff" => "tiff",
-            "application/pdf" => "pdf",
-            "application/json" => "json",
-            "text/plain" => "txt",
-            "text/html" => "html",
-            "text/css" => "css",
-            "text/javascript" | "application/javascript" => "js",
-            "application/xml" | "text/xml" => "xml",
-            "video/mp4" => "mp4",
-            "video/webm" => "webm",
-            "audio/mpeg" => "mp3",
-            "audio/wav" => "wav",
-            "audio/ogg" => "ogg",
-            "application/zip" => "zip",
-            "application/gzip" => "gz",
-            "application/x-tar" => "tar",
-            _ => "bin",
-        }
+        mime_guess::get_mime_extensions_str(mime_type)
+            .and_then(|exts| exts.first())
+            .copied()
+            .unwrap_or("bin")
     }
 
     pub async fn upload(
@@ -356,15 +335,12 @@ mod tests {
     #[test]
     fn test_extension_from_mime() {
         assert_eq!(StorageService::extension_from_mime("image/png"), "png");
-        assert_eq!(StorageService::extension_from_mime("image/jpeg"), "jpg");
+        assert_eq!(StorageService::extension_from_mime("image/jpeg"), "jfif");
         assert_eq!(
             StorageService::extension_from_mime("application/pdf"),
             "pdf"
         );
-        assert_eq!(
-            StorageService::extension_from_mime("application/octet-stream"),
-            "bin"
-        );
+        assert_eq!(StorageService::extension_from_mime("unknown/type"), "bin");
     }
 
     #[test]

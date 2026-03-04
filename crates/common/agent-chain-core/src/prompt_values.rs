@@ -249,6 +249,9 @@ impl Serializable for ChatPromptValueConcrete {
     }
 }
 
+submit_constructor!(StringPromptValue);
+submit_constructor!(ChatPromptValue);
+
 #[cfg(test)]
 mod tests {
     use super::*;

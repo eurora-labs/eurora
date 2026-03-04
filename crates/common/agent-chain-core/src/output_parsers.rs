@@ -10,8 +10,7 @@ mod transform;
 mod xml;
 
 pub use base::{
-    BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser, OutputParserError,
-    RunnableOutputParser,
+    BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser, RunnableOutputParser,
 };
 
 pub use format_instructions::JSON_FORMAT_INSTRUCTIONS;

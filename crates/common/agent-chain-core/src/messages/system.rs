@@ -421,3 +421,6 @@ impl Serializable for SystemMessageChunk {
         ]
     }
 }
+
+submit_constructor!(SystemMessage);
+submit_constructor!(SystemMessageChunk);

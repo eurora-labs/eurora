@@ -7,7 +7,7 @@ use futures::stream::BoxStream;
 use serde::Serialize;
 
 use crate::error::{Error, Result};
-use crate::load::{Serializable, Serialized, SerializedConstructorData};
+use crate::load::{Serializable, Serialized, SerializedConstructor};
 
 use super::base::{DynRunnable, Runnable, RunnableLambda, RunnableSerializable};
 use super::config::{RunnableConfig, ensure_config, get_callback_manager_for_config, patch_config};
@@ -345,13 +345,7 @@ where
     fn to_json(&self) -> Serialized {
         let kwargs = std::collections::HashMap::new();
 
-        Serialized::Constructor(SerializedConstructorData {
-            lc: 1,
-            id: Self::get_lc_namespace(),
-            kwargs,
-            name: None,
-            graph: None,
-        })
+        Serialized::Constructor(SerializedConstructor::new(Self::lc_id(), kwargs))
     }
 }
 

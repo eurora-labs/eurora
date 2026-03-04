@@ -1,23 +1,29 @@
 use std::collections::HashMap;
 use std::io::{self, Write};
 
-pub static TEXT_COLOR_MAPPING: std::sync::LazyLock<HashMap<&'static str, &'static str>> =
-    std::sync::LazyLock::new(|| {
-        let mut m = HashMap::new();
-        m.insert("blue", "36;1");
-        m.insert("yellow", "33;1");
-        m.insert("pink", "38;5;200");
-        m.insert("green", "32;1");
-        m.insert("red", "31;1");
-        m
-    });
+use owo_colors::{AnsiColors, OwoColorize, Style};
+
+use crate::error::{Error, Result};
+
+pub const AVAILABLE_COLORS: &[&str] = &["blue", "yellow", "pink", "green", "red"];
+
+fn ansi_color(color: &str) -> AnsiColors {
+    match color {
+        "blue" => AnsiColors::Cyan,
+        "yellow" => AnsiColors::Yellow,
+        "pink" => AnsiColors::BrightMagenta,
+        "green" => AnsiColors::Green,
+        "red" => AnsiColors::Red,
+        _ => AnsiColors::Default,
+    }
+}
 
 pub fn get_color_mapping(
     items: &[String],
     excluded_colors: Option<&[&str]>,
-) -> Result<HashMap<String, String>, InputError> {
-    let colors: Vec<&str> = TEXT_COLOR_MAPPING
-        .keys()
+) -> Result<HashMap<String, String>> {
+    let colors: Vec<&str> = AVAILABLE_COLORS
+        .iter()
         .filter(|c| {
             excluded_colors
                 .map(|excluded| !excluded.contains(c))
@@ -27,7 +33,9 @@ pub fn get_color_mapping(
         .collect();
 
     if colors.is_empty() {
-        return Err(InputError::NoColorsAvailable);
+        return Err(Error::ValidationError(
+            "No colors available after applying exclusions".to_string(),
+        ));
     }
 
     let mut mapping = HashMap::new();
@@ -39,13 +47,12 @@ pub fn get_color_mapping(
 }
 
 pub fn get_colored_text(text: &str, color: &str) -> String {
-    let color_str = TEXT_COLOR_MAPPING.get(color).copied().unwrap_or("0");
-
-    format!("\x1b[{}m\x1b[1;3m{}\x1b[0m", color_str, text)
+    let style = Style::new().bold().italic().color(ansi_color(color));
+    format!("{}", text.style(style))
 }
 
 pub fn get_bolded_text(text: &str) -> String {
-    format!("\x1b[1m{}\x1b[0m", text)
+    format!("{}", text.bold())
 }
 
 pub fn print_text(text: &str, color: Option<&str>, end: &str, writer: Option<&mut dyn Write>) {
@@ -71,23 +78,6 @@ pub fn print_text(text: &str, color: Option<&str>, end: &str, writer: Option<&mu
         }
     }
 }
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum InputError {
-    NoColorsAvailable,
-}
-
-impl std::fmt::Display for InputError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InputError::NoColorsAvailable => {
-                write!(f, "No colors available after applying exclusions")
-            }
-        }
-    }
-}
-
-impl std::error::Error for InputError {}
 
 #[cfg(test)]
 mod tests {
@@ -126,16 +116,16 @@ mod tests {
     #[test]
     fn test_get_colored_text() {
         let colored = get_colored_text("test", "blue");
-        assert!(colored.contains("36;1"));
         assert!(colored.contains("test"));
+        assert!(colored.contains("\x1b["));
         assert!(colored.contains("\x1b[0m"));
     }
 
     #[test]
     fn test_get_bolded_text() {
         let bolded = get_bolded_text("test");
-        assert!(bolded.contains("\x1b[1m"));
         assert!(bolded.contains("test"));
+        assert!(bolded.contains("\x1b["));
         assert!(bolded.contains("\x1b[0m"));
     }
 

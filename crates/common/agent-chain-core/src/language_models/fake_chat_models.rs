@@ -141,10 +141,6 @@ impl BaseChatModel for FakeMessagesListChatModel {
     }
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
-#[error("FakeListChatModelError")]
-pub struct FakeListChatModelError;
-
 #[derive(Debug)]
 pub struct FakeListChatModel {
     responses: Vec<String>,

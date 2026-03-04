@@ -1,3 +1,4 @@
+use agent_chain_core::Serializable;
 use agent_chain_core::messages::{AIMessage, HumanMessage};
 use agent_chain_core::outputs::{
     ChatGeneration, ChatGenerationChunk, Generation, merge_chat_generation_chunks,
@@ -340,7 +341,11 @@ mod test_chat_generation_inheritance {
     fn test_chat_generation_get_lc_namespace() {
         assert_eq!(
             ChatGeneration::get_lc_namespace(),
-            vec!["langchain", "schema", "output"]
+            vec![
+                "langchain".to_string(),
+                "schema".to_string(),
+                "output".to_string()
+            ]
         );
     }
 

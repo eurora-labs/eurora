@@ -1,7 +1,4 @@
-use std::collections::HashMap;
-
 use async_trait::async_trait;
-use serde_json::Value;
 
 use super::Document;
 
@@ -9,16 +6,14 @@ use super::Document;
 pub trait BaseDocumentTransformer: Send + Sync {
     fn transform_documents(
         &self,
-        documents: Vec<Document>,
-        kwargs: HashMap<String, Value>,
+        documents: &[Document],
     ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>>;
 
     async fn atransform_documents(
         &self,
-        documents: Vec<Document>,
-        kwargs: HashMap<String, Value>,
+        documents: &[Document],
     ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
-        self.transform_documents(documents, kwargs)
+        self.transform_documents(documents)
     }
 }
 
@@ -32,15 +27,14 @@ mod tests {
     impl BaseDocumentTransformer for UppercaseTransformer {
         fn transform_documents(
             &self,
-            documents: Vec<Document>,
-            _kwargs: HashMap<String, Value>,
+            documents: &[Document],
         ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
             Ok(documents
-                .into_iter()
+                .iter()
                 .map(|doc| {
                     Document::builder()
                         .page_content(doc.page_content.to_uppercase())
-                        .metadata(doc.metadata)
+                        .metadata(doc.metadata.clone())
                         .build()
                 })
                 .collect())
@@ -55,9 +49,7 @@ mod tests {
             Document::builder().page_content("goodbye world").build(),
         ];
 
-        let result = transformer
-            .transform_documents(documents, HashMap::new())
-            .unwrap();
+        let result = transformer.transform_documents(&documents).unwrap();
 
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].page_content, "HELLO WORLD");
@@ -69,10 +61,7 @@ mod tests {
         let transformer = UppercaseTransformer;
         let documents = vec![Document::builder().page_content("hello world").build()];
 
-        let result = transformer
-            .atransform_documents(documents, HashMap::new())
-            .await
-            .unwrap();
+        let result = transformer.atransform_documents(&documents).await.unwrap();
 
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].page_content, "HELLO WORLD");

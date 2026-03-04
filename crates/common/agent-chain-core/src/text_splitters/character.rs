@@ -1,9 +1,7 @@
 use bon::bon;
-use std::collections::HashMap;
 
 use async_trait::async_trait;
 use fancy_regex::Regex;
-use serde_json::Value;
 
 use crate::documents::{BaseDocumentTransformer, Document};
 use crate::text_splitters::base::{merge_splits, split_text_with_regex};
@@ -557,10 +555,9 @@ impl RecursiveCharacterTextSplitter {
 impl BaseDocumentTransformer for RecursiveCharacterTextSplitter {
     fn transform_documents(
         &self,
-        documents: Vec<Document>,
-        _kwargs: HashMap<String, Value>,
+        documents: &[Document],
     ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
-        self.split_documents(&documents)
+        self.split_documents(documents)
     }
 }
 

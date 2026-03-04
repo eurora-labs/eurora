@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use tokio::sync::RwLock;
 
 use crate::error::Error;
+pub use crate::runnables::run_in_executor;
 
 #[async_trait]
 pub trait BaseStore<K, V>: Send + Sync
@@ -158,32 +159,33 @@ pub type InMemoryStore = InMemoryBaseStore<serde_json::Value>;
 
 pub type InMemoryByteStore = InMemoryBaseStore<Vec<u8>>;
 
-#[derive(Debug, Clone)]
-pub struct InvalidKeyException {
-    pub key: String,
-    pub message: String,
-}
+pub struct InvalidKeyException(Error);
 
 impl InvalidKeyException {
-    pub fn new(key: impl Into<String>, message: impl Into<String>) -> Self {
-        Self {
-            key: key.into(),
-            message: message.into(),
-        }
+    pub fn new(message: impl Into<String>) -> Self {
+        Self(Error::InvalidKey(message.into()))
+    }
+
+    pub fn into_error(self) -> Error {
+        self.0
+    }
+}
+
+impl From<InvalidKeyException> for Error {
+    fn from(exception: InvalidKeyException) -> Self {
+        exception.0
     }
 }
 
 impl std::fmt::Display for InvalidKeyException {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Invalid key '{}': {}", self.key, self.message)
+        self.0.fmt(f)
     }
 }
 
-impl std::error::Error for InvalidKeyException {}
-
-impl From<InvalidKeyException> for Error {
-    fn from(e: InvalidKeyException) -> Self {
-        Error::Other(e.to_string())
+impl std::fmt::Debug for InvalidKeyException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("InvalidKeyException").field(&self.0).finish()
     }
 }
 
@@ -279,10 +281,8 @@ mod tests {
 
     #[test]
     fn test_invalid_key_exception() {
-        let exception = InvalidKeyException::new("bad/key", "keys cannot contain slashes");
-        assert_eq!(
-            exception.to_string(),
-            "Invalid key 'bad/key': keys cannot contain slashes"
-        );
+        let exception = InvalidKeyException::new("bad key characters");
+        let error: Error = exception.into();
+        assert!(error.to_string().contains("Invalid key"));
     }
 }

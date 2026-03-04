@@ -4,6 +4,7 @@ use std::path::Path;
 use bon::bon;
 
 use super::graph::{Graph, LabelsDict};
+use crate::error::{Error, Result};
 
 #[derive(Debug, Clone)]
 pub struct PngDrawer {
@@ -146,26 +147,13 @@ impl PngDrawer {
         (first, last)
     }
 
-    pub fn draw(
-        &self,
-        _graph: &Graph,
-        _output_path: Option<&Path>,
-    ) -> Result<Option<Vec<u8>>, PngDrawError> {
-        Err(PngDrawError::MissingDependency(
+    pub fn draw(&self, _graph: &Graph, _output_path: Option<&Path>) -> Result<Option<Vec<u8>>> {
+        Err(Error::NotImplemented(
             "PNG rendering requires a graphviz binding (not yet available). \
              Use draw_mermaid() for text-based graph rendering."
                 .to_string(),
         ))
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum PngDrawError {
-    #[error("{0}")]
-    MissingDependency(String),
-
-    #[error("I/O error: {0}")]
-    Io(#[from] std::io::Error),
 }
 
 mod itertools_substitute {

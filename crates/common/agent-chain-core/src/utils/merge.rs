@@ -1,5 +1,10 @@
 use serde_json::{Map, Value};
 
+use super::usage::json_type_name;
+
+const SKIP_CONCAT_WHEN_PREFIXED: &[(&str, &str)] = &[("index", "lc_")];
+const SKIP_CONCAT_WHEN_EQUAL: &[&str] = &["id", "output_version", "model_provider"];
+
 pub fn merge_dicts(left: Value, others: Vec<Value>) -> Result<Value, MergeError> {
     let mut merged = match left {
         Value::Object(map) => map,
@@ -26,27 +31,28 @@ pub fn merge_dicts(left: Value, others: Vec<Value>) -> Result<Value, MergeError>
                 if !values_same_type(left_v, &right_v) {
                     return Err(MergeError::TypeMismatch {
                         key: right_k.clone(),
-                        left_type: type_name(left_v),
-                        right_type: type_name(&right_v),
+                        left_type: json_type_name(left_v).to_string(),
+                        right_type: json_type_name(&right_v).to_string(),
                     });
                 }
 
-                match (left_v.clone(), right_v.clone()) {
+                let left_v = left_v.clone();
+                match (left_v, right_v) {
                     (Value::String(left_str), Value::String(right_str)) => {
-                        if (right_k == "index" && left_str.starts_with("lc_"))
-                            || ((right_k == "id"
-                                || right_k == "output_version"
-                                || right_k == "model_provider")
-                                && left_str == right_str)
-                        {
+                        let skip = SKIP_CONCAT_WHEN_PREFIXED
+                            .iter()
+                            .any(|(k, prefix)| right_k == *k && left_str.starts_with(prefix))
+                            || (SKIP_CONCAT_WHEN_EQUAL.contains(&right_k.as_str())
+                                && left_str == right_str);
+                        if skip {
                             continue;
                         }
                         merged.insert(right_k, Value::String(left_str + &right_str));
                     }
-                    (Value::Object(_), Value::Object(_)) => {
+                    (Value::Object(_), Value::Object(right_map)) => {
                         let merged_nested = merge_dicts(
                             merged.remove(&right_k).expect("key exists in merged"),
-                            vec![right_v],
+                            vec![Value::Object(right_map)],
                         )?;
                         merged.insert(right_k, merged_nested);
                     }
@@ -72,13 +78,13 @@ pub fn merge_dicts(left: Value, others: Vec<Value>) -> Result<Value, MergeError>
                             merged.insert(right_k, Value::Number(num));
                         }
                     }
-                    (left_v, right_v) if left_v == right_v => {
+                    (ref left_v, ref right_v) if left_v == right_v => {
                         continue;
                     }
                     (left_v, _) => {
                         return Err(MergeError::UnsupportedType {
                             key: right_k,
-                            value_type: type_name(&left_v),
+                            value_type: json_type_name(&left_v).to_string(),
                         });
                     }
                 }
@@ -210,8 +216,8 @@ pub fn merge_obj(left: Value, right: Value) -> Result<Value, MergeError> {
     if !values_same_type(&left, &right) {
         return Err(MergeError::TypeMismatch {
             key: String::new(),
-            left_type: type_name(&left),
-            right_type: type_name(&right),
+            left_type: json_type_name(&left).to_string(),
+            right_type: json_type_name(&right).to_string(),
         });
     }
 
@@ -224,67 +230,36 @@ pub fn merge_obj(left: Value, right: Value) -> Result<Value, MergeError> {
         }
         (l, r) if l == r => Ok(left),
         _ => Err(MergeError::UnableToMerge {
-            left_type: type_name(&left),
-            right_type: type_name(&right),
+            left_type: json_type_name(&left).to_string(),
+            right_type: json_type_name(&right).to_string(),
         }),
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum MergeError {
+    #[error("Value is not a JSON object")]
     NotAnObject,
+    #[error(
+        "additional_kwargs[\"{key}\"] already exists in this message, but with a different type. Left type: {left_type}, Right type: {right_type}"
+    )]
     TypeMismatch {
         key: String,
         left_type: String,
         right_type: String,
     },
-    UnsupportedType {
-        key: String,
-        value_type: String,
-    },
+    #[error(
+        "Additional kwargs key {key} already exists in left dict and value has unsupported type {value_type}"
+    )]
+    UnsupportedType { key: String, value_type: String },
+    #[error(
+        "Unable to merge {left_type} and {right_type}. Both must be of type str, dict, or list, or else be two equal objects"
+    )]
     UnableToMerge {
         left_type: String,
         right_type: String,
     },
 }
-
-impl std::fmt::Display for MergeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MergeError::NotAnObject => write!(f, "Value is not a JSON object"),
-            MergeError::TypeMismatch {
-                key,
-                left_type,
-                right_type,
-            } => {
-                write!(
-                    f,
-                    "additional_kwargs[\"{}\"] already exists in this message, but with a different type. Left type: {}, Right type: {}",
-                    key, left_type, right_type
-                )
-            }
-            MergeError::UnsupportedType { key, value_type } => {
-                write!(
-                    f,
-                    "Additional kwargs key {} already exists in left dict and value has unsupported type {}",
-                    key, value_type
-                )
-            }
-            MergeError::UnableToMerge {
-                left_type,
-                right_type,
-            } => {
-                write!(
-                    f,
-                    "Unable to merge {} and {}. Both must be of type str, dict, or list, or else be two equal objects",
-                    left_type, right_type
-                )
-            }
-        }
-    }
-}
-
-impl std::error::Error for MergeError {}
 
 fn values_same_type(left: &Value, right: &Value) -> bool {
     matches!(
@@ -296,18 +271,6 @@ fn values_same_type(left: &Value, right: &Value) -> bool {
             | (Value::Array(_), Value::Array(_))
             | (Value::Object(_), Value::Object(_))
     )
-}
-
-fn type_name(value: &Value) -> String {
-    match value {
-        Value::Null => "null",
-        Value::Bool(_) => "bool",
-        Value::Number(_) => "number",
-        Value::String(_) => "string",
-        Value::Array(_) => "array",
-        Value::Object(_) => "object",
-    }
-    .to_string()
 }
 
 #[cfg(test)]

@@ -4,7 +4,6 @@ use std::fmt::Debug;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use super::base::OutputParserError;
 use crate::error::{Error, Result};
 use crate::messages::AIMessage;
 use crate::messages::{InvalidToolCall, invalid_tool_call};
@@ -44,21 +43,21 @@ pub fn parse_tool_call(
     } else {
         let args_str = arguments
             .and_then(|a| a.as_str())
-            .ok_or_else(|| OutputParserError::new("Tool call arguments is not a string"))?;
+            .ok_or_else(|| Error::output_parser_simple("Tool call arguments is not a string"))?;
 
         if strict {
             serde_json::from_str::<Value>(args_str).map_err(|e| {
-                Error::from(OutputParserError::new(format!(
+                Error::output_parser_simple(format!(
                     "Function {} arguments:\n\n{}\n\nare not valid JSON. Received JSONDecodeError {}",
                     name, args_str, e
-                )))
+                ))
             })?
         } else {
             parse_partial_json(args_str, false).map_err(|e| {
-                Error::from(OutputParserError::new(format!(
+                Error::output_parser_simple(format!(
                     "Function {} arguments:\n\n{}\n\nare not valid JSON. Received JSONDecodeError {:?}",
                     name, args_str, e
-                )))
+                ))
             })?
         }
     };
@@ -121,7 +120,7 @@ pub fn parse_tool_calls(
     }
 
     if !exceptions.is_empty() {
-        return Err(OutputParserError::new(exceptions.join("\n\n")).into());
+        return Err(Error::output_parser_simple(exceptions.join("\n\n")));
     }
 
     Ok(final_tools)
@@ -151,7 +150,9 @@ impl JsonOutputToolsParser {
 
     pub fn parse_result(&self, result: &[ChatGeneration], partial: bool) -> Result<Value> {
         let generation = result.first().ok_or_else(|| {
-            OutputParserError::new("This output parser can only be used with a chat generation.")
+            Error::output_parser_simple(
+                "This output parser can only be used with a chat generation.",
+            )
         })?;
 
         let message = &generation.message;
@@ -250,7 +251,9 @@ impl JsonOutputKeyToolsParser {
 
     pub fn parse_result(&self, result: &[ChatGeneration], partial: bool) -> Result<Value> {
         let generation = result.first().ok_or_else(|| {
-            OutputParserError::new("This output parser can only be used with a chat generation.")
+            Error::output_parser_simple(
+                "This output parser can only be used with a chat generation.",
+            )
         })?;
 
         let message = &generation.message;
@@ -398,10 +401,7 @@ impl PydanticToolsParser {
             tool_name,
             std::sync::Arc::new(|args: &Value| {
                 let deserialized: T = serde_json::from_value(args.clone()).map_err(|e| {
-                    Error::from(OutputParserError::new(format!(
-                        "Tool arguments validation failed: {}",
-                        e
-                    )))
+                    Error::output_parser_simple(format!("Tool arguments validation failed: {}", e))
                 })?;
                 serde_json::to_value(deserialized)
                     .map_err(|e| Error::Other(format!("Failed to serialize: {}", e)))
@@ -424,7 +424,7 @@ impl PydanticToolsParser {
 
         let items: Vec<&Value> = match json_results.as_array() {
             Some(arr) => arr.iter().collect(),
-            None => return Err(OutputParserError::new("Expected array of tool calls").into()),
+            None => return Err(Error::output_parser_simple("Expected array of tool calls")),
         };
 
         let mut pydantic_objects = Vec::new();
@@ -437,15 +437,16 @@ impl PydanticToolsParser {
                 Some(Value::Object(_)) => args,
                 Some(_) if partial => continue,
                 Some(other) => {
-                    return Err(OutputParserError::new(format!(
+                    return Err(Error::output_parser_simple(format!(
                         "Tool arguments must be specified as a dict, received: {}",
                         other
-                    ))
-                    .into());
+                    )));
                 }
                 None if partial => continue,
                 None => {
-                    return Err(OutputParserError::new("Tool call missing 'args' field").into());
+                    return Err(Error::output_parser_simple(
+                        "Tool call missing 'args' field",
+                    ));
                 }
             };
 
@@ -462,9 +463,10 @@ impl PydanticToolsParser {
             } else if partial {
                 continue;
             } else {
-                return Err(
-                    OutputParserError::new(format!("Unknown tool type: {}", type_name)).into(),
-                );
+                return Err(Error::output_parser_simple(format!(
+                    "Unknown tool type: {}",
+                    type_name
+                )));
             }
         }
 
