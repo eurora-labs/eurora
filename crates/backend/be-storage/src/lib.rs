@@ -1,22 +1,3 @@
-//! Storage backend implementation using OpenDAL.
-//!
-//! This module provides a unified storage interface that can use either
-//! local filesystem or S3 as the backend, configurable via environment variables.
-//!
-//! ## Environment Variables
-//!
-//! - `ASSET_STORAGE_BACKEND`: Either "fs" (default) or "s3"
-//!
-//! ### For filesystem backend:
-//! - `ASSET_STORAGE_FS_ROOT`: Root directory for file storage (default: "./assets")
-//!
-//! ### For S3 backend:
-//! - `ASSET_STORAGE_S3_BUCKET`: S3 bucket name (required)
-//! - `ASSET_STORAGE_S3_REGION`: S3 region (required)
-//! - `ASSET_STORAGE_S3_ENDPOINT`: S3 endpoint URL (optional, for S3-compatible services)
-//! - `ASSET_STORAGE_S3_ACCESS_KEY_ID`: AWS access key ID (optional, uses default credentials if not set)
-//! - `ASSET_STORAGE_S3_SECRET_ACCESS_KEY`: AWS secret access key (optional)
-
 mod error;
 
 pub use error::{StorageError, StorageResult};
@@ -52,12 +33,6 @@ impl Default for StorageConfig {
 }
 
 impl StorageConfig {
-    /// Create configuration from environment variables
-    ///
-    /// # Errors
-    ///
-    /// Returns `StorageError::MissingEnvVar` if required environment variables
-    /// are not set when using S3 backend.
     pub fn from_env() -> StorageResult<Self> {
         let backend = std::env::var("ASSET_STORAGE_BACKEND")
             .unwrap_or_else(|_| "fs".to_string())
@@ -104,11 +79,6 @@ pub struct StorageService {
 
 #[bon]
 impl StorageService {
-    /// Create a new storage service with the given configuration.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the storage operator cannot be created.
     #[builder]
     pub fn new(
         config: StorageConfig,
@@ -123,8 +93,6 @@ impl StorageService {
         })
     }
 
-    /// Set the encryption key at runtime. Subsequent uploads will be encrypted
-    /// and downloads of encrypted assets will be decrypted.
     #[cfg(feature = "encryption")]
     pub fn set_encryption_key(&self, key: be_encrypt::MainKey) {
         *self
@@ -133,11 +101,6 @@ impl StorageService {
             .expect("encryption key lock poisoned") = Some(key);
     }
 
-    /// Create a new storage service using environment variables for configuration
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the configuration is invalid or the operator cannot be created.
     pub fn from_env() -> StorageResult<Self> {
         let config = StorageConfig::from_env()?;
         tracing::info!(
@@ -228,11 +191,6 @@ impl StorageService {
         }
     }
 
-    /// Upload content to storage and return the path
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the upload operation fails.
     pub async fn upload(
         &self,
         user_id: &Uuid,
@@ -284,11 +242,6 @@ impl StorageService {
         Ok(path)
     }
 
-    /// Download content from storage
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the download operation fails or the asset is not found.
     pub async fn download(&self, path: &str) -> StorageResult<Vec<u8>> {
         tracing::debug!("Downloading asset from path: {}", path);
 
@@ -339,11 +292,6 @@ impl StorageService {
         Ok(bytes)
     }
 
-    /// Delete content from storage
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the delete operation fails.
     pub async fn delete(&self, path: &str) -> StorageResult<()> {
         tracing::debug!("Deleting asset at path: {}", path);
 
@@ -354,11 +302,6 @@ impl StorageService {
         Ok(())
     }
 
-    /// Check if content exists at path
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the stat operation fails (other than NotFound).
     pub async fn exists(&self, path: &str) -> StorageResult<bool> {
         match self.operator.stat(path).await {
             Ok(_) => Ok(true),

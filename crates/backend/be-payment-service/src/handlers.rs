@@ -282,8 +282,6 @@ pub async fn handle_webhook(
     let event_id = event.id.as_str();
     let event_type = event.type_.as_str();
 
-    // Begin a transaction so the idempotency claim and business logic are atomic.
-    // If processing fails, the claim is rolled back and Stripe will retry.
     let mut tx = state
         .db
         .pool
@@ -325,8 +323,6 @@ pub async fn handle_webhook(
                     .and_then(|d| d.email.clone())
             });
 
-            // The webhook payload only includes the subscription ID (not expanded).
-            // Fetch the full subscription object from Stripe so we have items/prices.
             let fetched_sub = match &subscription_id {
                 Some(sub_id) => {
                     match stripe_billing::subscription::RetrieveSubscription::new(sub_id.as_str())

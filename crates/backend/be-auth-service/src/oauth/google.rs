@@ -12,8 +12,6 @@ use serde::{Deserialize, Serialize};
 
 use super::OAuthError;
 
-/// Concrete client type: the generic params are opaque endpoint-state markers
-/// from `from_provider_metadata` + `set_redirect_uri`.
 type DiscoveredClient = CoreClient<
     EndpointSet,
     EndpointNotSet,
@@ -124,7 +122,6 @@ impl GoogleOAuthClient {
         authorize_url.to_string()
     }
 
-    /// `nonce` verifies the ID token's nonce claim (OIDC replay protection).
     pub async fn exchange_code(
         &self,
         code: &str,
