@@ -24,7 +24,7 @@ pub use base::{
     raise_for_status_with_text, secret_from_env, validate_xor_args,
 };
 
-pub use aiter::{ABatchIterator, AClosing, TeePeer, abatch_iterate, atee};
+pub use aiter::{AClosing, TeePeer, abatch_iterate, atee};
 pub use formatting::{FORMATTER, StrictFormatter, format_string};
 pub use input::{get_bolded_text, get_color_mapping, get_colored_text, print_text};
 pub use iter::{batch_iterate, tee};
