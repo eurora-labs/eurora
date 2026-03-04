@@ -1,8 +1,5 @@
-use std::collections::HashMap;
-
 use async_trait::async_trait;
 use regex::Regex;
-use serde_json::Value;
 
 use crate::documents::{BaseDocumentTransformer, Document};
 use crate::text_splitters::character::RecursiveCharacterTextSplitter;
@@ -84,10 +81,9 @@ impl JSFrameworkTextSplitter {
 impl BaseDocumentTransformer for JSFrameworkTextSplitter {
     fn transform_documents(
         &self,
-        documents: Vec<Document>,
-        _kwargs: HashMap<String, Value>,
+        documents: &[Document],
     ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
-        self.split_documents(&documents)
+        self.split_documents(documents)
     }
 }
 

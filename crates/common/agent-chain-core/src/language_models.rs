@@ -28,11 +28,11 @@ pub use llms::{
     get_run_ids_list, resolve_cache, save_llm, update_cache,
 };
 
-pub use fake::{FakeListLLM, FakeListLLMError, FakeStreamingListLLM};
+pub use fake::{FakeListLLM, FakeStreamingListLLM};
 
 pub use fake_chat_models::{
-    FakeChatModel, FakeListChatModel, FakeListChatModelError, FakeMessagesListChatModel,
-    GenericFakeChatModel, ParrotFakeChatModel,
+    FakeChatModel, FakeListChatModel, FakeMessagesListChatModel, GenericFakeChatModel,
+    ParrotFakeChatModel,
 };
 
 pub use model_profile::{ModelProfile, ModelProfileRegistry};

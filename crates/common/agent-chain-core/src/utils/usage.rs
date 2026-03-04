@@ -1,38 +1,19 @@
 use serde_json::{Map, Value};
 use std::collections::HashSet;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum UsageError {
+    #[error("max_depth={0} exceeded, unable to combine dicts")]
     MaxDepthExceeded(usize),
+    #[error(
+        "Unknown value types for key '{key}': {left_type} and {right_type}. Only dict and int values are supported."
+    )]
     TypeMismatch {
         key: String,
         left_type: String,
         right_type: String,
     },
 }
-
-impl std::fmt::Display for UsageError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            UsageError::MaxDepthExceeded(depth) => {
-                write!(f, "max_depth={} exceeded, unable to combine dicts", depth)
-            }
-            UsageError::TypeMismatch {
-                key,
-                left_type,
-                right_type,
-            } => {
-                write!(
-                    f,
-                    "Unknown value types for key \'{}\': {} and {}. Only dict and int values are supported.",
-                    key, left_type, right_type
-                )
-            }
-        }
-    }
-}
-
-impl std::error::Error for UsageError {}
 
 pub fn dict_int_op<F>(
     left: &Value,
@@ -113,7 +94,7 @@ where
     Ok(Value::Object(combined))
 }
 
-fn json_type_name(value: &Value) -> &'static str {
+pub(crate) fn json_type_name(value: &Value) -> &'static str {
     match value {
         Value::Null => "null",
         Value::Bool(_) => "bool",

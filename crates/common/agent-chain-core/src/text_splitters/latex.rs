@@ -1,7 +1,4 @@
-use std::collections::HashMap;
-
 use async_trait::async_trait;
-use serde_json::Value;
 
 use crate::documents::{BaseDocumentTransformer, Document};
 use crate::text_splitters::character::RecursiveCharacterTextSplitter;
@@ -29,10 +26,9 @@ impl LatexTextSplitter {
 impl BaseDocumentTransformer for LatexTextSplitter {
     fn transform_documents(
         &self,
-        documents: Vec<Document>,
-        kwargs: HashMap<String, Value>,
+        documents: &[Document],
     ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
-        self.inner.transform_documents(documents, kwargs)
+        self.inner.transform_documents(documents)
     }
 }
 

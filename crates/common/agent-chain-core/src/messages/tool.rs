@@ -566,3 +566,5 @@ impl Serializable for ToolMessage {
         ]
     }
 }
+
+submit_constructor!(ToolMessage);

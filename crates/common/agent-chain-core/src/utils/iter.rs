@@ -163,15 +163,6 @@ impl<T: Clone> Iterator for TeeChild<T> {
     }
 }
 
-pub fn safetee<T, I>(iterable: I, n: usize) -> Tee<T>
-where
-    T: Clone,
-    I: IntoIterator<Item = T>,
-    <I as IntoIterator>::IntoIter: Send + 'static,
-{
-    tee(iterable, n)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

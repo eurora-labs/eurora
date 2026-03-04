@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::error::{Error, Result};
-use crate::load::{Serializable, Serialized, SerializedConstructorData};
+use crate::load::{Serializable, Serialized, SerializedConstructor};
 
 use super::base::{DynRunnable, Runnable, RunnableSerializable};
 use super::config::{ConfigOrList, RunnableConfig, get_config_list};
@@ -312,13 +312,7 @@ where
             serde_json::json!(self.runnables.keys().collect::<Vec<_>>()),
         );
 
-        Serialized::Constructor(SerializedConstructorData {
-            lc: 1,
-            id: Self::get_lc_namespace(),
-            kwargs,
-            name: None,
-            graph: None,
-        })
+        Serialized::Constructor(SerializedConstructor::new(Self::lc_id(), kwargs))
     }
 }
 

@@ -60,21 +60,21 @@ pub fn parse_partial_json(s: &str, strict: bool) -> Result<Value, JsonParseError
 
     stack.reverse();
 
-    while !new_chars.is_empty() {
-        let mut attempt = new_chars.join("");
-        for closer in &stack {
-            attempt.push(*closer);
-        }
+    let closing: String = stack.iter().collect();
+    let mut attempt = new_chars.join("");
 
-        match serde_json::from_str::<Value>(&attempt) {
+    while !attempt.is_empty() {
+        let full = format!("{}{}", attempt, closing);
+
+        match serde_json::from_str::<Value>(&full) {
             Ok(value) => {
-                if strict && contains_control_chars(&attempt) {
+                if strict && contains_control_chars(&full) {
                     return Err(JsonParseError::ControlCharacters);
                 }
                 return Ok(value);
             }
             Err(_) => {
-                new_chars.pop();
+                attempt.pop();
             }
         }
     }
@@ -170,32 +170,19 @@ pub fn parse_and_check_json_markdown(
     Ok(json_obj)
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum JsonParseError {
+    #[error("Failed to parse JSON: {0}")]
     ParseError(String),
+    #[error("Mismatched bracket in JSON")]
     MismatchedBracket,
+    #[error("Control characters found in JSON")]
     ControlCharacters,
+    #[error("Expected JSON object (dict), but got: {0}")]
     NotAnObject(String),
+    #[error("Missing expected key: {0}")]
     MissingKey(String),
 }
-
-impl std::fmt::Display for JsonParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            JsonParseError::ParseError(msg) => write!(f, "Failed to parse JSON: {}", msg),
-            JsonParseError::MismatchedBracket => write!(f, "Mismatched bracket in JSON"),
-            JsonParseError::ControlCharacters => write!(f, "Control characters found in JSON"),
-            JsonParseError::NotAnObject(got) => {
-                write!(f, "Expected JSON object (dict), but got: {}", got)
-            }
-            JsonParseError::MissingKey(key) => {
-                write!(f, "Missing expected key: {}", key)
-            }
-        }
-    }
-}
-
-impl std::error::Error for JsonParseError {}
 
 #[cfg(test)]
 mod tests {

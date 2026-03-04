@@ -1,31 +1,21 @@
 use serde::Serialize;
 use serde_json::Value;
 
-use super::serializable::{Serializable, to_json_not_implemented_value};
+use super::serializable::Serializable;
 
 pub fn dumps<T: Serializable + Serialize>(obj: &T, pretty: bool) -> crate::Result<String> {
     let serialized = obj.to_json();
-    let result = if pretty {
-        serde_json::to_string_pretty(&serialized)
+    let json = if pretty {
+        serde_json::to_string_pretty(&serialized)?
     } else {
-        serde_json::to_string(&serialized)
+        serde_json::to_string(&serialized)?
     };
-    match result {
-        Ok(json) => Ok(json),
-        Err(_) => {
-            let fallback = to_json_not_implemented_value(obj.lc_type_name(), None);
-            if pretty {
-                serde_json::to_string_pretty(&fallback).map_err(crate::Error::from)
-            } else {
-                serde_json::to_string(&fallback).map_err(crate::Error::from)
-            }
-        }
-    }
+    Ok(json)
 }
 
 pub fn dumpd<T: Serializable + Serialize>(obj: &T) -> crate::Result<Value> {
-    let json_string = dumps(obj, false)?;
-    serde_json::from_str(&json_string).map_err(crate::Error::from)
+    let serialized = obj.to_json();
+    Ok(serde_json::to_value(&serialized)?)
 }
 
 #[cfg(test)]

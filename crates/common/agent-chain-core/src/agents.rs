@@ -192,6 +192,9 @@ pub fn convert_agent_action_message_log_observation_to_messages(
     )]
 }
 
+submit_constructor!(AgentAction);
+submit_constructor!(AgentFinish);
+
 #[cfg(test)]
 mod tests {
     use super::*;
