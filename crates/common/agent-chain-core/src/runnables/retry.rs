@@ -1,7 +1,9 @@
 use std::fmt::Debug;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use async_trait::async_trait;
+use backon::{BackoffBuilder, BlockingRetryable, Retryable};
 use bon::bon;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -161,6 +163,47 @@ impl RunnableRetryConfig {
     }
 }
 
+#[derive(Clone)]
+struct RetryBackoffBuilder {
+    params: ExponentialJitterParams,
+    max_retries: usize,
+    wait: bool,
+}
+
+impl BackoffBuilder for RetryBackoffBuilder {
+    type Backoff = RetryBackoff;
+    fn build(self) -> Self::Backoff {
+        RetryBackoff {
+            params: self.params,
+            max_retries: self.max_retries,
+            current: 0,
+            wait: self.wait,
+        }
+    }
+}
+
+struct RetryBackoff {
+    params: ExponentialJitterParams,
+    max_retries: usize,
+    current: usize,
+    wait: bool,
+}
+
+impl Iterator for RetryBackoff {
+    type Item = Duration;
+    fn next(&mut self) -> Option<Duration> {
+        if self.current >= self.max_retries {
+            return None;
+        }
+        self.current += 1;
+        Some(if self.wait {
+            self.params.calculate_wait(self.current)
+        } else {
+            Duration::ZERO
+        })
+    }
+}
+
 pub struct RunnableRetry<R>
 where
     R: Runnable,
@@ -213,6 +256,14 @@ where
 
     fn should_retry(&self, error: &Error) -> bool {
         self.config.retry_predicate.should_retry(error)
+    }
+
+    fn backoff_builder(&self) -> RetryBackoffBuilder {
+        RetryBackoffBuilder {
+            params: self.get_jitter_params(),
+            max_retries: self.config.max_attempt_number.saturating_sub(1),
+            wait: self.config.wait_exponential_jitter,
+        }
     }
 
     fn calculate_wait(&self, attempt: usize) -> Duration {
@@ -290,37 +341,27 @@ where
             .maybe_run_id(config.run_id)
             .call();
 
-        let mut last_error = None;
-
-        for attempt in 1..=self.config.max_attempt_number {
-            let retry_state = RetryCallState::new(attempt);
+        let attempt = AtomicUsize::new(0);
+        let result = (|| {
+            let n = attempt.fetch_add(1, Ordering::SeqCst) + 1;
+            let retry_state = RetryCallState::new(n);
             let patched_config = Self::patch_config_for_retry(&config, &run_manager, &retry_state);
+            self.bound.invoke(input.clone(), Some(patched_config))
+        })
+        .retry(self.backoff_builder())
+        .when(|e: &Error| self.should_retry(e))
+        .call();
 
-            match self.bound.invoke(input.clone(), Some(patched_config)) {
-                Ok(output) => {
-                    run_manager.on_chain_end(&std::collections::HashMap::new());
-                    return Ok(output);
-                }
-                Err(e) => {
-                    if !self.should_retry(&e) || attempt == self.config.max_attempt_number {
-                        run_manager.on_chain_error(&e);
-                        return Err(e);
-                    }
-                    last_error = Some(e);
-
-                    if self.config.wait_exponential_jitter
-                        && attempt < self.config.max_attempt_number
-                    {
-                        let wait = self.calculate_wait(attempt);
-                        std::thread::sleep(wait);
-                    }
-                }
+        match result {
+            Ok(output) => {
+                run_manager.on_chain_end(&std::collections::HashMap::new());
+                Ok(output)
+            }
+            Err(e) => {
+                run_manager.on_chain_error(&e);
+                Err(e)
             }
         }
-
-        let error = last_error.unwrap_or_else(|| Error::other("Max retries exceeded"));
-        run_manager.on_chain_error(&error);
-        Err(error)
     }
 
     async fn ainvoke(
@@ -341,41 +382,28 @@ where
             .maybe_run_id(config.run_id)
             .call();
 
-        let mut last_error = None;
-
-        for attempt in 1..=self.config.max_attempt_number {
-            let retry_state = RetryCallState::new(attempt);
+        let attempt = AtomicUsize::new(0);
+        let result = (|| {
+            let n = attempt.fetch_add(1, Ordering::SeqCst) + 1;
+            let retry_state = RetryCallState::new(n);
             let patched_config = Self::patch_config_for_retry(&config, &run_manager, &retry_state);
+            let input = input.clone();
+            async move { self.bound.ainvoke(input, Some(patched_config)).await }
+        })
+        .retry(self.backoff_builder())
+        .when(|e: &Error| self.should_retry(e))
+        .await;
 
-            match self
-                .bound
-                .ainvoke(input.clone(), Some(patched_config))
-                .await
-            {
-                Ok(output) => {
-                    run_manager.on_chain_end(&std::collections::HashMap::new());
-                    return Ok(output);
-                }
-                Err(e) => {
-                    if !self.should_retry(&e) || attempt == self.config.max_attempt_number {
-                        run_manager.on_chain_error(&e);
-                        return Err(e);
-                    }
-                    last_error = Some(e);
-
-                    if self.config.wait_exponential_jitter
-                        && attempt < self.config.max_attempt_number
-                    {
-                        let wait = self.calculate_wait(attempt);
-                        tokio::time::sleep(wait).await;
-                    }
-                }
+        match result {
+            Ok(output) => {
+                run_manager.on_chain_end(&std::collections::HashMap::new());
+                Ok(output)
+            }
+            Err(e) => {
+                run_manager.on_chain_error(&e);
+                Err(e)
             }
         }
-
-        let error = last_error.unwrap_or_else(|| Error::other("Max retries exceeded"));
-        run_manager.on_chain_error(&error);
-        Err(error)
     }
 
     fn batch(

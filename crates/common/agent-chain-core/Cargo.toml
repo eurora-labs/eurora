@@ -8,6 +8,7 @@ license = "MIT"
 [dependencies]
 async-stream = { workspace = true }
 async-trait = { workspace = true }
+backon = "1"
 base64 = { workspace = true }
 mime_guess = "2"
 blake2 = { workspace = true }
