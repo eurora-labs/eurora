@@ -1564,14 +1564,37 @@ impl ChatOpenAI {
                                             }
                                         }
                                         "response.output_item.added" => {
-                                            if let Some(ref item) = event.item && item.get("type").and_then(|t| t.as_str()) == Some("function_call") && let (Some(call_id), Some(name)) = (
-                                                        item.get("call_id").and_then(|v| v.as_str()),
-                                                        item.get("name").and_then(|v| v.as_str()),
-                                                    ) {
-                                                        let entry = tool_call_acc
-                                                            .entry(call_id.to_string())
-                                                            .or_insert_with(|| (call_id.to_string(), String::new(), String::new()));
-                                                        entry.1 = name.to_string();
+                                            if let Some(ref item) = event.item {
+                                                match item.get("type").and_then(|t| t.as_str()) {
+                                                    Some("function_call") => {
+                                                        if let (Some(call_id), Some(name)) = (
+                                                            item.get("call_id").and_then(|v| v.as_str()),
+                                                            item.get("name").and_then(|v| v.as_str()),
+                                                        ) {
+                                                            let entry = tool_call_acc
+                                                                .entry(call_id.to_string())
+                                                                .or_insert_with(|| (call_id.to_string(), String::new(), String::new()));
+                                                            entry.1 = name.to_string();
+                                                        }
+                                                    }
+                                                    Some("reasoning") => {
+                                                        // Reasoning item started — no text content yet
+                                                    }
+                                                    _ => {}
+                                                }
+                                            }
+                                        }
+                                        "response.reasoning_summary_text.delta" => {
+                                            if let Some(delta) = event.delta {
+                                                let mut kwargs = HashMap::new();
+                                                kwargs.insert(
+                                                    "reasoning_content".to_string(),
+                                                    serde_json::Value::String(delta),
+                                                );
+                                                yield Ok(ChatChunk::builder()
+                                                    .content("")
+                                                    .additional_kwargs(kwargs)
+                                                    .build());
                                             }
                                         }
                                         "response.completed" | "response.incomplete" => {
@@ -1767,6 +1790,7 @@ impl ChatOpenAI {
         let mut tool_calls = Vec::new();
         let mut invalid_tool_calls = Vec::new();
         let mut tool_outputs: Vec<serde_json::Value> = Vec::new();
+        let mut reasoning_content: Option<serde_json::Value> = None;
 
         for output in &response.output {
             match output {
@@ -1803,6 +1827,25 @@ impl ChatOpenAI {
                         );
                     }
                 },
+                ResponsesOutput::Reasoning { id, summary } => {
+                    let mut value = serde_json::json!({"type": "reasoning"});
+                    if let Some(id) = id {
+                        value["id"] = serde_json::json!(id);
+                    }
+                    if let Some(summaries) = summary {
+                        let arr: Vec<serde_json::Value> = summaries
+                            .iter()
+                            .map(|s| {
+                                serde_json::json!({
+                                    "type": s.summary_type.as_deref().unwrap_or("summary_text"),
+                                    "text": s.text.as_deref().unwrap_or(""),
+                                })
+                            })
+                            .collect();
+                        value["summary"] = serde_json::Value::Array(arr);
+                    }
+                    reasoning_content = Some(value);
+                }
                 ResponsesOutput::WebSearchCall {}
                 | ResponsesOutput::FileSearchCall {}
                 | ResponsesOutput::CodeInterpreterCall {}
@@ -1817,6 +1860,9 @@ impl ChatOpenAI {
         }
 
         let mut additional_kwargs = HashMap::new();
+        if let Some(reasoning) = reasoning_content {
+            additional_kwargs.insert("reasoning".to_string(), reasoning);
+        }
         if !tool_outputs.is_empty() {
             additional_kwargs.insert(
                 "tool_outputs".to_string(),
@@ -1851,6 +1897,7 @@ impl ChatOpenAI {
             .invalid_tool_calls(invalid_tool_calls)
             .maybe_usage_metadata(usage_metadata)
             .response_metadata(response_metadata)
+            .additional_kwargs(additional_kwargs)
             .build();
 
         let generation = ChatGeneration::builder()
@@ -2629,6 +2676,7 @@ impl BaseChatModel for ChatOpenAI {
                             .tool_calls(chat_chunk.tool_calls.clone())
                             .maybe_usage_metadata(chat_chunk.usage_metadata.clone())
                             .response_metadata(response_metadata)
+                            .additional_kwargs(chat_chunk.additional_kwargs.clone())
                             .build();
                         yield Ok(ChatGenerationChunk::builder().message(message.into()).build());
                     }
@@ -3125,8 +3173,20 @@ enum ResponsesOutput {
     ComputerCall {},
     #[serde(rename = "image_generation_call")]
     ImageGenerationCall {},
+    #[serde(rename = "reasoning")]
+    Reasoning {
+        id: Option<String>,
+        summary: Option<Vec<ReasoningSummary>>,
+    },
     #[serde(other)]
     Other,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct ReasoningSummary {
+    #[serde(rename = "type")]
+    summary_type: Option<String>,
+    text: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -3170,6 +3230,8 @@ struct ResponsesStreamEvent {
     call_id: Option<String>,
     item_id: Option<String>,
     item: Option<serde_json::Value>,
+    #[serde(rename = "summary_index")]
+    _summary_index: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]

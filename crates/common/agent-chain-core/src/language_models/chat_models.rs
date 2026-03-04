@@ -68,6 +68,8 @@ pub struct ChatChunk {
     pub tool_calls: Vec<crate::messages::ToolCall>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub response_metadata: HashMap<String, serde_json::Value>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub additional_kwargs: HashMap<String, serde_json::Value>,
 }
 
 #[bon::bon]
@@ -80,6 +82,7 @@ impl ChatChunk {
         #[builder(into)] finish_reason: Option<String>,
         #[builder(default)] tool_calls: Vec<crate::messages::ToolCall>,
         #[builder(default)] response_metadata: HashMap<String, serde_json::Value>,
+        #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
     ) -> Self {
         Self {
             content,
@@ -88,6 +91,7 @@ impl ChatChunk {
             finish_reason,
             tool_calls,
             response_metadata,
+            additional_kwargs,
         }
     }
 
