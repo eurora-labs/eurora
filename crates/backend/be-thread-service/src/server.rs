@@ -9,13 +9,14 @@ use be_local_settings::{OllamaConfig, OpenAIConfig, ProviderSettings, SettingsRe
 use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
+use proto_gen::agent_chain::ProtoChatStreamResponse;
 pub use proto_gen::thread::proto_thread_service_server::{
     ProtoThreadService, ProtoThreadServiceServer,
 };
 use proto_gen::thread::{
     AddHiddenHumanMessageRequest, AddHiddenHumanMessageResponse, AddHumanMessageRequest,
     AddHumanMessageResponse, AddSystemMessageRequest, AddSystemMessageResponse, ChatStreamRequest,
-    ChatStreamResponse, CreateThreadRequest, CreateThreadResponse, GenerateThreadTitleRequest,
+    CreateThreadRequest, CreateThreadResponse, GenerateThreadTitleRequest,
     GenerateThreadTitleResponse, GetMessagesRequest, GetMessagesResponse, GetThreadResponse,
     ListThreadsRequest, ListThreadsResponse, Thread,
 };
@@ -66,10 +67,12 @@ fn build_openai(
     web_search: bool,
 ) -> Box<dyn BaseChatModel + Send + Sync> {
     let model = model_override.unwrap_or(&config.model);
+    let is_openai_native = config.base_url.as_str().contains("openai.com");
     let mut provider = ChatOpenAI::new(model)
         .api_key(config.api_key.expose_secret())
-        .api_base(config.base_url.as_str());
-    if web_search {
+        .api_base(config.base_url.as_str())
+        .with_responses_api(is_openai_native);
+    if web_search && is_openai_native {
         provider = provider.with_builtin_tools(vec![BuiltinTool::WebSearch]);
     }
     Box::new(provider)
@@ -120,8 +123,10 @@ fn build_env_fallback() -> Option<Providers> {
     } else {
         let chat_model =
             ChatOpenAI::new(std::env::var("NEBUL_MODEL").expect("Nebul model should be set"))
+                .reasoning_effort("medium")
                 .api_base(BASE_NEBUL_URL)
-                .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"));
+                .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"))
+                .with_responses_api(false);
         let bound = chat_model
             .bind_tools(
                 &firecrawl_tools()
@@ -240,7 +245,7 @@ fn datetime_to_timestamp(dt: DateTime<Utc>) -> Timestamp {
 }
 
 type ChatResult<T> = Result<Response<T>, Status>;
-type ChatStreamResult = Pin<Box<dyn Stream<Item = Result<ChatStreamResponse, Status>> + Send>>;
+type ChatStreamResult = Pin<Box<dyn Stream<Item = Result<ProtoChatStreamResponse, Status>> + Send>>;
 
 #[tonic::async_trait]
 impl ProtoThreadService for ThreadService {
@@ -548,13 +553,9 @@ impl ProtoThreadService for ThreadService {
                             let content = chunk.content.to_string();
                             if !content.is_empty() {
                                 round_content.push_str(&content);
-                                yield ChatStreamResponse {
-                                    chunk: content,
-                                    is_final: false,
-                                };
                             }
                             if !chunk.tool_calls.is_empty() {
-                                tool_calls.extend(chunk.tool_calls);
+                                tool_calls.extend(chunk.tool_calls.clone());
                             }
                             if let Some(ref usage) = chunk.usage_metadata {
                                 total_input_tokens += usage.input_tokens;
@@ -567,6 +568,10 @@ impl ProtoThreadService for ThreadService {
                                     total_cache_read_tokens += details.cache_read.unwrap_or(0);
                                 }
                             }
+                            yield ProtoChatStreamResponse {
+                                chunk: Some(chunk.into()),
+                                is_final: false,
+                            };
                         }
                         Err(e) => {
                             Err(Status::internal(e.to_string()))?;
@@ -605,8 +610,8 @@ impl ProtoThreadService for ThreadService {
                 }
             }
 
-            yield ChatStreamResponse {
-                chunk: String::new(),
+            yield ProtoChatStreamResponse {
+                chunk: None,
                 is_final: true,
             };
 

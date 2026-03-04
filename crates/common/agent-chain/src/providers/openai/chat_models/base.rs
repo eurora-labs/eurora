@@ -745,6 +745,7 @@ impl ChatOpenAI {
         if !self.builtin_tools.is_empty()
             || self.reasoning.is_some()
             || self.verbosity.is_some()
+            || self.reasoning_effort.is_some()
             || self.truncation.is_some()
             || self.include.is_some()
             || self.use_previous_response_id
@@ -1389,7 +1390,7 @@ impl ChatOpenAI {
         if let Some(ref reasoning) = self.reasoning {
             payload["reasoning"] = serde_json::json!(reasoning);
         } else if let Some(ref effort) = self.reasoning_effort {
-            payload["reasoning"] = serde_json::json!({"effort": effort});
+            payload["reasoning"] = serde_json::json!({"effort": effort, "summary": "auto"});
         }
 
         if let Some(ref verbosity) = self.verbosity {
@@ -2336,6 +2337,17 @@ impl ChatOpenAI {
                                     match serde_json::from_str::<OpenAIStreamChunk>(data) {
                                         Ok(chunk) => {
                                             if let Some(choice) = chunk.choices.first() {
+                                                if let Some(ref reasoning) = choice.delta.reasoning_content {
+                                                    let mut kwargs = std::collections::HashMap::new();
+                                                    kwargs.insert(
+                                                        "reasoning_content".to_string(),
+                                                        serde_json::Value::String(reasoning.clone()),
+                                                    );
+                                                    yield Ok(ChatChunk::builder()
+                                                        .content("")
+                                                        .additional_kwargs(kwargs)
+                                                        .build());
+                                                }
                                                 if let Some(ref content) = choice.delta.content {
                                                     yield Ok(ChatChunk::builder().content(content.clone()).build());
                                                 }
@@ -3121,6 +3133,8 @@ struct OpenAIStreamChoice {
 #[derive(Debug, Deserialize)]
 struct OpenAIDelta {
     content: Option<String>,
+    #[serde(alias = "reasoning")]
+    reasoning_content: Option<String>,
     tool_calls: Option<Vec<OpenAIStreamToolCall>>,
 }
 
