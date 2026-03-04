@@ -15,7 +15,7 @@ fn test_openai_model_param() {
     let llm = ChatOpenAI::new("foo");
     assert_eq!(llm.model_name(), "foo");
 
-    let llm = ChatOpenAI::new("foo").max_tokens(10);
+    let llm = ChatOpenAI::builder().model("foo").max_tokens(10u32).build();
     assert_eq!(llm.model_name(), "foo");
 }
 
@@ -34,13 +34,19 @@ fn test_openai_o1_temperature() {
 /// Ported from `test_init_o1`.
 #[test]
 fn test_init_o1() {
-    let _llm = ChatOpenAI::new("o1").reasoning_effort("medium");
+    let _llm = ChatOpenAI::builder()
+        .model("o1")
+        .reasoning_effort("medium")
+        .build();
 }
 
 /// Ported from `test_init_minimal_reasoning_effort`.
 #[test]
 fn test_init_minimal_reasoning_effort() {
-    let _llm = ChatOpenAI::new("gpt-5").reasoning_effort("minimal");
+    let _llm = ChatOpenAI::builder()
+        .model("gpt-5")
+        .reasoning_effort("minimal")
+        .build();
 }
 
 /// Ported from `test__get_request_payload` (basic case).
@@ -64,9 +70,11 @@ fn test_get_request_payload_basic() {
 /// Ported from `test_minimal_reasoning_effort_payload` (non-responses API).
 #[test]
 fn test_minimal_reasoning_effort_payload_chat_completions() {
-    let llm = ChatOpenAI::new("gpt-5")
+    let llm = ChatOpenAI::builder()
+        .model("gpt-5")
         .reasoning_effort("minimal")
-        .max_tokens(100);
+        .max_tokens(100u32)
+        .build();
 
     let messages = vec![BaseMessage::Human(
         HumanMessage::builder().content("hello").build(),
@@ -80,10 +88,12 @@ fn test_minimal_reasoning_effort_payload_chat_completions() {
 /// Ported from `test_minimal_reasoning_effort_payload` (responses API).
 #[test]
 fn test_minimal_reasoning_effort_payload_responses_api() {
-    let llm = ChatOpenAI::new("gpt-5")
+    let llm = ChatOpenAI::builder()
+        .model("gpt-5")
         .reasoning_effort("minimal")
-        .max_tokens(100)
-        .with_responses_api(true);
+        .max_tokens(100u32)
+        .use_responses_api(true)
+        .build();
 
     let messages = vec![BaseMessage::Human(
         HumanMessage::builder().content("hello").build(),
@@ -98,16 +108,21 @@ fn test_minimal_reasoning_effort_payload_responses_api() {
 /// Ported from `test_output_version_compat`.
 #[test]
 fn test_output_version_compat() {
-    let llm = ChatOpenAI::new("gpt-5").output_version("responses/v1");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-5")
+        .output_version("responses/v1")
+        .build();
     assert!(llm.should_use_responses_api(None));
 }
 
 /// Ported from `test_verbosity_parameter_payload`.
 #[test]
 fn test_verbosity_parameter_payload() {
-    let llm = ChatOpenAI::new("gpt-5")
+    let llm = ChatOpenAI::builder()
+        .model("gpt-5")
         .verbosity("high")
-        .with_responses_api(true);
+        .use_responses_api(true)
+        .build();
 
     let messages = vec![BaseMessage::Human(
         HumanMessage::builder().content("hello").build(),
@@ -121,7 +136,10 @@ fn test_verbosity_parameter_payload() {
 /// Ported from `test_service_tier`.
 #[test]
 fn test_service_tier() {
-    let llm = ChatOpenAI::new("o4-mini").service_tier("flex");
+    let llm = ChatOpenAI::builder()
+        .model("o4-mini")
+        .service_tier("flex")
+        .build();
     let messages = vec![BaseMessage::Human(
         HumanMessage::builder().content("Hello").build(),
     )];
@@ -136,7 +154,10 @@ fn test_extra_body_parameter() {
     extra.insert("ttl".to_string(), serde_json::json!(300));
     extra.insert("custom_param".to_string(), serde_json::json!("test_value"));
 
-    let llm = ChatOpenAI::new("gpt-4o-mini").extra_body(extra);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .extra_body(extra)
+        .build();
 
     let messages = vec![BaseMessage::Human(
         HumanMessage::builder().content("Hello").build(),
@@ -159,9 +180,11 @@ fn test_extra_body_with_model_kwargs() {
         serde_json::json!("test_value"),
     );
 
-    let llm = ChatOpenAI::new("gpt-4o-mini")
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .temperature(0.5)
-        .extra_body(extra);
+        .extra_body(extra)
+        .build();
     let messages = vec![BaseMessage::Human(
         HumanMessage::builder().content("Hello").build(),
     )];
@@ -215,10 +238,16 @@ fn test_model_prefers_responses_api() {
 /// Tests that should_use_responses_api returns true for various conditions.
 #[test]
 fn test_should_use_responses_api_conditions() {
-    let llm = ChatOpenAI::new("gpt-4o").with_responses_api(true);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o")
+        .use_responses_api(true)
+        .build();
     assert!(llm.should_use_responses_api(None));
 
-    let llm = ChatOpenAI::new("gpt-4o").with_responses_api(false);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o")
+        .use_responses_api(false)
+        .build();
     assert!(!llm.should_use_responses_api(None));
 
     assert!(
@@ -229,19 +258,34 @@ fn test_should_use_responses_api_conditions() {
 
     let mut reasoning = HashMap::new();
     reasoning.insert("effort".to_string(), serde_json::json!("high"));
-    let llm = ChatOpenAI::new("gpt-4o").reasoning(reasoning);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o")
+        .reasoning(reasoning)
+        .build();
     assert!(llm.should_use_responses_api(None));
 
-    let llm = ChatOpenAI::new("gpt-4o").verbosity("high");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o")
+        .verbosity("high")
+        .build();
     assert!(llm.should_use_responses_api(None));
 
-    let llm = ChatOpenAI::new("gpt-4o").truncation("auto");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o")
+        .truncation("auto")
+        .build();
     assert!(llm.should_use_responses_api(None));
 
-    let llm = ChatOpenAI::new("gpt-4o").include(vec!["reasoning".to_string()]);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o")
+        .include(vec!["reasoning".to_string()])
+        .build();
     assert!(llm.should_use_responses_api(None));
 
-    let llm = ChatOpenAI::new("gpt-4o").output_version("responses/v1");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o")
+        .output_version("responses/v1")
+        .build();
     assert!(llm.should_use_responses_api(None));
 
     let llm = ChatOpenAI::new("gpt-4o");
@@ -251,7 +295,11 @@ fn test_should_use_responses_api_conditions() {
 /// Tests get_ls_params returns correct values.
 #[test]
 fn test_get_ls_params() {
-    let llm = ChatOpenAI::new("gpt-4o").temperature(0.7).max_tokens(100);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o")
+        .temperature(0.7)
+        .max_tokens(100u32)
+        .build();
 
     let params = llm.get_ls_params(Some(&["stop1".to_string()]));
 
@@ -422,9 +470,10 @@ fn test_format_messages_for_responses_api_multiple_types() {
 /// Tests all builder methods work without panicking.
 #[test]
 fn test_builder_methods() {
-    let _llm = ChatOpenAI::new("gpt-4o")
+    let _llm = ChatOpenAI::builder()
+        .model("gpt-4o")
         .temperature(0.7)
-        .max_tokens(1024)
+        .max_tokens(1024u32)
         .api_base("https://custom.api.com/v1")
         .organization("org-123")
         .top_p(0.9)
@@ -445,7 +494,8 @@ fn test_builder_methods() {
         .truncation("auto")
         .use_previous_response_id(true)
         .output_version("v1")
-        .with_responses_api(true);
+        .use_responses_api(true)
+        .build();
 }
 
 /// Tests llm_type returns correct value.

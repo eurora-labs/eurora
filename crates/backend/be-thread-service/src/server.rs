@@ -68,10 +68,12 @@ fn build_openai(
 ) -> Box<dyn BaseChatModel + Send + Sync> {
     let model = model_override.unwrap_or(&config.model);
     let is_openai_native = config.base_url.as_str().contains("openai.com");
-    let mut provider = ChatOpenAI::new(model)
+    let mut provider = ChatOpenAI::builder()
+        .model(model)
         .api_key(config.api_key.expose_secret())
         .api_base(config.base_url.as_str())
-        .with_responses_api(is_openai_native);
+        .use_responses_api(is_openai_native)
+        .build();
     if web_search && is_openai_native {
         provider = provider.with_builtin_tools(vec![BuiltinTool::WebSearch]);
     }
@@ -121,12 +123,13 @@ fn build_env_fallback() -> Option<Providers> {
             tools: HashMap::new(),
         })
     } else {
-        let chat_model =
-            ChatOpenAI::new(std::env::var("NEBUL_MODEL").expect("Nebul model should be set"))
-                .reasoning_effort("medium")
-                .api_base(BASE_NEBUL_URL)
-                .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"))
-                .with_responses_api(false);
+        let chat_model = ChatOpenAI::builder()
+            .model(std::env::var("NEBUL_MODEL").expect("Nebul model should be set"))
+            .reasoning_effort("medium")
+            .api_base(BASE_NEBUL_URL)
+            .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"))
+            .use_responses_api(false)
+            .build();
         let bound = chat_model
             .bind_tools(
                 &firecrawl_tools()
@@ -140,11 +143,11 @@ fn build_env_fallback() -> Option<Providers> {
             Arc::from(bound as Box<dyn BaseChatModel + Send + Sync>);
 
         let title = Arc::new(
-            ChatOpenAI::new(
-                std::env::var("NEBUL_TITLE_MODEL").expect("Nebul title model should be set"),
-            )
-            .api_base(BASE_NEBUL_URL)
-            .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set")),
+            ChatOpenAI::builder()
+                .model(std::env::var("NEBUL_TITLE_MODEL").expect("Nebul title model should be set"))
+                .api_base(BASE_NEBUL_URL)
+                .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"))
+                .build(),
         );
 
         Some(Providers {
