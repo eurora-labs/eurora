@@ -67,11 +67,10 @@ impl Serializable for StrOutputParser {
     where
         Self: Sized + serde::Serialize,
     {
-        SerializedConstructor::builder()
-            .id(Self::lc_id())
-            .kwargs(std::collections::HashMap::new())
-            .build()
-            .into()
+        Serialized::Constructor(SerializedConstructor::new(
+            Self::lc_id(),
+            std::collections::HashMap::new(),
+        ))
     }
 }
 
@@ -95,6 +94,8 @@ impl<'de> serde::Deserialize<'de> for StrOutputParser {
         Ok(Self::new())
     }
 }
+
+submit_constructor!(StrOutputParser);
 
 #[cfg(test)]
 mod tests {

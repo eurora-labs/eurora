@@ -3,7 +3,13 @@ use std::env;
 
 pub fn env_var_is_set(env_var: &str) -> bool {
     match env::var(env_var) {
-        Ok(value) => !value.is_empty() && value != "0" && value != "false" && value != "False",
+        Ok(value) => {
+            !value.is_empty()
+                && !value.eq_ignore_ascii_case("false")
+                && value != "0"
+                && !value.eq_ignore_ascii_case("no")
+                && !value.eq_ignore_ascii_case("off")
+        }
         Err(_) => false,
     }
 }
@@ -43,28 +49,15 @@ pub fn get_from_env(key: &str, env_key: &str, default: Option<&str>) -> Result<S
     })
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum EnvError {
+    #[error(
+        "Did not find {key}, please add an environment variable `{env_key}` which contains it, or pass `{key}` as a named parameter."
+    )]
     NotFound { key: String, env_key: String },
+    #[error("{0}")]
     Custom(String),
 }
-
-impl std::fmt::Display for EnvError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            EnvError::NotFound { key, env_key } => {
-                write!(
-                    f,
-                    "Did not find {}, please add an environment variable `{}` which contains it, or pass `{}` as a named parameter.",
-                    key, env_key, key
-                )
-            }
-            EnvError::Custom(msg) => write!(f, "{}", msg),
-        }
-    }
-}
-
-impl std::error::Error for EnvError {}
 
 #[cfg(test)]
 mod tests {

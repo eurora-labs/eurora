@@ -814,14 +814,20 @@ pub trait Runnable: Send + Sync + Debug {
     where
         Self: Sized,
     {
-        RunnableBinding::new(self, kwargs, None)
+        RunnableBinding::builder()
+            .bound(self)
+            .kwargs(kwargs)
+            .build()
     }
 
     fn with_config(self, config: RunnableConfig) -> RunnableBinding<Self>
     where
         Self: Sized,
     {
-        RunnableBinding::new(self, HashMap::new(), Some(config))
+        RunnableBinding::builder()
+            .bound(self)
+            .config(config)
+            .build()
     }
 
     fn with_retry(
@@ -961,7 +967,10 @@ pub trait Runnable: Send + Sync + Debug {
             }
         });
 
-        RunnableBinding::with_config_factories(self, HashMap::new(), None, vec![factory])
+        RunnableBinding::builder()
+            .bound(self)
+            .config_factories(vec![factory])
+            .build()
     }
 
     fn with_alisteners(
@@ -1080,7 +1089,10 @@ pub trait Runnable: Send + Sync + Debug {
             }
         });
 
-        RunnableBinding::with_config_factories(self, HashMap::new(), None, vec![factory])
+        RunnableBinding::builder()
+            .bound(self)
+            .config_factories(vec![factory])
+            .build()
     }
 
     fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
@@ -2224,24 +2236,17 @@ where
     }
 }
 
+#[bon::bon]
 impl<R> RunnableBinding<R>
 where
     R: Runnable,
 {
-    pub fn new(bound: R, kwargs: HashMap<String, Value>, config: Option<RunnableConfig>) -> Self {
-        Self {
-            bound,
-            kwargs,
-            config,
-            config_factories: Vec::new(),
-        }
-    }
-
-    pub fn with_config_factories(
+    #[builder]
+    pub fn new(
         bound: R,
-        kwargs: HashMap<String, Value>,
+        #[builder(default)] kwargs: HashMap<String, Value>,
         config: Option<RunnableConfig>,
-        config_factories: Vec<ConfigFactory>,
+        #[builder(default)] config_factories: Vec<ConfigFactory>,
     ) -> Self {
         Self {
             bound,
@@ -2671,7 +2676,10 @@ mod tests {
         let config = RunnableConfig::builder()
             .tags(vec!["test".to_string()])
             .build();
-        let bound = RunnableBinding::new(runnable, HashMap::new(), Some(config));
+        let bound = RunnableBinding::builder()
+            .bound(runnable)
+            .config(config)
+            .build();
 
         let result = bound.invoke(1, None).unwrap();
         assert_eq!(result, 2);

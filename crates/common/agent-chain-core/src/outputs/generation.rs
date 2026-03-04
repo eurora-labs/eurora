@@ -4,6 +4,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::ops::Add;
 
+use crate::load::Serializable;
 use crate::utils::merge::merge_dicts;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -31,13 +32,15 @@ impl Generation {
             generation_type: "Generation".to_string(),
         }
     }
+}
 
-    pub fn is_lc_serializable() -> bool {
+impl Serializable for Generation {
+    fn is_lc_serializable() -> bool {
         true
     }
 
-    pub fn get_lc_namespace() -> Vec<&'static str> {
-        vec!["langchain", "schema", "output"]
+    fn get_lc_namespace() -> Vec<String> {
+        vec!["langchain".into(), "schema".into(), "output".into()]
     }
 }
 
@@ -71,6 +74,16 @@ impl GenerationChunk {
             generation_info,
             generation_type: "Generation".to_string(),
         }
+    }
+}
+
+impl Serializable for GenerationChunk {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec!["langchain".into(), "schema".into(), "output".into()]
     }
 }
 

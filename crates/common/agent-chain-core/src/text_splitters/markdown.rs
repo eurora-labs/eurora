@@ -31,10 +31,9 @@ impl MarkdownTextSplitter {
 impl BaseDocumentTransformer for MarkdownTextSplitter {
     fn transform_documents(
         &self,
-        documents: Vec<Document>,
-        kwargs: HashMap<String, Value>,
+        documents: &[Document],
     ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
-        self.inner.transform_documents(documents, kwargs)
+        self.inner.transform_documents(documents)
     }
 }
 

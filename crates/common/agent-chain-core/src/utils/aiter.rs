@@ -1,24 +1,9 @@
 use std::collections::VecDeque;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
 use futures::stream::Stream;
-use tokio::sync::Mutex;
-
-pub struct NoLock;
-
-impl NoLock {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for NoLock {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 struct TeeShared<T> {
     source: Pin<Box<dyn Stream<Item = T> + Send>>,
@@ -57,12 +42,9 @@ where
 
     fn poll_next(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
-        let mut guard = match this.shared.try_lock() {
+        let mut guard = match this.shared.lock() {
             Ok(guard) => guard,
-            Err(_) => {
-                context.waker().wake_by_ref();
-                return Poll::Pending;
-            }
+            Err(poisoned) => poisoned.into_inner(),
         };
 
         if let Some(item) = guard.buffers[this.index].pop_front() {
@@ -108,12 +90,6 @@ impl<S> AClosing<S> {
 
     pub fn into_inner(mut self) -> Option<S> {
         self.stream.take()
-    }
-}
-
-impl<S> Drop for AClosing<S> {
-    fn drop(&mut self) {
-        self.stream.take();
     }
 }
 

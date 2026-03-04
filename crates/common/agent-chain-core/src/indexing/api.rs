@@ -170,12 +170,11 @@ pub fn get_document_with_hash(document: &Document, key_encoder: &KeyEncoder) -> 
         }
     };
 
-    Ok(Document {
-        id: Some(hash),
-        page_content: document.page_content.clone(),
-        metadata: document.metadata.clone(),
-        type_: document.type_.clone(),
-    })
+    Ok(Document::builder()
+        .page_content(document.page_content.clone())
+        .id(hash)
+        .metadata(document.metadata.clone())
+        .build())
 }
 
 fn deduplicate_in_order(documents: Vec<Document>) -> Vec<Document> {

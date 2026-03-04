@@ -29,7 +29,7 @@ use uuid::Uuid;
 
 use crate::converters::convert_db_message_to_base_message;
 use crate::error::ThreadServiceError;
-use crate::tools::firecrawl_search_tool;
+use crate::tools::firecrawl_tools;
 
 const BASE_NEBUL_URL: &str = "https://api.inference.nebul.io/v1";
 
@@ -93,9 +93,10 @@ fn build_title_provider_from(settings: &ProviderSettings) -> Box<dyn BaseChatMod
 }
 
 fn build_tool_map() -> HashMap<String, Arc<dyn BaseTool>> {
-    let tool = firecrawl_search_tool();
-    let name = tool.name().to_string();
-    HashMap::from([(name, tool)])
+    firecrawl_tools()
+        .into_iter()
+        .map(|tool| (tool.name().to_string(), tool))
+        .collect()
 }
 
 fn build_env_fallback() -> Option<Providers> {
@@ -122,7 +123,13 @@ fn build_env_fallback() -> Option<Providers> {
                 .api_base(BASE_NEBUL_URL)
                 .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"));
         let bound = chat_model
-            .bind_tools(&[ToolLike::Tool(firecrawl_search_tool())], None)
+            .bind_tools(
+                &firecrawl_tools()
+                    .into_iter()
+                    .map(ToolLike::Tool)
+                    .collect::<Vec<_>>(),
+                None,
+            )
             .expect("Failed to bind firecrawl_search tool");
         let chat: Arc<dyn BaseChatModel + Send + Sync> =
             Arc::from(bound as Box<dyn BaseChatModel + Send + Sync>);

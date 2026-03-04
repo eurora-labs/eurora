@@ -97,7 +97,7 @@
 								{#snippet child({ props })}
 									<a href={item.url} {...props}>
 										<CreditCardIcon />
-										<span>Billing & Invoices</span>
+										<span>Billing &amp; Invoices</span>
 									</a>
 								{/snippet}
 							</Sidebar.MenuButton>

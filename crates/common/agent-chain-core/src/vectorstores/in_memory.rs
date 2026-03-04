@@ -95,12 +95,11 @@ impl InMemoryVectorStore {
 
         if let Some(filter_fn) = filter {
             docs.retain(|entry| {
-                let doc = Document {
-                    id: Some(entry.id.clone()),
-                    page_content: entry.text.clone(),
-                    metadata: entry.metadata.clone(),
-                    type_: "Document".to_string(),
-                };
+                let doc = Document::builder()
+                    .page_content(entry.text.clone())
+                    .id(entry.id.clone())
+                    .metadata(entry.metadata.clone())
+                    .build();
                 filter_fn(&doc)
             });
         }
@@ -121,12 +120,11 @@ impl InMemoryVectorStore {
             .into_iter()
             .map(|(idx, score)| {
                 let entry = docs[idx];
-                let doc = Document {
-                    id: Some(entry.id.clone()),
-                    page_content: entry.text.clone(),
-                    metadata: entry.metadata.clone(),
-                    type_: "Document".to_string(),
-                };
+                let doc = Document::builder()
+                    .page_content(entry.text.clone())
+                    .id(entry.id.clone())
+                    .metadata(entry.metadata.clone())
+                    .build();
                 (doc, score, entry.vector.clone())
             })
             .collect();
@@ -221,12 +219,13 @@ impl VectorStore for InMemoryVectorStore {
         let mut documents = Vec::new();
         for id in ids {
             if let Some(entry) = store.get(id) {
-                documents.push(Document {
-                    id: Some(entry.id.clone()),
-                    page_content: entry.text.clone(),
-                    metadata: entry.metadata.clone(),
-                    type_: "Document".to_string(),
-                });
+                documents.push(
+                    Document::builder()
+                        .page_content(entry.text.clone())
+                        .id(entry.id.clone())
+                        .metadata(entry.metadata.clone())
+                        .build(),
+                );
             }
         }
         Ok(documents)

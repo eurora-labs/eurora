@@ -1,4 +1,5 @@
 pub mod base;
+pub use crate::runnables::run_in_executor;
 pub mod blob_loaders;
 
 pub use base::{BaseBlobParser, BaseLoader};
