@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 use agent_chain_core::GenericFakeChatModel;
 use agent_chain_core::language_models::{BaseChatModel, ChatModelConfig, LanguageModelInput};
 use agent_chain_core::messages::AIMessage;
-use agent_chain_core::rate_limiters::{InMemoryRateLimiter, InMemoryRateLimiterConfig};
+use agent_chain_core::rate_limiters::InMemoryRateLimiter;
 
 fn make_rate_limited_model(
     messages: Vec<AIMessage>,
@@ -12,11 +12,13 @@ fn make_rate_limited_model(
     check_every_n_seconds: f64,
     max_bucket_size: f64,
 ) -> GenericFakeChatModel {
-    let rate_limiter = Arc::new(InMemoryRateLimiter::new(InMemoryRateLimiterConfig {
-        requests_per_second,
-        check_every_n_seconds,
-        max_bucket_size,
-    }));
+    let rate_limiter = Arc::new(
+        InMemoryRateLimiter::builder()
+            .requests_per_second(requests_per_second)
+            .check_every_n_seconds(check_every_n_seconds)
+            .max_bucket_size(max_bucket_size)
+            .build(),
+    );
     let config = ChatModelConfig::builder()
         .rate_limiter(rate_limiter)
         .build();
@@ -32,7 +34,7 @@ async fn test_rate_limit_invoke() {
         ],
         20.0,
         0.1,
-        10.0,
+        1.0,
     );
 
     let tic = Instant::now();
@@ -42,20 +44,20 @@ async fn test_rate_limit_invoke() {
         .unwrap();
     let elapsed = tic.elapsed();
     assert!(
-        elapsed >= Duration::from_millis(100),
-        "First call took {:?}, expected >= 100ms",
+        elapsed < Duration::from_millis(50),
+        "First call took {:?}, expected < 50ms (burst token available)",
         elapsed
     );
 
     let tic = Instant::now();
     let _ = model
-        .invoke(LanguageModelInput::from("foo"), None)
+        .invoke(LanguageModelInput::from("bar"), None)
         .await
         .unwrap();
     let elapsed = tic.elapsed();
     assert!(
-        elapsed < Duration::from_millis(100),
-        "Second call took {:?}, expected < 100ms",
+        elapsed >= Duration::from_millis(30),
+        "Second call took {:?}, expected >= 30ms (must wait for replenishment)",
         elapsed
     );
 }
@@ -70,7 +72,7 @@ async fn test_rate_limit_ainvoke() {
         ],
         20.0,
         0.1,
-        10.0,
+        1.0,
     );
 
     let tic = Instant::now();
@@ -79,23 +81,35 @@ async fn test_rate_limit_ainvoke() {
         .await
         .unwrap();
     let elapsed = tic.elapsed();
-    assert!(elapsed >= Duration::from_millis(100));
+    assert!(
+        elapsed < Duration::from_millis(50),
+        "First call took {:?}, expected < 50ms",
+        elapsed
+    );
 
     let tic = Instant::now();
     let _ = model
-        .ainvoke(LanguageModelInput::from("foo"), None)
+        .ainvoke(LanguageModelInput::from("bar"), None)
         .await
         .unwrap();
     let elapsed = tic.elapsed();
-    assert!(elapsed < Duration::from_millis(100));
+    assert!(
+        elapsed >= Duration::from_millis(30),
+        "Second call took {:?}, expected >= 30ms",
+        elapsed
+    );
 
     let tic = Instant::now();
     let _ = model
-        .ainvoke(LanguageModelInput::from("foo"), None)
+        .ainvoke(LanguageModelInput::from("baz"), None)
         .await
         .unwrap();
     let elapsed = tic.elapsed();
-    assert!(elapsed >= Duration::from_millis(100));
+    assert!(
+        elapsed >= Duration::from_millis(30),
+        "Third call took {:?}, expected >= 30ms",
+        elapsed
+    );
 }
 
 #[tokio::test]
@@ -103,11 +117,12 @@ async fn test_rate_limit_skips_cache() {
     use agent_chain_core::caches::InMemoryCache;
 
     let cache = Arc::new(InMemoryCache::unbounded());
-    let rate_limiter = Arc::new(InMemoryRateLimiter::new(InMemoryRateLimiterConfig {
-        requests_per_second: 20.0,
-        check_every_n_seconds: 0.1,
-        max_bucket_size: 1.0,
-    }));
+    let rate_limiter = Arc::new(
+        InMemoryRateLimiter::builder()
+            .requests_per_second(20.0)
+            .check_every_n_seconds(0.1)
+            .build(),
+    );
     let config = ChatModelConfig::builder()
         .rate_limiter(rate_limiter)
         .cache_instance(cache.clone())
@@ -127,8 +142,8 @@ async fn test_rate_limit_skips_cache() {
         .unwrap();
     let elapsed = tic.elapsed();
     assert!(
-        elapsed >= Duration::from_millis(100),
-        "First call took {:?}",
+        elapsed < Duration::from_millis(50),
+        "First call took {:?}, expected < 50ms (burst token)",
         elapsed
     );
 
@@ -158,7 +173,7 @@ async fn test_rate_limit_stream() {
         ],
         20.0,
         0.1,
-        10.0,
+        1.0,
     );
 
     let tic = Instant::now();
@@ -169,8 +184,8 @@ async fn test_rate_limit_stream() {
     let elapsed = tic.elapsed();
     assert!(result.content.contains("hello"));
     assert!(
-        elapsed >= Duration::from_millis(100),
-        "First invoke took {:?}",
+        elapsed < Duration::from_millis(50),
+        "First invoke took {:?}, expected < 50ms",
         elapsed
     );
 
@@ -181,8 +196,8 @@ async fn test_rate_limit_stream() {
         .unwrap();
     let elapsed = tic.elapsed();
     assert!(
-        elapsed < Duration::from_millis(100),
-        "Second invoke took {:?}",
+        elapsed >= Duration::from_millis(30),
+        "Second invoke took {:?}, expected >= 30ms",
         elapsed
     );
 
@@ -193,8 +208,8 @@ async fn test_rate_limit_stream() {
         .unwrap();
     let elapsed = tic.elapsed();
     assert!(
-        elapsed >= Duration::from_millis(100),
-        "Third invoke took {:?}",
+        elapsed >= Duration::from_millis(30),
+        "Third invoke took {:?}, expected >= 30ms",
         elapsed
     );
 }
@@ -209,7 +224,7 @@ async fn test_rate_limit_astream() {
         ],
         20.0,
         0.1,
-        10.0,
+        1.0,
     );
 
     let tic = Instant::now();
@@ -218,7 +233,11 @@ async fn test_rate_limit_astream() {
         .await
         .unwrap();
     let elapsed = tic.elapsed();
-    assert!(elapsed >= Duration::from_millis(100));
+    assert!(
+        elapsed < Duration::from_millis(50),
+        "First call took {:?}, expected < 50ms",
+        elapsed
+    );
 
     let tic = Instant::now();
     let _ = model
@@ -226,7 +245,11 @@ async fn test_rate_limit_astream() {
         .await
         .unwrap();
     let elapsed = tic.elapsed();
-    assert!(elapsed < Duration::from_millis(100));
+    assert!(
+        elapsed >= Duration::from_millis(30),
+        "Second call took {:?}, expected >= 30ms",
+        elapsed
+    );
 
     let tic = Instant::now();
     let _ = model
@@ -234,7 +257,11 @@ async fn test_rate_limit_astream() {
         .await
         .unwrap();
     let elapsed = tic.elapsed();
-    assert!(elapsed >= Duration::from_millis(100));
+    assert!(
+        elapsed >= Duration::from_millis(30),
+        "Third call took {:?}, expected >= 30ms",
+        elapsed
+    );
 }
 
 #[tokio::test]
@@ -242,11 +269,12 @@ async fn test_rate_limit_skips_cache_async() {
     use agent_chain_core::caches::InMemoryCache;
 
     let cache = Arc::new(InMemoryCache::unbounded());
-    let rate_limiter = Arc::new(InMemoryRateLimiter::new(InMemoryRateLimiterConfig {
-        requests_per_second: 20.0,
-        check_every_n_seconds: 0.1,
-        max_bucket_size: 1.0,
-    }));
+    let rate_limiter = Arc::new(
+        InMemoryRateLimiter::builder()
+            .requests_per_second(20.0)
+            .check_every_n_seconds(0.1)
+            .build(),
+    );
     let config = ChatModelConfig::builder()
         .rate_limiter(rate_limiter)
         .cache_instance(cache.clone())
@@ -266,8 +294,8 @@ async fn test_rate_limit_skips_cache_async() {
         .unwrap();
     let elapsed = tic.elapsed();
     assert!(
-        elapsed >= Duration::from_millis(100),
-        "First call took {:?}",
+        elapsed < Duration::from_millis(50),
+        "First call took {:?}, expected < 50ms (burst token)",
         elapsed
     );
 

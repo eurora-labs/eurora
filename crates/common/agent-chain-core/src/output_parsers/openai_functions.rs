@@ -88,9 +88,11 @@ impl JsonOutputFunctionsParser {
     }
 
     pub fn diff(&self, prev: &Value, next: &Value) -> Vec<Value> {
-        let mut ops = Vec::new();
-        compute_json_diff("", prev, next, &mut ops);
-        ops
+        let patch = json_patch::diff(prev, next);
+        match serde_json::to_value(&patch) {
+            Ok(Value::Array(ops)) => ops,
+            _ => vec![],
+        }
     }
 
     pub fn parse_result_with_partial(
@@ -373,83 +375,6 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + 'static>
                 self.attr_name
             ))
         })
-    }
-}
-
-fn compute_json_diff(path: &str, prev: &Value, next: &Value, ops: &mut Vec<Value>) {
-    if prev == next {
-        return;
-    }
-
-    match (prev, next) {
-        (Value::Object(prev_map), Value::Object(next_map)) => {
-            for (key, next_val) in next_map {
-                let child_path = if path.is_empty() {
-                    format!("/{}", key)
-                } else {
-                    format!("{}/{}", path, key)
-                };
-
-                match prev_map.get(key) {
-                    Some(prev_val) => {
-                        compute_json_diff(&child_path, prev_val, next_val, ops);
-                    }
-                    None => {
-                        ops.push(serde_json::json!({
-                            "op": "add",
-                            "path": child_path,
-                            "value": next_val,
-                        }));
-                    }
-                }
-            }
-
-            for key in prev_map.keys() {
-                if !next_map.contains_key(key) {
-                    let child_path = if path.is_empty() {
-                        format!("/{}", key)
-                    } else {
-                        format!("{}/{}", path, key)
-                    };
-                    ops.push(serde_json::json!({
-                        "op": "remove",
-                        "path": child_path,
-                    }));
-                }
-            }
-        }
-        (Value::Array(prev_arr), Value::Array(next_arr)) => {
-            let min_len = prev_arr.len().min(next_arr.len());
-            for i in 0..min_len {
-                let child_path = format!("{}/{}", path, i);
-                compute_json_diff(&child_path, &prev_arr[i], &next_arr[i], ops);
-            }
-
-            for (i, item) in next_arr.iter().enumerate().skip(min_len) {
-                let child_path = format!("{}/{}", path, i);
-                ops.push(serde_json::json!({
-                    "op": "add",
-                    "path": child_path,
-                    "value": item,
-                }));
-            }
-
-            for i in (min_len..prev_arr.len()).rev() {
-                let child_path = format!("{}/{}", path, i);
-                ops.push(serde_json::json!({
-                    "op": "remove",
-                    "path": child_path,
-                }));
-            }
-        }
-        _ => {
-            let op_path = if path.is_empty() { "/" } else { path };
-            ops.push(serde_json::json!({
-                "op": "replace",
-                "path": op_path,
-                "value": next,
-            }));
-        }
     }
 }
 
