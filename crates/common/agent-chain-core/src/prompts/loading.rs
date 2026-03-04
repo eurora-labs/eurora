@@ -47,24 +47,41 @@ pub fn load_prompt_from_config(config: serde_json::Value) -> Result<Box<dyn Base
     loader(&mut config)
 }
 
-fn load_template(var_name: &str, config: &mut serde_json::Map<String, serde_json::Value>) {
+fn load_template(
+    var_name: &str,
+    config: &mut serde_json::Map<String, serde_json::Value>,
+) -> Result<()> {
     let path_key = format!("{}_path", var_name);
 
-    if let Some(path_value) = config.remove(&path_key) {
-        if config.contains_key(var_name) {
-            tracing::warn!("Both '{}' and '{}' cannot be provided.", path_key, var_name);
-            return;
-        }
+    let Some(path_value) = config.remove(&path_key) else {
+        return Ok(());
+    };
 
-        if let Some(path_str) = path_value.as_str() {
-            let path = Path::new(path_str);
-            if path.extension().and_then(|e| e.to_str()) == Some("txt")
-                && let Ok(content) = std::fs::read_to_string(path)
-            {
-                config.insert(var_name.to_string(), serde_json::Value::String(content));
-            }
-        }
+    if config.contains_key(var_name) {
+        return Err(Error::InvalidConfig(format!(
+            "Both '{}' and '{}' cannot be provided.",
+            path_key, var_name
+        )));
     }
+
+    let path_str = path_value
+        .as_str()
+        .ok_or_else(|| Error::InvalidConfig(format!("'{}' must be a string", path_key)))?;
+
+    let path = Path::new(path_str);
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+
+    if ext != "txt" {
+        return Err(Error::InvalidConfig(format!(
+            "Expected .txt file for '{}', got '.{}'",
+            path_key, ext
+        )));
+    }
+
+    let content = std::fs::read_to_string(path)?;
+    config.insert(var_name.to_string(), serde_json::Value::String(content));
+
+    Ok(())
 }
 
 fn load_examples_from_config(
@@ -131,7 +148,7 @@ fn extract_examples(
 fn load_basic_prompt(
     config: &mut serde_json::Map<String, serde_json::Value>,
 ) -> Result<Box<dyn BasePromptTemplate>> {
-    load_template("template", config);
+    load_template("template", config)?;
 
     let template = config
         .get("template")
@@ -166,8 +183,8 @@ fn load_basic_prompt(
 fn load_few_shot_prompt(
     config: &mut serde_json::Map<String, serde_json::Value>,
 ) -> Result<Box<dyn BasePromptTemplate>> {
-    load_template("suffix", config);
-    load_template("prefix", config);
+    load_template("suffix", config)?;
+    load_template("prefix", config)?;
 
     let example_prompt = if let Some(example_prompt_path) = config.remove("example_prompt_path") {
         if config.contains_key("example_prompt") {

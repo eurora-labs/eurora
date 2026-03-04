@@ -12,9 +12,7 @@ use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
 use crate::utils::input::get_colored_text;
 
-use super::base::{
-    BasePromptTemplate, FormatOutputType, PartialValue, merge_prompt_config, resolve_partials,
-};
+use super::base::{BasePromptTemplate, PartialValue, merge_prompt_config, resolve_partials};
 use super::string::{
     PromptTemplateFormat, StringPromptTemplate, check_valid_template, format_template,
     get_template_variables,
@@ -190,7 +188,7 @@ impl BasePromptTemplate for PromptTemplate {
         self.tags.as_deref()
     }
 
-    fn format(&self, kwargs: &HashMap<String, String>) -> Result<FormatOutputType> {
+    fn format(&self, kwargs: &HashMap<String, String>) -> Result<String> {
         let merged = self.merge_partial_and_user_variables(kwargs);
         format_template(&self.template, self.template_format, &merged)
     }

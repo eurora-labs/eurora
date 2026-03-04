@@ -10,12 +10,10 @@ use crate::prompt_values::StringPromptValue;
 use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
 
-use super::base::{
-    BasePromptTemplate, FormatOutputType, PartialValue, merge_prompt_config, resolve_partials,
-};
+use super::base::{BasePromptTemplate, PartialValue, merge_prompt_config, resolve_partials};
 use super::few_shot::ExampleSelectorClone;
 use super::prompt::PromptTemplate;
-use super::string::{PromptTemplateFormat, StringPromptTemplate, format_template};
+use super::string::{PromptTemplateFormat, StringPromptTemplate};
 
 #[derive(Debug, Clone)]
 pub struct FewShotPromptWithTemplates {
@@ -124,31 +122,11 @@ impl FewShotPromptWithTemplates {
         &self,
         kwargs: &HashMap<String, String>,
     ) -> Result<Vec<HashMap<String, String>>> {
-        if let Some(ref examples) = self.examples {
-            Ok(examples.clone())
-        } else if let Some(ref selector) = self.example_selector {
-            Ok(selector.select_examples(kwargs))
-        } else {
-            Err(Error::InvalidConfig(
-                "One of 'examples' and 'example_selector' should be provided".to_string(),
-            ))
-        }
-    }
-
-    #[allow(dead_code)]
-    async fn aget_examples(
-        &self,
-        kwargs: &HashMap<String, String>,
-    ) -> Result<Vec<HashMap<String, String>>> {
-        if let Some(ref examples) = self.examples {
-            Ok(examples.clone())
-        } else if let Some(ref selector) = self.example_selector {
-            Ok(selector.aselect_examples(kwargs).await)
-        } else {
-            Err(Error::InvalidConfig(
-                "One of 'examples' and 'example_selector' should be provided".to_string(),
-            ))
-        }
+        super::few_shot::resolve_examples(
+            self.examples.as_deref(),
+            self.example_selector.as_deref(),
+            kwargs,
+        )
     }
 
     fn validate_template_variables(&mut self) -> Result<()> {
@@ -183,15 +161,6 @@ impl FewShotPromptWithTemplates {
         }
         Ok(())
     }
-
-    fn merge_partial_and_user_variables(
-        &self,
-        kwargs: &HashMap<String, String>,
-    ) -> HashMap<String, String> {
-        let mut merged = resolve_partials(&self.partial_variables);
-        merged.extend(kwargs.clone());
-        merged
-    }
 }
 
 impl BasePromptTemplate for FewShotPromptWithTemplates {
@@ -203,8 +172,8 @@ impl BasePromptTemplate for FewShotPromptWithTemplates {
         resolve_partials(&self.partial_variables)
     }
 
-    fn format(&self, kwargs: &HashMap<String, String>) -> Result<FormatOutputType> {
-        let mut kwargs = self.merge_partial_and_user_variables(kwargs);
+    fn format(&self, kwargs: &HashMap<String, String>) -> Result<String> {
+        let kwargs = self.merge_partial_and_user_variables(kwargs);
 
         let examples = self.get_examples(&kwargs)?;
 
@@ -215,44 +184,22 @@ impl BasePromptTemplate for FewShotPromptWithTemplates {
         let example_strings = example_strings?;
 
         let prefix = if let Some(ref prefix_template) = self.prefix {
-            let prefix_vars: HashMap<_, _> = kwargs
-                .iter()
-                .filter(|(k, _)| prefix_template.input_variables.contains(k))
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect();
-
-            for k in prefix_vars.keys() {
-                kwargs.remove(k);
-            }
-
-            StringPromptTemplate::format(prefix_template, &prefix_vars)?
+            StringPromptTemplate::format(prefix_template, &kwargs)?
         } else {
             String::new()
         };
 
-        let suffix_vars: HashMap<_, _> = kwargs
-            .iter()
-            .filter(|(k, _)| self.suffix.input_variables.contains(k))
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
-
-        for k in suffix_vars.keys() {
-            kwargs.remove(k);
-        }
-
-        let suffix = StringPromptTemplate::format(&self.suffix, &suffix_vars)?;
+        let suffix = StringPromptTemplate::format(&self.suffix, &kwargs)?;
 
         let mut pieces = vec![prefix];
         pieces.extend(example_strings);
         pieces.push(suffix);
 
-        let template = pieces
+        Ok(pieces
             .into_iter()
             .filter(|p| !p.is_empty())
             .collect::<Vec<_>>()
-            .join(&self.example_separator);
-
-        format_template(&template, self.template_format, &kwargs)
+            .join(&self.example_separator))
     }
 
     fn partial(
@@ -446,5 +393,29 @@ mod tests {
         let vars = BasePromptTemplate::input_variables(&few_shot);
         assert!(vars.contains(&"suffix_var".to_string()));
         assert!(vars.contains(&"prefix_var".to_string()));
+    }
+
+    #[test]
+    fn test_shared_variable_between_prefix_and_suffix() {
+        let examples = vec![];
+        let example_prompt = PromptTemplate::from_template("{ex}").unwrap();
+        let prefix = PromptTemplate::from_template("Context: {context}").unwrap();
+        let suffix = PromptTemplate::from_template("Question about {context}: {question}").unwrap();
+
+        let few_shot = FewShotPromptWithTemplates::builder()
+            .examples(examples)
+            .example_prompt(example_prompt)
+            .suffix(suffix)
+            .prefix(prefix)
+            .build()
+            .unwrap();
+
+        let mut kwargs = HashMap::new();
+        kwargs.insert("context".to_string(), "science".to_string());
+        kwargs.insert("question".to_string(), "why is sky blue?".to_string());
+
+        let result = BasePromptTemplate::format(&few_shot, &kwargs).unwrap();
+        assert!(result.contains("Context: science"));
+        assert!(result.contains("Question about science: why is sky blue?"));
     }
 }

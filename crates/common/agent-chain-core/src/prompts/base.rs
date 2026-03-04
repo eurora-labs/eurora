@@ -8,8 +8,6 @@ use crate::error::{Error, Result};
 use crate::prompt_values::{PromptValue, StringPromptValue};
 use crate::runnables::config::{RunnableConfig, ensure_config};
 
-pub type FormatOutputType = String;
-
 #[derive(Clone)]
 pub struct PartialValue(Arc<dyn Fn() -> String + Send + Sync>);
 
@@ -69,27 +67,6 @@ pub(super) fn merge_prompt_config(
     Some(config)
 }
 
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct PromptTemplateConfig {
-    pub input_variables: Vec<String>,
-
-    #[serde(default)]
-    pub optional_variables: Vec<String>,
-
-    #[serde(default)]
-    pub input_types: HashMap<String, String>,
-
-    #[serde(skip, default)]
-    pub partial_variables: HashMap<String, PartialValue>,
-
-    #[serde(default)]
-    pub metadata: Option<HashMap<String, serde_json::Value>>,
-
-    #[serde(default)]
-    pub tags: Option<Vec<String>>,
-}
-
 pub trait BasePromptTemplate: Send + Sync {
     fn input_variables(&self) -> &[String];
 
@@ -115,13 +92,12 @@ pub trait BasePromptTemplate: Send + Sync {
         None
     }
 
-    fn format(&self, kwargs: &HashMap<String, String>) -> Result<FormatOutputType>;
+    fn format(&self, kwargs: &HashMap<String, String>) -> Result<String>;
 
     fn aformat(
         &self,
         kwargs: &HashMap<String, String>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<FormatOutputType>> + Send + '_>>
-    {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send + '_>> {
         let result = self.format(kwargs);
         Box::pin(async move { result })
     }
@@ -246,7 +222,7 @@ pub trait BasePromptTemplate: Send + Sync {
             }
             _ => {
                 return Err(Error::InvalidConfig(format!(
-                    "{} must be json or yaml",
+                    "Unsupported file extension for '{}'. Only .json is supported.",
                     file_path.display()
                 )));
             }
@@ -342,7 +318,7 @@ mod tests {
             &self.input_variables
         }
 
-        fn format(&self, kwargs: &HashMap<String, String>) -> Result<FormatOutputType> {
+        fn format(&self, kwargs: &HashMap<String, String>) -> Result<String> {
             let mut result = self.template.clone();
             for (key, value) in kwargs {
                 result = result.replace(&format!("{{{}}}", key), value);
