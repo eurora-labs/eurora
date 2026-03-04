@@ -11,49 +11,30 @@ pub trait BaseRateLimiter: Send + Sync {
     async fn aacquire(&self, blocking: bool) -> bool;
 }
 
-#[derive(Debug, Clone)]
-pub struct InMemoryRateLimiterConfig {
-    pub requests_per_second: f64,
-    pub check_every_n_seconds: f64,
-    pub max_bucket_size: f64,
-}
-
-impl Default for InMemoryRateLimiterConfig {
-    fn default() -> Self {
-        Self {
-            requests_per_second: 1.0,
-            check_every_n_seconds: 0.1,
-            max_bucket_size: 1.0,
-        }
-    }
-}
-
 pub struct InMemoryRateLimiter {
     limiter: Arc<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
-    check_every_n_seconds: f64,
+    check_interval: Duration,
 }
 
+#[bon::bon]
 impl InMemoryRateLimiter {
-    pub fn new(config: InMemoryRateLimiterConfig) -> Self {
-        let burst = config.max_bucket_size.ceil().max(1.0) as u32;
+    #[builder]
+    pub fn new(
+        #[builder(default = 1.0)] requests_per_second: f64,
+        #[builder(default = 0.1)] check_every_n_seconds: f64,
+        #[builder(default = 1.0)] max_bucket_size: f64,
+    ) -> Self {
+        let burst = max_bucket_size.ceil().max(1.0) as u32;
         let burst = NonZeroU32::new(burst).unwrap_or(NonZeroU32::new(1).unwrap());
 
-        let period = Duration::from_secs_f64(1.0 / config.requests_per_second);
+        let period = Duration::from_secs_f64(1.0 / requests_per_second);
         let quota = Quota::with_period(period)
             .expect("valid rate limiter period")
             .allow_burst(burst);
 
-        let limiter = RateLimiter::direct(quota);
-
-        // Drain initial burst tokens to match the old behavior where
-        // no tokens are available until time has passed.
-        for _ in 0..burst.get() {
-            let _ = limiter.check();
-        }
-
         Self {
-            limiter: Arc::new(limiter),
-            check_every_n_seconds: config.check_every_n_seconds,
+            limiter: Arc::new(RateLimiter::direct(quota)),
+            check_interval: Duration::from_secs_f64(check_every_n_seconds),
         }
     }
 }
@@ -66,7 +47,7 @@ impl BaseRateLimiter for InMemoryRateLimiter {
         }
 
         while self.limiter.check().is_err() {
-            std::thread::sleep(Duration::from_secs_f64(self.check_every_n_seconds));
+            std::thread::sleep(self.check_interval);
         }
         true
     }
@@ -76,9 +57,7 @@ impl BaseRateLimiter for InMemoryRateLimiter {
             return self.limiter.check().is_ok();
         }
 
-        while self.limiter.check().is_err() {
-            tokio::time::sleep(Duration::from_secs_f64(self.check_every_n_seconds)).await;
-        }
+        self.limiter.until_ready().await;
         true
     }
 }
@@ -90,72 +69,65 @@ mod tests {
 
     #[test]
     fn test_rate_limiter_non_blocking() {
-        let rate_limiter = InMemoryRateLimiter::new(InMemoryRateLimiterConfig {
-            requests_per_second: 10.0,
-            check_every_n_seconds: 0.01,
-            max_bucket_size: 1.0,
-        });
+        let rate_limiter = InMemoryRateLimiter::builder()
+            .requests_per_second(10.0)
+            .check_every_n_seconds(0.01)
+            .build();
 
-        // Drain the initial burst token
-        let _ = rate_limiter.acquire(false);
-        let result = rate_limiter.acquire(false);
-        assert!(!result);
+        assert!(rate_limiter.acquire(false));
+        assert!(!rate_limiter.acquire(false));
     }
 
     #[test]
     fn test_rate_limiter_blocking() {
-        let rate_limiter = InMemoryRateLimiter::new(InMemoryRateLimiterConfig {
-            requests_per_second: 100.0,
-            check_every_n_seconds: 0.001,
-            max_bucket_size: 1.0,
-        });
+        let rate_limiter = InMemoryRateLimiter::builder()
+            .requests_per_second(100.0)
+            .check_every_n_seconds(0.001)
+            .build();
 
         let start = Instant::now();
-        let result = rate_limiter.acquire(true);
-        let elapsed = start.elapsed();
+        assert!(rate_limiter.acquire(true));
+        assert!(start.elapsed().as_millis() < 50);
 
-        assert!(result);
-        assert!(elapsed.as_millis() < 100);
+        let start = Instant::now();
+        assert!(rate_limiter.acquire(true));
+        assert!(start.elapsed().as_millis() >= 5);
     }
 
     #[tokio::test]
     async fn test_rate_limiter_async_non_blocking() {
-        let rate_limiter = InMemoryRateLimiter::new(InMemoryRateLimiterConfig {
-            requests_per_second: 10.0,
-            check_every_n_seconds: 0.01,
-            max_bucket_size: 1.0,
-        });
+        let rate_limiter = InMemoryRateLimiter::builder()
+            .requests_per_second(10.0)
+            .check_every_n_seconds(0.01)
+            .build();
 
-        let _ = rate_limiter.aacquire(false).await;
-        let result = rate_limiter.aacquire(false).await;
-        assert!(!result);
+        assert!(rate_limiter.aacquire(false).await);
+        assert!(!rate_limiter.aacquire(false).await);
     }
 
     #[tokio::test]
     async fn test_rate_limiter_async_blocking() {
-        let rate_limiter = InMemoryRateLimiter::new(InMemoryRateLimiterConfig {
-            requests_per_second: 100.0,
-            check_every_n_seconds: 0.001,
-            max_bucket_size: 1.0,
-        });
+        let rate_limiter = InMemoryRateLimiter::builder()
+            .requests_per_second(100.0)
+            .check_every_n_seconds(0.001)
+            .build();
 
         let start = Instant::now();
-        let result = rate_limiter.aacquire(true).await;
-        let elapsed = start.elapsed();
+        assert!(rate_limiter.aacquire(true).await);
+        assert!(start.elapsed().as_millis() < 50);
 
-        assert!(result);
-        assert!(elapsed.as_millis() < 100);
+        let start = Instant::now();
+        assert!(rate_limiter.aacquire(true).await);
+        assert!(start.elapsed().as_millis() >= 5);
     }
 
     #[test]
     fn test_rate_limiter_burst() {
-        let rate_limiter = InMemoryRateLimiter::new(InMemoryRateLimiterConfig {
-            requests_per_second: 1000.0,
-            check_every_n_seconds: 0.001,
-            max_bucket_size: 5.0,
-        });
-
-        std::thread::sleep(std::time::Duration::from_millis(10));
+        let rate_limiter = InMemoryRateLimiter::builder()
+            .requests_per_second(10.0)
+            .check_every_n_seconds(0.001)
+            .max_bucket_size(5.0)
+            .build();
 
         let mut successes = 0;
         for _ in 0..10 {
@@ -164,14 +136,13 @@ mod tests {
             }
         }
 
-        assert!(successes <= 5);
+        assert_eq!(successes, 5);
     }
 
     #[test]
     fn test_default_config() {
-        let config = InMemoryRateLimiterConfig::default();
-        assert!((config.requests_per_second - 1.0).abs() < f64::EPSILON);
-        assert!((config.check_every_n_seconds - 0.1).abs() < f64::EPSILON);
-        assert!((config.max_bucket_size - 1.0).abs() < f64::EPSILON);
+        let rate_limiter = InMemoryRateLimiter::builder().build();
+        assert!(rate_limiter.acquire(false));
+        assert!(!rate_limiter.acquire(false));
     }
 }
