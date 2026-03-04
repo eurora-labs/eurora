@@ -44,8 +44,6 @@ fn get_parent_pid_impl() -> u32 {
         return direct_ppid;
     }
 
-    // Direct parent may be an intermediary (e.g. xdg-desktop-portal),
-    // so check siblings sharing the same grandparent.
     if let Some((grandparent, _)) = read_proc_stat(direct_ppid)
         && grandparent > 1
         && let Some(browser_pid) = find_browser_child(grandparent, browser_names)
@@ -95,7 +93,6 @@ fn find_browser_child(parent_pid: u32, browser_names: &[&str]) -> Option<u32> {
 #[cfg(target_os = "linux")]
 fn read_proc_stat(pid: u32) -> Option<(u32, String)> {
     let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
-    // comm can contain spaces and parentheses, so find the last ')'.
     let comm_start = stat.find('(')? + 1;
     let comm_end = stat.rfind(')')?;
     let comm = stat[comm_start..comm_end].to_string();

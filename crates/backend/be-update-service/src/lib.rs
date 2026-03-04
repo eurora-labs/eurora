@@ -1,11 +1,3 @@
-//! Eurora Update Service
-//!
-//! A Tauri-compatible update service that serves application updates from AWS S3.
-//! Supports multiple channels (nightly, release, beta) and cross-platform builds.
-//!
-//! Also provides browser extension version checking for Firefox, Chrome, and Safari
-//! with support for release and nightly channels.
-
 use std::sync::Arc;
 
 use anyhow::{Context, Result};

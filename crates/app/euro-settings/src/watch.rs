@@ -24,7 +24,6 @@ pub(crate) struct SettingsEnforceSaveToDisk<'a> {
 impl SettingsEnforceSaveToDisk<'_> {
     #[allow(dead_code)]
     pub fn save(&mut self) -> Result<()> {
-        // Mark before save so a save failure doesn't trigger the Drop assertion
         self.saved = true;
         self.snapshot.save(self.config_path)?;
         Ok(())

@@ -25,18 +25,13 @@ impl AppSettings {
 
         let mut app_settings: AppSettings = serde_json::from_value(settings)?;
 
-        // Normal user login flows won't work during development
-        // if you have the variable set in the .env file
         if let Ok(api_base_url) = std::env::var("API_BASE_URL") {
             app_settings.api.endpoint = api_base_url;
-        } else if cfg!(debug_assertions) {
-            // This is handy for development so that
-            // the Tauri app connects after running
-            // pnpm docker:monolith
-            if let Some(endpoint) = euro_debug::detect_local_backend_endpoint() {
-                tracing::debug!("Detected local backend at {}", endpoint);
-                app_settings.api.endpoint = endpoint;
-            }
+        } else if cfg!(debug_assertions)
+            && let Some(endpoint) = euro_debug::detect_local_backend_endpoint()
+        {
+            tracing::debug!("Detected local backend at {}", endpoint);
+            app_settings.api.endpoint = endpoint;
         }
 
         Ok(app_settings)
@@ -62,7 +57,6 @@ impl AppSettings {
         let mut customizations =
             serde_json_lenient::from_str(&std::fs::read_to_string(config_path)?)?;
 
-        // TODO: This will nuke any comments in the file
         merge_non_null_json_value(diff, &mut customizations);
         euro_fs::create_dirs_then_write(config_path, to_string_pretty(&customizations)?)?;
         Ok(())

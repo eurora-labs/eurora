@@ -17,10 +17,6 @@ pub struct APISettings {
 }
 
 impl APISettings {
-    /// Sync provider settings to the local backend.
-    ///
-    /// If the endpoint is the cloud endpoint, provider settings are cleared
-    /// since the cloud backend manages its own provider configuration.
     pub async fn sync(&mut self) -> Result<()> {
         if self.endpoint == CLOUD_ENDPOINT {
             self.provider = None;

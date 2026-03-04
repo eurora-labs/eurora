@@ -42,18 +42,6 @@ pub struct FileHeader {
 }
 
 impl MainKey {
-    /// Retrieve the existing main key from the OS keychain, or generate and
-    /// persist a brand-new one if no entry exists yet (first run).
-    ///
-    /// # Errors
-    ///
-    /// * Returns [`EncryptError::Keyring`] if the keychain cannot be accessed
-    ///   (locked, permission denied, transient I/O error).  This is
-    ///   intentionally **not** silently swallowed — generating a new key when
-    ///   the old one is merely unreachable would make all previously encrypted
-    ///   data unrecoverable.
-    /// * Returns [`EncryptError::Base64Decode`] / [`EncryptError::InvalidKeyLength`]
-    ///   if the stored value is corrupt.
     pub fn new() -> EncryptResult<Self> {
         match secret::keyring_retrieve(USER_MAIN_KEY_HANDLE) {
             Ok(Some(key)) => {
@@ -68,10 +56,7 @@ impl MainKey {
                 main_key.validate()?;
                 Ok(main_key)
             }
-            Ok(None) => {
-                // First run — no key in the keychain yet.
-                generate_new_main_key()
-            }
+            Ok(None) => generate_new_main_key(),
             Err(e) => {
                 tracing::error!("Failed to access keyring: {}", e);
                 Err(EncryptError::Keyring(format!(
@@ -81,14 +66,10 @@ impl MainKey {
         }
     }
 
-    /// Construct a `MainKey` from raw bytes.
-    ///
-    /// Useful in tests or when the caller already holds validated key material.
     pub fn from_bytes(bytes: [u8; 32]) -> Self {
         MainKey(bytes)
     }
 
-    /// Borrow the raw key bytes.
     pub fn as_bytes(&self) -> &[u8; 32] {
         &self.0
     }
@@ -101,7 +82,6 @@ impl MainKey {
         let hk = Hkdf::<Sha256>::new(Some(salt), &self.0);
         let mut out = [0u8; 32];
 
-        // Domain separation so FEKs can't collide with other derived keys
         let info = b"EURORA-FEK-v1";
         hk.expand(info, &mut out).map_err(|e| {
             tracing::error!("Failed to derive FEK: {}", e);
@@ -136,7 +116,6 @@ pub fn generate_new_main_key() -> EncryptResult<MainKey> {
     rand::rng().fill_bytes(&mut mk);
 
     let main_key = MainKey(mk);
-    // Should never fail with proper RNG, but safety first
     main_key.validate()?;
 
     let mut encoded = Zeroizing::new(BASE64_STANDARD.encode(mk));
@@ -332,7 +311,6 @@ pub fn parse_header(buf: &[u8]) -> EncryptResult<FileHeader> {
     let tag_len = u16::from_be_bytes([buf[9], buf[10]]);
     let tag_len_size = tag_len as usize;
 
-    // Prevent integer overflow in total_header_len calculation
     if tag_len_size > 1024 {
         return Err(EncryptError::Format("Tag length too large".to_string()));
     }

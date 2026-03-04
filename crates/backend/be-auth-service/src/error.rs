@@ -3,13 +3,11 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum AuthError {
-    // 400 - InvalidArgument
     #[error("Missing credentials")]
     MissingCredentials,
     #[error("{0}")]
     InvalidInput(String),
 
-    // 401 - Unauthenticated
     #[error("Invalid credentials")]
     InvalidCredentials,
     #[error("Missing authorization header")]
@@ -21,7 +19,6 @@ pub enum AuthError {
     #[error("Email address is not verified")]
     EmailNotVerified,
 
-    // 500 - Internal
     #[error("Password hashing failed: {0}")]
     PasswordHash(String),
     #[error("Token generation failed: {0}")]

@@ -27,8 +27,6 @@ pub fn json_difference(
     }
 }
 
-/// Based on Zed `merge_non_null_json_value_into`
-/// Note: This doesn't merge arrays.
 pub fn merge_non_null_json_value(source: serde_json::Value, target: &mut serde_json::Value) {
     use serde_json::Value;
     if let Value::Object(source_object) = source {

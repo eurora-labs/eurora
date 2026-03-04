@@ -44,7 +44,6 @@ impl PaymentConfig {
                 .map(|s| s.trim().to_lowercase().to_string())
                 .filter(|s| !s.is_empty())
                 .collect::<Vec<_>>(),
-            // Allow all by default
             Err(_) => vec!["*".to_string()],
         };
 

@@ -12,7 +12,6 @@ use crate::{
     types::{Activity, ActivityAsset, ActivitySnapshot},
 };
 
-/// Fallback for applications that don't have specific strategy implementations.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DefaultStrategy;
 

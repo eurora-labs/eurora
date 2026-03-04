@@ -385,7 +385,6 @@ jobs:
                   APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
                   APPIMAGE_KEY_ID: ${{ secrets.APPIMAGE_KEY_ID }}
                   APPIMAGE_KEY_PASSPHRASE: ${{ secrets.APPIMAGE_KEY_PASSPHRASE }}
-                  POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
               run: |
                   ./scripts/release.sh \
                     --channel                    "$RELEASE_CHANNEL" \

@@ -1,5 +1,3 @@
-/// Inspect the running `backend` docker compose service to discover its gRPC port.
-/// Returns `Some("http://0.0.0.0:<port>")` if found, `None` otherwise.
 pub fn detect_local_backend_endpoint() -> Option<String> {
     let ps = std::process::Command::new("docker")
         .args(["compose", "ps", "-q", "backend"])
