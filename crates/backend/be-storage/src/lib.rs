@@ -25,10 +25,11 @@ use std::sync::Arc;
 
 use bon::bon;
 use opendal::{Operator, services};
+use secrecy::{ExposeSecret, SecretString};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum StorageConfig {
     FS {
         root: String,
@@ -37,31 +38,9 @@ pub enum StorageConfig {
         bucket: String,
         region: String,
         endpoint: Option<String>,
-        access_key_id: Option<String>,
-        secret_access_key: Option<String>,
+        access_key_id: Option<SecretString>,
+        secret_access_key: Option<SecretString>,
     },
-}
-
-impl std::fmt::Debug for StorageConfig {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::FS { root } => f.debug_struct("FS").field("root", root).finish(),
-            Self::S3 {
-                bucket,
-                region,
-                endpoint,
-                access_key_id,
-                ..
-            } => f
-                .debug_struct("S3")
-                .field("bucket", bucket)
-                .field("region", region)
-                .field("endpoint", endpoint)
-                .field("access_key_id", access_key_id)
-                .field("secret_access_key", &"[REDACTED]")
-                .finish(),
-        }
-    }
 }
 
 impl Default for StorageConfig {
@@ -91,8 +70,12 @@ impl StorageConfig {
                 let region = std::env::var("ASSET_STORAGE_S3_REGION")
                     .map_err(|_| StorageError::missing_env_var("ASSET_STORAGE_S3_REGION"))?;
                 let endpoint = std::env::var("ASSET_STORAGE_S3_ENDPOINT").ok();
-                let access_key_id = std::env::var("ASSET_STORAGE_S3_ACCESS_KEY_ID").ok();
-                let secret_access_key = std::env::var("ASSET_STORAGE_S3_SECRET_ACCESS_KEY").ok();
+                let access_key_id = std::env::var("ASSET_STORAGE_S3_ACCESS_KEY_ID")
+                    .ok()
+                    .map(SecretString::from);
+                let secret_access_key = std::env::var("ASSET_STORAGE_S3_SECRET_ACCESS_KEY")
+                    .ok()
+                    .map(SecretString::from);
 
                 Ok(StorageConfig::S3 {
                     bucket,
@@ -157,7 +140,13 @@ impl StorageService {
     /// Returns an error if the configuration is invalid or the operator cannot be created.
     pub fn from_env() -> StorageResult<Self> {
         let config = StorageConfig::from_env()?;
-        tracing::info!("Initializing storage service with config: {:?}", config);
+        tracing::info!(
+            backend = match &config {
+                StorageConfig::FS { .. } => "fs",
+                StorageConfig::S3 { .. } => "s3",
+            },
+            "Initializing storage service"
+        );
         Self::builder().config(config).build()
     }
 
@@ -188,11 +177,11 @@ impl StorageService {
                 }
 
                 if let Some(key_id) = access_key_id {
-                    builder = builder.access_key_id(key_id);
+                    builder = builder.access_key_id(key_id.expose_secret());
                 }
 
                 if let Some(secret) = secret_access_key {
-                    builder = builder.secret_access_key(secret);
+                    builder = builder.secret_access_key(secret.expose_secret());
                 }
 
                 Ok(Operator::new(builder)?.finish())

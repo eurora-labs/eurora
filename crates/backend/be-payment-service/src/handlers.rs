@@ -73,7 +73,7 @@ async fn resolve_customer_id(state: &AppState, email: &str) -> Result<String, Pa
         .await
         .map_err(|e| anyhow::anyhow!("commit tx: {e}"))?;
 
-    tracing::info!(%customer_id, %email, "Auto-created Stripe customer for new account");
+    tracing::info!(%customer_id, "Auto-created Stripe customer for new account");
 
     Ok(customer_id)
 }
@@ -136,7 +136,7 @@ pub async fn create_checkout_session(
         })?;
 
     if let Some(customer) = existing.data.first() {
-        tracing::info!(customer_id = %customer.id, %email, "Reusing existing Stripe customer");
+        tracing::info!(customer_id = %customer.id, "Reusing existing Stripe customer");
         req = req.customer(&customer.id);
     } else {
         req = req.customer_email(email);

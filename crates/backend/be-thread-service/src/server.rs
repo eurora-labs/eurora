@@ -268,7 +268,7 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        tracing::info!("Created thread {} for user {}", thread.id, user_id);
+        tracing::info!("Created thread {}", thread.id);
 
         Ok(Response::new(CreateThreadResponse {
             thread: Some(Self::db_thread_to_proto(thread)),
@@ -299,7 +299,7 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        tracing::info!("Listed {} threads for user {}", threads.len(), user_id);
+        tracing::info!("Listed {} threads", threads.len());
 
         Ok(Response::new(ListThreadsResponse {
             threads: threads.into_iter().map(Self::db_thread_to_proto).collect(),
@@ -343,11 +343,7 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        tracing::info!(
-            "Added human message to thread {} for user {}",
-            thread_id,
-            user_id
-        );
+        tracing::info!("Added human message to thread {}", thread_id);
 
         Ok(Response::new(AddHumanMessageResponse {
             message: Some(message.into()),
@@ -392,11 +388,7 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        tracing::info!(
-            "Added hidden human message to thread {} for user {}",
-            thread_id,
-            user_id
-        );
+        tracing::info!("Added hidden human message to thread {}", thread_id);
 
         Ok(Response::new(AddHiddenHumanMessageResponse {
             message: Some(message.into()),
@@ -440,11 +432,7 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        tracing::info!(
-            "Added system message to thread {} for user {}",
-            thread_id,
-            user_id
-        );
+        tracing::info!("Added system message to thread {}", thread_id);
 
         Ok(Response::new(AddSystemMessageResponse {
             message: Some(message.into()),
@@ -467,11 +455,7 @@ impl ProtoThreadService for ThreadService {
                 source: e,
             })?;
 
-        tracing::debug!(
-            "ChatStream: user_id = {}, thread_id = {}",
-            user_id,
-            thread_id
-        );
+        tracing::debug!("ChatStream: thread_id = {}", thread_id);
 
         // TODO: this is incorrect. This is essentially
         // a replacement for proper agent-driven rag

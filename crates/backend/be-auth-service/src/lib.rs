@@ -31,6 +31,7 @@ use crypto::{decrypt_sensitive_string, encrypt_sensitive_string};
 use error::AuthError;
 use oauth::github::GitHubOAuthClient;
 use oauth::google::GoogleOAuthClient;
+use secrecy::ExposeSecret;
 
 const MIN_PASSWORD_LENGTH: usize = 8;
 const MAX_PASSWORD_LENGTH: usize = 128;
@@ -614,11 +615,11 @@ impl AuthService {
             return Err(AuthError::EmailNotVerified);
         }
 
-        let oauth_access_token = encrypt_sensitive_string(&user_info.access_token)?;
+        let oauth_access_token = encrypt_sensitive_string(user_info.access_token.expose_secret())?;
         let oauth_refresh_token = user_info
             .refresh_token
             .as_ref()
-            .map(|t| encrypt_sensitive_string(t))
+            .map(|t| encrypt_sensitive_string(t.expose_secret()))
             .transpose()?;
         let oauth_token_expiry = user_info.expires_in.map(|duration| {
             chrono::Utc::now() + chrono::Duration::seconds(duration.as_secs() as i64)
@@ -718,7 +719,7 @@ impl AuthService {
             return Err(AuthError::EmailNotVerified);
         }
 
-        let oauth_access_token = encrypt_sensitive_string(&user_info.access_token)?;
+        let oauth_access_token = encrypt_sensitive_string(user_info.access_token.expose_secret())?;
 
         let user = self
             .find_or_create_oauth_user()

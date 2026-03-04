@@ -113,8 +113,8 @@ impl From<ThreadServiceError> for Status {
             ThreadServiceError::TokenLimitReached(_) => {
                 tracing::info!("Token limit reached: {}", message);
             }
-            ThreadServiceError::Database(e) => {
-                tracing::error!("Database error: {} (source: {:?})", message, e);
+            ThreadServiceError::Database(_) => {
+                tracing::error!("Database error: {}", message);
             }
             ThreadServiceError::Internal(_) => {
                 tracing::error!("Internal error: {}", message);
