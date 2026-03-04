@@ -4,8 +4,10 @@ use agent_chain_core::caches::{BaseCache, InMemoryCache};
 use agent_chain_core::language_models::{BaseLLM, FakeListLLM};
 use agent_chain_core::outputs::GenerationType;
 use agent_chain_core::set_llm_cache;
+use serial_test::serial;
 
 #[tokio::test]
+#[serial]
 async fn test_local_cache_generate_async() {
     let global_cache = Arc::new(InMemoryCache::unbounded());
     let local_cache = Arc::new(InMemoryCache::unbounded());
@@ -49,6 +51,7 @@ async fn test_local_cache_generate_async() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_local_cache_generate_sync() {
     let global_cache = Arc::new(InMemoryCache::unbounded());
     let local_cache = Arc::new(InMemoryCache::unbounded());
@@ -88,6 +91,7 @@ async fn test_local_cache_generate_sync() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_no_cache_generate_sync() {
     let global_cache = Arc::new(InMemoryCache::unbounded());
 
@@ -126,6 +130,7 @@ async fn test_no_cache_generate_sync() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_no_cache_generate_async() {
     let global_cache = Arc::new(InMemoryCache::unbounded());
 

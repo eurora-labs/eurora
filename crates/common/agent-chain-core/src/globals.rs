@@ -46,14 +46,17 @@ pub fn get_llm_cache() -> Option<Arc<dyn BaseCache>> {
 mod tests {
     use super::*;
     use crate::caches::InMemoryCache;
+    use serial_test::serial;
 
     #[test]
+    #[serial]
     fn test_verbose_default() {
         set_verbose(false);
         assert!(!get_verbose());
     }
 
     #[test]
+    #[serial]
     fn test_set_and_get_verbose() {
         set_verbose(true);
         assert!(get_verbose());
@@ -62,12 +65,14 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_debug_default() {
         set_debug(false);
         assert!(!get_debug());
     }
 
     #[test]
+    #[serial]
     fn test_set_and_get_debug() {
         set_debug(true);
         assert!(get_debug());
@@ -76,12 +81,14 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_llm_cache_default() {
         set_llm_cache(None);
         assert!(get_llm_cache().is_none());
     }
 
     #[test]
+    #[serial]
     fn test_set_and_get_llm_cache() {
         let cache = Arc::new(InMemoryCache::unbounded());
         set_llm_cache(Some(cache.clone()));
