@@ -1,12 +1,3 @@
-//! Two-tier secret storage.
-//!
-//! Only the master encryption key stays in the OS keychain.  This reduces
-//! macOS Keychain "Allow" prompts from one per secret to exactly one per
-//! application update.
-//!
-//! Secrets still in the keychain from a previous version are lazily migrated
-//! into the file store on first [`retrieve`].
-
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -14,8 +5,6 @@ use secrecy::{ExposeSecret, SecretString};
 
 use crate::file_store;
 
-/// Kept constant so that migration from the keychain maps 1-to-1 with the
-/// file-store backend.
 const PREFIX: &str = "eurora";
 
 pub fn init_file_store(encryption_key: [u8; 32], data_dir: impl Into<PathBuf>) -> Result<()> {
@@ -63,11 +52,6 @@ pub fn delete(handle: &str) -> Result<()> {
     if file_store::is_initialized() {
         let qh = qualified_handle(handle);
         file_store::remove(&qh)?;
-
-        // Don't touch the keychain here — `retrieve()` already handles
-        // migration and cleanup lazily.  Hitting the keychain directly
-        // would bypass that path and could trigger an extra macOS "Allow"
-        // prompt for an entry that hasn't been migrated yet.
     } else {
         let _ = keyring_delete(handle);
     }

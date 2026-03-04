@@ -212,19 +212,16 @@ impl ActivityConfig {
     }
 
     pub fn get_collection_interval(&self, app_name: &str, strategy_id: &str) -> Duration {
-        // Check application-specific override first
         if let Some(app_config) = self.get_application_config(app_name)
             && let Some(interval) = app_config.collection_interval_override
         {
             return interval;
         }
 
-        // Check strategy-specific configuration
         if let Some(strategy_config) = self.get_strategy_config(strategy_id) {
             return strategy_config.collection_interval;
         }
 
-        // Fall back to global default
         self.global.default_collection_interval
     }
 
@@ -398,19 +395,16 @@ mod tests {
             .configure_application("firefox".to_string(), app_config)
             .build();
 
-        // Application override should take precedence
         assert_eq!(
             config.get_collection_interval("firefox", "browser"),
             Duration::from_secs(15)
         );
 
-        // Strategy config should be used for other apps
         assert_eq!(
             config.get_collection_interval("chrome", "browser"),
             Duration::from_secs(7)
         );
 
-        // Global default for unknown strategy
         assert_eq!(
             config.get_collection_interval("notepad", "unknown"),
             Duration::from_secs(5)

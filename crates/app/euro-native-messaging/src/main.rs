@@ -32,7 +32,7 @@ async fn connect_with_retry(server_addr: &str) -> BrowserBridgeClient<Channel> {
     (|| {
         let addr = addr.clone();
         async move {
-            tracing::info!("Attempting to connect to euro-activity server at {}", addr);
+            tracing::info!("Attempting to connect to euro-activity server");
             BrowserBridgeClient::connect(addr)
                 .await
                 .map_err(|e| e.to_string())

@@ -106,11 +106,7 @@ impl ProtoActivityService for ActivityService {
         let proto_activities: Vec<Activity> =
             activities.iter().map(Self::db_activity_to_proto).collect();
 
-        tracing::debug!(
-            "Listed {} activities for user {}",
-            proto_activities.len(),
-            user_id
-        );
+        tracing::debug!("Listed {} activities", proto_activities.len());
 
         analytics::track_activities_listed(req.limit, req.offset, proto_activities.len());
 
@@ -216,7 +212,7 @@ impl ProtoActivityService for ActivityService {
             return Err(ActivityServiceError::Database(e).into());
         }
 
-        tracing::debug!("Created activity {} for user {}", activity.id, user_id);
+        tracing::debug!("Created activity {}", activity.id);
 
         analytics::track_activity_inserted(has_icon, has_ended_at, &process_name);
 

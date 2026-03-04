@@ -1,5 +1,3 @@
-//! Error types for the remote database system
-
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -19,7 +17,7 @@ pub enum DbError {
     #[error("Database connection error: {0}")]
     Connection(String),
 
-    #[error("Migration error: {0}")]
+    #[error("Migration error")]
     Migration(#[from] sqlx::migrate::MigrateError),
 
     #[error("Connection pool error: {0}")]
@@ -43,7 +41,7 @@ pub enum DbError {
     #[error("Token error: {0}")]
     Token(String),
 
-    #[error("Database error: {0}")]
+    #[error("Database error")]
     Database(#[source] sqlx::Error),
 
     #[error("Internal error: {0}")]
@@ -122,14 +120,9 @@ impl From<sqlx::Error> for DbError {
                 id: None,
             },
             sqlx::Error::Database(db_err) => {
-                // PostgreSQL error codes
-                // 23505 = unique_violation
-                // 23503 = foreign_key_violation
-                // 23502 = not_null_violation
                 if let Some(code) = db_err.code() {
                     match code.as_ref() {
                         "23505" => {
-                            // Try to extract constraint name for better error messages
                             let constraint = db_err.constraint().unwrap_or("unknown").to_string();
                             Self::Duplicate {
                                 field: "constraint",
@@ -151,8 +144,8 @@ impl From<sqlx::Error> for DbError {
             }
             sqlx::Error::PoolTimedOut => Self::Pool("Connection pool timed out".to_string()),
             sqlx::Error::PoolClosed => Self::Pool("Connection pool is closed".to_string()),
-            sqlx::Error::Io(io_err) => Self::Connection(io_err.to_string()),
-            sqlx::Error::Tls(tls_err) => Self::Connection(format!("TLS error: {}", tls_err)),
+            sqlx::Error::Io(_) => Self::Connection("IO error".to_string()),
+            sqlx::Error::Tls(_) => Self::Connection("TLS error".to_string()),
             other => Self::Database(other),
         }
     }

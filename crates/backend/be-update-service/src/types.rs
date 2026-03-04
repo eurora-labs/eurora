@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-/// Tauri updater response format
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UpdateResponse {
     pub version: String,
@@ -38,8 +37,6 @@ pub struct PlatformInfo {
     pub signature: String,
 }
 
-/// Response for the `GET /releases/{channel}` endpoint.
-/// Contains the latest version with all available platform downloads.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ReleaseInfoResponse {
     pub version: String,
@@ -142,8 +139,6 @@ pub struct BrowserExtensionInfo {
     pub url: String,
 }
 
-/// Response for the `GET /extensions/{channel}` endpoint.
-/// Contains the latest extension versions for all browsers in a channel.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExtensionReleaseResponse {
     pub channel: String,
