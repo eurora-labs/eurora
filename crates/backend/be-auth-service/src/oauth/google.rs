@@ -7,6 +7,7 @@ use openidconnect::{
     PkceCodeVerifier, RedirectUrl, Scope, TokenResponse,
     core::{CoreClient, CoreIdTokenClaims, CoreProviderMetadata, CoreResponseType},
 };
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 
 use super::OAuthError;
@@ -24,17 +25,21 @@ type DiscoveredClient = CoreClient<
 
 #[derive(Debug, Clone)]
 pub struct GoogleOAuthConfig {
-    pub client_id: String,
-    pub client_secret: String,
+    pub client_id: SecretString,
+    pub client_secret: SecretString,
     pub redirect_uri: String,
 }
 
 impl GoogleOAuthConfig {
     pub fn from_env() -> Result<Self, OAuthError> {
-        let client_id = env::var("GOOGLE_CLIENT_ID")
-            .map_err(|_| OAuthError::MissingEnvVar("GOOGLE_CLIENT_ID"))?;
-        let client_secret = env::var("GOOGLE_CLIENT_SECRET")
-            .map_err(|_| OAuthError::MissingEnvVar("GOOGLE_CLIENT_SECRET"))?;
+        let client_id = SecretString::from(
+            env::var("GOOGLE_CLIENT_ID")
+                .map_err(|_| OAuthError::MissingEnvVar("GOOGLE_CLIENT_ID"))?,
+        );
+        let client_secret = SecretString::from(
+            env::var("GOOGLE_CLIENT_SECRET")
+                .map_err(|_| OAuthError::MissingEnvVar("GOOGLE_CLIENT_SECRET"))?,
+        );
         let redirect_uri = env::var("GOOGLE_REDIRECT_URI")
             .map_err(|_| OAuthError::MissingEnvVar("GOOGLE_REDIRECT_URI"))?;
 
@@ -71,8 +76,10 @@ impl GoogleOAuthClient {
             .await
             .map_err(|e| OAuthError::Discovery(e.to_string()))?;
 
-        let client_id = ClientId::new(config.client_id);
-        let client_secret = Some(ClientSecret::new(config.client_secret));
+        let client_id = ClientId::new(config.client_id.expose_secret().to_owned());
+        let client_secret = Some(ClientSecret::new(
+            config.client_secret.expose_secret().to_owned(),
+        ));
         let redirect_uri = config.redirect_uri;
         let redirect_url = RedirectUrl::new(redirect_uri.clone())
             .map_err(|e| OAuthError::InvalidUrl(e.to_string()))?;
@@ -165,10 +172,10 @@ impl GoogleOAuthClient {
             .picture()
             .and_then(|localized| localized.get(None).map(|v| v.to_string()));
 
-        let access_token = token_response.access_token().secret().to_string();
+        let access_token = SecretString::from(token_response.access_token().secret().to_string());
         let refresh_token = token_response
             .refresh_token()
-            .map(|t| t.secret().to_string());
+            .map(|t| SecretString::from(t.secret().to_string()));
         let expires_in = token_response.expires_in();
 
         Ok(GoogleUserInfo {
@@ -198,9 +205,9 @@ pub struct GoogleUserInfo {
     pub picture: Option<String>,
     pub locale: Option<String>,
     #[serde(skip)]
-    pub access_token: String,
+    pub access_token: SecretString,
     #[serde(skip)]
-    pub refresh_token: Option<String>,
+    pub refresh_token: Option<SecretString>,
     #[serde(skip)]
     pub expires_in: Option<std::time::Duration>,
 }

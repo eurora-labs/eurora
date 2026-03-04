@@ -141,7 +141,7 @@ impl SystemApi for SystemApiImpl {
     ) -> Result<String, String> {
         let address = server_address.unwrap_or_else(|| "localhost:50051".to_string());
 
-        tracing::debug!("Checking connection to gRPC server: {}", address);
+        tracing::debug!("Checking connection to gRPC server");
 
         match tokio::net::TcpStream::connect(address.replace("http://", "").replace("https://", ""))
             .await
