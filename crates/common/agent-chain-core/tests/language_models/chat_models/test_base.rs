@@ -294,7 +294,7 @@ impl BaseChatModel for ModelWithAsyncStream {
         &self,
         _messages: Vec<BaseMessage>,
         _stop: Option<Vec<String>>,
-        _run_manager: Option<&agent_chain_core::callbacks::AsyncCallbackManagerForLLMRun>,
+        _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
         let stream = async_stream::stream! {
             yield Ok(ChatGenerationChunk::builder().message(AIMessage::builder().content("a").build().into()).build());

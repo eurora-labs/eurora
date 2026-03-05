@@ -1110,7 +1110,7 @@ mod test_generic_fake_chat_model_run_manager {
     use agent_chain_core::GenericFakeChatModel;
     use agent_chain_core::callbacks::BaseCallbackHandler;
     use agent_chain_core::callbacks::CallbackManagerForLLMRun;
-    use agent_chain_core::callbacks::manager::RunManagerCore;
+    use agent_chain_core::callbacks::manager::{CallbackManager, RunManagerCore};
     use agent_chain_core::language_models::BaseChatModel;
     use agent_chain_core::messages::AIMessage;
     use futures::StreamExt;
@@ -1157,12 +1157,10 @@ mod test_generic_fake_chat_model_run_manager {
         let recorder = TokenRecorder::new();
         let handler: Arc<dyn BaseCallbackHandler> = Arc::new(recorder.clone());
 
-        let run_manager = CallbackManagerForLLMRun::new(
-            RunManagerCore::builder()
-                .run_id(Uuid::new_v4())
-                .handlers(vec![handler])
-                .build(),
-        );
+        let mut config = CallbackManager::new();
+        config.add_handler(handler, false);
+        let run_manager =
+            CallbackManagerForLLMRun::new(RunManagerCore::new(Uuid::new_v4(), config));
 
         let mut stream = model._stream(vec![], None, Some(&run_manager)).unwrap();
 

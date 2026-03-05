@@ -446,7 +446,7 @@ pub fn tool(attr: TokenStream, item: TokenStream) -> TokenStream {
                 async fn tool_arun(
                     &self,
                     input: ::agent_chain::_core::tools::ToolInput,
-                    _run_manager: Option<&::agent_chain::_core::callbacks::manager::AsyncCallbackManagerForToolRun>,
+                    _run_manager: Option<&::agent_chain::_core::callbacks::manager::CallbackManagerForToolRun>,
                     _config: &::agent_chain::_core::runnables::RunnableConfig,
                 ) -> ::agent_chain::_core::error::Result<::agent_chain::_core::tools::ToolOutput> {
                     #extract_args

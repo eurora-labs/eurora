@@ -687,7 +687,7 @@ impl BaseChatModel for ChatOllama {
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-        _run_manager: Option<&crate::callbacks::AsyncCallbackManagerForLLMRun>,
+        _run_manager: Option<&crate::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<crate::language_models::ChatGenerationStream> {
         let reasoning_enabled = self.is_reasoning_enabled();
         let chat_stream = self.stream_internal(messages, stop).await?;

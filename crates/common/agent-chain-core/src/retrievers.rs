@@ -5,10 +5,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::callbacks::{
-    AsyncCallbackManager, AsyncCallbackManagerForRetrieverRun, CallbackManager,
-    CallbackManagerForRetrieverRun,
-};
+use crate::callbacks::{CallbackManager, CallbackManagerForRetrieverRun};
 use crate::documents::Document;
 use crate::error::Result;
 use crate::runnables::{RunnableConfig, ensure_config};
@@ -104,7 +101,7 @@ pub trait BaseRetriever: Send + Sync + Debug {
     async fn aget_relevant_documents(
         &self,
         query: &str,
-        run_manager: Option<&AsyncCallbackManagerForRetrieverRun>,
+        run_manager: Option<&CallbackManagerForRetrieverRun>,
     ) -> Result<Vec<Document>> {
         self.get_relevant_documents(query, run_manager)
     }
@@ -154,7 +151,7 @@ pub trait BaseRetriever: Send + Sync + Debug {
         let mut inheritable_metadata = config.metadata.clone();
         inheritable_metadata.extend(self.get_ls_params().to_metadata());
 
-        let callback_manager = AsyncCallbackManager::configure()
+        let callback_manager = CallbackManager::configure()
             .maybe_inheritable_callbacks(config.callbacks.clone())
             .inheritable_tags(config.tags.clone())
             .maybe_local_tags(self.tags().map(|t| t.to_vec()))

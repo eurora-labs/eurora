@@ -57,7 +57,6 @@ use futures::Stream;
 use serde::{Deserialize, Serialize};
 
 use crate::ToolChoice;
-use crate::callbacks::AsyncCallbackManagerForLLMRun;
 use crate::callbacks::CallbackManagerForLLMRun;
 use crate::callbacks::Callbacks;
 use crate::chat_models::{
@@ -2975,7 +2974,7 @@ impl BaseChatModel for ChatOpenAI {
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-        _run_manager: Option<&AsyncCallbackManagerForLLMRun>,
+        _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
         let chat_stream = if !self.bound_tools.is_empty() || !self.bound_builtin_tools.is_empty() {
             self.stream_internal_with_tools(

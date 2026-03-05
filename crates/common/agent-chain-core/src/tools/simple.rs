@@ -267,7 +267,7 @@ impl BaseTool for Tool {
     async fn tool_arun(
         &self,
         input: ToolInput,
-        _run_manager: Option<&crate::callbacks::manager::AsyncCallbackManagerForToolRun>,
+        _run_manager: Option<&crate::callbacks::manager::CallbackManagerForToolRun>,
         _config: &RunnableConfig,
     ) -> Result<ToolOutput> {
         let string_input = self.extract_single_input(input.clone())?;

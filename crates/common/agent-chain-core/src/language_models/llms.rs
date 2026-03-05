@@ -6,7 +6,7 @@ use futures::Stream;
 use serde_json::Value;
 
 use super::base::{BaseLanguageModel, LangSmithParams, LanguageModelConfig, LanguageModelInput};
-use crate::callbacks::{AsyncCallbackManagerForLLMRun, CallbackManagerForLLMRun, Callbacks};
+use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::error::Result;
 use crate::outputs::{
     ChatGeneration, ChatResult, Generation, GenerationChunk, GenerationType, LLMResult, RunInfo,
@@ -503,7 +503,7 @@ pub trait BaseLLM: BaseLanguageModel {
             inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
         }
 
-        let callback_manager = crate::callbacks::AsyncCallbackManager::configure()
+        let callback_manager = crate::callbacks::CallbackManager::configure()
             .maybe_inheritable_callbacks(callbacks)
             .maybe_local_callbacks(self.callbacks().cloned())
             .verbose(self.verbose())
@@ -588,7 +588,7 @@ pub trait BaseLLM: BaseLanguageModel {
         config: LLMGenerateConfig,
     ) -> Result<LLMResult> {
         use crate::caches::BaseCache;
-        use crate::callbacks::AsyncCallbackManager;
+        use crate::callbacks::CallbackManager;
 
         let LLMGenerateConfig {
             stop,
@@ -613,7 +613,7 @@ pub trait BaseLLM: BaseLanguageModel {
             inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
         }
 
-        let callback_manager = AsyncCallbackManager::configure()
+        let callback_manager = CallbackManager::configure()
             .maybe_inheritable_callbacks(callbacks)
             .maybe_local_callbacks(self.callbacks().cloned())
             .verbose(self.verbose())
@@ -714,7 +714,7 @@ pub trait BaseLLM: BaseLanguageModel {
         &self,
         prompts: Vec<String>,
         stop: Option<Vec<String>>,
-        run_managers: &[AsyncCallbackManagerForLLMRun],
+        run_managers: &[CallbackManagerForLLMRun],
     ) -> Result<LLMResult> {
         match self
             .generate_prompts(prompts, stop, run_managers.first())
