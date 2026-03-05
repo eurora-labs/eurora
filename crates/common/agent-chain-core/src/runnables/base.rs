@@ -27,6 +27,16 @@ struct ConcurrencyGate {
     max: usize,
 }
 
+struct ConcurrencyPermit<'a>(&'a ConcurrencyGate);
+
+impl Drop for ConcurrencyPermit<'_> {
+    fn drop(&mut self) {
+        let mut active = self.0.active.lock().unwrap();
+        *active -= 1;
+        self.0.cvar.notify_one();
+    }
+}
+
 impl ConcurrencyGate {
     fn new(max: usize) -> Arc<Self> {
         Arc::new(Self {
@@ -36,18 +46,13 @@ impl ConcurrencyGate {
         })
     }
 
-    fn acquire(&self) {
+    fn acquire(&self) -> ConcurrencyPermit<'_> {
         let mut active = self.active.lock().unwrap();
         while *active >= self.max {
             active = self.cvar.wait(active).unwrap();
         }
         *active += 1;
-    }
-
-    fn release(&self) {
-        let mut active = self.active.lock().unwrap();
-        *active -= 1;
-        self.cvar.notify_one();
+        ConcurrencyPermit(self)
     }
 }
 
@@ -367,12 +372,10 @@ pub trait Runnable: Send + Sync + Debug {
             let mut handles = Vec::with_capacity(len);
 
             for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
-                if let Some(ref gate) = gate {
-                    gate.acquire();
-                }
                 let gate = gate.clone();
 
                 let handle = scope.spawn(move || {
+                    let _permit = gate.as_ref().map(|g| g.acquire());
                     let result = if return_exceptions {
                         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                             self.invoke(input, Some(config))
@@ -392,9 +395,6 @@ pub trait Runnable: Send + Sync + Debug {
                     } else {
                         self.invoke(input, Some(config))
                     };
-                    if let Some(ref gate) = gate {
-                        gate.release();
-                    }
                     (i, result)
                 });
                 handles.push(handle);
@@ -518,13 +518,11 @@ pub trait Runnable: Send + Sync + Debug {
             let gate = max_concurrency.map(ConcurrencyGate::new);
 
             for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
-                if let Some(ref gate) = gate {
-                    gate.acquire();
-                }
                 let gate = gate.clone();
                 let tx = sender.clone();
 
                 scope.spawn(move || {
+                    let _permit = gate.as_ref().map(|g| g.acquire());
                     let result = if return_exceptions {
                         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                             self.invoke(input, Some(config))
@@ -544,9 +542,6 @@ pub trait Runnable: Send + Sync + Debug {
                     } else {
                         self.invoke(input, Some(config))
                     };
-                    if let Some(ref gate) = gate {
-                        gate.release();
-                    }
                     tx.send((i, result))
                         .expect("receiver should not be dropped");
                 });
@@ -689,17 +684,11 @@ pub trait Runnable: Send + Sync + Debug {
         config: Option<RunnableConfig>,
     ) -> BoxStream<'a, Result<Self::Output>> {
         Box::pin(async_stream::stream! {
-            let mut final_input: Option<Self::Input> = None;
+            let mut final_input = None;
             let mut input = input;
-
             while let Some(ichunk) = input.next().await {
-                if let Some(ref mut current) = final_input {
-                    *current = ichunk;
-                } else {
-                    final_input = Some(ichunk);
-                }
+                final_input = Some(ichunk);
             }
-
             if let Some(input) = final_input {
                 let mut stream = self.stream(input, config);
                 while let Some(output) = stream.next().await {
@@ -1041,8 +1030,8 @@ where
             input,
             Box::new(move |input_stream, _config| {
                 Box::pin(async_stream::stream! {
+                    let mut final_input = None;
                     let mut stream = input_stream;
-                    let mut final_input: Option<I> = None;
                     while let Some(ichunk) = stream.next().await {
                         final_input = Some(ichunk);
                     }
@@ -1301,8 +1290,8 @@ where
             Box::new(move |input_stream, config| {
                 let config = config.clone();
                 Box::pin(async_stream::stream! {
+                    let mut final_input = None;
                     let mut stream = input_stream;
-                    let mut final_input: Option<I> = None;
                     while let Some(ichunk) = stream.next().await {
                         final_input = Some(ichunk);
                     }
@@ -1335,8 +1324,8 @@ where
                 Box::new(move |input_stream, config| {
                     let config = config.clone();
                     Box::pin(async_stream::stream! {
+                        let mut final_input = None;
                         let mut stream = input_stream;
-                        let mut final_input: Option<I> = None;
                         while let Some(ichunk) = stream.next().await {
                             final_input = Some(ichunk);
                         }
