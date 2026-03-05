@@ -15,10 +15,10 @@ pub mod schema;
 pub mod utils;
 
 pub use base::{
-    ConfigFactory, DynRunnable, GraphProvider, Runnable, RunnableBinding, RunnableEach,
-    RunnableGenerator, RunnableGraphProvider, RunnableLambda, RunnableLambdaWithConfig,
-    RunnableMap, RunnableParallel, RunnableSequence, RunnableSerializable, TransformFn, pipe,
-    runnable_lambda, to_dyn,
+    ConfigFactory, DynRunnable, DynRunnableSequence, GraphProvider, Runnable, RunnableBinding,
+    RunnableEach, RunnableExt, RunnableGenerator, RunnableGraphProvider, RunnableLambda,
+    RunnableLambdaWithConfig, RunnableMap, RunnableParallel, RunnableSequence,
+    RunnableSerializable, TransformFn, pipe, runnable_lambda, to_dyn,
 };
 pub use branch::{RunnableBranch, RunnableBranchFluentBuilder};
 pub use config::{

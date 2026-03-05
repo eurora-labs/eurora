@@ -163,12 +163,12 @@ pub use stores::{BaseStore, InMemoryBaseStore, InMemoryByteStore, InMemoryStore}
 
 pub use runnables::{
     AddableDict, BaseStreamEvent, CUSTOM_EVENT_TYPE, ConfigOrList, CustomStreamEvent,
-    DynRouterRunnable, DynRunnable, EventData, PickKeys, RouterInput, RouterRunnable, Runnable,
-    RunnableAssign, RunnableAssignFluentBuilder, RunnableBinding, RunnableConfig, RunnableEach,
-    RunnableLambda, RunnableLambdaWithConfig, RunnableParallel, RunnablePassthrough, RunnablePick,
-    RunnableRetry, RunnableSequence, RunnableSerializable, StandardStreamEvent, StreamEvent,
-    ensure_config, get_config_list, graph_passthrough, merge_configs, patch_config, pipe,
-    runnable_lambda, to_dyn,
+    DynRouterRunnable, DynRunnable, DynRunnableSequence, EventData, PickKeys, RouterInput,
+    RouterRunnable, Runnable, RunnableAssign, RunnableAssignFluentBuilder, RunnableBinding,
+    RunnableConfig, RunnableEach, RunnableExt, RunnableLambda, RunnableLambdaWithConfig,
+    RunnableParallel, RunnablePassthrough, RunnablePick, RunnableRetry, RunnableSequence,
+    RunnableSerializable, StandardStreamEvent, StreamEvent, ensure_config, get_config_list,
+    graph_passthrough, merge_configs, patch_config, pipe, runnable_lambda, to_dyn,
 };
 
 pub use structured_query::{

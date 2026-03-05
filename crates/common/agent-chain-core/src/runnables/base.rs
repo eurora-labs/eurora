@@ -728,28 +728,31 @@ pub trait Runnable: Send + Sync + Debug {
         self.transform(input, config)
     }
 
+    fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
+        Ok(vec![])
+    }
+
+    fn get_prompts(&self) -> Vec<Arc<dyn crate::BasePromptTemplate>> {
+        vec![]
+    }
+}
+
+pub trait RunnableExt: Runnable + Sized + 'static {
     fn pipe<R2>(self, other: R2) -> RunnableSequence<Self, R2>
     where
-        Self: Sized,
         R2: Runnable<Input = Self::Output>,
     {
         RunnableSequence::builder().first(self).last(other).build()
     }
 
-    fn bind(self, kwargs: HashMap<String, Value>) -> RunnableBinding<Self>
-    where
-        Self: Sized,
-    {
+    fn bind(self, kwargs: HashMap<String, Value>) -> RunnableBinding<Self> {
         RunnableBinding::builder()
             .bound(self)
             .kwargs(kwargs)
             .build()
     }
 
-    fn with_config(self, config: RunnableConfig) -> RunnableBinding<Self>
-    where
-        Self: Sized,
-    {
+    fn with_config(self, config: RunnableConfig) -> RunnableBinding<Self> {
         RunnableBinding::builder()
             .bound(self)
             .config(config)
@@ -760,17 +763,11 @@ pub trait Runnable: Send + Sync + Debug {
         self,
         max_attempts: usize,
         wait_exponential_jitter: bool,
-    ) -> super::retry::RunnableRetry<Self>
-    where
-        Self: Sized,
-    {
+    ) -> super::retry::RunnableRetry<Self> {
         super::retry::RunnableRetry::with_simple(self, max_attempts, wait_exponential_jitter)
     }
 
-    fn map(self) -> RunnableEach<Self>
-    where
-        Self: Sized,
-    {
+    fn map(self) -> RunnableEach<Self> {
         RunnableEach::new(self)
     }
 
@@ -779,7 +776,7 @@ pub trait Runnable: Send + Sync + Debug {
         keys: super::passthrough::PickKeys,
     ) -> RunnableSequence<Self, super::passthrough::RunnablePick>
     where
-        Self: Sized + Runnable<Output = HashMap<String, Value>>,
+        Self: Runnable<Output = HashMap<String, Value>>,
     {
         pipe(self, super::passthrough::RunnablePick::from(keys))
     }
@@ -789,7 +786,7 @@ pub trait Runnable: Send + Sync + Debug {
         mapper: super::passthrough::RunnableAssign,
     ) -> RunnableSequence<Self, super::passthrough::RunnableAssign>
     where
-        Self: Sized + Runnable<Output = HashMap<String, Value>>,
+        Self: Runnable<Output = HashMap<String, Value>>,
     {
         pipe(self, mapper)
     }
@@ -799,7 +796,7 @@ pub trait Runnable: Send + Sync + Debug {
         fallbacks: Vec<DynRunnable<Self::Input, Self::Output>>,
     ) -> super::fallbacks::RunnableWithFallbacks<Self::Input, Self::Output>
     where
-        Self: Sized + Send + Sync + 'static,
+        Self: Send + Sync,
     {
         super::fallbacks::RunnableWithFallbacks::new(self, fallbacks)
     }
@@ -809,10 +806,7 @@ pub trait Runnable: Send + Sync + Debug {
         on_start: Option<crate::tracers::root_listeners::Listener>,
         on_end: Option<crate::tracers::root_listeners::Listener>,
         on_error: Option<crate::tracers::root_listeners::Listener>,
-    ) -> RunnableBinding<Self>
-    where
-        Self: Sized,
-    {
+    ) -> RunnableBinding<Self> {
         type SyncFn =
             dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig) + Send + Sync;
 
@@ -859,10 +853,7 @@ pub trait Runnable: Send + Sync + Debug {
         on_start: Option<crate::tracers::root_listeners::AsyncListener>,
         on_end: Option<crate::tracers::root_listeners::AsyncListener>,
         on_error: Option<crate::tracers::root_listeners::AsyncListener>,
-    ) -> RunnableBinding<Self>
-    where
-        Self: Sized,
-    {
+    ) -> RunnableBinding<Self> {
         type AsyncFn = dyn Fn(
                 &crate::tracers::schemas::Run,
                 &super::config::RunnableConfig,
@@ -908,21 +899,22 @@ pub trait Runnable: Send + Sync + Debug {
             .build()
     }
 
-    fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
-        Ok(vec![])
-    }
-
-    fn get_prompts(&self) -> Vec<Arc<dyn crate::BasePromptTemplate>> {
-        vec![]
-    }
-
     fn as_tool(self: Arc<Self>, name: &str, description: &str) -> crate::tools::StructuredTool
     where
-        Self: Sized + Runnable<Input = HashMap<String, Value>, Output = Value> + 'static,
+        Self: Runnable<Input = HashMap<String, Value>, Output = Value>,
     {
         crate::tools::convert_runnable_to_tool(self, name, description)
     }
+
+    fn into_dyn(self) -> DynRunnable<Self::Input, Self::Output>
+    where
+        Self: Send + Sync,
+    {
+        Arc::new(self)
+    }
 }
+
+impl<T: Runnable + Sized + 'static> RunnableExt for T {}
 
 pub trait GraphProvider: Send + Sync + Debug {
     fn provide_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph>;
@@ -1627,6 +1619,16 @@ where
         self.steps.insert(key.into(), Arc::new(runnable));
         self
     }
+
+    pub fn add_branch<R>(mut self, key: impl Into<String>, runnable: R) -> Self
+    where
+        R: Runnable<Input = I> + Send + Sync + 'static,
+        R::Output: Serialize,
+    {
+        self.steps
+            .insert(key.into(), Arc::new(SerializeAdapter { inner: runnable }));
+        self
+    }
 }
 
 impl<I> Default for RunnableParallel<I>
@@ -2228,6 +2230,189 @@ where
     R: Runnable + Send + Sync + 'static,
 {
     Arc::new(runnable)
+}
+
+pub struct DynRunnableSequence<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    steps: Vec<DynRunnable<I, O>>,
+    name: Option<String>,
+}
+
+impl<I, O> Debug for DynRunnableSequence<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DynRunnableSequence")
+            .field("steps", &self.steps.len())
+            .field("name", &self.name)
+            .finish()
+    }
+}
+
+impl<I, O> DynRunnableSequence<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    pub fn new(steps: Vec<DynRunnable<I, O>>) -> Self {
+        Self { steps, name: None }
+    }
+
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    pub fn push(&mut self, step: DynRunnable<I, O>) {
+        self.steps.push(step);
+    }
+}
+
+#[async_trait]
+impl<T> Runnable for DynRunnableSequence<T, T>
+where
+    T: Send + Sync + Clone + Debug + 'static,
+{
+    type Input = T;
+    type Output = T;
+
+    fn name(&self) -> Option<String> {
+        self.name.clone()
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let (run_manager, config) = start_chain_run(config);
+        let mut current = input;
+        for (i, step) in self.steps.iter().enumerate() {
+            let cfg = child_config(&config, &run_manager, Some(&format!("seq:step:{}", i + 1)));
+            match step.invoke(current, Some(cfg)) {
+                Ok(output) => current = output,
+                Err(e) => return finish_chain_run(&run_manager, Err(e)),
+            }
+        }
+        finish_chain_run(&run_manager, Ok(current))
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output>
+    where
+        Self: 'static,
+    {
+        let (run_manager, config) = start_chain_run(config);
+        let mut current = input;
+        for (i, step) in self.steps.iter().enumerate() {
+            let cfg = child_config(&config, &run_manager, Some(&format!("seq:step:{}", i + 1)));
+            match step.ainvoke(current, Some(cfg)).await {
+                Ok(output) => current = output,
+                Err(e) => return finish_chain_run(&run_manager, Err(e)),
+            }
+        }
+        finish_chain_run(&run_manager, Ok(current))
+    }
+
+    fn stream(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'_, Result<Self::Output>> {
+        if self.steps.is_empty() {
+            return Box::pin(futures::stream::once(async move { Ok(input) }));
+        }
+
+        Box::pin(async_stream::stream! {
+            let config = ensure_config(config);
+            let last_idx = self.steps.len() - 1;
+
+            let mut current = input;
+            for step in &self.steps[..last_idx] {
+                match step.invoke(current, Some(config.clone())) {
+                    Ok(output) => current = output,
+                    Err(e) => {
+                        yield Err(e);
+                        return;
+                    }
+                }
+            }
+
+            let mut stream = self.steps[last_idx].stream(current, Some(config));
+            while let Some(result) = stream.next().await {
+                yield result;
+            }
+        })
+    }
+}
+
+struct SerializeAdapter<R>
+where
+    R: Runnable,
+    R::Output: Serialize,
+{
+    inner: R,
+}
+
+impl<R> Debug for SerializeAdapter<R>
+where
+    R: Runnable,
+    R::Output: Serialize,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SerializeAdapter")
+            .field("inner", &self.inner)
+            .finish()
+    }
+}
+
+#[async_trait]
+impl<R> Runnable for SerializeAdapter<R>
+where
+    R: Runnable + 'static,
+    R::Output: Serialize,
+{
+    type Input = R::Input;
+    type Output = Value;
+
+    fn name(&self) -> Option<String> {
+        self.inner.name()
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let output = self.inner.invoke(input, config)?;
+        serde_json::to_value(output).map_err(|e| Error::other(format!("serialization failed: {e}")))
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output>
+    where
+        Self: 'static,
+    {
+        let output = self.inner.ainvoke(input, config).await?;
+        serde_json::to_value(output).map_err(|e| Error::other(format!("serialization failed: {e}")))
+    }
+
+    fn stream(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'_, Result<Self::Output>> {
+        let inner_stream = self.inner.stream(input, config);
+        Box::pin(inner_stream.map(|result| {
+            result.and_then(|output| {
+                serde_json::to_value(output)
+                    .map_err(|e| Error::other(format!("serialization failed: {e}")))
+            })
+        }))
+    }
 }
 
 #[cfg(test)]

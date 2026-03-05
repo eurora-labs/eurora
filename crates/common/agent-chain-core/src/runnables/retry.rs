@@ -527,7 +527,7 @@ impl<R: Runnable> RunnableRetryExt for R {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runnables::base::RunnableLambda;
+    use crate::runnables::base::{RunnableExt, RunnableLambda};
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
