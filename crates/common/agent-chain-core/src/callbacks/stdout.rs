@@ -36,7 +36,7 @@ fn write_text(writer: &Mutex<Box<dyn Write + Send>>, text: &str, color: Option<&
 
 #[derive(Clone)]
 pub struct StdOutCallbackHandler {
-    pub color: Option<String>,
+    color: Option<String>,
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
 }
 
@@ -76,7 +76,11 @@ impl StdOutCallbackHandler {
         }
     }
 
-    fn get_color(&self) -> Option<&str> {
+    pub fn set_color(&mut self, color: impl Into<String>) {
+        self.color = Some(color.into());
+    }
+
+    pub fn color(&self) -> Option<&str> {
         self.color.as_deref()
     }
 }
@@ -98,7 +102,7 @@ impl BaseCallbackHandler for StdOutCallbackHandler {
         if let Some(prefix) = observation_prefix {
             write_text(&self.writer, &format!("\n{}", prefix), None, "");
         }
-        let effective_color = color.or(self.get_color());
+        let effective_color = color.or(self.color());
         write_text(&self.writer, output, effective_color, "");
         if let Some(prefix) = llm_prefix {
             write_text(&self.writer, &format!("\n{}", prefix), None, "");
@@ -113,7 +117,7 @@ impl BaseCallbackHandler for StdOutCallbackHandler {
         color: Option<&str>,
         end: &str,
     ) {
-        let effective_color = color.or(self.get_color());
+        let effective_color = color.or(self.color());
         write_text(&self.writer, text, effective_color, end);
     }
 
@@ -169,7 +173,7 @@ impl BaseCallbackHandler for StdOutCallbackHandler {
         color: Option<&str>,
     ) {
         if let Some(log) = action.get("log").and_then(|v| v.as_str()) {
-            let effective_color = color.or(self.get_color());
+            let effective_color = color.or(self.color());
             write_text(&self.writer, log, effective_color, "");
         }
     }
@@ -182,7 +186,7 @@ impl BaseCallbackHandler for StdOutCallbackHandler {
         color: Option<&str>,
     ) {
         if let Some(log) = finish.get("log").and_then(|v| v.as_str()) {
-            let effective_color = color.or(self.get_color());
+            let effective_color = color.or(self.color());
             write_text(&self.writer, log, effective_color, "\n");
         }
     }
@@ -195,13 +199,13 @@ mod tests {
     #[test]
     fn test_stdout_handler_creation() {
         let handler = StdOutCallbackHandler::new();
-        assert!(handler.color.is_none());
+        assert!(handler.color().is_none());
         assert_eq!(handler.name(), "StdOutCallbackHandler");
     }
 
     #[test]
     fn test_stdout_handler_with_color() {
         let handler = StdOutCallbackHandler::with_color(colors::GREEN);
-        assert_eq!(handler.color, Some(colors::GREEN.to_string()));
+        assert_eq!(handler.color(), Some(colors::GREEN));
     }
 }

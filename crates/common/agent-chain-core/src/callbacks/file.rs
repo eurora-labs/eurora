@@ -29,7 +29,6 @@ impl FileMode {
 pub struct FileCallbackHandler {
     filename: String,
     mode: FileMode,
-    color: Option<String>,
     file: Mutex<Option<BufWriter<File>>>,
 }
 
@@ -49,19 +48,8 @@ impl FileCallbackHandler {
         Ok(Self {
             filename: filename.as_ref().to_string_lossy().to_string(),
             mode,
-            color: None,
             file: Mutex::new(Some(BufWriter::new(file))),
         })
-    }
-
-    pub fn with_color<P: AsRef<Path>>(
-        filename: P,
-        mode: FileMode,
-        color: impl Into<String>,
-    ) -> io::Result<Self> {
-        let mut handler = Self::with_mode(filename, mode)?;
-        handler.color = Some(color.into());
-        Ok(handler)
     }
 
     pub fn filename(&self) -> &str {
@@ -70,10 +58,6 @@ impl FileCallbackHandler {
 
     pub fn mode(&self) -> FileMode {
         self.mode
-    }
-
-    pub fn color(&self) -> Option<&str> {
-        self.color.as_deref()
     }
 
     pub fn close(&self) {
@@ -210,7 +194,6 @@ mod tests {
 
         let handler = handler.unwrap();
         assert_eq!(handler.name(), "FileCallbackHandler");
-        assert!(handler.color().is_none());
         assert_eq!(handler.mode(), FileMode::Write);
     }
 
@@ -231,18 +214,6 @@ mod tests {
 
         let handler = FileCallbackHandler::with_mode(&file_path, FileMode::CreateNew);
         assert!(handler.is_err());
-    }
-
-    #[test]
-    fn test_file_handler_with_color() {
-        let dir = tempdir().unwrap();
-        let file_path = dir.path().join("test_color.txt");
-
-        let handler = FileCallbackHandler::with_color(&file_path, FileMode::Append, "green");
-        assert!(handler.is_ok());
-
-        let handler = handler.unwrap();
-        assert_eq!(handler.color(), Some("green"));
     }
 
     #[test]

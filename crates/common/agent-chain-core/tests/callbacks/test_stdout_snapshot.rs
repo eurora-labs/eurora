@@ -43,21 +43,23 @@ fn create_test_handler() -> (StdOutCallbackHandler, TestWriter) {
 }
 
 fn create_test_handler_with_color(color: &str) -> (StdOutCallbackHandler, TestWriter) {
-    let (mut handler, writer) = create_test_handler();
-    handler.color = Some(color.to_string());
+    let writer = TestWriter::new();
+    let boxed: Box<dyn Write + Send> = Box::new(writer.clone());
+    let mut handler = StdOutCallbackHandler::with_writer(Arc::new(Mutex::new(boxed)));
+    handler.set_color(color);
     (handler, writer)
 }
 
 #[test]
 fn test_default_color_is_none() {
     let handler = StdOutCallbackHandler::new();
-    assert!(handler.color.is_none());
+    assert!(handler.color().is_none());
 }
 
 #[test]
 fn test_custom_color_stored() {
     let handler = StdOutCallbackHandler::with_color("blue");
-    assert_eq!(handler.color, Some("blue".to_string()));
+    assert_eq!(handler.color(), Some("blue"));
 }
 
 #[test]

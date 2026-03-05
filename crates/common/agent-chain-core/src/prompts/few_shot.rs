@@ -23,10 +23,7 @@ pub type ExampleSelectionFuture<'a> =
     std::pin::Pin<Box<dyn std::future::Future<Output = Vec<HashMap<String, String>>> + Send + 'a>>;
 
 pub trait ExampleSelector: Send + Sync {
-    fn add_example(&mut self, example: HashMap<String, String>) -> Option<String> {
-        let _ = example;
-        None
-    }
+    fn add_example(&mut self, example: HashMap<String, String>) -> Option<String>;
 
     fn select_examples(
         &self,
@@ -95,6 +92,11 @@ impl StaticExampleSelector {
 
 #[cfg(test)]
 impl ExampleSelector for StaticExampleSelector {
+    fn add_example(&mut self, example: HashMap<String, String>) -> Option<String> {
+        self.examples.push(example);
+        None
+    }
+
     fn select_examples(
         &self,
         _input_variables: &HashMap<String, String>,
