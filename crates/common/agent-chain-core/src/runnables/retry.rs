@@ -18,6 +18,24 @@ use super::config::{
     patch_config,
 };
 
+const DEFAULT_INITIAL: f64 = 1.0;
+const DEFAULT_MAX: f64 = 60.0;
+const DEFAULT_EXP_BASE: f64 = 2.0;
+const DEFAULT_JITTER: f64 = 1.0;
+
+fn default_initial() -> f64 {
+    DEFAULT_INITIAL
+}
+fn default_max() -> f64 {
+    DEFAULT_MAX
+}
+fn default_exp_base() -> f64 {
+    DEFAULT_EXP_BASE
+}
+fn default_jitter() -> f64 {
+    DEFAULT_JITTER
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExponentialJitterParams {
     #[serde(default = "default_initial")]
@@ -33,29 +51,13 @@ pub struct ExponentialJitterParams {
     pub jitter: f64,
 }
 
-fn default_initial() -> f64 {
-    1.0
-}
-
-fn default_max() -> f64 {
-    60.0
-}
-
-fn default_exp_base() -> f64 {
-    2.0
-}
-
-fn default_jitter() -> f64 {
-    1.0
-}
-
 impl Default for ExponentialJitterParams {
     fn default() -> Self {
         Self {
-            initial: 1.0,
-            max: 60.0,
-            exp_base: 2.0,
-            jitter: 1.0,
+            initial: DEFAULT_INITIAL,
+            max: DEFAULT_MAX,
+            exp_base: DEFAULT_EXP_BASE,
+            jitter: DEFAULT_JITTER,
         }
     }
 }
@@ -64,10 +66,10 @@ impl Default for ExponentialJitterParams {
 impl ExponentialJitterParams {
     #[builder]
     pub fn new(
-        #[builder(default = 1.0)] initial: f64,
-        #[builder(default = 60.0)] max: f64,
-        #[builder(default = 2.0)] exp_base: f64,
-        #[builder(default = 1.0)] jitter: f64,
+        #[builder(default = DEFAULT_INITIAL)] initial: f64,
+        #[builder(default = DEFAULT_MAX)] max: f64,
+        #[builder(default = DEFAULT_EXP_BASE)] exp_base: f64,
+        #[builder(default = DEFAULT_JITTER)] jitter: f64,
     ) -> Self {
         Self {
             initial,
@@ -88,17 +90,6 @@ impl ExponentialJitterParams {
         };
         let total_seconds = capped_wait + jitter_amount;
         Duration::from_secs_f64(total_seconds)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct RetryCallState {
-    pub attempt_number: usize,
-}
-
-impl RetryCallState {
-    fn new(attempt_number: usize) -> Self {
-        Self { attempt_number }
     }
 }
 
@@ -266,10 +257,10 @@ where
     fn patch_config_for_retry(
         config: &RunnableConfig,
         run_manager: &CallbackManagerForChainRun,
-        retry_state: &RetryCallState,
+        attempt: usize,
     ) -> RunnableConfig {
-        let tag = if retry_state.attempt_number > 1 {
-            Some(format!("retry:attempt:{}", retry_state.attempt_number))
+        let tag = if attempt > 1 {
+            Some(format!("retry:attempt:{}", attempt))
         } else {
             None
         };
@@ -283,14 +274,12 @@ where
     fn patch_config_list_for_retry(
         configs: &[RunnableConfig],
         run_managers: &[CallbackManagerForChainRun],
-        retry_state: &RetryCallState,
+        attempt: usize,
     ) -> Vec<RunnableConfig> {
         configs
             .iter()
             .zip(run_managers.iter())
-            .map(|(config, run_manager)| {
-                Self::patch_config_for_retry(config, run_manager, retry_state)
-            })
+            .map(|(config, run_manager)| Self::patch_config_for_retry(config, run_manager, attempt))
             .collect()
     }
 }
@@ -329,8 +318,7 @@ where
         let attempt = AtomicUsize::new(0);
         let result = (|| {
             let n = attempt.fetch_add(1, Ordering::SeqCst) + 1;
-            let retry_state = RetryCallState::new(n);
-            let patched_config = Self::patch_config_for_retry(&config, &run_manager, &retry_state);
+            let patched_config = Self::patch_config_for_retry(&config, &run_manager, n);
             self.bound.invoke(input.clone(), Some(patched_config))
         })
         .retry(self.backoff_builder())
@@ -370,8 +358,7 @@ where
         let attempt = AtomicUsize::new(0);
         let result = (|| {
             let n = attempt.fetch_add(1, Ordering::SeqCst) + 1;
-            let retry_state = RetryCallState::new(n);
-            let patched_config = Self::patch_config_for_retry(&config, &run_manager, &retry_state);
+            let patched_config = Self::patch_config_for_retry(&config, &run_manager, n);
             let input = input.clone();
             async move { self.bound.ainvoke(input, Some(patched_config)).await }
         })
@@ -432,8 +419,6 @@ where
                 break;
             }
 
-            let retry_state = RetryCallState::new(attempt);
-
             let pending_inputs: Vec<Self::Input> =
                 remaining.iter().map(|&i| inputs[i].clone()).collect();
             let pending_configs: Vec<RunnableConfig> =
@@ -441,11 +426,8 @@ where
             let pending_managers: Vec<CallbackManagerForChainRun> =
                 remaining.iter().map(|&i| run_managers[i].clone()).collect();
 
-            let patched_configs = Self::patch_config_list_for_retry(
-                &pending_configs,
-                &pending_managers,
-                &retry_state,
-            );
+            let patched_configs =
+                Self::patch_config_list_for_retry(&pending_configs, &pending_managers, attempt);
 
             let batch_results = self.bound.batch(
                 pending_inputs,
@@ -546,8 +528,6 @@ where
                 break;
             }
 
-            let retry_state = RetryCallState::new(attempt);
-
             let pending_inputs: Vec<Self::Input> =
                 remaining.iter().map(|&i| inputs[i].clone()).collect();
             let pending_configs: Vec<RunnableConfig> =
@@ -555,11 +535,8 @@ where
             let pending_managers: Vec<CallbackManagerForChainRun> =
                 remaining.iter().map(|&i| run_managers[i].clone()).collect();
 
-            let patched_configs = Self::patch_config_list_for_retry(
-                &pending_configs,
-                &pending_managers,
-                &retry_state,
-            );
+            let patched_configs =
+                Self::patch_config_list_for_retry(&pending_configs, &pending_managers, attempt);
 
             let batch_results = self
                 .bound

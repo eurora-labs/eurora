@@ -84,14 +84,6 @@ pub fn make_options_spec_multi(
     }
 }
 
-fn str_remove_prefix(s: &str, prefix: &str) -> String {
-    if let Some(stripped) = s.strip_prefix(prefix) {
-        stripped.to_string()
-    } else {
-        s.to_string()
-    }
-}
-
 pub trait DynamicRunnable: Runnable {
     fn config_specs(&self) -> Vec<ConfigurableFieldSpec>;
 
@@ -568,7 +560,12 @@ where
             let new_configurable: HashMap<String, Value> = config
                 .configurable
                 .iter()
-                .map(|(k, v)| (str_remove_prefix(k, &prefix), v.clone()))
+                .map(|(k, v)| {
+                    (
+                        k.strip_prefix(prefix.as_str()).unwrap_or(k).to_string(),
+                        v.clone(),
+                    )
+                })
                 .collect();
             RunnableConfig {
                 configurable: new_configurable,
@@ -908,18 +905,6 @@ mod tests {
         };
         let prefixed_shared = prefix_config_spec(&shared_spec, "model==gpt4");
         assert_eq!(prefixed_shared.id, "temperature");
-    }
-
-    #[test]
-    fn test_str_remove_prefix() {
-        assert_eq!(
-            str_remove_prefix("model==gpt4/temperature", "model==gpt4/"),
-            "temperature"
-        );
-        assert_eq!(
-            str_remove_prefix("temperature", "model==gpt4/"),
-            "temperature"
-        );
     }
 
     #[test]

@@ -394,7 +394,7 @@ fn test_stream_event_with_parent_ids() {
 
 #[test]
 fn test_filter_default_includes_all() {
-    let filter = RootEventFilter::new();
+    let filter = RootEventFilter::default();
     assert!(filter.include_event("any_name", &[], "chain"));
     assert!(filter.include_event("foo", &["tag1".into()], "llm"));
 }

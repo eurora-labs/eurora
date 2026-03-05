@@ -96,6 +96,71 @@ where
             None => true,
         }
     }
+
+    /// Process batch outputs from a single runnable, updating tracking state.
+    /// Returns `Some(results)` if we should return early (non-fallback error), `None` to continue.
+    fn process_batch_outputs(
+        &self,
+        outputs: Vec<Result<O>>,
+        run_again: &[(usize, I)],
+        to_return: &mut [Option<Result<O>>],
+        handled_exception_indices: &mut Vec<usize>,
+        first_to_raise: &mut Option<Error>,
+        next_run_again: &mut Vec<(usize, I)>,
+        return_exceptions: bool,
+    ) -> Option<Vec<Result<O>>> {
+        for ((i, input), output) in run_again.iter().zip(outputs) {
+            match output {
+                Ok(out) => {
+                    to_return[*i] = Some(Ok(out));
+                    handled_exception_indices.retain(|&idx| idx != *i);
+                }
+                Err(e) => {
+                    if self.should_fallback(&e) {
+                        if !handled_exception_indices.contains(i) {
+                            handled_exception_indices.push(*i);
+                        }
+                        let next_input = if let (Some(key), Some(inserter)) =
+                            (&self.exception_key, &self.exception_inserter)
+                        {
+                            inserter(input, key, &e)
+                        } else {
+                            input.clone()
+                        };
+                        to_return[*i] = Some(Err(e));
+                        next_run_again.push((*i, next_input));
+                    } else if return_exceptions {
+                        to_return[*i] = Some(Err(e));
+                    } else if first_to_raise.is_none() {
+                        *first_to_raise = Some(e);
+                    }
+                }
+            }
+        }
+
+        if first_to_raise.is_some() {
+            let mut results = Vec::with_capacity(to_return.len());
+            let mut error_consumed = false;
+            for opt in to_return.iter_mut() {
+                match opt.take() {
+                    Some(result) => results.push(result),
+                    None => {
+                        if !error_consumed {
+                            results.push(Err(first_to_raise
+                                .take()
+                                .expect("first_to_raise set when errors exist")));
+                            error_consumed = true;
+                        } else {
+                            results.push(Err(Error::other("Batch aborted due to error")));
+                        }
+                    }
+                }
+            }
+            return Some(results);
+        }
+
+        None
+    }
 }
 
 #[async_trait]
@@ -249,61 +314,19 @@ where
             let batch_configs: Vec<RunnableConfig> =
                 run_again.iter().map(|(i, _)| configs[*i].clone()).collect();
 
-            let outputs = runnable.batch(
-                batch_inputs,
-                Some(ConfigOrList::List(batch_configs)),
-                true, // Always return exceptions to handle them ourselves
-            );
+            let outputs =
+                runnable.batch(batch_inputs, Some(ConfigOrList::List(batch_configs)), true);
 
             let mut next_run_again = Vec::new();
-
-            for ((i, input), output) in run_again.iter().zip(outputs) {
-                match output {
-                    Ok(out) => {
-                        to_return[*i] = Some(Ok(out));
-                        handled_exception_indices.retain(|&idx| idx != *i);
-                    }
-                    Err(e) => {
-                        if self.should_fallback(&e) {
-                            if !handled_exception_indices.contains(i) {
-                                handled_exception_indices.push(*i);
-                            }
-                            let next_input = if let (Some(key), Some(inserter)) =
-                                (&self.exception_key, &self.exception_inserter)
-                            {
-                                inserter(input, key, &e)
-                            } else {
-                                input.clone()
-                            };
-                            to_return[*i] = Some(Err(e));
-                            next_run_again.push((*i, next_input));
-                        } else if return_exceptions {
-                            to_return[*i] = Some(Err(e));
-                        } else if first_to_raise.is_none() {
-                            first_to_raise = Some(e);
-                        }
-                    }
-                }
-            }
-
-            if first_to_raise.is_some() {
-                let mut results = Vec::with_capacity(to_return.len());
-                let mut error_consumed = false;
-                for opt in to_return {
-                    match opt {
-                        Some(result) => results.push(result),
-                        None => {
-                            if !error_consumed {
-                                results.push(Err(first_to_raise
-                                    .take()
-                                    .expect("first_to_raise set when errors exist")));
-                                error_consumed = true;
-                            } else {
-                                results.push(Err(Error::other("Batch aborted due to error")));
-                            }
-                        }
-                    }
-                }
+            if let Some(results) = self.process_batch_outputs(
+                outputs,
+                &run_again,
+                &mut to_return,
+                &mut handled_exception_indices,
+                &mut first_to_raise,
+                &mut next_run_again,
+                return_exceptions,
+            ) {
                 return results;
             }
 
@@ -351,62 +374,19 @@ where
                 run_again.iter().map(|(i, _)| configs[*i].clone()).collect();
 
             let outputs = runnable
-                .abatch(
-                    batch_inputs,
-                    Some(ConfigOrList::List(batch_configs)),
-                    true, // Always return exceptions to handle them ourselves
-                )
+                .abatch(batch_inputs, Some(ConfigOrList::List(batch_configs)), true)
                 .await;
 
             let mut next_run_again = Vec::new();
-
-            for ((i, input), output) in run_again.iter().zip(outputs) {
-                match output {
-                    Ok(out) => {
-                        to_return[*i] = Some(Ok(out));
-                        handled_exception_indices.retain(|&idx| idx != *i);
-                    }
-                    Err(e) => {
-                        if self.should_fallback(&e) {
-                            if !handled_exception_indices.contains(i) {
-                                handled_exception_indices.push(*i);
-                            }
-                            let next_input = if let (Some(key), Some(inserter)) =
-                                (&self.exception_key, &self.exception_inserter)
-                            {
-                                inserter(input, key, &e)
-                            } else {
-                                input.clone()
-                            };
-                            to_return[*i] = Some(Err(e));
-                            next_run_again.push((*i, next_input));
-                        } else if return_exceptions {
-                            to_return[*i] = Some(Err(e));
-                        } else if first_to_raise.is_none() {
-                            first_to_raise = Some(e);
-                        }
-                    }
-                }
-            }
-
-            if first_to_raise.is_some() {
-                let mut results = Vec::with_capacity(to_return.len());
-                let mut error_consumed = false;
-                for opt in to_return {
-                    match opt {
-                        Some(result) => results.push(result),
-                        None => {
-                            if !error_consumed {
-                                results.push(Err(first_to_raise
-                                    .take()
-                                    .expect("first_to_raise set when errors exist")));
-                                error_consumed = true;
-                            } else {
-                                results.push(Err(Error::other("Batch aborted due to error")));
-                            }
-                        }
-                    }
-                }
+            if let Some(results) = self.process_batch_outputs(
+                outputs,
+                &run_again,
+                &mut to_return,
+                &mut handled_exception_indices,
+                &mut first_to_raise,
+                &mut next_run_again,
+                return_exceptions,
+            ) {
                 return results;
             }
 
@@ -424,52 +404,7 @@ where
         input: Self::Input,
         config: Option<RunnableConfig>,
     ) -> BoxStream<'_, Result<Self::Output>> {
-        let config = ensure_config(config);
-
-        Box::pin(async_stream::stream! {
-            let mut first_error: Option<Error> = None;
-            let mut last_error: Option<Error> = None;
-            let mut current_input = input;
-
-            for runnable in self.runnables() {
-                if let (Some(key), Some(inserter), Some(err)) =
-                    (&self.exception_key, &self.exception_inserter, &last_error)
-                {
-                    current_input = inserter(&current_input, key, err);
-                }
-
-                let mut stream = runnable.stream(current_input.clone(), Some(config.clone()));
-
-                match stream.next().await {
-                    Some(Ok(chunk)) => {
-                        yield Ok(chunk);
-
-                        while let Some(result) = stream.next().await {
-                            yield result;
-                        }
-                        return;
-                    }
-                    Some(Err(e)) => {
-                        if self.should_fallback(&e) {
-                            if first_error.is_none() {
-                                first_error = Some(Error::other(e.to_string()));
-                            }
-                            last_error = Some(e);
-                        } else {
-                            yield Err(e);
-                            return;
-                        }
-                    }
-                    None => {
-                        if first_error.is_none() {
-                            first_error = Some(Error::other("Empty stream from runnable"));
-                        }
-                    }
-                }
-            }
-
-            yield Err(first_error.unwrap_or_else(|| Error::other("No error stored at end of fallbacks.")));
-        })
+        self.astream(input, config)
     }
 
     fn astream(

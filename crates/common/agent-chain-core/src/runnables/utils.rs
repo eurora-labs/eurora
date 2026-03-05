@@ -58,18 +58,37 @@ impl AddableDict {
     }
 }
 
+impl std::ops::Deref for AddableDict {
+    type Target = HashMap<String, Value>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for AddableDict {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl From<HashMap<String, Value>> for AddableDict {
+    fn from(map: HashMap<String, Value>) -> Self {
+        Self(map)
+    }
+}
+
 impl std::ops::Add for AddableDict {
     type Output = Self;
 
     fn add(mut self, other: Self) -> Self::Output {
         for (key, value) in other.0 {
-            match self.0.get(&key) {
+            match self.get(&key) {
                 None | Some(&Value::Null) => {
-                    self.0.insert(key, value);
+                    self.insert(key, value);
                 }
                 Some(existing) if !value.is_null() => {
                     let added = try_add_values(existing, &value);
-                    self.0.insert(key, added);
+                    self.insert(key, added);
                 }
                 _ => {}
             }
@@ -346,7 +365,7 @@ pub fn get_unique_config_specs(
     Ok(unique)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RootEventFilter {
     pub include_names: Option<Vec<String>>,
     pub include_types: Option<Vec<String>>,
@@ -357,17 +376,6 @@ pub struct RootEventFilter {
 }
 
 impl RootEventFilter {
-    pub fn new() -> Self {
-        Self {
-            include_names: None,
-            include_types: None,
-            include_tags: None,
-            exclude_names: None,
-            exclude_types: None,
-            exclude_tags: None,
-        }
-    }
-
     pub fn include_event(&self, event_name: &str, event_tags: &[String], root_type: &str) -> bool {
         let mut include = self.include_names.is_none()
             && self.include_types.is_none()
@@ -398,12 +406,6 @@ impl RootEventFilter {
         }
 
         include
-    }
-}
-
-impl Default for RootEventFilter {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
