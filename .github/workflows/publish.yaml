@@ -110,7 +110,7 @@ jobs:
                   VITE_MODE: ${{ env.vitemode }}
               run: pnpm build:desktop -- --mode "$VITE_MODE"
 
-            - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+            - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
               name: Upload SvelteKit build output
               with:
                   name: sveltekit-build
@@ -178,7 +178,7 @@ jobs:
                   ls -lh "release/${BROWSER}.zip"
 
             - name: Upload artifact
-              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+              uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
               with:
                   name: 'browser-${{ matrix.browser }}-${{ github.run_number }}'
                   path: release/
@@ -673,7 +673,7 @@ jobs:
 
             - name: Upload Artifacts
               if: runner.os != 'macOS'
-              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+              uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
               with:
                   name: '${{ env.channel }}-${{ matrix.platform }}${{ env.artifact_suffix }}-${{ github.run_number }}'
                   path: release/
@@ -681,7 +681,7 @@ jobs:
 
             - name: Upload assembled macOS artifacts
               if: runner.os == 'macOS'
-              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+              uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
               with:
                   name: 'assembled-macos-${{ matrix.launcher_arch }}-${{ github.run_number }}'
                   path: release/
