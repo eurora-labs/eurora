@@ -21,6 +21,47 @@ use super::utils::{Addable, ConfigurableFieldSpec, get_unique_config_specs};
 
 pub type ConfigFactory = Arc<dyn Fn(&RunnableConfig) -> RunnableConfig + Send + Sync>;
 
+fn default_get_graph(
+    runnable: &(impl Runnable + ?Sized),
+    config: Option<&RunnableConfig>,
+) -> Result<super::graph::Graph> {
+    use super::graph::NodeData;
+    let mut graph = super::graph::Graph::new();
+
+    let input_node = graph.add_node(
+        Some(NodeData::Schema {
+            name: runnable.get_name(Some("Input"), None),
+        }),
+        None,
+        None,
+    );
+
+    let metadata = config
+        .map(|c| &c.metadata)
+        .filter(|m| !m.is_empty())
+        .cloned();
+    let runnable_node = graph.add_node(
+        Some(NodeData::Runnable {
+            name: runnable.get_name(None, None),
+        }),
+        None,
+        metadata,
+    );
+
+    let output_node = graph.add_node(
+        Some(NodeData::Schema {
+            name: runnable.get_name(Some("Output"), None),
+        }),
+        None,
+        None,
+    );
+
+    graph.add_edge(&input_node, &runnable_node, None, false);
+    graph.add_edge(&runnable_node, &output_node, None, false);
+
+    Ok(graph)
+}
+
 #[async_trait]
 pub trait Runnable: Send + Sync + Debug {
     type Input: Send + Sync + Clone + Debug + 'static;
@@ -711,41 +752,7 @@ pub trait Runnable: Send + Sync + Debug {
     }
 
     fn get_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph> {
-        use super::graph::NodeData;
-        let mut graph = super::graph::Graph::new();
-
-        let input_node = graph.add_node(
-            Some(NodeData::Schema {
-                name: self.get_name(Some("Input"), None),
-            }),
-            None,
-            None,
-        );
-
-        let metadata = config
-            .map(|c| &c.metadata)
-            .filter(|m| !m.is_empty())
-            .cloned();
-        let runnable_node = graph.add_node(
-            Some(NodeData::Runnable {
-                name: self.get_name(None, None),
-            }),
-            None,
-            metadata,
-        );
-
-        let output_node = graph.add_node(
-            Some(NodeData::Schema {
-                name: self.get_name(Some("Output"), None),
-            }),
-            None,
-            None,
-        );
-
-        graph.add_edge(&input_node, &runnable_node, None, false);
-        graph.add_edge(&runnable_node, &output_node, None, false);
-
-        Ok(graph)
+        default_get_graph(self, config)
     }
 
     fn transform<'a>(
@@ -888,42 +895,21 @@ pub trait Runnable: Send + Sync + Debug {
     where
         Self: Sized,
     {
-        let on_start: Option<
-            Arc<
-                dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig) + Send + Sync,
-            >,
-        > = on_start.map(|f| {
-            Arc::from(f)
-                as Arc<
-                    dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig)
-                        + Send
-                        + Sync,
-                >
-        });
-        let on_end: Option<
-            Arc<
-                dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig) + Send + Sync,
-            >,
-        > = on_end.map(|f| {
-            Arc::from(f)
-                as Arc<
-                    dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig)
-                        + Send
-                        + Sync,
-                >
-        });
-        let on_error: Option<
-            Arc<
-                dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig) + Send + Sync,
-            >,
-        > = on_error.map(|f| {
-            Arc::from(f)
-                as Arc<
-                    dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig)
-                        + Send
-                        + Sync,
-                >
-        });
+        type SyncFn =
+            dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig) + Send + Sync;
+
+        fn arc_listener(f: crate::tracers::root_listeners::Listener) -> Arc<SyncFn> {
+            Arc::from(f) as Arc<SyncFn>
+        }
+
+        fn clone_listener(f: &Arc<SyncFn>) -> crate::tracers::root_listeners::Listener {
+            let f = f.clone();
+            Box::new(move |run, cfg| f(run, cfg))
+        }
+
+        let on_start = on_start.map(arc_listener);
+        let on_end = on_end.map(arc_listener);
+        let on_error = on_error.map(arc_listener);
 
         let factory: ConfigFactory = Arc::new(move |config: &super::config::RunnableConfig| {
             use crate::callbacks::Callbacks;
@@ -931,33 +917,9 @@ pub trait Runnable: Send + Sync + Debug {
 
             let tracer = RootListenersTracer::new(
                 config.clone(),
-                on_start.as_ref().map(|f| {
-                    Box::new({
-                        let f = f.clone();
-                        move |run: &crate::tracers::schemas::Run,
-                              cfg: &super::config::RunnableConfig| {
-                            f(run, cfg)
-                        }
-                    }) as crate::tracers::root_listeners::Listener
-                }),
-                on_end.as_ref().map(|f| {
-                    Box::new({
-                        let f = f.clone();
-                        move |run: &crate::tracers::schemas::Run,
-                              cfg: &super::config::RunnableConfig| {
-                            f(run, cfg)
-                        }
-                    }) as crate::tracers::root_listeners::Listener
-                }),
-                on_error.as_ref().map(|f| {
-                    Box::new({
-                        let f = f.clone();
-                        move |run: &crate::tracers::schemas::Run,
-                              cfg: &super::config::RunnableConfig| {
-                            f(run, cfg)
-                        }
-                    }) as crate::tracers::root_listeners::Listener
-                }),
+                on_start.as_ref().map(clone_listener),
+                on_end.as_ref().map(clone_listener),
+                on_error.as_ref().map(clone_listener),
             );
 
             super::config::RunnableConfig {
@@ -983,66 +945,25 @@ pub trait Runnable: Send + Sync + Debug {
     where
         Self: Sized,
     {
-        let on_start: Option<
-            Arc<
-                dyn Fn(
-                        &crate::tracers::schemas::Run,
-                        &super::config::RunnableConfig,
-                    ) -> futures::future::BoxFuture<'static, ()>
-                    + Send
-                    + Sync,
-            >,
-        > = on_start.map(|f| {
-            Arc::from(f)
-                as Arc<
-                    dyn Fn(
-                            &crate::tracers::schemas::Run,
-                            &super::config::RunnableConfig,
-                        ) -> futures::future::BoxFuture<'static, ()>
-                        + Send
-                        + Sync,
-                >
-        });
-        let on_end: Option<
-            Arc<
-                dyn Fn(
-                        &crate::tracers::schemas::Run,
-                        &super::config::RunnableConfig,
-                    ) -> futures::future::BoxFuture<'static, ()>
-                    + Send
-                    + Sync,
-            >,
-        > = on_end.map(|f| {
-            Arc::from(f)
-                as Arc<
-                    dyn Fn(
-                            &crate::tracers::schemas::Run,
-                            &super::config::RunnableConfig,
-                        ) -> futures::future::BoxFuture<'static, ()>
-                        + Send
-                        + Sync,
-                >
-        });
-        let on_error: Option<
-            Arc<
-                dyn Fn(
-                        &crate::tracers::schemas::Run,
-                        &super::config::RunnableConfig,
-                    ) -> futures::future::BoxFuture<'static, ()>
-                    + Send
-                    + Sync,
-            >,
-        > = on_error.map(|f| {
-            Arc::from(f)
-                as Arc<
-                    dyn Fn(
-                            &crate::tracers::schemas::Run,
-                            &super::config::RunnableConfig,
-                        ) -> futures::future::BoxFuture<'static, ()>
-                        + Send
-                        + Sync,
-                >
-        });
+        type AsyncFn = dyn Fn(
+                &crate::tracers::schemas::Run,
+                &super::config::RunnableConfig,
+            ) -> futures::future::BoxFuture<'static, ()>
+            + Send
+            + Sync;
+
+        fn arc_listener(f: crate::tracers::root_listeners::AsyncListener) -> Arc<AsyncFn> {
+            Arc::from(f) as Arc<AsyncFn>
+        }
+
+        fn clone_listener(f: &Arc<AsyncFn>) -> crate::tracers::root_listeners::AsyncListener {
+            let f = f.clone();
+            Box::new(move |run, cfg| f(run, cfg))
+        }
+
+        let on_start = on_start.map(arc_listener);
+        let on_end = on_end.map(arc_listener);
+        let on_error = on_error.map(arc_listener);
 
         let factory: ConfigFactory = Arc::new(move |config: &super::config::RunnableConfig| {
             use crate::callbacks::Callbacks;
@@ -1050,36 +971,9 @@ pub trait Runnable: Send + Sync + Debug {
 
             let tracer = AsyncRootListenersTracer::new(
                 config.clone(),
-                on_start.as_ref().map(|f| {
-                    Box::new({
-                        let f = f.clone();
-                        move |run: &crate::tracers::schemas::Run,
-                              cfg: &crate::runnables::config::RunnableConfig|
-                              -> futures::future::BoxFuture<'static, ()> {
-                            f(run, cfg)
-                        }
-                    }) as crate::tracers::root_listeners::AsyncListener
-                }),
-                on_end.as_ref().map(|f| {
-                    Box::new({
-                        let f = f.clone();
-                        move |run: &crate::tracers::schemas::Run,
-                              cfg: &crate::runnables::config::RunnableConfig|
-                              -> futures::future::BoxFuture<'static, ()> {
-                            f(run, cfg)
-                        }
-                    }) as crate::tracers::root_listeners::AsyncListener
-                }),
-                on_error.as_ref().map(|f| {
-                    Box::new({
-                        let f = f.clone();
-                        move |run: &crate::tracers::schemas::Run,
-                              cfg: &crate::runnables::config::RunnableConfig|
-                              -> futures::future::BoxFuture<'static, ()> {
-                            f(run, cfg)
-                        }
-                    }) as crate::tracers::root_listeners::AsyncListener
-                }),
+                on_start.as_ref().map(clone_listener),
+                on_end.as_ref().map(clone_listener),
+                on_error.as_ref().map(clone_listener),
             );
 
             super::config::RunnableConfig {
@@ -1253,80 +1147,46 @@ where
 
     fn get_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph> {
         if self.deps.is_empty() {
-            use super::graph::NodeData;
-            let mut graph = super::graph::Graph::new();
-
-            let input_node = graph.add_node(
-                Some(NodeData::Schema {
-                    name: self.get_name(Some("Input"), None),
-                }),
-                None,
-                None,
-            );
-
-            let metadata = config
-                .map(|c| &c.metadata)
-                .filter(|m| !m.is_empty())
-                .cloned();
-            let runnable_node = graph.add_node(
-                Some(NodeData::Runnable {
-                    name: self.get_name(None, None),
-                }),
-                None,
-                metadata,
-            );
-
-            let output_node = graph.add_node(
-                Some(NodeData::Schema {
-                    name: self.get_name(Some("Output"), None),
-                }),
-                None,
-                None,
-            );
-
-            graph.add_edge(&input_node, &runnable_node, None, false);
-            graph.add_edge(&runnable_node, &output_node, None, false);
-
-            Ok(graph)
-        } else {
-            use super::graph::NodeData;
-            let mut graph = super::graph::Graph::new();
-
-            let input_node = graph.add_node(
-                Some(NodeData::Schema {
-                    name: self.get_name(Some("Input"), None),
-                }),
-                None,
-                None,
-            );
-            let output_node = graph.add_node(
-                Some(NodeData::Schema {
-                    name: self.get_name(Some("Output"), None),
-                }),
-                None,
-                None,
-            );
-
-            for dep in &self.deps {
-                let mut dep_graph = dep.provide_graph(None)?;
-                dep_graph.trim_first_node();
-                dep_graph.trim_last_node();
-
-                if dep_graph.nodes.is_empty() {
-                    graph.add_edge(&input_node, &output_node, None, false);
-                } else {
-                    let (dep_first, dep_last) = graph.extend(dep_graph, "");
-                    let dep_first = dep_first
-                        .ok_or_else(|| Error::other("RunnableLambda dep has no first node"))?;
-                    let dep_last = dep_last
-                        .ok_or_else(|| Error::other("RunnableLambda dep has no last node"))?;
-                    graph.add_edge(&input_node, &dep_first, None, false);
-                    graph.add_edge(&dep_last, &output_node, None, false);
-                }
-            }
-
-            Ok(graph)
+            return default_get_graph(self, config);
         }
+
+        use super::graph::NodeData;
+        let mut graph = super::graph::Graph::new();
+
+        let input_node = graph.add_node(
+            Some(NodeData::Schema {
+                name: self.get_name(Some("Input"), None),
+            }),
+            None,
+            None,
+        );
+        let output_node = graph.add_node(
+            Some(NodeData::Schema {
+                name: self.get_name(Some("Output"), None),
+            }),
+            None,
+            None,
+        );
+
+        for dep in &self.deps {
+            let mut dep_graph = dep.provide_graph(None)?;
+            dep_graph.trim_first_node();
+            dep_graph.trim_last_node();
+
+            if dep_graph.nodes.is_empty() {
+                graph.add_edge(&input_node, &output_node, None, false);
+            } else {
+                let (dep_first, dep_last) = graph.extend(dep_graph, "");
+                let dep_first = dep_first
+                    .ok_or_else(|| Error::other("RunnableLambda dep has no first node"))?;
+                let dep_last =
+                    dep_last.ok_or_else(|| Error::other("RunnableLambda dep has no last node"))?;
+                graph.add_edge(&input_node, &dep_first, None, false);
+                graph.add_edge(&dep_last, &output_node, None, false);
+            }
+        }
+
+        Ok(graph)
     }
 }
 
@@ -2554,33 +2414,6 @@ where
     R: Runnable + Send + Sync + 'static,
 {
     Arc::new(runnable)
-}
-
-pub fn coerce_to_runnable<F, I, O>(func: F) -> RunnableLambda<F, I, O>
-where
-    F: Fn(I) -> Result<O> + Send + Sync,
-    I: Send + Sync + Clone + Debug + 'static,
-    O: Send + Sync + Clone + Debug + 'static,
-{
-    RunnableLambda::builder().func(func).build()
-}
-
-pub fn coerce_map_to_runnable<I>(
-    map: HashMap<String, Arc<dyn Runnable<Input = I, Output = Value> + Send + Sync>>,
-) -> RunnableParallel<I>
-where
-    I: Send + Sync + Clone + Debug + 'static,
-{
-    RunnableParallel::from(map)
-}
-
-pub fn chain<F, I, O>(name: &str, func: F) -> RunnableLambda<F, I, O>
-where
-    F: Fn(I) -> Result<O> + Send + Sync,
-    I: Send + Sync + Clone + Debug + 'static,
-    O: Send + Sync + Clone + Debug + 'static,
-{
-    RunnableLambda::builder().func(func).name(name).build()
 }
 
 #[cfg(test)]

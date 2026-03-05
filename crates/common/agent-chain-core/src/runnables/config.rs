@@ -190,7 +190,7 @@ pub fn get_config_list(
         Some(ConfigOrList::List(list)) => {
             if list.len() != length {
                 return Err(crate::error::Error::other(format!(
-                    "config must be a list of the same length as inputs,                      but got {} configs for {} inputs",
+                    "config must be a list of the same length as inputs, but got {} configs for {} inputs",
                     list.len(),
                     length
                 )));

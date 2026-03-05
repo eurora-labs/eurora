@@ -658,19 +658,12 @@ impl Runnable for RunnablePick {
     fn atransform<'a>(
         &'a self,
         input: BoxStream<'a, Self::Input>,
-        _config: Option<RunnableConfig>,
+        config: Option<RunnableConfig>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self: 'static,
     {
-        Box::pin(async_stream::stream! {
-            let mut input = input;
-            while let Some(chunk) = input.next().await {
-                if let Some(picked) = self.pick(&chunk) {
-                    yield Ok(picked);
-                }
-            }
-        })
+        self.transform(input, config)
     }
 }
 
