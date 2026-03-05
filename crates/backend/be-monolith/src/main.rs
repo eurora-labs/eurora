@@ -107,7 +107,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let global_filter = Targets::new()
         .with_default(LevelFilter::WARN)
         .with_target("be_", app_level)
-        .with_target("agent_chain", app_level)
+        .with_target("agent_", app_level)
         .with_target("hyper", LevelFilter::OFF)
         .with_target("tokio", LevelFilter::OFF);
 

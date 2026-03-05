@@ -662,7 +662,7 @@ fn test_graph_extend_returns_correct_first_last() {
     assert_eq!(last.unwrap().id, "z");
 }
 
-use agent_chain_core::runnables::base::{Runnable, RunnableLambda, runnable_lambda};
+use agent_chain_core::runnables::base::{Runnable, RunnableExt, RunnableLambda, runnable_lambda};
 
 #[test]
 fn test_get_graph_base_runnable() {

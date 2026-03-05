@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 
 use crate::Result;
-use crate::callbacks::{AsyncCallbackManagerForRetrieverRun, CallbackManagerForRetrieverRun};
+use crate::callbacks::CallbackManagerForRetrieverRun;
 use crate::documents::Document;
 use crate::embeddings::Embeddings;
 use crate::error::Error;
@@ -60,11 +60,16 @@ pub trait VectorStore: Send + Sync {
             .into_iter()
             .zip(metadatas_iter)
             .zip(ids_iter)
-            .map(|((text, metadata), id)| {
-                let mut doc = Document::builder().page_content(text).build();
-                doc.metadata = metadata;
-                doc.id = id;
-                doc
+            .map(|((text, metadata), id)| match id {
+                Some(id) => Document::builder()
+                    .page_content(text)
+                    .metadata(metadata)
+                    .id(id)
+                    .build(),
+                None => Document::builder()
+                    .page_content(text)
+                    .metadata(metadata)
+                    .build(),
             })
             .collect();
 
@@ -314,10 +319,13 @@ pub trait VectorStoreFactory: VectorStore + Sized {
     ) -> Result<Self>;
 
     fn from_documents(documents: Vec<Document>, embedding: Box<dyn Embeddings>) -> Result<Self> {
-        let texts: Vec<&str> = documents.iter().map(|d| d.page_content.as_str()).collect();
+        let texts: Vec<&str> = documents.iter().map(|d| d.page_content()).collect();
         let metadatas: Vec<HashMap<String, Value>> =
-            documents.iter().map(|d| d.metadata.clone()).collect();
-        let ids: Vec<String> = documents.iter().filter_map(|d| d.id.clone()).collect();
+            documents.iter().map(|d| d.metadata().clone()).collect();
+        let ids: Vec<String> = documents
+            .iter()
+            .filter_map(|d| d.id().map(String::from))
+            .collect();
         let ids = if ids.is_empty() { None } else { Some(ids) };
         Self::from_texts(&texts, embedding, Some(metadatas), ids)
     }
@@ -519,7 +527,7 @@ impl BaseRetriever for VectorStoreRetriever {
     async fn aget_relevant_documents(
         &self,
         query: &str,
-        _run_manager: Option<&AsyncCallbackManagerForRetrieverRun>,
+        _run_manager: Option<&CallbackManagerForRetrieverRun>,
     ) -> Result<Vec<Document>> {
         let k = self.k();
         match &self.search_type {

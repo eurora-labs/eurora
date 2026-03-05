@@ -36,9 +36,11 @@ fn check_response(response: &AIMessage) {
 
 async fn test_responses_incomplete_response() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let model = ChatOpenAI::new("gpt-4o-mini")
-        .with_responses_api(true)
-        .max_tokens(16);
+    let model = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .use_responses_api(true)
+        .max_tokens(16u32)
+        .build();
 
     // Invoke
     let response = model
@@ -108,7 +110,10 @@ async fn test_responses_incomplete_response() -> Result<(), Box<dyn std::error::
 
 async fn test_responses_web_search_responses_v1() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini").output_version("responses/v1");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .output_version("responses/v1")
+        .build();
     let web_search_tool = ToolLike::Builtin(serde_json::json!({"type": "web_search_preview"}));
 
     let llm_with_tools = llm.bind_tools(std::slice::from_ref(&web_search_tool), None)?;
@@ -133,9 +138,11 @@ async fn test_responses_web_search_responses_v1() -> Result<(), Box<dyn std::err
         .get("id")
         .and_then(|v| v.as_str())
         .expect("response should have id");
-    let llm_stateful = ChatOpenAI::new("gpt-4o-mini")
+    let llm_stateful = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .output_version("responses/v1")
-        .previous_response_id(response_id);
+        .previous_response_id(response_id)
+        .build();
     let llm_stateful_with_tools =
         llm_stateful.bind_tools(std::slice::from_ref(&web_search_tool), None)?;
     let response2 = llm_stateful_with_tools
@@ -160,7 +167,10 @@ async fn test_responses_web_search_responses_v1() -> Result<(), Box<dyn std::err
 
 async fn test_responses_web_search_v1() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini").output_version("v1");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .output_version("v1")
+        .build();
     let web_search_tool = ToolLike::Builtin(serde_json::json!({"type": "web_search_preview"}));
 
     let llm_with_tools = llm.bind_tools(&[web_search_tool], None)?;
@@ -186,7 +196,10 @@ async fn test_responses_web_search_v1() -> Result<(), Box<dyn std::error::Error>
 
 async fn test_responses_web_search_async() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini").output_version("v0");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .output_version("v0")
+        .build();
     let web_search_tool = ToolLike::Builtin(serde_json::json!({"type": "web_search_preview"}));
     let llm_with_tools = llm.bind_tools(&[web_search_tool], None)?;
 
@@ -243,7 +256,10 @@ async fn test_responses_function_calling_v0() -> Result<(), Box<dyn std::error::
         },
         "required": ["x", "y"]
     });
-    let llm = ChatOpenAI::new("gpt-4o-mini").output_version("v0");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .output_version("v0")
+        .build();
     let bound = llm.bind_tools(
         &[
             ToolLike::Schema(multiply_schema),
@@ -300,7 +316,10 @@ async fn test_responses_function_calling_responses_v1() -> Result<(), Box<dyn st
         },
         "required": ["x", "y"]
     });
-    let llm = ChatOpenAI::new("gpt-4o-mini").output_version("responses/v1");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .output_version("responses/v1")
+        .build();
     let bound = llm.bind_tools(
         &[
             ToolLike::Schema(multiply_schema),
@@ -342,7 +361,10 @@ async fn test_responses_function_calling_v1() -> Result<(), Box<dyn std::error::
         },
         "required": ["x", "y"]
     });
-    let llm = ChatOpenAI::new("gpt-4o-mini").output_version("v1");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .output_version("v1")
+        .build();
     let bound = llm.bind_tools(
         &[
             ToolLike::Schema(multiply_schema),
@@ -388,9 +410,11 @@ async fn test_responses_parsed_schema_v0() -> Result<(), Box<dyn std::error::Err
         }
     });
 
-    let llm = ChatOpenAI::new("gpt-4o-mini")
-        .with_responses_api(true)
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .use_responses_api(true)
         .output_version("v0")
+        .build()
         .response_format(foo_schema);
 
     let response = llm
@@ -425,9 +449,11 @@ async fn test_responses_parsed_schema_responses_v1() -> Result<(), Box<dyn std::
         }
     });
 
-    let llm = ChatOpenAI::new("gpt-4o-mini")
-        .with_responses_api(true)
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .use_responses_api(true)
         .output_version("responses/v1")
+        .build()
         .response_format(foo_schema);
 
     let response = llm
@@ -462,9 +488,11 @@ async fn test_responses_parsed_schema_v1() -> Result<(), Box<dyn std::error::Err
         }
     });
 
-    let llm = ChatOpenAI::new("gpt-4o-mini")
-        .with_responses_api(true)
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .use_responses_api(true)
         .output_version("v1")
+        .build()
         .response_format(foo_schema);
 
     let response = llm
@@ -499,8 +527,10 @@ async fn test_responses_parsed_schema_async() -> Result<(), Box<dyn std::error::
         }
     });
 
-    let llm = ChatOpenAI::new("gpt-4o-mini")
-        .with_responses_api(true)
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .use_responses_api(true)
+        .build()
         .response_format(foo_schema);
 
     let response = llm
@@ -528,8 +558,10 @@ async fn test_responses_parsed_dict_schema() -> Result<(), Box<dyn std::error::E
         "required": ["response"]
     });
 
-    let llm = ChatOpenAI::new("gpt-4o-mini")
-        .with_responses_api(true)
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .use_responses_api(true)
+        .build()
         .response_format(schema);
 
     let response = llm
@@ -565,7 +597,10 @@ async fn test_responses_parsed_strict() -> Result<(), Box<dyn std::error::Error>
         }
     });
 
-    let llm = ChatOpenAI::new("gpt-4o-mini").with_responses_api(true);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .use_responses_api(true)
+        .build();
 
     // Non-strict should work
     let response = llm
@@ -599,8 +634,10 @@ async fn test_responses_parsed_strict() -> Result<(), Box<dyn std::error::Error>
         }
     });
 
-    let llm_strict = ChatOpenAI::new("gpt-4o-mini")
-        .with_responses_api(true)
+    let llm_strict = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .use_responses_api(true)
+        .build()
         .response_format(invalid_schema);
     let result = llm_strict
         .invoke(
@@ -631,8 +668,10 @@ async fn test_responses_parsed_dict_schema_async() -> Result<(), Box<dyn std::er
         "required": ["response"]
     });
 
-    let llm = ChatOpenAI::new("gpt-4o-mini")
-        .with_responses_api(true)
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .use_responses_api(true)
+        .build()
         .response_format(schema);
 
     let response = llm
@@ -672,7 +711,10 @@ async fn test_responses_fn_calling_and_structured_output() -> Result<(), Box<dyn
         "additionalProperties": false
     });
 
-    let llm = ChatOpenAI::new("gpt-4o-mini").with_responses_api(true);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .use_responses_api(true)
+        .build();
     let bound = llm.bind_tools_with_options(
         &[ToolLike::Schema(multiply_schema)],
         None,
@@ -717,10 +759,12 @@ async fn test_responses_reasoning_v0() -> Result<(), Box<dyn std::error::Error>>
     let mut reasoning = HashMap::new();
     reasoning.insert("effort".to_string(), serde_json::json!("low"));
 
-    let llm = ChatOpenAI::new("o4-mini")
-        .with_responses_api(true)
+    let llm = ChatOpenAI::builder()
+        .model("o4-mini")
+        .use_responses_api(true)
         .output_version("v0")
-        .reasoning(reasoning);
+        .reasoning(reasoning)
+        .build();
 
     let response = llm
         .invoke(
@@ -741,10 +785,12 @@ async fn test_responses_reasoning_responses_v1() -> Result<(), Box<dyn std::erro
     let mut reasoning = HashMap::new();
     reasoning.insert("effort".to_string(), serde_json::json!("low"));
 
-    let llm = ChatOpenAI::new("o4-mini")
-        .with_responses_api(true)
+    let llm = ChatOpenAI::builder()
+        .model("o4-mini")
+        .use_responses_api(true)
         .output_version("responses/v1")
-        .reasoning(reasoning);
+        .reasoning(reasoning)
+        .build();
 
     let response = llm
         .invoke(
@@ -765,10 +811,12 @@ async fn test_responses_reasoning_v1() -> Result<(), Box<dyn std::error::Error>>
     let mut reasoning = HashMap::new();
     reasoning.insert("effort".to_string(), serde_json::json!("low"));
 
-    let llm = ChatOpenAI::new("o4-mini")
-        .with_responses_api(true)
+    let llm = ChatOpenAI::builder()
+        .model("o4-mini")
+        .use_responses_api(true)
         .output_version("v1")
-        .reasoning(reasoning);
+        .reasoning(reasoning)
+        .build();
 
     let response = llm
         .invoke(
@@ -786,7 +834,10 @@ async fn test_responses_reasoning_v1() -> Result<(), Box<dyn std::error::Error>>
 
 async fn test_responses_stateful_api() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini").with_responses_api(true);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .use_responses_api(true)
+        .build();
 
     let response = llm
         .invoke(
@@ -808,9 +859,11 @@ async fn test_responses_stateful_api() -> Result<(), Box<dyn std::error::Error>>
         .and_then(|v| v.as_str())
         .expect("response should have id");
 
-    let llm2 = ChatOpenAI::new("gpt-4o-mini")
-        .with_responses_api(true)
-        .previous_response_id(response_id);
+    let llm2 = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .use_responses_api(true)
+        .previous_response_id(response_id)
+        .build();
     let response2 = llm2
         .invoke(
             vec![
@@ -842,7 +895,10 @@ async fn test_responses_route_from_model_kwargs() -> Result<(), Box<dyn std::err
         serde_json::json!({"format": {"type": "text"}}),
     );
 
-    let llm = ChatOpenAI::new("gpt-4o-mini").model_kwargs(kwargs);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .model_kwargs(kwargs)
+        .build();
 
     let mut stream = llm
         .astream(
@@ -867,9 +923,11 @@ async fn test_responses_route_from_model_kwargs() -> Result<(), Box<dyn std::err
 
 async fn test_responses_computer_calls() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("computer-use-preview")
+    let llm = ChatOpenAI::builder()
+        .model("computer-use-preview")
         .truncation("auto")
-        .output_version("v0");
+        .output_version("v0")
+        .build();
     let tool = serde_json::json!({
         "type": "computer_use_preview",
         "display_width": 1024,
@@ -911,9 +969,11 @@ async fn test_responses_file_search_responses_v1() -> Result<(), Box<dyn std::er
         }
     };
 
-    let llm = ChatOpenAI::new("gpt-4o-mini")
-        .with_responses_api(true)
-        .output_version("responses/v1");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .use_responses_api(true)
+        .output_version("responses/v1")
+        .build();
     let tool = serde_json::json!({
         "type": "file_search",
         "vector_store_ids": [vector_store_id]
@@ -950,9 +1010,11 @@ async fn test_responses_file_search_v1() -> Result<(), Box<dyn std::error::Error
         }
     };
 
-    let llm = ChatOpenAI::new("gpt-4o-mini")
-        .with_responses_api(true)
-        .output_version("v1");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .use_responses_api(true)
+        .output_version("v1")
+        .build();
     let tool = serde_json::json!({
         "type": "file_search",
         "vector_store_ids": [vector_store_id]
@@ -985,9 +1047,11 @@ async fn test_responses_stream_reasoning_summary_v0() -> Result<(), Box<dyn std:
     reasoning.insert("effort".to_string(), serde_json::json!("medium"));
     reasoning.insert("summary".to_string(), serde_json::json!("auto"));
 
-    let llm = ChatOpenAI::new("o4-mini")
+    let llm = ChatOpenAI::builder()
+        .model("o4-mini")
         .reasoning(reasoning)
-        .output_version("v0");
+        .output_version("v0")
+        .build();
 
     let mut stream = llm
         .astream(
@@ -1023,9 +1087,11 @@ async fn test_responses_stream_reasoning_summary_responses_v1()
     reasoning.insert("effort".to_string(), serde_json::json!("medium"));
     reasoning.insert("summary".to_string(), serde_json::json!("auto"));
 
-    let llm = ChatOpenAI::new("o4-mini")
+    let llm = ChatOpenAI::builder()
+        .model("o4-mini")
         .reasoning(reasoning)
-        .output_version("responses/v1");
+        .output_version("responses/v1")
+        .build();
 
     let mut stream = llm
         .astream(
@@ -1060,9 +1126,11 @@ async fn test_responses_stream_reasoning_summary_v1() -> Result<(), Box<dyn std:
     reasoning.insert("effort".to_string(), serde_json::json!("medium"));
     reasoning.insert("summary".to_string(), serde_json::json!("auto"));
 
-    let llm = ChatOpenAI::new("o4-mini")
+    let llm = ChatOpenAI::builder()
+        .model("o4-mini")
         .reasoning(reasoning)
-        .output_version("v1");
+        .output_version("v1")
+        .build();
 
     let mut stream = llm
         .astream(
@@ -1093,9 +1161,11 @@ async fn test_responses_stream_reasoning_summary_v1() -> Result<(), Box<dyn std:
 
 async fn test_responses_code_interpreter_v0() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("o4-mini")
-        .with_responses_api(true)
-        .output_version("v0");
+    let llm = ChatOpenAI::builder()
+        .model("o4-mini")
+        .use_responses_api(true)
+        .output_version("v0")
+        .build();
     let tool = serde_json::json!({"type": "code_interpreter", "container": {"type": "auto"}});
     let llm_with_tools = llm.bind_tools(&[ToolLike::Builtin(tool)], None)?;
 
@@ -1121,9 +1191,11 @@ async fn test_responses_code_interpreter_v0() -> Result<(), Box<dyn std::error::
 
 async fn test_responses_code_interpreter_responses_v1() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("o4-mini")
-        .with_responses_api(true)
-        .output_version("responses/v1");
+    let llm = ChatOpenAI::builder()
+        .model("o4-mini")
+        .use_responses_api(true)
+        .output_version("responses/v1")
+        .build();
     let tool = serde_json::json!({"type": "code_interpreter", "container": {"type": "auto"}});
     let llm_with_tools = llm.bind_tools(&[ToolLike::Builtin(tool)], None)?;
 
@@ -1149,9 +1221,11 @@ async fn test_responses_code_interpreter_responses_v1() -> Result<(), Box<dyn st
 
 async fn test_responses_code_interpreter_v1() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("o4-mini")
-        .with_responses_api(true)
-        .output_version("v1");
+    let llm = ChatOpenAI::builder()
+        .model("o4-mini")
+        .use_responses_api(true)
+        .output_version("v1")
+        .build();
     let tool = serde_json::json!({"type": "code_interpreter", "container": {"type": "auto"}});
     let llm_with_tools = llm.bind_tools(&[ToolLike::Builtin(tool)], None)?;
 
@@ -1177,9 +1251,11 @@ async fn test_responses_code_interpreter_v1() -> Result<(), Box<dyn std::error::
 
 async fn test_responses_mcp_builtin() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("o4-mini")
-        .with_responses_api(true)
-        .output_version("v0");
+    let llm = ChatOpenAI::builder()
+        .model("o4-mini")
+        .use_responses_api(true)
+        .output_version("v0")
+        .build();
     let mcp_tool = serde_json::json!({
         "type": "mcp",
         "server_label": "deepwiki",
@@ -1210,10 +1286,12 @@ async fn test_responses_mcp_builtin() -> Result<(), Box<dyn std::error::Error>> 
 
 async fn test_responses_mcp_builtin_zdr() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini")
-        .with_responses_api(true)
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .use_responses_api(true)
         .store(false)
-        .include(vec!["reasoning.encrypted_content".to_string()]);
+        .include(vec!["reasoning.encrypted_content".to_string()])
+        .build();
     let mcp_tool = serde_json::json!({
         "type": "mcp",
         "server_label": "deepwiki",
@@ -1255,10 +1333,12 @@ async fn test_responses_mcp_builtin_zdr() -> Result<(), Box<dyn std::error::Erro
 
 async fn test_responses_mcp_builtin_zdr_v1() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini")
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .output_version("v1")
         .store(false)
-        .include(vec!["reasoning.encrypted_content".to_string()]);
+        .include(vec!["reasoning.encrypted_content".to_string()])
+        .build();
     let mcp_tool = serde_json::json!({
         "type": "mcp",
         "server_label": "deepwiki",
@@ -1299,9 +1379,11 @@ async fn test_responses_mcp_builtin_zdr_v1() -> Result<(), Box<dyn std::error::E
 
 async fn test_responses_image_gen_streaming_v0() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4.1")
-        .with_responses_api(true)
-        .output_version("v0");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4.1")
+        .use_responses_api(true)
+        .output_version("v0")
+        .build();
     let tool = serde_json::json!({
         "type": "image_generation",
         "quality": "low",
@@ -1341,9 +1423,11 @@ async fn test_responses_image_gen_streaming_v0() -> Result<(), Box<dyn std::erro
 async fn test_responses_image_gen_streaming_responses_v1() -> Result<(), Box<dyn std::error::Error>>
 {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4.1")
-        .with_responses_api(true)
-        .output_version("responses/v1");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4.1")
+        .use_responses_api(true)
+        .output_version("responses/v1")
+        .build();
     let tool = serde_json::json!({
         "type": "image_generation",
         "quality": "low",
@@ -1381,9 +1465,11 @@ async fn test_responses_image_gen_streaming_responses_v1() -> Result<(), Box<dyn
 
 async fn test_responses_image_gen_streaming_v1() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4.1")
-        .with_responses_api(true)
-        .output_version("v1");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4.1")
+        .use_responses_api(true)
+        .output_version("v1")
+        .build();
     let tool = serde_json::json!({
         "type": "image_generation",
         "quality": "low",
@@ -1421,9 +1507,11 @@ async fn test_responses_image_gen_streaming_v1() -> Result<(), Box<dyn std::erro
 
 async fn test_responses_image_gen_multi_turn_v0() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4.1")
-        .with_responses_api(true)
-        .output_version("v0");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4.1")
+        .use_responses_api(true)
+        .output_version("v0")
+        .build();
     let tool = serde_json::json!({
         "type": "image_generation",
         "quality": "low",
@@ -1456,9 +1544,11 @@ async fn test_responses_image_gen_multi_turn_v0() -> Result<(), Box<dyn std::err
 async fn test_responses_image_gen_multi_turn_responses_v1() -> Result<(), Box<dyn std::error::Error>>
 {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4.1")
-        .with_responses_api(true)
-        .output_version("responses/v1");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4.1")
+        .use_responses_api(true)
+        .output_version("responses/v1")
+        .build();
     let tool = serde_json::json!({
         "type": "image_generation",
         "quality": "low",
@@ -1490,9 +1580,11 @@ async fn test_responses_image_gen_multi_turn_responses_v1() -> Result<(), Box<dy
 
 async fn test_responses_image_gen_multi_turn_v1() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4.1")
-        .with_responses_api(true)
-        .output_version("v1");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4.1")
+        .use_responses_api(true)
+        .output_version("v1")
+        .build();
     let tool = serde_json::json!({
         "type": "image_generation",
         "quality": "low",
@@ -1524,9 +1616,11 @@ async fn test_responses_image_gen_multi_turn_v1() -> Result<(), Box<dyn std::err
 
 async fn test_responses_verbosity_parameter() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini")
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .verbosity("medium")
-        .with_responses_api(true);
+        .use_responses_api(true)
+        .build();
 
     let response = llm
         .invoke(
@@ -1560,7 +1654,10 @@ async fn test_responses_custom_tool_responses_v1() -> Result<(), Box<dyn std::er
         "required": ["code"]
     });
 
-    let llm = ChatOpenAI::new("gpt-4o-mini").output_version("responses/v1");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .output_version("responses/v1")
+        .build();
     let llm_with_tools = llm.bind_tools(&[ToolLike::Schema(execute_code_schema)], None)?;
 
     let msg = llm_with_tools
@@ -1618,7 +1715,10 @@ async fn test_responses_custom_tool_v1() -> Result<(), Box<dyn std::error::Error
         "required": ["code"]
     });
 
-    let llm = ChatOpenAI::new("gpt-4o-mini").output_version("v1");
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .output_version("v1")
+        .build();
     let llm_with_tools = llm.bind_tools(&[ToolLike::Schema(execute_code_schema)], None)?;
 
     let msg = llm_with_tools

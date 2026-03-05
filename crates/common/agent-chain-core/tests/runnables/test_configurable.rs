@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use agent_chain_core::error::Result;
-use agent_chain_core::runnables::base::Runnable;
+use agent_chain_core::runnables::base::{Runnable, RunnableExt};
 use agent_chain_core::runnables::config::RunnableConfig;
 use agent_chain_core::runnables::configurable::{
     Alternative, ConfigurableRunnable, Reconfigurable, RunnableConfigurableAlternatives,

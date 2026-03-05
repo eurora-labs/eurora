@@ -21,26 +21,26 @@ fn assert_docs_eq(actual: &[Document], expected: &[Document], test_case: &str) {
         test_case,
         expected.len(),
         actual.len(),
-        actual.iter().map(|d| &d.page_content).collect::<Vec<_>>()
+        actual.iter().map(|d| d.page_content()).collect::<Vec<_>>()
     );
     for (idx, (a, e)) in actual.iter().zip(expected.iter()).enumerate() {
         assert_eq!(
-            a.page_content,
-            e.page_content,
+            a.page_content(),
+            e.page_content(),
             "Test Case '{}' Failed at Document {}: Content mismatch.\nExpected: {:?}\nGot: {:?}",
             test_case,
             idx + 1,
-            e.page_content,
-            a.page_content
+            e.page_content(),
+            a.page_content()
         );
         assert_eq!(
-            a.metadata,
-            e.metadata,
+            a.metadata(),
+            e.metadata(),
             "Test Case '{}' Failed at Document {}: Metadata mismatch.\nExpected: {:?}\nGot: {:?}",
             test_case,
             idx + 1,
-            e.metadata,
-            a.metadata
+            e.metadata(),
+            a.metadata()
         );
     }
 }
@@ -451,9 +451,9 @@ fn test_section_splitter_header_based() {
     let docs = splitter.split_text(html).unwrap();
 
     assert_eq!(docs.len(), 3, "Expected 3 documents, got {}", docs.len());
-    assert_eq!(docs[0].metadata["Header 1"], "Foo");
-    assert_eq!(docs[1].metadata["Header 2"], "Bar main section");
-    assert_eq!(docs[2].metadata["Header 2"], "Baz");
+    assert_eq!(docs[0].metadata()["Header 1"], "Foo");
+    assert_eq!(docs[1].metadata()["Header 2"], "Bar main section");
+    assert_eq!(docs[2].metadata()["Header 2"], "Baz");
 }
 
 #[test]
@@ -484,8 +484,8 @@ fn test_section_splitter_font_size() {
         "Expected at least 2 documents, got {}",
         docs.len()
     );
-    assert_eq!(docs[0].metadata["Header 1"], "Foo");
-    assert_eq!(docs[1].metadata["Header 2"], "Bar main section");
+    assert_eq!(docs[0].metadata()["Header 1"], "Foo");
+    assert_eq!(docs[1].metadata()["Header 2"], "Bar main section");
 }
 
 #[test]
@@ -517,7 +517,7 @@ Foo </span>
         "Expected at least 2 documents, got {}",
         docs.len()
     );
-    assert_eq!(docs[0].metadata["Header 1"], "Foo");
+    assert_eq!(docs[0].metadata()["Header 1"], "Foo");
 }
 
 #[test]
@@ -551,10 +551,10 @@ fn test_section_splitter_duplicate_header() {
     let docs = splitter.split_text(html).unwrap();
 
     assert_eq!(docs.len(), 4, "Expected 4 documents, got {}", docs.len());
-    assert_eq!(docs[0].metadata["Header 1"], "Foo");
-    assert_eq!(docs[1].metadata["Header 2"], "Bar main section");
-    assert_eq!(docs[2].metadata["Header 2"], "Foo");
-    assert_eq!(docs[3].metadata["Header 1"], "Foo");
+    assert_eq!(docs[0].metadata()["Header 1"], "Foo");
+    assert_eq!(docs[1].metadata()["Header 2"], "Bar main section");
+    assert_eq!(docs[2].metadata()["Header 2"], "Foo");
+    assert_eq!(docs[3].metadata()["Header 1"], "Foo");
 }
 
 #[test]
@@ -567,5 +567,5 @@ fn test_extract_font_size_px() {
         r#"<html><body><span style="font-size: 22px">Title</span><p>Body text</p></body></html>"#;
     let docs = splitter.split_text(html).unwrap();
     assert!(!docs.is_empty());
-    assert_eq!(docs[0].metadata["Header 1"], "Title");
+    assert_eq!(docs[0].metadata()["Header 1"], "Title");
 }

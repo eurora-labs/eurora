@@ -1,4 +1,4 @@
-use agent_chain_core::messages::BaseMessage;
+use agent_chain_core::ParserInput;
 use agent_chain_core::output_parsers::{
     BaseOutputParser, BaseTransformOutputParser, CommaSeparatedListOutputParser,
     MarkdownListOutputParser, NumberedListOutputParser,
@@ -7,7 +7,7 @@ use futures::StreamExt;
 
 async fn transform_add<P: BaseTransformOutputParser<Output = Vec<String>>>(
     parser: &P,
-    chunks: Vec<BaseMessage>,
+    chunks: Vec<ParserInput>,
 ) -> Vec<String> {
     let input_stream = futures::stream::iter(chunks);
     parser
@@ -22,7 +22,7 @@ async fn transform_add<P: BaseTransformOutputParser<Output = Vec<String>>>(
 
 async fn transform_list<P: BaseTransformOutputParser<Output = Vec<String>>>(
     parser: &P,
-    chunks: Vec<BaseMessage>,
+    chunks: Vec<ParserInput>,
 ) -> Vec<Vec<String>> {
     let input_stream = futures::stream::iter(chunks);
     parser
@@ -32,42 +32,42 @@ async fn transform_list<P: BaseTransformOutputParser<Output = Vec<String>>>(
         .await
 }
 
-fn char_chunks(text: &str) -> Vec<BaseMessage> {
+fn char_chunks(text: &str) -> Vec<ParserInput> {
     text.chars()
-        .map(|c| BaseMessage::from(c.to_string()))
+        .map(|c| ParserInput::from(c.to_string()))
         .collect()
 }
 
-fn line_chunks(text: &str) -> Vec<BaseMessage> {
+fn line_chunks(text: &str) -> Vec<ParserInput> {
     let mut chunks = Vec::new();
     let mut start = 0;
     for (idx, ch) in text.char_indices() {
         if ch == '\n' {
-            chunks.push(BaseMessage::from(&text[start..=idx]));
+            chunks.push(ParserInput::from(&text[start..=idx]));
             start = idx + 1;
         }
     }
     if start < text.len() {
-        chunks.push(BaseMessage::from(&text[start..]));
+        chunks.push(ParserInput::from(&text[start..]));
     }
     chunks
 }
 
-fn word_chunks(text: &str) -> Vec<BaseMessage> {
+fn word_chunks(text: &str) -> Vec<ParserInput> {
     text.split(' ')
         .enumerate()
         .map(|(i, word)| {
             if i > 0 {
-                BaseMessage::from(format!(" {word}"))
+                ParserInput::from(format!(" {word}"))
             } else {
-                BaseMessage::from(word)
+                ParserInput::from(word)
             }
         })
         .collect()
 }
 
-fn single_chunk(text: &str) -> Vec<BaseMessage> {
-    vec![BaseMessage::from(text)]
+fn single_chunk(text: &str) -> Vec<ParserInput> {
+    vec![ParserInput::from(text)]
 }
 
 #[tokio::test]
@@ -561,81 +561,63 @@ async fn test_markdown_list_text3_no_items_transform_list_single_chunk() {
     assert_eq!(result, empty);
 }
 
-#[tokio::test]
-async fn test_comma_aparse_single_item() {
+#[test]
+fn test_comma_parse_single_item() {
     let parser = CommaSeparatedListOutputParser::new();
-    assert_eq!(parser.aparse("foo").await.unwrap(), vec!["foo"]);
+    assert_eq!(parser.parse("foo").unwrap(), vec!["foo"]);
 }
 
-#[tokio::test]
-async fn test_comma_aparse_multiple_items() {
+#[test]
+fn test_comma_parse_multiple_items() {
     let parser = CommaSeparatedListOutputParser::new();
     assert_eq!(
-        parser.aparse("foo, bar, baz").await.unwrap(),
+        parser.parse("foo, bar, baz").unwrap(),
         vec!["foo", "bar", "baz"]
     );
 }
 
-#[tokio::test]
-async fn test_numbered_aparse() {
+#[test]
+fn test_numbered_parse() {
     let parser = NumberedListOutputParser::new();
     let text = "1. foo\n2. bar\n3. baz";
-    assert_eq!(
-        parser.aparse(text).await.unwrap(),
-        vec!["foo", "bar", "baz"]
-    );
+    assert_eq!(parser.parse(text).unwrap(), vec!["foo", "bar", "baz"]);
 }
 
-#[tokio::test]
-async fn test_numbered_aparse_with_prefix() {
+#[test]
+fn test_numbered_parse_with_prefix() {
     let parser = NumberedListOutputParser::new();
     let text = "Items:\n\n1. apple\n\n2. banana\n\n3. cherry";
     assert_eq!(
-        parser.aparse(text).await.unwrap(),
+        parser.parse(text).unwrap(),
         vec!["apple", "banana", "cherry"]
     );
 }
 
-#[tokio::test]
-async fn test_numbered_aparse_no_items() {
+#[test]
+fn test_numbered_parse_no_items() {
     let parser = NumberedListOutputParser::new();
-    assert!(
-        parser
-            .aparse("No items in the list.")
-            .await
-            .unwrap()
-            .is_empty()
-    );
+    assert!(parser.parse("No items in the list.").unwrap().is_empty());
 }
 
-#[tokio::test]
-async fn test_markdown_aparse() {
+#[test]
+fn test_markdown_parse() {
     let parser = MarkdownListOutputParser::new();
     let text = "- foo\n- bar\n- baz";
-    assert_eq!(
-        parser.aparse(text).await.unwrap(),
-        vec!["foo", "bar", "baz"]
-    );
+    assert_eq!(parser.parse(text).unwrap(), vec!["foo", "bar", "baz"]);
 }
 
-#[tokio::test]
-async fn test_markdown_aparse_with_prefix() {
+#[test]
+fn test_markdown_parse_with_prefix() {
     let parser = MarkdownListOutputParser::new();
     let text = "Items:\n- apple\n- banana\n- cherry";
     assert_eq!(
-        parser.aparse(text).await.unwrap(),
+        parser.parse(text).unwrap(),
         vec!["apple", "banana", "cherry"]
     );
 }
 
-#[tokio::test]
-async fn test_markdown_aparse_no_items() {
+#[test]
+fn test_markdown_parse_no_items() {
     let parser = MarkdownListOutputParser::new();
-    assert!(
-        parser
-            .aparse("No items in the list.")
-            .await
-            .unwrap()
-            .is_empty()
-    );
+    assert!(parser.parse("No items in the list.").unwrap().is_empty());
 }

@@ -187,7 +187,10 @@ async fn test_stop_sequence() -> Result<(), Box<dyn std::error::Error>> {
     assert!(!result.text().contains("you"));
 
     // stop via builder
-    let model_with_stop = ChatOpenAI::new(MODEL).stop(vec!["you".to_string()]);
+    let model_with_stop = ChatOpenAI::builder()
+        .model(MODEL)
+        .stop(vec!["you".to_string()])
+        .build();
     let result2 = model_with_stop
         .invoke(
             vec![

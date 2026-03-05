@@ -37,7 +37,7 @@ fn parse_code_json(s: &str) -> Option<Value> {
 
 pub fn convert_to_standard_blocks_with_message_context(
     content: &[Value],
-    _is_chunk: bool,
+    is_chunk: bool,
     additional_kwargs: &HashMap<String, Value>,
     tool_calls: &[ToolCall],
     text_content: Option<&str>,
@@ -101,12 +101,22 @@ pub fn convert_to_standard_blocks_with_message_context(
                     ""
                 };
 
-                content_blocks.push(json!({
-                    "type": "server_tool_call",
-                    "name": name,
-                    "id": idx.to_string(),
-                    "args": args_val,
-                }));
+                let is_empty_input = args_val == &json!({});
+                if is_chunk && is_empty_input {
+                    content_blocks.push(json!({
+                        "type": "server_tool_call_chunk",
+                        "name": name,
+                        "id": idx.to_string(),
+                        "args": "",
+                    }));
+                } else {
+                    content_blocks.push(json!({
+                        "type": "server_tool_call",
+                        "name": name,
+                        "id": idx.to_string(),
+                        "args": args_val,
+                    }));
+                }
             }
 
             if let Some(tool_output) = executed_tool.get("output") {
@@ -155,12 +165,21 @@ pub fn convert_to_standard_blocks_with_message_context(
     }
 
     for tool_call in tool_calls {
-        content_blocks.push(json!({
-            "type": "tool_call",
-            "name": tool_call.name,
-            "args": tool_call.args,
-            "id": tool_call.id,
-        }));
+        if is_chunk {
+            content_blocks.push(json!({
+                "type": "tool_call_chunk",
+                "name": tool_call.name,
+                "args": tool_call.args,
+                "id": tool_call.id,
+            }));
+        } else {
+            content_blocks.push(json!({
+                "type": "tool_call",
+                "name": tool_call.name,
+                "args": tool_call.args,
+                "id": tool_call.id,
+            }));
+        }
     }
 
     content_blocks

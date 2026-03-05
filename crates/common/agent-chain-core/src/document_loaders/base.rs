@@ -1,12 +1,10 @@
 use std::pin::Pin;
 
-use async_trait::async_trait;
 use futures::Stream;
 
 use crate::documents::BaseDocumentTransformer;
-use crate::documents::base::{Blob, Document};
+use crate::documents::base::Document;
 
-#[async_trait]
 pub trait BaseLoader: Send + Sync {
     fn lazy_load(&self) -> Box<dyn Iterator<Item = Document> + '_>;
 
@@ -19,24 +17,40 @@ pub trait BaseLoader: Send + Sync {
         text_splitter: &dyn BaseDocumentTransformer,
     ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
         let docs = self.load();
-        text_splitter.transform_documents(&docs)
+        text_splitter
+            .transform_documents(&docs)
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
     }
 
-    async fn alazy_load(&self) -> Pin<Box<dyn Stream<Item = Document> + Send + '_>> {
-        let docs: Vec<Document> = self.lazy_load().collect();
-        Box::pin(futures::stream::iter(docs))
+    /// Returns an async stream of documents.
+    ///
+    /// The default implementation eagerly collects from `lazy_load` then wraps
+    /// the result in a stream. Override this for truly lazy async iteration.
+    fn alazy_load(
+        &self,
+    ) -> impl std::future::Future<Output = Pin<Box<dyn Stream<Item = Document> + Send + '_>>> + Send
+    {
+        async {
+            Box::pin(futures::stream::iter(self.load()))
+                as Pin<Box<dyn Stream<Item = Document> + Send + '_>>
+        }
     }
 
-    async fn aload(&self) -> Vec<Document> {
-        use futures::StreamExt;
-        self.alazy_load().await.collect().await
+    fn aload(&self) -> impl std::future::Future<Output = Vec<Document>> + Send {
+        async {
+            use futures::StreamExt;
+            self.alazy_load().await.collect().await
+        }
     }
 }
 
 pub trait BaseBlobParser: Send + Sync {
-    fn lazy_parse(&self, blob: &Blob) -> Box<dyn Iterator<Item = Document> + '_>;
+    fn lazy_parse(
+        &self,
+        blob: &crate::documents::base::Blob,
+    ) -> Box<dyn Iterator<Item = Document> + '_>;
 
-    fn parse(&self, blob: &Blob) -> Vec<Document> {
+    fn parse(&self, blob: &crate::documents::base::Blob) -> Vec<Document> {
         self.lazy_parse(blob).collect()
     }
 }
@@ -49,7 +63,6 @@ mod tests {
         docs: Vec<Document>,
     }
 
-    #[async_trait]
     impl BaseLoader for TestLoader {
         fn lazy_load(&self) -> Box<dyn Iterator<Item = Document> + '_> {
             Box::new(self.docs.iter().cloned())
@@ -64,16 +77,16 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl crate::documents::BaseDocumentTransformer for HalfSplitter {
         fn transform_documents(
             &self,
             documents: &[Document],
-        ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
+        ) -> crate::error::Result<Vec<Document>> {
             let mut result = Vec::new();
             for doc in documents {
-                let text = &doc.page_content;
+                let text = doc.page_content();
                 let mid = text.len() / 2;
+                let mid = text.floor_char_boundary(mid);
                 if mid == 0 {
                     result.push(doc.clone());
                 } else {
@@ -95,8 +108,8 @@ mod tests {
         };
         let docs = loader.load();
         assert_eq!(docs.len(), 2);
-        assert_eq!(docs[0].page_content, "hello");
-        assert_eq!(docs[1].page_content, "world");
+        assert_eq!(docs[0].page_content(), "hello");
+        assert_eq!(docs[1].page_content(), "world");
     }
 
     #[test]
@@ -110,10 +123,10 @@ mod tests {
         let splitter = HalfSplitter::new();
         let docs = loader.load_and_split(&splitter).unwrap();
         assert_eq!(docs.len(), 4);
-        assert_eq!(docs[0].page_content, "abc");
-        assert_eq!(docs[1].page_content, "def");
-        assert_eq!(docs[2].page_content, "12");
-        assert_eq!(docs[3].page_content, "34");
+        assert_eq!(docs[0].page_content(), "abc");
+        assert_eq!(docs[1].page_content(), "def");
+        assert_eq!(docs[2].page_content(), "12");
+        assert_eq!(docs[3].page_content(), "34");
     }
 
     #[tokio::test]
@@ -123,7 +136,7 @@ mod tests {
         };
         let docs = loader.aload().await;
         assert_eq!(docs.len(), 1);
-        assert_eq!(docs[0].page_content, "async doc");
+        assert_eq!(docs[0].page_content(), "async doc");
     }
 
     #[tokio::test]
@@ -139,7 +152,7 @@ mod tests {
         };
         let mut stream = loader.alazy_load().await;
         let first = stream.next().await;
-        assert_eq!(first.unwrap().page_content, "a");
+        assert_eq!(first.unwrap().page_content(), "a");
         let rest: Vec<Document> = stream.collect().await;
         assert_eq!(rest.len(), 2);
     }

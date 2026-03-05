@@ -5,7 +5,7 @@ use crate::messages::BaseMessage;
 use crate::utils::interactive_env::is_interactive_env;
 
 pub trait BaseMessagePromptTemplate: Send + Sync {
-    fn input_variables(&self) -> Vec<String>;
+    fn input_variables(&self) -> &[String];
 
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>>;
 

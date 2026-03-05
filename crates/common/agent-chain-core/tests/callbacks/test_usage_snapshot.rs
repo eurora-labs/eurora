@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
-use agent_chain_core::callbacks::base::{BaseCallbackHandler, LLMManagerMixin};
-use agent_chain_core::callbacks::usage::{
-    UsageMetadataCallbackHandler, get_usage_metadata_callback,
-};
+use agent_chain_core::callbacks::BaseCallbackHandler;
+use agent_chain_core::callbacks::usage::UsageMetadataCallbackHandler;
 use agent_chain_core::messages::{AIMessage, InputTokenDetails, OutputTokenDetails, UsageMetadata};
 use agent_chain_core::outputs::{ChatGeneration, ChatResult};
 use uuid::Uuid;
@@ -240,33 +238,31 @@ fn test_concurrent_on_llm_end_calls() {
 
 #[test]
 fn test_guard_yields_handler() {
-    let guard = get_usage_metadata_callback();
-    assert_eq!(guard.handler().name(), "UsageMetadataCallbackHandler");
+    let handler = UsageMetadataCallbackHandler::new();
+    assert_eq!(handler.name(), "UsageMetadataCallbackHandler");
 }
 
 #[test]
 fn test_guard_handler_starts_empty() {
-    let guard = get_usage_metadata_callback();
-    assert!(guard.usage_metadata().is_empty());
+    let handler = UsageMetadataCallbackHandler::new();
+    assert!(handler.usage_metadata().is_empty());
 }
 
 #[test]
 fn test_guard_returns_valid_handler() {
-    let guard = get_usage_metadata_callback();
-    let arc = guard.as_arc_handler();
+    let handler = UsageMetadataCallbackHandler::new();
+    let arc = handler.as_arc_handler();
     assert_eq!(arc.name(), "UsageMetadataCallbackHandler");
 }
 
 #[test]
 fn test_multiple_guards_independent() {
-    let guard1 = get_usage_metadata_callback();
-    let guard2 = get_usage_metadata_callback();
+    let handler1 = UsageMetadataCallbackHandler::new();
+    let handler2 = UsageMetadataCallbackHandler::new();
 
     let usage = UsageMetadata::new(5, 5);
-    guard1
-        .handler()
-        .on_llm_end(&make_chat_result("a", &usage, "m"), Uuid::new_v4(), None);
+    handler1.on_llm_end(&make_chat_result("a", &usage, "m"), Uuid::new_v4(), None);
 
-    assert!(guard2.usage_metadata().is_empty());
-    assert_eq!(guard1.usage_metadata().len(), 1);
+    assert!(handler2.usage_metadata().is_empty());
+    assert_eq!(handler1.usage_metadata().len(), 1);
 }

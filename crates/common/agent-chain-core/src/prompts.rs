@@ -10,7 +10,7 @@ mod prompt;
 mod string;
 mod structured;
 
-pub use base::{BasePromptTemplate, FormatOutputType, aformat_document, format_document};
+pub use base::{BasePromptTemplate, PartialValue, aformat_document, format_document};
 
 pub use string::{
     PromptTemplateFormat, StringPromptTemplate, check_valid_template, get_template_variables,
@@ -23,8 +23,9 @@ pub use message::BaseMessagePromptTemplate;
 
 pub use chat::{
     AIMessagePromptTemplate, BaseChatPromptTemplate, BaseStringMessagePromptTemplate,
-    ChatMessagePromptTemplate, ChatPromptTemplate, HumanMessagePromptTemplate, MessageLike,
-    MessageLikeRepresentation, MessagesPlaceholder, SystemMessagePromptTemplate,
+    ChatMessagePromptTemplate, ChatPromptInput, ChatPromptTemplate, HumanMessagePromptTemplate,
+    MessageLike, MessageLikeRepresentation, MessagePromptContentPart, MessagesPlaceholder,
+    SystemMessagePromptTemplate,
 };
 
 pub use dict::DictPromptTemplate;

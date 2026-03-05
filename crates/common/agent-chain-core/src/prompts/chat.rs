@@ -5,7 +5,10 @@ use bon::bon;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
-use crate::messages::{AIMessage, BaseMessage, ChatMessage, HumanMessage, SystemMessage};
+use crate::messages::{
+    AIMessage, BaseMessage, ChatMessage, ContentPart, HumanMessage, ImageDetail, ImageSource,
+    MessageContent, SystemMessage,
+};
 use crate::prompt_values::{ChatPromptValue, PromptValue};
 use crate::utils::input::get_colored_text;
 use crate::utils::interactive_env::is_interactive_env;
@@ -13,12 +16,43 @@ use crate::utils::interactive_env::is_interactive_env;
 use async_trait::async_trait;
 
 use crate::runnables::base::Runnable;
-use crate::runnables::config::{RunnableConfig, ensure_config};
+use crate::runnables::config::RunnableConfig;
 
-use super::base::BasePromptTemplate;
+use super::base::{BasePromptTemplate, PartialValue, merge_prompt_config, resolve_partials};
+use super::dict::DictPromptTemplate;
+use super::image::ImagePromptTemplate;
 use super::message::{BaseMessagePromptTemplate, get_msg_title_repr};
 use super::prompt::PromptTemplate;
 use super::string::{PromptTemplateFormat, StringPromptTemplate};
+
+#[derive(Debug, Clone, Default)]
+pub struct ChatPromptInput {
+    pub variables: HashMap<String, String>,
+    pub messages: HashMap<String, Vec<BaseMessage>>,
+}
+
+#[bon::bon]
+impl ChatPromptInput {
+    #[builder]
+    pub fn new(
+        #[builder(default)] variables: HashMap<String, String>,
+        #[builder(default)] messages: HashMap<String, Vec<BaseMessage>>,
+    ) -> Self {
+        Self {
+            variables,
+            messages,
+        }
+    }
+}
+
+impl From<HashMap<String, String>> for ChatPromptInput {
+    fn from(variables: HashMap<String, String>) -> Self {
+        Self {
+            variables,
+            messages: HashMap::new(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessagesPlaceholder {
@@ -29,6 +63,9 @@ pub struct MessagesPlaceholder {
 
     #[serde(default)]
     pub n_messages: Option<usize>,
+
+    #[serde(skip, default)]
+    input_variables: Vec<String>,
 }
 
 #[bon]
@@ -39,10 +76,17 @@ impl MessagesPlaceholder {
         #[builder(default)] optional: bool,
         n_messages: Option<usize>,
     ) -> Self {
+        let variable_name = variable_name.into();
+        let input_variables = if optional {
+            Vec::new()
+        } else {
+            vec![variable_name.clone()]
+        };
         Self {
-            variable_name: variable_name.into(),
+            variable_name,
             optional,
             n_messages,
+            input_variables,
         }
     }
 
@@ -77,12 +121,8 @@ impl MessagesPlaceholder {
 }
 
 impl BaseMessagePromptTemplate for MessagesPlaceholder {
-    fn input_variables(&self) -> Vec<String> {
-        if self.optional {
-            Vec::new()
-        } else {
-            vec![self.variable_name.clone()]
-        }
+    fn input_variables(&self) -> &[String] {
+        &self.input_variables
     }
 
     fn format_messages(&self, _kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
@@ -129,6 +169,66 @@ pub trait BaseStringMessagePromptTemplate: BaseMessagePromptTemplate {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MessagePromptContentPart {
+    Text(PromptTemplate),
+    Image(ImagePromptTemplate),
+    Dict(DictPromptTemplate),
+}
+
+impl MessagePromptContentPart {
+    pub fn input_variables(&self) -> Vec<String> {
+        match self {
+            Self::Text(p) => p.input_variables.clone(),
+            Self::Image(p) => p.input_variables.clone(),
+            Self::Dict(p) => p.input_variables(),
+        }
+    }
+
+    fn format_to_content_part(&self, kwargs: &HashMap<String, String>) -> Result<ContentPart> {
+        match self {
+            Self::Text(p) => {
+                let text = StringPromptTemplate::format(p, kwargs)?;
+                Ok(ContentPart::Text { text })
+            }
+            Self::Image(p) => {
+                let image_url = p.format_image(kwargs)?;
+                let detail = image_url.detail.as_deref().map(|d| match d {
+                    "low" => ImageDetail::Low,
+                    "high" => ImageDetail::High,
+                    _ => ImageDetail::Auto,
+                });
+                Ok(ContentPart::Image {
+                    source: ImageSource::Url { url: image_url.url },
+                    detail,
+                })
+            }
+            Self::Dict(p) => {
+                let value = p.format(kwargs)?;
+                Ok(ContentPart::Other(value))
+            }
+        }
+    }
+}
+
+fn format_content_parts(
+    parts: &[MessagePromptContentPart],
+    kwargs: &HashMap<String, String>,
+) -> Result<MessageContent> {
+    if parts.len() == 1
+        && let MessagePromptContentPart::Text(p) = &parts[0]
+    {
+        let text = StringPromptTemplate::format(p, kwargs)?;
+        return Ok(MessageContent::Text(text));
+    }
+
+    let content_parts: Result<Vec<ContentPart>> = parts
+        .iter()
+        .map(|part| part.format_to_content_part(kwargs))
+        .collect();
+    Ok(MessageContent::Parts(content_parts?))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessagePromptTemplate {
     pub prompt: PromptTemplate,
     pub role: String,
@@ -162,8 +262,8 @@ impl ChatMessagePromptTemplate {
 }
 
 impl BaseMessagePromptTemplate for ChatMessagePromptTemplate {
-    fn input_variables(&self) -> Vec<String> {
-        self.prompt.input_variables.clone()
+    fn input_variables(&self) -> &[String] {
+        &self.prompt.input_variables
     }
 
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
@@ -203,217 +303,112 @@ impl BaseStringMessagePromptTemplate for ChatMessagePromptTemplate {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HumanMessagePromptTemplate {
-    pub prompt: PromptTemplate,
-    #[serde(default)]
-    pub additional_kwargs: HashMap<String, serde_json::Value>,
-}
-
-#[bon]
-impl HumanMessagePromptTemplate {
-    #[builder]
-    pub fn new(
-        prompt: PromptTemplate,
-        #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        Self {
-            prompt,
-            additional_kwargs,
+macro_rules! message_prompt_template {
+    ($name:ident, $variant:ident, $builder:ident, $title:expr) => {
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        pub struct $name {
+            pub content_parts: Vec<MessagePromptContentPart>,
+            #[serde(default)]
+            pub additional_kwargs: HashMap<String, serde_json::Value>,
+            #[serde(skip, default)]
+            input_variables: Vec<String>,
         }
-    }
 
-    pub fn from_template(template: impl Into<String>) -> Result<Self> {
-        Self::from_template_with_format(template, PromptTemplateFormat::FString)
-    }
+        impl $name {
+            fn compute_input_variables(content_parts: &[MessagePromptContentPart]) -> Vec<String> {
+                content_parts
+                    .iter()
+                    .flat_map(|p| p.input_variables())
+                    .collect()
+            }
 
-    pub fn from_template_with_format(
-        template: impl Into<String>,
-        template_format: PromptTemplateFormat,
-    ) -> Result<Self> {
-        let prompt = PromptTemplate::from_template_with_format(template, template_format)?;
-        Ok(Self::builder().prompt(prompt).build())
-    }
+            pub fn new(
+                content_parts: Vec<MessagePromptContentPart>,
+                additional_kwargs: HashMap<String, serde_json::Value>,
+            ) -> Self {
+                let input_variables = Self::compute_input_variables(&content_parts);
+                Self {
+                    content_parts,
+                    additional_kwargs,
+                    input_variables,
+                }
+            }
 
-    pub fn from_template_file(template_file: impl AsRef<Path>) -> Result<Self> {
-        let prompt = PromptTemplate::from_file(template_file)?;
-        Ok(Self::builder().prompt(prompt).build())
-    }
-}
+            pub fn from_template(template: impl Into<String>) -> Result<Self> {
+                Self::from_template_with_format(template, PromptTemplateFormat::FString)
+            }
 
-impl BaseMessagePromptTemplate for HumanMessagePromptTemplate {
-    fn input_variables(&self) -> Vec<String> {
-        self.prompt.input_variables.clone()
-    }
+            pub fn from_template_with_format(
+                template: impl Into<String>,
+                template_format: PromptTemplateFormat,
+            ) -> Result<Self> {
+                let prompt = PromptTemplate::from_template_with_format(template, template_format)?;
+                let content_parts = vec![MessagePromptContentPart::Text(prompt)];
+                let input_variables = Self::compute_input_variables(&content_parts);
+                Ok(Self {
+                    content_parts,
+                    additional_kwargs: HashMap::new(),
+                    input_variables,
+                })
+            }
 
-    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
-        let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(vec![BaseMessage::Human(
-            HumanMessage::builder().content(text).build(),
-        )])
-    }
-
-    fn pretty_repr(&self, html: bool) -> String {
-        let title = get_msg_title_repr("Human Message", html);
-        format!("{}\n\n{}", title, self.prompt.pretty_repr(html))
-    }
-}
-
-impl BaseStringMessagePromptTemplate for HumanMessagePromptTemplate {
-    fn prompt(&self) -> &PromptTemplate {
-        &self.prompt
-    }
-
-    fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
-        &self.additional_kwargs
-    }
-
-    fn format(&self, kwargs: &HashMap<String, String>) -> Result<BaseMessage> {
-        let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(BaseMessage::Human(
-            HumanMessage::builder().content(text).build(),
-        ))
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AIMessagePromptTemplate {
-    pub prompt: PromptTemplate,
-    #[serde(default)]
-    pub additional_kwargs: HashMap<String, serde_json::Value>,
-}
-
-#[bon]
-impl AIMessagePromptTemplate {
-    #[builder]
-    pub fn new(
-        prompt: PromptTemplate,
-        #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        Self {
-            prompt,
-            additional_kwargs,
+            pub fn from_template_file(template_file: impl AsRef<Path>) -> Result<Self> {
+                let prompt = PromptTemplate::from_file(template_file)?;
+                let content_parts = vec![MessagePromptContentPart::Text(prompt)];
+                let input_variables = Self::compute_input_variables(&content_parts);
+                Ok(Self {
+                    content_parts,
+                    additional_kwargs: HashMap::new(),
+                    input_variables,
+                })
+            }
         }
-    }
 
-    pub fn from_template(template: impl Into<String>) -> Result<Self> {
-        Self::from_template_with_format(template, PromptTemplateFormat::FString)
-    }
+        impl BaseMessagePromptTemplate for $name {
+            fn input_variables(&self) -> &[String] {
+                &self.input_variables
+            }
 
-    pub fn from_template_with_format(
-        template: impl Into<String>,
-        template_format: PromptTemplateFormat,
-    ) -> Result<Self> {
-        let prompt = PromptTemplate::from_template_with_format(template, template_format)?;
-        Ok(Self::builder().prompt(prompt).build())
-    }
+            fn format_messages(
+                &self,
+                kwargs: &HashMap<String, String>,
+            ) -> Result<Vec<BaseMessage>> {
+                let content = format_content_parts(&self.content_parts, kwargs)?;
+                Ok(vec![BaseMessage::$variant(
+                    $builder::builder().content(content).build(),
+                )])
+            }
 
-    pub fn from_template_file(template_file: impl AsRef<Path>) -> Result<Self> {
-        let prompt = PromptTemplate::from_file(template_file)?;
-        Ok(Self::builder().prompt(prompt).build())
-    }
-}
-
-impl BaseMessagePromptTemplate for AIMessagePromptTemplate {
-    fn input_variables(&self) -> Vec<String> {
-        self.prompt.input_variables.clone()
-    }
-
-    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
-        let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(vec![BaseMessage::AI(
-            AIMessage::builder().content(text).build(),
-        )])
-    }
-
-    fn pretty_repr(&self, html: bool) -> String {
-        let title = get_msg_title_repr("AI Message", html);
-        format!("{}\n\n{}", title, self.prompt.pretty_repr(html))
-    }
-}
-
-impl BaseStringMessagePromptTemplate for AIMessagePromptTemplate {
-    fn prompt(&self) -> &PromptTemplate {
-        &self.prompt
-    }
-
-    fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
-        &self.additional_kwargs
-    }
-
-    fn format(&self, kwargs: &HashMap<String, String>) -> Result<BaseMessage> {
-        let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(BaseMessage::AI(AIMessage::builder().content(text).build()))
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SystemMessagePromptTemplate {
-    pub prompt: PromptTemplate,
-    #[serde(default)]
-    pub additional_kwargs: HashMap<String, serde_json::Value>,
-}
-
-impl SystemMessagePromptTemplate {
-    pub fn new(prompt: PromptTemplate) -> Self {
-        Self {
-            prompt,
-            additional_kwargs: HashMap::new(),
+            fn pretty_repr(&self, html: bool) -> String {
+                let title = get_msg_title_repr($title, html);
+                let parts_repr: Vec<String> = self
+                    .content_parts
+                    .iter()
+                    .map(|p| match p {
+                        MessagePromptContentPart::Text(t) => t.pretty_repr(html),
+                        MessagePromptContentPart::Image(_) => "[Image]".to_string(),
+                        MessagePromptContentPart::Dict(_) => "[Dict]".to_string(),
+                    })
+                    .collect();
+                format!("{}\n\n{}", title, parts_repr.join("\n"))
+            }
         }
-    }
-
-    pub fn from_template(template: impl Into<String>) -> Result<Self> {
-        Self::from_template_with_format(template, PromptTemplateFormat::FString)
-    }
-
-    pub fn from_template_with_format(
-        template: impl Into<String>,
-        template_format: PromptTemplateFormat,
-    ) -> Result<Self> {
-        let prompt = PromptTemplate::from_template_with_format(template, template_format)?;
-        Ok(Self::new(prompt))
-    }
-
-    pub fn from_template_file(template_file: impl AsRef<Path>) -> Result<Self> {
-        let prompt = PromptTemplate::from_file(template_file)?;
-        Ok(Self::new(prompt))
-    }
+    };
 }
 
-impl BaseMessagePromptTemplate for SystemMessagePromptTemplate {
-    fn input_variables(&self) -> Vec<String> {
-        self.prompt.input_variables.clone()
-    }
-
-    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
-        let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(vec![BaseMessage::System(
-            SystemMessage::builder().content(text).build(),
-        )])
-    }
-
-    fn pretty_repr(&self, html: bool) -> String {
-        let title = get_msg_title_repr("System Message", html);
-        format!("{}\n\n{}", title, self.prompt.pretty_repr(html))
-    }
-}
-
-impl BaseStringMessagePromptTemplate for SystemMessagePromptTemplate {
-    fn prompt(&self) -> &PromptTemplate {
-        &self.prompt
-    }
-
-    fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
-        &self.additional_kwargs
-    }
-
-    fn format(&self, kwargs: &HashMap<String, String>) -> Result<BaseMessage> {
-        let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(BaseMessage::System(
-            SystemMessage::builder().content(text).build(),
-        ))
-    }
-}
+message_prompt_template!(
+    HumanMessagePromptTemplate,
+    Human,
+    HumanMessage,
+    "Human Message"
+);
+message_prompt_template!(AIMessagePromptTemplate, AI, AIMessage, "AI Message");
+message_prompt_template!(
+    SystemMessagePromptTemplate,
+    System,
+    SystemMessage,
+    "System Message"
+);
 
 #[derive(Clone)]
 pub enum MessageLike {
@@ -520,28 +515,28 @@ impl std::fmt::Debug for MessageLikeRepresentation {
 }
 
 pub trait BaseChatPromptTemplate: BasePromptTemplate {
-    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>>;
+    fn format_messages(&self, input: &ChatPromptInput) -> Result<Vec<BaseMessage>>;
 
     fn aformat_messages(
         &self,
-        kwargs: &HashMap<String, String>,
+        input: &ChatPromptInput,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<BaseMessage>>> + Send + '_>>
     {
-        let result = self.format_messages(kwargs);
+        let result = self.format_messages(input);
         Box::pin(async move { result })
     }
 
-    fn format_prompt_chat(&self, kwargs: &HashMap<String, String>) -> Result<ChatPromptValue> {
-        let messages = self.format_messages(kwargs)?;
+    fn format_prompt_chat(&self, input: &ChatPromptInput) -> Result<ChatPromptValue> {
+        let messages = self.format_messages(input)?;
         Ok(ChatPromptValue::new(messages))
     }
 
     fn aformat_prompt_chat(
         &self,
-        kwargs: &HashMap<String, String>,
+        input: &ChatPromptInput,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<ChatPromptValue>> + Send + '_>>
     {
-        let result = self.format_prompt_chat(kwargs);
+        let result = self.format_prompt_chat(input);
         Box::pin(async move { result })
     }
 
@@ -566,22 +561,25 @@ impl ChatPromptMessage {
     fn input_variables(&self) -> Vec<String> {
         match self {
             ChatPromptMessage::Message(_) => Vec::new(),
-            ChatPromptMessage::Human(t) => t.input_variables(),
-            ChatPromptMessage::AI(t) => t.input_variables(),
-            ChatPromptMessage::System(t) => t.input_variables(),
-            ChatPromptMessage::Chat(t) => t.input_variables(),
-            ChatPromptMessage::Placeholder(p) => p.input_variables(),
+            ChatPromptMessage::Human(t) => t.input_variables().to_vec(),
+            ChatPromptMessage::AI(t) => t.input_variables().to_vec(),
+            ChatPromptMessage::System(t) => t.input_variables().to_vec(),
+            ChatPromptMessage::Chat(t) => t.input_variables().to_vec(),
+            ChatPromptMessage::Placeholder(p) => p.input_variables().to_vec(),
         }
     }
 
-    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
+    fn format_messages_with_input(&self, input: &ChatPromptInput) -> Result<Vec<BaseMessage>> {
         match self {
             ChatPromptMessage::Message(m) => Ok(vec![m.clone()]),
-            ChatPromptMessage::Human(t) => t.format_messages(kwargs),
-            ChatPromptMessage::AI(t) => t.format_messages(kwargs),
-            ChatPromptMessage::System(t) => t.format_messages(kwargs),
-            ChatPromptMessage::Chat(t) => t.format_messages(kwargs),
-            ChatPromptMessage::Placeholder(p) => p.format_messages(kwargs),
+            ChatPromptMessage::Human(t) => t.format_messages(&input.variables),
+            ChatPromptMessage::AI(t) => t.format_messages(&input.variables),
+            ChatPromptMessage::System(t) => t.format_messages(&input.variables),
+            ChatPromptMessage::Chat(t) => t.format_messages(&input.variables),
+            ChatPromptMessage::Placeholder(p) => {
+                let messages = input.messages.get(&p.variable_name).cloned();
+                p.format_with_messages(messages)
+            }
         }
     }
 
@@ -602,7 +600,8 @@ pub struct ChatPromptTemplate {
     pub messages: Vec<ChatPromptMessage>,
     input_variables: Vec<String>,
     optional_variables: Vec<String>,
-    partial_variables: HashMap<String, String>,
+    #[serde(skip, default)]
+    partial_variables: HashMap<String, PartialValue>,
     validate_template: bool,
     template_format: PromptTemplateFormat,
 }
@@ -629,12 +628,10 @@ impl ChatPromptTemplate {
 
         let mut input_vars = std::collections::HashSet::new();
         let mut optional_vars = std::collections::HashSet::new();
-        let mut partial_vars = HashMap::new();
 
         for msg in &chat_messages {
             match msg {
                 ChatPromptMessage::Placeholder(p) if p.optional => {
-                    partial_vars.insert(p.variable_name.clone(), String::new());
                     optional_vars.insert(p.variable_name.clone());
                 }
                 _ => {
@@ -655,7 +652,7 @@ impl ChatPromptTemplate {
             messages: chat_messages,
             input_variables,
             optional_variables,
-            partial_variables: partial_vars,
+            partial_variables: HashMap::<String, PartialValue>::new(),
             validate_template: false,
             template_format,
         })
@@ -695,7 +692,7 @@ impl ChatPromptTemplate {
         Ok(())
     }
 
-    pub fn partial(&self, kwargs: HashMap<String, String>) -> Self {
+    pub fn partial(&self, kwargs: HashMap<String, PartialValue>) -> Self {
         let new_vars: Vec<_> = self
             .input_variables
             .iter()
@@ -727,24 +724,19 @@ impl ChatPromptTemplate {
     pub fn get(&self, index: usize) -> Option<&ChatPromptMessage> {
         self.messages.get(index)
     }
-
-    fn merge_partial_and_user_variables(
-        &self,
-        kwargs: &HashMap<String, String>,
-    ) -> HashMap<String, String> {
-        let mut merged = self.partial_variables.clone();
-        merged.extend(kwargs.clone());
-        merged
-    }
 }
 
 impl BaseChatPromptTemplate for ChatPromptTemplate {
-    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
-        let merged = self.merge_partial_and_user_variables(kwargs);
+    fn format_messages(&self, input: &ChatPromptInput) -> Result<Vec<BaseMessage>> {
+        let merged_variables = self.merge_partial_and_user_variables(&input.variables);
+        let merged_input = ChatPromptInput {
+            variables: merged_variables,
+            messages: input.messages.clone(),
+        };
         let mut result = Vec::new();
 
         for message in &self.messages {
-            let formatted = message.format_messages(&merged)?;
+            let formatted = message.format_messages_with_input(&merged_input)?;
             result.extend(formatted);
         }
 
@@ -762,7 +754,7 @@ impl BaseChatPromptTemplate for ChatPromptTemplate {
 
 #[async_trait]
 impl Runnable for ChatPromptTemplate {
-    type Input = HashMap<String, String>;
+    type Input = ChatPromptInput;
     type Output = ChatPromptValue;
 
     fn name(&self) -> Option<String> {
@@ -770,10 +762,16 @@ impl Runnable for ChatPromptTemplate {
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let _config = ensure_config(config);
-        self.validate_input(&input)?;
-        let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
-        Ok(ChatPromptValue::new(messages))
+        let config = merge_prompt_config(config, self.metadata(), self.tags());
+        self.call_with_config(
+            &|input: ChatPromptInput, _config| {
+                self.validate_input(&input.variables)?;
+                let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
+                Ok(ChatPromptValue::new(messages))
+            },
+            input,
+            config,
+        )
     }
 
     async fn ainvoke(
@@ -862,22 +860,27 @@ impl BasePromptTemplate for ChatPromptTemplate {
         &self.optional_variables
     }
 
-    fn partial_variables(&self) -> &HashMap<String, String> {
-        &self.partial_variables
+    fn partial_variables(&self) -> HashMap<String, String> {
+        resolve_partials(&self.partial_variables)
     }
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<String> {
-        let messages = self.format_messages(kwargs)?;
+        let input = ChatPromptInput::from(kwargs.clone());
+        let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
         let prompt_value = ChatPromptValue::new(messages);
         Ok(prompt_value.to_string())
     }
 
     fn format_prompt(&self, kwargs: &HashMap<String, String>) -> Result<Box<dyn PromptValue>> {
-        let messages = self.format_messages(kwargs)?;
+        let input = ChatPromptInput::from(kwargs.clone());
+        let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
         Ok(Box::new(ChatPromptValue::new(messages)))
     }
 
-    fn partial(&self, kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>> {
+    fn partial(
+        &self,
+        kwargs: HashMap<String, PartialValue>,
+    ) -> Result<Box<dyn BasePromptTemplate>> {
         Ok(Box::new(ChatPromptTemplate::partial(self, kwargs)))
     }
 
@@ -897,6 +900,12 @@ impl std::ops::Add for ChatPromptTemplate {
     type Output = ChatPromptTemplate;
 
     fn add(self, other: Self) -> Self::Output {
+        assert_eq!(
+            self.template_format, other.template_format,
+            "Cannot add ChatPromptTemplates with different template formats: {:?} vs {:?}",
+            self.template_format, other.template_format
+        );
+
         let mut messages = self.messages;
         messages.extend(other.messages);
 
@@ -904,7 +913,7 @@ impl std::ops::Add for ChatPromptTemplate {
             self.input_variables.into_iter().collect();
         input_vars.extend(other.input_variables);
 
-        let mut partial_vars = self.partial_variables;
+        let mut partial_vars: HashMap<String, PartialValue> = self.partial_variables;
         partial_vars.extend(other.partial_variables);
 
         let mut optional_vars: std::collections::HashSet<_> =
@@ -930,78 +939,76 @@ impl std::ops::Add for ChatPromptTemplate {
     }
 }
 
+impl std::ops::Index<usize> for ChatPromptTemplate {
+    type Output = ChatPromptMessage;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.messages[index]
+    }
+}
+
+impl std::ops::Index<std::ops::Range<usize>> for ChatPromptTemplate {
+    type Output = [ChatPromptMessage];
+
+    fn index(&self, index: std::ops::Range<usize>) -> &Self::Output {
+        &self.messages[index]
+    }
+}
+
+impl std::ops::Index<std::ops::RangeFrom<usize>> for ChatPromptTemplate {
+    type Output = [ChatPromptMessage];
+
+    fn index(&self, index: std::ops::RangeFrom<usize>) -> &Self::Output {
+        &self.messages[index]
+    }
+}
+
+impl std::ops::Index<std::ops::RangeTo<usize>> for ChatPromptTemplate {
+    type Output = [ChatPromptMessage];
+
+    fn index(&self, index: std::ops::RangeTo<usize>) -> &Self::Output {
+        &self.messages[index]
+    }
+}
+
+impl std::ops::Index<std::ops::RangeFull> for ChatPromptTemplate {
+    type Output = [ChatPromptMessage];
+
+    fn index(&self, index: std::ops::RangeFull) -> &Self::Output {
+        &self.messages[index]
+    }
+}
+
 use crate::load::Serializable;
 use serde_json::Value;
 
-impl Serializable for MessagesPlaceholder {
-    fn is_lc_serializable() -> bool {
-        true
-    }
+macro_rules! lc_serializable_chat {
+    ($($ty:ty),+ $(,)?) => {
+        $(
+            impl Serializable for $ty {
+                fn is_lc_serializable() -> bool {
+                    true
+                }
 
-    fn get_lc_namespace() -> Vec<String> {
-        vec![
-            "langchain".to_string(),
-            "prompts".to_string(),
-            "chat".to_string(),
-        ]
-    }
+                fn get_lc_namespace() -> Vec<String> {
+                    vec![
+                        "langchain".to_string(),
+                        "prompts".to_string(),
+                        "chat".to_string(),
+                    ]
+                }
+            }
+        )+
+    };
 }
 
-impl Serializable for HumanMessagePromptTemplate {
-    fn is_lc_serializable() -> bool {
-        true
-    }
-
-    fn get_lc_namespace() -> Vec<String> {
-        vec![
-            "langchain".to_string(),
-            "prompts".to_string(),
-            "chat".to_string(),
-        ]
-    }
-}
-
-impl Serializable for AIMessagePromptTemplate {
-    fn is_lc_serializable() -> bool {
-        true
-    }
-
-    fn get_lc_namespace() -> Vec<String> {
-        vec![
-            "langchain".to_string(),
-            "prompts".to_string(),
-            "chat".to_string(),
-        ]
-    }
-}
-
-impl Serializable for SystemMessagePromptTemplate {
-    fn is_lc_serializable() -> bool {
-        true
-    }
-
-    fn get_lc_namespace() -> Vec<String> {
-        vec![
-            "langchain".to_string(),
-            "prompts".to_string(),
-            "chat".to_string(),
-        ]
-    }
-}
-
-impl Serializable for ChatMessagePromptTemplate {
-    fn is_lc_serializable() -> bool {
-        true
-    }
-
-    fn get_lc_namespace() -> Vec<String> {
-        vec![
-            "langchain".to_string(),
-            "prompts".to_string(),
-            "chat".to_string(),
-        ]
-    }
-}
+lc_serializable_chat!(
+    MessagesPlaceholder,
+    HumanMessagePromptTemplate,
+    AIMessagePromptTemplate,
+    SystemMessagePromptTemplate,
+    ChatMessagePromptTemplate,
+);
 
 impl Serializable for ChatPromptTemplate {
     fn is_lc_serializable() -> bool {
@@ -1088,7 +1095,8 @@ mod tests {
         let mut kwargs = HashMap::new();
         kwargs.insert("question".to_string(), "Hello!".to_string());
 
-        let messages = template.format_messages(&kwargs).unwrap();
+        let input = ChatPromptInput::from(kwargs);
+        let messages = template.format_messages(&input).unwrap();
         assert_eq!(messages.len(), 2);
         assert_eq!(messages[0].content(), "You are a helpful assistant.");
         assert_eq!(messages[1].content(), "Hello!");
@@ -1101,7 +1109,8 @@ mod tests {
         let mut kwargs = HashMap::new();
         kwargs.insert("name".to_string(), "World".to_string());
 
-        let messages = template.format_messages(&kwargs).unwrap();
+        let input = ChatPromptInput::from(kwargs);
+        let messages = template.format_messages(&input).unwrap();
         assert_eq!(messages.len(), 1);
         assert_eq!(messages[0].content(), "Hello, World!");
     }
@@ -1121,7 +1130,8 @@ mod tests {
         let mut kwargs = HashMap::new();
         kwargs.insert("question".to_string(), "Hello!".to_string());
 
-        let messages = combined.format_messages(&kwargs).unwrap();
+        let input = ChatPromptInput::from(kwargs);
+        let messages = combined.format_messages(&input).unwrap();
         assert_eq!(messages.len(), 2);
     }
 
@@ -1134,7 +1144,7 @@ mod tests {
         .unwrap();
 
         let mut partial_vars = HashMap::new();
-        partial_vars.insert("role".to_string(), "an assistant".to_string());
+        partial_vars.insert("role".to_string(), PartialValue::from("an assistant"));
 
         let partial = template.partial(partial_vars);
         assert_eq!(partial.input_variables(), &["question"]);
@@ -1142,7 +1152,8 @@ mod tests {
         let mut kwargs = HashMap::new();
         kwargs.insert("question".to_string(), "Hello!".to_string());
 
-        let messages = partial.format_messages(&kwargs).unwrap();
+        let input = ChatPromptInput::from(kwargs);
+        let messages = partial.format_messages(&input).unwrap();
         assert_eq!(messages.len(), 2);
         assert_eq!(messages[0].content(), "You are an assistant.");
     }
@@ -1160,7 +1171,8 @@ mod tests {
 
         let mut kwargs = HashMap::new();
         kwargs.insert("name".to_string(), "Bob".to_string());
-        let messages = template.format_messages(&kwargs).unwrap();
+        let input = ChatPromptInput::from(kwargs);
+        let messages = template.format_messages(&input).unwrap();
         assert_eq!(messages[0].content(), "hello");
         assert_eq!(messages[1].content(), "Hi Bob");
     }
@@ -1176,7 +1188,8 @@ mod tests {
 
         let mut kwargs = HashMap::new();
         kwargs.insert("name".to_string(), "World".to_string());
-        let messages = template.format_messages(&kwargs).unwrap();
+        let input = ChatPromptInput::from(kwargs);
+        let messages = template.format_messages(&input).unwrap();
         assert_eq!(messages.len(), 1);
         assert_eq!(messages[0].content(), "Hello World");
     }
@@ -1199,6 +1212,76 @@ mod tests {
     }
 
     #[test]
+    fn test_messages_placeholder_with_history() {
+        let template = ChatPromptTemplate::from_messages(vec![
+            ("system", "You are a helpful assistant.").into(),
+            MessageLikeRepresentation::Placeholder {
+                variable_name: "history".into(),
+                optional: false,
+            },
+            ("human", "{question}").into(),
+        ])
+        .unwrap();
+
+        let input = ChatPromptInput::builder()
+            .variables(HashMap::from([(
+                "question".to_string(),
+                "What is 2+2?".to_string(),
+            )]))
+            .messages(HashMap::from([(
+                "history".to_string(),
+                vec![
+                    BaseMessage::Human(HumanMessage::builder().content("Hi").build()),
+                    BaseMessage::AI(AIMessage::builder().content("Hello!").build()),
+                ],
+            )]))
+            .build();
+
+        let messages = template.format_messages(&input).unwrap();
+        assert_eq!(messages.len(), 4);
+        assert_eq!(messages[0].content(), "You are a helpful assistant.");
+        assert_eq!(messages[1].content(), "Hi");
+        assert_eq!(messages[2].content(), "Hello!");
+        assert_eq!(messages[3].content(), "What is 2+2?");
+    }
+
+    #[test]
+    fn test_callable_partial_value() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let counter = Arc::new(AtomicUsize::new(0));
+        let counter_clone = counter.clone();
+
+        let template = ChatPromptTemplate::from_messages(vec![
+            ("system", "Call count: {call_count}").into(),
+            ("human", "{question}").into(),
+        ])
+        .unwrap();
+
+        let mut partial_vars = HashMap::new();
+        partial_vars.insert(
+            "call_count".to_string(),
+            PartialValue::from_fn(move || {
+                let val = counter_clone.fetch_add(1, Ordering::SeqCst);
+                val.to_string()
+            }),
+        );
+
+        let partial = template.partial(partial_vars);
+
+        let input1 =
+            ChatPromptInput::from(HashMap::from([("question".to_string(), "Q1".to_string())]));
+        let messages1 = partial.format_messages(&input1).unwrap();
+        assert_eq!(messages1[0].content(), "Call count: 0");
+
+        let input2 =
+            ChatPromptInput::from(HashMap::from([("question".to_string(), "Q2".to_string())]));
+        let messages2 = partial.format_messages(&input2).unwrap();
+        assert_eq!(messages2[0].content(), "Call count: 1");
+    }
+
+    #[test]
     fn test_format_prompt() {
         let template = ChatPromptTemplate::from_messages(vec![
             ("system", "You are helpful.").into(),
@@ -1209,7 +1292,8 @@ mod tests {
         let mut kwargs = HashMap::new();
         kwargs.insert("question".to_string(), "Hello!".to_string());
 
-        let messages = template.format_messages(&kwargs).unwrap();
+        let input = ChatPromptInput::from(kwargs);
+        let messages = template.format_messages(&input).unwrap();
         assert_eq!(messages.len(), 2);
     }
 

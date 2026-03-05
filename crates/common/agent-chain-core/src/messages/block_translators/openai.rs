@@ -15,7 +15,6 @@ pub enum OpenAiApi {
     Responses,
 }
 
-#[allow(dead_code)]
 const FUNCTION_CALL_IDS_MAP_KEY: &str = "__openai_function_call_ids__";
 
 pub fn convert_to_openai_image_block(block: &Value) -> Result<Value, String> {

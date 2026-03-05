@@ -52,8 +52,23 @@ impl AddableDict {
     pub fn new() -> Self {
         Self(HashMap::new())
     }
+}
 
-    pub fn from_map(map: HashMap<String, Value>) -> Self {
+impl std::ops::Deref for AddableDict {
+    type Target = HashMap<String, Value>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for AddableDict {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl From<HashMap<String, Value>> for AddableDict {
+    fn from(map: HashMap<String, Value>) -> Self {
         Self(map)
     }
 }
@@ -61,26 +76,21 @@ impl AddableDict {
 impl std::ops::Add for AddableDict {
     type Output = Self;
 
-    fn add(self, other: Self) -> Self::Output {
-        let mut chunk = self.clone();
-
+    fn add(mut self, other: Self) -> Self::Output {
         for (key, value) in other.0 {
-            match chunk.0.get(&key) {
-                None => {
-                    chunk.0.insert(key, value);
-                }
-                Some(existing) if existing.is_null() => {
-                    chunk.0.insert(key, value);
+            match self.get(&key) {
+                None | Some(&Value::Null) => {
+                    self.insert(key, value);
                 }
                 Some(existing) if !value.is_null() => {
                     let added = try_add_values(existing, &value);
-                    chunk.0.insert(key, added);
+                    self.insert(key, added);
                 }
                 _ => {}
             }
         }
 
-        chunk
+        self
     }
 }
 
@@ -119,30 +129,18 @@ pub trait Addable: Clone {
 }
 
 pub fn add<T: Addable>(addables: impl IntoIterator<Item = T>) -> Option<T> {
-    let mut final_value: Option<T> = None;
-
-    for chunk in addables {
-        final_value = match final_value {
-            None => Some(chunk),
-            Some(prev) => Some(prev.add(chunk)),
-        };
-    }
-
-    final_value
+    addables.into_iter().reduce(|a, b| a.add(b))
 }
 
 pub async fn aadd<T: Addable>(addables: impl Stream<Item = T> + Unpin) -> Option<T> {
-    let mut final_value: Option<T> = None;
-    let mut stream = addables;
-
-    while let Some(chunk) = stream.next().await {
-        final_value = match final_value {
-            None => Some(chunk),
-            Some(prev) => Some(prev.add(chunk)),
-        };
-    }
-
-    final_value
+    addables
+        .fold(None, |acc: Option<T>, chunk| async move {
+            Some(match acc {
+                None => chunk,
+                Some(prev) => prev.add(chunk),
+            })
+        })
+        .await
 }
 
 impl Addable for String {
@@ -164,23 +162,8 @@ impl Addable for AddableDict {
 }
 
 impl Addable for HashMap<String, Value> {
-    fn add(mut self, other: Self) -> Self {
-        for (key, value) in other {
-            match self.get(&key) {
-                None => {
-                    self.insert(key, value);
-                }
-                Some(existing) if existing.is_null() => {
-                    self.insert(key, value);
-                }
-                Some(existing) if !value.is_null() => {
-                    let added = try_add_values(existing, &value);
-                    self.insert(key, added);
-                }
-                _ => {}
-            }
-        }
-        self
+    fn add(self, other: Self) -> Self {
+        (AddableDict(self) + AddableDict(other)).0
     }
 }
 
@@ -378,7 +361,7 @@ pub fn get_unique_config_specs(
     Ok(unique)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RootEventFilter {
     pub include_names: Option<Vec<String>>,
     pub include_types: Option<Vec<String>>,
@@ -389,17 +372,6 @@ pub struct RootEventFilter {
 }
 
 impl RootEventFilter {
-    pub fn new() -> Self {
-        Self {
-            include_names: None,
-            include_types: None,
-            include_tags: None,
-            exclude_names: None,
-            exclude_types: None,
-            exclude_tags: None,
-        }
-    }
-
     pub fn include_event(&self, event_name: &str, event_tags: &[String], root_type: &str) -> bool {
         let mut include = self.include_names.is_none()
             && self.include_types.is_none()
@@ -431,28 +403,6 @@ impl RootEventFilter {
 
         include
     }
-}
-
-impl Default for RootEventFilter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-pub fn is_async_generator<F, S, T>(_f: F) -> bool
-where
-    F: Fn() -> S,
-    S: Stream<Item = T>,
-{
-    true
-}
-
-pub fn is_async_callable<F, Fut>(_f: F) -> bool
-where
-    F: Fn() -> Fut,
-    Fut: Future,
-{
-    true
 }
 
 #[cfg(test)]

@@ -43,16 +43,20 @@ impl FakeMessagesListChatModel {
         sleep: Option<Duration>,
         config: Option<ChatModelConfig>,
     ) -> Self {
+        let mut config = config.unwrap_or_default();
+        if config.base.cache.is_none() {
+            config.base.cache = Some(false);
+        }
         Self {
             responses,
             sleep,
             index: AtomicUsize::new(0),
-            config: config.unwrap_or_default(),
+            config,
         }
     }
 
     pub fn current_index(&self) -> usize {
-        self.index.load(Ordering::SeqCst)
+        self.index.load(Ordering::SeqCst) % self.responses.len()
     }
 
     pub fn reset(&self) {
@@ -122,19 +126,8 @@ impl BaseChatModel for FakeMessagesListChatModel {
             tokio::time::sleep(duration).await;
         }
 
-        let i = self.index.load(Ordering::SeqCst);
-        let response = self
-            .responses
-            .get(i)
-            .cloned()
-            .unwrap_or_else(|| BaseMessage::AI(AIMessage::builder().content("").build()));
-
-        let next_i = if i < self.responses.len() - 1 {
-            i + 1
-        } else {
-            0
-        };
-        self.index.store(next_i, Ordering::SeqCst);
+        let i = self.index.fetch_add(1, Ordering::SeqCst) % self.responses.len();
+        let response = self.responses[i].clone();
 
         let generation = ChatGeneration::builder().message(response).build();
         Ok(ChatResult::builder().generations(vec![generation]).build())
@@ -177,9 +170,7 @@ impl FakeListChatModel {
         if let Some(instance) = cache_instance {
             config.cache_instance = Some(instance);
         }
-        if let Some(cache) = cache {
-            config.base.cache = Some(cache);
-        }
+        config.base.cache = Some(cache.unwrap_or(false));
         Self {
             responses,
             sleep,
@@ -190,7 +181,7 @@ impl FakeListChatModel {
     }
 
     pub fn current_index(&self) -> usize {
-        self.index.load(Ordering::SeqCst)
+        self.index.load(Ordering::SeqCst) % self.responses.len()
     }
 
     pub fn reset(&self) {
@@ -198,17 +189,8 @@ impl FakeListChatModel {
     }
 
     fn get_next_response(&self) -> String {
-        let i = self.index.load(Ordering::SeqCst);
-        let response = self.responses.get(i).cloned().unwrap_or_default();
-
-        let next_i = if i < self.responses.len() - 1 {
-            i + 1
-        } else {
-            0
-        };
-        self.index.store(next_i, Ordering::SeqCst);
-
-        response
+        let i = self.index.fetch_add(1, Ordering::SeqCst) % self.responses.len();
+        self.responses[i].clone()
     }
 
     pub async fn batch(
@@ -358,13 +340,11 @@ impl BaseChatModel for FakeListChatModel {
 }
 
 #[derive(Debug, Clone, Default)]
-#[allow(dead_code)]
 pub struct FakeChatModel {
     config: ChatModelConfig,
 }
 
 #[bon::bon]
-#[allow(dead_code)]
 impl FakeChatModel {
     #[builder]
     pub fn new(config: Option<ChatModelConfig>) -> Self {
@@ -464,9 +444,11 @@ impl GenericFakeChatModel {
     where
         I: Iterator<Item = AIMessage> + Send + 'static,
     {
+        let mut config = ChatModelConfig::default();
+        config.base.cache = Some(false);
         Self {
             messages: std::sync::Mutex::new(Box::new(messages)),
-            config: ChatModelConfig::default(),
+            config,
         }
     }
 
@@ -602,11 +584,10 @@ impl BaseChatModel for GenericFakeChatModel {
         let message_id = message.id;
         let additional_kwargs = message.additional_kwargs.clone();
 
-        let callback_handlers: Vec<
-            std::sync::Arc<dyn crate::callbacks::base::BaseCallbackHandler>,
-        > = run_manager
-            .map(|rm| rm.handlers().to_vec())
-            .unwrap_or_default();
+        let callback_handlers: Vec<std::sync::Arc<dyn crate::callbacks::BaseCallbackHandler>> =
+            run_manager
+                .map(|rm| rm.handlers().to_vec())
+                .unwrap_or_default();
         let callback_run_id = run_manager.map(|rm| rm.run_id());
         let callback_parent_run_id = run_manager.and_then(|rm| rm.parent_run_id());
 

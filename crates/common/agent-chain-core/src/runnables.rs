@@ -15,18 +15,18 @@ pub mod schema;
 pub mod utils;
 
 pub use base::{
-    ConfigFactory, DynRunnable, GraphProvider, Runnable, RunnableBinding, RunnableEach,
-    RunnableGenerator, RunnableGraphProvider, RunnableLambda, RunnableLambdaWithConfig,
-    RunnableMap, RunnableParallel, RunnableSequence, RunnableSerializable, TransformFn, chain,
-    coerce_map_to_runnable, coerce_to_runnable, pipe, runnable_lambda, to_dyn,
+    ConfigFactory, DynRunnable, DynRunnableSequence, GraphProvider, Runnable, RunnableBinding,
+    RunnableEach, RunnableExt, RunnableGenerator, RunnableGraphProvider, RunnableLambda,
+    RunnableLambdaWithConfig, RunnableMap, RunnableParallel, RunnableSequence,
+    RunnableSerializable, TransformFn, pipe, runnable_lambda, to_dyn,
 };
 pub use branch::{RunnableBranch, RunnableBranchFluentBuilder};
 pub use config::{
-    AsyncVariableArgsFn, ConfigContextGuard, ConfigOrList, DEFAULT_RECURSION_LIMIT, RunnableConfig,
-    VariableArgsFn, acall_func_with_variable_args, call_func_with_variable_args, ensure_config,
-    get_async_callback_manager_for_config, get_callback_manager_for_config,
+    AsyncVariableArgsFn, ConfigContextGuard, ConfigOrList, DEFAULT_RECURSION_LIMIT, EMPTY_MAP,
+    RunnableConfig, VariableArgsFn, acall_func_with_variable_args, call_func_with_variable_args,
+    child_config, ensure_config, finish_chain_run, get_callback_manager_for_config,
     get_child_runnable_config, get_config_list, merge_configs, patch_config, run_in_executor,
-    set_config_context,
+    set_config_context, start_chain_run,
 };
 pub use configurable::{
     Alternative, ConfigurableRunnable, DynamicRunnable, Reconfigurable,
@@ -49,8 +49,8 @@ pub use passthrough::{
     graph_passthrough,
 };
 pub use retry::{
-    ExponentialJitterParams, RetryCallState, RetryErrorPredicate, RunnableRetry,
-    RunnableRetryConfig, RunnableRetryExt,
+    ExponentialJitterParams, RetryErrorPredicate, RunnableRetry, RunnableRetryConfig,
+    RunnableRetryExt,
 };
 pub use router::{DynRouterRunnable, RouterInput, RouterRunnable};
 pub use schema::{

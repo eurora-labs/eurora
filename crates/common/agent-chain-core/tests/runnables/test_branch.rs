@@ -16,7 +16,7 @@ fn test_branch_initialization() {
         .default(Ok)
         .unwrap();
 
-    assert_eq!(branch.name(), Some("RunnableBranch".to_string()));
+    assert_eq!(branch.name(), None);
 }
 
 #[test]
@@ -681,7 +681,7 @@ fn test_branch_default_name() {
         .default(|_: i32| Ok("default".to_string()))
         .unwrap();
 
-    assert_eq!(branch.name(), Some("RunnableBranch".to_string()));
+    assert_eq!(branch.name(), None);
 }
 
 #[tokio::test]

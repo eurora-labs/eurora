@@ -16,6 +16,7 @@ path = "tests/ollama/mod.rs"
 [dependencies]
 agent-chain-core = { workspace = true }
 agent-chain-macros = { workspace = true }
+bon = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
 backon = { workspace = true }
@@ -25,6 +26,7 @@ percent-encoding = { workspace = true }
 reqwest = { workspace = true, features = ["json", "stream"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+tiktoken-rs = { version = "0.9", optional = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-util = { version = "0.7", features = ["io"] }
 tracing = { workspace = true }
@@ -39,3 +41,4 @@ anthropic = []
 integration-tests = []
 ollama = []
 openai = []
+tiktoken = ["tiktoken-rs", "agent-chain-core/tiktoken"]

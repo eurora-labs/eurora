@@ -18,15 +18,16 @@
 	function startPolling() {
 		interval = setInterval(async () => {
 			try {
-				await taurpc.auth.refresh_session();
-				const role = await taurpc.auth.get_role();
-				if (role !== 'Tier1') return;
+				const subscribed = await taurpc.payment.is_subscribed();
+				if (!subscribed) return;
+
 				clearInterval(interval);
+				await taurpc.auth.refresh_session().catch(() => {});
 				const win = getCurrentWindow();
 				await win.setFocus();
 				goto('/');
-			} catch {
-				// keep polling on transient errors
+			} catch (e) {
+				console.warn('Upgrade poll error:', e);
 			}
 		}, 5000);
 	}

@@ -181,15 +181,12 @@ pub fn draw_mermaid(
 
     let mut seen_subgraphs: HashSet<String> = HashSet::new();
 
-    #[allow(clippy::too_many_arguments)]
     fn add_subgraph(
         mermaid_graph: &mut String,
         edge_groups: &HashMap<String, Vec<&Edge>>,
         subgraph_nodes: &HashMap<String, Vec<(&String, &Node)>>,
         edges: &[&Edge],
         prefix: &str,
-        _first_node: Option<&str>,
-        _last_node: Option<&str>,
         with_styles: bool,
         wrap_label_n_words: usize,
         seen_subgraphs: &mut HashSet<String>,
@@ -274,8 +271,6 @@ pub fn draw_mermaid(
                     subgraph_nodes,
                     nested_edges,
                     nested_prefix,
-                    _first_node,
-                    _last_node,
                     with_styles,
                     wrap_label_n_words,
                     seen_subgraphs,
@@ -298,8 +293,6 @@ pub fn draw_mermaid(
             &subgraph_nodes,
             top_edges,
             "",
-            first_node,
-            last_node,
             with_styles,
             wrap_label_n_words,
             &mut seen_subgraphs,
@@ -321,8 +314,6 @@ pub fn draw_mermaid(
                 &subgraph_nodes,
                 prefix_edges,
                 prefix,
-                first_node,
-                last_node,
                 with_styles,
                 wrap_label_n_words,
                 &mut seen_subgraphs,
@@ -367,10 +358,11 @@ pub fn draw_mermaid(
 }
 
 pub fn generate_mermaid_graph_styles(node_colors: &NodeStyles) -> String {
+    use std::fmt::Write;
     let mut styles = String::new();
-    styles += &format!("\tclassDef default {}\n", node_colors.default);
-    styles += &format!("\tclassDef first {}\n", node_colors.first);
-    styles += &format!("\tclassDef last {}\n", node_colors.last);
+    let _ = writeln!(styles, "\tclassDef default {}", node_colors.default);
+    let _ = writeln!(styles, "\tclassDef first {}", node_colors.first);
+    let _ = writeln!(styles, "\tclassDef last {}", node_colors.last);
     styles
 }
 
@@ -416,9 +408,11 @@ async fn render_mermaid_using_api(
 
     let bg_color = match background_color {
         Some(color) => {
-            let hex_pattern = regex::Regex::new(r"^#(?:[0-9a-fA-F]{3}){1,2}$")
-                .map_err(|e| Error::other(format!("regex error: {e}")))?;
-            if hex_pattern.is_match(color) {
+            static HEX_PATTERN: std::sync::LazyLock<regex::Regex> =
+                std::sync::LazyLock::new(|| {
+                    regex::Regex::new(r"^#(?:[0-9a-fA-F]{3}){1,2}$").unwrap()
+                });
+            if HEX_PATTERN.is_match(color) {
                 color.to_string()
             } else {
                 format!("!{color}")

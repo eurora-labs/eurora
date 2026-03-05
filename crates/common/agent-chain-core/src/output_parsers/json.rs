@@ -1,24 +1,18 @@
-use std::fmt::Debug;
-
 use futures::stream::BoxStream;
-
-use crate::messages::BaseMessage;
-
 use serde_json::Value;
 
 use crate::error::{Error, Result};
 use crate::outputs::Generation;
 use crate::utils::json::{parse_json_markdown, parse_partial_json};
 
-use super::base::BaseOutputParser;
+use super::base::{BaseOutputParser, ParserInput};
 use super::format_instructions::JSON_FORMAT_INSTRUCTIONS;
 use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
 
 #[derive(Debug, Clone, Default)]
 pub struct JsonOutputParser {
-    pub schema: Option<Value>,
-
-    pub diff: bool,
+    schema: Option<Value>,
+    diff: bool,
 }
 
 #[bon::bon]
@@ -37,62 +31,49 @@ impl JsonOutputParser {
     }
 }
 
+pub(crate) fn parse_json_result(text: &str, partial: bool) -> Result<Value> {
+    parse_json_markdown(text).or_else(|e| {
+        if partial {
+            parse_partial_json(text, false)
+                .map_err(|e| Error::output_parser_simple(format!("Partial parse failed: {e}")))
+        } else {
+            Err(Error::output_parser_with_output(
+                format!("Invalid json output: {e}"),
+                text,
+            ))
+        }
+    })
+}
+
+fn format_schema_instructions(schema: &Value) -> String {
+    let mut schema_copy = schema.clone();
+    if let Value::Object(ref mut map) = schema_copy {
+        map.remove("title");
+        map.remove("type");
+    }
+    let schema_str = serde_json::to_string(&schema_copy).unwrap_or_else(|_| "{}".to_string());
+    JSON_FORMAT_INSTRUCTIONS.replace("{schema}", &schema_str)
+}
+
 impl BaseOutputParser for JsonOutputParser {
     type Output = Value;
 
     fn parse(&self, text: &str) -> Result<Value> {
-        let text = text.trim();
-
-        match parse_json_markdown(text) {
-            Ok(value) => Ok(value),
-            Err(e) => Err(Error::Other(format!(
-                "Invalid json output: {}. Error: {}",
-                text, e
-            ))),
-        }
+        parse_json_result(text.trim(), false)
     }
 
     fn parse_result(&self, result: &[Generation], partial: bool) -> Result<Value> {
-        if result.is_empty() {
-            return Err(Error::Other("No generations to parse".to_string()));
-        }
-
-        let text = result[0].text.trim();
-
-        if partial {
-            match parse_json_markdown(text) {
-                Ok(value) => Ok(value),
-                Err(_) => parse_partial_json(text, false)
-                    .map_err(|e| Error::Other(format!("Partial parse failed: {}", e))),
-            }
-        } else {
-            match parse_json_markdown(text) {
-                Ok(value) => Ok(value),
-                Err(e) => Err(Error::output_parser_with_output(
-                    format!("Invalid json output: {}", e),
-                    text,
-                )),
-            }
-        }
+        let first = result
+            .first()
+            .ok_or_else(|| Error::output_parser_simple("No generations to parse"))?;
+        parse_json_result(first.text.trim(), partial)
     }
 
     fn get_format_instructions(&self) -> Result<String> {
-        match self.get_schema() {
-            Some(schema) => {
-                let mut schema_copy = schema.clone();
-
-                if let Value::Object(ref mut map) = schema_copy {
-                    map.remove("title");
-                    map.remove("type");
-                }
-
-                let schema_str =
-                    serde_json::to_string(&schema_copy).unwrap_or_else(|_| "{}".to_string());
-
-                Ok(JSON_FORMAT_INSTRUCTIONS.replace("{schema}", &schema_str))
-            }
-            None => Ok("Return a JSON object.".to_string()),
-        }
+        Ok(match self.get_schema() {
+            Some(schema) => format_schema_instructions(schema),
+            None => "Return a JSON object.".to_string(),
+        })
     }
 
     fn parser_type(&self) -> &str {
@@ -103,17 +84,7 @@ impl BaseOutputParser for JsonOutputParser {
 impl BaseTransformOutputParser for JsonOutputParser {
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, BaseMessage>,
-    ) -> BoxStream<'a, Result<Self::Output>>
-    where
-        Self::Output: 'a,
-    {
-        self.cumulative_transform(input, None)
-    }
-
-    fn atransform<'a>(
-        &'a self,
-        input: BoxStream<'a, BaseMessage>,
+        input: BoxStream<'a, ParserInput>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,

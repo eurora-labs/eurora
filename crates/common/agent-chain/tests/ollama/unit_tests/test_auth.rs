@@ -145,8 +145,10 @@ fn test_parse_url_with_auth_complex_password() {
 /// Ported from `test_chat_ollama_url_auth_integration`.
 #[test]
 fn test_chat_ollama_url_with_auth_strips_credentials() {
-    let llm =
-        ChatOllama::new("llama3.1").base_url("https://user:password@ollama.example.com:11434");
+    let llm = ChatOllama::builder()
+        .model("llama3.1")
+        .base_url("https://user:password@ollama.example.com:11434")
+        .build();
     let base_url = llm.get_base_url();
     assert_eq!(base_url, "https://ollama.example.com:11434");
 }

@@ -27,9 +27,16 @@ struct CheckoutResponse {
     url: String,
 }
 
+#[derive(Deserialize)]
+struct SubscriptionResponse {
+    subscription_id: Option<String>,
+    status: Option<String>,
+}
+
 #[taurpc::procedures(path = "payment")]
 pub trait PaymentApi {
     async fn create_checkout_url<R: Runtime>(app_handle: AppHandle<R>) -> Result<String, String>;
+    async fn is_subscribed<R: Runtime>(app_handle: AppHandle<R>) -> Result<bool, String>;
 }
 
 #[derive(Clone)]
@@ -84,5 +91,34 @@ impl PaymentApi for PaymentApiImpl {
             .ctx("Failed to parse checkout response")?;
 
         Ok(checkout.url)
+    }
+
+    async fn is_subscribed<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
+        let user_state = app_handle
+            .try_state::<SharedUserController>()
+            .ok_or_else(|| "User controller not available".to_string())?;
+
+        let token = {
+            let mut controller = user_state.lock().await;
+            controller
+                .get_or_refresh_access_token()
+                .await
+                .ctx("Failed to get access token")?
+        };
+
+        let base_url = rest_api_url();
+        let sub: SubscriptionResponse = Client::new()
+            .get(format!("{base_url}/payment/subscription"))
+            .header("Authorization", format!("Bearer {}", token.expose_secret()))
+            .send()
+            .await
+            .ctx("Failed to fetch subscription status")?
+            .error_for_status()
+            .ctx("Subscription request failed")?
+            .json()
+            .await
+            .ctx("Failed to parse subscription response")?;
+
+        Ok(sub.subscription_id.is_some() && sub.status.as_deref() == Some("active"))
     }
 }

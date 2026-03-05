@@ -15,7 +15,7 @@ service ProtoThreadService {
   rpc AddHumanMessage(AddHumanMessageRequest) returns (AddHumanMessageResponse);
   rpc AddSystemMessage(AddSystemMessageRequest) returns (AddSystemMessageResponse);
 
-  rpc ChatStream(ChatStreamRequest) returns (stream ChatStreamResponse);
+  rpc ChatStream(ChatStreamRequest) returns (stream agent_chain.ProtoChatStreamResponse);
   rpc GenerateThreadTitle(GenerateThreadTitleRequest) returns (GenerateThreadTitleResponse);
 }
 
@@ -47,11 +47,6 @@ message ListThreadsResponse {
 message ChatStreamRequest {
   string thread_id = 1;
   string content = 2;
-}
-
-message ChatStreamResponse {
-  string chunk = 1;
-  bool is_final = 2;
 }
 
 message AddHumanMessageRequest {

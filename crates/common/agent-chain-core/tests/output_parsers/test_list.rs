@@ -1,5 +1,5 @@
+use agent_chain_core::ParserInput;
 use agent_chain_core::drop_last_n;
-use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::output_parsers::{
     BaseOutputParser, BaseTransformOutputParser, CommaSeparatedListOutputParser, ListOutputParser,
     MarkdownListOutputParser, NumberedListOutputParser,
@@ -109,19 +109,6 @@ fn test_comma_type_property() {
 }
 
 #[test]
-fn test_comma_is_lc_serializable() {
-    assert!(CommaSeparatedListOutputParser::is_lc_serializable());
-}
-
-#[test]
-fn test_comma_get_lc_namespace() {
-    assert_eq!(
-        CommaSeparatedListOutputParser::get_lc_namespace(),
-        vec!["langchain", "output_parsers", "list"]
-    );
-}
-
-#[test]
 fn test_comma_get_format_instructions() {
     let parser = CommaSeparatedListOutputParser::new();
     let instructions = parser.get_format_instructions().unwrap();
@@ -134,7 +121,7 @@ async fn test_comma_transform_single_chunk() {
     let parser = CommaSeparatedListOutputParser::new();
     let text = "foo, bar, baz";
 
-    let input_stream = futures::stream::iter(vec![BaseMessage::from(text)]);
+    let input_stream = futures::stream::iter(vec![ParserInput::from(text)]);
     let results: Vec<Vec<String>> = parser
         .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
@@ -144,10 +131,10 @@ async fn test_comma_transform_single_chunk() {
     assert_eq!(results, vec![vec!["foo"], vec!["bar"], vec!["baz"]]);
 }
 
-#[tokio::test]
-async fn test_comma_aparse() {
+#[test]
+fn test_comma_parse() {
     let parser = CommaSeparatedListOutputParser::new();
-    assert_eq!(parser.aparse("foo, bar").await.unwrap(), vec!["foo", "bar"]);
+    assert_eq!(parser.parse("foo, bar").unwrap(), vec!["foo", "bar"]);
 }
 
 #[test]
@@ -226,7 +213,7 @@ fn test_numbered_parse_iter() {
 
 #[test]
 fn test_numbered_custom_pattern() {
-    let parser = NumberedListOutputParser::with_pattern(r"\d+\)\s([^\n]+)");
+    let parser = NumberedListOutputParser::with_pattern(r"\d+\)\s([^\n]+)").unwrap();
     let text = "1) foo\n2) bar";
     assert_eq!(parser.parse(text).unwrap(), vec!["foo", "bar"]);
 }
@@ -236,7 +223,7 @@ async fn test_numbered_transform_single_chunk() {
     let parser = NumberedListOutputParser::new();
     let text = "1. foo\n2. bar\n3. baz";
 
-    let input_stream = futures::stream::iter(vec![BaseMessage::from(text)]);
+    let input_stream = futures::stream::iter(vec![ParserInput::from(text)]);
     let results: Vec<Vec<String>> = parser
         .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
@@ -246,14 +233,11 @@ async fn test_numbered_transform_single_chunk() {
     assert_eq!(results, vec![vec!["foo"], vec!["bar"], vec!["baz"]]);
 }
 
-#[tokio::test]
-async fn test_numbered_aparse() {
+#[test]
+fn test_numbered_parse() {
     let parser = NumberedListOutputParser::new();
     let text = "1. foo\n2. bar\n3. baz";
-    assert_eq!(
-        parser.aparse(text).await.unwrap(),
-        vec!["foo", "bar", "baz"]
-    );
+    assert_eq!(parser.parse(text).unwrap(), vec!["foo", "bar", "baz"]);
 }
 
 #[test]
@@ -333,7 +317,7 @@ async fn test_markdown_transform_single_chunk() {
     let parser = MarkdownListOutputParser::new();
     let text = "- foo\n- bar\n- baz";
 
-    let input_stream = futures::stream::iter(vec![BaseMessage::from(text)]);
+    let input_stream = futures::stream::iter(vec![ParserInput::from(text)]);
     let results: Vec<Vec<String>> = parser
         .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
@@ -343,14 +327,11 @@ async fn test_markdown_transform_single_chunk() {
     assert_eq!(results, vec![vec!["foo"], vec!["bar"], vec!["baz"]]);
 }
 
-#[tokio::test]
-async fn test_markdown_aparse() {
+#[test]
+fn test_markdown_parse() {
     let parser = MarkdownListOutputParser::new();
     let text = "- foo\n- bar\n- baz";
-    assert_eq!(
-        parser.aparse(text).await.unwrap(),
-        vec!["foo", "bar", "baz"]
-    );
+    assert_eq!(parser.parse(text).unwrap(), vec!["foo", "bar", "baz"]);
 }
 
 #[test]

@@ -122,7 +122,7 @@ fn test_addable_dict_radd() {
     b.0.insert("x".to_string(), json!(2));
     b.0.insert("y".to_string(), json!(3));
 
-    let result = AddableDict::from_map(a) + b;
+    let result = AddableDict::from(a) + b;
     assert_eq!(result.0.get("x"), Some(&json!(3)));
     assert_eq!(result.0.get("y"), Some(&json!(3)));
 }
@@ -134,7 +134,7 @@ fn test_addable_dict_radd_new_keys() {
     let mut b = AddableDict::new();
     b.0.insert("b".to_string(), json!(2));
 
-    let result = AddableDict::from_map(a) + b;
+    let result = AddableDict::from(a) + b;
     assert_eq!(result.0.get("a"), Some(&json!(1)));
     assert_eq!(result.0.get("b"), Some(&json!(2)));
 }
@@ -431,7 +431,7 @@ fn test_get_unique_config_specs_empty() {
 
 #[test]
 fn test_root_event_filter_include_all_by_default() {
-    let f = RootEventFilter::new();
+    let f = RootEventFilter::default();
     assert!(f.include_event("test", &["a".to_string()], "chain"));
 }
 
@@ -439,7 +439,7 @@ fn test_root_event_filter_include_all_by_default() {
 fn test_root_event_filter_include_names() {
     let f = RootEventFilter {
         include_names: Some(vec!["foo".to_string()]),
-        ..RootEventFilter::new()
+        ..RootEventFilter::default()
     };
     assert!(f.include_event("foo", &[], "chain"));
     assert!(!f.include_event("bar", &[], "chain"));
@@ -449,7 +449,7 @@ fn test_root_event_filter_include_names() {
 fn test_root_event_filter_include_types() {
     let f = RootEventFilter {
         include_types: Some(vec!["llm".to_string()]),
-        ..RootEventFilter::new()
+        ..RootEventFilter::default()
     };
     assert!(f.include_event("x", &[], "llm"));
     assert!(!f.include_event("x", &[], "chain"));
@@ -459,7 +459,7 @@ fn test_root_event_filter_include_types() {
 fn test_root_event_filter_include_tags() {
     let f = RootEventFilter {
         include_tags: Some(vec!["my_tag".to_string()]),
-        ..RootEventFilter::new()
+        ..RootEventFilter::default()
     };
     assert!(f.include_event("x", &["my_tag".to_string()], "chain"));
     assert!(!f.include_event("x", &["other".to_string()], "chain"));
@@ -469,7 +469,7 @@ fn test_root_event_filter_include_tags() {
 fn test_root_event_filter_exclude_names() {
     let f = RootEventFilter {
         exclude_names: Some(vec!["bad".to_string()]),
-        ..RootEventFilter::new()
+        ..RootEventFilter::default()
     };
     assert!(f.include_event("good", &[], "chain"));
     assert!(!f.include_event("bad", &[], "chain"));
@@ -479,7 +479,7 @@ fn test_root_event_filter_exclude_names() {
 fn test_root_event_filter_exclude_types() {
     let f = RootEventFilter {
         exclude_types: Some(vec!["llm".to_string()]),
-        ..RootEventFilter::new()
+        ..RootEventFilter::default()
     };
     assert!(f.include_event("x", &[], "chain"));
     assert!(!f.include_event("x", &[], "llm"));
@@ -489,7 +489,7 @@ fn test_root_event_filter_exclude_types() {
 fn test_root_event_filter_exclude_tags() {
     let f = RootEventFilter {
         exclude_tags: Some(vec!["secret".to_string()]),
-        ..RootEventFilter::new()
+        ..RootEventFilter::default()
     };
     assert!(f.include_event("x", &["public".to_string()], "chain"));
     assert!(!f.include_event("x", &["secret".to_string()], "chain"));
@@ -500,7 +500,7 @@ fn test_root_event_filter_include_and_exclude_combined() {
     let f = RootEventFilter {
         include_names: Some(vec!["foo".to_string()]),
         exclude_tags: Some(vec!["no".to_string()]),
-        ..RootEventFilter::new()
+        ..RootEventFilter::default()
     };
     assert!(f.include_event("foo", &[], "chain"));
     assert!(!f.include_event("foo", &["no".to_string()], "chain"));
@@ -511,7 +511,7 @@ fn test_root_event_filter_include_and_exclude_combined() {
 fn test_root_event_filter_no_tags_in_event() {
     let f = RootEventFilter {
         include_tags: Some(vec!["needed".to_string()]),
-        ..RootEventFilter::new()
+        ..RootEventFilter::default()
     };
     assert!(!f.include_event("x", &[], "chain"));
 }

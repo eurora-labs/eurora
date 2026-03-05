@@ -8,14 +8,13 @@ use async_trait::async_trait;
 use bon::bon;
 use serde_json::Value;
 
-use crate::callbacks::base::Callbacks;
+use crate::callbacks::Callbacks;
 use crate::callbacks::manager::CallbackManagerForToolRun;
 use crate::error::{Error, Result};
 use crate::runnables::RunnableConfig;
 
 use super::base::{
-    ArgsSchema, BaseTool, HandleToolError, HandleValidationError, ResponseFormat, ToolInput,
-    ToolOutput,
+    ArgsSchema, BaseTool, ErrorHandler, ResponseFormat, ToolInput, ToolMeta, ToolOutput,
 };
 
 pub type ToolFunc = Arc<dyn Fn(String) -> Result<String> + Send + Sync>;
@@ -24,30 +23,15 @@ pub type AsyncToolFunc =
     Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Send + Sync>;
 
 pub struct Tool {
-    name: String,
-    description: String,
+    meta: ToolMeta,
     func: Option<ToolFunc>,
     coroutine: Option<AsyncToolFunc>,
     args_schema: Option<ArgsSchema>,
-    return_direct: bool,
-    verbose: bool,
-    handle_tool_error: HandleToolError,
-    handle_validation_error: HandleValidationError,
-    response_format: ResponseFormat,
-    tags: Option<Vec<String>>,
-    metadata: Option<HashMap<String, Value>>,
-    extras: Option<HashMap<String, Value>>,
-    callbacks: Option<Callbacks>,
 }
 
 impl Debug for Tool {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Tool")
-            .field("name", &self.name)
-            .field("description", &self.description)
-            .field("return_direct", &self.return_direct)
-            .field("response_format", &self.response_format)
-            .finish()
+        f.debug_struct("Tool").field("meta", &self.meta).finish()
     }
 }
 
@@ -62,9 +46,8 @@ impl Tool {
         args_schema: Option<ArgsSchema>,
         #[builder(default)] return_direct: bool,
         #[builder(default)] verbose: bool,
-        #[builder(default = HandleToolError::Bool(false))] handle_tool_error: HandleToolError,
-        #[builder(default = HandleValidationError::Bool(false))]
-        handle_validation_error: HandleValidationError,
+        #[builder(default)] handle_tool_error: ErrorHandler,
+        #[builder(default)] handle_validation_error: ErrorHandler,
         #[builder(default)] response_format: ResponseFormat,
         tags: Option<Vec<String>>,
         metadata: Option<HashMap<String, Value>>,
@@ -72,20 +55,22 @@ impl Tool {
         callbacks: Option<Callbacks>,
     ) -> Self {
         Self {
-            name: name.into(),
-            description: description.into(),
+            meta: ToolMeta {
+                name: name.into(),
+                description: description.into(),
+                return_direct,
+                verbose,
+                handle_tool_error,
+                handle_validation_error,
+                response_format,
+                tags,
+                metadata,
+                extras,
+                callbacks,
+            },
             func,
             coroutine,
             args_schema,
-            return_direct,
-            verbose,
-            handle_tool_error,
-            handle_validation_error,
-            response_format,
-            tags,
-            metadata,
-            extras,
-            callbacks,
         }
     }
 
@@ -101,27 +86,6 @@ impl Tool {
             .name(name)
             .description(description)
             .func(Arc::new(func))
-            .build()
-    }
-
-    pub fn from_function_full<F>(
-        func: F,
-        name: impl Into<String>,
-        description: impl Into<String>,
-        return_direct: bool,
-        args_schema: Option<ArgsSchema>,
-        coroutine: Option<AsyncToolFunc>,
-    ) -> Self
-    where
-        F: Fn(String) -> Result<String> + Send + Sync + 'static,
-    {
-        Self::builder()
-            .name(name)
-            .description(description)
-            .func(Arc::new(func))
-            .return_direct(return_direct)
-            .maybe_args_schema(args_schema)
-            .maybe_coroutine(coroutine)
             .build()
     }
 
@@ -147,103 +111,50 @@ impl Tool {
     fn extract_single_input(&self, input: ToolInput) -> Result<String> {
         match input {
             ToolInput::String(s) => Ok(s),
-            ToolInput::Dict(d) => {
-                let all_args: Vec<_> = d.values().collect();
-                if all_args.len() != 1 {
-                    return Err(Error::ToolInvocation(format!(
-                        "Too many arguments to single-input tool {}. Consider using StructuredTool instead. Args: {:?}",
-                        self.name, all_args
-                    )));
+            ToolInput::Dict(d) => self.extract_single_value_from_map(d),
+            ToolInput::ToolCall(tc) => match tc.args {
+                Value::Object(obj) => {
+                    let map: HashMap<String, Value> = obj.into_iter().collect();
+                    self.extract_single_value_from_map(map)
                 }
-                match all_args[0] {
-                    Value::String(s) => Ok(s.clone()),
-                    other => Ok(other.to_string()),
-                }
-            }
-            ToolInput::ToolCall(tc) => {
-                let args = &tc.args;
-                if let Some(obj) = args.as_object() {
-                    let values: Vec<_> = obj.values().collect();
-                    if values.len() != 1 {
-                        return Err(Error::ToolInvocation(format!(
-                            "Too many arguments to single-input tool {}. Consider using StructuredTool instead.",
-                            self.name,
-                        )));
-                    }
-                    match &values[0] {
-                        Value::String(s) => Ok(s.clone()),
-                        other => Ok(other.to_string()),
-                    }
-                } else if let Some(s) = args.as_str() {
-                    Ok(s.to_string())
-                } else {
-                    Ok(args.to_string())
-                }
-            }
+                Value::String(s) => Ok(s),
+                other => Ok(other.to_string()),
+            },
         }
+    }
+
+    fn extract_single_value_from_map(&self, map: HashMap<String, Value>) -> Result<String> {
+        if map.len() != 1 {
+            return Err(Error::ToolInvocation(format!(
+                "Too many arguments to single-input tool {}. \
+                 Consider using StructuredTool instead.",
+                self.meta.name,
+            )));
+        }
+        let value = map.into_values().next().expect("checked len == 1");
+        Ok(match value {
+            Value::String(s) => s,
+            other => other.to_string(),
+        })
     }
 }
 
 #[async_trait]
 impl BaseTool for Tool {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn description(&self) -> &str {
-        &self.description
-    }
+    impl_base_tool_getters!();
 
     fn args_schema(&self) -> Option<&ArgsSchema> {
         self.args_schema.as_ref()
     }
 
-    fn return_direct(&self) -> bool {
-        self.return_direct
-    }
-
-    fn verbose(&self) -> bool {
-        self.verbose
-    }
-
-    fn tags(&self) -> Option<&[String]> {
-        self.tags.as_deref()
-    }
-
-    fn metadata(&self) -> Option<&HashMap<String, Value>> {
-        self.metadata.as_ref()
-    }
-
-    fn handle_tool_error(&self) -> &HandleToolError {
-        &self.handle_tool_error
-    }
-
-    fn handle_validation_error(&self) -> &HandleValidationError {
-        &self.handle_validation_error
-    }
-
-    fn response_format(&self) -> ResponseFormat {
-        self.response_format
-    }
-
-    fn extras(&self) -> Option<&HashMap<String, Value>> {
-        self.extras.as_ref()
-    }
-
-    fn callbacks(&self) -> Option<&Callbacks> {
-        self.callbacks.as_ref()
-    }
-
     fn args(&self) -> HashMap<String, Value> {
-        if let Some(args_schema) = &self.args_schema {
-            return args_schema.properties();
+        if let Some(schema) = &self.args_schema {
+            return schema.properties();
         }
-        let mut props = HashMap::new();
-        props.insert(
+        HashMap::from([(
             "tool_input".to_string(),
             serde_json::json!({"type": "string"}),
-        );
-        props
+        )])
     }
 
     fn tool_run(
@@ -254,30 +165,24 @@ impl BaseTool for Tool {
     ) -> Result<ToolOutput> {
         let string_input = self.extract_single_input(input)?;
 
-        if let Some(ref func) = self.func {
-            let result = func(string_input)?;
-            Ok(ToolOutput::String(result))
-        } else {
-            Err(Error::ToolInvocation(
-                "Tool does not support sync invocation.".to_string(),
-            ))
-        }
+        let func = self.func.as_ref().ok_or_else(|| {
+            Error::ToolInvocation("Tool does not support sync invocation.".to_string())
+        })?;
+
+        func(string_input).map(ToolOutput::String)
     }
 
     async fn tool_arun(
         &self,
         input: ToolInput,
-        _run_manager: Option<&crate::callbacks::manager::AsyncCallbackManagerForToolRun>,
-        _config: &RunnableConfig,
+        run_manager: Option<&CallbackManagerForToolRun>,
+        config: &RunnableConfig,
     ) -> Result<ToolOutput> {
-        let string_input = self.extract_single_input(input.clone())?;
-
-        if let Some(ref coroutine) = self.coroutine {
-            let result = coroutine(string_input).await?;
-            Ok(ToolOutput::String(result))
+        if let Some(coroutine) = &self.coroutine {
+            let string_input = self.extract_single_input(input)?;
+            coroutine(string_input).await.map(ToolOutput::String)
         } else {
-            let sync_manager = _run_manager.map(|rm| rm.get_sync());
-            self.tool_run(input, sync_manager.as_ref(), _config)
+            self.tool_run(input, run_manager, config)
         }
     }
 }

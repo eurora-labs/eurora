@@ -148,10 +148,8 @@ impl TextSplitter for TokenTextSplitter {
 
 #[async_trait]
 impl BaseDocumentTransformer for TokenTextSplitter {
-    fn transform_documents(
-        &self,
-        documents: &[Document],
-    ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
+    fn transform_documents(&self, documents: &[Document]) -> crate::error::Result<Vec<Document>> {
         self.split_documents(documents)
+            .map_err(|e| crate::error::Error::General(e.to_string()))
     }
 }

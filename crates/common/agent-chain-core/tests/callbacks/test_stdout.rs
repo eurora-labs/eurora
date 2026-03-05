@@ -1,7 +1,4 @@
-use agent_chain_core::callbacks::base::LLMManagerMixin;
-use agent_chain_core::callbacks::base::{
-    BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, RunManagerMixin, ToolManagerMixin,
-};
+use agent_chain_core::callbacks::BaseCallbackHandler;
 use agent_chain_core::callbacks::stdout::{StdOutCallbackHandler, colors};
 use agent_chain_core::callbacks::streaming_stdout::StreamingStdOutCallbackHandler;
 use std::collections::HashMap;
@@ -10,14 +7,14 @@ use uuid::Uuid;
 #[test]
 fn test_stdout_handler_no_color() {
     let handler = StdOutCallbackHandler::new();
-    assert!(handler.color.is_none());
+    assert!(handler.color().is_none());
     assert_eq!(handler.name(), "StdOutCallbackHandler");
 }
 
 #[test]
 fn test_stdout_handler_with_color() {
     let handler = StdOutCallbackHandler::with_color("blue");
-    assert_eq!(handler.color, Some("blue".to_string()));
+    assert_eq!(handler.color(), Some("blue"));
 }
 
 #[test]

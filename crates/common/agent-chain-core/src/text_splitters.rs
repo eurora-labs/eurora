@@ -232,9 +232,12 @@ pub trait TextSplitter: BaseDocumentTransformer {
         &self,
         documents: &[Document],
     ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
-        let texts: Vec<String> = documents.iter().map(|d| d.page_content.clone()).collect();
+        let texts: Vec<String> = documents
+            .iter()
+            .map(|d| d.page_content().to_string())
+            .collect();
         let metadatas: Vec<HashMap<String, serde_json::Value>> =
-            documents.iter().map(|d| d.metadata.clone()).collect();
+            documents.iter().map(|d| d.metadata().clone()).collect();
         self.create_documents(&texts, Some(&metadatas))
     }
 }
@@ -305,8 +308,9 @@ mod tests {
         fn transform_documents(
             &self,
             documents: &[Document],
-        ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
+        ) -> crate::error::Result<Vec<Document>> {
             self.split_documents(documents)
+                .map_err(|e| crate::error::Error::General(e.to_string()))
         }
     }
 
@@ -341,8 +345,8 @@ mod tests {
         let texts = vec!["hello\nworld".to_string()];
         let docs = splitter.create_documents(&texts, None).unwrap();
         assert_eq!(docs.len(), 2);
-        assert_eq!(docs[0].page_content, "hello");
-        assert_eq!(docs[1].page_content, "world");
+        assert_eq!(docs[0].page_content(), "hello");
+        assert_eq!(docs[1].page_content(), "world");
     }
 
     #[test]
@@ -355,8 +359,8 @@ mod tests {
         )])];
         let docs = splitter.create_documents(&texts, Some(&metadata)).unwrap();
         assert_eq!(docs.len(), 2);
-        assert_eq!(docs[0].metadata["source"], "test.txt");
-        assert_eq!(docs[1].metadata["source"], "test.txt");
+        assert_eq!(docs[0].metadata()["source"], "test.txt");
+        assert_eq!(docs[1].metadata()["source"], "test.txt");
     }
 
     #[test]
@@ -368,11 +372,11 @@ mod tests {
         ];
         let result = splitter.split_documents(&input_docs).unwrap();
         assert_eq!(result.len(), 5);
-        assert_eq!(result[0].page_content, "hello");
-        assert_eq!(result[1].page_content, "world");
-        assert_eq!(result[2].page_content, "foo");
-        assert_eq!(result[3].page_content, "bar");
-        assert_eq!(result[4].page_content, "baz");
+        assert_eq!(result[0].page_content(), "hello");
+        assert_eq!(result[1].page_content(), "world");
+        assert_eq!(result[2].page_content(), "foo");
+        assert_eq!(result[3].page_content(), "bar");
+        assert_eq!(result[4].page_content(), "baz");
     }
 
     #[test]
@@ -388,8 +392,8 @@ mod tests {
         ];
         let result = splitter.split_documents(&input_docs).unwrap();
         assert_eq!(result.len(), 2);
-        assert_eq!(result[0].metadata["key"], "value");
-        assert_eq!(result[1].metadata["key"], "value");
+        assert_eq!(result[0].metadata()["key"], "value");
+        assert_eq!(result[1].metadata()["key"], "value");
     }
 
     #[test]
@@ -398,7 +402,7 @@ mod tests {
         let docs = vec![Document::builder().page_content("x\ny").build()];
         let result = splitter.transform_documents(&docs).unwrap();
         assert_eq!(result.len(), 2);
-        assert_eq!(result[0].page_content, "x");
-        assert_eq!(result[1].page_content, "y");
+        assert_eq!(result[0].page_content(), "x");
+        assert_eq!(result[1].page_content(), "y");
     }
 }

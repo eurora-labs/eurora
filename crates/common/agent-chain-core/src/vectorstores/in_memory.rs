@@ -151,7 +151,7 @@ impl InMemoryVectorStore {
         let mut id_iter: Box<dyn Iterator<Item = Option<String>>> = if let Some(ids) = ids {
             Box::new(ids.into_iter().map(Some))
         } else {
-            Box::new(documents.iter().map(|d| d.id.clone()))
+            Box::new(documents.iter().map(|d| d.id().map(String::from)))
         };
 
         let mut store = self.lock_write()?;
@@ -168,8 +168,8 @@ impl InMemoryVectorStore {
                 StoreEntry {
                     id: doc_id,
                     vector,
-                    text: doc.page_content.clone(),
-                    metadata: doc.metadata.clone(),
+                    text: doc.page_content().to_string(),
+                    metadata: doc.metadata().clone(),
                 },
             );
         }
@@ -185,7 +185,10 @@ impl VectorStore for InMemoryVectorStore {
         documents: Vec<Document>,
         ids: Option<Vec<String>>,
     ) -> Result<Vec<String>> {
-        let texts: Vec<String> = documents.iter().map(|d| d.page_content.clone()).collect();
+        let texts: Vec<String> = documents
+            .iter()
+            .map(|d| d.page_content().to_string())
+            .collect();
         let vectors = self.embedding.embed_documents(texts)?;
         self.add_documents_with_vectors(&documents, vectors, ids)
     }
@@ -195,7 +198,10 @@ impl VectorStore for InMemoryVectorStore {
         documents: Vec<Document>,
         ids: Option<Vec<String>>,
     ) -> Result<Vec<String>> {
-        let texts: Vec<String> = documents.iter().map(|d| d.page_content.clone()).collect();
+        let texts: Vec<String> = documents
+            .iter()
+            .map(|d| d.page_content().to_string())
+            .collect();
         let vectors = self.embedding.aembed_documents(texts).await?;
         self.add_documents_with_vectors(&documents, vectors, ids)
     }
@@ -345,7 +351,7 @@ mod tests {
 
         let results = store.similarity_search("foo", 1, None).unwrap();
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].page_content, "foo");
+        assert_eq!(results[0].page_content(), "foo");
     }
 
     #[test]
@@ -406,19 +412,19 @@ mod tests {
     fn test_similarity_search_with_filter() {
         let store = make_store();
         let mut doc1 = Document::builder().page_content("foo").id("1").build();
-        doc1.metadata
+        doc1.metadata_mut()
             .insert("category".into(), Value::String("a".into()));
         let mut doc2 = Document::builder().page_content("bar").id("2").build();
-        doc2.metadata
+        doc2.metadata_mut()
             .insert("category".into(), Value::String("b".into()));
         store.add_documents(vec![doc1, doc2], None).unwrap();
 
         let filter = |doc: &Document| -> bool {
-            doc.metadata.get("category").and_then(|v| v.as_str()) == Some("b")
+            doc.metadata().get("category").and_then(|v| v.as_str()) == Some("b")
         };
         let results = store.similarity_search("bar", 2, Some(&filter)).unwrap();
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].page_content, "bar");
+        assert_eq!(results[0].page_content(), "bar");
     }
 
     #[test]
@@ -466,17 +472,11 @@ mod tests {
             .unwrap();
         assert_eq!(loaded_docs.len(), 2);
 
-        let doc1 = loaded_docs
-            .iter()
-            .find(|d| d.id.as_deref() == Some("1"))
-            .unwrap();
-        assert_eq!(doc1.page_content, "hello world");
+        let doc1 = loaded_docs.iter().find(|d| d.id() == Some("1")).unwrap();
+        assert_eq!(doc1.page_content(), "hello world");
 
-        let doc2 = loaded_docs
-            .iter()
-            .find(|d| d.id.as_deref() == Some("2"))
-            .unwrap();
-        assert_eq!(doc2.page_content, "goodbye world");
+        let doc2 = loaded_docs.iter().find(|d| d.id() == Some("2")).unwrap();
+        assert_eq!(doc2.page_content(), "goodbye world");
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
@@ -495,6 +495,6 @@ mod tests {
 
         let results = store.get_by_ids(&["custom1".into()]).unwrap();
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].page_content, "foo");
+        assert_eq!(results[0].page_content(), "foo");
     }
 }

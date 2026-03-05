@@ -3,7 +3,7 @@ use crate::{
     error::{Error, Result},
     types::ThreadEvent,
 };
-use agent_chain::{BaseMessage, HumanMessage, SystemMessage};
+use agent_chain::{BaseMessage, HumanMessage, SystemMessage, messages::AIMessageChunk};
 use euro_auth::{AuthManager, AuthedChannel, build_authed_channel};
 use proto_gen::agent_chain::{ProtoHumanMessage, ProtoSystemMessage};
 use proto_gen::thread::{
@@ -230,7 +230,7 @@ impl ThreadManager {
     pub async fn chat_stream(
         &mut self,
         content: String,
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<String>> + Send>>> {
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<AIMessageChunk>> + Send>>> {
         let mut client = self.client();
         let stream = client
             .chat_stream(ChatStreamRequest {
@@ -240,8 +240,10 @@ impl ThreadManager {
             .await?
             .into_inner();
 
-        let mapped_stream =
-            stream.map(|result| result.map(|response| response.chunk).map_err(Error::from));
+        let mapped_stream = stream.filter_map(|result| match result {
+            Ok(response) => response.chunk.map(|c| Ok(AIMessageChunk::from(c))),
+            Err(e) => Some(Err(Error::from(e))),
+        });
 
         Ok(Box::pin(mapped_stream))
     }

@@ -10,7 +10,10 @@ const MODEL_NAME: &str = "llama3.1";
 /// Ported from `test_none_parameters_excluded_from_options`.
 #[test]
 fn test_none_parameters_excluded_from_options() {
-    let llm = ChatOllama::new(MODEL_NAME).num_ctx(4096);
+    let llm = ChatOllama::builder()
+        .model(MODEL_NAME)
+        .num_ctx(4096u32)
+        .build();
     let options = llm.build_options(None).unwrap();
     let options_map = options.as_object().unwrap();
 
@@ -40,14 +43,20 @@ fn test_reasoning_param_passed_to_payload() {
     let messages: Vec<BaseMessage> = vec![HumanMessage::builder().content("Hello").build().into()];
 
     // reasoning=true
-    let llm = ChatOllama::new("deepseek-r1").reasoning(true);
+    let llm = ChatOllama::builder()
+        .model("deepseek-r1")
+        .reasoning(true)
+        .build();
     let payload = llm
         .build_request_payload(&messages, None, None, false)
         .unwrap();
     assert_eq!(payload["think"], serde_json::json!(true));
 
     // reasoning=false
-    let llm = ChatOllama::new("deepseek-r1").reasoning(false);
+    let llm = ChatOllama::builder()
+        .model("deepseek-r1")
+        .reasoning(false)
+        .build();
     let payload = llm
         .build_request_payload(&messages, None, None, false)
         .unwrap();
@@ -99,7 +108,11 @@ fn test_arbitrary_roles_accepted_in_chatmessages() {
 /// Ported from `test_none_parameters_excluded_from_options` — num_ctx variant.
 #[test]
 fn test_options_only_include_set_parameters() {
-    let llm = ChatOllama::new(MODEL_NAME).num_ctx(4096).temperature(0.5);
+    let llm = ChatOllama::builder()
+        .model(MODEL_NAME)
+        .num_ctx(4096u32)
+        .temperature(0.5)
+        .build();
     let options = llm.build_options(None).unwrap();
     let options_map = options.as_object().unwrap();
 
@@ -134,7 +147,11 @@ fn test_payload_does_not_include_strict() {
 /// Verifies that options set on the model are correctly included in the payload.
 #[test]
 fn test_explicit_options_in_payload() {
-    let llm = ChatOllama::new(MODEL_NAME).temperature(0.5).num_ctx(4096);
+    let llm = ChatOllama::builder()
+        .model(MODEL_NAME)
+        .temperature(0.5)
+        .num_ctx(4096u32)
+        .build();
     let messages: Vec<BaseMessage> = vec![HumanMessage::builder().content("Hello").build().into()];
 
     let payload = llm
@@ -252,11 +269,17 @@ fn test_parse_arguments_from_tool_call_with_function_name_metadata() {
 /// In Rust, model validation is deferred to first use; we verify the flag.
 #[test]
 fn test_validate_model_on_init_flag() {
-    let llm = ChatOllama::new(MODEL_NAME).validate_model_on_init(true);
+    let llm = ChatOllama::builder()
+        .model(MODEL_NAME)
+        .validate_model_on_init(true)
+        .build();
     let base_url = llm.get_base_url();
     assert!(!base_url.is_empty());
 
-    let llm = ChatOllama::new(MODEL_NAME).validate_model_on_init(false);
+    let llm = ChatOllama::builder()
+        .model(MODEL_NAME)
+        .validate_model_on_init(false)
+        .build();
     let base_url = llm.get_base_url();
     assert!(!base_url.is_empty());
 
