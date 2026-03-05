@@ -131,10 +131,10 @@ async fn test_comma_transform_single_chunk() {
     assert_eq!(results, vec![vec!["foo"], vec!["bar"], vec!["baz"]]);
 }
 
-#[tokio::test]
-async fn test_comma_aparse() {
+#[test]
+fn test_comma_parse() {
     let parser = CommaSeparatedListOutputParser::new();
-    assert_eq!(parser.aparse("foo, bar").await.unwrap(), vec!["foo", "bar"]);
+    assert_eq!(parser.parse("foo, bar").unwrap(), vec!["foo", "bar"]);
 }
 
 #[test]
@@ -233,14 +233,11 @@ async fn test_numbered_transform_single_chunk() {
     assert_eq!(results, vec![vec!["foo"], vec!["bar"], vec!["baz"]]);
 }
 
-#[tokio::test]
-async fn test_numbered_aparse() {
+#[test]
+fn test_numbered_parse() {
     let parser = NumberedListOutputParser::new();
     let text = "1. foo\n2. bar\n3. baz";
-    assert_eq!(
-        parser.aparse(text).await.unwrap(),
-        vec!["foo", "bar", "baz"]
-    );
+    assert_eq!(parser.parse(text).unwrap(), vec!["foo", "bar", "baz"]);
 }
 
 #[test]
@@ -330,14 +327,11 @@ async fn test_markdown_transform_single_chunk() {
     assert_eq!(results, vec![vec!["foo"], vec!["bar"], vec!["baz"]]);
 }
 
-#[tokio::test]
-async fn test_markdown_aparse() {
+#[test]
+fn test_markdown_parse() {
     let parser = MarkdownListOutputParser::new();
     let text = "- foo\n- bar\n- baz";
-    assert_eq!(
-        parser.aparse(text).await.unwrap(),
-        vec!["foo", "bar", "baz"]
-    );
+    assert_eq!(parser.parse(text).unwrap(), vec!["foo", "bar", "baz"]);
 }
 
 #[test]

@@ -174,37 +174,19 @@ fn test_invoke_with_human_message() {
     assert_eq!(parser.invoke(message, None).unwrap(), 42);
 }
 
-#[tokio::test]
-async fn test_ainvoke_message() {
+#[test]
+fn test_invoke_with_ai_message_content() {
     let parser = IntParser;
     let message: BaseMessage = AIMessage::builder().content("42").build().into();
-    let result = parser.ainvoke(message, None).await.unwrap();
+    let result = parser.invoke(message, None).unwrap();
     assert_eq!(result, 42);
 }
 
-#[tokio::test]
-async fn test_aparse() {
-    let parser = IntParser;
-    let result = parser.aparse("42").await.unwrap();
-    assert_eq!(result, 42);
-}
-
-#[tokio::test]
-async fn test_aparse_result() {
+#[test]
+fn test_parse_result_partial_flag() {
     let parser = IntParser;
     let result = parser
-        .aparse_result(&[Generation::builder().text("42").build()], false)
-        .await
-        .unwrap();
-    assert_eq!(result, 42);
-}
-
-#[tokio::test]
-async fn test_aparse_result_partial_flag() {
-    let parser = IntParser;
-    let result = parser
-        .aparse_result(&[Generation::builder().text("42").build()], true)
-        .await
+        .parse_result(&[Generation::builder().text("42").build()], true)
         .unwrap();
     assert_eq!(result, 42);
 }
@@ -262,12 +244,11 @@ impl BaseLLMOutputParser for SimpleParser {
     }
 }
 
-#[tokio::test]
-async fn test_base_llm_aparse_result_delegates_to_sync() {
+#[test]
+fn test_base_llm_parse_result_delegates() {
     let parser = SimpleParser;
     let result = parser
-        .aparse_result(&[Generation::builder().text("hello").build()], false)
-        .await
+        .parse_result(&[Generation::builder().text("hello").build()], false)
         .unwrap();
     assert_eq!(result, "HELLO");
 }
@@ -294,12 +275,11 @@ impl BaseLLMOutputParser for PartialTracker {
     }
 }
 
-#[tokio::test]
-async fn test_base_llm_aparse_result_partial_flag() {
+#[test]
+fn test_base_llm_parse_result_partial_flag() {
     let parser = PartialTracker::new();
     parser
-        .aparse_result(&[Generation::builder().text("test").build()], true)
-        .await
+        .parse_result(&[Generation::builder().text("test").build()], true)
         .unwrap();
     assert!(parser.received_partial.load(Ordering::SeqCst));
 }

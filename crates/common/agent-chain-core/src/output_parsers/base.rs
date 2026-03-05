@@ -11,28 +11,12 @@ pub trait BaseLLMOutputParser: Send + Sync + Debug {
     type Output: Send + Sync + Clone + Debug;
 
     fn parse_result(&self, result: &[Generation], partial: bool) -> Result<Self::Output>;
-
-    fn aparse_result(
-        &self,
-        result: &[Generation],
-        partial: bool,
-    ) -> impl Future<Output = Result<Self::Output>> + Send {
-        async move { self.parse_result(result, partial) }
-    }
 }
 
 pub trait BaseGenerationOutputParser: BaseLLMOutputParser {
     fn invoke(&self, input: BaseMessage, _config: Option<RunnableConfig>) -> Result<Self::Output> {
         let chat_gen = ChatGeneration::builder().message(input).build();
         self.parse_result(&[Generation::builder().text(&chat_gen.text).build()], false)
-    }
-
-    fn ainvoke(
-        &self,
-        input: BaseMessage,
-        config: Option<RunnableConfig>,
-    ) -> impl Future<Output = Result<Self::Output>> + Send {
-        async move { self.invoke(input, config) }
     }
 }
 
@@ -41,23 +25,11 @@ pub trait BaseOutputParser: Send + Sync + Debug {
 
     fn parse(&self, text: &str) -> Result<Self::Output>;
 
-    fn aparse(&self, text: &str) -> impl Future<Output = Result<Self::Output>> + Send {
-        async move { self.parse(text) }
-    }
-
     fn parse_result(&self, result: &[Generation], _partial: bool) -> Result<Self::Output> {
         let first = result
             .first()
             .ok_or_else(|| Error::output_parser_simple("parse_result called with empty list"))?;
         self.parse(&first.text)
-    }
-
-    fn aparse_result(
-        &self,
-        result: &[Generation],
-        partial: bool,
-    ) -> impl Future<Output = Result<Self::Output>> + Send {
-        async move { self.parse_result(result, partial) }
     }
 
     fn parse_with_prompt(
@@ -79,14 +51,6 @@ pub trait BaseOutputParser: Send + Sync + Debug {
     fn invoke(&self, input: BaseMessage, _config: Option<RunnableConfig>) -> Result<Self::Output> {
         let chat_gen = ChatGeneration::builder().message(input).build();
         self.parse_result(&[Generation::builder().text(&chat_gen.text).build()], false)
-    }
-
-    fn ainvoke(
-        &self,
-        input: BaseMessage,
-        config: Option<RunnableConfig>,
-    ) -> impl Future<Output = Result<Self::Output>> + Send {
-        async move { self.invoke(input, config) }
     }
 
     fn into_runnable(self) -> RunnableOutputParser<Self>
@@ -144,7 +108,7 @@ where
     where
         Self: 'static,
     {
-        self.parser.ainvoke(input, config).await
+        self.parser.invoke(input, config)
     }
 }
 
