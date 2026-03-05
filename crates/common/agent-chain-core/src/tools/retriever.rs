@@ -57,35 +57,29 @@ impl RetrieverTool {
     where
         R: BaseRetriever + Send + Sync + 'static,
     {
-        let description = description.into();
+        let func = move |args: HashMap<String, Value>| -> Result<Value> {
+            let query = args
+                .get("query")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
 
-        let func = {
-            let separator = document_separator.clone();
-            let document_prompt = document_prompt.clone();
-            move |args: HashMap<String, Value>| -> Result<Value> {
-                let query = args
-                    .get("query")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
+            let docs = retriever.get_relevant_documents(&query, None)?;
+            let content = format_documents(&docs, &document_separator, document_prompt.as_deref());
 
-                let docs = retriever.get_relevant_documents(&query, None)?;
-                let content = format_documents(&docs, &separator, document_prompt.as_deref());
-
-                match response_format {
-                    ResponseFormat::Content => Ok(Value::String(content)),
-                    ResponseFormat::ContentAndArtifact => {
-                        let docs_json: Vec<Value> = docs
-                            .iter()
-                            .map(|d| {
-                                serde_json::json!({
-                                    "page_content": d.page_content(),
-                                    "metadata": d.metadata()
-                                })
+            match response_format {
+                ResponseFormat::Content => Ok(Value::String(content)),
+                ResponseFormat::ContentAndArtifact => {
+                    let docs_json: Vec<Value> = docs
+                        .iter()
+                        .map(|d| {
+                            serde_json::json!({
+                                "page_content": d.page_content(),
+                                "metadata": d.metadata()
                             })
-                            .collect();
-                        Ok(serde_json::json!([content, docs_json]))
-                    }
+                        })
+                        .collect();
+                    Ok(serde_json::json!([content, docs_json]))
                 }
             }
         };
@@ -111,30 +105,21 @@ impl RetrieverTool {
         F: Fn(Arc<R>, String) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Vec<Document>>> + Send + 'static,
     {
-        let retrieve_fn: Arc<
-            dyn Fn(Arc<R>, String) -> Pin<Box<dyn Future<Output = Result<Vec<Document>>> + Send>>
-                + Send
-                + Sync,
-        > = Arc::new(move |r, q| Box::pin(retrieve_fn(r, q)));
-
-        let coroutine = {
+        let coroutine = move |args: HashMap<String, Value>| -> Pin<
+            Box<dyn Future<Output = Result<Value>> + Send>,
+        > {
+            let query = args
+                .get("query")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             let retriever = retriever.clone();
-            let retrieve_fn = retrieve_fn.clone();
-            move |args: HashMap<String, Value>| -> Pin<Box<dyn Future<Output = Result<Value>> + Send>>
-            {
-                let query = args
-                    .get("query")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let retriever = retriever.clone();
-                let retrieve_fn = retrieve_fn.clone();
-                Box::pin(async move {
-                    let docs = retrieve_fn(retriever, query).await?;
-                    let content = format_documents(&docs, "\n\n", None);
-                    Ok(Value::String(content))
-                })
-            }
+            let fut = retrieve_fn(retriever, query);
+            Box::pin(async move {
+                let docs = fut.await?;
+                let content = format_documents(&docs, "\n\n", None);
+                Ok(Value::String(content))
+            })
         };
 
         StructuredTool::builder()

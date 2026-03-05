@@ -13,7 +13,9 @@ use crate::callbacks::manager::CallbackManagerForToolRun;
 use crate::error::{Error, Result};
 use crate::runnables::RunnableConfig;
 
-use super::base::{ArgsSchema, BaseTool, ErrorHandler, ResponseFormat, ToolInput, ToolOutput};
+use super::base::{
+    ArgsSchema, BaseTool, ErrorHandler, ResponseFormat, ToolInput, ToolMeta, ToolOutput,
+};
 
 pub type ToolFunc = Arc<dyn Fn(String) -> Result<String> + Send + Sync>;
 
@@ -21,30 +23,15 @@ pub type AsyncToolFunc =
     Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Send + Sync>;
 
 pub struct Tool {
-    name: String,
-    description: String,
+    meta: ToolMeta,
     func: Option<ToolFunc>,
     coroutine: Option<AsyncToolFunc>,
     args_schema: Option<ArgsSchema>,
-    return_direct: bool,
-    verbose: bool,
-    handle_tool_error: ErrorHandler,
-    handle_validation_error: ErrorHandler,
-    response_format: ResponseFormat,
-    tags: Option<Vec<String>>,
-    metadata: Option<HashMap<String, Value>>,
-    extras: Option<HashMap<String, Value>>,
-    callbacks: Option<Callbacks>,
 }
 
 impl Debug for Tool {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Tool")
-            .field("name", &self.name)
-            .field("description", &self.description)
-            .field("return_direct", &self.return_direct)
-            .field("response_format", &self.response_format)
-            .finish()
+        f.debug_struct("Tool").field("meta", &self.meta).finish()
     }
 }
 
@@ -68,20 +55,22 @@ impl Tool {
         callbacks: Option<Callbacks>,
     ) -> Self {
         Self {
-            name: name.into(),
-            description: description.into(),
+            meta: ToolMeta {
+                name: name.into(),
+                description: description.into(),
+                return_direct,
+                verbose,
+                handle_tool_error,
+                handle_validation_error,
+                response_format,
+                tags,
+                metadata,
+                extras,
+                callbacks,
+            },
             func,
             coroutine,
             args_schema,
-            return_direct,
-            verbose,
-            handle_tool_error,
-            handle_validation_error,
-            response_format,
-            tags,
-            metadata,
-            extras,
-            callbacks,
         }
     }
 
@@ -122,10 +111,11 @@ impl Tool {
     fn extract_single_input(&self, input: ToolInput) -> Result<String> {
         match input {
             ToolInput::String(s) => Ok(s),
-            ToolInput::Dict(d) => self.extract_single_value_from_map(d.len(), d.into_values()),
+            ToolInput::Dict(d) => self.extract_single_value_from_map(d),
             ToolInput::ToolCall(tc) => match tc.args {
                 Value::Object(obj) => {
-                    self.extract_single_value_from_map(obj.len(), obj.into_values())
+                    let map: HashMap<String, Value> = obj.into_iter().collect();
+                    self.extract_single_value_from_map(map)
                 }
                 Value::String(s) => Ok(s),
                 other => Ok(other.to_string()),
@@ -133,19 +123,15 @@ impl Tool {
         }
     }
 
-    fn extract_single_value_from_map(
-        &self,
-        len: usize,
-        mut values: impl Iterator<Item = Value>,
-    ) -> Result<String> {
-        if len != 1 {
+    fn extract_single_value_from_map(&self, map: HashMap<String, Value>) -> Result<String> {
+        if map.len() != 1 {
             return Err(Error::ToolInvocation(format!(
                 "Too many arguments to single-input tool {}. \
                  Consider using StructuredTool instead.",
-                self.name,
+                self.meta.name,
             )));
         }
-        let value = values.next().expect("checked len == 1");
+        let value = map.into_values().next().expect("checked len == 1");
         Ok(match value {
             Value::String(s) => s,
             other => other.to_string(),
@@ -155,57 +141,15 @@ impl Tool {
 
 #[async_trait]
 impl BaseTool for Tool {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn description(&self) -> &str {
-        &self.description
-    }
+    impl_base_tool_getters!();
 
     fn args_schema(&self) -> Option<&ArgsSchema> {
         self.args_schema.as_ref()
     }
 
-    fn return_direct(&self) -> bool {
-        self.return_direct
-    }
-
-    fn verbose(&self) -> bool {
-        self.verbose
-    }
-
-    fn tags(&self) -> Option<&[String]> {
-        self.tags.as_deref()
-    }
-
-    fn metadata(&self) -> Option<&HashMap<String, Value>> {
-        self.metadata.as_ref()
-    }
-
-    fn handle_tool_error(&self) -> &ErrorHandler {
-        &self.handle_tool_error
-    }
-
-    fn handle_validation_error(&self) -> &ErrorHandler {
-        &self.handle_validation_error
-    }
-
-    fn response_format(&self) -> ResponseFormat {
-        self.response_format
-    }
-
-    fn extras(&self) -> Option<&HashMap<String, Value>> {
-        self.extras.as_ref()
-    }
-
-    fn callbacks(&self) -> Option<&Callbacks> {
-        self.callbacks.as_ref()
-    }
-
     fn args(&self) -> HashMap<String, Value> {
-        if let Some(args_schema) = &self.args_schema {
-            return args_schema.properties();
+        if let Some(schema) = &self.args_schema {
+            return schema.properties();
         }
         HashMap::from([(
             "tool_input".to_string(),
