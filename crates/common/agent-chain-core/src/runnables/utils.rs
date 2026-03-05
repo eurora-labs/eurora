@@ -61,26 +61,21 @@ impl AddableDict {
 impl std::ops::Add for AddableDict {
     type Output = Self;
 
-    fn add(self, other: Self) -> Self::Output {
-        let mut chunk = self.clone();
-
+    fn add(mut self, other: Self) -> Self::Output {
         for (key, value) in other.0 {
-            match chunk.0.get(&key) {
-                None => {
-                    chunk.0.insert(key, value);
-                }
-                Some(existing) if existing.is_null() => {
-                    chunk.0.insert(key, value);
+            match self.0.get(&key) {
+                None | Some(&Value::Null) => {
+                    self.0.insert(key, value);
                 }
                 Some(existing) if !value.is_null() => {
                     let added = try_add_values(existing, &value);
-                    chunk.0.insert(key, added);
+                    self.0.insert(key, added);
                 }
                 _ => {}
             }
         }
 
-        chunk
+        self
     }
 }
 
@@ -119,16 +114,7 @@ pub trait Addable: Clone {
 }
 
 pub fn add<T: Addable>(addables: impl IntoIterator<Item = T>) -> Option<T> {
-    let mut final_value: Option<T> = None;
-
-    for chunk in addables {
-        final_value = match final_value {
-            None => Some(chunk),
-            Some(prev) => Some(prev.add(chunk)),
-        };
-    }
-
-    final_value
+    addables.into_iter().reduce(|a, b| a.add(b))
 }
 
 pub async fn aadd<T: Addable>(addables: impl Stream<Item = T> + Unpin) -> Option<T> {

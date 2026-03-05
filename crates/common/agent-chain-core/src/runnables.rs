@@ -24,9 +24,8 @@ pub use branch::{RunnableBranch, RunnableBranchFluentBuilder};
 pub use config::{
     AsyncVariableArgsFn, ConfigContextGuard, ConfigOrList, DEFAULT_RECURSION_LIMIT, RunnableConfig,
     VariableArgsFn, acall_func_with_variable_args, call_func_with_variable_args, ensure_config,
-    get_async_callback_manager_for_config, get_callback_manager_for_config,
-    get_child_runnable_config, get_config_list, merge_configs, patch_config, run_in_executor,
-    set_config_context,
+    get_callback_manager_for_config, get_child_runnable_config, get_config_list, merge_configs,
+    patch_config, run_in_executor, set_config_context,
 };
 pub use configurable::{
     Alternative, ConfigurableRunnable, DynamicRunnable, Reconfigurable,
