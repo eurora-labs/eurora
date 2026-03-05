@@ -7,7 +7,7 @@ use bon::bon;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::callbacks::{CallbackManager, Callbacks};
+use crate::callbacks::{CallbackManager, CallbackManagerForChainRun, Callbacks};
 
 pub const DEFAULT_RECURSION_LIMIT: i32 = 25;
 
@@ -342,14 +342,54 @@ pub fn get_callback_manager_for_config(config: &RunnableConfig) -> CallbackManag
         .call()
 }
 
-pub async fn run_in_executor<F, T>(func: F) -> T
+pub static EMPTY_MAP: std::sync::LazyLock<HashMap<String, serde_json::Value>> =
+    std::sync::LazyLock::new(HashMap::new);
+
+pub fn start_chain_run(
+    config: Option<RunnableConfig>,
+) -> (CallbackManagerForChainRun, RunnableConfig) {
+    let config = ensure_config(config);
+    let callback_manager = get_callback_manager_for_config(&config);
+    let run_manager = callback_manager
+        .on_chain_start()
+        .serialized(&EMPTY_MAP)
+        .inputs(&EMPTY_MAP)
+        .maybe_run_id(config.run_id)
+        .maybe_name(config.run_name.as_deref())
+        .call();
+    (run_manager, config)
+}
+
+pub fn child_config(
+    config: &RunnableConfig,
+    run_manager: &CallbackManagerForChainRun,
+    tag: Option<&str>,
+) -> RunnableConfig {
+    patch_config()
+        .config(config.clone())
+        .callbacks(run_manager.get_child(tag))
+        .call()
+}
+
+pub fn finish_chain_run<T>(
+    run_manager: &CallbackManagerForChainRun,
+    result: crate::error::Result<T>,
+) -> crate::error::Result<T> {
+    match &result {
+        Ok(_) => run_manager.on_chain_end(&EMPTY_MAP),
+        Err(e) => run_manager.on_chain_error(e),
+    }
+    result
+}
+
+pub async fn run_in_executor<F, T>(func: F) -> crate::error::Result<T>
 where
     F: FnOnce() -> T + Send + 'static,
     T: Send + 'static,
 {
     tokio::task::spawn_blocking(func)
         .await
-        .expect("blocking task panicked")
+        .map_err(|e| crate::error::Error::other(format!("blocking task panicked: {e}")))
 }
 
 #[cfg(test)]
@@ -560,7 +600,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_run_in_executor() {
-        let result = run_in_executor(|| 42).await;
+        let result = run_in_executor(|| 42).await.unwrap();
         assert_eq!(result, 42);
     }
 }

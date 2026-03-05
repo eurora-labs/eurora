@@ -11,8 +11,8 @@ use crate::error::{Error, Result};
 
 use super::base::{DynRunnable, Runnable};
 use super::config::{
-    ConfigOrList, RunnableConfig, ensure_config, get_callback_manager_for_config, get_config_list,
-    patch_config,
+    ConfigOrList, RunnableConfig, child_config, ensure_config, finish_chain_run, get_config_list,
+    start_chain_run,
 };
 
 pub type FallbackErrorPredicate = Arc<dyn Fn(&Error) -> bool + Send + Sync>;
@@ -97,8 +97,76 @@ where
         }
     }
 
-    /// Process batch outputs from a single runnable, updating tracking state.
-    /// Returns `Some(results)` if we should return early (non-fallback error), `None` to continue.
+    fn maybe_insert_exception(&self, input: &I, last_error: &Option<Error>) -> Option<I> {
+        if let (Some(key), Some(inserter), Some(err)) =
+            (&self.exception_key, &self.exception_inserter, last_error)
+        {
+            Some(inserter(input, key, err))
+        } else {
+            None
+        }
+    }
+
+    fn try_invoke_with_fallbacks(
+        &self,
+        input: I,
+        config: &RunnableConfig,
+        use_callbacks: bool,
+    ) -> Result<O> {
+        let run_manager_and_config = if use_callbacks {
+            let (rm, cfg) = start_chain_run(Some(config.clone()));
+            Some((rm, cfg))
+        } else {
+            None
+        };
+
+        let mut first_error: Option<Error> = None;
+        let mut last_error: Option<Error> = None;
+        let mut current_input = input;
+
+        for runnable in self.runnables() {
+            if let Some(modified) = self.maybe_insert_exception(&current_input, &last_error) {
+                current_input = modified;
+            }
+
+            let invoke_config = if let Some((ref rm, ref cfg)) = run_manager_and_config {
+                Some(child_config(cfg, rm, None))
+            } else {
+                Some(config.clone())
+            };
+
+            match runnable.invoke(current_input.clone(), invoke_config) {
+                Ok(output) => {
+                    if let Some((ref rm, _)) = run_manager_and_config {
+                        return finish_chain_run(rm, Ok(output));
+                    }
+                    return Ok(output);
+                }
+                Err(e) => {
+                    if self.should_fallback(&e) {
+                        if first_error.is_none() {
+                            first_error = Some(Error::other(e.to_string()));
+                        }
+                        last_error = Some(e);
+                    } else {
+                        if let Some((ref rm, _)) = run_manager_and_config {
+                            return finish_chain_run(rm, Err(e));
+                        }
+                        return Err(e);
+                    }
+                }
+            }
+        }
+
+        let error =
+            first_error.unwrap_or_else(|| Error::other("No error stored at end of fallbacks."));
+        if let Some((ref rm, _)) = run_manager_and_config {
+            finish_chain_run(rm, Err(error))
+        } else {
+            Err(error)
+        }
+    }
+
     fn process_batch_outputs(
         &self,
         outputs: Vec<Result<O>>,
@@ -120,13 +188,9 @@ where
                         if !handled_exception_indices.contains(i) {
                             handled_exception_indices.push(*i);
                         }
-                        let next_input = if let (Some(key), Some(inserter)) =
-                            (&self.exception_key, &self.exception_inserter)
-                        {
-                            inserter(input, key, &e)
-                        } else {
-                            input.clone()
-                        };
+                        let next_input = self
+                            .maybe_insert_exception(input, &Some(Error::other(e.to_string())))
+                            .unwrap_or_else(|| input.clone());
                         to_return[*i] = Some(Err(e));
                         next_run_again.push((*i, next_input));
                     } else if return_exceptions {
@@ -186,54 +250,7 @@ where
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         let config = ensure_config(config);
-        let callback_manager = get_callback_manager_for_config(&config);
-
-        let run_manager = callback_manager
-            .on_chain_start()
-            .serialized(&std::collections::HashMap::new())
-            .inputs(&std::collections::HashMap::new())
-            .maybe_run_id(config.run_id)
-            .call();
-
-        let mut first_error: Option<Error> = None;
-        let mut last_error: Option<Error> = None;
-        let mut current_input = input;
-
-        for runnable in self.runnables() {
-            if let (Some(key), Some(inserter), Some(err)) =
-                (&self.exception_key, &self.exception_inserter, &last_error)
-            {
-                current_input = inserter(&current_input, key, err);
-            }
-
-            let child_config = patch_config()
-                .config(config.clone())
-                .callbacks(run_manager.get_child(None))
-                .call();
-
-            match runnable.invoke(current_input.clone(), Some(child_config)) {
-                Ok(output) => {
-                    run_manager.on_chain_end(&std::collections::HashMap::new());
-                    return Ok(output);
-                }
-                Err(e) => {
-                    if self.should_fallback(&e) {
-                        if first_error.is_none() {
-                            first_error = Some(Error::other(e.to_string()));
-                        }
-                        last_error = Some(e);
-                    } else {
-                        run_manager.on_chain_error(&e);
-                        return Err(e);
-                    }
-                }
-            }
-        }
-
-        let error =
-            first_error.unwrap_or_else(|| Error::other("No error stored at end of fallbacks."));
-        run_manager.on_chain_error(&error);
-        Err(error)
+        self.try_invoke_with_fallbacks(input, &config, true)
     }
 
     async fn ainvoke(
@@ -244,26 +261,25 @@ where
     where
         Self: 'static,
     {
-        let config = ensure_config(config);
+        let (run_manager, config) = start_chain_run(config);
 
         let mut first_error: Option<Error> = None;
         let mut last_error: Option<Error> = None;
         let mut current_input = input;
 
         for runnable in self.runnables() {
-            if let (Some(key), Some(inserter), Some(err)) =
-                (&self.exception_key, &self.exception_inserter, &last_error)
-            {
-                current_input = inserter(&current_input, key, err);
+            if let Some(modified) = self.maybe_insert_exception(&current_input, &last_error) {
+                current_input = modified;
             }
 
             match runnable
-                .ainvoke(current_input.clone(), Some(config.clone()))
+                .ainvoke(
+                    current_input.clone(),
+                    Some(child_config(&config, &run_manager, None)),
+                )
                 .await
             {
-                Ok(output) => {
-                    return Ok(output);
-                }
+                Ok(output) => return finish_chain_run(&run_manager, Ok(output)),
                 Err(e) => {
                     if self.should_fallback(&e) {
                         if first_error.is_none() {
@@ -271,13 +287,16 @@ where
                         }
                         last_error = Some(e);
                     } else {
-                        return Err(e);
+                        return finish_chain_run(&run_manager, Err(e));
                     }
                 }
             }
         }
 
-        Err(first_error.unwrap_or_else(|| Error::other("No error stored at end of fallbacks.")))
+        finish_chain_run(
+            &run_manager,
+            Err(first_error.unwrap_or_else(|| Error::other("No error stored at end of fallbacks."))),
+        )
     }
 
     fn batch(
@@ -423,10 +442,8 @@ where
             let mut current_input = input;
 
             for runnable in self.runnables() {
-                if let (Some(key), Some(inserter), Some(err)) =
-                    (&self.exception_key, &self.exception_inserter, &last_error)
-                {
-                    current_input = inserter(&current_input, key, err);
+                if let Some(modified) = self.maybe_insert_exception(&current_input, &last_error) {
+                    current_input = modified;
                 }
 
                 let mut stream = runnable.astream(current_input.clone(), Some(config.clone()));
@@ -498,7 +515,7 @@ mod tests {
         let with_fallbacks = RunnableWithFallbacks::new(primary, vec![Arc::new(fallback)]);
 
         let result = with_fallbacks.invoke(5, None).unwrap();
-        assert_eq!(result, 6); // Primary succeeded, not fallback
+        assert_eq!(result, 6);
     }
 
     #[test]
@@ -535,7 +552,7 @@ mod tests {
             RunnableWithFallbacks::new(primary, vec![Arc::new(fallback1), Arc::new(fallback2)]);
 
         let result = with_fallbacks.invoke(5, None).unwrap();
-        assert_eq!(result, 15); // Second fallback succeeded
+        assert_eq!(result, 15);
     }
 
     #[test]
@@ -630,6 +647,6 @@ mod tests {
             RunnableWithFallbacks::new(primary, vec![Arc::new(fallback1), Arc::new(fallback2)]);
 
         let count = with_fallbacks.runnables().count();
-        assert_eq!(count, 3); // primary + 2 fallbacks
+        assert_eq!(count, 3);
     }
 }
