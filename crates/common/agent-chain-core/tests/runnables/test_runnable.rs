@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use agent_chain_core::error::Error;
 use agent_chain_core::runnables::base::{
-    Runnable, RunnableEach, RunnableLambda, RunnableParallel, RunnableSequence, pipe,
+    Runnable, RunnableEach, RunnableExt, RunnableLambda, RunnableParallel, RunnableSequence, pipe,
 };
 use agent_chain_core::runnables::config::RunnableConfig;
 use agent_chain_core::runnables::passthrough::{RunnableAssign, RunnablePassthrough};

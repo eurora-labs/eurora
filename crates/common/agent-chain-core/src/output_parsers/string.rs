@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use crate::error::Result;
 use crate::load::{Serializable, Serialized, SerializedConstructor};
 use crate::outputs::Generation;
@@ -8,21 +6,12 @@ use super::base::BaseOutputParser;
 use super::transform::BaseTransformOutputParser;
 
 #[derive(Debug, Clone, Default)]
-pub struct StrOutputParser {
-    _private: (),
-}
+#[non_exhaustive]
+pub struct StrOutputParser;
 
 impl StrOutputParser {
     pub fn new() -> Self {
-        Self { _private: () }
-    }
-
-    pub fn is_lc_serializable() -> bool {
-        true
-    }
-
-    pub fn get_lc_namespace() -> Vec<&'static str> {
-        vec!["langchain", "schema", "output_parser"]
+        Self
     }
 }
 

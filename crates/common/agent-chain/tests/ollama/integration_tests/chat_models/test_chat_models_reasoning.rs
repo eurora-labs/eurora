@@ -18,9 +18,11 @@ fn load_env() {
 
 async fn test_reasoning_stream_no_reasoning_sync() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(REASONING_MODEL)
-        .num_ctx(4096)
-        .reasoning(serde_json::json!(false));
+    let llm = ChatOllama::builder()
+        .model(REASONING_MODEL)
+        .num_ctx(4096u32)
+        .reasoning(serde_json::json!(false))
+        .build();
 
     let mut stream = llm
         .astream(
@@ -59,9 +61,11 @@ async fn test_reasoning_stream_no_reasoning_sync() -> Result<(), Box<dyn std::er
 
 async fn test_reasoning_stream_no_reasoning_async() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(REASONING_MODEL)
-        .num_ctx(4096)
-        .reasoning(serde_json::json!(false));
+    let llm = ChatOllama::builder()
+        .model(REASONING_MODEL)
+        .num_ctx(4096u32)
+        .reasoning(serde_json::json!(false))
+        .build();
 
     let mut stream = llm
         .astream(
@@ -94,7 +98,10 @@ async fn test_reasoning_stream_no_reasoning_async() -> Result<(), Box<dyn std::e
 
 async fn test_reasoning_stream_none_sync() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(REASONING_MODEL).num_ctx(4096);
+    let llm = ChatOllama::builder()
+        .model(REASONING_MODEL)
+        .num_ctx(4096u32)
+        .build();
     // reasoning=None is the default (not set)
 
     let mut stream = llm
@@ -126,7 +133,10 @@ async fn test_reasoning_stream_none_sync() -> Result<(), Box<dyn std::error::Err
 
 async fn test_reasoning_stream_none_async() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(REASONING_MODEL).num_ctx(4096);
+    let llm = ChatOllama::builder()
+        .model(REASONING_MODEL)
+        .num_ctx(4096u32)
+        .build();
 
     let mut stream = llm
         .astream(
@@ -157,9 +167,11 @@ async fn test_reasoning_stream_none_async() -> Result<(), Box<dyn std::error::Er
 
 async fn test_reasoning_stream_enabled_sync() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(REASONING_MODEL)
-        .num_ctx(4096)
-        .reasoning(serde_json::json!(true));
+    let llm = ChatOllama::builder()
+        .model(REASONING_MODEL)
+        .num_ctx(4096u32)
+        .reasoning(serde_json::json!(true))
+        .build();
 
     let mut stream = llm
         .astream(
@@ -192,9 +204,11 @@ async fn test_reasoning_stream_enabled_sync() -> Result<(), Box<dyn std::error::
 
 async fn test_reasoning_stream_enabled_async() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(REASONING_MODEL)
-        .num_ctx(4096)
-        .reasoning(serde_json::json!(true));
+    let llm = ChatOllama::builder()
+        .model(REASONING_MODEL)
+        .num_ctx(4096u32)
+        .reasoning(serde_json::json!(true))
+        .build();
 
     let mut stream = llm
         .astream(
@@ -227,9 +241,11 @@ async fn test_reasoning_stream_enabled_async() -> Result<(), Box<dyn std::error:
 
 async fn test_reasoning_invoke_no_reasoning_sync() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(REASONING_MODEL)
-        .num_ctx(4096)
-        .reasoning(serde_json::json!(false));
+    let llm = ChatOllama::builder()
+        .model(REASONING_MODEL)
+        .num_ctx(4096u32)
+        .reasoning(serde_json::json!(false))
+        .build();
 
     let result = llm
         .invoke(
@@ -259,9 +275,11 @@ async fn test_reasoning_invoke_no_reasoning_sync() -> Result<(), Box<dyn std::er
 
 async fn test_reasoning_invoke_no_reasoning_async() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(REASONING_MODEL)
-        .num_ctx(4096)
-        .reasoning(serde_json::json!(false));
+    let llm = ChatOllama::builder()
+        .model(REASONING_MODEL)
+        .num_ctx(4096u32)
+        .reasoning(serde_json::json!(false))
+        .build();
 
     let result = llm
         .ainvoke(
@@ -290,7 +308,10 @@ async fn test_reasoning_invoke_no_reasoning_async() -> Result<(), Box<dyn std::e
 
 async fn test_reasoning_invoke_none_sync() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(REASONING_MODEL).num_ctx(4096);
+    let llm = ChatOllama::builder()
+        .model(REASONING_MODEL)
+        .num_ctx(4096u32)
+        .build();
     // reasoning=None (default, not set)
 
     let result = llm
@@ -319,7 +340,10 @@ async fn test_reasoning_invoke_none_sync() -> Result<(), Box<dyn std::error::Err
 
 async fn test_reasoning_invoke_none_async() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(REASONING_MODEL).num_ctx(4096);
+    let llm = ChatOllama::builder()
+        .model(REASONING_MODEL)
+        .num_ctx(4096u32)
+        .build();
 
     let result = llm
         .ainvoke(
@@ -347,9 +371,11 @@ async fn test_reasoning_invoke_none_async() -> Result<(), Box<dyn std::error::Er
 
 async fn test_reasoning_invoke_enabled_sync() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(REASONING_MODEL)
-        .num_ctx(4096)
-        .reasoning(serde_json::json!(true));
+    let llm = ChatOllama::builder()
+        .model(REASONING_MODEL)
+        .num_ctx(4096u32)
+        .reasoning(serde_json::json!(true))
+        .build();
 
     let result = llm
         .invoke(
@@ -385,9 +411,11 @@ async fn test_reasoning_invoke_enabled_sync() -> Result<(), Box<dyn std::error::
 
 async fn test_reasoning_invoke_enabled_async() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(REASONING_MODEL)
-        .num_ctx(4096)
-        .reasoning(serde_json::json!(true));
+    let llm = ChatOllama::builder()
+        .model(REASONING_MODEL)
+        .num_ctx(4096u32)
+        .reasoning(serde_json::json!(true))
+        .build();
 
     let result = llm
         .ainvoke(
@@ -428,7 +456,10 @@ async fn test_reasoning_modes_behavior() -> Result<(), Box<dyn std::error::Error
         .into();
 
     // reasoning=None (default)
-    let llm_default = ChatOllama::new(REASONING_MODEL).num_ctx(4096);
+    let llm_default = ChatOllama::builder()
+        .model(REASONING_MODEL)
+        .num_ctx(4096u32)
+        .build();
     let result_default = llm_default
         .invoke(vec![message.clone()].into(), None)
         .await?;
@@ -441,9 +472,11 @@ async fn test_reasoning_modes_behavior() -> Result<(), Box<dyn std::error::Error
     );
 
     // reasoning=false
-    let llm_disabled = ChatOllama::new(REASONING_MODEL)
-        .num_ctx(4096)
-        .reasoning(serde_json::json!(false));
+    let llm_disabled = ChatOllama::builder()
+        .model(REASONING_MODEL)
+        .num_ctx(4096u32)
+        .reasoning(serde_json::json!(false))
+        .build();
     let result_disabled = llm_disabled
         .invoke(vec![message.clone()].into(), None)
         .await?;
@@ -456,9 +489,11 @@ async fn test_reasoning_modes_behavior() -> Result<(), Box<dyn std::error::Error
     );
 
     // reasoning=true
-    let llm_enabled = ChatOllama::new(REASONING_MODEL)
-        .num_ctx(4096)
-        .reasoning(serde_json::json!(true));
+    let llm_enabled = ChatOllama::builder()
+        .model(REASONING_MODEL)
+        .num_ctx(4096u32)
+        .reasoning(serde_json::json!(true))
+        .build();
     let result_enabled = llm_enabled
         .invoke(vec![message.clone()].into(), None)
         .await?;

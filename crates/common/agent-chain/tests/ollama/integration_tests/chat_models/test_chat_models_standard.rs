@@ -20,7 +20,10 @@ fn load_env() {
 #[tokio::test]
 async fn test_invoke() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(DEFAULT_MODEL).temperature(0.0);
+    let llm = ChatOllama::builder()
+        .model(DEFAULT_MODEL)
+        .temperature(0.0)
+        .build();
 
     let result = llm
         .invoke(
@@ -37,7 +40,10 @@ async fn test_invoke() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_ainvoke() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(DEFAULT_MODEL).temperature(0.0);
+    let llm = ChatOllama::builder()
+        .model(DEFAULT_MODEL)
+        .temperature(0.0)
+        .build();
 
     let result = llm
         .ainvoke(
@@ -54,7 +60,10 @@ async fn test_ainvoke() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(DEFAULT_MODEL).temperature(0.0);
+    let llm = ChatOllama::builder()
+        .model(DEFAULT_MODEL)
+        .temperature(0.0)
+        .build();
 
     let mut stream = llm
         .astream(
@@ -84,7 +93,10 @@ async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_astream() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(DEFAULT_MODEL).temperature(0.0);
+    let llm = ChatOllama::builder()
+        .model(DEFAULT_MODEL)
+        .temperature(0.0)
+        .build();
 
     let mut stream = llm
         .astream(
@@ -121,7 +133,10 @@ async fn test_astream() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_conversation() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(DEFAULT_MODEL).temperature(0.0);
+    let llm = ChatOllama::builder()
+        .model(DEFAULT_MODEL)
+        .temperature(0.0)
+        .build();
 
     let messages: Vec<BaseMessage> = vec![
         HumanMessage::builder().content("hello").build().into(),
@@ -142,7 +157,10 @@ async fn test_conversation() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_message_with_name() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(DEFAULT_MODEL).temperature(0.0);
+    let llm = ChatOllama::builder()
+        .model(DEFAULT_MODEL)
+        .temperature(0.0)
+        .build();
 
     let messages: Vec<BaseMessage> = vec![
         HumanMessage::builder()
@@ -166,7 +184,10 @@ async fn test_message_with_name() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_usage_metadata() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(DEFAULT_MODEL).temperature(0.0);
+    let llm = ChatOllama::builder()
+        .model(DEFAULT_MODEL)
+        .temperature(0.0)
+        .build();
 
     let result = llm
         .invoke(
@@ -203,7 +224,10 @@ async fn test_usage_metadata() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_usage_metadata_streaming() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(DEFAULT_MODEL).temperature(0.0);
+    let llm = ChatOllama::builder()
+        .model(DEFAULT_MODEL)
+        .temperature(0.0)
+        .build();
 
     let mut stream = llm
         .astream(
@@ -248,9 +272,11 @@ async fn test_usage_metadata_streaming() -> Result<(), Box<dyn std::error::Error
 #[tokio::test]
 async fn test_stop_sequence() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(DEFAULT_MODEL)
+    let llm = ChatOllama::builder()
+        .model(DEFAULT_MODEL)
         .temperature(0.0)
-        .stop(vec!["you".to_string()]);
+        .stop(vec!["you".to_string()])
+        .build();
 
     let result = llm
         .invoke(
@@ -584,7 +610,10 @@ async fn test_structured_output() -> Result<(), Box<dyn std::error::Error>> {
         "required": ["setup", "punchline"]
     });
 
-    let llm = ChatOllama::new(TOOL_MODEL).temperature(0.0);
+    let llm = ChatOllama::builder()
+        .model(TOOL_MODEL)
+        .temperature(0.0)
+        .build();
     let structured = llm.with_structured_output(joke_schema, false)?;
 
     let result = structured
@@ -626,7 +655,10 @@ async fn test_structured_output_async() -> Result<(), Box<dyn std::error::Error>
         "required": ["setup", "punchline"]
     });
 
-    let llm = ChatOllama::new(TOOL_MODEL).temperature(0.0);
+    let llm = ChatOllama::builder()
+        .model(TOOL_MODEL)
+        .temperature(0.0)
+        .build();
     let structured = llm.with_structured_output(joke_schema, false)?;
 
     let result = structured
@@ -661,7 +693,10 @@ async fn test_structured_output_async() -> Result<(), Box<dyn std::error::Error>
 #[tokio::test]
 async fn test_image_inputs() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(DEFAULT_MODEL).temperature(0.0);
+    let llm = ChatOllama::builder()
+        .model(DEFAULT_MODEL)
+        .temperature(0.0)
+        .build();
 
     let image_url = "https://raw.githubusercontent.com/langchain-ai/docs/4d11d08b6b0e210bd456943f7a22febbd168b543/src/images/agentic-rag-output.png";
 
@@ -695,7 +730,10 @@ async fn test_image_inputs() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_batch() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(DEFAULT_MODEL).temperature(0.0);
+    let llm = ChatOllama::builder()
+        .model(DEFAULT_MODEL)
+        .temperature(0.0)
+        .build();
 
     let prompts = vec!["Hello", "Hey"];
     let mut results = Vec::new();
@@ -720,7 +758,10 @@ async fn test_batch() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_abatch() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(DEFAULT_MODEL).temperature(0.0);
+    let llm = ChatOllama::builder()
+        .model(DEFAULT_MODEL)
+        .temperature(0.0)
+        .build();
 
     let futures: Vec<_> = vec!["Hello", "Hey"]
         .into_iter()
@@ -754,7 +795,10 @@ async fn test_abatch() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_double_messages_conversation() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new(DEFAULT_MODEL).temperature(0.0);
+    let llm = ChatOllama::builder()
+        .model(DEFAULT_MODEL)
+        .temperature(0.0)
+        .build();
 
     let messages: Vec<BaseMessage> = vec![
         SystemMessage::builder().content("hello").build().into(),
@@ -952,7 +996,10 @@ async fn test_structured_output_optional_param() -> Result<(), Box<dyn std::erro
         "required": ["setup"]
     });
 
-    let llm = ChatOllama::new(DEFAULT_MODEL).temperature(0.0);
+    let llm = ChatOllama::builder()
+        .model(DEFAULT_MODEL)
+        .temperature(0.0)
+        .build();
     let structured = llm.with_structured_output(joke_schema, false)?;
 
     let result = structured

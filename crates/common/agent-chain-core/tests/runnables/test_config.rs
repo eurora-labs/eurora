@@ -8,8 +8,7 @@ use agent_chain_core::callbacks::{
 use agent_chain_core::runnables::config::{
     AsyncVariableArgsFn, ConfigOrList, RunnableConfig, VariableArgsFn,
     acall_func_with_variable_args, call_func_with_variable_args, ensure_config,
-    get_async_callback_manager_for_config, get_callback_manager_for_config, get_config_list,
-    merge_configs, patch_config,
+    get_callback_manager_for_config, get_config_list, merge_configs, patch_config,
 };
 
 #[test]
@@ -133,7 +132,7 @@ fn test_get_config_list_run_id_single_no_issue() {
 
 #[test]
 fn test_patch_config_none_input() {
-    let config = patch_config(None, None, None, None, None, None);
+    let config = patch_config().call();
     assert!(config.tags.is_empty());
     assert_eq!(config.recursion_limit, 25);
 }
@@ -141,19 +140,19 @@ fn test_patch_config_none_input() {
 #[test]
 fn test_patch_config_sets_recursion_limit() {
     let config = RunnableConfig::builder().recursion_limit(10).build();
-    let patched = patch_config(Some(config), None, None, None, Some(50), None);
+    let patched = patch_config().config(config).recursion_limit(50).call();
     assert_eq!(patched.recursion_limit, 50);
 }
 
 #[test]
 fn test_patch_config_sets_max_concurrency() {
-    let patched = patch_config(None, None, None, Some(5), None, None);
+    let patched = patch_config().max_concurrency(5).call();
     assert_eq!(patched.max_concurrency, Some(5));
 }
 
 #[test]
 fn test_patch_config_sets_run_name() {
-    let patched = patch_config(None, None, Some("my_run".to_string()), None, None, None);
+    let patched = patch_config().run_name("my_run").call();
     assert_eq!(patched.run_name, Some("my_run".to_string()));
 }
 
@@ -163,14 +162,10 @@ fn test_patch_config_configurable_merges() {
         configurable: HashMap::from([("a".to_string(), serde_json::json!(1))]),
         ..Default::default()
     };
-    let patched = patch_config(
-        Some(config),
-        None,
-        None,
-        None,
-        None,
-        Some(HashMap::from([("b".to_string(), serde_json::json!(2))])),
-    );
+    let patched = patch_config()
+        .config(config)
+        .configurable(HashMap::from([("b".to_string(), serde_json::json!(2))]))
+        .call();
     assert_eq!(patched.configurable["a"], serde_json::json!(1));
     assert_eq!(patched.configurable["b"], serde_json::json!(2));
 }
@@ -184,7 +179,7 @@ fn test_patch_config_callbacks_clears_run_name_and_run_id() {
         .build();
 
     let callback_mgr = CallbackManager::new();
-    let patched = patch_config(Some(config), Some(callback_mgr), None, None, None, None);
+    let patched = patch_config().config(config).callbacks(callback_mgr).call();
     assert!(patched.run_name.is_none());
     assert!(patched.run_id.is_none());
     assert!(patched.callbacks.is_some());
@@ -325,17 +320,7 @@ fn test_merge_config_callbacks_manager_with_handlers() {
     let handler2: Arc<dyn BaseCallbackHandler> = Arc::new(StreamingStdOutCallbackHandler::new());
 
     let c1 = RunnableConfig {
-        callbacks: Some(Callbacks::Manager(
-            agent_chain_core::callbacks::BaseCallbackManager::with_handlers(
-                mgr.handlers.clone(),
-                Some(mgr.inheritable_handlers.clone()),
-                mgr.parent_run_id,
-                Some(mgr.tags.clone()),
-                Some(mgr.inheritable_tags.clone()),
-                Some(mgr.metadata.clone()),
-                Some(mgr.inheritable_metadata.clone()),
-            ),
-        )),
+        callbacks: Some(Callbacks::Manager(mgr.clone())),
         ..Default::default()
     };
     let c2 = RunnableConfig {
@@ -346,10 +331,10 @@ fn test_merge_config_callbacks_manager_with_handlers() {
     let merged = merge_configs(vec![Some(c1), Some(c2)]);
     match &merged.callbacks {
         Some(Callbacks::Manager(base_mgr)) => {
-            assert_eq!(base_mgr.handlers.len(), 2);
-            assert_eq!(base_mgr.handlers[0].name(), "StdOutCallbackHandler");
+            assert_eq!(base_mgr.handlers().len(), 2);
+            assert_eq!(base_mgr.handlers()[0].name(), "StdOutCallbackHandler");
             assert_eq!(
-                base_mgr.handlers[1].name(),
+                base_mgr.handlers()[1].name(),
                 "StreamingStdOutCallbackHandler"
             );
         }
@@ -369,24 +354,14 @@ fn test_merge_config_callbacks_handlers_with_manager() {
         ..Default::default()
     };
     let c2 = RunnableConfig {
-        callbacks: Some(Callbacks::Manager(
-            agent_chain_core::callbacks::BaseCallbackManager::with_handlers(
-                mgr.handlers.clone(),
-                Some(mgr.inheritable_handlers.clone()),
-                mgr.parent_run_id,
-                Some(mgr.tags.clone()),
-                Some(mgr.inheritable_tags.clone()),
-                Some(mgr.metadata.clone()),
-                Some(mgr.inheritable_metadata.clone()),
-            ),
-        )),
+        callbacks: Some(Callbacks::Manager(mgr.clone())),
         ..Default::default()
     };
 
     let merged = merge_configs(vec![Some(c1), Some(c2)]);
     match &merged.callbacks {
         Some(Callbacks::Manager(base_mgr)) => {
-            assert!(!base_mgr.handlers.is_empty());
+            assert!(!base_mgr.handlers().is_empty());
         }
         _ => panic!("Expected Callbacks::Manager"),
     }
@@ -440,27 +415,11 @@ fn test_get_callback_manager_for_config_with_tags_and_metadata() {
     let mut config = RunnableConfig::builder().tags(vec!["a".into()]).build();
     config.metadata = HashMap::from([("k".to_string(), serde_json::json!("v"))]);
     let mgr = get_callback_manager_for_config(&config);
-    assert!(mgr.inheritable_tags.contains(&"a".to_string()));
+    assert!(mgr.inheritable_tags().contains(&"a".to_string()));
     assert_eq!(
-        mgr.inheritable_metadata.get("k"),
+        mgr.inheritable_metadata().get("k"),
         Some(&serde_json::json!("v"))
     );
-}
-
-#[test]
-fn test_get_async_callback_manager_for_config_basic() {
-    let config = ensure_config(None);
-    let mgr = get_async_callback_manager_for_config(&config);
-    let _ = mgr;
-}
-
-#[test]
-fn test_get_async_callback_manager_for_config_with_tags_and_metadata() {
-    let mut config = RunnableConfig::builder().tags(vec!["a".into()]).build();
-    config.metadata = HashMap::from([("k".to_string(), serde_json::json!("v"))]);
-    let mgr = get_async_callback_manager_for_config(&config);
-
-    let _ = mgr;
 }
 
 #[test]
@@ -473,7 +432,7 @@ fn test_runnable_config_with_run_id() {
 #[test]
 fn test_runnable_config_with_callbacks() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(StdOutCallbackHandler::new());
-    let callbacks = Callbacks::from_handlers(vec![handler]);
+    let callbacks = Callbacks::from(vec![handler]);
     let config = RunnableConfig::builder().callbacks(callbacks).build();
     assert!(config.callbacks.is_some());
 }
@@ -575,7 +534,7 @@ fn test_patch_config_preserves_existing_tags() {
     let config = RunnableConfig::builder()
         .tags(vec!["existing".into()])
         .build();
-    let patched = patch_config(Some(config), None, None, None, None, None);
+    let patched = patch_config().config(config).call();
     assert_eq!(patched.tags, vec!["existing"]);
 }
 
@@ -583,12 +542,12 @@ fn test_patch_config_preserves_existing_tags() {
 fn test_patch_config_preserves_callbacks_when_not_replaced() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(StdOutCallbackHandler::new());
     let config = RunnableConfig::builder()
-        .callbacks(Callbacks::from_handlers(vec![handler]))
+        .callbacks(Callbacks::from(vec![handler]))
         .run_name("keep_me")
         .run_id(uuid::Uuid::new_v4())
         .build();
 
-    let patched = patch_config(Some(config), None, None, None, Some(99), None);
+    let patched = patch_config().config(config).recursion_limit(99).call();
 
     assert_eq!(patched.run_name, Some("keep_me".to_string()));
     assert!(patched.run_id.is_some());

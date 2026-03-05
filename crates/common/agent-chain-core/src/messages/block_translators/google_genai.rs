@@ -300,7 +300,7 @@ pub fn convert_input_to_standard_blocks(content: &[Value]) -> Vec<Value> {
     result
 }
 
-pub fn convert_to_standard_blocks(content: &[Value], _is_chunk: bool) -> Vec<Value> {
+pub fn convert_to_standard_blocks(content: &[Value], is_chunk: bool) -> Vec<Value> {
     let mut result = Vec::new();
 
     for block in content {
@@ -352,8 +352,13 @@ pub fn convert_to_standard_blocks(content: &[Value], _is_chunk: bool) -> Vec<Val
             }
 
             Some("function_call") => {
+                let call_type = if is_chunk {
+                    "tool_call_chunk"
+                } else {
+                    "tool_call"
+                };
                 result.push(json!({
-                    "type": "tool_call",
+                    "type": call_type,
                     "name": obj.get("name").and_then(|v| v.as_str()).unwrap_or(""),
                     "args": obj.get("args").cloned().unwrap_or(json!({})),
                     "id": obj.get("id").and_then(|v| v.as_str()).unwrap_or(""),
@@ -383,15 +388,30 @@ pub fn convert_to_standard_blocks(content: &[Value], _is_chunk: bool) -> Vec<Val
             }
 
             Some("executable_code") => {
-                result.push(json!({
-                    "type": "server_tool_call",
-                    "name": "code_interpreter",
-                    "args": {
-                        "code": obj.get("executable_code").and_then(|v| v.as_str()).unwrap_or(""),
-                        "language": obj.get("language").and_then(|v| v.as_str()).unwrap_or("python"),
-                    },
-                    "id": obj.get("id").and_then(|v| v.as_str()).unwrap_or(""),
-                }));
+                let code = obj
+                    .get("executable_code")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let is_empty_input = code.is_empty();
+
+                if is_chunk && is_empty_input {
+                    result.push(json!({
+                        "type": "server_tool_call_chunk",
+                        "name": "code_interpreter",
+                        "args": "",
+                        "id": obj.get("id").and_then(|v| v.as_str()).unwrap_or(""),
+                    }));
+                } else {
+                    result.push(json!({
+                        "type": "server_tool_call",
+                        "name": "code_interpreter",
+                        "args": {
+                            "code": code,
+                            "language": obj.get("language").and_then(|v| v.as_str()).unwrap_or("python"),
+                        },
+                        "id": obj.get("id").and_then(|v| v.as_str()).unwrap_or(""),
+                    }));
+                }
             }
 
             Some("code_execution_result") => {
