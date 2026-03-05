@@ -32,8 +32,8 @@ fn test_base_run_manager_initialization() {
     let mut config = CallbackManager::new();
     config.add_handler(handler, true);
     config.set_parent_run_id(Some(parent_run_id));
-    config.add_tags(vec!["tag1".to_string()], false);
-    config.add_tags(vec!["tag2".to_string()], true);
+    config.add_tags(&["tag1".to_string()], false);
+    config.add_tags(&["tag2".to_string()], true);
     config.add_metadata(
         HashMap::from([("key".to_string(), serde_json::json!("value"))]),
         false,
@@ -83,8 +83,8 @@ fn test_parent_run_manager_get_child() {
 
     let mut config = CallbackManager::new();
     config.add_handler(handler, true);
-    config.add_tags(vec!["parent_tag".to_string()], false);
-    config.add_tags(vec!["inheritable_tag".to_string()], true);
+    config.add_tags(&["parent_tag".to_string()], false);
+    config.add_tags(&["inheritable_tag".to_string()], true);
     config.add_metadata(
         HashMap::from([("key".to_string(), serde_json::json!("value"))]),
         false,
