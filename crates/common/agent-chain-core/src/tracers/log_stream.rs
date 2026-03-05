@@ -872,6 +872,7 @@ impl crate::callbacks::BaseCallbackHandler for LogStreamCallbackHandlerBridge {
         parent_run_id: Option<Uuid>,
         tags: Option<&[String]>,
         metadata: Option<&HashMap<String, serde_json::Value>>,
+        name: Option<&str>,
     ) {
         let mut handler = self.inner.lock().expect("lock poisoned");
         if let Err(e) = handler.handle_chat_model_start(
@@ -881,7 +882,7 @@ impl crate::callbacks::BaseCallbackHandler for LogStreamCallbackHandlerBridge {
             parent_run_id,
             tags.map(|t| t.to_vec()),
             metadata.cloned(),
-            None,
+            name.map(|s| s.to_string()),
             HashMap::new(),
         ) {
             tracing::warn!(

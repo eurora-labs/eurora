@@ -148,7 +148,9 @@ pub trait BaseCallbackHandler: Send + Sync + Debug {
         parent_run_id: Option<Uuid>,
         tags: Option<&[String]>,
         metadata: Option<&HashMap<String, serde_json::Value>>,
+        name: Option<&str>,
     ) {
+        let _ = name;
         use crate::messages::utils::get_buffer_string;
         let message_strings: Vec<String> = messages
             .iter()

@@ -224,7 +224,7 @@ async fn test_async_callback_manager_chat_model_start() {
         HumanMessage::builder().content("Hello").build().into(),
     ]];
     let run_managers = manager
-        .on_chat_model_start(&HashMap::new(), &messages, None)
+        .on_chat_model_start(&HashMap::new(), &messages, None, None)
         .await;
 
     assert_eq!(run_managers.len(), 1);

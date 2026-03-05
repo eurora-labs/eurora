@@ -487,12 +487,12 @@ pub trait BaseChatModel: BaseLanguageModel {
             callbacks,
             tags,
             metadata,
-            run_name: _run_name,
+            run_name,
             run_id,
         } = config;
 
         let params = self._get_invocation_params(stop.as_deref(), None);
-        let _options = {
+        let options = {
             let mut opts = HashMap::new();
             if let Some(ref s) = stop {
                 opts.insert(
@@ -514,6 +514,12 @@ pub trait BaseChatModel: BaseLanguageModel {
         if let Some(model_type) = ls_params.ls_model_type {
             inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
         }
+        if !options.is_empty() {
+            inheritable_metadata.insert(
+                "options".to_string(),
+                serde_json::to_value(&options).unwrap_or_default(),
+            );
+        }
 
         let callback_manager = CallbackManager::configure()
             .maybe_inheritable_callbacks(callbacks)
@@ -525,7 +531,8 @@ pub trait BaseChatModel: BaseLanguageModel {
             .maybe_local_metadata(self.config().metadata.clone())
             .call();
 
-        let run_managers = callback_manager.on_chat_model_start(&params, &messages, run_id);
+        let run_managers =
+            callback_manager.on_chat_model_start(&params, &messages, run_id, run_name.as_deref());
 
         let mut results = Vec::new();
         for (i, message_list) in messages.iter().enumerate() {
@@ -612,12 +619,12 @@ pub trait BaseChatModel: BaseLanguageModel {
             callbacks,
             tags,
             metadata,
-            run_name: _run_name,
+            run_name,
             run_id,
         } = config;
 
         let params = self._get_invocation_params(stop.as_deref(), None);
-        let _options = {
+        let options = {
             let mut opts = HashMap::new();
             if let Some(ref s) = stop {
                 opts.insert(
@@ -639,6 +646,12 @@ pub trait BaseChatModel: BaseLanguageModel {
         if let Some(model_type) = ls_params.ls_model_type {
             inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
         }
+        if !options.is_empty() {
+            inheritable_metadata.insert(
+                "options".to_string(),
+                serde_json::to_value(&options).unwrap_or_default(),
+            );
+        }
 
         let callback_manager = AsyncCallbackManager::configure()
             .maybe_inheritable_callbacks(callbacks)
@@ -651,7 +664,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             .call();
 
         let run_managers = callback_manager
-            .on_chat_model_start(&params, &messages, run_id)
+            .on_chat_model_start(&params, &messages, run_id, run_name.as_deref())
             .await;
 
         let futures: Vec<_> = messages
@@ -1103,7 +1116,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
-        let (callbacks, tags, metadata, _run_name, run_id) = if let Some(cfg) = config {
+        let (callbacks, tags, metadata, run_name, run_id) = if let Some(cfg) = config {
             (
                 cfg.callbacks.clone(),
                 Some(cfg.tags.clone()).filter(|t| !t.is_empty()),
@@ -1137,8 +1150,12 @@ pub trait BaseChatModel: BaseLanguageModel {
             .inheritable_metadata(inheritable_metadata)
             .maybe_local_metadata(self.config().metadata.clone())
             .call();
-        let run_managers =
-            callback_manager.on_chat_model_start(&params, std::slice::from_ref(&messages), run_id);
+        let run_managers = callback_manager.on_chat_model_start(
+            &params,
+            std::slice::from_ref(&messages),
+            run_id,
+            run_name.as_deref(),
+        );
         let run_manager = run_managers.into_iter().next();
 
         if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
@@ -1256,7 +1273,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
-        let (callbacks, tags, metadata, _run_name, run_id) = if let Some(cfg) = config {
+        let (callbacks, tags, metadata, run_name, run_id) = if let Some(cfg) = config {
             (
                 cfg.callbacks.clone(),
                 Some(cfg.tags.clone()).filter(|t| !t.is_empty()),
@@ -1291,7 +1308,12 @@ pub trait BaseChatModel: BaseLanguageModel {
             .maybe_local_metadata(self.config().metadata.clone())
             .call();
         let run_managers = callback_manager
-            .on_chat_model_start(&params, std::slice::from_ref(&messages), run_id)
+            .on_chat_model_start(
+                &params,
+                std::slice::from_ref(&messages),
+                run_id,
+                run_name.as_deref(),
+            )
             .await;
         let run_manager = run_managers.into_iter().next();
 
@@ -1577,9 +1599,12 @@ pub fn cleanup_llm_representation(serialized: &mut Value, depth: usize) {
 }
 
 pub fn format_ls_structured_output(
-    _format: Option<&HashMap<String, Value>>,
+    format: Option<&HashMap<String, Value>>,
 ) -> HashMap<String, Value> {
-    HashMap::new()
+    match format {
+        Some(f) => f.clone(),
+        None => HashMap::new(),
+    }
 }
 
 pub fn extract_tool_name_from_schema(schema: &Value) -> Result<String> {

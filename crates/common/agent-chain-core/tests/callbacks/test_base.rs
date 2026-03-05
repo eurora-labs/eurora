@@ -30,6 +30,7 @@ impl BaseCallbackHandler for ChatModelStartHandler {
         _parent_run_id: Option<Uuid>,
         _tags: Option<&[String]>,
         _metadata: Option<&HashMap<String, serde_json::Value>>,
+        _name: Option<&str>,
     ) {
     }
 }

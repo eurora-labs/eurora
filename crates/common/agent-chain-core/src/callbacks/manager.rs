@@ -816,25 +816,28 @@ impl CallbackManager {
         serialized: &HashMap<String, serde_json::Value>,
         messages: &[Vec<BaseMessage>],
         run_id: Option<Uuid>,
+        name: Option<&str>,
     ) -> Vec<CallbackManagerForLLMRun> {
         let mut managers = Vec::new();
         let mut current_run_id = run_id;
 
-        for _message_list in messages {
+        for message_list in messages {
             let run_id = current_run_id.unwrap_or_else(|| uuid7(None));
             current_run_id = None;
 
+            let individual_messages = std::slice::from_ref(message_list);
             handle_event(
                 &self.handlers,
                 Some(|h: &dyn BaseCallbackHandler| h.ignore_chat_model()),
                 |handler| {
                     handler.on_chat_model_start(
                         serialized,
-                        messages,
+                        individual_messages,
                         run_id,
                         self.parent_run_id,
                         Some(&self.tags),
                         Some(&self.metadata),
+                        name,
                     );
                 },
             );
@@ -1335,9 +1338,10 @@ impl AsyncCallbackManager {
         serialized: &HashMap<String, serde_json::Value>,
         messages: &[Vec<BaseMessage>],
         run_id: Option<Uuid>,
+        name: Option<&str>,
     ) -> Vec<AsyncCallbackManagerForLLMRun> {
         self.inner
-            .on_chat_model_start(serialized, messages, run_id)
+            .on_chat_model_start(serialized, messages, run_id, name)
             .into_iter()
             .map(AsyncCallbackManagerForLLMRun::from_sync)
             .collect()
@@ -1732,8 +1736,10 @@ impl CallbackManagerForChainGroup {
         serialized: &HashMap<String, serde_json::Value>,
         messages: &[Vec<BaseMessage>],
         run_id: Option<Uuid>,
+        name: Option<&str>,
     ) -> Vec<CallbackManagerForLLMRun> {
-        self.inner.on_chat_model_start(serialized, messages, run_id)
+        self.inner
+            .on_chat_model_start(serialized, messages, run_id, name)
     }
 
     pub fn on_chain_start(
@@ -1892,9 +1898,10 @@ impl AsyncCallbackManagerForChainGroup {
         serialized: &HashMap<String, serde_json::Value>,
         messages: &[Vec<BaseMessage>],
         run_id: Option<Uuid>,
+        name: Option<&str>,
     ) -> Vec<AsyncCallbackManagerForLLMRun> {
         self.inner
-            .on_chat_model_start(serialized, messages, run_id)
+            .on_chat_model_start(serialized, messages, run_id, name)
             .await
     }
 
