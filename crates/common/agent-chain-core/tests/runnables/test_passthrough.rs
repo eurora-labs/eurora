@@ -1098,8 +1098,7 @@ fn test_assign_get_name() {
         );
     let assign = RunnableAssign::builder().mapper(mapper).build();
 
-    let name = assign.name().unwrap();
-    assert_eq!(name, "RunnableAssign");
+    assert_eq!(assign.name(), None);
 }
 
 #[test]

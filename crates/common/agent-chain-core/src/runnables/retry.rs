@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
@@ -93,15 +94,11 @@ impl ExponentialJitterParams {
 #[derive(Debug, Clone)]
 pub struct RetryCallState {
     pub attempt_number: usize,
-    pub succeeded: bool,
 }
 
 impl RetryCallState {
     fn new(attempt_number: usize) -> Self {
-        Self {
-            attempt_number,
-            succeeded: false,
-        }
+        Self { attempt_number }
     }
 }
 
@@ -266,14 +263,6 @@ where
         }
     }
 
-    fn calculate_wait(&self, attempt: usize) -> Duration {
-        if self.config.wait_exponential_jitter {
-            self.get_jitter_params().calculate_wait(attempt)
-        } else {
-            Duration::ZERO
-        }
-    }
-
     fn patch_config_for_retry(
         config: &RunnableConfig,
         run_manager: &CallbackManagerForChainRun,
@@ -285,14 +274,10 @@ where
             None
         };
 
-        patch_config(
-            Some(config.clone()),
-            Some(run_manager.get_child(tag.as_deref())),
-            None,
-            None,
-            None,
-            None,
-        )
+        patch_config()
+            .config(config.clone())
+            .callbacks(run_manager.get_child(tag.as_deref()))
+            .call()
     }
 
     fn patch_config_list_for_retry(
@@ -336,8 +321,8 @@ where
 
         let run_manager = callback_manager
             .on_chain_start()
-            .serialized(&std::collections::HashMap::new())
-            .inputs(&std::collections::HashMap::new())
+            .serialized(&HashMap::new())
+            .inputs(&HashMap::new())
             .maybe_run_id(config.run_id)
             .call();
 
@@ -354,7 +339,7 @@ where
 
         match result {
             Ok(output) => {
-                run_manager.on_chain_end(&std::collections::HashMap::new());
+                run_manager.on_chain_end(&HashMap::new());
                 Ok(output)
             }
             Err(e) => {
@@ -377,8 +362,8 @@ where
 
         let run_manager = callback_manager
             .on_chain_start()
-            .serialized(&std::collections::HashMap::new())
-            .inputs(&std::collections::HashMap::new())
+            .serialized(&HashMap::new())
+            .inputs(&HashMap::new())
             .maybe_run_id(config.run_id)
             .call();
 
@@ -396,7 +381,7 @@ where
 
         match result {
             Ok(output) => {
-                run_manager.on_chain_end(&std::collections::HashMap::new());
+                run_manager.on_chain_end(&HashMap::new());
                 Ok(output)
             }
             Err(e) => {
@@ -431,8 +416,8 @@ where
                 let callback_manager = get_callback_manager_for_config(config);
                 callback_manager
                     .on_chain_start()
-                    .serialized(&std::collections::HashMap::new())
-                    .inputs(&std::collections::HashMap::new())
+                    .serialized(&HashMap::new())
+                    .inputs(&HashMap::new())
                     .maybe_run_id(config.run_id)
                     .call()
             })
@@ -509,7 +494,11 @@ where
                 && self.config.wait_exponential_jitter
                 && attempt < self.config.max_attempt_number
             {
-                let wait = self.calculate_wait(attempt);
+                let wait = if self.config.wait_exponential_jitter {
+                    self.get_jitter_params().calculate_wait(attempt)
+                } else {
+                    Duration::ZERO
+                };
                 std::thread::sleep(wait);
             }
         }
@@ -545,8 +534,8 @@ where
                 let callback_manager = get_callback_manager_for_config(config);
                 callback_manager
                     .on_chain_start()
-                    .serialized(&std::collections::HashMap::new())
-                    .inputs(&std::collections::HashMap::new())
+                    .serialized(&HashMap::new())
+                    .inputs(&HashMap::new())
                     .maybe_run_id(config.run_id)
                     .call()
             })
@@ -626,7 +615,11 @@ where
                 && self.config.wait_exponential_jitter
                 && attempt < self.config.max_attempt_number
             {
-                let wait = self.calculate_wait(attempt);
+                let wait = if self.config.wait_exponential_jitter {
+                    self.get_jitter_params().calculate_wait(attempt)
+                } else {
+                    Duration::ZERO
+                };
                 tokio::time::sleep(wait).await;
             }
         }

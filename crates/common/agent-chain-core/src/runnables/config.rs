@@ -158,12 +158,12 @@ pub fn ensure_config(config: Option<RunnableConfig>) -> RunnableConfig {
 }
 
 fn merge_into_config(target: &mut RunnableConfig, source: &RunnableConfig) {
-    if !source.tags.is_empty() {
-        target.tags = source.tags.clone();
+    for tag in &source.tags {
+        if !target.tags.contains(tag) {
+            target.tags.push(tag.clone());
+        }
     }
-    if !source.metadata.is_empty() {
-        target.metadata = source.metadata.clone();
-    }
+    target.metadata.extend(source.metadata.clone());
     if source.callbacks.is_some() {
         target.callbacks = source.callbacks.clone();
     }
@@ -176,9 +176,7 @@ fn merge_into_config(target: &mut RunnableConfig, source: &RunnableConfig) {
     if source.recursion_limit != DEFAULT_RECURSION_LIMIT {
         target.recursion_limit = source.recursion_limit;
     }
-    if !source.configurable.is_empty() {
-        target.configurable = source.configurable.clone();
-    }
+    target.configurable.extend(source.configurable.clone());
     if source.run_id.is_some() {
         target.run_id = source.run_id;
     }
@@ -223,10 +221,11 @@ pub fn get_config_list(
     }
 }
 
+#[bon::builder]
 pub fn patch_config(
     config: Option<RunnableConfig>,
     callbacks: Option<CallbackManager>,
-    run_name: Option<String>,
+    #[builder(into)] run_name: Option<String>,
     max_concurrency: Option<usize>,
     recursion_limit: Option<i32>,
     configurable: Option<HashMap<String, serde_json::Value>>,
@@ -371,14 +370,6 @@ pub fn get_callback_manager_for_config(config: &RunnableConfig) -> CallbackManag
         .call()
 }
 
-pub fn get_async_callback_manager_for_config(config: &RunnableConfig) -> CallbackManager {
-    CallbackManager::configure()
-        .maybe_inheritable_callbacks(config.callbacks.clone())
-        .inheritable_tags(config.tags.clone())
-        .inheritable_metadata(config.metadata.clone())
-        .call()
-}
-
 pub async fn run_in_executor<F, T>(func: F) -> T
 where
     F: FnOnce() -> T + Send + 'static,
@@ -479,7 +470,7 @@ mod tests {
             .recursion_limit(50)
             .build();
         let config = ensure_config(Some(child));
-        assert_eq!(config.tags, vec!["child"]);
+        assert_eq!(config.tags, vec!["parent", "child"]);
         assert_eq!(config.recursion_limit, 50);
     }
 
@@ -531,14 +522,11 @@ mod tests {
     fn test_patch_config() {
         let config = RunnableConfig::builder().recursion_limit(10).build();
 
-        let patched = patch_config(
-            Some(config),
-            None,
-            Some("new_name".to_string()),
-            Some(8),
-            None,
-            None,
-        );
+        let patched = patch_config()
+            .config(config)
+            .run_name("new_name")
+            .max_concurrency(8)
+            .call();
 
         assert_eq!(patched.run_name, Some("new_name".to_string()));
         assert_eq!(patched.max_concurrency, Some(8));
@@ -573,7 +561,7 @@ mod tests {
             .build();
 
         let new_manager = CallbackManager::new();
-        let patched = patch_config(Some(config), Some(new_manager), None, None, None, None);
+        let patched = patch_config().config(config).callbacks(new_manager).call();
 
         assert!(patched.run_name.is_none());
         assert!(patched.run_id.is_none());

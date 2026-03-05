@@ -356,14 +356,10 @@ pub trait BaseTool: Send + Sync + Debug {
         let run_manager =
             callback_manager.on_tool_start(&serialized, &input_str, config.run_id, None);
 
-        let child_config = patch_config(
-            Some(config.clone()),
-            Some(run_manager.get_child(None)),
-            None,
-            None,
-            None,
-            None,
-        );
+        let child_config = patch_config()
+            .config(config.clone())
+            .callbacks(run_manager.get_child(None))
+            .call();
 
         let result = self.tool_run(input, Some(&run_manager), &child_config);
 
@@ -477,14 +473,10 @@ pub trait BaseTool: Send + Sync + Debug {
         let run_manager =
             async_callback_manager.on_tool_start(&serialized, &input_str, config.run_id, None);
 
-        let child_config = patch_config(
-            Some(config.clone()),
-            Some(run_manager.get_child(None)),
-            None,
-            None,
-            None,
-            None,
-        );
+        let child_config = patch_config()
+            .config(config.clone())
+            .callbacks(run_manager.get_child(None))
+            .call();
 
         let result = self
             .tool_arun(input, Some(&run_manager), &child_config)

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -48,8 +49,8 @@ where
         #[builder(into)] name: Option<String>,
     ) -> Result<Self> {
         if branches.is_empty() {
-            return Err(Error::Other(
-                "RunnableBranch requires at least one condition branch".to_string(),
+            return Err(Error::other(
+                "RunnableBranch requires at least one condition branch",
             ));
         }
 
@@ -144,9 +145,7 @@ where
     type Output = O;
 
     fn name(&self) -> Option<String> {
-        self.name
-            .clone()
-            .or_else(|| Some("RunnableBranch".to_string()))
+        self.name.clone()
     }
 
     fn get_input_schema(&self, config: Option<&RunnableConfig>) -> serde_json::Value {
@@ -172,53 +171,41 @@ where
         let callback_manager = get_callback_manager_for_config(&config);
         let run_manager = callback_manager
             .on_chain_start()
-            .serialized(&std::collections::HashMap::new())
-            .inputs(&std::collections::HashMap::new())
+            .serialized(&HashMap::new())
+            .inputs(&HashMap::new())
             .maybe_run_id(config.run_id)
             .call();
 
         let result = (|| {
             for (idx, (condition, runnable)) in self.branches.iter().enumerate() {
-                let condition_config = patch_config(
-                    Some(config.clone()),
-                    Some(run_manager.get_child(Some(&format!("condition:{}", idx + 1)))),
-                    None,
-                    None,
-                    None,
-                    None,
-                );
+                let condition_config = patch_config()
+                    .config(config.clone())
+                    .callbacks(run_manager.get_child(Some(&format!("condition:{}", idx + 1))))
+                    .call();
 
                 let expression_value = condition.invoke(input.clone(), Some(condition_config))?;
 
                 if expression_value {
-                    let branch_config = patch_config(
-                        Some(config.clone()),
-                        Some(run_manager.get_child(Some(&format!("branch:{}", idx + 1)))),
-                        None,
-                        None,
-                        None,
-                        None,
-                    );
+                    let branch_config = patch_config()
+                        .config(config.clone())
+                        .callbacks(run_manager.get_child(Some(&format!("branch:{}", idx + 1))))
+                        .call();
 
                     return runnable.invoke(input.clone(), Some(branch_config));
                 }
             }
 
-            let default_config = patch_config(
-                Some(config.clone()),
-                Some(run_manager.get_child(Some("branch:default"))),
-                None,
-                None,
-                None,
-                None,
-            );
+            let default_config = patch_config()
+                .config(config.clone())
+                .callbacks(run_manager.get_child(Some("branch:default")))
+                .call();
 
             self.default.invoke(input, Some(default_config))
         })();
 
         match &result {
             Ok(_) => {
-                run_manager.on_chain_end(&std::collections::HashMap::new());
+                run_manager.on_chain_end(&HashMap::new());
             }
             Err(e) => {
                 run_manager.on_chain_error(e);
@@ -343,7 +330,7 @@ where
     }
 
     fn to_json(&self) -> Serialized {
-        let kwargs = std::collections::HashMap::new();
+        let kwargs = HashMap::new();
 
         Serialized::Constructor(SerializedConstructor::new(Self::lc_id(), kwargs))
     }
@@ -442,7 +429,7 @@ mod tests {
             .default(|_: i32| Ok("default".to_string()))
             .unwrap();
 
-        assert_eq!(branch.name(), Some("RunnableBranch".to_string()));
+        assert_eq!(branch.name(), None);
     }
 
     #[test]

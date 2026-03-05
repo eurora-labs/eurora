@@ -141,14 +141,10 @@ where
                 current_input = inserter(&current_input, key, err);
             }
 
-            let child_config = patch_config(
-                Some(config.clone()),
-                Some(run_manager.get_child(None)),
-                None,
-                None,
-                None,
-                None,
-            );
+            let child_config = patch_config()
+                .config(config.clone())
+                .callbacks(run_manager.get_child(None))
+                .call();
 
             match runnable.invoke(current_input.clone(), Some(child_config)) {
                 Ok(output) => {

@@ -31,15 +31,11 @@ pub type HistoryAInvokeFn = Arc<
 pub type GetSessionHistoryFn =
     Arc<dyn Fn(&HashMap<String, String>) -> Arc<Mutex<dyn BaseChatMessageHistory>> + Send + Sync>;
 
-pub enum HistoryRunnable {
-    Lambda(
-        Arc<
-            dyn Fn(Vec<BaseMessage>, Option<&RunnableConfig>) -> Result<Vec<BaseMessage>>
-                + Send
-                + Sync,
-        >,
-    ),
-}
+pub struct HistoryRunnable(
+    Arc<
+        dyn Fn(Vec<BaseMessage>, Option<&RunnableConfig>) -> Result<Vec<BaseMessage>> + Send + Sync,
+    >,
+);
 
 impl HistoryRunnable {
     pub fn from_fn<F>(f: F) -> Self
@@ -49,7 +45,7 @@ impl HistoryRunnable {
             + Sync
             + 'static,
     {
-        HistoryRunnable::Lambda(Arc::new(f))
+        HistoryRunnable(Arc::new(f))
     }
 
     pub fn invoke(
@@ -57,17 +53,13 @@ impl HistoryRunnable {
         input: Vec<BaseMessage>,
         config: Option<&RunnableConfig>,
     ) -> Result<Vec<BaseMessage>> {
-        match self {
-            HistoryRunnable::Lambda(f) => f(input, config),
-        }
+        (self.0)(input, config)
     }
 }
 
 impl fmt::Debug for HistoryRunnable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            HistoryRunnable::Lambda(_) => write!(f, "HistoryRunnable::Lambda(...)"),
-        }
+        write!(f, "HistoryRunnable(...)")
     }
 }
 

@@ -117,7 +117,7 @@ where
         let runnable = self
             .runnables
             .get(key)
-            .ok_or_else(|| Error::Other(format!("No runnable associated with key '{}'", key)))?;
+            .ok_or_else(|| Error::other(format!("No runnable associated with key '{}'", key)))?;
 
         runnable.invoke(actual_input, config)
     }
@@ -136,7 +136,7 @@ where
         let runnable = self
             .runnables
             .get(key)
-            .ok_or_else(|| Error::Other(format!("No runnable associated with key '{}'", key)))?;
+            .ok_or_else(|| Error::other(format!("No runnable associated with key '{}'", key)))?;
 
         runnable.ainvoke(actual_input, config).await
     }
@@ -159,8 +159,8 @@ where
 
         for key in &keys {
             if !self.runnables.contains_key(key) {
-                return vec![Err(Error::Other(
-                    "One or more keys do not have a corresponding runnable".to_string(),
+                return vec![Err(Error::other(
+                    "One or more keys do not have a corresponding runnable",
                 ))];
             }
         }
@@ -176,7 +176,7 @@ where
             .zip(configs)
             .map(|((key, input), config)| {
                 let runnable = self.runnables.get(&key).ok_or_else(|| {
-                    Error::Other(format!("No runnable associated with key '{}'", key))
+                    Error::other(format!("No runnable associated with key '{}'", key))
                 })?;
                 runnable.invoke(input, Some(config))
             })
@@ -203,8 +203,8 @@ where
 
         for key in &keys {
             if !self.runnables.contains_key(key) {
-                return vec![Err(Error::Other(
-                    "One or more keys do not have a corresponding runnable".to_string(),
+                return vec![Err(Error::other(
+                    "One or more keys do not have a corresponding runnable",
                 ))];
             }
         }
@@ -221,7 +221,7 @@ where
             .zip(configs)
             .map(|((key, input), config)| {
                 let runnable = self.runnables.get(&key).cloned().ok_or_else(|| {
-                    Error::Other(format!("No runnable associated with key '{}'", key))
+                    Error::other(format!("No runnable associated with key '{}'", key))
                 });
                 Box::pin(async move {
                     let runnable = runnable?;
@@ -246,7 +246,7 @@ where
             let runnable = match self.runnables.get(&key) {
                 Some(r) => r,
                 None => {
-                    yield Err(Error::Other(format!("No runnable associated with key '{}'", key)));
+                    yield Err(Error::other(format!("No runnable associated with key '{}'", key)));
                     return;
                 }
             };
@@ -273,7 +273,7 @@ where
             let runnable = match self.runnables.get(&key) {
                 Some(r) => r,
                 None => {
-                    yield Err(Error::Other(format!("No runnable associated with key '{}'", key)));
+                    yield Err(Error::other(format!("No runnable associated with key '{}'", key)));
                     return;
                 }
             };
@@ -304,7 +304,7 @@ where
     }
 
     fn to_json(&self) -> Serialized {
-        let mut kwargs = std::collections::HashMap::new();
+        let mut kwargs = HashMap::new();
         kwargs.insert(
             "runnables".to_string(),
             serde_json::json!(self.runnables.keys().collect::<Vec<_>>()),

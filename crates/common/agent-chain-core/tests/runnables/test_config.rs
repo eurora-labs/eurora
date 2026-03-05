@@ -8,8 +8,7 @@ use agent_chain_core::callbacks::{
 use agent_chain_core::runnables::config::{
     AsyncVariableArgsFn, ConfigOrList, RunnableConfig, VariableArgsFn,
     acall_func_with_variable_args, call_func_with_variable_args, ensure_config,
-    get_async_callback_manager_for_config, get_callback_manager_for_config, get_config_list,
-    merge_configs, patch_config,
+    get_callback_manager_for_config, get_config_list, merge_configs, patch_config,
 };
 
 #[test]
@@ -133,7 +132,7 @@ fn test_get_config_list_run_id_single_no_issue() {
 
 #[test]
 fn test_patch_config_none_input() {
-    let config = patch_config(None, None, None, None, None, None);
+    let config = patch_config().call();
     assert!(config.tags.is_empty());
     assert_eq!(config.recursion_limit, 25);
 }
@@ -141,19 +140,19 @@ fn test_patch_config_none_input() {
 #[test]
 fn test_patch_config_sets_recursion_limit() {
     let config = RunnableConfig::builder().recursion_limit(10).build();
-    let patched = patch_config(Some(config), None, None, None, Some(50), None);
+    let patched = patch_config().config(config).recursion_limit(50).call();
     assert_eq!(patched.recursion_limit, 50);
 }
 
 #[test]
 fn test_patch_config_sets_max_concurrency() {
-    let patched = patch_config(None, None, None, Some(5), None, None);
+    let patched = patch_config().max_concurrency(5).call();
     assert_eq!(patched.max_concurrency, Some(5));
 }
 
 #[test]
 fn test_patch_config_sets_run_name() {
-    let patched = patch_config(None, None, Some("my_run".to_string()), None, None, None);
+    let patched = patch_config().run_name("my_run").call();
     assert_eq!(patched.run_name, Some("my_run".to_string()));
 }
 
@@ -163,14 +162,10 @@ fn test_patch_config_configurable_merges() {
         configurable: HashMap::from([("a".to_string(), serde_json::json!(1))]),
         ..Default::default()
     };
-    let patched = patch_config(
-        Some(config),
-        None,
-        None,
-        None,
-        None,
-        Some(HashMap::from([("b".to_string(), serde_json::json!(2))])),
-    );
+    let patched = patch_config()
+        .config(config)
+        .configurable(HashMap::from([("b".to_string(), serde_json::json!(2))]))
+        .call();
     assert_eq!(patched.configurable["a"], serde_json::json!(1));
     assert_eq!(patched.configurable["b"], serde_json::json!(2));
 }
@@ -184,7 +179,7 @@ fn test_patch_config_callbacks_clears_run_name_and_run_id() {
         .build();
 
     let callback_mgr = CallbackManager::new();
-    let patched = patch_config(Some(config), Some(callback_mgr), None, None, None, None);
+    let patched = patch_config().config(config).callbacks(callback_mgr).call();
     assert!(patched.run_name.is_none());
     assert!(patched.run_id.is_none());
     assert!(patched.callbacks.is_some());
@@ -428,22 +423,6 @@ fn test_get_callback_manager_for_config_with_tags_and_metadata() {
 }
 
 #[test]
-fn test_get_async_callback_manager_for_config_basic() {
-    let config = ensure_config(None);
-    let mgr = get_async_callback_manager_for_config(&config);
-    let _ = mgr;
-}
-
-#[test]
-fn test_get_async_callback_manager_for_config_with_tags_and_metadata() {
-    let mut config = RunnableConfig::builder().tags(vec!["a".into()]).build();
-    config.metadata = HashMap::from([("k".to_string(), serde_json::json!("v"))]);
-    let mgr = get_async_callback_manager_for_config(&config);
-
-    let _ = mgr;
-}
-
-#[test]
 fn test_runnable_config_with_run_id() {
     let run_id = uuid::Uuid::new_v4();
     let config = RunnableConfig::builder().run_id(run_id).build();
@@ -555,7 +534,7 @@ fn test_patch_config_preserves_existing_tags() {
     let config = RunnableConfig::builder()
         .tags(vec!["existing".into()])
         .build();
-    let patched = patch_config(Some(config), None, None, None, None, None);
+    let patched = patch_config().config(config).call();
     assert_eq!(patched.tags, vec!["existing"]);
 }
 
@@ -568,7 +547,7 @@ fn test_patch_config_preserves_callbacks_when_not_replaced() {
         .run_id(uuid::Uuid::new_v4())
         .build();
 
-    let patched = patch_config(Some(config), None, None, None, Some(99), None);
+    let patched = patch_config().config(config).recursion_limit(99).call();
 
     assert_eq!(patched.run_name, Some("keep_me".to_string()));
     assert!(patched.run_id.is_some());

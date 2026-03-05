@@ -26,7 +26,6 @@ where
     name: Option<String>,
     func: Option<PassthroughFunc<I>>,
     afunc: Option<PassthroughAfunc<I>>,
-    _phantom: std::marker::PhantomData<I>,
 }
 
 impl<I> Debug for RunnablePassthrough<I>
@@ -51,7 +50,6 @@ where
             name: self.name.clone(),
             func: self.func.clone(),
             afunc: self.afunc.clone(),
-            _phantom: std::marker::PhantomData,
         }
     }
 }
@@ -76,7 +74,6 @@ where
             name,
             func: None,
             afunc: None,
-            _phantom: std::marker::PhantomData,
         }
     }
 
@@ -88,7 +85,6 @@ where
             name: None,
             func: Some(Arc::new(func)),
             afunc: None,
-            _phantom: std::marker::PhantomData,
         }
     }
 
@@ -103,7 +99,6 @@ where
             afunc: Some(Arc::new(move |input, config| {
                 Box::pin(afunc(input, config)) as Pin<Box<dyn Future<Output = ()> + Send>>
             })),
-            _phantom: std::marker::PhantomData,
         }
     }
 
@@ -318,9 +313,7 @@ impl Runnable for RunnableAssign {
     type Output = HashMap<String, Value>;
 
     fn name(&self) -> Option<String> {
-        self.name
-            .clone()
-            .or_else(|| Some("RunnableAssign".to_string()))
+        self.name.clone()
     }
 
     fn get_input_schema(&self, config: Option<&RunnableConfig>) -> serde_json::Value {
@@ -370,14 +363,10 @@ impl Runnable for RunnableAssign {
             .maybe_run_id(config.run_id)
             .call();
 
-        let child_config = patch_config(
-            Some(config),
-            Some(run_manager.get_child(None)),
-            None,
-            None,
-            None,
-            None,
-        );
+        let child_config = patch_config()
+            .config(config)
+            .callbacks(run_manager.get_child(None))
+            .call();
 
         let mapper_output = match self.mapper.invoke(input.clone(), Some(child_config)) {
             Ok(output) => output,
@@ -414,14 +403,10 @@ impl Runnable for RunnableAssign {
             .maybe_run_id(config.run_id)
             .call();
 
-        let child_config = patch_config(
-            Some(config),
-            Some(run_manager.get_child(None)),
-            None,
-            None,
-            None,
-            None,
-        );
+        let child_config = patch_config()
+            .config(config)
+            .callbacks(run_manager.get_child(None))
+            .call();
 
         let mapper_output = match self.mapper.ainvoke(input.clone(), Some(child_config)).await {
             Ok(output) => output,
@@ -448,17 +433,7 @@ impl Runnable for RunnableAssign {
         Box::pin(async_stream::stream! {
             let config = ensure_config(config);
 
-            let mapper_keys: std::collections::HashSet<String> = std::collections::HashSet::new();
-
-            let filtered: HashMap<String, Value> = input
-                .iter()
-                .filter(|(k, _)| !mapper_keys.contains(*k))
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect();
-
-            if !filtered.is_empty() {
-                yield Ok(filtered);
-            }
+            yield Ok(input.clone());
 
             match self.mapper.invoke(input, Some(config)) {
                 Ok(mapper_output) => {
@@ -639,7 +614,7 @@ impl Runnable for RunnablePick {
     }
     fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
         self.pick(&input)
-            .ok_or_else(|| Error::Other("No matching keys found in input".to_string()))
+            .ok_or_else(|| Error::other("No matching keys found in input"))
     }
 
     async fn ainvoke(
@@ -651,7 +626,7 @@ impl Runnable for RunnablePick {
         Self: 'static,
     {
         self.pick(&input)
-            .ok_or_else(|| Error::Other("No matching keys found in input".to_string()))
+            .ok_or_else(|| Error::other("No matching keys found in input"))
     }
 
     fn stream(
@@ -661,7 +636,7 @@ impl Runnable for RunnablePick {
     ) -> BoxStream<'_, Result<Self::Output>> {
         let result = self
             .pick(&input)
-            .ok_or_else(|| Error::Other("No matching keys found in input".to_string()));
+            .ok_or_else(|| Error::other("No matching keys found in input"));
         Box::pin(futures::stream::once(async move { result }))
     }
 

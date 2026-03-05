@@ -1,13 +1,11 @@
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 use async_trait::async_trait;
 use futures::StreamExt;
 use futures::stream::BoxStream;
 use serde::Serialize;
 use serde_json::Value;
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::sync::Arc;
 use tokio::sync::Semaphore;
 
 use crate::error::{Error, Result};
@@ -16,8 +14,8 @@ use crate::load::{Serializable, Serialized};
 use super::config::{
     AsyncVariableArgsFn, ConfigOrList, RunnableConfig, VariableArgsFn,
     acall_func_with_variable_args, call_func_with_variable_args, ensure_config,
-    get_async_callback_manager_for_config, get_callback_manager_for_config, get_config_list,
-    merge_configs, patch_config, set_config_context,
+    get_callback_manager_for_config, get_config_list, merge_configs, patch_config,
+    set_config_context,
 };
 use super::utils::{Addable, ConfigurableFieldSpec, get_unique_config_specs};
 
@@ -67,14 +65,10 @@ pub trait Runnable: Send + Sync + Debug {
             .maybe_name(config.run_name.as_deref())
             .call();
 
-        let child_config = patch_config(
-            Some(config),
-            Some(run_manager.get_child(None)),
-            None,
-            None,
-            None,
-            None,
-        );
+        let child_config = patch_config()
+            .config(config)
+            .callbacks(run_manager.get_child(None))
+            .call();
 
         let _context_guard = set_config_context(child_config.clone());
 
@@ -109,8 +103,8 @@ pub trait Runnable: Send + Sync + Debug {
         Self: 'static,
     {
         let config = ensure_config(config);
-        let async_callback_manager = get_async_callback_manager_for_config(&config);
-        let run_manager = async_callback_manager
+        let callback_manager = get_callback_manager_for_config(&config);
+        let run_manager = callback_manager
             .on_chain_start()
             .serialized(&HashMap::new())
             .inputs(&HashMap::new())
@@ -118,14 +112,10 @@ pub trait Runnable: Send + Sync + Debug {
             .maybe_name(config.run_name.as_deref())
             .call();
 
-        let child_config = patch_config(
-            Some(config),
-            Some(run_manager.get_child(None)),
-            None,
-            None,
-            None,
-            None,
-        );
+        let child_config = patch_config()
+            .config(config)
+            .callbacks(run_manager.get_child(None))
+            .call();
 
         let _context_guard = set_config_context(child_config.clone());
 
@@ -178,14 +168,10 @@ pub trait Runnable: Send + Sync + Debug {
             .into_iter()
             .zip(run_managers.iter())
             .map(|(config, run_manager)| {
-                patch_config(
-                    Some(config),
-                    Some(run_manager.get_child(None)),
-                    None,
-                    None,
-                    None,
-                    None,
-                )
+                patch_config()
+                    .config(config)
+                    .callbacks(run_manager.get_child(None))
+                    .call()
             })
             .collect();
 
@@ -240,14 +226,10 @@ pub trait Runnable: Send + Sync + Debug {
             .maybe_name(config.run_name.as_deref())
             .call();
 
-        let child_config = patch_config(
-            Some(config),
-            Some(run_manager.get_child(None)),
-            None,
-            None,
-            None,
-            None,
-        );
+        let child_config = patch_config()
+            .config(config)
+            .callbacks(run_manager.get_child(None))
+            .call();
 
         let output_stream = transformer(input, &child_config);
 
@@ -376,9 +358,6 @@ pub trait Runnable: Send + Sync + Debug {
             let input = inputs.into_iter().next().expect("checked len == 1");
             let config = configs.into_iter().next().expect("checked len == 1");
             let result = self.invoke(input, Some(config));
-            if return_exceptions {
-                return vec![result];
-            }
             return vec![result];
         }
 
@@ -387,18 +366,25 @@ pub trait Runnable: Send + Sync + Debug {
         let mut results: Vec<Option<Result<Self::Output>>> = (0..len).map(|_| None).collect();
 
         std::thread::scope(|scope| {
-            let active_count = Arc::new(AtomicUsize::new(0));
-            let semaphore_like = max_concurrency;
+            let gate = max_concurrency.map(|max| {
+                Arc::new((
+                    std::sync::Mutex::new(0usize),
+                    std::sync::Condvar::new(),
+                    max,
+                ))
+            });
             let mut handles = Vec::with_capacity(len);
 
             for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
-                if let Some(max) = semaphore_like {
-                    while active_count.load(Ordering::SeqCst) >= max {
-                        std::thread::sleep(std::time::Duration::from_millis(1));
+                if let Some(ref gate) = gate {
+                    let (lock, cvar, max) = gate.as_ref();
+                    let mut active = lock.lock().unwrap();
+                    while *active >= *max {
+                        active = cvar.wait(active).unwrap();
                     }
+                    *active += 1;
                 }
-                let active = active_count.clone();
-                active.fetch_add(1, Ordering::SeqCst);
+                let gate = gate.clone();
 
                 let handle = scope.spawn(move || {
                     let result = if return_exceptions {
@@ -420,7 +406,12 @@ pub trait Runnable: Send + Sync + Debug {
                     } else {
                         self.invoke(input, Some(config))
                     };
-                    active.fetch_sub(1, Ordering::SeqCst);
+                    if let Some(ref gate) = gate {
+                        let (lock, cvar, _) = gate.as_ref();
+                        let mut active = lock.lock().unwrap();
+                        *active -= 1;
+                        cvar.notify_one();
+                    }
                     (i, result)
                 });
                 handles.push(handle);
@@ -447,14 +438,13 @@ pub trait Runnable: Send + Sync + Debug {
 
         if return_exceptions {
             collected
+        } else if let Some(first_err_idx) = collected.iter().position(|r| r.is_err()) {
+            collected
+                .into_iter()
+                .nth(first_err_idx)
+                .into_iter()
+                .collect()
         } else {
-            if let Some(first_err_idx) = collected.iter().position(|r| r.is_err()) {
-                return collected
-                    .into_iter()
-                    .nth(first_err_idx)
-                    .into_iter()
-                    .collect();
-            }
             collected
         }
     }
@@ -507,10 +497,9 @@ pub trait Runnable: Send + Sync + Debug {
 
         if return_exceptions {
             results
+        } else if let Some(first_err_idx) = results.iter().position(|r| r.is_err()) {
+            results.into_iter().nth(first_err_idx).into_iter().collect()
         } else {
-            if let Some(first_err_idx) = results.iter().position(|r| r.is_err()) {
-                return results.into_iter().nth(first_err_idx).into_iter().collect();
-            }
             results
         }
     }
@@ -543,16 +532,24 @@ pub trait Runnable: Send + Sync + Debug {
         let (sender, receiver) = std::sync::mpsc::channel();
 
         std::thread::scope(|scope| {
-            let active_count = Arc::new(AtomicUsize::new(0));
+            let gate = max_concurrency.map(|max| {
+                Arc::new((
+                    std::sync::Mutex::new(0usize),
+                    std::sync::Condvar::new(),
+                    max,
+                ))
+            });
 
             for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
-                if let Some(max) = max_concurrency {
-                    while active_count.load(Ordering::SeqCst) >= max {
-                        std::thread::sleep(std::time::Duration::from_millis(1));
+                if let Some(ref gate) = gate {
+                    let (lock, cvar, max) = gate.as_ref();
+                    let mut active = lock.lock().unwrap();
+                    while *active >= *max {
+                        active = cvar.wait(active).unwrap();
                     }
+                    *active += 1;
                 }
-                let active = active_count.clone();
-                active.fetch_add(1, Ordering::SeqCst);
+                let gate = gate.clone();
                 let tx = sender.clone();
 
                 scope.spawn(move || {
@@ -575,7 +572,12 @@ pub trait Runnable: Send + Sync + Debug {
                     } else {
                         self.invoke(input, Some(config))
                     };
-                    active.fetch_sub(1, Ordering::SeqCst);
+                    if let Some(ref gate) = gate {
+                        let (lock, cvar, _) = gate.as_ref();
+                        let mut active = lock.lock().unwrap();
+                        *active -= 1;
+                        cvar.notify_one();
+                    }
                     tx.send((i, result))
                         .expect("receiver should not be dropped");
                 });
@@ -1662,14 +1664,10 @@ where
             .maybe_run_id(config.run_id)
             .call();
 
-        let first_config = patch_config(
-            Some(config.clone()),
-            Some(run_manager.get_child(Some("seq:step:1"))),
-            None,
-            None,
-            None,
-            None,
-        );
+        let first_config = patch_config()
+            .config(config.clone())
+            .callbacks(run_manager.get_child(Some("seq:step:1")))
+            .call();
         let intermediate = match self.first.invoke(input, Some(first_config)) {
             Ok(output) => output,
             Err(e) => {
@@ -1678,14 +1676,10 @@ where
             }
         };
 
-        let last_config = patch_config(
-            Some(config),
-            Some(run_manager.get_child(Some("seq:step:2"))),
-            None,
-            None,
-            None,
-            None,
-        );
+        let last_config = patch_config()
+            .config(config)
+            .callbacks(run_manager.get_child(Some("seq:step:2")))
+            .call();
         let result = match self.last.invoke(intermediate, Some(last_config)) {
             Ok(output) => output,
             Err(e) => {
@@ -1707,22 +1701,18 @@ where
         Self: 'static,
     {
         let config = ensure_config(config);
-        let async_callback_manager = get_async_callback_manager_for_config(&config);
-        let run_manager = async_callback_manager
+        let callback_manager = get_callback_manager_for_config(&config);
+        let run_manager = callback_manager
             .on_chain_start()
             .serialized(&HashMap::new())
             .inputs(&HashMap::new())
             .maybe_run_id(config.run_id)
             .call();
 
-        let first_config = patch_config(
-            Some(config.clone()),
-            Some(run_manager.get_child(Some("seq:step:1"))),
-            None,
-            None,
-            None,
-            None,
-        );
+        let first_config = patch_config()
+            .config(config.clone())
+            .callbacks(run_manager.get_child(Some("seq:step:1")))
+            .call();
         let intermediate = match self.first.ainvoke(input, Some(first_config)).await {
             Ok(output) => output,
             Err(e) => {
@@ -1731,14 +1721,10 @@ where
             }
         };
 
-        let last_config = patch_config(
-            Some(config),
-            Some(run_manager.get_child(Some("seq:step:2"))),
-            None,
-            None,
-            None,
-            None,
-        );
+        let last_config = patch_config()
+            .config(config)
+            .callbacks(run_manager.get_child(Some("seq:step:2")))
+            .call();
         let result = match self.last.ainvoke(intermediate, Some(last_config)).await {
             Ok(output) => output,
             Err(e) => {
@@ -1969,14 +1955,10 @@ where
                 .iter()
                 .map(|(key, step)| {
                     let input = input.clone();
-                    let child_config = patch_config(
-                        Some(config.clone()),
-                        Some(run_manager.get_child(Some(&format!("map:key:{}", key)))),
-                        None,
-                        None,
-                        None,
-                        None,
-                    );
+                    let child_config = patch_config()
+                        .config(config.clone())
+                        .callbacks(run_manager.get_child(Some(&format!("map:key:{}", key))))
+                        .call();
                     let key = (*key).clone();
                     scope.spawn(move || {
                         let _context_guard = set_config_context(child_config.clone());
@@ -2015,8 +1997,8 @@ where
         Self: 'static,
     {
         let config = ensure_config(config);
-        let async_callback_manager = get_async_callback_manager_for_config(&config);
-        let run_manager = async_callback_manager
+        let callback_manager = get_callback_manager_for_config(&config);
+        let run_manager = callback_manager
             .on_chain_start()
             .serialized(&HashMap::new())
             .inputs(&HashMap::new())
@@ -2029,14 +2011,10 @@ where
             .iter()
             .map(|(key, step)| {
                 let input = input.clone();
-                let child_config = patch_config(
-                    Some(config.clone()),
-                    Some(run_manager.get_child(Some(&format!("map:key:{}", key)))),
-                    None,
-                    None,
-                    None,
-                    None,
-                );
+                let child_config = patch_config()
+                    .config(config.clone())
+                    .callbacks(run_manager.get_child(Some(&format!("map:key:{}", key))))
+                    .call();
                 let key = key.clone();
                 async move {
                     let result = step.ainvoke(input, Some(child_config)).await;
@@ -2132,14 +2110,9 @@ where
                 let name = name.clone();
                 let branch_input: BoxStream<'_, Self::Input> =
                     Box::pin(futures::stream::iter(input_chunks.clone()));
-                let branch_config = patch_config(
-                    Some(config.clone()),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                );
+                let branch_config = patch_config()
+                    .config(config.clone())
+                    .call();
                 let branch_output = step.transform(branch_input, Some(branch_config));
                 let named_stream = branch_output.map(move |result| {
                     result.map(|value| (name.clone(), value))
@@ -2382,8 +2355,8 @@ where
         Self: 'static,
     {
         let config = ensure_config(config);
-        let async_callback_manager = get_async_callback_manager_for_config(&config);
-        let run_manager = async_callback_manager
+        let callback_manager = get_callback_manager_for_config(&config);
+        let run_manager = callback_manager
             .on_chain_start()
             .serialized(&HashMap::new())
             .inputs(&HashMap::new())
@@ -2391,14 +2364,10 @@ where
             .maybe_name(config.run_name.as_deref())
             .call();
 
-        let child_config = patch_config(
-            Some(config),
-            Some(run_manager.get_child(None)),
-            None,
-            None,
-            None,
-            None,
-        );
+        let child_config = patch_config()
+            .config(config)
+            .callbacks(run_manager.get_child(None))
+            .call();
 
         let configs = super::config::ConfigOrList::List(
             inputs.iter().map(|_| child_config.clone()).collect(),
