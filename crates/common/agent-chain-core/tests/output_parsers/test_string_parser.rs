@@ -59,15 +59,12 @@ fn test_str_output_parser_invoke_with_human_message() {
     assert_eq!(result, "Hello from human");
 }
 
-#[tokio::test]
-async fn test_str_output_parser_ainvoke_with_message() {
+#[test]
+fn test_str_output_parser_invoke_with_ai_message() {
     let parser = StrOutputParser::new();
-    let message = AIMessage::builder().content("Async hello from AI").build();
-    let result = parser
-        .ainvoke(BaseMessage::AI(message), None)
-        .await
-        .unwrap();
-    assert_eq!(result, "Async hello from AI");
+    let message = AIMessage::builder().content("Hello from AI").build();
+    let result = parser.invoke(BaseMessage::AI(message), None).unwrap();
+    assert_eq!(result, "Hello from AI");
 }
 
 #[test]
@@ -274,11 +271,11 @@ fn test_str_output_parser_multiple_generations() {
     assert_eq!(result, "First generation");
 }
 
-#[tokio::test]
-async fn test_str_output_parser_aparse() {
+#[test]
+fn test_str_output_parser_parse_text() {
     let parser = StrOutputParser::new();
-    let text = "Async parse test";
-    let result = parser.aparse(text).await.unwrap();
+    let text = "Parse test";
+    let result = parser.parse(text).unwrap();
     assert_eq!(result, text);
 }
 
