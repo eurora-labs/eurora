@@ -126,11 +126,67 @@ pub fn parse_tool_calls(
     Ok(final_tools)
 }
 
+fn extract_tool_calls_from_generation(
+    generation: &ChatGeneration,
+    partial: bool,
+    strict: bool,
+    return_id: bool,
+) -> Result<Vec<Value>> {
+    let message = &generation.message;
+
+    let tool_calls = if !message.tool_calls().is_empty() {
+        message
+            .tool_calls()
+            .iter()
+            .map(|tc| {
+                let mut map = serde_json::Map::new();
+                map.insert("name".to_string(), Value::String(tc.name.clone()));
+                map.insert("args".to_string(), tc.args.clone());
+                if return_id {
+                    map.insert(
+                        "id".to_string(),
+                        tc.id
+                            .as_ref()
+                            .map(|id| Value::String(id.clone()))
+                            .unwrap_or(Value::Null),
+                    );
+                }
+                Value::Object(map)
+            })
+            .collect()
+    } else {
+        let raw_tool_calls = message
+            .additional_kwargs()
+            .and_then(|kwargs| kwargs.get("tool_calls"))
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        if raw_tool_calls.is_empty() {
+            vec![]
+        } else {
+            parse_tool_calls(&raw_tool_calls, partial, strict, return_id)?
+        }
+    };
+
+    Ok(tool_calls
+        .into_iter()
+        .map(|mut tc| {
+            if let Value::Object(ref mut map) = tc
+                && let Some(name) = map.remove("name")
+            {
+                map.insert("type".to_string(), name);
+            }
+            tc
+        })
+        .collect())
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct JsonOutputToolsParser {
-    pub strict: bool,
-    pub return_id: bool,
-    pub first_tool_only: bool,
+    strict: bool,
+    return_id: bool,
+    first_tool_only: bool,
 }
 
 #[bon::bon]
@@ -155,54 +211,8 @@ impl JsonOutputToolsParser {
             )
         })?;
 
-        let message = &generation.message;
-
-        let tool_calls = if !message.tool_calls().is_empty() {
-            message
-                .tool_calls()
-                .iter()
-                .map(|tc| {
-                    let mut map = serde_json::Map::new();
-                    map.insert("name".to_string(), Value::String(tc.name.clone()));
-                    map.insert("args".to_string(), tc.args.clone());
-                    if self.return_id {
-                        map.insert(
-                            "id".to_string(),
-                            tc.id
-                                .as_ref()
-                                .map(|id| Value::String(id.clone()))
-                                .unwrap_or(Value::Null),
-                        );
-                    }
-                    Value::Object(map)
-                })
-                .collect()
-        } else {
-            let raw_tool_calls = message
-                .additional_kwargs()
-                .and_then(|kwargs| kwargs.get("tool_calls"))
-                .and_then(|v| v.as_array())
-                .cloned()
-                .unwrap_or_default();
-
-            if raw_tool_calls.is_empty() {
-                vec![]
-            } else {
-                parse_tool_calls(&raw_tool_calls, partial, self.strict, self.return_id)?
-            }
-        };
-
-        let tool_calls: Vec<Value> = tool_calls
-            .into_iter()
-            .map(|mut tc| {
-                if let Value::Object(ref mut map) = tc
-                    && let Some(name) = map.remove("name")
-                {
-                    map.insert("type".to_string(), name);
-                }
-                tc
-            })
-            .collect();
+        let tool_calls =
+            extract_tool_calls_from_generation(generation, partial, self.strict, self.return_id)?;
 
         if self.first_tool_only {
             Ok(tool_calls.into_iter().next().unwrap_or(Value::Null))
@@ -226,10 +236,10 @@ impl Runnable for JsonOutputToolsParser {
 
 #[derive(Debug, Clone)]
 pub struct JsonOutputKeyToolsParser {
-    pub key_name: String,
-    pub strict: bool,
-    pub return_id: bool,
-    pub first_tool_only: bool,
+    key_name: String,
+    strict: bool,
+    return_id: bool,
+    first_tool_only: bool,
 }
 
 #[bon::bon]
@@ -256,98 +266,30 @@ impl JsonOutputKeyToolsParser {
             )
         })?;
 
-        let message = &generation.message;
+        let tool_calls =
+            extract_tool_calls_from_generation(generation, partial, self.strict, self.return_id)?;
 
-        let parsed_tool_calls = if !message.tool_calls().is_empty() {
-            message
-                .tool_calls()
-                .iter()
-                .map(|tc| {
-                    let mut map = serde_json::Map::new();
-                    map.insert("name".to_string(), Value::String(tc.name.clone()));
-                    map.insert("args".to_string(), tc.args.clone());
-                    if self.return_id {
-                        map.insert(
-                            "id".to_string(),
-                            tc.id
-                                .as_ref()
-                                .map(|id| Value::String(id.clone()))
-                                .unwrap_or(Value::Null),
-                        );
-                    }
-                    Value::Object(map)
-                })
-                .collect()
-        } else {
-            let raw_tool_calls = message
-                .additional_kwargs()
-                .and_then(|kwargs| kwargs.get("tool_calls"))
-                .and_then(|v| v.as_array())
-                .cloned()
-                .unwrap_or_default();
-
-            if raw_tool_calls.is_empty() {
-                vec![]
-            } else {
-                parse_tool_calls(&raw_tool_calls, partial, self.strict, self.return_id)?
-            }
-        };
-
-        let parsed_tool_calls: Vec<Value> = parsed_tool_calls
-            .into_iter()
-            .map(|mut tc| {
-                if let Value::Object(ref mut map) = tc
-                    && let Some(name) = map.remove("name")
-                {
-                    map.insert("type".to_string(), name);
-                }
-                tc
-            })
-            .collect();
+        let matching = tool_calls.iter().filter(|tc| {
+            tc.get("type")
+                .and_then(|t| t.as_str())
+                .is_some_and(|t| t == self.key_name)
+        });
 
         if self.first_tool_only {
-            let matching: Vec<&Value> = parsed_tool_calls
-                .iter()
-                .filter(|tc| {
-                    tc.get("type")
-                        .and_then(|t| t.as_str())
-                        .map(|t| t == self.key_name)
-                        .unwrap_or(false)
-                })
-                .collect();
-
-            let single_result = matching.first().cloned();
-
+            let first = matching.into_iter().next();
             if self.return_id {
-                Ok(single_result.cloned().unwrap_or(Value::Null))
-            } else if let Some(result) = single_result {
-                Ok(result.get("args").cloned().unwrap_or(Value::Null))
+                Ok(first.cloned().unwrap_or(Value::Null))
             } else {
-                Ok(Value::Null)
+                Ok(first
+                    .and_then(|r| r.get("args").cloned())
+                    .unwrap_or(Value::Null))
             }
         } else if self.return_id {
-            let filtered: Vec<Value> = parsed_tool_calls
-                .into_iter()
-                .filter(|tc| {
-                    tc.get("type")
-                        .and_then(|t| t.as_str())
-                        .map(|t| t == self.key_name)
-                        .unwrap_or(false)
-                })
-                .collect();
-            Ok(Value::Array(filtered))
+            Ok(Value::Array(matching.cloned().collect()))
         } else {
-            let filtered: Vec<Value> = parsed_tool_calls
-                .iter()
-                .filter(|tc| {
-                    tc.get("type")
-                        .and_then(|t| t.as_str())
-                        .map(|t| t == self.key_name)
-                        .unwrap_or(false)
-                })
-                .filter_map(|tc| tc.get("args").cloned())
-                .collect();
-            Ok(Value::Array(filtered))
+            Ok(Value::Array(
+                matching.filter_map(|tc| tc.get("args").cloned()).collect(),
+            ))
         }
     }
 }
@@ -367,7 +309,7 @@ impl Runnable for JsonOutputKeyToolsParser {
 #[derive(Clone)]
 pub struct PydanticToolsParser {
     name_dict: HashMap<String, DeserializerFn>,
-    pub first_tool_only: bool,
+    first_tool_only: bool,
     inner: JsonOutputToolsParser,
 }
 

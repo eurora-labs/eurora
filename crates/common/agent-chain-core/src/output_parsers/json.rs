@@ -1,12 +1,10 @@
 use std::fmt::Debug;
 
 use futures::stream::BoxStream;
-
-use crate::messages::BaseMessage;
-
 use serde_json::Value;
 
 use crate::error::{Error, Result};
+use crate::messages::BaseMessage;
 use crate::outputs::Generation;
 use crate::utils::json::{parse_json_markdown, parse_partial_json};
 
@@ -16,9 +14,8 @@ use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputP
 
 #[derive(Debug, Clone, Default)]
 pub struct JsonOutputParser {
-    pub schema: Option<Value>,
-
-    pub diff: bool,
+    schema: Option<Value>,
+    diff: bool,
 }
 
 #[bon::bon]

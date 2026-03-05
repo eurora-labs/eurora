@@ -16,7 +16,7 @@ use crate::utils::json::parse_partial_json;
 
 #[derive(Debug, Clone)]
 pub struct OutputFunctionsParser {
-    pub args_only: bool,
+    args_only: bool,
 }
 
 impl OutputFunctionsParser {
@@ -56,9 +56,8 @@ impl OutputFunctionsParser {
 
 #[derive(Debug, Clone)]
 pub struct JsonOutputFunctionsParser {
-    pub strict: bool,
-
-    pub args_only: bool,
+    strict: bool,
+    args_only: bool,
 }
 
 impl Default for JsonOutputFunctionsParser {
@@ -245,7 +244,7 @@ impl<T: Send + Sync + 'static> PydanticSchema<T> {
 
 #[derive(Debug, Clone)]
 pub struct PydanticOutputFunctionsParser<T> {
-    pub schema: PydanticSchema<T>,
+    schema: PydanticSchema<T>,
 }
 
 impl<T: DeserializeOwned + Send + Sync + Clone + Debug + 'static> Default
@@ -296,8 +295,7 @@ impl<T: Send + Sync + Clone + Debug + 'static> PydanticOutputFunctionsParser<T> 
 
 #[derive(Debug, Clone)]
 pub struct JsonKeyOutputFunctionsParser {
-    pub key_name: String,
-
+    key_name: String,
     inner: JsonOutputFunctionsParser,
 }
 
@@ -349,7 +347,7 @@ impl JsonKeyOutputFunctionsParser {
 #[derive(Debug, Clone)]
 pub struct PydanticAttrOutputFunctionsParser<T> {
     inner: PydanticOutputFunctionsParser<T>,
-    pub attr_name: String,
+    attr_name: String,
 }
 
 impl<T: DeserializeOwned + Send + Sync + Clone + Debug + 'static>
@@ -473,7 +471,6 @@ impl BaseOutputParser for JsonOutputFunctionsParser {
 
 impl BaseTransformOutputParser for JsonOutputFunctionsParser {}
 
-#[async_trait]
 impl BaseCumulativeTransformOutputParser for JsonOutputFunctionsParser {
     fn diff_mode(&self) -> bool {
         false

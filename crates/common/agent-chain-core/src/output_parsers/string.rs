@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use crate::error::Result;
 use crate::load::{Serializable, Serialized, SerializedConstructor};
 use crate::outputs::Generation;
@@ -14,14 +12,6 @@ pub struct StrOutputParser;
 impl StrOutputParser {
     pub fn new() -> Self {
         Self
-    }
-
-    pub fn is_lc_serializable() -> bool {
-        true
-    }
-
-    pub fn get_lc_namespace() -> Vec<&'static str> {
-        vec!["langchain", "schema", "output_parser"]
     }
 }
 
