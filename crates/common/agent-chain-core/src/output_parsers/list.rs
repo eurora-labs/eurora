@@ -276,9 +276,9 @@ fn list_transform<'a, P: ListOutputParser + 'a>(
 
     Box::pin(async_stream::stream! {
         let mut buffer = String::new();
-        let mut stream = input;
+        let mut input = input;
 
-        while let Some(message) = stream.next().await {
+        while let Some(message) = input.next().await {
             let chunk_content = message.text();
             buffer.push_str(&chunk_content);
 

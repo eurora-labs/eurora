@@ -346,7 +346,7 @@ impl PydanticToolsParser {
                     Error::output_parser_simple(format!("Tool arguments validation failed: {}", e))
                 })?;
                 serde_json::to_value(deserialized)
-                    .map_err(|e| Error::Other(format!("Failed to serialize: {}", e)))
+                    .map_err(|e| Error::output_parser_simple(format!("Failed to serialize: {e}")))
             }),
         );
         self

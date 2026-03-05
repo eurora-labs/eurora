@@ -1,20 +1,17 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
+use futures::stream::BoxStream;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::error::{Error, Result};
+use crate::messages::BaseMessage;
 use crate::outputs::Generation;
-use crate::utils::json::parse_json_markdown;
 
 use super::base::BaseOutputParser;
+use super::json::parse_json_result;
 use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
-
-use futures::stream::BoxStream;
-
-use crate::messages::BaseMessage;
-use crate::utils::json::parse_partial_json;
 
 #[derive(Debug, Clone)]
 pub struct PydanticOutputParser<T> {
@@ -33,16 +30,16 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq> PydanticOutp
     }
 
     pub fn parse_obj(&self, obj: &Value) -> Result<T> {
-        serde_json::from_value::<T>(obj.clone()).map_err(|e| self.parser_exception(&e, obj))
-    }
-
-    pub fn parser_exception(&self, error: &dyn std::fmt::Display, json_object: &Value) -> Error {
-        let json_string = serde_json::to_string(json_object).unwrap_or_default();
-        let message = format!(
-            "Failed to parse {} from completion {}. Got: {}",
-            self.name, json_string, error
-        );
-        Error::output_parser_with_output(message, json_string)
+        serde_json::from_value::<T>(obj.clone()).map_err(|e| {
+            let json_string = serde_json::to_string(obj).unwrap_or_default();
+            Error::output_parser_with_output(
+                format!(
+                    "Failed to parse {} from completion {json_string}. Got: {e}",
+                    self.name
+                ),
+                json_string,
+            )
+        })
     }
 
     pub fn get_schema(&self) -> &Value {
@@ -60,55 +57,29 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq> BaseOutputPa
     type Output = T;
 
     fn parse(&self, text: &str) -> Result<T> {
-        let text = text.trim();
-        let json_object = parse_json_markdown(text).map_err(|e| {
-            let message = format!("Invalid json output: {}. Error: {}", text, e);
-            Error::output_parser_with_output(&message, text)
-        })?;
+        let json_object = parse_json_result(text.trim(), false)?;
         self.parse_obj(&json_object)
     }
 
     fn parse_result(&self, result: &[Generation], partial: bool) -> Result<T> {
-        if result.is_empty() {
-            return Err(Error::Other("No generations to parse".to_string()));
-        }
-
-        let text = result[0].text.trim();
-
+        let first = result
+            .first()
+            .ok_or_else(|| Error::output_parser_simple("No generations to parse"))?;
+        let json_object = parse_json_result(first.text.trim(), partial)?;
         if partial {
-            let json_object = match parse_json_markdown(text) {
-                Ok(value) => value,
-                Err(_) => match parse_partial_json(text, false) {
-                    Ok(value) => value,
-                    Err(e) => {
-                        return Err(Error::Other(format!("Partial parse failed: {}", e)));
-                    }
-                },
-            };
             self.parse_obj(&json_object)
-                .map_err(|_| Error::Other("Partial parse: validation failed".to_string()))
+                .map_err(|_| Error::output_parser_simple("Partial parse: validation failed"))
         } else {
-            let json_object = match parse_json_markdown(text) {
-                Ok(value) => value,
-                Err(e) => {
-                    return Err(Error::output_parser_with_output(
-                        format!("Invalid json output: {}", e),
-                        text,
-                    ));
-                }
-            };
             self.parse_obj(&json_object)
         }
     }
 
     fn get_format_instructions(&self) -> Result<String> {
         let mut schema_copy = self.schema.clone();
-
         if let Value::Object(ref mut map) = schema_copy {
             map.remove("title");
             map.remove("type");
         }
-
         let schema_str = serde_json::to_string(&schema_copy).unwrap_or_else(|_| "{}".to_string());
         Ok(PYDANTIC_FORMAT_INSTRUCTIONS.replace("{schema}", &schema_str))
     }
@@ -122,16 +93,6 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq + 'static>
     BaseTransformOutputParser for PydanticOutputParser<T>
 {
     fn transform<'a>(
-        &'a self,
-        input: BoxStream<'a, BaseMessage>,
-    ) -> BoxStream<'a, Result<Self::Output>>
-    where
-        Self::Output: 'a,
-    {
-        self.cumulative_transform(input, None)
-    }
-
-    fn atransform<'a>(
         &'a self,
         input: BoxStream<'a, BaseMessage>,
     ) -> BoxStream<'a, Result<Self::Output>>

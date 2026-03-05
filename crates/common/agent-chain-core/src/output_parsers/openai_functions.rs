@@ -3,8 +3,6 @@ use std::fmt::Debug;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use async_trait::async_trait;
-
 use super::base::{BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser};
 use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
 use crate::error::{Error, Result};
@@ -27,7 +25,7 @@ impl OutputFunctionsParser {
     pub fn parse_result(&self, result: &[ChatGeneration]) -> Result<Value> {
         let generation = result
             .first()
-            .ok_or_else(|| Error::Other("No generations to parse".to_string()))?;
+            .ok_or_else(|| Error::output_parser_simple("No generations to parse"))?;
 
         let additional_kwargs = generation
             .message
@@ -76,17 +74,7 @@ impl JsonOutputFunctionsParser {
         Self { strict, args_only }
     }
 
-    pub fn parser_type(&self) -> &str {
-        "json_functions"
-    }
-
-    pub fn parse(&self, _text: &str) -> Result<Value> {
-        Err(Error::NotImplemented(
-            "JsonOutputFunctionsParser.parse is not implemented".to_string(),
-        ))
-    }
-
-    pub fn diff(&self, prev: &Value, next: &Value) -> Vec<Value> {
+    fn diff(&self, prev: &Value, next: &Value) -> Vec<Value> {
         let patch = json_patch::diff(prev, next);
         match serde_json::to_value(&patch) {
             Ok(Value::Array(ops)) => ops,
@@ -328,7 +316,7 @@ impl JsonKeyOutputFunctionsParser {
                         .get(&self.key_name)
                         .cloned()
                         .ok_or_else(|| {
-                            Error::Other(format!(
+                            Error::output_parser_simple(format!(
                                 "Key '{}' not found in parsed output",
                                 self.key_name
                             ))
@@ -366,9 +354,9 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + 'static>
     {
         let parsed = self.inner.parse_result(result)?;
         let as_value = serde_json::to_value(&parsed)
-            .map_err(|e| Error::Other(format!("Failed to serialize parsed result: {}", e)))?;
+            .map_err(|e| Error::output_parser_simple(format!("Failed to serialize: {e}")))?;
         as_value.get(&self.attr_name).cloned().ok_or_else(|| {
-            Error::Other(format!(
+            Error::output_parser_simple(format!(
                 "Attribute '{}' not found on parsed object",
                 self.attr_name
             ))
@@ -381,63 +369,59 @@ fn parse_json_lenient(input: &str) -> std::result::Result<Value, String> {
         return Ok(value);
     }
 
-    let mut result = String::with_capacity(input.len());
+    use std::fmt::Write;
+
+    let mut escaped = String::with_capacity(input.len());
     let mut in_string = false;
     let mut prev_was_backslash = false;
-    let chars: Vec<char> = input.chars().collect();
 
-    for &character in &chars {
+    for ch in input.chars() {
         if prev_was_backslash {
-            result.push(character);
+            escaped.push(ch);
             prev_was_backslash = false;
             continue;
         }
 
-        if character == '\\' && in_string {
-            result.push(character);
+        if ch == '\\' && in_string {
+            escaped.push(ch);
             prev_was_backslash = true;
             continue;
         }
 
-        if character == '"' {
+        if ch == '"' {
             in_string = !in_string;
-            result.push(character);
+            escaped.push(ch);
             continue;
         }
 
-        if in_string && character.is_control() {
-            match character {
-                '\n' => result.push_str("\\n"),
-                '\r' => result.push_str("\\r"),
-                '\t' => result.push_str("\\t"),
+        if in_string && ch.is_control() {
+            match ch {
+                '\n' => escaped.push_str("\\n"),
+                '\r' => escaped.push_str("\\r"),
+                '\t' => escaped.push_str("\\t"),
                 c => {
-                    result.push_str(&format!("\\u{:04x}", c as u32));
+                    let _ = write!(escaped, "\\u{:04x}", c as u32);
                 }
             }
             continue;
         }
 
-        result.push(character);
+        escaped.push(ch);
     }
 
-    serde_json::from_str::<Value>(&result).map_err(|e| format!("JSON parse error: {}", e))
+    serde_json::from_str::<Value>(&escaped).map_err(|e| format!("JSON parse error: {e}"))
 }
 
-#[async_trait]
 impl BaseLLMOutputParser for OutputFunctionsParser {
     type Output = Value;
 
     fn parse_result(&self, _result: &[Generation], _partial: bool) -> Result<Self::Output> {
-        Err(Error::OutputParser {
-            message: "This output parser can only be used with a chat generation.".to_string(),
-            observation: None,
-            llm_output: None,
-            send_to_llm: false,
-        })
+        Err(Error::output_parser_simple(
+            "This output parser can only be used with a chat generation.",
+        ))
     }
 }
 
-#[async_trait]
 impl BaseGenerationOutputParser for OutputFunctionsParser {
     fn invoke(&self, input: BaseMessage, _config: Option<RunnableConfig>) -> Result<Self::Output> {
         let chat_gen = ChatGeneration::builder().message(input).build();
@@ -445,7 +429,6 @@ impl BaseGenerationOutputParser for OutputFunctionsParser {
     }
 }
 
-#[async_trait]
 impl BaseOutputParser for JsonOutputFunctionsParser {
     type Output = Option<Value>;
 
@@ -456,12 +439,9 @@ impl BaseOutputParser for JsonOutputFunctionsParser {
     }
 
     fn parse_result(&self, _result: &[Generation], _partial: bool) -> Result<Self::Output> {
-        Err(Error::OutputParser {
-            message: "This output parser can only be used with a chat generation.".to_string(),
-            observation: None,
-            llm_output: None,
-            send_to_llm: false,
-        })
+        Err(Error::output_parser_simple(
+            "This output parser can only be used with a chat generation.",
+        ))
     }
 
     fn parser_type(&self) -> &str {

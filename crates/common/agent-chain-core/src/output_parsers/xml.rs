@@ -1,4 +1,3 @@
-use std::fmt::Debug;
 use std::sync::LazyLock;
 
 use regex::Regex;
@@ -33,10 +32,12 @@ Here are the output tags:
 {tags}
 ```"#;
 
+static XML_START_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"<[a-zA-Z:_]").expect("valid regex"));
+
 pub(crate) struct StreamingParser {
     buffer: String,
     xml_started: bool,
-    xml_start_re: Regex,
     yielded_count: usize,
     current_path: Vec<String>,
     current_path_has_children: bool,
@@ -47,7 +48,6 @@ impl StreamingParser {
         Self {
             buffer: String::new(),
             xml_started: false,
-            xml_start_re: Regex::new(r"<[a-zA-Z:_]").expect("Invalid regex"),
             yielded_count: 0,
             current_path: Vec::new(),
             current_path_has_children: false,
@@ -58,7 +58,7 @@ impl StreamingParser {
         self.buffer.push_str(chunk);
 
         if !self.xml_started {
-            if let Some(m) = self.xml_start_re.find(&self.buffer) {
+            if let Some(m) = XML_START_RE.find(&self.buffer) {
                 self.buffer = self.buffer[m.start()..].to_string();
                 self.xml_started = true;
             } else {
@@ -199,7 +199,9 @@ fn read_root(reader: &mut quick_xml::Reader<&[u8]>) -> Result<Value> {
                 return Ok(Value::Object(Default::default()));
             }
             Err(e) => {
-                return Err(Error::Other(format!("Failed to parse XML: {}", e)));
+                return Err(Error::output_parser_simple(format!(
+                    "Failed to parse XML: {e}"
+                )));
             }
             _ => continue,
         }
@@ -246,7 +248,7 @@ fn read_element_content(reader: &mut quick_xml::Reader<&[u8]>, parent_tag: &str)
             }
             Ok(quick_xml::events::Event::Eof) => break,
             Err(e) => {
-                return Err(Error::Other(format!("XML parse error: {}", e)));
+                return Err(Error::output_parser_simple(format!("XML parse error: {e}")));
             }
             _ => continue,
         }
@@ -297,7 +299,7 @@ impl BaseOutputParser for XMLOutputParser {
 
     fn parse_result(&self, result: &[Generation], _partial: bool) -> Result<Value> {
         if result.is_empty() {
-            return Err(Error::Other("No generations to parse".to_string()));
+            return Err(Error::output_parser_simple("No generations to parse"));
         }
         self.parse(&result[0].text)
     }
@@ -335,22 +337,12 @@ impl BaseTransformOutputParser for XMLOutputParser {
                 for dict in streaming_parser.parse(&chunk_text) {
                     match serde_json::to_value(&dict) {
                         Ok(value) => yield Ok(value),
-                        Err(e) => yield Err(Error::Other(format!("XML serialization error: {}", e))),
+                        Err(e) => yield Err(Error::output_parser_simple(format!("XML serialization error: {e}"))),
                     }
                 }
             }
             streaming_parser.close();
         })
-    }
-
-    fn atransform<'a>(
-        &'a self,
-        input: futures::stream::BoxStream<'a, BaseMessage>,
-    ) -> futures::stream::BoxStream<'a, Result<Self::Output>>
-    where
-        Self::Output: 'a,
-    {
-        self.transform(input)
     }
 }
 

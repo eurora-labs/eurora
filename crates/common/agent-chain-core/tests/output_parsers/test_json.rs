@@ -437,14 +437,14 @@ async fn test_partial_text_json_output_parser_diff() {
 }
 
 #[tokio::test]
-async fn test_partial_text_json_output_parser_async() {
+async fn test_partial_text_json_output_parser_transform_2() {
     let parser = SimpleJsonOutputParser::builder().build();
     let tokens = streamed_tokens();
 
     let input_stream = futures::stream::iter(tokens.into_iter().map(BaseMessage::from));
 
     let results: Vec<Value> = parser
-        .atransform(Box::pin(input_stream))
+        .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
         .collect()
         .await;
@@ -457,14 +457,14 @@ async fn test_partial_text_json_output_parser_async() {
 }
 
 #[tokio::test]
-async fn test_partial_text_json_output_parser_diff_async() {
+async fn test_partial_text_json_output_parser_diff_transform_2() {
     let parser = SimpleJsonOutputParser::builder().diff(true).build();
     let tokens = streamed_tokens();
 
     let input_stream = futures::stream::iter(tokens.into_iter().map(BaseMessage::from));
 
     let results: Vec<Value> = parser
-        .atransform(Box::pin(input_stream))
+        .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
         .collect()
         .await;

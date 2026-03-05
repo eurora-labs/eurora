@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use agent_chain_core::messages::AIMessage;
 use agent_chain_core::output_parsers::{
-    JsonKeyOutputFunctionsParser, JsonOutputFunctionsParser, OutputFunctionsParser,
-    PydanticAttrOutputFunctionsParser, PydanticOutputFunctionsParser,
+    BaseOutputParser, JsonKeyOutputFunctionsParser, JsonOutputFunctionsParser,
+    OutputFunctionsParser, PydanticAttrOutputFunctionsParser, PydanticOutputFunctionsParser,
 };
 use agent_chain_core::outputs::ChatGeneration;
 use serde::{Deserialize, Serialize};
@@ -259,14 +259,6 @@ fn test_json_output_functions_parser_parse_raises_not_implemented() {
     let parser = JsonOutputFunctionsParser::default();
     let result = parser.parse("text");
     assert!(result.is_err());
-}
-
-#[test]
-fn test_json_output_functions_parser_diff_method() {
-    let parser = JsonOutputFunctionsParser::default();
-    let diff = parser.diff(&json!({"a": 1}), &json!({"a": 1, "b": 2}));
-    assert!(!diff.is_empty());
-    assert!(diff.iter().any(|op| op["op"] == "add"));
 }
 
 #[test]
