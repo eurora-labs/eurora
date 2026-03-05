@@ -9,8 +9,6 @@ use crate::messages::BaseMessage;
 use crate::outputs::ChatResult;
 
 pub trait BaseCallbackHandler: Send + Sync + Debug {
-    // -- LLM events --
-
     fn on_llm_new_token(
         &self,
         _token: &str,
@@ -29,8 +27,6 @@ pub trait BaseCallbackHandler: Send + Sync + Debug {
         _parent_run_id: Option<Uuid>,
     ) {
     }
-
-    // -- Chain events --
 
     fn on_chain_end(
         &self,
@@ -66,8 +62,6 @@ pub trait BaseCallbackHandler: Send + Sync + Debug {
     ) {
     }
 
-    // -- Tool events --
-
     fn on_tool_end(
         &self,
         _output: &str,
@@ -87,8 +81,6 @@ pub trait BaseCallbackHandler: Send + Sync + Debug {
     ) {
     }
 
-    // -- Retriever events --
-
     fn on_retriever_error(
         &self,
         _error: &dyn std::error::Error,
@@ -104,8 +96,6 @@ pub trait BaseCallbackHandler: Send + Sync + Debug {
         _parent_run_id: Option<Uuid>,
     ) {
     }
-
-    // -- Lifecycle start events --
 
     #[allow(clippy::too_many_arguments)]
     fn on_llm_start(
@@ -184,8 +174,6 @@ pub trait BaseCallbackHandler: Send + Sync + Debug {
     ) {
     }
 
-    // -- Run events --
-
     fn on_text(
         &self,
         _text: &str,
@@ -207,8 +195,6 @@ pub trait BaseCallbackHandler: Send + Sync + Debug {
         _metadata: Option<&HashMap<String, serde_json::Value>>,
     ) {
     }
-
-    // -- Configuration --
 
     fn raise_error(&self) -> bool {
         false
