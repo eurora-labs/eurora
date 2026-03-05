@@ -22,18 +22,24 @@ use super::utils::{Addable, ConfigurableFieldSpec, get_unique_config_specs};
 pub type ConfigFactory = Arc<dyn Fn(&RunnableConfig) -> RunnableConfig + Send + Sync>;
 
 struct ConcurrencyGate {
-    active: std::sync::Mutex<usize>,
+    state: std::sync::Mutex<ConcurrencyGateState>,
     cvar: std::sync::Condvar,
     max: usize,
+}
+
+struct ConcurrencyGateState {
+    active: usize,
+    next_ticket: u64,
+    now_serving: u64,
 }
 
 struct ConcurrencyPermit<'a>(&'a ConcurrencyGate);
 
 impl Drop for ConcurrencyPermit<'_> {
     fn drop(&mut self) {
-        let mut active = self.0.active.lock().unwrap();
-        *active -= 1;
-        self.0.cvar.notify_one();
+        let mut state = self.0.state.lock().unwrap();
+        state.active -= 1;
+        self.0.cvar.notify_all();
     }
 }
 
@@ -41,18 +47,30 @@ impl ConcurrencyGate {
     fn new(max: usize) -> Arc<Self> {
         debug_assert!(max > 0, "ConcurrencyGate max must be > 0");
         Arc::new(Self {
-            active: std::sync::Mutex::new(0),
+            state: std::sync::Mutex::new(ConcurrencyGateState {
+                active: 0,
+                next_ticket: 0,
+                now_serving: 0,
+            }),
             cvar: std::sync::Condvar::new(),
             max,
         })
     }
 
-    fn acquire(&self) -> ConcurrencyPermit<'_> {
-        let mut active = self.active.lock().unwrap();
-        while *active >= self.max {
-            active = self.cvar.wait(active).unwrap();
+    fn take_ticket(&self) -> u64 {
+        let mut state = self.state.lock().unwrap();
+        let ticket = state.next_ticket;
+        state.next_ticket += 1;
+        ticket
+    }
+
+    fn acquire(&self, ticket: u64) -> ConcurrencyPermit<'_> {
+        let mut state = self.state.lock().unwrap();
+        while state.active >= self.max || state.now_serving != ticket {
+            state = self.cvar.wait(state).unwrap();
         }
-        *active += 1;
+        state.active += 1;
+        state.now_serving += 1;
         ConcurrencyPermit(self)
     }
 }
@@ -374,9 +392,10 @@ pub trait Runnable: Send + Sync + Debug {
 
             for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
                 let gate = gate.clone();
+                let ticket = gate.as_ref().map(|g| g.take_ticket());
 
                 let handle = scope.spawn(move || {
-                    let _permit = gate.as_ref().map(|g| g.acquire());
+                    let _permit = gate.as_ref().zip(ticket).map(|(g, t)| g.acquire(t));
                     let result = if return_exceptions {
                         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                             self.invoke(input, Some(config))
@@ -520,10 +539,11 @@ pub trait Runnable: Send + Sync + Debug {
 
             for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
                 let gate = gate.clone();
+                let ticket = gate.as_ref().map(|g| g.take_ticket());
                 let tx = sender.clone();
 
                 scope.spawn(move || {
-                    let _permit = gate.as_ref().map(|g| g.acquire());
+                    let _permit = gate.as_ref().zip(ticket).map(|(g, t)| g.acquire(t));
                     let result = if return_exceptions {
                         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                             self.invoke(input, Some(config))
