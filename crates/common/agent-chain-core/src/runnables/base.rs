@@ -14,8 +14,7 @@ use crate::load::{Serializable, Serialized};
 use super::config::{
     AsyncVariableArgsFn, ConfigOrList, EMPTY_MAP, RunnableConfig, VariableArgsFn,
     acall_func_with_variable_args, call_func_with_variable_args, child_config, ensure_config,
-    finish_chain_run, get_config_list, merge_configs, patch_config, set_config_context,
-    start_chain_run,
+    finish_chain_run, get_config_list, merge_configs, set_config_context, start_chain_run,
 };
 use super::utils::{Addable, ConfigurableFieldSpec, get_unique_config_specs};
 
@@ -156,7 +155,6 @@ pub trait Runnable: Send + Sync + Debug {
         finish_chain_run(&run_manager, func(input, &cfg))
     }
 
-    #[allow(async_fn_in_trait)]
     async fn acall_with_config(
         &self,
         func: &(
@@ -223,7 +221,7 @@ pub trait Runnable: Send + Sync + Debug {
                     if first_exception.is_none() {
                         first_exception = Some(i);
                     }
-                    run_manager.on_chain_error(e as &dyn std::error::Error);
+                    run_manager.on_chain_error(e);
                 }
             }
         }
@@ -265,7 +263,7 @@ pub trait Runnable: Send + Sync + Debug {
             while let Some(item) = stream.next().await {
                 if let Err(e) = &item
                     && !had_error {
-                        run_manager.on_chain_error(e as &dyn std::error::Error);
+                        run_manager.on_chain_error(e);
                         had_error = true;
                     }
                 yield item;
@@ -1813,10 +1811,7 @@ where
                 let name = name.clone();
                 let branch_input: BoxStream<'_, Self::Input> =
                     Box::pin(futures::stream::iter(input_chunks.clone()));
-                let branch_config = patch_config()
-                    .config(config.clone())
-                    .call();
-                let branch_output = step.transform(branch_input, Some(branch_config));
+                let branch_output = step.transform(branch_input, Some(config.clone()));
                 let named_stream = branch_output.map(move |result| {
                     result.map(|value| (name.clone(), value))
                 });
