@@ -21,11 +21,8 @@ pub struct RootListenersTracer {
     order_map: HashMap<Uuid, (Uuid, String)>,
     root_id: Option<Uuid>,
     config: RunnableConfig,
-    #[allow(dead_code)]
     on_start: Option<Listener>,
-    #[allow(dead_code)]
     on_end: Option<Listener>,
-    #[allow(dead_code)]
     on_error: Option<Listener>,
 }
 

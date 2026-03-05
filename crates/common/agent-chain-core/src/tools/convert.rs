@@ -181,11 +181,12 @@ pub fn tool_from_schema(
     move |func| StructuredTool::from_function(func, name, description, schema)
 }
 
-pub fn get_description_from_runnable<R>(_runnable: &R) -> String
+pub fn get_description_from_runnable<R>(runnable: &R) -> String
 where
     R: Runnable,
 {
-    "Takes an input and produces an output.".to_string()
+    let input_schema = runnable.get_input_schema(None);
+    format!("Takes {}.", input_schema)
 }
 
 #[cfg(test)]

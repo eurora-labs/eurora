@@ -439,22 +439,6 @@ impl Default for RootEventFilter {
     }
 }
 
-pub fn is_async_generator<F, S, T>(_f: F) -> bool
-where
-    F: Fn() -> S,
-    S: Stream<Item = T>,
-{
-    true
-}
-
-pub fn is_async_callable<F, Fut>(_f: F) -> bool
-where
-    F: Fn() -> Fut,
-    Fut: Future,
-{
-    true
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
