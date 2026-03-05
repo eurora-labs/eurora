@@ -380,10 +380,6 @@ impl CallbackManager {
         Self::default()
     }
 
-    pub fn from_callback_manager(manager: CallbackManager) -> Self {
-        manager
-    }
-
     fn make_run_core(&self, run_id: Uuid) -> RunManagerCore {
         RunManagerCore::builder()
             .run_id(run_id)
