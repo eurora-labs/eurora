@@ -41,214 +41,119 @@ fn retriever_args_schema() -> ArgsSchema {
     }))
 }
 
-pub fn create_retriever_tool<R>(
-    retriever: Arc<R>,
-    name: impl Into<String>,
-    description: impl Into<String>,
-) -> StructuredTool
-where
-    R: BaseRetriever + Send + Sync + 'static,
-{
-    create_retriever_tool_with_options(
-        retriever,
-        name,
-        description,
-        None,
-        "\n\n",
-        ResponseFormat::Content,
-    )
-}
+pub struct RetrieverTool;
 
-pub fn create_retriever_tool_with_options<R>(
-    retriever: Arc<R>,
-    name: impl Into<String>,
-    description: impl Into<String>,
-    document_prompt: Option<String>,
-    document_separator: &str,
-    response_format: ResponseFormat,
-) -> StructuredTool
-where
-    R: BaseRetriever + Send + Sync + 'static,
-{
-    let description = description.into();
-    let separator = document_separator.to_string();
+#[bon::bon]
+impl RetrieverTool {
+    #[builder]
+    pub fn create<R>(
+        retriever: Arc<R>,
+        name: impl Into<String>,
+        description: impl Into<String>,
+        document_prompt: Option<String>,
+        #[builder(default = "\n\n".to_string())] document_separator: String,
+        #[builder(default)] response_format: ResponseFormat,
+    ) -> StructuredTool
+    where
+        R: BaseRetriever + Send + Sync + 'static,
+    {
+        let description = description.into();
 
-    let func = {
-        let separator = separator.clone();
-        let document_prompt = document_prompt.clone();
-        move |args: HashMap<String, Value>| -> Result<Value> {
-            let query = args
-                .get("query")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
+        let func = {
+            let separator = document_separator.clone();
+            let document_prompt = document_prompt.clone();
+            move |args: HashMap<String, Value>| -> Result<Value> {
+                let query = args
+                    .get("query")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
 
-            let docs = retriever.get_relevant_documents(&query, None)?;
-            let content = format_documents(&docs, &separator, document_prompt.as_deref());
+                let docs = retriever.get_relevant_documents(&query, None)?;
+                let content = format_documents(&docs, &separator, document_prompt.as_deref());
 
-            match response_format {
-                ResponseFormat::Content => Ok(Value::String(content)),
-                ResponseFormat::ContentAndArtifact => {
-                    let docs_json: Vec<Value> = docs
-                        .iter()
-                        .map(|d| {
-                            serde_json::json!({
-                                "page_content": d.page_content(),
-                                "metadata": d.metadata()
+                match response_format {
+                    ResponseFormat::Content => Ok(Value::String(content)),
+                    ResponseFormat::ContentAndArtifact => {
+                        let docs_json: Vec<Value> = docs
+                            .iter()
+                            .map(|d| {
+                                serde_json::json!({
+                                    "page_content": d.page_content(),
+                                    "metadata": d.metadata()
+                                })
                             })
-                        })
-                        .collect();
-                    Ok(serde_json::json!([content, docs_json]))
+                            .collect();
+                        Ok(serde_json::json!([content, docs_json]))
+                    }
                 }
             }
-        }
-    };
+        };
 
-    StructuredTool::builder()
-        .name(name)
-        .description(description)
-        .args_schema(retriever_args_schema())
-        .func(Arc::new(func))
-        .response_format(response_format)
-        .build()
+        StructuredTool::builder()
+            .name(name)
+            .description(description)
+            .args_schema(retriever_args_schema())
+            .func(Arc::new(func))
+            .response_format(response_format)
+            .build()
+    }
+
+    #[builder]
+    pub fn create_async<R, F, Fut>(
+        retriever: Arc<R>,
+        retrieve_fn: F,
+        name: impl Into<String>,
+        description: impl Into<String>,
+    ) -> StructuredTool
+    where
+        R: Send + Sync + 'static,
+        F: Fn(Arc<R>, String) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Vec<Document>>> + Send + 'static,
+    {
+        let retrieve_fn: Arc<
+            dyn Fn(Arc<R>, String) -> Pin<Box<dyn Future<Output = Result<Vec<Document>>> + Send>>
+                + Send
+                + Sync,
+        > = Arc::new(move |r, q| Box::pin(retrieve_fn(r, q)));
+
+        let coroutine = {
+            let retriever = retriever.clone();
+            let retrieve_fn = retrieve_fn.clone();
+            move |args: HashMap<String, Value>| -> Pin<Box<dyn Future<Output = Result<Value>> + Send>>
+            {
+                let query = args
+                    .get("query")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let retriever = retriever.clone();
+                let retrieve_fn = retrieve_fn.clone();
+                Box::pin(async move {
+                    let docs = retrieve_fn(retriever, query).await?;
+                    let content = format_documents(&docs, "\n\n", None);
+                    Ok(Value::String(content))
+                })
+            }
+        };
+
+        StructuredTool::builder()
+            .name(name)
+            .description(description)
+            .args_schema(retriever_args_schema())
+            .coroutine(Arc::new(coroutine))
+            .build()
+    }
 }
 
 fn format_documents(docs: &[Document], separator: &str, prompt: Option<&str>) -> String {
     docs.iter()
-        .map(|doc| {
-            if let Some(prompt_template) = prompt {
-                prompt_template.replace("{page_content}", doc.page_content())
-            } else {
-                doc.page_content().to_string()
-            }
+        .map(|doc| match prompt {
+            Some(template) => template.replace("{page_content}", doc.page_content()),
+            None => doc.page_content().to_string(),
         })
         .collect::<Vec<_>>()
         .join(separator)
-}
-
-pub type AsyncRetrieveFn<R> = Arc<
-    dyn Fn(Arc<R>, String) -> Pin<Box<dyn Future<Output = Result<Vec<Document>>> + Send>>
-        + Send
-        + Sync,
->;
-
-pub fn create_async_retriever_tool<R, F, Fut>(
-    retriever: Arc<R>,
-    retrieve_fn: F,
-    name: impl Into<String>,
-    description: impl Into<String>,
-) -> StructuredTool
-where
-    R: Send + Sync + 'static,
-    F: Fn(Arc<R>, String) -> Fut + Send + Sync + 'static,
-    Fut: Future<Output = Result<Vec<Document>>> + Send + 'static,
-{
-    let retrieve_fn: AsyncRetrieveFn<R> = Arc::new(move |r, q| Box::pin(retrieve_fn(r, q)));
-
-    let coroutine = {
-        let retriever = retriever.clone();
-        let retrieve_fn = retrieve_fn.clone();
-        move |args: HashMap<String, Value>| -> Pin<Box<dyn Future<Output = Result<Value>> + Send>> {
-            let query = args
-                .get("query")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
-            let retriever = retriever.clone();
-            let retrieve_fn = retrieve_fn.clone();
-            Box::pin(async move {
-                let docs = retrieve_fn(retriever, query).await?;
-                let content = format_documents(&docs, "\n\n", None);
-                Ok(Value::String(content))
-            })
-        }
-    };
-
-    let sync_func = |_args: HashMap<String, Value>| -> Result<Value> {
-        Err(crate::error::Error::ToolInvocation(
-            "Async retriever tool does not support sync invocation".to_string(),
-        ))
-    };
-
-    StructuredTool::builder()
-        .name(name)
-        .description(description)
-        .args_schema(retriever_args_schema())
-        .func(Arc::new(sync_func))
-        .coroutine(Arc::new(coroutine))
-        .build()
-}
-
-pub struct RetrieverToolBuilder<R>
-where
-    R: BaseRetriever + Send + Sync + 'static,
-{
-    retriever: Arc<R>,
-    name: Option<String>,
-    description: Option<String>,
-    document_prompt: Option<String>,
-    document_separator: String,
-    response_format: ResponseFormat,
-}
-
-impl<R> RetrieverToolBuilder<R>
-where
-    R: BaseRetriever + Send + Sync + 'static,
-{
-    pub fn new(retriever: Arc<R>) -> Self {
-        Self {
-            retriever,
-            name: None,
-            description: None,
-            document_prompt: None,
-            document_separator: "\n\n".to_string(),
-            response_format: ResponseFormat::Content,
-        }
-    }
-
-    pub fn name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
-
-    pub fn description(mut self, description: impl Into<String>) -> Self {
-        self.description = Some(description.into());
-        self
-    }
-
-    pub fn document_prompt(mut self, prompt: impl Into<String>) -> Self {
-        self.document_prompt = Some(prompt.into());
-        self
-    }
-
-    pub fn document_separator(mut self, separator: impl Into<String>) -> Self {
-        self.document_separator = separator.into();
-        self
-    }
-
-    pub fn response_format(mut self, format: ResponseFormat) -> Self {
-        self.response_format = format;
-        self
-    }
-
-    pub fn build(self) -> Result<StructuredTool> {
-        let name = self.name.ok_or_else(|| {
-            crate::error::Error::InvalidConfig("Retriever tool name is required".to_string())
-        })?;
-
-        let description = self.description.ok_or_else(|| {
-            crate::error::Error::InvalidConfig("Retriever tool description is required".to_string())
-        })?;
-
-        Ok(create_retriever_tool_with_options(
-            self.retriever,
-            name,
-            description,
-            self.document_prompt,
-            &self.document_separator,
-            self.response_format,
-        ))
-    }
 }
 
 #[cfg(test)]

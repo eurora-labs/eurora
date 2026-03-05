@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::future::Future;
 use std::sync::Arc;
 
 use serde_json::Value;
@@ -8,7 +7,6 @@ use crate::error::{Error, Result};
 use crate::runnables::Runnable;
 
 use super::base::{ArgsSchema, ResponseFormat};
-use super::simple::Tool;
 use super::structured::{StructuredTool, create_args_schema};
 
 #[derive(Debug, Clone, Default)]
@@ -41,79 +39,25 @@ impl ToolConfig {
             extras,
         }
     }
-}
 
-pub fn create_simple_tool<F>(
-    name: impl Into<String>,
-    description: impl Into<String>,
-    func: F,
-) -> Tool
-where
-    F: Fn(String) -> Result<String> + Send + Sync + 'static,
-{
-    Tool::from_function(func, name, description)
-}
+    pub fn into_structured_tool<F>(self, func: F) -> Result<StructuredTool>
+    where
+        F: Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync + 'static,
+    {
+        let name = self
+            .name
+            .ok_or_else(|| Error::InvalidConfig("Tool name is required".to_string()))?;
 
-pub fn create_simple_tool_async<F, AF, Fut>(
-    name: impl Into<String>,
-    description: impl Into<String>,
-    func: F,
-    coroutine: AF,
-) -> Tool
-where
-    F: Fn(String) -> Result<String> + Send + Sync + 'static,
-    AF: Fn(String) -> Fut + Send + Sync + 'static,
-    Fut: Future<Output = Result<String>> + Send + 'static,
-{
-    Tool::from_function_with_async(func, coroutine, name, description)
-}
-
-pub fn create_structured_tool<F>(
-    name: impl Into<String>,
-    description: impl Into<String>,
-    args_schema: ArgsSchema,
-    func: F,
-) -> StructuredTool
-where
-    F: Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync + 'static,
-{
-    StructuredTool::from_function(func, name, description, args_schema)
-}
-
-pub fn create_structured_tool_async<F, AF, Fut>(
-    name: impl Into<String>,
-    description: impl Into<String>,
-    args_schema: ArgsSchema,
-    func: F,
-    coroutine: AF,
-) -> StructuredTool
-where
-    F: Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync + 'static,
-    AF: Fn(HashMap<String, Value>) -> Fut + Send + Sync + 'static,
-    Fut: Future<Output = Result<Value>> + Send + 'static,
-{
-    StructuredTool::from_function_with_async(func, coroutine, name, description, args_schema)
-}
-
-pub fn create_tool_with_config<F>(func: F, config: ToolConfig) -> Result<StructuredTool>
-where
-    F: Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync + 'static,
-{
-    let name = config
-        .name
-        .ok_or_else(|| Error::InvalidConfig("Tool name is required".to_string()))?;
-    let description = config.description.unwrap_or_default();
-    let args_schema = config.args_schema.unwrap_or_default();
-
-    Ok(StructuredTool::builder()
-        .name(name)
-        .description(description)
-        .args_schema(args_schema)
-        .func(Arc::new(func))
-        .return_direct(config.return_direct)
-        .response_format(config.response_format)
-        .maybe_extras(config.extras)
-        .build())
+        Ok(StructuredTool::builder()
+            .name(name)
+            .description(self.description.unwrap_or_default())
+            .args_schema(self.args_schema.unwrap_or_default())
+            .func(Arc::new(func))
+            .return_direct(self.return_direct)
+            .response_format(self.response_format)
+            .maybe_extras(self.extras)
+            .build())
+    }
 }
 
 pub fn convert_runnable_to_tool<R>(
@@ -138,20 +82,19 @@ where
     StructuredTool::from_function(func, name, description, schema)
 }
 
-pub type ToolFromSchemaFn = Box<dyn Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync>;
-
 pub fn tool_from_schema(
     name: impl Into<String>,
     description: impl Into<String>,
-    properties: Vec<(&str, &str, &str, bool)>,
-) -> impl FnOnce(ToolFromSchemaFn) -> StructuredTool {
+    properties: &[(&str, &str, &str, bool)],
+    func: impl Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync + 'static,
+) -> StructuredTool {
     let name = name.into();
     let description = description.into();
 
     let mut props = HashMap::new();
     let mut required = Vec::new();
 
-    for (prop_name, prop_type, prop_desc, is_required) in properties {
+    for &(prop_name, prop_type, prop_desc, is_required) in properties {
         props.insert(
             prop_name.to_string(),
             serde_json::json!({
@@ -165,8 +108,7 @@ pub fn tool_from_schema(
     }
 
     let schema = create_args_schema(&name, props, required, Some(&description));
-
-    move |func| StructuredTool::from_function(func, name, description, schema)
+    StructuredTool::from_function(func, name, description, schema)
 }
 
 pub fn get_description_from_runnable<R>(runnable: &R) -> String
@@ -181,56 +123,10 @@ where
 mod tests {
     use super::*;
     use crate::tools::base::BaseTool;
+    use crate::tools::simple::Tool;
 
     #[test]
-    fn test_create_simple_tool() {
-        let tool = create_simple_tool("echo", "Echoes the input", |input| {
-            Ok(format!("Echo: {}", input))
-        });
-
-        assert_eq!(tool.name(), "echo");
-        assert_eq!(tool.description(), "Echoes the input");
-    }
-
-    #[test]
-    fn test_create_structured_tool() {
-        let schema = create_args_schema(
-            "add",
-            {
-                let mut props = HashMap::new();
-                props.insert("a".to_string(), serde_json::json!({"type": "number"}));
-                props.insert("b".to_string(), serde_json::json!({"type": "number"}));
-                props
-            },
-            vec!["a".to_string(), "b".to_string()],
-            None,
-        );
-
-        let tool = create_structured_tool("add", "Adds two numbers", schema, |args| {
-            let a = args.get("a").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            let b = args.get("b").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            Ok(Value::from(a + b))
-        });
-
-        assert_eq!(tool.name(), "add");
-    }
-
-    #[test]
-    fn test_tool_config() {
-        let config = ToolConfig::builder()
-            .name("test")
-            .description("A test tool")
-            .return_direct(true)
-            .response_format(ResponseFormat::ContentAndArtifact)
-            .build();
-
-        assert_eq!(config.name, Some("test".to_string()));
-        assert!(config.return_direct);
-        assert_eq!(config.response_format, ResponseFormat::ContentAndArtifact);
-    }
-
-    #[test]
-    fn test_create_tool_with_config() {
+    fn test_tool_config_into_structured_tool() {
         let config = ToolConfig::builder()
             .name("configured_tool")
             .description("A configured tool")
@@ -242,31 +138,62 @@ mod tests {
             })))
             .build();
 
-        let tool = create_tool_with_config(
-            |args| Ok(args.get("input").cloned().unwrap_or(Value::Null)),
-            config,
-        )
-        .unwrap();
+        let tool = config
+            .into_structured_tool(|args| Ok(args.get("input").cloned().unwrap_or(Value::Null)))
+            .unwrap();
 
         assert_eq!(tool.name(), "configured_tool");
     }
 
     #[test]
+    fn test_tool_config_requires_name() {
+        let config = ToolConfig::builder().description("No name").build();
+
+        let result = config.into_structured_tool(|_| Ok(Value::Null));
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_tool_from_schema() {
-        let create_tool = tool_from_schema(
+        let tool = tool_from_schema(
             "greet",
             "Greets a person",
-            vec![("name", "string", "The person's name", true)],
+            &[("name", "string", "The person's name", true)],
+            |args| {
+                let name = args
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("stranger");
+                Ok(Value::String(format!("Hello, {}!", name)))
+            },
         );
 
-        let tool = create_tool(Box::new(|args| {
-            let name = args
-                .get("name")
-                .and_then(|v| v.as_str())
-                .unwrap_or("stranger");
-            Ok(Value::String(format!("Hello, {}!", name)))
-        }));
-
         assert_eq!(tool.name(), "greet");
+    }
+
+    #[test]
+    fn test_simple_tool_creation() {
+        let tool = Tool::from_function(
+            |input| Ok(format!("Echo: {}", input)),
+            "echo",
+            "Echoes the input",
+        );
+
+        assert_eq!(tool.name(), "echo");
+        assert_eq!(tool.description(), "Echoes the input");
+    }
+
+    #[test]
+    fn test_tool_config_defaults() {
+        let config = ToolConfig::builder()
+            .name("test")
+            .description("A test tool")
+            .return_direct(true)
+            .response_format(ResponseFormat::ContentAndArtifact)
+            .build();
+
+        assert_eq!(config.name, Some("test".to_string()));
+        assert!(config.return_direct);
+        assert_eq!(config.response_format, ResponseFormat::ContentAndArtifact);
     }
 }

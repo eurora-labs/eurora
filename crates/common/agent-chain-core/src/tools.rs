@@ -6,8 +6,7 @@ pub mod simple;
 pub mod structured;
 
 pub use base::{
-    ArgsSchema, BaseTool, BaseToolkit, DynTool, ErrorHandler, FILTERED_ARGS, HandleToolError,
-    HandleValidationError, InjectedToolArg, InjectedToolCallId, ResponseFormat,
+    ArgsSchema, BaseTool, BaseToolkit, DynTool, ErrorHandler, FILTERED_ARGS, ResponseFormat,
     TOOL_MESSAGE_BLOCK_TYPES, ToolDefinition, ToolInput, ToolOutput, ToolRunnable, format_output,
     is_message_content_block, is_message_content_type, is_tool_call, prep_run_args, stringify,
 };
@@ -19,17 +18,12 @@ pub use structured::{
 };
 
 pub use convert::{
-    ToolConfig, convert_runnable_to_tool, create_simple_tool, create_simple_tool_async,
-    create_structured_tool, create_structured_tool_async, create_tool_with_config,
-    get_description_from_runnable, tool_from_schema,
+    ToolConfig, convert_runnable_to_tool, get_description_from_runnable, tool_from_schema,
 };
 
 pub use render::{ToolsRenderer, render_text_description, render_text_description_and_args};
 
-pub use retriever::{
-    RetrieverInput, RetrieverToolBuilder, create_async_retriever_tool, create_retriever_tool,
-    create_retriever_tool_with_options,
-};
+pub use retriever::{RetrieverInput, RetrieverTool};
 
 #[cfg(test)]
 mod tests {
@@ -44,14 +38,14 @@ mod tests {
     }
 
     #[test]
-    fn test_create_simple_tool() {
-        let tool = create_simple_tool("test", "A test tool", |input| Ok(format!("Got: {}", input)));
-
+    fn test_simple_tool() {
+        let tool =
+            Tool::from_function(|input| Ok(format!("Got: {}", input)), "test", "A test tool");
         assert_eq!(tool.name(), "test");
     }
 
     #[test]
-    fn test_create_structured_tool() {
+    fn test_structured_tool() {
         let schema = create_args_schema(
             "test",
             {
@@ -63,10 +57,15 @@ mod tests {
             None,
         );
 
-        let tool = create_structured_tool("test", "A test tool", schema, |args| {
-            let x = args.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            Ok(serde_json::json!(x * 2.0))
-        });
+        let tool = StructuredTool::from_function(
+            |args| {
+                let x = args.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                Ok(serde_json::json!(x * 2.0))
+            },
+            "test",
+            "A test tool",
+            schema,
+        );
 
         assert_eq!(tool.name(), "test");
     }
@@ -74,8 +73,8 @@ mod tests {
     #[test]
     fn test_render_tools() {
         let tools: Vec<Arc<dyn BaseTool>> = vec![
-            Arc::new(create_simple_tool("tool1", "First tool", Ok)),
-            Arc::new(create_simple_tool("tool2", "Second tool", Ok)),
+            Arc::new(Tool::from_function(Ok, "tool1", "First tool")),
+            Arc::new(Tool::from_function(Ok, "tool2", "Second tool")),
         ];
 
         let rendered = render_text_description(&tools);
