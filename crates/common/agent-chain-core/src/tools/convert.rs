@@ -17,10 +17,7 @@ pub struct ToolConfig {
     pub description: Option<String>,
     pub return_direct: bool,
     pub args_schema: Option<ArgsSchema>,
-    pub infer_schema: bool,
     pub response_format: ResponseFormat,
-    pub parse_docstring: bool,
-    pub error_on_invalid_docstring: bool,
     pub extras: Option<HashMap<String, Value>>,
 }
 
@@ -32,10 +29,7 @@ impl ToolConfig {
         #[builder(into)] description: Option<String>,
         #[builder(default)] return_direct: bool,
         args_schema: Option<ArgsSchema>,
-        #[builder(default = true)] infer_schema: bool,
         #[builder(default)] response_format: ResponseFormat,
-        #[builder(default)] parse_docstring: bool,
-        #[builder(default)] error_on_invalid_docstring: bool,
         extras: Option<HashMap<String, Value>>,
     ) -> Self {
         Self {
@@ -43,10 +37,7 @@ impl ToolConfig {
             description,
             return_direct,
             args_schema,
-            infer_schema,
             response_format,
-            parse_docstring,
-            error_on_invalid_docstring,
             extras,
         }
     }
@@ -114,7 +105,7 @@ where
     let description = config.description.unwrap_or_default();
     let args_schema = config.args_schema.unwrap_or_default();
 
-    let tool = StructuredTool::builder()
+    Ok(StructuredTool::builder()
         .name(name)
         .description(description)
         .args_schema(args_schema)
@@ -122,9 +113,7 @@ where
         .return_direct(config.return_direct)
         .response_format(config.response_format)
         .maybe_extras(config.extras)
-        .build();
-
-    Ok(tool)
+        .build())
 }
 
 pub fn convert_runnable_to_tool<R>(
@@ -138,8 +127,7 @@ where
     let name = name.into();
     let description = description.into();
 
-    let runnable_clone = runnable.clone();
-    let func = move |args: HashMap<String, Value>| runnable_clone.invoke(args, None);
+    let func = move |args: HashMap<String, Value>| runnable.invoke(args, None);
 
     let schema = ArgsSchema::JsonSchema(serde_json::json!({
         "type": "object",
@@ -155,7 +143,7 @@ pub type ToolFromSchemaFn = Box<dyn Fn(HashMap<String, Value>) -> Result<Value> 
 pub fn tool_from_schema(
     name: impl Into<String>,
     description: impl Into<String>,
-    properties: Vec<(&str, &str, &str, bool)>, // (name, type, description, required)
+    properties: Vec<(&str, &str, &str, bool)>,
 ) -> impl FnOnce(ToolFromSchemaFn) -> StructuredTool {
     let name = name.into();
     let description = description.into();

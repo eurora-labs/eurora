@@ -66,9 +66,8 @@ impl StructuredTool {
         coroutine: Option<AsyncStructuredToolFunc>,
         #[builder(default)] return_direct: bool,
         #[builder(default)] verbose: bool,
-        #[builder(default = HandleToolError::Bool(false))] handle_tool_error: HandleToolError,
-        #[builder(default = HandleValidationError::Bool(false))]
-        handle_validation_error: HandleValidationError,
+        #[builder(default)] handle_tool_error: HandleToolError,
+        #[builder(default)] handle_validation_error: HandleValidationError,
         #[builder(default)] response_format: ResponseFormat,
         tags: Option<Vec<String>>,
         metadata: Option<HashMap<String, Value>>,
@@ -139,10 +138,8 @@ impl StructuredTool {
                 } else {
                     let props = self.args_schema.properties();
                     if props.len() == 1 {
-                        let key = props.keys().next().expect("checked len == 1").clone();
-                        let mut args = HashMap::new();
-                        args.insert(key, Value::String(s));
-                        Ok(args)
+                        let key = props.into_keys().next().expect("checked len == 1");
+                        Ok(HashMap::from([(key, Value::String(s))]))
                     } else {
                         Err(Error::ToolInvocation(
                             "String input not allowed for multi-argument tool".to_string(),
@@ -151,16 +148,13 @@ impl StructuredTool {
                 }
             }
             ToolInput::Dict(d) => Ok(d),
-            ToolInput::ToolCall(tc) => {
-                let args = &tc.args;
-                if let Some(obj) = args.as_object() {
-                    Ok(obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
-                } else {
-                    Err(Error::ToolInvocation(
-                        "ToolCall args must be an object".to_string(),
-                    ))
-                }
-            }
+            ToolInput::ToolCall(tc) => tc
+                .args
+                .as_object()
+                .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                .ok_or_else(|| {
+                    Error::ToolInvocation("ToolCall args must be an object".to_string())
+                }),
         }
     }
 
@@ -168,6 +162,13 @@ impl StructuredTool {
         args.into_iter()
             .filter(|(k, _)| !FILTERED_ARGS.contains(&k.as_str()))
             .collect()
+    }
+}
+
+fn value_to_tool_output(value: Value) -> ToolOutput {
+    match value {
+        Value::String(s) => ToolOutput::String(s),
+        other => ToolOutput::Json(other),
     }
 }
 
@@ -227,39 +228,26 @@ impl BaseTool for StructuredTool {
         _run_manager: Option<&CallbackManagerForToolRun>,
         _config: &RunnableConfig,
     ) -> Result<ToolOutput> {
-        let args = self.extract_args(input)?;
-        let filtered_args = self.filter_args(args);
+        let args = self.filter_args(self.extract_args(input)?);
 
-        if let Some(ref func) = self.func {
-            let result = func(filtered_args)?;
-            match result {
-                Value::String(s) => Ok(ToolOutput::String(s)),
-                other => Ok(ToolOutput::Json(other)),
-            }
-        } else {
-            Err(Error::ToolInvocation(
-                "StructuredTool does not support sync invocation.".to_string(),
-            ))
-        }
+        let func = self.func.as_ref().ok_or_else(|| {
+            Error::ToolInvocation("StructuredTool does not support sync invocation.".to_string())
+        })?;
+
+        func(args).map(value_to_tool_output)
     }
 
     async fn tool_arun(
         &self,
         input: ToolInput,
-        _run_manager: Option<&crate::callbacks::manager::CallbackManagerForToolRun>,
-        _config: &RunnableConfig,
+        run_manager: Option<&CallbackManagerForToolRun>,
+        config: &RunnableConfig,
     ) -> Result<ToolOutput> {
-        let args = self.extract_args(input.clone())?;
-        let filtered_args = self.filter_args(args);
-
-        if let Some(ref coroutine) = self.coroutine {
-            let result = coroutine(filtered_args).await?;
-            match result {
-                Value::String(s) => Ok(ToolOutput::String(s)),
-                other => Ok(ToolOutput::Json(other)),
-            }
+        if let Some(coroutine) = &self.coroutine {
+            let args = self.filter_args(self.extract_args(input)?);
+            coroutine(args).await.map(value_to_tool_output)
         } else {
-            self.tool_run(input, _run_manager, _config)
+            self.tool_run(input, run_manager, config)
         }
     }
 }

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -69,12 +70,10 @@ pub fn create_retriever_tool_with_options<R>(
 where
     R: BaseRetriever + Send + Sync + 'static,
 {
-    let name = name.into();
     let description = description.into();
     let separator = document_separator.to_string();
 
     let func = {
-        let retriever = retriever.clone();
         let separator = separator.clone();
         let document_prompt = document_prompt.clone();
         move |args: HashMap<String, Value>| -> Result<Value> {
@@ -106,7 +105,7 @@ where
     };
 
     StructuredTool::builder()
-        .name(name.clone())
+        .name(name)
         .description(description)
         .args_schema(retriever_args_schema())
         .func(Arc::new(func))
@@ -127,6 +126,12 @@ fn format_documents(docs: &[Document], separator: &str, prompt: Option<&str>) ->
         .join(separator)
 }
 
+pub type AsyncRetrieveFn<R> = Arc<
+    dyn Fn(Arc<R>, String) -> Pin<Box<dyn Future<Output = Result<Vec<Document>>> + Send>>
+        + Send
+        + Sync,
+>;
+
 pub fn create_async_retriever_tool<R, F, Fut>(
     retriever: Arc<R>,
     retrieve_fn: F,
@@ -138,36 +143,40 @@ where
     F: Fn(Arc<R>, String) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Result<Vec<Document>>> + Send + 'static,
 {
-    let name = name.into();
-    let description = description.into();
+    let retrieve_fn: AsyncRetrieveFn<R> = Arc::new(move |r, q| Box::pin(retrieve_fn(r, q)));
 
-    let retriever = Arc::new(retriever);
-    let retrieve_fn = Arc::new(retrieve_fn);
-
-    let func = {
+    let coroutine = {
         let retriever = retriever.clone();
         let retrieve_fn = retrieve_fn.clone();
-        move |args: HashMap<String, Value>| -> Result<Value> {
+        move |args: HashMap<String, Value>| -> Pin<Box<dyn Future<Output = Result<Value>> + Send>> {
             let query = args
                 .get("query")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-
-            let rt = tokio::runtime::Handle::try_current()
-                .map_err(|e| crate::error::Error::Other(format!("No tokio runtime: {}", e)))?;
-
             let retriever = retriever.clone();
             let retrieve_fn = retrieve_fn.clone();
-            let docs =
-                rt.block_on(async move { (retrieve_fn)((*retriever).clone(), query).await })?;
-
-            let content = format_documents(&docs, "\n\n", None);
-            Ok(Value::String(content))
+            Box::pin(async move {
+                let docs = retrieve_fn(retriever, query).await?;
+                let content = format_documents(&docs, "\n\n", None);
+                Ok(Value::String(content))
+            })
         }
     };
 
-    StructuredTool::from_function(func, name, description, retriever_args_schema())
+    let sync_func = |_args: HashMap<String, Value>| -> Result<Value> {
+        Err(crate::error::Error::ToolInvocation(
+            "Async retriever tool does not support sync invocation".to_string(),
+        ))
+    };
+
+    StructuredTool::builder()
+        .name(name)
+        .description(description)
+        .args_schema(retriever_args_schema())
+        .func(Arc::new(sync_func))
+        .coroutine(Arc::new(coroutine))
+        .build()
 }
 
 pub struct RetrieverToolBuilder<R>

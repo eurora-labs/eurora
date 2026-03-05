@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fmt::Debug;
+use std::fmt::{self, Debug, Display};
 use std::sync::Arc;
 
 use crate::callbacks::Callbacks;
@@ -80,59 +80,43 @@ pub struct ToolDefinition {
     pub parameters: Value,
 }
 
-#[derive(Clone)]
-pub enum HandleToolError {
-    Bool(bool),
+#[derive(Clone, Default)]
+pub enum ErrorHandler {
+    #[default]
+    Ignore,
+    UseDefault,
     Message(String),
     Handler(Arc<dyn Fn(&str) -> String + Send + Sync>),
 }
 
-impl Debug for HandleToolError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for ErrorHandler {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            HandleToolError::Bool(b) => f.debug_tuple("HandleToolError::Bool").field(b).finish(),
-            HandleToolError::Message(m) => {
-                f.debug_tuple("HandleToolError::Message").field(m).finish()
-            }
-            HandleToolError::Handler(_) => write!(f, "HandleToolError::Handler(<function>)"),
+            ErrorHandler::Ignore => write!(f, "ErrorHandler::Ignore"),
+            ErrorHandler::UseDefault => write!(f, "ErrorHandler::UseDefault"),
+            ErrorHandler::Message(m) => f.debug_tuple("ErrorHandler::Message").field(m).finish(),
+            ErrorHandler::Handler(_) => write!(f, "ErrorHandler::Handler(<fn>)"),
         }
     }
 }
 
-impl Default for HandleToolError {
-    fn default() -> Self {
-        HandleToolError::Bool(false)
-    }
-}
+pub type HandleToolError = ErrorHandler;
+pub type HandleValidationError = ErrorHandler;
 
-#[derive(Clone)]
-pub enum HandleValidationError {
-    Bool(bool),
-    Message(String),
-    Handler(Arc<dyn Fn(&str) -> String + Send + Sync>),
-}
-
-impl Debug for HandleValidationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl ErrorHandler {
+    pub fn handle(&self, error_msg: &str, default_msg: &str) -> Option<String> {
         match self {
-            HandleValidationError::Bool(b) => f
-                .debug_tuple("HandleValidationError::Bool")
-                .field(b)
-                .finish(),
-            HandleValidationError::Message(m) => f
-                .debug_tuple("HandleValidationError::Message")
-                .field(m)
-                .finish(),
-            HandleValidationError::Handler(_) => {
-                write!(f, "HandleValidationError::Handler(<function>)")
+            ErrorHandler::Ignore => None,
+            ErrorHandler::UseDefault => {
+                if error_msg.is_empty() {
+                    Some(default_msg.to_string())
+                } else {
+                    Some(error_msg.to_string())
+                }
             }
+            ErrorHandler::Message(msg) => Some(msg.clone()),
+            ErrorHandler::Handler(f) => Some(f(error_msg)),
         }
-    }
-}
-
-impl Default for HandleValidationError {
-    fn default() -> Self {
-        HandleValidationError::Bool(false)
     }
 }
 
@@ -141,6 +125,19 @@ pub enum ToolInput {
     String(String),
     Dict(HashMap<String, Value>),
     ToolCall(ToolCall),
+}
+
+impl Display for ToolInput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ToolInput::String(s) => f.write_str(s),
+            ToolInput::Dict(d) => {
+                let v = serde_json::to_string(d).unwrap_or_else(|_| format!("{d:?}"));
+                f.write_str(&v)
+            }
+            ToolInput::ToolCall(tc) => write!(f, "{}", tc.args),
+        }
+    }
 }
 
 impl From<String> for ToolInput {
@@ -253,11 +250,11 @@ pub trait BaseTool: Send + Sync + Debug {
     }
 
     fn handle_tool_error(&self) -> &HandleToolError {
-        &HandleToolError::Bool(false)
+        &ErrorHandler::Ignore
     }
 
     fn handle_validation_error(&self) -> &HandleValidationError {
-        &HandleValidationError::Bool(false)
+        &ErrorHandler::Ignore
     }
 
     fn response_format(&self) -> ResponseFormat {
@@ -273,9 +270,7 @@ pub trait BaseTool: Send + Sync + Debug {
     }
 
     fn is_single_input(&self) -> bool {
-        let args = self.args();
-        let keys: Vec<_> = args.keys().filter(|k| *k != "kwargs").collect();
-        keys.len() == 1
+        self.args().keys().filter(|k| *k != "kwargs").count() == 1
     }
 
     fn args(&self) -> HashMap<String, Value> {
@@ -325,115 +320,10 @@ pub trait BaseTool: Send + Sync + Debug {
         config: Option<RunnableConfig>,
         tool_call_id: Option<String>,
     ) -> Result<ToolOutput> {
-        let config = ensure_config(config);
-
-        let callback_manager = CallbackManager::configure()
-            .maybe_inheritable_callbacks(config.callbacks.clone())
-            .maybe_local_callbacks(self.callbacks().cloned())
-            .verbose(self.verbose())
-            .inheritable_tags(config.tags.clone())
-            .maybe_local_tags(self.tags().map(|t| t.to_vec()))
-            .inheritable_metadata(config.metadata.clone())
-            .maybe_local_metadata(self.metadata().cloned())
-            .call();
-
-        let mut serialized = HashMap::new();
-        serialized.insert(
-            "name".to_string(),
-            serde_json::Value::String(self.name().to_string()),
-        );
-        serialized.insert(
-            "description".to_string(),
-            serde_json::Value::String(self.description().to_string()),
-        );
-
-        let input_str = match &input {
-            ToolInput::String(s) => s.clone(),
-            ToolInput::Dict(d) => format!("{:?}", d),
-            ToolInput::ToolCall(tc) => tc.args.to_string(),
-        };
-
-        let run_manager =
-            callback_manager.on_tool_start(&serialized, &input_str, config.run_id, None);
-
-        let child_config = patch_config()
-            .config(config.clone())
-            .callbacks(run_manager.get_child(None))
-            .call();
+        let (run_manager, child_config, _) = self.setup_run(&input, config);
 
         let result = self.tool_run(input, Some(&run_manager), &child_config);
-
-        match result {
-            Ok(output) => {
-                let (content, artifact) = match self.response_format() {
-                    ResponseFormat::ContentAndArtifact => match output {
-                        ToolOutput::Json(Value::Array(ref arr)) if arr.len() == 2 => {
-                            let content = match &arr[0] {
-                                Value::String(s) => ToolOutput::String(s.clone()),
-                                other => ToolOutput::Json(other.clone()),
-                            };
-                            (content, Some(arr[1].clone()))
-                        }
-                        _ => {
-                            let err = Error::ToolException(
-                                    "Since response_format='content_and_artifact', the tool                                      function must return a two-element JSON array                                      [content, artifact]."
-                                        .to_string(),
-                                );
-                            run_manager.on_tool_error(&err);
-                            return Err(err);
-                        }
-                    },
-                    ResponseFormat::Content => (output, None),
-                };
-                let formatted = format_output(
-                    content,
-                    artifact,
-                    tool_call_id.as_deref(),
-                    self.name(),
-                    "success",
-                );
-                let output_str = match &formatted {
-                    ToolOutput::String(s) => s.clone(),
-                    ToolOutput::Message(m) => m.content.to_string(),
-                    ToolOutput::Json(v) => stringify(v),
-                    ToolOutput::ContentAndArtifact { content, .. } => stringify(content),
-                };
-                run_manager.on_tool_end(&output_str);
-                Ok(formatted)
-            }
-            Err(e) => {
-                if let Some(tool_err_msg) = e.as_tool_exception()
-                    && let Some(handled) =
-                        handle_tool_error_impl(tool_err_msg, self.handle_tool_error())
-                {
-                    let formatted = format_output(
-                        ToolOutput::String(handled.clone()),
-                        None,
-                        tool_call_id.as_deref(),
-                        self.name(),
-                        "error",
-                    );
-                    run_manager.on_tool_end(&handled);
-                    return Ok(formatted);
-                }
-                if let Some(validation_msg) = e.as_validation_error()
-                    && let Some(handled) =
-                        handle_validation_error_impl(validation_msg, self.handle_validation_error())
-                {
-                    let formatted = format_output(
-                        ToolOutput::String(handled.clone()),
-                        None,
-                        tool_call_id.as_deref(),
-                        self.name(),
-                        "error",
-                    );
-                    run_manager.on_tool_end(&handled);
-                    return Ok(formatted);
-                }
-                run_manager.on_tool_error(&e);
-                Err(e)
-            }
-        }
+        self.finalize_run(result, &run_manager, tool_call_id.as_deref())
     }
 
     async fn arun(
@@ -442,117 +332,12 @@ pub trait BaseTool: Send + Sync + Debug {
         config: Option<RunnableConfig>,
         tool_call_id: Option<String>,
     ) -> Result<ToolOutput> {
-        let config = ensure_config(config);
-
-        let async_callback_manager = CallbackManager::configure()
-            .maybe_inheritable_callbacks(config.callbacks.clone())
-            .maybe_local_callbacks(self.callbacks().cloned())
-            .verbose(self.verbose())
-            .inheritable_tags(config.tags.clone())
-            .maybe_local_tags(self.tags().map(|t| t.to_vec()))
-            .inheritable_metadata(config.metadata.clone())
-            .maybe_local_metadata(self.metadata().cloned())
-            .call();
-
-        let mut serialized = HashMap::new();
-        serialized.insert(
-            "name".to_string(),
-            serde_json::Value::String(self.name().to_string()),
-        );
-        serialized.insert(
-            "description".to_string(),
-            serde_json::Value::String(self.description().to_string()),
-        );
-
-        let input_str = match &input {
-            ToolInput::String(s) => s.clone(),
-            ToolInput::Dict(d) => format!("{:?}", d),
-            ToolInput::ToolCall(tc) => tc.args.to_string(),
-        };
-
-        let run_manager =
-            async_callback_manager.on_tool_start(&serialized, &input_str, config.run_id, None);
-
-        let child_config = patch_config()
-            .config(config.clone())
-            .callbacks(run_manager.get_child(None))
-            .call();
+        let (run_manager, child_config, _) = self.setup_run(&input, config);
 
         let result = self
             .tool_arun(input, Some(&run_manager), &child_config)
             .await;
-
-        match result {
-            Ok(output) => {
-                let (content, artifact) = match self.response_format() {
-                    ResponseFormat::ContentAndArtifact => match output {
-                        ToolOutput::Json(Value::Array(ref arr)) if arr.len() == 2 => {
-                            let content = match &arr[0] {
-                                Value::String(s) => ToolOutput::String(s.clone()),
-                                other => ToolOutput::Json(other.clone()),
-                            };
-                            (content, Some(arr[1].clone()))
-                        }
-                        _ => {
-                            let err = Error::ToolException(
-                                    "Since response_format='content_and_artifact', the tool                                      function must return a two-element JSON array                                      [content, artifact]."
-                                        .to_string(),
-                                );
-                            run_manager.on_tool_error(&err);
-                            return Err(err);
-                        }
-                    },
-                    ResponseFormat::Content => (output, None),
-                };
-                let formatted = format_output(
-                    content,
-                    artifact,
-                    tool_call_id.as_deref(),
-                    self.name(),
-                    "success",
-                );
-                let output_str = match &formatted {
-                    ToolOutput::String(s) => s.clone(),
-                    ToolOutput::Message(m) => m.content.to_string(),
-                    ToolOutput::Json(v) => stringify(v),
-                    ToolOutput::ContentAndArtifact { content, .. } => stringify(content),
-                };
-                run_manager.on_tool_end(&output_str);
-                Ok(formatted)
-            }
-            Err(e) => {
-                if let Some(tool_err_msg) = e.as_tool_exception()
-                    && let Some(handled) =
-                        handle_tool_error_impl(tool_err_msg, self.handle_tool_error())
-                {
-                    let formatted = format_output(
-                        ToolOutput::String(handled.clone()),
-                        None,
-                        tool_call_id.as_deref(),
-                        self.name(),
-                        "error",
-                    );
-                    run_manager.on_tool_end(&handled);
-                    return Ok(formatted);
-                }
-                if let Some(validation_msg) = e.as_validation_error()
-                    && let Some(handled) =
-                        handle_validation_error_impl(validation_msg, self.handle_validation_error())
-                {
-                    let formatted = format_output(
-                        ToolOutput::String(handled.clone()),
-                        None,
-                        tool_call_id.as_deref(),
-                        self.name(),
-                        "error",
-                    );
-                    run_manager.on_tool_end(&handled);
-                    return Ok(formatted);
-                }
-                run_manager.on_tool_error(&e);
-                Err(e)
-            }
-        }
+        self.finalize_run(result, &run_manager, tool_call_id.as_deref())
     }
 
     async fn invoke(&self, input: ToolInput, config: Option<RunnableConfig>) -> Result<ToolOutput> {
@@ -599,6 +384,131 @@ pub trait BaseTool: Send + Sync + Debug {
     }
 }
 
+trait BaseToolExt: BaseTool {
+    fn setup_run(
+        &self,
+        input: &ToolInput,
+        config: Option<RunnableConfig>,
+    ) -> (CallbackManagerForToolRun, RunnableConfig, String) {
+        let config = ensure_config(config);
+
+        let callback_manager = CallbackManager::configure()
+            .maybe_inheritable_callbacks(config.callbacks.clone())
+            .maybe_local_callbacks(self.callbacks().cloned())
+            .verbose(self.verbose())
+            .inheritable_tags(config.tags.clone())
+            .maybe_local_tags(self.tags().map(|t| t.to_vec()))
+            .inheritable_metadata(config.metadata.clone())
+            .maybe_local_metadata(self.metadata().cloned())
+            .call();
+
+        let serialized = HashMap::from([
+            ("name".to_string(), Value::String(self.name().to_string())),
+            (
+                "description".to_string(),
+                Value::String(self.description().to_string()),
+            ),
+        ]);
+
+        let input_str = input.to_string();
+
+        let run_manager =
+            callback_manager.on_tool_start(&serialized, &input_str, config.run_id, None);
+
+        let child_config = patch_config()
+            .config(config)
+            .callbacks(run_manager.get_child(None))
+            .call();
+
+        (run_manager, child_config, input_str)
+    }
+
+    fn finalize_run(
+        &self,
+        result: Result<ToolOutput>,
+        run_manager: &CallbackManagerForToolRun,
+        tool_call_id: Option<&str>,
+    ) -> Result<ToolOutput> {
+        match result {
+            Ok(output) => {
+                let (content, artifact) = match self.response_format() {
+                    ResponseFormat::ContentAndArtifact => match output {
+                        ToolOutput::Json(Value::Array(ref arr)) if arr.len() == 2 => {
+                            let content = match &arr[0] {
+                                Value::String(s) => ToolOutput::String(s.clone()),
+                                other => ToolOutput::Json(other.clone()),
+                            };
+                            (content, Some(arr[1].clone()))
+                        }
+                        _ => {
+                            let err = Error::ToolException(
+                                "response_format='content_and_artifact' requires the tool \
+                                 function to return a two-element JSON array [content, artifact]"
+                                    .to_string(),
+                            );
+                            run_manager.on_tool_error(&err);
+                            return Err(err);
+                        }
+                    },
+                    ResponseFormat::Content => (output, None),
+                };
+
+                let formatted =
+                    format_output(content, artifact, tool_call_id, self.name(), "success");
+                run_manager.on_tool_end(&formatted.to_string_lossy());
+                Ok(formatted)
+            }
+            Err(e) => {
+                if let Some(tool_err_msg) = e.as_tool_exception()
+                    && let Some(handled) = self
+                        .handle_tool_error()
+                        .handle(tool_err_msg, "Tool execution error")
+                {
+                    let formatted = format_output(
+                        ToolOutput::String(handled.clone()),
+                        None,
+                        tool_call_id,
+                        self.name(),
+                        "error",
+                    );
+                    run_manager.on_tool_end(&handled);
+                    return Ok(formatted);
+                }
+                if let Some(validation_msg) = e.as_validation_error()
+                    && let Some(handled) = self
+                        .handle_validation_error()
+                        .handle(validation_msg, "Tool input validation error")
+                {
+                    let formatted = format_output(
+                        ToolOutput::String(handled.clone()),
+                        None,
+                        tool_call_id,
+                        self.name(),
+                        "error",
+                    );
+                    run_manager.on_tool_end(&handled);
+                    return Ok(formatted);
+                }
+                run_manager.on_tool_error(&e);
+                Err(e)
+            }
+        }
+    }
+}
+
+impl<T: BaseTool + ?Sized> BaseToolExt for T {}
+
+impl ToolOutput {
+    pub fn to_string_lossy(&self) -> String {
+        match self {
+            ToolOutput::String(s) => s.clone(),
+            ToolOutput::Message(m) => m.content.to_string(),
+            ToolOutput::Json(v) => stringify(v),
+            ToolOutput::ContentAndArtifact { content, .. } => stringify(content),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct ToolRunnable {
     tool: Arc<dyn BaseTool>,
@@ -615,7 +525,7 @@ impl ToolRunnable {
 }
 
 impl Debug for ToolRunnable {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ToolRunnable")
             .field("name", &self.tool.name())
             .finish()
@@ -656,30 +566,6 @@ pub fn is_tool_call(input: &Value) -> bool {
     input.get("type").and_then(|t| t.as_str()) == Some("tool_call")
 }
 
-pub fn handle_tool_error_impl(e: &str, flag: &HandleToolError) -> Option<String> {
-    match flag {
-        HandleToolError::Bool(false) => None,
-        HandleToolError::Bool(true) => {
-            if e.is_empty() {
-                Some("Tool execution error".to_string())
-            } else {
-                Some(e.to_string())
-            }
-        }
-        HandleToolError::Message(msg) => Some(msg.clone()),
-        HandleToolError::Handler(f) => Some(f(e)),
-    }
-}
-
-pub fn handle_validation_error_impl(e: &str, flag: &HandleValidationError) -> Option<String> {
-    match flag {
-        HandleValidationError::Bool(false) => None,
-        HandleValidationError::Bool(true) => Some("Tool input validation error".to_string()),
-        HandleValidationError::Message(msg) => Some(msg.clone()),
-        HandleValidationError::Handler(f) => Some(f(e)),
-    }
-}
-
 pub fn format_output(
     content: ToolOutput,
     artifact: Option<Value>,
@@ -687,17 +573,20 @@ pub fn format_output(
     name: &str,
     status: &str,
 ) -> ToolOutput {
-    if matches!(content, ToolOutput::Message(_)) || tool_call_id.is_none() {
+    let tool_call_id = match tool_call_id {
+        Some(id) => id,
+        None => return content,
+    };
+
+    if matches!(content, ToolOutput::Message(_)) {
         return content;
     }
-
-    let tool_call_id = tool_call_id.expect("tool_call_id should be Some at this point");
 
     let content_str = match &content {
         ToolOutput::String(s) => s.clone(),
         ToolOutput::Json(v) => stringify(v),
-        ToolOutput::Message(_) => return content,
         ToolOutput::ContentAndArtifact { content, .. } => stringify(content),
+        ToolOutput::Message(_) => unreachable!(),
     };
 
     let status_enum = match status {
@@ -740,10 +629,6 @@ pub fn stringify(content: &Value) -> String {
         Value::String(s) => s.clone(),
         other => serde_json::to_string(other).unwrap_or_else(|_| other.to_string()),
     }
-}
-
-pub fn stringify_content(content: &Value) -> String {
-    stringify(content)
 }
 
 pub fn prep_run_args(
@@ -830,17 +715,30 @@ mod tests {
     }
 
     #[test]
-    fn test_handle_tool_error() {
-        let result = handle_tool_error_impl("test error", &HandleToolError::Bool(false));
+    fn test_error_handler() {
+        let result = ErrorHandler::Ignore.handle("test error", "default");
         assert!(result.is_none());
 
-        let result = handle_tool_error_impl("test error", &HandleToolError::Bool(true));
+        let result = ErrorHandler::UseDefault.handle("test error", "default");
         assert_eq!(result, Some("test error".to_string()));
 
-        let result = handle_tool_error_impl(
-            "test error",
-            &HandleToolError::Message("custom".to_string()),
-        );
+        let result = ErrorHandler::UseDefault.handle("", "default");
+        assert_eq!(result, Some("default".to_string()));
+
+        let result = ErrorHandler::Message("custom".to_string()).handle("test error", "default");
         assert_eq!(result, Some("custom".to_string()));
+    }
+
+    #[test]
+    fn test_tool_input_display() {
+        let input = ToolInput::String("hello".to_string());
+        assert_eq!(input.to_string(), "hello");
+
+        let mut dict = HashMap::new();
+        dict.insert("key".to_string(), Value::String("value".to_string()));
+        let input = ToolInput::Dict(dict);
+        let display = input.to_string();
+        assert!(display.contains("key"));
+        assert!(display.contains("value"));
     }
 }
