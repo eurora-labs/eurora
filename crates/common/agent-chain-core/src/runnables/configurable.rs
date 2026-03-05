@@ -734,16 +734,23 @@ where
                 .await;
         }
 
-        let mut results = Vec::with_capacity(inputs.len());
-        for (input, prepared_result) in inputs.into_iter().zip(prepared) {
-            let result = match prepared_result {
-                Ok((runnable, config)) => runnable.ainvoke(input, Some(config)).await,
-                Err(e) => Err(e),
-            };
-            results.push(result);
-        }
+        let max_concurrency = configs.first().and_then(|c| c.max_concurrency);
 
-        results
+        let futures: Vec<_> = inputs
+            .into_iter()
+            .zip(prepared)
+            .map(|(input, prepared_result)| {
+                Box::pin(async move {
+                    match prepared_result {
+                        Ok((runnable, config)) => runnable.ainvoke(input, Some(config)).await,
+                        Err(e) => Err(e),
+                    }
+                })
+                    as std::pin::Pin<Box<dyn std::future::Future<Output = Result<O>> + Send>>
+            })
+            .collect();
+
+        gather_with_concurrency(max_concurrency, futures).await
     }
 
     fn stream(

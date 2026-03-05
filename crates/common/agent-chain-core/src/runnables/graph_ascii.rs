@@ -126,20 +126,15 @@ pub fn draw_ascii(vertices: &HashMap<String, String>, edges: &[Edge]) -> Result<
         .enumerate()
         .map(|(i, id)| (*id, i as u32))
         .collect();
-    let idx_to_id: HashMap<u32, &String> = id_list
+
+    let vertex_labels: HashMap<u32, String> = vertices
         .iter()
-        .enumerate()
-        .map(|(i, id)| (i as u32, *id))
+        .map(|(id, label)| (id_to_idx[id], format!(" {} ", label)))
         .collect();
 
-    let sugiyama_vertices: Vec<(u32, (f64, f64))> = vertices
+    let sugiyama_vertices: Vec<(u32, (f64, f64))> = vertex_labels
         .iter()
-        .map(|(id, label)| {
-            let idx = id_to_idx[id];
-            let label_with_spaces = format!(" {} ", label);
-            let width = vertex_width(&label_with_spaces) as f64;
-            (idx, (width, VERTEX_HEIGHT as f64))
-        })
+        .map(|(&idx, label)| (idx, (vertex_width(label) as f64, VERTEX_HEIGHT as f64)))
         .collect();
 
     let sugiyama_edges: Vec<(u32, u32)> = edges
@@ -179,16 +174,11 @@ pub fn draw_ascii(vertices: &HashMap<String, String>, edges: &[Edge]) -> Result<
     let mut max_y = f64::MIN;
 
     for &(idx, (x, y)) in &all_positions {
-        let id = idx_to_id[&(idx as u32)];
-        let label = &vertices[id];
-        let label_with_spaces = format!(" {} ", label);
-        let w = vertex_width(&label_with_spaces) as f64;
+        let w = vertex_width(&vertex_labels[&(idx as u32)]) as f64;
         let h = VERTEX_HEIGHT as f64;
 
-        let left = x - w / 2.0;
-        let right = x + w / 2.0;
-        min_x = min_x.min(left);
-        max_x = max_x.max(right);
+        min_x = min_x.min(x - w / 2.0);
+        max_x = max_x.max(x + w / 2.0);
         min_y = min_y.min(y);
         max_y = max_y.max(y + h);
     }
@@ -201,15 +191,13 @@ pub fn draw_ascii(vertices: &HashMap<String, String>, edges: &[Edge]) -> Result<
 
     let mut canvas = AsciiCanvas::new(canvas_cols, canvas_lines)?;
 
-    let mut vertex_positions: HashMap<usize, (f64, f64, f64, f64)> = HashMap::new();
-    for &(idx, (x, y)) in &all_positions {
-        let id = idx_to_id[&(idx as u32)];
-        let label = &vertices[id];
-        let label_with_spaces = format!(" {} ", label);
-        let w = vertex_width(&label_with_spaces) as f64;
-        let h = VERTEX_HEIGHT as f64;
-        vertex_positions.insert(idx, (x, y, w, h));
-    }
+    let vertex_positions: HashMap<usize, (f64, f64, f64, f64)> = all_positions
+        .iter()
+        .map(|&(idx, (x, y))| {
+            let w = vertex_width(&vertex_labels[&(idx as u32)]) as f64;
+            (idx, (x, y, w, VERTEX_HEIGHT as f64))
+        })
+        .collect();
 
     for edge in &sugiyama_edges {
         let source_idx = edge.0 as usize;
@@ -235,17 +223,14 @@ pub fn draw_ascii(vertices: &HashMap<String, String>, edges: &[Edge]) -> Result<
     }
 
     for &(idx, (x, y)) in &all_positions {
-        let id = idx_to_id[&(idx as u32)];
-        let label = &vertices[id];
-        let label_with_spaces = format!(" {} ", label);
-        let w = vertex_width(&label_with_spaces);
-        let h = VERTEX_HEIGHT;
+        let label = &vertex_labels[&(idx as u32)];
+        let w = vertex_width(label);
 
         let box_x = (x - w as f64 / 2.0 - min_x).round() as usize;
         let box_y = (y - min_y).round() as usize;
 
-        canvas.draw_box(box_x, box_y, w, h);
-        canvas.text(box_x + 1, box_y + 1, &label_with_spaces);
+        canvas.draw_box(box_x, box_y, w, VERTEX_HEIGHT);
+        canvas.text(box_x + 1, box_y + 1, label);
     }
 
     Ok(canvas.draw())
