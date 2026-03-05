@@ -1517,7 +1517,8 @@ async fn test_structured_output_with_raw_success() {
         .await
         .unwrap();
 
-    assert_eq!(result["parsed"], tool_args);
+    assert_eq!(result["parsed"]["name"], "test_tool");
+    assert_eq!(result["parsed"]["args"], tool_args);
     assert_eq!(result["parsing_error"], serde_json::Value::Null);
     assert!(result.get("raw").is_some());
     assert!(!result["raw"].is_null());

@@ -1,8 +1,7 @@
 use agent_chain_core::GenericFakeChatModel;
+use agent_chain_core::ParserInput;
 use agent_chain_core::language_models::BaseChatModel;
-use agent_chain_core::messages::{
-    AIMessage, AIMessageChunk, BaseMessage, BaseMessageChunk, HumanMessage,
-};
+use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
 use agent_chain_core::output_parsers::{
     BaseOutputParser, BaseTransformOutputParser, StrOutputParser,
 };
@@ -92,7 +91,7 @@ async fn test_str_output_parser_transform_string_chunks() {
     let parser = StrOutputParser::new();
     let chunks = vec!["Hello", " ", "world", "!"];
 
-    let input_stream = futures::stream::iter(chunks.iter().map(|s| BaseMessage::from(*s)));
+    let input_stream = futures::stream::iter(chunks.iter().map(|s| ParserInput::from(*s)));
     let mut result_stream = parser.transform(Box::pin(input_stream));
 
     let mut results = Vec::new();
@@ -106,13 +105,9 @@ async fn test_str_output_parser_transform_string_chunks() {
 #[tokio::test]
 async fn test_str_output_parser_transform_message_chunks() {
     let parser = StrOutputParser::new();
-    let chunks = vec![
-        BaseMessageChunk::AI(AIMessageChunk::builder().content("Hello").build()),
-        BaseMessageChunk::AI(AIMessageChunk::builder().content(" ").build()),
-        BaseMessageChunk::AI(AIMessageChunk::builder().content("world").build()),
-    ];
+    let chunks = vec!["Hello", " ", "world"];
 
-    let input_stream = futures::stream::iter(chunks.into_iter().map(|c| c.to_message()));
+    let input_stream = futures::stream::iter(chunks.iter().map(|s| ParserInput::from(*s)));
     let mut result_stream = parser.transform(Box::pin(input_stream));
 
     let mut results = Vec::new();
@@ -128,7 +123,7 @@ async fn test_str_output_parser_transform_string_chunks_2() {
     let parser = StrOutputParser::new();
     let chunks = vec!["Async", " ", "test"];
 
-    let input_stream = futures::stream::iter(chunks.iter().map(|s| BaseMessage::from(*s)));
+    let input_stream = futures::stream::iter(chunks.iter().map(|s| ParserInput::from(*s)));
     let result: Vec<String> = parser
         .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
@@ -141,13 +136,9 @@ async fn test_str_output_parser_transform_string_chunks_2() {
 #[tokio::test]
 async fn test_str_output_parser_transform_message_chunks_2() {
     let parser = StrOutputParser::new();
-    let chunks = vec![
-        BaseMessageChunk::AI(AIMessageChunk::builder().content("Async").build()),
-        BaseMessageChunk::AI(AIMessageChunk::builder().content(" ").build()),
-        BaseMessageChunk::AI(AIMessageChunk::builder().content("messages").build()),
-    ];
+    let chunks = vec!["Async", " ", "messages"];
 
-    let input_stream = futures::stream::iter(chunks.into_iter().map(|c| c.to_message()));
+    let input_stream = futures::stream::iter(chunks.iter().map(|s| ParserInput::from(*s)));
     let result: Vec<String> = parser
         .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
@@ -291,7 +282,7 @@ fn test_str_output_parser_with_long_text() {
 async fn test_str_output_parser_transform_empty_iterator() {
     let parser = StrOutputParser::new();
 
-    let input_stream = futures::stream::iter(Vec::<BaseMessage>::new());
+    let input_stream = futures::stream::iter(Vec::<ParserInput>::new());
     let result: Vec<String> = parser
         .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
@@ -305,7 +296,7 @@ async fn test_str_output_parser_transform_empty_iterator() {
 async fn test_str_output_parser_transform_empty_iterator_2() {
     let parser = StrOutputParser::new();
 
-    let input_stream = futures::stream::iter(Vec::<BaseMessage>::new());
+    let input_stream = futures::stream::iter(Vec::<ParserInput>::new());
     let result: Vec<String> = parser
         .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })

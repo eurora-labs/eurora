@@ -10,7 +10,8 @@ mod transform;
 mod xml;
 
 pub use base::{
-    BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser, RunnableOutputParser,
+    BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser, ParserInput,
+    RunnableOutputParser,
 };
 
 pub use format_instructions::JSON_FORMAT_INSTRUCTIONS;
@@ -28,7 +29,7 @@ pub use list::{
 
 pub use pydantic::PydanticOutputParser;
 
-pub use xml::{XMLOutputParser, nested_element};
+pub use xml::{XMLOutputParser, XmlParserBackend, nested_element};
 
 pub use openai_functions::{
     JsonKeyOutputFunctionsParser, JsonOutputFunctionsParser, OutputFunctionsParser,
@@ -39,6 +40,8 @@ pub use openai_tools::{
     JsonOutputKeyToolsParser, JsonOutputToolsParser, PydanticToolsParser, make_invalid_tool_call,
     parse_tool_call, parse_tool_calls,
 };
+
+pub use crate::messages::ToolCall;
 
 #[cfg(test)]
 mod tests {

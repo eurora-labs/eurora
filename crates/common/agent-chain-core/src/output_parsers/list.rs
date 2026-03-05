@@ -5,9 +5,8 @@ use futures::stream::BoxStream;
 use regex::Regex;
 
 use crate::error::Result;
-use crate::messages::BaseMessage;
 
-use super::base::BaseOutputParser;
+use super::base::{BaseOutputParser, ParserInput};
 use super::transform::BaseTransformOutputParser;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -94,7 +93,7 @@ impl BaseOutputParser for CommaSeparatedListOutputParser {
 impl BaseTransformOutputParser for CommaSeparatedListOutputParser {
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, BaseMessage>,
+        input: BoxStream<'a, ParserInput>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
@@ -162,7 +161,7 @@ impl BaseOutputParser for NumberedListOutputParser {
 impl BaseTransformOutputParser for NumberedListOutputParser {
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, BaseMessage>,
+        input: BoxStream<'a, ParserInput>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
@@ -239,7 +238,7 @@ impl BaseOutputParser for MarkdownListOutputParser {
 impl BaseTransformOutputParser for MarkdownListOutputParser {
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, BaseMessage>,
+        input: BoxStream<'a, ParserInput>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
@@ -270,7 +269,7 @@ impl ListOutputParser for MarkdownListOutputParser {
 
 fn list_transform<'a, P: ListOutputParser + 'a>(
     parser: &'a P,
-    input: BoxStream<'a, BaseMessage>,
+    input: BoxStream<'a, ParserInput>,
 ) -> BoxStream<'a, Result<Vec<String>>> {
     use futures::StreamExt;
 
@@ -278,8 +277,8 @@ fn list_transform<'a, P: ListOutputParser + 'a>(
         let mut buffer = String::new();
         let mut input = input;
 
-        while let Some(message) = input.next().await {
-            let chunk_content = message.text();
+        while let Some(chunk) = input.next().await {
+            let chunk_content = chunk.to_generation().text;
             buffer.push_str(&chunk_content);
 
             let iter_results = parser.parse_iter(&buffer);

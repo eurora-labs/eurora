@@ -4,11 +4,10 @@ use regex::Regex;
 use serde_json::Value;
 
 use crate::error::{Error, Result};
-use crate::messages::BaseMessage;
 use crate::outputs::Generation;
 use crate::runnables::AddableDict;
 
-use super::base::BaseOutputParser;
+use super::base::{BaseOutputParser, ParserInput};
 use super::transform::BaseTransformOutputParser;
 
 static MARKDOWN_CODE_FENCE_RE: LazyLock<Regex> =
@@ -151,22 +150,45 @@ impl StreamingParser {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum XmlParserBackend {
+    #[default]
+    QuickXml,
+    QuickXmlDefused,
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct XMLOutputParser {
     tags: Option<Vec<String>>,
+    parser: XmlParserBackend,
 }
 
 impl XMLOutputParser {
     pub fn new() -> Self {
-        Self { tags: None }
+        Self {
+            tags: None,
+            parser: XmlParserBackend::default(),
+        }
     }
 
     pub fn with_tags(tags: Vec<String>) -> Self {
-        Self { tags: Some(tags) }
+        Self {
+            tags: Some(tags),
+            parser: XmlParserBackend::default(),
+        }
+    }
+
+    pub fn with_parser(mut self, parser: XmlParserBackend) -> Self {
+        self.parser = parser;
+        self
     }
 
     pub fn tags(&self) -> Option<&[String]> {
         self.tags.as_deref()
+    }
+
+    pub fn parser_backend(&self) -> XmlParserBackend {
+        self.parser
     }
 
     fn parse_xml(&self, text: &str) -> Result<Value> {
@@ -284,12 +306,6 @@ fn preprocess_xml(text: &str) -> String {
     text.trim().to_string()
 }
 
-impl Default for XMLOutputParser {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl BaseOutputParser for XMLOutputParser {
     type Output = Value;
 
@@ -322,7 +338,7 @@ impl BaseOutputParser for XMLOutputParser {
 impl BaseTransformOutputParser for XMLOutputParser {
     fn transform<'a>(
         &'a self,
-        input: futures::stream::BoxStream<'a, BaseMessage>,
+        input: futures::stream::BoxStream<'a, ParserInput>,
     ) -> futures::stream::BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
@@ -332,8 +348,8 @@ impl BaseTransformOutputParser for XMLOutputParser {
 
             let mut streaming_parser = StreamingParser::new();
             let mut stream = input;
-            while let Some(message) = stream.next().await {
-                let chunk_text = message.text().to_string();
+            while let Some(chunk) = stream.next().await {
+                let chunk_text = chunk.to_generation().text;
                 for dict in streaming_parser.parse(&chunk_text) {
                     match serde_json::to_value(&dict) {
                         Ok(value) => yield Ok(value),
@@ -529,21 +545,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_xml_transform_stream() {
-        use crate::messages::HumanMessage;
         use futures::StreamExt;
 
         let parser = XMLOutputParser::new();
-        let messages: Vec<BaseMessage> = vec![
-            BaseMessage::Human(HumanMessage::builder().content("<root>").build()),
-            BaseMessage::Human(
-                HumanMessage::builder()
-                    .content("<item>hello</item>")
-                    .build(),
-            ),
-            BaseMessage::Human(HumanMessage::builder().content("</root>").build()),
+        let inputs: Vec<ParserInput> = vec![
+            ParserInput::from("<root>"),
+            ParserInput::from("<item>hello</item>"),
+            ParserInput::from("</root>"),
         ];
-        let stream = futures::stream::iter(messages);
-        let boxed: futures::stream::BoxStream<BaseMessage> = Box::pin(stream);
+        let stream = futures::stream::iter(inputs);
+        let boxed: futures::stream::BoxStream<ParserInput> = Box::pin(stream);
         let mut output_stream = parser.transform(boxed);
 
         let mut results = Vec::new();
