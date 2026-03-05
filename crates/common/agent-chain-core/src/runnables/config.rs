@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
@@ -9,7 +8,7 @@ use uuid::Uuid;
 
 use crate::callbacks::{CallbackManager, CallbackManagerForChainRun, Callbacks};
 
-pub const DEFAULT_RECURSION_LIMIT: i32 = 25;
+pub const DEFAULT_RECURSION_LIMIT: u32 = 25;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunnableConfig {
@@ -29,7 +28,7 @@ pub struct RunnableConfig {
     pub max_concurrency: Option<usize>,
 
     #[serde(default = "default_recursion_limit")]
-    pub recursion_limit: i32,
+    pub recursion_limit: u32,
 
     #[serde(default)]
     pub configurable: HashMap<String, serde_json::Value>,
@@ -38,7 +37,7 @@ pub struct RunnableConfig {
     pub run_id: Option<Uuid>,
 }
 
-fn default_recursion_limit() -> i32 {
+fn default_recursion_limit() -> u32 {
     DEFAULT_RECURSION_LIMIT
 }
 
@@ -66,7 +65,7 @@ impl RunnableConfig {
         callbacks: Option<Callbacks>,
         #[builder(into)] run_name: Option<String>,
         max_concurrency: Option<usize>,
-        #[builder(default = DEFAULT_RECURSION_LIMIT)] recursion_limit: i32,
+        #[builder(default = DEFAULT_RECURSION_LIMIT)] recursion_limit: u32,
         #[builder(default)] configurable: HashMap<String, serde_json::Value>,
         run_id: Option<Uuid>,
     ) -> Self {
@@ -100,6 +99,8 @@ impl From<Vec<RunnableConfig>> for ConfigOrList {
         ConfigOrList::List(configs)
     }
 }
+
+use std::cell::RefCell;
 
 thread_local! {
     static VAR_CHILD_RUNNABLE_CONFIG: RefCell<Option<RunnableConfig>> = const { RefCell::new(None) };
@@ -227,7 +228,7 @@ pub fn patch_config(
     callbacks: Option<CallbackManager>,
     #[builder(into)] run_name: Option<String>,
     max_concurrency: Option<usize>,
-    recursion_limit: Option<i32>,
+    recursion_limit: Option<u32>,
     configurable: Option<HashMap<String, serde_json::Value>>,
 ) -> RunnableConfig {
     let mut config = ensure_config(config);
@@ -254,28 +255,27 @@ pub fn patch_config(
 }
 
 fn merge_callbacks_rich(base: Option<Callbacks>, new: Option<Callbacks>) -> Option<Callbacks> {
-    match (base, &new) {
+    match (base, new) {
         (base, None) => base,
-        (None, Some(_)) => new,
+        (None, new) => new,
         (Some(Callbacks::Handlers(mut base_handlers)), Some(Callbacks::Handlers(new_handlers))) => {
-            base_handlers.extend(new_handlers.clone());
+            base_handlers.extend(new_handlers);
             Some(Callbacks::Handlers(base_handlers))
         }
         (Some(Callbacks::Manager(mut base_mgr)), Some(Callbacks::Handlers(new_handlers))) => {
             for handler in new_handlers {
-                base_mgr.add_handler(handler.clone(), true);
+                base_mgr.add_handler(handler, true);
             }
             Some(Callbacks::Manager(base_mgr))
         }
-        (Some(Callbacks::Handlers(base_handlers)), Some(Callbacks::Manager(new_mgr))) => {
-            let mut merged = new_mgr.clone();
-            for handler in &base_handlers {
-                merged.add_handler(handler.clone(), true);
+        (Some(Callbacks::Handlers(base_handlers)), Some(Callbacks::Manager(mut new_mgr))) => {
+            for handler in base_handlers {
+                new_mgr.add_handler(handler, true);
             }
-            Some(Callbacks::Manager(merged))
+            Some(Callbacks::Manager(new_mgr))
         }
         (Some(Callbacks::Manager(base_mgr)), Some(Callbacks::Manager(new_mgr))) => {
-            Some(Callbacks::Manager(base_mgr.merge(new_mgr)))
+            Some(Callbacks::Manager(base_mgr.merge(&new_mgr)))
         }
     }
 }

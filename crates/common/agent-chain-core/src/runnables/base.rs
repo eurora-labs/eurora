@@ -21,6 +21,36 @@ use super::utils::{Addable, ConfigurableFieldSpec, get_unique_config_specs};
 
 pub type ConfigFactory = Arc<dyn Fn(&RunnableConfig) -> RunnableConfig + Send + Sync>;
 
+struct ConcurrencyGate {
+    active: std::sync::Mutex<usize>,
+    cvar: std::sync::Condvar,
+    max: usize,
+}
+
+impl ConcurrencyGate {
+    fn new(max: usize) -> Arc<Self> {
+        Arc::new(Self {
+            active: std::sync::Mutex::new(0),
+            cvar: std::sync::Condvar::new(),
+            max,
+        })
+    }
+
+    fn acquire(&self) {
+        let mut active = self.active.lock().unwrap();
+        while *active >= self.max {
+            active = self.cvar.wait(active).unwrap();
+        }
+        *active += 1;
+    }
+
+    fn release(&self) {
+        let mut active = self.active.lock().unwrap();
+        *active -= 1;
+        self.cvar.notify_one();
+    }
+}
+
 fn default_get_graph(
     runnable: &(impl Runnable + ?Sized),
     config: Option<&RunnableConfig>,
@@ -333,23 +363,12 @@ pub trait Runnable: Send + Sync + Debug {
         let mut results: Vec<Option<Result<Self::Output>>> = (0..len).map(|_| None).collect();
 
         std::thread::scope(|scope| {
-            let gate = max_concurrency.map(|max| {
-                Arc::new((
-                    std::sync::Mutex::new(0usize),
-                    std::sync::Condvar::new(),
-                    max,
-                ))
-            });
+            let gate = max_concurrency.map(ConcurrencyGate::new);
             let mut handles = Vec::with_capacity(len);
 
             for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
                 if let Some(ref gate) = gate {
-                    let (lock, cvar, max) = gate.as_ref();
-                    let mut active = lock.lock().unwrap();
-                    while *active >= *max {
-                        active = cvar.wait(active).unwrap();
-                    }
-                    *active += 1;
+                    gate.acquire();
                 }
                 let gate = gate.clone();
 
@@ -374,10 +393,7 @@ pub trait Runnable: Send + Sync + Debug {
                         self.invoke(input, Some(config))
                     };
                     if let Some(ref gate) = gate {
-                        let (lock, cvar, _) = gate.as_ref();
-                        let mut active = lock.lock().unwrap();
-                        *active -= 1;
-                        cvar.notify_one();
+                        gate.release();
                     }
                     (i, result)
                 });
@@ -499,22 +515,11 @@ pub trait Runnable: Send + Sync + Debug {
         let (sender, receiver) = std::sync::mpsc::channel();
 
         std::thread::scope(|scope| {
-            let gate = max_concurrency.map(|max| {
-                Arc::new((
-                    std::sync::Mutex::new(0usize),
-                    std::sync::Condvar::new(),
-                    max,
-                ))
-            });
+            let gate = max_concurrency.map(ConcurrencyGate::new);
 
             for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
                 if let Some(ref gate) = gate {
-                    let (lock, cvar, max) = gate.as_ref();
-                    let mut active = lock.lock().unwrap();
-                    while *active >= *max {
-                        active = cvar.wait(active).unwrap();
-                    }
-                    *active += 1;
+                    gate.acquire();
                 }
                 let gate = gate.clone();
                 let tx = sender.clone();
@@ -540,10 +545,7 @@ pub trait Runnable: Send + Sync + Debug {
                         self.invoke(input, Some(config))
                     };
                     if let Some(ref gate) = gate {
-                        let (lock, cvar, _) = gate.as_ref();
-                        let mut active = lock.lock().unwrap();
-                        *active -= 1;
-                        cvar.notify_one();
+                        gate.release();
                     }
                     tx.send((i, result))
                         .expect("receiver should not be dropped");
@@ -715,25 +717,7 @@ pub trait Runnable: Send + Sync + Debug {
     where
         Self: 'static,
     {
-        Box::pin(async_stream::stream! {
-            let mut final_input: Option<Self::Input> = None;
-            let mut input = input;
-
-            while let Some(ichunk) = input.next().await {
-                if let Some(ref mut current) = final_input {
-                    *current = ichunk;
-                } else {
-                    final_input = Some(ichunk);
-                }
-            }
-
-            if let Some(input) = final_input {
-                let mut stream = self.astream(input, config);
-                while let Some(output) = stream.next().await {
-                    yield output;
-                }
-            }
-        })
+        self.transform(input, config)
     }
 
     fn pipe<R2>(self, other: R2) -> RunnableSequence<Self, R2>

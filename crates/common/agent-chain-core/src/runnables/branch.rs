@@ -11,7 +11,9 @@ use crate::error::{Error, Result};
 use crate::load::{Serializable, Serialized, SerializedConstructor};
 
 use super::base::{DynRunnable, Runnable, RunnableLambda, RunnableSerializable};
-use super::config::{RunnableConfig, ensure_config, get_callback_manager_for_config, patch_config};
+use super::config::{
+    RunnableConfig, child_config, ensure_config, finish_chain_run, start_chain_run,
+};
 
 pub struct RunnableBranch<I, O>
 where
@@ -167,52 +169,29 @@ where
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let config = ensure_config(config);
-        let callback_manager = get_callback_manager_for_config(&config);
-        let run_manager = callback_manager
-            .on_chain_start()
-            .serialized(&HashMap::new())
-            .inputs(&HashMap::new())
-            .maybe_run_id(config.run_id)
-            .call();
+        let (run_manager, config) = start_chain_run(config);
 
         let result = (|| {
             for (idx, (condition, runnable)) in self.branches.iter().enumerate() {
-                let condition_config = patch_config()
-                    .config(config.clone())
-                    .callbacks(run_manager.get_child(Some(&format!("condition:{}", idx + 1))))
-                    .call();
-
+                let condition_config = child_config(
+                    &config,
+                    &run_manager,
+                    Some(&format!("condition:{}", idx + 1)),
+                );
                 let expression_value = condition.invoke(input.clone(), Some(condition_config))?;
 
                 if expression_value {
-                    let branch_config = patch_config()
-                        .config(config.clone())
-                        .callbacks(run_manager.get_child(Some(&format!("branch:{}", idx + 1))))
-                        .call();
-
+                    let branch_config =
+                        child_config(&config, &run_manager, Some(&format!("branch:{}", idx + 1)));
                     return runnable.invoke(input.clone(), Some(branch_config));
                 }
             }
 
-            let default_config = patch_config()
-                .config(config.clone())
-                .callbacks(run_manager.get_child(Some("branch:default")))
-                .call();
-
+            let default_config = child_config(&config, &run_manager, Some("branch:default"));
             self.default.invoke(input, Some(default_config))
         })();
 
-        match &result {
-            Ok(_) => {
-                run_manager.on_chain_end(&HashMap::new());
-            }
-            Err(e) => {
-                run_manager.on_chain_error(e);
-            }
-        }
-
-        result
+        finish_chain_run(&run_manager, result)
     }
 
     async fn ainvoke(
@@ -223,19 +202,32 @@ where
     where
         Self: 'static,
     {
-        let config = ensure_config(config);
+        let (run_manager, config) = start_chain_run(config);
 
-        for (condition, runnable) in self.branches.iter() {
-            let expression_value = condition
-                .ainvoke(input.clone(), Some(config.clone()))
-                .await?;
+        let result: Result<Self::Output> = async {
+            for (idx, (condition, runnable)) in self.branches.iter().enumerate() {
+                let condition_config = child_config(
+                    &config,
+                    &run_manager,
+                    Some(&format!("condition:{}", idx + 1)),
+                );
+                let expression_value = condition
+                    .ainvoke(input.clone(), Some(condition_config))
+                    .await?;
 
-            if expression_value {
-                return runnable.ainvoke(input.clone(), Some(config.clone())).await;
+                if expression_value {
+                    let branch_config =
+                        child_config(&config, &run_manager, Some(&format!("branch:{}", idx + 1)));
+                    return runnable.ainvoke(input.clone(), Some(branch_config)).await;
+                }
             }
-        }
 
-        self.default.ainvoke(input, Some(config)).await
+            let default_config = child_config(&config, &run_manager, Some("branch:default"));
+            self.default.ainvoke(input, Some(default_config)).await
+        }
+        .await;
+
+        finish_chain_run(&run_manager, result)
     }
 
     fn stream(
@@ -243,34 +235,7 @@ where
         input: Self::Input,
         config: Option<RunnableConfig>,
     ) -> BoxStream<'_, Result<Self::Output>> {
-        let config = ensure_config(config);
-
-        Box::pin(async_stream::stream! {
-            'outer: {
-                for (condition, runnable) in self.branches.iter() {
-                    let expression_value = match condition.invoke(input.clone(), Some(config.clone())) {
-                        Ok(v) => v,
-                        Err(e) => {
-                            yield Err(e);
-                            break 'outer;
-                        }
-                    };
-
-                    if expression_value {
-                        let mut stream = runnable.stream(input.clone(), Some(config.clone()));
-                        while let Some(chunk_result) = stream.next().await {
-                            yield chunk_result;
-                        }
-                        break 'outer;
-                    }
-                }
-
-                let mut stream = self.default.stream(input, Some(config.clone()));
-                while let Some(chunk_result) = stream.next().await {
-                    yield chunk_result;
-                }
-            }
-        })
+        self.astream(input, config)
     }
 
     fn astream(
