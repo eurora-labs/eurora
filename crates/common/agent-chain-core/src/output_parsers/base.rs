@@ -1,7 +1,5 @@
 use std::fmt::Debug;
 
-use async_trait::async_trait;
-
 use crate::error::{Error, Result};
 use crate::messages::BaseMessage;
 use crate::outputs::{ChatGeneration, Generation};
@@ -9,52 +7,57 @@ use crate::prompt_values::PromptValue;
 use crate::runnables::RunnableConfig;
 use crate::runnables::base::Runnable;
 
-#[async_trait]
 pub trait BaseLLMOutputParser: Send + Sync + Debug {
     type Output: Send + Sync + Clone + Debug;
 
     fn parse_result(&self, result: &[Generation], partial: bool) -> Result<Self::Output>;
 
-    async fn aparse_result(&self, result: &[Generation], partial: bool) -> Result<Self::Output> {
-        self.parse_result(result, partial)
+    fn aparse_result(
+        &self,
+        result: &[Generation],
+        partial: bool,
+    ) -> impl Future<Output = Result<Self::Output>> + Send {
+        async move { self.parse_result(result, partial) }
     }
 }
 
-#[async_trait]
 pub trait BaseGenerationOutputParser: BaseLLMOutputParser {
     fn invoke(&self, input: BaseMessage, _config: Option<RunnableConfig>) -> Result<Self::Output> {
         let chat_gen = ChatGeneration::builder().message(input).build();
         self.parse_result(&[Generation::builder().text(&chat_gen.text).build()], false)
     }
 
-    async fn ainvoke(
+    fn ainvoke(
         &self,
         input: BaseMessage,
         config: Option<RunnableConfig>,
-    ) -> Result<Self::Output> {
-        self.invoke(input, config)
+    ) -> impl Future<Output = Result<Self::Output>> + Send {
+        async move { self.invoke(input, config) }
     }
 }
 
-#[async_trait]
 pub trait BaseOutputParser: Send + Sync + Debug {
     type Output: Send + Sync + Clone + Debug;
 
     fn parse(&self, text: &str) -> Result<Self::Output>;
 
-    async fn aparse(&self, text: &str) -> Result<Self::Output> {
-        self.parse(text)
+    fn aparse(&self, text: &str) -> impl Future<Output = Result<Self::Output>> + Send {
+        async move { self.parse(text) }
     }
 
     fn parse_result(&self, result: &[Generation], _partial: bool) -> Result<Self::Output> {
-        let first = result.first().ok_or_else(|| {
-            Error::Other("parse_result called with empty result list".to_string())
-        })?;
+        let first = result
+            .first()
+            .ok_or_else(|| Error::output_parser_simple("parse_result called with empty list"))?;
         self.parse(&first.text)
     }
 
-    async fn aparse_result(&self, result: &[Generation], partial: bool) -> Result<Self::Output> {
-        self.parse_result(result, partial)
+    fn aparse_result(
+        &self,
+        result: &[Generation],
+        partial: bool,
+    ) -> impl Future<Output = Result<Self::Output>> + Send {
+        async move { self.parse_result(result, partial) }
     }
 
     fn parse_with_prompt(
@@ -66,7 +69,7 @@ pub trait BaseOutputParser: Send + Sync + Debug {
     }
 
     fn get_format_instructions(&self) -> Result<String> {
-        Err(Error::Other(
+        Err(Error::NotImplemented(
             "get_format_instructions not implemented".to_string(),
         ))
     }
@@ -78,12 +81,12 @@ pub trait BaseOutputParser: Send + Sync + Debug {
         self.parse_result(&[Generation::builder().text(&chat_gen.text).build()], false)
     }
 
-    async fn ainvoke(
+    fn ainvoke(
         &self,
         input: BaseMessage,
         config: Option<RunnableConfig>,
-    ) -> Result<Self::Output> {
-        self.invoke(input, config)
+    ) -> impl Future<Output = Result<Self::Output>> + Send {
+        async move { self.invoke(input, config) }
     }
 
     fn into_runnable(self) -> RunnableOutputParser<Self>
@@ -94,7 +97,8 @@ pub trait BaseOutputParser: Send + Sync + Debug {
     }
 }
 
-pub struct RunnableOutputParser<P> {
+#[derive(Debug)]
+pub struct RunnableOutputParser<P: Debug> {
     parser: P,
 }
 
@@ -112,15 +116,7 @@ impl<P: BaseOutputParser> RunnableOutputParser<P> {
     }
 }
 
-impl<P: BaseOutputParser> Debug for RunnableOutputParser<P> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RunnableOutputParser")
-            .field("parser", &self.parser)
-            .finish()
-    }
-}
-
-#[async_trait]
+#[async_trait::async_trait]
 impl<P> Runnable for RunnableOutputParser<P>
 where
     P: BaseOutputParser + 'static,

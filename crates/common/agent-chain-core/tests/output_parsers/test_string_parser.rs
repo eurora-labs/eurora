@@ -127,13 +127,13 @@ async fn test_str_output_parser_transform_message_chunks() {
 }
 
 #[tokio::test]
-async fn test_str_output_parser_atransform_string_chunks() {
+async fn test_str_output_parser_transform_string_chunks_2() {
     let parser = StrOutputParser::new();
     let chunks = vec!["Async", " ", "test"];
 
     let input_stream = futures::stream::iter(chunks.iter().map(|s| BaseMessage::from(*s)));
     let result: Vec<String> = parser
-        .atransform(Box::pin(input_stream))
+        .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
         .collect()
         .await;
@@ -142,7 +142,7 @@ async fn test_str_output_parser_atransform_string_chunks() {
 }
 
 #[tokio::test]
-async fn test_str_output_parser_atransform_message_chunks() {
+async fn test_str_output_parser_transform_message_chunks_2() {
     let parser = StrOutputParser::new();
     let chunks = vec![
         BaseMessageChunk::AI(AIMessageChunk::builder().content("Async").build()),
@@ -152,7 +152,7 @@ async fn test_str_output_parser_atransform_message_chunks() {
 
     let input_stream = futures::stream::iter(chunks.into_iter().map(|c| c.to_message()));
     let result: Vec<String> = parser
-        .atransform(Box::pin(input_stream))
+        .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
         .collect()
         .await;
@@ -305,12 +305,12 @@ async fn test_str_output_parser_transform_empty_iterator() {
 }
 
 #[tokio::test]
-async fn test_str_output_parser_atransform_empty_iterator() {
+async fn test_str_output_parser_transform_empty_iterator_2() {
     let parser = StrOutputParser::new();
 
     let input_stream = futures::stream::iter(Vec::<BaseMessage>::new());
     let result: Vec<String> = parser
-        .atransform(Box::pin(input_stream))
+        .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
         .collect()
         .await;
