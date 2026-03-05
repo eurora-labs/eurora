@@ -27,13 +27,12 @@ pub trait ListOutputParser: BaseOutputParser<Output = Vec<String>> {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct CommaSeparatedListOutputParser {
-    _private: (),
-}
+#[non_exhaustive]
+pub struct CommaSeparatedListOutputParser;
 
 impl CommaSeparatedListOutputParser {
     pub fn new() -> Self {
-        Self { _private: () }
+        Self
     }
 
     pub fn is_lc_serializable() -> bool {

@@ -948,7 +948,7 @@ impl crate::callbacks::BaseCallbackHandler for LogStreamCallbackHandlerBridge {
         parent_run_id: Option<Uuid>,
         tags: Option<&[String]>,
         metadata: Option<&HashMap<String, serde_json::Value>>,
-        _name: Option<&str>,
+        name: Option<&str>,
     ) {
         let mut handler = self.inner.lock().expect("lock poisoned");
         handler.handle_retriever_start(
@@ -958,7 +958,7 @@ impl crate::callbacks::BaseCallbackHandler for LogStreamCallbackHandlerBridge {
             parent_run_id,
             tags.map(|t| t.to_vec()),
             metadata.cloned(),
-            None,
+            name.map(|n| n.to_string()),
             HashMap::new(),
         );
     }

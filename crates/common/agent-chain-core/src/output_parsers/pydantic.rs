@@ -20,7 +20,7 @@ use crate::utils::json::parse_partial_json;
 pub struct PydanticOutputParser<T> {
     name: String,
     schema: Value,
-    _marker: PhantomData<T>,
+    _phantom: PhantomData<T>,
 }
 
 impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq> PydanticOutputParser<T> {
@@ -28,7 +28,7 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq> PydanticOutp
         Self {
             name: name.into(),
             schema,
-            _marker: PhantomData,
+            _phantom: PhantomData,
         }
     }
 

@@ -904,7 +904,6 @@ impl BaseCallbackHandler for AstreamEventsCallbackHandler {
         metadata: Option<&HashMap<String, serde_json::Value>>,
         name: Option<&str>,
     ) {
-        let _name = name;
         self.handle_retriever_start(
             serialized,
             query,
@@ -912,7 +911,7 @@ impl BaseCallbackHandler for AstreamEventsCallbackHandler {
             parent_run_id,
             tags.map(|t| t.to_vec()),
             metadata.cloned(),
-            None,
+            name,
         );
     }
 
