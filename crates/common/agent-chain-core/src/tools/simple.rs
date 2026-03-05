@@ -13,10 +13,7 @@ use crate::callbacks::manager::CallbackManagerForToolRun;
 use crate::error::{Error, Result};
 use crate::runnables::RunnableConfig;
 
-use super::base::{
-    ArgsSchema, BaseTool, HandleToolError, HandleValidationError, ResponseFormat, ToolInput,
-    ToolOutput,
-};
+use super::base::{ArgsSchema, BaseTool, ErrorHandler, ResponseFormat, ToolInput, ToolOutput};
 
 pub type ToolFunc = Arc<dyn Fn(String) -> Result<String> + Send + Sync>;
 
@@ -31,8 +28,8 @@ pub struct Tool {
     args_schema: Option<ArgsSchema>,
     return_direct: bool,
     verbose: bool,
-    handle_tool_error: HandleToolError,
-    handle_validation_error: HandleValidationError,
+    handle_tool_error: ErrorHandler,
+    handle_validation_error: ErrorHandler,
     response_format: ResponseFormat,
     tags: Option<Vec<String>>,
     metadata: Option<HashMap<String, Value>>,
@@ -62,8 +59,8 @@ impl Tool {
         args_schema: Option<ArgsSchema>,
         #[builder(default)] return_direct: bool,
         #[builder(default)] verbose: bool,
-        #[builder(default)] handle_tool_error: HandleToolError,
-        #[builder(default)] handle_validation_error: HandleValidationError,
+        #[builder(default)] handle_tool_error: ErrorHandler,
+        #[builder(default)] handle_validation_error: ErrorHandler,
         #[builder(default)] response_format: ResponseFormat,
         tags: Option<Vec<String>>,
         metadata: Option<HashMap<String, Value>>,
@@ -103,27 +100,6 @@ impl Tool {
             .build()
     }
 
-    pub fn from_function_full<F>(
-        func: F,
-        name: impl Into<String>,
-        description: impl Into<String>,
-        return_direct: bool,
-        args_schema: Option<ArgsSchema>,
-        coroutine: Option<AsyncToolFunc>,
-    ) -> Self
-    where
-        F: Fn(String) -> Result<String> + Send + Sync + 'static,
-    {
-        Self::builder()
-            .name(name)
-            .description(description)
-            .func(Arc::new(func))
-            .return_direct(return_direct)
-            .maybe_args_schema(args_schema)
-            .maybe_coroutine(coroutine)
-            .build()
-    }
-
     pub fn from_function_with_async<F, AF, Fut>(
         func: F,
         coroutine: AF,
@@ -146,41 +122,34 @@ impl Tool {
     fn extract_single_input(&self, input: ToolInput) -> Result<String> {
         match input {
             ToolInput::String(s) => Ok(s),
-            ToolInput::Dict(d) => {
-                if d.len() != 1 {
-                    return Err(Error::ToolInvocation(format!(
-                        "Too many arguments to single-input tool {}. \
-                         Consider using StructuredTool instead. Args: {:?}",
-                        self.name, d
-                    )));
+            ToolInput::Dict(d) => self.extract_single_value_from_map(d.len(), d.into_values()),
+            ToolInput::ToolCall(tc) => match tc.args {
+                Value::Object(obj) => {
+                    self.extract_single_value_from_map(obj.len(), obj.into_values())
                 }
-                let value = d.into_values().next().expect("checked len == 1");
-                match value {
-                    Value::String(s) => Ok(s),
-                    other => Ok(other.to_string()),
-                }
-            }
-            ToolInput::ToolCall(tc) => {
-                if let Some(obj) = tc.args.as_object() {
-                    if obj.len() != 1 {
-                        return Err(Error::ToolInvocation(format!(
-                            "Too many arguments to single-input tool {}. \
-                             Consider using StructuredTool instead.",
-                            self.name,
-                        )));
-                    }
-                    let value = obj.values().next().expect("checked len == 1");
-                    match value {
-                        Value::String(s) => Ok(s.clone()),
-                        other => Ok(other.to_string()),
-                    }
-                } else if let Some(s) = tc.args.as_str() {
-                    Ok(s.to_string())
-                } else {
-                    Ok(tc.args.to_string())
-                }
-            }
+                Value::String(s) => Ok(s),
+                other => Ok(other.to_string()),
+            },
         }
+    }
+
+    fn extract_single_value_from_map(
+        &self,
+        len: usize,
+        mut values: impl Iterator<Item = Value>,
+    ) -> Result<String> {
+        if len != 1 {
+            return Err(Error::ToolInvocation(format!(
+                "Too many arguments to single-input tool {}. \
+                 Consider using StructuredTool instead.",
+                self.name,
+            )));
+        }
+        let value = values.next().expect("checked len == 1");
+        Ok(match value {
+            Value::String(s) => s,
+            other => other.to_string(),
+        })
     }
 }
 
@@ -214,11 +183,11 @@ impl BaseTool for Tool {
         self.metadata.as_ref()
     }
 
-    fn handle_tool_error(&self) -> &HandleToolError {
+    fn handle_tool_error(&self) -> &ErrorHandler {
         &self.handle_tool_error
     }
 
-    fn handle_validation_error(&self) -> &HandleValidationError {
+    fn handle_validation_error(&self) -> &ErrorHandler {
         &self.handle_validation_error
     }
 

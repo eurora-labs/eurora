@@ -14,8 +14,7 @@ use crate::error::{Error, Result};
 use crate::runnables::RunnableConfig;
 
 use super::base::{
-    ArgsSchema, BaseTool, FILTERED_ARGS, HandleToolError, HandleValidationError, ResponseFormat,
-    ToolInput, ToolOutput,
+    ArgsSchema, BaseTool, ErrorHandler, FILTERED_ARGS, ResponseFormat, ToolInput, ToolOutput,
 };
 
 pub type StructuredToolFunc = Arc<dyn Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync>;
@@ -34,8 +33,8 @@ pub struct StructuredTool {
     args_schema: ArgsSchema,
     return_direct: bool,
     verbose: bool,
-    handle_tool_error: HandleToolError,
-    handle_validation_error: HandleValidationError,
+    handle_tool_error: ErrorHandler,
+    handle_validation_error: ErrorHandler,
     response_format: ResponseFormat,
     tags: Option<Vec<String>>,
     metadata: Option<HashMap<String, Value>>,
@@ -66,8 +65,8 @@ impl StructuredTool {
         coroutine: Option<AsyncStructuredToolFunc>,
         #[builder(default)] return_direct: bool,
         #[builder(default)] verbose: bool,
-        #[builder(default)] handle_tool_error: HandleToolError,
-        #[builder(default)] handle_validation_error: HandleValidationError,
+        #[builder(default)] handle_tool_error: ErrorHandler,
+        #[builder(default)] handle_validation_error: ErrorHandler,
         #[builder(default)] response_format: ResponseFormat,
         tags: Option<Vec<String>>,
         metadata: Option<HashMap<String, Value>>,
@@ -157,12 +156,12 @@ impl StructuredTool {
                 }),
         }
     }
+}
 
-    fn filter_args(&self, args: HashMap<String, Value>) -> HashMap<String, Value> {
-        args.into_iter()
-            .filter(|(k, _)| !FILTERED_ARGS.contains(&k.as_str()))
-            .collect()
-    }
+fn filter_args(args: HashMap<String, Value>) -> HashMap<String, Value> {
+    args.into_iter()
+        .filter(|(k, _)| !FILTERED_ARGS.contains(&k.as_str()))
+        .collect()
 }
 
 fn value_to_tool_output(value: Value) -> ToolOutput {
@@ -202,11 +201,11 @@ impl BaseTool for StructuredTool {
         self.metadata.as_ref()
     }
 
-    fn handle_tool_error(&self) -> &HandleToolError {
+    fn handle_tool_error(&self) -> &ErrorHandler {
         &self.handle_tool_error
     }
 
-    fn handle_validation_error(&self) -> &HandleValidationError {
+    fn handle_validation_error(&self) -> &ErrorHandler {
         &self.handle_validation_error
     }
 
@@ -228,7 +227,7 @@ impl BaseTool for StructuredTool {
         _run_manager: Option<&CallbackManagerForToolRun>,
         _config: &RunnableConfig,
     ) -> Result<ToolOutput> {
-        let args = self.filter_args(self.extract_args(input)?);
+        let args = filter_args(self.extract_args(input)?);
 
         let func = self.func.as_ref().ok_or_else(|| {
             Error::ToolInvocation("StructuredTool does not support sync invocation.".to_string())
@@ -244,7 +243,7 @@ impl BaseTool for StructuredTool {
         config: &RunnableConfig,
     ) -> Result<ToolOutput> {
         if let Some(coroutine) = &self.coroutine {
-            let args = self.filter_args(self.extract_args(input)?);
+            let args = filter_args(self.extract_args(input)?);
             coroutine(args).await.map(value_to_tool_output)
         } else {
             self.tool_run(input, run_manager, config)

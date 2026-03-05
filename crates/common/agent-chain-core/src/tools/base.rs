@@ -100,9 +100,6 @@ impl Debug for ErrorHandler {
     }
 }
 
-pub type HandleToolError = ErrorHandler;
-pub type HandleValidationError = ErrorHandler;
-
 impl ErrorHandler {
     pub fn handle(&self, error_msg: &str, default_msg: &str) -> Option<String> {
         match self {
@@ -249,11 +246,11 @@ pub trait BaseTool: Send + Sync + Debug {
         None
     }
 
-    fn handle_tool_error(&self) -> &HandleToolError {
+    fn handle_tool_error(&self) -> &ErrorHandler {
         &ErrorHandler::Ignore
     }
 
-    fn handle_validation_error(&self) -> &HandleValidationError {
+    fn handle_validation_error(&self) -> &ErrorHandler {
         &ErrorHandler::Ignore
     }
 
@@ -453,8 +450,13 @@ trait BaseToolExt: BaseTool {
                     ResponseFormat::Content => (output, None),
                 };
 
-                let formatted =
-                    format_output(content, artifact, tool_call_id, self.name(), "success");
+                let formatted = format_output(
+                    content,
+                    artifact,
+                    tool_call_id,
+                    self.name(),
+                    crate::messages::ToolStatus::Success,
+                );
                 run_manager.on_tool_end(&formatted.to_string_lossy());
                 Ok(formatted)
             }
@@ -469,7 +471,7 @@ trait BaseToolExt: BaseTool {
                         None,
                         tool_call_id,
                         self.name(),
-                        "error",
+                        crate::messages::ToolStatus::Error,
                     );
                     run_manager.on_tool_end(&handled);
                     return Ok(formatted);
@@ -484,7 +486,7 @@ trait BaseToolExt: BaseTool {
                         None,
                         tool_call_id,
                         self.name(),
-                        "error",
+                        crate::messages::ToolStatus::Error,
                     );
                     run_manager.on_tool_end(&handled);
                     return Ok(formatted);
@@ -556,12 +558,6 @@ impl crate::runnables::base::Runnable for ToolRunnable {
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct InjectedToolArg;
-
-#[derive(Debug, Clone, Default)]
-pub struct InjectedToolCallId;
-
 pub fn is_tool_call(input: &Value) -> bool {
     input.get("type").and_then(|t| t.as_str()) == Some("tool_call")
 }
@@ -571,7 +567,7 @@ pub fn format_output(
     artifact: Option<Value>,
     tool_call_id: Option<&str>,
     name: &str,
-    status: &str,
+    status: crate::messages::ToolStatus,
 ) -> ToolOutput {
     let tool_call_id = match tool_call_id {
         Some(id) => id,
@@ -589,15 +585,10 @@ pub fn format_output(
         ToolOutput::Message(_) => unreachable!(),
     };
 
-    let status_enum = match status {
-        "error" => crate::messages::ToolStatus::Error,
-        _ => crate::messages::ToolStatus::Success,
-    };
-
     let msg = ToolMessage::builder()
         .content(content_str)
         .tool_call_id(tool_call_id)
-        .status(status_enum)
+        .status(status)
         .name(name.to_string())
         .maybe_artifact(artifact)
         .build();
