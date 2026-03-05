@@ -17,7 +17,9 @@ use serde_json::Value;
 use crate::error::{Error, Result};
 
 use super::base::{Runnable, RunnableParallel};
-use super::config::{RunnableConfig, ensure_config, get_callback_manager_for_config, patch_config};
+use super::config::{
+    RunnableConfig, child_config, ensure_config, finish_chain_run, start_chain_run,
+};
 
 pub struct RunnablePassthrough<I>
 where
@@ -185,30 +187,23 @@ where
         let config = ensure_config(config);
 
         if self.func.is_none() {
-            Box::pin(input.map(Ok))
-        } else {
-            let func = self.func.clone();
-            Box::pin(async_stream::stream! {
-                let mut final_input: Option<Self::Input> = None;
-                let mut first_chunk = true;
-                let mut input = input;
-
-                while let Some(chunk) = input.next().await {
-                    yield Ok(chunk.clone());
-
-                    if first_chunk {
-                        final_input = Some(chunk);
-                        first_chunk = false;
-                    } else if let Some(ref mut current) = final_input {
-                        *current = chunk;
-                    }
-                }
-
-                if let (Some(func), Some(final_val)) = (func, final_input) {
-                    func(&final_val, &config);
-                }
-            })
+            return Box::pin(input.map(Ok));
         }
+
+        let func = self.func.clone();
+        Box::pin(async_stream::stream! {
+            let mut last_input: Option<Self::Input> = None;
+            let mut input = input;
+
+            while let Some(chunk) = input.next().await {
+                yield Ok(chunk.clone());
+                last_input = Some(chunk);
+            }
+
+            if let (Some(func), Some(val)) = (func, last_input) {
+                func(&val, &config);
+            }
+        })
     }
 
     fn atransform<'a>(
@@ -222,35 +217,28 @@ where
         let config = ensure_config(config);
 
         if self.func.is_none() && self.afunc.is_none() {
-            Box::pin(input.map(Ok))
-        } else {
-            let func = self.func.clone();
-            let afunc = self.afunc.clone();
-            Box::pin(async_stream::stream! {
-                let mut final_input: Option<Self::Input> = None;
-                let mut first_chunk = true;
-                let mut input = input;
-
-                while let Some(chunk) = input.next().await {
-                    yield Ok(chunk.clone());
-
-                    if first_chunk {
-                        final_input = Some(chunk);
-                        first_chunk = false;
-                    } else if let Some(ref mut current) = final_input {
-                        *current = chunk;
-                    }
-                }
-
-                if let Some(final_val) = final_input {
-                    if let Some(ref afunc) = afunc {
-                        afunc(&final_val, &config).await;
-                    } else if let Some(ref func) = func {
-                        func(&final_val, &config);
-                    }
-                }
-            })
+            return Box::pin(input.map(Ok));
         }
+
+        let func = self.func.clone();
+        let afunc = self.afunc.clone();
+        Box::pin(async_stream::stream! {
+            let mut last_input: Option<Self::Input> = None;
+            let mut input = input;
+
+            while let Some(chunk) = input.next().await {
+                yield Ok(chunk.clone());
+                last_input = Some(chunk);
+            }
+
+            if let Some(val) = last_input {
+                if let Some(ref afunc) = afunc {
+                    afunc(&val, &config).await;
+                } else if let Some(ref func) = func {
+                    func(&val, &config);
+                }
+            }
+        })
     }
 }
 
@@ -357,9 +345,7 @@ impl Runnable for RunnableAssign {
             &|input: HashMap<String, Value>, config: &RunnableConfig| {
                 let mapper_output = self.mapper.invoke(input.clone(), Some(config.clone()))?;
                 let mut result = input;
-                for (key, value) in mapper_output {
-                    result.insert(key, value);
-                }
+                result.extend(mapper_output);
                 Ok(result)
             },
             input,
@@ -375,36 +361,17 @@ impl Runnable for RunnableAssign {
     where
         Self: 'static,
     {
-        let config = ensure_config(config);
-        let callback_manager = get_callback_manager_for_config(&config);
+        let (run_manager, config) = start_chain_run(config);
+        let cfg = child_config(&config, &run_manager, None);
 
-        let run_manager = callback_manager
-            .on_chain_start()
-            .serialized(&HashMap::new())
-            .inputs(&HashMap::new())
-            .maybe_run_id(config.run_id)
-            .call();
-
-        let child_config = patch_config()
-            .config(config)
-            .callbacks(run_manager.get_child(None))
-            .call();
-
-        let mapper_output = match self.mapper.ainvoke(input.clone(), Some(child_config)).await {
+        let mapper_output = match self.mapper.ainvoke(input.clone(), Some(cfg)).await {
             Ok(output) => output,
-            Err(e) => {
-                run_manager.on_chain_error(&e);
-                return Err(e);
-            }
+            Err(e) => return finish_chain_run(&run_manager, Err(e)),
         };
 
         let mut result = input;
-        for (key, value) in mapper_output {
-            result.insert(key, value);
-        }
-
-        run_manager.on_chain_end(&HashMap::new());
-        Ok(result)
+        result.extend(mapper_output);
+        finish_chain_run(&run_manager, Ok(result))
     }
 
     fn stream(

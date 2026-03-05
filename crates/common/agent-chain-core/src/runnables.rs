@@ -22,10 +22,11 @@ pub use base::{
 };
 pub use branch::{RunnableBranch, RunnableBranchFluentBuilder};
 pub use config::{
-    AsyncVariableArgsFn, ConfigContextGuard, ConfigOrList, DEFAULT_RECURSION_LIMIT, RunnableConfig,
-    VariableArgsFn, acall_func_with_variable_args, call_func_with_variable_args, ensure_config,
-    get_callback_manager_for_config, get_child_runnable_config, get_config_list, merge_configs,
-    patch_config, run_in_executor, set_config_context,
+    AsyncVariableArgsFn, ConfigContextGuard, ConfigOrList, DEFAULT_RECURSION_LIMIT, EMPTY_MAP,
+    RunnableConfig, VariableArgsFn, acall_func_with_variable_args, call_func_with_variable_args,
+    child_config, ensure_config, finish_chain_run, get_callback_manager_for_config,
+    get_child_runnable_config, get_config_list, merge_configs, patch_config, run_in_executor,
+    set_config_context, start_chain_run,
 };
 pub use configurable::{
     Alternative, ConfigurableRunnable, DynamicRunnable, Reconfigurable,
