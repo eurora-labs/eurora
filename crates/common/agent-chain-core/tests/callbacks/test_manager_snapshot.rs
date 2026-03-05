@@ -165,6 +165,7 @@ impl BaseCallbackHandler for RecordingHandler {
         _parent_run_id: Option<Uuid>,
         _tags: Option<&[String]>,
         _metadata: Option<&HashMap<String, serde_json::Value>>,
+        _name: Option<&str>,
     ) {
         self.record("on_chat_model_start");
     }
@@ -479,7 +480,7 @@ fn test_callback_manager_on_chat_model_start_returns_managers_per_message_list()
         vec![HumanMessage::builder().content("a").build().into()],
         vec![HumanMessage::builder().content("b").build().into()],
     ];
-    let managers = mgr.on_chat_model_start(&HashMap::new(), &msgs, None);
+    let managers = mgr.on_chat_model_start(&HashMap::new(), &msgs, None, None);
     assert_eq!(managers.len(), 2);
 }
 
@@ -494,7 +495,7 @@ fn test_callback_manager_on_chat_model_start_uses_provided_run_id_for_first() {
         vec![HumanMessage::builder().content("a").build().into()],
         vec![HumanMessage::builder().content("b").build().into()],
     ];
-    let managers = mgr.on_chat_model_start(&HashMap::new(), &msgs, Some(rid));
+    let managers = mgr.on_chat_model_start(&HashMap::new(), &msgs, Some(rid), None);
     assert_eq!(managers[0].run_id(), rid);
     assert_ne!(managers[1].run_id(), rid);
 }
@@ -771,7 +772,9 @@ async fn test_async_callback_manager_on_chat_model_start_returns_async_managers(
         vec![HumanMessage::builder().content("a").build().into()],
         vec![HumanMessage::builder().content("b").build().into()],
     ];
-    let managers = mgr.on_chat_model_start(&HashMap::new(), &msgs, None).await;
+    let managers = mgr
+        .on_chat_model_start(&HashMap::new(), &msgs, None, None)
+        .await;
     assert_eq!(managers.len(), 2);
 }
 

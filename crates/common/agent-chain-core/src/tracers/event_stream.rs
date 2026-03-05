@@ -837,6 +837,7 @@ impl BaseCallbackHandler for AstreamEventsCallbackHandler {
         parent_run_id: Option<Uuid>,
         tags: Option<&[String]>,
         metadata: Option<&HashMap<String, serde_json::Value>>,
+        name: Option<&str>,
     ) {
         self.handle_chat_model_start(
             serialized,
@@ -845,7 +846,7 @@ impl BaseCallbackHandler for AstreamEventsCallbackHandler {
             tags.map(|t| t.to_vec()),
             parent_run_id,
             metadata.cloned(),
-            None,
+            name,
         );
     }
 

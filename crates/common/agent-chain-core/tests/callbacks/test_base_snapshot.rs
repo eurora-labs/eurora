@@ -39,6 +39,7 @@ fn test_sync_handler_has_methods() {
         None,
         None,
         None,
+        None,
     );
     BaseCallbackHandler::on_chain_start(
         &handler,
