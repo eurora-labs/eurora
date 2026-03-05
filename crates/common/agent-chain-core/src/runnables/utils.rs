@@ -118,17 +118,14 @@ pub fn add<T: Addable>(addables: impl IntoIterator<Item = T>) -> Option<T> {
 }
 
 pub async fn aadd<T: Addable>(addables: impl Stream<Item = T> + Unpin) -> Option<T> {
-    let mut final_value: Option<T> = None;
-    let mut stream = addables;
-
-    while let Some(chunk) = stream.next().await {
-        final_value = match final_value {
-            None => Some(chunk),
-            Some(prev) => Some(prev.add(chunk)),
-        };
-    }
-
-    final_value
+    addables
+        .fold(None, |acc: Option<T>, chunk| async move {
+            Some(match acc {
+                None => chunk,
+                Some(prev) => prev.add(chunk),
+            })
+        })
+        .await
 }
 
 impl Addable for String {
@@ -150,23 +147,8 @@ impl Addable for AddableDict {
 }
 
 impl Addable for HashMap<String, Value> {
-    fn add(mut self, other: Self) -> Self {
-        for (key, value) in other {
-            match self.get(&key) {
-                None => {
-                    self.insert(key, value);
-                }
-                Some(existing) if existing.is_null() => {
-                    self.insert(key, value);
-                }
-                Some(existing) if !value.is_null() => {
-                    let added = try_add_values(existing, &value);
-                    self.insert(key, added);
-                }
-                _ => {}
-            }
-        }
-        self
+    fn add(self, other: Self) -> Self {
+        (AddableDict(self) + AddableDict(other)).0
     }
 }
 

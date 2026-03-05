@@ -17,8 +17,8 @@ pub mod utils;
 pub use base::{
     ConfigFactory, DynRunnable, GraphProvider, Runnable, RunnableBinding, RunnableEach,
     RunnableGenerator, RunnableGraphProvider, RunnableLambda, RunnableLambdaWithConfig,
-    RunnableMap, RunnableParallel, RunnableSequence, RunnableSerializable, TransformFn, chain,
-    coerce_map_to_runnable, coerce_to_runnable, pipe, runnable_lambda, to_dyn,
+    RunnableMap, RunnableParallel, RunnableSequence, RunnableSerializable, TransformFn, pipe,
+    runnable_lambda, to_dyn,
 };
 pub use branch::{RunnableBranch, RunnableBranchFluentBuilder};
 pub use config::{

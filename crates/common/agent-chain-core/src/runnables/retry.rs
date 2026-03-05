@@ -494,11 +494,7 @@ where
                 && self.config.wait_exponential_jitter
                 && attempt < self.config.max_attempt_number
             {
-                let wait = if self.config.wait_exponential_jitter {
-                    self.get_jitter_params().calculate_wait(attempt)
-                } else {
-                    Duration::ZERO
-                };
+                let wait = self.get_jitter_params().calculate_wait(attempt);
                 std::thread::sleep(wait);
             }
         }
@@ -615,11 +611,7 @@ where
                 && self.config.wait_exponential_jitter
                 && attempt < self.config.max_attempt_number
             {
-                let wait = if self.config.wait_exponential_jitter {
-                    self.get_jitter_params().calculate_wait(attempt)
-                } else {
-                    Duration::ZERO
-                };
+                let wait = self.get_jitter_params().calculate_wait(attempt);
                 tokio::time::sleep(wait).await;
             }
         }
