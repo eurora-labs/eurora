@@ -18,22 +18,6 @@ pub mod colors {
     pub const WHITE: &str = "\x1b[37m";
 }
 
-fn write_text(writer: &Mutex<Box<dyn Write + Send>>, text: &str, color: Option<&str>, end: &str) {
-    if let Ok(mut w) = writer.lock() {
-        let result = if let Some(c) = color {
-            write!(w, "{}{}{}{}", c, text, colors::RESET, end)
-        } else {
-            write!(w, "{}{}", text, end)
-        };
-        if let Err(e) = result {
-            tracing::warn!("StdOutCallbackHandler write error: {e}");
-        }
-        if let Err(e) = w.flush() {
-            tracing::warn!("StdOutCallbackHandler flush error: {e}");
-        }
-    }
-}
-
 #[derive(Clone)]
 pub struct StdOutCallbackHandler {
     color: Option<String>,
@@ -83,6 +67,22 @@ impl StdOutCallbackHandler {
     pub fn color(&self) -> Option<&str> {
         self.color.as_deref()
     }
+
+    fn write_text(&self, text: &str, color: Option<&str>, end: &str) {
+        if let Ok(mut w) = self.writer.lock() {
+            let result = if let Some(c) = color {
+                write!(w, "{}{}{}{}", c, text, colors::RESET, end)
+            } else {
+                write!(w, "{}{}", text, end)
+            };
+            if let Err(e) = result {
+                tracing::warn!("StdOutCallbackHandler write error: {e}");
+            }
+            if let Err(e) = w.flush() {
+                tracing::warn!("StdOutCallbackHandler flush error: {e}");
+            }
+        }
+    }
 }
 
 impl BaseCallbackHandler for StdOutCallbackHandler {
@@ -100,12 +100,12 @@ impl BaseCallbackHandler for StdOutCallbackHandler {
         llm_prefix: Option<&str>,
     ) {
         if let Some(prefix) = observation_prefix {
-            write_text(&self.writer, &format!("\n{}", prefix), None, "");
+            self.write_text(&format!("\n{}", prefix), None, "");
         }
         let effective_color = color.or(self.color());
-        write_text(&self.writer, output, effective_color, "");
+        self.write_text(output, effective_color, "");
         if let Some(prefix) = llm_prefix {
-            write_text(&self.writer, &format!("\n{}", prefix), None, "");
+            self.write_text(&format!("\n{}", prefix), None, "");
         }
     }
 
@@ -118,7 +118,7 @@ impl BaseCallbackHandler for StdOutCallbackHandler {
         end: &str,
     ) {
         let effective_color = color.or(self.color());
-        write_text(&self.writer, text, effective_color, end);
+        self.write_text(text, effective_color, end);
     }
 
     fn on_chain_start(
@@ -174,7 +174,7 @@ impl BaseCallbackHandler for StdOutCallbackHandler {
     ) {
         if let Some(log) = action.get("log").and_then(|v| v.as_str()) {
             let effective_color = color.or(self.color());
-            write_text(&self.writer, log, effective_color, "");
+            self.write_text(log, effective_color, "");
         }
     }
 
@@ -187,7 +187,7 @@ impl BaseCallbackHandler for StdOutCallbackHandler {
     ) {
         if let Some(log) = finish.get("log").and_then(|v| v.as_str()) {
             let effective_color = color.or(self.color());
-            write_text(&self.writer, log, effective_color, "\n");
+            self.write_text(log, effective_color, "\n");
         }
     }
 }

@@ -3,10 +3,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 use crate::callbacks::Callbacks;
-use crate::callbacks::manager::{
-    AsyncCallbackManager, AsyncCallbackManagerForToolRun, CallbackManager,
-    CallbackManagerForToolRun,
-};
+use crate::callbacks::manager::{CallbackManager, CallbackManagerForToolRun};
 use crate::error::{Error, Result};
 use crate::messages::{BaseMessage, ToolCall, ToolMessage};
 use crate::runnables::config::patch_config;
@@ -316,7 +313,7 @@ pub trait BaseTool: Send + Sync + Debug {
     async fn tool_arun(
         &self,
         input: ToolInput,
-        run_manager: Option<&AsyncCallbackManagerForToolRun>,
+        run_manager: Option<&CallbackManagerForToolRun>,
         config: &RunnableConfig,
     ) -> Result<ToolOutput> {
         self.tool_run(input, run_manager, config)
@@ -451,7 +448,7 @@ pub trait BaseTool: Send + Sync + Debug {
     ) -> Result<ToolOutput> {
         let config = ensure_config(config);
 
-        let async_callback_manager = AsyncCallbackManager::configure()
+        let async_callback_manager = CallbackManager::configure()
             .maybe_inheritable_callbacks(config.callbacks.clone())
             .maybe_local_callbacks(self.callbacks().cloned())
             .verbose(self.verbose())

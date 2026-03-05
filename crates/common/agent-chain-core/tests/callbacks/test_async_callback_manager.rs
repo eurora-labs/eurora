@@ -1,5 +1,5 @@
 use agent_chain_core::callbacks::BaseCallbackHandler;
-use agent_chain_core::callbacks::manager::AsyncCallbackManager;
+use agent_chain_core::callbacks::manager::CallbackManager;
 use agent_chain_core::messages::HumanMessage;
 use agent_chain_core::outputs::ChatResult;
 use std::collections::HashMap;
@@ -17,7 +17,7 @@ impl BaseCallbackHandler for FakeHandler {
 #[test]
 fn test_async_callback_manager_on_llm_start() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let run_managers = manager.on_llm_start(&HashMap::new(), &["prompt".to_string()], None);
@@ -29,7 +29,7 @@ fn test_async_callback_manager_on_llm_start() {
 #[test]
 fn test_async_callback_manager_on_chain_start() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let run_manager = manager
@@ -44,7 +44,7 @@ fn test_async_callback_manager_on_chain_start() {
 #[test]
 fn test_async_callback_manager_on_tool_start() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let run_manager = manager.on_tool_start(&HashMap::new(), "test", None, None);
@@ -55,7 +55,7 @@ fn test_async_callback_manager_on_tool_start() {
 #[test]
 fn test_async_callback_manager_on_llm_end() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let run_managers = manager.on_llm_start(&HashMap::new(), &["prompt".to_string()], None);
@@ -68,7 +68,7 @@ fn test_async_callback_manager_on_llm_end() {
 #[test]
 fn test_async_callback_manager_on_chain_end() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let run_manager = manager
@@ -83,7 +83,7 @@ fn test_async_callback_manager_on_chain_end() {
 #[test]
 fn test_async_callback_manager_on_tool_end() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let run_manager = manager.on_tool_start(&HashMap::new(), "test", None, None);
@@ -94,7 +94,7 @@ fn test_async_callback_manager_on_tool_end() {
 #[test]
 fn test_async_callback_manager_on_llm_error() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let run_managers = manager.on_llm_start(&HashMap::new(), &["prompt".to_string()], None);
@@ -108,7 +108,7 @@ fn test_async_callback_manager_on_llm_error() {
 #[test]
 fn test_async_callback_manager_on_chain_error() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let run_manager = manager
@@ -124,7 +124,7 @@ fn test_async_callback_manager_on_chain_error() {
 #[test]
 fn test_async_callback_manager_on_tool_error() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let run_manager = manager.on_tool_start(&HashMap::new(), "test", None, None);
@@ -136,7 +136,7 @@ fn test_async_callback_manager_on_tool_error() {
 #[test]
 fn test_async_callback_manager_on_llm_new_token() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let run_managers = manager.on_llm_start(&HashMap::new(), &["prompt".to_string()], None);
@@ -149,7 +149,7 @@ fn test_async_callback_manager_on_llm_new_token() {
 fn test_async_callback_manager_with_multiple_handlers() {
     let handler1: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let handler2: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler1, true);
     manager.add_handler(handler2, true);
 
@@ -165,7 +165,7 @@ fn test_async_callback_manager_with_multiple_handlers() {
 fn test_async_callback_manager_add_handler() {
     let handler1: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let handler2: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler1, true);
 
     assert_eq!(manager.handlers().len(), 1);
@@ -179,7 +179,7 @@ fn test_async_callback_manager_add_handler() {
 fn test_async_callback_manager_remove_handler() {
     let handler1: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let handler2: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler1, true);
     manager.add_handler(handler2.clone(), true);
 
@@ -193,7 +193,7 @@ fn test_async_callback_manager_remove_handler() {
 #[test]
 fn test_async_callback_manager_inheritable_handlers() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut parent = AsyncCallbackManager::new();
+    let mut parent = CallbackManager::new();
     parent.add_handler(handler, true);
 
     let chain_run = parent
@@ -209,7 +209,7 @@ fn test_async_callback_manager_inheritable_handlers() {
 #[test]
 fn test_async_callback_manager_chat_model_start() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let messages = vec![vec![
@@ -236,7 +236,7 @@ fn test_async_callback_manager_ignore_llm() {
     }
 
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(IgnoreLLMHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let run_managers = manager.on_llm_start(&HashMap::new(), &["prompt".to_string()], None);
@@ -259,7 +259,7 @@ fn test_async_callback_manager_ignore_chain() {
     }
 
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(IgnoreChainHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let run_manager = manager
@@ -274,7 +274,7 @@ fn test_async_callback_manager_ignore_chain() {
 #[test]
 fn test_async_callback_manager_copy() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let manager_copy = manager.clone();
@@ -284,7 +284,7 @@ fn test_async_callback_manager_copy() {
 #[test]
 fn test_async_callback_manager_chain_child_managers() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let chain_run = manager
@@ -318,7 +318,7 @@ fn test_async_callback_manager_chain_child_managers() {
 #[test]
 fn test_async_callback_manager_retriever_callbacks() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let run_manager = manager
@@ -334,7 +334,7 @@ fn test_async_callback_manager_retriever_callbacks() {
 #[test]
 fn test_async_callback_manager_retriever_error() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let run_manager = manager
@@ -350,7 +350,7 @@ fn test_async_callback_manager_retriever_error() {
 #[test]
 fn test_async_callback_manager_tags() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
     manager.add_tags(vec!["test-tag".to_string()], true);
 
@@ -363,7 +363,7 @@ fn test_async_callback_manager_tags() {
 #[test]
 fn test_async_callback_manager_metadata() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
     manager.add_metadata(
         HashMap::from([("key".to_string(), serde_json::json!("value"))]),
@@ -379,7 +379,7 @@ fn test_async_callback_manager_metadata() {
 #[test]
 fn test_async_callback_manager_chain_run_on_agent_action() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let chain_run = manager
@@ -405,7 +405,7 @@ fn test_async_callback_manager_chain_run_on_agent_action() {
 #[test]
 fn test_async_callback_manager_concurrent_runs() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let empty = HashMap::new();
@@ -429,7 +429,7 @@ fn test_async_callback_manager_concurrent_runs() {
 #[test]
 fn test_async_callback_manager_full_lifecycle() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let chain_run = manager

@@ -6,9 +6,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::callbacks::manager::{
-    AsyncCallbackManagerForRetrieverRun, CallbackManagerForRetrieverRun,
-};
+use crate::callbacks::manager::CallbackManagerForRetrieverRun;
 use crate::documents::Document;
 use crate::error::{Error, Result};
 use crate::indexing::base::{DeleteResponse, DocumentIndex, UpsertResponse};
@@ -174,7 +172,7 @@ impl BaseRetriever for InMemoryDocumentIndex {
     async fn aget_relevant_documents(
         &self,
         query: &str,
-        _run_manager: Option<&AsyncCallbackManagerForRetrieverRun>,
+        _run_manager: Option<&CallbackManagerForRetrieverRun>,
     ) -> Result<Vec<Document>> {
         self.get_relevant_documents(query, None)
     }

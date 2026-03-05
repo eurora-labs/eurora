@@ -246,7 +246,7 @@ impl BaseTool for StructuredTool {
     async fn tool_arun(
         &self,
         input: ToolInput,
-        _run_manager: Option<&crate::callbacks::manager::AsyncCallbackManagerForToolRun>,
+        _run_manager: Option<&crate::callbacks::manager::CallbackManagerForToolRun>,
         _config: &RunnableConfig,
     ) -> Result<ToolOutput> {
         let args = self.extract_args(input.clone())?;

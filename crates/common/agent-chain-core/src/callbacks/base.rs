@@ -1,7 +1,6 @@
 use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::sync::Arc;
 
 use uuid::Uuid;
 
@@ -256,7 +255,3 @@ pub fn resolve_chain_name<'a>(
     })
     .unwrap_or("<unknown>")
 }
-
-pub type BoxedCallbackHandler = Box<dyn BaseCallbackHandler>;
-
-pub type ArcCallbackHandler = Arc<dyn BaseCallbackHandler>;

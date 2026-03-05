@@ -10,9 +10,7 @@ use serde_json::Value;
 use super::base::{BaseLanguageModel, LangSmithParams, LanguageModelConfig, LanguageModelInput};
 use super::model_profile::ModelProfile;
 use crate::GenerationType;
-use crate::callbacks::{
-    AsyncCallbackManagerForLLMRun, BaseCallbackHandler, CallbackManagerForLLMRun, Callbacks,
-};
+use crate::callbacks::{BaseCallbackHandler, CallbackManagerForLLMRun, Callbacks};
 use crate::error::{Error, Result};
 use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition, UsageMetadata};
 use crate::output_parsers::JsonOutputKeyToolsParser;
@@ -311,7 +309,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-        run_manager: Option<&AsyncCallbackManagerForLLMRun>,
+        run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
         self._generate(messages, stop, run_manager).await
     }
@@ -329,7 +327,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-        run_manager: Option<&AsyncCallbackManagerForLLMRun>,
+        run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
         self._stream(messages, stop, run_manager)
     }
@@ -609,7 +607,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         messages: Vec<Vec<BaseMessage>>,
         config: GenerateConfig,
     ) -> Result<LLMResult> {
-        use crate::callbacks::AsyncCallbackManager;
+        use crate::callbacks::CallbackManager;
         use crate::outputs::RunInfo;
 
         let GenerateConfig {
@@ -651,7 +649,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             );
         }
 
-        let callback_manager = AsyncCallbackManager::configure()
+        let callback_manager = CallbackManager::configure()
             .maybe_inheritable_callbacks(callbacks)
             .maybe_local_callbacks(self.callbacks().cloned())
             .verbose(self.verbose())
@@ -847,7 +845,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-        run_manager: Option<&AsyncCallbackManagerForLLMRun>,
+        run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<crate::outputs::ChatResult> {
         let cache_config = self.chat_config().base.cache;
         let cache_instance = self.chat_config().cache_instance.clone();
@@ -1295,7 +1293,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
 
         let params = self._get_invocation_params(stop.as_deref(), None);
-        let callback_manager = crate::callbacks::AsyncCallbackManager::configure()
+        let callback_manager = crate::callbacks::CallbackManager::configure()
             .maybe_inheritable_callbacks(callbacks)
             .maybe_local_callbacks(self.callbacks().cloned())
             .verbose(self.verbose())

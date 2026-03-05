@@ -7,7 +7,7 @@ use bon::bon;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::callbacks::{AsyncCallbackManager, CallbackManager, Callbacks};
+use crate::callbacks::{CallbackManager, Callbacks};
 
 pub const DEFAULT_RECURSION_LIMIT: i32 = 25;
 
@@ -371,8 +371,8 @@ pub fn get_callback_manager_for_config(config: &RunnableConfig) -> CallbackManag
         .call()
 }
 
-pub fn get_async_callback_manager_for_config(config: &RunnableConfig) -> AsyncCallbackManager {
-    AsyncCallbackManager::configure()
+pub fn get_async_callback_manager_for_config(config: &RunnableConfig) -> CallbackManager {
+    CallbackManager::configure()
         .maybe_inheritable_callbacks(config.callbacks.clone())
         .inheritable_tags(config.tags.clone())
         .inheritable_metadata(config.metadata.clone())

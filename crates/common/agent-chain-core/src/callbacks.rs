@@ -5,16 +5,13 @@ pub mod stdout;
 pub mod streaming_stdout;
 pub mod usage;
 
-pub use base::{ArcCallbackHandler, BaseCallbackHandler, BoxedCallbackHandler, resolve_chain_name};
+pub use base::{BaseCallbackHandler, resolve_chain_name};
 
 pub use manager::{
-    AsyncCallbackManager, AsyncCallbackManagerForChainGroup, AsyncCallbackManagerForChainRun,
-    AsyncCallbackManagerForLLMRun, AsyncCallbackManagerForRetrieverRun,
-    AsyncCallbackManagerForToolRun, AsyncParentRunManager, AsyncRunManager, CallbackManager,
-    CallbackManagerForChainGroup, CallbackManagerForChainRun, CallbackManagerForLLMRun,
-    CallbackManagerForRetrieverRun, CallbackManagerForToolRun, Callbacks, ParentRunManager,
-    RunManager, RunManagerCore, adispatch_custom_event, atrace_as_chain_group,
-    dispatch_custom_event, handle_event, trace_as_chain_group,
+    CallbackManager, CallbackManagerForChainGroup, CallbackManagerForChainRun,
+    CallbackManagerForLLMRun, CallbackManagerForRetrieverRun, CallbackManagerForToolRun, Callbacks,
+    ParentRunManager, RunManager, RunManagerCore, adispatch_custom_event, atrace_as_chain_group,
+    dispatch_custom_event, trace_as_chain_group,
 };
 
 pub use file::{FileCallbackHandler, FileMode};

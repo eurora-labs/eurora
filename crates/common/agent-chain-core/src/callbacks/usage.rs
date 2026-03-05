@@ -83,12 +83,10 @@ impl BaseCallbackHandler for UsageMetadataCallbackHandler {
                 .usage_metadata
                 .lock()
                 .expect("usage_metadata lock poisoned");
-            if let Some(existing) = guard.get(&model) {
-                let combined = existing.add(&usage);
-                guard.insert(model, combined);
-            } else {
-                guard.insert(model, usage);
-            }
+            guard
+                .entry(model)
+                .and_modify(|existing| *existing = existing.add(&usage))
+                .or_insert(usage);
         }
     }
 }

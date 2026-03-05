@@ -1,7 +1,7 @@
 use agent_chain_core::callbacks::BaseCallbackHandler;
 use agent_chain_core::callbacks::Callbacks;
 use agent_chain_core::callbacks::manager::{
-    AsyncCallbackManager, CallbackManager, adispatch_custom_event, dispatch_custom_event,
+    CallbackManager, adispatch_custom_event, dispatch_custom_event,
 };
 use agent_chain_core::runnables::base::Runnable;
 use agent_chain_core::runnables::config::get_callback_manager_for_config;
@@ -35,13 +35,13 @@ fn test_custom_event_root_dispatch() {
 
 #[tokio::test]
 async fn test_async_custom_event_root_dispatch() {
-    let manager = AsyncCallbackManager::new();
+    let manager = CallbackManager::new();
     let result = adispatch_custom_event("event1", &serde_json::json!({"x": 1}), &manager).await;
 
     assert!(result.is_ok());
 
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let result = adispatch_custom_event("event1", &serde_json::json!({"x": 1}), &manager).await;
@@ -145,7 +145,7 @@ fn test_dispatch_custom_event_no_handlers() {
 
 #[tokio::test]
 async fn test_adispatch_custom_event_no_handlers() {
-    let manager = AsyncCallbackManager::new();
+    let manager = CallbackManager::new();
 
     let result = adispatch_custom_event("event1", &serde_json::json!({"x": 1}), &manager).await;
     assert!(result.is_ok());

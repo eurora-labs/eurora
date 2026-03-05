@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 
 use crate::Result;
-use crate::callbacks::{AsyncCallbackManagerForRetrieverRun, CallbackManagerForRetrieverRun};
+use crate::callbacks::CallbackManagerForRetrieverRun;
 use crate::documents::Document;
 use crate::embeddings::Embeddings;
 use crate::error::Error;
@@ -527,7 +527,7 @@ impl BaseRetriever for VectorStoreRetriever {
     async fn aget_relevant_documents(
         &self,
         query: &str,
-        _run_manager: Option<&AsyncCallbackManagerForRetrieverRun>,
+        _run_manager: Option<&CallbackManagerForRetrieverRun>,
     ) -> Result<Vec<Document>> {
         let k = self.k();
         match &self.search_type {
