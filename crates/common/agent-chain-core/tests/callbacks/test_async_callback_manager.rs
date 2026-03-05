@@ -352,7 +352,7 @@ fn test_async_callback_manager_tags() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
-    manager.add_tags(vec!["test-tag".to_string()], true);
+    manager.add_tags(&["test-tag".to_string()], true);
 
     let run_managers = manager.on_llm_start(&HashMap::new(), &["prompt".to_string()], None);
 

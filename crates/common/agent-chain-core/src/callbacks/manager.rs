@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::future::Future;
-use std::ops::{Deref, DerefMut};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
 
@@ -33,7 +32,7 @@ pub(crate) fn handle_event(
         }
         let result = catch_unwind(AssertUnwindSafe(|| event_fn(handler.as_ref())));
         if let Err(payload) = result {
-            let msg = panic_message(&payload);
+            let msg = panic_message(&*payload);
             tracing::warn!(
                 target: "agent_chain_core::callbacks",
                 "Error in {}.callback: {msg}",
@@ -46,7 +45,7 @@ pub(crate) fn handle_event(
     }
 }
 
-fn panic_message(payload: &Box<dyn std::any::Any + Send>) -> String {
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
     payload
         .downcast_ref::<&str>()
         .map(|s| s.to_string())
@@ -153,13 +152,13 @@ impl CallbackManager {
             .retain(|h| !Arc::ptr_eq(h, handler));
     }
 
-    pub fn add_tags(&mut self, tags: Vec<String>, inherit: bool) {
+    pub fn add_tags(&mut self, tags: &[String], inherit: bool) {
         for tag in tags {
-            if !self.tags.contains(&tag) {
+            if !self.tags.contains(tag) {
                 self.tags.push(tag.clone());
             }
-            if inherit && !self.inheritable_tags.contains(&tag) {
-                self.inheritable_tags.push(tag);
+            if inherit && !self.inheritable_tags.contains(tag) {
+                self.inheritable_tags.push(tag.clone());
             }
         }
     }
@@ -172,10 +171,10 @@ impl CallbackManager {
     }
 
     pub fn add_metadata(&mut self, metadata: HashMap<String, serde_json::Value>, inherit: bool) {
-        self.metadata.extend(metadata.clone());
         if inherit {
-            self.inheritable_metadata.extend(metadata);
+            self.inheritable_metadata.extend(metadata.clone());
         }
+        self.metadata.extend(metadata);
     }
 
     pub fn remove_metadata(&mut self, keys: &[String]) {
@@ -340,14 +339,7 @@ pub enum Callbacks {
 
 impl Callbacks {
     pub fn into_manager(self) -> CallbackManager {
-        match self {
-            Callbacks::Handlers(handlers) => CallbackManager {
-                inheritable_handlers: handlers.clone(),
-                handlers,
-                ..Default::default()
-            },
-            Callbacks::Manager(manager) => manager,
-        }
+        CallbackManager::from(self)
     }
 }
 
@@ -360,6 +352,19 @@ impl From<Vec<Arc<dyn BaseCallbackHandler>>> for Callbacks {
 impl From<CallbackManager> for Callbacks {
     fn from(manager: CallbackManager) -> Self {
         Callbacks::Manager(manager)
+    }
+}
+
+impl From<Callbacks> for CallbackManager {
+    fn from(callbacks: Callbacks) -> Self {
+        match callbacks {
+            Callbacks::Handlers(handlers) => CallbackManager {
+                inheritable_handlers: handlers.clone(),
+                handlers,
+                ..Default::default()
+            },
+            Callbacks::Manager(manager) => manager,
+        }
     }
 }
 
@@ -393,10 +398,10 @@ fn configure_impl(
         }
     }
 
-    if let Some(tags) = inheritable_tags {
+    if let Some(ref tags) = inheritable_tags {
         manager.add_tags(tags, true);
     }
-    if let Some(tags) = local_tags {
+    if let Some(ref tags) = local_tags {
         manager.add_tags(tags, false);
     }
     if let Some(metadata) = inheritable_metadata {
@@ -607,7 +612,7 @@ impl RunManagerCore {
     pub fn get_child_manager(&self, tag: Option<&str>) -> CallbackManager {
         let mut child = self.config.make_child(self.run_id);
         if let Some(tag) = tag {
-            child.add_tags(vec![tag.to_string()], false);
+            child.add_tags(&[tag.to_string()], false);
         }
         child
     }
@@ -799,19 +804,6 @@ pub struct CallbackManagerForChainGroup {
     ended: bool,
 }
 
-impl Deref for CallbackManagerForChainGroup {
-    type Target = CallbackManager;
-    fn deref(&self) -> &CallbackManager {
-        &self.inner
-    }
-}
-
-impl DerefMut for CallbackManagerForChainGroup {
-    fn deref_mut(&mut self) -> &mut CallbackManager {
-        &mut self.inner
-    }
-}
-
 impl CallbackManagerForChainGroup {
     pub fn from_parts(
         inner: CallbackManager,
@@ -824,8 +816,28 @@ impl CallbackManagerForChainGroup {
         }
     }
 
+    pub fn inner(&self) -> &CallbackManager {
+        &self.inner
+    }
+
+    pub fn inner_mut(&mut self) -> &mut CallbackManager {
+        &mut self.inner
+    }
+
     pub fn ended(&self) -> bool {
         self.ended
+    }
+
+    pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
+        self.inner.handlers()
+    }
+
+    pub fn tags(&self) -> &[String] {
+        self.inner.tags()
+    }
+
+    pub fn parent_run_id(&self) -> Option<Uuid> {
+        self.inner.parent_run_id()
     }
 
     pub fn merge_with(&self, other: &CallbackManager) -> Self {

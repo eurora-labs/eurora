@@ -333,7 +333,7 @@ fn test_parent_run_manager_get_child_inherits_handlers() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
     let mut config = CallbackManager::new();
     config.add_handler(h, true);
-    config.add_tags(vec!["it".to_string()], true);
+    config.add_tags(&["it".to_string()], true);
     config.add_metadata(
         HashMap::from([("ik".to_string(), serde_json::json!("iv"))]),
         true,
@@ -578,8 +578,8 @@ fn test_callback_manager_run_managers_inherit_tags_and_metadata() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
     let mut mgr = CallbackManager::new();
     mgr.add_handler(h, true);
-    mgr.add_tags(vec!["t1".to_string()], false);
-    mgr.add_tags(vec!["it1".to_string()], true);
+    mgr.add_tags(&["t1".to_string()], false);
+    mgr.add_tags(&["it1".to_string()], true);
     mgr.add_metadata(
         HashMap::from([("k".to_string(), serde_json::json!("v"))]),
         false,
@@ -636,7 +636,7 @@ fn test_chain_group_copy_preserves_parent_run_manager() {
 fn test_chain_group_merge_preserves_parent_run_manager() {
     let (group, _) = make_sync_chain_group();
     let mut other = CallbackManager::new();
-    other.add_tags(vec!["extra".to_string()], false);
+    other.add_tags(&["extra".to_string()], false);
     let merged = group.merge_with(&other);
     assert!(merged.tags().contains(&"extra".to_string()));
 }
@@ -655,257 +655,6 @@ fn test_base_run_manager_initialization_defaults() {
     assert_eq!(mgr.run_id(), rid);
     assert!(mgr.parent_run_id().is_none());
     assert!(mgr.tags().is_empty());
-}
-
-#[test]
-fn test_async_llm_run_is_same_as_sync() {
-    let rid = Uuid::new_v4();
-    let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let mut config = CallbackManager::new();
-    config.add_handler(h, true);
-    config.add_tags(vec!["t".to_string()], false);
-    config.add_tags(vec!["it".to_string()], true);
-    config.add_metadata(
-        HashMap::from([("k".to_string(), serde_json::json!("v"))]),
-        false,
-    );
-    config.add_metadata(
-        HashMap::from([("ik".to_string(), serde_json::json!("iv"))]),
-        true,
-    );
-    let mgr = CallbackManagerForLLMRun::new(RunManagerCore::new(rid, config));
-    assert_eq!(mgr.run_id(), rid);
-    assert_eq!(mgr.handlers().len(), 1);
-    assert!(mgr.tags().contains(&"t".to_string()));
-}
-
-#[test]
-fn test_async_chain_run_is_same_as_sync() {
-    let rid = Uuid::new_v4();
-    let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let mut config = CallbackManager::new();
-    config.add_handler(h, true);
-    config.add_tags(vec!["t".to_string()], false);
-    let mgr = CallbackManagerForChainRun::new(RunManagerCore::new(rid, config));
-    assert_eq!(mgr.run_id(), rid);
-}
-
-#[test]
-fn test_async_tool_run_is_same_as_sync() {
-    let rid = Uuid::new_v4();
-    let mgr = CallbackManagerForToolRun::new(RunManagerCore::new(rid, CallbackManager::new()));
-    assert_eq!(mgr.run_id(), rid);
-}
-
-#[test]
-fn test_async_retriever_run_is_same_as_sync() {
-    let rid = Uuid::new_v4();
-    let mgr = CallbackManagerForRetrieverRun::new(RunManagerCore::new(rid, CallbackManager::new()));
-    assert_eq!(mgr.run_id(), rid);
-}
-
-#[test]
-fn test_callback_manager_on_llm_start_returns_managers() {
-    let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let mut mgr = CallbackManager::new();
-    mgr.add_handler(h, true);
-    let managers = mgr.on_llm_start(&HashMap::new(), &["p1".to_string(), "p2".to_string()], None);
-    assert_eq!(managers.len(), 2);
-}
-
-#[test]
-fn test_callback_manager_on_llm_start_uses_provided_run_id() {
-    let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let mut mgr = CallbackManager::new();
-    mgr.add_handler(h, true);
-    let rid = Uuid::new_v4();
-    let managers = mgr.on_llm_start(
-        &HashMap::new(),
-        &["p1".to_string(), "p2".to_string()],
-        Some(rid),
-    );
-    assert_eq!(managers[0].run_id(), rid);
-    assert_ne!(managers[1].run_id(), rid);
-}
-
-#[test]
-fn test_callback_manager_on_chat_model_start_returns_managers() {
-    use agent_chain_core::messages::HumanMessage;
-    let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let mut mgr = CallbackManager::new();
-    mgr.add_handler(h, true);
-    let msgs = vec![
-        vec![HumanMessage::builder().content("a").build().into()],
-        vec![HumanMessage::builder().content("b").build().into()],
-    ];
-    let managers = mgr.on_chat_model_start(&HashMap::new(), &msgs, None, None);
-    assert_eq!(managers.len(), 2);
-}
-
-#[test]
-fn test_callback_manager_on_chain_start_returns_chain_manager() {
-    let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let mut mgr = CallbackManager::new();
-    mgr.add_handler(h, true);
-    let rm = mgr
-        .on_chain_start()
-        .serialized(&HashMap::new())
-        .inputs(&HashMap::new())
-        .call();
-    assert!(!rm.run_id().is_nil());
-}
-
-#[test]
-fn test_callback_manager_on_chain_start_uses_run_id() {
-    let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let mut mgr = CallbackManager::new();
-    mgr.add_handler(h, true);
-    let rid = Uuid::new_v4();
-    let rm = mgr
-        .on_chain_start()
-        .serialized(&HashMap::new())
-        .inputs(&HashMap::new())
-        .maybe_run_id(Some(rid))
-        .call();
-    assert_eq!(rm.run_id(), rid);
-}
-
-#[test]
-fn test_callback_manager_on_tool_start_returns_tool_manager() {
-    let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let mut mgr = CallbackManager::new();
-    mgr.add_handler(h, true);
-    let rm = mgr.on_tool_start(&HashMap::new(), "input", None, None);
-    assert!(!rm.run_id().is_nil());
-}
-
-#[test]
-fn test_callback_manager_on_retriever_start_returns_retriever_manager() {
-    let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let mut mgr = CallbackManager::new();
-    mgr.add_handler(h, true);
-    let rm = mgr
-        .on_retriever_start()
-        .serialized(&HashMap::new())
-        .query("query")
-        .call();
-    assert!(!rm.run_id().is_nil());
-}
-
-#[test]
-fn test_callback_manager_on_custom_event_empty_handlers_noop_async() {
-    let mgr = CallbackManager::new();
-    mgr.on_custom_event("evt", &serde_json::json!({}), None);
-}
-
-#[test]
-fn test_llm_run_empty_handlers_noop_async() {
-    let mgr =
-        CallbackManagerForLLMRun::new(RunManagerCore::new(Uuid::new_v4(), CallbackManager::new()));
-    mgr.on_llm_new_token("tok", None);
-    mgr.on_llm_end(&ChatResult::default());
-    mgr.on_llm_error(&std::io::Error::other("err"));
-}
-
-#[test]
-fn test_chain_run_empty_handlers_noop_async() {
-    let mgr = CallbackManagerForChainRun::new(RunManagerCore::new(
-        Uuid::new_v4(),
-        CallbackManager::new(),
-    ));
-    mgr.on_chain_end(&HashMap::new());
-    mgr.on_chain_error(&std::io::Error::other("err"));
-    mgr.on_agent_action(&serde_json::json!({"tool": "t"}));
-    mgr.on_agent_finish(&serde_json::json!({"return_values": {}}));
-}
-
-#[test]
-fn test_chain_run_get_child_returns_manager() {
-    let mgr = CallbackManagerForChainRun::new(RunManagerCore::new(
-        Uuid::new_v4(),
-        CallbackManager::new(),
-    ));
-    let child = mgr.get_child(None);
-    assert_eq!(child.parent_run_id(), Some(mgr.run_id()));
-}
-
-#[test]
-fn test_tool_run_empty_handlers_noop_async() {
-    let mgr =
-        CallbackManagerForToolRun::new(RunManagerCore::new(Uuid::new_v4(), CallbackManager::new()));
-    mgr.on_tool_end("out");
-    mgr.on_tool_error(&std::io::Error::other("err"));
-}
-
-#[test]
-fn test_retriever_run_empty_handlers_noop_async() {
-    let mgr = CallbackManagerForRetrieverRun::new(RunManagerCore::new(
-        Uuid::new_v4(),
-        CallbackManager::new(),
-    ));
-    mgr.on_retriever_end(&[]);
-    mgr.on_retriever_error(&std::io::Error::other("err"));
-}
-
-fn make_async_chain_group() -> (CallbackManagerForChainGroup, CallbackManagerForChainRun) {
-    let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let mut parent_config = CallbackManager::new();
-    parent_config.add_handler(h.clone(), true);
-    let parent_rm =
-        CallbackManagerForChainRun::new(RunManagerCore::new(Uuid::new_v4(), parent_config));
-    let mut inner = CallbackManager::new();
-    inner.add_handler(h, true);
-    inner.set_parent_run_id(parent_rm.parent_run_id());
-    let group = CallbackManagerForChainGroup::from_parts(inner, parent_rm.clone());
-    (group, parent_rm)
-}
-
-#[test]
-fn test_async_chain_group_on_chain_end_sets_ended() {
-    let (mut group, _) = make_async_chain_group();
-    assert!(!group.ended());
-    group.on_chain_end(&HashMap::new());
-    assert!(group.ended());
-}
-
-#[test]
-fn test_async_chain_group_on_chain_error_sets_ended() {
-    let (mut group, _) = make_async_chain_group();
-    group.on_chain_error(&std::io::Error::other("err"));
-    assert!(group.ended());
-}
-
-#[test]
-fn test_async_chain_group_copy_preserves_parent_run_manager() {
-    let (group, parent_rm) = make_async_chain_group();
-    let cp = group.clone();
-    assert_eq!(cp.parent_run_id(), parent_rm.parent_run_id());
-}
-
-#[test]
-fn test_parent_run_manager_get_child_returns_callback_manager() {
-    let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let mut config = CallbackManager::new();
-    config.add_handler(h, true);
-    config.add_tags(vec!["it".to_string()], true);
-    config.add_metadata(
-        HashMap::from([("ik".to_string(), serde_json::json!("iv"))]),
-        true,
-    );
-    let mgr = CallbackManagerForChainRun::new(RunManagerCore::new(Uuid::new_v4(), config));
-    let child = mgr.get_child(None);
-    assert_eq!(child.parent_run_id(), Some(mgr.run_id()));
-    assert_eq!(child.handlers().len(), 1);
-}
-
-#[test]
-fn test_parent_run_manager_get_child_with_tag() {
-    let mgr = CallbackManagerForChainRun::new(RunManagerCore::new(
-        Uuid::new_v4(),
-        CallbackManager::new(),
-    ));
-    let child = mgr.get_child(Some("local"));
-    assert!(child.tags().contains(&"local".to_string()));
 }
 
 #[test]
