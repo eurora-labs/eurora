@@ -39,6 +39,7 @@ impl Drop for ConcurrencyPermit<'_> {
 
 impl ConcurrencyGate {
     fn new(max: usize) -> Arc<Self> {
+        debug_assert!(max > 0, "ConcurrencyGate max must be > 0");
         Arc::new(Self {
             active: std::sync::Mutex::new(0),
             cvar: std::sync::Condvar::new(),
@@ -368,7 +369,7 @@ pub trait Runnable: Send + Sync + Debug {
         let mut results: Vec<Option<Result<Self::Output>>> = (0..len).map(|_| None).collect();
 
         std::thread::scope(|scope| {
-            let gate = max_concurrency.map(ConcurrencyGate::new);
+            let gate = max_concurrency.filter(|&n| n > 0).map(ConcurrencyGate::new);
             let mut handles = Vec::with_capacity(len);
 
             for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
@@ -515,7 +516,7 @@ pub trait Runnable: Send + Sync + Debug {
         let (sender, receiver) = std::sync::mpsc::channel();
 
         std::thread::scope(|scope| {
-            let gate = max_concurrency.map(ConcurrencyGate::new);
+            let gate = max_concurrency.filter(|&n| n > 0).map(ConcurrencyGate::new);
 
             for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
                 let gate = gate.clone();
