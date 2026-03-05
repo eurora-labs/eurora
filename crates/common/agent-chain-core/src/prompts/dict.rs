@@ -48,8 +48,13 @@ impl DictPromptTemplate {
         "dict-prompt"
     }
 
-    pub fn pretty_repr(&self, _html: bool) -> String {
-        format!("DictPromptTemplate({:?})", self.template)
+    pub fn pretty_repr(&self, html: bool) -> String {
+        let content = format!("DictPromptTemplate({:?})", self.template);
+        if html {
+            format!("<pre>{}</pre>", content)
+        } else {
+            content
+        }
     }
 }
 

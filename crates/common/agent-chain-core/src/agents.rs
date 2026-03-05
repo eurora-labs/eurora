@@ -163,6 +163,23 @@ impl Serializable for AgentFinish {
     }
 }
 
+pub enum AgentActionRef<'a> {
+    Action(&'a AgentAction),
+    MessageLog(&'a AgentActionMessageLog),
+}
+
+pub fn convert_observation_to_messages(
+    action: AgentActionRef<'_>,
+    observation: &Value,
+) -> Vec<BaseMessage> {
+    match action {
+        AgentActionRef::Action(a) => convert_agent_observation_to_messages(a, observation),
+        AgentActionRef::MessageLog(a) => {
+            convert_agent_action_message_log_observation_to_messages(a, observation)
+        }
+    }
+}
+
 fn convert_agent_observation_to_messages(
     _agent_action: &AgentAction,
     observation: &Value,

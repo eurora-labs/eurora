@@ -358,13 +358,11 @@ impl BaseChatModel for FakeListChatModel {
 }
 
 #[derive(Debug, Clone, Default)]
-#[allow(dead_code)]
 pub struct FakeChatModel {
     config: ChatModelConfig,
 }
 
 #[bon::bon]
-#[allow(dead_code)]
 impl FakeChatModel {
     #[builder]
     pub fn new(config: Option<ChatModelConfig>) -> Self {
