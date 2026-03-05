@@ -62,7 +62,7 @@ pub fn create_retriever_tool_with_options<R>(
     retriever: Arc<R>,
     name: impl Into<String>,
     description: impl Into<String>,
-    _document_prompt: Option<String>,
+    document_prompt: Option<String>,
     document_separator: &str,
     response_format: ResponseFormat,
 ) -> StructuredTool
@@ -73,24 +73,21 @@ where
     let description = description.into();
     let separator = document_separator.to_string();
 
-    let retriever_clone = retriever.clone();
-    let separator_clone = separator.clone();
-    let response_format_clone = response_format;
-
     let func = {
-        let _retriever = retriever_clone.clone();
-        let separator = separator_clone.clone();
+        let retriever = retriever.clone();
+        let separator = separator.clone();
+        let document_prompt = document_prompt.clone();
         move |args: HashMap<String, Value>| -> Result<Value> {
-            let _query = args
+            let query = args
                 .get("query")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
 
-            let docs: Vec<Document> = Vec::new();
-            let content = format_documents(&docs, &separator);
+            let docs = retriever.get_relevant_documents(&query, None)?;
+            let content = format_documents(&docs, &separator, document_prompt.as_deref());
 
-            match response_format_clone {
+            match response_format {
                 ResponseFormat::Content => Ok(Value::String(content)),
                 ResponseFormat::ContentAndArtifact => {
                     let docs_json: Vec<Value> = docs
@@ -117,9 +114,15 @@ where
         .build()
 }
 
-fn format_documents(docs: &[Document], separator: &str) -> String {
+fn format_documents(docs: &[Document], separator: &str, prompt: Option<&str>) -> String {
     docs.iter()
-        .map(|doc| doc.page_content().to_string())
+        .map(|doc| {
+            if let Some(prompt_template) = prompt {
+                prompt_template.replace("{page_content}", doc.page_content())
+            } else {
+                doc.page_content().to_string()
+            }
+        })
         .collect::<Vec<_>>()
         .join(separator)
 }
@@ -138,20 +141,30 @@ where
     let name = name.into();
     let description = description.into();
 
-    let _retriever_clone = retriever.clone();
-    let _retrieve_fn = Arc::new(retrieve_fn);
+    let retriever = Arc::new(retriever);
+    let retrieve_fn = Arc::new(retrieve_fn);
 
-    let func = move |args: HashMap<String, Value>| -> Result<Value> {
-        let query = args
-            .get("query")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
+    let func = {
+        let retriever = retriever.clone();
+        let retrieve_fn = retrieve_fn.clone();
+        move |args: HashMap<String, Value>| -> Result<Value> {
+            let query = args
+                .get("query")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
 
-        Ok(Value::String(format!(
-            "Retrieval for query '{}' (use async invoke for actual results)",
-            query
-        )))
+            let rt = tokio::runtime::Handle::try_current()
+                .map_err(|e| crate::error::Error::Other(format!("No tokio runtime: {}", e)))?;
+
+            let retriever = retriever.clone();
+            let retrieve_fn = retrieve_fn.clone();
+            let docs =
+                rt.block_on(async move { (retrieve_fn)((*retriever).clone(), query).await })?;
+
+            let content = format_documents(&docs, "\n\n", None);
+            Ok(Value::String(content))
+        }
     };
 
     StructuredTool::from_function(func, name, description, retriever_args_schema())
@@ -255,7 +268,7 @@ mod tests {
             Document::builder().page_content("Second document").build(),
         ];
 
-        let formatted = format_documents(&docs, "\n\n");
+        let formatted = format_documents(&docs, "\n\n", None);
         assert_eq!(formatted, "First document\n\nSecond document");
     }
 
@@ -267,7 +280,18 @@ mod tests {
             Document::builder().page_content("Doc 3").build(),
         ];
 
-        let formatted = format_documents(&docs, " | ");
+        let formatted = format_documents(&docs, " | ", None);
         assert_eq!(formatted, "Doc 1 | Doc 2 | Doc 3");
+    }
+
+    #[test]
+    fn test_format_documents_with_prompt() {
+        let docs = vec![
+            Document::builder().page_content("Hello").build(),
+            Document::builder().page_content("World").build(),
+        ];
+
+        let formatted = format_documents(&docs, "\n", Some("Content: {page_content}"));
+        assert_eq!(formatted, "Content: Hello\nContent: World");
     }
 }

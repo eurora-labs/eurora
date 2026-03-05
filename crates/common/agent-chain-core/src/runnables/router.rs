@@ -145,7 +145,7 @@ where
         &self,
         inputs: Vec<Self::Input>,
         config: Option<ConfigOrList>,
-        return_exceptions: bool,
+        _return_exceptions: bool,
     ) -> Vec<Result<Self::Output>>
     where
         Self: 'static,
@@ -170,7 +170,6 @@ where
             Err(e) => return vec![Err(e)],
         };
 
-        let _return_exceptions = return_exceptions; // Vec<Result<O>> already captures exceptions per-item
         let results: Vec<Result<O>> = keys
             .into_iter()
             .zip(actual_inputs)
@@ -190,7 +189,7 @@ where
         &self,
         inputs: Vec<Self::Input>,
         config: Option<ConfigOrList>,
-        return_exceptions: bool,
+        _return_exceptions: bool,
     ) -> Vec<Result<Self::Output>>
     where
         Self: 'static,
@@ -216,7 +215,6 @@ where
         };
         let max_concurrency = configs.first().and_then(|c| c.max_concurrency);
 
-        let _return_exceptions = return_exceptions; // Vec<Result<O>> already captures exceptions per-item
         let futures: Vec<_> = keys
             .into_iter()
             .zip(actual_inputs)

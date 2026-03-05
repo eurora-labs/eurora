@@ -13,115 +13,96 @@ pub trait BaseCallbackHandler: Send + Sync + Debug {
 
     fn on_llm_new_token(
         &self,
-        token: &str,
-        run_id: Uuid,
-        parent_run_id: Option<Uuid>,
-        chunk: Option<&serde_json::Value>,
+        _token: &str,
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+        _chunk: Option<&serde_json::Value>,
     ) {
-        let _ = (token, run_id, parent_run_id, chunk);
     }
 
-    fn on_llm_end(&self, response: &ChatResult, run_id: Uuid, parent_run_id: Option<Uuid>) {
-        let _ = (response, run_id, parent_run_id);
-    }
+    fn on_llm_end(&self, _response: &ChatResult, _run_id: Uuid, _parent_run_id: Option<Uuid>) {}
 
     fn on_llm_error(
         &self,
-        error: &dyn std::error::Error,
-        run_id: Uuid,
-        parent_run_id: Option<Uuid>,
+        _error: &dyn std::error::Error,
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
     ) {
-        let _ = (error, run_id, parent_run_id);
     }
 
     // -- Chain events --
 
     fn on_chain_end(
         &self,
-        outputs: &HashMap<String, serde_json::Value>,
-        run_id: Uuid,
-        parent_run_id: Option<Uuid>,
+        _outputs: &HashMap<String, serde_json::Value>,
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
     ) {
-        let _ = (outputs, run_id, parent_run_id);
     }
 
     fn on_chain_error(
         &self,
-        error: &dyn std::error::Error,
-        run_id: Uuid,
-        parent_run_id: Option<Uuid>,
+        _error: &dyn std::error::Error,
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
     ) {
-        let _ = (error, run_id, parent_run_id);
     }
 
     fn on_agent_action(
         &self,
-        action: &serde_json::Value,
-        run_id: Uuid,
-        parent_run_id: Option<Uuid>,
-        color: Option<&str>,
+        _action: &serde_json::Value,
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+        _color: Option<&str>,
     ) {
-        let _ = (action, run_id, parent_run_id, color);
     }
 
     fn on_agent_finish(
         &self,
-        finish: &serde_json::Value,
-        run_id: Uuid,
-        parent_run_id: Option<Uuid>,
-        color: Option<&str>,
+        _finish: &serde_json::Value,
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+        _color: Option<&str>,
     ) {
-        let _ = (finish, run_id, parent_run_id, color);
     }
 
     // -- Tool events --
 
     fn on_tool_end(
         &self,
-        output: &str,
-        run_id: Uuid,
-        parent_run_id: Option<Uuid>,
-        color: Option<&str>,
-        observation_prefix: Option<&str>,
-        llm_prefix: Option<&str>,
+        _output: &str,
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+        _color: Option<&str>,
+        _observation_prefix: Option<&str>,
+        _llm_prefix: Option<&str>,
     ) {
-        let _ = (
-            output,
-            run_id,
-            parent_run_id,
-            color,
-            observation_prefix,
-            llm_prefix,
-        );
     }
 
     fn on_tool_error(
         &self,
-        error: &dyn std::error::Error,
-        run_id: Uuid,
-        parent_run_id: Option<Uuid>,
+        _error: &dyn std::error::Error,
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
     ) {
-        let _ = (error, run_id, parent_run_id);
     }
 
     // -- Retriever events --
 
     fn on_retriever_error(
         &self,
-        error: &dyn std::error::Error,
-        run_id: Uuid,
-        parent_run_id: Option<Uuid>,
+        _error: &dyn std::error::Error,
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
     ) {
-        let _ = (error, run_id, parent_run_id);
     }
 
     fn on_retriever_end(
         &self,
-        documents: &[serde_json::Value],
-        run_id: Uuid,
-        parent_run_id: Option<Uuid>,
+        _documents: &[serde_json::Value],
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
     ) {
-        let _ = (documents, run_id, parent_run_id);
     }
 
     // -- Lifecycle start events --
@@ -129,14 +110,13 @@ pub trait BaseCallbackHandler: Send + Sync + Debug {
     #[allow(clippy::too_many_arguments)]
     fn on_llm_start(
         &self,
-        serialized: &HashMap<String, serde_json::Value>,
-        prompts: &[String],
-        run_id: Uuid,
-        parent_run_id: Option<Uuid>,
-        tags: Option<&[String]>,
-        metadata: Option<&HashMap<String, serde_json::Value>>,
+        _serialized: &HashMap<String, serde_json::Value>,
+        _prompts: &[String],
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+        _tags: Option<&[String]>,
+        _metadata: Option<&HashMap<String, serde_json::Value>>,
     ) {
-        let _ = (serialized, prompts, run_id, parent_run_id, tags, metadata);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -148,9 +128,8 @@ pub trait BaseCallbackHandler: Send + Sync + Debug {
         parent_run_id: Option<Uuid>,
         tags: Option<&[String]>,
         metadata: Option<&HashMap<String, serde_json::Value>>,
-        name: Option<&str>,
+        _name: Option<&str>,
     ) {
-        let _ = name;
         use crate::messages::utils::get_buffer_string;
         let message_strings: Vec<String> = messages
             .iter()
@@ -169,95 +148,64 @@ pub trait BaseCallbackHandler: Send + Sync + Debug {
     #[allow(clippy::too_many_arguments)]
     fn on_retriever_start(
         &self,
-        serialized: &HashMap<String, serde_json::Value>,
-        query: &str,
-        run_id: Uuid,
-        parent_run_id: Option<Uuid>,
-        tags: Option<&[String]>,
-        metadata: Option<&HashMap<String, serde_json::Value>>,
-        name: Option<&str>,
+        _serialized: &HashMap<String, serde_json::Value>,
+        _query: &str,
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+        _tags: Option<&[String]>,
+        _metadata: Option<&HashMap<String, serde_json::Value>>,
+        _name: Option<&str>,
     ) {
-        let _ = (
-            serialized,
-            query,
-            run_id,
-            parent_run_id,
-            tags,
-            metadata,
-            name,
-        );
     }
 
     #[allow(clippy::too_many_arguments)]
     fn on_chain_start(
         &self,
-        serialized: &HashMap<String, serde_json::Value>,
-        inputs: &HashMap<String, serde_json::Value>,
-        run_id: Uuid,
-        parent_run_id: Option<Uuid>,
-        tags: Option<&[String]>,
-        metadata: Option<&HashMap<String, serde_json::Value>>,
-        name: Option<&str>,
+        _serialized: &HashMap<String, serde_json::Value>,
+        _inputs: &HashMap<String, serde_json::Value>,
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+        _tags: Option<&[String]>,
+        _metadata: Option<&HashMap<String, serde_json::Value>>,
+        _name: Option<&str>,
     ) {
-        let _ = (
-            serialized,
-            inputs,
-            run_id,
-            parent_run_id,
-            tags,
-            metadata,
-            name,
-        );
     }
 
     #[allow(clippy::too_many_arguments)]
     fn on_tool_start(
         &self,
-        serialized: &HashMap<String, serde_json::Value>,
-        input_str: &str,
-        run_id: Uuid,
-        parent_run_id: Option<Uuid>,
-        tags: Option<&[String]>,
-        metadata: Option<&HashMap<String, serde_json::Value>>,
-        inputs: Option<&HashMap<String, serde_json::Value>>,
+        _serialized: &HashMap<String, serde_json::Value>,
+        _input_str: &str,
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+        _tags: Option<&[String]>,
+        _metadata: Option<&HashMap<String, serde_json::Value>>,
+        _inputs: Option<&HashMap<String, serde_json::Value>>,
     ) {
-        let _ = (
-            serialized,
-            input_str,
-            run_id,
-            parent_run_id,
-            tags,
-            metadata,
-            inputs,
-        );
     }
 
     // -- Run events --
 
     fn on_text(
         &self,
-        text: &str,
-        run_id: Uuid,
-        parent_run_id: Option<Uuid>,
-        color: Option<&str>,
-        end: &str,
+        _text: &str,
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+        _color: Option<&str>,
+        _end: &str,
     ) {
-        let _ = (text, run_id, parent_run_id, color, end);
     }
 
-    fn on_retry(&self, retry_state: &dyn Any, run_id: Uuid, parent_run_id: Option<Uuid>) {
-        let _ = (retry_state, run_id, parent_run_id);
-    }
+    fn on_retry(&self, _retry_state: &dyn Any, _run_id: Uuid, _parent_run_id: Option<Uuid>) {}
 
     fn on_custom_event(
         &self,
-        name: &str,
-        data: &dyn Any,
-        run_id: Uuid,
-        tags: Option<&[String]>,
-        metadata: Option<&HashMap<String, serde_json::Value>>,
+        _name: &str,
+        _data: &dyn Any,
+        _run_id: Uuid,
+        _tags: Option<&[String]>,
+        _metadata: Option<&HashMap<String, serde_json::Value>>,
     ) {
-        let _ = (name, data, run_id, tags, metadata);
     }
 
     // -- Configuration --

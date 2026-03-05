@@ -8,13 +8,12 @@ use super::base::BaseOutputParser;
 use super::transform::BaseTransformOutputParser;
 
 #[derive(Debug, Clone, Default)]
-pub struct StrOutputParser {
-    _private: (),
-}
+#[non_exhaustive]
+pub struct StrOutputParser;
 
 impl StrOutputParser {
     pub fn new() -> Self {
-        Self { _private: () }
+        Self
     }
 
     pub fn is_lc_serializable() -> bool {
