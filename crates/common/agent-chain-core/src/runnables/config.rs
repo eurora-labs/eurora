@@ -166,21 +166,17 @@ fn merge_into_config(target: &mut RunnableConfig, source: &RunnableConfig) {
     }
     target.metadata.extend(source.metadata.clone());
     if source.callbacks.is_some() {
-        target.callbacks = source.callbacks.clone();
+        target.callbacks.clone_from(&source.callbacks);
     }
-    if source.run_name.is_some() {
-        target.run_name = source.run_name.clone();
+    if let Some(ref name) = source.run_name {
+        target.run_name = Some(name.clone());
     }
-    if source.max_concurrency.is_some() {
-        target.max_concurrency = source.max_concurrency;
-    }
+    target.max_concurrency = source.max_concurrency.or(target.max_concurrency);
     if source.recursion_limit != DEFAULT_RECURSION_LIMIT {
         target.recursion_limit = source.recursion_limit;
     }
     target.configurable.extend(source.configurable.clone());
-    if source.run_id.is_some() {
-        target.run_id = source.run_id;
-    }
+    target.run_id = source.run_id.or(target.run_id);
 }
 
 pub fn get_config_list(

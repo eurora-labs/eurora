@@ -505,7 +505,7 @@ impl RunnablePick {
         match &self.keys {
             PickKeys::Single(key) => input.get(key).cloned(),
             PickKeys::Multiple(keys) => {
-                let picked: HashMap<String, Value> = keys
+                let picked: serde_json::Map<String, Value> = keys
                     .iter()
                     .filter_map(|k| input.get(k).map(|v| (k.clone(), v.clone())))
                     .collect();
@@ -513,7 +513,7 @@ impl RunnablePick {
                 if picked.is_empty() {
                     None
                 } else {
-                    Some(serde_json::to_value(picked).unwrap_or(Value::Null))
+                    Some(Value::Object(picked))
                 }
             }
         }

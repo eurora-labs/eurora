@@ -97,7 +97,7 @@ where
         }
     }
 
-    fn maybe_insert_exception(&self, input: &I, last_error: &Option<Error>) -> Option<I> {
+    fn maybe_insert_exception(&self, input: &I, last_error: Option<&Error>) -> Option<I> {
         if let (Some(key), Some(inserter), Some(err)) =
             (&self.exception_key, &self.exception_inserter, last_error)
         {
@@ -115,7 +115,8 @@ where
         let mut current_input = input;
 
         for runnable in self.runnables() {
-            if let Some(modified) = self.maybe_insert_exception(&current_input, &last_error) {
+            if let Some(modified) = self.maybe_insert_exception(&current_input, last_error.as_ref())
+            {
                 current_input = modified;
             }
 
@@ -162,7 +163,7 @@ where
                             handled_exception_indices.push(*i);
                         }
                         let next_input = self
-                            .maybe_insert_exception(input, &Some(Error::other(e.to_string())))
+                            .maybe_insert_exception(input, Some(&e))
                             .unwrap_or_else(|| input.clone());
                         to_return[*i] = Some(Err(e));
                         next_run_again.push((*i, next_input));
@@ -241,7 +242,8 @@ where
         let mut current_input = input;
 
         for runnable in self.runnables() {
-            if let Some(modified) = self.maybe_insert_exception(&current_input, &last_error) {
+            if let Some(modified) = self.maybe_insert_exception(&current_input, last_error.as_ref())
+            {
                 current_input = modified;
             }
 
@@ -415,7 +417,7 @@ where
             let mut current_input = input;
 
             for runnable in self.runnables() {
-                if let Some(modified) = self.maybe_insert_exception(&current_input, &last_error) {
+                if let Some(modified) = self.maybe_insert_exception(&current_input, last_error.as_ref()) {
                     current_input = modified;
                 }
 
