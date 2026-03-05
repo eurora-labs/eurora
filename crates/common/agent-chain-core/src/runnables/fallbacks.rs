@@ -459,7 +459,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runnables::base::RunnableLambda;
+    use crate::runnables::base::{RunnableExt, RunnableLambda};
 
     #[test]
     fn test_fallback_on_error() {
