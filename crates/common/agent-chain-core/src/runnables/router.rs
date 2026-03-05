@@ -154,35 +154,24 @@ where
             return Vec::new();
         }
 
-        let keys: Vec<_> = inputs.iter().map(|i| i.key.clone()).collect();
-        let actual_inputs: Vec<_> = inputs.into_iter().map(|i| i.input).collect();
-
-        for key in &keys {
-            if !self.runnables.contains_key(key) {
-                return vec![Err(Error::other(
-                    "One or more keys do not have a corresponding runnable",
-                ))];
-            }
-        }
-
-        let configs = match get_config_list(config, keys.len()) {
+        let configs = match get_config_list(config, inputs.len()) {
             Ok(c) => c,
             Err(e) => return vec![Err(e)],
         };
 
-        let results: Vec<Result<O>> = keys
+        inputs
             .into_iter()
-            .zip(actual_inputs)
             .zip(configs)
-            .map(|((key, input), config)| {
-                let runnable = self.runnables.get(&key).ok_or_else(|| {
-                    Error::other(format!("No runnable associated with key '{}'", key))
+            .map(|(router_input, config)| {
+                let runnable = self.runnables.get(&router_input.key).ok_or_else(|| {
+                    Error::other(format!(
+                        "No runnable associated with key '{}'",
+                        router_input.key
+                    ))
                 })?;
-                runnable.invoke(input, Some(config))
+                runnable.invoke(router_input.input, Some(config))
             })
-            .collect();
-
-        results
+            .collect()
     }
 
     async fn abatch(
@@ -198,34 +187,29 @@ where
             return Vec::new();
         }
 
-        let keys: Vec<_> = inputs.iter().map(|i| i.key.clone()).collect();
-        let actual_inputs: Vec<_> = inputs.into_iter().map(|i| i.input).collect();
-
-        for key in &keys {
-            if !self.runnables.contains_key(key) {
-                return vec![Err(Error::other(
-                    "One or more keys do not have a corresponding runnable",
-                ))];
-            }
-        }
-
-        let configs = match get_config_list(config, keys.len()) {
+        let configs = match get_config_list(config, inputs.len()) {
             Ok(c) => c,
             Err(e) => return vec![Err(e)],
         };
         let max_concurrency = configs.first().and_then(|c| c.max_concurrency);
 
-        let futures: Vec<_> = keys
+        let futures: Vec<_> = inputs
             .into_iter()
-            .zip(actual_inputs)
             .zip(configs)
-            .map(|((key, input), config)| {
-                let runnable = self.runnables.get(&key).cloned().ok_or_else(|| {
-                    Error::other(format!("No runnable associated with key '{}'", key))
-                });
+            .map(|(router_input, config)| {
+                let runnable = self
+                    .runnables
+                    .get(&router_input.key)
+                    .cloned()
+                    .ok_or_else(|| {
+                        Error::other(format!(
+                            "No runnable associated with key '{}'",
+                            router_input.key
+                        ))
+                    });
                 Box::pin(async move {
                     let runnable = runnable?;
-                    runnable.ainvoke(input, Some(config)).await
+                    runnable.ainvoke(router_input.input, Some(config)).await
                 })
                     as std::pin::Pin<Box<dyn std::future::Future<Output = Result<O>> + Send>>
             })
@@ -239,23 +223,7 @@ where
         input: Self::Input,
         config: Option<RunnableConfig>,
     ) -> BoxStream<'_, Result<Self::Output>> {
-        let key = input.key.clone();
-        let actual_input = input.input;
-
-        Box::pin(async_stream::stream! {
-            let runnable = match self.runnables.get(&key) {
-                Some(r) => r,
-                None => {
-                    yield Err(Error::other(format!("No runnable associated with key '{}'", key)));
-                    return;
-                }
-            };
-
-            let mut stream = runnable.stream(actual_input, config);
-            while let Some(output) = stream.next().await {
-                yield output;
-            }
-        })
+        self.astream(input, config)
     }
 
     fn astream(
@@ -266,19 +234,16 @@ where
     where
         Self: 'static,
     {
-        let key = input.key.clone();
-        let actual_input = input.input;
-
         Box::pin(async_stream::stream! {
-            let runnable = match self.runnables.get(&key) {
+            let runnable = match self.runnables.get(&input.key) {
                 Some(r) => r,
                 None => {
-                    yield Err(Error::other(format!("No runnable associated with key '{}'", key)));
+                    yield Err(Error::other(format!("No runnable associated with key '{}'", input.key)));
                     return;
                 }
             };
 
-            let mut stream = runnable.astream(actual_input, config);
+            let mut stream = runnable.astream(input.input, config);
             while let Some(output) = stream.next().await {
                 yield output;
             }

@@ -107,18 +107,8 @@ where
         }
     }
 
-    fn try_invoke_with_fallbacks(
-        &self,
-        input: I,
-        config: &RunnableConfig,
-        use_callbacks: bool,
-    ) -> Result<O> {
-        let run_manager_and_config = if use_callbacks {
-            let (rm, cfg) = start_chain_run(Some(config.clone()));
-            Some((rm, cfg))
-        } else {
-            None
-        };
+    fn try_invoke_with_fallbacks(&self, input: I, config: &RunnableConfig) -> Result<O> {
+        let (run_manager, config) = start_chain_run(Some(config.clone()));
 
         let mut first_error: Option<Error> = None;
         let mut last_error: Option<Error> = None;
@@ -129,19 +119,9 @@ where
                 current_input = modified;
             }
 
-            let invoke_config = if let Some((ref rm, ref cfg)) = run_manager_and_config {
-                Some(child_config(cfg, rm, None))
-            } else {
-                Some(config.clone())
-            };
-
-            match runnable.invoke(current_input.clone(), invoke_config) {
-                Ok(output) => {
-                    if let Some((ref rm, _)) = run_manager_and_config {
-                        return finish_chain_run(rm, Ok(output));
-                    }
-                    return Ok(output);
-                }
+            let invoke_config = child_config(&config, &run_manager, None);
+            match runnable.invoke(current_input.clone(), Some(invoke_config)) {
+                Ok(output) => return finish_chain_run(&run_manager, Ok(output)),
                 Err(e) => {
                     if self.should_fallback(&e) {
                         if first_error.is_none() {
@@ -149,10 +129,7 @@ where
                         }
                         last_error = Some(e);
                     } else {
-                        if let Some((ref rm, _)) = run_manager_and_config {
-                            return finish_chain_run(rm, Err(e));
-                        }
-                        return Err(e);
+                        return finish_chain_run(&run_manager, Err(e));
                     }
                 }
             }
@@ -160,11 +137,7 @@ where
 
         let error =
             first_error.unwrap_or_else(|| Error::other("No error stored at end of fallbacks."));
-        if let Some((ref rm, _)) = run_manager_and_config {
-            finish_chain_run(rm, Err(error))
-        } else {
-            Err(error)
-        }
+        finish_chain_run(&run_manager, Err(error))
     }
 
     fn process_batch_outputs(
@@ -250,7 +223,7 @@ where
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         let config = ensure_config(config);
-        self.try_invoke_with_fallbacks(input, &config, true)
+        self.try_invoke_with_fallbacks(input, &config)
     }
 
     async fn ainvoke(

@@ -433,29 +433,7 @@ impl Runnable for RunnableAssign {
     where
         Self: 'static,
     {
-        let config = ensure_config(config);
-
-        Box::pin(async_stream::stream! {
-            let mut collected_input: Option<HashMap<String, Value>> = None;
-            let mut input = input;
-
-            while let Some(chunk) = input.next().await {
-                if let Some(ref mut current) = collected_input {
-                    for (key, value) in chunk {
-                        current.insert(key, value);
-                    }
-                } else {
-                    collected_input = Some(chunk);
-                }
-            }
-
-            if let Some(final_input) = collected_input {
-                match self.ainvoke(final_input, Some(config)).await {
-                    Ok(result) => yield Ok(result),
-                    Err(e) => yield Err(e),
-                }
-            }
-        })
+        self.transform(input, config)
     }
 }
 

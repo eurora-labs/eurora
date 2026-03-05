@@ -122,7 +122,7 @@ fn test_addable_dict_radd() {
     b.0.insert("x".to_string(), json!(2));
     b.0.insert("y".to_string(), json!(3));
 
-    let result = AddableDict::from_map(a) + b;
+    let result = AddableDict::from(a) + b;
     assert_eq!(result.0.get("x"), Some(&json!(3)));
     assert_eq!(result.0.get("y"), Some(&json!(3)));
 }
@@ -134,7 +134,7 @@ fn test_addable_dict_radd_new_keys() {
     let mut b = AddableDict::new();
     b.0.insert("b".to_string(), json!(2));
 
-    let result = AddableDict::from_map(a) + b;
+    let result = AddableDict::from(a) + b;
     assert_eq!(result.0.get("a"), Some(&json!(1)));
     assert_eq!(result.0.get("b"), Some(&json!(2)));
 }

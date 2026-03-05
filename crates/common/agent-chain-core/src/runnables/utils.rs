@@ -52,10 +52,6 @@ impl AddableDict {
     pub fn new() -> Self {
         Self(HashMap::new())
     }
-
-    pub fn from_map(map: HashMap<String, Value>) -> Self {
-        Self(map)
-    }
 }
 
 impl std::ops::Deref for AddableDict {

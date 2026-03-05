@@ -13,8 +13,8 @@ use crate::error::{Error, Result};
 
 use super::base::Runnable;
 use super::config::{
-    ConfigOrList, EMPTY_MAP, RunnableConfig, child_config, finish_chain_run,
-    get_callback_manager_for_config, get_config_list, start_chain_run,
+    ConfigOrList, EMPTY_MAP, RunnableConfig, child_config, finish_chain_run, get_config_list,
+    start_chain_run,
 };
 
 const DEFAULT_INITIAL: f64 = 1.0;
@@ -372,18 +372,10 @@ where
         };
         let n = inputs.len();
 
-        let run_managers: Vec<CallbackManagerForChainRun> = configs
-            .iter()
-            .map(|config| {
-                let callback_manager = get_callback_manager_for_config(config);
-                callback_manager
-                    .on_chain_start()
-                    .serialized(&EMPTY_MAP)
-                    .inputs(&EMPTY_MAP)
-                    .maybe_run_id(config.run_id)
-                    .call()
-            })
-            .collect();
+        let (run_managers, configs): (Vec<_>, Vec<_>) = configs
+            .into_iter()
+            .map(|config| start_chain_run(Some(config)))
+            .unzip();
 
         let mut results: Vec<Option<Result<Self::Output>>> = (0..n).map(|_| None).collect();
         let mut remaining: Vec<usize> = (0..n).collect();
@@ -429,7 +421,14 @@ where
             }
         }
 
-        Self::collect_results(results)
+        let results = Self::collect_results(results);
+        for (run_manager, result) in run_managers.iter().zip(results.iter()) {
+            match result {
+                Ok(_) => run_manager.on_chain_end(&EMPTY_MAP),
+                Err(e) => run_manager.on_chain_error(e),
+            }
+        }
+        results
     }
 
     async fn abatch(
@@ -451,18 +450,10 @@ where
         };
         let n = inputs.len();
 
-        let run_managers: Vec<CallbackManagerForChainRun> = configs
-            .iter()
-            .map(|config| {
-                let callback_manager = get_callback_manager_for_config(config);
-                callback_manager
-                    .on_chain_start()
-                    .serialized(&EMPTY_MAP)
-                    .inputs(&EMPTY_MAP)
-                    .maybe_run_id(config.run_id)
-                    .call()
-            })
-            .collect();
+        let (run_managers, configs): (Vec<_>, Vec<_>) = configs
+            .into_iter()
+            .map(|config| start_chain_run(Some(config)))
+            .unzip();
 
         let mut results: Vec<Option<Result<Self::Output>>> = (0..n).map(|_| None).collect();
         let mut remaining: Vec<usize> = (0..n).collect();
@@ -511,7 +502,14 @@ where
             }
         }
 
-        Self::collect_results(results)
+        let results = Self::collect_results(results);
+        for (run_manager, result) in run_managers.iter().zip(results.iter()) {
+            match result {
+                Ok(_) => run_manager.on_chain_end(&EMPTY_MAP),
+                Err(e) => run_manager.on_chain_error(e),
+            }
+        }
+        results
     }
 }
 

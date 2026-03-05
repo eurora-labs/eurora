@@ -187,7 +187,7 @@ fn test_router_batch_invalid_key() {
         err.as_ref()
             .unwrap_err()
             .to_string()
-            .contains("do not have a corresponding runnable")
+            .contains("No runnable associated with key")
     );
 }
 
