@@ -46,6 +46,7 @@ impl BaseRateLimiter for CountingRateLimiter {
 fn make_model(messages: Vec<AIMessage>, limiter: Arc<CountingRateLimiter>) -> GenericFakeChatModel {
     let config = ChatModelConfig::builder()
         .rate_limiter(limiter as Arc<dyn BaseRateLimiter>)
+        .cache(false)
         .build();
     GenericFakeChatModel::from_vec(messages).with_config(config)
 }
