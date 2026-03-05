@@ -109,19 +109,6 @@ fn test_comma_type_property() {
 }
 
 #[test]
-fn test_comma_is_lc_serializable() {
-    assert!(CommaSeparatedListOutputParser::is_lc_serializable());
-}
-
-#[test]
-fn test_comma_get_lc_namespace() {
-    assert_eq!(
-        CommaSeparatedListOutputParser::get_lc_namespace(),
-        vec!["langchain", "output_parsers", "list"]
-    );
-}
-
-#[test]
 fn test_comma_get_format_instructions() {
     let parser = CommaSeparatedListOutputParser::new();
     let instructions = parser.get_format_instructions().unwrap();
@@ -226,7 +213,7 @@ fn test_numbered_parse_iter() {
 
 #[test]
 fn test_numbered_custom_pattern() {
-    let parser = NumberedListOutputParser::with_pattern(r"\d+\)\s([^\n]+)");
+    let parser = NumberedListOutputParser::with_pattern(r"\d+\)\s([^\n]+)").unwrap();
     let text = "1) foo\n2) bar";
     assert_eq!(parser.parse(text).unwrap(), vec!["foo", "bar"]);
 }

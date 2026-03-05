@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::sync::LazyLock;
 
 use regex::Regex;
 use serde_json::Value;
@@ -10,6 +11,12 @@ use crate::runnables::AddableDict;
 
 use super::base::BaseOutputParser;
 use super::transform::BaseTransformOutputParser;
+
+static MARKDOWN_CODE_FENCE_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?s)```(?:xml)?(.*?)```").expect("valid regex"));
+
+static ENCODING_MATCHER_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?s)<([^>]*encoding[^>]*)>\n(.*)").expect("valid regex"));
 
 const XML_FORMAT_INSTRUCTIONS: &str = r#"The output should be formatted as a XML file.
 1. Output should conform to the tags below.
@@ -146,149 +153,133 @@ impl StreamingParser {
 
 #[derive(Debug, Clone)]
 pub struct XMLOutputParser {
-    pub tags: Option<Vec<String>>,
-
-    encoding_matcher: Regex,
+    tags: Option<Vec<String>>,
 }
 
 impl XMLOutputParser {
     pub fn new() -> Self {
-        Self {
-            tags: None,
-            encoding_matcher: Regex::new(r"(?s)<([^>]*encoding[^>]*)>\n(.*)")
-                .expect("Invalid regex pattern"),
-        }
+        Self { tags: None }
     }
 
     pub fn with_tags(tags: Vec<String>) -> Self {
-        Self {
-            tags: Some(tags),
-            ..Self::new()
-        }
+        Self { tags: Some(tags) }
+    }
+
+    pub fn tags(&self) -> Option<&[String]> {
+        self.tags.as_deref()
     }
 
     fn parse_xml(&self, text: &str) -> Result<Value> {
-        let text = self.preprocess_xml(text);
+        let text = preprocess_xml(text);
 
         let mut reader = quick_xml::Reader::from_str(&text);
         reader.config_mut().trim_text(true);
 
-        self.read_root(&mut reader)
+        read_root(&mut reader)
     }
+}
 
-    fn read_root(&self, reader: &mut quick_xml::Reader<&[u8]>) -> Result<Value> {
-        loop {
-            match reader.read_event() {
-                Ok(quick_xml::events::Event::Start(ref e)) => {
-                    let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                    let value = self.read_element_content(reader, &tag)?;
-                    let mut result = serde_json::Map::new();
-                    result.insert(tag, value);
-                    return Ok(Value::Object(result));
-                }
-                Ok(quick_xml::events::Event::Empty(ref e)) => {
-                    let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                    let mut result = serde_json::Map::new();
-                    result.insert(tag, Value::Null);
-                    return Ok(Value::Object(result));
-                }
-                Ok(quick_xml::events::Event::Eof) => {
-                    return Ok(Value::Object(Default::default()));
-                }
-                Err(e) => {
-                    return Err(Error::Other(format!(
-                        "Failed to parse XML format from completion {}. Got: {}",
-                        "<input>", e
-                    )));
-                }
-                _ => {
-                    continue;
+fn read_root(reader: &mut quick_xml::Reader<&[u8]>) -> Result<Value> {
+    loop {
+        match reader.read_event() {
+            Ok(quick_xml::events::Event::Start(ref e)) => {
+                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let value = read_element_content(reader, &tag)?;
+                let mut result = serde_json::Map::new();
+                result.insert(tag, value);
+                return Ok(Value::Object(result));
+            }
+            Ok(quick_xml::events::Event::Empty(ref e)) => {
+                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let mut result = serde_json::Map::new();
+                result.insert(tag, Value::Null);
+                return Ok(Value::Object(result));
+            }
+            Ok(quick_xml::events::Event::Eof) => {
+                return Ok(Value::Object(Default::default()));
+            }
+            Err(e) => {
+                return Err(Error::Other(format!("Failed to parse XML: {}", e)));
+            }
+            _ => continue,
+        }
+    }
+}
+
+fn read_element_content(reader: &mut quick_xml::Reader<&[u8]>, parent_tag: &str) -> Result<Value> {
+    let mut text_content = String::new();
+    let mut children: Vec<Value> = Vec::new();
+    let mut has_children = false;
+
+    loop {
+        match reader.read_event() {
+            Ok(quick_xml::events::Event::Start(ref e)) => {
+                has_children = true;
+                let child_tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let child_value = read_element_content(reader, &child_tag)?;
+                let mut child_map = serde_json::Map::new();
+                child_map.insert(child_tag, child_value);
+                children.push(Value::Object(child_map));
+            }
+            Ok(quick_xml::events::Event::Empty(ref e)) => {
+                has_children = true;
+                let child_tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let mut child_map = serde_json::Map::new();
+                child_map.insert(child_tag, Value::Null);
+                children.push(Value::Object(child_map));
+            }
+            Ok(quick_xml::events::Event::Text(ref e)) => {
+                if let Ok(t) = e.unescape() {
+                    text_content.push_str(&t);
                 }
             }
+            Ok(quick_xml::events::Event::CData(ref e)) => {
+                if let Ok(t) = std::str::from_utf8(e.as_ref()) {
+                    text_content.push_str(t);
+                }
+            }
+            Ok(quick_xml::events::Event::End(ref e)) => {
+                let end_tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                if end_tag == parent_tag {
+                    break;
+                }
+            }
+            Ok(quick_xml::events::Event::Eof) => break,
+            Err(e) => {
+                return Err(Error::Other(format!("XML parse error: {}", e)));
+            }
+            _ => continue,
         }
     }
 
-    #[allow(clippy::only_used_in_recursion)]
-    fn read_element_content(
-        &self,
-        reader: &mut quick_xml::Reader<&[u8]>,
-        parent_tag: &str,
-    ) -> Result<Value> {
-        let mut text_content = String::new();
-        let mut children: Vec<Value> = Vec::new();
-        let mut has_children = false;
-
-        loop {
-            match reader.read_event() {
-                Ok(quick_xml::events::Event::Start(ref e)) => {
-                    has_children = true;
-                    let child_tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                    let child_value = self.read_element_content(reader, &child_tag)?;
-                    let mut child_map = serde_json::Map::new();
-                    child_map.insert(child_tag, child_value);
-                    children.push(Value::Object(child_map));
-                }
-                Ok(quick_xml::events::Event::Empty(ref e)) => {
-                    has_children = true;
-                    let child_tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                    let mut child_map = serde_json::Map::new();
-                    child_map.insert(child_tag, Value::Null);
-                    children.push(Value::Object(child_map));
-                }
-                Ok(quick_xml::events::Event::Text(ref e)) => {
-                    if let Ok(t) = e.unescape() {
-                        text_content.push_str(&t);
-                    }
-                }
-                Ok(quick_xml::events::Event::CData(ref e)) => {
-                    if let Ok(t) = std::str::from_utf8(e.as_ref()) {
-                        text_content.push_str(t);
-                    }
-                }
-                Ok(quick_xml::events::Event::End(ref e)) => {
-                    let end_tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                    if end_tag == parent_tag {
-                        break;
-                    }
-                }
-                Ok(quick_xml::events::Event::Eof) => break,
-                Err(e) => {
-                    return Err(Error::Other(format!("XML parse error: {}", e)));
-                }
-                _ => continue,
-            }
-        }
-
-        if has_children {
-            Ok(Value::Array(children))
+    if has_children {
+        Ok(Value::Array(children))
+    } else {
+        let trimmed = text_content.trim().to_string();
+        if trimmed.is_empty() {
+            Ok(Value::Null)
         } else {
-            let trimmed = text_content.trim().to_string();
-            if trimmed.is_empty() {
-                Ok(Value::Null)
-            } else {
-                Ok(Value::String(trimmed))
-            }
+            Ok(Value::String(trimmed))
         }
     }
+}
 
-    fn preprocess_xml(&self, text: &str) -> String {
-        let mut text = text.to_string();
+fn preprocess_xml(text: &str) -> String {
+    let mut text = text.to_string();
 
-        let re = Regex::new(r"(?s)```(?:xml)?(.*?)```").expect("Invalid regex");
-        if let Some(caps) = re.captures(&text)
-            && let Some(m) = caps.get(1)
-        {
-            text = m.as_str().to_string();
-        }
-
-        if let Some(caps) = self.encoding_matcher.captures(&text)
-            && let Some(m) = caps.get(2)
-        {
-            text = m.as_str().to_string();
-        }
-
-        text.trim().to_string()
+    if let Some(caps) = MARKDOWN_CODE_FENCE_RE.captures(&text)
+        && let Some(m) = caps.get(1)
+    {
+        text = m.as_str().to_string();
     }
+
+    if let Some(caps) = ENCODING_MATCHER_RE.captures(&text)
+        && let Some(m) = caps.get(2)
+    {
+        text = m.as_str().to_string();
+    }
+
+    text.trim().to_string()
 }
 
 impl Default for XMLOutputParser {
@@ -312,7 +303,7 @@ impl BaseOutputParser for XMLOutputParser {
     }
 
     fn get_format_instructions(&self) -> Result<String> {
-        match &self.tags {
+        match self.tags() {
             Some(tags) => {
                 let tags_str = format!("{:?}", tags);
                 Ok(XML_FORMAT_INSTRUCTIONS.replace("{tags}", &tags_str))

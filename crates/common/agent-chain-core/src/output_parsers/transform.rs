@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use futures::StreamExt;
 use futures::stream::BoxStream;
 
@@ -9,7 +8,6 @@ use crate::runnables::RunnableConfig;
 
 use super::base::BaseOutputParser;
 
-#[async_trait]
 pub trait BaseTransformOutputParser: BaseOutputParser {
     fn parse_generation(&self, generation: &Generation) -> Result<Self::Output> {
         self.parse(&generation.text)
@@ -43,7 +41,6 @@ pub trait BaseTransformOutputParser: BaseOutputParser {
     }
 }
 
-#[async_trait]
 pub trait BaseCumulativeTransformOutputParser: BaseTransformOutputParser {
     fn diff_mode(&self) -> bool {
         false
