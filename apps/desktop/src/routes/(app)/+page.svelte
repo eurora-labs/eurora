@@ -13,6 +13,7 @@
 	import * as Conversation from '@eurora/ui/components/ai-elements/conversation/index';
 	import * as Message from '@eurora/ui/components/ai-elements/message/index';
 	import * as PromptInput from '@eurora/ui/components/ai-elements/prompt-input/index';
+	import * as Reasoning from '@eurora/ui/components/ai-elements/reasoning/index';
 	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
 	import * as Suggestion from '@eurora/ui/components/ai-elements/suggestion/index';
 	import * as Empty from '@eurora/ui/components/empty/index';
@@ -25,6 +26,12 @@
 		PromptInputMessage,
 		ChatStatus,
 	} from '@eurora/ui/components/ai-elements/prompt-input/index';
+
+	interface ReasoningData {
+		content: string;
+		isStreaming: boolean;
+		duration?: number;
+	}
 
 	let copiedMessageId = $state<string | null>(null);
 
@@ -44,6 +51,7 @@
 	let chatStatus = $state<ChatStatus>('ready');
 	let assets = $state<ContextChip[]>([]);
 	let latestTimelineItem = $state<TimelineAppEvent | null>(null);
+	let reasoningData = $state<Record<number, ReasoningData>>({});
 
 	const showSuggestions = $derived(messages.length === 0 && assets.length === 0);
 
@@ -164,19 +172,45 @@
 			content: '',
 		});
 
+		const messageIndex = messages.length - 1;
 		chatStatus = 'streaming';
+		let reasoningStartTime: number | null = null;
 
 		function onEvent(response: ResponseChunk) {
 			if (!agentMessage) {
 				agentMessage = messages.at(-1);
 			}
 
-			if (agentMessage && agentMessage.role === 'ai') {
+			if (response.reasoning) {
+				if (!reasoningData[messageIndex]) {
+					reasoningStartTime = Date.now();
+					reasoningData[messageIndex] = {
+						content: response.reasoning,
+						isStreaming: true,
+					};
+				} else {
+					reasoningData[messageIndex].content += response.reasoning;
+				}
+			}
+
+			if (agentMessage && agentMessage.role === 'ai' && response.chunk) {
+				if (reasoningData[messageIndex]?.isStreaming) {
+					reasoningData[messageIndex].isStreaming = false;
+					reasoningData[messageIndex].duration = reasoningStartTime
+						? Math.ceil((Date.now() - reasoningStartTime) / 1000)
+						: undefined;
+				}
 				agentMessage.content += response.chunk;
 			}
 		}
 
 		await taurpc.chat.send_query(thread?.id ?? null, onEvent, tauRpcQuery);
+		if (reasoningData[messageIndex]?.isStreaming) {
+			reasoningData[messageIndex].isStreaming = false;
+			reasoningData[messageIndex].duration = reasoningStartTime
+				? Math.ceil((Date.now() - reasoningStartTime) / 1000)
+				: undefined;
+		}
 		chatStatus = 'ready';
 	}
 </script>
@@ -205,12 +239,22 @@
 			{#each messages as message, i}
 				{@const content = getMessageContent(message)}
 				{@const isUser = isUserMessage(message)}
+				{@const reasoning = reasoningData[i]}
 				{#if content.length > 0 || !isUser}
 					<Message.Root from={isUser ? 'user' : 'assistant'}>
+						{#if reasoning}
+							<Reasoning.Root
+								isStreaming={reasoning.isStreaming}
+								duration={reasoning.duration}
+							>
+								<Reasoning.Trigger />
+								<Reasoning.Content children={reasoning.content} />
+							</Reasoning.Root>
+						{/if}
 						<Message.Content>
 							{#if content.trim().length > 0}
 								<Message.Response {content} />
-							{:else}
+							{:else if !reasoning}
 								<Shimmer>Thinking</Shimmer>
 							{/if}
 						</Message.Content>

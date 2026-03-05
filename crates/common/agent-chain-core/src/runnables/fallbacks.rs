@@ -11,8 +11,8 @@ use crate::error::{Error, Result};
 
 use super::base::{DynRunnable, Runnable};
 use super::config::{
-    ConfigOrList, RunnableConfig, ensure_config, get_callback_manager_for_config, get_config_list,
-    patch_config,
+    ConfigOrList, RunnableConfig, child_config, ensure_config, finish_chain_run, get_config_list,
+    start_chain_run,
 };
 
 pub type FallbackErrorPredicate = Arc<dyn Fn(&Error) -> bool + Send + Sync>;
@@ -96,6 +96,109 @@ where
             None => true,
         }
     }
+
+    fn maybe_insert_exception(&self, input: &I, last_error: Option<&Error>) -> Option<I> {
+        if let (Some(key), Some(inserter), Some(err)) =
+            (&self.exception_key, &self.exception_inserter, last_error)
+        {
+            Some(inserter(input, key, err))
+        } else {
+            None
+        }
+    }
+
+    fn try_invoke_with_fallbacks(&self, input: I, config: &RunnableConfig) -> Result<O> {
+        let (run_manager, config) = start_chain_run(Some(config.clone()));
+
+        let mut first_error: Option<Error> = None;
+        let mut last_error: Option<Error> = None;
+        let mut current_input = input;
+
+        for runnable in self.runnables() {
+            if let Some(modified) = self.maybe_insert_exception(&current_input, last_error.as_ref())
+            {
+                current_input = modified;
+            }
+
+            let invoke_config = child_config(&config, &run_manager, None);
+            match runnable.invoke(current_input.clone(), Some(invoke_config)) {
+                Ok(output) => return finish_chain_run(&run_manager, Ok(output)),
+                Err(e) => {
+                    if self.should_fallback(&e) {
+                        if first_error.is_none() {
+                            first_error = Some(Error::other(e.to_string()));
+                        }
+                        last_error = Some(e);
+                    } else {
+                        return finish_chain_run(&run_manager, Err(e));
+                    }
+                }
+            }
+        }
+
+        let error =
+            first_error.unwrap_or_else(|| Error::other("No error stored at end of fallbacks."));
+        finish_chain_run(&run_manager, Err(error))
+    }
+
+    fn process_batch_outputs(
+        &self,
+        outputs: Vec<Result<O>>,
+        run_again: &[(usize, I)],
+        to_return: &mut [Option<Result<O>>],
+        handled_exception_indices: &mut Vec<usize>,
+        first_to_raise: &mut Option<Error>,
+        next_run_again: &mut Vec<(usize, I)>,
+        return_exceptions: bool,
+    ) -> Option<Vec<Result<O>>> {
+        for ((i, input), output) in run_again.iter().zip(outputs) {
+            match output {
+                Ok(out) => {
+                    to_return[*i] = Some(Ok(out));
+                    handled_exception_indices.retain(|&idx| idx != *i);
+                }
+                Err(e) => {
+                    if self.should_fallback(&e) {
+                        if !handled_exception_indices.contains(i) {
+                            handled_exception_indices.push(*i);
+                        }
+                        let next_input = self
+                            .maybe_insert_exception(input, Some(&e))
+                            .unwrap_or_else(|| input.clone());
+                        to_return[*i] = Some(Err(e));
+                        next_run_again.push((*i, next_input));
+                    } else if return_exceptions {
+                        to_return[*i] = Some(Err(e));
+                    } else if first_to_raise.is_none() {
+                        *first_to_raise = Some(e);
+                    }
+                }
+            }
+        }
+
+        if first_to_raise.is_some() {
+            let mut results = Vec::with_capacity(to_return.len());
+            let mut error_consumed = false;
+            for opt in to_return.iter_mut() {
+                match opt.take() {
+                    Some(result) => results.push(result),
+                    None => {
+                        if !error_consumed {
+                            results.push(Err(first_to_raise
+                                .take()
+                                .expect("first_to_raise set when errors exist")));
+                            error_consumed = true;
+                        } else {
+                            results.push(Err(Error::other("Batch aborted due to error")));
+                        }
+                    }
+                }
+            }
+            return Some(results);
+        }
+
+        None
+    }
 }
 
 #[async_trait]
@@ -121,58 +224,7 @@ where
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         let config = ensure_config(config);
-        let callback_manager = get_callback_manager_for_config(&config);
-
-        let run_manager = callback_manager
-            .on_chain_start()
-            .serialized(&std::collections::HashMap::new())
-            .inputs(&std::collections::HashMap::new())
-            .maybe_run_id(config.run_id)
-            .call();
-
-        let mut first_error: Option<Error> = None;
-        let mut last_error: Option<Error> = None;
-        let mut current_input = input;
-
-        for runnable in self.runnables() {
-            if let (Some(key), Some(inserter), Some(err)) =
-                (&self.exception_key, &self.exception_inserter, &last_error)
-            {
-                current_input = inserter(&current_input, key, err);
-            }
-
-            let child_config = patch_config(
-                Some(config.clone()),
-                Some(run_manager.get_child(None)),
-                None,
-                None,
-                None,
-                None,
-            );
-
-            match runnable.invoke(current_input.clone(), Some(child_config)) {
-                Ok(output) => {
-                    run_manager.on_chain_end(&std::collections::HashMap::new());
-                    return Ok(output);
-                }
-                Err(e) => {
-                    if self.should_fallback(&e) {
-                        if first_error.is_none() {
-                            first_error = Some(Error::other(e.to_string()));
-                        }
-                        last_error = Some(e);
-                    } else {
-                        run_manager.on_chain_error(&e);
-                        return Err(e);
-                    }
-                }
-            }
-        }
-
-        let error =
-            first_error.unwrap_or_else(|| Error::other("No error stored at end of fallbacks."));
-        run_manager.on_chain_error(&error);
-        Err(error)
+        self.try_invoke_with_fallbacks(input, &config)
     }
 
     async fn ainvoke(
@@ -183,26 +235,26 @@ where
     where
         Self: 'static,
     {
-        let config = ensure_config(config);
+        let (run_manager, config) = start_chain_run(config);
 
         let mut first_error: Option<Error> = None;
         let mut last_error: Option<Error> = None;
         let mut current_input = input;
 
         for runnable in self.runnables() {
-            if let (Some(key), Some(inserter), Some(err)) =
-                (&self.exception_key, &self.exception_inserter, &last_error)
+            if let Some(modified) = self.maybe_insert_exception(&current_input, last_error.as_ref())
             {
-                current_input = inserter(&current_input, key, err);
+                current_input = modified;
             }
 
             match runnable
-                .ainvoke(current_input.clone(), Some(config.clone()))
+                .ainvoke(
+                    current_input.clone(),
+                    Some(child_config(&config, &run_manager, None)),
+                )
                 .await
             {
-                Ok(output) => {
-                    return Ok(output);
-                }
+                Ok(output) => return finish_chain_run(&run_manager, Ok(output)),
                 Err(e) => {
                     if self.should_fallback(&e) {
                         if first_error.is_none() {
@@ -210,13 +262,16 @@ where
                         }
                         last_error = Some(e);
                     } else {
-                        return Err(e);
+                        return finish_chain_run(&run_manager, Err(e));
                     }
                 }
             }
         }
 
-        Err(first_error.unwrap_or_else(|| Error::other("No error stored at end of fallbacks.")))
+        finish_chain_run(
+            &run_manager,
+            Err(first_error.unwrap_or_else(|| Error::other("No error stored at end of fallbacks."))),
+        )
     }
 
     fn batch(
@@ -253,61 +308,19 @@ where
             let batch_configs: Vec<RunnableConfig> =
                 run_again.iter().map(|(i, _)| configs[*i].clone()).collect();
 
-            let outputs = runnable.batch(
-                batch_inputs,
-                Some(ConfigOrList::List(batch_configs)),
-                true, // Always return exceptions to handle them ourselves
-            );
+            let outputs =
+                runnable.batch(batch_inputs, Some(ConfigOrList::List(batch_configs)), true);
 
             let mut next_run_again = Vec::new();
-
-            for ((i, input), output) in run_again.iter().zip(outputs) {
-                match output {
-                    Ok(out) => {
-                        to_return[*i] = Some(Ok(out));
-                        handled_exception_indices.retain(|&idx| idx != *i);
-                    }
-                    Err(e) => {
-                        if self.should_fallback(&e) {
-                            if !handled_exception_indices.contains(i) {
-                                handled_exception_indices.push(*i);
-                            }
-                            let next_input = if let (Some(key), Some(inserter)) =
-                                (&self.exception_key, &self.exception_inserter)
-                            {
-                                inserter(input, key, &e)
-                            } else {
-                                input.clone()
-                            };
-                            to_return[*i] = Some(Err(e));
-                            next_run_again.push((*i, next_input));
-                        } else if return_exceptions {
-                            to_return[*i] = Some(Err(e));
-                        } else if first_to_raise.is_none() {
-                            first_to_raise = Some(e);
-                        }
-                    }
-                }
-            }
-
-            if first_to_raise.is_some() {
-                let mut results = Vec::with_capacity(to_return.len());
-                let mut error_consumed = false;
-                for opt in to_return {
-                    match opt {
-                        Some(result) => results.push(result),
-                        None => {
-                            if !error_consumed {
-                                results.push(Err(first_to_raise
-                                    .take()
-                                    .expect("first_to_raise set when errors exist")));
-                                error_consumed = true;
-                            } else {
-                                results.push(Err(Error::other("Batch aborted due to error")));
-                            }
-                        }
-                    }
-                }
+            if let Some(results) = self.process_batch_outputs(
+                outputs,
+                &run_again,
+                &mut to_return,
+                &mut handled_exception_indices,
+                &mut first_to_raise,
+                &mut next_run_again,
+                return_exceptions,
+            ) {
                 return results;
             }
 
@@ -355,62 +368,19 @@ where
                 run_again.iter().map(|(i, _)| configs[*i].clone()).collect();
 
             let outputs = runnable
-                .abatch(
-                    batch_inputs,
-                    Some(ConfigOrList::List(batch_configs)),
-                    true, // Always return exceptions to handle them ourselves
-                )
+                .abatch(batch_inputs, Some(ConfigOrList::List(batch_configs)), true)
                 .await;
 
             let mut next_run_again = Vec::new();
-
-            for ((i, input), output) in run_again.iter().zip(outputs) {
-                match output {
-                    Ok(out) => {
-                        to_return[*i] = Some(Ok(out));
-                        handled_exception_indices.retain(|&idx| idx != *i);
-                    }
-                    Err(e) => {
-                        if self.should_fallback(&e) {
-                            if !handled_exception_indices.contains(i) {
-                                handled_exception_indices.push(*i);
-                            }
-                            let next_input = if let (Some(key), Some(inserter)) =
-                                (&self.exception_key, &self.exception_inserter)
-                            {
-                                inserter(input, key, &e)
-                            } else {
-                                input.clone()
-                            };
-                            to_return[*i] = Some(Err(e));
-                            next_run_again.push((*i, next_input));
-                        } else if return_exceptions {
-                            to_return[*i] = Some(Err(e));
-                        } else if first_to_raise.is_none() {
-                            first_to_raise = Some(e);
-                        }
-                    }
-                }
-            }
-
-            if first_to_raise.is_some() {
-                let mut results = Vec::with_capacity(to_return.len());
-                let mut error_consumed = false;
-                for opt in to_return {
-                    match opt {
-                        Some(result) => results.push(result),
-                        None => {
-                            if !error_consumed {
-                                results.push(Err(first_to_raise
-                                    .take()
-                                    .expect("first_to_raise set when errors exist")));
-                                error_consumed = true;
-                            } else {
-                                results.push(Err(Error::other("Batch aborted due to error")));
-                            }
-                        }
-                    }
-                }
+            if let Some(results) = self.process_batch_outputs(
+                outputs,
+                &run_again,
+                &mut to_return,
+                &mut handled_exception_indices,
+                &mut first_to_raise,
+                &mut next_run_again,
+                return_exceptions,
+            ) {
                 return results;
             }
 
@@ -428,52 +398,7 @@ where
         input: Self::Input,
         config: Option<RunnableConfig>,
     ) -> BoxStream<'_, Result<Self::Output>> {
-        let config = ensure_config(config);
-
-        Box::pin(async_stream::stream! {
-            let mut first_error: Option<Error> = None;
-            let mut last_error: Option<Error> = None;
-            let mut current_input = input;
-
-            for runnable in self.runnables() {
-                if let (Some(key), Some(inserter), Some(err)) =
-                    (&self.exception_key, &self.exception_inserter, &last_error)
-                {
-                    current_input = inserter(&current_input, key, err);
-                }
-
-                let mut stream = runnable.stream(current_input.clone(), Some(config.clone()));
-
-                match stream.next().await {
-                    Some(Ok(chunk)) => {
-                        yield Ok(chunk);
-
-                        while let Some(result) = stream.next().await {
-                            yield result;
-                        }
-                        return;
-                    }
-                    Some(Err(e)) => {
-                        if self.should_fallback(&e) {
-                            if first_error.is_none() {
-                                first_error = Some(Error::other(e.to_string()));
-                            }
-                            last_error = Some(e);
-                        } else {
-                            yield Err(e);
-                            return;
-                        }
-                    }
-                    None => {
-                        if first_error.is_none() {
-                            first_error = Some(Error::other("Empty stream from runnable"));
-                        }
-                    }
-                }
-            }
-
-            yield Err(first_error.unwrap_or_else(|| Error::other("No error stored at end of fallbacks.")));
-        })
+        self.astream(input, config)
     }
 
     fn astream(
@@ -492,10 +417,8 @@ where
             let mut current_input = input;
 
             for runnable in self.runnables() {
-                if let (Some(key), Some(inserter), Some(err)) =
-                    (&self.exception_key, &self.exception_inserter, &last_error)
-                {
-                    current_input = inserter(&current_input, key, err);
+                if let Some(modified) = self.maybe_insert_exception(&current_input, last_error.as_ref()) {
+                    current_input = modified;
                 }
 
                 let mut stream = runnable.astream(current_input.clone(), Some(config.clone()));
@@ -536,7 +459,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runnables::base::RunnableLambda;
+    use crate::runnables::base::{RunnableExt, RunnableLambda};
 
     #[test]
     fn test_fallback_on_error() {
@@ -567,7 +490,7 @@ mod tests {
         let with_fallbacks = RunnableWithFallbacks::new(primary, vec![Arc::new(fallback)]);
 
         let result = with_fallbacks.invoke(5, None).unwrap();
-        assert_eq!(result, 6); // Primary succeeded, not fallback
+        assert_eq!(result, 6);
     }
 
     #[test]
@@ -604,7 +527,7 @@ mod tests {
             RunnableWithFallbacks::new(primary, vec![Arc::new(fallback1), Arc::new(fallback2)]);
 
         let result = with_fallbacks.invoke(5, None).unwrap();
-        assert_eq!(result, 15); // Second fallback succeeded
+        assert_eq!(result, 15);
     }
 
     #[test]
@@ -699,6 +622,6 @@ mod tests {
             RunnableWithFallbacks::new(primary, vec![Arc::new(fallback1), Arc::new(fallback2)]);
 
         let count = with_fallbacks.runnables().count();
-        assert_eq!(count, 3); // primary + 2 fallbacks
+        assert_eq!(count, 3);
     }
 }

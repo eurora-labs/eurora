@@ -6,68 +6,58 @@ use std::sync::Mutex;
 
 use uuid::Uuid;
 
-use super::base::{
-    BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
-    RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
-};
+use super::base::{BaseCallbackHandler, resolve_chain_name};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileMode {
+    Write,
+    Append,
+    CreateNew,
+}
+
+impl FileMode {
+    fn open(&self, path: &Path) -> io::Result<File> {
+        match self {
+            FileMode::Write => File::create(path),
+            FileMode::Append => OpenOptions::new().create(true).append(true).open(path),
+            FileMode::CreateNew => OpenOptions::new().create_new(true).write(true).open(path),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct FileCallbackHandler {
     filename: String,
-    mode: String,
-    pub color: Option<String>,
+    mode: FileMode,
     file: Mutex<Option<BufWriter<File>>>,
 }
 
 impl FileCallbackHandler {
     pub fn new<P: AsRef<Path>>(filename: P, append: bool) -> io::Result<Self> {
-        let mode = if append { "a" } else { "w" };
+        let mode = if append {
+            FileMode::Append
+        } else {
+            FileMode::Write
+        };
         Self::with_mode(filename, mode)
     }
 
-    pub fn with_mode<P: AsRef<Path>>(filename: P, mode: &str) -> io::Result<Self> {
-        let file = match mode {
-            "w" => File::create(filename.as_ref())?,
-            "a" => OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(filename.as_ref())?,
-            "x" => OpenOptions::new()
-                .create_new(true)
-                .write(true)
-                .open(filename.as_ref())?,
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Unsupported file mode: {}", mode),
-                ));
-            }
-        };
+    pub fn with_mode<P: AsRef<Path>>(filename: P, mode: FileMode) -> io::Result<Self> {
+        let file = mode.open(filename.as_ref())?;
 
         Ok(Self {
             filename: filename.as_ref().to_string_lossy().to_string(),
-            mode: mode.to_string(),
-            color: None,
+            mode,
             file: Mutex::new(Some(BufWriter::new(file))),
         })
-    }
-
-    pub fn with_color<P: AsRef<Path>>(
-        filename: P,
-        mode: &str,
-        color: impl Into<String>,
-    ) -> io::Result<Self> {
-        let mut handler = Self::with_mode(filename, mode)?;
-        handler.color = Some(color.into());
-        Ok(handler)
     }
 
     pub fn filename(&self) -> &str {
         &self.filename
     }
 
-    pub fn mode(&self) -> &str {
-        &self.mode
+    pub fn mode(&self) -> FileMode {
+        self.mode
     }
 
     pub fn close(&self) {
@@ -79,13 +69,10 @@ impl FileCallbackHandler {
     }
 
     fn write(&self, text: &str, end: &str) {
-        if let Some(ref mut writer) = *self.file.lock().expect("file lock poisoned") {
-            if let Err(e) = write!(writer, "{}{}", text, end) {
-                tracing::warn!("FileCallbackHandler write error: {e}");
-            }
-            if let Err(e) = writer.flush() {
-                tracing::warn!("FileCallbackHandler flush error: {e}");
-            }
+        if let Some(ref mut writer) = *self.file.lock().expect("file lock poisoned")
+            && let Err(e) = write!(writer, "{}{}", text, end)
+        {
+            tracing::warn!("FileCallbackHandler write error: {e}");
         }
     }
 
@@ -100,7 +87,8 @@ impl FileCallbackHandler {
 
 impl Drop for FileCallbackHandler {
     fn drop(&mut self) {
-        if let Some(mut writer) = self.file.lock().expect("file lock poisoned").take()
+        if let Ok(mut guard) = self.file.lock()
+            && let Some(mut writer) = guard.take()
             && let Err(e) = writer.flush()
         {
             eprintln!("FileCallbackHandler drop flush error: {e}");
@@ -108,10 +96,11 @@ impl Drop for FileCallbackHandler {
     }
 }
 
-impl LLMManagerMixin for FileCallbackHandler {}
-impl RetrieverManagerMixin for FileCallbackHandler {}
+impl BaseCallbackHandler for FileCallbackHandler {
+    fn name(&self) -> &str {
+        "FileCallbackHandler"
+    }
 
-impl ToolManagerMixin for FileCallbackHandler {
     fn on_tool_end(
         &self,
         output: &str,
@@ -129,9 +118,7 @@ impl ToolManagerMixin for FileCallbackHandler {
             self.write(&format!("\n{}", prefix), "");
         }
     }
-}
 
-impl RunManagerMixin for FileCallbackHandler {
     fn on_text(
         &self,
         text: &str,
@@ -142,9 +129,7 @@ impl RunManagerMixin for FileCallbackHandler {
     ) {
         self.write(text, end);
     }
-}
 
-impl CallbackManagerMixin for FileCallbackHandler {
     fn on_chain_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -155,27 +140,10 @@ impl CallbackManagerMixin for FileCallbackHandler {
         _metadata: Option<&HashMap<String, serde_json::Value>>,
         name: Option<&str>,
     ) {
-        let name = name
-            .or_else(|| {
-                if !serialized.is_empty() {
-                    serialized.get("name").and_then(|v| v.as_str()).or_else(|| {
-                        serialized.get("id").and_then(|v| {
-                            v.as_array()
-                                .and_then(|arr| arr.last())
-                                .and_then(|v| v.as_str())
-                        })
-                    })
-                } else {
-                    None
-                }
-            })
-            .unwrap_or("<unknown>");
-
+        let name = resolve_chain_name(serialized, name);
         self.write(&format!("\n\n> Entering new {} chain...", name), "\n");
     }
-}
 
-impl ChainManagerMixin for FileCallbackHandler {
     fn on_chain_end(
         &self,
         _outputs: &HashMap<String, serde_json::Value>,
@@ -210,12 +178,6 @@ impl ChainManagerMixin for FileCallbackHandler {
     }
 }
 
-impl BaseCallbackHandler for FileCallbackHandler {
-    fn name(&self) -> &str {
-        "FileCallbackHandler"
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -232,8 +194,7 @@ mod tests {
 
         let handler = handler.unwrap();
         assert_eq!(handler.name(), "FileCallbackHandler");
-        assert!(handler.color.is_none());
-        assert_eq!(handler.mode(), "w");
+        assert_eq!(handler.mode(), FileMode::Write);
     }
 
     #[test]
@@ -241,33 +202,18 @@ mod tests {
         let dir = tempdir().unwrap();
         let file_path = dir.path().join("test_mode.txt");
 
-        let handler = FileCallbackHandler::with_mode(&file_path, "w");
+        let handler = FileCallbackHandler::with_mode(&file_path, FileMode::Write);
         assert!(handler.is_ok());
         let handler = handler.unwrap();
-        assert_eq!(handler.mode(), "w");
+        assert_eq!(handler.mode(), FileMode::Write);
 
-        let handler = FileCallbackHandler::with_mode(&file_path, "a");
+        let handler = FileCallbackHandler::with_mode(&file_path, FileMode::Append);
         assert!(handler.is_ok());
         let handler = handler.unwrap();
-        assert_eq!(handler.mode(), "a");
+        assert_eq!(handler.mode(), FileMode::Append);
 
-        let handler = FileCallbackHandler::with_mode(&file_path, "x");
+        let handler = FileCallbackHandler::with_mode(&file_path, FileMode::CreateNew);
         assert!(handler.is_err());
-
-        let handler = FileCallbackHandler::with_mode(&file_path, "r");
-        assert!(handler.is_err());
-    }
-
-    #[test]
-    fn test_file_handler_with_color() {
-        let dir = tempdir().unwrap();
-        let file_path = dir.path().join("test_color.txt");
-
-        let handler = FileCallbackHandler::with_color(&file_path, "a", "green");
-        assert!(handler.is_ok());
-
-        let handler = handler.unwrap();
-        assert_eq!(handler.color, Some("green".to_string()));
     }
 
     #[test]

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use agent_chain_core::error::{Error, Result};
-use agent_chain_core::runnables::base::{Runnable, RunnableLambda};
+use agent_chain_core::runnables::base::{Runnable, RunnableExt, RunnableLambda};
 
 use agent_chain_core::runnables::fallbacks::{ExceptionInserter, RunnableWithFallbacks};
 use serde_json::Value;

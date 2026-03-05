@@ -206,11 +206,9 @@ impl CharacterTextSplitter {
 
 #[async_trait]
 impl BaseDocumentTransformer for CharacterTextSplitter {
-    fn transform_documents(
-        &self,
-        documents: &[Document],
-    ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
+    fn transform_documents(&self, documents: &[Document]) -> crate::error::Result<Vec<Document>> {
         self.split_documents(documents)
+            .map_err(|e| crate::error::Error::General(e.to_string()))
     }
 }
 
@@ -418,9 +416,9 @@ mod tests {
         let texts = vec!["foo bar".to_string(), "baz".to_string()];
         let docs = splitter.create_documents(&texts, None).unwrap();
         assert_eq!(docs.len(), 3);
-        assert_eq!(docs[0].page_content, "foo");
-        assert_eq!(docs[1].page_content, "bar");
-        assert_eq!(docs[2].page_content, "baz");
+        assert_eq!(docs[0].page_content(), "foo");
+        assert_eq!(docs[1].page_content(), "bar");
+        assert_eq!(docs[2].page_content(), "baz");
     }
 
     #[test]
@@ -440,12 +438,12 @@ mod tests {
         ];
         let docs = splitter.create_documents(&texts, Some(&metadatas)).unwrap();
         assert_eq!(docs.len(), 3);
-        assert_eq!(docs[0].page_content, "foo");
-        assert_eq!(docs[0].metadata["source"], "1");
-        assert_eq!(docs[1].page_content, "bar");
-        assert_eq!(docs[1].metadata["source"], "1");
-        assert_eq!(docs[2].page_content, "baz");
-        assert_eq!(docs[2].metadata["source"], "2");
+        assert_eq!(docs[0].page_content(), "foo");
+        assert_eq!(docs[0].metadata()["source"], "1");
+        assert_eq!(docs[1].page_content(), "bar");
+        assert_eq!(docs[1].metadata()["source"], "1");
+        assert_eq!(docs[2].page_content(), "baz");
+        assert_eq!(docs[2].metadata()["source"], "2");
     }
 
     #[test]
@@ -461,11 +459,11 @@ mod tests {
         let texts = vec!["foo bar baz 123".to_string()];
         let docs = splitter.create_documents(&texts, None).unwrap();
         assert_eq!(docs.len(), 3);
-        assert_eq!(docs[0].page_content, "foo bar");
-        assert_eq!(docs[0].metadata["start_index"], 0);
-        assert_eq!(docs[1].page_content, "bar baz");
-        assert_eq!(docs[1].metadata["start_index"], 4);
-        assert_eq!(docs[2].page_content, "baz 123");
-        assert_eq!(docs[2].metadata["start_index"], 8);
+        assert_eq!(docs[0].page_content(), "foo bar");
+        assert_eq!(docs[0].metadata()["start_index"], 0);
+        assert_eq!(docs[1].page_content(), "bar baz");
+        assert_eq!(docs[1].metadata()["start_index"], 4);
+        assert_eq!(docs[2].page_content(), "baz 123");
+        assert_eq!(docs[2].metadata()["start_index"], 8);
     }
 }

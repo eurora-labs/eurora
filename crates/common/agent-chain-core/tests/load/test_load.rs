@@ -1756,8 +1756,8 @@ fn test_round_trip_human_message_prompt_template() {
 
     assert!(loaded.is_object());
     assert!(loaded.get("_type").is_none());
-    let prompt = loaded.get("prompt");
-    assert!(prompt.is_some());
+    let content_parts = loaded.get("content_parts");
+    assert!(content_parts.is_some());
 }
 
 #[test]

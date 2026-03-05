@@ -65,14 +65,10 @@ pub fn node_data_str(id: &str, data: Option<&NodeData>) -> String {
         Some(d) if is_uuid(id) => d,
         _ => return id.to_string(),
     };
-    let data_str = match data {
-        NodeData::Schema { name } => name.clone(),
-        NodeData::Runnable { name } => name.clone(),
+    let name = match data {
+        NodeData::Schema { name } | NodeData::Runnable { name } => name,
     };
-    match data_str.strip_prefix("Runnable") {
-        Some(stripped) => stripped.to_string(),
-        None => data_str,
-    }
+    name.strip_prefix("Runnable").unwrap_or(name).to_string()
 }
 
 pub fn node_data_json(node: &Node) -> Value {

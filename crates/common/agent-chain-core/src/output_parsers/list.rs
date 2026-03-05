@@ -5,9 +5,8 @@ use futures::stream::BoxStream;
 use regex::Regex;
 
 use crate::error::Result;
-use crate::messages::BaseMessage;
 
-use super::base::BaseOutputParser;
+use super::base::{BaseOutputParser, ParserInput};
 use super::transform::BaseTransformOutputParser;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,22 +25,50 @@ pub trait ListOutputParser: BaseOutputParser<Output = Vec<String>> {
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct CommaSeparatedListOutputParser {
-    _private: (),
+fn parse_csv(text: &str, filter_empty: bool) -> Vec<String> {
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .flexible(true)
+        .trim(csv::Trim::All)
+        .from_reader(text.as_bytes());
+
+    let mut result = Vec::new();
+    for record in reader.records() {
+        match record {
+            Ok(rec) => {
+                for field in rec.iter() {
+                    if !filter_empty || !field.is_empty() {
+                        result.push(field.to_string());
+                    }
+                }
+            }
+            Err(_) => {
+                return text
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !filter_empty || !s.is_empty())
+                    .collect();
+            }
+        }
+    }
+
+    if result.is_empty() {
+        text.split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !filter_empty || !s.is_empty())
+            .collect()
+    } else {
+        result
+    }
 }
+
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub struct CommaSeparatedListOutputParser;
 
 impl CommaSeparatedListOutputParser {
     pub fn new() -> Self {
-        Self { _private: () }
-    }
-
-    pub fn is_lc_serializable() -> bool {
-        true
-    }
-
-    pub fn get_lc_namespace() -> Vec<&'static str> {
-        vec!["langchain", "output_parsers", "list"]
+        Self
     }
 }
 
@@ -49,41 +76,7 @@ impl BaseOutputParser for CommaSeparatedListOutputParser {
     type Output = Vec<String>;
 
     fn parse(&self, text: &str) -> Result<Vec<String>> {
-        let mut reader = csv::ReaderBuilder::new()
-            .has_headers(false)
-            .flexible(true)
-            .trim(csv::Trim::All)
-            .from_reader(text.as_bytes());
-
-        let mut result = Vec::new();
-        for record in reader.records() {
-            match record {
-                Ok(rec) => {
-                    for field in rec.iter() {
-                        if !field.is_empty() {
-                            result.push(field.to_string());
-                        }
-                    }
-                }
-                Err(_) => {
-                    return Ok(text
-                        .split(',')
-                        .map(|s| s.trim().to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect());
-                }
-            }
-        }
-
-        if result.is_empty() {
-            Ok(text
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect())
-        } else {
-            Ok(result)
-        }
+        Ok(parse_csv(text, true))
     }
 
     fn get_format_instructions(&self) -> Result<String> {
@@ -100,7 +93,7 @@ impl BaseOutputParser for CommaSeparatedListOutputParser {
 impl BaseTransformOutputParser for CommaSeparatedListOutputParser {
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, BaseMessage>,
+        input: BoxStream<'a, ParserInput>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
@@ -111,56 +104,27 @@ impl BaseTransformOutputParser for CommaSeparatedListOutputParser {
 
 impl ListOutputParser for CommaSeparatedListOutputParser {
     fn parse_with_empties(&self, text: &str) -> Result<Vec<String>> {
-        let mut reader = csv::ReaderBuilder::new()
-            .has_headers(false)
-            .flexible(true)
-            .trim(csv::Trim::All)
-            .from_reader(text.as_bytes());
-
-        let mut result = Vec::new();
-        for record in reader.records() {
-            match record {
-                Ok(rec) => {
-                    for field in rec.iter() {
-                        result.push(field.to_string());
-                    }
-                }
-                Err(_) => {
-                    return Ok(text.split(',').map(|s| s.trim().to_string()).collect());
-                }
-            }
-        }
-
-        if result.is_empty() {
-            Ok(text.split(',').map(|s| s.trim().to_string()).collect())
-        } else {
-            Ok(result)
-        }
+        Ok(parse_csv(text, false))
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct NumberedListOutputParser {
-    pub pattern: String,
+    regex: Regex,
 }
 
 impl NumberedListOutputParser {
     pub fn new() -> Self {
         Self {
-            pattern: r"\d+\.\s*([^\n]+)".to_string(),
+            regex: Regex::new(r"\d+\.\s*([^\n]+)").expect("default regex is valid"),
         }
     }
 
-    pub fn with_pattern(pattern: impl Into<String>) -> Self {
-        Self {
-            pattern: pattern.into(),
-        }
-    }
-
-    fn get_regex(&self) -> Result<Regex> {
-        Regex::new(&self.pattern).map_err(|e| {
-            crate::Error::InvalidConfig(format!("Invalid regex pattern '{}': {}", self.pattern, e))
-        })
+    pub fn with_pattern(pattern: &str) -> Result<Self> {
+        let regex = Regex::new(pattern).map_err(|e| {
+            crate::Error::InvalidConfig(format!("Invalid regex pattern '{}': {}", pattern, e))
+        })?;
+        Ok(Self { regex })
     }
 }
 
@@ -174,8 +138,8 @@ impl BaseOutputParser for NumberedListOutputParser {
     type Output = Vec<String>;
 
     fn parse(&self, text: &str) -> Result<Vec<String>> {
-        let re = self.get_regex()?;
-        Ok(re
+        Ok(self
+            .regex
             .captures_iter(text)
             .filter_map(|cap| cap.get(1).map(|m| m.as_str().trim().to_string()))
             .collect())
@@ -197,7 +161,7 @@ impl BaseOutputParser for NumberedListOutputParser {
 impl BaseTransformOutputParser for NumberedListOutputParser {
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, BaseMessage>,
+        input: BoxStream<'a, ParserInput>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
@@ -208,11 +172,8 @@ impl BaseTransformOutputParser for NumberedListOutputParser {
 
 impl ListOutputParser for NumberedListOutputParser {
     fn parse_iter(&self, text: &str) -> Vec<ParseMatch> {
-        let re = match self.get_regex() {
-            Ok(re) => re,
-            Err(_) => return Vec::new(),
-        };
-        re.captures_iter(text)
+        self.regex
+            .captures_iter(text)
             .filter_map(|cap| {
                 let overall = cap.get(0)?;
                 let group = cap.get(1)?;
@@ -227,26 +188,21 @@ impl ListOutputParser for NumberedListOutputParser {
 
 #[derive(Debug, Clone)]
 pub struct MarkdownListOutputParser {
-    pub pattern: String,
+    regex: Regex,
 }
 
 impl MarkdownListOutputParser {
     pub fn new() -> Self {
         Self {
-            pattern: r"^\s*[-*]\s+([^\n]+)$".to_string(),
+            regex: Regex::new(r"^\s*[-*]\s+([^\n]+)$").expect("default regex is valid"),
         }
     }
 
-    pub fn with_pattern(pattern: impl Into<String>) -> Self {
-        Self {
-            pattern: pattern.into(),
-        }
-    }
-
-    fn get_regex(&self) -> Result<Regex> {
-        Regex::new(&self.pattern).map_err(|e| {
-            crate::Error::InvalidConfig(format!("Invalid regex pattern '{}': {}", self.pattern, e))
-        })
+    pub fn with_pattern(pattern: &str) -> Result<Self> {
+        let regex = Regex::new(pattern).map_err(|e| {
+            crate::Error::InvalidConfig(format!("Invalid regex pattern '{}': {}", pattern, e))
+        })?;
+        Ok(Self { regex })
     }
 }
 
@@ -260,11 +216,11 @@ impl BaseOutputParser for MarkdownListOutputParser {
     type Output = Vec<String>;
 
     fn parse(&self, text: &str) -> Result<Vec<String>> {
-        let re = self.get_regex()?;
         Ok(text
             .lines()
             .filter_map(|line| {
-                re.captures(line)
+                self.regex
+                    .captures(line)
                     .and_then(|cap| cap.get(1).map(|m| m.as_str().trim().to_string()))
             })
             .collect())
@@ -282,7 +238,7 @@ impl BaseOutputParser for MarkdownListOutputParser {
 impl BaseTransformOutputParser for MarkdownListOutputParser {
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, BaseMessage>,
+        input: BoxStream<'a, ParserInput>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
@@ -293,16 +249,12 @@ impl BaseTransformOutputParser for MarkdownListOutputParser {
 
 impl ListOutputParser for MarkdownListOutputParser {
     fn parse_iter(&self, text: &str) -> Vec<ParseMatch> {
-        let re = match self.get_regex() {
-            Ok(re) => re,
-            Err(_) => return Vec::new(),
-        };
         let mut offset = 0;
         text.lines()
             .filter_map(|line| {
                 let line_start = offset;
                 offset += line.len() + 1;
-                re.captures(line).and_then(|cap| {
+                self.regex.captures(line).and_then(|cap| {
                     let group = cap.get(1)?;
                     let overall = cap.get(0)?;
                     Some(ParseMatch {
@@ -317,16 +269,16 @@ impl ListOutputParser for MarkdownListOutputParser {
 
 fn list_transform<'a, P: ListOutputParser + 'a>(
     parser: &'a P,
-    input: BoxStream<'a, BaseMessage>,
+    input: BoxStream<'a, ParserInput>,
 ) -> BoxStream<'a, Result<Vec<String>>> {
     use futures::StreamExt;
 
     Box::pin(async_stream::stream! {
         let mut buffer = String::new();
-        let mut stream = input;
+        let mut input = input;
 
-        while let Some(message) = stream.next().await {
-            let chunk_content = message.text();
+        while let Some(chunk) = input.next().await {
+            let chunk_content = chunk.to_generation().text;
             buffer.push_str(&chunk_content);
 
             let iter_results = parser.parse_iter(&buffer);

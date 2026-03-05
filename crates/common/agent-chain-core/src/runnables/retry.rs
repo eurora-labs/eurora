@@ -13,48 +13,31 @@ use crate::error::{Error, Result};
 
 use super::base::Runnable;
 use super::config::{
-    ConfigOrList, RunnableConfig, ensure_config, get_callback_manager_for_config, get_config_list,
-    patch_config,
+    ConfigOrList, EMPTY_MAP, RunnableConfig, child_config, finish_chain_run, get_config_list,
+    start_chain_run,
 };
 
+const DEFAULT_INITIAL: f64 = 1.0;
+const DEFAULT_MAX: f64 = 60.0;
+const DEFAULT_EXP_BASE: f64 = 2.0;
+const DEFAULT_JITTER: f64 = 1.0;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ExponentialJitterParams {
-    #[serde(default = "default_initial")]
     pub initial: f64,
-
-    #[serde(default = "default_max")]
     pub max: f64,
-
-    #[serde(default = "default_exp_base")]
     pub exp_base: f64,
-
-    #[serde(default = "default_jitter")]
     pub jitter: f64,
-}
-
-fn default_initial() -> f64 {
-    1.0
-}
-
-fn default_max() -> f64 {
-    60.0
-}
-
-fn default_exp_base() -> f64 {
-    2.0
-}
-
-fn default_jitter() -> f64 {
-    1.0
 }
 
 impl Default for ExponentialJitterParams {
     fn default() -> Self {
         Self {
-            initial: 1.0,
-            max: 60.0,
-            exp_base: 2.0,
-            jitter: 1.0,
+            initial: DEFAULT_INITIAL,
+            max: DEFAULT_MAX,
+            exp_base: DEFAULT_EXP_BASE,
+            jitter: DEFAULT_JITTER,
         }
     }
 }
@@ -63,10 +46,10 @@ impl Default for ExponentialJitterParams {
 impl ExponentialJitterParams {
     #[builder]
     pub fn new(
-        #[builder(default = 1.0)] initial: f64,
-        #[builder(default = 60.0)] max: f64,
-        #[builder(default = 2.0)] exp_base: f64,
-        #[builder(default = 1.0)] jitter: f64,
+        #[builder(default = DEFAULT_INITIAL)] initial: f64,
+        #[builder(default = DEFAULT_MAX)] max: f64,
+        #[builder(default = DEFAULT_EXP_BASE)] exp_base: f64,
+        #[builder(default = DEFAULT_JITTER)] jitter: f64,
     ) -> Self {
         Self {
             initial,
@@ -80,28 +63,11 @@ impl ExponentialJitterParams {
         let exp_wait = self.initial * self.exp_base.powi(attempt.saturating_sub(1) as i32);
         let capped_wait = exp_wait.min(self.max);
         let jitter_amount = if self.jitter > 0.0 {
-            let mut rng = rand::rng();
-            rng.random_range(0.0..self.jitter)
+            rand::rng().random_range(0.0..self.jitter)
         } else {
             0.0
         };
-        let total_seconds = capped_wait + jitter_amount;
-        Duration::from_secs_f64(total_seconds)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct RetryCallState {
-    pub attempt_number: usize,
-    pub succeeded: bool,
-}
-
-impl RetryCallState {
-    fn new(attempt_number: usize) -> Self {
-        Self {
-            attempt_number,
-            succeeded: false,
-        }
+        Duration::from_secs_f64(capped_wait + jitter_amount)
     }
 }
 
@@ -126,11 +92,8 @@ impl RetryErrorPredicate {
 #[derive(Debug, Clone)]
 pub struct RunnableRetryConfig {
     pub retry_predicate: RetryErrorPredicate,
-
     pub wait_exponential_jitter: bool,
-
     pub exponential_jitter_params: Option<ExponentialJitterParams>,
-
     pub max_attempt_number: usize,
 }
 
@@ -209,7 +172,6 @@ where
     R: Runnable,
 {
     bound: R,
-
     config: RunnableRetryConfig,
 }
 
@@ -266,46 +228,67 @@ where
         }
     }
 
-    fn calculate_wait(&self, attempt: usize) -> Duration {
-        if self.config.wait_exponential_jitter {
-            self.get_jitter_params().calculate_wait(attempt)
-        } else {
-            Duration::ZERO
-        }
-    }
-
     fn patch_config_for_retry(
         config: &RunnableConfig,
         run_manager: &CallbackManagerForChainRun,
-        retry_state: &RetryCallState,
+        attempt: usize,
     ) -> RunnableConfig {
-        let tag = if retry_state.attempt_number > 1 {
-            Some(format!("retry:attempt:{}", retry_state.attempt_number))
+        let tag = if attempt > 1 {
+            Some(format!("retry:attempt:{}", attempt))
         } else {
             None
         };
-
-        patch_config(
-            Some(config.clone()),
-            Some(run_manager.get_child(tag.as_deref())),
-            None,
-            None,
-            None,
-            None,
-        )
+        child_config(config, run_manager, tag.as_deref())
     }
 
-    fn patch_config_list_for_retry(
-        configs: &[RunnableConfig],
-        run_managers: &[CallbackManagerForChainRun],
-        retry_state: &RetryCallState,
-    ) -> Vec<RunnableConfig> {
-        configs
-            .iter()
-            .zip(run_managers.iter())
-            .map(|(config, run_manager)| {
-                Self::patch_config_for_retry(config, run_manager, retry_state)
-            })
+    fn process_batch_results<O: Clone>(
+        &self,
+        batch_results: Vec<Result<O>>,
+        remaining: &[usize],
+        results: &mut [Option<Result<O>>],
+        attempt: usize,
+        return_exceptions: bool,
+    ) -> (Vec<usize>, Option<Error>) {
+        let mut next_remaining = Vec::new();
+        let mut first_non_retryable_error: Option<Error> = None;
+
+        for (offset, result) in batch_results.into_iter().enumerate() {
+            let orig_idx = remaining[offset];
+            match result {
+                Ok(output) => {
+                    results[orig_idx] = Some(Ok(output));
+                }
+                Err(e) => {
+                    if self.should_retry(&e) && attempt < self.config.max_attempt_number {
+                        results[orig_idx] = Some(Err(e));
+                        next_remaining.push(orig_idx);
+                    } else if !self.should_retry(&e) && !return_exceptions {
+                        if first_non_retryable_error.is_none() {
+                            first_non_retryable_error = Some(e);
+                        }
+                        results[orig_idx] = Some(Err(Error::other("Batch aborted")));
+                    } else {
+                        results[orig_idx] = Some(Err(e));
+                    }
+                }
+            }
+        }
+
+        (next_remaining, first_non_retryable_error)
+    }
+
+    fn fill_aborted<O>(results: &mut [Option<Result<O>>], n: usize) {
+        for result in results.iter_mut().take(n) {
+            if result.is_none() {
+                *result = Some(Err(Error::other("Batch aborted due to error")));
+            }
+        }
+    }
+
+    fn collect_results<O>(results: Vec<Option<Result<O>>>) -> Vec<Result<O>> {
+        results
+            .into_iter()
+            .map(|opt| opt.unwrap_or_else(|| Err(Error::other("No result"))))
             .collect()
     }
 }
@@ -331,37 +314,19 @@ where
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let config = ensure_config(config);
-        let callback_manager = get_callback_manager_for_config(&config);
-
-        let run_manager = callback_manager
-            .on_chain_start()
-            .serialized(&std::collections::HashMap::new())
-            .inputs(&std::collections::HashMap::new())
-            .maybe_run_id(config.run_id)
-            .call();
+        let (run_manager, config) = start_chain_run(config);
 
         let attempt = AtomicUsize::new(0);
         let result = (|| {
             let n = attempt.fetch_add(1, Ordering::SeqCst) + 1;
-            let retry_state = RetryCallState::new(n);
-            let patched_config = Self::patch_config_for_retry(&config, &run_manager, &retry_state);
-            self.bound.invoke(input.clone(), Some(patched_config))
+            let patched = Self::patch_config_for_retry(&config, &run_manager, n);
+            self.bound.invoke(input.clone(), Some(patched))
         })
         .retry(self.backoff_builder())
         .when(|e: &Error| self.should_retry(e))
         .call();
 
-        match result {
-            Ok(output) => {
-                run_manager.on_chain_end(&std::collections::HashMap::new());
-                Ok(output)
-            }
-            Err(e) => {
-                run_manager.on_chain_error(&e);
-                Err(e)
-            }
-        }
+        finish_chain_run(&run_manager, result)
     }
 
     async fn ainvoke(
@@ -372,38 +337,20 @@ where
     where
         Self: 'static,
     {
-        let config = ensure_config(config);
-        let callback_manager = get_callback_manager_for_config(&config);
-
-        let run_manager = callback_manager
-            .on_chain_start()
-            .serialized(&std::collections::HashMap::new())
-            .inputs(&std::collections::HashMap::new())
-            .maybe_run_id(config.run_id)
-            .call();
+        let (run_manager, config) = start_chain_run(config);
 
         let attempt = AtomicUsize::new(0);
         let result = (|| {
             let n = attempt.fetch_add(1, Ordering::SeqCst) + 1;
-            let retry_state = RetryCallState::new(n);
-            let patched_config = Self::patch_config_for_retry(&config, &run_manager, &retry_state);
+            let patched = Self::patch_config_for_retry(&config, &run_manager, n);
             let input = input.clone();
-            async move { self.bound.ainvoke(input, Some(patched_config)).await }
+            async move { self.bound.ainvoke(input, Some(patched)).await }
         })
         .retry(self.backoff_builder())
         .when(|e: &Error| self.should_retry(e))
         .await;
 
-        match result {
-            Ok(output) => {
-                run_manager.on_chain_end(&std::collections::HashMap::new());
-                Ok(output)
-            }
-            Err(e) => {
-                run_manager.on_chain_error(&e);
-                Err(e)
-            }
-        }
+        finish_chain_run(&run_manager, result)
     }
 
     fn batch(
@@ -425,21 +372,12 @@ where
         };
         let n = inputs.len();
 
-        let run_managers: Vec<CallbackManagerForChainRun> = configs
-            .iter()
-            .map(|config| {
-                let callback_manager = get_callback_manager_for_config(config);
-                callback_manager
-                    .on_chain_start()
-                    .serialized(&std::collections::HashMap::new())
-                    .inputs(&std::collections::HashMap::new())
-                    .maybe_run_id(config.run_id)
-                    .call()
-            })
-            .collect();
+        let (run_managers, configs): (Vec<_>, Vec<_>) = configs
+            .into_iter()
+            .map(|config| start_chain_run(Some(config)))
+            .unzip();
 
         let mut results: Vec<Option<Result<Self::Output>>> = (0..n).map(|_| None).collect();
-
         let mut remaining: Vec<usize> = (0..n).collect();
 
         for attempt in 1..=self.config.max_attempt_number {
@@ -447,59 +385,29 @@ where
                 break;
             }
 
-            let retry_state = RetryCallState::new(attempt);
-
             let pending_inputs: Vec<Self::Input> =
                 remaining.iter().map(|&i| inputs[i].clone()).collect();
-            let pending_configs: Vec<RunnableConfig> =
-                remaining.iter().map(|&i| configs[i].clone()).collect();
-            let pending_managers: Vec<CallbackManagerForChainRun> =
-                remaining.iter().map(|&i| run_managers[i].clone()).collect();
-
-            let patched_configs = Self::patch_config_list_for_retry(
-                &pending_configs,
-                &pending_managers,
-                &retry_state,
-            );
+            let patched_configs: Vec<RunnableConfig> = remaining
+                .iter()
+                .map(|&i| Self::patch_config_for_retry(&configs[i], &run_managers[i], attempt))
+                .collect();
 
             let batch_results = self.bound.batch(
                 pending_inputs,
                 Some(ConfigOrList::List(patched_configs)),
-                true, // Always return exceptions to handle ourselves
+                true,
             );
 
-            let mut next_remaining = Vec::new();
-            let mut first_non_retryable_error: Option<Error> = None;
+            let (next_remaining, non_retryable_err) = self.process_batch_results(
+                batch_results,
+                &remaining,
+                &mut results,
+                attempt,
+                return_exceptions,
+            );
 
-            for (offset, result) in batch_results.into_iter().enumerate() {
-                let orig_idx = remaining[offset];
-
-                match result {
-                    Ok(output) => {
-                        results[orig_idx] = Some(Ok(output));
-                    }
-                    Err(e) => {
-                        if self.should_retry(&e) && attempt < self.config.max_attempt_number {
-                            results[orig_idx] = Some(Err(e));
-                            next_remaining.push(orig_idx);
-                        } else if !self.should_retry(&e) && !return_exceptions {
-                            if first_non_retryable_error.is_none() {
-                                first_non_retryable_error = Some(e);
-                            }
-                            results[orig_idx] = Some(Err(Error::other("Batch aborted")));
-                        } else {
-                            results[orig_idx] = Some(Err(e));
-                        }
-                    }
-                }
-            }
-
-            if first_non_retryable_error.is_some() && !return_exceptions {
-                for result in results.iter_mut().take(n) {
-                    if result.is_none() {
-                        *result = Some(Err(Error::other("Batch aborted due to error")));
-                    }
-                }
+            if non_retryable_err.is_some() && !return_exceptions {
+                Self::fill_aborted(&mut results, n);
                 break;
             }
 
@@ -509,15 +417,18 @@ where
                 && self.config.wait_exponential_jitter
                 && attempt < self.config.max_attempt_number
             {
-                let wait = self.calculate_wait(attempt);
-                std::thread::sleep(wait);
+                std::thread::sleep(self.get_jitter_params().calculate_wait(attempt));
             }
         }
 
+        let results = Self::collect_results(results);
+        for (run_manager, result) in run_managers.iter().zip(results.iter()) {
+            match result {
+                Ok(_) => run_manager.on_chain_end(&EMPTY_MAP),
+                Err(e) => run_manager.on_chain_error(e),
+            }
+        }
         results
-            .into_iter()
-            .map(|opt| opt.unwrap_or_else(|| Err(Error::other("No result"))))
-            .collect()
     }
 
     async fn abatch(
@@ -539,21 +450,12 @@ where
         };
         let n = inputs.len();
 
-        let run_managers: Vec<CallbackManagerForChainRun> = configs
-            .iter()
-            .map(|config| {
-                let callback_manager = get_callback_manager_for_config(config);
-                callback_manager
-                    .on_chain_start()
-                    .serialized(&std::collections::HashMap::new())
-                    .inputs(&std::collections::HashMap::new())
-                    .maybe_run_id(config.run_id)
-                    .call()
-            })
-            .collect();
+        let (run_managers, configs): (Vec<_>, Vec<_>) = configs
+            .into_iter()
+            .map(|config| start_chain_run(Some(config)))
+            .unzip();
 
         let mut results: Vec<Option<Result<Self::Output>>> = (0..n).map(|_| None).collect();
-
         let mut remaining: Vec<usize> = (0..n).collect();
 
         for attempt in 1..=self.config.max_attempt_number {
@@ -561,62 +463,32 @@ where
                 break;
             }
 
-            let retry_state = RetryCallState::new(attempt);
-
             let pending_inputs: Vec<Self::Input> =
                 remaining.iter().map(|&i| inputs[i].clone()).collect();
-            let pending_configs: Vec<RunnableConfig> =
-                remaining.iter().map(|&i| configs[i].clone()).collect();
-            let pending_managers: Vec<CallbackManagerForChainRun> =
-                remaining.iter().map(|&i| run_managers[i].clone()).collect();
-
-            let patched_configs = Self::patch_config_list_for_retry(
-                &pending_configs,
-                &pending_managers,
-                &retry_state,
-            );
+            let patched_configs: Vec<RunnableConfig> = remaining
+                .iter()
+                .map(|&i| Self::patch_config_for_retry(&configs[i], &run_managers[i], attempt))
+                .collect();
 
             let batch_results = self
                 .bound
                 .abatch(
                     pending_inputs,
                     Some(ConfigOrList::List(patched_configs)),
-                    true, // Always return exceptions to handle ourselves
+                    true,
                 )
                 .await;
 
-            let mut next_remaining = Vec::new();
-            let mut first_non_retryable_error: Option<Error> = None;
+            let (next_remaining, non_retryable_err) = self.process_batch_results(
+                batch_results,
+                &remaining,
+                &mut results,
+                attempt,
+                return_exceptions,
+            );
 
-            for (offset, result) in batch_results.into_iter().enumerate() {
-                let orig_idx = remaining[offset];
-
-                match result {
-                    Ok(output) => {
-                        results[orig_idx] = Some(Ok(output));
-                    }
-                    Err(e) => {
-                        if self.should_retry(&e) && attempt < self.config.max_attempt_number {
-                            results[orig_idx] = Some(Err(e));
-                            next_remaining.push(orig_idx);
-                        } else if !self.should_retry(&e) && !return_exceptions {
-                            if first_non_retryable_error.is_none() {
-                                first_non_retryable_error = Some(e);
-                            }
-                            results[orig_idx] = Some(Err(Error::other("Batch aborted")));
-                        } else {
-                            results[orig_idx] = Some(Err(e));
-                        }
-                    }
-                }
-            }
-
-            if first_non_retryable_error.is_some() && !return_exceptions {
-                for result in results.iter_mut().take(n) {
-                    if result.is_none() {
-                        *result = Some(Err(Error::other("Batch aborted due to error")));
-                    }
-                }
+            if non_retryable_err.is_some() && !return_exceptions {
+                Self::fill_aborted(&mut results, n);
                 break;
             }
 
@@ -626,15 +498,18 @@ where
                 && self.config.wait_exponential_jitter
                 && attempt < self.config.max_attempt_number
             {
-                let wait = self.calculate_wait(attempt);
-                tokio::time::sleep(wait).await;
+                tokio::time::sleep(self.get_jitter_params().calculate_wait(attempt)).await;
             }
         }
 
+        let results = Self::collect_results(results);
+        for (run_manager, result) in run_managers.iter().zip(results.iter()) {
+            match result {
+                Ok(_) => run_manager.on_chain_end(&EMPTY_MAP),
+                Err(e) => run_manager.on_chain_error(e),
+            }
+        }
         results
-            .into_iter()
-            .map(|opt| opt.unwrap_or_else(|| Err(Error::other("No result"))))
-            .collect()
     }
 }
 
@@ -652,7 +527,7 @@ impl<R: Runnable> RunnableRetryExt for R {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runnables::base::RunnableLambda;
+    use crate::runnables::base::{RunnableExt, RunnableLambda};
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
 

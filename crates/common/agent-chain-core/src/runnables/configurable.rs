@@ -84,14 +84,6 @@ pub fn make_options_spec_multi(
     }
 }
 
-fn str_remove_prefix(s: &str, prefix: &str) -> String {
-    if let Some(stripped) = s.strip_prefix(prefix) {
-        stripped.to_string()
-    } else {
-        s.to_string()
-    }
-}
-
 pub trait DynamicRunnable: Runnable {
     fn config_specs(&self) -> Vec<ConfigurableFieldSpec>;
 
@@ -568,7 +560,12 @@ where
             let new_configurable: HashMap<String, Value> = config
                 .configurable
                 .iter()
-                .map(|(k, v)| (str_remove_prefix(k, &prefix), v.clone()))
+                .map(|(k, v)| {
+                    (
+                        k.strip_prefix(prefix.as_str()).unwrap_or(k).to_string(),
+                        v.clone(),
+                    )
+                })
                 .collect();
             RunnableConfig {
                 configurable: new_configurable,
@@ -737,16 +734,23 @@ where
                 .await;
         }
 
-        let mut results = Vec::with_capacity(inputs.len());
-        for (input, prepared_result) in inputs.into_iter().zip(prepared) {
-            let result = match prepared_result {
-                Ok((runnable, config)) => runnable.ainvoke(input, Some(config)).await,
-                Err(e) => Err(e),
-            };
-            results.push(result);
-        }
+        let max_concurrency = configs.first().and_then(|c| c.max_concurrency);
 
-        results
+        let futures: Vec<_> = inputs
+            .into_iter()
+            .zip(prepared)
+            .map(|(input, prepared_result)| {
+                Box::pin(async move {
+                    match prepared_result {
+                        Ok((runnable, config)) => runnable.ainvoke(input, Some(config)).await,
+                        Err(e) => Err(e),
+                    }
+                })
+                    as std::pin::Pin<Box<dyn std::future::Future<Output = Result<O>> + Send>>
+            })
+            .collect();
+
+        gather_with_concurrency(max_concurrency, futures).await
     }
 
     fn stream(
@@ -908,18 +912,6 @@ mod tests {
         };
         let prefixed_shared = prefix_config_spec(&shared_spec, "model==gpt4");
         assert_eq!(prefixed_shared.id, "temperature");
-    }
-
-    #[test]
-    fn test_str_remove_prefix() {
-        assert_eq!(
-            str_remove_prefix("model==gpt4/temperature", "model==gpt4/"),
-            "temperature"
-        );
-        assert_eq!(
-            str_remove_prefix("temperature", "model==gpt4/"),
-            "temperature"
-        );
     }
 
     #[test]

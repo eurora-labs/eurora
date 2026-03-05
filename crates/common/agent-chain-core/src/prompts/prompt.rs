@@ -9,10 +9,10 @@ use async_trait::async_trait;
 use crate::error::{Error, Result};
 use crate::prompt_values::StringPromptValue;
 use crate::runnables::base::Runnable;
-use crate::runnables::config::{RunnableConfig, ensure_config};
+use crate::runnables::config::RunnableConfig;
 use crate::utils::input::get_colored_text;
 
-use super::base::{BasePromptTemplate, FormatOutputType};
+use super::base::{BasePromptTemplate, PartialValue, merge_prompt_config, resolve_partials};
 use super::string::{
     PromptTemplateFormat, StringPromptTemplate, check_valid_template, format_template,
     get_template_variables,
@@ -33,8 +33,8 @@ pub struct PromptTemplate {
     #[serde(default)]
     pub validate_template: bool,
 
-    #[serde(default)]
-    pub partial_variables: HashMap<String, String>,
+    #[serde(skip, default)]
+    pub partial_variables: HashMap<String, PartialValue>,
 
     #[serde(default)]
     pub metadata: Option<HashMap<String, serde_json::Value>>,
@@ -49,7 +49,7 @@ impl PromptTemplate {
     pub fn new(
         template: impl Into<String>,
         #[builder(default)] template_format: PromptTemplateFormat,
-        #[builder(default)] partial_variables: HashMap<String, String>,
+        #[builder(default)] partial_variables: HashMap<String, PartialValue>,
         metadata: Option<HashMap<String, serde_json::Value>>,
         tags: Option<Vec<String>>,
         #[builder(default)] validate_template: bool,
@@ -94,7 +94,7 @@ impl PromptTemplate {
     pub fn from_template_with_partials(
         template: impl Into<String>,
         template_format: PromptTemplateFormat,
-        partial_variables: HashMap<String, String>,
+        partial_variables: HashMap<String, PartialValue>,
     ) -> Result<Self> {
         Self::builder()
             .template(template)
@@ -138,7 +138,7 @@ impl PromptTemplate {
             optional_variables: Vec::new(),
             template_format: PromptTemplateFormat::FString,
             validate_template: false,
-            partial_variables: HashMap::new(),
+            partial_variables: HashMap::<String, PartialValue>::new(),
             metadata: None,
             tags: None,
         })
@@ -152,11 +152,12 @@ impl PromptTemplate {
                 ));
             }
 
+            let partial_keys: Vec<_> = self.partial_variables.keys().cloned().collect();
             let all_inputs: Vec<_> = self
                 .input_variables
                 .iter()
-                .chain(self.partial_variables.keys())
                 .cloned()
+                .chain(partial_keys)
                 .collect();
 
             check_valid_template(&self.template, self.template_format, &all_inputs)?;
@@ -175,8 +176,8 @@ impl BasePromptTemplate for PromptTemplate {
         &self.optional_variables
     }
 
-    fn partial_variables(&self) -> &HashMap<String, String> {
-        &self.partial_variables
+    fn partial_variables(&self) -> HashMap<String, String> {
+        resolve_partials(&self.partial_variables)
     }
 
     fn metadata(&self) -> Option<&HashMap<String, serde_json::Value>> {
@@ -187,12 +188,15 @@ impl BasePromptTemplate for PromptTemplate {
         self.tags.as_deref()
     }
 
-    fn format(&self, kwargs: &HashMap<String, String>) -> Result<FormatOutputType> {
+    fn format(&self, kwargs: &HashMap<String, String>) -> Result<String> {
         let merged = self.merge_partial_and_user_variables(kwargs);
         format_template(&self.template, self.template_format, &merged)
     }
 
-    fn partial(&self, kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>> {
+    fn partial(
+        &self,
+        kwargs: HashMap<String, PartialValue>,
+    ) -> Result<Box<dyn BasePromptTemplate>> {
         let new_vars: Vec<_> = self
             .input_variables
             .iter()
@@ -238,8 +242,8 @@ impl StringPromptTemplate for PromptTemplate {
         &self.optional_variables
     }
 
-    fn partial_variables(&self) -> &HashMap<String, String> {
-        &self.partial_variables
+    fn partial_variables(&self) -> HashMap<String, String> {
+        resolve_partials(&self.partial_variables)
     }
 
     fn template_format(&self) -> PromptTemplateFormat {
@@ -288,7 +292,7 @@ impl std::ops::Add for PromptTemplate {
         let template = format!("{}{}", self.template, other.template);
         let validate_template = self.validate_template && other.validate_template;
 
-        let mut partial_variables = self.partial_variables;
+        let mut partial_variables: HashMap<String, PartialValue> = self.partial_variables;
         for (k, v) in other.partial_variables {
             if partial_variables.contains_key(&k) {
                 return Err(Error::InvalidConfig(
@@ -330,10 +334,16 @@ impl Runnable for PromptTemplate {
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let _config = ensure_config(config);
-        BasePromptTemplate::validate_input(self, &input)?;
-        let text = BasePromptTemplate::format(self, &input)?;
-        Ok(StringPromptValue::new(text))
+        let config = merge_prompt_config(config, self.metadata(), self.tags());
+        self.call_with_config(
+            &|input, _config| {
+                BasePromptTemplate::validate_input(self, &input)?;
+                let text = BasePromptTemplate::format(self, &input)?;
+                Ok(StringPromptValue::new(text))
+            },
+            input,
+            config,
+        )
     }
 
     async fn ainvoke(
@@ -412,7 +422,7 @@ mod tests {
         let prompt = PromptTemplate::from_template("{greeting}, {name}!").unwrap();
 
         let mut partial_vars = HashMap::new();
-        partial_vars.insert("greeting".to_string(), "Hi".to_string());
+        partial_vars.insert("greeting".to_string(), PartialValue::from("Hi"));
 
         let partial_prompt = BasePromptTemplate::partial(&prompt, partial_vars).unwrap();
 

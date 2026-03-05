@@ -10,9 +10,7 @@ use serde_json::Value;
 use super::base::{BaseLanguageModel, LangSmithParams, LanguageModelConfig, LanguageModelInput};
 use super::model_profile::ModelProfile;
 use crate::GenerationType;
-use crate::callbacks::{
-    AsyncCallbackManagerForLLMRun, BaseCallbackHandler, CallbackManagerForLLMRun, Callbacks,
-};
+use crate::callbacks::{BaseCallbackHandler, CallbackManagerForLLMRun, Callbacks};
 use crate::error::{Error, Result};
 use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition, UsageMetadata};
 use crate::output_parsers::JsonOutputKeyToolsParser;
@@ -68,6 +66,8 @@ pub struct ChatChunk {
     pub tool_calls: Vec<crate::messages::ToolCall>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub response_metadata: HashMap<String, serde_json::Value>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub additional_kwargs: HashMap<String, serde_json::Value>,
 }
 
 #[bon::bon]
@@ -80,6 +80,7 @@ impl ChatChunk {
         #[builder(into)] finish_reason: Option<String>,
         #[builder(default)] tool_calls: Vec<crate::messages::ToolCall>,
         #[builder(default)] response_metadata: HashMap<String, serde_json::Value>,
+        #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
     ) -> Self {
         Self {
             content,
@@ -88,6 +89,7 @@ impl ChatChunk {
             finish_reason,
             tool_calls,
             response_metadata,
+            additional_kwargs,
         }
     }
 
@@ -307,10 +309,9 @@ pub trait BaseChatModel: BaseLanguageModel {
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-        run_manager: Option<&AsyncCallbackManagerForLLMRun>,
+        run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
-        let sync_manager = run_manager.map(|m| m.get_sync());
-        self._generate(messages, stop, sync_manager.as_ref()).await
+        self._generate(messages, stop, run_manager).await
     }
 
     fn _stream(
@@ -326,10 +327,9 @@ pub trait BaseChatModel: BaseLanguageModel {
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-        run_manager: Option<&AsyncCallbackManagerForLLMRun>,
+        run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
-        let sync_manager = run_manager.map(|m| m.get_sync());
-        self._stream(messages, stop, sync_manager.as_ref())
+        self._stream(messages, stop, run_manager)
     }
 
     fn get_first_message(&self, result: &ChatResult) -> Result<AIMessage> {
@@ -483,12 +483,12 @@ pub trait BaseChatModel: BaseLanguageModel {
             callbacks,
             tags,
             metadata,
-            run_name: _run_name,
+            run_name,
             run_id,
         } = config;
 
         let params = self._get_invocation_params(stop.as_deref(), None);
-        let _options = {
+        let options = {
             let mut opts = HashMap::new();
             if let Some(ref s) = stop {
                 opts.insert(
@@ -510,18 +510,25 @@ pub trait BaseChatModel: BaseLanguageModel {
         if let Some(model_type) = ls_params.ls_model_type {
             inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
         }
+        if !options.is_empty() {
+            inheritable_metadata.insert(
+                "options".to_string(),
+                serde_json::to_value(&options).unwrap_or_default(),
+            );
+        }
 
-        let callback_manager = CallbackManager::configure(
-            callbacks,
-            self.callbacks().cloned(),
-            self.verbose(),
-            tags,
-            self.config().tags.clone(),
-            Some(inheritable_metadata),
-            self.config().metadata.clone(),
-        );
+        let callback_manager = CallbackManager::configure()
+            .maybe_inheritable_callbacks(callbacks)
+            .maybe_local_callbacks(self.callbacks().cloned())
+            .verbose(self.verbose())
+            .maybe_inheritable_tags(tags)
+            .maybe_local_tags(self.config().tags.clone())
+            .inheritable_metadata(inheritable_metadata)
+            .maybe_local_metadata(self.config().metadata.clone())
+            .call();
 
-        let run_managers = callback_manager.on_chat_model_start(&params, &messages, run_id);
+        let run_managers =
+            callback_manager.on_chat_model_start(&params, &messages, run_id, run_name.as_deref());
 
         let mut results = Vec::new();
         for (i, message_list) in messages.iter().enumerate() {
@@ -600,7 +607,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         messages: Vec<Vec<BaseMessage>>,
         config: GenerateConfig,
     ) -> Result<LLMResult> {
-        use crate::callbacks::AsyncCallbackManager;
+        use crate::callbacks::CallbackManager;
         use crate::outputs::RunInfo;
 
         let GenerateConfig {
@@ -608,12 +615,12 @@ pub trait BaseChatModel: BaseLanguageModel {
             callbacks,
             tags,
             metadata,
-            run_name: _run_name,
+            run_name,
             run_id,
         } = config;
 
         let params = self._get_invocation_params(stop.as_deref(), None);
-        let _options = {
+        let options = {
             let mut opts = HashMap::new();
             if let Some(ref s) = stop {
                 opts.insert(
@@ -635,20 +642,25 @@ pub trait BaseChatModel: BaseLanguageModel {
         if let Some(model_type) = ls_params.ls_model_type {
             inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
         }
+        if !options.is_empty() {
+            inheritable_metadata.insert(
+                "options".to_string(),
+                serde_json::to_value(&options).unwrap_or_default(),
+            );
+        }
 
-        let callback_manager = AsyncCallbackManager::configure(
-            callbacks,
-            self.callbacks().cloned(),
-            self.verbose(),
-            tags,
-            self.config().tags.clone(),
-            Some(inheritable_metadata),
-            self.config().metadata.clone(),
-        );
+        let callback_manager = CallbackManager::configure()
+            .maybe_inheritable_callbacks(callbacks)
+            .maybe_local_callbacks(self.callbacks().cloned())
+            .verbose(self.verbose())
+            .maybe_inheritable_tags(tags)
+            .maybe_local_tags(self.config().tags.clone())
+            .inheritable_metadata(inheritable_metadata)
+            .maybe_local_metadata(self.config().metadata.clone())
+            .call();
 
-        let run_managers = callback_manager
-            .on_chat_model_start(&params, &messages, run_id)
-            .await;
+        let run_managers =
+            callback_manager.on_chat_model_start(&params, &messages, run_id, run_name.as_deref());
 
         let futures: Vec<_> = messages
             .iter()
@@ -676,7 +688,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 }
                 Err(e) => {
                     if let Some(rm) = run_managers.get(i) {
-                        rm.get_sync().on_llm_error(&e);
+                        rm.on_llm_error(&e);
                     }
                     return Err(e);
                 }
@@ -722,7 +734,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 let chat_result = crate::outputs::ChatResult::builder()
                     .generations(vec![chat_gen.clone()])
                     .build();
-                run_manager.on_llm_end(&chat_result).await;
+                run_manager.on_llm_end(&chat_result);
             }
             run_infos.push(RunInfo::new(run_manager.run_id()));
         }
@@ -833,7 +845,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-        run_manager: Option<&AsyncCallbackManagerForLLMRun>,
+        run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<crate::outputs::ChatResult> {
         let cache_config = self.chat_config().base.cache;
         let cache_instance = self.chat_config().cache_instance.clone();
@@ -1099,7 +1111,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
-        let (callbacks, tags, metadata, _run_name, run_id) = if let Some(cfg) = config {
+        let (callbacks, tags, metadata, run_name, run_id) = if let Some(cfg) = config {
             (
                 cfg.callbacks.clone(),
                 Some(cfg.tags.clone()).filter(|t| !t.is_empty()),
@@ -1124,17 +1136,21 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
 
         let params = self._get_invocation_params(stop.as_deref(), None);
-        let callback_manager = crate::callbacks::CallbackManager::configure(
-            callbacks,
-            self.callbacks().cloned(),
-            self.verbose(),
-            tags,
-            self.config().tags.clone(),
-            Some(inheritable_metadata),
-            self.config().metadata.clone(),
+        let callback_manager = crate::callbacks::CallbackManager::configure()
+            .maybe_inheritable_callbacks(callbacks)
+            .maybe_local_callbacks(self.callbacks().cloned())
+            .verbose(self.verbose())
+            .maybe_inheritable_tags(tags)
+            .maybe_local_tags(self.config().tags.clone())
+            .inheritable_metadata(inheritable_metadata)
+            .maybe_local_metadata(self.config().metadata.clone())
+            .call();
+        let run_managers = callback_manager.on_chat_model_start(
+            &params,
+            std::slice::from_ref(&messages),
+            run_id,
+            run_name.as_deref(),
         );
-        let run_managers =
-            callback_manager.on_chat_model_start(&params, std::slice::from_ref(&messages), run_id);
         let run_manager = run_managers.into_iter().next();
 
         if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
@@ -1164,6 +1180,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                             BaseMessage::AI(ai_msg) => AIMessageChunk::builder()
                                 .content(ai_msg.content.clone())
                                 .tool_calls(ai_msg.tool_calls.clone())
+                                .additional_kwargs(ai_msg.additional_kwargs.clone())
                                 .build(),
                             other => AIMessageChunk::builder().content(other.text()).build(),
                         };
@@ -1251,7 +1268,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
-        let (callbacks, tags, metadata, _run_name, run_id) = if let Some(cfg) = config {
+        let (callbacks, tags, metadata, run_name, run_id) = if let Some(cfg) = config {
             (
                 cfg.callbacks.clone(),
                 Some(cfg.tags.clone()).filter(|t| !t.is_empty()),
@@ -1276,18 +1293,21 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
 
         let params = self._get_invocation_params(stop.as_deref(), None);
-        let callback_manager = crate::callbacks::AsyncCallbackManager::configure(
-            callbacks,
-            self.callbacks().cloned(),
-            self.verbose(),
-            tags,
-            self.config().tags.clone(),
-            Some(inheritable_metadata),
-            self.config().metadata.clone(),
+        let callback_manager = crate::callbacks::CallbackManager::configure()
+            .maybe_inheritable_callbacks(callbacks)
+            .maybe_local_callbacks(self.callbacks().cloned())
+            .verbose(self.verbose())
+            .maybe_inheritable_tags(tags)
+            .maybe_local_tags(self.config().tags.clone())
+            .inheritable_metadata(inheritable_metadata)
+            .maybe_local_metadata(self.config().metadata.clone())
+            .call();
+        let run_managers = callback_manager.on_chat_model_start(
+            &params,
+            std::slice::from_ref(&messages),
+            run_id,
+            run_name.as_deref(),
         );
-        let run_managers = callback_manager
-            .on_chat_model_start(&params, std::slice::from_ref(&messages), run_id)
-            .await;
         let run_manager = run_managers.into_iter().next();
 
         if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
@@ -1318,6 +1338,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                                 .content(ai_msg.content.clone())
                                 .tool_calls(ai_msg.tool_calls.clone())
                                 .maybe_usage_metadata(ai_msg.usage_metadata.clone())
+                                .additional_kwargs(ai_msg.additional_kwargs.clone())
                                 .build(),
                             other => AIMessageChunk::builder().content(other.text()).build(),
                         };
@@ -1341,7 +1362,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                             rm.on_llm_new_token(
                                 ai_chunk.content.as_text_ref(),
                                 chunk_json.as_ref(),
-                            ).await;
+                            );
                         }
 
                         last_chunk_position = generation_chunk
@@ -1355,7 +1376,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                     }
                     Err(e) => {
                         if let Some(ref rm) = run_manager {
-                            rm.get_sync().on_llm_error(&e);
+                            rm.on_llm_error(&e);
                         }
                         yield Err(e);
                         return;
@@ -1370,7 +1391,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 if let Some(ref rm) = run_manager {
                     let msg_chunk = ChatGenerationChunk::builder().message(BaseMessage::AI(crate::messages::AIMessage::builder().content("").build())).build();
                     let chunk_json = serde_json::to_value(&msg_chunk).ok();
-                    rm.on_llm_new_token("", chunk_json.as_ref()).await;
+                    rm.on_llm_new_token("", chunk_json.as_ref());
                 }
 
                 yield Ok(final_chunk);
@@ -1380,7 +1401,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 && let Some(merged) = crate::outputs::merge_chat_generation_chunks(chunks) {
                     let chat_gen: ChatGeneration = merged.into();
                     let chat_result = ChatResult::builder().generations(vec![chat_gen]).build();
-                    rm.on_llm_end(&chat_result).await;
+                    rm.on_llm_end(&chat_result);
                 }
         };
 
@@ -1571,9 +1592,12 @@ pub fn cleanup_llm_representation(serialized: &mut Value, depth: usize) {
 }
 
 pub fn format_ls_structured_output(
-    _format: Option<&HashMap<String, Value>>,
+    format: Option<&HashMap<String, Value>>,
 ) -> HashMap<String, Value> {
-    HashMap::new()
+    match format {
+        Some(f) => f.clone(),
+        None => HashMap::new(),
+    }
 }
 
 pub fn extract_tool_name_from_schema(schema: &Value) -> Result<String> {
@@ -1697,7 +1721,10 @@ impl Runnable for StructuredOutputWithRaw {
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         let raw: AIMessage = self.model.invoke(input, config.clone())?;
         match self.parser.invoke(raw.clone(), config) {
-            Ok(parsed) => Self::build_output(&raw, Some(parsed), None),
+            Ok(parsed) => {
+                let parsed_value = serde_json::to_value(&parsed)?;
+                Self::build_output(&raw, Some(parsed_value), None)
+            }
             Err(e) => Self::build_output(&raw, None, Some(e.to_string())),
         }
     }
@@ -1709,7 +1736,10 @@ impl Runnable for StructuredOutputWithRaw {
     ) -> Result<Self::Output> {
         let raw: AIMessage = self.model.ainvoke(input, config.clone()).await?;
         match self.parser.ainvoke(raw.clone(), config).await {
-            Ok(parsed) => Self::build_output(&raw, Some(parsed), None),
+            Ok(parsed) => {
+                let parsed_value = serde_json::to_value(&parsed)?;
+                Self::build_output(&raw, Some(parsed_value), None)
+            }
             Err(e) => Self::build_output(&raw, None, Some(e.to_string())),
         }
     }

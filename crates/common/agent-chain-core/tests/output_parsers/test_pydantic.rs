@@ -476,20 +476,15 @@ fn test_parse_obj_invalid_raises() {
 }
 
 #[test]
-fn test_parser_exception_message() {
+fn test_parse_obj_error_message_format() {
     let parser = simple_model_parser();
-    let test_error = "test error";
-    let json_object = json!({"name": "Alice", "age": "bad"});
-    let exc = parser.parser_exception(&test_error, &json_object);
-    let err_msg = format!("{}", exc);
+    let obj = json!({"name": "Alice", "age": "bad"});
+    let result = parser.parse_obj(&obj);
+    assert!(result.is_err());
+    let err_msg = format!("{}", result.unwrap_err());
     assert!(
         err_msg.contains("Failed to parse SimpleModel"),
         "Expected 'Failed to parse SimpleModel' in error: {}",
-        err_msg
-    );
-    assert!(
-        err_msg.contains("test error"),
-        "Expected 'test error' in error: {}",
         err_msg
     );
 }

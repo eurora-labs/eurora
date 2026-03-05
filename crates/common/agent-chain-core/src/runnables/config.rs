@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
@@ -7,10 +6,9 @@ use bon::bon;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::callbacks::base::BaseCallbackManager;
-use crate::callbacks::{AsyncCallbackManager, CallbackManager, Callbacks};
+use crate::callbacks::{CallbackManager, CallbackManagerForChainRun, Callbacks};
 
-pub const DEFAULT_RECURSION_LIMIT: i32 = 25;
+pub const DEFAULT_RECURSION_LIMIT: u32 = 25;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunnableConfig {
@@ -30,7 +28,7 @@ pub struct RunnableConfig {
     pub max_concurrency: Option<usize>,
 
     #[serde(default = "default_recursion_limit")]
-    pub recursion_limit: i32,
+    pub recursion_limit: u32,
 
     #[serde(default)]
     pub configurable: HashMap<String, serde_json::Value>,
@@ -39,7 +37,7 @@ pub struct RunnableConfig {
     pub run_id: Option<Uuid>,
 }
 
-fn default_recursion_limit() -> i32 {
+fn default_recursion_limit() -> u32 {
     DEFAULT_RECURSION_LIMIT
 }
 
@@ -67,7 +65,7 @@ impl RunnableConfig {
         callbacks: Option<Callbacks>,
         #[builder(into)] run_name: Option<String>,
         max_concurrency: Option<usize>,
-        #[builder(default = DEFAULT_RECURSION_LIMIT)] recursion_limit: i32,
+        #[builder(default = DEFAULT_RECURSION_LIMIT)] recursion_limit: u32,
         #[builder(default)] configurable: HashMap<String, serde_json::Value>,
         run_id: Option<Uuid>,
     ) -> Self {
@@ -101,6 +99,8 @@ impl From<Vec<RunnableConfig>> for ConfigOrList {
         ConfigOrList::List(configs)
     }
 }
+
+use std::cell::RefCell;
 
 thread_local! {
     static VAR_CHILD_RUNNABLE_CONFIG: RefCell<Option<RunnableConfig>> = const { RefCell::new(None) };
@@ -159,30 +159,24 @@ pub fn ensure_config(config: Option<RunnableConfig>) -> RunnableConfig {
 }
 
 fn merge_into_config(target: &mut RunnableConfig, source: &RunnableConfig) {
-    if !source.tags.is_empty() {
-        target.tags = source.tags.clone();
+    for tag in &source.tags {
+        if !target.tags.contains(tag) {
+            target.tags.push(tag.clone());
+        }
     }
-    if !source.metadata.is_empty() {
-        target.metadata = source.metadata.clone();
-    }
+    target.metadata.extend(source.metadata.clone());
     if source.callbacks.is_some() {
-        target.callbacks = source.callbacks.clone();
+        target.callbacks.clone_from(&source.callbacks);
     }
-    if source.run_name.is_some() {
-        target.run_name = source.run_name.clone();
+    if let Some(ref name) = source.run_name {
+        target.run_name = Some(name.clone());
     }
-    if source.max_concurrency.is_some() {
-        target.max_concurrency = source.max_concurrency;
-    }
+    target.max_concurrency = source.max_concurrency.or(target.max_concurrency);
     if source.recursion_limit != DEFAULT_RECURSION_LIMIT {
         target.recursion_limit = source.recursion_limit;
     }
-    if !source.configurable.is_empty() {
-        target.configurable = source.configurable.clone();
-    }
-    if source.run_id.is_some() {
-        target.run_id = source.run_id;
-    }
+    target.configurable.extend(source.configurable.clone());
+    target.run_id = source.run_id.or(target.run_id);
 }
 
 pub fn get_config_list(
@@ -193,7 +187,7 @@ pub fn get_config_list(
         Some(ConfigOrList::List(list)) => {
             if list.len() != length {
                 return Err(crate::error::Error::other(format!(
-                    "config must be a list of the same length as inputs,                      but got {} configs for {} inputs",
+                    "config must be a list of the same length as inputs, but got {} configs for {} inputs",
                     list.len(),
                     length
                 )));
@@ -224,26 +218,19 @@ pub fn get_config_list(
     }
 }
 
+#[bon::builder]
 pub fn patch_config(
     config: Option<RunnableConfig>,
     callbacks: Option<CallbackManager>,
-    run_name: Option<String>,
+    #[builder(into)] run_name: Option<String>,
     max_concurrency: Option<usize>,
-    recursion_limit: Option<i32>,
+    recursion_limit: Option<u32>,
     configurable: Option<HashMap<String, serde_json::Value>>,
 ) -> RunnableConfig {
     let mut config = ensure_config(config);
 
     if let Some(cb) = callbacks {
-        config.callbacks = Some(Callbacks::Manager(BaseCallbackManager {
-            handlers: cb.handlers,
-            inheritable_handlers: cb.inheritable_handlers,
-            parent_run_id: cb.parent_run_id,
-            tags: cb.tags,
-            inheritable_tags: cb.inheritable_tags,
-            metadata: cb.metadata,
-            inheritable_metadata: cb.inheritable_metadata,
-        }));
+        config.callbacks = Some(Callbacks::from(cb));
         config.run_name = None;
         config.run_id = None;
     }
@@ -263,74 +250,45 @@ pub fn patch_config(
     config
 }
 
+fn merge_callbacks_rich(base: Option<Callbacks>, new: Option<Callbacks>) -> Option<Callbacks> {
+    match (base, new) {
+        (base, None) => base,
+        (None, new) => new,
+        (Some(Callbacks::Handlers(mut base_handlers)), Some(Callbacks::Handlers(new_handlers))) => {
+            base_handlers.extend(new_handlers);
+            Some(Callbacks::Handlers(base_handlers))
+        }
+        (Some(Callbacks::Manager(mut base_mgr)), Some(Callbacks::Handlers(new_handlers))) => {
+            for handler in new_handlers {
+                base_mgr.add_handler(handler, true);
+            }
+            Some(Callbacks::Manager(base_mgr))
+        }
+        (Some(Callbacks::Handlers(base_handlers)), Some(Callbacks::Manager(mut new_mgr))) => {
+            for handler in base_handlers {
+                new_mgr.add_handler(handler, true);
+            }
+            Some(Callbacks::Manager(new_mgr))
+        }
+        (Some(Callbacks::Manager(base_mgr)), Some(Callbacks::Manager(new_mgr))) => {
+            Some(Callbacks::Manager(base_mgr.merge(&new_mgr)))
+        }
+    }
+}
+
 pub fn merge_configs(configs: Vec<Option<RunnableConfig>>) -> RunnableConfig {
-    let mut base = RunnableConfig {
-        tags: Vec::new(),
-        metadata: HashMap::new(),
-        callbacks: None,
-        run_name: None,
-        max_concurrency: None,
-        recursion_limit: DEFAULT_RECURSION_LIMIT,
-        configurable: HashMap::new(),
-        run_id: None,
-    };
+    let mut base = RunnableConfig::default();
 
     for config in configs.into_iter().flatten() {
         let config = ensure_config(Some(config));
 
-        for tag in config.tags {
-            if !base.tags.contains(&tag) {
-                base.tags.push(tag);
-            }
-        }
+        let old_callbacks = base.callbacks.take();
+        let new_callbacks = config.callbacks.clone();
+
+        merge_into_config(&mut base, &config);
+
+        base.callbacks = merge_callbacks_rich(old_callbacks, new_callbacks);
         base.tags.sort();
-
-        base.metadata.extend(config.metadata);
-
-        match (&base.callbacks, &config.callbacks) {
-            (_, None) => {}
-            (None, Some(cb)) => {
-                base.callbacks = Some(cb.clone());
-            }
-            (Some(Callbacks::Handlers(base_handlers)), Some(Callbacks::Handlers(new_handlers))) => {
-                let mut merged = base_handlers.clone();
-                merged.extend(new_handlers.clone());
-                base.callbacks = Some(Callbacks::Handlers(merged));
-            }
-            (Some(Callbacks::Manager(base_mgr)), Some(Callbacks::Handlers(new_handlers))) => {
-                let mut merged = base_mgr.copy();
-                for handler in new_handlers {
-                    merged.add_handler(handler.clone(), true);
-                }
-                base.callbacks = Some(Callbacks::Manager(merged));
-            }
-            (Some(Callbacks::Handlers(base_handlers)), Some(Callbacks::Manager(new_mgr))) => {
-                let mut merged = new_mgr.copy();
-                for handler in base_handlers {
-                    merged.add_handler(handler.clone(), true);
-                }
-                base.callbacks = Some(Callbacks::Manager(merged));
-            }
-            (Some(Callbacks::Manager(base_mgr)), Some(Callbacks::Manager(new_mgr))) => {
-                base.callbacks = Some(Callbacks::Manager(base_mgr.merge(new_mgr)));
-            }
-        }
-
-        base.configurable.extend(config.configurable);
-
-        if config.recursion_limit != DEFAULT_RECURSION_LIMIT {
-            base.recursion_limit = config.recursion_limit;
-        }
-
-        if config.run_name.is_some() {
-            base.run_name = config.run_name;
-        }
-        if config.max_concurrency.is_some() {
-            base.max_concurrency = config.max_concurrency;
-        }
-        if config.run_id.is_some() {
-            base.run_id = config.run_id;
-        }
     }
 
     base
@@ -373,37 +331,61 @@ pub async fn acall_func_with_variable_args<I, O>(
 }
 
 pub fn get_callback_manager_for_config(config: &RunnableConfig) -> CallbackManager {
-    CallbackManager::configure(
-        config.callbacks.clone(),
-        None,
-        false,
-        Some(config.tags.clone()),
-        None,
-        Some(config.metadata.clone()),
-        None,
-    )
+    CallbackManager::configure()
+        .maybe_inheritable_callbacks(config.callbacks.clone())
+        .inheritable_tags(config.tags.clone())
+        .inheritable_metadata(config.metadata.clone())
+        .call()
 }
 
-pub fn get_async_callback_manager_for_config(config: &RunnableConfig) -> AsyncCallbackManager {
-    AsyncCallbackManager::configure(
-        config.callbacks.clone(),
-        None,
-        false,
-        Some(config.tags.clone()),
-        None,
-        Some(config.metadata.clone()),
-        None,
-    )
+pub static EMPTY_MAP: std::sync::LazyLock<HashMap<String, serde_json::Value>> =
+    std::sync::LazyLock::new(HashMap::new);
+
+pub fn start_chain_run(
+    config: Option<RunnableConfig>,
+) -> (CallbackManagerForChainRun, RunnableConfig) {
+    let config = ensure_config(config);
+    let callback_manager = get_callback_manager_for_config(&config);
+    let run_manager = callback_manager
+        .on_chain_start()
+        .serialized(&EMPTY_MAP)
+        .inputs(&EMPTY_MAP)
+        .maybe_run_id(config.run_id)
+        .maybe_name(config.run_name.as_deref())
+        .call();
+    (run_manager, config)
 }
 
-pub async fn run_in_executor<F, T>(func: F) -> T
+pub fn child_config(
+    config: &RunnableConfig,
+    run_manager: &CallbackManagerForChainRun,
+    tag: Option<&str>,
+) -> RunnableConfig {
+    patch_config()
+        .config(config.clone())
+        .callbacks(run_manager.get_child(tag))
+        .call()
+}
+
+pub fn finish_chain_run<T>(
+    run_manager: &CallbackManagerForChainRun,
+    result: crate::error::Result<T>,
+) -> crate::error::Result<T> {
+    match &result {
+        Ok(_) => run_manager.on_chain_end(&EMPTY_MAP),
+        Err(e) => run_manager.on_chain_error(e),
+    }
+    result
+}
+
+pub async fn run_in_executor<F, T>(func: F) -> crate::error::Result<T>
 where
     F: FnOnce() -> T + Send + 'static,
     T: Send + 'static,
 {
     tokio::task::spawn_blocking(func)
         .await
-        .expect("blocking task panicked")
+        .map_err(|e| crate::error::Error::other(format!("blocking task panicked: {e}")))
 }
 
 #[cfg(test)]
@@ -496,7 +478,7 @@ mod tests {
             .recursion_limit(50)
             .build();
         let config = ensure_config(Some(child));
-        assert_eq!(config.tags, vec!["child"]);
+        assert_eq!(config.tags, vec!["parent", "child"]);
         assert_eq!(config.recursion_limit, 50);
     }
 
@@ -548,14 +530,11 @@ mod tests {
     fn test_patch_config() {
         let config = RunnableConfig::builder().recursion_limit(10).build();
 
-        let patched = patch_config(
-            Some(config),
-            None,
-            Some("new_name".to_string()),
-            Some(8),
-            None,
-            None,
-        );
+        let patched = patch_config()
+            .config(config)
+            .run_name("new_name")
+            .max_concurrency(8)
+            .call();
 
         assert_eq!(patched.run_name, Some("new_name".to_string()));
         assert_eq!(patched.max_concurrency, Some(8));
@@ -590,7 +569,7 @@ mod tests {
             .build();
 
         let new_manager = CallbackManager::new();
-        let patched = patch_config(Some(config), Some(new_manager), None, None, None, None);
+        let patched = patch_config().config(config).callbacks(new_manager).call();
 
         assert!(patched.run_name.is_none());
         assert!(patched.run_id.is_none());
@@ -599,8 +578,8 @@ mod tests {
 
     #[test]
     fn test_merge_configs_manager_plus_manager_uses_merge() {
-        let mgr1 = BaseCallbackManager::default();
-        let mgr2 = BaseCallbackManager::default();
+        let mgr1 = CallbackManager::default();
+        let mgr2 = CallbackManager::default();
 
         let c1 = RunnableConfig {
             callbacks: Some(Callbacks::Manager(mgr1)),
@@ -617,7 +596,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_run_in_executor() {
-        let result = run_in_executor(|| 42).await;
+        let result = run_in_executor(|| 42).await.unwrap();
         assert_eq!(result, 42);
     }
 }

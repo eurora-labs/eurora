@@ -9,8 +9,10 @@ use super::few_shot::FewShotPromptTemplate;
 use super::prompt::PromptTemplate;
 use super::string::PromptTemplateFormat;
 
-type LoaderFn =
-    fn(&mut serde_json::Map<String, serde_json::Value>) -> Result<Box<dyn BasePromptTemplate>>;
+type LoaderFn = fn(
+    &mut serde_json::Map<String, serde_json::Value>,
+    Option<&str>,
+) -> Result<Box<dyn BasePromptTemplate>>;
 
 fn get_type_to_loader() -> HashMap<&'static str, LoaderFn> {
     let mut map: HashMap<&str, LoaderFn> = HashMap::new();
@@ -21,6 +23,13 @@ fn get_type_to_loader() -> HashMap<&'static str, LoaderFn> {
 }
 
 pub fn load_prompt_from_config(config: serde_json::Value) -> Result<Box<dyn BasePromptTemplate>> {
+    load_prompt_from_config_with_encoding(config, None)
+}
+
+fn load_prompt_from_config_with_encoding(
+    config: serde_json::Value,
+    encoding: Option<&str>,
+) -> Result<Box<dyn BasePromptTemplate>> {
     let mut config = match config {
         serde_json::Value::Object(map) => map,
         _ => {
@@ -44,31 +53,50 @@ pub fn load_prompt_from_config(config: serde_json::Value) -> Result<Box<dyn Base
         Error::InvalidConfig(format!("Loading {} prompt not supported", config_type))
     })?;
 
-    loader(&mut config)
+    loader(&mut config, encoding)
 }
 
-fn load_template(var_name: &str, config: &mut serde_json::Map<String, serde_json::Value>) {
+fn load_template(
+    var_name: &str,
+    config: &mut serde_json::Map<String, serde_json::Value>,
+    encoding: Option<&str>,
+) -> Result<()> {
     let path_key = format!("{}_path", var_name);
 
-    if let Some(path_value) = config.remove(&path_key) {
-        if config.contains_key(var_name) {
-            tracing::warn!("Both '{}' and '{}' cannot be provided.", path_key, var_name);
-            return;
-        }
+    let Some(path_value) = config.remove(&path_key) else {
+        return Ok(());
+    };
 
-        if let Some(path_str) = path_value.as_str() {
-            let path = Path::new(path_str);
-            if path.extension().and_then(|e| e.to_str()) == Some("txt")
-                && let Ok(content) = std::fs::read_to_string(path)
-            {
-                config.insert(var_name.to_string(), serde_json::Value::String(content));
-            }
-        }
+    if config.contains_key(var_name) {
+        return Err(Error::InvalidConfig(format!(
+            "Both '{}' and '{}' cannot be provided.",
+            path_key, var_name
+        )));
     }
+
+    let path_str = path_value
+        .as_str()
+        .ok_or_else(|| Error::InvalidConfig(format!("'{}' must be a string", path_key)))?;
+
+    let path = Path::new(path_str);
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+
+    if ext != "txt" {
+        return Err(Error::InvalidConfig(format!(
+            "Expected .txt file for '{}', got '.{}'",
+            path_key, ext
+        )));
+    }
+
+    let content = read_file_with_encoding(path, encoding)?;
+    config.insert(var_name.to_string(), serde_json::Value::String(content));
+
+    Ok(())
 }
 
 fn load_examples_from_config(
     config: &mut serde_json::Map<String, serde_json::Value>,
+    encoding: Option<&str>,
 ) -> Result<()> {
     let examples = config
         .get("examples")
@@ -78,7 +106,7 @@ fn load_examples_from_config(
         serde_json::Value::Array(_) => Ok(()),
         serde_json::Value::String(path_str) => {
             let path = Path::new(path_str);
-            let content = std::fs::read_to_string(path)?;
+            let content = read_file_with_encoding(path, encoding)?;
 
             let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
             let parsed: serde_json::Value = match extension {
@@ -130,8 +158,9 @@ fn extract_examples(
 
 fn load_basic_prompt(
     config: &mut serde_json::Map<String, serde_json::Value>,
+    encoding: Option<&str>,
 ) -> Result<Box<dyn BasePromptTemplate>> {
-    load_template("template", config);
+    load_template("template", config, encoding)?;
 
     let template = config
         .get("template")
@@ -165,9 +194,10 @@ fn load_basic_prompt(
 
 fn load_few_shot_prompt(
     config: &mut serde_json::Map<String, serde_json::Value>,
+    encoding: Option<&str>,
 ) -> Result<Box<dyn BasePromptTemplate>> {
-    load_template("suffix", config);
-    load_template("prefix", config);
+    load_template("suffix", config, encoding)?;
+    load_template("prefix", config, encoding)?;
 
     let example_prompt = if let Some(example_prompt_path) = config.remove("example_prompt_path") {
         if config.contains_key("example_prompt") {
@@ -179,7 +209,7 @@ fn load_few_shot_prompt(
         let path_str = example_prompt_path.as_str().ok_or_else(|| {
             Error::InvalidConfig("example_prompt_path must be a string".to_string())
         })?;
-        let loaded = load_prompt(path_str)?;
+        let loaded = load_prompt_with_encoding(path_str, encoding)?;
         let dict = loaded.to_dict();
         let template_str = dict
             .get("template")
@@ -204,7 +234,7 @@ fn load_few_shot_prompt(
         ));
     };
 
-    load_examples_from_config(config)?;
+    load_examples_from_config(config, encoding)?;
     let examples = extract_examples(config)?;
 
     let suffix = config
@@ -230,6 +260,7 @@ fn load_few_shot_prompt(
 
 fn load_chat_prompt(
     config: &mut serde_json::Map<String, serde_json::Value>,
+    _encoding: Option<&str>,
 ) -> Result<Box<dyn BasePromptTemplate>> {
     let messages = config
         .remove("messages")
@@ -262,7 +293,7 @@ pub fn load_prompt(path: impl AsRef<Path>) -> Result<Box<dyn BasePromptTemplate>
 
 pub fn load_prompt_with_encoding(
     path: impl AsRef<Path>,
-    _encoding: Option<&str>,
+    encoding: Option<&str>,
 ) -> Result<Box<dyn BasePromptTemplate>> {
     let path = path.as_ref();
 
@@ -276,11 +307,33 @@ pub fn load_prompt_with_encoding(
         ));
     }
 
-    load_prompt_from_file(path)
+    load_prompt_from_file(path, encoding)
 }
 
-fn load_prompt_from_file(path: &Path) -> Result<Box<dyn BasePromptTemplate>> {
-    let content = std::fs::read_to_string(path)?;
+fn read_file_with_encoding(path: &Path, encoding: Option<&str>) -> Result<String> {
+    match encoding {
+        None | Some("utf-8") | Some("utf8") | Some("UTF-8") => Ok(std::fs::read_to_string(path)?),
+        Some(label) => {
+            let enc = encoding_rs::Encoding::for_label(label.as_bytes())
+                .ok_or_else(|| Error::Other(format!("Unsupported encoding: {}", label)))?;
+            let bytes = std::fs::read(path)?;
+            let (cow, _, had_errors) = enc.decode(&bytes);
+            if had_errors {
+                return Err(Error::Other(format!(
+                    "Failed to decode file with encoding: {}",
+                    label
+                )));
+            }
+            Ok(cow.into_owned())
+        }
+    }
+}
+
+fn load_prompt_from_file(
+    path: &Path,
+    encoding: Option<&str>,
+) -> Result<Box<dyn BasePromptTemplate>> {
+    let content = read_file_with_encoding(path, encoding)?;
 
     let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
@@ -299,7 +352,7 @@ fn load_prompt_from_file(path: &Path) -> Result<Box<dyn BasePromptTemplate>> {
         }
     };
 
-    load_prompt_from_config(config)
+    load_prompt_from_config_with_encoding(config, encoding)
 }
 
 #[cfg(test)]
@@ -454,5 +507,32 @@ mod tests {
 
         let result = prompt.format(&kwargs).unwrap();
         assert_eq!(result, "Hello, World!");
+    }
+
+    #[test]
+    fn test_load_prompt_with_latin1_encoding() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("prompt.json");
+
+        let config_str = r#"{"_type": "prompt", "template": "Hello, {name}!"}"#;
+        std::fs::write(&file_path, config_str.as_bytes()).unwrap();
+
+        let prompt = load_prompt_with_encoding(&file_path, Some("iso-8859-1")).unwrap();
+
+        let mut kwargs = HashMap::new();
+        kwargs.insert("name".to_string(), "World".to_string());
+
+        let result = prompt.format(&kwargs).unwrap();
+        assert_eq!(result, "Hello, World!");
+    }
+
+    #[test]
+    fn test_unsupported_encoding() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("prompt.json");
+        std::fs::write(&file_path, "{}").unwrap();
+
+        let result = load_prompt_with_encoding(&file_path, Some("not-a-real-encoding"));
+        assert!(result.is_err());
     }
 }

@@ -1,15 +1,12 @@
-use async_trait::async_trait;
 use futures::StreamExt;
 use futures::stream::BoxStream;
 
 use crate::error::{Error, Result};
-use crate::messages::BaseMessage;
-use crate::outputs::{ChatGenerationChunk, Generation, GenerationChunk};
+use crate::outputs::{Generation, GenerationChunk};
 use crate::runnables::RunnableConfig;
 
-use super::base::BaseOutputParser;
+use super::base::{BaseOutputParser, ParserInput};
 
-#[async_trait]
 pub trait BaseTransformOutputParser: BaseOutputParser {
     fn parse_generation(&self, generation: &Generation) -> Result<Self::Output> {
         self.parse(&generation.text)
@@ -17,33 +14,21 @@ pub trait BaseTransformOutputParser: BaseOutputParser {
 
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, BaseMessage>,
+        input: BoxStream<'a, ParserInput>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
     {
         Box::pin(async_stream::stream! {
-            let mut stream = input;
-            while let Some(message) = stream.next().await {
-                let chunk = ChatGenerationChunk::builder().message(message).build();
-                let generation = Generation::builder().text(chunk.text.clone()).build();
+            let mut input = input;
+            while let Some(chunk) = input.next().await {
+                let generation = chunk.to_generation();
                 yield self.parse_result(&[generation], false);
             }
         })
     }
-
-    fn atransform<'a>(
-        &'a self,
-        input: BoxStream<'a, BaseMessage>,
-    ) -> BoxStream<'a, Result<Self::Output>>
-    where
-        Self::Output: 'a,
-    {
-        self.transform(input)
-    }
 }
 
-#[async_trait]
 pub trait BaseCumulativeTransformOutputParser: BaseTransformOutputParser {
     fn diff_mode(&self) -> bool {
         false
@@ -54,12 +39,14 @@ pub trait BaseCumulativeTransformOutputParser: BaseTransformOutputParser {
         _prev: Option<&Self::Output>,
         _next: Self::Output,
     ) -> Result<Self::Output> {
-        Err(Error::Other("_diff not implemented".to_string()))
+        Err(Error::NotImplemented(
+            "compute_diff not implemented".to_string(),
+        ))
     }
 
     fn cumulative_transform<'a>(
         &'a self,
-        input: BoxStream<'a, BaseMessage>,
+        input: BoxStream<'a, ParserInput>,
         _config: Option<RunnableConfig>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
@@ -70,33 +57,29 @@ pub trait BaseCumulativeTransformOutputParser: BaseTransformOutputParser {
         Box::pin(async_stream::stream! {
             let mut prev_parsed: Option<Self::Output> = None;
             let mut acc_gen: Option<GenerationChunk> = None;
-            let mut stream = input;
+            let mut input = input;
 
-            while let Some(message) = stream.next().await {
-                let chunk_gen = GenerationChunk::builder().text(message.text()).build();
+            while let Some(chunk) = input.next().await {
+                let chunk_gen = GenerationChunk::builder().text(chunk.to_generation().text).build();
 
                 acc_gen = Some(match acc_gen {
                     None => chunk_gen,
                     Some(acc) => acc + chunk_gen,
                 });
 
-                if let Some(ref acc) = acc_gen {
-                    let generation = Generation::from(acc.clone());
-                    if let Ok(parsed) = self.parse_result(&[generation], true) {
-                        let should_yield = match &prev_parsed {
-                            Some(prev) => parsed != *prev,
-                            None => true,
-                        };
+                let acc = acc_gen.as_ref().expect("just assigned Some");
+                let generation = Generation::from(acc.clone());
+                let Ok(parsed) = self.parse_result(&[generation], true) else {
+                    continue;
+                };
 
-                        if should_yield {
-                            if diff_mode {
-                                yield self.compute_diff(prev_parsed.as_ref(), parsed.clone());
-                            } else {
-                                yield Ok(parsed.clone());
-                            }
-                            prev_parsed = Some(parsed);
-                        }
+                if prev_parsed.as_ref().is_none_or(|prev| parsed != *prev) {
+                    if diff_mode {
+                        yield self.compute_diff(prev_parsed.as_ref(), parsed.clone());
+                    } else {
+                        yield Ok(parsed.clone());
                     }
+                    prev_parsed = Some(parsed);
                 }
             }
         })

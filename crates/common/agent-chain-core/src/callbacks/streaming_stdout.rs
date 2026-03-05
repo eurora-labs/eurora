@@ -3,10 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use uuid::Uuid;
 
-use super::base::{
-    BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
-    RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
-};
+use super::base::BaseCallbackHandler;
 
 #[derive(Clone)]
 pub struct StreamingStdOutCallbackHandler {
@@ -37,7 +34,11 @@ impl StreamingStdOutCallbackHandler {
     }
 }
 
-impl LLMManagerMixin for StreamingStdOutCallbackHandler {
+impl BaseCallbackHandler for StreamingStdOutCallbackHandler {
+    fn name(&self) -> &str {
+        "StreamingStdOutCallbackHandler"
+    }
+
     fn on_llm_new_token(
         &self,
         token: &str,
@@ -53,18 +54,6 @@ impl LLMManagerMixin for StreamingStdOutCallbackHandler {
                 tracing::warn!("StreamingStdOutCallbackHandler flush error: {e}");
             }
         }
-    }
-}
-
-impl ChainManagerMixin for StreamingStdOutCallbackHandler {}
-impl ToolManagerMixin for StreamingStdOutCallbackHandler {}
-impl RetrieverManagerMixin for StreamingStdOutCallbackHandler {}
-impl CallbackManagerMixin for StreamingStdOutCallbackHandler {}
-impl RunManagerMixin for StreamingStdOutCallbackHandler {}
-
-impl BaseCallbackHandler for StreamingStdOutCallbackHandler {
-    fn name(&self) -> &str {
-        "StreamingStdOutCallbackHandler"
     }
 }
 
