@@ -1,130 +1,119 @@
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use async_trait::async_trait;
 
 use agent_chain_core::GenericFakeChatModel;
 use agent_chain_core::language_models::{BaseChatModel, ChatModelConfig, LanguageModelInput};
 use agent_chain_core::messages::AIMessage;
-use agent_chain_core::rate_limiters::InMemoryRateLimiter;
+use agent_chain_core::rate_limiters::BaseRateLimiter;
 
-fn make_rate_limited_model(
-    messages: Vec<AIMessage>,
-    requests_per_second: f64,
-    check_every_n_seconds: f64,
-    max_bucket_size: f64,
-) -> GenericFakeChatModel {
-    let rate_limiter = Arc::new(
-        InMemoryRateLimiter::builder()
-            .requests_per_second(requests_per_second)
-            .check_every_n_seconds(check_every_n_seconds)
-            .max_bucket_size(max_bucket_size)
-            .build(),
-    );
+struct CountingRateLimiter {
+    acquire_count: AtomicUsize,
+    aacquire_count: AtomicUsize,
+}
+
+impl CountingRateLimiter {
+    fn new() -> Self {
+        Self {
+            acquire_count: AtomicUsize::new(0),
+            aacquire_count: AtomicUsize::new(0),
+        }
+    }
+
+    fn acquire_count(&self) -> usize {
+        self.acquire_count.load(Ordering::SeqCst)
+    }
+
+    fn aacquire_count(&self) -> usize {
+        self.aacquire_count.load(Ordering::SeqCst)
+    }
+}
+
+#[async_trait]
+impl BaseRateLimiter for CountingRateLimiter {
+    fn acquire(&self, _blocking: bool) -> bool {
+        self.acquire_count.fetch_add(1, Ordering::SeqCst);
+        true
+    }
+
+    async fn aacquire(&self, _blocking: bool) -> bool {
+        self.aacquire_count.fetch_add(1, Ordering::SeqCst);
+        true
+    }
+}
+
+fn make_model(messages: Vec<AIMessage>, limiter: Arc<CountingRateLimiter>) -> GenericFakeChatModel {
     let config = ChatModelConfig::builder()
-        .rate_limiter(rate_limiter)
+        .rate_limiter(limiter as Arc<dyn BaseRateLimiter>)
+        .cache(false)
         .build();
     GenericFakeChatModel::from_vec(messages).with_config(config)
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_rate_limit_invoke() {
-    let model = make_rate_limited_model(
+    let limiter = Arc::new(CountingRateLimiter::new());
+    let model = make_model(
         vec![
             AIMessage::builder().content("hello").build(),
             AIMessage::builder().content("world").build(),
         ],
-        20.0,
-        0.1,
-        1.0,
+        limiter.clone(),
     );
 
-    let tic = Instant::now();
     let _ = model
         .invoke(LanguageModelInput::from("foo"), None)
         .await
         .unwrap();
-    let elapsed = tic.elapsed();
-    assert!(
-        elapsed < Duration::from_millis(50),
-        "First call took {:?}, expected < 50ms (burst token available)",
-        elapsed
-    );
+    assert_eq!(limiter.acquire_count(), 1);
 
-    let tic = Instant::now();
     let _ = model
         .invoke(LanguageModelInput::from("bar"), None)
         .await
         .unwrap();
-    let elapsed = tic.elapsed();
-    assert!(
-        elapsed >= Duration::from_millis(30),
-        "Second call took {:?}, expected >= 30ms (must wait for replenishment)",
-        elapsed
-    );
+    assert_eq!(limiter.acquire_count(), 2);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_rate_limit_ainvoke() {
-    let model = make_rate_limited_model(
+    let limiter = Arc::new(CountingRateLimiter::new());
+    let model = make_model(
         vec![
             AIMessage::builder().content("hello").build(),
             AIMessage::builder().content("world").build(),
             AIMessage::builder().content("!").build(),
         ],
-        20.0,
-        0.1,
-        1.0,
+        limiter.clone(),
     );
 
-    let tic = Instant::now();
     let _ = model
         .ainvoke(LanguageModelInput::from("foo"), None)
         .await
         .unwrap();
-    let elapsed = tic.elapsed();
-    assert!(
-        elapsed < Duration::from_millis(50),
-        "First call took {:?}, expected < 50ms",
-        elapsed
-    );
+    assert_eq!(limiter.aacquire_count(), 1);
 
-    let tic = Instant::now();
     let _ = model
         .ainvoke(LanguageModelInput::from("bar"), None)
         .await
         .unwrap();
-    let elapsed = tic.elapsed();
-    assert!(
-        elapsed >= Duration::from_millis(30),
-        "Second call took {:?}, expected >= 30ms",
-        elapsed
-    );
+    assert_eq!(limiter.aacquire_count(), 2);
 
-    let tic = Instant::now();
     let _ = model
         .ainvoke(LanguageModelInput::from("baz"), None)
         .await
         .unwrap();
-    let elapsed = tic.elapsed();
-    assert!(
-        elapsed >= Duration::from_millis(30),
-        "Third call took {:?}, expected >= 30ms",
-        elapsed
-    );
+    assert_eq!(limiter.aacquire_count(), 3);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_rate_limit_skips_cache() {
     use agent_chain_core::caches::InMemoryCache;
 
     let cache = Arc::new(InMemoryCache::unbounded());
-    let rate_limiter = Arc::new(
-        InMemoryRateLimiter::builder()
-            .requests_per_second(20.0)
-            .check_every_n_seconds(0.1)
-            .build(),
-    );
+    let limiter = Arc::new(CountingRateLimiter::new());
     let config = ChatModelConfig::builder()
-        .rate_limiter(rate_limiter)
+        .rate_limiter(limiter.clone() as Arc<dyn BaseRateLimiter>)
         .cache_instance(cache.clone())
         .build();
 
@@ -135,148 +124,96 @@ async fn test_rate_limit_skips_cache() {
     ])
     .with_config(config);
 
-    let tic = Instant::now();
     let _ = model
         .invoke(LanguageModelInput::from("foo"), None)
         .await
         .unwrap();
-    let elapsed = tic.elapsed();
-    assert!(
-        elapsed < Duration::from_millis(50),
-        "First call took {:?}, expected < 50ms (burst token)",
-        elapsed
-    );
+    assert_eq!(limiter.acquire_count(), 1);
 
-    for i in 0..2 {
-        let tic = Instant::now();
+    for _ in 0..3 {
         let _ = model
             .invoke(LanguageModelInput::from("foo"), None)
             .await
             .unwrap();
-        let elapsed = tic.elapsed();
-        assert!(
-            elapsed < Duration::from_millis(50),
-            "Cache hit {} took {:?}, expected < 50ms",
-            i + 1,
-            elapsed
-        );
     }
+    assert_eq!(
+        limiter.acquire_count(),
+        1,
+        "cache hits must skip rate limiter"
+    );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_rate_limit_stream() {
-    let model = make_rate_limited_model(
+    let limiter = Arc::new(CountingRateLimiter::new());
+    let model = make_model(
         vec![
             AIMessage::builder().content("hello world").build(),
             AIMessage::builder().content("hello world").build(),
             AIMessage::builder().content("hello world").build(),
         ],
-        20.0,
-        0.1,
-        1.0,
+        limiter.clone(),
     );
 
-    let tic = Instant::now();
     let result = model
         .invoke(LanguageModelInput::from("foo"), None)
         .await
         .unwrap();
-    let elapsed = tic.elapsed();
     assert!(result.content.contains("hello"));
-    assert!(
-        elapsed < Duration::from_millis(50),
-        "First invoke took {:?}, expected < 50ms",
-        elapsed
-    );
+    assert_eq!(limiter.acquire_count(), 1);
 
-    let tic = Instant::now();
     let _ = model
         .invoke(LanguageModelInput::from("bar"), None)
         .await
         .unwrap();
-    let elapsed = tic.elapsed();
-    assert!(
-        elapsed >= Duration::from_millis(30),
-        "Second invoke took {:?}, expected >= 30ms",
-        elapsed
-    );
+    assert_eq!(limiter.acquire_count(), 2);
 
-    let tic = Instant::now();
     let _ = model
         .invoke(LanguageModelInput::from("baz"), None)
         .await
         .unwrap();
-    let elapsed = tic.elapsed();
-    assert!(
-        elapsed >= Duration::from_millis(30),
-        "Third invoke took {:?}, expected >= 30ms",
-        elapsed
-    );
+    assert_eq!(limiter.acquire_count(), 3);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_rate_limit_astream() {
-    let model = make_rate_limited_model(
+    let limiter = Arc::new(CountingRateLimiter::new());
+    let model = make_model(
         vec![
             AIMessage::builder().content("hello world").build(),
             AIMessage::builder().content("hello world").build(),
             AIMessage::builder().content("hello world").build(),
         ],
-        20.0,
-        0.1,
-        1.0,
+        limiter.clone(),
     );
 
-    let tic = Instant::now();
     let _ = model
         .ainvoke(LanguageModelInput::from("foo"), None)
         .await
         .unwrap();
-    let elapsed = tic.elapsed();
-    assert!(
-        elapsed < Duration::from_millis(50),
-        "First call took {:?}, expected < 50ms",
-        elapsed
-    );
+    assert_eq!(limiter.aacquire_count(), 1);
 
-    let tic = Instant::now();
     let _ = model
         .ainvoke(LanguageModelInput::from("bar"), None)
         .await
         .unwrap();
-    let elapsed = tic.elapsed();
-    assert!(
-        elapsed >= Duration::from_millis(30),
-        "Second call took {:?}, expected >= 30ms",
-        elapsed
-    );
+    assert_eq!(limiter.aacquire_count(), 2);
 
-    let tic = Instant::now();
     let _ = model
         .ainvoke(LanguageModelInput::from("baz"), None)
         .await
         .unwrap();
-    let elapsed = tic.elapsed();
-    assert!(
-        elapsed >= Duration::from_millis(30),
-        "Third call took {:?}, expected >= 30ms",
-        elapsed
-    );
+    assert_eq!(limiter.aacquire_count(), 3);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_rate_limit_skips_cache_async() {
     use agent_chain_core::caches::InMemoryCache;
 
     let cache = Arc::new(InMemoryCache::unbounded());
-    let rate_limiter = Arc::new(
-        InMemoryRateLimiter::builder()
-            .requests_per_second(20.0)
-            .check_every_n_seconds(0.1)
-            .build(),
-    );
+    let limiter = Arc::new(CountingRateLimiter::new());
     let config = ChatModelConfig::builder()
-        .rate_limiter(rate_limiter)
+        .rate_limiter(limiter.clone() as Arc<dyn BaseRateLimiter>)
         .cache_instance(cache.clone())
         .build();
 
@@ -287,30 +224,21 @@ async fn test_rate_limit_skips_cache_async() {
     ])
     .with_config(config);
 
-    let tic = Instant::now();
     let _ = model
         .ainvoke(LanguageModelInput::from("foo"), None)
         .await
         .unwrap();
-    let elapsed = tic.elapsed();
-    assert!(
-        elapsed < Duration::from_millis(50),
-        "First call took {:?}, expected < 50ms (burst token)",
-        elapsed
-    );
+    assert_eq!(limiter.aacquire_count(), 1);
 
-    for i in 0..2 {
-        let tic = Instant::now();
+    for _ in 0..3 {
         let _ = model
             .ainvoke(LanguageModelInput::from("foo"), None)
             .await
             .unwrap();
-        let elapsed = tic.elapsed();
-        assert!(
-            elapsed < Duration::from_millis(50),
-            "Cache hit {} took {:?}, expected < 50ms",
-            i + 1,
-            elapsed
-        );
     }
+    assert_eq!(
+        limiter.aacquire_count(),
+        1,
+        "cache hits must skip rate limiter"
+    );
 }

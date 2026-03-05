@@ -1,10 +1,7 @@
+use agent_chain_core::callbacks::BaseCallbackHandler;
 use agent_chain_core::callbacks::Callbacks;
-use agent_chain_core::callbacks::base::{
-    BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
-    RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
-};
 use agent_chain_core::callbacks::manager::{
-    AsyncCallbackManager, CallbackManager, adispatch_custom_event, dispatch_custom_event,
+    CallbackManager, adispatch_custom_event, dispatch_custom_event,
 };
 use agent_chain_core::runnables::base::Runnable;
 use agent_chain_core::runnables::config::get_callback_manager_for_config;
@@ -13,13 +10,6 @@ use std::sync::Arc;
 
 #[derive(Debug, Default)]
 struct FakeHandler;
-
-impl LLMManagerMixin for FakeHandler {}
-impl ChainManagerMixin for FakeHandler {}
-impl ToolManagerMixin for FakeHandler {}
-impl RetrieverManagerMixin for FakeHandler {}
-impl CallbackManagerMixin for FakeHandler {}
-impl RunManagerMixin for FakeHandler {}
 
 impl BaseCallbackHandler for FakeHandler {
     fn name(&self) -> &str {
@@ -45,13 +35,13 @@ fn test_custom_event_root_dispatch() {
 
 #[tokio::test]
 async fn test_async_custom_event_root_dispatch() {
-    let manager = AsyncCallbackManager::new();
+    let manager = CallbackManager::new();
     let result = adispatch_custom_event("event1", &serde_json::json!({"x": 1}), &manager).await;
 
     assert!(result.is_ok());
 
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-    let mut manager = AsyncCallbackManager::new();
+    let mut manager = CallbackManager::new();
     manager.add_handler(handler, true);
 
     let result = adispatch_custom_event("event1", &serde_json::json!({"x": 1}), &manager).await;
@@ -73,7 +63,7 @@ fn test_sync_callback_manager() {
     });
 
     let config = RunnableConfig {
-        callbacks: Some(Callbacks::from_handlers(vec![handler])),
+        callbacks: Some(Callbacks::from(vec![handler])),
         ..Default::default()
     };
 
@@ -96,7 +86,7 @@ async fn test_async_callback_manager() {
     });
 
     let config = RunnableConfig {
-        callbacks: Some(Callbacks::from_handlers(vec![handler])),
+        callbacks: Some(Callbacks::from(vec![handler])),
         ..Default::default()
     };
 
@@ -114,7 +104,7 @@ fn test_runnable_lambda_callback_lifecycle() {
     let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
 
     let config = RunnableConfig {
-        callbacks: Some(Callbacks::from_handlers(vec![handler])),
+        callbacks: Some(Callbacks::from(vec![handler])),
         ..Default::default()
     };
 
@@ -136,7 +126,7 @@ fn test_runnable_lambda_callback_error_lifecycle() {
         .build();
 
     let config = RunnableConfig {
-        callbacks: Some(Callbacks::from_handlers(vec![handler])),
+        callbacks: Some(Callbacks::from(vec![handler])),
         ..Default::default()
     };
 
@@ -147,7 +137,7 @@ fn test_runnable_lambda_callback_error_lifecycle() {
 #[test]
 fn test_dispatch_custom_event_no_handlers() {
     let mut manager = CallbackManager::new();
-    manager.parent_run_id = Some(uuid::Uuid::nil());
+    manager.set_parent_run_id(Some(uuid::Uuid::nil()));
 
     let result = dispatch_custom_event("event1", &serde_json::json!({"x": 1}), &manager);
     assert!(result.is_ok());
@@ -155,7 +145,7 @@ fn test_dispatch_custom_event_no_handlers() {
 
 #[tokio::test]
 async fn test_adispatch_custom_event_no_handlers() {
-    let manager = AsyncCallbackManager::new();
+    let manager = CallbackManager::new();
 
     let result = adispatch_custom_event("event1", &serde_json::json!({"x": 1}), &manager).await;
     assert!(result.is_ok());

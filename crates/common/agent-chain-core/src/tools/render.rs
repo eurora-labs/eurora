@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::sync::Arc;
 
 use super::base::BaseTool;
@@ -5,30 +6,33 @@ use super::base::BaseTool;
 pub type ToolsRenderer = fn(&[Arc<dyn BaseTool>]) -> String;
 
 pub fn render_text_description(tools: &[Arc<dyn BaseTool>]) -> String {
-    let descriptions: Vec<String> = tools
-        .iter()
-        .map(|tool| format!("{} - {}", tool.name(), tool.description()))
-        .collect();
-
-    descriptions.join("\n")
+    let mut out = String::new();
+    for (i, tool) in tools.iter().enumerate() {
+        if i > 0 {
+            out.push('\n');
+        }
+        write!(out, "{} - {}", tool.name(), tool.description()).unwrap();
+    }
+    out
 }
 
 pub fn render_text_description_and_args(tools: &[Arc<dyn BaseTool>]) -> String {
-    let tool_strings: Vec<String> = tools
-        .iter()
-        .map(|tool| {
-            let args_schema =
-                serde_json::to_string(&tool.args()).unwrap_or_else(|_| "{}".to_string());
-            format!(
-                "{} - {}, args: {}",
-                tool.name(),
-                tool.description(),
-                args_schema
-            )
-        })
-        .collect();
-
-    tool_strings.join("\n")
+    let mut out = String::new();
+    for (i, tool) in tools.iter().enumerate() {
+        if i > 0 {
+            out.push('\n');
+        }
+        let args_schema = serde_json::to_string(&tool.args()).unwrap_or_else(|_| "{}".to_string());
+        write!(
+            out,
+            "{} - {}, args: {}",
+            tool.name(),
+            tool.description(),
+            args_schema
+        )
+        .unwrap();
+    }
+    out
 }
 
 #[cfg(test)]

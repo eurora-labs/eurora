@@ -1,32 +1,70 @@
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 use crate::prompt_values::{PromptValue, StringPromptValue};
+use crate::runnables::config::{RunnableConfig, ensure_config};
 
-pub type FormatOutputType = String;
+#[derive(Clone)]
+pub struct PartialValue(Arc<dyn Fn() -> String + Send + Sync>);
 
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct PromptTemplateConfig {
-    pub input_variables: Vec<String>,
+impl PartialValue {
+    pub fn from_fn(f: impl Fn() -> String + Send + Sync + 'static) -> Self {
+        Self(Arc::new(f))
+    }
 
-    #[serde(default)]
-    pub optional_variables: Vec<String>,
+    pub fn resolve(&self) -> String {
+        (self.0)()
+    }
+}
 
-    #[serde(default)]
-    pub input_types: HashMap<String, String>,
+impl From<String> for PartialValue {
+    fn from(s: String) -> Self {
+        Self(Arc::new(move || s.clone()))
+    }
+}
 
-    #[serde(default)]
-    pub partial_variables: HashMap<String, String>,
+impl From<&str> for PartialValue {
+    fn from(s: &str) -> Self {
+        let s = s.to_string();
+        Self(Arc::new(move || s.clone()))
+    }
+}
 
-    #[serde(default)]
-    pub metadata: Option<HashMap<String, serde_json::Value>>,
+impl std::fmt::Debug for PartialValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PartialValue(\"{}\")", self.resolve())
+    }
+}
 
-    #[serde(default)]
-    pub tags: Option<Vec<String>>,
+pub fn resolve_partials(partials: &HashMap<String, PartialValue>) -> HashMap<String, String> {
+    partials
+        .iter()
+        .map(|(k, v)| (k.clone(), v.resolve()))
+        .collect()
+}
+
+pub(super) fn merge_prompt_config(
+    config: Option<RunnableConfig>,
+    metadata: Option<&HashMap<String, serde_json::Value>>,
+    tags: Option<&[String]>,
+) -> Option<RunnableConfig> {
+    if metadata.is_none() && tags.is_none() {
+        return config;
+    }
+    let mut config = ensure_config(config);
+    if let Some(m) = metadata {
+        config
+            .metadata
+            .extend(m.iter().map(|(k, v)| (k.clone(), v.clone())));
+    }
+    if let Some(t) = tags {
+        config.tags.extend(t.iter().cloned());
+    }
+    Some(config)
 }
 
 pub trait BasePromptTemplate: Send + Sync {
@@ -42,10 +80,8 @@ pub trait BasePromptTemplate: Send + Sync {
         &EMPTY
     }
 
-    fn partial_variables(&self) -> &HashMap<String, String> {
-        static EMPTY: std::sync::LazyLock<HashMap<String, String>> =
-            std::sync::LazyLock::new(HashMap::new);
-        &EMPTY
+    fn partial_variables(&self) -> HashMap<String, String> {
+        HashMap::new()
     }
 
     fn metadata(&self) -> Option<&HashMap<String, serde_json::Value>> {
@@ -56,13 +92,12 @@ pub trait BasePromptTemplate: Send + Sync {
         None
     }
 
-    fn format(&self, kwargs: &HashMap<String, String>) -> Result<FormatOutputType>;
+    fn format(&self, kwargs: &HashMap<String, String>) -> Result<String>;
 
     fn aformat(
         &self,
         kwargs: &HashMap<String, String>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<FormatOutputType>> + Send + '_>>
-    {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send + '_>> {
         let result = self.format(kwargs);
         Box::pin(async move { result })
     }
@@ -82,7 +117,8 @@ pub trait BasePromptTemplate: Send + Sync {
         Box::pin(async move { result })
     }
 
-    fn partial(&self, kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>>;
+    fn partial(&self, kwargs: HashMap<String, PartialValue>)
+    -> Result<Box<dyn BasePromptTemplate>>;
 
     fn prompt_type(&self) -> &str;
 
@@ -95,7 +131,8 @@ pub trait BasePromptTemplate: Send + Sync {
             ));
         }
 
-        if self.partial_variables().contains_key("stop") {
+        let partial = self.partial_variables();
+        if partial.contains_key("stop") {
             return Err(Error::InvalidConfig(
                 "Cannot have a partial variable named 'stop', as it is used internally. \
                  Please rename."
@@ -105,8 +142,7 @@ pub trait BasePromptTemplate: Send + Sync {
 
         let input_set: std::collections::HashSet<_> =
             self.input_variables().iter().cloned().collect();
-        let partial_set: std::collections::HashSet<_> =
-            self.partial_variables().keys().cloned().collect();
+        let partial_set: std::collections::HashSet<_> = partial.keys().cloned().collect();
 
         let overlap: Vec<_> = input_set.intersection(&partial_set).collect();
         if !overlap.is_empty() {
@@ -146,7 +182,7 @@ pub trait BasePromptTemplate: Send + Sync {
         &self,
         kwargs: &HashMap<String, String>,
     ) -> HashMap<String, String> {
-        let mut merged = self.partial_variables().clone();
+        let mut merged = self.partial_variables();
         merged.extend(kwargs.clone());
         merged
     }
@@ -186,7 +222,7 @@ pub trait BasePromptTemplate: Send + Sync {
             }
             _ => {
                 return Err(Error::InvalidConfig(format!(
-                    "{} must be json or yaml",
+                    "Unsupported file extension for '{}'. Only .json is supported.",
                     file_path.display()
                 )));
             }
@@ -282,7 +318,7 @@ mod tests {
             &self.input_variables
         }
 
-        fn format(&self, kwargs: &HashMap<String, String>) -> Result<FormatOutputType> {
+        fn format(&self, kwargs: &HashMap<String, String>) -> Result<String> {
             let mut result = self.template.clone();
             for (key, value) in kwargs {
                 result = result.replace(&format!("{{{}}}", key), value);
@@ -290,16 +326,20 @@ mod tests {
             Ok(result)
         }
 
-        fn partial(&self, kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>> {
+        fn partial(
+            &self,
+            kwargs: HashMap<String, PartialValue>,
+        ) -> Result<Box<dyn BasePromptTemplate>> {
+            let resolved: HashMap<String, String> = resolve_partials(&kwargs);
             let new_vars: Vec<_> = self
                 .input_variables
                 .iter()
-                .filter(|v| !kwargs.contains_key(*v))
+                .filter(|v| !resolved.contains_key(*v))
                 .cloned()
                 .collect();
 
             let mut new_template = self.template.clone();
-            for (key, value) in &kwargs {
+            for (key, value) in &resolved {
                 new_template = new_template.replace(&format!("{{{}}}", key), value);
             }
 

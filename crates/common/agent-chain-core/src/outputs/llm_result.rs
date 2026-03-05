@@ -1,19 +1,50 @@
 use bon::bon;
+use serde::de::{self, Deserializer};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
-use super::chat_generation::{ChatGeneration, ChatGenerationChunk};
-use super::generation::{Generation, GenerationChunk};
+use super::chat_generation::{
+    CHAT_GENERATION_CHUNK_TYPE, CHAT_GENERATION_TYPE, ChatGeneration, ChatGenerationChunk,
+};
+use super::generation::{GENERATION_TYPE, Generation, GenerationChunk};
 use super::run_info::RunInfo;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(untagged)]
 pub enum GenerationType {
     Generation(Generation),
     GenerationChunk(GenerationChunk),
     ChatGeneration(ChatGeneration),
     ChatGenerationChunk(ChatGenerationChunk),
+}
+
+impl<'de> Deserialize<'de> for GenerationType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+
+        let type_str = value
+            .get("type")
+            .and_then(|v| v.as_str())
+            .unwrap_or(GENERATION_TYPE);
+
+        let has_message = value.get("message").is_some();
+
+        match (type_str, has_message) {
+            (CHAT_GENERATION_CHUNK_TYPE, true) => serde_json::from_value(value.clone())
+                .map(GenerationType::ChatGenerationChunk)
+                .map_err(de::Error::custom),
+            (CHAT_GENERATION_TYPE, true) | (_, true) => serde_json::from_value(value.clone())
+                .map(GenerationType::ChatGeneration)
+                .map_err(de::Error::custom),
+            _ => serde_json::from_value(value.clone())
+                .map(GenerationType::Generation)
+                .map_err(de::Error::custom),
+        }
+    }
 }
 
 impl From<Generation> for GenerationType {
@@ -40,6 +71,8 @@ impl From<ChatGenerationChunk> for GenerationType {
     }
 }
 
+pub const LLM_RESULT_TYPE: &str = "LLMResult";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LLMResult {
     pub generations: Vec<Vec<GenerationType>>,
@@ -55,7 +88,7 @@ pub struct LLMResult {
 }
 
 fn default_llm_result_type() -> String {
-    "LLMResult".to_string()
+    LLM_RESULT_TYPE.to_string()
 }
 
 #[bon]
@@ -69,7 +102,7 @@ impl LLMResult {
             generations,
             llm_output,
             run: None,
-            result_type: "LLMResult".to_string(),
+            result_type: LLM_RESULT_TYPE.to_string(),
         }
     }
 
@@ -82,7 +115,7 @@ impl LLMResult {
                     generations: vec![gen_list.clone()],
                     llm_output: self.llm_output.clone(),
                     run: None,
-                    result_type: "LLMResult".to_string(),
+                    result_type: LLM_RESULT_TYPE.to_string(),
                 });
             } else {
                 let llm_output = if let Some(ref output) = self.llm_output {
@@ -96,7 +129,7 @@ impl LLMResult {
                     generations: vec![gen_list.clone()],
                     llm_output,
                     run: None,
-                    result_type: "LLMResult".to_string(),
+                    result_type: LLM_RESULT_TYPE.to_string(),
                 });
             }
         }
@@ -105,6 +138,8 @@ impl LLMResult {
     }
 }
 
+/// Mirrors Python's LLMResult.__eq__: ignores run metadata so that
+/// two results with different run IDs but identical outputs compare equal.
 impl PartialEq for LLMResult {
     fn eq(&self, other: &Self) -> bool {
         self.generations == other.generations
@@ -119,7 +154,7 @@ impl Default for LLMResult {
             generations: Vec::new(),
             llm_output: None,
             run: None,
-            result_type: "LLMResult".to_string(),
+            result_type: LLM_RESULT_TYPE.to_string(),
         }
     }
 }
@@ -198,5 +233,37 @@ mod tests {
             .build();
         let json = serde_json::to_string(&result).unwrap();
         assert!(json.contains("\"type\":\"LLMResult\""));
+    }
+
+    #[test]
+    fn test_generation_type_deserialize_chat_generation() {
+        let msg = AIMessage::builder().content("Hello").build();
+        let chat_gen = ChatGeneration::builder().message(msg.into()).build();
+        let gen_type = GenerationType::ChatGeneration(chat_gen);
+        let json = serde_json::to_value(&gen_type).unwrap();
+        let deserialized: GenerationType = serde_json::from_value(json).unwrap();
+        assert!(matches!(deserialized, GenerationType::ChatGeneration(_)));
+    }
+
+    #[test]
+    fn test_generation_type_deserialize_chat_generation_chunk() {
+        let msg = AIMessage::builder().content("Hello").build();
+        let chunk = ChatGenerationChunk::builder().message(msg.into()).build();
+        let gen_type = GenerationType::ChatGenerationChunk(chunk);
+        let json = serde_json::to_value(&gen_type).unwrap();
+        let deserialized: GenerationType = serde_json::from_value(json).unwrap();
+        assert!(matches!(
+            deserialized,
+            GenerationType::ChatGenerationChunk(_)
+        ));
+    }
+
+    #[test]
+    fn test_generation_type_deserialize_generation() {
+        let generation = Generation::builder().text("Hello").build();
+        let gen_type = GenerationType::Generation(generation);
+        let json = serde_json::to_value(&gen_type).unwrap();
+        let deserialized: GenerationType = serde_json::from_value(json).unwrap();
+        assert!(matches!(deserialized, GenerationType::Generation(_)));
     }
 }

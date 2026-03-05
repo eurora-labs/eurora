@@ -18,7 +18,10 @@ fn load_env() {
 
 async fn test_init_model_not_found() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new("non-existent-model-xyz-12345").validate_model_on_init(true);
+    let llm = ChatOllama::builder()
+        .model("non-existent-model-xyz-12345")
+        .validate_model_on_init(true)
+        .build();
 
     let result = llm.validate_model().await;
     assert!(
@@ -40,9 +43,11 @@ async fn test_init_model_not_found() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_init_connection_error() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOllama::new("any-model")
+    let llm = ChatOllama::builder()
+        .model("any-model")
         .base_url("http://localhost:1")
-        .validate_model_on_init(true);
+        .validate_model_on_init(true)
+        .build();
 
     let result = llm.validate_model().await;
     assert!(
@@ -66,9 +71,11 @@ async fn test_init_connection_error() -> Result<(), Box<dyn std::error::Error>> 
 async fn test_init_response_error() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     // Point to a URL that returns HTTP errors (not an Ollama server)
-    let llm = ChatOllama::new("any-model")
+    let llm = ChatOllama::builder()
+        .model("any-model")
         .base_url("http://httpbin.org/status/500")
-        .validate_model_on_init(true);
+        .validate_model_on_init(true)
+        .build();
 
     let result = llm.validate_model().await;
     assert!(
@@ -99,7 +106,10 @@ async fn test_structured_output_function_calling() -> Result<(), Box<dyn std::er
         "required": ["setup", "punchline"]
     });
 
-    let llm = ChatOllama::new(REASONING_MODEL).temperature(0.0);
+    let llm = ChatOllama::builder()
+        .model(REASONING_MODEL)
+        .temperature(0.0)
+        .build();
     let structured = llm.with_structured_output(joke_schema, false)?;
     let result = structured
         .ainvoke(
@@ -138,9 +148,11 @@ async fn test_structured_output_json_schema() -> Result<(), Box<dyn std::error::
     // json_schema method uses Ollama's format parameter instead of tool calling.
     // In Rust this requires with_structured_output_options with method="json_schema".
     // For now, use the format builder + JSON parsing to match the Python behavior.
-    let llm_with_format = ChatOllama::new(DEFAULT_MODEL)
+    let llm_with_format = ChatOllama::builder()
+        .model(DEFAULT_MODEL)
         .temperature(0.0)
-        .format(OllamaFormat::JsonSchema(joke_schema.clone()));
+        .format(OllamaFormat::JsonSchema(joke_schema.clone()))
+        .build();
 
     let response = llm_with_format
         .invoke(
@@ -185,7 +197,10 @@ async fn test_structured_output_deeply_nested() -> Result<(), Box<dyn std::error
         "required": ["people"]
     });
 
-    let llm = ChatOllama::new(DEFAULT_MODEL).temperature(0.0);
+    let llm = ChatOllama::builder()
+        .model(DEFAULT_MODEL)
+        .temperature(0.0)
+        .build();
     let structured = llm.with_structured_output(data_schema, false)?;
 
     let result = structured
@@ -323,7 +338,10 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
         "required": ["location"]
     });
 
-    let llm = ChatOllama::new(REASONING_MODEL).reasoning(serde_json::json!("low"));
+    let llm = ChatOllama::builder()
+        .model(REASONING_MODEL)
+        .reasoning(serde_json::json!("low"))
+        .build();
     let llm_with_tools = BaseChatModel::bind_tools(&llm, &[ToolLike::Schema(weather_tool)], None)?;
 
     let input_message: BaseMessage = HumanMessage::builder()
@@ -399,9 +417,11 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
         "required": ["location"]
     });
 
-    let llm = ChatOllama::new(REASONING_MODEL)
+    let llm = ChatOllama::builder()
+        .model(REASONING_MODEL)
         .output_version("v1")
-        .reasoning(serde_json::json!("low"));
+        .reasoning(serde_json::json!("low"))
+        .build();
     let llm_with_tools = BaseChatModel::bind_tools(&llm, &[ToolLike::Schema(weather_tool)], None)?;
 
     let input_message: BaseMessage = HumanMessage::builder()

@@ -1,9 +1,7 @@
 use std::collections::HashMap;
-use std::pin::Pin;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use futures::Stream;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -314,10 +312,6 @@ pub trait BaseLanguageModel: Send + Sync {
             .sum()
     }
 }
-
-#[allow(dead_code)]
-pub type LanguageModelOutputStream =
-    Pin<Box<dyn Stream<Item = Result<LanguageModelOutput>> + Send>>;
 
 pub type LanguageModelLike = Arc<
     dyn crate::runnables::base::Runnable<Input = LanguageModelInput, Output = LanguageModelOutput>,

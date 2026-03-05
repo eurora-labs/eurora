@@ -45,9 +45,7 @@ impl FakeListLLM {
         if let Some(instance) = cache_instance {
             config.cache_instance = Some(instance);
         }
-        if let Some(cache) = cache {
-            config.base.cache = Some(cache);
-        }
+        config.base.cache = Some(cache.unwrap_or(false));
         Self {
             responses,
             sleep,
@@ -57,7 +55,7 @@ impl FakeListLLM {
     }
 
     pub fn current_index(&self) -> usize {
-        self.index.load(Ordering::SeqCst)
+        self.index.load(Ordering::SeqCst) % self.responses.len()
     }
 
     pub fn reset(&self) {
@@ -65,17 +63,8 @@ impl FakeListLLM {
     }
 
     fn get_next_response(&self) -> String {
-        let i = self.index.load(Ordering::SeqCst);
-        let response = self.responses.get(i).cloned().unwrap_or_default();
-
-        let next_i = if i + 1 < self.responses.len() {
-            i + 1
-        } else {
-            0
-        };
-        self.index.store(next_i, Ordering::SeqCst);
-
-        response
+        let i = self.index.fetch_add(1, Ordering::SeqCst) % self.responses.len();
+        self.responses[i].clone()
     }
 }
 

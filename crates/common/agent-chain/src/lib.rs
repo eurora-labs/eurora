@@ -234,19 +234,13 @@ impl ChatModelBuilder {
             }
             #[cfg(feature = "openai")]
             "openai" | "azure_openai" => {
-                let mut model = openai::ChatOpenAI::new(_model_name);
-                if let Some(temp) = self.temperature {
-                    model = model.temperature(temp);
-                }
-                if let Some(max) = self.max_tokens {
-                    model = model.max_tokens(max);
-                }
-                if let Some(key) = self.api_key {
-                    model = model.api_key(key);
-                }
-                if let Some(base) = self.api_base {
-                    model = model.api_base(base);
-                }
+                let model = openai::ChatOpenAI::builder()
+                    .model(_model_name)
+                    .maybe_temperature(self.temperature)
+                    .maybe_max_tokens(self.max_tokens)
+                    .maybe_api_key(self.api_key)
+                    .maybe_api_base(self.api_base)
+                    .build();
                 Ok(Arc::new(model))
             }
             _ => Err(Error::unsupported_provider(provider)),

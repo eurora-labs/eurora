@@ -226,7 +226,7 @@ mod tests {
         let data = vec![serde_json::json!({"key": "value"})];
         let docs = splitter.create_documents(&data, false, None).unwrap();
         assert_eq!(docs.len(), 1);
-        assert!(docs[0].page_content.contains("key"));
+        assert!(docs[0].page_content().contains("key"));
     }
 
     #[test]

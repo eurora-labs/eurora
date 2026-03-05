@@ -147,10 +147,121 @@ impl PngDrawer {
         (first, last)
     }
 
+    #[cfg(feature = "graphviz")]
+    pub fn draw(&self, graph: &Graph, output_path: Option<&Path>) -> Result<Option<Vec<u8>>> {
+        use graphviz_rust::cmd::{CommandArg, Format};
+        use graphviz_rust::dot_structures::{
+            Attribute, Edge, EdgeTy, Graph as DotGraph, Id, Node, NodeId, Stmt, Subgraph, Vertex,
+        };
+        use graphviz_rust::printer::PrinterContext;
+
+        let mut stmts: Vec<Stmt> = Vec::new();
+
+        stmts.push(Stmt::Attribute(Attribute(
+            Id::Plain("nodesep".into()),
+            Id::Plain("0.9".into()),
+        )));
+        stmts.push(Stmt::Attribute(Attribute(
+            Id::Plain("ranksep".into()),
+            Id::Plain("1.0".into()),
+        )));
+
+        let nodes = self.add_nodes(graph);
+        let (first_id, last_id) = self.styled_node_ids(graph);
+
+        for (id, attrs) in &nodes {
+            let mut node_attrs: Vec<Attribute> = Vec::new();
+            for (k, v) in attrs {
+                node_attrs.push(Attribute(Id::Plain(k.clone()), Id::Html(v.clone())));
+            }
+
+            if Some(id) == first_id.as_ref() {
+                node_attrs.push(Attribute(
+                    Id::Plain("fillcolor".into()),
+                    Id::Plain("lightblue".into()),
+                ));
+            } else if Some(id) == last_id.as_ref() {
+                node_attrs.push(Attribute(
+                    Id::Plain("fillcolor".into()),
+                    Id::Plain("orange".into()),
+                ));
+            }
+
+            stmts.push(Stmt::Node(Node {
+                id: NodeId(Id::Escaped(format!("\"{}\"", id)), None),
+                attributes: node_attrs,
+            }));
+        }
+
+        let edges = self.add_edges(graph);
+        for (source, target, attrs) in &edges {
+            let mut edge_attrs: Vec<Attribute> = Vec::new();
+            for (k, v) in attrs {
+                if k == "label" && !v.is_empty() {
+                    edge_attrs.push(Attribute(Id::Plain(k.clone()), Id::Html(v.clone())));
+                } else if k != "label" {
+                    edge_attrs.push(Attribute(Id::Plain(k.clone()), Id::Plain(v.clone())));
+                }
+            }
+
+            stmts.push(Stmt::Edge(Edge {
+                ty: EdgeTy::Pair(
+                    Vertex::N(NodeId(Id::Escaped(format!("\"{}\"", source)), None)),
+                    Vertex::N(NodeId(Id::Escaped(format!("\"{}\"", target)), None)),
+                ),
+                attributes: edge_attrs,
+            }));
+        }
+
+        let split_nodes: Vec<Vec<String>> = graph
+            .nodes
+            .keys()
+            .map(|id| id.split(':').map(String::from).collect())
+            .collect();
+        let subgraphs = self.collect_subgraphs(&split_nodes, None);
+        for (cluster_name, member_ids) in &subgraphs {
+            let sub_stmts: Vec<Stmt> = member_ids
+                .iter()
+                .map(|id| {
+                    Stmt::Node(Node {
+                        id: NodeId(Id::Escaped(format!("\"{}\"", id)), None),
+                        attributes: vec![],
+                    })
+                })
+                .collect();
+
+            stmts.push(Stmt::Subgraph(Subgraph {
+                id: Id::Plain(cluster_name.clone()),
+                stmts: sub_stmts,
+            }));
+        }
+
+        let dot_graph = DotGraph::DiGraph {
+            id: Id::Plain("G".into()),
+            strict: false,
+            stmts,
+        };
+
+        let mut args = vec![CommandArg::Format(Format::Png)];
+        if let Some(path) = output_path {
+            args.push(CommandArg::Output(path.to_string_lossy().into_owned()));
+        }
+
+        let bytes = graphviz_rust::exec(dot_graph, &mut PrinterContext::default(), args)
+            .map_err(|e| Error::Other(format!("Graphviz rendering failed: {}", e)))?;
+
+        if output_path.is_some() {
+            Ok(None)
+        } else {
+            Ok(Some(bytes))
+        }
+    }
+
+    #[cfg(not(feature = "graphviz"))]
     pub fn draw(&self, _graph: &Graph, _output_path: Option<&Path>) -> Result<Option<Vec<u8>>> {
         Err(Error::NotImplemented(
-            "PNG rendering requires a graphviz binding (not yet available). \
-             Use draw_mermaid() for text-based graph rendering."
+            "PNG rendering requires the 'graphviz' feature. \
+             Enable it with: agent-chain-core = { features = [\"graphviz\"] }"
                 .to_string(),
         ))
     }

@@ -91,8 +91,8 @@ pub use globals::{get_debug, get_llm_cache, get_verbose, set_debug, set_llm_cach
 pub use output_parsers::{
     BaseCumulativeTransformOutputParser, BaseLLMOutputParser, BaseOutputParser,
     BaseTransformOutputParser, CommaSeparatedListOutputParser, JsonOutputParser, ListOutputParser,
-    MarkdownListOutputParser, NumberedListOutputParser, ParseMatch, PydanticOutputParser,
-    SimpleJsonOutputParser, StrOutputParser, XMLOutputParser, drop_last_n,
+    MarkdownListOutputParser, NumberedListOutputParser, ParseMatch, ParserInput,
+    PydanticOutputParser, SimpleJsonOutputParser, StrOutputParser, XMLOutputParser, drop_last_n,
 };
 
 pub use outputs::{
@@ -101,18 +101,21 @@ pub use outputs::{
 };
 
 pub use callbacks::{
-    AsyncCallbackHandler, AsyncCallbackManager, AsyncCallbackManagerForChainRun,
-    AsyncCallbackManagerForLLMRun, BaseCallbackHandler, BaseCallbackManager, CallbackManager,
-    CallbackManagerForChainRun, CallbackManagerForLLMRun, Callbacks, StdOutCallbackHandler,
-    StreamingStdOutCallbackHandler, UsageMetadataCallbackHandler,
+    BaseCallbackHandler, CallbackManager, CallbackManagerForChainGroup, CallbackManagerForChainRun,
+    CallbackManagerForLLMRun, CallbackManagerForRetrieverRun, CallbackManagerForToolRun, Callbacks,
+    FileCallbackHandler, FileMode, ParentRunManager, RunManager, RunManagerCore,
+    StdOutCallbackHandler, StreamingStdOutCallbackHandler, UsageMetadataCallbackHandler,
+    adispatch_custom_event, atrace_as_chain_group, dispatch_custom_event, resolve_chain_name,
+    trace_as_chain_group,
 };
 
 pub use prompts::{
     AIMessagePromptTemplate, BaseChatPromptTemplate, BaseMessagePromptTemplate, BasePromptTemplate,
-    ChatMessagePromptTemplate, ChatPromptTemplate, DictPromptTemplate,
+    ChatMessagePromptTemplate, ChatPromptInput, ChatPromptTemplate, DictPromptTemplate,
     FewShotChatMessagePromptTemplate, FewShotPromptTemplate, FewShotPromptWithTemplates,
-    HumanMessagePromptTemplate, ImagePromptTemplate, MessagesPlaceholder, PromptTemplate,
-    PromptTemplateFormat, StringPromptTemplate, SystemMessagePromptTemplate, load_prompt,
+    HumanMessagePromptTemplate, ImagePromptTemplate, MessagePromptContentPart, MessagesPlaceholder,
+    PartialValue, PromptTemplate, PromptTemplateFormat, StringPromptTemplate,
+    SystemMessagePromptTemplate, load_prompt,
 };
 
 pub use load::{
@@ -137,9 +140,7 @@ pub use rate_limiters::{BaseRateLimiter, InMemoryRateLimiter};
 
 pub use agents::{AgentAction, AgentActionMessageLog, AgentFinish, AgentStep, ToolInput};
 
-pub use document_loaders::{
-    BaseBlobParser, BaseLoader as BaseDocumentLoader, BlobLoader, PathLike,
-};
+pub use document_loaders::{BaseBlobParser, BaseLoader as BaseDocumentLoader, BlobLoader};
 
 pub use documents::{
     BaseDocumentCompressor, BaseDocumentTransformer, Blob, BlobBuilder, BlobData, Document,
@@ -162,12 +163,12 @@ pub use stores::{BaseStore, InMemoryBaseStore, InMemoryByteStore, InMemoryStore}
 
 pub use runnables::{
     AddableDict, BaseStreamEvent, CUSTOM_EVENT_TYPE, ConfigOrList, CustomStreamEvent,
-    DynRouterRunnable, DynRunnable, EventData, PickKeys, RouterInput, RouterRunnable, Runnable,
-    RunnableAssign, RunnableAssignFluentBuilder, RunnableBinding, RunnableConfig, RunnableEach,
-    RunnableLambda, RunnableLambdaWithConfig, RunnableParallel, RunnablePassthrough, RunnablePick,
-    RunnableRetry, RunnableSequence, RunnableSerializable, StandardStreamEvent, StreamEvent,
-    coerce_to_runnable, ensure_config, get_config_list, graph_passthrough, merge_configs,
-    patch_config, pipe, runnable_lambda, to_dyn,
+    DynRouterRunnable, DynRunnable, DynRunnableSequence, EventData, PickKeys, RouterInput,
+    RouterRunnable, Runnable, RunnableAssign, RunnableAssignFluentBuilder, RunnableBinding,
+    RunnableConfig, RunnableEach, RunnableExt, RunnableLambda, RunnableLambdaWithConfig,
+    RunnableParallel, RunnablePassthrough, RunnablePick, RunnableRetry, RunnableSequence,
+    RunnableSerializable, StandardStreamEvent, StreamEvent, ensure_config, get_config_list,
+    graph_passthrough, merge_configs, patch_config, pipe, runnable_lambda, to_dyn,
 };
 
 pub use structured_query::{

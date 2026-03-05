@@ -294,7 +294,7 @@ impl BaseChatModel for ModelWithAsyncStream {
         &self,
         _messages: Vec<BaseMessage>,
         _stop: Option<Vec<String>>,
-        _run_manager: Option<&agent_chain_core::callbacks::AsyncCallbackManagerForLLMRun>,
+        _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
         let stream = async_stream::stream! {
             yield Ok(ChatGenerationChunk::builder().message(AIMessage::builder().content("a").build().into()).build());
@@ -534,7 +534,7 @@ fn test_disable_streaming_bool_true() {
 fn test_disable_streaming_bool_false() {
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::Bool(false));
 
-    let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::base::BaseCallbackHandler>> =
+    let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::BaseCallbackHandler>> =
         vec![std::sync::Arc::new(
             agent_chain_core::callbacks::StdOutCallbackHandler::new(),
         )];
@@ -546,7 +546,7 @@ fn test_disable_streaming_bool_false() {
 fn test_disable_streaming_tool_calling() {
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::ToolCalling);
 
-    let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::base::BaseCallbackHandler>> =
+    let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::BaseCallbackHandler>> =
         vec![std::sync::Arc::new(
             agent_chain_core::callbacks::StdOutCallbackHandler::new(),
         )];
@@ -558,7 +558,7 @@ fn test_disable_streaming_tool_calling() {
 
 #[tokio::test]
 async fn test_disable_streaming_async() {
-    let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::base::BaseCallbackHandler>> =
+    let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::BaseCallbackHandler>> =
         vec![std::sync::Arc::new(
             agent_chain_core::callbacks::StdOutCallbackHandler::new(),
         )];
@@ -1099,7 +1099,7 @@ fn test_should_stream_no_handlers() {
     let model = FakeListChatModel::builder()
         .responses(vec!["test".to_string()])
         .build();
-    let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::base::BaseCallbackHandler>> =
+    let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::BaseCallbackHandler>> =
         vec![];
     assert!(!model._should_stream(false, false, None, Some(&handlers)));
 }
@@ -1425,10 +1425,7 @@ async fn test_stream_injects_response_metadata() {
 
 #[tokio::test]
 async fn test_stream_callback_receives_chunk_data() {
-    use agent_chain_core::callbacks::base::{
-        BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
-        RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
-    };
+    use agent_chain_core::callbacks::BaseCallbackHandler;
     use agent_chain_core::runnables::config::RunnableConfig;
     use std::sync::{Arc, Mutex};
     use uuid::Uuid;
@@ -1446,7 +1443,11 @@ async fn test_stream_callback_receives_chunk_data() {
         }
     }
 
-    impl LLMManagerMixin for ChunkRecorder {
+    impl BaseCallbackHandler for ChunkRecorder {
+        fn name(&self) -> &str {
+            "chunk_recorder"
+        }
+
         fn on_llm_new_token(
             &self,
             _token: &str,
@@ -1455,18 +1456,6 @@ async fn test_stream_callback_receives_chunk_data() {
             chunk: Option<&serde_json::Value>,
         ) {
             self.chunks_received.lock().unwrap().push(chunk.cloned());
-        }
-    }
-
-    impl ChainManagerMixin for ChunkRecorder {}
-    impl ToolManagerMixin for ChunkRecorder {}
-    impl RetrieverManagerMixin for ChunkRecorder {}
-    impl CallbackManagerMixin for ChunkRecorder {}
-    impl RunManagerMixin for ChunkRecorder {}
-
-    impl BaseCallbackHandler for ChunkRecorder {
-        fn name(&self) -> &str {
-            "chunk_recorder"
         }
     }
 
@@ -1528,7 +1517,8 @@ async fn test_structured_output_with_raw_success() {
         .await
         .unwrap();
 
-    assert_eq!(result["parsed"], tool_args);
+    assert_eq!(result["parsed"]["name"], "test_tool");
+    assert_eq!(result["parsed"]["args"], tool_args);
     assert_eq!(result["parsing_error"], serde_json::Value::Null);
     assert!(result.get("raw").is_some());
     assert!(!result["raw"].is_null());

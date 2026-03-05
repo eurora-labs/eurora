@@ -5,30 +5,21 @@ pub mod stdout;
 pub mod streaming_stdout;
 pub mod usage;
 
-pub use base::{
-    ArcCallbackHandler, AsyncCallbackHandler, BaseCallbackHandler, BaseCallbackManager,
-    BoxedCallbackHandler, CallbackManagerMixin, Callbacks, ChainManagerMixin, LLMManagerMixin,
-    RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
-};
+pub use base::{BaseCallbackHandler, resolve_chain_name};
 
 pub use manager::{
-    AsyncCallbackManager, AsyncCallbackManagerForChainGroup, AsyncCallbackManagerForChainRun,
-    AsyncCallbackManagerForLLMRun, AsyncCallbackManagerForRetrieverRun,
-    AsyncCallbackManagerForToolRun, AsyncParentRunManager, AsyncRunManager, BaseRunManager,
     CallbackManager, CallbackManagerForChainGroup, CallbackManagerForChainRun,
-    CallbackManagerForLLMRun, CallbackManagerForRetrieverRun, CallbackManagerForToolRun,
-    ParentRunManager, RunManager, adispatch_custom_event, ahandle_event, atrace_as_chain_group,
-    dispatch_custom_event, handle_event, trace_as_chain_group,
+    CallbackManagerForLLMRun, CallbackManagerForRetrieverRun, CallbackManagerForToolRun, Callbacks,
+    ParentRunManager, RunManager, RunManagerCore, adispatch_custom_event, atrace_as_chain_group,
+    dispatch_custom_event, trace_as_chain_group,
 };
 
-pub use file::FileCallbackHandler;
+pub use file::{FileCallbackHandler, FileMode};
 
 pub use stdout::{StdOutCallbackHandler, colors};
 pub use streaming_stdout::StreamingStdOutCallbackHandler;
 
-pub use usage::{
-    UsageMetadataCallbackGuard, UsageMetadataCallbackHandler, get_usage_metadata_callback,
-};
+pub use usage::UsageMetadataCallbackHandler;
 
 #[cfg(test)]
 mod tests {
@@ -44,8 +35,8 @@ mod tests {
         manager.add_handler(Arc::new(stdout_handler), true);
         manager.add_handler(Arc::new(streaming_handler), true);
 
-        assert_eq!(manager.handlers.len(), 2);
-        assert_eq!(manager.inheritable_handlers.len(), 2);
+        assert_eq!(manager.handlers().len(), 2);
+        assert_eq!(manager.inheritable_handlers().len(), 2);
     }
 
     #[test]
@@ -64,15 +55,15 @@ mod tests {
         assert!(run_manager.parent_run_id().is_none());
 
         let child_manager = run_manager.get_child(Some("test"));
-        assert!(child_manager.tags.contains(&"test".to_string()));
+        assert!(child_manager.tags().contains(&"test".to_string()));
     }
 
     #[test]
     fn test_callbacks_from_handlers() {
         let handler: Arc<dyn BaseCallbackHandler> = Arc::new(StdOutCallbackHandler::new());
-        let callbacks = Callbacks::from_handlers(vec![handler]);
+        let callbacks = Callbacks::from(vec![handler]);
 
-        let manager = callbacks.to_manager();
-        assert_eq!(manager.handlers.len(), 1);
+        let manager = callbacks.into_manager();
+        assert_eq!(manager.handlers().len(), 1);
     }
 }

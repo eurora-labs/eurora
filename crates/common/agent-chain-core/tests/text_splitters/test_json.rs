@@ -29,9 +29,9 @@ fn test_split_json() {
         .unwrap();
     for doc in &docs {
         assert!(
-            doc.page_content.len() < (max_chunk as f64 * 1.05) as usize,
+            doc.page_content().len() < (max_chunk as f64 * 1.05) as usize,
             "Chunk too large: {} > {}",
-            doc.page_content.len(),
+            doc.page_content().len(),
             (max_chunk as f64 * 1.05) as usize,
         );
     }

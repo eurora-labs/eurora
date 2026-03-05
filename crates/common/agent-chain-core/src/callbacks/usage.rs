@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 
 use uuid::Uuid;
@@ -8,10 +7,7 @@ use uuid::Uuid;
 use crate::messages::{BaseMessage, UsageMetadata};
 use crate::outputs::ChatResult;
 
-use super::base::{
-    BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
-    RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
-};
+use super::base::BaseCallbackHandler;
 
 #[derive(Debug, Clone)]
 pub struct UsageMetadataCallbackHandler {
@@ -37,6 +33,10 @@ impl UsageMetadataCallbackHandler {
             .expect("usage_metadata lock poisoned")
             .clone()
     }
+
+    pub fn as_arc_handler(self) -> Arc<dyn BaseCallbackHandler> {
+        Arc::new(self)
+    }
 }
 
 impl fmt::Display for UsageMetadataCallbackHandler {
@@ -51,7 +51,11 @@ impl fmt::Display for UsageMetadataCallbackHandler {
     }
 }
 
-impl LLMManagerMixin for UsageMetadataCallbackHandler {
+impl BaseCallbackHandler for UsageMetadataCallbackHandler {
+    fn name(&self) -> &str {
+        "UsageMetadataCallbackHandler"
+    }
+
     fn on_llm_end(&self, response: &ChatResult, _run_id: Uuid, _parent_run_id: Option<Uuid>) {
         let first_generation = response.generations.first();
 
@@ -79,72 +83,12 @@ impl LLMManagerMixin for UsageMetadataCallbackHandler {
                 .usage_metadata
                 .lock()
                 .expect("usage_metadata lock poisoned");
-            if let Some(existing) = guard.get(&model) {
-                let combined = existing.add(&usage);
-                guard.insert(model, combined);
-            } else {
-                guard.insert(model, usage);
-            }
+            guard
+                .entry(model)
+                .and_modify(|existing| *existing = existing.add(&usage))
+                .or_insert(usage);
         }
     }
-}
-
-impl ChainManagerMixin for UsageMetadataCallbackHandler {}
-impl ToolManagerMixin for UsageMetadataCallbackHandler {}
-impl RetrieverManagerMixin for UsageMetadataCallbackHandler {}
-impl CallbackManagerMixin for UsageMetadataCallbackHandler {}
-impl RunManagerMixin for UsageMetadataCallbackHandler {}
-
-impl BaseCallbackHandler for UsageMetadataCallbackHandler {
-    fn name(&self) -> &str {
-        "UsageMetadataCallbackHandler"
-    }
-}
-
-pub struct UsageMetadataCallbackGuard {
-    handler: UsageMetadataCallbackHandler,
-}
-
-impl UsageMetadataCallbackGuard {
-    fn new() -> Self {
-        Self {
-            handler: UsageMetadataCallbackHandler::new(),
-        }
-    }
-
-    pub fn handler(&self) -> &UsageMetadataCallbackHandler {
-        &self.handler
-    }
-
-    pub fn handler_mut(&mut self) -> &mut UsageMetadataCallbackHandler {
-        &mut self.handler
-    }
-
-    pub fn usage_metadata(&self) -> HashMap<String, UsageMetadata> {
-        self.handler.usage_metadata()
-    }
-
-    pub fn as_arc_handler(&self) -> Arc<dyn BaseCallbackHandler> {
-        Arc::new(self.handler.clone()) as Arc<dyn BaseCallbackHandler>
-    }
-}
-
-impl Deref for UsageMetadataCallbackGuard {
-    type Target = UsageMetadataCallbackHandler;
-
-    fn deref(&self) -> &Self::Target {
-        &self.handler
-    }
-}
-
-impl DerefMut for UsageMetadataCallbackGuard {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.handler
-    }
-}
-
-pub fn get_usage_metadata_callback() -> UsageMetadataCallbackGuard {
-    UsageMetadataCallbackGuard::new()
 }
 
 #[cfg(test)]

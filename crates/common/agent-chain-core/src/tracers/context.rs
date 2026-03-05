@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::callbacks::base::BaseCallbackHandler;
+use crate::callbacks::BaseCallbackHandler;
 use crate::tracers::run_collector::RunCollectorCallbackHandler;
 use crate::tracers::schemas::Run;
 use crate::utils::env::env_var_is_set;

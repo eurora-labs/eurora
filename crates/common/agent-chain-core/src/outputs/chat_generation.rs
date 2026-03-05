@@ -6,7 +6,9 @@ use std::ops::Add;
 
 use crate::load::Serializable;
 use crate::messages::BaseMessage;
-use crate::utils::merge::merge_dicts;
+
+pub const CHAT_GENERATION_TYPE: &str = "ChatGeneration";
+pub const CHAT_GENERATION_CHUNK_TYPE: &str = "ChatGenerationChunk";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChatGeneration {
@@ -23,7 +25,7 @@ pub struct ChatGeneration {
 }
 
 fn default_chat_generation_type() -> String {
-    "ChatGeneration".to_string()
+    CHAT_GENERATION_TYPE.to_string()
 }
 
 #[bon]
@@ -35,7 +37,7 @@ impl ChatGeneration {
             text,
             message,
             generation_info,
-            generation_type: "ChatGeneration".to_string(),
+            generation_type: CHAT_GENERATION_TYPE.to_string(),
         }
     }
 }
@@ -90,7 +92,7 @@ pub struct ChatGenerationChunk {
 }
 
 fn default_chat_generation_chunk_type() -> String {
-    "ChatGenerationChunk".to_string()
+    CHAT_GENERATION_CHUNK_TYPE.to_string()
 }
 
 #[bon]
@@ -102,7 +104,7 @@ impl ChatGenerationChunk {
             text,
             message,
             generation_info,
-            generation_type: "ChatGenerationChunk".to_string(),
+            generation_type: CHAT_GENERATION_CHUNK_TYPE.to_string(),
         }
     }
 }
@@ -121,7 +123,8 @@ impl Add for ChatGenerationChunk {
     type Output = ChatGenerationChunk;
 
     fn add(self, other: ChatGenerationChunk) -> Self::Output {
-        let generation_info = merge_generation_info(self.generation_info, other.generation_info);
+        let generation_info =
+            super::merge_generation_info(self.generation_info, other.generation_info);
 
         let self_chunk = crate::messages::utils::msg_to_chunk(&self.message);
         let other_chunk = crate::messages::utils::msg_to_chunk(&other.message);
@@ -133,35 +136,8 @@ impl Add for ChatGenerationChunk {
             text,
             message: merged_message,
             generation_info,
-            generation_type: "ChatGenerationChunk".to_string(),
+            generation_type: CHAT_GENERATION_CHUNK_TYPE.to_string(),
         }
-    }
-}
-
-fn merge_generation_info(
-    left: Option<HashMap<String, Value>>,
-    right: Option<HashMap<String, Value>>,
-) -> Option<HashMap<String, Value>> {
-    match (left, right) {
-        (Some(left_map), Some(right_map)) => {
-            let left_value =
-                serde_json::to_value(&left_map).unwrap_or(Value::Object(Default::default()));
-            let right_value =
-                serde_json::to_value(&right_map).unwrap_or(Value::Object(Default::default()));
-            match merge_dicts(left_value, vec![right_value]) {
-                Ok(Value::Object(map)) => {
-                    let result: HashMap<String, Value> = map.into_iter().collect();
-                    if result.is_empty() {
-                        None
-                    } else {
-                        Some(result)
-                    }
-                }
-                _ => None,
-            }
-        }
-        (Some(info), None) | (None, Some(info)) => Some(info),
-        (None, None) => None,
     }
 }
 
@@ -171,7 +147,7 @@ impl From<ChatGeneration> for ChatGenerationChunk {
             text: chat_gen.text,
             message: chat_gen.message,
             generation_info: chat_gen.generation_info,
-            generation_type: "ChatGenerationChunk".to_string(),
+            generation_type: CHAT_GENERATION_CHUNK_TYPE.to_string(),
         }
     }
 }
@@ -182,7 +158,7 @@ impl From<ChatGenerationChunk> for ChatGeneration {
             text: chunk.text,
             message: chunk.message,
             generation_info: chunk.generation_info,
-            generation_type: "ChatGeneration".to_string(),
+            generation_type: CHAT_GENERATION_TYPE.to_string(),
         }
     }
 }
@@ -190,14 +166,6 @@ impl From<ChatGenerationChunk> for ChatGeneration {
 pub fn merge_chat_generation_chunks(
     chunks: Vec<ChatGenerationChunk>,
 ) -> Option<ChatGenerationChunk> {
-    if chunks.is_empty() {
-        return None;
-    }
-
-    if chunks.len() == 1 {
-        return chunks.into_iter().next();
-    }
-
     let mut iter = chunks.into_iter();
     let first = iter.next()?;
     Some(iter.fold(first, |acc, chunk| acc + chunk))
@@ -215,7 +183,7 @@ mod tests {
         let chat_gen = ChatGeneration::builder().message(msg.into()).build();
         assert_eq!(chat_gen.text, "Hello, world!");
         assert!(chat_gen.generation_info.is_none());
-        assert_eq!(chat_gen.generation_type, "ChatGeneration");
+        assert_eq!(chat_gen.generation_type, CHAT_GENERATION_TYPE);
     }
 
     #[test]

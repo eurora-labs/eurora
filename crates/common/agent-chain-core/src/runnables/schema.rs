@@ -153,18 +153,19 @@ pub enum StreamEvent {
 }
 
 impl StreamEvent {
-    pub fn event(&self) -> &str {
+    fn base(&self) -> &BaseStreamEvent {
         match self {
-            StreamEvent::Standard(e) => &e.base.event,
-            StreamEvent::Custom(e) => &e.base.event,
+            StreamEvent::Standard(e) => &e.base,
+            StreamEvent::Custom(e) => &e.base,
         }
     }
 
+    pub fn event(&self) -> &str {
+        &self.base().event
+    }
+
     pub fn run_id(&self) -> &str {
-        match self {
-            StreamEvent::Standard(e) => &e.base.run_id,
-            StreamEvent::Custom(e) => &e.base.run_id,
-        }
+        &self.base().run_id
     }
 
     pub fn name(&self) -> &str {
@@ -175,24 +176,15 @@ impl StreamEvent {
     }
 
     pub fn tags(&self) -> &[String] {
-        match self {
-            StreamEvent::Standard(e) => &e.base.tags,
-            StreamEvent::Custom(e) => &e.base.tags,
-        }
+        &self.base().tags
     }
 
     pub fn metadata(&self) -> &HashMap<String, Value> {
-        match self {
-            StreamEvent::Standard(e) => &e.base.metadata,
-            StreamEvent::Custom(e) => &e.base.metadata,
-        }
+        &self.base().metadata
     }
 
     pub fn parent_ids(&self) -> &[String] {
-        match self {
-            StreamEvent::Standard(e) => &e.base.parent_ids,
-            StreamEvent::Custom(e) => &e.base.parent_ids,
-        }
+        &self.base().parent_ids
     }
 
     pub fn is_custom(&self) -> bool {

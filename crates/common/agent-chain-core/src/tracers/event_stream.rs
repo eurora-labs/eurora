@@ -9,10 +9,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::GenerationType;
-use crate::callbacks::base::{
-    BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
-    RetrieverManagerMixin, RunManagerMixin, ToolManagerMixin,
-};
+use crate::callbacks::BaseCallbackHandler;
 use crate::messages::{AIMessageChunk, BaseMessage};
 use crate::outputs::ChatResult;
 use crate::outputs::{GenerationChunk, LLMResult};
@@ -726,7 +723,15 @@ impl AstreamEventsCallbackHandler {
     }
 }
 
-impl LLMManagerMixin for AstreamEventsCallbackHandler {
+impl BaseCallbackHandler for AstreamEventsCallbackHandler {
+    fn name(&self) -> &str {
+        "AstreamEventsCallbackHandler"
+    }
+
+    fn run_inline(&self) -> bool {
+        true
+    }
+
     fn on_llm_new_token(
         &self,
         token: &str,
@@ -756,9 +761,7 @@ impl LLMManagerMixin for AstreamEventsCallbackHandler {
             tracing::warn!("AstreamEventsCallbackHandler on_llm_end error: {}", e);
         }
     }
-}
 
-impl ChainManagerMixin for AstreamEventsCallbackHandler {
     fn on_chain_end(
         &self,
         outputs: &HashMap<String, serde_json::Value>,
@@ -769,9 +772,7 @@ impl ChainManagerMixin for AstreamEventsCallbackHandler {
             tracing::warn!("AstreamEventsCallbackHandler on_chain_end error: {}", e);
         }
     }
-}
 
-impl ToolManagerMixin for AstreamEventsCallbackHandler {
     fn on_tool_end(
         &self,
         output: &str,
@@ -796,9 +797,7 @@ impl ToolManagerMixin for AstreamEventsCallbackHandler {
             tracing::warn!("AstreamEventsCallbackHandler on_tool_error error: {}", e);
         }
     }
-}
 
-impl RetrieverManagerMixin for AstreamEventsCallbackHandler {
     fn on_retriever_end(
         &self,
         documents: &[serde_json::Value],
@@ -809,9 +808,7 @@ impl RetrieverManagerMixin for AstreamEventsCallbackHandler {
             tracing::warn!("AstreamEventsCallbackHandler on_retriever_end error: {}", e);
         }
     }
-}
 
-impl CallbackManagerMixin for AstreamEventsCallbackHandler {
     fn on_llm_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
@@ -840,6 +837,7 @@ impl CallbackManagerMixin for AstreamEventsCallbackHandler {
         parent_run_id: Option<Uuid>,
         tags: Option<&[String]>,
         metadata: Option<&HashMap<String, serde_json::Value>>,
+        name: Option<&str>,
     ) {
         self.handle_chat_model_start(
             serialized,
@@ -848,7 +846,7 @@ impl CallbackManagerMixin for AstreamEventsCallbackHandler {
             tags.map(|t| t.to_vec()),
             parent_run_id,
             metadata.cloned(),
-            None,
+            name,
         );
     }
 
@@ -906,7 +904,6 @@ impl CallbackManagerMixin for AstreamEventsCallbackHandler {
         metadata: Option<&HashMap<String, serde_json::Value>>,
         name: Option<&str>,
     ) {
-        let _name = name;
         self.handle_retriever_start(
             serialized,
             query,
@@ -914,12 +911,10 @@ impl CallbackManagerMixin for AstreamEventsCallbackHandler {
             parent_run_id,
             tags.map(|t| t.to_vec()),
             metadata.cloned(),
-            None,
+            name,
         );
     }
-}
 
-impl RunManagerMixin for AstreamEventsCallbackHandler {
     fn on_custom_event(
         &self,
         name: &str,
@@ -940,16 +935,6 @@ impl RunManagerMixin for AstreamEventsCallbackHandler {
             tags.map(|t| t.to_vec()),
             metadata.cloned(),
         );
-    }
-}
-
-impl BaseCallbackHandler for AstreamEventsCallbackHandler {
-    fn name(&self) -> &str {
-        "AstreamEventsCallbackHandler"
-    }
-
-    fn run_inline(&self) -> bool {
-        true
     }
 }
 
@@ -1054,7 +1039,7 @@ where
     R: crate::runnables::base::Runnable + 'static,
     R::Output: serde::Serialize,
 {
-    use crate::callbacks::base::Callbacks;
+    use crate::callbacks::Callbacks;
     use crate::runnables::config::ensure_config;
     use crate::utils::uuid::uuid7;
     use std::sync::Arc;

@@ -145,11 +145,8 @@ fn test_sha1_deterministic_hash() {
     let encoder = KeyEncoder::Algorithm(HashAlgorithm::Sha1);
     let hashed = get_document_with_hash(&doc, &encoder).unwrap();
 
-    assert_eq!(
-        hashed.id.as_deref(),
-        Some("fd1dc827-051b-537d-a1fe-1fa043e8b276")
-    );
-    assert_eq!(hashed.page_content, doc.page_content);
+    assert_eq!(hashed.id(), Some("fd1dc827-051b-537d-a1fe-1fa043e8b276"));
+    assert_eq!(hashed.page_content(), doc.page_content());
 }
 
 #[test]
@@ -163,10 +160,22 @@ fn test_different_algorithms_produce_different_results() {
     let sha512_enc = KeyEncoder::Algorithm(HashAlgorithm::Sha512);
     let blake2_enc = KeyEncoder::Algorithm(HashAlgorithm::Blake2b);
 
-    let h1 = get_document_with_hash(&doc, &sha1_enc).unwrap().id;
-    let h2 = get_document_with_hash(&doc, &sha256_enc).unwrap().id;
-    let h3 = get_document_with_hash(&doc, &sha512_enc).unwrap().id;
-    let h4 = get_document_with_hash(&doc, &blake2_enc).unwrap().id;
+    let h1 = get_document_with_hash(&doc, &sha1_enc)
+        .unwrap()
+        .id()
+        .map(String::from);
+    let h2 = get_document_with_hash(&doc, &sha256_enc)
+        .unwrap()
+        .id()
+        .map(String::from);
+    let h3 = get_document_with_hash(&doc, &sha512_enc)
+        .unwrap()
+        .id()
+        .map(String::from);
+    let h4 = get_document_with_hash(&doc, &blake2_enc)
+        .unwrap()
+        .id()
+        .map(String::from);
 
     assert_ne!(h1, h2);
     assert_ne!(h2, h3);
@@ -179,11 +188,11 @@ fn test_custom_key_encoder() {
 
     let doc = Document::builder().page_content("hello world").build();
     let encoder = KeyEncoder::Custom(Box::new(|doc: &Document| {
-        format!("custom-{}", doc.page_content.len())
+        format!("custom-{}", doc.page_content().len())
     }));
 
     let hashed = get_document_with_hash(&doc, &encoder).unwrap();
-    assert_eq!(hashed.id.as_deref(), Some("custom-11"));
+    assert_eq!(hashed.id(), Some("custom-11"));
 }
 
 #[test]
@@ -304,8 +313,10 @@ fn test_index_simple_delete_full() {
     assert_eq!(store_keys.len(), 2);
 
     let all_docs = store.get_by_ids(&store_keys).unwrap();
-    let texts: std::collections::HashSet<String> =
-        all_docs.into_iter().map(|d| d.page_content).collect();
+    let texts: std::collections::HashSet<String> = all_docs
+        .into_iter()
+        .map(|d| d.page_content().to_string())
+        .collect();
     assert!(texts.contains("mutated document 1"));
     assert!(texts.contains("This is another document."));
 
@@ -530,11 +541,11 @@ fn test_document_index_upsert_and_get() {
 
     let retrieved = index.get(&["id1".to_string()]).unwrap();
     assert_eq!(retrieved.len(), 1);
-    assert_eq!(retrieved[0].page_content, "hello world");
+    assert_eq!(retrieved[0].page_content(), "hello world");
 
     let retrieved = index.get(&[response.succeeded[1].clone()]).unwrap();
     assert_eq!(retrieved.len(), 1);
-    assert_eq!(retrieved[0].page_content, "foo bar");
+    assert_eq!(retrieved[0].page_content(), "foo bar");
 }
 
 #[test]
@@ -583,8 +594,8 @@ fn test_document_index_retriever_ordering() {
 
     let results = idx.invoke("the", None).unwrap();
     assert_eq!(results.len(), 2);
-    assert_eq!(results[0].page_content, "the the the the the");
-    assert_eq!(results[1].page_content, "the cat sat on the mat");
+    assert_eq!(results[0].page_content(), "the the the the the");
+    assert_eq!(results[1].page_content(), "the cat sat on the mat");
 }
 
 #[test]

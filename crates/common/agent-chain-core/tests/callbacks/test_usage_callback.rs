@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
-use agent_chain_core::callbacks::base::LLMManagerMixin;
-use agent_chain_core::callbacks::usage::{
-    UsageMetadataCallbackHandler, get_usage_metadata_callback,
-};
+use agent_chain_core::callbacks::BaseCallbackHandler;
+use agent_chain_core::callbacks::usage::UsageMetadataCallbackHandler;
 use agent_chain_core::messages::{AIMessage, InputTokenDetails, OutputTokenDetails, UsageMetadata};
 use agent_chain_core::outputs::{ChatGeneration, ChatResult};
 use uuid::Uuid;
@@ -84,8 +82,7 @@ fn create_chat_result(content: &str, model_name: &str, usage: &UsageMetadata) ->
 
 #[test]
 fn test_usage_callback_accumulation() {
-    let callback = get_usage_metadata_callback();
-    let handler = callback.handler();
+    let handler = UsageMetadataCallbackHandler::new();
 
     let result1 = create_chat_result("Response 1", "test_model", &usage1());
     handler.on_llm_end(&result1, Uuid::new_v4(), None);
@@ -94,7 +91,7 @@ fn test_usage_callback_accumulation() {
     handler.on_llm_end(&result2, Uuid::new_v4(), None);
 
     let total_1_2 = usage1().add(&usage2());
-    let metadata = callback.usage_metadata();
+    let metadata = handler.usage_metadata();
     assert_eq!(metadata.len(), 1);
     assert_eq!(
         metadata.get("test_model").unwrap(),
@@ -110,7 +107,7 @@ fn test_usage_callback_accumulation() {
 
     let total_3_4 = usage3().add(&usage4());
     let expected = total_1_2.add(&total_3_4);
-    let metadata = callback.usage_metadata();
+    let metadata = handler.usage_metadata();
     assert_eq!(
         metadata.get("test_model").unwrap(),
         &expected,
@@ -189,12 +186,12 @@ fn test_usage_callback_token_details_accumulation() {
 }
 
 #[test]
-fn test_get_usage_metadata_callback_guard() {
-    let guard = get_usage_metadata_callback();
+fn test_usage_handler_as_arc() {
+    let handler = UsageMetadataCallbackHandler::new();
 
-    assert!(guard.usage_metadata().is_empty());
+    assert!(handler.usage_metadata().is_empty());
 
-    let arc_handler = guard.as_arc_handler();
+    let arc_handler = handler.as_arc_handler();
     assert_eq!(arc_handler.name(), "UsageMetadataCallbackHandler");
 }
 

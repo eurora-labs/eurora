@@ -1,27 +1,119 @@
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 use async_trait::async_trait;
 use futures::StreamExt;
 use futures::stream::BoxStream;
 use serde::Serialize;
 use serde_json::Value;
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::sync::Arc;
 use tokio::sync::Semaphore;
 
 use crate::error::{Error, Result};
 use crate::load::{Serializable, Serialized};
 
 use super::config::{
-    AsyncVariableArgsFn, ConfigOrList, RunnableConfig, VariableArgsFn,
-    acall_func_with_variable_args, call_func_with_variable_args, ensure_config,
-    get_async_callback_manager_for_config, get_callback_manager_for_config, get_config_list,
-    merge_configs, patch_config, set_config_context,
+    AsyncVariableArgsFn, ConfigOrList, EMPTY_MAP, RunnableConfig, VariableArgsFn,
+    acall_func_with_variable_args, call_func_with_variable_args, child_config, ensure_config,
+    finish_chain_run, get_config_list, merge_configs, set_config_context, start_chain_run,
 };
 use super::utils::{Addable, ConfigurableFieldSpec, get_unique_config_specs};
 
 pub type ConfigFactory = Arc<dyn Fn(&RunnableConfig) -> RunnableConfig + Send + Sync>;
+
+struct ConcurrencyGate {
+    state: std::sync::Mutex<ConcurrencyGateState>,
+    cvar: std::sync::Condvar,
+    max: usize,
+}
+
+struct ConcurrencyGateState {
+    active: usize,
+    next_ticket: u64,
+    now_serving: u64,
+}
+
+struct ConcurrencyPermit<'a>(&'a ConcurrencyGate);
+
+impl Drop for ConcurrencyPermit<'_> {
+    fn drop(&mut self) {
+        let mut state = self.0.state.lock().unwrap();
+        state.active -= 1;
+        self.0.cvar.notify_all();
+    }
+}
+
+impl ConcurrencyGate {
+    fn new(max: usize) -> Arc<Self> {
+        debug_assert!(max > 0, "ConcurrencyGate max must be > 0");
+        Arc::new(Self {
+            state: std::sync::Mutex::new(ConcurrencyGateState {
+                active: 0,
+                next_ticket: 0,
+                now_serving: 0,
+            }),
+            cvar: std::sync::Condvar::new(),
+            max,
+        })
+    }
+
+    fn take_ticket(&self) -> u64 {
+        let mut state = self.state.lock().unwrap();
+        let ticket = state.next_ticket;
+        state.next_ticket += 1;
+        ticket
+    }
+
+    fn acquire(&self, ticket: u64) -> ConcurrencyPermit<'_> {
+        let mut state = self.state.lock().unwrap();
+        while state.active >= self.max || state.now_serving != ticket {
+            state = self.cvar.wait(state).unwrap();
+        }
+        state.active += 1;
+        state.now_serving += 1;
+        ConcurrencyPermit(self)
+    }
+}
+
+fn default_get_graph(
+    runnable: &(impl Runnable + ?Sized),
+    config: Option<&RunnableConfig>,
+) -> Result<super::graph::Graph> {
+    use super::graph::NodeData;
+    let mut graph = super::graph::Graph::new();
+
+    let input_node = graph.add_node(
+        Some(NodeData::Schema {
+            name: runnable.get_name(Some("Input"), None),
+        }),
+        None,
+        None,
+    );
+
+    let metadata = config
+        .map(|c| &c.metadata)
+        .filter(|m| !m.is_empty())
+        .cloned();
+    let runnable_node = graph.add_node(
+        Some(NodeData::Runnable {
+            name: runnable.get_name(None, None),
+        }),
+        None,
+        metadata,
+    );
+
+    let output_node = graph.add_node(
+        Some(NodeData::Schema {
+            name: runnable.get_name(Some("Output"), None),
+        }),
+        None,
+        None,
+    );
+
+    graph.add_edge(&input_node, &runnable_node, None, false);
+    graph.add_edge(&runnable_node, &output_node, None, false);
+
+    Ok(graph)
+}
 
 #[async_trait]
 pub trait Runnable: Send + Sync + Debug {
@@ -57,40 +149,12 @@ pub trait Runnable: Send + Sync + Debug {
         input: Self::Input,
         config: Option<RunnableConfig>,
     ) -> Result<Self::Output> {
-        let config = ensure_config(config);
-        let callback_manager = get_callback_manager_for_config(&config);
-        let run_manager = callback_manager
-            .on_chain_start()
-            .serialized(&HashMap::new())
-            .inputs(&HashMap::new())
-            .maybe_run_id(config.run_id)
-            .maybe_name(config.run_name.as_deref())
-            .call();
-
-        let child_config = patch_config(
-            Some(config),
-            Some(run_manager.get_child(None)),
-            None,
-            None,
-            None,
-            None,
-        );
-
-        let _context_guard = set_config_context(child_config.clone());
-
-        match func(input, &child_config) {
-            Ok(output) => {
-                run_manager.on_chain_end(&HashMap::new());
-                Ok(output)
-            }
-            Err(e) => {
-                run_manager.on_chain_error(&e);
-                Err(e)
-            }
-        }
+        let (run_manager, config) = start_chain_run(config);
+        let cfg = child_config(&config, &run_manager, None);
+        let _context_guard = set_config_context(cfg.clone());
+        finish_chain_run(&run_manager, func(input, &cfg))
     }
 
-    #[allow(async_fn_in_trait)]
     async fn acall_with_config(
         &self,
         func: &(
@@ -108,38 +172,10 @@ pub trait Runnable: Send + Sync + Debug {
     where
         Self: 'static,
     {
-        let config = ensure_config(config);
-        let async_callback_manager = get_async_callback_manager_for_config(&config);
-        let run_manager = async_callback_manager
-            .on_chain_start(
-                &HashMap::new(),
-                &HashMap::new(),
-                config.run_id,
-                config.run_name.as_deref(),
-            )
-            .await;
-
-        let child_config = patch_config(
-            Some(config),
-            Some(run_manager.get_child(None).to_callback_manager()),
-            None,
-            None,
-            None,
-            None,
-        );
-
-        let _context_guard = set_config_context(child_config.clone());
-
-        match func(input, child_config).await {
-            Ok(output) => {
-                run_manager.get_sync().on_chain_end(&HashMap::new());
-                Ok(output)
-            }
-            Err(e) => {
-                run_manager.get_sync().on_chain_error(&e);
-                Err(e)
-            }
-        }
+        let (run_manager, config) = start_chain_run(config);
+        let cfg = child_config(&config, &run_manager, None);
+        let _context_guard = set_config_context(cfg.clone());
+        finish_chain_run(&run_manager, func(input, cfg).await)
     }
 
     fn batch_with_config(
@@ -164,30 +200,15 @@ pub trait Runnable: Send + Sync + Debug {
         let run_managers: Vec<_> = configs
             .iter()
             .map(|config| {
-                let callback_manager = get_callback_manager_for_config(config);
-                callback_manager
-                    .on_chain_start()
-                    .serialized(&HashMap::new())
-                    .inputs(&HashMap::new())
-                    .maybe_run_id(config.run_id)
-                    .maybe_name(config.run_name.as_deref())
-                    .call()
+                let (run_manager, _) = start_chain_run(Some(config.clone()));
+                run_manager
             })
             .collect();
 
         let child_configs: Vec<_> = configs
-            .into_iter()
+            .iter()
             .zip(run_managers.iter())
-            .map(|(config, run_manager)| {
-                patch_config(
-                    Some(config),
-                    Some(run_manager.get_child(None)),
-                    None,
-                    None,
-                    None,
-                    None,
-                )
-            })
+            .map(|(config, run_manager)| child_config(config, run_manager, None))
             .collect();
 
         let outputs = func(inputs, child_configs);
@@ -195,12 +216,12 @@ pub trait Runnable: Send + Sync + Debug {
         let mut first_exception: Option<usize> = None;
         for (i, (run_manager, output)) in run_managers.iter().zip(outputs.iter()).enumerate() {
             match output {
-                Ok(_) => run_manager.on_chain_end(&HashMap::new()),
+                Ok(_) => run_manager.on_chain_end(&EMPTY_MAP),
                 Err(e) => {
                     if first_exception.is_none() {
                         first_exception = Some(i);
                     }
-                    run_manager.on_chain_error(e as &dyn std::error::Error);
+                    run_manager.on_chain_error(e);
                 }
             }
         }
@@ -231,46 +252,25 @@ pub trait Runnable: Send + Sync + Debug {
         >,
         config: Option<RunnableConfig>,
     ) -> BoxStream<'a, Result<Self::Output>> {
-        let config = ensure_config(config);
-        let callback_manager = get_callback_manager_for_config(&config);
-        let run_manager = callback_manager
-            .on_chain_start()
-            .serialized(&HashMap::new())
-            .inputs(&HashMap::new())
-            .maybe_run_id(config.run_id)
-            .maybe_name(config.run_name.as_deref())
-            .call();
-
-        let child_config = patch_config(
-            Some(config),
-            Some(run_manager.get_child(None)),
-            None,
-            None,
-            None,
-            None,
-        );
-
-        let output_stream = transformer(input, &child_config);
+        let (run_manager, config) = start_chain_run(config);
+        let cfg = child_config(&config, &run_manager, None);
+        let output_stream = transformer(input, &cfg);
 
         Box::pin(async_stream::stream! {
             let mut stream = output_stream;
             let mut had_error = false;
 
             while let Some(item) = stream.next().await {
-                match &item {
-                    Ok(_) => {}
-                    Err(e) => {
-                        if !had_error {
-                            run_manager.on_chain_error(e as &dyn std::error::Error);
-                            had_error = true;
-                        }
+                if let Err(e) = &item
+                    && !had_error {
+                        run_manager.on_chain_error(e);
+                        had_error = true;
                     }
-                }
                 yield item;
             }
 
             if !had_error {
-                run_manager.on_chain_end(&HashMap::new());
+                run_manager.on_chain_end(&EMPTY_MAP);
             }
         })
     }
@@ -377,9 +377,6 @@ pub trait Runnable: Send + Sync + Debug {
             let input = inputs.into_iter().next().expect("checked len == 1");
             let config = configs.into_iter().next().expect("checked len == 1");
             let result = self.invoke(input, Some(config));
-            if return_exceptions {
-                return vec![result];
-            }
             return vec![result];
         }
 
@@ -388,20 +385,15 @@ pub trait Runnable: Send + Sync + Debug {
         let mut results: Vec<Option<Result<Self::Output>>> = (0..len).map(|_| None).collect();
 
         std::thread::scope(|scope| {
-            let active_count = Arc::new(AtomicUsize::new(0));
-            let semaphore_like = max_concurrency;
+            let gate = max_concurrency.filter(|&n| n > 0).map(ConcurrencyGate::new);
             let mut handles = Vec::with_capacity(len);
 
             for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
-                if let Some(max) = semaphore_like {
-                    while active_count.load(Ordering::SeqCst) >= max {
-                        std::thread::sleep(std::time::Duration::from_millis(1));
-                    }
-                }
-                let active = active_count.clone();
-                active.fetch_add(1, Ordering::SeqCst);
+                let gate = gate.clone();
+                let ticket = gate.as_ref().map(|g| g.take_ticket());
 
                 let handle = scope.spawn(move || {
+                    let _permit = gate.as_ref().zip(ticket).map(|(g, t)| g.acquire(t));
                     let result = if return_exceptions {
                         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                             self.invoke(input, Some(config))
@@ -421,7 +413,6 @@ pub trait Runnable: Send + Sync + Debug {
                     } else {
                         self.invoke(input, Some(config))
                     };
-                    active.fetch_sub(1, Ordering::SeqCst);
                     (i, result)
                 });
                 handles.push(handle);
@@ -448,14 +439,13 @@ pub trait Runnable: Send + Sync + Debug {
 
         if return_exceptions {
             collected
+        } else if let Some(first_err_idx) = collected.iter().position(|r| r.is_err()) {
+            collected
+                .into_iter()
+                .nth(first_err_idx)
+                .into_iter()
+                .collect()
         } else {
-            if let Some(first_err_idx) = collected.iter().position(|r| r.is_err()) {
-                return collected
-                    .into_iter()
-                    .nth(first_err_idx)
-                    .into_iter()
-                    .collect();
-            }
             collected
         }
     }
@@ -508,10 +498,9 @@ pub trait Runnable: Send + Sync + Debug {
 
         if return_exceptions {
             results
+        } else if let Some(first_err_idx) = results.iter().position(|r| r.is_err()) {
+            results.into_iter().nth(first_err_idx).into_iter().collect()
         } else {
-            if let Some(first_err_idx) = results.iter().position(|r| r.is_err()) {
-                return results.into_iter().nth(first_err_idx).into_iter().collect();
-            }
             results
         }
     }
@@ -544,19 +533,15 @@ pub trait Runnable: Send + Sync + Debug {
         let (sender, receiver) = std::sync::mpsc::channel();
 
         std::thread::scope(|scope| {
-            let active_count = Arc::new(AtomicUsize::new(0));
+            let gate = max_concurrency.filter(|&n| n > 0).map(ConcurrencyGate::new);
 
             for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
-                if let Some(max) = max_concurrency {
-                    while active_count.load(Ordering::SeqCst) >= max {
-                        std::thread::sleep(std::time::Duration::from_millis(1));
-                    }
-                }
-                let active = active_count.clone();
-                active.fetch_add(1, Ordering::SeqCst);
+                let gate = gate.clone();
+                let ticket = gate.as_ref().map(|g| g.take_ticket());
                 let tx = sender.clone();
 
                 scope.spawn(move || {
+                    let _permit = gate.as_ref().zip(ticket).map(|(g, t)| g.acquire(t));
                     let result = if return_exceptions {
                         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                             self.invoke(input, Some(config))
@@ -576,7 +561,6 @@ pub trait Runnable: Send + Sync + Debug {
                     } else {
                         self.invoke(input, Some(config))
                     };
-                    active.fetch_sub(1, Ordering::SeqCst);
                     tx.send((i, result))
                         .expect("receiver should not be dropped");
                 });
@@ -710,41 +694,7 @@ pub trait Runnable: Send + Sync + Debug {
     }
 
     fn get_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph> {
-        use super::graph::NodeData;
-        let mut graph = super::graph::Graph::new();
-
-        let input_node = graph.add_node(
-            Some(NodeData::Schema {
-                name: self.get_name(Some("Input"), None),
-            }),
-            None,
-            None,
-        );
-
-        let metadata = config
-            .map(|c| &c.metadata)
-            .filter(|m| !m.is_empty())
-            .cloned();
-        let runnable_node = graph.add_node(
-            Some(NodeData::Runnable {
-                name: self.get_name(None, None),
-            }),
-            None,
-            metadata,
-        );
-
-        let output_node = graph.add_node(
-            Some(NodeData::Schema {
-                name: self.get_name(Some("Output"), None),
-            }),
-            None,
-            None,
-        );
-
-        graph.add_edge(&input_node, &runnable_node, None, false);
-        graph.add_edge(&runnable_node, &output_node, None, false);
-
-        Ok(graph)
+        default_get_graph(self, config)
     }
 
     fn transform<'a>(
@@ -753,17 +703,11 @@ pub trait Runnable: Send + Sync + Debug {
         config: Option<RunnableConfig>,
     ) -> BoxStream<'a, Result<Self::Output>> {
         Box::pin(async_stream::stream! {
-            let mut final_input: Option<Self::Input> = None;
+            let mut final_input = None;
             let mut input = input;
-
             while let Some(ichunk) = input.next().await {
-                if let Some(ref mut current) = final_input {
-                    *current = ichunk;
-                } else {
-                    final_input = Some(ichunk);
-                }
+                final_input = Some(ichunk);
             }
-
             if let Some(input) = final_input {
                 let mut stream = self.stream(input, config);
                 while let Some(output) = stream.next().await {
@@ -781,49 +725,34 @@ pub trait Runnable: Send + Sync + Debug {
     where
         Self: 'static,
     {
-        Box::pin(async_stream::stream! {
-            let mut final_input: Option<Self::Input> = None;
-            let mut input = input;
-
-            while let Some(ichunk) = input.next().await {
-                if let Some(ref mut current) = final_input {
-                    *current = ichunk;
-                } else {
-                    final_input = Some(ichunk);
-                }
-            }
-
-            if let Some(input) = final_input {
-                let mut stream = self.astream(input, config);
-                while let Some(output) = stream.next().await {
-                    yield output;
-                }
-            }
-        })
+        self.transform(input, config)
     }
 
+    fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
+        Ok(vec![])
+    }
+
+    fn get_prompts(&self) -> Vec<Arc<dyn crate::BasePromptTemplate>> {
+        vec![]
+    }
+}
+
+pub trait RunnableExt: Runnable + Sized + 'static {
     fn pipe<R2>(self, other: R2) -> RunnableSequence<Self, R2>
     where
-        Self: Sized,
         R2: Runnable<Input = Self::Output>,
     {
         RunnableSequence::builder().first(self).last(other).build()
     }
 
-    fn bind(self, kwargs: HashMap<String, Value>) -> RunnableBinding<Self>
-    where
-        Self: Sized,
-    {
+    fn bind(self, kwargs: HashMap<String, Value>) -> RunnableBinding<Self> {
         RunnableBinding::builder()
             .bound(self)
             .kwargs(kwargs)
             .build()
     }
 
-    fn with_config(self, config: RunnableConfig) -> RunnableBinding<Self>
-    where
-        Self: Sized,
-    {
+    fn with_config(self, config: RunnableConfig) -> RunnableBinding<Self> {
         RunnableBinding::builder()
             .bound(self)
             .config(config)
@@ -834,17 +763,11 @@ pub trait Runnable: Send + Sync + Debug {
         self,
         max_attempts: usize,
         wait_exponential_jitter: bool,
-    ) -> super::retry::RunnableRetry<Self>
-    where
-        Self: Sized,
-    {
+    ) -> super::retry::RunnableRetry<Self> {
         super::retry::RunnableRetry::with_simple(self, max_attempts, wait_exponential_jitter)
     }
 
-    fn map(self) -> RunnableEach<Self>
-    where
-        Self: Sized,
-    {
+    fn map(self) -> RunnableEach<Self> {
         RunnableEach::new(self)
     }
 
@@ -853,7 +776,7 @@ pub trait Runnable: Send + Sync + Debug {
         keys: super::passthrough::PickKeys,
     ) -> RunnableSequence<Self, super::passthrough::RunnablePick>
     where
-        Self: Sized + Runnable<Output = HashMap<String, Value>>,
+        Self: Runnable<Output = HashMap<String, Value>>,
     {
         pipe(self, super::passthrough::RunnablePick::from(keys))
     }
@@ -863,7 +786,7 @@ pub trait Runnable: Send + Sync + Debug {
         mapper: super::passthrough::RunnableAssign,
     ) -> RunnableSequence<Self, super::passthrough::RunnableAssign>
     where
-        Self: Sized + Runnable<Output = HashMap<String, Value>>,
+        Self: Runnable<Output = HashMap<String, Value>>,
     {
         pipe(self, mapper)
     }
@@ -873,7 +796,7 @@ pub trait Runnable: Send + Sync + Debug {
         fallbacks: Vec<DynRunnable<Self::Input, Self::Output>>,
     ) -> super::fallbacks::RunnableWithFallbacks<Self::Input, Self::Output>
     where
-        Self: Sized + Send + Sync + 'static,
+        Self: Send + Sync,
     {
         super::fallbacks::RunnableWithFallbacks::new(self, fallbacks)
     }
@@ -883,85 +806,37 @@ pub trait Runnable: Send + Sync + Debug {
         on_start: Option<crate::tracers::root_listeners::Listener>,
         on_end: Option<crate::tracers::root_listeners::Listener>,
         on_error: Option<crate::tracers::root_listeners::Listener>,
-    ) -> RunnableBinding<Self>
-    where
-        Self: Sized,
-    {
-        let on_start: Option<
-            Arc<
-                dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig) + Send + Sync,
-            >,
-        > = on_start.map(|f| {
-            Arc::from(f)
-                as Arc<
-                    dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig)
-                        + Send
-                        + Sync,
-                >
-        });
-        let on_end: Option<
-            Arc<
-                dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig) + Send + Sync,
-            >,
-        > = on_end.map(|f| {
-            Arc::from(f)
-                as Arc<
-                    dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig)
-                        + Send
-                        + Sync,
-                >
-        });
-        let on_error: Option<
-            Arc<
-                dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig) + Send + Sync,
-            >,
-        > = on_error.map(|f| {
-            Arc::from(f)
-                as Arc<
-                    dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig)
-                        + Send
-                        + Sync,
-                >
-        });
+    ) -> RunnableBinding<Self> {
+        type SyncFn =
+            dyn Fn(&crate::tracers::schemas::Run, &super::config::RunnableConfig) + Send + Sync;
+
+        fn arc_listener(f: crate::tracers::root_listeners::Listener) -> Arc<SyncFn> {
+            Arc::from(f) as Arc<SyncFn>
+        }
+
+        fn clone_listener(f: &Arc<SyncFn>) -> crate::tracers::root_listeners::Listener {
+            let f = f.clone();
+            Box::new(move |run, cfg| f(run, cfg))
+        }
+
+        let on_start = on_start.map(arc_listener);
+        let on_end = on_end.map(arc_listener);
+        let on_error = on_error.map(arc_listener);
 
         let factory: ConfigFactory = Arc::new(move |config: &super::config::RunnableConfig| {
-            use crate::callbacks::base::Callbacks;
+            use crate::callbacks::Callbacks;
             use crate::tracers::root_listeners::RootListenersTracer;
 
             let tracer = RootListenersTracer::new(
                 config.clone(),
-                on_start.as_ref().map(|f| {
-                    Box::new({
-                        let f = f.clone();
-                        move |run: &crate::tracers::schemas::Run,
-                              cfg: &super::config::RunnableConfig| {
-                            f(run, cfg)
-                        }
-                    }) as crate::tracers::root_listeners::Listener
-                }),
-                on_end.as_ref().map(|f| {
-                    Box::new({
-                        let f = f.clone();
-                        move |run: &crate::tracers::schemas::Run,
-                              cfg: &super::config::RunnableConfig| {
-                            f(run, cfg)
-                        }
-                    }) as crate::tracers::root_listeners::Listener
-                }),
-                on_error.as_ref().map(|f| {
-                    Box::new({
-                        let f = f.clone();
-                        move |run: &crate::tracers::schemas::Run,
-                              cfg: &super::config::RunnableConfig| {
-                            f(run, cfg)
-                        }
-                    }) as crate::tracers::root_listeners::Listener
-                }),
+                on_start.as_ref().map(clone_listener),
+                on_end.as_ref().map(clone_listener),
+                on_error.as_ref().map(clone_listener),
             );
 
             super::config::RunnableConfig {
                 callbacks: Some(Callbacks::Handlers(vec![
-                    Arc::new(tracer) as Arc<dyn crate::callbacks::base::BaseCallbackHandler>
+                    Arc::new(tracer) as Arc<dyn crate::callbacks::BaseCallbackHandler>
                 ])),
                 ..Default::default()
             }
@@ -978,112 +853,41 @@ pub trait Runnable: Send + Sync + Debug {
         on_start: Option<crate::tracers::root_listeners::AsyncListener>,
         on_end: Option<crate::tracers::root_listeners::AsyncListener>,
         on_error: Option<crate::tracers::root_listeners::AsyncListener>,
-    ) -> RunnableBinding<Self>
-    where
-        Self: Sized,
-    {
-        let on_start: Option<
-            Arc<
-                dyn Fn(
-                        &crate::tracers::schemas::Run,
-                        &super::config::RunnableConfig,
-                    ) -> futures::future::BoxFuture<'static, ()>
-                    + Send
-                    + Sync,
-            >,
-        > = on_start.map(|f| {
-            Arc::from(f)
-                as Arc<
-                    dyn Fn(
-                            &crate::tracers::schemas::Run,
-                            &super::config::RunnableConfig,
-                        ) -> futures::future::BoxFuture<'static, ()>
-                        + Send
-                        + Sync,
-                >
-        });
-        let on_end: Option<
-            Arc<
-                dyn Fn(
-                        &crate::tracers::schemas::Run,
-                        &super::config::RunnableConfig,
-                    ) -> futures::future::BoxFuture<'static, ()>
-                    + Send
-                    + Sync,
-            >,
-        > = on_end.map(|f| {
-            Arc::from(f)
-                as Arc<
-                    dyn Fn(
-                            &crate::tracers::schemas::Run,
-                            &super::config::RunnableConfig,
-                        ) -> futures::future::BoxFuture<'static, ()>
-                        + Send
-                        + Sync,
-                >
-        });
-        let on_error: Option<
-            Arc<
-                dyn Fn(
-                        &crate::tracers::schemas::Run,
-                        &super::config::RunnableConfig,
-                    ) -> futures::future::BoxFuture<'static, ()>
-                    + Send
-                    + Sync,
-            >,
-        > = on_error.map(|f| {
-            Arc::from(f)
-                as Arc<
-                    dyn Fn(
-                            &crate::tracers::schemas::Run,
-                            &super::config::RunnableConfig,
-                        ) -> futures::future::BoxFuture<'static, ()>
-                        + Send
-                        + Sync,
-                >
-        });
+    ) -> RunnableBinding<Self> {
+        type AsyncFn = dyn Fn(
+                &crate::tracers::schemas::Run,
+                &super::config::RunnableConfig,
+            ) -> futures::future::BoxFuture<'static, ()>
+            + Send
+            + Sync;
+
+        fn arc_listener(f: crate::tracers::root_listeners::AsyncListener) -> Arc<AsyncFn> {
+            Arc::from(f) as Arc<AsyncFn>
+        }
+
+        fn clone_listener(f: &Arc<AsyncFn>) -> crate::tracers::root_listeners::AsyncListener {
+            let f = f.clone();
+            Box::new(move |run, cfg| f(run, cfg))
+        }
+
+        let on_start = on_start.map(arc_listener);
+        let on_end = on_end.map(arc_listener);
+        let on_error = on_error.map(arc_listener);
 
         let factory: ConfigFactory = Arc::new(move |config: &super::config::RunnableConfig| {
-            use crate::callbacks::base::Callbacks;
+            use crate::callbacks::Callbacks;
             use crate::tracers::root_listeners::AsyncRootListenersTracer;
 
             let tracer = AsyncRootListenersTracer::new(
                 config.clone(),
-                on_start.as_ref().map(|f| {
-                    Box::new({
-                        let f = f.clone();
-                        move |run: &crate::tracers::schemas::Run,
-                              cfg: &crate::runnables::config::RunnableConfig|
-                              -> futures::future::BoxFuture<'static, ()> {
-                            f(run, cfg)
-                        }
-                    }) as crate::tracers::root_listeners::AsyncListener
-                }),
-                on_end.as_ref().map(|f| {
-                    Box::new({
-                        let f = f.clone();
-                        move |run: &crate::tracers::schemas::Run,
-                              cfg: &crate::runnables::config::RunnableConfig|
-                              -> futures::future::BoxFuture<'static, ()> {
-                            f(run, cfg)
-                        }
-                    }) as crate::tracers::root_listeners::AsyncListener
-                }),
-                on_error.as_ref().map(|f| {
-                    Box::new({
-                        let f = f.clone();
-                        move |run: &crate::tracers::schemas::Run,
-                              cfg: &crate::runnables::config::RunnableConfig|
-                              -> futures::future::BoxFuture<'static, ()> {
-                            f(run, cfg)
-                        }
-                    }) as crate::tracers::root_listeners::AsyncListener
-                }),
+                on_start.as_ref().map(clone_listener),
+                on_end.as_ref().map(clone_listener),
+                on_error.as_ref().map(clone_listener),
             );
 
             super::config::RunnableConfig {
                 callbacks: Some(Callbacks::Handlers(vec![
-                    Arc::new(tracer) as Arc<dyn crate::callbacks::base::BaseCallbackHandler>
+                    Arc::new(tracer) as Arc<dyn crate::callbacks::BaseCallbackHandler>
                 ])),
                 ..Default::default()
             }
@@ -1095,21 +899,22 @@ pub trait Runnable: Send + Sync + Debug {
             .build()
     }
 
-    fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
-        Ok(vec![])
-    }
-
-    fn get_prompts(&self) -> Vec<Arc<dyn crate::BasePromptTemplate>> {
-        vec![]
-    }
-
     fn as_tool(self: Arc<Self>, name: &str, description: &str) -> crate::tools::StructuredTool
     where
-        Self: Sized + Runnable<Input = HashMap<String, Value>, Output = Value> + 'static,
+        Self: Runnable<Input = HashMap<String, Value>, Output = Value>,
     {
         crate::tools::convert_runnable_to_tool(self, name, description)
     }
+
+    fn into_dyn(self) -> DynRunnable<Self::Input, Self::Output>
+    where
+        Self: Send + Sync,
+    {
+        Arc::new(self)
+    }
 }
+
+impl<T: Runnable + Sized + 'static> RunnableExt for T {}
 
 pub trait GraphProvider: Send + Sync + Debug {
     fn provide_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph>;
@@ -1236,8 +1041,8 @@ where
             input,
             Box::new(move |input_stream, _config| {
                 Box::pin(async_stream::stream! {
+                    let mut final_input = None;
                     let mut stream = input_stream;
-                    let mut final_input: Option<I> = None;
                     while let Some(ichunk) = stream.next().await {
                         final_input = Some(ichunk);
                     }
@@ -1252,80 +1057,46 @@ where
 
     fn get_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph> {
         if self.deps.is_empty() {
-            use super::graph::NodeData;
-            let mut graph = super::graph::Graph::new();
-
-            let input_node = graph.add_node(
-                Some(NodeData::Schema {
-                    name: self.get_name(Some("Input"), None),
-                }),
-                None,
-                None,
-            );
-
-            let metadata = config
-                .map(|c| &c.metadata)
-                .filter(|m| !m.is_empty())
-                .cloned();
-            let runnable_node = graph.add_node(
-                Some(NodeData::Runnable {
-                    name: self.get_name(None, None),
-                }),
-                None,
-                metadata,
-            );
-
-            let output_node = graph.add_node(
-                Some(NodeData::Schema {
-                    name: self.get_name(Some("Output"), None),
-                }),
-                None,
-                None,
-            );
-
-            graph.add_edge(&input_node, &runnable_node, None, false);
-            graph.add_edge(&runnable_node, &output_node, None, false);
-
-            Ok(graph)
-        } else {
-            use super::graph::NodeData;
-            let mut graph = super::graph::Graph::new();
-
-            let input_node = graph.add_node(
-                Some(NodeData::Schema {
-                    name: self.get_name(Some("Input"), None),
-                }),
-                None,
-                None,
-            );
-            let output_node = graph.add_node(
-                Some(NodeData::Schema {
-                    name: self.get_name(Some("Output"), None),
-                }),
-                None,
-                None,
-            );
-
-            for dep in &self.deps {
-                let mut dep_graph = dep.provide_graph(None)?;
-                dep_graph.trim_first_node();
-                dep_graph.trim_last_node();
-
-                if dep_graph.nodes.is_empty() {
-                    graph.add_edge(&input_node, &output_node, None, false);
-                } else {
-                    let (dep_first, dep_last) = graph.extend(dep_graph, "");
-                    let dep_first = dep_first
-                        .ok_or_else(|| Error::other("RunnableLambda dep has no first node"))?;
-                    let dep_last = dep_last
-                        .ok_or_else(|| Error::other("RunnableLambda dep has no last node"))?;
-                    graph.add_edge(&input_node, &dep_first, None, false);
-                    graph.add_edge(&dep_last, &output_node, None, false);
-                }
-            }
-
-            Ok(graph)
+            return default_get_graph(self, config);
         }
+
+        use super::graph::NodeData;
+        let mut graph = super::graph::Graph::new();
+
+        let input_node = graph.add_node(
+            Some(NodeData::Schema {
+                name: self.get_name(Some("Input"), None),
+            }),
+            None,
+            None,
+        );
+        let output_node = graph.add_node(
+            Some(NodeData::Schema {
+                name: self.get_name(Some("Output"), None),
+            }),
+            None,
+            None,
+        );
+
+        for dep in &self.deps {
+            let mut dep_graph = dep.provide_graph(None)?;
+            dep_graph.trim_first_node();
+            dep_graph.trim_last_node();
+
+            if dep_graph.nodes.is_empty() {
+                graph.add_edge(&input_node, &output_node, None, false);
+            } else {
+                let (dep_first, dep_last) = graph.extend(dep_graph, "");
+                let dep_first = dep_first
+                    .ok_or_else(|| Error::other("RunnableLambda dep has no first node"))?;
+                let dep_last =
+                    dep_last.ok_or_else(|| Error::other("RunnableLambda dep has no last node"))?;
+                graph.add_edge(&input_node, &dep_first, None, false);
+                graph.add_edge(&dep_last, &output_node, None, false);
+            }
+        }
+
+        Ok(graph)
     }
 }
 
@@ -1530,8 +1301,8 @@ where
             Box::new(move |input_stream, config| {
                 let config = config.clone();
                 Box::pin(async_stream::stream! {
+                    let mut final_input = None;
                     let mut stream = input_stream;
-                    let mut final_input: Option<I> = None;
                     while let Some(ichunk) = stream.next().await {
                         final_input = Some(ichunk);
                     }
@@ -1564,8 +1335,8 @@ where
                 Box::new(move |input_stream, config| {
                     let config = config.clone();
                     Box::pin(async_stream::stream! {
+                        let mut final_input = None;
                         let mut stream = input_stream;
-                        let mut final_input: Option<I> = None;
                         while let Some(ichunk) = stream.next().await {
                             final_input = Some(ichunk);
                         }
@@ -1653,50 +1424,23 @@ where
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let config = ensure_config(config);
-        let callback_manager = get_callback_manager_for_config(&config);
+        let (run_manager, config) = start_chain_run(config);
 
-        let run_manager = callback_manager
-            .on_chain_start()
-            .serialized(&HashMap::new())
-            .inputs(&HashMap::new())
-            .maybe_run_id(config.run_id)
-            .call();
-
-        let first_config = patch_config(
-            Some(config.clone()),
-            Some(run_manager.get_child(Some("seq:step:1"))),
-            None,
-            None,
-            None,
-            None,
-        );
-        let intermediate = match self.first.invoke(input, Some(first_config)) {
+        let intermediate = match self.first.invoke(
+            input,
+            Some(child_config(&config, &run_manager, Some("seq:step:1"))),
+        ) {
             Ok(output) => output,
-            Err(e) => {
-                run_manager.on_chain_error(&e);
-                return Err(e);
-            }
+            Err(e) => return finish_chain_run(&run_manager, Err(e)),
         };
 
-        let last_config = patch_config(
-            Some(config),
-            Some(run_manager.get_child(Some("seq:step:2"))),
-            None,
-            None,
-            None,
-            None,
-        );
-        let result = match self.last.invoke(intermediate, Some(last_config)) {
-            Ok(output) => output,
-            Err(e) => {
-                run_manager.on_chain_error(&e);
-                return Err(e);
-            }
-        };
-
-        run_manager.on_chain_end(&HashMap::new());
-        Ok(result)
+        finish_chain_run(
+            &run_manager,
+            self.last.invoke(
+                intermediate,
+                Some(child_config(&config, &run_manager, Some("seq:step:2"))),
+            ),
+        )
     }
 
     async fn ainvoke(
@@ -1707,54 +1451,29 @@ where
     where
         Self: 'static,
     {
-        let config = ensure_config(config);
-        let async_callback_manager = get_async_callback_manager_for_config(&config);
-        let run_manager = async_callback_manager
-            .on_chain_start(&HashMap::new(), &HashMap::new(), config.run_id, None)
-            .await;
+        let (run_manager, config) = start_chain_run(config);
 
-        let first_config = patch_config(
-            Some(config.clone()),
-            Some(
-                run_manager
-                    .get_child(Some("seq:step:1"))
-                    .to_callback_manager(),
-            ),
-            None,
-            None,
-            None,
-            None,
-        );
-        let intermediate = match self.first.ainvoke(input, Some(first_config)).await {
+        let intermediate = match self
+            .first
+            .ainvoke(
+                input,
+                Some(child_config(&config, &run_manager, Some("seq:step:1"))),
+            )
+            .await
+        {
             Ok(output) => output,
-            Err(e) => {
-                run_manager.get_sync().on_chain_error(&e);
-                return Err(e);
-            }
+            Err(e) => return finish_chain_run(&run_manager, Err(e)),
         };
 
-        let last_config = patch_config(
-            Some(config),
-            Some(
-                run_manager
-                    .get_child(Some("seq:step:2"))
-                    .to_callback_manager(),
-            ),
-            None,
-            None,
-            None,
-            None,
-        );
-        let result = match self.last.ainvoke(intermediate, Some(last_config)).await {
-            Ok(output) => output,
-            Err(e) => {
-                run_manager.get_sync().on_chain_error(&e);
-                return Err(e);
-            }
-        };
-
-        run_manager.get_sync().on_chain_end(&HashMap::new());
-        Ok(result)
+        finish_chain_run(
+            &run_manager,
+            self.last
+                .ainvoke(
+                    intermediate,
+                    Some(child_config(&config, &run_manager, Some("seq:step:2"))),
+                )
+                .await,
+        )
     }
 
     fn stream(
@@ -1900,6 +1619,16 @@ where
         self.steps.insert(key.into(), Arc::new(runnable));
         self
     }
+
+    pub fn add_branch<R>(mut self, key: impl Into<String>, runnable: R) -> Self
+    where
+        R: Runnable<Input = I> + Send + Sync + 'static,
+        R::Output: Serialize,
+    {
+        self.steps
+            .insert(key.into(), Arc::new(SerializeAdapter { inner: runnable }));
+        self
+    }
 }
 
 impl<I> Default for RunnableParallel<I>
@@ -1957,15 +1686,7 @@ where
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let config = ensure_config(config);
-        let callback_manager = get_callback_manager_for_config(&config);
-        let run_manager = callback_manager
-            .on_chain_start()
-            .serialized(&HashMap::new())
-            .inputs(&HashMap::new())
-            .maybe_run_id(config.run_id)
-            .maybe_name(config.run_name.as_deref())
-            .call();
+        let (run_manager, config) = start_chain_run(config);
 
         let step_entries: Vec<_> = self.steps.iter().collect();
         let mut results = HashMap::new();
@@ -1975,18 +1696,12 @@ where
                 .iter()
                 .map(|(key, step)| {
                     let input = input.clone();
-                    let child_config = patch_config(
-                        Some(config.clone()),
-                        Some(run_manager.get_child(Some(&format!("map:key:{}", key)))),
-                        None,
-                        None,
-                        None,
-                        None,
-                    );
+                    let cfg =
+                        child_config(&config, &run_manager, Some(&format!("map:key:{}", key)));
                     let key = (*key).clone();
                     scope.spawn(move || {
-                        let _context_guard = set_config_context(child_config.clone());
-                        let result = step.invoke(input, Some(child_config));
+                        let _context_guard = set_config_context(cfg.clone());
+                        let result = step.invoke(input, Some(cfg));
                         (key, result)
                     })
                 })
@@ -2000,16 +1715,7 @@ where
             Ok(())
         });
 
-        match outcome {
-            Ok(()) => {
-                run_manager.on_chain_end(&HashMap::new());
-                Ok(results)
-            }
-            Err(e) => {
-                run_manager.on_chain_error(&e);
-                Err(e)
-            }
-        }
+        finish_chain_run(&run_manager, outcome.map(|()| results))
     }
 
     async fn ainvoke(
@@ -2020,68 +1726,32 @@ where
     where
         Self: 'static,
     {
-        let config = ensure_config(config);
-        let async_callback_manager = get_async_callback_manager_for_config(&config);
-        let run_manager = async_callback_manager
-            .on_chain_start(
-                &HashMap::new(),
-                &HashMap::new(),
-                config.run_id,
-                config.run_name.as_deref(),
-            )
-            .await;
+        let (run_manager, config) = start_chain_run(config);
 
         let futures: Vec<_> = self
             .steps
             .iter()
             .map(|(key, step)| {
                 let input = input.clone();
-                let child_config = patch_config(
-                    Some(config.clone()),
-                    Some(
-                        run_manager
-                            .get_child(Some(&format!("map:key:{}", key)))
-                            .to_callback_manager(),
-                    ),
-                    None,
-                    None,
-                    None,
-                    None,
-                );
+                let cfg = child_config(&config, &run_manager, Some(&format!("map:key:{}", key)));
                 let key = key.clone();
-                async move {
-                    let result = step.ainvoke(input, Some(child_config)).await;
-                    (key, result)
-                }
+                async move { (key, step.ainvoke(input, Some(cfg)).await) }
             })
             .collect();
 
         let completed = futures::future::join_all(futures).await;
 
         let mut results = HashMap::new();
-        let mut error: Option<Error> = None;
         for (key, result) in completed {
             match result {
                 Ok(value) => {
                     results.insert(key, value);
                 }
-                Err(e) => {
-                    error = Some(e);
-                    break;
-                }
+                Err(e) => return finish_chain_run(&run_manager, Err(e)),
             }
         }
 
-        match error {
-            None => {
-                run_manager.get_sync().on_chain_end(&HashMap::new());
-                Ok(results)
-            }
-            Some(e) => {
-                run_manager.get_sync().on_chain_error(&e);
-                Err(e)
-            }
-        }
+        finish_chain_run(&run_manager, Ok(results))
     }
 
     fn stream(
@@ -2143,15 +1813,7 @@ where
                 let name = name.clone();
                 let branch_input: BoxStream<'_, Self::Input> =
                     Box::pin(futures::stream::iter(input_chunks.clone()));
-                let branch_config = patch_config(
-                    Some(config.clone()),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                );
-                let branch_output = step.transform(branch_input, Some(branch_config));
+                let branch_output = step.transform(branch_input, Some(config.clone()));
                 let named_stream = branch_output.map(move |result| {
                     result.map(|value| (name.clone(), value))
                 });
@@ -2392,43 +2054,14 @@ where
     where
         Self: 'static,
     {
-        let config = ensure_config(config);
-        let async_callback_manager = get_async_callback_manager_for_config(&config);
-        let run_manager = async_callback_manager
-            .on_chain_start(
-                &HashMap::new(),
-                &HashMap::new(),
-                config.run_id,
-                config.run_name.as_deref(),
-            )
-            .await;
+        let (run_manager, config) = start_chain_run(config);
+        let cfg = child_config(&config, &run_manager, None);
 
-        let child_config = patch_config(
-            Some(config),
-            Some(run_manager.get_child(None).to_callback_manager()),
-            None,
-            None,
-            None,
-            None,
-        );
-
-        let configs = super::config::ConfigOrList::List(
-            inputs.iter().map(|_| child_config.clone()).collect(),
-        );
+        let configs =
+            super::config::ConfigOrList::List(inputs.iter().map(|_| cfg.clone()).collect());
         let results = self.bound.abatch(inputs, Some(configs), false).await;
 
-        match results.iter().find(|r| r.is_err()) {
-            None => {
-                run_manager.get_sync().on_chain_end(&HashMap::new());
-                results.into_iter().collect()
-            }
-            Some(_) => {
-                let collected: Result<Vec<R::Output>> = results.into_iter().collect();
-                let e = collected.unwrap_err();
-                run_manager.get_sync().on_chain_error(&e);
-                Err(e)
-            }
-        }
+        finish_chain_run(&run_manager, results.into_iter().collect())
     }
 }
 
@@ -2599,31 +2232,187 @@ where
     Arc::new(runnable)
 }
 
-pub fn coerce_to_runnable<F, I, O>(func: F) -> RunnableLambda<F, I, O>
+pub struct DynRunnableSequence<I, O>
 where
-    F: Fn(I) -> Result<O> + Send + Sync,
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    RunnableLambda::builder().func(func).build()
+    steps: Vec<DynRunnable<I, O>>,
+    name: Option<String>,
 }
 
-pub fn coerce_map_to_runnable<I>(
-    map: HashMap<String, Arc<dyn Runnable<Input = I, Output = Value> + Send + Sync>>,
-) -> RunnableParallel<I>
+impl<I, O> Debug for DynRunnableSequence<I, O>
 where
-    I: Send + Sync + Clone + Debug + 'static,
-{
-    RunnableParallel::from(map)
-}
-
-pub fn chain<F, I, O>(name: &str, func: F) -> RunnableLambda<F, I, O>
-where
-    F: Fn(I) -> Result<O> + Send + Sync,
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    RunnableLambda::builder().func(func).name(name).build()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DynRunnableSequence")
+            .field("steps", &self.steps.len())
+            .field("name", &self.name)
+            .finish()
+    }
+}
+
+impl<I, O> DynRunnableSequence<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    pub fn new(steps: Vec<DynRunnable<I, O>>) -> Self {
+        Self { steps, name: None }
+    }
+
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    pub fn push(&mut self, step: DynRunnable<I, O>) {
+        self.steps.push(step);
+    }
+}
+
+#[async_trait]
+impl<T> Runnable for DynRunnableSequence<T, T>
+where
+    T: Send + Sync + Clone + Debug + 'static,
+{
+    type Input = T;
+    type Output = T;
+
+    fn name(&self) -> Option<String> {
+        self.name.clone()
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let (run_manager, config) = start_chain_run(config);
+        let mut current = input;
+        for (i, step) in self.steps.iter().enumerate() {
+            let cfg = child_config(&config, &run_manager, Some(&format!("seq:step:{}", i + 1)));
+            match step.invoke(current, Some(cfg)) {
+                Ok(output) => current = output,
+                Err(e) => return finish_chain_run(&run_manager, Err(e)),
+            }
+        }
+        finish_chain_run(&run_manager, Ok(current))
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output>
+    where
+        Self: 'static,
+    {
+        let (run_manager, config) = start_chain_run(config);
+        let mut current = input;
+        for (i, step) in self.steps.iter().enumerate() {
+            let cfg = child_config(&config, &run_manager, Some(&format!("seq:step:{}", i + 1)));
+            match step.ainvoke(current, Some(cfg)).await {
+                Ok(output) => current = output,
+                Err(e) => return finish_chain_run(&run_manager, Err(e)),
+            }
+        }
+        finish_chain_run(&run_manager, Ok(current))
+    }
+
+    fn stream(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'_, Result<Self::Output>> {
+        if self.steps.is_empty() {
+            return Box::pin(futures::stream::once(async move { Ok(input) }));
+        }
+
+        Box::pin(async_stream::stream! {
+            let config = ensure_config(config);
+            let last_idx = self.steps.len() - 1;
+
+            let mut current = input;
+            for step in &self.steps[..last_idx] {
+                match step.invoke(current, Some(config.clone())) {
+                    Ok(output) => current = output,
+                    Err(e) => {
+                        yield Err(e);
+                        return;
+                    }
+                }
+            }
+
+            let mut stream = self.steps[last_idx].stream(current, Some(config));
+            while let Some(result) = stream.next().await {
+                yield result;
+            }
+        })
+    }
+}
+
+struct SerializeAdapter<R>
+where
+    R: Runnable,
+    R::Output: Serialize,
+{
+    inner: R,
+}
+
+impl<R> Debug for SerializeAdapter<R>
+where
+    R: Runnable,
+    R::Output: Serialize,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SerializeAdapter")
+            .field("inner", &self.inner)
+            .finish()
+    }
+}
+
+#[async_trait]
+impl<R> Runnable for SerializeAdapter<R>
+where
+    R: Runnable + 'static,
+    R::Output: Serialize,
+{
+    type Input = R::Input;
+    type Output = Value;
+
+    fn name(&self) -> Option<String> {
+        self.inner.name()
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let output = self.inner.invoke(input, config)?;
+        serde_json::to_value(output).map_err(|e| Error::other(format!("serialization failed: {e}")))
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output>
+    where
+        Self: 'static,
+    {
+        let output = self.inner.ainvoke(input, config).await?;
+        serde_json::to_value(output).map_err(|e| Error::other(format!("serialization failed: {e}")))
+    }
+
+    fn stream(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'_, Result<Self::Output>> {
+        let inner_stream = self.inner.stream(input, config);
+        Box::pin(inner_stream.map(|result| {
+            result.and_then(|output| {
+                serde_json::to_value(output)
+                    .map_err(|e| Error::other(format!("serialization failed: {e}")))
+            })
+        }))
+    }
 }
 
 #[cfg(test)]

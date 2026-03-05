@@ -5,10 +5,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::callbacks::{
-    AsyncCallbackManager, AsyncCallbackManagerForRetrieverRun, CallbackManager,
-    CallbackManagerForRetrieverRun,
-};
+use crate::callbacks::{CallbackManager, CallbackManagerForRetrieverRun};
 use crate::documents::Document;
 use crate::error::Result;
 use crate::runnables::{RunnableConfig, ensure_config};
@@ -104,10 +101,9 @@ pub trait BaseRetriever: Send + Sync + Debug {
     async fn aget_relevant_documents(
         &self,
         query: &str,
-        run_manager: Option<&AsyncCallbackManagerForRetrieverRun>,
+        run_manager: Option<&CallbackManagerForRetrieverRun>,
     ) -> Result<Vec<Document>> {
-        let sync_run_manager = run_manager.map(|rm| rm.get_sync());
-        self.get_relevant_documents(query, sync_run_manager.as_ref())
+        self.get_relevant_documents(query, run_manager)
     }
 
     fn invoke(&self, input: &str, config: Option<RunnableConfig>) -> Result<Vec<Document>> {
@@ -116,15 +112,13 @@ pub trait BaseRetriever: Send + Sync + Debug {
         let mut inheritable_metadata = config.metadata.clone();
         inheritable_metadata.extend(self.get_ls_params().to_metadata());
 
-        let callback_manager = CallbackManager::configure(
-            config.callbacks.clone(),
-            None,
-            false,
-            Some(config.tags.clone()),
-            self.tags().map(|t| t.to_vec()),
-            Some(inheritable_metadata),
-            self.metadata().cloned(),
-        );
+        let callback_manager = CallbackManager::configure()
+            .maybe_inheritable_callbacks(config.callbacks.clone())
+            .inheritable_tags(config.tags.clone())
+            .maybe_local_tags(self.tags().map(|t| t.to_vec()))
+            .inheritable_metadata(inheritable_metadata)
+            .maybe_local_metadata(self.metadata().cloned())
+            .call();
 
         let run_manager = callback_manager
             .on_retriever_start()
@@ -157,15 +151,13 @@ pub trait BaseRetriever: Send + Sync + Debug {
         let mut inheritable_metadata = config.metadata.clone();
         inheritable_metadata.extend(self.get_ls_params().to_metadata());
 
-        let callback_manager = AsyncCallbackManager::configure(
-            config.callbacks.clone(),
-            None,
-            false,
-            Some(config.tags.clone()),
-            self.tags().map(|t| t.to_vec()),
-            Some(inheritable_metadata),
-            self.metadata().cloned(),
-        );
+        let callback_manager = CallbackManager::configure()
+            .maybe_inheritable_callbacks(config.callbacks.clone())
+            .inheritable_tags(config.tags.clone())
+            .maybe_local_tags(self.tags().map(|t| t.to_vec()))
+            .inheritable_metadata(inheritable_metadata)
+            .maybe_local_metadata(self.metadata().cloned())
+            .call();
 
         let run_manager = callback_manager
             .on_retriever_start()
@@ -173,8 +165,7 @@ pub trait BaseRetriever: Send + Sync + Debug {
             .query(input)
             .maybe_run_id(config.run_id)
             .name(&config.run_name.clone().unwrap_or_else(|| self.get_name()))
-            .call()
-            .await;
+            .call();
 
         let result = self
             .aget_relevant_documents(input, Some(&run_manager))
@@ -182,17 +173,15 @@ pub trait BaseRetriever: Send + Sync + Debug {
 
         match &result {
             Ok(docs) => {
-                run_manager
-                    .on_retriever_end(
-                        &docs
-                            .iter()
-                            .filter_map(|doc| serde_json::to_value(doc).ok())
-                            .collect::<Vec<_>>(),
-                    )
-                    .await;
+                run_manager.on_retriever_end(
+                    &docs
+                        .iter()
+                        .filter_map(|doc| serde_json::to_value(doc).ok())
+                        .collect::<Vec<_>>(),
+                );
             }
             Err(e) => {
-                run_manager.get_sync().on_retriever_error(e);
+                run_manager.on_retriever_error(e);
             }
         }
 
@@ -237,8 +226,8 @@ mod tests {
         let result = retriever.get_relevant_documents("test", None).unwrap();
 
         assert_eq!(result.len(), 2);
-        assert_eq!(result[0].page_content, "Hello world");
-        assert_eq!(result[1].page_content, "Goodbye world");
+        assert_eq!(result[0].page_content(), "Hello world");
+        assert_eq!(result[1].page_content(), "Goodbye world");
     }
 
     #[test]

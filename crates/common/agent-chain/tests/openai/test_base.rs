@@ -22,12 +22,14 @@ fn load_env() {
 
 async fn test_chat_openai() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let chat = ChatOpenAI::new("gpt-4o-mini")
+    let chat = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .temperature(0.7)
         .timeout(10)
         .max_retries(3)
         .n(1)
-        .max_tokens(MAX_TOKEN_COUNT);
+        .max_tokens(MAX_TOKEN_COUNT)
+        .build();
 
     let message = HumanMessage::builder().content("Hello").build();
     let response = chat.invoke(vec![message.into()].into(), None).await?;
@@ -55,8 +57,10 @@ async fn test_callable_api_key() -> Result<(), Box<dyn std::error::Error>> {
     let call_count = Arc::new(AtomicUsize::new(0));
     let call_count_clone = call_count.clone();
 
-    let model = ChatOpenAI::new("gpt-4o-mini")
+    let model = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
+        .build()
         .api_key_fn(move || {
             call_count_clone.fetch_add(1, Ordering::SeqCst);
             original_key.clone()
@@ -86,8 +90,10 @@ async fn test_callable_api_key_async() -> Result<(), Box<dyn std::error::Error>>
     let call_count = Arc::new(AtomicUsize::new(0));
     let call_count_clone = call_count.clone();
 
-    let model = ChatOpenAI::new("gpt-4o-mini")
+    let model = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
+        .build()
         .api_key_fn(move || {
             call_count_clone.fetch_add(1, Ordering::SeqCst);
             original_key.clone()
@@ -110,7 +116,10 @@ async fn test_callable_api_key_async() -> Result<(), Box<dyn std::error::Error>>
 
 async fn test_chat_openai_system_message() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let chat = ChatOpenAI::new("gpt-4o-mini").max_tokens(MAX_TOKEN_COUNT);
+    let chat = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .max_tokens(MAX_TOKEN_COUNT)
+        .build();
 
     let system_message = SystemMessage::builder()
         .content("You are to chat with the user.")
@@ -132,9 +141,11 @@ async fn test_chat_openai_system_message() -> Result<(), Box<dyn std::error::Err
 
 async fn test_chat_openai_system_message_responses_api() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let chat = ChatOpenAI::new("gpt-4o-mini")
+    let chat = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
-        .with_responses_api(true);
+        .use_responses_api(true)
+        .build();
 
     let system_message = SystemMessage::builder()
         .content("You are to chat with the user.")
@@ -156,9 +167,11 @@ async fn test_chat_openai_system_message_responses_api() -> Result<(), Box<dyn s
 
 async fn test_chat_openai_generate() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let chat = ChatOpenAI::new("gpt-4o-mini")
+    let chat = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
-        .n(2);
+        .n(2)
+        .build();
 
     let message: BaseMessage = HumanMessage::builder().content("Hello").build().into();
     let result = chat
@@ -186,9 +199,11 @@ async fn test_chat_openai_generate() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_chat_openai_multiple_completions() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let chat = ChatOpenAI::new("gpt-4o-mini")
+    let chat = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
-        .n(5);
+        .n(5)
+        .build();
 
     let messages = vec![HumanMessage::builder().content("Hello").build().into()];
     let result = chat._generate(messages, None, None).await?;
@@ -205,10 +220,12 @@ async fn test_chat_openai_multiple_completions() -> Result<(), Box<dyn std::erro
 
 async fn test_chat_openai_streaming() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let chat = ChatOpenAI::new("gpt-4o-mini")
+    let chat = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
         .streaming(true)
-        .temperature(0.0);
+        .temperature(0.0)
+        .build();
 
     let message = HumanMessage::builder().content("Hello").build();
     let response = chat.invoke(vec![message.into()].into(), None).await?;
@@ -222,11 +239,13 @@ async fn test_chat_openai_streaming() -> Result<(), Box<dyn std::error::Error>> 
 
 async fn test_chat_openai_streaming_responses_api() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let chat = ChatOpenAI::new("gpt-4o-mini")
+    let chat = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
         .streaming(true)
         .temperature(0.0)
-        .with_responses_api(true);
+        .use_responses_api(true)
+        .build();
 
     let message = HumanMessage::builder().content("Hello").build();
     let response = chat.invoke(vec![message.into()].into(), None).await?;
@@ -240,9 +259,11 @@ async fn test_chat_openai_streaming_responses_api() -> Result<(), Box<dyn std::e
 
 async fn test_chat_openai_streaming_generation_info() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let chat = ChatOpenAI::new("gpt-4o-mini")
-        .max_tokens(2)
-        .temperature(0.0);
+    let chat = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .max_tokens(2u32)
+        .temperature(0.0)
+        .build();
 
     let mut stream = chat
         .stream(
@@ -267,7 +288,10 @@ async fn test_chat_openai_streaming_generation_info() -> Result<(), Box<dyn std:
 async fn test_chat_openai_llm_output_contains_model_name() -> Result<(), Box<dyn std::error::Error>>
 {
     load_env();
-    let chat = ChatOpenAI::new("gpt-4o-mini").max_tokens(MAX_TOKEN_COUNT);
+    let chat = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .max_tokens(MAX_TOKEN_COUNT)
+        .build();
 
     let message: BaseMessage = HumanMessage::builder().content("Hello").build().into();
     let result = chat
@@ -291,9 +315,11 @@ async fn test_chat_openai_llm_output_contains_model_name() -> Result<(), Box<dyn
 async fn test_chat_openai_streaming_llm_output_contains_model_name()
 -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let chat = ChatOpenAI::new("gpt-4o-mini")
+    let chat = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
-        .streaming(true);
+        .streaming(true)
+        .build();
 
     let message: BaseMessage = HumanMessage::builder().content("Hello").build().into();
     let result = chat
@@ -314,11 +340,13 @@ async fn test_chat_openai_streaming_llm_output_contains_model_name()
 /// Ported from `test_chat_openai_invalid_streaming_params`.
 #[test]
 fn test_chat_openai_invalid_streaming_params() {
-    let chat = ChatOpenAI::new("gpt-4o-mini")
+    let chat = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
         .streaming(true)
         .temperature(0.0)
-        .n(5);
+        .n(5)
+        .build();
 
     // In Rust, we validate at request time. Attempting to build a streaming payload
     // with n>1 should be caught. For now we test that the model can be constructed
@@ -331,7 +359,10 @@ fn test_chat_openai_invalid_streaming_params() {
 
 async fn test_openai_abatch_tags() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini").max_tokens(MAX_TOKEN_COUNT);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .max_tokens(MAX_TOKEN_COUNT)
+        .build();
 
     let result1 = llm
         .invoke(
@@ -368,9 +399,11 @@ async fn test_openai_abatch_tags() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_openai_abatch_tags_responses_api() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini")
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
-        .with_responses_api(true);
+        .use_responses_api(true)
+        .build();
 
     let result1 = llm
         .invoke(
@@ -407,7 +440,10 @@ async fn test_openai_abatch_tags_responses_api() -> Result<(), Box<dyn std::erro
 
 async fn test_openai_invoke() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini").max_retries(3);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .max_retries(3)
+        .build();
 
     let result = llm
         .invoke(
@@ -438,7 +474,10 @@ async fn test_openai_invoke() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini").max_retries(3);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .max_retries(3)
+        .build();
 
     let mut stream = llm
         .astream(
@@ -478,9 +517,11 @@ async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_astream() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini")
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .temperature(0.0)
-        .max_tokens(MAX_TOKEN_COUNT);
+        .max_tokens(MAX_TOKEN_COUNT)
+        .build();
 
     // Test with default stream_usage (true for openai api base)
     let mut stream = llm
@@ -513,9 +554,11 @@ async fn test_astream() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_flex_usage_responses() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini")
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .max_retries(3)
-        .with_responses_api(true);
+        .use_responses_api(true)
+        .build();
 
     let result = llm
         .invoke(
@@ -533,10 +576,12 @@ async fn test_flex_usage_responses() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_flex_usage_responses_streaming() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini")
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .max_retries(3)
-        .with_responses_api(true)
-        .streaming(true);
+        .use_responses_api(true)
+        .streaming(true)
+        .build();
 
     let result = llm
         .invoke(
@@ -554,7 +599,10 @@ async fn test_flex_usage_responses_streaming() -> Result<(), Box<dyn std::error:
 
 async fn test_abatch_tags() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini").max_tokens(MAX_TOKEN_COUNT);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .max_tokens(MAX_TOKEN_COUNT)
+        .build();
 
     let result = llm
         .invoke(
@@ -578,7 +626,10 @@ async fn test_abatch_tags() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_response_metadata() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini").logprobs(true);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .logprobs(true)
+        .build();
 
     let result = llm
         .invoke(
@@ -603,7 +654,10 @@ async fn test_response_metadata() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_async_response_metadata() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini").logprobs(true);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .logprobs(true)
+        .build();
 
     let result = llm
         .ainvoke(
@@ -628,7 +682,10 @@ async fn test_async_response_metadata() -> Result<(), Box<dyn std::error::Error>
 
 async fn test_response_metadata_streaming() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini").logprobs(true);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .logprobs(true)
+        .build();
 
     let mut stream = llm
         .astream(
@@ -664,7 +721,10 @@ async fn test_response_metadata_streaming() -> Result<(), Box<dyn std::error::Er
 
 async fn test_async_response_metadata_streaming() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini").logprobs(true);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .logprobs(true)
+        .build();
 
     let mut stream = llm
         .astream(
@@ -711,7 +771,10 @@ async fn test_tool_use() -> Result<(), Box<dyn std::error::Error>> {
         "required": ["name", "hair_color"]
     });
 
-    let llm = ChatOpenAI::new("gpt-4o-mini").temperature(0.0);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .temperature(0.0)
+        .build();
     let tool_like = ToolLike::Schema(generate_username_schema);
     let llm_with_tool = llm.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
 
@@ -758,7 +821,10 @@ async fn test_manual_tool_call_msg() -> Result<(), Box<dyn std::error::Error>> {
         "required": ["name", "hair_color"]
     });
 
-    let llm = ChatOpenAI::new("gpt-4o-mini").temperature(0.0);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .temperature(0.0)
+        .build();
     let tool_like = ToolLike::Schema(generate_username_schema);
     let llm_with_tool = llm.bind_tools(&[tool_like], None)?;
 
@@ -810,9 +876,11 @@ async fn test_manual_tool_call_msg_responses_api() -> Result<(), Box<dyn std::er
         "required": ["name", "hair_color"]
     });
 
-    let llm = ChatOpenAI::new("gpt-4o-mini")
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .temperature(0.0)
-        .with_responses_api(true);
+        .use_responses_api(true)
+        .build();
     let tool_like = ToolLike::Schema(generate_username_schema);
     let llm_with_tool = llm.bind_tools(&[tool_like], None)?;
 
@@ -874,7 +942,10 @@ async fn test_bind_tools_tool_choice() -> Result<(), Box<dyn std::error::Error>>
         "required": ["bread_type", "cheese_type", "condiments", "vegetables"]
     });
 
-    let llm = ChatOpenAI::new("gpt-4o-mini").temperature(0.0);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .temperature(0.0)
+        .build();
     let tools = [
         ToolLike::Schema(generate_username.clone()),
         ToolLike::Schema(make_sandwich.clone()),
@@ -960,9 +1031,11 @@ async fn test_bind_tools_tool_choice_responses_api() -> Result<(), Box<dyn std::
         "required": ["bread_type", "cheese_type", "condiments", "vegetables"]
     });
 
-    let llm = ChatOpenAI::new("gpt-4o-mini")
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .temperature(0.0)
-        .with_responses_api(true);
+        .use_responses_api(true)
+        .build();
     let tools = [
         ToolLike::Schema(generate_username),
         ToolLike::Schema(make_sandwich),
@@ -1069,7 +1142,10 @@ async fn test_openai_structured_output() -> Result<(), Box<dyn std::error::Error
 /// Ported from `test_openai_proxy`.
 #[test]
 fn test_openai_proxy() {
-    let chat_openai = ChatOpenAI::new("gpt-4o-mini").openai_proxy("http://localhost:8080");
+    let chat_openai = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .proxy("http://localhost:8080")
+        .build();
 
     // Verify the proxy URL is stored
     // The actual proxy configuration is applied in build_client()
@@ -1083,7 +1159,10 @@ fn test_openai_proxy() {
 
 async fn test_openai_response_headers() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let chat_openai = ChatOpenAI::new("gpt-4o-mini").include_response_headers(true);
+    let chat_openai = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .include_response_headers(true)
+        .build();
 
     let result = chat_openai
         .invoke(
@@ -1113,9 +1192,11 @@ async fn test_openai_response_headers() -> Result<(), Box<dyn std::error::Error>
 
 async fn test_openai_response_headers_responses_api() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let chat_openai = ChatOpenAI::new("gpt-4o-mini")
+    let chat_openai = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .include_response_headers(true)
-        .with_responses_api(true);
+        .use_responses_api(true)
+        .build();
 
     let result = chat_openai
         .invoke(
@@ -1145,7 +1226,10 @@ async fn test_openai_response_headers_responses_api() -> Result<(), Box<dyn std:
 
 async fn test_openai_response_headers_async() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let chat_openai = ChatOpenAI::new("gpt-4o-mini").include_response_headers(true);
+    let chat_openai = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .include_response_headers(true)
+        .build();
 
     let result = chat_openai
         .ainvoke(
@@ -1176,9 +1260,11 @@ async fn test_openai_response_headers_async() -> Result<(), Box<dyn std::error::
 async fn test_openai_response_headers_async_responses_api() -> Result<(), Box<dyn std::error::Error>>
 {
     load_env();
-    let chat_openai = ChatOpenAI::new("gpt-4o-mini")
+    let chat_openai = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .include_response_headers(true)
-        .with_responses_api(true);
+        .use_responses_api(true)
+        .build();
 
     let result = chat_openai
         .ainvoke(
@@ -1210,7 +1296,10 @@ async fn test_image_token_counting_jpeg() -> Result<(), Box<dyn std::error::Erro
     load_env();
     use agent_chain_core::messages::{ContentPart, ImageSource, MessageContent};
 
-    let model = ChatOpenAI::new("gpt-4o").temperature(0.0);
+    let model = ChatOpenAI::builder()
+        .model("gpt-4o")
+        .temperature(0.0)
+        .build();
     let image_url = "https://raw.githubusercontent.com/langchain-ai/docs/9f99bb977307a1bd5efeb8dc6b67eb13904c4af1/src/oss/images/checkpoints.jpg";
 
     let message = HumanMessage::builder()
@@ -1241,7 +1330,10 @@ async fn test_image_token_counting_png() -> Result<(), Box<dyn std::error::Error
     load_env();
     use agent_chain_core::messages::{ContentPart, ImageSource, MessageContent};
 
-    let model = ChatOpenAI::new("gpt-4o").temperature(0.0);
+    let model = ChatOpenAI::builder()
+        .model("gpt-4o")
+        .temperature(0.0)
+        .build();
     let image_url = "https://raw.githubusercontent.com/langchain-ai/docs/4d11d08b6b0e210bd456943f7a22febbd168b543/src/images/agentic-rag-output.png";
 
     let message = HumanMessage::builder()
@@ -1279,7 +1371,10 @@ async fn test_tool_calling_strict() -> Result<(), Box<dyn std::error::Error>> {
         "required": ["input"]
     });
 
-    let model = ChatOpenAI::new("gpt-4o-mini").temperature(0.0);
+    let model = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .temperature(0.0)
+        .build();
 
     let model_with_tools = model.bind_tools_with_options(
         &[ToolLike::Schema(magic_function_schema)],
@@ -1316,9 +1411,11 @@ async fn test_tool_calling_strict_responses_api() -> Result<(), Box<dyn std::err
         "required": ["input"]
     });
 
-    let model = ChatOpenAI::new("gpt-4o-mini")
+    let model = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
         .temperature(0.0)
-        .with_responses_api(true);
+        .use_responses_api(true)
+        .build();
 
     let model_with_tools = model.bind_tools_with_options(
         &[ToolLike::Schema(magic_function_schema)],
@@ -1448,7 +1545,10 @@ async fn test_nested_structured_output_strict() -> Result<(), Box<dyn std::error
         "required": ["setup", "punchline", "self_evaluation"]
     });
 
-    let llm = ChatOpenAI::new("gpt-4o-2024-08-06").temperature(0.0);
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-2024-08-06")
+        .temperature(0.0)
+        .build();
     let chat = llm.with_structured_output_options(
         joke_with_eval_schema,
         false,
@@ -1540,9 +1640,11 @@ async fn test_audio_output_modality() -> Result<(), Box<dyn std::error::Error>> 
         serde_json::json!({"voice": "alloy", "format": "wav"}),
     );
 
-    let llm = ChatOpenAI::new("gpt-4o-audio-preview")
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-audio-preview")
         .temperature(0.0)
-        .model_kwargs(model_kwargs);
+        .model_kwargs(model_kwargs)
+        .build();
 
     let output = llm
         .invoke(
@@ -1578,9 +1680,11 @@ async fn test_audio_input_modality() -> Result<(), Box<dyn std::error::Error>> {
         serde_json::json!({"voice": "alloy", "format": "wav"}),
     );
 
-    let llm = ChatOpenAI::new("gpt-4o-audio-preview")
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-audio-preview")
         .temperature(0.0)
-        .model_kwargs(model_kwargs);
+        .model_kwargs(model_kwargs)
+        .build();
 
     // Create a minimal audio content part using Other variant
     let message = HumanMessage::builder()
@@ -1622,10 +1726,13 @@ public class User
     public string Username { get; set; }
 }"#;
 
-    let llm = ChatOpenAI::new("gpt-4o-mini").prediction(serde_json::json!({
-        "type": "content",
-        "content": code
-    }));
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .prediction(serde_json::json!({
+            "type": "content",
+            "content": code
+        }))
+        .build();
 
     let query = "Replace the Username property with an Email property. \
                  Respond only with code, and with no markdown formatting.";
@@ -1678,8 +1785,10 @@ async fn test_stream_o_series() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_stream_o_series_responses_api() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let mut stream = ChatOpenAI::new("o3-mini")
-        .with_responses_api(true)
+    let mut stream = ChatOpenAI::builder()
+        .model("o3-mini")
+        .use_responses_api(true)
+        .build()
         .astream(
             vec![
                 HumanMessage::builder()
@@ -1735,8 +1844,10 @@ async fn test_astream_o_series() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_astream_o_series_responses_api() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let mut stream = ChatOpenAI::new("o3-mini")
-        .with_responses_api(true)
+    let mut stream = ChatOpenAI::builder()
+        .model("o3-mini")
+        .use_responses_api(true)
+        .build()
         .astream(
             vec![
                 HumanMessage::builder()
@@ -1851,9 +1962,11 @@ async fn test_astream_response_format() -> Result<(), Box<dyn std::error::Error>
 
 async fn test_o1() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let response = ChatOpenAI::new("o1")
+    let response = ChatOpenAI::builder()
+        .model("o1")
         .reasoning_effort("low")
-        .max_tokens(1000)
+        .max_tokens(1000u32)
+        .build()
         .invoke(
             vec![
                 HumanMessage::builder()
@@ -1875,10 +1988,12 @@ async fn test_o1() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_o1_responses_api() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let response = ChatOpenAI::new("o1")
+    let response = ChatOpenAI::builder()
+        .model("o1")
         .reasoning_effort("low")
-        .max_tokens(1000)
-        .with_responses_api(true)
+        .max_tokens(1000u32)
+        .use_responses_api(true)
+        .build()
         .invoke(
             vec![
                 HumanMessage::builder()
@@ -2057,9 +2172,11 @@ async fn test_prompt_cache_key_invoke() -> Result<(), Box<dyn std::error::Error>
         serde_json::json!("integration-test-v1"),
     );
 
-    let chat = ChatOpenAI::new("gpt-4o-mini")
-        .max_tokens(500)
-        .model_kwargs(model_kwargs);
+    let chat = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .max_tokens(500u32)
+        .model_kwargs(model_kwargs)
+        .build();
 
     let messages: Vec<BaseMessage> =
         vec![HumanMessage::builder().content("Say hello").build().into()];
@@ -2085,9 +2202,11 @@ async fn test_prompt_cache_key_usage_methods_integration() -> Result<(), Box<dyn
         serde_json::json!("integration-model-level-v1"),
     );
 
-    let chat = ChatOpenAI::new("gpt-4o-mini")
-        .max_tokens(10)
-        .model_kwargs(model_kwargs);
+    let chat = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .max_tokens(10u32)
+        .model_kwargs(model_kwargs)
+        .build();
 
     let response = chat.invoke(messages.into(), None).await?;
     assert!(!response.text().is_empty());
@@ -2145,8 +2264,10 @@ async fn test_schema_parsing_failures() -> Result<(), Box<dyn std::error::Error>
 
 async fn test_schema_parsing_failures_responses_api() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini")
-        .with_responses_api(true)
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .use_responses_api(true)
+        .build()
         .response_format(serde_json::json!({
             "type": "json_schema",
             "json_schema": {
@@ -2226,8 +2347,10 @@ async fn test_schema_parsing_failures_async() -> Result<(), Box<dyn std::error::
 async fn test_schema_parsing_failures_responses_api_async() -> Result<(), Box<dyn std::error::Error>>
 {
     load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini")
-        .with_responses_api(true)
+    let llm = ChatOpenAI::builder()
+        .model("gpt-4o-mini")
+        .use_responses_api(true)
+        .build()
         .response_format(serde_json::json!({
             "type": "json_schema",
             "json_schema": {

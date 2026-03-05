@@ -10,10 +10,12 @@ use crate::error::{Error, Result};
 use crate::messages::BaseMessage;
 use crate::prompt_values::{ChatPromptValue, PromptValue};
 use crate::runnables::base::Runnable;
-use crate::runnables::config::{RunnableConfig, ensure_config};
+use crate::runnables::config::RunnableConfig;
 
-use super::base::BasePromptTemplate;
-use super::chat::{BaseChatPromptTemplate, ChatPromptTemplate, MessageLikeRepresentation};
+use super::base::{BasePromptTemplate, PartialValue, merge_prompt_config};
+use super::chat::{
+    BaseChatPromptTemplate, ChatPromptInput, ChatPromptTemplate, MessageLikeRepresentation,
+};
 use super::string::PromptTemplateFormat;
 
 #[derive(Debug, Clone)]
@@ -34,7 +36,7 @@ impl StructuredPrompt {
     ) -> Result<Self> {
         warn_beta(
             BetaParams {
-                message: Some("StructuredPrompt is in beta. It is actively being worked on,                           so the API may change.".to_string()),
+                message: Some("StructuredPrompt is in beta. It is actively being worked on, so the API may change.".to_string()),
                 ..Default::default()
             },
             module_path!(),
@@ -80,24 +82,29 @@ impl BasePromptTemplate for StructuredPrompt {
         self.chat_template.optional_variables()
     }
 
-    fn partial_variables(&self) -> &HashMap<String, String> {
+    fn partial_variables(&self) -> HashMap<String, String> {
         self.chat_template.partial_variables()
     }
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<String> {
-        let messages = self.format_messages(kwargs)?;
+        let input = ChatPromptInput::from(kwargs.clone());
+        let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
         let prompt_value = crate::prompt_values::ChatPromptValue::new(messages);
         Ok(prompt_value.to_string())
     }
 
     fn format_prompt(&self, kwargs: &HashMap<String, String>) -> Result<Box<dyn PromptValue>> {
-        let messages = self.format_messages(kwargs)?;
+        let input = ChatPromptInput::from(kwargs.clone());
+        let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
         Ok(Box::new(crate::prompt_values::ChatPromptValue::new(
             messages,
         )))
     }
 
-    fn partial(&self, _kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>> {
+    fn partial(
+        &self,
+        _kwargs: HashMap<String, PartialValue>,
+    ) -> Result<Box<dyn BasePromptTemplate>> {
         Err(crate::error::Error::NotImplemented(
             "partial is not supported for StructuredPrompt".into(),
         ))
@@ -117,8 +124,8 @@ impl BasePromptTemplate for StructuredPrompt {
 }
 
 impl BaseChatPromptTemplate for StructuredPrompt {
-    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
-        self.chat_template.format_messages(kwargs)
+    fn format_messages(&self, input: &ChatPromptInput) -> Result<Vec<BaseMessage>> {
+        self.chat_template.format_messages(input)
     }
 
     fn pretty_repr(&self, html: bool) -> String {
@@ -128,7 +135,7 @@ impl BaseChatPromptTemplate for StructuredPrompt {
 
 #[async_trait]
 impl Runnable for StructuredPrompt {
-    type Input = HashMap<String, String>;
+    type Input = ChatPromptInput;
     type Output = ChatPromptValue;
 
     fn name(&self) -> Option<String> {
@@ -136,10 +143,16 @@ impl Runnable for StructuredPrompt {
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let _config = ensure_config(config);
-        BasePromptTemplate::validate_input(self, &input)?;
-        let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
-        Ok(ChatPromptValue::new(messages))
+        let config = merge_prompt_config(config, self.metadata(), self.tags());
+        self.call_with_config(
+            &|input: ChatPromptInput, _config| {
+                BasePromptTemplate::validate_input(self, &input.variables)?;
+                let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
+                Ok(ChatPromptValue::new(messages))
+            },
+            input,
+            config,
+        )
     }
 
     async fn ainvoke(
@@ -195,7 +208,8 @@ mod tests {
         let mut kwargs = HashMap::new();
         kwargs.insert("text".to_string(), "Hello world".to_string());
 
-        let messages = prompt.format_messages(&kwargs).unwrap();
+        let input = ChatPromptInput::from(kwargs);
+        let messages = prompt.format_messages(&input).unwrap();
         assert_eq!(messages.len(), 2);
         assert_eq!(messages[0].content(), "You extract data.");
         assert_eq!(messages[1].content(), "Hello world");
