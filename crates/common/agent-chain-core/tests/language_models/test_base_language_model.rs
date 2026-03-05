@@ -746,7 +746,7 @@ mod test_callbacks_config {
     #[test]
     fn test_initialization_with_callbacks() {
         let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-        let callbacks = Callbacks::from_handlers(vec![handler]);
+        let callbacks = Callbacks::from(vec![handler]);
         let config = LanguageModelConfig::builder().callbacks(callbacks).build();
         assert!(config.callbacks.is_some());
     }
@@ -754,7 +754,7 @@ mod test_callbacks_config {
     #[test]
     fn test_callbacks_excluded_from_serialization() {
         let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-        let callbacks = Callbacks::from_handlers(vec![handler]);
+        let callbacks = Callbacks::from(vec![handler]);
         let config = LanguageModelConfig::builder().callbacks(callbacks).build();
 
         let json = serde_json::to_string(&config).unwrap();

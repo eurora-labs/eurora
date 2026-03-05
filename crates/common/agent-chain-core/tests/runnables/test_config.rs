@@ -325,15 +325,7 @@ fn test_merge_config_callbacks_manager_with_handlers() {
     let handler2: Arc<dyn BaseCallbackHandler> = Arc::new(StreamingStdOutCallbackHandler::new());
 
     let c1 = RunnableConfig {
-        callbacks: Some(Callbacks::Manager(CallbackManager {
-            handlers: mgr.handlers.clone(),
-            inheritable_handlers: mgr.inheritable_handlers.clone(),
-            parent_run_id: mgr.parent_run_id,
-            tags: mgr.tags.clone(),
-            inheritable_tags: mgr.inheritable_tags.clone(),
-            metadata: mgr.metadata.clone(),
-            inheritable_metadata: mgr.inheritable_metadata.clone(),
-        })),
+        callbacks: Some(Callbacks::Manager(mgr.clone())),
         ..Default::default()
     };
     let c2 = RunnableConfig {
@@ -344,10 +336,10 @@ fn test_merge_config_callbacks_manager_with_handlers() {
     let merged = merge_configs(vec![Some(c1), Some(c2)]);
     match &merged.callbacks {
         Some(Callbacks::Manager(base_mgr)) => {
-            assert_eq!(base_mgr.handlers.len(), 2);
-            assert_eq!(base_mgr.handlers[0].name(), "StdOutCallbackHandler");
+            assert_eq!(base_mgr.handlers().len(), 2);
+            assert_eq!(base_mgr.handlers()[0].name(), "StdOutCallbackHandler");
             assert_eq!(
-                base_mgr.handlers[1].name(),
+                base_mgr.handlers()[1].name(),
                 "StreamingStdOutCallbackHandler"
             );
         }
@@ -367,22 +359,14 @@ fn test_merge_config_callbacks_handlers_with_manager() {
         ..Default::default()
     };
     let c2 = RunnableConfig {
-        callbacks: Some(Callbacks::Manager(CallbackManager {
-            handlers: mgr.handlers.clone(),
-            inheritable_handlers: mgr.inheritable_handlers.clone(),
-            parent_run_id: mgr.parent_run_id,
-            tags: mgr.tags.clone(),
-            inheritable_tags: mgr.inheritable_tags.clone(),
-            metadata: mgr.metadata.clone(),
-            inheritable_metadata: mgr.inheritable_metadata.clone(),
-        })),
+        callbacks: Some(Callbacks::Manager(mgr.clone())),
         ..Default::default()
     };
 
     let merged = merge_configs(vec![Some(c1), Some(c2)]);
     match &merged.callbacks {
         Some(Callbacks::Manager(base_mgr)) => {
-            assert!(!base_mgr.handlers.is_empty());
+            assert!(!base_mgr.handlers().is_empty());
         }
         _ => panic!("Expected Callbacks::Manager"),
     }
@@ -436,9 +420,9 @@ fn test_get_callback_manager_for_config_with_tags_and_metadata() {
     let mut config = RunnableConfig::builder().tags(vec!["a".into()]).build();
     config.metadata = HashMap::from([("k".to_string(), serde_json::json!("v"))]);
     let mgr = get_callback_manager_for_config(&config);
-    assert!(mgr.inheritable_tags.contains(&"a".to_string()));
+    assert!(mgr.inheritable_tags().contains(&"a".to_string()));
     assert_eq!(
-        mgr.inheritable_metadata.get("k"),
+        mgr.inheritable_metadata().get("k"),
         Some(&serde_json::json!("v"))
     );
 }
@@ -469,7 +453,7 @@ fn test_runnable_config_with_run_id() {
 #[test]
 fn test_runnable_config_with_callbacks() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(StdOutCallbackHandler::new());
-    let callbacks = Callbacks::from_handlers(vec![handler]);
+    let callbacks = Callbacks::from(vec![handler]);
     let config = RunnableConfig::builder().callbacks(callbacks).build();
     assert!(config.callbacks.is_some());
 }
@@ -579,7 +563,7 @@ fn test_patch_config_preserves_existing_tags() {
 fn test_patch_config_preserves_callbacks_when_not_replaced() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(StdOutCallbackHandler::new());
     let config = RunnableConfig::builder()
-        .callbacks(Callbacks::from_handlers(vec![handler]))
+        .callbacks(Callbacks::from(vec![handler]))
         .run_name("keep_me")
         .run_id(uuid::Uuid::new_v4())
         .build();

@@ -63,7 +63,7 @@ fn test_sync_callback_manager() {
     });
 
     let config = RunnableConfig {
-        callbacks: Some(Callbacks::from_handlers(vec![handler])),
+        callbacks: Some(Callbacks::from(vec![handler])),
         ..Default::default()
     };
 
@@ -86,7 +86,7 @@ async fn test_async_callback_manager() {
     });
 
     let config = RunnableConfig {
-        callbacks: Some(Callbacks::from_handlers(vec![handler])),
+        callbacks: Some(Callbacks::from(vec![handler])),
         ..Default::default()
     };
 
@@ -104,7 +104,7 @@ fn test_runnable_lambda_callback_lifecycle() {
     let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
 
     let config = RunnableConfig {
-        callbacks: Some(Callbacks::from_handlers(vec![handler])),
+        callbacks: Some(Callbacks::from(vec![handler])),
         ..Default::default()
     };
 
@@ -126,7 +126,7 @@ fn test_runnable_lambda_callback_error_lifecycle() {
         .build();
 
     let config = RunnableConfig {
-        callbacks: Some(Callbacks::from_handlers(vec![handler])),
+        callbacks: Some(Callbacks::from(vec![handler])),
         ..Default::default()
     };
 
@@ -137,7 +137,7 @@ fn test_runnable_lambda_callback_error_lifecycle() {
 #[test]
 fn test_dispatch_custom_event_no_handlers() {
     let mut manager = CallbackManager::new();
-    manager.parent_run_id = Some(uuid::Uuid::nil());
+    manager.set_parent_run_id(Some(uuid::Uuid::nil()));
 
     let result = dispatch_custom_event("event1", &serde_json::json!({"x": 1}), &manager);
     assert!(result.is_ok());

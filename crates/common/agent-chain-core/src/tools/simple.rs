@@ -276,8 +276,7 @@ impl BaseTool for Tool {
             let result = coroutine(string_input).await?;
             Ok(ToolOutput::String(result))
         } else {
-            let sync_manager = _run_manager.map(|rm| rm.get_sync());
-            self.tool_run(input, sync_manager.as_ref(), _config)
+            self.tool_run(input, _run_manager, _config)
         }
     }
 }

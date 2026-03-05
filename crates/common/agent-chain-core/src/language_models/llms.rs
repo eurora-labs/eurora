@@ -513,17 +513,12 @@ pub trait BaseLLM: BaseLanguageModel {
             .maybe_local_metadata(self.config().metadata.clone())
             .call();
 
-        let run_managers = callback_manager
-            .on_llm_start(&params, std::slice::from_ref(&prompt), run_id)
-            .await;
+        let run_managers =
+            callback_manager.on_llm_start(&params, std::slice::from_ref(&prompt), run_id);
         let run_manager = run_managers.into_iter().next();
 
         let generation_stream = self
-            .stream_prompt(
-                prompt,
-                stop,
-                run_manager.as_ref().map(|rm| rm.get_sync()).as_ref(),
-            )
+            .stream_prompt(prompt, stop, run_manager.as_ref())
             .await?;
 
         let chunk_stream = async_stream::stream! {
@@ -536,14 +531,14 @@ pub trait BaseLLM: BaseLanguageModel {
                 match result {
                     Ok(chunk) => {
                         if let Some(ref rm) = run_manager {
-                            rm.on_llm_new_token(&chunk.text, None).await;
+                            rm.on_llm_new_token(&chunk.text, None);
                         }
                         chunks.push(chunk.clone());
                         yield Ok(chunk);
                     }
                     Err(e) => {
                         if let Some(ref rm) = run_manager {
-                            rm.get_sync().on_llm_error(&e);
+                            rm.on_llm_error(&e);
                         }
                         yield Err(e);
                         return;
@@ -556,7 +551,7 @@ pub trait BaseLLM: BaseLanguageModel {
                     let generation: Generation = merged.into();
                     let result = LLMResult::builder().generations(vec![vec![GenerationType::Generation(generation)]]).build();
                     let chat_result = llm_result_to_chat_result(&result);
-                    rm.on_llm_end(&chat_result).await;
+                    rm.on_llm_end(&chat_result);
                 }
         };
 
@@ -658,9 +653,7 @@ pub trait BaseLLM: BaseLanguageModel {
                 return Ok(LLMResult::builder().generations(generations).build());
             }
 
-            let run_managers = callback_manager
-                .on_llm_start(&params, &missing_prompts, run_id)
-                .await;
+            let run_managers = callback_manager.on_llm_start(&params, &missing_prompts, run_id);
 
             let new_results = self
                 ._agenerate_helper(missing_prompts, stop, &run_managers)
@@ -700,9 +693,7 @@ pub trait BaseLLM: BaseLanguageModel {
 
             Ok(output)
         } else {
-            let run_managers = callback_manager
-                .on_llm_start(&params, &prompts, run_id)
-                .await;
+            let run_managers = callback_manager.on_llm_start(&params, &prompts, run_id);
 
             let mut output = self._agenerate_helper(prompts, stop, &run_managers).await?;
 
@@ -726,24 +717,20 @@ pub trait BaseLLM: BaseLanguageModel {
         run_managers: &[AsyncCallbackManagerForLLMRun],
     ) -> Result<LLMResult> {
         match self
-            .generate_prompts(
-                prompts,
-                stop,
-                run_managers.first().map(|rm| rm.get_sync()).as_ref(),
-            )
+            .generate_prompts(prompts, stop, run_managers.first())
             .await
         {
             Ok(output) => {
                 let flattened = output.flatten();
                 for (run_manager, flattened_output) in run_managers.iter().zip(flattened.iter()) {
                     let chat_result = llm_result_to_chat_result(flattened_output);
-                    run_manager.on_llm_end(&chat_result).await;
+                    run_manager.on_llm_end(&chat_result);
                 }
                 Ok(output)
             }
             Err(e) => {
                 for run_manager in run_managers {
-                    run_manager.get_sync().on_llm_error(&e);
+                    run_manager.on_llm_error(&e);
                 }
                 Err(e)
             }

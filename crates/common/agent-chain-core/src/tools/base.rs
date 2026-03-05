@@ -319,8 +319,7 @@ pub trait BaseTool: Send + Sync + Debug {
         run_manager: Option<&AsyncCallbackManagerForToolRun>,
         config: &RunnableConfig,
     ) -> Result<ToolOutput> {
-        let sync_manager = run_manager.map(|rm| rm.get_sync());
-        self.tool_run(input, sync_manager.as_ref(), config)
+        self.tool_run(input, run_manager, config)
     }
 
     fn run(
@@ -478,13 +477,12 @@ pub trait BaseTool: Send + Sync + Debug {
             ToolInput::ToolCall(tc) => tc.args.to_string(),
         };
 
-        let run_manager = async_callback_manager
-            .on_tool_start(&serialized, &input_str, config.run_id, None)
-            .await;
+        let run_manager =
+            async_callback_manager.on_tool_start(&serialized, &input_str, config.run_id, None);
 
         let child_config = patch_config(
             Some(config.clone()),
-            Some(run_manager.get_sync().get_child(None)),
+            Some(run_manager.get_child(None)),
             None,
             None,
             None,
@@ -511,7 +509,7 @@ pub trait BaseTool: Send + Sync + Debug {
                                     "Since response_format='content_and_artifact', the tool                                      function must return a two-element JSON array                                      [content, artifact]."
                                         .to_string(),
                                 );
-                            run_manager.get_sync().on_tool_error(&err);
+                            run_manager.on_tool_error(&err);
                             return Err(err);
                         }
                     },
@@ -530,7 +528,7 @@ pub trait BaseTool: Send + Sync + Debug {
                     ToolOutput::Json(v) => stringify(v),
                     ToolOutput::ContentAndArtifact { content, .. } => stringify(content),
                 };
-                run_manager.on_tool_end(&output_str).await;
+                run_manager.on_tool_end(&output_str);
                 Ok(formatted)
             }
             Err(e) => {
@@ -545,7 +543,7 @@ pub trait BaseTool: Send + Sync + Debug {
                         self.name(),
                         "error",
                     );
-                    run_manager.on_tool_end(&handled).await;
+                    run_manager.on_tool_end(&handled);
                     return Ok(formatted);
                 }
                 if let Some(validation_msg) = e.as_validation_error()
@@ -559,10 +557,10 @@ pub trait BaseTool: Send + Sync + Debug {
                         self.name(),
                         "error",
                     );
-                    run_manager.on_tool_end(&handled).await;
+                    run_manager.on_tool_end(&handled);
                     return Ok(formatted);
                 }
-                run_manager.get_sync().on_tool_error(&e);
+                run_manager.on_tool_error(&e);
                 Err(e)
             }
         }
