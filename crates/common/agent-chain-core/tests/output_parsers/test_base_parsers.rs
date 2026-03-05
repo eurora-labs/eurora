@@ -1,4 +1,5 @@
 use agent_chain_core::GenericFakeChatModel;
+use agent_chain_core::ParserInput;
 use agent_chain_core::error::Result;
 use agent_chain_core::language_models::BaseChatModel;
 use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
@@ -106,7 +107,8 @@ async fn test_base_transform_output_parser() {
         )
         .unwrap();
 
-    let input_stream = stream.filter_map(|chunk| async { chunk.ok().map(|c| c.message) });
+    let input_stream =
+        stream.filter_map(|chunk| async { chunk.ok().map(|c| ParserInput::from(c.message)) });
 
     let parser = TransformStrInvertCase;
     let chunks: Vec<String> = parser

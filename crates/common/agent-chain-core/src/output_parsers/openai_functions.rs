@@ -423,8 +423,19 @@ impl BaseLLMOutputParser for OutputFunctionsParser {
 }
 
 impl BaseGenerationOutputParser for OutputFunctionsParser {
-    fn invoke(&self, input: BaseMessage, _config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let chat_gen = ChatGeneration::builder().message(input).build();
+    fn invoke(
+        &self,
+        input: impl Into<super::base::ParserInput>,
+        _config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        let parser_input: super::base::ParserInput = input.into();
+        let message = match parser_input {
+            super::base::ParserInput::Message(m) => *m,
+            super::base::ParserInput::Text(s) => {
+                BaseMessage::Human(crate::messages::HumanMessage::builder().content(s).build())
+            }
+        };
+        let chat_gen = ChatGeneration::builder().message(message).build();
         self.parse_result(&[chat_gen])
     }
 }

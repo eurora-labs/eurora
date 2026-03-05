@@ -7,6 +7,44 @@ use crate::prompt_values::PromptValue;
 use crate::runnables::RunnableConfig;
 use crate::runnables::base::Runnable;
 
+#[derive(Debug, Clone)]
+pub enum ParserInput {
+    Text(String),
+    Message(Box<BaseMessage>),
+}
+
+impl From<String> for ParserInput {
+    fn from(s: String) -> Self {
+        ParserInput::Text(s)
+    }
+}
+
+impl From<&str> for ParserInput {
+    fn from(s: &str) -> Self {
+        ParserInput::Text(s.to_string())
+    }
+}
+
+impl From<BaseMessage> for ParserInput {
+    fn from(m: BaseMessage) -> Self {
+        ParserInput::Message(Box::new(m))
+    }
+}
+
+impl ParserInput {
+    pub fn to_generation(&self) -> Generation {
+        match self {
+            ParserInput::Text(s) => Generation::builder().text(s).build(),
+            ParserInput::Message(m) => {
+                let chat_gen = ChatGeneration::builder()
+                    .message(m.as_ref().clone())
+                    .build();
+                Generation::builder().text(&chat_gen.text).build()
+            }
+        }
+    }
+}
+
 pub trait BaseLLMOutputParser: Send + Sync + Debug {
     type Output: Send + Sync + Clone + Debug;
 
@@ -14,9 +52,13 @@ pub trait BaseLLMOutputParser: Send + Sync + Debug {
 }
 
 pub trait BaseGenerationOutputParser: BaseLLMOutputParser {
-    fn invoke(&self, input: BaseMessage, _config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let chat_gen = ChatGeneration::builder().message(input).build();
-        self.parse_result(&[Generation::builder().text(&chat_gen.text).build()], false)
+    fn invoke(
+        &self,
+        input: impl Into<ParserInput>,
+        _config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        let generation = Into::<ParserInput>::into(input).to_generation();
+        self.parse_result(&[generation], false)
     }
 }
 
@@ -48,9 +90,13 @@ pub trait BaseOutputParser: Send + Sync + Debug {
 
     fn parser_type(&self) -> &str;
 
-    fn invoke(&self, input: BaseMessage, _config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let chat_gen = ChatGeneration::builder().message(input).build();
-        self.parse_result(&[Generation::builder().text(&chat_gen.text).build()], false)
+    fn invoke(
+        &self,
+        input: impl Into<ParserInput>,
+        _config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        let generation = Into::<ParserInput>::into(input).to_generation();
+        self.parse_result(&[generation], false)
     }
 
     fn into_runnable(self) -> RunnableOutputParser<Self>
@@ -86,7 +132,7 @@ where
     P: BaseOutputParser + 'static,
     P::Output: 'static,
 {
-    type Input = BaseMessage;
+    type Input = ParserInput;
     type Output = P::Output;
 
     fn name(&self) -> Option<String> {
@@ -151,6 +197,38 @@ mod tests {
         let parser = TestParser;
         let result = parser.parse_result(&[], false);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_invoke_with_string() {
+        let parser = TestParser;
+        let result = parser.invoke("hello", None).unwrap();
+        assert_eq!(result, "HELLO");
+    }
+
+    #[test]
+    fn test_invoke_with_message() {
+        use crate::messages::HumanMessage;
+        let parser = TestParser;
+        let msg = BaseMessage::Human(HumanMessage::builder().content("hello").build());
+        let result = parser.invoke(msg, None).unwrap();
+        assert_eq!(result, "HELLO");
+    }
+
+    #[test]
+    fn test_parser_input_from_str() {
+        let input: ParserInput = "hello".into();
+        let generation = input.to_generation();
+        assert_eq!(generation.text, "hello");
+    }
+
+    #[test]
+    fn test_parser_input_from_message() {
+        use crate::messages::HumanMessage;
+        let msg = BaseMessage::Human(HumanMessage::builder().content("hello").build());
+        let input: ParserInput = msg.into();
+        let generation = input.to_generation();
+        assert_eq!(generation.text, "hello");
     }
 
     #[test]

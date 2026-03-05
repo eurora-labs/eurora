@@ -6,10 +6,9 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::error::{Error, Result};
-use crate::messages::BaseMessage;
 use crate::outputs::Generation;
 
-use super::base::BaseOutputParser;
+use super::base::{BaseOutputParser, ParserInput};
 use super::json::parse_json_result;
 use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
 
@@ -94,7 +93,7 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq + 'static>
 {
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, BaseMessage>,
+        input: BoxStream<'a, ParserInput>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
@@ -211,17 +210,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_pydantic_cumulative_transform() {
-        use crate::messages::HumanMessage;
         use futures::StreamExt;
 
         let parser = person_parser();
-        let messages: Vec<BaseMessage> = vec![
-            BaseMessage::Human(HumanMessage::builder().content("{\"name\":").build()),
-            BaseMessage::Human(HumanMessage::builder().content(" \"Alice\", ").build()),
-            BaseMessage::Human(HumanMessage::builder().content("\"age\": 30}").build()),
+        let inputs: Vec<ParserInput> = vec![
+            ParserInput::from("{\"name\":"),
+            ParserInput::from(" \"Alice\", "),
+            ParserInput::from("\"age\": 30}"),
         ];
-        let stream = futures::stream::iter(messages);
-        let boxed: BoxStream<BaseMessage> = Box::pin(stream);
+        let stream = futures::stream::iter(inputs);
+        let boxed: BoxStream<ParserInput> = Box::pin(stream);
         let mut output_stream = parser.transform(boxed);
 
         let mut results = Vec::new();

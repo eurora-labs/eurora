@@ -1721,7 +1721,10 @@ impl Runnable for StructuredOutputWithRaw {
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
         let raw: AIMessage = self.model.invoke(input, config.clone())?;
         match self.parser.invoke(raw.clone(), config) {
-            Ok(parsed) => Self::build_output(&raw, Some(parsed), None),
+            Ok(parsed) => {
+                let parsed_value = serde_json::to_value(&parsed)?;
+                Self::build_output(&raw, Some(parsed_value), None)
+            }
             Err(e) => Self::build_output(&raw, None, Some(e.to_string())),
         }
     }
@@ -1733,7 +1736,10 @@ impl Runnable for StructuredOutputWithRaw {
     ) -> Result<Self::Output> {
         let raw: AIMessage = self.model.ainvoke(input, config.clone()).await?;
         match self.parser.ainvoke(raw.clone(), config).await {
-            Ok(parsed) => Self::build_output(&raw, Some(parsed), None),
+            Ok(parsed) => {
+                let parsed_value = serde_json::to_value(&parsed)?;
+                Self::build_output(&raw, Some(parsed_value), None)
+            }
             Err(e) => Self::build_output(&raw, None, Some(e.to_string())),
         }
     }
