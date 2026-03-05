@@ -62,9 +62,8 @@ impl Tool {
         args_schema: Option<ArgsSchema>,
         #[builder(default)] return_direct: bool,
         #[builder(default)] verbose: bool,
-        #[builder(default = HandleToolError::Bool(false))] handle_tool_error: HandleToolError,
-        #[builder(default = HandleValidationError::Bool(false))]
-        handle_validation_error: HandleValidationError,
+        #[builder(default)] handle_tool_error: HandleToolError,
+        #[builder(default)] handle_validation_error: HandleValidationError,
         #[builder(default)] response_format: ResponseFormat,
         tags: Option<Vec<String>>,
         metadata: Option<HashMap<String, Value>>,
@@ -148,36 +147,37 @@ impl Tool {
         match input {
             ToolInput::String(s) => Ok(s),
             ToolInput::Dict(d) => {
-                let all_args: Vec<_> = d.values().collect();
-                if all_args.len() != 1 {
+                if d.len() != 1 {
                     return Err(Error::ToolInvocation(format!(
-                        "Too many arguments to single-input tool {}. Consider using StructuredTool instead. Args: {:?}",
-                        self.name, all_args
+                        "Too many arguments to single-input tool {}. \
+                         Consider using StructuredTool instead. Args: {:?}",
+                        self.name, d
                     )));
                 }
-                match all_args[0] {
-                    Value::String(s) => Ok(s.clone()),
+                let value = d.into_values().next().expect("checked len == 1");
+                match value {
+                    Value::String(s) => Ok(s),
                     other => Ok(other.to_string()),
                 }
             }
             ToolInput::ToolCall(tc) => {
-                let args = &tc.args;
-                if let Some(obj) = args.as_object() {
-                    let values: Vec<_> = obj.values().collect();
-                    if values.len() != 1 {
+                if let Some(obj) = tc.args.as_object() {
+                    if obj.len() != 1 {
                         return Err(Error::ToolInvocation(format!(
-                            "Too many arguments to single-input tool {}. Consider using StructuredTool instead.",
+                            "Too many arguments to single-input tool {}. \
+                             Consider using StructuredTool instead.",
                             self.name,
                         )));
                     }
-                    match &values[0] {
+                    let value = obj.values().next().expect("checked len == 1");
+                    match value {
                         Value::String(s) => Ok(s.clone()),
                         other => Ok(other.to_string()),
                     }
-                } else if let Some(s) = args.as_str() {
+                } else if let Some(s) = tc.args.as_str() {
                     Ok(s.to_string())
                 } else {
-                    Ok(args.to_string())
+                    Ok(tc.args.to_string())
                 }
             }
         }
@@ -238,12 +238,10 @@ impl BaseTool for Tool {
         if let Some(args_schema) = &self.args_schema {
             return args_schema.properties();
         }
-        let mut props = HashMap::new();
-        props.insert(
+        HashMap::from([(
             "tool_input".to_string(),
             serde_json::json!({"type": "string"}),
-        );
-        props
+        )])
     }
 
     fn tool_run(
@@ -254,29 +252,24 @@ impl BaseTool for Tool {
     ) -> Result<ToolOutput> {
         let string_input = self.extract_single_input(input)?;
 
-        if let Some(ref func) = self.func {
-            let result = func(string_input)?;
-            Ok(ToolOutput::String(result))
-        } else {
-            Err(Error::ToolInvocation(
-                "Tool does not support sync invocation.".to_string(),
-            ))
-        }
+        let func = self.func.as_ref().ok_or_else(|| {
+            Error::ToolInvocation("Tool does not support sync invocation.".to_string())
+        })?;
+
+        func(string_input).map(ToolOutput::String)
     }
 
     async fn tool_arun(
         &self,
         input: ToolInput,
-        _run_manager: Option<&crate::callbacks::manager::CallbackManagerForToolRun>,
-        _config: &RunnableConfig,
+        run_manager: Option<&CallbackManagerForToolRun>,
+        config: &RunnableConfig,
     ) -> Result<ToolOutput> {
-        let string_input = self.extract_single_input(input.clone())?;
-
-        if let Some(ref coroutine) = self.coroutine {
-            let result = coroutine(string_input).await?;
-            Ok(ToolOutput::String(result))
+        if let Some(coroutine) = &self.coroutine {
+            let string_input = self.extract_single_input(input)?;
+            coroutine(string_input).await.map(ToolOutput::String)
         } else {
-            self.tool_run(input, _run_manager, _config)
+            self.tool_run(input, run_manager, config)
         }
     }
 }
