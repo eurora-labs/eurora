@@ -353,36 +353,18 @@ impl Runnable for RunnableAssign {
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let config = ensure_config(config);
-        let callback_manager = get_callback_manager_for_config(&config);
-
-        let run_manager = callback_manager
-            .on_chain_start()
-            .serialized(&HashMap::new())
-            .inputs(&HashMap::new())
-            .maybe_run_id(config.run_id)
-            .call();
-
-        let child_config = patch_config()
-            .config(config)
-            .callbacks(run_manager.get_child(None))
-            .call();
-
-        let mapper_output = match self.mapper.invoke(input.clone(), Some(child_config)) {
-            Ok(output) => output,
-            Err(e) => {
-                run_manager.on_chain_error(&e);
-                return Err(e);
-            }
-        };
-
-        let mut result = input;
-        for (key, value) in mapper_output {
-            result.insert(key, value);
-        }
-
-        run_manager.on_chain_end(&HashMap::new());
-        Ok(result)
+        self.call_with_config(
+            &|input: HashMap<String, Value>, config: &RunnableConfig| {
+                let mapper_output = self.mapper.invoke(input.clone(), Some(config.clone()))?;
+                let mut result = input;
+                for (key, value) in mapper_output {
+                    result.insert(key, value);
+                }
+                Ok(result)
+            },
+            input,
+            config,
+        )
     }
 
     async fn ainvoke(
@@ -519,6 +501,24 @@ pub struct RunnablePick {
 pub enum PickKeys {
     Single(String),
     Multiple(Vec<String>),
+}
+
+impl From<String> for PickKeys {
+    fn from(s: String) -> Self {
+        PickKeys::Single(s)
+    }
+}
+
+impl From<&str> for PickKeys {
+    fn from(s: &str) -> Self {
+        PickKeys::Single(s.to_string())
+    }
+}
+
+impl From<Vec<String>> for PickKeys {
+    fn from(v: Vec<String>) -> Self {
+        PickKeys::Multiple(v)
+    }
 }
 
 impl Debug for RunnablePick {

@@ -48,8 +48,8 @@ pub use passthrough::{
     graph_passthrough,
 };
 pub use retry::{
-    ExponentialJitterParams, RetryCallState, RetryErrorPredicate, RunnableRetry,
-    RunnableRetryConfig, RunnableRetryExt,
+    ExponentialJitterParams, RetryErrorPredicate, RunnableRetry, RunnableRetryConfig,
+    RunnableRetryExt,
 };
 pub use router::{DynRouterRunnable, RouterInput, RouterRunnable};
 pub use schema::{

@@ -253,74 +253,46 @@ pub fn patch_config(
     config
 }
 
+fn merge_callbacks_rich(base: Option<Callbacks>, new: Option<Callbacks>) -> Option<Callbacks> {
+    match (base, &new) {
+        (base, None) => base,
+        (None, Some(_)) => new,
+        (Some(Callbacks::Handlers(mut base_handlers)), Some(Callbacks::Handlers(new_handlers))) => {
+            base_handlers.extend(new_handlers.clone());
+            Some(Callbacks::Handlers(base_handlers))
+        }
+        (Some(Callbacks::Manager(mut base_mgr)), Some(Callbacks::Handlers(new_handlers))) => {
+            for handler in new_handlers {
+                base_mgr.add_handler(handler.clone(), true);
+            }
+            Some(Callbacks::Manager(base_mgr))
+        }
+        (Some(Callbacks::Handlers(base_handlers)), Some(Callbacks::Manager(new_mgr))) => {
+            let mut merged = new_mgr.clone();
+            for handler in &base_handlers {
+                merged.add_handler(handler.clone(), true);
+            }
+            Some(Callbacks::Manager(merged))
+        }
+        (Some(Callbacks::Manager(base_mgr)), Some(Callbacks::Manager(new_mgr))) => {
+            Some(Callbacks::Manager(base_mgr.merge(new_mgr)))
+        }
+    }
+}
+
 pub fn merge_configs(configs: Vec<Option<RunnableConfig>>) -> RunnableConfig {
-    let mut base = RunnableConfig {
-        tags: Vec::new(),
-        metadata: HashMap::new(),
-        callbacks: None,
-        run_name: None,
-        max_concurrency: None,
-        recursion_limit: DEFAULT_RECURSION_LIMIT,
-        configurable: HashMap::new(),
-        run_id: None,
-    };
+    let mut base = RunnableConfig::default();
 
     for config in configs.into_iter().flatten() {
         let config = ensure_config(Some(config));
 
-        for tag in config.tags {
-            if !base.tags.contains(&tag) {
-                base.tags.push(tag);
-            }
-        }
+        let old_callbacks = base.callbacks.take();
+        let new_callbacks = config.callbacks.clone();
+
+        merge_into_config(&mut base, &config);
+
+        base.callbacks = merge_callbacks_rich(old_callbacks, new_callbacks);
         base.tags.sort();
-
-        base.metadata.extend(config.metadata);
-
-        match (&base.callbacks, &config.callbacks) {
-            (_, None) => {}
-            (None, Some(cb)) => {
-                base.callbacks = Some(cb.clone());
-            }
-            (Some(Callbacks::Handlers(base_handlers)), Some(Callbacks::Handlers(new_handlers))) => {
-                let mut merged = base_handlers.clone();
-                merged.extend(new_handlers.clone());
-                base.callbacks = Some(Callbacks::Handlers(merged));
-            }
-            (Some(Callbacks::Manager(base_mgr)), Some(Callbacks::Handlers(new_handlers))) => {
-                let mut merged = base_mgr.clone();
-                for handler in new_handlers {
-                    merged.add_handler(handler.clone(), true);
-                }
-                base.callbacks = Some(Callbacks::Manager(merged));
-            }
-            (Some(Callbacks::Handlers(base_handlers)), Some(Callbacks::Manager(new_mgr))) => {
-                let mut merged = new_mgr.clone();
-                for handler in base_handlers {
-                    merged.add_handler(handler.clone(), true);
-                }
-                base.callbacks = Some(Callbacks::Manager(merged));
-            }
-            (Some(Callbacks::Manager(base_mgr)), Some(Callbacks::Manager(new_mgr))) => {
-                base.callbacks = Some(Callbacks::Manager(base_mgr.merge(new_mgr)));
-            }
-        }
-
-        base.configurable.extend(config.configurable);
-
-        if config.recursion_limit != DEFAULT_RECURSION_LIMIT {
-            base.recursion_limit = config.recursion_limit;
-        }
-
-        if config.run_name.is_some() {
-            base.run_name = config.run_name;
-        }
-        if config.max_concurrency.is_some() {
-            base.max_concurrency = config.max_concurrency;
-        }
-        if config.run_id.is_some() {
-            base.run_id = config.run_id;
-        }
     }
 
     base

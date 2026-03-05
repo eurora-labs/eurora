@@ -421,17 +421,12 @@ impl RunnableWithMessageHistory {
         Ok((config, history))
     }
 
-    pub fn invoke_with_history(
+    fn build_augmented_input(
         &self,
-        input: Value,
-        config: Option<RunnableConfig>,
+        input: &Value,
+        history_messages: Vec<BaseMessage>,
     ) -> Result<Value> {
-        let config = config.unwrap_or_default();
-        let (config, history) = self.merge_configs(config)?;
-
-        let history_messages = self.enter_history(&input, &history)?;
-
-        let augmented_input = if let Some(ref history_key) = self.history_messages_key {
+        if let Some(ref history_key) = self.history_messages_key {
             let mut obj = match input.as_object() {
                 Some(obj) => obj.clone(),
                 None => {
@@ -446,12 +441,23 @@ impl RunnableWithMessageHistory {
                 Error::other(format!("Failed to serialize history messages: {}", e))
             })?;
             obj.insert(history_key.clone(), history_value);
-            Value::Object(obj)
+            Ok(Value::Object(obj))
         } else {
-            serde_json::to_value(&history_messages).map_err(|e| {
-                Error::other(format!("Failed to serialize augmented messages: {}", e))
-            })?
-        };
+            serde_json::to_value(&history_messages)
+                .map_err(|e| Error::other(format!("Failed to serialize augmented messages: {}", e)))
+        }
+    }
+
+    pub fn invoke_with_history(
+        &self,
+        input: Value,
+        config: Option<RunnableConfig>,
+    ) -> Result<Value> {
+        let config = config.unwrap_or_default();
+        let (config, history) = self.merge_configs(config)?;
+
+        let history_messages = self.enter_history(&input, &history)?;
+        let augmented_input = self.build_augmented_input(&input, history_messages)?;
 
         let output = (self.runnable)(augmented_input, Some(&config))?;
 
@@ -469,28 +475,7 @@ impl RunnableWithMessageHistory {
         let (config, history) = self.merge_configs(config)?;
 
         let history_messages = self.enter_history(&input, &history)?;
-
-        let augmented_input = if let Some(ref history_key) = self.history_messages_key {
-            let mut obj = match input.as_object() {
-                Some(obj) => obj.clone(),
-                None => {
-                    let mut map = serde_json::Map::new();
-                    if let Some(ref input_key) = self.input_messages_key {
-                        map.insert(input_key.clone(), input.clone());
-                    }
-                    map
-                }
-            };
-            let history_value = serde_json::to_value(&history_messages).map_err(|e| {
-                Error::other(format!("Failed to serialize history messages: {}", e))
-            })?;
-            obj.insert(history_key.clone(), history_value);
-            Value::Object(obj)
-        } else {
-            serde_json::to_value(&history_messages).map_err(|e| {
-                Error::other(format!("Failed to serialize augmented messages: {}", e))
-            })?
-        };
+        let augmented_input = self.build_augmented_input(&input, history_messages)?;
 
         let output = if let Some(ref async_fn) = self.runnable_async {
             async_fn(augmented_input, Some(&config)).await?
