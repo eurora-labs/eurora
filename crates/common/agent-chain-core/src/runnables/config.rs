@@ -234,15 +234,7 @@ pub fn patch_config(
     let mut config = ensure_config(config);
 
     if let Some(cb) = callbacks {
-        config.callbacks = Some(Callbacks::Manager(CallbackManager {
-            handlers: cb.handlers,
-            inheritable_handlers: cb.inheritable_handlers,
-            parent_run_id: cb.parent_run_id,
-            tags: cb.tags,
-            inheritable_tags: cb.inheritable_tags,
-            metadata: cb.metadata,
-            inheritable_metadata: cb.inheritable_metadata,
-        }));
+        config.callbacks = Some(Callbacks::from(cb));
         config.run_name = None;
         config.run_id = None;
     }

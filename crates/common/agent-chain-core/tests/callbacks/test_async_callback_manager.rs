@@ -14,147 +14,139 @@ impl BaseCallbackHandler for FakeHandler {
     }
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_on_llm_start() {
+#[test]
+fn test_async_callback_manager_on_llm_start() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
 
-    let run_managers = manager
-        .on_llm_start(&HashMap::new(), &["prompt".to_string()], None)
-        .await;
+    let run_managers = manager.on_llm_start(&HashMap::new(), &["prompt".to_string()], None);
 
     assert_eq!(run_managers.len(), 1);
     assert!(!run_managers[0].run_id().is_nil());
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_on_chain_start() {
+#[test]
+fn test_async_callback_manager_on_chain_start() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
 
     let run_manager = manager
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
-        .await;
+        .on_chain_start()
+        .serialized(&HashMap::new())
+        .inputs(&HashMap::new())
+        .call();
 
     assert!(!run_manager.run_id().is_nil());
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_on_tool_start() {
+#[test]
+fn test_async_callback_manager_on_tool_start() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
 
-    let run_manager = manager
-        .on_tool_start(&HashMap::new(), "test", None, None)
-        .await;
+    let run_manager = manager.on_tool_start(&HashMap::new(), "test", None, None);
 
     assert!(!run_manager.run_id().is_nil());
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_on_llm_end() {
+#[test]
+fn test_async_callback_manager_on_llm_end() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
 
-    let run_managers = manager
-        .on_llm_start(&HashMap::new(), &["prompt".to_string()], None)
-        .await;
+    let run_managers = manager.on_llm_start(&HashMap::new(), &["prompt".to_string()], None);
 
     assert_eq!(run_managers.len(), 1);
     let result = ChatResult::default();
-    run_managers[0].on_llm_end(&result).await;
+    run_managers[0].on_llm_end(&result);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_on_chain_end() {
+#[test]
+fn test_async_callback_manager_on_chain_end() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
 
     let run_manager = manager
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
-        .await;
+        .on_chain_start()
+        .serialized(&HashMap::new())
+        .inputs(&HashMap::new())
+        .call();
 
-    run_manager.on_chain_end(&HashMap::new()).await;
+    run_manager.on_chain_end(&HashMap::new());
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_on_tool_end() {
+#[test]
+fn test_async_callback_manager_on_tool_end() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
 
-    let run_manager = manager
-        .on_tool_start(&HashMap::new(), "test", None, None)
-        .await;
+    let run_manager = manager.on_tool_start(&HashMap::new(), "test", None, None);
 
-    run_manager.on_tool_end("test").await;
+    run_manager.on_tool_end("test");
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_on_llm_error() {
+#[test]
+fn test_async_callback_manager_on_llm_error() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
 
-    let run_managers = manager
-        .on_llm_start(&HashMap::new(), &["prompt".to_string()], None)
-        .await;
+    let run_managers = manager.on_llm_start(&HashMap::new(), &["prompt".to_string()], None);
 
     assert_eq!(run_managers.len(), 1);
 
     let error = std::io::Error::other("test");
-    run_managers[0].on_llm_error(&error).await;
+    run_managers[0].on_llm_error(&error);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_on_chain_error() {
+#[test]
+fn test_async_callback_manager_on_chain_error() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
 
     let run_manager = manager
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
-        .await;
+        .on_chain_start()
+        .serialized(&HashMap::new())
+        .inputs(&HashMap::new())
+        .call();
 
     let error = std::io::Error::other("test");
-    run_manager.on_chain_error(&error).await;
+    run_manager.on_chain_error(&error);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_on_tool_error() {
+#[test]
+fn test_async_callback_manager_on_tool_error() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
 
-    let run_manager = manager
-        .on_tool_start(&HashMap::new(), "test", None, None)
-        .await;
+    let run_manager = manager.on_tool_start(&HashMap::new(), "test", None, None);
 
     let error = std::io::Error::other("test");
-    run_manager.on_tool_error(&error).await;
+    run_manager.on_tool_error(&error);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_on_llm_new_token() {
+#[test]
+fn test_async_callback_manager_on_llm_new_token() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
 
-    let run_managers = manager
-        .on_llm_start(&HashMap::new(), &["prompt".to_string()], None)
-        .await;
+    let run_managers = manager.on_llm_start(&HashMap::new(), &["prompt".to_string()], None);
 
     assert_eq!(run_managers.len(), 1);
-    run_managers[0].on_llm_new_token("test", None).await;
+    run_managers[0].on_llm_new_token("test", None);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_with_multiple_handlers() {
+#[test]
+fn test_async_callback_manager_with_multiple_handlers() {
     let handler1: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let handler2: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
@@ -163,16 +155,14 @@ async fn test_async_callback_manager_with_multiple_handlers() {
 
     assert_eq!(manager.handlers().len(), 2);
 
-    let run_managers = manager
-        .on_llm_start(&HashMap::new(), &["prompt".to_string()], None)
-        .await;
+    let run_managers = manager.on_llm_start(&HashMap::new(), &["prompt".to_string()], None);
 
     assert_eq!(run_managers.len(), 1);
     assert_eq!(run_managers[0].handlers().len(), 2);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_add_handler() {
+#[test]
+fn test_async_callback_manager_add_handler() {
     let handler1: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let handler2: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
@@ -185,8 +175,8 @@ async fn test_async_callback_manager_add_handler() {
     assert_eq!(manager.handlers().len(), 2);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_remove_handler() {
+#[test]
+fn test_async_callback_manager_remove_handler() {
     let handler1: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let handler2: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
@@ -200,22 +190,24 @@ async fn test_async_callback_manager_remove_handler() {
     assert_eq!(manager.handlers().len(), 1);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_inheritable_handlers() {
+#[test]
+fn test_async_callback_manager_inheritable_handlers() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut parent = AsyncCallbackManager::new();
     parent.add_handler(handler, true);
 
     let chain_run = parent
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
-        .await;
+        .on_chain_start()
+        .serialized(&HashMap::new())
+        .inputs(&HashMap::new())
+        .call();
 
     let child_manager = chain_run.get_child(None);
     assert_eq!(child_manager.handlers().len(), 1);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_chat_model_start() {
+#[test]
+fn test_async_callback_manager_chat_model_start() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
@@ -223,16 +215,14 @@ async fn test_async_callback_manager_chat_model_start() {
     let messages = vec![vec![
         HumanMessage::builder().content("Hello").build().into(),
     ]];
-    let run_managers = manager
-        .on_chat_model_start(&HashMap::new(), &messages, None, None)
-        .await;
+    let run_managers = manager.on_chat_model_start(&HashMap::new(), &messages, None, None);
 
     assert_eq!(run_managers.len(), 1);
     assert!(!run_managers[0].run_id().is_nil());
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_ignore_llm() {
+#[test]
+fn test_async_callback_manager_ignore_llm() {
     #[derive(Debug)]
     struct IgnoreLLMHandler;
 
@@ -249,15 +239,13 @@ async fn test_async_callback_manager_ignore_llm() {
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
 
-    let run_managers = manager
-        .on_llm_start(&HashMap::new(), &["prompt".to_string()], None)
-        .await;
+    let run_managers = manager.on_llm_start(&HashMap::new(), &["prompt".to_string()], None);
 
     assert_eq!(run_managers.len(), 1);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_ignore_chain() {
+#[test]
+fn test_async_callback_manager_ignore_chain() {
     #[derive(Debug)]
     struct IgnoreChainHandler;
 
@@ -275,14 +263,16 @@ async fn test_async_callback_manager_ignore_chain() {
     manager.add_handler(handler, true);
 
     let run_manager = manager
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
-        .await;
+        .on_chain_start()
+        .serialized(&HashMap::new())
+        .inputs(&HashMap::new())
+        .call();
 
     assert!(!run_manager.run_id().is_nil());
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_copy() {
+#[test]
+fn test_async_callback_manager_copy() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
@@ -291,38 +281,42 @@ async fn test_async_callback_manager_copy() {
     assert_eq!(manager_copy.handlers().len(), 1);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_chain_child_managers() {
+#[test]
+fn test_async_callback_manager_chain_child_managers() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
 
     let chain_run = manager
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
-        .await;
+        .on_chain_start()
+        .serialized(&HashMap::new())
+        .inputs(&HashMap::new())
+        .call();
 
-    let child_llm_runs = chain_run
-        .get_child(None)
-        .on_llm_start(&HashMap::new(), &["prompt".to_string()], None)
-        .await;
+    let child_llm_runs =
+        chain_run
+            .get_child(None)
+            .on_llm_start(&HashMap::new(), &["prompt".to_string()], None);
     assert_eq!(child_llm_runs.len(), 1);
     assert!(!child_llm_runs[0].run_id().is_nil());
 
     let child_chain_run = chain_run
         .get_child(None)
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
-        .await;
+        .on_chain_start()
+        .serialized(&HashMap::new())
+        .inputs(&HashMap::new())
+        .call();
     assert!(!child_chain_run.run_id().is_nil());
 
-    let child_tool_run = chain_run
-        .get_child(None)
-        .on_tool_start(&HashMap::new(), "test", None, None)
-        .await;
+    let child_tool_run =
+        chain_run
+            .get_child(None)
+            .on_tool_start(&HashMap::new(), "test", None, None);
     assert!(!child_tool_run.run_id().is_nil());
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_retriever_callbacks() {
+#[test]
+fn test_async_callback_manager_retriever_callbacks() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
@@ -331,15 +325,14 @@ async fn test_async_callback_manager_retriever_callbacks() {
         .on_retriever_start()
         .serialized(&HashMap::new())
         .query("test query")
-        .call()
-        .await;
+        .call();
 
     assert!(!run_manager.run_id().is_nil());
-    run_manager.on_retriever_end(&[]).await;
+    run_manager.on_retriever_end(&[]);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_retriever_error() {
+#[test]
+fn test_async_callback_manager_retriever_error() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
@@ -348,30 +341,27 @@ async fn test_async_callback_manager_retriever_error() {
         .on_retriever_start()
         .serialized(&HashMap::new())
         .query("test query")
-        .call()
-        .await;
+        .call();
 
     let error = std::io::Error::other("test error");
-    run_manager.on_retriever_error(&error).await;
+    run_manager.on_retriever_error(&error);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_tags() {
+#[test]
+fn test_async_callback_manager_tags() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
     manager.add_tags(vec!["test-tag".to_string()], true);
 
-    let run_managers = manager
-        .on_llm_start(&HashMap::new(), &["prompt".to_string()], None)
-        .await;
+    let run_managers = manager.on_llm_start(&HashMap::new(), &["prompt".to_string()], None);
 
     assert_eq!(run_managers.len(), 1);
     assert!(!run_managers[0].run_id().is_nil());
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_metadata() {
+#[test]
+fn test_async_callback_manager_metadata() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
@@ -380,53 +370,48 @@ async fn test_async_callback_manager_metadata() {
         true,
     );
 
-    let run_managers = manager
-        .on_llm_start(&HashMap::new(), &["prompt".to_string()], None)
-        .await;
+    let run_managers = manager.on_llm_start(&HashMap::new(), &["prompt".to_string()], None);
 
     assert_eq!(run_managers.len(), 1);
     assert!(!run_managers[0].run_id().is_nil());
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_chain_run_on_agent_action() {
+#[test]
+fn test_async_callback_manager_chain_run_on_agent_action() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
 
     let chain_run = manager
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
-        .await;
+        .on_chain_start()
+        .serialized(&HashMap::new())
+        .inputs(&HashMap::new())
+        .call();
 
     let action = serde_json::json!({
         "tool": "test_tool",
         "tool_input": "test_input",
         "log": "test_log"
     });
-    chain_run.on_agent_action(&action).await;
+    chain_run.on_agent_action(&action);
 
     let finish = serde_json::json!({
         "return_values": {"output": "test"},
         "log": "test_log"
     });
-    chain_run.on_agent_finish(&finish).await;
+    chain_run.on_agent_finish(&finish);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_concurrent_runs() {
+#[test]
+fn test_async_callback_manager_concurrent_runs() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
 
     let empty = HashMap::new();
-    let prompts1 = ["prompt1".to_string()];
-    let prompts2 = ["prompt2".to_string()];
-    let prompts3 = ["prompt3".to_string()];
-    let (runs1, runs2, runs3) = tokio::join!(
-        manager.on_llm_start(&empty, &prompts1, None),
-        manager.on_llm_start(&empty, &prompts2, None),
-        manager.on_llm_start(&empty, &prompts3, None),
-    );
+    let runs1 = manager.on_llm_start(&empty, &["prompt1".to_string()], None);
+    let runs2 = manager.on_llm_start(&empty, &["prompt2".to_string()], None);
+    let runs3 = manager.on_llm_start(&empty, &["prompt3".to_string()], None);
 
     assert_eq!(runs1.len(), 1);
     assert_eq!(runs2.len(), 1);
@@ -436,39 +421,35 @@ async fn test_async_callback_manager_concurrent_runs() {
     assert_ne!(runs2[0].run_id(), runs3[0].run_id());
 
     let result = ChatResult::default();
-    tokio::join!(
-        runs1[0].on_llm_end(&result),
-        runs2[0].on_llm_end(&result),
-        runs3[0].on_llm_end(&result),
-    );
+    runs1[0].on_llm_end(&result);
+    runs2[0].on_llm_end(&result);
+    runs3[0].on_llm_end(&result);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_full_lifecycle() {
+#[test]
+fn test_async_callback_manager_full_lifecycle() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
     let mut manager = AsyncCallbackManager::new();
     manager.add_handler(handler, true);
 
     let chain_run = manager
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
-        .await;
+        .on_chain_start()
+        .serialized(&HashMap::new())
+        .inputs(&HashMap::new())
+        .call();
 
     let child_manager = chain_run.get_child(None);
-    let llm_runs = child_manager
-        .on_llm_start(&HashMap::new(), &["prompt".to_string()], None)
-        .await;
+    let llm_runs = child_manager.on_llm_start(&HashMap::new(), &["prompt".to_string()], None);
     assert_eq!(llm_runs.len(), 1);
 
-    llm_runs[0].on_llm_new_token("Hello", None).await;
-    llm_runs[0].on_llm_new_token(" World", None).await;
+    llm_runs[0].on_llm_new_token("Hello", None);
+    llm_runs[0].on_llm_new_token(" World", None);
 
-    llm_runs[0].on_llm_end(&ChatResult::default()).await;
+    llm_runs[0].on_llm_end(&ChatResult::default());
 
     let child_manager2 = chain_run.get_child(None);
-    let tool_run = child_manager2
-        .on_tool_start(&HashMap::new(), "test", None, None)
-        .await;
-    tool_run.on_tool_end("result").await;
+    let tool_run = child_manager2.on_tool_start(&HashMap::new(), "test", None, None);
+    tool_run.on_tool_end("result");
 
-    chain_run.on_chain_end(&HashMap::new()).await;
+    chain_run.on_chain_end(&HashMap::new());
 }

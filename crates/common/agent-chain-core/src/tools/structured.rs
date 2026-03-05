@@ -259,8 +259,7 @@ impl BaseTool for StructuredTool {
                 other => Ok(ToolOutput::Json(other)),
             }
         } else {
-            let sync_manager = _run_manager.map(|rm| rm.get_sync());
-            self.tool_run(input, sync_manager.as_ref(), _config)
+            self.tool_run(input, _run_manager, _config)
         }
     }
 }

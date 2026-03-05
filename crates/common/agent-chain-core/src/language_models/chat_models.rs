@@ -313,8 +313,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         stop: Option<Vec<String>>,
         run_manager: Option<&AsyncCallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
-        let sync_manager = run_manager.map(|m| m.get_sync());
-        self._generate(messages, stop, sync_manager.as_ref()).await
+        self._generate(messages, stop, run_manager).await
     }
 
     fn _stream(
@@ -332,8 +331,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         stop: Option<Vec<String>>,
         run_manager: Option<&AsyncCallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
-        let sync_manager = run_manager.map(|m| m.get_sync());
-        self._stream(messages, stop, sync_manager.as_ref())
+        self._stream(messages, stop, run_manager)
     }
 
     fn get_first_message(&self, result: &ChatResult) -> Result<AIMessage> {
@@ -663,9 +661,8 @@ pub trait BaseChatModel: BaseLanguageModel {
             .maybe_local_metadata(self.config().metadata.clone())
             .call();
 
-        let run_managers = callback_manager
-            .on_chat_model_start(&params, &messages, run_id, run_name.as_deref())
-            .await;
+        let run_managers =
+            callback_manager.on_chat_model_start(&params, &messages, run_id, run_name.as_deref());
 
         let futures: Vec<_> = messages
             .iter()
@@ -693,7 +690,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 }
                 Err(e) => {
                     if let Some(rm) = run_managers.get(i) {
-                        rm.get_sync().on_llm_error(&e);
+                        rm.on_llm_error(&e);
                     }
                     return Err(e);
                 }
@@ -739,7 +736,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 let chat_result = crate::outputs::ChatResult::builder()
                     .generations(vec![chat_gen.clone()])
                     .build();
-                run_manager.on_llm_end(&chat_result).await;
+                run_manager.on_llm_end(&chat_result);
             }
             run_infos.push(RunInfo::new(run_manager.run_id()));
         }
@@ -1307,14 +1304,12 @@ pub trait BaseChatModel: BaseLanguageModel {
             .inheritable_metadata(inheritable_metadata)
             .maybe_local_metadata(self.config().metadata.clone())
             .call();
-        let run_managers = callback_manager
-            .on_chat_model_start(
-                &params,
-                std::slice::from_ref(&messages),
-                run_id,
-                run_name.as_deref(),
-            )
-            .await;
+        let run_managers = callback_manager.on_chat_model_start(
+            &params,
+            std::slice::from_ref(&messages),
+            run_id,
+            run_name.as_deref(),
+        );
         let run_manager = run_managers.into_iter().next();
 
         if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
@@ -1369,7 +1364,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                             rm.on_llm_new_token(
                                 ai_chunk.content.as_text_ref(),
                                 chunk_json.as_ref(),
-                            ).await;
+                            );
                         }
 
                         last_chunk_position = generation_chunk
@@ -1383,7 +1378,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                     }
                     Err(e) => {
                         if let Some(ref rm) = run_manager {
-                            rm.get_sync().on_llm_error(&e);
+                            rm.on_llm_error(&e);
                         }
                         yield Err(e);
                         return;
@@ -1398,7 +1393,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 if let Some(ref rm) = run_manager {
                     let msg_chunk = ChatGenerationChunk::builder().message(BaseMessage::AI(crate::messages::AIMessage::builder().content("").build())).build();
                     let chunk_json = serde_json::to_value(&msg_chunk).ok();
-                    rm.on_llm_new_token("", chunk_json.as_ref()).await;
+                    rm.on_llm_new_token("", chunk_json.as_ref());
                 }
 
                 yield Ok(final_chunk);
@@ -1408,7 +1403,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 && let Some(merged) = crate::outputs::merge_chat_generation_chunks(chunks) {
                     let chat_gen: ChatGeneration = merged.into();
                     let chat_result = ChatResult::builder().generations(vec![chat_gen]).build();
-                    rm.on_llm_end(&chat_result).await;
+                    rm.on_llm_end(&chat_result);
                 }
         };
 

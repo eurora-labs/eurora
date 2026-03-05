@@ -106,8 +106,7 @@ pub trait BaseRetriever: Send + Sync + Debug {
         query: &str,
         run_manager: Option<&AsyncCallbackManagerForRetrieverRun>,
     ) -> Result<Vec<Document>> {
-        let sync_run_manager = run_manager.map(|rm| rm.get_sync());
-        self.get_relevant_documents(query, sync_run_manager.as_ref())
+        self.get_relevant_documents(query, run_manager)
     }
 
     fn invoke(&self, input: &str, config: Option<RunnableConfig>) -> Result<Vec<Document>> {
@@ -169,8 +168,7 @@ pub trait BaseRetriever: Send + Sync + Debug {
             .query(input)
             .maybe_run_id(config.run_id)
             .name(&config.run_name.clone().unwrap_or_else(|| self.get_name()))
-            .call()
-            .await;
+            .call();
 
         let result = self
             .aget_relevant_documents(input, Some(&run_manager))
@@ -178,17 +176,15 @@ pub trait BaseRetriever: Send + Sync + Debug {
 
         match &result {
             Ok(docs) => {
-                run_manager
-                    .on_retriever_end(
-                        &docs
-                            .iter()
-                            .filter_map(|doc| serde_json::to_value(doc).ok())
-                            .collect::<Vec<_>>(),
-                    )
-                    .await;
+                run_manager.on_retriever_end(
+                    &docs
+                        .iter()
+                        .filter_map(|doc| serde_json::to_value(doc).ok())
+                        .collect::<Vec<_>>(),
+                );
             }
             Err(e) => {
-                run_manager.get_sync().on_retriever_error(e);
+                run_manager.on_retriever_error(e);
             }
         }
 

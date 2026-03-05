@@ -1,10 +1,8 @@
 use agent_chain_core::callbacks::BaseCallbackHandler;
 use agent_chain_core::callbacks::manager::{
-    AsyncCallbackManager, AsyncCallbackManagerForChainGroup, AsyncCallbackManagerForChainRun,
-    AsyncCallbackManagerForLLMRun, AsyncCallbackManagerForRetrieverRun,
-    AsyncCallbackManagerForToolRun, CallbackManager, CallbackManagerForChainGroup,
-    CallbackManagerForChainRun, CallbackManagerForLLMRun, CallbackManagerForRetrieverRun,
-    CallbackManagerForToolRun, ParentRunManager, RunManager, RunManagerCore,
+    CallbackManager, CallbackManagerForChainGroup, CallbackManagerForChainRun,
+    CallbackManagerForLLMRun, CallbackManagerForRetrieverRun, CallbackManagerForToolRun,
+    ParentRunManager, RunManager, RunManagerCore,
 };
 use agent_chain_core::outputs::ChatResult;
 use std::collections::HashMap;
@@ -350,10 +348,10 @@ fn test_parent_run_manager_get_child_inherits_handlers() {
             .build(),
     );
     let child = mgr.get_child(None);
-    assert!(!child.handlers.is_empty());
-    assert!(!child.inheritable_handlers.is_empty());
-    assert!(child.tags.contains(&"it".to_string()));
-    assert_eq!(child.metadata["ik"], serde_json::json!("iv"));
+    assert!(!child.handlers().is_empty());
+    assert!(!child.inheritable_handlers().is_empty());
+    assert!(child.tags().contains(&"it".to_string()));
+    assert_eq!(child.metadata()["ik"], serde_json::json!("iv"));
 }
 
 #[test]
@@ -361,15 +359,15 @@ fn test_parent_run_manager_get_child_sets_parent_run_id() {
     let run_id = Uuid::new_v4();
     let mgr = ParentRunManager::new(RunManagerCore::builder().run_id(run_id).build());
     let child = mgr.get_child(None);
-    assert_eq!(child.parent_run_id, Some(run_id));
+    assert_eq!(child.parent_run_id(), Some(run_id));
 }
 
 #[test]
 fn test_parent_run_manager_get_child_tag_not_inheritable() {
     let mgr = ParentRunManager::new(RunManagerCore::builder().run_id(Uuid::new_v4()).build());
     let child = mgr.get_child(Some("local"));
-    assert!(child.tags.contains(&"local".to_string()));
-    assert!(!child.inheritable_tags.contains(&"local".to_string()));
+    assert!(child.tags().contains(&"local".to_string()));
+    assert!(!child.inheritable_tags().contains(&"local".to_string()));
 }
 
 #[test]
@@ -626,16 +624,16 @@ fn make_sync_chain_group() -> (CallbackManagerForChainGroup, CallbackManagerForC
 #[test]
 fn test_chain_group_on_chain_end_sets_ended() {
     let (mut group, _) = make_sync_chain_group();
-    assert!(!group.ended);
+    assert!(!group.ended());
     group.on_chain_end(&HashMap::new());
-    assert!(group.ended);
+    assert!(group.ended());
 }
 
 #[test]
 fn test_chain_group_on_chain_error_sets_ended() {
     let (mut group, _) = make_sync_chain_group();
     group.on_chain_error(&std::io::Error::other("err"));
-    assert!(group.ended);
+    assert!(group.ended());
 }
 
 #[test]
@@ -657,30 +655,24 @@ fn test_chain_group_merge_preserves_parent_run_manager() {
 #[test]
 fn test_base_run_manager_get_noop_manager() {
     let mgr = RunManagerCore::noop();
-    assert!(!mgr.run_id.is_nil());
-    assert!(mgr.handlers.is_empty());
-    assert!(mgr.inheritable_handlers.is_empty());
-    assert!(mgr.tags.is_empty());
-    assert!(mgr.metadata.is_empty());
+    assert!(!mgr.run_id().is_nil());
+    assert!(mgr.handlers().is_empty());
 }
 
 #[test]
 fn test_base_run_manager_initialization_defaults() {
     let rid = Uuid::new_v4();
     let mgr = RunManagerCore::builder().run_id(rid).build();
-    assert_eq!(mgr.run_id, rid);
-    assert!(mgr.parent_run_id.is_none());
-    assert!(mgr.tags.is_empty());
-    assert!(mgr.inheritable_tags.is_empty());
-    assert!(mgr.metadata.is_empty());
-    assert!(mgr.inheritable_metadata.is_empty());
+    assert_eq!(mgr.run_id(), rid);
+    assert!(mgr.parent_run_id().is_none());
+    assert!(mgr.tags().is_empty());
 }
 
 #[test]
-fn test_async_llm_run_get_sync() {
+fn test_async_llm_run_is_same_as_sync() {
     let rid = Uuid::new_v4();
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let sync_mgr = CallbackManagerForLLMRun::new(
+    let mgr = CallbackManagerForLLMRun::new(
         RunManagerCore::builder()
             .run_id(rid)
             .handlers(vec![h.clone()])
@@ -691,18 +683,16 @@ fn test_async_llm_run_get_sync() {
             .inheritable_metadata(HashMap::from([("ik".to_string(), serde_json::json!("iv"))]))
             .build(),
     );
-    let async_mgr = AsyncCallbackManagerForLLMRun::from_sync(sync_mgr);
-    let back = async_mgr.get_sync();
-    assert_eq!(back.run_id(), rid);
-    assert_eq!(back.handlers().len(), 1);
-    assert!(back.tags().contains(&"t".to_string()));
+    assert_eq!(mgr.run_id(), rid);
+    assert_eq!(mgr.handlers().len(), 1);
+    assert!(mgr.tags().contains(&"t".to_string()));
 }
 
 #[test]
-fn test_async_chain_run_get_sync() {
+fn test_async_chain_run_is_same_as_sync() {
     let rid = Uuid::new_v4();
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let sync_mgr = CallbackManagerForChainRun::new(
+    let mgr = CallbackManagerForChainRun::new(
         RunManagerCore::builder()
             .run_id(rid)
             .handlers(vec![h.clone()])
@@ -710,193 +700,171 @@ fn test_async_chain_run_get_sync() {
             .tags(vec!["t".to_string()])
             .build(),
     );
-    let async_mgr = AsyncCallbackManagerForChainRun::from_sync(sync_mgr);
-    let back = async_mgr.get_sync();
-    assert_eq!(back.run_id(), rid);
+    assert_eq!(mgr.run_id(), rid);
 }
 
 #[test]
-fn test_async_tool_run_get_sync() {
+fn test_async_tool_run_is_same_as_sync() {
     let rid = Uuid::new_v4();
-    let sync_mgr = CallbackManagerForToolRun::new(RunManagerCore::builder().run_id(rid).build());
-    let async_mgr = AsyncCallbackManagerForToolRun::from_sync(sync_mgr);
-    let back = async_mgr.get_sync();
-    assert_eq!(back.run_id(), rid);
+    let mgr = CallbackManagerForToolRun::new(RunManagerCore::builder().run_id(rid).build());
+    assert_eq!(mgr.run_id(), rid);
 }
 
 #[test]
-fn test_async_retriever_run_get_sync() {
+fn test_async_retriever_run_is_same_as_sync() {
     let rid = Uuid::new_v4();
-    let sync_mgr =
-        CallbackManagerForRetrieverRun::new(RunManagerCore::builder().run_id(rid).build());
-    let async_mgr = AsyncCallbackManagerForRetrieverRun::from_sync(sync_mgr);
-    let back = async_mgr.get_sync();
-    assert_eq!(back.run_id(), rid);
+    let mgr = CallbackManagerForRetrieverRun::new(RunManagerCore::builder().run_id(rid).build());
+    assert_eq!(mgr.run_id(), rid);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_on_llm_start_returns_async_managers() {
+#[test]
+fn test_callback_manager_on_llm_start_returns_managers() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let mut mgr = AsyncCallbackManager::new();
+    let mut mgr = CallbackManager::new();
     mgr.add_handler(h, true);
-    let managers = mgr
-        .on_llm_start(&HashMap::new(), &["p1".to_string(), "p2".to_string()], None)
-        .await;
+    let managers = mgr.on_llm_start(&HashMap::new(), &["p1".to_string(), "p2".to_string()], None);
     assert_eq!(managers.len(), 2);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_on_llm_start_uses_provided_run_id() {
+#[test]
+fn test_callback_manager_on_llm_start_uses_provided_run_id() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let mut mgr = AsyncCallbackManager::new();
+    let mut mgr = CallbackManager::new();
     mgr.add_handler(h, true);
     let rid = Uuid::new_v4();
-    let managers = mgr
-        .on_llm_start(
-            &HashMap::new(),
-            &["p1".to_string(), "p2".to_string()],
-            Some(rid),
-        )
-        .await;
+    let managers = mgr.on_llm_start(
+        &HashMap::new(),
+        &["p1".to_string(), "p2".to_string()],
+        Some(rid),
+    );
     assert_eq!(managers[0].run_id(), rid);
     assert_ne!(managers[1].run_id(), rid);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_on_chat_model_start_returns_async_managers() {
+#[test]
+fn test_callback_manager_on_chat_model_start_returns_managers() {
     use agent_chain_core::messages::HumanMessage;
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let mut mgr = AsyncCallbackManager::new();
+    let mut mgr = CallbackManager::new();
     mgr.add_handler(h, true);
     let msgs = vec![
         vec![HumanMessage::builder().content("a").build().into()],
         vec![HumanMessage::builder().content("b").build().into()],
     ];
-    let managers = mgr
-        .on_chat_model_start(&HashMap::new(), &msgs, None, None)
-        .await;
+    let managers = mgr.on_chat_model_start(&HashMap::new(), &msgs, None, None);
     assert_eq!(managers.len(), 2);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_on_chain_start_returns_async_chain_manager() {
+#[test]
+fn test_callback_manager_on_chain_start_returns_chain_manager() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let mut mgr = AsyncCallbackManager::new();
+    let mut mgr = CallbackManager::new();
     mgr.add_handler(h, true);
     let rm = mgr
-        .on_chain_start(&HashMap::new(), &HashMap::new(), None, None)
-        .await;
+        .on_chain_start()
+        .serialized(&HashMap::new())
+        .inputs(&HashMap::new())
+        .call();
     assert!(!rm.run_id().is_nil());
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_on_chain_start_uses_provided_run_id() {
+#[test]
+fn test_callback_manager_on_chain_start_uses_run_id() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let mut mgr = AsyncCallbackManager::new();
+    let mut mgr = CallbackManager::new();
     mgr.add_handler(h, true);
     let rid = Uuid::new_v4();
     let rm = mgr
-        .on_chain_start(&HashMap::new(), &HashMap::new(), Some(rid), None)
-        .await;
+        .on_chain_start()
+        .serialized(&HashMap::new())
+        .inputs(&HashMap::new())
+        .maybe_run_id(Some(rid))
+        .call();
     assert_eq!(rm.run_id(), rid);
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_on_tool_start_returns_async_tool_manager() {
+#[test]
+fn test_callback_manager_on_tool_start_returns_tool_manager() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let mut mgr = AsyncCallbackManager::new();
+    let mut mgr = CallbackManager::new();
     mgr.add_handler(h, true);
-    let rm = mgr
-        .on_tool_start(&HashMap::new(), "input", None, None)
-        .await;
+    let rm = mgr.on_tool_start(&HashMap::new(), "input", None, None);
     assert!(!rm.run_id().is_nil());
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_on_retriever_start_returns_async_retriever_manager() {
+#[test]
+fn test_callback_manager_on_retriever_start_returns_retriever_manager() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let mut mgr = AsyncCallbackManager::new();
+    let mut mgr = CallbackManager::new();
     mgr.add_handler(h, true);
     let rm = mgr
         .on_retriever_start()
         .serialized(&HashMap::new())
         .query("query")
-        .call()
-        .await;
+        .call();
     assert!(!rm.run_id().is_nil());
 }
 
-#[tokio::test]
-async fn test_async_callback_manager_on_custom_event_empty_handlers_noop() {
-    let mgr = AsyncCallbackManager::new();
-    mgr.on_custom_event("evt", &serde_json::json!({}), None)
-        .await;
+#[test]
+fn test_callback_manager_on_custom_event_empty_handlers_noop_async() {
+    let mgr = CallbackManager::new();
+    mgr.on_custom_event("evt", &serde_json::json!({}), None);
 }
 
-#[tokio::test]
-async fn test_async_llm_run_empty_handlers_noop() {
-    let sync_mgr =
+#[test]
+fn test_llm_run_empty_handlers_noop_async() {
+    let mgr =
         CallbackManagerForLLMRun::new(RunManagerCore::builder().run_id(Uuid::new_v4()).build());
-    let mgr = AsyncCallbackManagerForLLMRun::from_sync(sync_mgr);
-    mgr.on_llm_new_token("tok", None).await;
-    mgr.on_llm_end(&ChatResult::default()).await;
-    mgr.on_llm_error(&std::io::Error::other("err")).await;
+    mgr.on_llm_new_token("tok", None);
+    mgr.on_llm_end(&ChatResult::default());
+    mgr.on_llm_error(&std::io::Error::other("err"));
 }
 
-#[tokio::test]
-async fn test_async_chain_run_empty_handlers_noop() {
-    let sync_mgr =
+#[test]
+fn test_chain_run_empty_handlers_noop_async() {
+    let mgr =
         CallbackManagerForChainRun::new(RunManagerCore::builder().run_id(Uuid::new_v4()).build());
-    let mgr = AsyncCallbackManagerForChainRun::from_sync(sync_mgr);
-    mgr.on_chain_end(&HashMap::new()).await;
-    mgr.on_chain_error(&std::io::Error::other("err")).await;
-    mgr.on_agent_action(&serde_json::json!({"tool": "t"})).await;
-    mgr.on_agent_finish(&serde_json::json!({"return_values": {}}))
-        .await;
+    mgr.on_chain_end(&HashMap::new());
+    mgr.on_chain_error(&std::io::Error::other("err"));
+    mgr.on_agent_action(&serde_json::json!({"tool": "t"}));
+    mgr.on_agent_finish(&serde_json::json!({"return_values": {}}));
 }
 
-#[tokio::test]
-async fn test_async_chain_run_get_child_returns_async_manager() {
-    let sync_mgr =
+#[test]
+fn test_chain_run_get_child_returns_manager() {
+    let mgr =
         CallbackManagerForChainRun::new(RunManagerCore::builder().run_id(Uuid::new_v4()).build());
-    let mgr = AsyncCallbackManagerForChainRun::from_sync(sync_mgr);
     let child = mgr.get_child(None);
     assert_eq!(child.parent_run_id(), Some(mgr.run_id()));
 }
 
-#[tokio::test]
-async fn test_async_tool_run_empty_handlers_noop() {
-    let sync_mgr =
+#[test]
+fn test_tool_run_empty_handlers_noop_async() {
+    let mgr =
         CallbackManagerForToolRun::new(RunManagerCore::builder().run_id(Uuid::new_v4()).build());
-    let mgr = AsyncCallbackManagerForToolRun::from_sync(sync_mgr);
-    mgr.on_tool_end("out").await;
-    mgr.on_tool_error(&std::io::Error::other("err")).await;
+    mgr.on_tool_end("out");
+    mgr.on_tool_error(&std::io::Error::other("err"));
 }
 
-#[tokio::test]
-async fn test_async_retriever_run_empty_handlers_noop() {
-    let sync_mgr = CallbackManagerForRetrieverRun::new(
+#[test]
+fn test_retriever_run_empty_handlers_noop_async() {
+    let mgr = CallbackManagerForRetrieverRun::new(
         RunManagerCore::builder().run_id(Uuid::new_v4()).build(),
     );
-    let mgr = AsyncCallbackManagerForRetrieverRun::from_sync(sync_mgr);
-    mgr.on_retriever_end(&[]).await;
-    mgr.on_retriever_error(&std::io::Error::other("err")).await;
+    mgr.on_retriever_end(&[]);
+    mgr.on_retriever_error(&std::io::Error::other("err"));
 }
 
-fn make_async_chain_group() -> (
-    AsyncCallbackManagerForChainGroup,
-    AsyncCallbackManagerForChainRun,
-) {
+fn make_async_chain_group() -> (CallbackManagerForChainGroup, CallbackManagerForChainRun) {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let sync_parent = CallbackManagerForChainRun::new(
+    let parent_rm = CallbackManagerForChainRun::new(
         RunManagerCore::builder()
             .run_id(Uuid::new_v4())
             .handlers(vec![h.clone()])
             .inheritable_handlers(vec![h.clone()])
             .build(),
     );
-    let parent_rm = AsyncCallbackManagerForChainRun::from_sync(sync_parent);
-    let group = AsyncCallbackManagerForChainGroup::builder()
+    let group = CallbackManagerForChainGroup::builder()
         .handlers(vec![h.clone()])
         .inheritable_handlers(vec![h])
         .maybe_parent_run_id(parent_rm.parent_run_id())
@@ -905,32 +873,32 @@ fn make_async_chain_group() -> (
     (group, parent_rm)
 }
 
-#[tokio::test]
-async fn test_async_chain_group_on_chain_end_sets_ended() {
+#[test]
+fn test_async_chain_group_on_chain_end_sets_ended() {
     let (mut group, _) = make_async_chain_group();
-    assert!(!group.ended);
-    group.on_chain_end(&HashMap::new()).await;
-    assert!(group.ended);
+    assert!(!group.ended());
+    group.on_chain_end(&HashMap::new());
+    assert!(group.ended());
 }
 
-#[tokio::test]
-async fn test_async_chain_group_on_chain_error_sets_ended() {
+#[test]
+fn test_async_chain_group_on_chain_error_sets_ended() {
     let (mut group, _) = make_async_chain_group();
-    group.on_chain_error(&std::io::Error::other("err")).await;
-    assert!(group.ended);
+    group.on_chain_error(&std::io::Error::other("err"));
+    assert!(group.ended());
 }
 
-#[tokio::test]
-async fn test_async_chain_group_copy_preserves_parent_run_manager() {
+#[test]
+fn test_async_chain_group_copy_preserves_parent_run_manager() {
     let (group, parent_rm) = make_async_chain_group();
     let cp = group.clone();
     assert_eq!(cp.parent_run_id(), parent_rm.parent_run_id());
 }
 
-#[tokio::test]
-async fn test_async_parent_run_manager_get_child_returns_async_callback_manager() {
+#[test]
+fn test_parent_run_manager_get_child_returns_callback_manager() {
     let h: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
-    let sync_mgr = CallbackManagerForChainRun::new(
+    let mgr = CallbackManagerForChainRun::new(
         RunManagerCore::builder()
             .run_id(Uuid::new_v4())
             .handlers(vec![h.clone()])
@@ -939,24 +907,17 @@ async fn test_async_parent_run_manager_get_child_returns_async_callback_manager(
             .inheritable_metadata(HashMap::from([("ik".to_string(), serde_json::json!("iv"))]))
             .build(),
     );
-    let mgr = AsyncCallbackManagerForChainRun::from_sync(sync_mgr);
     let child = mgr.get_child(None);
     assert_eq!(child.parent_run_id(), Some(mgr.run_id()));
     assert_eq!(child.handlers().len(), 1);
 }
 
-#[tokio::test]
-async fn test_async_parent_run_manager_get_child_with_tag() {
-    let sync_mgr =
+#[test]
+fn test_parent_run_manager_get_child_with_tag() {
+    let mgr =
         CallbackManagerForChainRun::new(RunManagerCore::builder().run_id(Uuid::new_v4()).build());
-    let mgr = AsyncCallbackManagerForChainRun::from_sync(sync_mgr);
     let child = mgr.get_child(Some("local"));
-    assert!(
-        child
-            .to_callback_manager()
-            .tags
-            .contains(&"local".to_string())
-    );
+    assert!(child.tags().contains(&"local".to_string()));
 }
 
 #[test]
