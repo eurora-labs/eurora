@@ -10,11 +10,11 @@ pub use base::{ArcCallbackHandler, BaseCallbackHandler, BoxedCallbackHandler, re
 pub use manager::{
     AsyncCallbackManager, AsyncCallbackManagerForChainGroup, AsyncCallbackManagerForChainRun,
     AsyncCallbackManagerForLLMRun, AsyncCallbackManagerForRetrieverRun,
-    AsyncCallbackManagerForToolRun, AsyncParentRunManager, AsyncRunManager, BaseRunManager,
-    CallbackManager, CallbackManagerForChainGroup, CallbackManagerForChainRun,
-    CallbackManagerForLLMRun, CallbackManagerForRetrieverRun, CallbackManagerForToolRun, Callbacks,
-    ParentRunManager, RunManager, RunManagerCore, adispatch_custom_event, ahandle_event,
-    atrace_as_chain_group, dispatch_custom_event, handle_event, trace_as_chain_group,
+    AsyncCallbackManagerForToolRun, AsyncParentRunManager, AsyncRunManager, CallbackManager,
+    CallbackManagerForChainGroup, CallbackManagerForChainRun, CallbackManagerForLLMRun,
+    CallbackManagerForRetrieverRun, CallbackManagerForToolRun, Callbacks, ParentRunManager,
+    RunManager, RunManagerCore, adispatch_custom_event, ahandle_event, atrace_as_chain_group,
+    dispatch_custom_event, handle_event, trace_as_chain_group,
 };
 
 pub use file::{FileCallbackHandler, FileMode};
@@ -22,12 +22,7 @@ pub use file::{FileCallbackHandler, FileMode};
 pub use stdout::{StdOutCallbackHandler, colors};
 pub use streaming_stdout::StreamingStdOutCallbackHandler;
 
-pub use usage::{
-    UsageMetadataCallbackHandler, UsageMetadataCallbackWrapper, get_usage_metadata_callback,
-};
-
-#[deprecated(note = "renamed to UsageMetadataCallbackWrapper")]
-pub type UsageMetadataCallbackGuard = UsageMetadataCallbackWrapper;
+pub use usage::UsageMetadataCallbackHandler;
 
 #[cfg(test)]
 mod tests {

@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 
 use uuid::Uuid;
@@ -33,6 +32,10 @@ impl UsageMetadataCallbackHandler {
             .lock()
             .expect("usage_metadata lock poisoned")
             .clone()
+    }
+
+    pub fn as_arc_handler(self) -> Arc<dyn BaseCallbackHandler> {
+        Arc::new(self)
     }
 }
 
@@ -88,52 +91,6 @@ impl BaseCallbackHandler for UsageMetadataCallbackHandler {
             }
         }
     }
-}
-
-pub struct UsageMetadataCallbackWrapper {
-    handler: UsageMetadataCallbackHandler,
-}
-
-impl UsageMetadataCallbackWrapper {
-    fn new() -> Self {
-        Self {
-            handler: UsageMetadataCallbackHandler::new(),
-        }
-    }
-
-    pub fn handler(&self) -> &UsageMetadataCallbackHandler {
-        &self.handler
-    }
-
-    pub fn handler_mut(&mut self) -> &mut UsageMetadataCallbackHandler {
-        &mut self.handler
-    }
-
-    pub fn usage_metadata(&self) -> HashMap<String, UsageMetadata> {
-        self.handler.usage_metadata()
-    }
-
-    pub fn as_arc_handler(&self) -> Arc<dyn BaseCallbackHandler> {
-        Arc::new(self.handler.clone()) as Arc<dyn BaseCallbackHandler>
-    }
-}
-
-impl Deref for UsageMetadataCallbackWrapper {
-    type Target = UsageMetadataCallbackHandler;
-
-    fn deref(&self) -> &Self::Target {
-        &self.handler
-    }
-}
-
-impl DerefMut for UsageMetadataCallbackWrapper {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.handler
-    }
-}
-
-pub fn get_usage_metadata_callback() -> UsageMetadataCallbackWrapper {
-    UsageMetadataCallbackWrapper::new()
 }
 
 #[cfg(test)]

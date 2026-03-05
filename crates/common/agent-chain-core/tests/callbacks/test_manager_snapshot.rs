@@ -2,7 +2,7 @@ use agent_chain_core::callbacks::BaseCallbackHandler;
 use agent_chain_core::callbacks::manager::{
     AsyncCallbackManager, AsyncCallbackManagerForChainGroup, AsyncCallbackManagerForChainRun,
     AsyncCallbackManagerForLLMRun, AsyncCallbackManagerForRetrieverRun,
-    AsyncCallbackManagerForToolRun, BaseRunManager, CallbackManager, CallbackManagerForChainGroup,
+    AsyncCallbackManagerForToolRun, CallbackManager, CallbackManagerForChainGroup,
     CallbackManagerForChainRun, CallbackManagerForLLMRun, CallbackManagerForRetrieverRun,
     CallbackManagerForToolRun, ParentRunManager, RunManager, RunManagerCore,
 };
@@ -656,7 +656,7 @@ fn test_chain_group_merge_preserves_parent_run_manager() {
 
 #[test]
 fn test_base_run_manager_get_noop_manager() {
-    let mgr = BaseRunManager::noop();
+    let mgr = RunManagerCore::noop();
     assert!(!mgr.run_id.is_nil());
     assert!(mgr.handlers.is_empty());
     assert!(mgr.inheritable_handlers.is_empty());
@@ -667,7 +667,7 @@ fn test_base_run_manager_get_noop_manager() {
 #[test]
 fn test_base_run_manager_initialization_defaults() {
     let rid = Uuid::new_v4();
-    let mgr = BaseRunManager::builder().run_id(rid).build();
+    let mgr = RunManagerCore::builder().run_id(rid).build();
     assert_eq!(mgr.run_id, rid);
     assert!(mgr.parent_run_id.is_none());
     assert!(mgr.tags.is_empty());

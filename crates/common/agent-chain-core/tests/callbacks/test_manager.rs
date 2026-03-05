@@ -1,6 +1,6 @@
 use agent_chain_core::callbacks::BaseCallbackHandler;
 use agent_chain_core::callbacks::manager::{
-    AsyncCallbackManager, AsyncCallbackManagerForLLMRun, BaseRunManager, CallbackManager,
+    AsyncCallbackManager, AsyncCallbackManagerForLLMRun, CallbackManager,
     CallbackManagerForChainRun, CallbackManagerForLLMRun, CallbackManagerForRetrieverRun,
     CallbackManagerForToolRun, ParentRunManager, RunManager, RunManagerCore,
 };
@@ -23,7 +23,7 @@ fn test_base_run_manager_initialization() {
     let parent_run_id = Uuid::new_v4();
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
 
-    let manager = BaseRunManager::builder()
+    let manager = RunManagerCore::builder()
         .run_id(run_id)
         .handlers(vec![handler.clone()])
         .inheritable_handlers(vec![handler])
@@ -55,7 +55,7 @@ fn test_base_run_manager_initialization() {
 
 #[test]
 fn test_base_run_manager_get_noop_manager() {
-    let manager = BaseRunManager::noop();
+    let manager = RunManagerCore::noop();
 
     assert!(!manager.run_id.is_nil());
     assert!(manager.handlers.is_empty());
@@ -379,16 +379,16 @@ async fn test_async_callback_manager_on_chain_start() {
 
 #[tokio::test]
 async fn test_async_run_manager_on_text() {
-    use agent_chain_core::callbacks::manager::AsyncRunManager;
+    use agent_chain_core::callbacks::manager::{AsyncRunManager, RunManager};
 
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(TestHandler);
 
-    let manager = AsyncRunManager::new(
+    let manager = AsyncRunManager::from_sync(RunManager::new(
         RunManagerCore::builder()
             .run_id(Uuid::new_v4())
             .handlers(vec![handler])
             .build(),
-    );
+    ));
 
     manager.on_text("Hello").await;
     manager.on_text("World").await;

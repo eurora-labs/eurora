@@ -207,40 +207,82 @@ impl RunManagerCore {
     }
 }
 
-pub type BaseRunManager = RunManagerCore;
+// ---------------------------------------------------------------------------
+// Sync run manager macro — eliminates boilerplate for wrapper types
+// ---------------------------------------------------------------------------
+
+macro_rules! define_run_manager {
+    ($name:ident) => {
+        #[derive(Debug, Clone)]
+        pub struct $name {
+            core: RunManagerCore,
+        }
+
+        impl Deref for $name {
+            type Target = RunManagerCore;
+            fn deref(&self) -> &Self::Target {
+                &self.core
+            }
+        }
+
+        impl $name {
+            pub fn new(core: RunManagerCore) -> Self {
+                Self { core }
+            }
+
+            pub fn noop() -> Self {
+                Self {
+                    core: RunManagerCore::noop(),
+                }
+            }
+        }
+    };
+}
+
+macro_rules! define_async_run_manager {
+    ($async_name:ident, $sync_name:ident) => {
+        #[derive(Debug, Clone)]
+        pub struct $async_name {
+            inner: $sync_name,
+        }
+
+        impl $async_name {
+            pub fn from_sync(inner: $sync_name) -> Self {
+                Self { inner }
+            }
+
+            pub fn get_sync(&self) -> $sync_name {
+                self.inner.clone()
+            }
+
+            pub fn run_id(&self) -> Uuid {
+                self.inner.run_id()
+            }
+
+            pub fn parent_run_id(&self) -> Option<Uuid> {
+                self.inner.parent_run_id()
+            }
+
+            pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
+                self.inner.handlers()
+            }
+
+            pub fn noop() -> Self {
+                Self {
+                    inner: $sync_name::noop(),
+                }
+            }
+        }
+    };
+}
 
 // ---------------------------------------------------------------------------
 // RunManager — adds on_text / on_retry
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone)]
-pub struct RunManager {
-    core: RunManagerCore,
-}
-
-impl Deref for RunManager {
-    type Target = RunManagerCore;
-    fn deref(&self) -> &Self::Target {
-        &self.core
-    }
-}
+define_run_manager!(RunManager);
 
 impl RunManager {
-    pub fn new(core: RunManagerCore) -> Self {
-        Self { core }
-    }
-
-    pub fn noop() -> Self {
-        Self {
-            core: RunManagerCore::noop(),
-        }
-    }
-
-    #[doc(hidden)]
-    pub fn get_noop_manager() -> Self {
-        Self::noop()
-    }
-
     pub fn on_text(&self, text: &str) {
         let run_id = self.core.run_id;
         let parent_run_id = self.core.parent_run_id;
@@ -265,45 +307,16 @@ impl RunManager {
 // AsyncRunManager
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone)]
-pub struct AsyncRunManager {
-    core: RunManagerCore,
-}
-
-impl Deref for AsyncRunManager {
-    type Target = RunManagerCore;
-    fn deref(&self) -> &Self::Target {
-        &self.core
-    }
-}
+define_async_run_manager!(AsyncRunManager, RunManager);
 
 impl AsyncRunManager {
-    pub fn new(core: RunManagerCore) -> Self {
-        Self { core }
-    }
-
-    pub fn noop() -> Self {
-        Self {
-            core: RunManagerCore::noop(),
-        }
-    }
-
-    #[doc(hidden)]
-    pub fn get_noop_manager() -> Self {
-        Self::noop()
-    }
-
-    pub fn get_sync(&self) -> RunManager {
-        RunManager::new(self.core.clone())
-    }
-
     pub async fn on_text(&self, text: &str) {
-        if self.core.handlers.is_empty() {
+        if self.inner.handlers.is_empty() {
             return;
         }
-        let run_id = self.core.run_id;
-        let parent_run_id = self.core.parent_run_id;
-        ahandle_event(&self.core.handlers, None, |handler| {
+        let run_id = self.inner.run_id();
+        let parent_run_id = self.inner.parent_run_id();
+        ahandle_event(&self.inner.handlers, None, |handler| {
             handler.on_text(text, run_id, parent_run_id, None, "");
             async {}
         })
@@ -311,13 +324,13 @@ impl AsyncRunManager {
     }
 
     pub async fn on_retry(&self, retry_state: &serde_json::Value) {
-        if self.core.handlers.is_empty() {
+        if self.inner.handlers.is_empty() {
             return;
         }
-        let run_id = self.core.run_id;
-        let parent_run_id = self.core.parent_run_id;
+        let run_id = self.inner.run_id();
+        let parent_run_id = self.inner.parent_run_id();
         ahandle_event(
-            &self.core.handlers,
+            &self.inner.handlers,
             Some(|h: &dyn BaseCallbackHandler| h.ignore_retry()),
             |handler| {
                 handler.on_retry(retry_state, run_id, parent_run_id);
@@ -332,34 +345,9 @@ impl AsyncRunManager {
 // ParentRunManager — adds get_child
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone)]
-pub struct ParentRunManager {
-    core: RunManagerCore,
-}
-
-impl Deref for ParentRunManager {
-    type Target = RunManagerCore;
-    fn deref(&self) -> &Self::Target {
-        &self.core
-    }
-}
+define_run_manager!(ParentRunManager);
 
 impl ParentRunManager {
-    pub fn new(core: RunManagerCore) -> Self {
-        Self { core }
-    }
-
-    pub fn noop() -> Self {
-        Self {
-            core: RunManagerCore::noop(),
-        }
-    }
-
-    #[doc(hidden)]
-    pub fn get_noop_manager() -> Self {
-        Self::noop()
-    }
-
     pub fn get_child(&self, tag: Option<&str>) -> CallbackManager {
         self.core.get_child_manager(tag)
     }
@@ -369,40 +357,11 @@ impl ParentRunManager {
 // AsyncParentRunManager
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone)]
-pub struct AsyncParentRunManager {
-    core: RunManagerCore,
-}
-
-impl Deref for AsyncParentRunManager {
-    type Target = RunManagerCore;
-    fn deref(&self) -> &Self::Target {
-        &self.core
-    }
-}
+define_async_run_manager!(AsyncParentRunManager, ParentRunManager);
 
 impl AsyncParentRunManager {
-    pub fn new(core: RunManagerCore) -> Self {
-        Self { core }
-    }
-
-    pub fn noop() -> Self {
-        Self {
-            core: RunManagerCore::noop(),
-        }
-    }
-
-    #[doc(hidden)]
-    pub fn get_noop_manager() -> Self {
-        Self::noop()
-    }
-
     pub fn get_child(&self, tag: Option<&str>) -> AsyncCallbackManager {
-        AsyncCallbackManager::from_callback_manager(self.core.get_child_manager(tag))
-    }
-
-    pub fn get_sync(&self) -> ParentRunManager {
-        ParentRunManager::new(self.core.clone())
+        AsyncCallbackManager::from_callback_manager(self.inner.get_child(tag))
     }
 }
 
@@ -410,34 +369,9 @@ impl AsyncParentRunManager {
 // CallbackManagerForLLMRun
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone)]
-pub struct CallbackManagerForLLMRun {
-    core: RunManagerCore,
-}
-
-impl Deref for CallbackManagerForLLMRun {
-    type Target = RunManagerCore;
-    fn deref(&self) -> &Self::Target {
-        &self.core
-    }
-}
+define_run_manager!(CallbackManagerForLLMRun);
 
 impl CallbackManagerForLLMRun {
-    pub fn new(core: RunManagerCore) -> Self {
-        Self { core }
-    }
-
-    pub fn noop() -> Self {
-        Self {
-            core: RunManagerCore::noop(),
-        }
-    }
-
-    #[doc(hidden)]
-    pub fn get_noop_manager() -> Self {
-        Self::noop()
-    }
-
     pub fn on_llm_new_token(&self, token: &str, chunk: Option<&serde_json::Value>) {
         let run_id = self.core.run_id;
         let parent_run_id = self.core.parent_run_id;
@@ -476,34 +410,9 @@ impl CallbackManagerForLLMRun {
 // CallbackManagerForChainRun
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone)]
-pub struct CallbackManagerForChainRun {
-    core: RunManagerCore,
-}
-
-impl Deref for CallbackManagerForChainRun {
-    type Target = RunManagerCore;
-    fn deref(&self) -> &Self::Target {
-        &self.core
-    }
-}
+define_run_manager!(CallbackManagerForChainRun);
 
 impl CallbackManagerForChainRun {
-    pub fn new(core: RunManagerCore) -> Self {
-        Self { core }
-    }
-
-    pub fn noop() -> Self {
-        Self {
-            core: RunManagerCore::noop(),
-        }
-    }
-
-    #[doc(hidden)]
-    pub fn get_noop_manager() -> Self {
-        Self::noop()
-    }
-
     pub fn get_child(&self, tag: Option<&str>) -> CallbackManager {
         self.core.get_child_manager(tag)
     }
@@ -557,34 +466,9 @@ impl CallbackManagerForChainRun {
 // CallbackManagerForToolRun
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone)]
-pub struct CallbackManagerForToolRun {
-    core: RunManagerCore,
-}
-
-impl Deref for CallbackManagerForToolRun {
-    type Target = RunManagerCore;
-    fn deref(&self) -> &Self::Target {
-        &self.core
-    }
-}
+define_run_manager!(CallbackManagerForToolRun);
 
 impl CallbackManagerForToolRun {
-    pub fn new(core: RunManagerCore) -> Self {
-        Self { core }
-    }
-
-    pub fn noop() -> Self {
-        Self {
-            core: RunManagerCore::noop(),
-        }
-    }
-
-    #[doc(hidden)]
-    pub fn get_noop_manager() -> Self {
-        Self::noop()
-    }
-
     pub fn get_child(&self, tag: Option<&str>) -> CallbackManager {
         self.core.get_child_manager(tag)
     }
@@ -616,34 +500,9 @@ impl CallbackManagerForToolRun {
 // CallbackManagerForRetrieverRun
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone)]
-pub struct CallbackManagerForRetrieverRun {
-    core: RunManagerCore,
-}
-
-impl Deref for CallbackManagerForRetrieverRun {
-    type Target = RunManagerCore;
-    fn deref(&self) -> &Self::Target {
-        &self.core
-    }
-}
+define_run_manager!(CallbackManagerForRetrieverRun);
 
 impl CallbackManagerForRetrieverRun {
-    pub fn new(core: RunManagerCore) -> Self {
-        Self { core }
-    }
-
-    pub fn noop() -> Self {
-        Self {
-            core: RunManagerCore::noop(),
-        }
-    }
-
-    #[doc(hidden)]
-    pub fn get_noop_manager() -> Self {
-        Self::noop()
-    }
-
     pub fn get_child(&self, tag: Option<&str>) -> CallbackManager {
         self.core.get_child_manager(tag)
     }
@@ -668,6 +527,89 @@ impl CallbackManagerForRetrieverRun {
                 handler.on_retriever_error(error, run_id, parent_run_id);
             },
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Async run manager types
+// ---------------------------------------------------------------------------
+
+define_async_run_manager!(AsyncCallbackManagerForLLMRun, CallbackManagerForLLMRun);
+
+impl AsyncCallbackManagerForLLMRun {
+    pub fn tags(&self) -> &[String] {
+        self.inner.tags()
+    }
+
+    pub async fn on_llm_new_token(&self, token: &str, chunk: Option<&serde_json::Value>) {
+        self.inner.on_llm_new_token(token, chunk);
+    }
+
+    pub async fn on_llm_end(&self, response: &ChatResult) {
+        self.inner.on_llm_end(response);
+    }
+
+    pub async fn on_llm_error(&self, error: &dyn std::error::Error) {
+        self.inner.on_llm_error(error);
+    }
+}
+
+define_async_run_manager!(AsyncCallbackManagerForChainRun, CallbackManagerForChainRun);
+
+impl AsyncCallbackManagerForChainRun {
+    pub fn get_child(&self, tag: Option<&str>) -> AsyncCallbackManager {
+        AsyncCallbackManager::from_callback_manager(self.inner.get_child(tag))
+    }
+
+    pub async fn on_chain_end(&self, outputs: &HashMap<String, serde_json::Value>) {
+        self.inner.on_chain_end(outputs);
+    }
+
+    pub async fn on_chain_error(&self, error: &dyn std::error::Error) {
+        self.inner.on_chain_error(error);
+    }
+
+    pub async fn on_agent_action(&self, action: &serde_json::Value) {
+        self.inner.on_agent_action(action);
+    }
+
+    pub async fn on_agent_finish(&self, finish: &serde_json::Value) {
+        self.inner.on_agent_finish(finish);
+    }
+}
+
+define_async_run_manager!(AsyncCallbackManagerForToolRun, CallbackManagerForToolRun);
+
+impl AsyncCallbackManagerForToolRun {
+    pub fn get_child(&self, tag: Option<&str>) -> AsyncCallbackManager {
+        AsyncCallbackManager::from_callback_manager(self.inner.get_child(tag))
+    }
+
+    pub async fn on_tool_end(&self, output: &str) {
+        self.inner.on_tool_end(output);
+    }
+
+    pub async fn on_tool_error(&self, error: &dyn std::error::Error) {
+        self.inner.on_tool_error(error);
+    }
+}
+
+define_async_run_manager!(
+    AsyncCallbackManagerForRetrieverRun,
+    CallbackManagerForRetrieverRun
+);
+
+impl AsyncCallbackManagerForRetrieverRun {
+    pub fn get_child(&self, tag: Option<&str>) -> AsyncCallbackManager {
+        AsyncCallbackManager::from_callback_manager(self.inner.get_child(tag))
+    }
+
+    pub async fn on_retriever_end(&self, documents: &[serde_json::Value]) {
+        self.inner.on_retriever_end(documents);
+    }
+
+    pub async fn on_retriever_error(&self, error: &dyn std::error::Error) {
+        self.inner.on_retriever_error(error);
     }
 }
 
@@ -1401,223 +1343,7 @@ impl AsyncCallbackManager {
 }
 
 // ---------------------------------------------------------------------------
-// Async run manager types
-// ---------------------------------------------------------------------------
-
-#[derive(Debug, Clone)]
-pub struct AsyncCallbackManagerForLLMRun {
-    inner: CallbackManagerForLLMRun,
-}
-
-impl AsyncCallbackManagerForLLMRun {
-    pub fn from_sync(inner: CallbackManagerForLLMRun) -> Self {
-        Self { inner }
-    }
-
-    pub fn get_sync(&self) -> CallbackManagerForLLMRun {
-        self.inner.clone()
-    }
-
-    pub fn run_id(&self) -> Uuid {
-        self.inner.run_id()
-    }
-
-    pub fn parent_run_id(&self) -> Option<Uuid> {
-        self.inner.parent_run_id()
-    }
-
-    pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
-        self.inner.handlers()
-    }
-
-    pub fn tags(&self) -> &[String] {
-        self.inner.tags()
-    }
-
-    pub async fn on_llm_new_token(&self, token: &str, chunk: Option<&serde_json::Value>) {
-        self.inner.on_llm_new_token(token, chunk);
-    }
-
-    pub async fn on_llm_end(&self, response: &ChatResult) {
-        self.inner.on_llm_end(response);
-    }
-
-    pub async fn on_llm_error(&self, error: &dyn std::error::Error) {
-        self.inner.on_llm_error(error);
-    }
-
-    pub fn noop() -> Self {
-        Self {
-            inner: CallbackManagerForLLMRun::noop(),
-        }
-    }
-
-    #[doc(hidden)]
-    pub fn get_noop_manager() -> Self {
-        Self::noop()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct AsyncCallbackManagerForChainRun {
-    inner: CallbackManagerForChainRun,
-}
-
-impl AsyncCallbackManagerForChainRun {
-    pub fn from_sync(inner: CallbackManagerForChainRun) -> Self {
-        Self { inner }
-    }
-
-    pub fn get_sync(&self) -> CallbackManagerForChainRun {
-        self.inner.clone()
-    }
-
-    pub fn run_id(&self) -> Uuid {
-        self.inner.run_id()
-    }
-
-    pub fn parent_run_id(&self) -> Option<Uuid> {
-        self.inner.parent_run_id()
-    }
-
-    pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
-        self.inner.handlers()
-    }
-
-    pub fn get_child(&self, tag: Option<&str>) -> AsyncCallbackManager {
-        AsyncCallbackManager::from_callback_manager(self.inner.get_child(tag))
-    }
-
-    pub async fn on_chain_end(&self, outputs: &HashMap<String, serde_json::Value>) {
-        self.inner.on_chain_end(outputs);
-    }
-
-    pub async fn on_chain_error(&self, error: &dyn std::error::Error) {
-        self.inner.on_chain_error(error);
-    }
-
-    pub async fn on_agent_action(&self, action: &serde_json::Value) {
-        self.inner.on_agent_action(action);
-    }
-
-    pub async fn on_agent_finish(&self, finish: &serde_json::Value) {
-        self.inner.on_agent_finish(finish);
-    }
-
-    pub fn noop() -> Self {
-        Self {
-            inner: CallbackManagerForChainRun::noop(),
-        }
-    }
-
-    #[doc(hidden)]
-    pub fn get_noop_manager() -> Self {
-        Self::noop()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct AsyncCallbackManagerForToolRun {
-    inner: CallbackManagerForToolRun,
-}
-
-impl AsyncCallbackManagerForToolRun {
-    pub fn from_sync(inner: CallbackManagerForToolRun) -> Self {
-        Self { inner }
-    }
-
-    pub fn get_sync(&self) -> CallbackManagerForToolRun {
-        self.inner.clone()
-    }
-
-    pub fn run_id(&self) -> Uuid {
-        self.inner.run_id()
-    }
-
-    pub fn parent_run_id(&self) -> Option<Uuid> {
-        self.inner.parent_run_id()
-    }
-
-    pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
-        self.inner.handlers()
-    }
-
-    pub fn get_child(&self, tag: Option<&str>) -> AsyncCallbackManager {
-        AsyncCallbackManager::from_callback_manager(self.inner.get_child(tag))
-    }
-
-    pub async fn on_tool_end(&self, output: &str) {
-        self.inner.on_tool_end(output);
-    }
-
-    pub async fn on_tool_error(&self, error: &dyn std::error::Error) {
-        self.inner.on_tool_error(error);
-    }
-
-    pub fn noop() -> Self {
-        Self {
-            inner: CallbackManagerForToolRun::noop(),
-        }
-    }
-
-    #[doc(hidden)]
-    pub fn get_noop_manager() -> Self {
-        Self::noop()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct AsyncCallbackManagerForRetrieverRun {
-    inner: CallbackManagerForRetrieverRun,
-}
-
-impl AsyncCallbackManagerForRetrieverRun {
-    pub fn from_sync(inner: CallbackManagerForRetrieverRun) -> Self {
-        Self { inner }
-    }
-
-    pub fn get_sync(&self) -> CallbackManagerForRetrieverRun {
-        self.inner.clone()
-    }
-
-    pub fn run_id(&self) -> Uuid {
-        self.inner.run_id()
-    }
-
-    pub fn parent_run_id(&self) -> Option<Uuid> {
-        self.inner.parent_run_id()
-    }
-
-    pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
-        self.inner.handlers()
-    }
-
-    pub fn get_child(&self, tag: Option<&str>) -> AsyncCallbackManager {
-        AsyncCallbackManager::from_callback_manager(self.inner.get_child(tag))
-    }
-
-    pub async fn on_retriever_end(&self, documents: &[serde_json::Value]) {
-        self.inner.on_retriever_end(documents);
-    }
-
-    pub async fn on_retriever_error(&self, error: &dyn std::error::Error) {
-        self.inner.on_retriever_error(error);
-    }
-
-    pub fn noop() -> Self {
-        Self {
-            inner: CallbackManagerForRetrieverRun::noop(),
-        }
-    }
-
-    #[doc(hidden)]
-    pub fn get_noop_manager() -> Self {
-        Self::noop()
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Chain group types
+// Chain group types — use Deref to eliminate delegation boilerplate
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
@@ -1670,27 +1396,8 @@ impl CallbackManagerForChainGroup {
     }
 
     pub fn merge(&self, other: &CallbackManager) -> Self {
-        let mut merged_inner = self.inner.clone();
-
-        for tag in &other.tags {
-            if !merged_inner.tags.contains(tag) {
-                merged_inner.tags.push(tag.clone());
-            }
-        }
-        for tag in &other.inheritable_tags {
-            if !merged_inner.inheritable_tags.contains(tag) {
-                merged_inner.inheritable_tags.push(tag.clone());
-            }
-        }
-
-        merged_inner.metadata.extend(other.metadata.clone());
-
-        for handler in &other.handlers {
-            merged_inner.add_handler(handler.clone(), false);
-        }
-
         Self {
-            inner: merged_inner,
+            inner: self.inner.merge(other),
             parent_run_manager: self.parent_run_manager.clone(),
             ended: self.ended,
         }
@@ -1832,27 +1539,8 @@ impl AsyncCallbackManagerForChainGroup {
     }
 
     pub fn merge(&self, other: &CallbackManager) -> Self {
-        let mut inner_sync = self.inner.inner.clone();
-
-        for tag in &other.tags {
-            if !inner_sync.tags.contains(tag) {
-                inner_sync.tags.push(tag.clone());
-            }
-        }
-        for tag in &other.inheritable_tags {
-            if !inner_sync.inheritable_tags.contains(tag) {
-                inner_sync.inheritable_tags.push(tag.clone());
-            }
-        }
-
-        inner_sync.metadata.extend(other.metadata.clone());
-
-        for handler in &other.handlers {
-            inner_sync.add_handler(handler.clone(), false);
-        }
-
         Self {
-            inner: AsyncCallbackManager::from_callback_manager(inner_sync),
+            inner: AsyncCallbackManager::from_callback_manager(self.inner.inner.merge(other)),
             parent_run_manager: self.parent_run_manager.clone(),
             ended: self.ended,
         }
