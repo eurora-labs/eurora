@@ -82,10 +82,17 @@ where
     StructuredTool::from_function(func, name, description, schema)
 }
 
+pub struct PropertyDef<'a> {
+    pub name: &'a str,
+    pub r#type: &'a str,
+    pub description: &'a str,
+    pub required: bool,
+}
+
 pub fn tool_from_schema(
     name: impl Into<String>,
     description: impl Into<String>,
-    properties: &[(&str, &str, &str, bool)],
+    properties: &[PropertyDef<'_>],
     func: impl Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync + 'static,
 ) -> StructuredTool {
     let name = name.into();
@@ -94,16 +101,16 @@ pub fn tool_from_schema(
     let mut props = HashMap::new();
     let mut required = Vec::new();
 
-    for &(prop_name, prop_type, prop_desc, is_required) in properties {
+    for prop in properties {
         props.insert(
-            prop_name.to_string(),
+            prop.name.to_string(),
             serde_json::json!({
-                "type": prop_type,
-                "description": prop_desc
+                "type": prop.r#type,
+                "description": prop.description
             }),
         );
-        if is_required {
-            required.push(prop_name.to_string());
+        if prop.required {
+            required.push(prop.name.to_string());
         }
     }
 
@@ -158,7 +165,12 @@ mod tests {
         let tool = tool_from_schema(
             "greet",
             "Greets a person",
-            &[("name", "string", "The person's name", true)],
+            &[PropertyDef {
+                name: "name",
+                r#type: "string",
+                description: "The person's name",
+                required: true,
+            }],
             |args| {
                 let name = args
                     .get("name")

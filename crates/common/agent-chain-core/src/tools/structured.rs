@@ -14,7 +14,8 @@ use crate::error::{Error, Result};
 use crate::runnables::RunnableConfig;
 
 use super::base::{
-    ArgsSchema, BaseTool, ErrorHandler, FILTERED_ARGS, ResponseFormat, ToolInput, ToolOutput,
+    ArgsSchema, BaseTool, ErrorHandler, FILTERED_ARGS, ResponseFormat, ToolInput, ToolMeta,
+    ToolOutput,
 };
 
 pub type StructuredToolFunc = Arc<dyn Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync>;
@@ -26,30 +27,17 @@ pub type AsyncStructuredToolFunc = Arc<
 >;
 
 pub struct StructuredTool {
-    name: String,
-    description: String,
+    meta: ToolMeta,
     func: Option<StructuredToolFunc>,
     coroutine: Option<AsyncStructuredToolFunc>,
     args_schema: ArgsSchema,
-    return_direct: bool,
-    verbose: bool,
-    handle_tool_error: ErrorHandler,
-    handle_validation_error: ErrorHandler,
-    response_format: ResponseFormat,
-    tags: Option<Vec<String>>,
-    metadata: Option<HashMap<String, Value>>,
-    extras: Option<HashMap<String, Value>>,
-    callbacks: Option<Callbacks>,
 }
 
 impl Debug for StructuredTool {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StructuredTool")
-            .field("name", &self.name)
-            .field("description", &self.description)
+            .field("meta", &self.meta)
             .field("args_schema", &self.args_schema)
-            .field("return_direct", &self.return_direct)
-            .field("response_format", &self.response_format)
             .finish()
     }
 }
@@ -74,20 +62,22 @@ impl StructuredTool {
         callbacks: Option<Callbacks>,
     ) -> Self {
         Self {
-            name: name.into(),
-            description: description.into(),
+            meta: ToolMeta {
+                name: name.into(),
+                description: description.into(),
+                return_direct,
+                verbose,
+                handle_tool_error,
+                handle_validation_error,
+                response_format,
+                tags,
+                metadata,
+                extras,
+                callbacks,
+            },
             func,
             coroutine,
             args_schema,
-            return_direct,
-            verbose,
-            handle_tool_error,
-            handle_validation_error,
-            response_format,
-            tags,
-            metadata,
-            extras,
-            callbacks,
         }
     }
 
@@ -150,7 +140,7 @@ impl StructuredTool {
             ToolInput::ToolCall(tc) => tc
                 .args
                 .as_object()
-                .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                .map(|obj| obj.clone().into_iter().collect())
                 .ok_or_else(|| {
                     Error::ToolInvocation("ToolCall args must be an object".to_string())
                 }),
@@ -158,10 +148,9 @@ impl StructuredTool {
     }
 }
 
-fn filter_args(args: HashMap<String, Value>) -> HashMap<String, Value> {
-    args.into_iter()
-        .filter(|(k, _)| !FILTERED_ARGS.contains(&k.as_str()))
-        .collect()
+fn filter_args(mut args: HashMap<String, Value>) -> HashMap<String, Value> {
+    args.retain(|k, _| !FILTERED_ARGS.contains(&k.as_str()));
+    args
 }
 
 fn value_to_tool_output(value: Value) -> ToolOutput {
@@ -173,52 +162,10 @@ fn value_to_tool_output(value: Value) -> ToolOutput {
 
 #[async_trait]
 impl BaseTool for StructuredTool {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn description(&self) -> &str {
-        &self.description
-    }
+    impl_base_tool_getters!();
 
     fn args_schema(&self) -> Option<&ArgsSchema> {
         Some(&self.args_schema)
-    }
-
-    fn return_direct(&self) -> bool {
-        self.return_direct
-    }
-
-    fn verbose(&self) -> bool {
-        self.verbose
-    }
-
-    fn tags(&self) -> Option<&[String]> {
-        self.tags.as_deref()
-    }
-
-    fn metadata(&self) -> Option<&HashMap<String, Value>> {
-        self.metadata.as_ref()
-    }
-
-    fn handle_tool_error(&self) -> &ErrorHandler {
-        &self.handle_tool_error
-    }
-
-    fn handle_validation_error(&self) -> &ErrorHandler {
-        &self.handle_validation_error
-    }
-
-    fn response_format(&self) -> ResponseFormat {
-        self.response_format
-    }
-
-    fn extras(&self) -> Option<&HashMap<String, Value>> {
-        self.extras.as_ref()
-    }
-
-    fn callbacks(&self) -> Option<&Callbacks> {
-        self.callbacks.as_ref()
     }
 
     fn tool_run(

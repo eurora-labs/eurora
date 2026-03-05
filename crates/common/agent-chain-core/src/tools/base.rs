@@ -66,7 +66,7 @@ impl ArgsSchema {
             ArgsSchema::JsonSchema(schema) => schema
                 .get("properties")
                 .and_then(|p| p.as_object())
-                .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                .map(|obj| obj.clone().into_iter().collect())
                 .unwrap_or_default(),
             ArgsSchema::TypeName(_) => HashMap::new(),
         }
@@ -114,6 +114,31 @@ impl ErrorHandler {
             ErrorHandler::Message(msg) => Some(msg.clone()),
             ErrorHandler::Handler(f) => Some(f(error_msg)),
         }
+    }
+}
+
+pub struct ToolMeta {
+    pub(crate) name: String,
+    pub(crate) description: String,
+    pub(crate) return_direct: bool,
+    pub(crate) verbose: bool,
+    pub(crate) handle_tool_error: ErrorHandler,
+    pub(crate) handle_validation_error: ErrorHandler,
+    pub(crate) response_format: ResponseFormat,
+    pub(crate) tags: Option<Vec<String>>,
+    pub(crate) metadata: Option<HashMap<String, Value>>,
+    pub(crate) extras: Option<HashMap<String, Value>>,
+    pub(crate) callbacks: Option<Callbacks>,
+}
+
+impl Debug for ToolMeta {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ToolMeta")
+            .field("name", &self.name)
+            .field("description", &self.description)
+            .field("return_direct", &self.return_direct)
+            .field("response_format", &self.response_format)
+            .finish()
     }
 }
 
@@ -574,19 +599,12 @@ pub fn format_output(
         None => return content,
     };
 
-    if matches!(content, ToolOutput::Message(_)) {
+    if let ToolOutput::Message(_) = content {
         return content;
     }
 
-    let content_str = match &content {
-        ToolOutput::String(s) => s.clone(),
-        ToolOutput::Json(v) => stringify(v),
-        ToolOutput::ContentAndArtifact { content, .. } => stringify(content),
-        ToolOutput::Message(_) => unreachable!(),
-    };
-
     let msg = ToolMessage::builder()
-        .content(content_str)
+        .content(content.to_string_lossy())
         .tool_call_id(tool_call_id)
         .status(status)
         .name(name.to_string())
@@ -623,23 +641,22 @@ pub fn stringify(content: &Value) -> String {
 }
 
 pub fn prep_run_args(
-    value: ToolInput,
+    input: ToolInput,
     config: Option<RunnableConfig>,
 ) -> (ToolInput, Option<String>, RunnableConfig) {
     let config = ensure_config(config);
 
-    match &value {
+    match input {
         ToolInput::ToolCall(tc) => {
-            let tool_call_id = tc.id.clone();
-            let input = ToolInput::Dict(
-                tc.args
-                    .as_object()
-                    .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
-                    .unwrap_or_default(),
-            );
-            (input, tool_call_id, config)
+            let tool_call_id = tc.id;
+            let args = tc
+                .args
+                .as_object()
+                .map(|obj| obj.clone().into_iter().collect())
+                .unwrap_or_default();
+            (ToolInput::Dict(args), tool_call_id, config)
         }
-        _ => (value, None, config),
+        other => (other, None, config),
     }
 }
 
