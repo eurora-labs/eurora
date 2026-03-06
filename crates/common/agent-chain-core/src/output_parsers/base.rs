@@ -6,6 +6,7 @@ use crate::outputs::{ChatGeneration, Generation};
 use crate::prompt_values::PromptValue;
 use crate::runnables::RunnableConfig;
 use crate::runnables::base::Runnable;
+use crate::runnables::config::run_in_executor;
 
 #[derive(Debug, Clone)]
 pub enum ParserInput {
@@ -129,7 +130,7 @@ impl<P: BaseOutputParser> RunnableOutputParser<P> {
 #[async_trait::async_trait]
 impl<P> Runnable for RunnableOutputParser<P>
 where
-    P: BaseOutputParser + 'static,
+    P: BaseOutputParser + Clone + 'static,
     P::Output: 'static,
 {
     type Input = ParserInput;
@@ -154,7 +155,8 @@ where
     where
         Self: 'static,
     {
-        self.parser.invoke(input, config)
+        let parser = self.parser.clone();
+        run_in_executor(move || parser.invoke(input, config)).await?
     }
 }
 

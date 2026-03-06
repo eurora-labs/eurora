@@ -44,6 +44,13 @@ pub trait BaseCumulativeTransformOutputParser: BaseTransformOutputParser {
         ))
     }
 
+    fn parse_result_partial(&self, result: &[Generation]) -> Result<Option<Self::Output>> {
+        match self.parse_result(result, true) {
+            Ok(v) => Ok(Some(v)),
+            Err(_) => Ok(None),
+        }
+    }
+
     fn cumulative_transform<'a>(
         &'a self,
         input: BoxStream<'a, ParserInput>,
@@ -69,7 +76,8 @@ pub trait BaseCumulativeTransformOutputParser: BaseTransformOutputParser {
 
                 let acc = acc_gen.as_ref().expect("just assigned Some");
                 let generation = Generation::from(acc.clone());
-                let Ok(parsed) = self.parse_result(&[generation], true) else {
+                let parsed = self.parse_result_partial(&[generation])?;
+                let Some(parsed) = parsed else {
                     continue;
                 };
 
