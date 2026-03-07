@@ -1,11 +1,11 @@
 use serde::{Deserialize, Serialize};
 
-use crate::messages::BaseMessage;
+use crate::messages::AnyMessage;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ChatSession {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub messages: Option<Vec<BaseMessage>>,
+    pub messages: Option<Vec<AnyMessage>>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub functions: Option<Vec<serde_json::Value>>,
@@ -16,7 +16,7 @@ impl ChatSession {
         Self::default()
     }
 
-    pub fn with_messages(messages: Vec<BaseMessage>) -> Self {
+    pub fn with_messages(messages: Vec<AnyMessage>) -> Self {
         Self {
             messages: Some(messages),
             functions: None,
@@ -24,7 +24,7 @@ impl ChatSession {
     }
 
     pub fn with_messages_and_functions(
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         functions: Vec<serde_json::Value>,
     ) -> Self {
         Self {
@@ -33,7 +33,7 @@ impl ChatSession {
         }
     }
 
-    pub fn messages(&self) -> &[BaseMessage] {
+    pub fn messages(&self) -> &[AnyMessage] {
         self.messages.as_deref().unwrap_or(&[])
     }
 
@@ -67,8 +67,8 @@ mod tests {
     #[test]
     fn test_chat_session_with_messages() {
         let messages = vec![
-            BaseMessage::Human(HumanMessage::builder().content("Hello").build()),
-            BaseMessage::AI(AIMessage::builder().content("Hi").build()),
+            AnyMessage::Human(HumanMessage::builder().content("Hello").build()),
+            AnyMessage::AI(AIMessage::builder().content("Hi").build()),
         ];
         let session = ChatSession::with_messages(messages);
 
@@ -79,7 +79,7 @@ mod tests {
 
     #[test]
     fn test_chat_session_with_messages_and_functions() {
-        let messages = vec![BaseMessage::Human(
+        let messages = vec![AnyMessage::Human(
             HumanMessage::builder().content("Hello").build(),
         )];
         let functions = vec![serde_json::json!({
@@ -100,7 +100,7 @@ mod tests {
         let session = ChatSession::new();
         assert!(session.messages().is_empty());
 
-        let session_with_messages = ChatSession::with_messages(vec![BaseMessage::Human(
+        let session_with_messages = ChatSession::with_messages(vec![AnyMessage::Human(
             HumanMessage::builder().content("Hello").build(),
         )]);
         assert_eq!(session_with_messages.messages().len(), 1);
@@ -120,7 +120,7 @@ mod tests {
 
     #[test]
     fn test_chat_session_serialization() {
-        let messages = vec![BaseMessage::Human(
+        let messages = vec![AnyMessage::Human(
             HumanMessage::builder().content("Hello").build(),
         )];
         let session = ChatSession::with_messages(messages);

@@ -134,7 +134,7 @@ mod chat_result_tests {
             .build();
         let result = ChatResult::builder().generations(vec![chat_gen]).build();
         assert_eq!(result.generations[0].text, "Test response");
-        if let agent_chain_core::BaseMessage::AI(ai_msg) = &result.generations[0].message {
+        if let agent_chain_core::AnyMessage::AI(ai_msg) = &result.generations[0].message {
             assert_eq!(
                 ai_msg.additional_kwargs.get("function_call"),
                 Some(&json!({"name": "test"}))

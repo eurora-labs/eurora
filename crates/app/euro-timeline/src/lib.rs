@@ -1,4 +1,4 @@
-pub use agent_chain_core::BaseMessage;
+pub use agent_chain_core::AnyMessage;
 pub use config::TimelineConfig;
 pub use error::{TimelineError, TimelineResult};
 pub use euro_activity::{

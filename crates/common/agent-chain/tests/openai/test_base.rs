@@ -4,7 +4,7 @@ use agent_chain_core::language_models::BaseLanguageModel;
 use agent_chain_core::language_models::ToolLike;
 use agent_chain_core::language_models::chat_models::BaseChatModel;
 use agent_chain_core::messages::{
-    AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolCall, ToolMessage,
+    AIMessage, AnyMessage, HumanMessage, SystemMessage, ToolCall, ToolMessage,
 };
 use agent_chain_core::outputs::GenerationType;
 use futures::StreamExt;
@@ -173,7 +173,7 @@ async fn test_chat_openai_generate() -> Result<(), Box<dyn std::error::Error>> {
         .n(2)
         .build();
 
-    let message: BaseMessage = HumanMessage::builder().content("Hello").build().into();
+    let message: AnyMessage = HumanMessage::builder().content("Hello").build().into();
     let result = chat
         .generate(
             vec![vec![message.clone()], vec![message]],
@@ -293,7 +293,7 @@ async fn test_chat_openai_llm_output_contains_model_name() -> Result<(), Box<dyn
         .max_tokens(MAX_TOKEN_COUNT)
         .build();
 
-    let message: BaseMessage = HumanMessage::builder().content("Hello").build().into();
+    let message: AnyMessage = HumanMessage::builder().content("Hello").build().into();
     let result = chat
         .generate(
             vec![vec![message]],
@@ -321,7 +321,7 @@ async fn test_chat_openai_streaming_llm_output_contains_model_name()
         .streaming(true)
         .build();
 
-    let message: BaseMessage = HumanMessage::builder().content("Hello").build().into();
+    let message: AnyMessage = HumanMessage::builder().content("Hello").build().into();
     let result = chat
         .generate(
             vec![vec![message]],
@@ -778,7 +778,7 @@ async fn test_tool_use() -> Result<(), Box<dyn std::error::Error>> {
     let tool_like = ToolLike::Schema(generate_username_schema);
     let llm_with_tool = llm.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
 
-    let msgs: Vec<BaseMessage> = vec![
+    let msgs: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("Sally has green hair, what would her username be?")
             .build()
@@ -828,7 +828,7 @@ async fn test_manual_tool_call_msg() -> Result<(), Box<dyn std::error::Error>> {
     let tool_like = ToolLike::Schema(generate_username_schema);
     let llm_with_tool = llm.bind_tools(&[tool_like], None)?;
 
-    let msgs: Vec<BaseMessage> = vec![
+    let msgs: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("Sally has green hair, what would her username be?")
             .build()
@@ -884,7 +884,7 @@ async fn test_manual_tool_call_msg_responses_api() -> Result<(), Box<dyn std::er
     let tool_like = ToolLike::Schema(generate_username_schema);
     let llm_with_tool = llm.bind_tools(&[tool_like], None)?;
 
-    let msgs: Vec<BaseMessage> = vec![
+    let msgs: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("Sally has green hair, what would her username be?")
             .build()
@@ -2039,7 +2039,7 @@ async fn test_multi_party_conversation() -> Result<(), Box<dyn std::error::Error
     load_env();
     let llm = ChatOpenAI::new("gpt-4o-mini");
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("Hi, I have black hair.")
             .name("Alice".to_string())
@@ -2178,7 +2178,7 @@ async fn test_prompt_cache_key_invoke() -> Result<(), Box<dyn std::error::Error>
         .model_kwargs(model_kwargs)
         .build();
 
-    let messages: Vec<BaseMessage> =
+    let messages: Vec<AnyMessage> =
         vec![HumanMessage::builder().content("Say hello").build().into()];
     let response = chat.invoke(messages.into(), None).await?;
 
@@ -2193,7 +2193,7 @@ async fn test_prompt_cache_key_invoke() -> Result<(), Box<dyn std::error::Error>
 async fn test_prompt_cache_key_usage_methods_integration() -> Result<(), Box<dyn std::error::Error>>
 {
     load_env();
-    let messages: Vec<BaseMessage> = vec![HumanMessage::builder().content("Say hi").build().into()];
+    let messages: Vec<AnyMessage> = vec![HumanMessage::builder().content("Say hi").build().into()];
 
     // Test via model_kwargs
     let mut model_kwargs = HashMap::new();

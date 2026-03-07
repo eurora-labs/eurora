@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use crate::error::{Error, Result};
-use crate::messages::BaseMessage;
+use crate::messages::AnyMessage;
 use crate::outputs::{ChatGeneration, Generation};
 use crate::prompt_values::PromptValue;
 use crate::runnables::RunnableConfig;
@@ -11,7 +11,7 @@ use crate::runnables::config::run_in_executor;
 #[derive(Debug, Clone)]
 pub enum ParserInput {
     Text(String),
-    Message(Box<BaseMessage>),
+    Message(Box<AnyMessage>),
 }
 
 impl From<String> for ParserInput {
@@ -26,8 +26,8 @@ impl From<&str> for ParserInput {
     }
 }
 
-impl From<BaseMessage> for ParserInput {
-    fn from(m: BaseMessage) -> Self {
+impl From<AnyMessage> for ParserInput {
+    fn from(m: AnyMessage) -> Self {
         ParserInput::Message(Box::new(m))
     }
 }
@@ -212,7 +212,7 @@ mod tests {
     fn test_invoke_with_message() {
         use crate::messages::HumanMessage;
         let parser = TestParser;
-        let msg = BaseMessage::Human(HumanMessage::builder().content("hello").build());
+        let msg = AnyMessage::Human(HumanMessage::builder().content("hello").build());
         let result = parser.invoke(msg, None).unwrap();
         assert_eq!(result, "HELLO");
     }
@@ -227,7 +227,7 @@ mod tests {
     #[test]
     fn test_parser_input_from_message() {
         use crate::messages::HumanMessage;
-        let msg = BaseMessage::Human(HumanMessage::builder().content("hello").build());
+        let msg = AnyMessage::Human(HumanMessage::builder().content("hello").build());
         let input: ParserInput = msg.into();
         let generation = input.to_generation();
         assert_eq!(generation.text, "hello");

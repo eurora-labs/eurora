@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::callbacks::Callbacks;
 use crate::callbacks::manager::{CallbackManager, CallbackManagerForToolRun};
 use crate::error::{Error, Result};
-use crate::messages::{BaseMessage, ToolCall, ToolMessage};
+use crate::messages::{AnyMessage, ToolCall, ToolMessage};
 use crate::runnables::config::patch_config;
 use crate::runnables::{RunnableConfig, ensure_config};
 use async_trait::async_trait;
@@ -367,7 +367,7 @@ pub trait BaseTool: Send + Sync + Debug {
         self.arun(tool_input, Some(config), tool_call_id).await
     }
 
-    async fn invoke_tool_call(&self, tool_call: ToolCall) -> BaseMessage {
+    async fn invoke_tool_call(&self, tool_call: ToolCall) -> AnyMessage {
         let tool_call_id = tool_call.id.clone().unwrap_or_default();
         let input = ToolInput::ToolCall(tool_call);
         match self.invoke(input, None).await {

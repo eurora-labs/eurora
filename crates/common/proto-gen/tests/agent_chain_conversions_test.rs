@@ -133,13 +133,13 @@ mod tests {
     #[test]
     fn test_base_message_roundtrip() {
         let human = HumanMessage::builder().content("Hello!").build();
-        let original = BaseMessage::Human(human);
+        let original = AnyMessage::Human(human);
 
         let proto: ProtoBaseMessage = original.clone().into();
-        let roundtrip: BaseMessage = proto.into();
+        let roundtrip: AnyMessage = proto.into();
 
         match roundtrip {
-            BaseMessage::Human(msg) => {
+            AnyMessage::Human(msg) => {
                 assert_eq!(msg.content.as_text(), "Hello!");
             }
             _ => panic!("Expected Human message"),

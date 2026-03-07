@@ -40,7 +40,7 @@ use crate::chat_models::{
 use crate::error::{Error, Result};
 use crate::language_models::ToolLike;
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
-use crate::messages::{AIMessage, BaseMessage, ContentPart, ImageSource, MessageContent, ToolCall};
+use crate::messages::{AIMessage, AnyMessage, ContentPart, ImageSource, MessageContent, ToolCall};
 use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, LLMResult};
 use crate::runnables::base::Runnable;
 use crate::tools::{BaseTool, ToolDefinition};
@@ -291,11 +291,11 @@ impl ChatOllama {
     /// Matches Python's `_convert_messages_to_ollama_messages`.
     /// Pre-processes v1-format AIMessages by converting their content blocks
     /// via `convert_from_v1_to_ollama`.
-    pub fn format_messages(&self, messages: &[BaseMessage]) -> Result<Vec<serde_json::Value>> {
-        let messages: Vec<std::borrow::Cow<'_, BaseMessage>> = messages
+    pub fn format_messages(&self, messages: &[AnyMessage]) -> Result<Vec<serde_json::Value>> {
+        let messages: Vec<std::borrow::Cow<'_, AnyMessage>> = messages
             .iter()
             .map(|msg| {
-                if let BaseMessage::AI(ai) = msg {
+                if let AnyMessage::AI(ai) = msg {
                     let is_v1 = ai
                         .response_metadata
                         .get("output_version")
@@ -309,7 +309,7 @@ impl ChatOllama {
                         );
                         let mut new_ai = ai.clone();
                         new_ai.content = new_content;
-                        return std::borrow::Cow::Owned(BaseMessage::AI(new_ai));
+                        return std::borrow::Cow::Owned(AnyMessage::AI(new_ai));
                     }
                 }
                 std::borrow::Cow::Borrowed(msg)
@@ -320,12 +320,12 @@ impl ChatOllama {
 
         for msg in messages.iter() {
             let formatted = match msg.as_ref() {
-                BaseMessage::System(m) => serde_json::json!({
+                AnyMessage::System(m) => serde_json::json!({
                     "role": "system",
                     "content": m.content.as_text(),
                     "images": [],
                 }),
-                BaseMessage::Human(m) => {
+                AnyMessage::Human(m) => {
                     let (content, images) = extract_content_and_images(&m.content);
                     serde_json::json!({
                         "role": "user",
@@ -333,7 +333,7 @@ impl ChatOllama {
                         "images": images,
                     })
                 }
-                BaseMessage::AI(m) => {
+                AnyMessage::AI(m) => {
                     let mut message = serde_json::json!({
                         "role": "assistant",
                         "content": m.content.as_text(),
@@ -351,18 +351,18 @@ impl ChatOllama {
 
                     message
                 }
-                BaseMessage::Tool(m) => serde_json::json!({
+                AnyMessage::Tool(m) => serde_json::json!({
                     "role": "tool",
                     "content": m.content,
                     "images": [],
                     "tool_call_id": m.tool_call_id,
                 }),
-                BaseMessage::Chat(m) => serde_json::json!({
+                AnyMessage::Chat(m) => serde_json::json!({
                     "role": m.role,
                     "content": m.content,
                     "images": [],
                 }),
-                BaseMessage::Remove(_) => continue,
+                AnyMessage::Remove(_) => continue,
                 _ => {
                     return Err(Error::Other(
                         "Received unsupported message type for Ollama.".to_string(),
@@ -441,7 +441,7 @@ impl ChatOllama {
     /// Matches Python's `_chat_params`.
     pub fn build_request_payload(
         &self,
-        messages: &[BaseMessage],
+        messages: &[AnyMessage],
         stop: Option<Vec<String>>,
         tools: Option<&[serde_json::Value]>,
         stream: bool,
@@ -664,7 +664,7 @@ impl BaseChatModel for ChatOllama {
 
     async fn _generate(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -685,7 +685,7 @@ impl BaseChatModel for ChatOllama {
 
     async fn _astream(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         _run_manager: Option<&crate::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<crate::language_models::ChatGenerationStream> {
@@ -750,7 +750,7 @@ impl BaseChatModel for ChatOllama {
 
     async fn generate_with_tools(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         tools: &[ToolDefinition],
         _tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,
@@ -856,7 +856,7 @@ impl ChatOllama {
     /// `final_chunk += chunk` semantics.
     async fn _generate_internal(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -921,7 +921,7 @@ impl ChatOllama {
 
         let (content, usage_metadata, tool_calls, chunk_additional_kwargs) =
             match &final_chunk.message {
-                BaseMessage::AI(ai) => (
+                AnyMessage::AI(ai) => (
                     ai.text(),
                     ai.usage_metadata.clone(),
                     ai.tool_calls.clone(),
@@ -957,7 +957,7 @@ impl ChatOllama {
     /// Matches Python's `_aiterate_over_stream` / `_iterate_over_stream`.
     async fn stream_internal(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
     ) -> Result<std::pin::Pin<Box<dyn futures::Stream<Item = Result<OllamaStreamChunk>> + Send>>>
     {
@@ -1382,7 +1382,7 @@ impl BoundChatOllama {
     }
 
     /// Invoke the model with messages.
-    pub async fn invoke(&self, messages: Vec<BaseMessage>) -> Result<AIMessage> {
+    pub async fn invoke(&self, messages: Vec<AnyMessage>) -> Result<AIMessage> {
         use crate::language_models::BaseChatModel;
         let tool_definitions = self.tool_definitions();
         self.model
@@ -1571,7 +1571,7 @@ mod tests {
     #[test]
     fn test_format_messages_with_images() {
         let model = ChatOllama::new("llama3.2-vision");
-        let messages = vec![BaseMessage::Human(
+        let messages = vec![AnyMessage::Human(
             crate::messages::HumanMessage::builder()
                 .content(MessageContent::Parts(vec![
                     ContentPart::Text {
@@ -1597,7 +1597,7 @@ mod tests {
     #[test]
     fn test_format_messages_rejects_unsupported_types() {
         let model = ChatOllama::new("llama3.1");
-        let messages = vec![BaseMessage::Function(
+        let messages = vec![AnyMessage::Function(
             crate::messages::FunctionMessage::builder()
                 .name("fn_name")
                 .content("content")

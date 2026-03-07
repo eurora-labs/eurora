@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use agent_chain_core::chat_history::{BaseChatMessageHistory, InMemoryChatMessageHistory};
-use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage, SystemMessage};
+use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage, SystemMessage};
 use agent_chain_core::runnables::base::Runnable;
 use agent_chain_core::runnables::config::RunnableConfig;
 use agent_chain_core::runnables::history::{
@@ -33,16 +33,16 @@ fn make_session_factory(
     })
 }
 
-fn human(content: &str) -> BaseMessage {
-    BaseMessage::Human(HumanMessage::builder().content(content).build())
+fn human(content: &str) -> AnyMessage {
+    AnyMessage::Human(HumanMessage::builder().content(content).build())
 }
 
-fn ai(content: &str) -> BaseMessage {
-    BaseMessage::AI(AIMessage::builder().content(content).build())
+fn ai(content: &str) -> AnyMessage {
+    AnyMessage::AI(AIMessage::builder().content(content).build())
 }
 
-fn system(content: &str) -> BaseMessage {
-    BaseMessage::System(SystemMessage::builder().content(content).build())
+fn system(content: &str) -> AnyMessage {
+    AnyMessage::System(SystemMessage::builder().content(content).build())
 }
 
 fn concat_human_messages() -> HistoryRunnable {
@@ -50,11 +50,11 @@ fn concat_human_messages() -> HistoryRunnable {
         let human_contents: Vec<String> = messages
             .iter()
             .filter_map(|m| match m {
-                BaseMessage::Human(h) => Some(h.content.as_text()),
+                AnyMessage::Human(h) => Some(h.content.as_text()),
                 _ => None,
             })
             .collect();
-        Ok(vec![BaseMessage::AI(
+        Ok(vec![AnyMessage::AI(
             AIMessage::builder()
                 .content(format!("you said: {}", human_contents.join("\n")))
                 .build(),
@@ -65,7 +65,7 @@ fn concat_human_messages() -> HistoryRunnable {
 fn length_runnable() -> HistoryRunnable {
     HistoryRunnable::from_fn(|messages, _config| {
         let count = messages.len();
-        Ok(vec![BaseMessage::AI(
+        Ok(vec![AnyMessage::AI(
             AIMessage::builder().content(count.to_string()).build(),
         )])
     })
@@ -379,10 +379,10 @@ fn test_dict_input_with_history_messages_key() {
         let obj = input
             .as_object()
             .ok_or_else(|| Error::Other("expected dict".into()))?;
-        let history: Vec<BaseMessage> =
+        let history: Vec<AnyMessage> =
             serde_json::from_value(obj.get("history").cloned().unwrap_or(Value::Array(vec![])))
                 .map_err(|e| Error::Other(format!("history deser: {}", e)))?;
-        let question: Vec<BaseMessage> =
+        let question: Vec<AnyMessage> =
             serde_json::from_value(obj.get("question").cloned().unwrap_or(Value::Array(vec![])))
                 .map_err(|e| Error::Other(format!("question deser: {}", e)))?;
 
@@ -392,7 +392,7 @@ fn test_dict_input_with_history_messages_key() {
             .collect::<Vec<_>>()
             .join(", ");
         let response = format!("history={}, question={}", history.len(), question_text);
-        let output = vec![BaseMessage::AI(
+        let output = vec![AnyMessage::AI(
             AIMessage::builder().content(response).build(),
         )];
         serde_json::to_value(&output).map_err(|e| Error::Other(format!("ser: {}", e)))
@@ -414,7 +414,7 @@ fn test_dict_input_with_history_messages_key() {
         )
         .expect("first invoke should succeed");
 
-    let messages: Vec<BaseMessage> =
+    let messages: Vec<AnyMessage> =
         serde_json::from_value(output).expect("output should deserialize to messages");
     assert!(
         messages[0].content().contains("history=0"),
@@ -434,7 +434,7 @@ fn test_dict_input_with_history_messages_key() {
         )
         .expect("second invoke should succeed");
 
-    let messages: Vec<BaseMessage> =
+    let messages: Vec<AnyMessage> =
         serde_json::from_value(output).expect("output should deserialize to messages");
     assert!(
         messages[0].content().contains("history=2"),
@@ -458,16 +458,16 @@ fn test_dict_input_with_output_messages_key() {
     let factory = make_session_factory(store.clone());
 
     let runnable: HistoryInvokeFn = Arc::new(|input: Value, _config| {
-        let messages: Vec<BaseMessage> =
+        let messages: Vec<AnyMessage> =
             serde_json::from_value(input).map_err(|e| Error::Other(format!("deser: {}", e)))?;
         let human_texts: Vec<String> = messages
             .iter()
             .filter_map(|m| match m {
-                BaseMessage::Human(_) => Some(m.content().to_string()),
+                AnyMessage::Human(_) => Some(m.content().to_string()),
                 _ => None,
             })
             .collect();
-        let response = BaseMessage::AI(
+        let response = AnyMessage::AI(
             AIMessage::builder()
                 .content(format!("you said: {}", human_texts.join(", ")))
                 .build(),
@@ -536,7 +536,7 @@ fn test_get_input_messages_normalization() {
     assert_eq!(msgs.len(), 1);
     assert_eq!(msgs[0].content(), "hello");
     assert!(
-        matches!(msgs[0], BaseMessage::Human(_)),
+        matches!(msgs[0], AnyMessage::Human(_)),
         "string input should become HumanMessage"
     );
 
@@ -582,7 +582,7 @@ fn test_get_output_messages_normalization() {
     assert_eq!(msgs.len(), 1);
     assert_eq!(msgs[0].content(), "response");
     assert!(
-        matches!(msgs[0], BaseMessage::AI(_)),
+        matches!(msgs[0], AnyMessage::AI(_)),
         "string output should become AIMessage"
     );
 

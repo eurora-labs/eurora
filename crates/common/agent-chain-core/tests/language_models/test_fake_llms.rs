@@ -3,7 +3,7 @@ use std::time::Duration;
 use agent_chain_core::language_models::{
     BaseLLM, BaseLanguageModel, FakeListLLM, FakeStreamingListLLM, LLM, LanguageModelInput,
 };
-use agent_chain_core::messages::{BaseMessage, HumanMessage};
+use agent_chain_core::messages::{AnyMessage, HumanMessage};
 use agent_chain_core::outputs::GenerationType;
 use futures::StreamExt;
 
@@ -608,7 +608,7 @@ async fn test_invoke_with_human_message_list() {
     let llm = FakeListLLM::builder()
         .responses(vec!["message response".to_string()])
         .build();
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::Human(
         HumanMessage::builder().content("Hello").build(),
     )];
     let input = LanguageModelInput::from(messages);
@@ -855,12 +855,12 @@ async fn test_invoke_with_multiple_messages() {
         .responses(vec!["multi message response".to_string()])
         .build();
     let messages = vec![
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .content("You are a helper.")
                 .build(),
         ),
-        BaseMessage::Human(HumanMessage::builder().content("What is 2+2?").build()),
+        AnyMessage::Human(HumanMessage::builder().content("What is 2+2?").build()),
     ];
     let result = llm
         .invoke(LanguageModelInput::from(messages), None)
@@ -874,7 +874,7 @@ async fn test_ainvoke_with_human_message_list() {
     let llm = FakeListLLM::builder()
         .responses(vec!["async message response".to_string()])
         .build();
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::Human(
         HumanMessage::builder().content("Hello").build(),
     )];
     let result = llm

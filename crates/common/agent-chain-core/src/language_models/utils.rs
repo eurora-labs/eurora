@@ -1,4 +1,4 @@
-use crate::messages::BaseMessage;
+use crate::messages::AnyMessage;
 use crate::messages::content::{ContentPart, MessageContent};
 use std::collections::HashMap;
 
@@ -297,11 +297,11 @@ pub fn update_message_content_to_blocks(
         .build()
 }
 
-pub fn normalize_messages(messages: Vec<BaseMessage>) -> Vec<BaseMessage> {
+pub fn normalize_messages(messages: Vec<AnyMessage>) -> Vec<AnyMessage> {
     messages.into_iter().map(normalize_single_message).collect()
 }
 
-fn normalize_single_message(mut message: BaseMessage) -> BaseMessage {
+fn normalize_single_message(mut message: AnyMessage) -> AnyMessage {
     let parts = match message.content() {
         MessageContent::Parts(parts) => parts.clone(),
         MessageContent::Text(_) => return message,
@@ -350,13 +350,13 @@ fn normalize_single_message(mut message: BaseMessage) -> BaseMessage {
     if modified {
         let new_content = MessageContent::Parts(new_parts);
         match &mut message {
-            BaseMessage::Human(m) => m.content = new_content,
-            BaseMessage::System(m) => m.content = new_content,
-            BaseMessage::AI(m) => m.content = new_content,
-            BaseMessage::Tool(m) => m.content = new_content,
-            BaseMessage::Chat(m) => m.content = new_content,
-            BaseMessage::Function(m) => m.content = new_content,
-            BaseMessage::Remove(_) => {}
+            AnyMessage::Human(m) => m.content = new_content,
+            AnyMessage::System(m) => m.content = new_content,
+            AnyMessage::AI(m) => m.content = new_content,
+            AnyMessage::Tool(m) => m.content = new_content,
+            AnyMessage::Chat(m) => m.content = new_content,
+            AnyMessage::Function(m) => m.content = new_content,
+            AnyMessage::Remove(_) => {}
         }
     }
 
@@ -546,7 +546,7 @@ mod tests {
     fn test_normalize_messages_plain_text_passthrough() {
         use crate::messages::HumanMessage;
 
-        let messages = vec![BaseMessage::Human(
+        let messages = vec![AnyMessage::Human(
             HumanMessage::builder().content("Hello").build(),
         )];
         let result = normalize_messages(messages.clone());
@@ -564,7 +564,7 @@ mod tests {
             },
             ContentPart::Other(json!({"type": "image", "url": "https://example.com/img.png"})),
         ];
-        let messages = vec![BaseMessage::Human(
+        let messages = vec![AnyMessage::Human(
             HumanMessage::builder()
                 .content(MessageContent::Parts(parts))
                 .build(),
@@ -585,7 +585,7 @@ mod tests {
                 "format": "wav"
             }
         }))];
-        let messages = vec![BaseMessage::Human(
+        let messages = vec![AnyMessage::Human(
             HumanMessage::builder()
                 .content(MessageContent::Parts(parts))
                 .build(),
@@ -616,7 +616,7 @@ mod tests {
                 "file_id": "file-123"
             }
         }))];
-        let messages = vec![BaseMessage::Human(
+        let messages = vec![AnyMessage::Human(
             HumanMessage::builder()
                 .content(MessageContent::Parts(parts))
                 .build(),
@@ -646,7 +646,7 @@ mod tests {
             "url": "https://example.com/img.png",
             "mime_type": "image/png"
         }))];
-        let messages = vec![BaseMessage::Human(
+        let messages = vec![AnyMessage::Human(
             HumanMessage::builder()
                 .content(MessageContent::Parts(parts))
                 .build(),
@@ -677,7 +677,7 @@ mod tests {
             "data": "iVBORw0KGgo=",
             "mime_type": "image/png"
         }))];
-        let messages = vec![BaseMessage::Human(
+        let messages = vec![AnyMessage::Human(
             HumanMessage::builder()
                 .content(MessageContent::Parts(parts))
                 .build(),
@@ -713,7 +713,7 @@ mod tests {
             })),
             ContentPart::Other(json!({"type": "image", "url": "https://example.com/img.png"})),
         ];
-        let messages = vec![BaseMessage::Human(
+        let messages = vec![AnyMessage::Human(
             HumanMessage::builder()
                 .content(MessageContent::Parts(parts))
                 .build(),

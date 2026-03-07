@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use bon::bon;
 
 use crate::error::{Error, Result};
-use crate::messages::{BaseMessage, get_buffer_string};
+use crate::messages::{AnyMessage, get_buffer_string};
 use crate::prompt_values::{ChatPromptValue, StringPromptValue};
 use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
@@ -376,7 +376,7 @@ pub struct FewShotChatMessagePromptTemplate {
 
 pub trait ExamplePrompt: Send + Sync {
     fn input_variables(&self) -> Vec<String>;
-    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>>;
+    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<AnyMessage>>;
     fn clone_box(&self) -> Box<dyn ExamplePrompt>;
 }
 
@@ -396,7 +396,7 @@ impl ExamplePrompt for super::chat::ChatPromptTemplate {
     fn input_variables(&self) -> Vec<String> {
         BasePromptTemplate::input_variables(self).to_vec()
     }
-    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
+    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<AnyMessage>> {
         let input = ChatPromptInput::from(kwargs.clone());
         BaseChatPromptTemplate::format_messages(self, &input)
     }
@@ -448,7 +448,7 @@ impl BaseMessagePromptTemplate for FewShotChatMessagePromptTemplate {
         &self.input_variables
     }
 
-    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
+    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<AnyMessage>> {
         let examples = self.get_examples(kwargs)?;
 
         let example_vars = self.example_prompt.input_variables();
@@ -509,7 +509,7 @@ impl BasePromptTemplate for FewShotChatMessagePromptTemplate {
 }
 
 impl BaseChatPromptTemplate for FewShotChatMessagePromptTemplate {
-    fn format_messages(&self, input: &ChatPromptInput) -> Result<Vec<BaseMessage>> {
+    fn format_messages(&self, input: &ChatPromptInput) -> Result<Vec<AnyMessage>> {
         BaseMessagePromptTemplate::format_messages(self, &input.variables)
     }
 

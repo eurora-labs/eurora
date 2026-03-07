@@ -265,6 +265,7 @@ dependencies = [
  "chrono",
  "csv",
  "encoding_rs",
+ "enum_dispatch",
  "fancy-regex 0.17.0",
  "futures",
  "governor",

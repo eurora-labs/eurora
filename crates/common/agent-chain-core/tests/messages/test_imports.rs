@@ -3,7 +3,7 @@
 fn test_all_imports() {
     use agent_chain_core::messages::AIMessage;
     use agent_chain_core::messages::AIMessageChunk;
-    use agent_chain_core::messages::BaseMessage;
+    use agent_chain_core::messages::AnyMessage;
     use agent_chain_core::messages::ChatMessage;
     use agent_chain_core::messages::ChatMessageChunk;
     use agent_chain_core::messages::FunctionMessage;
@@ -96,27 +96,27 @@ fn test_all_imports() {
 #[test]
 fn test_base_message_variants() {
     use agent_chain_core::messages::{
-        AIMessage, BaseMessage, ChatMessage, FunctionMessage, HumanMessage, RemoveMessage,
+        AIMessage, AnyMessage, ChatMessage, FunctionMessage, HumanMessage, RemoveMessage,
         SystemMessage, ToolMessage,
     };
 
-    let _human = BaseMessage::Human(HumanMessage::builder().content("test").build());
-    let _ai = BaseMessage::AI(AIMessage::builder().content("test").build());
-    let _system = BaseMessage::System(SystemMessage::builder().content("test").build());
-    let _chat = BaseMessage::Chat(ChatMessage::builder().content("test").role("user").build());
-    let _function = BaseMessage::Function(
+    let _human = AnyMessage::Human(HumanMessage::builder().content("test").build());
+    let _ai = AnyMessage::AI(AIMessage::builder().content("test").build());
+    let _system = AnyMessage::System(SystemMessage::builder().content("test").build());
+    let _chat = AnyMessage::Chat(ChatMessage::builder().content("test").role("user").build());
+    let _function = AnyMessage::Function(
         FunctionMessage::builder()
             .content("test")
             .name("func")
             .build(),
     );
-    let _tool = BaseMessage::Tool(
+    let _tool = AnyMessage::Tool(
         ToolMessage::builder()
             .content("test")
             .tool_call_id("call-123")
             .build(),
     );
-    let _remove = BaseMessage::Remove(RemoveMessage::builder().id("msg-123").build());
+    let _remove = AnyMessage::Remove(RemoveMessage::builder().id("msg-123").build());
 }
 
 #[test]

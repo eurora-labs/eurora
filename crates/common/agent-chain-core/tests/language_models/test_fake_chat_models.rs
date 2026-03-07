@@ -5,13 +5,13 @@ mod test_fake_messages_list_chat_model {
 
     use agent_chain_core::FakeMessagesListChatModel;
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
-    use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
+    use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage};
 
     #[test]
     fn test_initialization() {
         let responses = vec![
-            BaseMessage::AI(AIMessage::builder().content("response1").build()),
-            BaseMessage::AI(AIMessage::builder().content("response2").build()),
+            AnyMessage::AI(AIMessage::builder().content("response1").build()),
+            AnyMessage::AI(AIMessage::builder().content("response2").build()),
         ];
         let model = FakeMessagesListChatModel::builder()
             .responses(responses)
@@ -22,7 +22,7 @@ mod test_fake_messages_list_chat_model {
     #[test]
     fn test_initialization_with_sleep() {
         let model = FakeMessagesListChatModel::builder()
-            .responses(vec![BaseMessage::AI(
+            .responses(vec![AnyMessage::AI(
                 AIMessage::builder().content("test").build(),
             )])
             .sleep(Duration::from_millis(100))
@@ -33,7 +33,7 @@ mod test_fake_messages_list_chat_model {
     #[test]
     fn test_llm_type() {
         let model = FakeMessagesListChatModel::builder()
-            .responses(vec![BaseMessage::AI(
+            .responses(vec![AnyMessage::AI(
                 AIMessage::builder().content("test").build(),
             )])
             .build();
@@ -42,7 +42,7 @@ mod test_fake_messages_list_chat_model {
 
     #[tokio::test]
     async fn test_invoke_returns_message() {
-        let response = BaseMessage::AI(AIMessage::builder().content("hello").build());
+        let response = AnyMessage::AI(AIMessage::builder().content("hello").build());
         let model = FakeMessagesListChatModel::builder()
             .responses(vec![response])
             .build();
@@ -53,9 +53,9 @@ mod test_fake_messages_list_chat_model {
     #[tokio::test]
     async fn test_invoke_cycles_through_responses() {
         let responses = vec![
-            BaseMessage::AI(AIMessage::builder().content("first").build()),
-            BaseMessage::AI(AIMessage::builder().content("second").build()),
-            BaseMessage::AI(AIMessage::builder().content("third").build()),
+            AnyMessage::AI(AIMessage::builder().content("first").build()),
+            AnyMessage::AI(AIMessage::builder().content("second").build()),
+            AnyMessage::AI(AIMessage::builder().content("third").build()),
         ];
         let model = FakeMessagesListChatModel::builder()
             .responses(responses)
@@ -77,7 +77,7 @@ mod test_fake_messages_list_chat_model {
     #[tokio::test]
     async fn test_invoke_with_single_response() {
         let model = FakeMessagesListChatModel::builder()
-            .responses(vec![BaseMessage::AI(
+            .responses(vec![AnyMessage::AI(
                 AIMessage::builder().content("only").build(),
             )])
             .build();
@@ -94,7 +94,7 @@ mod test_fake_messages_list_chat_model {
     #[tokio::test]
     async fn test_invoke_with_sleep() {
         let model = FakeMessagesListChatModel::builder()
-            .responses(vec![BaseMessage::AI(
+            .responses(vec![AnyMessage::AI(
                 AIMessage::builder().content("test").build(),
             )])
             .sleep(Duration::from_millis(50))
@@ -114,13 +114,13 @@ mod test_fake_messages_list_chat_model {
     #[tokio::test]
     async fn test_generate_returns_chat_result() {
         let model = FakeMessagesListChatModel::builder()
-            .responses(vec![BaseMessage::AI(
+            .responses(vec![AnyMessage::AI(
                 AIMessage::builder().content("test").build(),
             )])
             .build();
         let result = model
             ._generate(
-                vec![BaseMessage::Human(
+                vec![AnyMessage::Human(
                     HumanMessage::builder().content("hi").build(),
                 )],
                 None,
@@ -138,7 +138,7 @@ mod test_fake_list_chat_model {
 
     use agent_chain_core::FakeListChatModel;
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
-    use agent_chain_core::messages::BaseMessage;
+    use agent_chain_core::messages::AnyMessage;
     use futures::StreamExt;
 
     #[test]
@@ -163,7 +163,7 @@ mod test_fake_list_chat_model {
             .responses(vec!["hello".to_string()])
             .build();
         let result = model._generate(vec![], None, None).await.unwrap();
-        assert!(matches!(result.generations[0].message, BaseMessage::AI(_)));
+        assert!(matches!(result.generations[0].message, AnyMessage::AI(_)));
         assert_eq!(result.generations[0].message.content(), "hello");
     }
 
@@ -213,7 +213,7 @@ mod test_fake_list_chat_model {
         }
 
         assert_eq!(chunks.len(), 2);
-        if let BaseMessage::AI(_ai_msg) = &chunks[1].message {}
+        if let AnyMessage::AI(_ai_msg) = &chunks[1].message {}
     }
 
     #[tokio::test]
@@ -362,12 +362,12 @@ mod test_fake_chat_model {
 
     #[tokio::test]
     async fn test_invoke_ignores_input() {
-        use agent_chain_core::messages::{BaseMessage, HumanMessage};
+        use agent_chain_core::messages::{AnyMessage, HumanMessage};
 
         let model = FakeChatModel::builder().build();
         let result1 = model
             ._generate(
-                vec![BaseMessage::Human(
+                vec![AnyMessage::Human(
                     HumanMessage::builder().content("hello").build(),
                 )],
                 None,
@@ -377,7 +377,7 @@ mod test_fake_chat_model {
             .unwrap();
         let result2 = model
             ._generate(
-                vec![BaseMessage::Human(
+                vec![AnyMessage::Human(
                     HumanMessage::builder().content("goodbye").build(),
                 )],
                 None,
@@ -559,7 +559,7 @@ mod test_parrot_fake_chat_model {
 
     use agent_chain_core::ParrotFakeChatModel;
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
-    use agent_chain_core::messages::{BaseMessage, HumanMessage, SystemMessage};
+    use agent_chain_core::messages::{AnyMessage, HumanMessage, SystemMessage};
 
     #[test]
     fn test_initialization() {
@@ -571,8 +571,8 @@ mod test_parrot_fake_chat_model {
     async fn test_invoke_returns_last_message() {
         let model = ParrotFakeChatModel::builder().build();
         let messages = vec![
-            BaseMessage::System(SystemMessage::builder().content("You are helpful").build()),
-            BaseMessage::Human(HumanMessage::builder().content("Hello!").build()),
+            AnyMessage::System(SystemMessage::builder().content("You are helpful").build()),
+            AnyMessage::Human(HumanMessage::builder().content("Hello!").build()),
         ];
         let result = model._generate(messages, None, None).await.unwrap();
         assert_eq!(result.generations[0].message.content(), "Hello!");
@@ -583,7 +583,7 @@ mod test_parrot_fake_chat_model {
         let model = ParrotFakeChatModel::builder().build();
         let result = model
             ._generate(
-                vec![BaseMessage::Human(
+                vec![AnyMessage::Human(
                     HumanMessage::builder().content("Single").build(),
                 )],
                 None,
@@ -608,7 +608,7 @@ mod test_parrot_fake_chat_model {
     #[tokio::test]
     async fn test_invoke_preserves_message_type() {
         let model = ParrotFakeChatModel::builder().build();
-        let messages = vec![BaseMessage::Human(
+        let messages = vec![AnyMessage::Human(
             HumanMessage::builder().content("test").build(),
         )];
         let result = model._generate(messages, None, None).await.unwrap();
@@ -619,8 +619,8 @@ mod test_parrot_fake_chat_model {
     async fn test_ainvoke_returns_last_message() {
         let model = ParrotFakeChatModel::builder().build();
         let messages = vec![
-            BaseMessage::Human(HumanMessage::builder().content("First").build()),
-            BaseMessage::Human(HumanMessage::builder().content("Last").build()),
+            AnyMessage::Human(HumanMessage::builder().content("First").build()),
+            AnyMessage::Human(HumanMessage::builder().content("Last").build()),
         ];
         let result = model._generate(messages, None, None).await.unwrap();
         assert_eq!(result.generations[0].message.content(), "Last");
@@ -631,7 +631,7 @@ mod test_parrot_fake_chat_model {
         let model = ParrotFakeChatModel::builder().build();
         let result = model
             ._generate(
-                vec![BaseMessage::Human(
+                vec![AnyMessage::Human(
                     HumanMessage::builder().content("test").build(),
                 )],
                 None,
@@ -649,7 +649,7 @@ mod test_parrot_fake_chat_model {
 
         let result1 = model
             ._generate(
-                vec![BaseMessage::Human(
+                vec![AnyMessage::Human(
                     HumanMessage::builder().content("batch1").build(),
                 )],
                 None,
@@ -659,7 +659,7 @@ mod test_parrot_fake_chat_model {
             .unwrap();
         let result2 = model
             ._generate(
-                vec![BaseMessage::Human(
+                vec![AnyMessage::Human(
                     HumanMessage::builder().content("batch2").build(),
                 )],
                 None,
@@ -692,13 +692,13 @@ mod test_parrot_fake_chat_model {
             .build();
 
         let result = model
-            ._generate(vec![BaseMessage::Human(message.clone())], None, None)
+            ._generate(vec![AnyMessage::Human(message.clone())], None, None)
             .await
             .unwrap();
 
         assert_eq!(
             result.generations[0].message.content(),
-            BaseMessage::Human(message).content()
+            AnyMessage::Human(message).content()
         );
     }
 }
@@ -707,12 +707,12 @@ mod test_parrot_fake_chat_model {
 mod test_fake_messages_list_additional {
     use agent_chain_core::FakeMessagesListChatModel;
     use agent_chain_core::language_models::BaseChatModel;
-    use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
+    use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage};
 
     #[tokio::test]
     async fn test_single_response_counter_stays_at_zero() {
         let model = FakeMessagesListChatModel::builder()
-            .responses(vec![BaseMessage::AI(
+            .responses(vec![AnyMessage::AI(
                 AIMessage::builder().content("only one").build(),
             )])
             .build();
@@ -728,8 +728,8 @@ mod test_fake_messages_list_additional {
     #[tokio::test]
     async fn test_ainvoke() {
         let responses = vec![
-            BaseMessage::AI(AIMessage::builder().content("async first").build()),
-            BaseMessage::AI(AIMessage::builder().content("async second").build()),
+            AnyMessage::AI(AIMessage::builder().content("async first").build()),
+            AnyMessage::AI(AIMessage::builder().content("async second").build()),
         ];
         let model = FakeMessagesListChatModel::builder()
             .responses(responses)
@@ -748,13 +748,13 @@ mod test_fake_messages_list_additional {
     #[tokio::test]
     async fn test_generate_returns_proper_chat_result_structure() {
         let model = FakeMessagesListChatModel::builder()
-            .responses(vec![BaseMessage::AI(
+            .responses(vec![AnyMessage::AI(
                 AIMessage::builder().content("structured").build(),
             )])
             .build();
         let result = model
             ._generate(
-                vec![BaseMessage::Human(
+                vec![AnyMessage::Human(
                     HumanMessage::builder().content("hi").build(),
                 )],
                 None,
@@ -765,19 +765,19 @@ mod test_fake_messages_list_additional {
 
         assert_eq!(result.generations.len(), 1);
         let generation = &result.generations[0];
-        assert!(matches!(generation.message, BaseMessage::AI(_)));
+        assert!(matches!(generation.message, AnyMessage::AI(_)));
         assert_eq!(generation.message.content(), "structured");
     }
 
     #[tokio::test]
     async fn test_generate_with_non_ai_message_response() {
-        let human_msg = BaseMessage::Human(HumanMessage::builder().content("echoed back").build());
+        let human_msg = AnyMessage::Human(HumanMessage::builder().content("echoed back").build());
         let model = FakeMessagesListChatModel::builder()
             .responses(vec![human_msg])
             .build();
         let result = model
             ._generate(
-                vec![BaseMessage::Human(
+                vec![AnyMessage::Human(
                     HumanMessage::builder().content("hi").build(),
                 )],
                 None,
@@ -790,7 +790,7 @@ mod test_fake_messages_list_additional {
         assert_eq!(result.generations[0].message.content(), "echoed back");
         assert!(matches!(
             result.generations[0].message,
-            BaseMessage::Human(_)
+            AnyMessage::Human(_)
         ));
     }
 }
@@ -931,14 +931,14 @@ mod test_fake_list_chat_model_additional {
 mod test_fake_chat_model_additional {
     use agent_chain_core::FakeChatModel;
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
-    use agent_chain_core::messages::{BaseMessage, HumanMessage};
+    use agent_chain_core::messages::{AnyMessage, HumanMessage};
 
     #[tokio::test]
     async fn test_agenerate_returns_chat_result() {
         let model = FakeChatModel::builder().build();
         let result = model
             ._generate(
-                vec![BaseMessage::Human(
+                vec![AnyMessage::Human(
                     HumanMessage::builder().content("hi").build(),
                 )],
                 None,
@@ -948,7 +948,7 @@ mod test_fake_chat_model_additional {
             .unwrap();
 
         assert_eq!(result.generations.len(), 1);
-        assert!(matches!(result.generations[0].message, BaseMessage::AI(_)));
+        assert!(matches!(result.generations[0].message, AnyMessage::AI(_)));
         assert_eq!(result.generations[0].message.content(), "fake response");
     }
 
@@ -1077,16 +1077,16 @@ mod test_generic_fake_chat_model_additional {
 mod test_parrot_fake_chat_model_additional {
     use agent_chain_core::ParrotFakeChatModel;
     use agent_chain_core::language_models::{BaseChatModel, LanguageModelInput};
-    use agent_chain_core::messages::{BaseMessage, HumanMessage, SystemMessage};
+    use agent_chain_core::messages::{AnyMessage, HumanMessage, SystemMessage};
 
     #[tokio::test]
     async fn test_generate_with_multiple_messages_returns_last() {
         let model = ParrotFakeChatModel::builder().build();
         let messages = vec![
-            BaseMessage::System(SystemMessage::builder().content("system prompt").build()),
-            BaseMessage::Human(HumanMessage::builder().content("first human").build()),
-            BaseMessage::Human(HumanMessage::builder().content("second human").build()),
-            BaseMessage::Human(HumanMessage::builder().content("last human").build()),
+            AnyMessage::System(SystemMessage::builder().content("system prompt").build()),
+            AnyMessage::Human(HumanMessage::builder().content("first human").build()),
+            AnyMessage::Human(HumanMessage::builder().content("second human").build()),
+            AnyMessage::Human(HumanMessage::builder().content("last human").build()),
         ];
         let result = model._generate(messages, None, None).await.unwrap();
         assert_eq!(result.generations.len(), 1);

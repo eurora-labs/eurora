@@ -1,7 +1,7 @@
 use agent_chain_core::GenericFakeChatModel;
 use agent_chain_core::ParserInput;
 use agent_chain_core::language_models::BaseChatModel;
-use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
+use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage};
 use agent_chain_core::output_parsers::{
     BaseOutputParser, BaseTransformOutputParser, StrOutputParser,
 };
@@ -46,7 +46,7 @@ fn test_str_output_parser_parse_unicode() {
 fn test_str_output_parser_invoke_with_message() {
     let parser = StrOutputParser::new();
     let message = AIMessage::builder().content("Hello from AI").build();
-    let result = parser.invoke(BaseMessage::AI(message), None).unwrap();
+    let result = parser.invoke(AnyMessage::AI(message), None).unwrap();
     assert_eq!(result, "Hello from AI");
 }
 
@@ -54,7 +54,7 @@ fn test_str_output_parser_invoke_with_message() {
 fn test_str_output_parser_invoke_with_human_message() {
     let parser = StrOutputParser::new();
     let message = HumanMessage::builder().content("Hello from human").build();
-    let result = parser.invoke(BaseMessage::Human(message), None).unwrap();
+    let result = parser.invoke(AnyMessage::Human(message), None).unwrap();
     assert_eq!(result, "Hello from human");
 }
 
@@ -62,7 +62,7 @@ fn test_str_output_parser_invoke_with_human_message() {
 fn test_str_output_parser_invoke_with_ai_message() {
     let parser = StrOutputParser::new();
     let message = AIMessage::builder().content("Hello from AI").build();
-    let result = parser.invoke(BaseMessage::AI(message), None).unwrap();
+    let result = parser.invoke(AnyMessage::AI(message), None).unwrap();
     assert_eq!(result, "Hello from AI");
 }
 
@@ -79,7 +79,7 @@ fn test_str_output_parser_parse_result_with_chat_generation() {
     let parser = StrOutputParser::new();
     let message = AIMessage::builder().content("Chat generated text").build();
     let chat_generation = ChatGeneration::builder()
-        .message(BaseMessage::AI(message))
+        .message(AnyMessage::AI(message))
         .build();
     let generation = Generation::builder().text(&chat_generation.text).build();
     let result = parser.parse_result(&[generation], false).unwrap();
@@ -105,7 +105,7 @@ async fn test_str_output_parser_transform_string_chunks() {
 #[tokio::test]
 async fn test_str_output_parser_transform_message_chunks() {
     let parser = StrOutputParser::new();
-    let chunks = vec!["Hello", " ", "world"];
+    let chunks = ["Hello", " ", "world"];
 
     let input_stream = futures::stream::iter(chunks.iter().map(|s| ParserInput::from(*s)));
     let mut result_stream = parser.transform(Box::pin(input_stream));
@@ -136,7 +136,7 @@ async fn test_str_output_parser_transform_string_chunks_2() {
 #[tokio::test]
 async fn test_str_output_parser_transform_message_chunks_2() {
     let parser = StrOutputParser::new();
-    let chunks = vec!["Async", " ", "messages"];
+    let chunks = ["Async", " ", "messages"];
 
     let input_stream = futures::stream::iter(chunks.iter().map(|s| ParserInput::from(*s)));
     let result: Vec<String> = parser
@@ -156,7 +156,7 @@ async fn test_str_output_parser_with_model_chain() {
 
     let model_output = model
         ._generate(
-            vec![BaseMessage::Human(
+            vec![AnyMessage::Human(
                 HumanMessage::builder().content("input").build(),
             )],
             None,
@@ -180,7 +180,7 @@ async fn test_str_output_parser_with_model_stream() {
 
     let stream = model
         ._stream(
-            vec![BaseMessage::Human(
+            vec![AnyMessage::Human(
                 HumanMessage::builder().content("input").build(),
             )],
             None,
@@ -204,7 +204,7 @@ async fn test_str_output_parser_with_model_stream() {
 fn test_str_output_parser_with_empty_content() {
     let parser = StrOutputParser::new();
     let message = AIMessage::builder().content("").build();
-    let result = parser.invoke(BaseMessage::AI(message), None).unwrap();
+    let result = parser.invoke(AnyMessage::AI(message), None).unwrap();
     assert_eq!(result, "");
 }
 

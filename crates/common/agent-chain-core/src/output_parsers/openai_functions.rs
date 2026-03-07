@@ -6,7 +6,7 @@ use serde_json::Value;
 use super::base::{BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser};
 use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
 use crate::error::{Error, Result};
-use crate::messages::BaseMessage;
+use crate::messages::AnyMessage;
 use crate::outputs::ChatGeneration;
 use crate::outputs::Generation;
 use crate::runnables::RunnableConfig;
@@ -432,7 +432,7 @@ impl BaseGenerationOutputParser for OutputFunctionsParser {
         let message = match parser_input {
             super::base::ParserInput::Message(m) => *m,
             super::base::ParserInput::Text(s) => {
-                BaseMessage::Human(crate::messages::HumanMessage::builder().content(s).build())
+                AnyMessage::Human(crate::messages::HumanMessage::builder().content(s).build())
             }
         };
         let chat_gen = ChatGeneration::builder().message(message).build();
