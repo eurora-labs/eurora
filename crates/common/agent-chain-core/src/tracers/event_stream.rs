@@ -396,12 +396,12 @@ impl AstreamEventsCallbackHandler {
                                 "type": gc.generation_type,
                             }),
                             GenerationType::ChatGeneration(cg) => serde_json::json!({
-                                "text": cg.text,
+                                "text": cg.message.text(),
                                 "generation_info": cg.generation_info,
                                 "type": "ChatGeneration",
                             }),
                             GenerationType::ChatGenerationChunk(cgc) => serde_json::json!({
-                                "text": cgc.text,
+                                "text": cgc.message.text(),
                                 "generation_info": cgc.generation_info,
                                 "type": "ChatGenerationChunk",
                             }),

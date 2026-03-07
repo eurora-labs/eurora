@@ -863,7 +863,7 @@ mod tests {
 
         let mut result = String::new();
         while let Some(chunk) = stream.next().await {
-            let text = chunk.unwrap().text.clone();
+            let text = chunk.unwrap().message.text();
             result.push_str(&text);
         }
 

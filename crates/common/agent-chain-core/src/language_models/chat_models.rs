@@ -1520,7 +1520,7 @@ fn _chat_generations_to_cache(generations: &[ChatGeneration]) -> Vec<Generation>
                 info.insert("message".to_string(), msg_val);
             }
             Generation::builder()
-                .text(&chat_gen.text)
+                .text(chat_gen.message.text())
                 .generation_info(info)
                 .build()
         })
@@ -2004,7 +2004,7 @@ mod tests {
         let merged = collect_and_merge_stream(stream).await.unwrap();
 
         assert!(merged.is_some());
-        assert_eq!(merged.unwrap().text, "abc");
+        assert_eq!(merged.unwrap().message.text(), "abc");
     }
 
     #[tokio::test]

@@ -127,7 +127,7 @@ fn test_parse_result_with_chat_generation() {
     let parser = IntParser;
     let message: AnyMessage = AIMessage::builder().content("55").build().into();
     let chat_gen = ChatGeneration::builder().message(message).build();
-    let generation = Generation::builder().text(&chat_gen.text).build();
+    let generation = Generation::builder().text(&chat_gen.message.text()).build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result, 55);
 }
