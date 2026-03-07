@@ -646,7 +646,7 @@ fn format_annotation_from_lc(annotation: &serde_json::Value) -> serde_json::Valu
 /// Get messages after the last AIMessage with a response ID.
 fn get_last_messages(messages: &[AnyMessage]) -> (&[AnyMessage], Option<String>) {
     for i in (0..messages.len()).rev() {
-        if let AnyMessage::AI(ai_msg) = &messages[i]
+        if let AnyMessage::AIMessage(ai_msg) = &messages[i]
             && let Some(id) = ai_msg.response_metadata.get("id").and_then(|v| v.as_str())
             && id.starts_with("resp_")
         {
@@ -922,7 +922,7 @@ impl ChatOpenAI {
     /// Convert a single message to OpenAI dict format.
     fn convert_message_to_dict(&self, msg: &AnyMessage) -> Option<serde_json::Value> {
         match msg {
-            AnyMessage::System(m) => {
+            AnyMessage::SystemMessage(m) => {
                 let role = m
                     .additional_kwargs
                     .get("__openai_role__")
@@ -937,7 +937,7 @@ impl ChatOpenAI {
                 }
                 Some(message)
             }
-            AnyMessage::Human(m) => {
+            AnyMessage::HumanMessage(m) => {
                 let content = match &m.content {
                     MessageContent::Text(text) => serde_json::json!(text),
                     MessageContent::Parts(parts) => {
@@ -978,7 +978,7 @@ impl ChatOpenAI {
                 }
                 Some(message)
             }
-            AnyMessage::AI(m) => {
+            AnyMessage::AIMessage(m) => {
                 let mut message = serde_json::json!({"role": "assistant"});
 
                 let mut all_tool_calls: Vec<serde_json::Value> = m
@@ -1054,7 +1054,7 @@ impl ChatOpenAI {
 
                 Some(message)
             }
-            AnyMessage::Tool(m) => {
+            AnyMessage::ToolMessage(m) => {
                 let content = match &m.content {
                     MessageContent::Parts(parts) => {
                         let content_parts: Vec<serde_json::Value> = parts
@@ -1095,8 +1095,8 @@ impl ChatOpenAI {
                     "content": content
                 }))
             }
-            AnyMessage::Remove(_) => None,
-            AnyMessage::Chat(m) => {
+            AnyMessage::RemoveMessage(_) => None,
+            AnyMessage::ChatMessage(m) => {
                 let mut message = serde_json::json!({
                     "role": m.role,
                     "content": m.content.as_text()
@@ -1106,7 +1106,7 @@ impl ChatOpenAI {
                 }
                 Some(message)
             }
-            AnyMessage::Function(m) => Some(serde_json::json!({
+            AnyMessage::FunctionMessage(m) => Some(serde_json::json!({
                 "role": "function",
                 "name": m.name,
                 "content": m.content
@@ -1126,7 +1126,7 @@ impl ChatOpenAI {
 
         for msg in messages {
             match msg {
-                AnyMessage::System(m) => {
+                AnyMessage::SystemMessage(m) => {
                     let role = m
                         .additional_kwargs
                         .get("__openai_role__")
@@ -1137,7 +1137,7 @@ impl ChatOpenAI {
                         "content": m.content.as_text()
                     }));
                 }
-                AnyMessage::Human(m) => {
+                AnyMessage::HumanMessage(m) => {
                     let content = match &m.content {
                         MessageContent::Text(text) => serde_json::json!(text),
                         MessageContent::Parts(parts) => {
@@ -1198,7 +1198,7 @@ impl ChatOpenAI {
                         input.push(serde_json::json!({"role": "user", "content": content}));
                     }
                 }
-                AnyMessage::AI(m) => {
+                AnyMessage::AIMessage(m) => {
                     let has_structured_blocks = if let MessageContent::Parts(parts) = &m.content {
                         parts.iter().any(|p| {
                             if let ContentPart::Other(block) = p {
@@ -1332,7 +1332,7 @@ impl ChatOpenAI {
                         }
                     }
                 }
-                AnyMessage::Tool(m) => {
+                AnyMessage::ToolMessage(m) => {
                     if m.additional_kwargs.get("type").and_then(|v| v.as_str())
                         == Some("computer_call_output")
                         && let Some(output) = make_computer_call_output(m)
@@ -1351,14 +1351,14 @@ impl ChatOpenAI {
                         "output": tool_output
                     }));
                 }
-                AnyMessage::Remove(_) => continue,
-                AnyMessage::Chat(m) => {
+                AnyMessage::RemoveMessage(_) => continue,
+                AnyMessage::ChatMessage(m) => {
                     input.push(serde_json::json!({
                         "role": m.role,
                         "content": m.content.as_text()
                     }));
                 }
-                AnyMessage::Function(m) => {
+                AnyMessage::FunctionMessage(m) => {
                     input.push(serde_json::json!({
                         "type": "function_call_output",
                         "name": m.name,
@@ -1942,11 +1942,11 @@ impl ChatOpenAI {
 
             let generation = if generation_info.is_empty() {
                 ChatGeneration::builder()
-                    .message(AnyMessage::AI(ai_message))
+                    .message(AnyMessage::AIMessage(ai_message))
                     .build()
             } else {
                 ChatGeneration::builder()
-                    .message(AnyMessage::AI(ai_message))
+                    .message(AnyMessage::AIMessage(ai_message))
                     .generation_info(generation_info)
                     .build()
             };
@@ -2115,7 +2115,7 @@ impl ChatOpenAI {
             .build();
 
         let generation = ChatGeneration::builder()
-            .message(AnyMessage::AI(ai_message))
+            .message(AnyMessage::AIMessage(ai_message))
             .build();
         Ok(ChatResult::builder().generations(vec![generation]).build())
     }
@@ -2242,7 +2242,7 @@ impl ChatOpenAI {
     ) {
         let headers_value = serde_json::to_value(headers).unwrap_or_default();
         for generation in &mut result.generations {
-            if let AnyMessage::AI(ref mut ai) = generation.message {
+            if let AnyMessage::AIMessage(ref mut ai) = generation.message {
                 ai.response_metadata
                     .insert("headers".to_string(), headers_value.clone());
             }
@@ -2395,7 +2395,7 @@ impl ChatOpenAI {
             .next()
             .ok_or_else(|| Error::other("No generations returned"))?;
         match generation.message {
-            AnyMessage::AI(msg) => Ok(msg),
+            AnyMessage::AIMessage(msg) => Ok(msg),
             _ => Err(Error::other("Expected AI message")),
         }
     }
@@ -3691,7 +3691,7 @@ mod tests {
             .build();
 
         let model = ChatOpenAI::new("gpt-4o");
-        let formatted = model.format_messages(&[AnyMessage::AI(ai_msg)]);
+        let formatted = model.format_messages(&[AnyMessage::AIMessage(ai_msg)]);
         assert_eq!(formatted.len(), 1);
         assert!(formatted[0]["content"].is_null());
     }
@@ -3712,7 +3712,8 @@ mod tests {
         use crate::messages::SystemMessage;
         let sys = SystemMessage::builder().content("Be helpful").build();
         let model = ChatOpenAI::new("o3-mini");
-        let payload = model.build_request_payload(&[AnyMessage::System(sys)], None, None, false);
+        let payload =
+            model.build_request_payload(&[AnyMessage::SystemMessage(sys)], None, None, false);
         let messages = payload["messages"].as_array().expect("messages array");
         assert_eq!(messages[0]["role"], "developer");
     }

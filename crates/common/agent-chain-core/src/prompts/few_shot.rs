@@ -553,6 +553,7 @@ impl Runnable for FewShotChatMessagePromptTemplate {
 mod tests {
     use super::super::chat::ChatPromptTemplate;
     use super::*;
+    use crate::messages::BaseMessage;
 
     #[test]
     fn test_few_shot_prompt_template() {

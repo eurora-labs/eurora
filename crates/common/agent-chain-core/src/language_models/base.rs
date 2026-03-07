@@ -8,7 +8,7 @@ use serde_json::Value;
 use crate::caches::BaseCache;
 use crate::callbacks::Callbacks;
 use crate::error::Result;
-use crate::messages::{AIMessage, AnyMessage};
+use crate::messages::{AIMessage, AnyMessage, BaseMessage};
 use crate::outputs::LLMResult;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -106,7 +106,7 @@ impl LanguageModelInput {
         use crate::prompt_values::PromptValue;
         match self {
             LanguageModelInput::Text(s) => {
-                vec![AnyMessage::Human(
+                vec![AnyMessage::HumanMessage(
                     crate::messages::HumanMessage::builder()
                         .content(s.as_str())
                         .build(),

@@ -6,7 +6,7 @@ use serde_json::Value;
 use super::base::{BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser};
 use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
 use crate::error::{Error, Result};
-use crate::messages::AnyMessage;
+use crate::messages::{AnyMessage, BaseMessage};
 use crate::outputs::ChatGeneration;
 use crate::outputs::Generation;
 use crate::runnables::RunnableConfig;
@@ -27,12 +27,9 @@ impl OutputFunctionsParser {
             .first()
             .ok_or_else(|| Error::output_parser_simple("No generations to parse"))?;
 
-        let additional_kwargs = generation
+        let function_call = generation
             .message
             .additional_kwargs()
-            .ok_or_else(|| Error::output_parser_simple("Message has no additional_kwargs"))?;
-
-        let function_call = additional_kwargs
             .get("function_call")
             .ok_or_else(|| {
                 Error::output_parser_simple(
@@ -95,11 +92,7 @@ impl JsonOutputFunctionsParser {
         }
 
         let generation = &result[0];
-        let additional_kwargs = generation.message.additional_kwargs().ok_or_else(|| {
-            Error::output_parser_simple(
-                "This output parser can only be used with a chat generation.",
-            )
-        })?;
+        let additional_kwargs = generation.message.additional_kwargs();
 
         let function_call = match additional_kwargs.get("function_call") {
             Some(fc) => fc,
@@ -431,9 +424,9 @@ impl BaseGenerationOutputParser for OutputFunctionsParser {
         let parser_input: super::base::ParserInput = input.into();
         let message = match parser_input {
             super::base::ParserInput::Message(m) => *m,
-            super::base::ParserInput::Text(s) => {
-                AnyMessage::Human(crate::messages::HumanMessage::builder().content(s).build())
-            }
+            super::base::ParserInput::Text(s) => AnyMessage::HumanMessage(
+                crate::messages::HumanMessage::builder().content(s).build(),
+            ),
         };
         let chat_gen = ChatGeneration::builder().message(message).build();
         self.parse_result(&[chat_gen])

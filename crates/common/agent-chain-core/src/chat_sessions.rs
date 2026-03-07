@@ -67,8 +67,8 @@ mod tests {
     #[test]
     fn test_chat_session_with_messages() {
         let messages = vec![
-            AnyMessage::Human(HumanMessage::builder().content("Hello").build()),
-            AnyMessage::AI(AIMessage::builder().content("Hi").build()),
+            AnyMessage::HumanMessage(HumanMessage::builder().content("Hello").build()),
+            AnyMessage::AIMessage(AIMessage::builder().content("Hi").build()),
         ];
         let session = ChatSession::with_messages(messages);
 
@@ -79,7 +79,7 @@ mod tests {
 
     #[test]
     fn test_chat_session_with_messages_and_functions() {
-        let messages = vec![AnyMessage::Human(
+        let messages = vec![AnyMessage::HumanMessage(
             HumanMessage::builder().content("Hello").build(),
         )];
         let functions = vec![serde_json::json!({
@@ -100,7 +100,7 @@ mod tests {
         let session = ChatSession::new();
         assert!(session.messages().is_empty());
 
-        let session_with_messages = ChatSession::with_messages(vec![AnyMessage::Human(
+        let session_with_messages = ChatSession::with_messages(vec![AnyMessage::HumanMessage(
             HumanMessage::builder().content("Hello").build(),
         )]);
         assert_eq!(session_with_messages.messages().len(), 1);
@@ -120,7 +120,7 @@ mod tests {
 
     #[test]
     fn test_chat_session_serialization() {
-        let messages = vec![AnyMessage::Human(
+        let messages = vec![AnyMessage::HumanMessage(
             HumanMessage::builder().content("Hello").build(),
         )];
         let session = ChatSession::with_messages(messages);

@@ -338,7 +338,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
 
         match result.generations[0].message.clone() {
-            AnyMessage::AI(message) => Ok(message),
+            AnyMessage::AIMessage(message) => Ok(message),
             other => Ok(AIMessage::builder().content(other.text()).build()),
         }
     }
@@ -794,10 +794,10 @@ pub trait BaseChatModel: BaseLanguageModel {
                     let mut chat_result = agenerate_from_stream(stream).await?;
                     if self.chat_config().output_version.as_deref() == Some("v1") {
                         for generation in &mut chat_result.generations {
-                            if let AnyMessage::AI(ref ai_msg) = generation.message {
+                            if let AnyMessage::AIMessage(ref ai_msg) = generation.message {
                                 let updated =
                                     super::utils::update_message_content_to_blocks(ai_msg, "v1");
-                                generation.message = AnyMessage::AI(updated);
+                                generation.message = AnyMessage::AIMessage(updated);
                             }
                         }
                     }
@@ -814,15 +814,15 @@ pub trait BaseChatModel: BaseLanguageModel {
 
         if self.chat_config().output_version.as_deref() == Some("v1") {
             for generation in &mut result.generations {
-                if let AnyMessage::AI(ref ai_msg) = generation.message {
+                if let AnyMessage::AIMessage(ref ai_msg) = generation.message {
                     let updated = super::utils::update_message_content_to_blocks(ai_msg, "v1");
-                    generation.message = AnyMessage::AI(updated);
+                    generation.message = AnyMessage::AIMessage(updated);
                 }
             }
         }
 
         for generation in &mut result.generations {
-            if let AnyMessage::AI(ref mut ai_msg) = generation.message {
+            if let AnyMessage::AIMessage(ref mut ai_msg) = generation.message {
                 ai_msg.response_metadata = _gen_info_and_msg_metadata(
                     generation.generation_info.as_ref(),
                     &ai_msg.response_metadata,
@@ -890,10 +890,10 @@ pub trait BaseChatModel: BaseLanguageModel {
                     let mut chat_result = agenerate_from_stream(stream).await?;
                     if self.chat_config().output_version.as_deref() == Some("v1") {
                         for generation in &mut chat_result.generations {
-                            if let AnyMessage::AI(ref ai_msg) = generation.message {
+                            if let AnyMessage::AIMessage(ref ai_msg) = generation.message {
                                 let updated =
                                     super::utils::update_message_content_to_blocks(ai_msg, "v1");
-                                generation.message = AnyMessage::AI(updated);
+                                generation.message = AnyMessage::AIMessage(updated);
                             }
                         }
                     }
@@ -910,15 +910,15 @@ pub trait BaseChatModel: BaseLanguageModel {
 
         if self.chat_config().output_version.as_deref() == Some("v1") {
             for generation in &mut result.generations {
-                if let AnyMessage::AI(ref ai_msg) = generation.message {
+                if let AnyMessage::AIMessage(ref ai_msg) = generation.message {
                     let updated = super::utils::update_message_content_to_blocks(ai_msg, "v1");
-                    generation.message = AnyMessage::AI(updated);
+                    generation.message = AnyMessage::AIMessage(updated);
                 }
             }
         }
 
         for generation in &mut result.generations {
-            if let AnyMessage::AI(ref mut ai_msg) = generation.message {
+            if let AnyMessage::AIMessage(ref mut ai_msg) = generation.message {
                 ai_msg.response_metadata = _gen_info_and_msg_metadata(
                     generation.generation_info.as_ref(),
                     &ai_msg.response_metadata,
@@ -977,7 +977,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
 
         match result.generations[0].message.clone() {
-            AnyMessage::AI(message) => Ok(message),
+            AnyMessage::AIMessage(message) => Ok(message),
             _ => Err(Error::Other("Unexpected message type".into())),
         }
     }
@@ -1024,7 +1024,7 @@ pub trait BaseChatModel: BaseLanguageModel {
 
         match &result.generations[0][0] {
             GenerationType::ChatGeneration(chat_gen) => match &chat_gen.message {
-                AnyMessage::AI(ai) => Ok(ai.clone()),
+                AnyMessage::AIMessage(ai) => Ok(ai.clone()),
                 other => Ok(AIMessage::builder().content(other.text()).build()),
             },
             _ => Err(Error::Other("Unexpected generation type".into())),
@@ -1069,7 +1069,7 @@ pub trait BaseChatModel: BaseLanguageModel {
 
         match &result.generations[0][0] {
             GenerationType::ChatGeneration(chat_gen) => match &chat_gen.message {
-                AnyMessage::AI(ai) => Ok(ai.clone()),
+                AnyMessage::AIMessage(ai) => Ok(ai.clone()),
                 other => Ok(AIMessage::builder().content(other.text()).build()),
             },
             _ => Err(Error::Other("Unexpected generation type".into())),
@@ -1177,7 +1177,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 match result {
                     Ok(generation_chunk) => {
                         let mut ai_chunk = match &generation_chunk.message {
-                            AnyMessage::AI(ai_msg) => AIMessageChunk::builder()
+                            AnyMessage::AIMessage(ai_msg) => AIMessageChunk::builder()
                                 .content(ai_msg.content.clone())
                                 .tool_calls(ai_msg.tool_calls.clone())
                                 .additional_kwargs(ai_msg.additional_kwargs.clone())
@@ -1186,7 +1186,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                         };
 
                         let ai_response_meta = match &generation_chunk.message {
-                            AnyMessage::AI(ai_msg) => &ai_msg.response_metadata,
+                            AnyMessage::AIMessage(ai_msg) => &ai_msg.response_metadata,
                             _ => &ai_chunk.response_metadata,
                         };
                         ai_chunk.response_metadata = _gen_info_and_msg_metadata(
@@ -1231,7 +1231,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 final_chunk.set_chunk_position(Some(ChunkPosition::Last));
 
                 if let Some(ref rm) = run_manager {
-                    let msg_chunk = ChatGenerationChunk::builder().message(AnyMessage::AI(crate::messages::AIMessage::builder().content("").build())).build();
+                    let msg_chunk = ChatGenerationChunk::builder().message(AnyMessage::AIMessage(crate::messages::AIMessage::builder().content("").build())).build();
                     let chunk_json = serde_json::to_value(&msg_chunk).ok();
                     rm.on_llm_new_token("", chunk_json.as_ref());
                 }
@@ -1334,7 +1334,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 match result {
                     Ok(generation_chunk) => {
                         let mut ai_chunk = match &generation_chunk.message {
-                            AnyMessage::AI(ai_msg) => AIMessageChunk::builder()
+                            AnyMessage::AIMessage(ai_msg) => AIMessageChunk::builder()
                                 .content(ai_msg.content.clone())
                                 .tool_calls(ai_msg.tool_calls.clone())
                                 .maybe_usage_metadata(ai_msg.usage_metadata.clone())
@@ -1344,7 +1344,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                         };
 
                         let ai_response_meta = match &generation_chunk.message {
-                            AnyMessage::AI(ai_msg) => &ai_msg.response_metadata,
+                            AnyMessage::AIMessage(ai_msg) => &ai_msg.response_metadata,
                             _ => &ai_chunk.response_metadata,
                         };
                         ai_chunk.response_metadata = _gen_info_and_msg_metadata(
@@ -1389,7 +1389,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 final_chunk.set_chunk_position(Some(ChunkPosition::Last));
 
                 if let Some(ref rm) = run_manager {
-                    let msg_chunk = ChatGenerationChunk::builder().message(AnyMessage::AI(crate::messages::AIMessage::builder().content("").build())).build();
+                    let msg_chunk = ChatGenerationChunk::builder().message(AnyMessage::AIMessage(crate::messages::AIMessage::builder().content("").build())).build();
                     let chunk_json = serde_json::to_value(&msg_chunk).ok();
                     rm.on_llm_new_token("", chunk_json.as_ref());
                 }
@@ -1551,7 +1551,7 @@ pub fn generate_response_from_error(error: &crate::error::Error) -> Vec<ChatGene
 
     vec![
         ChatGeneration::builder()
-            .message(AnyMessage::AI(
+            .message(AnyMessage::AIMessage(
                 AIMessage::builder()
                     .content("")
                     .response_metadata(metadata)
@@ -1874,6 +1874,7 @@ fn apply_block_indices(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messages::prelude::*;
 
     #[test]
     fn test_chat_model_config_builder() {

@@ -33,10 +33,10 @@ mod tests {
     fn test_lazy_load() {
         let sessions = vec![
             ChatSession::with_messages(vec![
-                AnyMessage::Human(HumanMessage::builder().content("Hello").build()),
-                AnyMessage::AI(AIMessage::builder().content("Hi").build()),
+                AnyMessage::HumanMessage(HumanMessage::builder().content("Hello").build()),
+                AnyMessage::AIMessage(AIMessage::builder().content("Hi").build()),
             ]),
-            ChatSession::with_messages(vec![AnyMessage::Human(
+            ChatSession::with_messages(vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("Bye").build(),
             )]),
         ];
@@ -54,13 +54,13 @@ mod tests {
     #[test]
     fn test_load() {
         let sessions = vec![
-            ChatSession::with_messages(vec![AnyMessage::Human(
+            ChatSession::with_messages(vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("Hello").build(),
             )]),
-            ChatSession::with_messages(vec![AnyMessage::AI(
+            ChatSession::with_messages(vec![AnyMessage::AIMessage(
                 AIMessage::builder().content("Hi").build(),
             )]),
-            ChatSession::with_messages(vec![AnyMessage::Human(
+            ChatSession::with_messages(vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("Bye").build(),
             )]),
         ];

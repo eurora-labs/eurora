@@ -30,7 +30,7 @@ impl AgentAction {
     }
 
     pub fn messages(&self) -> Vec<AnyMessage> {
-        vec![AnyMessage::AI(
+        vec![AnyMessage::AIMessage(
             AIMessage::builder().content(&self.log).build(),
         )]
     }
@@ -143,7 +143,7 @@ impl AgentFinish {
     }
 
     pub fn messages(&self) -> Vec<AnyMessage> {
-        vec![AnyMessage::AI(
+        vec![AnyMessage::AIMessage(
             AIMessage::builder().content(&self.log).build(),
         )]
     }
@@ -188,7 +188,7 @@ fn convert_agent_observation_to_messages(
         Value::String(s) => s.clone(),
         other => serde_json::to_string(other).unwrap_or_else(|_| other.to_string()),
     };
-    vec![AnyMessage::Human(
+    vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content(content).build(),
     )]
 }
@@ -201,7 +201,7 @@ pub fn convert_agent_action_message_log_observation_to_messages(
         Value::String(s) => s.clone(),
         other => serde_json::to_string(other).unwrap_or_else(|_| other.to_string()),
     };
-    vec![AnyMessage::Function(
+    vec![AnyMessage::FunctionMessage(
         FunctionMessage::builder()
             .content(content)
             .name(&agent_action.tool)
@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn test_agent_action_message_log() {
-        let msg = AnyMessage::AI(AIMessage::builder().content("I should search").build());
+        let msg = AnyMessage::AIMessage(AIMessage::builder().content("I should search").build());
         let action = AgentActionMessageLog::builder()
             .tool("search")
             .tool_input("query")

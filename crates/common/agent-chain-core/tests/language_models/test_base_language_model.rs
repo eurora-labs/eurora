@@ -241,7 +241,7 @@ mod test_language_model_input {
 
     #[test]
     fn test_language_model_input_accepts_message_sequence() {
-        let messages = vec![AnyMessage::Human(
+        let messages = vec![AnyMessage::HumanMessage(
             HumanMessage::builder().content("Hello").build(),
         )];
         let input: LanguageModelInput = messages.into();
@@ -261,7 +261,7 @@ mod test_language_model_input {
 
         assert_eq!(messages.len(), 1);
         match &messages[0] {
-            AnyMessage::Human(m) => {
+            AnyMessage::HumanMessage(m) => {
                 assert_eq!(m.content.as_text(), "hello");
             }
             _ => panic!("Expected Human message"),
@@ -491,8 +491,8 @@ mod test_base_language_model_trait {
             .build();
 
         let messages = vec![
-            AnyMessage::Human(HumanMessage::builder().content("Hi").build()),
-            AnyMessage::AI(AIMessage::builder().content("Hello").build()),
+            AnyMessage::HumanMessage(HumanMessage::builder().content("Hi").build()),
+            AnyMessage::AIMessage(AIMessage::builder().content("Hello").build()),
         ];
 
         let result = model.get_num_tokens_from_messages(&messages, None);
@@ -624,7 +624,7 @@ mod test_get_num_tokens_from_messages_edge_cases {
         let model = FakeListLLM::builder()
             .responses(vec!["response".to_string()])
             .build();
-        let messages = vec![AnyMessage::Human(
+        let messages = vec![AnyMessage::HumanMessage(
             HumanMessage::builder().content("Hello world").build(),
         )];
         let result = model.get_num_tokens_from_messages(&messages, None);

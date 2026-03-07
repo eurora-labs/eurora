@@ -167,6 +167,7 @@ impl Runnable for StructuredPrompt {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messages::BaseMessage;
     use serde_json::json;
 
     #[test]

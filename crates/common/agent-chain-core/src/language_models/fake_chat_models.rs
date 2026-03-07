@@ -807,7 +807,7 @@ impl BaseChatModel for ParrotFakeChatModel {
         let last_message = messages
             .last()
             .cloned()
-            .unwrap_or_else(|| AnyMessage::AI(AIMessage::builder().content("").build()));
+            .unwrap_or_else(|| AnyMessage::AIMessage(AIMessage::builder().content("").build()));
 
         let generation = ChatGeneration::builder().message(last_message).build();
         Ok(ChatResult::builder().generations(vec![generation]).build())
@@ -817,14 +817,14 @@ impl BaseChatModel for ParrotFakeChatModel {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messages::HumanMessage;
+    use crate::messages::prelude::*;
 
     #[tokio::test]
     async fn test_fake_messages_list_chat_model() {
         let llm = FakeMessagesListChatModel::builder()
             .responses(vec![
-                AnyMessage::AI(AIMessage::builder().content("Response 1").build()),
-                AnyMessage::AI(AIMessage::builder().content("Response 2").build()),
+                AnyMessage::AIMessage(AIMessage::builder().content("Response 1").build()),
+                AnyMessage::AIMessage(AIMessage::builder().content("Response 2").build()),
             ])
             .build();
 
@@ -896,7 +896,7 @@ mod tests {
     async fn test_parrot_fake_chat_model() {
         let llm = ParrotFakeChatModel::builder().build();
 
-        let messages = vec![AnyMessage::Human(
+        let messages = vec![AnyMessage::HumanMessage(
             HumanMessage::builder().content("Hello, parrot!").build(),
         )];
 

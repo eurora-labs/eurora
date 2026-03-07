@@ -866,25 +866,25 @@ impl From<ProtoRemoveMessage> for RemoveMessage {
 impl From<AnyMessage> for ProtoBaseMessage {
     fn from(msg: AnyMessage) -> Self {
         match msg {
-            AnyMessage::Human(m) => ProtoBaseMessage {
+            AnyMessage::HumanMessage(m) => ProtoBaseMessage {
                 message: Some(proto_base_message::Message::Human(m.into())),
             },
-            AnyMessage::System(m) => ProtoBaseMessage {
+            AnyMessage::SystemMessage(m) => ProtoBaseMessage {
                 message: Some(proto_base_message::Message::System(m.into())),
             },
-            AnyMessage::AI(m) => ProtoBaseMessage {
+            AnyMessage::AIMessage(m) => ProtoBaseMessage {
                 message: Some(proto_base_message::Message::Ai(m.into())),
             },
-            AnyMessage::Tool(m) => ProtoBaseMessage {
+            AnyMessage::ToolMessage(m) => ProtoBaseMessage {
                 message: Some(proto_base_message::Message::Tool(m.into())),
             },
-            AnyMessage::Chat(m) => ProtoBaseMessage {
+            AnyMessage::ChatMessage(m) => ProtoBaseMessage {
                 message: Some(proto_base_message::Message::Chat(m.into())),
             },
-            AnyMessage::Function(m) => ProtoBaseMessage {
+            AnyMessage::FunctionMessage(m) => ProtoBaseMessage {
                 message: Some(proto_base_message::Message::Function(m.into())),
             },
-            AnyMessage::Remove(m) => ProtoBaseMessage {
+            AnyMessage::RemoveMessage(m) => ProtoBaseMessage {
                 message: Some(proto_base_message::Message::Remove(m.into())),
             },
         }
@@ -894,14 +894,14 @@ impl From<AnyMessage> for ProtoBaseMessage {
 impl From<ProtoBaseMessage> for AnyMessage {
     fn from(proto: ProtoBaseMessage) -> Self {
         match proto.message {
-            Some(proto_base_message::Message::Human(m)) => AnyMessage::Human(m.into()),
-            Some(proto_base_message::Message::System(m)) => AnyMessage::System(m.into()),
-            Some(proto_base_message::Message::Ai(m)) => AnyMessage::AI(m.into()),
-            Some(proto_base_message::Message::Tool(m)) => AnyMessage::Tool(m.into()),
-            Some(proto_base_message::Message::Chat(m)) => AnyMessage::Chat(m.into()),
-            Some(proto_base_message::Message::Function(m)) => AnyMessage::Function(m.into()),
-            Some(proto_base_message::Message::Remove(m)) => AnyMessage::Remove(m.into()),
-            None => AnyMessage::Human(HumanMessage::builder().content("").build()),
+            Some(proto_base_message::Message::Human(m)) => AnyMessage::HumanMessage(m.into()),
+            Some(proto_base_message::Message::System(m)) => AnyMessage::SystemMessage(m.into()),
+            Some(proto_base_message::Message::Ai(m)) => AnyMessage::AIMessage(m.into()),
+            Some(proto_base_message::Message::Tool(m)) => AnyMessage::ToolMessage(m.into()),
+            Some(proto_base_message::Message::Chat(m)) => AnyMessage::ChatMessage(m.into()),
+            Some(proto_base_message::Message::Function(m)) => AnyMessage::FunctionMessage(m.into()),
+            Some(proto_base_message::Message::Remove(m)) => AnyMessage::RemoveMessage(m.into()),
+            None => AnyMessage::HumanMessage(HumanMessage::builder().content("").build()),
         }
     }
 }
@@ -909,22 +909,22 @@ impl From<ProtoBaseMessage> for AnyMessage {
 impl From<AnyMessageChunk> for ProtoBaseMessageChunk {
     fn from(chunk: AnyMessageChunk) -> Self {
         match chunk {
-            AnyMessageChunk::AI(c) => ProtoBaseMessageChunk {
+            AnyMessageChunk::AIMessageChunk(c) => ProtoBaseMessageChunk {
                 chunk: Some(proto_base_message_chunk::Chunk::Ai(c.into())),
             },
-            AnyMessageChunk::Human(c) => ProtoBaseMessageChunk {
+            AnyMessageChunk::HumanMessageChunk(c) => ProtoBaseMessageChunk {
                 chunk: Some(proto_base_message_chunk::Chunk::Human(c.into())),
             },
-            AnyMessageChunk::System(c) => ProtoBaseMessageChunk {
+            AnyMessageChunk::SystemMessageChunk(c) => ProtoBaseMessageChunk {
                 chunk: Some(proto_base_message_chunk::Chunk::System(c.into())),
             },
-            AnyMessageChunk::Tool(c) => ProtoBaseMessageChunk {
+            AnyMessageChunk::ToolMessageChunk(c) => ProtoBaseMessageChunk {
                 chunk: Some(proto_base_message_chunk::Chunk::Tool(c.into())),
             },
-            AnyMessageChunk::Chat(c) => ProtoBaseMessageChunk {
+            AnyMessageChunk::ChatMessageChunk(c) => ProtoBaseMessageChunk {
                 chunk: Some(proto_base_message_chunk::Chunk::Chat(c.into())),
             },
-            AnyMessageChunk::Function(c) => ProtoBaseMessageChunk {
+            AnyMessageChunk::FunctionMessageChunk(c) => ProtoBaseMessageChunk {
                 chunk: Some(proto_base_message_chunk::Chunk::Function(c.into())),
             },
         }
@@ -934,15 +934,25 @@ impl From<AnyMessageChunk> for ProtoBaseMessageChunk {
 impl From<ProtoBaseMessageChunk> for AnyMessageChunk {
     fn from(proto: ProtoBaseMessageChunk) -> Self {
         match proto.chunk {
-            Some(proto_base_message_chunk::Chunk::Ai(c)) => AnyMessageChunk::AI(c.into()),
-            Some(proto_base_message_chunk::Chunk::Human(c)) => AnyMessageChunk::Human(c.into()),
-            Some(proto_base_message_chunk::Chunk::System(c)) => AnyMessageChunk::System(c.into()),
-            Some(proto_base_message_chunk::Chunk::Tool(c)) => AnyMessageChunk::Tool(c.into()),
-            Some(proto_base_message_chunk::Chunk::Chat(c)) => AnyMessageChunk::Chat(c.into()),
-            Some(proto_base_message_chunk::Chunk::Function(c)) => {
-                AnyMessageChunk::Function(c.into())
+            Some(proto_base_message_chunk::Chunk::Ai(c)) => {
+                AnyMessageChunk::AIMessageChunk(c.into())
             }
-            None => AnyMessageChunk::AI(AIMessageChunk::builder().content("").build()),
+            Some(proto_base_message_chunk::Chunk::Human(c)) => {
+                AnyMessageChunk::HumanMessageChunk(c.into())
+            }
+            Some(proto_base_message_chunk::Chunk::System(c)) => {
+                AnyMessageChunk::SystemMessageChunk(c.into())
+            }
+            Some(proto_base_message_chunk::Chunk::Tool(c)) => {
+                AnyMessageChunk::ToolMessageChunk(c.into())
+            }
+            Some(proto_base_message_chunk::Chunk::Chat(c)) => {
+                AnyMessageChunk::ChatMessageChunk(c.into())
+            }
+            Some(proto_base_message_chunk::Chunk::Function(c)) => {
+                AnyMessageChunk::FunctionMessageChunk(c.into())
+            }
+            None => AnyMessageChunk::AIMessageChunk(AIMessageChunk::builder().content("").build()),
         }
     }
 }

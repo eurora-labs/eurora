@@ -66,7 +66,7 @@ impl PromptValue for StringPromptValue {
     }
 
     fn to_messages(&self) -> Vec<AnyMessage> {
-        vec![AnyMessage::Human(
+        vec![AnyMessage::HumanMessage(
             HumanMessage::builder().content(&self.text).build(),
         )]
     }
@@ -180,7 +180,7 @@ impl PromptValue for ImagePromptValue {
             detail,
         };
 
-        vec![AnyMessage::Human(
+        vec![AnyMessage::HumanMessage(
             HumanMessage::builder()
                 .content(MessageContent::Parts(vec![content_part]))
                 .build(),
@@ -255,7 +255,7 @@ submit_constructor!(ChatPromptValue);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messages::{AIMessage, SystemMessage};
+    use crate::messages::{AIMessage, BaseMessage, SystemMessage};
 
     #[test]
     fn test_string_prompt_value() {
@@ -270,13 +270,13 @@ mod tests {
     #[test]
     fn test_chat_prompt_value() {
         let messages = vec![
-            AnyMessage::System(
+            AnyMessage::SystemMessage(
                 SystemMessage::builder()
                     .content("You are a helpful assistant.")
                     .build(),
             ),
-            AnyMessage::Human(HumanMessage::builder().content("Hello!").build()),
-            AnyMessage::AI(AIMessage::builder().content("Hi there!").build()),
+            AnyMessage::HumanMessage(HumanMessage::builder().content("Hello!").build()),
+            AnyMessage::AIMessage(AIMessage::builder().content("Hi there!").build()),
         ];
         let pv = ChatPromptValue::new(messages.clone());
 
@@ -312,8 +312,8 @@ mod tests {
     #[test]
     fn test_chat_prompt_value_concrete() {
         let messages = vec![
-            AnyMessage::Human(HumanMessage::builder().content("Hello!").build()),
-            AnyMessage::AI(AIMessage::builder().content("Hi!").build()),
+            AnyMessage::HumanMessage(HumanMessage::builder().content("Hello!").build()),
+            AnyMessage::AIMessage(AIMessage::builder().content("Hi!").build()),
         ];
         let pv = ChatPromptValueConcrete::new(messages);
 

@@ -103,8 +103,8 @@ fn test_standard_event_with_all_data_fields() {
 fn test_event_data_with_messages() {
     use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage};
 
-    let human = AnyMessage::Human(HumanMessage::builder().content("hello").build());
-    let ai = AnyMessage::AI(AIMessage::builder().content("hi there").build());
+    let human = AnyMessage::HumanMessage(HumanMessage::builder().content("hello").build());
+    let ai = AnyMessage::AIMessage(AIMessage::builder().content("hi there").build());
 
     let input_val = serde_json::to_value([&human]).unwrap();
     let output_val = serde_json::to_value(&ai).unwrap();

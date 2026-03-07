@@ -47,7 +47,7 @@ async fn test_base_generation_parser() {
 
     let model_output = model
         ._generate(
-            vec![AnyMessage::Human(
+            vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("").build(),
             )],
             None,
@@ -99,7 +99,7 @@ async fn test_base_transform_output_parser() {
 
     let stream = model
         ._stream(
-            vec![AnyMessage::Human(
+            vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("").build(),
             )],
             None,

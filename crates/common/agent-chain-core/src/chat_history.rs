@@ -13,11 +13,11 @@ pub trait BaseChatMessageHistory: Send + Sync {
     }
 
     fn add_user_message(&mut self, message: HumanMessage) {
-        self.add_message(AnyMessage::Human(message));
+        self.add_message(AnyMessage::HumanMessage(message));
     }
 
     fn add_ai_message(&mut self, message: AIMessage) {
-        self.add_message(AnyMessage::AI(message));
+        self.add_message(AnyMessage::AIMessage(message));
     }
 
     fn add_message(&mut self, message: AnyMessage) {
@@ -94,6 +94,7 @@ impl BaseChatMessageHistory for InMemoryChatMessageHistory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messages::prelude::*;
 
     #[test]
     fn test_in_memory_chat_history_new() {
@@ -104,8 +105,8 @@ mod tests {
     #[test]
     fn test_in_memory_chat_history_with_messages() {
         let messages = vec![
-            AnyMessage::Human(HumanMessage::builder().content("Hello").build()),
-            AnyMessage::AI(AIMessage::builder().content("Hi there!").build()),
+            AnyMessage::HumanMessage(HumanMessage::builder().content("Hello").build()),
+            AnyMessage::AIMessage(AIMessage::builder().content("Hi there!").build()),
         ];
         let history = InMemoryChatMessageHistory::with_messages(messages.clone());
         assert_eq!(history.messages().len(), 2);
@@ -118,7 +119,7 @@ mod tests {
 
         let messages = history.messages();
         assert_eq!(messages.len(), 1);
-        assert!(matches!(&messages[0], AnyMessage::Human(_)));
+        assert!(matches!(&messages[0], AnyMessage::HumanMessage(_)));
         assert_eq!(messages[0].content(), "Hello!");
     }
 
@@ -130,7 +131,7 @@ mod tests {
 
         let messages = history.messages();
         assert_eq!(messages.len(), 1);
-        assert!(matches!(&messages[0], AnyMessage::Human(_)));
+        assert!(matches!(&messages[0], AnyMessage::HumanMessage(_)));
         assert_eq!(messages[0].content(), "Hello!");
     }
 
@@ -141,7 +142,7 @@ mod tests {
 
         let messages = history.messages();
         assert_eq!(messages.len(), 1);
-        assert!(matches!(&messages[0], AnyMessage::AI(_)));
+        assert!(matches!(&messages[0], AnyMessage::AIMessage(_)));
         assert_eq!(messages[0].content(), "Hi there!");
     }
 
@@ -153,17 +154,19 @@ mod tests {
 
         let messages = history.messages();
         assert_eq!(messages.len(), 1);
-        assert!(matches!(&messages[0], AnyMessage::AI(_)));
+        assert!(matches!(&messages[0], AnyMessage::AIMessage(_)));
         assert_eq!(messages[0].content(), "Hi there!");
     }
 
     #[test]
     fn test_add_message() {
         let mut history = InMemoryChatMessageHistory::new();
-        history.add_message(AnyMessage::Human(
+        history.add_message(AnyMessage::HumanMessage(
             HumanMessage::builder().content("Hello").build(),
         ));
-        history.add_message(AnyMessage::AI(AIMessage::builder().content("Hi").build()));
+        history.add_message(AnyMessage::AIMessage(
+            AIMessage::builder().content("Hi").build(),
+        ));
 
         let messages = history.messages();
         assert_eq!(messages.len(), 2);
@@ -173,9 +176,9 @@ mod tests {
     fn test_add_messages() {
         let mut history = InMemoryChatMessageHistory::new();
         let new_messages = vec![
-            AnyMessage::Human(HumanMessage::builder().content("Hello").build()),
-            AnyMessage::AI(AIMessage::builder().content("Hi").build()),
-            AnyMessage::Human(HumanMessage::builder().content("How are you?").build()),
+            AnyMessage::HumanMessage(HumanMessage::builder().content("Hello").build()),
+            AnyMessage::AIMessage(AIMessage::builder().content("Hi").build()),
+            AnyMessage::HumanMessage(HumanMessage::builder().content("How are you?").build()),
         ];
         history.add_messages(&new_messages);
 
@@ -230,8 +233,8 @@ mod tests {
     async fn test_aadd_messages() {
         let mut history = InMemoryChatMessageHistory::new();
         let new_messages = vec![
-            AnyMessage::Human(HumanMessage::builder().content("Hello").build()),
-            AnyMessage::AI(AIMessage::builder().content("Hi").build()),
+            AnyMessage::HumanMessage(HumanMessage::builder().content("Hello").build()),
+            AnyMessage::AIMessage(AIMessage::builder().content("Hi").build()),
         ];
         history.aadd_messages(new_messages).await;
 

@@ -212,7 +212,7 @@ mod tests {
     fn test_invoke_with_message() {
         use crate::messages::HumanMessage;
         let parser = TestParser;
-        let msg = AnyMessage::Human(HumanMessage::builder().content("hello").build());
+        let msg = AnyMessage::HumanMessage(HumanMessage::builder().content("hello").build());
         let result = parser.invoke(msg, None).unwrap();
         assert_eq!(result, "HELLO");
     }
@@ -227,7 +227,7 @@ mod tests {
     #[test]
     fn test_parser_input_from_message() {
         use crate::messages::HumanMessage;
-        let msg = AnyMessage::Human(HumanMessage::builder().content("hello").build());
+        let msg = AnyMessage::HumanMessage(HumanMessage::builder().content("hello").build());
         let input: ParserInput = msg.into();
         let generation = input.to_generation();
         assert_eq!(generation.text, "hello");

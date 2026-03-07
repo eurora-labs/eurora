@@ -1,6 +1,6 @@
 use crate::error::ResultExt;
 use crate::shared_types::SharedThreadManager;
-use agent_chain_core::AnyMessage;
+use agent_chain_core::messages::prelude::*;
 use euro_thread::{ListThreadsRequest, Thread};
 use tauri::{Manager, Runtime};
 
@@ -131,7 +131,7 @@ impl ThreadApi for ThreadApiImpl {
         Ok(messages
             .into_iter()
             .filter_map(|message| match message {
-                AnyMessage::System(_) => None,
+                AnyMessage::SystemMessage(_) => None,
                 _ => Some(MessageView::from(message)),
             })
             .collect())

@@ -17,12 +17,12 @@ pub fn convert_db_message_to_base_message(db_message: Message) -> ThreadServiceR
                     HumanMessage::builder().id(id).content(parts).build()
                 }
             };
-            Ok(AnyMessage::Human(message))
+            Ok(AnyMessage::HumanMessage(message))
         }
         MessageType::System => {
             let content = parse_message_content(&db_message.content)?;
             let message = SystemMessage::builder().id(id).content(content).build();
-            Ok(AnyMessage::System(message))
+            Ok(AnyMessage::SystemMessage(message))
         }
         MessageType::Ai => {
             let content = parse_ai_content(&db_message.content)?;
@@ -32,7 +32,7 @@ pub fn convert_db_message_to_base_message(db_message: Message) -> ThreadServiceR
                 .content(content)
                 .tool_calls(tool_calls)
                 .build();
-            Ok(AnyMessage::AI(message))
+            Ok(AnyMessage::AIMessage(message))
         }
         MessageType::Tool => {
             let content = parse_ai_content(&db_message.content)?;
@@ -44,7 +44,7 @@ pub fn convert_db_message_to_base_message(db_message: Message) -> ThreadServiceR
                 .content(content)
                 .tool_call_id(tool_call_id)
                 .build();
-            Ok(AnyMessage::Tool(message))
+            Ok(AnyMessage::ToolMessage(message))
         }
     }
 }
