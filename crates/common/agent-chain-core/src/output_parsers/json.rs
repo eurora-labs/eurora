@@ -5,7 +5,9 @@ use crate::error::{Error, Result};
 use crate::outputs::Generation;
 use crate::utils::json::{parse_json_markdown, parse_partial_json};
 
-use super::base::{BaseOutputParser, ParserInput};
+use crate::messages::AnyMessage;
+
+use super::base::BaseOutputParser;
 use super::format_instructions::JSON_FORMAT_INSTRUCTIONS;
 use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
 
@@ -94,7 +96,7 @@ impl BaseOutputParser for JsonOutputParser {
 impl BaseTransformOutputParser for JsonOutputParser {
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, ParserInput>,
+        input: BoxStream<'a, AnyMessage>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,

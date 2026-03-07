@@ -8,7 +8,9 @@ use serde_json::Value;
 use crate::error::{Error, Result};
 use crate::outputs::Generation;
 
-use super::base::{BaseOutputParser, ParserInput};
+use crate::messages::AnyMessage;
+
+use super::base::BaseOutputParser;
 use super::json::{parse_json_result, parse_json_result_partial};
 use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
 
@@ -93,7 +95,7 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq + 'static>
 {
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, ParserInput>,
+        input: BoxStream<'a, AnyMessage>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
@@ -225,13 +227,13 @@ mod tests {
         use futures::StreamExt;
 
         let parser = person_parser();
-        let inputs: Vec<ParserInput> = vec![
-            ParserInput::from("{\"name\":"),
-            ParserInput::from(" \"Alice\", "),
-            ParserInput::from("\"age\": 30}"),
+        let inputs: Vec<AnyMessage> = vec![
+            AnyMessage::from("{\"name\":"),
+            AnyMessage::from(" \"Alice\", "),
+            AnyMessage::from("\"age\": 30}"),
         ];
         let stream = futures::stream::iter(inputs);
-        let boxed: BoxStream<ParserInput> = Box::pin(stream);
+        let boxed: BoxStream<AnyMessage> = Box::pin(stream);
         let mut output_stream = parser.transform(boxed);
 
         let mut results = Vec::new();
