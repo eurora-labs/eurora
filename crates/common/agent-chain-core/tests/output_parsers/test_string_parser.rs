@@ -82,7 +82,9 @@ fn test_str_output_parser_parse_result_with_chat_generation() {
     let chat_generation = ChatGeneration::builder()
         .message(AnyMessage::AIMessage(message))
         .build();
-    let generation = Generation::builder().text(&chat_generation.text).build();
+    let generation = Generation::builder()
+        .text(&chat_generation.message.text())
+        .build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result, "Chat generated text");
 }

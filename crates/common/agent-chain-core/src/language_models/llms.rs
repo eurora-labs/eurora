@@ -102,8 +102,8 @@ fn extract_text(generation: &GenerationType) -> String {
     match generation {
         GenerationType::Generation(g) => g.text.clone(),
         GenerationType::GenerationChunk(g) => g.text.clone(),
-        GenerationType::ChatGeneration(g) => g.text.to_string(),
-        GenerationType::ChatGenerationChunk(g) => g.text.to_string(),
+        GenerationType::ChatGeneration(g) => g.message.text(),
+        GenerationType::ChatGenerationChunk(g) => g.message.text(),
     }
 }
 

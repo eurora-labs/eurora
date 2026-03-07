@@ -894,7 +894,7 @@ async fn test_stream_basic() {
     }
 
     assert_eq!(chunks.len(), 5);
-    let text: String = chunks.iter().map(|c| c.text.as_str()).collect();
+    let text: String = chunks.iter().map(|c| c.message.text()).collect();
     assert_eq!(text, "hello");
 }
 

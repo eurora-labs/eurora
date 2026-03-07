@@ -199,7 +199,7 @@ mod test_fake_list_chat_model {
         }
 
         assert_eq!(chunks.len(), 5);
-        let contents: Vec<String> = chunks.iter().map(|c| c.text.clone()).collect();
+        let contents: Vec<String> = chunks.iter().map(|c| c.message.text()).collect();
         assert_eq!(contents, vec!["h", "e", "l", "l", "o"]);
     }
 
@@ -253,7 +253,7 @@ mod test_fake_list_chat_model {
         }
 
         assert_eq!(chunks.len(), 5);
-        let contents: Vec<String> = chunks.iter().map(|c| c.text.clone()).collect();
+        let contents: Vec<String> = chunks.iter().map(|c| c.message.text()).collect();
         assert_eq!(contents, vec!["h", "e", "l", "l", "o"]);
     }
 
@@ -471,7 +471,7 @@ mod test_generic_fake_chat_model {
             }
         }
 
-        let contents: Vec<String> = chunks.iter().map(|c| c.text.clone()).collect();
+        let contents: Vec<String> = chunks.iter().map(|c| c.message.text()).collect();
         let joined = contents.join("");
         assert_eq!(joined, "hello world");
     }
@@ -836,7 +836,7 @@ mod test_fake_list_chat_model_additional {
         }
 
         assert_eq!(chunks.len(), 1);
-        assert_eq!(chunks[0].text, "x");
+        assert_eq!(chunks[0].message.text(), "x");
     }
 
     #[tokio::test]
@@ -852,7 +852,7 @@ mod test_fake_list_chat_model_additional {
         }
 
         assert_eq!(chunks.len(), 3);
-        let contents: Vec<String> = chunks.iter().map(|c| c.text.clone()).collect();
+        let contents: Vec<String> = chunks.iter().map(|c| c.message.text()).collect();
         assert_eq!(contents, vec!["a", "b", "c"]);
     }
 
@@ -988,7 +988,7 @@ mod test_generic_fake_chat_model_additional {
         let mut chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {
             if let Ok(chunk) = chunk_result {
-                chunks.push(chunk.text.clone());
+                chunks.push(chunk.message.text());
             }
         }
 
@@ -1043,7 +1043,7 @@ mod test_generic_fake_chat_model_additional {
         }
 
         assert_eq!(chunks.len(), 3);
-        let contents: Vec<String> = chunks.iter().map(|c| c.text.clone()).collect();
+        let contents: Vec<String> = chunks.iter().map(|c| c.message.text()).collect();
         assert_eq!(contents, vec!["hi", " ", "there"]);
     }
 
@@ -1075,9 +1075,12 @@ mod test_generic_fake_chat_model_additional {
 
         assert!(chunks.len() >= 2);
 
-        let content_chunks: Vec<_> = chunks.iter().filter(|c| !c.text.is_empty()).collect();
+        let content_chunks: Vec<_> = chunks
+            .iter()
+            .filter(|c| !c.message.text().is_empty())
+            .collect();
         assert!(!content_chunks.is_empty());
-        let joined: String = content_chunks.iter().map(|c| c.text.as_str()).collect();
+        let joined: String = content_chunks.iter().map(|c| c.message.text()).collect();
         assert_eq!(joined, "hello");
     }
 }
@@ -1176,7 +1179,7 @@ mod test_generic_fake_chat_model_run_manager {
         let mut chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {
             if let Ok(chunk) = chunk_result {
-                chunks.push(chunk.text.clone());
+                chunks.push(chunk.message.text());
             }
         }
 
