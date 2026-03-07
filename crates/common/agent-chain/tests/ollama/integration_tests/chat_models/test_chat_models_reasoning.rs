@@ -1,6 +1,6 @@
 use agent_chain::providers::ollama::ChatOllama;
 use agent_chain_core::language_models::chat_models::BaseChatModel;
-use agent_chain_core::messages::{BaseMessage, HumanMessage};
+use agent_chain_core::messages::{AnyMessage, HumanMessage};
 use futures::StreamExt;
 
 const REASONING_MODEL: &str = "deepseek-r1:1.5b";
@@ -450,7 +450,7 @@ async fn test_reasoning_invoke_enabled_async() -> Result<(), Box<dyn std::error:
 
 async fn test_reasoning_modes_behavior() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let message: BaseMessage = HumanMessage::builder()
+    let message: AnyMessage = HumanMessage::builder()
         .content(SAMPLE_PROMPT)
         .build()
         .into();

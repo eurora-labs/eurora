@@ -1,5 +1,5 @@
 use super::ai::{AIMessage, AIMessageChunk};
-use super::base::{BaseMessage, BaseMessageChunk};
+use super::base::{AnyMessage, AnyMessageChunk};
 use super::chat::{ChatMessage, ChatMessageChunk};
 use super::function::{FunctionMessage, FunctionMessageChunk};
 use super::human::{HumanMessage, HumanMessageChunk};
@@ -7,13 +7,11 @@ use super::modifier::RemoveMessage;
 use super::system::{SystemMessage, SystemMessageChunk};
 use super::tool::{ToolCall, ToolMessage, ToolMessageChunk};
 
-pub type AnyMessage = BaseMessage;
-
 pub type MessageLikeRepresentation = serde_json::Value;
 
-pub(crate) fn msg_to_chunk(message: &BaseMessage) -> BaseMessageChunk {
+pub(crate) fn msg_to_chunk(message: &AnyMessage) -> AnyMessageChunk {
     match message {
-        BaseMessage::Human(m) => BaseMessageChunk::Human(
+        AnyMessage::Human(m) => AnyMessageChunk::Human(
             HumanMessageChunk::builder()
                 .content(m.content.clone())
                 .maybe_id(m.id.clone())
@@ -22,7 +20,7 @@ pub(crate) fn msg_to_chunk(message: &BaseMessage) -> BaseMessageChunk {
                 .response_metadata(m.response_metadata.clone())
                 .build(),
         ),
-        BaseMessage::AI(m) => {
+        AnyMessage::AI(m) => {
             let mut chunk = AIMessageChunk::builder()
                 .content(m.content.clone())
                 .maybe_id(m.id.clone())
@@ -34,9 +32,9 @@ pub(crate) fn msg_to_chunk(message: &BaseMessage) -> BaseMessageChunk {
                 .response_metadata(m.response_metadata.clone())
                 .build();
             chunk.init_tool_calls();
-            BaseMessageChunk::AI(chunk)
+            AnyMessageChunk::AI(chunk)
         }
-        BaseMessage::System(m) => BaseMessageChunk::System(
+        AnyMessage::System(m) => AnyMessageChunk::System(
             SystemMessageChunk::builder()
                 .content(m.content.clone())
                 .maybe_id(m.id.clone())
@@ -45,7 +43,7 @@ pub(crate) fn msg_to_chunk(message: &BaseMessage) -> BaseMessageChunk {
                 .response_metadata(m.response_metadata.clone())
                 .build(),
         ),
-        BaseMessage::Tool(m) => BaseMessageChunk::Tool(
+        AnyMessage::Tool(m) => AnyMessageChunk::Tool(
             ToolMessageChunk::builder()
                 .content(m.content.clone())
                 .tool_call_id(m.tool_call_id.clone())
@@ -57,7 +55,7 @@ pub(crate) fn msg_to_chunk(message: &BaseMessage) -> BaseMessageChunk {
                 .response_metadata(m.response_metadata.clone())
                 .build(),
         ),
-        BaseMessage::Chat(m) => BaseMessageChunk::Chat(
+        AnyMessage::Chat(m) => AnyMessageChunk::Chat(
             ChatMessageChunk::builder()
                 .content(m.content.clone())
                 .role(m.role.clone())
@@ -67,7 +65,7 @@ pub(crate) fn msg_to_chunk(message: &BaseMessage) -> BaseMessageChunk {
                 .response_metadata(m.response_metadata.clone())
                 .build(),
         ),
-        BaseMessage::Function(m) => BaseMessageChunk::Function(
+        AnyMessage::Function(m) => AnyMessageChunk::Function(
             FunctionMessageChunk::builder()
                 .content(m.content.clone())
                 .name(m.name.clone())
@@ -76,31 +74,31 @@ pub(crate) fn msg_to_chunk(message: &BaseMessage) -> BaseMessageChunk {
                 .response_metadata(m.response_metadata.clone())
                 .build(),
         ),
-        BaseMessage::Remove(_) => {
+        AnyMessage::Remove(_) => {
             panic!("Cannot convert RemoveMessage to chunk")
         }
     }
 }
 
-pub(crate) fn chunk_to_msg(chunk: &BaseMessageChunk) -> BaseMessage {
+pub(crate) fn chunk_to_msg(chunk: &AnyMessageChunk) -> AnyMessage {
     chunk.to_message()
 }
 
-pub fn get_buffer_string(messages: &[BaseMessage], human_prefix: &str, ai_prefix: &str) -> String {
+pub fn get_buffer_string(messages: &[AnyMessage], human_prefix: &str, ai_prefix: &str) -> String {
     messages
         .iter()
         .map(|m| {
             let role = match m {
-                BaseMessage::Human(_) => human_prefix,
-                BaseMessage::System(_) => "System",
-                BaseMessage::AI(_) => ai_prefix,
-                BaseMessage::Tool(_) => "Tool",
-                BaseMessage::Chat(c) => &c.role,
-                BaseMessage::Function(_) => "Function",
-                BaseMessage::Remove(_) => "Remove",
+                AnyMessage::Human(_) => human_prefix,
+                AnyMessage::System(_) => "System",
+                AnyMessage::AI(_) => ai_prefix,
+                AnyMessage::Tool(_) => "Tool",
+                AnyMessage::Chat(c) => &c.role,
+                AnyMessage::Function(_) => "Function",
+                AnyMessage::Remove(_) => "Remove",
             };
             let mut message = format!("{}: {}", role, m.text());
-            if let BaseMessage::AI(ai_msg) = m
+            if let AnyMessage::AI(ai_msg) = m
                 && let Some(function_call) = ai_msg.additional_kwargs.get("function_call")
             {
                 message.push_str(&function_call.to_string());
@@ -111,7 +109,7 @@ pub fn get_buffer_string(messages: &[BaseMessage], human_prefix: &str, ai_prefix
         .join("\n")
 }
 
-pub fn message_to_dict(message: &BaseMessage) -> serde_json::Value {
+pub fn message_to_dict(message: &AnyMessage) -> serde_json::Value {
     let mut data = serde_json::to_value(message).unwrap_or_default();
 
     let msg_type = message.message_type();
@@ -126,11 +124,11 @@ pub fn message_to_dict(message: &BaseMessage) -> serde_json::Value {
     })
 }
 
-pub fn messages_to_dict(messages: &[BaseMessage]) -> Vec<serde_json::Value> {
+pub fn messages_to_dict(messages: &[AnyMessage]) -> Vec<serde_json::Value> {
     messages.iter().map(message_to_dict).collect()
 }
 
-pub fn message_from_dict(message: &serde_json::Value) -> Result<BaseMessage, String> {
+pub fn message_from_dict(message: &serde_json::Value) -> Result<AnyMessage, String> {
     let msg_type = message
         .get("type")
         .and_then(|t| t.as_str())
@@ -156,11 +154,11 @@ pub fn message_from_dict(message: &serde_json::Value) -> Result<BaseMessage, Str
     })
 }
 
-pub fn messages_from_dict(messages: &[serde_json::Value]) -> Result<Vec<BaseMessage>, String> {
+pub fn messages_from_dict(messages: &[serde_json::Value]) -> Result<Vec<AnyMessage>, String> {
     messages.iter().map(message_from_dict).collect()
 }
 
-pub fn convert_to_messages(messages: &[serde_json::Value]) -> Result<Vec<BaseMessage>, String> {
+pub fn convert_to_messages(messages: &[serde_json::Value]) -> Result<Vec<AnyMessage>, String> {
     let mut result = Vec::new();
 
     for message in messages {
@@ -170,7 +168,7 @@ pub fn convert_to_messages(messages: &[serde_json::Value]) -> Result<Vec<BaseMes
     Ok(result)
 }
 
-pub fn convert_to_message(message: &serde_json::Value) -> Result<BaseMessage, String> {
+pub fn convert_to_message(message: &serde_json::Value) -> Result<AnyMessage, String> {
     if let Some(_msg_type) = message.get("type").and_then(|t| t.as_str()) {
         if message.get("data").is_some() {
             return message_from_dict(message);
@@ -208,7 +206,7 @@ pub fn convert_to_message(message: &serde_json::Value) -> Result<BaseMessage, St
     }
 
     if let Some(s) = message.as_str() {
-        return Ok(BaseMessage::Human(
+        return Ok(AnyMessage::Human(
             HumanMessage::builder().content(s).build(),
         ));
     }
@@ -235,7 +233,7 @@ fn create_message_from_role(
     tool_call_id: Option<&str>,
     tool_calls: Option<&Vec<serde_json::Value>>,
     id: Option<&str>,
-) -> Result<BaseMessage, String> {
+) -> Result<AnyMessage, String> {
     let parsed_tool_calls: Vec<ToolCall> = if let Some(tcs) = tool_calls {
         tcs.iter()
             .filter_map(|tc| {
@@ -266,14 +264,14 @@ fn create_message_from_role(
     };
 
     match role {
-        "human" | "user" => Ok(BaseMessage::Human(
+        "human" | "user" => Ok(AnyMessage::Human(
             HumanMessage::builder()
                 .content(content)
                 .maybe_name(name.map(|n| n.to_string()))
                 .maybe_id(id.map(|i| i.to_string()))
                 .build(),
         )),
-        "ai" | "assistant" => Ok(BaseMessage::AI(
+        "ai" | "assistant" => Ok(AnyMessage::AI(
             AIMessage::builder()
                 .content(content)
                 .maybe_name(name.map(|n| n.to_string()))
@@ -281,7 +279,7 @@ fn create_message_from_role(
                 .tool_calls(parsed_tool_calls)
                 .build(),
         )),
-        "system" => Ok(BaseMessage::System(
+        "system" => Ok(AnyMessage::System(
             SystemMessage::builder()
                 .content(content)
                 .maybe_name(name.map(|n| n.to_string()))
@@ -298,11 +296,11 @@ fn create_message_from_role(
                 "__openai_role__".to_string(),
                 serde_json::Value::String("developer".to_string()),
             );
-            Ok(BaseMessage::System(msg))
+            Ok(AnyMessage::System(msg))
         }
         "function" => {
             let fn_name = name.ok_or("Function messages require a name")?;
-            Ok(BaseMessage::Function(
+            Ok(AnyMessage::Function(
                 FunctionMessage::builder()
                     .name(fn_name)
                     .content(content)
@@ -312,7 +310,7 @@ fn create_message_from_role(
         }
         "tool" => {
             let tc_id = tool_call_id.ok_or("Tool messages require a tool_call_id")?;
-            Ok(BaseMessage::Tool(
+            Ok(AnyMessage::Tool(
                 ToolMessage::builder()
                     .content(content)
                     .tool_call_id(tc_id)
@@ -323,11 +321,11 @@ fn create_message_from_role(
         }
         "remove" => {
             let msg_id = id.unwrap_or("");
-            Ok(BaseMessage::Remove(
+            Ok(AnyMessage::Remove(
                 RemoveMessage::builder().id(msg_id).build(),
             ))
         }
-        _ => Ok(BaseMessage::Chat(
+        _ => Ok(AnyMessage::Chat(
             ChatMessage::builder()
                 .content(content)
                 .role(role)
@@ -346,7 +344,7 @@ pub enum ExcludeToolCalls {
 
 #[allow(clippy::too_many_arguments)]
 pub fn filter_messages(
-    messages: &[BaseMessage],
+    messages: &[AnyMessage],
     include_names: Option<&[&str]>,
     exclude_names: Option<&[&str]>,
     include_types: Option<&[&str]>,
@@ -354,8 +352,8 @@ pub fn filter_messages(
     include_ids: Option<&[&str]>,
     exclude_ids: Option<&[&str]>,
     exclude_tool_calls: Option<&ExcludeToolCalls>,
-) -> Vec<BaseMessage> {
-    let mut filtered: Vec<BaseMessage> = Vec::new();
+) -> Vec<AnyMessage> {
+    let mut filtered: Vec<AnyMessage> = Vec::new();
 
     for msg in messages {
         if let Some(exclude_names) = exclude_names
@@ -381,17 +379,17 @@ pub fn filter_messages(
         let mut msg = msg.clone();
         match exclude_tool_calls {
             Some(ExcludeToolCalls::All) => {
-                if let BaseMessage::AI(ref ai_msg) = msg
+                if let AnyMessage::AI(ref ai_msg) = msg
                     && !ai_msg.tool_calls.is_empty()
                 {
                     continue;
                 }
-                if matches!(msg, BaseMessage::Tool(_)) {
+                if matches!(msg, AnyMessage::Tool(_)) {
                     continue;
                 }
             }
             Some(ExcludeToolCalls::Ids(ids)) => {
-                if let BaseMessage::AI(ref ai_msg) = msg
+                if let AnyMessage::AI(ref ai_msg) = msg
                     && !ai_msg.tool_calls.is_empty()
                 {
                     let remaining_tool_calls: Vec<ToolCall> = ai_msg
@@ -404,7 +402,7 @@ pub fn filter_messages(
                         continue;
                     }
                     if remaining_tool_calls.len() != ai_msg.tool_calls.len() {
-                        msg = BaseMessage::AI(
+                        msg = AnyMessage::AI(
                             AIMessage::builder()
                                 .content(ai_msg.content.clone())
                                 .maybe_id(ai_msg.id.clone())
@@ -418,7 +416,7 @@ pub fn filter_messages(
                         );
                     }
                 }
-                if let BaseMessage::Tool(ref tool_msg) = msg
+                if let AnyMessage::Tool(ref tool_msg) = msg
                     && ids.contains(&tool_msg.tool_call_id)
                 {
                     continue;
@@ -453,12 +451,12 @@ pub fn filter_messages(
     filtered
 }
 
-pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Vec<BaseMessage> {
+pub fn merge_message_runs(messages: &[AnyMessage], chunk_separator: &str) -> Vec<AnyMessage> {
     if messages.is_empty() {
         return Vec::new();
     }
 
-    let mut merged: Vec<BaseMessage> = Vec::new();
+    let mut merged: Vec<AnyMessage> = Vec::new();
 
     for msg in messages {
         let last = if merged.is_empty() {
@@ -472,7 +470,7 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
             continue;
         };
 
-        if matches!(msg, BaseMessage::Tool(_))
+        if matches!(msg, AnyMessage::Tool(_))
             || std::mem::discriminant(&last) != std::mem::discriminant(msg)
         {
             merged.push(last);
@@ -482,12 +480,12 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
             let mut curr_chunk = msg_to_chunk(msg);
 
             match &mut curr_chunk {
-                BaseMessageChunk::AI(c) => c.response_metadata.clear(),
-                BaseMessageChunk::Human(c) => c.response_metadata.clear(),
-                BaseMessageChunk::System(c) => c.response_metadata.clear(),
-                BaseMessageChunk::Tool(c) => c.response_metadata.clear(),
-                BaseMessageChunk::Chat(c) => c.response_metadata.clear(),
-                BaseMessageChunk::Function(c) => c.response_metadata.clear(),
+                AnyMessageChunk::AI(c) => c.response_metadata.clear(),
+                AnyMessageChunk::Human(c) => c.response_metadata.clear(),
+                AnyMessageChunk::System(c) => c.response_metadata.clear(),
+                AnyMessageChunk::Tool(c) => c.response_metadata.clear(),
+                AnyMessageChunk::Chat(c) => c.response_metadata.clear(),
+                AnyMessageChunk::Function(c) => c.response_metadata.clear(),
             }
 
             if !chunk_separator.is_empty() {
@@ -500,32 +498,32 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
                         matches!(curr_content, super::content::MessageContent::Text(_));
                     if last_is_str && curr_is_str {
                         match &mut curr_chunk {
-                            BaseMessageChunk::AI(c) => {
+                            AnyMessageChunk::AI(c) => {
                                 if let super::content::MessageContent::Text(ref mut s) = c.content {
                                     *s = format!("{}{}", chunk_separator, s);
                                 }
                             }
-                            BaseMessageChunk::Human(c) => {
+                            AnyMessageChunk::Human(c) => {
                                 if let super::content::MessageContent::Text(ref mut s) = c.content {
                                     *s = format!("{}{}", chunk_separator, s);
                                 }
                             }
-                            BaseMessageChunk::System(c) => {
+                            AnyMessageChunk::System(c) => {
                                 if let super::content::MessageContent::Text(ref mut s) = c.content {
                                     *s = format!("{}{}", chunk_separator, s);
                                 }
                             }
-                            BaseMessageChunk::Chat(c) => {
+                            AnyMessageChunk::Chat(c) => {
                                 if let super::content::MessageContent::Text(ref mut s) = c.content {
                                     *s = format!("{}{}", chunk_separator, s);
                                 }
                             }
-                            BaseMessageChunk::Function(c) => {
+                            AnyMessageChunk::Function(c) => {
                                 if let super::content::MessageContent::Text(ref mut s) = c.content {
                                     *s = format!("{}{}", chunk_separator, s);
                                 }
                             }
-                            BaseMessageChunk::Tool(c) => {
+                            AnyMessageChunk::Tool(c) => {
                                 if let super::content::MessageContent::Text(ref mut s) = c.content {
                                     *s = format!("{}{}", chunk_separator, s);
                                 }
@@ -537,7 +535,7 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
 
             let mut merged_chunk = last_chunk + curr_chunk;
 
-            if let BaseMessageChunk::AI(ref mut ai_chunk) = merged_chunk {
+            if let AnyMessageChunk::AI(ref mut ai_chunk) = merged_chunk {
                 ai_chunk.init_tool_calls();
             }
 
@@ -548,7 +546,7 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
     merged
 }
 
-pub fn message_chunk_to_message(chunk: &BaseMessageChunk) -> BaseMessage {
+pub fn message_chunk_to_message(chunk: &AnyMessageChunk) -> AnyMessage {
     chunk.to_message()
 }
 
@@ -569,7 +567,7 @@ impl Default for CountTokensConfig {
     }
 }
 
-pub fn count_tokens_approximately(messages: &[BaseMessage], config: &CountTokensConfig) -> usize {
+pub fn count_tokens_approximately(messages: &[AnyMessage], config: &CountTokensConfig) -> usize {
     let mut token_count: f64 = 0.0;
 
     for message in messages {
@@ -577,14 +575,14 @@ pub fn count_tokens_approximately(messages: &[BaseMessage], config: &CountTokens
 
         message_chars += message.text().len();
 
-        if let BaseMessage::AI(ai_msg) = message
+        if let AnyMessage::AI(ai_msg) = message
             && !ai_msg.tool_calls.is_empty()
         {
             let tool_calls_str = format!("{:?}", ai_msg.tool_calls);
             message_chars += tool_calls_str.len();
         }
 
-        if let BaseMessage::Tool(tool_msg) = message {
+        if let AnyMessage::Tool(tool_msg) = message {
             message_chars += tool_msg.tool_call_id.len();
         }
 
@@ -605,12 +603,12 @@ pub fn count_tokens_approximately(messages: &[BaseMessage], config: &CountTokens
     token_count.ceil() as usize
 }
 
-fn get_message_openai_role(message: &BaseMessage) -> &'static str {
+fn get_message_openai_role(message: &AnyMessage) -> &'static str {
     match message {
-        BaseMessage::AI(_) => "assistant",
-        BaseMessage::Human(_) => "user",
-        BaseMessage::Tool(_) => "tool",
-        BaseMessage::System(msg) => {
+        AnyMessage::AI(_) => "assistant",
+        AnyMessage::Human(_) => "user",
+        AnyMessage::Tool(_) => "tool",
+        AnyMessage::System(msg) => {
             if msg
                 .additional_kwargs
                 .get("__openai_role__")
@@ -622,8 +620,8 @@ fn get_message_openai_role(message: &BaseMessage) -> &'static str {
                 "system"
             }
         }
-        BaseMessage::Function(_) => "function",
-        BaseMessage::Chat(c) => match c.role.as_str() {
+        AnyMessage::Function(_) => "function",
+        AnyMessage::Chat(c) => match c.role.as_str() {
             "user" => "user",
             "assistant" => "assistant",
             "system" => "system",
@@ -631,7 +629,7 @@ fn get_message_openai_role(message: &BaseMessage) -> &'static str {
             "tool" => "tool",
             _ => "user",
         },
-        BaseMessage::Remove(_) => "remove",
+        AnyMessage::Remove(_) => "remove",
     }
 }
 
@@ -643,7 +641,7 @@ pub enum TextFormat {
 }
 
 pub fn convert_to_openai_messages(
-    messages: &[BaseMessage],
+    messages: &[AnyMessage],
     text_format: TextFormat,
     include_id: bool,
 ) -> Vec<serde_json::Value> {
@@ -659,7 +657,7 @@ pub fn convert_to_openai_messages(
 }
 
 fn convert_single_to_openai_message(
-    message: &BaseMessage,
+    message: &AnyMessage,
     text_format: TextFormat,
     include_id: bool,
 ) -> Vec<serde_json::Value> {
@@ -670,11 +668,11 @@ fn convert_single_to_openai_message(
         oai_msg["name"] = serde_json::json!(name);
     }
 
-    if let BaseMessage::Tool(tool_msg) = message {
+    if let AnyMessage::Tool(tool_msg) = message {
         oai_msg["tool_call_id"] = serde_json::json!(tool_msg.tool_call_id);
     }
 
-    if let BaseMessage::AI(ai_msg) = message
+    if let AnyMessage::AI(ai_msg) = message
         && !ai_msg.tool_calls.is_empty()
     {
         oai_msg["tool_calls"] = serde_json::json!(convert_to_openai_tool_calls(&ai_msg.tool_calls));
@@ -721,7 +719,7 @@ fn convert_single_to_openai_message(
                     content_blocks.push(block.clone());
                 }
                 "tool_use" => {
-                    if let BaseMessage::AI(ai_msg) = message {
+                    if let AnyMessage::AI(ai_msg) = message {
                         let block_id = block.get("id").and_then(|i| i.as_str()).unwrap_or("");
                         let already_in_tool_calls = ai_msg
                             .tool_calls
@@ -765,7 +763,7 @@ fn convert_single_to_openai_message(
                         .status(super::tool::ToolStatus::from(status.to_string()))
                         .build();
                     tool_messages.extend(convert_single_to_openai_message(
-                        &BaseMessage::Tool(tool_msg),
+                        &AnyMessage::Tool(tool_msg),
                         text_format,
                         include_id,
                     ));
@@ -870,7 +868,7 @@ fn convert_to_openai_tool_calls(tool_calls: &[ToolCall]) -> Vec<serde_json::Valu
         .collect()
 }
 
-fn is_message_type(message: &BaseMessage, types: &[String]) -> bool {
+fn is_message_type(message: &AnyMessage, types: &[String]) -> bool {
     types.iter().any(|t| t == message.message_type())
 }
 
@@ -897,7 +895,7 @@ pub enum TrimStrategy {
 #[derive(Debug, Clone)]
 pub struct TrimMessagesConfig<F, S = fn(&str) -> Vec<String>>
 where
-    F: Fn(&[BaseMessage]) -> usize,
+    F: Fn(&[AnyMessage]) -> usize,
     S: Fn(&str) -> Vec<String>,
 {
     pub max_tokens: usize,
@@ -913,7 +911,7 @@ where
 #[bon::bon]
 impl<F> TrimMessagesConfig<F>
 where
-    F: Fn(&[BaseMessage]) -> usize,
+    F: Fn(&[AnyMessage]) -> usize,
 {
     #[builder]
     pub fn new(
@@ -955,11 +953,11 @@ where
 }
 
 pub fn trim_messages<F, S>(
-    messages: &[BaseMessage],
+    messages: &[AnyMessage],
     config: &TrimMessagesConfig<F, S>,
-) -> Vec<BaseMessage>
+) -> Vec<AnyMessage>
 where
-    F: Fn(&[BaseMessage]) -> usize,
+    F: Fn(&[AnyMessage]) -> usize,
     S: Fn(&str) -> Vec<String>,
 {
     if messages.is_empty() {
@@ -980,15 +978,15 @@ where
 }
 
 fn trim_messages_first<F, S>(
-    messages: &[BaseMessage],
+    messages: &[AnyMessage],
     config: &TrimMessagesConfig<F, S>,
     reverse_partial: bool,
-) -> Vec<BaseMessage>
+) -> Vec<AnyMessage>
 where
-    F: Fn(&[BaseMessage]) -> usize,
+    F: Fn(&[AnyMessage]) -> usize,
     S: Fn(&str) -> Vec<String>,
 {
-    let mut messages: Vec<BaseMessage> = messages.to_vec();
+    let mut messages: Vec<AnyMessage> = messages.to_vec();
 
     if messages.is_empty() {
         return messages;
@@ -1107,14 +1105,14 @@ where
 }
 
 fn trim_messages_last<F, S>(
-    messages: &[BaseMessage],
+    messages: &[AnyMessage],
     config: &TrimMessagesConfig<F, S>,
-) -> Vec<BaseMessage>
+) -> Vec<AnyMessage>
 where
-    F: Fn(&[BaseMessage]) -> usize,
+    F: Fn(&[AnyMessage]) -> usize,
     S: Fn(&str) -> Vec<String>,
 {
-    let mut messages: Vec<BaseMessage> = messages.to_vec();
+    let mut messages: Vec<AnyMessage> = messages.to_vec();
 
     if messages.is_empty() {
         return messages;
@@ -1130,7 +1128,7 @@ where
 
     let system_message = if config.include_system
         && !messages.is_empty()
-        && matches!(messages.first(), Some(BaseMessage::System(_)))
+        && matches!(messages.first(), Some(AnyMessage::System(_)))
     {
         Some(messages.remove(0))
     } else {
@@ -1173,49 +1171,49 @@ where
     result
 }
 
-fn create_message_with_content(original: &BaseMessage, content: &str) -> BaseMessage {
+fn create_message_with_content(original: &AnyMessage, content: &str) -> AnyMessage {
     match original {
-        BaseMessage::Human(m) => BaseMessage::Human(
+        AnyMessage::Human(m) => AnyMessage::Human(
             HumanMessage::builder()
                 .content(content)
                 .maybe_id(m.id.clone())
                 .build(),
         ),
-        BaseMessage::AI(m) => BaseMessage::AI(
+        AnyMessage::AI(m) => AnyMessage::AI(
             AIMessage::builder()
                 .content(content)
                 .maybe_id(m.id.clone())
                 .build(),
         ),
-        BaseMessage::System(m) => BaseMessage::System(
+        AnyMessage::System(m) => AnyMessage::System(
             SystemMessage::builder()
                 .content(content)
                 .maybe_id(m.id.clone())
                 .build(),
         ),
-        BaseMessage::Tool(m) => {
+        AnyMessage::Tool(m) => {
             let new_msg = ToolMessage::builder()
                 .content(content)
                 .tool_call_id(&m.tool_call_id)
                 .maybe_id(m.id.clone())
                 .build();
-            BaseMessage::Tool(new_msg)
+            AnyMessage::Tool(new_msg)
         }
-        BaseMessage::Chat(m) => BaseMessage::Chat(
+        AnyMessage::Chat(m) => AnyMessage::Chat(
             ChatMessage::builder()
                 .content(content)
                 .role(&m.role)
                 .maybe_id(m.id.clone())
                 .build(),
         ),
-        BaseMessage::Function(m) => BaseMessage::Function(
+        AnyMessage::Function(m) => AnyMessage::Function(
             FunctionMessage::builder()
                 .name(&m.name)
                 .content(content)
                 .maybe_id(m.id.clone())
                 .build(),
         ),
-        BaseMessage::Remove(m) => BaseMessage::Remove(RemoveMessage::builder().id(&m.id).build()),
+        AnyMessage::Remove(m) => AnyMessage::Remove(RemoveMessage::builder().id(&m.id).build()),
     }
 }
 
@@ -1230,9 +1228,9 @@ pub fn filter_messages_runnable(
     include_ids: Option<Vec<String>>,
     exclude_ids: Option<Vec<String>>,
     exclude_tool_calls: Option<ExcludeToolCalls>,
-) -> RunnableLambdaWithConfig<Vec<BaseMessage>, Vec<BaseMessage>> {
+) -> RunnableLambdaWithConfig<Vec<AnyMessage>, Vec<AnyMessage>> {
     RunnableLambdaWithConfig::from_func_named(
-        move |messages: Vec<BaseMessage>| {
+        move |messages: Vec<AnyMessage>| {
             let include_names_refs: Option<Vec<&str>> = include_names
                 .as_ref()
                 .map(|v| v.iter().map(|s| s.as_str()).collect());
@@ -1269,24 +1267,24 @@ pub fn filter_messages_runnable(
 
 pub fn merge_message_runs_runnable(
     chunk_separator: Option<String>,
-) -> RunnableLambdaWithConfig<Vec<BaseMessage>, Vec<BaseMessage>> {
+) -> RunnableLambdaWithConfig<Vec<AnyMessage>, Vec<AnyMessage>> {
     let separator = chunk_separator.unwrap_or_else(|| "\n".to_string());
     RunnableLambdaWithConfig::from_func_named(
-        move |messages: Vec<BaseMessage>| Ok(merge_message_runs(&messages, &separator)),
+        move |messages: Vec<AnyMessage>| Ok(merge_message_runs(&messages, &separator)),
         "merge_message_runs",
     )
 }
 
 pub fn trim_messages_runnable<F, S>(
     config: TrimMessagesConfig<F, S>,
-) -> RunnableLambdaWithConfig<Vec<BaseMessage>, Vec<BaseMessage>>
+) -> RunnableLambdaWithConfig<Vec<AnyMessage>, Vec<AnyMessage>>
 where
-    F: Fn(&[BaseMessage]) -> usize + Send + Sync + 'static,
+    F: Fn(&[AnyMessage]) -> usize + Send + Sync + 'static,
     S: Fn(&str) -> Vec<String> + Send + Sync + 'static,
 {
     let config = Arc::new(config);
     RunnableLambdaWithConfig::from_func_named(
-        move |messages: Vec<BaseMessage>| Ok(trim_messages(&messages, &config)),
+        move |messages: Vec<AnyMessage>| Ok(trim_messages(&messages, &config)),
         "trim_messages",
     )
 }

@@ -11,7 +11,7 @@ pub trait BaseChatLoader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messages::{AIMessage, BaseMessage, HumanMessage};
+    use crate::messages::{AIMessage, AnyMessage, HumanMessage};
 
     struct InMemoryChatLoader {
         sessions: Vec<ChatSession>,
@@ -33,10 +33,10 @@ mod tests {
     fn test_lazy_load() {
         let sessions = vec![
             ChatSession::with_messages(vec![
-                BaseMessage::Human(HumanMessage::builder().content("Hello").build()),
-                BaseMessage::AI(AIMessage::builder().content("Hi").build()),
+                AnyMessage::Human(HumanMessage::builder().content("Hello").build()),
+                AnyMessage::AI(AIMessage::builder().content("Hi").build()),
             ]),
-            ChatSession::with_messages(vec![BaseMessage::Human(
+            ChatSession::with_messages(vec![AnyMessage::Human(
                 HumanMessage::builder().content("Bye").build(),
             )]),
         ];
@@ -54,13 +54,13 @@ mod tests {
     #[test]
     fn test_load() {
         let sessions = vec![
-            ChatSession::with_messages(vec![BaseMessage::Human(
+            ChatSession::with_messages(vec![AnyMessage::Human(
                 HumanMessage::builder().content("Hello").build(),
             )]),
-            ChatSession::with_messages(vec![BaseMessage::AI(
+            ChatSession::with_messages(vec![AnyMessage::AI(
                 AIMessage::builder().content("Hi").build(),
             )]),
-            ChatSession::with_messages(vec![BaseMessage::Human(
+            ChatSession::with_messages(vec![AnyMessage::Human(
                 HumanMessage::builder().content("Bye").build(),
             )]),
         ];

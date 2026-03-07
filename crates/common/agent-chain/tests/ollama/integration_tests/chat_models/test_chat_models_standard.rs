@@ -2,7 +2,7 @@ use agent_chain::providers::ollama::ChatOllama;
 use agent_chain_core::language_models::chat_models::BaseChatModel;
 use agent_chain_core::language_models::{ToolChoice, ToolLike};
 use agent_chain_core::messages::{
-    AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage, ToolStatus,
+    AIMessage, AnyMessage, HumanMessage, SystemMessage, ToolMessage, ToolStatus,
 };
 use futures::StreamExt;
 
@@ -138,9 +138,9 @@ async fn test_conversation() -> Result<(), Box<dyn std::error::Error>> {
         .temperature(0.0)
         .build();
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder().content("hello").build().into(),
-        BaseMessage::AI(AIMessage::builder().content("hello").build()),
+        AnyMessage::AI(AIMessage::builder().content("hello").build()),
         HumanMessage::builder()
             .content("how are you")
             .build()
@@ -162,7 +162,7 @@ async fn test_message_with_name() -> Result<(), Box<dyn std::error::Error>> {
         .temperature(0.0)
         .build();
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("hello")
             .name("alice".to_string())
@@ -427,12 +427,12 @@ async fn test_tool_message_histories_string_content() -> Result<(), Box<dyn std:
     let llm = ChatOllama::new(DEFAULT_MODEL);
     let llm_with_tools = BaseChatModel::bind_tools(&llm, &[ToolLike::Schema(adder_schema)], None)?;
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("What is 1 + 2")
             .build()
             .into(),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .content("")
                 .tool_calls(vec![agent_chain_core::messages::ToolCall {
@@ -475,12 +475,12 @@ async fn test_tool_message_histories_list_content() -> Result<(), Box<dyn std::e
     let llm = ChatOllama::new(DEFAULT_MODEL);
     let llm_with_tools = BaseChatModel::bind_tools(&llm, &[ToolLike::Schema(adder_schema)], None)?;
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("What is 1 + 2")
             .build()
             .into(),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .content(vec![
                     serde_json::json!({"type": "text", "text": "some text"}),
@@ -531,12 +531,12 @@ async fn test_tool_message_error_status() -> Result<(), Box<dyn std::error::Erro
     let llm = ChatOllama::new(DEFAULT_MODEL);
     let llm_with_tools = BaseChatModel::bind_tools(&llm, &[ToolLike::Schema(adder_schema)], None)?;
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("What is 1 + 2")
             .build()
             .into(),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .content("")
                 .tool_calls(vec![agent_chain_core::messages::ToolCall {
@@ -705,7 +705,7 @@ async fn test_image_inputs() -> Result<(), Box<dyn std::error::Error>> {
     use base64::Engine;
     let image_data = base64::engine::general_purpose::STANDARD.encode(&image_bytes);
 
-    let message: BaseMessage = HumanMessage::builder()
+    let message: AnyMessage = HumanMessage::builder()
         .content(vec![
             serde_json::json!({"type": "text", "text": "Give a concise description of this image."}),
             serde_json::json!({
@@ -800,13 +800,13 @@ async fn test_double_messages_conversation() -> Result<(), Box<dyn std::error::E
         .temperature(0.0)
         .build();
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         SystemMessage::builder().content("hello").build().into(),
         SystemMessage::builder().content("hello").build().into(),
         HumanMessage::builder().content("hello").build().into(),
         HumanMessage::builder().content("hello").build().into(),
-        BaseMessage::AI(AIMessage::builder().content("hello").build()),
-        BaseMessage::AI(AIMessage::builder().content("hello").build()),
+        AnyMessage::AI(AIMessage::builder().content("hello").build()),
+        AnyMessage::AI(AIMessage::builder().content("hello").build()),
         HumanMessage::builder()
             .content("how are you")
             .build()
@@ -932,12 +932,12 @@ async fn test_structured_few_shot_examples() -> Result<(), Box<dyn std::error::E
         Some(ToolChoice::any()),
     )?;
 
-    let few_shot_messages: Vec<BaseMessage> = vec![
+    let few_shot_messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("What is 1 + 2")
             .build()
             .into(),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .content("")
                 .tool_calls(vec![agent_chain_core::messages::ToolCall {
@@ -954,7 +954,7 @@ async fn test_structured_few_shot_examples() -> Result<(), Box<dyn std::error::E
             .tool_call_id("example_1")
             .build()
             .into(),
-        BaseMessage::AI(AIMessage::builder().content(r#"{"result": 3}"#).build()),
+        AnyMessage::AI(AIMessage::builder().content(r#"{"result": 3}"#).build()),
         HumanMessage::builder()
             .content("What is 3 + 4")
             .build()
@@ -1147,7 +1147,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
     let llm_with_tools =
         BaseChatModel::bind_tools(&llm, &[ToolLike::Schema(weather_schema)], None)?;
 
-    let input_message: BaseMessage = HumanMessage::builder()
+    let input_message: AnyMessage = HumanMessage::builder()
         .content("What is the weather in San Francisco, CA?")
         .build()
         .into();
@@ -1164,7 +1164,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
     let tool_call = &tool_call_message.tool_calls[0];
 
     // Step 2: simulate the tool response
-    let tool_response: BaseMessage = ToolMessage::builder()
+    let tool_response: AnyMessage = ToolMessage::builder()
         .content("It's sunny.")
         .name("get_weather".to_string())
         .tool_call_id(tool_call.id.clone().unwrap_or_default())
@@ -1176,7 +1176,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
         .invoke(
             vec![
                 input_message,
-                BaseMessage::AI(tool_call_message),
+                AnyMessage::AI(tool_call_message),
                 tool_response,
             ]
             .into(),

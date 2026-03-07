@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use agent_chain_core::messages::BaseMessage;
+use agent_chain_core::messages::AnyMessage;
 use agent_chain_core::tools::{ArgsSchema, StructuredTool, Tool};
 use agent_chain_core::utils::function_calling::{
     FunctionDescription, ToolDescription, convert_to_json_schema, convert_to_openai_function,
@@ -664,14 +664,14 @@ fn test_valid_example_conversion() {
     let messages = tool_example_to_messages("This is a valid example", empty_calls, None, None);
 
     assert_eq!(messages.len(), 2);
-    assert!(matches!(&messages[0], BaseMessage::Human(_)));
-    assert!(matches!(&messages[1], BaseMessage::AI(_)));
+    assert!(matches!(&messages[0], AnyMessage::Human(_)));
+    assert!(matches!(&messages[1], AnyMessage::AI(_)));
 
-    if let BaseMessage::Human(human_msg) = &messages[0] {
+    if let AnyMessage::Human(human_msg) = &messages[0] {
         assert_eq!(human_msg.content.as_text(), "This is a valid example");
     }
 
-    if let BaseMessage::AI(ai_msg) = &messages[1] {
+    if let AnyMessage::AI(ai_msg) = &messages[1] {
         assert_eq!(ai_msg.content, "");
         let tool_calls = ai_msg
             .additional_kwargs
@@ -699,13 +699,13 @@ fn test_multiple_tool_calls() {
     let messages = tool_example_to_messages("This is an example", tool_calls, None, None);
 
     assert_eq!(messages.len(), 5);
-    assert!(matches!(&messages[0], BaseMessage::Human(_)));
-    assert!(matches!(&messages[1], BaseMessage::AI(_)));
-    assert!(matches!(&messages[2], BaseMessage::Tool(_)));
-    assert!(matches!(&messages[3], BaseMessage::Tool(_)));
-    assert!(matches!(&messages[4], BaseMessage::Tool(_)));
+    assert!(matches!(&messages[0], AnyMessage::Human(_)));
+    assert!(matches!(&messages[1], AnyMessage::AI(_)));
+    assert!(matches!(&messages[2], AnyMessage::Tool(_)));
+    assert!(matches!(&messages[3], AnyMessage::Tool(_)));
+    assert!(matches!(&messages[4], AnyMessage::Tool(_)));
 
-    if let BaseMessage::AI(ai_msg) = &messages[1] {
+    if let AnyMessage::AI(ai_msg) = &messages[1] {
         let tool_calls = ai_msg
             .additional_kwargs
             .get("tool_calls")
@@ -737,11 +737,11 @@ fn test_tool_outputs() {
         tool_example_to_messages("This is an example", tool_calls, Some(tool_outputs), None);
 
     assert_eq!(messages.len(), 3);
-    assert!(matches!(&messages[0], BaseMessage::Human(_)));
-    assert!(matches!(&messages[1], BaseMessage::AI(_)));
-    assert!(matches!(&messages[2], BaseMessage::Tool(_)));
+    assert!(matches!(&messages[0], AnyMessage::Human(_)));
+    assert!(matches!(&messages[1], AnyMessage::AI(_)));
+    assert!(matches!(&messages[2], AnyMessage::Tool(_)));
 
-    if let BaseMessage::Tool(tool_msg) = &messages[2] {
+    if let AnyMessage::Tool(tool_msg) = &messages[2] {
         assert_eq!(tool_msg.content, "Output1");
     }
 }
@@ -763,12 +763,12 @@ fn test_tool_outputs_with_ai_response() {
     );
 
     assert_eq!(messages.len(), 4);
-    assert!(matches!(&messages[0], BaseMessage::Human(_)));
-    assert!(matches!(&messages[1], BaseMessage::AI(_)));
-    assert!(matches!(&messages[2], BaseMessage::Tool(_)));
-    assert!(matches!(&messages[3], BaseMessage::AI(_)));
+    assert!(matches!(&messages[0], AnyMessage::Human(_)));
+    assert!(matches!(&messages[1], AnyMessage::AI(_)));
+    assert!(matches!(&messages[2], AnyMessage::Tool(_)));
+    assert!(matches!(&messages[3], AnyMessage::AI(_)));
 
-    if let BaseMessage::AI(response) = &messages[3] {
+    if let AnyMessage::AI(response) = &messages[3] {
         assert_eq!(response.content, "The output is Output1");
         let tool_calls = response
             .additional_kwargs

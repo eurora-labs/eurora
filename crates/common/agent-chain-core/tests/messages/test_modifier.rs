@@ -1,4 +1,4 @@
-use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage, RemoveMessage};
+use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage, RemoveMessage};
 
 #[test]
 fn test_init_basic() {
@@ -96,36 +96,36 @@ fn test_multiple_remove_messages() {
 #[test]
 fn test_remove_message_in_list() {
     let messages = [
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("human-1".to_string())
                 .content("Hello")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .content("Hi there!")
                 .id("ai-1".to_string())
                 .build(),
         ),
-        BaseMessage::Remove(RemoveMessage::builder().id("human-1").build()),
+        AnyMessage::Remove(RemoveMessage::builder().id("human-1").build()),
     ];
 
     assert_eq!(messages.len(), 3);
-    assert!(matches!(messages[2], BaseMessage::Remove(_)));
+    assert!(matches!(messages[2], AnyMessage::Remove(_)));
     assert_eq!(messages[2].id(), Some("human-1".to_string()));
 }
 
 #[test]
 fn test_remove_message_serialization_in_list() {
     let messages = [
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("human-1".to_string())
                 .content("Hello")
                 .build(),
         ),
-        BaseMessage::Remove(RemoveMessage::builder().id("human-1").build()),
+        AnyMessage::Remove(RemoveMessage::builder().id("human-1").build()),
     ];
 
     let serialized: Vec<serde_json::Value> = messages
@@ -143,13 +143,13 @@ fn test_remove_message_serialization_in_list() {
         "remove"
     );
 
-    let deserialized: Vec<BaseMessage> = serialized
+    let deserialized: Vec<AnyMessage> = serialized
         .into_iter()
         .map(|s| serde_json::from_value(s).unwrap())
         .collect();
 
-    assert!(matches!(deserialized[0], BaseMessage::Human(_)));
-    assert!(matches!(deserialized[1], BaseMessage::Remove(_)));
+    assert!(matches!(deserialized[0], AnyMessage::Human(_)));
+    assert!(matches!(deserialized[1], AnyMessage::Remove(_)));
     assert_eq!(deserialized[1].id(), Some("human-1".to_string()));
 }
 

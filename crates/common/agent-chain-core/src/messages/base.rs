@@ -16,7 +16,7 @@ use super::tool::{ToolCall, ToolMessage, ToolMessageChunk};
 use crate::utils::merge::merge_lists;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum BaseMessage {
+pub enum AnyMessage {
     Human(HumanMessage),
     System(SystemMessage),
     AI(AIMessage),
@@ -26,24 +26,24 @@ pub enum BaseMessage {
     Remove(RemoveMessage),
 }
 
-impl Serialize for BaseMessage {
+impl Serialize for AnyMessage {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         match self {
-            BaseMessage::Human(m) => m.serialize(serializer),
-            BaseMessage::System(m) => m.serialize(serializer),
-            BaseMessage::AI(m) => m.serialize(serializer),
-            BaseMessage::Tool(m) => m.serialize(serializer),
-            BaseMessage::Chat(m) => m.serialize(serializer),
-            BaseMessage::Function(m) => m.serialize(serializer),
-            BaseMessage::Remove(m) => m.serialize(serializer),
+            AnyMessage::Human(m) => m.serialize(serializer),
+            AnyMessage::System(m) => m.serialize(serializer),
+            AnyMessage::AI(m) => m.serialize(serializer),
+            AnyMessage::Tool(m) => m.serialize(serializer),
+            AnyMessage::Chat(m) => m.serialize(serializer),
+            AnyMessage::Function(m) => m.serialize(serializer),
+            AnyMessage::Remove(m) => m.serialize(serializer),
         }
     }
 }
 
-impl<'de> Deserialize<'de> for BaseMessage {
+impl<'de> Deserialize<'de> for AnyMessage {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -51,13 +51,13 @@ impl<'de> Deserialize<'de> for BaseMessage {
         struct BaseMessageVisitor;
 
         impl<'de> Visitor<'de> for BaseMessageVisitor {
-            type Value = BaseMessage;
+            type Value = AnyMessage;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a message object with a 'type' field")
             }
 
-            fn visit_map<M>(self, mut map: M) -> Result<BaseMessage, M::Error>
+            fn visit_map<M>(self, mut map: M) -> Result<AnyMessage, M::Error>
             where
                 M: MapAccess<'de>,
             {
@@ -80,37 +80,37 @@ impl<'de> Deserialize<'de> for BaseMessage {
                     "human" => {
                         let msg: HumanMessage =
                             serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(BaseMessage::Human(msg))
+                        Ok(AnyMessage::Human(msg))
                     }
                     "system" => {
                         let msg: SystemMessage =
                             serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(BaseMessage::System(msg))
+                        Ok(AnyMessage::System(msg))
                     }
                     "ai" => {
                         let msg: AIMessage =
                             serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(BaseMessage::AI(msg))
+                        Ok(AnyMessage::AI(msg))
                     }
                     "tool" => {
                         let msg: ToolMessage =
                             serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(BaseMessage::Tool(msg))
+                        Ok(AnyMessage::Tool(msg))
                     }
                     "chat" => {
                         let msg: ChatMessage =
                             serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(BaseMessage::Chat(msg))
+                        Ok(AnyMessage::Chat(msg))
                     }
                     "function" => {
                         let msg: FunctionMessage =
                             serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(BaseMessage::Function(msg))
+                        Ok(AnyMessage::Function(msg))
                     }
                     "remove" => {
                         let msg: RemoveMessage =
                             serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(BaseMessage::Remove(msg))
+                        Ok(AnyMessage::Remove(msg))
                     }
                     _ => Err(de::Error::unknown_variant(
                         &message_type,
@@ -126,107 +126,107 @@ impl<'de> Deserialize<'de> for BaseMessage {
     }
 }
 
-impl BaseMessage {
+impl AnyMessage {
     pub fn content(&self) -> &MessageContent {
         match self {
-            BaseMessage::Human(m) => &m.content,
-            BaseMessage::System(m) => &m.content,
-            BaseMessage::AI(m) => &m.content,
-            BaseMessage::Tool(m) => &m.content,
-            BaseMessage::Chat(m) => &m.content,
-            BaseMessage::Function(m) => &m.content,
-            BaseMessage::Remove(_) => MessageContent::empty(),
+            AnyMessage::Human(m) => &m.content,
+            AnyMessage::System(m) => &m.content,
+            AnyMessage::AI(m) => &m.content,
+            AnyMessage::Tool(m) => &m.content,
+            AnyMessage::Chat(m) => &m.content,
+            AnyMessage::Function(m) => &m.content,
+            AnyMessage::Remove(_) => MessageContent::empty(),
         }
     }
 
     pub fn id(&self) -> Option<String> {
         match self {
-            BaseMessage::Human(m) => m.id.clone(),
-            BaseMessage::System(m) => m.id.clone(),
-            BaseMessage::AI(m) => m.id.clone(),
-            BaseMessage::Tool(m) => m.id.clone(),
-            BaseMessage::Chat(m) => m.id.clone(),
-            BaseMessage::Function(m) => m.id.clone(),
-            BaseMessage::Remove(m) => Some(m.id.clone()),
+            AnyMessage::Human(m) => m.id.clone(),
+            AnyMessage::System(m) => m.id.clone(),
+            AnyMessage::AI(m) => m.id.clone(),
+            AnyMessage::Tool(m) => m.id.clone(),
+            AnyMessage::Chat(m) => m.id.clone(),
+            AnyMessage::Function(m) => m.id.clone(),
+            AnyMessage::Remove(m) => Some(m.id.clone()),
         }
     }
 
     pub fn name(&self) -> Option<String> {
         match self {
-            BaseMessage::Human(m) => m.name.clone(),
-            BaseMessage::System(m) => m.name.clone(),
-            BaseMessage::AI(m) => m.name.clone(),
-            BaseMessage::Tool(m) => m.name.clone(),
-            BaseMessage::Chat(m) => m.name.clone(),
-            BaseMessage::Function(m) => Some(m.name.clone()),
-            BaseMessage::Remove(m) => m.name.clone(),
+            AnyMessage::Human(m) => m.name.clone(),
+            AnyMessage::System(m) => m.name.clone(),
+            AnyMessage::AI(m) => m.name.clone(),
+            AnyMessage::Tool(m) => m.name.clone(),
+            AnyMessage::Chat(m) => m.name.clone(),
+            AnyMessage::Function(m) => Some(m.name.clone()),
+            AnyMessage::Remove(m) => m.name.clone(),
         }
     }
 
     pub fn set_id(&mut self, id: String) {
         match self {
-            BaseMessage::Human(m) => m.set_id(id),
-            BaseMessage::System(m) => m.set_id(id),
-            BaseMessage::AI(m) => m.set_id(id),
-            BaseMessage::Tool(m) => m.set_id(id),
-            BaseMessage::Chat(m) => m.set_id(id),
-            BaseMessage::Function(m) => m.set_id(id),
-            BaseMessage::Remove(m) => m.set_id(id),
+            AnyMessage::Human(m) => m.set_id(id),
+            AnyMessage::System(m) => m.set_id(id),
+            AnyMessage::AI(m) => m.set_id(id),
+            AnyMessage::Tool(m) => m.set_id(id),
+            AnyMessage::Chat(m) => m.set_id(id),
+            AnyMessage::Function(m) => m.set_id(id),
+            AnyMessage::Remove(m) => m.set_id(id),
         }
     }
 
     pub fn text(&self) -> String {
         match self {
-            BaseMessage::Human(m) => m.content.as_text(),
-            BaseMessage::System(m) => m.content.as_text(),
-            BaseMessage::AI(m) => m.content.as_text(),
-            BaseMessage::Tool(m) => m.content.as_text(),
-            BaseMessage::Chat(m) => m.content.as_text(),
-            BaseMessage::Function(m) => m.content.as_text(),
-            BaseMessage::Remove(_) => String::new(),
+            AnyMessage::Human(m) => m.content.as_text(),
+            AnyMessage::System(m) => m.content.as_text(),
+            AnyMessage::AI(m) => m.content.as_text(),
+            AnyMessage::Tool(m) => m.content.as_text(),
+            AnyMessage::Chat(m) => m.content.as_text(),
+            AnyMessage::Function(m) => m.content.as_text(),
+            AnyMessage::Remove(_) => String::new(),
         }
     }
 
     pub fn tool_calls(&self) -> &[ToolCall] {
         match self {
-            BaseMessage::AI(m) => &m.tool_calls,
+            AnyMessage::AI(m) => &m.tool_calls,
             _ => &[],
         }
     }
 
     pub fn message_type(&self) -> &'static str {
         match self {
-            BaseMessage::Human(_) => "human",
-            BaseMessage::System(_) => "system",
-            BaseMessage::AI(_) => "ai",
-            BaseMessage::Tool(_) => "tool",
-            BaseMessage::Chat(_) => "chat",
-            BaseMessage::Function(_) => "function",
-            BaseMessage::Remove(_) => "remove",
+            AnyMessage::Human(_) => "human",
+            AnyMessage::System(_) => "system",
+            AnyMessage::AI(_) => "ai",
+            AnyMessage::Tool(_) => "tool",
+            AnyMessage::Chat(_) => "chat",
+            AnyMessage::Function(_) => "function",
+            AnyMessage::Remove(_) => "remove",
         }
     }
 
     pub fn additional_kwargs(&self) -> Option<&HashMap<String, serde_json::Value>> {
         match self {
-            BaseMessage::Human(m) => Some(&m.additional_kwargs),
-            BaseMessage::System(m) => Some(&m.additional_kwargs),
-            BaseMessage::AI(m) => Some(&m.additional_kwargs),
-            BaseMessage::Tool(m) => Some(&m.additional_kwargs),
-            BaseMessage::Chat(m) => Some(&m.additional_kwargs),
-            BaseMessage::Function(m) => Some(&m.additional_kwargs),
-            BaseMessage::Remove(m) => Some(&m.additional_kwargs),
+            AnyMessage::Human(m) => Some(&m.additional_kwargs),
+            AnyMessage::System(m) => Some(&m.additional_kwargs),
+            AnyMessage::AI(m) => Some(&m.additional_kwargs),
+            AnyMessage::Tool(m) => Some(&m.additional_kwargs),
+            AnyMessage::Chat(m) => Some(&m.additional_kwargs),
+            AnyMessage::Function(m) => Some(&m.additional_kwargs),
+            AnyMessage::Remove(m) => Some(&m.additional_kwargs),
         }
     }
 
     pub fn response_metadata(&self) -> Option<&HashMap<String, serde_json::Value>> {
         match self {
-            BaseMessage::Human(m) => Some(&m.response_metadata),
-            BaseMessage::System(m) => Some(&m.response_metadata),
-            BaseMessage::AI(m) => Some(&m.response_metadata),
-            BaseMessage::Tool(m) => Some(&m.response_metadata),
-            BaseMessage::Chat(m) => Some(&m.response_metadata),
-            BaseMessage::Function(m) => Some(&m.response_metadata),
-            BaseMessage::Remove(m) => Some(&m.response_metadata),
+            AnyMessage::Human(m) => Some(&m.response_metadata),
+            AnyMessage::System(m) => Some(&m.response_metadata),
+            AnyMessage::AI(m) => Some(&m.response_metadata),
+            AnyMessage::Tool(m) => Some(&m.response_metadata),
+            AnyMessage::Chat(m) => Some(&m.response_metadata),
+            AnyMessage::Function(m) => Some(&m.response_metadata),
+            AnyMessage::Remove(m) => Some(&m.response_metadata),
         }
     }
 
@@ -254,7 +254,7 @@ pub trait HasId {
     fn get_id(&self) -> Option<String>;
 }
 
-impl HasId for BaseMessage {
+impl HasId for AnyMessage {
     fn get_id(&self) -> Option<String> {
         self.id().clone()
     }
@@ -262,7 +262,7 @@ impl HasId for BaseMessage {
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(clippy::large_enum_variant)]
-pub enum BaseMessageChunk {
+pub enum AnyMessageChunk {
     AI(AIMessageChunk),
     Human(HumanMessageChunk),
     System(SystemMessageChunk),
@@ -271,37 +271,37 @@ pub enum BaseMessageChunk {
     Function(FunctionMessageChunk),
 }
 
-impl Serialize for BaseMessageChunk {
+impl Serialize for AnyMessageChunk {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         match self {
-            BaseMessageChunk::AI(m) => m.serialize(serializer),
-            BaseMessageChunk::Human(m) => m.serialize(serializer),
-            BaseMessageChunk::System(m) => m.serialize(serializer),
-            BaseMessageChunk::Tool(m) => m.serialize(serializer),
-            BaseMessageChunk::Chat(m) => m.serialize(serializer),
-            BaseMessageChunk::Function(m) => m.serialize(serializer),
+            AnyMessageChunk::AI(m) => m.serialize(serializer),
+            AnyMessageChunk::Human(m) => m.serialize(serializer),
+            AnyMessageChunk::System(m) => m.serialize(serializer),
+            AnyMessageChunk::Tool(m) => m.serialize(serializer),
+            AnyMessageChunk::Chat(m) => m.serialize(serializer),
+            AnyMessageChunk::Function(m) => m.serialize(serializer),
         }
     }
 }
 
-impl<'de> Deserialize<'de> for BaseMessageChunk {
+impl<'de> Deserialize<'de> for AnyMessageChunk {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct BaseMessageChunkVisitor;
+        struct AnyMessageChunkVisitor;
 
-        impl<'de> Visitor<'de> for BaseMessageChunkVisitor {
-            type Value = BaseMessageChunk;
+        impl<'de> Visitor<'de> for AnyMessageChunkVisitor {
+            type Value = AnyMessageChunk;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a message chunk object with a 'type' field")
             }
 
-            fn visit_map<M>(self, mut map: M) -> Result<BaseMessageChunk, M::Error>
+            fn visit_map<M>(self, mut map: M) -> Result<AnyMessageChunk, M::Error>
             where
                 M: MapAccess<'de>,
             {
@@ -324,32 +324,32 @@ impl<'de> Deserialize<'de> for BaseMessageChunk {
                     "AIMessageChunk" => {
                         let msg: AIMessageChunk =
                             serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(BaseMessageChunk::AI(msg))
+                        Ok(AnyMessageChunk::AI(msg))
                     }
                     "HumanMessageChunk" => {
                         let msg: HumanMessageChunk =
                             serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(BaseMessageChunk::Human(msg))
+                        Ok(AnyMessageChunk::Human(msg))
                     }
                     "SystemMessageChunk" => {
                         let msg: SystemMessageChunk =
                             serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(BaseMessageChunk::System(msg))
+                        Ok(AnyMessageChunk::System(msg))
                     }
                     "ToolMessageChunk" => {
                         let msg: ToolMessageChunk =
                             serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(BaseMessageChunk::Tool(msg))
+                        Ok(AnyMessageChunk::Tool(msg))
                     }
                     "ChatMessageChunk" => {
                         let msg: ChatMessageChunk =
                             serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(BaseMessageChunk::Chat(msg))
+                        Ok(AnyMessageChunk::Chat(msg))
                     }
                     "FunctionMessageChunk" => {
                         let msg: FunctionMessageChunk =
                             serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(BaseMessageChunk::Function(msg))
+                        Ok(AnyMessageChunk::Function(msg))
                     }
                     _ => Err(de::Error::unknown_variant(
                         &message_type,
@@ -366,108 +366,106 @@ impl<'de> Deserialize<'de> for BaseMessageChunk {
             }
         }
 
-        deserializer.deserialize_map(BaseMessageChunkVisitor)
+        deserializer.deserialize_map(AnyMessageChunkVisitor)
     }
 }
 
-impl BaseMessageChunk {
+impl AnyMessageChunk {
     pub fn content(&self) -> &MessageContent {
         match self {
-            BaseMessageChunk::AI(m) => &m.content,
-            BaseMessageChunk::Human(m) => &m.content,
-            BaseMessageChunk::System(m) => &m.content,
-            BaseMessageChunk::Tool(m) => &m.content,
-            BaseMessageChunk::Chat(m) => &m.content,
-            BaseMessageChunk::Function(m) => &m.content,
+            AnyMessageChunk::AI(m) => &m.content,
+            AnyMessageChunk::Human(m) => &m.content,
+            AnyMessageChunk::System(m) => &m.content,
+            AnyMessageChunk::Tool(m) => &m.content,
+            AnyMessageChunk::Chat(m) => &m.content,
+            AnyMessageChunk::Function(m) => &m.content,
         }
     }
 
     pub fn id(&self) -> Option<String> {
         match self {
-            BaseMessageChunk::AI(m) => m.id.clone(),
-            BaseMessageChunk::Human(m) => m.id.clone(),
-            BaseMessageChunk::System(m) => m.id.clone(),
-            BaseMessageChunk::Tool(m) => m.id.clone(),
-            BaseMessageChunk::Chat(m) => m.id.clone(),
-            BaseMessageChunk::Function(m) => m.id.clone(),
+            AnyMessageChunk::AI(m) => m.id.clone(),
+            AnyMessageChunk::Human(m) => m.id.clone(),
+            AnyMessageChunk::System(m) => m.id.clone(),
+            AnyMessageChunk::Tool(m) => m.id.clone(),
+            AnyMessageChunk::Chat(m) => m.id.clone(),
+            AnyMessageChunk::Function(m) => m.id.clone(),
         }
     }
 
     pub fn message_type(&self) -> &'static str {
         match self {
-            BaseMessageChunk::AI(_) => "AIMessageChunk",
-            BaseMessageChunk::Human(_) => "HumanMessageChunk",
-            BaseMessageChunk::System(_) => "SystemMessageChunk",
-            BaseMessageChunk::Tool(_) => "ToolMessageChunk",
-            BaseMessageChunk::Chat(_) => "ChatMessageChunk",
-            BaseMessageChunk::Function(_) => "FunctionMessageChunk",
+            AnyMessageChunk::AI(_) => "AIMessageChunk",
+            AnyMessageChunk::Human(_) => "HumanMessageChunk",
+            AnyMessageChunk::System(_) => "SystemMessageChunk",
+            AnyMessageChunk::Tool(_) => "ToolMessageChunk",
+            AnyMessageChunk::Chat(_) => "ChatMessageChunk",
+            AnyMessageChunk::Function(_) => "FunctionMessageChunk",
         }
     }
 
-    pub fn to_message(&self) -> BaseMessage {
+    pub fn to_message(&self) -> AnyMessage {
         match self {
-            BaseMessageChunk::AI(m) => BaseMessage::AI(m.to_message()),
-            BaseMessageChunk::Human(m) => BaseMessage::Human(m.to_message()),
-            BaseMessageChunk::System(m) => BaseMessage::System(m.to_message()),
-            BaseMessageChunk::Tool(m) => BaseMessage::Tool(m.to_message()),
-            BaseMessageChunk::Chat(m) => BaseMessage::Chat(m.to_message()),
-            BaseMessageChunk::Function(m) => BaseMessage::Function(m.to_message()),
+            AnyMessageChunk::AI(m) => AnyMessage::AI(m.to_message()),
+            AnyMessageChunk::Human(m) => AnyMessage::Human(m.to_message()),
+            AnyMessageChunk::System(m) => AnyMessage::System(m.to_message()),
+            AnyMessageChunk::Tool(m) => AnyMessage::Tool(m.to_message()),
+            AnyMessageChunk::Chat(m) => AnyMessage::Chat(m.to_message()),
+            AnyMessageChunk::Function(m) => AnyMessage::Function(m.to_message()),
         }
     }
 }
 
-impl From<AIMessageChunk> for BaseMessageChunk {
+impl From<AIMessageChunk> for AnyMessageChunk {
     fn from(chunk: AIMessageChunk) -> Self {
-        BaseMessageChunk::AI(chunk)
+        AnyMessageChunk::AI(chunk)
     }
 }
 
-impl From<HumanMessageChunk> for BaseMessageChunk {
+impl From<HumanMessageChunk> for AnyMessageChunk {
     fn from(chunk: HumanMessageChunk) -> Self {
-        BaseMessageChunk::Human(chunk)
+        AnyMessageChunk::Human(chunk)
     }
 }
 
-impl From<SystemMessageChunk> for BaseMessageChunk {
+impl From<SystemMessageChunk> for AnyMessageChunk {
     fn from(chunk: SystemMessageChunk) -> Self {
-        BaseMessageChunk::System(chunk)
+        AnyMessageChunk::System(chunk)
     }
 }
 
-impl From<ToolMessageChunk> for BaseMessageChunk {
+impl From<ToolMessageChunk> for AnyMessageChunk {
     fn from(chunk: ToolMessageChunk) -> Self {
-        BaseMessageChunk::Tool(chunk)
+        AnyMessageChunk::Tool(chunk)
     }
 }
 
-impl From<ChatMessageChunk> for BaseMessageChunk {
+impl From<ChatMessageChunk> for AnyMessageChunk {
     fn from(chunk: ChatMessageChunk) -> Self {
-        BaseMessageChunk::Chat(chunk)
+        AnyMessageChunk::Chat(chunk)
     }
 }
 
-impl From<FunctionMessageChunk> for BaseMessageChunk {
+impl From<FunctionMessageChunk> for AnyMessageChunk {
     fn from(chunk: FunctionMessageChunk) -> Self {
-        BaseMessageChunk::Function(chunk)
+        AnyMessageChunk::Function(chunk)
     }
 }
 
-impl std::ops::Add for BaseMessageChunk {
-    type Output = BaseMessageChunk;
+impl std::ops::Add for AnyMessageChunk {
+    type Output = AnyMessageChunk;
 
-    fn add(self, other: BaseMessageChunk) -> BaseMessageChunk {
+    fn add(self, other: AnyMessageChunk) -> AnyMessageChunk {
         match (self, other) {
-            (BaseMessageChunk::AI(a), BaseMessageChunk::AI(b)) => BaseMessageChunk::AI(a + b),
-            (BaseMessageChunk::Human(a), BaseMessageChunk::Human(b)) => {
-                BaseMessageChunk::Human(a + b)
+            (AnyMessageChunk::AI(a), AnyMessageChunk::AI(b)) => AnyMessageChunk::AI(a + b),
+            (AnyMessageChunk::Human(a), AnyMessageChunk::Human(b)) => AnyMessageChunk::Human(a + b),
+            (AnyMessageChunk::System(a), AnyMessageChunk::System(b)) => {
+                AnyMessageChunk::System(a + b)
             }
-            (BaseMessageChunk::System(a), BaseMessageChunk::System(b)) => {
-                BaseMessageChunk::System(a + b)
-            }
-            (BaseMessageChunk::Tool(a), BaseMessageChunk::Tool(b)) => BaseMessageChunk::Tool(a + b),
-            (BaseMessageChunk::Chat(a), BaseMessageChunk::Chat(b)) => BaseMessageChunk::Chat(a + b),
-            (BaseMessageChunk::Function(a), BaseMessageChunk::Function(b)) => {
-                BaseMessageChunk::Function(a + b)
+            (AnyMessageChunk::Tool(a), AnyMessageChunk::Tool(b)) => AnyMessageChunk::Tool(a + b),
+            (AnyMessageChunk::Chat(a), AnyMessageChunk::Chat(b)) => AnyMessageChunk::Chat(a + b),
+            (AnyMessageChunk::Function(a), AnyMessageChunk::Function(b)) => {
+                AnyMessageChunk::Function(a + b)
             }
             (left, right) => {
                 panic!(
@@ -480,57 +478,57 @@ impl std::ops::Add for BaseMessageChunk {
     }
 }
 
-impl From<AIMessage> for BaseMessage {
+impl From<AIMessage> for AnyMessage {
     fn from(message: AIMessage) -> Self {
-        BaseMessage::AI(message)
+        AnyMessage::AI(message)
     }
 }
 
-impl From<HumanMessage> for BaseMessage {
+impl From<HumanMessage> for AnyMessage {
     fn from(message: HumanMessage) -> Self {
-        BaseMessage::Human(message)
+        AnyMessage::Human(message)
     }
 }
 
-impl From<SystemMessage> for BaseMessage {
+impl From<SystemMessage> for AnyMessage {
     fn from(message: SystemMessage) -> Self {
-        BaseMessage::System(message)
+        AnyMessage::System(message)
     }
 }
 
-impl From<ToolMessage> for BaseMessage {
+impl From<ToolMessage> for AnyMessage {
     fn from(message: ToolMessage) -> Self {
-        BaseMessage::Tool(message)
+        AnyMessage::Tool(message)
     }
 }
 
-impl From<ChatMessage> for BaseMessage {
+impl From<ChatMessage> for AnyMessage {
     fn from(message: ChatMessage) -> Self {
-        BaseMessage::Chat(message)
+        AnyMessage::Chat(message)
     }
 }
 
-impl From<FunctionMessage> for BaseMessage {
+impl From<FunctionMessage> for AnyMessage {
     fn from(message: FunctionMessage) -> Self {
-        BaseMessage::Function(message)
+        AnyMessage::Function(message)
     }
 }
 
-impl From<RemoveMessage> for BaseMessage {
+impl From<RemoveMessage> for AnyMessage {
     fn from(message: RemoveMessage) -> Self {
-        BaseMessage::Remove(message)
+        AnyMessage::Remove(message)
     }
 }
 
-impl From<&str> for BaseMessage {
+impl From<&str> for AnyMessage {
     fn from(text: &str) -> Self {
-        BaseMessage::Human(HumanMessage::builder().content(text).build())
+        AnyMessage::Human(HumanMessage::builder().content(text).build())
     }
 }
 
-impl From<String> for BaseMessage {
+impl From<String> for AnyMessage {
     fn from(text: String) -> Self {
-        BaseMessage::Human(HumanMessage::builder().content(text).build())
+        AnyMessage::Human(HumanMessage::builder().content(text).build())
     }
 }
 
@@ -614,7 +612,7 @@ pub fn merge_content_vec(first: Vec<Value>, second: Vec<Value>) -> Vec<Value> {
     result
 }
 
-pub fn message_to_dict(message: &BaseMessage) -> Value {
+pub fn message_to_dict(message: &AnyMessage) -> Value {
     let mut data = serde_json::to_value(message).unwrap_or_default();
 
     let msg_type = message.message_type();
@@ -629,7 +627,7 @@ pub fn message_to_dict(message: &BaseMessage) -> Value {
     })
 }
 
-pub fn messages_to_dict(messages: &[BaseMessage]) -> Vec<serde_json::Value> {
+pub fn messages_to_dict(messages: &[AnyMessage]) -> Vec<serde_json::Value> {
     messages.iter().map(message_to_dict).collect()
 }
 

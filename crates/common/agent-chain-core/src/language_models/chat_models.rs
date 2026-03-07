@@ -12,7 +12,7 @@ use super::model_profile::ModelProfile;
 use crate::GenerationType;
 use crate::callbacks::{BaseCallbackHandler, CallbackManagerForLLMRun, Callbacks};
 use crate::error::{Error, Result};
-use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition, UsageMetadata};
+use crate::messages::{AIMessage, AIMessageChunk, AnyMessage, ChunkPosition, UsageMetadata};
 use crate::output_parsers::JsonOutputKeyToolsParser;
 use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, Generation, LLMResult};
 use crate::rate_limiters::BaseRateLimiter;
@@ -300,14 +300,14 @@ pub trait BaseChatModel: BaseLanguageModel {
 
     async fn _generate(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult>;
 
     async fn _agenerate(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -316,7 +316,7 @@ pub trait BaseChatModel: BaseLanguageModel {
 
     fn _stream(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
@@ -325,7 +325,7 @@ pub trait BaseChatModel: BaseLanguageModel {
 
     async fn _astream(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
@@ -338,7 +338,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
 
         match result.generations[0].message.clone() {
-            BaseMessage::AI(message) => Ok(message),
+            AnyMessage::AI(message) => Ok(message),
             other => Ok(AIMessage::builder().content(other.text()).build()),
         }
     }
@@ -358,7 +358,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                     .generation_info
                     .as_ref()
                     .and_then(|info| info.get("message"))
-                    .and_then(|msg_val| serde_json::from_value::<BaseMessage>(msg_val.clone()).ok())
+                    .and_then(|msg_val| serde_json::from_value::<AnyMessage>(msg_val.clone()).ok())
                     .unwrap_or_else(|| {
                         AIMessage::builder()
                             .content(&cached_gen.text)
@@ -472,7 +472,7 @@ pub trait BaseChatModel: BaseLanguageModel {
 
     async fn generate(
         &self,
-        messages: Vec<Vec<BaseMessage>>,
+        messages: Vec<Vec<AnyMessage>>,
         config: GenerateConfig,
     ) -> Result<LLMResult> {
         use crate::callbacks::CallbackManager;
@@ -604,7 +604,7 @@ pub trait BaseChatModel: BaseLanguageModel {
 
     async fn agenerate(
         &self,
-        messages: Vec<Vec<BaseMessage>>,
+        messages: Vec<Vec<AnyMessage>>,
         config: GenerateConfig,
     ) -> Result<LLMResult> {
         use crate::callbacks::CallbackManager;
@@ -748,7 +748,7 @@ pub trait BaseChatModel: BaseLanguageModel {
 
     async fn _generate_with_cache(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<crate::outputs::ChatResult> {
@@ -794,10 +794,10 @@ pub trait BaseChatModel: BaseLanguageModel {
                     let mut chat_result = agenerate_from_stream(stream).await?;
                     if self.chat_config().output_version.as_deref() == Some("v1") {
                         for generation in &mut chat_result.generations {
-                            if let BaseMessage::AI(ref ai_msg) = generation.message {
+                            if let AnyMessage::AI(ref ai_msg) = generation.message {
                                 let updated =
                                     super::utils::update_message_content_to_blocks(ai_msg, "v1");
-                                generation.message = BaseMessage::AI(updated);
+                                generation.message = AnyMessage::AI(updated);
                             }
                         }
                     }
@@ -814,15 +814,15 @@ pub trait BaseChatModel: BaseLanguageModel {
 
         if self.chat_config().output_version.as_deref() == Some("v1") {
             for generation in &mut result.generations {
-                if let BaseMessage::AI(ref ai_msg) = generation.message {
+                if let AnyMessage::AI(ref ai_msg) = generation.message {
                     let updated = super::utils::update_message_content_to_blocks(ai_msg, "v1");
-                    generation.message = BaseMessage::AI(updated);
+                    generation.message = AnyMessage::AI(updated);
                 }
             }
         }
 
         for generation in &mut result.generations {
-            if let BaseMessage::AI(ref mut ai_msg) = generation.message {
+            if let AnyMessage::AI(ref mut ai_msg) = generation.message {
                 ai_msg.response_metadata = _gen_info_and_msg_metadata(
                     generation.generation_info.as_ref(),
                     &ai_msg.response_metadata,
@@ -843,7 +843,7 @@ pub trait BaseChatModel: BaseLanguageModel {
 
     async fn _agenerate_with_cache(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<crate::outputs::ChatResult> {
@@ -890,10 +890,10 @@ pub trait BaseChatModel: BaseLanguageModel {
                     let mut chat_result = agenerate_from_stream(stream).await?;
                     if self.chat_config().output_version.as_deref() == Some("v1") {
                         for generation in &mut chat_result.generations {
-                            if let BaseMessage::AI(ref ai_msg) = generation.message {
+                            if let AnyMessage::AI(ref ai_msg) = generation.message {
                                 let updated =
                                     super::utils::update_message_content_to_blocks(ai_msg, "v1");
-                                generation.message = BaseMessage::AI(updated);
+                                generation.message = AnyMessage::AI(updated);
                             }
                         }
                     }
@@ -910,15 +910,15 @@ pub trait BaseChatModel: BaseLanguageModel {
 
         if self.chat_config().output_version.as_deref() == Some("v1") {
             for generation in &mut result.generations {
-                if let BaseMessage::AI(ref ai_msg) = generation.message {
+                if let AnyMessage::AI(ref ai_msg) = generation.message {
                     let updated = super::utils::update_message_content_to_blocks(ai_msg, "v1");
-                    generation.message = BaseMessage::AI(updated);
+                    generation.message = AnyMessage::AI(updated);
                 }
             }
         }
 
         for generation in &mut result.generations {
-            if let BaseMessage::AI(ref mut ai_msg) = generation.message {
+            if let AnyMessage::AI(ref mut ai_msg) = generation.message {
                 ai_msg.response_metadata = _gen_info_and_msg_metadata(
                     generation.generation_info.as_ref(),
                     &ai_msg.response_metadata,
@@ -939,10 +939,10 @@ pub trait BaseChatModel: BaseLanguageModel {
 
     async fn _call_async(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         callbacks: Option<Callbacks>,
-    ) -> Result<BaseMessage> {
+    ) -> Result<AnyMessage> {
         let result = self
             .agenerate(
                 vec![messages],
@@ -965,7 +965,7 @@ pub trait BaseChatModel: BaseLanguageModel {
 
     async fn generate_with_tools(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         _tools: &[ToolDefinition],
         _tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,
@@ -977,12 +977,12 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
 
         match result.generations[0].message.clone() {
-            BaseMessage::AI(message) => Ok(message),
+            AnyMessage::AI(message) => Ok(message),
             _ => Err(Error::Other("Unexpected message type".into())),
         }
     }
 
-    fn convert_input(&self, input: LanguageModelInput) -> Result<Vec<BaseMessage>> {
+    fn convert_input(&self, input: LanguageModelInput) -> Result<Vec<AnyMessage>> {
         Ok(input.to_messages())
     }
 
@@ -1024,7 +1024,7 @@ pub trait BaseChatModel: BaseLanguageModel {
 
         match &result.generations[0][0] {
             GenerationType::ChatGeneration(chat_gen) => match &chat_gen.message {
-                BaseMessage::AI(ai) => Ok(ai.clone()),
+                AnyMessage::AI(ai) => Ok(ai.clone()),
                 other => Ok(AIMessage::builder().content(other.text()).build()),
             },
             _ => Err(Error::Other("Unexpected generation type".into())),
@@ -1069,7 +1069,7 @@ pub trait BaseChatModel: BaseLanguageModel {
 
         match &result.generations[0][0] {
             GenerationType::ChatGeneration(chat_gen) => match &chat_gen.message {
-                BaseMessage::AI(ai) => Ok(ai.clone()),
+                AnyMessage::AI(ai) => Ok(ai.clone()),
                 other => Ok(AIMessage::builder().content(other.text()).build()),
             },
             _ => Err(Error::Other("Unexpected generation type".into())),
@@ -1177,7 +1177,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 match result {
                     Ok(generation_chunk) => {
                         let mut ai_chunk = match &generation_chunk.message {
-                            BaseMessage::AI(ai_msg) => AIMessageChunk::builder()
+                            AnyMessage::AI(ai_msg) => AIMessageChunk::builder()
                                 .content(ai_msg.content.clone())
                                 .tool_calls(ai_msg.tool_calls.clone())
                                 .additional_kwargs(ai_msg.additional_kwargs.clone())
@@ -1186,7 +1186,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                         };
 
                         let ai_response_meta = match &generation_chunk.message {
-                            BaseMessage::AI(ai_msg) => &ai_msg.response_metadata,
+                            AnyMessage::AI(ai_msg) => &ai_msg.response_metadata,
                             _ => &ai_chunk.response_metadata,
                         };
                         ai_chunk.response_metadata = _gen_info_and_msg_metadata(
@@ -1231,7 +1231,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 final_chunk.set_chunk_position(Some(ChunkPosition::Last));
 
                 if let Some(ref rm) = run_manager {
-                    let msg_chunk = ChatGenerationChunk::builder().message(BaseMessage::AI(crate::messages::AIMessage::builder().content("").build())).build();
+                    let msg_chunk = ChatGenerationChunk::builder().message(AnyMessage::AI(crate::messages::AIMessage::builder().content("").build())).build();
                     let chunk_json = serde_json::to_value(&msg_chunk).ok();
                     rm.on_llm_new_token("", chunk_json.as_ref());
                 }
@@ -1334,7 +1334,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 match result {
                     Ok(generation_chunk) => {
                         let mut ai_chunk = match &generation_chunk.message {
-                            BaseMessage::AI(ai_msg) => AIMessageChunk::builder()
+                            AnyMessage::AI(ai_msg) => AIMessageChunk::builder()
                                 .content(ai_msg.content.clone())
                                 .tool_calls(ai_msg.tool_calls.clone())
                                 .maybe_usage_metadata(ai_msg.usage_metadata.clone())
@@ -1344,7 +1344,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                         };
 
                         let ai_response_meta = match &generation_chunk.message {
-                            BaseMessage::AI(ai_msg) => &ai_msg.response_metadata,
+                            AnyMessage::AI(ai_msg) => &ai_msg.response_metadata,
                             _ => &ai_chunk.response_metadata,
                         };
                         ai_chunk.response_metadata = _gen_info_and_msg_metadata(
@@ -1389,7 +1389,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 final_chunk.set_chunk_position(Some(ChunkPosition::Last));
 
                 if let Some(ref rm) = run_manager {
-                    let msg_chunk = ChatGenerationChunk::builder().message(BaseMessage::AI(crate::messages::AIMessage::builder().content("").build())).build();
+                    let msg_chunk = ChatGenerationChunk::builder().message(AnyMessage::AI(crate::messages::AIMessage::builder().content("").build())).build();
                     let chunk_json = serde_json::to_value(&msg_chunk).ok();
                     rm.on_llm_new_token("", chunk_json.as_ref());
                 }
@@ -1410,7 +1410,7 @@ pub trait BaseChatModel: BaseLanguageModel {
 
     async fn stream_generations(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
@@ -1478,7 +1478,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         prompts: &[LanguageModelInput],
         config: GenerateConfig,
     ) -> Result<LLMResult> {
-        let prompt_messages: Vec<Vec<BaseMessage>> = prompts
+        let prompt_messages: Vec<Vec<AnyMessage>> = prompts
             .iter()
             .map(|p| self.convert_input(p.clone()))
             .collect::<Result<_>>()?;
@@ -1490,7 +1490,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         prompts: &[LanguageModelInput],
         config: GenerateConfig,
     ) -> Result<LLMResult> {
-        let prompt_messages: Vec<Vec<BaseMessage>> = prompts
+        let prompt_messages: Vec<Vec<AnyMessage>> = prompts
             .iter()
             .map(|p| self.convert_input(p.clone()))
             .collect::<Result<_>>()?;
@@ -1551,7 +1551,7 @@ pub fn generate_response_from_error(error: &crate::error::Error) -> Vec<ChatGene
 
     vec![
         ChatGeneration::builder()
-            .message(BaseMessage::AI(
+            .message(AnyMessage::AI(
                 AIMessage::builder()
                     .content("")
                     .response_metadata(metadata)
@@ -1561,7 +1561,7 @@ pub fn generate_response_from_error(error: &crate::error::Error) -> Vec<ChatGene
     ]
 }
 
-pub fn format_for_tracing(messages: &[BaseMessage]) -> Vec<BaseMessage> {
+pub fn format_for_tracing(messages: &[AnyMessage]) -> Vec<AnyMessage> {
     messages.to_vec()
 }
 
@@ -1749,7 +1749,7 @@ impl Runnable for StructuredOutputWithRaw {
 pub trait SimpleChatModel: BaseChatModel {
     async fn _call(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<String>;
@@ -1763,7 +1763,7 @@ impl<T: SimpleChatModel> BaseChatModel for T {
 
     async fn _generate(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {

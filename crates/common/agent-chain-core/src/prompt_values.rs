@@ -2,14 +2,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::load::Serializable;
 use crate::messages::{
-    AnyMessage, BaseMessage, ContentPart, HumanMessage, ImageDetail, ImageSource, MessageContent,
+    AnyMessage, ContentPart, HumanMessage, ImageDetail, ImageSource, MessageContent,
     get_buffer_string,
 };
 
 pub trait PromptValue: Serializable {
     fn to_string(&self) -> String;
 
-    fn to_messages(&self) -> Vec<BaseMessage>;
+    fn to_messages(&self) -> Vec<AnyMessage>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -65,8 +65,8 @@ impl PromptValue for StringPromptValue {
         self.text.clone()
     }
 
-    fn to_messages(&self) -> Vec<BaseMessage> {
-        vec![BaseMessage::Human(
+    fn to_messages(&self) -> Vec<AnyMessage> {
+        vec![AnyMessage::Human(
             HumanMessage::builder().content(&self.text).build(),
         )]
     }
@@ -94,15 +94,15 @@ impl Serializable for StringPromptValue {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChatPromptValue {
-    pub messages: Vec<BaseMessage>,
+    pub messages: Vec<AnyMessage>,
 }
 
 impl ChatPromptValue {
-    pub fn new(messages: Vec<BaseMessage>) -> Self {
+    pub fn new(messages: Vec<AnyMessage>) -> Self {
         Self { messages }
     }
 
-    pub fn from_message(message: impl Into<BaseMessage>) -> Self {
+    pub fn from_message(message: impl Into<AnyMessage>) -> Self {
         Self {
             messages: vec![message.into()],
         }
@@ -114,7 +114,7 @@ impl PromptValue for ChatPromptValue {
         get_buffer_string(&self.messages, "Human", "AI")
     }
 
-    fn to_messages(&self) -> Vec<BaseMessage> {
+    fn to_messages(&self) -> Vec<AnyMessage> {
         self.messages.clone()
     }
 }
@@ -167,7 +167,7 @@ impl PromptValue for ImagePromptValue {
         self.image_url.get_url().to_string()
     }
 
-    fn to_messages(&self) -> Vec<BaseMessage> {
+    fn to_messages(&self) -> Vec<AnyMessage> {
         let url = self.image_url.get_url().to_string();
         let detail = self.image_url.detail.as_ref().map(|d| match d {
             ImageDetailLevel::Auto => ImageDetail::Auto,
@@ -180,7 +180,7 @@ impl PromptValue for ImagePromptValue {
             detail,
         };
 
-        vec![BaseMessage::Human(
+        vec![AnyMessage::Human(
             HumanMessage::builder()
                 .content(MessageContent::Parts(vec![content_part]))
                 .build(),
@@ -224,7 +224,7 @@ impl PromptValue for ChatPromptValueConcrete {
         get_buffer_string(&self.messages, "Human", "AI")
     }
 
-    fn to_messages(&self) -> Vec<BaseMessage> {
+    fn to_messages(&self) -> Vec<AnyMessage> {
         self.messages.clone()
     }
 }
@@ -270,13 +270,13 @@ mod tests {
     #[test]
     fn test_chat_prompt_value() {
         let messages = vec![
-            BaseMessage::System(
+            AnyMessage::System(
                 SystemMessage::builder()
                     .content("You are a helpful assistant.")
                     .build(),
             ),
-            BaseMessage::Human(HumanMessage::builder().content("Hello!").build()),
-            BaseMessage::AI(AIMessage::builder().content("Hi there!").build()),
+            AnyMessage::Human(HumanMessage::builder().content("Hello!").build()),
+            AnyMessage::AI(AIMessage::builder().content("Hi there!").build()),
         ];
         let pv = ChatPromptValue::new(messages.clone());
 
@@ -312,8 +312,8 @@ mod tests {
     #[test]
     fn test_chat_prompt_value_concrete() {
         let messages = vec![
-            BaseMessage::Human(HumanMessage::builder().content("Hello!").build()),
-            BaseMessage::AI(AIMessage::builder().content("Hi!").build()),
+            AnyMessage::Human(HumanMessage::builder().content("Hello!").build()),
+            AnyMessage::AI(AIMessage::builder().content("Hi!").build()),
         ];
         let pv = ChatPromptValueConcrete::new(messages);
 

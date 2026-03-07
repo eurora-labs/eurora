@@ -12,13 +12,13 @@ use super::chat_models::{BaseChatModel, ChatGenerationStream, ChatModelConfig};
 use crate::caches::BaseCache;
 use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::error::Result;
-use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition};
+use crate::messages::{AIMessage, AIMessageChunk, AnyMessage, ChunkPosition};
 use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, GenerationType, LLMResult};
 use crate::runnables::RunnableConfig;
 
 #[derive(Debug)]
 pub struct FakeMessagesListChatModel {
-    responses: Vec<BaseMessage>,
+    responses: Vec<AnyMessage>,
     sleep: Option<Duration>,
     index: AtomicUsize,
     config: ChatModelConfig,
@@ -39,7 +39,7 @@ impl Clone for FakeMessagesListChatModel {
 impl FakeMessagesListChatModel {
     #[builder]
     pub fn new(
-        responses: Vec<BaseMessage>,
+        responses: Vec<AnyMessage>,
         sleep: Option<Duration>,
         config: Option<ChatModelConfig>,
     ) -> Self {
@@ -118,7 +118,7 @@ impl BaseChatModel for FakeMessagesListChatModel {
 
     async fn _generate(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -277,7 +277,7 @@ impl BaseChatModel for FakeListChatModel {
 
     async fn _generate(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -297,7 +297,7 @@ impl BaseChatModel for FakeListChatModel {
 
     fn _stream(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
@@ -414,7 +414,7 @@ impl BaseChatModel for FakeChatModel {
 
     async fn _generate(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -542,7 +542,7 @@ impl BaseChatModel for GenericFakeChatModel {
 
     async fn _generate(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -566,7 +566,7 @@ impl BaseChatModel for GenericFakeChatModel {
 
     fn _stream(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
@@ -800,14 +800,14 @@ impl BaseChatModel for ParrotFakeChatModel {
 
     async fn _generate(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
         let last_message = messages
             .last()
             .cloned()
-            .unwrap_or_else(|| BaseMessage::AI(AIMessage::builder().content("").build()));
+            .unwrap_or_else(|| AnyMessage::AI(AIMessage::builder().content("").build()));
 
         let generation = ChatGeneration::builder().message(last_message).build();
         Ok(ChatResult::builder().generations(vec![generation]).build())
@@ -823,8 +823,8 @@ mod tests {
     async fn test_fake_messages_list_chat_model() {
         let llm = FakeMessagesListChatModel::builder()
             .responses(vec![
-                BaseMessage::AI(AIMessage::builder().content("Response 1").build()),
-                BaseMessage::AI(AIMessage::builder().content("Response 2").build()),
+                AnyMessage::AI(AIMessage::builder().content("Response 1").build()),
+                AnyMessage::AI(AIMessage::builder().content("Response 2").build()),
             ])
             .build();
 
@@ -896,7 +896,7 @@ mod tests {
     async fn test_parrot_fake_chat_model() {
         let llm = ParrotFakeChatModel::builder().build();
 
-        let messages = vec![BaseMessage::Human(
+        let messages = vec![AnyMessage::Human(
             HumanMessage::builder().content("Hello, parrot!").build(),
         )];
 

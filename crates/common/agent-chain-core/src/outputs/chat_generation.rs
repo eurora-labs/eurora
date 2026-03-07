@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::ops::Add;
 
 use crate::load::Serializable;
-use crate::messages::BaseMessage;
+use crate::messages::AnyMessage;
 
 pub const CHAT_GENERATION_TYPE: &str = "ChatGeneration";
 pub const CHAT_GENERATION_CHUNK_TYPE: &str = "ChatGenerationChunk";
@@ -15,7 +15,7 @@ pub struct ChatGeneration {
     #[serde(default)]
     pub text: String,
 
-    pub message: BaseMessage,
+    pub message: AnyMessage,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub generation_info: Option<HashMap<String, Value>>,
@@ -31,7 +31,7 @@ fn default_chat_generation_type() -> String {
 #[bon]
 impl ChatGeneration {
     #[builder]
-    pub fn new(message: BaseMessage, generation_info: Option<HashMap<String, Value>>) -> Self {
+    pub fn new(message: AnyMessage, generation_info: Option<HashMap<String, Value>>) -> Self {
         let text = extract_text_from_message(&message);
         Self {
             text,
@@ -52,7 +52,7 @@ impl Serializable for ChatGeneration {
     }
 }
 
-fn extract_text_from_message(message: &BaseMessage) -> String {
+fn extract_text_from_message(message: &AnyMessage) -> String {
     let content = message.content();
 
     let blocks: Option<Vec<Value>> = match content {
@@ -82,7 +82,7 @@ pub struct ChatGenerationChunk {
     #[serde(default)]
     pub text: String,
 
-    pub message: BaseMessage,
+    pub message: AnyMessage,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub generation_info: Option<HashMap<String, Value>>,
@@ -98,7 +98,7 @@ fn default_chat_generation_chunk_type() -> String {
 #[bon]
 impl ChatGenerationChunk {
     #[builder]
-    pub fn new(message: BaseMessage, generation_info: Option<HashMap<String, Value>>) -> Self {
+    pub fn new(message: AnyMessage, generation_info: Option<HashMap<String, Value>>) -> Self {
         let text = extract_text_from_message(&message);
         Self {
             text,

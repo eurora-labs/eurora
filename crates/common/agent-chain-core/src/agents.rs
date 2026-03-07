@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::load::Serializable;
-use crate::messages::{AIMessage, BaseMessage, FunctionMessage, HumanMessage};
+use crate::messages::{AIMessage, AnyMessage, FunctionMessage, HumanMessage};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AgentAction {
@@ -29,8 +29,8 @@ impl AgentAction {
         }
     }
 
-    pub fn messages(&self) -> Vec<BaseMessage> {
-        vec![BaseMessage::AI(
+    pub fn messages(&self) -> Vec<AnyMessage> {
+        vec![AnyMessage::AI(
             AIMessage::builder().content(&self.log).build(),
         )]
     }
@@ -80,7 +80,7 @@ pub struct AgentActionMessageLog {
     pub tool: String,
     pub tool_input: ToolInput,
     pub log: String,
-    pub message_log: Vec<BaseMessage>,
+    pub message_log: Vec<AnyMessage>,
 }
 
 #[bon]
@@ -90,7 +90,7 @@ impl AgentActionMessageLog {
         tool: impl Into<String>,
         tool_input: impl Into<ToolInput>,
         log: impl Into<String>,
-        message_log: Vec<BaseMessage>,
+        message_log: Vec<AnyMessage>,
     ) -> Self {
         Self {
             tool: tool.into(),
@@ -100,7 +100,7 @@ impl AgentActionMessageLog {
         }
     }
 
-    pub fn messages(&self) -> &[BaseMessage] {
+    pub fn messages(&self) -> &[AnyMessage] {
         &self.message_log
     }
 }
@@ -121,7 +121,7 @@ impl AgentStep {
         }
     }
 
-    pub fn messages(&self) -> Vec<BaseMessage> {
+    pub fn messages(&self) -> Vec<AnyMessage> {
         convert_agent_observation_to_messages(&self.action, &self.observation)
     }
 }
@@ -142,8 +142,8 @@ impl AgentFinish {
         }
     }
 
-    pub fn messages(&self) -> Vec<BaseMessage> {
-        vec![BaseMessage::AI(
+    pub fn messages(&self) -> Vec<AnyMessage> {
+        vec![AnyMessage::AI(
             AIMessage::builder().content(&self.log).build(),
         )]
     }
@@ -171,7 +171,7 @@ pub enum AgentActionRef<'a> {
 pub fn convert_observation_to_messages(
     action: AgentActionRef<'_>,
     observation: &Value,
-) -> Vec<BaseMessage> {
+) -> Vec<AnyMessage> {
     match action {
         AgentActionRef::Action(a) => convert_agent_observation_to_messages(a, observation),
         AgentActionRef::MessageLog(a) => {
@@ -183,12 +183,12 @@ pub fn convert_observation_to_messages(
 fn convert_agent_observation_to_messages(
     _agent_action: &AgentAction,
     observation: &Value,
-) -> Vec<BaseMessage> {
+) -> Vec<AnyMessage> {
     let content = match observation {
         Value::String(s) => s.clone(),
         other => serde_json::to_string(other).unwrap_or_else(|_| other.to_string()),
     };
-    vec![BaseMessage::Human(
+    vec![AnyMessage::Human(
         HumanMessage::builder().content(content).build(),
     )]
 }
@@ -196,12 +196,12 @@ fn convert_agent_observation_to_messages(
 pub fn convert_agent_action_message_log_observation_to_messages(
     agent_action: &AgentActionMessageLog,
     observation: &Value,
-) -> Vec<BaseMessage> {
+) -> Vec<AnyMessage> {
     let content = match observation {
         Value::String(s) => s.clone(),
         other => serde_json::to_string(other).unwrap_or_else(|_| other.to_string()),
     };
-    vec![BaseMessage::Function(
+    vec![AnyMessage::Function(
         FunctionMessage::builder()
             .content(content)
             .name(&agent_action.tool)
@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn test_agent_action_message_log() {
-        let msg = BaseMessage::AI(AIMessage::builder().content("I should search").build());
+        let msg = AnyMessage::AI(AIMessage::builder().content("I should search").build());
         let action = AgentActionMessageLog::builder()
             .tool("search")
             .tool_input("query")

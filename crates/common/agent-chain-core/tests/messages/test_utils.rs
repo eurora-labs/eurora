@@ -1,5 +1,5 @@
 use agent_chain_core::messages::{
-    AIMessage, AIMessageChunk, BaseMessage, BaseMessageChunk, ChatMessage, ChatMessageChunk,
+    AIMessage, AIMessageChunk, AnyMessage, AnyMessageChunk, ChatMessage, ChatMessageChunk,
     CountTokensConfig, ExcludeToolCalls, FunctionMessage, FunctionMessageChunk, HumanMessage,
     HumanMessageChunk, SystemMessage, SystemMessageChunk, TextFormat, ToolMessage,
     ToolMessageChunk, TrimMessagesConfig, TrimStrategy, convert_to_messages,
@@ -11,12 +11,12 @@ use agent_chain_core::messages::{
 #[test]
 fn test_merge_message_runs_str_human() {
     let messages = vec![
-        BaseMessage::Human(HumanMessage::builder().content("foo").build()),
-        BaseMessage::Human(HumanMessage::builder().content("bar").build()),
-        BaseMessage::Human(HumanMessage::builder().content("baz").build()),
+        AnyMessage::Human(HumanMessage::builder().content("foo").build()),
+        AnyMessage::Human(HumanMessage::builder().content("bar").build()),
+        AnyMessage::Human(HumanMessage::builder().content("baz").build()),
     ];
     let messages_copy = messages.clone();
-    let expected = vec![BaseMessage::Human(
+    let expected = vec![AnyMessage::Human(
         HumanMessage::builder().content("foo\nbar\nbaz").build(),
     )];
     let actual = merge_message_runs(&messages, "\n");
@@ -27,12 +27,12 @@ fn test_merge_message_runs_str_human() {
 #[test]
 fn test_merge_message_runs_str_ai() {
     let messages = vec![
-        BaseMessage::AI(AIMessage::builder().content("foo").build()),
-        BaseMessage::AI(AIMessage::builder().content("bar").build()),
-        BaseMessage::AI(AIMessage::builder().content("baz").build()),
+        AnyMessage::AI(AIMessage::builder().content("foo").build()),
+        AnyMessage::AI(AIMessage::builder().content("bar").build()),
+        AnyMessage::AI(AIMessage::builder().content("baz").build()),
     ];
     let messages_copy = messages.clone();
-    let expected = vec![BaseMessage::AI(
+    let expected = vec![AnyMessage::AI(
         AIMessage::builder().content("foo\nbar\nbaz").build(),
     )];
     let actual = merge_message_runs(&messages, "\n");
@@ -43,12 +43,12 @@ fn test_merge_message_runs_str_ai() {
 #[test]
 fn test_merge_message_runs_str_system() {
     let messages = vec![
-        BaseMessage::System(SystemMessage::builder().content("foo").build()),
-        BaseMessage::System(SystemMessage::builder().content("bar").build()),
-        BaseMessage::System(SystemMessage::builder().content("baz").build()),
+        AnyMessage::System(SystemMessage::builder().content("foo").build()),
+        AnyMessage::System(SystemMessage::builder().content("bar").build()),
+        AnyMessage::System(SystemMessage::builder().content("baz").build()),
     ];
     let messages_copy = messages.clone();
-    let expected = vec![BaseMessage::System(
+    let expected = vec![AnyMessage::System(
         SystemMessage::builder().content("foo\nbar\nbaz").build(),
     )];
     let actual = merge_message_runs(&messages, "\n");
@@ -59,12 +59,12 @@ fn test_merge_message_runs_str_system() {
 #[test]
 fn test_merge_message_runs_str_with_specified_separator_human() {
     let messages = vec![
-        BaseMessage::Human(HumanMessage::builder().content("foo").build()),
-        BaseMessage::Human(HumanMessage::builder().content("bar").build()),
-        BaseMessage::Human(HumanMessage::builder().content("baz").build()),
+        AnyMessage::Human(HumanMessage::builder().content("foo").build()),
+        AnyMessage::Human(HumanMessage::builder().content("bar").build()),
+        AnyMessage::Human(HumanMessage::builder().content("baz").build()),
     ];
     let messages_copy = messages.clone();
-    let expected = vec![BaseMessage::Human(
+    let expected = vec![AnyMessage::Human(
         HumanMessage::builder()
             .content("foo<sep>bar<sep>baz")
             .build(),
@@ -77,12 +77,12 @@ fn test_merge_message_runs_str_with_specified_separator_human() {
 #[test]
 fn test_merge_message_runs_str_with_specified_separator_ai() {
     let messages = vec![
-        BaseMessage::AI(AIMessage::builder().content("foo").build()),
-        BaseMessage::AI(AIMessage::builder().content("bar").build()),
-        BaseMessage::AI(AIMessage::builder().content("baz").build()),
+        AnyMessage::AI(AIMessage::builder().content("foo").build()),
+        AnyMessage::AI(AIMessage::builder().content("bar").build()),
+        AnyMessage::AI(AIMessage::builder().content("baz").build()),
     ];
     let messages_copy = messages.clone();
-    let expected = vec![BaseMessage::AI(
+    let expected = vec![AnyMessage::AI(
         AIMessage::builder().content("foo<sep>bar<sep>baz").build(),
     )];
     let actual = merge_message_runs(&messages, "<sep>");
@@ -93,12 +93,12 @@ fn test_merge_message_runs_str_with_specified_separator_ai() {
 #[test]
 fn test_merge_message_runs_str_with_specified_separator_system() {
     let messages = vec![
-        BaseMessage::System(SystemMessage::builder().content("foo").build()),
-        BaseMessage::System(SystemMessage::builder().content("bar").build()),
-        BaseMessage::System(SystemMessage::builder().content("baz").build()),
+        AnyMessage::System(SystemMessage::builder().content("foo").build()),
+        AnyMessage::System(SystemMessage::builder().content("bar").build()),
+        AnyMessage::System(SystemMessage::builder().content("baz").build()),
     ];
     let messages_copy = messages.clone();
-    let expected = vec![BaseMessage::System(
+    let expected = vec![AnyMessage::System(
         SystemMessage::builder()
             .content("foo<sep>bar<sep>baz")
             .build(),
@@ -111,12 +111,12 @@ fn test_merge_message_runs_str_with_specified_separator_system() {
 #[test]
 fn test_merge_message_runs_str_without_separator_human() {
     let messages = vec![
-        BaseMessage::Human(HumanMessage::builder().content("foo").build()),
-        BaseMessage::Human(HumanMessage::builder().content("bar").build()),
-        BaseMessage::Human(HumanMessage::builder().content("baz").build()),
+        AnyMessage::Human(HumanMessage::builder().content("foo").build()),
+        AnyMessage::Human(HumanMessage::builder().content("bar").build()),
+        AnyMessage::Human(HumanMessage::builder().content("baz").build()),
     ];
     let messages_copy = messages.clone();
-    let expected = vec![BaseMessage::Human(
+    let expected = vec![AnyMessage::Human(
         HumanMessage::builder().content("foobarbaz").build(),
     )];
     let actual = merge_message_runs(&messages, "");
@@ -127,12 +127,12 @@ fn test_merge_message_runs_str_without_separator_human() {
 #[test]
 fn test_merge_message_runs_str_without_separator_ai() {
     let messages = vec![
-        BaseMessage::AI(AIMessage::builder().content("foo").build()),
-        BaseMessage::AI(AIMessage::builder().content("bar").build()),
-        BaseMessage::AI(AIMessage::builder().content("baz").build()),
+        AnyMessage::AI(AIMessage::builder().content("foo").build()),
+        AnyMessage::AI(AIMessage::builder().content("bar").build()),
+        AnyMessage::AI(AIMessage::builder().content("baz").build()),
     ];
     let messages_copy = messages.clone();
-    let expected = vec![BaseMessage::AI(
+    let expected = vec![AnyMessage::AI(
         AIMessage::builder().content("foobarbaz").build(),
     )];
     let actual = merge_message_runs(&messages, "");
@@ -143,12 +143,12 @@ fn test_merge_message_runs_str_without_separator_ai() {
 #[test]
 fn test_merge_message_runs_str_without_separator_system() {
     let messages = vec![
-        BaseMessage::System(SystemMessage::builder().content("foo").build()),
-        BaseMessage::System(SystemMessage::builder().content("bar").build()),
-        BaseMessage::System(SystemMessage::builder().content("baz").build()),
+        AnyMessage::System(SystemMessage::builder().content("foo").build()),
+        AnyMessage::System(SystemMessage::builder().content("bar").build()),
+        AnyMessage::System(SystemMessage::builder().content("baz").build()),
     ];
     let messages_copy = messages.clone();
-    let expected = vec![BaseMessage::System(
+    let expected = vec![AnyMessage::System(
         SystemMessage::builder().content("foobarbaz").build(),
     )];
     let actual = merge_message_runs(&messages, "");
@@ -159,20 +159,20 @@ fn test_merge_message_runs_str_without_separator_system() {
 #[test]
 fn test_merge_message_runs_response_metadata() {
     let messages = vec![
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("1".to_string())
                 .content("foo")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("2".to_string())
                 .content("bar")
                 .build(),
         ),
     ];
-    let expected = [BaseMessage::AI(
+    let expected = [AnyMessage::AI(
         AIMessage::builder()
             .id("1".to_string())
             .content("foo\nbar")
@@ -186,13 +186,13 @@ fn test_merge_message_runs_response_metadata() {
 #[test]
 fn test_merge_messages_tool_messages() {
     let messages = vec![
-        BaseMessage::Tool(
+        AnyMessage::Tool(
             ToolMessage::builder()
                 .content("foo")
                 .tool_call_id("1")
                 .build(),
         ),
-        BaseMessage::Tool(
+        AnyMessage::Tool(
             ToolMessage::builder()
                 .content("bar")
                 .tool_call_id("2")
@@ -208,14 +208,14 @@ fn test_merge_messages_tool_messages() {
 #[test]
 fn test_filter_message_include_names() {
     let messages = vec![
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .id("1".to_string())
                 .content("foo")
                 .name("blah".to_string())
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("2".to_string())
                 .content("bar")
@@ -242,14 +242,14 @@ fn test_filter_message_include_names() {
 #[test]
 fn test_filter_message_exclude_names() {
     let messages = vec![
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .id("1".to_string())
                 .content("foo")
                 .name("blah".to_string())
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("2".to_string())
                 .content("bar")
@@ -276,14 +276,14 @@ fn test_filter_message_exclude_names() {
 #[test]
 fn test_filter_message_include_ids() {
     let messages = vec![
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .id("1".to_string())
                 .content("foo")
                 .name("blah".to_string())
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("2".to_string())
                 .content("bar")
@@ -301,14 +301,14 @@ fn test_filter_message_include_ids() {
 #[test]
 fn test_filter_message_exclude_ids() {
     let messages = vec![
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .id("1".to_string())
                 .content("foo")
                 .name("blah".to_string())
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("2".to_string())
                 .content("bar")
@@ -326,14 +326,14 @@ fn test_filter_message_exclude_ids() {
 #[test]
 fn test_filter_message_include_types_str() {
     let messages = vec![
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .id("1".to_string())
                 .content("foo")
                 .name("blah".to_string())
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("2".to_string())
                 .content("bar")
@@ -360,14 +360,14 @@ fn test_filter_message_include_types_str() {
 #[test]
 fn test_filter_message_exclude_types_str() {
     let messages = vec![
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .id("1".to_string())
                 .content("foo")
                 .name("blah".to_string())
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("2".to_string())
                 .content("bar")
@@ -394,14 +394,14 @@ fn test_filter_message_exclude_types_str() {
 #[test]
 fn test_filter_message_combined() {
     let messages = vec![
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .id("1".to_string())
                 .content("foo")
                 .name("blah".to_string())
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("2".to_string())
                 .content("bar")
@@ -428,7 +428,7 @@ fn test_filter_message_combined() {
 #[test]
 fn test_convert_to_messages_string() {
     let message_like = vec![serde_json::json!("14.1")];
-    let expected = vec![BaseMessage::Human(
+    let expected = vec![AnyMessage::Human(
         HumanMessage::builder().content("14.1").build(),
     )];
     let actual = convert_to_messages(&message_like).unwrap();
@@ -438,7 +438,7 @@ fn test_convert_to_messages_string() {
 #[test]
 fn test_convert_to_messages_tuple_system() {
     let message_like = vec![serde_json::json!(["system", "11.1"])];
-    let expected = vec![BaseMessage::System(
+    let expected = vec![AnyMessage::System(
         SystemMessage::builder().content("11.1").build(),
     )];
     let actual = convert_to_messages(&message_like).unwrap();
@@ -448,7 +448,7 @@ fn test_convert_to_messages_tuple_system() {
 #[test]
 fn test_convert_to_messages_tuple_human() {
     let message_like = vec![serde_json::json!(["human", "test"])];
-    let expected = vec![BaseMessage::Human(
+    let expected = vec![AnyMessage::Human(
         HumanMessage::builder().content("test").build(),
     )];
     let actual = convert_to_messages(&message_like).unwrap();
@@ -458,7 +458,7 @@ fn test_convert_to_messages_tuple_human() {
 #[test]
 fn test_convert_to_messages_tuple_ai() {
     let message_like = vec![serde_json::json!(["ai", "response"])];
-    let expected = vec![BaseMessage::AI(
+    let expected = vec![AnyMessage::AI(
         AIMessage::builder().content("response").build(),
     )];
     let actual = convert_to_messages(&message_like).unwrap();
@@ -468,7 +468,7 @@ fn test_convert_to_messages_tuple_ai() {
 #[test]
 fn test_convert_to_messages_role_system() {
     let message_like = vec![serde_json::json!({"role": "system", "content": "6"})];
-    let expected = vec![BaseMessage::System(
+    let expected = vec![AnyMessage::System(
         SystemMessage::builder().content("6").build(),
     )];
     let actual = convert_to_messages(&message_like).unwrap();
@@ -478,7 +478,7 @@ fn test_convert_to_messages_role_system() {
 #[test]
 fn test_convert_to_messages_role_user() {
     let message_like = vec![serde_json::json!({"role": "user", "content": "Hello"})];
-    let expected = vec![BaseMessage::Human(
+    let expected = vec![AnyMessage::Human(
         HumanMessage::builder().content("Hello").build(),
     )];
     let actual = convert_to_messages(&message_like).unwrap();
@@ -488,7 +488,7 @@ fn test_convert_to_messages_role_user() {
 #[test]
 fn test_convert_to_messages_role_assistant() {
     let message_like = vec![serde_json::json!({"role": "assistant", "content": "Hi"})];
-    let expected = vec![BaseMessage::AI(AIMessage::builder().content("Hi").build())];
+    let expected = vec![AnyMessage::AI(AIMessage::builder().content("Hi").build())];
     let actual = convert_to_messages(&message_like).unwrap();
     assert_eq!(expected, actual);
 }
@@ -500,7 +500,7 @@ fn test_get_buffer_string_empty_input() {
 
 #[test]
 fn test_get_buffer_string_valid_single_message() {
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::Human(
         HumanMessage::builder().content("human").build(),
     )];
     let expected_output = "Human: human";
@@ -509,7 +509,7 @@ fn test_get_buffer_string_valid_single_message() {
 
 #[test]
 fn test_get_buffer_string_custom_human_prefix() {
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::Human(
         HumanMessage::builder().content("human").build(),
     )];
     let expected_output = "H: human";
@@ -518,7 +518,7 @@ fn test_get_buffer_string_custom_human_prefix() {
 
 #[test]
 fn test_get_buffer_string_custom_ai_prefix() {
-    let messages = vec![BaseMessage::AI(AIMessage::builder().content("ai").build())];
+    let messages = vec![AnyMessage::AI(AIMessage::builder().content("ai").build())];
     let expected_output = "A: ai";
     assert_eq!(get_buffer_string(&messages, "Human", "A"), expected_output);
 }
@@ -526,10 +526,10 @@ fn test_get_buffer_string_custom_ai_prefix() {
 #[test]
 fn test_get_buffer_string_multiple_msg() {
     let messages = vec![
-        BaseMessage::Human(HumanMessage::builder().content("human").build()),
-        BaseMessage::AI(AIMessage::builder().content("ai").build()),
-        BaseMessage::System(SystemMessage::builder().content("system").build()),
-        BaseMessage::Tool(
+        AnyMessage::Human(HumanMessage::builder().content("human").build()),
+        AnyMessage::AI(AIMessage::builder().content("ai").build()),
+        AnyMessage::System(SystemMessage::builder().content("system").build()),
+        AnyMessage::Tool(
             ToolMessage::builder()
                 .content("tool")
                 .tool_call_id("tool_id")
@@ -541,7 +541,7 @@ fn test_get_buffer_string_multiple_msg() {
     assert_eq!(get_buffer_string(&messages, "Human", "AI"), expected_output);
 }
 
-fn dummy_token_counter(messages: &[BaseMessage]) -> usize {
+fn dummy_token_counter(messages: &[AnyMessage]) -> usize {
     let default_content_len = 4;
     let default_msg_prefix_len = 3;
     let default_msg_suffix_len = 3;
@@ -556,30 +556,30 @@ fn dummy_token_counter(messages: &[BaseMessage]) -> usize {
 #[test]
 fn test_trim_messages_first_30() {
     let messages = vec![
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("first".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("second".to_string())
                 .content("This is the FIRST 4 token block.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("third".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("fourth".to_string())
                 .content("This is a 4 token text.")
@@ -589,18 +589,18 @@ fn test_trim_messages_first_30() {
     let messages_copy = messages.clone();
 
     let expected = [
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("first".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("second".to_string())
                 .content("This is the FIRST 4 token block.")
@@ -626,24 +626,24 @@ fn test_trim_messages_first_30() {
 #[test]
 fn test_trim_messages_first_30_allow_partial() {
     let messages = vec![
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("first".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("second".to_string())
                 .content("First line\nSecond line\nThird line")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("third".to_string())
                 .content("This is a 4 token text.")
@@ -670,30 +670,30 @@ fn test_trim_messages_first_30_allow_partial() {
 #[test]
 fn test_trim_messages_last_30_include_system() {
     let messages = vec![
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("first".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("second".to_string())
                 .content("This is a block.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("third".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("fourth".to_string())
                 .content("This is a 4 token text.")
@@ -703,18 +703,18 @@ fn test_trim_messages_last_30_include_system() {
     let messages_copy = messages.clone();
 
     let expected = [
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("third".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("fourth".to_string())
                 .content("This is a 4 token text.")
@@ -732,14 +732,14 @@ fn test_trim_messages_last_30_include_system() {
     let actual = trim_messages(&messages, &config);
 
     assert_eq!(actual.len(), expected.len());
-    assert!(matches!(actual.first(), Some(BaseMessage::System(_))));
+    assert!(matches!(actual.first(), Some(AnyMessage::System(_))));
     assert_eq!(actual[0].content(), expected[0].content());
     assert_eq!(messages, messages_copy);
 }
 
 #[test]
 fn test_convert_to_openai_messages_single_message() {
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::Human(
         HumanMessage::builder().content("Hello").build(),
     )];
     let result = convert_to_openai_messages(&messages, TextFormat::String, false);
@@ -752,9 +752,9 @@ fn test_convert_to_openai_messages_single_message() {
 #[test]
 fn test_convert_to_openai_messages_multiple_messages() {
     let messages = vec![
-        BaseMessage::System(SystemMessage::builder().content("System message").build()),
-        BaseMessage::Human(HumanMessage::builder().content("Human message").build()),
-        BaseMessage::AI(AIMessage::builder().content("AI message").build()),
+        AnyMessage::System(SystemMessage::builder().content("System message").build()),
+        AnyMessage::Human(HumanMessage::builder().content("Human message").build()),
+        AnyMessage::AI(AIMessage::builder().content("AI message").build()),
     ];
     let result = convert_to_openai_messages(&messages, TextFormat::String, false);
 
@@ -772,7 +772,7 @@ fn test_convert_to_openai_messages_multiple_messages() {
 
 #[test]
 fn test_convert_to_openai_messages_block_format() {
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::Human(
         HumanMessage::builder().content("Hello").build(),
     )];
     let result = convert_to_openai_messages(&messages, TextFormat::Block, false);
@@ -787,7 +787,7 @@ fn test_convert_to_openai_messages_block_format() {
 
 #[test]
 fn test_convert_to_openai_messages_tool_message() {
-    let messages = vec![BaseMessage::Tool(
+    let messages = vec![AnyMessage::Tool(
         ToolMessage::builder()
             .content("Tool result")
             .tool_call_id("123")
@@ -805,18 +805,18 @@ fn test_convert_to_openai_messages_tool_message() {
 
 #[test]
 fn test_convert_to_openai_messages_empty_list() {
-    let messages: Vec<BaseMessage> = vec![];
+    let messages: Vec<AnyMessage> = vec![];
     let result = convert_to_openai_messages(&messages, TextFormat::String, false);
     assert!(result.is_empty());
 }
 
 #[test]
 fn test_count_tokens_approximately_empty_messages() {
-    let messages: Vec<BaseMessage> = vec![];
+    let messages: Vec<AnyMessage> = vec![];
     let config = CountTokensConfig::default();
     assert_eq!(count_tokens_approximately(&messages, &config), 0);
 
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::Human(
         HumanMessage::builder().content("").build(),
     )];
     assert_eq!(count_tokens_approximately(&messages, &config), 4);
@@ -825,9 +825,9 @@ fn test_count_tokens_approximately_empty_messages() {
 #[test]
 fn test_count_tokens_approximately_string_content() {
     let messages = vec![
-        BaseMessage::Human(HumanMessage::builder().content("Hello").build()),
-        BaseMessage::AI(AIMessage::builder().content("Hi there").build()),
-        BaseMessage::Human(HumanMessage::builder().content("How are you?").build()),
+        AnyMessage::Human(HumanMessage::builder().content("Hello").build()),
+        AnyMessage::AI(AIMessage::builder().content("Hi there").build()),
+        AnyMessage::Human(HumanMessage::builder().content("How are you?").build()),
     ];
     let config = CountTokensConfig::default();
 
@@ -837,13 +837,13 @@ fn test_count_tokens_approximately_string_content() {
 #[test]
 fn test_count_tokens_approximately_with_names() {
     let messages = vec![
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .content("Hello")
                 .name("user".to_string())
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .content("Hi there")
                 .name("assistant".to_string())
@@ -864,8 +864,8 @@ fn test_count_tokens_approximately_with_names() {
 #[test]
 fn test_count_tokens_approximately_custom_token_length() {
     let messages = vec![
-        BaseMessage::Human(HumanMessage::builder().content("Hello world").build()),
-        BaseMessage::AI(AIMessage::builder().content("Testing").build()),
+        AnyMessage::Human(HumanMessage::builder().content("Hello world").build()),
+        AnyMessage::AI(AIMessage::builder().content("Testing").build()),
     ];
 
     let config4 = CountTokensConfig::default();
@@ -881,10 +881,10 @@ fn test_count_tokens_approximately_custom_token_length() {
 #[test]
 fn test_merge_message_runs_alternating_types_no_merge() {
     let messages = vec![
-        BaseMessage::Human(HumanMessage::builder().content("hello").build()),
-        BaseMessage::AI(AIMessage::builder().content("hi").build()),
-        BaseMessage::Human(HumanMessage::builder().content("how are you").build()),
-        BaseMessage::AI(AIMessage::builder().content("good").build()),
+        AnyMessage::Human(HumanMessage::builder().content("hello").build()),
+        AnyMessage::AI(AIMessage::builder().content("hi").build()),
+        AnyMessage::Human(HumanMessage::builder().content("how are you").build()),
+        AnyMessage::AI(AIMessage::builder().content("good").build()),
     ];
     let messages_copy = messages.clone();
     let actual = merge_message_runs(&messages, "\n");
@@ -909,13 +909,13 @@ fn test_merge_message_runs_preserves_tool_calls() {
         Some("id2".to_string()),
     );
     let messages = vec![
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .content("first")
                 .tool_calls(vec![tc1])
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .content("second")
                 .tool_calls(vec![tc2])
@@ -951,7 +951,7 @@ fn test_convert_to_openai_messages_developer() {
         "__openai_role__".to_string(),
         serde_json::json!("developer"),
     );
-    let messages = vec![BaseMessage::System(
+    let messages = vec![AnyMessage::System(
         SystemMessage::builder()
             .content("Be helpful")
             .additional_kwargs(additional_kwargs)
@@ -965,7 +965,7 @@ fn test_convert_to_openai_messages_developer() {
 
 #[test]
 fn test_convert_to_openai_messages_empty_content() {
-    let messages = vec![BaseMessage::AI(AIMessage::builder().content("").build())];
+    let messages = vec![AnyMessage::AI(AIMessage::builder().content("").build())];
     let result = convert_to_openai_messages(&messages, TextFormat::String, false);
     assert_eq!(result.len(), 1);
     assert_eq!(result[0]["role"], "assistant");
@@ -979,7 +979,7 @@ fn test_convert_to_openai_messages_ai_with_tool_calls() {
         serde_json::json!({"location": "Paris"}),
         Some("call_123".to_string()),
     );
-    let messages = vec![BaseMessage::AI(
+    let messages = vec![AnyMessage::AI(
         AIMessage::builder()
             .content("Let me check the weather.")
             .tool_calls(vec![tc])
@@ -999,8 +999,8 @@ fn test_convert_to_openai_messages_ai_with_tool_calls() {
 #[test]
 fn test_get_buffer_string_custom_human_and_ai_prefix() {
     let messages = vec![
-        BaseMessage::Human(HumanMessage::builder().content("hi").build()),
-        BaseMessage::AI(AIMessage::builder().content("hello").build()),
+        AnyMessage::Human(HumanMessage::builder().content("hi").build()),
+        AnyMessage::AI(AIMessage::builder().content("hello").build()),
     ];
     let result = get_buffer_string(&messages, "User", "Bot");
     assert_eq!(result, "User: hi\nBot: hello");
@@ -1008,7 +1008,7 @@ fn test_get_buffer_string_custom_human_and_ai_prefix() {
 
 #[test]
 fn test_get_buffer_string_with_tool_messages() {
-    let messages = vec![BaseMessage::Tool(
+    let messages = vec![AnyMessage::Tool(
         ToolMessage::builder()
             .content("result from tool")
             .tool_call_id("tc1")
@@ -1020,7 +1020,7 @@ fn test_get_buffer_string_with_tool_messages() {
 
 #[test]
 fn test_get_buffer_string_with_function_messages() {
-    let messages = vec![BaseMessage::Function(
+    let messages = vec![AnyMessage::Function(
         FunctionMessage::builder()
             .content("function output")
             .name("my_func")
@@ -1032,7 +1032,7 @@ fn test_get_buffer_string_with_function_messages() {
 
 #[test]
 fn test_get_buffer_string_with_empty_content() {
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::Human(
         HumanMessage::builder().content("").build(),
     )];
     let result = get_buffer_string(&messages, "Human", "AI");
@@ -1041,109 +1041,109 @@ fn test_get_buffer_string_with_empty_content() {
 
 #[test]
 fn test_message_chunk_to_message_ai() {
-    let chunk = BaseMessageChunk::AI(AIMessageChunk::builder().content("hello from ai").build());
+    let chunk = AnyMessageChunk::AI(AIMessageChunk::builder().content("hello from ai").build());
     let msg = message_chunk_to_message(&chunk);
-    assert!(matches!(msg, BaseMessage::AI(_)));
+    assert!(matches!(msg, AnyMessage::AI(_)));
     assert_eq!(msg.content(), "hello from ai");
 }
 
 #[test]
 fn test_message_chunk_to_message_human() {
-    let chunk = BaseMessageChunk::Human(
+    let chunk = AnyMessageChunk::Human(
         HumanMessageChunk::builder()
             .content("hello from human")
             .build(),
     );
     let msg = message_chunk_to_message(&chunk);
-    assert!(matches!(msg, BaseMessage::Human(_)));
+    assert!(matches!(msg, AnyMessage::Human(_)));
     assert_eq!(msg.content(), "hello from human");
 }
 
 #[test]
 fn test_message_chunk_to_message_system() {
-    let chunk = BaseMessageChunk::System(
+    let chunk = AnyMessageChunk::System(
         SystemMessageChunk::builder()
             .content("system prompt")
             .build(),
     );
     let msg = message_chunk_to_message(&chunk);
-    assert!(matches!(msg, BaseMessage::System(_)));
+    assert!(matches!(msg, AnyMessage::System(_)));
     assert_eq!(msg.content(), "system prompt");
 }
 
 #[test]
 fn test_message_chunk_to_message_tool() {
-    let chunk = BaseMessageChunk::Tool(
+    let chunk = AnyMessageChunk::Tool(
         ToolMessageChunk::builder()
             .content("tool result")
             .tool_call_id("tc_42")
             .build(),
     );
     let msg = message_chunk_to_message(&chunk);
-    assert!(matches!(msg, BaseMessage::Tool(_)));
+    assert!(matches!(msg, AnyMessage::Tool(_)));
     assert_eq!(msg.content(), "tool result");
-    if let BaseMessage::Tool(tool_msg) = &msg {
+    if let AnyMessage::Tool(tool_msg) = &msg {
         assert_eq!(tool_msg.tool_call_id, "tc_42");
     } else {
-        panic!("Expected BaseMessage::Tool");
+        panic!("Expected AnyMessage::Tool");
     }
 }
 
 #[test]
 fn test_message_chunk_to_message_function() {
-    let chunk = BaseMessageChunk::Function(
+    let chunk = AnyMessageChunk::Function(
         FunctionMessageChunk::builder()
             .content("func result")
             .name("my_function")
             .build(),
     );
     let msg = message_chunk_to_message(&chunk);
-    assert!(matches!(msg, BaseMessage::Function(_)));
+    assert!(matches!(msg, AnyMessage::Function(_)));
     assert_eq!(msg.content(), "func result");
-    if let BaseMessage::Function(func_msg) = &msg {
+    if let AnyMessage::Function(func_msg) = &msg {
         assert_eq!(func_msg.name, "my_function");
     } else {
-        panic!("Expected BaseMessage::Function");
+        panic!("Expected AnyMessage::Function");
     }
 }
 
 #[test]
 fn test_message_chunk_to_message_chat() {
-    let chunk = BaseMessageChunk::Chat(
+    let chunk = AnyMessageChunk::Chat(
         ChatMessageChunk::builder()
             .content("chat content")
             .role("custom_role")
             .build(),
     );
     let msg = message_chunk_to_message(&chunk);
-    assert!(matches!(msg, BaseMessage::Chat(_)));
+    assert!(matches!(msg, AnyMessage::Chat(_)));
     assert_eq!(msg.content(), "chat content");
-    if let BaseMessage::Chat(chat_msg) = &msg {
+    if let AnyMessage::Chat(chat_msg) = &msg {
         assert_eq!(chat_msg.role, "custom_role");
     } else {
-        panic!("Expected BaseMessage::Chat");
+        panic!("Expected AnyMessage::Chat");
     }
 }
 
 #[test]
 fn test_messages_from_dict_round_trip() {
     let original_messages = vec![
-        BaseMessage::Human(HumanMessage::builder().content("human msg").build()),
-        BaseMessage::AI(AIMessage::builder().content("ai msg").build()),
-        BaseMessage::System(SystemMessage::builder().content("system msg").build()),
-        BaseMessage::Tool(
+        AnyMessage::Human(HumanMessage::builder().content("human msg").build()),
+        AnyMessage::AI(AIMessage::builder().content("ai msg").build()),
+        AnyMessage::System(SystemMessage::builder().content("system msg").build()),
+        AnyMessage::Tool(
             ToolMessage::builder()
                 .content("tool msg")
                 .tool_call_id("tc1")
                 .build(),
         ),
-        BaseMessage::Function(
+        AnyMessage::Function(
             FunctionMessage::builder()
                 .content("func msg")
                 .name("my_func")
                 .build(),
         ),
-        BaseMessage::Chat(
+        AnyMessage::Chat(
             ChatMessage::builder()
                 .content("chat msg")
                 .role("custom")
@@ -1162,22 +1162,22 @@ fn test_messages_from_dict_round_trip() {
         assert_eq!(orig.content(), rt.content());
     }
 
-    if let BaseMessage::Tool(tool_msg) = &roundtripped[3] {
+    if let AnyMessage::Tool(tool_msg) = &roundtripped[3] {
         assert_eq!(tool_msg.tool_call_id, "tc1");
     } else {
-        panic!("Expected BaseMessage::Tool at index 3");
+        panic!("Expected AnyMessage::Tool at index 3");
     }
 
-    if let BaseMessage::Function(func_msg) = &roundtripped[4] {
+    if let AnyMessage::Function(func_msg) = &roundtripped[4] {
         assert_eq!(func_msg.name, "my_func");
     } else {
-        panic!("Expected BaseMessage::Function at index 4");
+        panic!("Expected AnyMessage::Function at index 4");
     }
 
-    if let BaseMessage::Chat(chat_msg) = &roundtripped[5] {
+    if let AnyMessage::Chat(chat_msg) = &roundtripped[5] {
         assert_eq!(chat_msg.role, "custom");
     } else {
-        panic!("Expected BaseMessage::Chat at index 5");
+        panic!("Expected AnyMessage::Chat at index 5");
     }
 }
 
@@ -1185,7 +1185,7 @@ fn test_messages_from_dict_round_trip() {
 fn test_count_tokens_approximately_tool_calls() {
     let config = CountTokensConfig::default();
 
-    let msg_without = vec![BaseMessage::AI(
+    let msg_without = vec![AnyMessage::AI(
         AIMessage::builder().content("calling tool").build(),
     )];
     let tokens_without = count_tokens_approximately(&msg_without, &config);
@@ -1195,7 +1195,7 @@ fn test_count_tokens_approximately_tool_calls() {
         serde_json::json!({"location": "San Francisco", "unit": "celsius"}),
         Some("call_abc".to_string()),
     );
-    let msg_with = vec![BaseMessage::AI(
+    let msg_with = vec![AnyMessage::AI(
         AIMessage::builder()
             .content("calling tool")
             .tool_calls(vec![tc])
@@ -1214,7 +1214,7 @@ fn test_count_tokens_approximately_tool_calls() {
 #[test]
 fn test_count_tokens_approximately_large_content() {
     let large_content = "a".repeat(10_000);
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::Human(
         HumanMessage::builder().content(&large_content).build(),
     )];
     let config = CountTokensConfig::default();
@@ -1224,9 +1224,9 @@ fn test_count_tokens_approximately_large_content() {
 
 #[test]
 fn test_count_tokens_approximately_large_number_of_messages() {
-    let messages: Vec<BaseMessage> = (0..1000)
+    let messages: Vec<AnyMessage> = (0..1000)
         .map(|i| {
-            BaseMessage::Human(
+            AnyMessage::Human(
                 HumanMessage::builder()
                     .content(format!("Message {}", i))
                     .build(),
@@ -1244,14 +1244,14 @@ fn test_count_tokens_approximately_large_number_of_messages() {
 fn test_count_tokens_approximately_mixed_content_types() {
     let config = CountTokensConfig::default();
     let messages = vec![
-        BaseMessage::Human(HumanMessage::builder().content("Hello").build()),
-        BaseMessage::AI(AIMessage::builder().content("Hi there").build()),
-        BaseMessage::System(
+        AnyMessage::Human(HumanMessage::builder().content("Hello").build()),
+        AnyMessage::AI(AIMessage::builder().content("Hi there").build()),
+        AnyMessage::System(
             SystemMessage::builder()
                 .content("You are a helpful assistant")
                 .build(),
         ),
-        BaseMessage::Tool(
+        AnyMessage::Tool(
             ToolMessage::builder()
                 .content("42")
                 .tool_call_id("call_123")
@@ -1260,7 +1260,7 @@ fn test_count_tokens_approximately_mixed_content_types() {
     ];
     let tokens = count_tokens_approximately(&messages, &config);
     assert!(tokens > 0);
-    let tool_only = vec![BaseMessage::Tool(
+    let tool_only = vec![AnyMessage::Tool(
         ToolMessage::builder()
             .content("42")
             .tool_call_id("call_123")
@@ -1274,7 +1274,7 @@ fn test_count_tokens_approximately_mixed_content_types() {
 fn test_count_tokens_approximately_tool_message_includes_tool_call_id() {
     let config = CountTokensConfig::default();
 
-    let msg_short = vec![BaseMessage::Tool(
+    let msg_short = vec![AnyMessage::Tool(
         ToolMessage::builder()
             .content("ok")
             .tool_call_id("x")
@@ -1282,7 +1282,7 @@ fn test_count_tokens_approximately_tool_message_includes_tool_call_id() {
     )];
     let tokens_short = count_tokens_approximately(&msg_short, &config);
 
-    let msg_long = vec![BaseMessage::Tool(
+    let msg_long = vec![AnyMessage::Tool(
         ToolMessage::builder()
             .content("ok")
             .tool_call_id("this_is_a_very_long_tool_call_identifier_string")
@@ -1300,7 +1300,7 @@ fn test_count_tokens_approximately_tool_message_includes_tool_call_id() {
 
 #[test]
 fn test_trim_messages_empty_messages() {
-    let messages: Vec<BaseMessage> = vec![];
+    let messages: Vec<AnyMessage> = vec![];
     let config = TrimMessagesConfig::builder()
         .max_tokens(100)
         .token_counter(dummy_token_counter)
@@ -1313,9 +1313,9 @@ fn test_trim_messages_empty_messages() {
 #[test]
 fn test_trim_messages_exact_token_boundary() {
     let messages = vec![
-        BaseMessage::Human(HumanMessage::builder().content("msg1").build()),
-        BaseMessage::AI(AIMessage::builder().content("msg2").build()),
-        BaseMessage::Human(HumanMessage::builder().content("msg3").build()),
+        AnyMessage::Human(HumanMessage::builder().content("msg1").build()),
+        AnyMessage::AI(AIMessage::builder().content("msg2").build()),
+        AnyMessage::Human(HumanMessage::builder().content("msg3").build()),
     ];
 
     let config = TrimMessagesConfig::builder()
@@ -1332,10 +1332,10 @@ fn test_trim_messages_exact_token_boundary() {
 #[test]
 fn test_trim_messages_last_without_include_system() {
     let messages = vec![
-        BaseMessage::System(SystemMessage::builder().content("system").build()),
-        BaseMessage::Human(HumanMessage::builder().content("human1").build()),
-        BaseMessage::AI(AIMessage::builder().content("ai1").build()),
-        BaseMessage::Human(HumanMessage::builder().content("human2").build()),
+        AnyMessage::System(SystemMessage::builder().content("system").build()),
+        AnyMessage::Human(HumanMessage::builder().content("human1").build()),
+        AnyMessage::AI(AIMessage::builder().content("ai1").build()),
+        AnyMessage::Human(HumanMessage::builder().content("human2").build()),
     ];
 
     let config = TrimMessagesConfig::builder()
@@ -1353,25 +1353,25 @@ fn test_trim_messages_last_without_include_system() {
 #[test]
 fn test_filter_messages_include_types_and_include_names_combined() {
     let messages = vec![
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .content("sys")
                 .name("sys_name".to_string())
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .content("human1")
                 .name("alice".to_string())
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .content("ai1")
                 .name("bot".to_string())
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .content("human2")
                 .name("bob".to_string())
@@ -1405,16 +1405,16 @@ fn test_convert_to_messages_multiple_formats() {
     let actual = convert_to_messages(&message_like).unwrap();
     assert_eq!(actual.len(), 4);
 
-    assert!(matches!(actual[0], BaseMessage::Human(_)));
+    assert!(matches!(actual[0], AnyMessage::Human(_)));
     assert_eq!(actual[0].content(), "plain text");
 
-    assert!(matches!(actual[1], BaseMessage::System(_)));
+    assert!(matches!(actual[1], AnyMessage::System(_)));
     assert_eq!(actual[1].content(), "be helpful");
 
-    assert!(matches!(actual[2], BaseMessage::AI(_)));
+    assert!(matches!(actual[2], AnyMessage::AI(_)));
     assert_eq!(actual[2].content(), "sure thing");
 
-    assert!(matches!(actual[3], BaseMessage::Human(_)));
+    assert!(matches!(actual[3], AnyMessage::Human(_)));
     assert_eq!(actual[3].content(), "thanks");
 }
 
@@ -1423,42 +1423,42 @@ fn test_filter_message_exclude_tool_calls_all() {
     let tc1 = tool_call("foo", serde_json::json!({}), Some("1".to_string()));
     let tc2 = tool_call("bar", serde_json::json!({}), Some("2".to_string()));
     let messages = vec![
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .content("foo")
                 .name("blah".to_string())
                 .id("1".to_string())
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .content("foo-response")
                 .name("blah".to_string())
                 .id("2".to_string())
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .content("bar")
                 .name("blur".to_string())
                 .id("3".to_string())
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .content("bar-response")
                 .tool_calls(vec![tc1.clone(), tc2.clone()])
                 .id("4".to_string())
                 .build(),
         ),
-        BaseMessage::Tool(
+        AnyMessage::Tool(
             ToolMessage::builder()
                 .content("baz")
                 .tool_call_id("1")
                 .id("5".to_string())
                 .build(),
         ),
-        BaseMessage::Tool(
+        AnyMessage::Tool(
             ToolMessage::builder()
                 .content("qux")
                 .tool_call_id("2")
@@ -1497,7 +1497,7 @@ fn test_filter_message_exclude_tool_calls_all() {
     assert_eq!(expected, actual);
 
     let mut expected_partial = messages[..5].to_vec();
-    expected_partial[3] = BaseMessage::AI(
+    expected_partial[3] = AnyMessage::AI(
         AIMessage::builder()
             .content("bar-response")
             .tool_calls(vec![tc1.clone()])
@@ -1522,30 +1522,30 @@ fn test_filter_message_exclude_tool_calls_all() {
 #[test]
 fn test_trim_messages_first_30_allow_partial_end_on_human() {
     let messages = vec![
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("first".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("second".to_string())
                 .content("This is the FIRST 4 token block.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("third".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("fourth".to_string())
                 .content("This is a 4 token text.")
@@ -1567,37 +1567,37 @@ fn test_trim_messages_first_30_allow_partial_end_on_human() {
     assert_eq!(actual.len(), 2);
     assert_eq!(actual[0].content(), "This is a 4 token text.");
     assert_eq!(actual[1].content(), "This is a 4 token text.");
-    assert!(matches!(actual[1], BaseMessage::Human(_)));
+    assert!(matches!(actual[1], AnyMessage::Human(_)));
     assert_eq!(messages, messages_copy);
 }
 
 #[test]
 fn test_trim_messages_last_40_include_system_allow_partial() {
     let messages = vec![
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("first".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("second".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("third".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("fourth".to_string())
                 .content("This is a 4 token text.")
@@ -1617,7 +1617,7 @@ fn test_trim_messages_last_40_include_system_allow_partial() {
     let actual = trim_messages(&messages, &config);
 
     assert_eq!(actual.len(), 4);
-    assert!(matches!(actual[0], BaseMessage::System(_)));
+    assert!(matches!(actual[0], AnyMessage::System(_)));
     assert_eq!(actual[0].content(), "This is a 4 token text.");
     assert_eq!(messages, messages_copy);
 }
@@ -1625,30 +1625,30 @@ fn test_trim_messages_last_40_include_system_allow_partial() {
 #[test]
 fn test_trim_messages_last_30_include_system_allow_partial_end_on_human() {
     let messages = vec![
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("first".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("second".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("third".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("fourth".to_string())
                 .content("This is a 4 token text.")
@@ -1669,38 +1669,38 @@ fn test_trim_messages_last_30_include_system_allow_partial_end_on_human() {
     let actual = trim_messages(&messages, &config);
 
     assert!(actual.len() >= 2);
-    assert!(matches!(actual[0], BaseMessage::System(_)));
-    assert!(matches!(actual.last().unwrap(), BaseMessage::Human(_)));
+    assert!(matches!(actual[0], AnyMessage::System(_)));
+    assert!(matches!(actual.last().unwrap(), AnyMessage::Human(_)));
     assert_eq!(messages, messages_copy);
 }
 
 #[test]
 fn test_trim_messages_last_40_include_system_allow_partial_start_on_human() {
     let messages = vec![
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("first".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("second".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("third".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("fourth".to_string())
                 .content("This is a 4 token text.")
@@ -1721,15 +1721,15 @@ fn test_trim_messages_last_40_include_system_allow_partial_start_on_human() {
     let actual = trim_messages(&messages, &config);
 
     assert_eq!(actual.len(), 3);
-    assert!(matches!(actual[0], BaseMessage::System(_)));
-    assert!(matches!(actual[1], BaseMessage::Human(_)));
+    assert!(matches!(actual[0], AnyMessage::System(_)));
+    assert!(matches!(actual[1], AnyMessage::Human(_)));
     assert_eq!(actual[1].content(), "This is a 4 token text.");
     assert_eq!(messages, messages_copy);
 }
 
 #[test]
 fn test_trim_messages_allow_partial_one_message() {
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::Human(
         HumanMessage::builder()
             .id("third".to_string())
             .content("This is a funky text.")
@@ -1738,7 +1738,7 @@ fn test_trim_messages_allow_partial_one_message() {
 
     let config = TrimMessagesConfig::builder()
         .max_tokens(2)
-        .token_counter(|msgs: &[BaseMessage]| -> usize {
+        .token_counter(|msgs: &[AnyMessage]| -> usize {
             msgs.iter().map(|m| m.content().len()).sum()
         })
         .strategy(TrimStrategy::First)
@@ -1754,7 +1754,7 @@ fn test_trim_messages_allow_partial_one_message() {
 
 #[test]
 fn test_trim_messages_last_allow_partial_one_message() {
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::Human(
         HumanMessage::builder()
             .id("third".to_string())
             .content("This is a funky text.")
@@ -1763,7 +1763,7 @@ fn test_trim_messages_last_allow_partial_one_message() {
 
     let config = TrimMessagesConfig::builder()
         .max_tokens(2)
-        .token_counter(|msgs: &[BaseMessage]| -> usize {
+        .token_counter(|msgs: &[AnyMessage]| -> usize {
             msgs.iter().map(|m| m.content().len()).sum()
         })
         .strategy(TrimStrategy::Last)
@@ -1780,30 +1780,30 @@ fn test_trim_messages_last_allow_partial_one_message() {
 #[test]
 fn test_trim_messages_allow_partial_text_splitter() {
     let messages = vec![
-        BaseMessage::System(
+        AnyMessage::System(
             SystemMessage::builder()
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("first".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("second".to_string())
                 .content("This is the FIRST 4 token block.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .id("third".to_string())
                 .content("This is a 4 token text.")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .id("fourth".to_string())
                 .content("This is a 4 token text.")
@@ -1812,7 +1812,7 @@ fn test_trim_messages_allow_partial_text_splitter() {
     ];
     let messages_copy = messages.clone();
 
-    fn count_words(msgs: &[BaseMessage]) -> usize {
+    fn count_words(msgs: &[AnyMessage]) -> usize {
         msgs.iter().map(|m| m.text().split(' ').count()).sum()
     }
 
@@ -1844,14 +1844,14 @@ fn test_trim_messages_allow_partial_text_splitter() {
 
 #[test]
 fn test_trim_messages_partial_text_splitting() {
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::Human(
         HumanMessage::builder()
             .content("This is a long message that needs trimming")
             .build(),
     )];
     let messages_copy = messages.clone();
 
-    fn count_characters(msgs: &[BaseMessage]) -> usize {
+    fn count_characters(msgs: &[AnyMessage]) -> usize {
         msgs.iter().map(|m| m.content().len()).sum()
     }
 
@@ -1880,14 +1880,14 @@ fn test_trim_messages_mixed_content_with_partial() {
         {"type": "text", "text": "First part of text."},
         {"type": "text", "text": "Second part that should be trimmed."},
     ]);
-    let messages = vec![BaseMessage::AI(
+    let messages = vec![AnyMessage::AI(
         AIMessage::builder()
             .content(serde_json::to_string(&content_blocks).unwrap())
             .build(),
     )];
     let messages_copy = messages.clone();
 
-    fn count_text_length(msgs: &[BaseMessage]) -> usize {
+    fn count_text_length(msgs: &[AnyMessage]) -> usize {
         let mut total = 0;
         for msg in msgs {
             let raw = msg.text();
@@ -1931,13 +1931,13 @@ fn test_trim_messages_mixed_content_with_partial() {
 #[test]
 fn test_trim_messages_start_on_with_allow_partial() {
     let messages = vec![
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .content("First human message")
                 .build(),
         ),
-        BaseMessage::AI(AIMessage::builder().content("AI response").build()),
-        BaseMessage::Human(
+        AnyMessage::AI(AIMessage::builder().content("AI response").build()),
+        AnyMessage::Human(
             HumanMessage::builder()
                 .content("Second human message")
                 .build(),
@@ -1962,7 +1962,7 @@ fn test_trim_messages_start_on_with_allow_partial() {
 
 #[test]
 fn test_trim_messages_include_system_strategy_last_empty_messages() {
-    let messages: Vec<BaseMessage> = vec![];
+    let messages: Vec<AnyMessage> = vec![];
     let config = TrimMessagesConfig::builder()
         .max_tokens(10)
         .token_counter(dummy_token_counter)
@@ -1985,12 +1985,12 @@ fn test_convert_to_openai_messages_openai_string() {
         {"type": "text", "text": "there"},
     ]);
     let messages = vec![
-        BaseMessage::Human(
+        AnyMessage::Human(
             HumanMessage::builder()
                 .content(serde_json::to_string(&human_content).unwrap())
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AI(
             AIMessage::builder()
                 .content(serde_json::to_string(&ai_content).unwrap())
                 .build(),
@@ -2008,8 +2008,8 @@ fn test_convert_to_openai_messages_openai_string() {
 #[test]
 fn test_convert_to_openai_messages_openai_block() {
     let messages = vec![
-        BaseMessage::Human(HumanMessage::builder().content("Hello").build()),
-        BaseMessage::AI(AIMessage::builder().content("Hi there").build()),
+        AnyMessage::Human(HumanMessage::builder().content("Hello").build()),
+        AnyMessage::AI(AIMessage::builder().content("Hi there").build()),
     ];
     let result = convert_to_openai_messages(&messages, TextFormat::Block, false);
 
@@ -2032,7 +2032,7 @@ fn test_convert_to_openai_messages_openai_image() {
         {"type": "text", "text": "Here's an image:"},
         {"type": "image_url", "image_url": {"url": base64_image}},
     ]);
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::Human(
         HumanMessage::builder()
             .content(serde_json::to_string(&content).unwrap())
             .build(),
@@ -2053,7 +2053,7 @@ fn test_convert_to_openai_messages_tool_use() {
     let content = serde_json::json!([
         {"type": "tool_use", "id": "123", "name": "calculator", "input": {"a": "b"}},
     ]);
-    let messages = vec![BaseMessage::AI(
+    let messages = vec![AnyMessage::AI(
         AIMessage::builder()
             .content(serde_json::to_string(&content).unwrap())
             .build(),
@@ -2075,7 +2075,7 @@ fn test_convert_to_openai_messages_tool_use_unicode() {
     let content = serde_json::json!([
         {"type": "tool_use", "id": "123", "name": "create_customer", "input": {"customer_name": "你好啊集团"}},
     ]);
-    let messages = vec![BaseMessage::AI(
+    let messages = vec![AnyMessage::AI(
         AIMessage::builder()
             .content(serde_json::to_string(&content).unwrap())
             .build(),
@@ -2095,7 +2095,7 @@ fn test_convert_to_openai_messages_tool_use_unicode() {
 fn test_convert_to_openai_messages_json() {
     let json_data = serde_json::json!({"key": "value"});
     let content = serde_json::json!([{"type": "json", "json": json_data}]);
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::Human(
         HumanMessage::builder()
             .content(serde_json::to_string(&content).unwrap())
             .build(),
@@ -2109,7 +2109,7 @@ fn test_convert_to_openai_messages_json() {
 
 #[test]
 fn test_convert_to_openai_messages_empty_message() {
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::Human(
         HumanMessage::builder().content("").build(),
     )];
     let result = convert_to_openai_messages(&messages, TextFormat::String, false);
@@ -2120,7 +2120,7 @@ fn test_convert_to_openai_messages_empty_message() {
 
 #[test]
 fn test_convert_to_openai_messages_include_id() {
-    let messages = vec![BaseMessage::AI(
+    let messages = vec![AnyMessage::AI(
         AIMessage::builder()
             .content("Hello")
             .id("resp_123".to_string())
@@ -2137,7 +2137,7 @@ fn test_convert_to_openai_messages_include_id() {
     assert_eq!(result_with_id[0]["content"], "Hello");
     assert_eq!(result_with_id[0]["id"], "resp_123");
 
-    let human_msgs = vec![BaseMessage::Human(
+    let human_msgs = vec![AnyMessage::Human(
         HumanMessage::builder().content("Hello").build(),
     )];
     let result_human = convert_to_openai_messages(&human_msgs, TextFormat::String, true);
@@ -2153,7 +2153,7 @@ fn test_convert_to_openai_messages_mixed_content_types() {
         {"type": "text", "text": "Structured text"},
         {"type": "image_url", "image_url": {"url": base64_image}},
     ]);
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::Human(
         HumanMessage::builder()
             .content(serde_json::to_string(&content).unwrap())
             .build(),
@@ -2171,7 +2171,7 @@ fn test_convert_to_openai_messages_ai_with_tool_calls_and_content() {
         serde_json::json!({"location": "Paris"}),
         Some("call_123".to_string()),
     );
-    let messages = vec![BaseMessage::AI(
+    let messages = vec![AnyMessage::AI(
         AIMessage::builder()
             .content("Let me check the weather.")
             .tool_calls(vec![tc])
@@ -2194,7 +2194,7 @@ fn test_convert_to_openai_messages_anthropic_tool_use_in_content() {
     let content = serde_json::json!([
         {"type": "tool_use", "name": "foo", "input": {"bar": "baz"}, "id": "1"},
     ]);
-    let messages = vec![BaseMessage::AI(
+    let messages = vec![AnyMessage::AI(
         AIMessage::builder()
             .content(serde_json::to_string(&content).unwrap())
             .build(),
@@ -2220,7 +2220,7 @@ fn test_convert_to_openai_messages_developer_role() {
         "__openai_role__".to_string(),
         serde_json::json!("developer"),
     );
-    let messages = vec![BaseMessage::System(
+    let messages = vec![AnyMessage::System(
         SystemMessage::builder()
             .content("Be helpful")
             .additional_kwargs(additional_kwargs)
@@ -2234,9 +2234,9 @@ fn test_convert_to_openai_messages_developer_role() {
 #[test]
 fn test_get_buffer_string_with_structured_content() {
     let messages = vec![
-        BaseMessage::Human(HumanMessage::builder().content("Hello, world!").build()),
-        BaseMessage::AI(AIMessage::builder().content("Hi there!").build()),
-        BaseMessage::System(SystemMessage::builder().content("System message").build()),
+        AnyMessage::Human(HumanMessage::builder().content("Hello, world!").build()),
+        AnyMessage::AI(AIMessage::builder().content("Hi there!").build()),
+        AnyMessage::System(SystemMessage::builder().content("System message").build()),
     ];
     let expected = "Human: Hello, world!\nAI: Hi there!\nSystem: System message";
     let actual = get_buffer_string(&messages, "Human", "AI");
@@ -2246,9 +2246,9 @@ fn test_get_buffer_string_with_structured_content() {
 #[test]
 fn test_get_buffer_string_with_mixed_content() {
     let messages = vec![
-        BaseMessage::Human(HumanMessage::builder().content("Simple text").build()),
-        BaseMessage::AI(AIMessage::builder().content("Structured text").build()),
-        BaseMessage::System(
+        AnyMessage::Human(HumanMessage::builder().content("Simple text").build()),
+        AnyMessage::AI(AIMessage::builder().content("Structured text").build()),
+        AnyMessage::System(
             SystemMessage::builder()
                 .content("Another structured text")
                 .build(),
@@ -2267,8 +2267,8 @@ fn test_get_buffer_string_with_function_call() {
         serde_json::json!({"name": "test_function", "arguments": "{\"arg\": \"value\"}"}),
     );
     let messages = vec![
-        BaseMessage::Human(HumanMessage::builder().content("Hello").build()),
-        BaseMessage::AI(
+        AnyMessage::Human(HumanMessage::builder().content("Hello").build()),
+        AnyMessage::AI(
             AIMessage::builder()
                 .content("Hi")
                 .additional_kwargs(additional_kwargs)
@@ -2283,9 +2283,9 @@ fn test_get_buffer_string_with_function_call() {
 #[test]
 fn test_get_buffer_string_with_empty_list_content() {
     let messages = vec![
-        BaseMessage::Human(HumanMessage::builder().content("").build()),
-        BaseMessage::AI(AIMessage::builder().content("").build()),
-        BaseMessage::System(SystemMessage::builder().content("").build()),
+        AnyMessage::Human(HumanMessage::builder().content("").build()),
+        AnyMessage::AI(AIMessage::builder().content("").build()),
+        AnyMessage::System(SystemMessage::builder().content("").build()),
     ];
     let expected = "Human: \nAI: \nSystem: ";
     let actual = get_buffer_string(&messages, "Human", "AI");
@@ -2296,7 +2296,7 @@ fn test_get_buffer_string_with_empty_list_content() {
 fn test_count_tokens_approximately_tool_message_includes_tool_call_id_and_name() {
     let config = CountTokensConfig::default();
 
-    let msg = BaseMessage::Tool(
+    let msg = AnyMessage::Tool(
         ToolMessage::builder()
             .content("result") // 6 chars
             .tool_call_id("call_1") // 6 chars
@@ -2314,7 +2314,7 @@ fn test_count_tokens_approximately_tool_message_includes_tool_call_id_and_name()
     };
     assert_eq!(count_tokens_approximately(&[msg], &config_no_name), 7);
 
-    let human_msg = BaseMessage::Human(HumanMessage::builder().content("result").build());
+    let human_msg = AnyMessage::Human(HumanMessage::builder().content("result").build());
     assert_eq!(
         count_tokens_approximately(std::slice::from_ref(&human_msg), &config),
         6
@@ -2339,9 +2339,9 @@ fn test_convert_to_messages_role_tool() {
         vec![serde_json::json!({"role": "tool", "content": "10.1", "tool_call_id": "10.2"})];
     let actual = convert_to_messages(&message_like).unwrap();
     assert_eq!(actual.len(), 1);
-    assert!(matches!(actual[0], BaseMessage::Tool(_)));
+    assert!(matches!(actual[0], AnyMessage::Tool(_)));
     assert_eq!(actual[0].content(), "10.1");
-    if let BaseMessage::Tool(tool_msg) = &actual[0] {
+    if let AnyMessage::Tool(tool_msg) = &actual[0] {
         assert_eq!(tool_msg.tool_call_id, "10.2");
     }
 }
@@ -2351,7 +2351,7 @@ fn test_convert_to_messages_role_developer() {
     let message_like = vec![serde_json::json!({"role": "developer", "content": "6.1"})];
     let actual = convert_to_messages(&message_like).unwrap();
     assert_eq!(actual.len(), 1);
-    assert!(matches!(actual[0], BaseMessage::System(_)));
+    assert!(matches!(actual[0], AnyMessage::System(_)));
     assert_eq!(actual[0].content(), "6.1");
 }
 
@@ -2360,7 +2360,7 @@ fn test_convert_to_messages_tuple_developer() {
     let message_like = vec![serde_json::json!(["developer", "11.2"])];
     let actual = convert_to_messages(&message_like).unwrap();
     assert_eq!(actual.len(), 1);
-    assert!(matches!(actual[0], BaseMessage::System(_)));
+    assert!(matches!(actual[0], AnyMessage::System(_)));
     assert_eq!(actual[0].content(), "11.2");
 }
 
@@ -2381,8 +2381,8 @@ fn test_convert_to_messages_role_assistant_with_tool_calls() {
     })];
     let actual = convert_to_messages(&message_like).unwrap();
     assert_eq!(actual.len(), 1);
-    assert!(matches!(actual[0], BaseMessage::AI(_)));
-    if let BaseMessage::AI(ai_msg) = &actual[0] {
+    assert!(matches!(actual[0], AnyMessage::AI(_)));
+    if let AnyMessage::AI(ai_msg) = &actual[0] {
         assert_eq!(ai_msg.tool_calls.len(), 1);
         assert_eq!(ai_msg.tool_calls[0].name, "8.4");
         assert_eq!(ai_msg.tool_calls[0].args, serde_json::json!({"8.2": "8.3"}));
@@ -2400,8 +2400,8 @@ fn test_convert_to_messages_langchain_dict_with_tool_calls() {
     })];
     let actual = convert_to_messages(&message_like).unwrap();
     assert_eq!(actual.len(), 1);
-    assert!(matches!(actual[0], BaseMessage::AI(_)));
-    if let BaseMessage::AI(ai_msg) = &actual[0] {
+    assert!(matches!(actual[0], AnyMessage::AI(_)));
+    if let AnyMessage::AI(ai_msg) = &actual[0] {
         assert_eq!(ai_msg.tool_calls.len(), 1);
         assert_eq!(ai_msg.tool_calls[0].name, "15.4");
         assert_eq!(ai_msg.tool_calls[0].id, Some("15.5".to_string()));
@@ -2411,7 +2411,7 @@ fn test_convert_to_messages_langchain_dict_with_tool_calls() {
 #[test]
 fn test_convert_to_openai_messages_reasoning_content() {
     let content = serde_json::json!([{"type": "reasoning", "summary": []}]);
-    let messages = vec![BaseMessage::AI(
+    let messages = vec![AnyMessage::AI(
         AIMessage::builder()
             .content(serde_json::to_string(&content).unwrap())
             .build(),
@@ -2431,7 +2431,7 @@ fn test_convert_to_openai_messages_reasoning_content() {
             {"type": "text", "text": "Second thought"},
         ],
     }]);
-    let messages2 = vec![BaseMessage::AI(
+    let messages2 = vec![AnyMessage::AI(
         AIMessage::builder()
             .content(serde_json::to_string(&content_with_summary).unwrap())
             .build(),
@@ -2451,7 +2451,7 @@ fn test_convert_to_openai_messages_reasoning_content() {
             "summary": [{"type": "text", "text": "My reasoning process"}],
         },
     ]);
-    let messages3 = vec![BaseMessage::AI(
+    let messages3 = vec![AnyMessage::AI(
         AIMessage::builder()
             .content(serde_json::to_string(&mixed_content).unwrap())
             .build(),
@@ -2474,7 +2474,7 @@ fn test_convert_to_openai_messages_thinking_blocks() {
     let text_block = serde_json::json!({"text": "Response text.", "type": "text"});
     let content = serde_json::json!([thinking_block, text_block]);
 
-    let messages = vec![BaseMessage::AI(
+    let messages = vec![AnyMessage::AI(
         AIMessage::builder()
             .content(serde_json::to_string(&content).unwrap())
             .build(),

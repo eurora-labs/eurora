@@ -1,5 +1,5 @@
 use agent_chain::providers::ollama::{ChatOllama, OllamaResponse, parse_tool_call_arguments};
-use agent_chain_core::messages::{BaseMessage, HumanMessage};
+use agent_chain_core::messages::{AnyMessage, HumanMessage};
 
 const MODEL_NAME: &str = "llama3.1";
 
@@ -40,7 +40,7 @@ fn test_all_none_parameters_results_in_empty_options() {
 /// Ported from `test_reasoning_param_passed_to_client`.
 #[test]
 fn test_reasoning_param_passed_to_payload() {
-    let messages: Vec<BaseMessage> = vec![HumanMessage::builder().content("Hello").build().into()];
+    let messages: Vec<AnyMessage> = vec![HumanMessage::builder().content("Hello").build().into()];
 
     // reasoning=true
     let llm = ChatOllama::builder()
@@ -74,7 +74,7 @@ fn test_reasoning_param_passed_to_payload() {
 #[test]
 fn test_arbitrary_roles_accepted_in_chatmessages() {
     let llm = ChatOllama::new(MODEL_NAME);
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         agent_chain_core::messages::ChatMessage::builder()
             .role("somerandomrole")
             .content("I'm ok with you adding any role message now!")
@@ -132,7 +132,7 @@ fn test_options_only_include_set_parameters() {
 #[test]
 fn test_payload_does_not_include_strict() {
     let llm = ChatOllama::new(MODEL_NAME);
-    let messages: Vec<BaseMessage> = vec![HumanMessage::builder().content("Hello").build().into()];
+    let messages: Vec<AnyMessage> = vec![HumanMessage::builder().content("Hello").build().into()];
 
     let payload = llm
         .build_request_payload(&messages, None, None, false)
@@ -152,7 +152,7 @@ fn test_explicit_options_in_payload() {
         .temperature(0.5)
         .num_ctx(4096u32)
         .build();
-    let messages: Vec<BaseMessage> = vec![HumanMessage::builder().content("Hello").build().into()];
+    let messages: Vec<AnyMessage> = vec![HumanMessage::builder().content("Hello").build().into()];
 
     let payload = llm
         .build_request_payload(&messages, None, None, false)
@@ -166,7 +166,7 @@ fn test_explicit_options_in_payload() {
 #[test]
 fn test_payload_stream_flag() {
     let llm = ChatOllama::new(MODEL_NAME);
-    let messages: Vec<BaseMessage> = vec![HumanMessage::builder().content("Hello").build().into()];
+    let messages: Vec<AnyMessage> = vec![HumanMessage::builder().content("Hello").build().into()];
 
     let payload_stream = llm
         .build_request_payload(&messages, None, None, true)
@@ -183,7 +183,7 @@ fn test_payload_stream_flag() {
 #[test]
 fn test_tools_included_in_payload() {
     let llm = ChatOllama::new(MODEL_NAME);
-    let messages: Vec<BaseMessage> = vec![HumanMessage::builder().content("Hello").build().into()];
+    let messages: Vec<AnyMessage> = vec![HumanMessage::builder().content("Hello").build().into()];
 
     let tools = vec![serde_json::json!({
         "type": "function",
@@ -205,7 +205,7 @@ fn test_tools_included_in_payload() {
 #[test]
 fn test_stop_sequences_in_payload() {
     let llm = ChatOllama::new(MODEL_NAME);
-    let messages: Vec<BaseMessage> = vec![HumanMessage::builder().content("Hello").build().into()];
+    let messages: Vec<AnyMessage> = vec![HumanMessage::builder().content("Hello").build().into()];
 
     let payload = llm
         .build_request_payload(&messages, Some(vec!["STOP".to_string()]), None, false)

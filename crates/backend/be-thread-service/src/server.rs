@@ -1,7 +1,7 @@
 use agent_chain::SystemMessage;
 use agent_chain::openai::BuiltinTool;
 use agent_chain::{
-    AIMessage, BaseChatModel, BaseMessage, BaseTool, HumanMessage, language_models::ToolLike,
+    AIMessage, AnyMessage, BaseChatModel, BaseTool, HumanMessage, language_models::ToolLike,
     messages::ToolCall, ollama::ChatOllama, openai::ChatOpenAI,
 };
 use be_authz::{extract_claims, parse_user_id};
@@ -501,7 +501,7 @@ impl ProtoThreadService for ThreadService {
 
         hidden_messages.extend(visible_messages);
 
-        let mut messages: Vec<BaseMessage> = hidden_messages
+        let mut messages: Vec<AnyMessage> = hidden_messages
             .into_iter()
             .filter_map(|msg| {
                 convert_db_message_to_base_message(msg)
@@ -754,7 +754,7 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        let mut messages: Vec<BaseMessage> = hidden_messages
+        let mut messages: Vec<AnyMessage> = hidden_messages
             .into_iter()
             .filter_map(|msg| {
                 convert_db_message_to_base_message(msg)

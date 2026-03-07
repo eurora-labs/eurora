@@ -1,4 +1,4 @@
-use agent_chain_core::{AIMessage, BaseMessage};
+use agent_chain_core::{AIMessage, AnyMessage};
 use euro_timeline::TimelineManager;
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
@@ -84,10 +84,10 @@ impl ChatApi for ChatApiImpl {
 
                 for message in messages {
                     match &message {
-                        BaseMessage::System(m) => {
+                        AnyMessage::System(m) => {
                             let _ = thread_manager.add_system_message(m).await;
                         }
-                        BaseMessage::Human(m) => {
+                        AnyMessage::Human(m) => {
                             let _ = thread_manager.add_hidden_human_message(m).await;
                         }
                         _ => {
@@ -182,7 +182,7 @@ impl ChatApi for ChatApiImpl {
             }
         }
 
-        let _ai_message: BaseMessage = AIMessage::builder()
+        let _ai_message: AnyMessage = AIMessage::builder()
             .content(complete_response.clone())
             .build()
             .into();

@@ -1,7 +1,7 @@
 use agent_chain::providers::ollama::{ChatOllama, OllamaFormat};
 use agent_chain_core::language_models::ToolLike;
 use agent_chain_core::language_models::chat_models::BaseChatModel;
-use agent_chain_core::messages::{BaseMessage, HumanMessage};
+use agent_chain_core::messages::{AnyMessage, HumanMessage};
 use futures::StreamExt;
 
 const DEFAULT_MODEL: &str = "llama3.1";
@@ -344,7 +344,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
         .build();
     let llm_with_tools = BaseChatModel::bind_tools(&llm, &[ToolLike::Schema(weather_tool)], None)?;
 
-    let input_message: BaseMessage = HumanMessage::builder()
+    let input_message: AnyMessage = HumanMessage::builder()
         .content("What is the weather in San Francisco, CA?")
         .build()
         .into();
@@ -361,7 +361,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(tool_call.name, "get_weather");
     assert!(tool_call.args.get("location").is_some());
 
-    let tool_message: BaseMessage = agent_chain_core::messages::ToolMessage::builder()
+    let tool_message: AnyMessage = agent_chain_core::messages::ToolMessage::builder()
         .content("It's sunny and 75 degrees.")
         .tool_call_id(tool_call.id.as_deref().unwrap_or(""))
         .build()
@@ -371,7 +371,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
         .invoke(
             vec![
                 input_message.clone(),
-                BaseMessage::AI(tool_call_message.clone()),
+                AnyMessage::AI(tool_call_message.clone()),
                 tool_message.clone(),
             ]
             .into(),
@@ -380,7 +380,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     assert!(!resp_message.text().is_empty());
 
-    let follow_up: BaseMessage = HumanMessage::builder()
+    let follow_up: AnyMessage = HumanMessage::builder()
         .content("Explain why that might be using a reasoning step.")
         .build()
         .into();
@@ -389,9 +389,9 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
         .invoke(
             vec![
                 input_message,
-                BaseMessage::AI(tool_call_message),
+                AnyMessage::AI(tool_call_message),
                 tool_message,
-                BaseMessage::AI(resp_message),
+                AnyMessage::AI(resp_message),
                 follow_up,
             ]
             .into(),
@@ -424,7 +424,7 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
         .build();
     let llm_with_tools = BaseChatModel::bind_tools(&llm, &[ToolLike::Schema(weather_tool)], None)?;
 
-    let input_message: BaseMessage = HumanMessage::builder()
+    let input_message: AnyMessage = HumanMessage::builder()
         .content("What is the weather in San Francisco, CA?")
         .build()
         .into();
@@ -441,7 +441,7 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(tool_call.name, "get_weather");
     assert!(tool_call.args.get("location").is_some());
 
-    let tool_message: BaseMessage = agent_chain_core::messages::ToolMessage::builder()
+    let tool_message: AnyMessage = agent_chain_core::messages::ToolMessage::builder()
         .content("It's sunny and 75 degrees.")
         .tool_call_id(tool_call.id.as_deref().unwrap_or(""))
         .build()
@@ -451,7 +451,7 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
         .invoke(
             vec![
                 input_message.clone(),
-                BaseMessage::AI(tool_call_message.clone()),
+                AnyMessage::AI(tool_call_message.clone()),
                 tool_message.clone(),
             ]
             .into(),
@@ -460,7 +460,7 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     assert!(!resp_message.text().is_empty());
 
-    let follow_up: BaseMessage = HumanMessage::builder()
+    let follow_up: AnyMessage = HumanMessage::builder()
         .content("Explain why that might be using a reasoning step.")
         .build()
         .into();
@@ -469,9 +469,9 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
         .invoke(
             vec![
                 input_message,
-                BaseMessage::AI(tool_call_message),
+                AnyMessage::AI(tool_call_message),
                 tool_message,
-                BaseMessage::AI(resp_message),
+                AnyMessage::AI(resp_message),
                 follow_up,
             ]
             .into(),

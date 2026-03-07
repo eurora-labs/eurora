@@ -16,10 +16,10 @@ pub use ai::{
 };
 
 pub use base::{
-    BaseMessage, BaseMessageChunk, HasId, MergeableContent,
-    extract_reasoning_from_additional_kwargs, get_bolded_text, get_msg_title_repr,
-    is_interactive_env, merge_content, merge_content_complex, merge_content_vec,
-    message_to_dict as base_message_to_dict, messages_to_dict as base_messages_to_dict,
+    AnyMessage, AnyMessageChunk, HasId, MergeableContent, extract_reasoning_from_additional_kwargs,
+    get_bolded_text, get_msg_title_repr, is_interactive_env, merge_content, merge_content_complex,
+    merge_content_vec, message_to_dict as base_message_to_dict,
+    messages_to_dict as base_messages_to_dict,
 };
 
 pub use chat::{ChatMessage, ChatMessageChunk};
@@ -51,10 +51,9 @@ pub use tool::{
 };
 
 pub use utils::{
-    AnyMessage, CountTokensConfig, ExcludeToolCalls, MessageLikeRepresentation, TextFormat,
-    TrimMessagesConfig, TrimStrategy, convert_to_message, convert_to_messages,
-    convert_to_openai_messages, count_tokens_approximately, filter_messages,
-    filter_messages_runnable, get_buffer_string, merge_message_runs, merge_message_runs_runnable,
-    message_chunk_to_message, message_from_dict, message_to_dict, messages_from_dict,
-    messages_to_dict, trim_messages, trim_messages_runnable,
+    CountTokensConfig, ExcludeToolCalls, MessageLikeRepresentation, TextFormat, TrimMessagesConfig,
+    TrimStrategy, convert_to_message, convert_to_messages, convert_to_openai_messages,
+    count_tokens_approximately, filter_messages, filter_messages_runnable, get_buffer_string,
+    merge_message_runs, merge_message_runs_runnable, message_chunk_to_message, message_from_dict,
+    message_to_dict, messages_from_dict, messages_to_dict, trim_messages, trim_messages_runnable,
 };

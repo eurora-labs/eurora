@@ -211,7 +211,7 @@ impl Runnable for JsonOutputToolsParser {
     type Output = Value;
 
     fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let message = crate::messages::BaseMessage::AI(input);
+        let message = crate::messages::AnyMessage::AI(input);
         let generation = ChatGeneration::builder().message(message).build();
         let tool_calls = self.parse_result(&[generation], false)?;
         if self.first_tool_only {
@@ -277,7 +277,7 @@ impl Runnable for JsonOutputKeyToolsParser {
     type Output = Value;
 
     fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let message = crate::messages::BaseMessage::AI(input);
+        let message = crate::messages::AnyMessage::AI(input);
         let generation = ChatGeneration::builder().message(message).build();
         let tool_calls = self.parse_result(&[generation], false)?;
         if self.first_tool_only {
@@ -396,7 +396,7 @@ impl Runnable for PydanticToolsParser {
     type Output = Value;
 
     fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let message = crate::messages::BaseMessage::AI(input);
+        let message = crate::messages::AnyMessage::AI(input);
         let generation = ChatGeneration::builder().message(message).build();
         self.parse_result(&[generation], false)
     }

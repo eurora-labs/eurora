@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::GenerationType;
 use crate::callbacks::BaseCallbackHandler;
-use crate::messages::{AIMessageChunk, BaseMessage};
+use crate::messages::{AIMessageChunk, AnyMessage};
 use crate::outputs::ChatResult;
 use crate::outputs::{GenerationChunk, LLMResult};
 use crate::runnables::schema::{CustomStreamEvent, EventData, StandardStreamEvent, StreamEvent};
@@ -161,7 +161,7 @@ impl AstreamEventsCallbackHandler {
     fn handle_chat_model_start(
         &self,
         serialized: &HashMap<String, Value>,
-        messages: &[Vec<BaseMessage>],
+        messages: &[Vec<AnyMessage>],
         run_id: Uuid,
         tags: Option<Vec<String>>,
         parent_run_id: Option<Uuid>,
@@ -832,7 +832,7 @@ impl BaseCallbackHandler for AstreamEventsCallbackHandler {
     fn on_chat_model_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
-        messages: &[Vec<BaseMessage>],
+        messages: &[Vec<AnyMessage>],
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
         tags: Option<&[String]>,

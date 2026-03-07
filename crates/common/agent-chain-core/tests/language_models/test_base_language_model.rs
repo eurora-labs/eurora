@@ -4,7 +4,7 @@ use agent_chain_core::language_models::{
     BaseLanguageModel, FakeListLLM, LangSmithParams, LanguageModelConfig, LanguageModelInput,
     LanguageModelOutput, get_token_ids_default,
 };
-use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
+use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage};
 use agent_chain_core::prompt_values::StringPromptValue;
 
 #[cfg(test)]
@@ -241,7 +241,7 @@ mod test_language_model_input {
 
     #[test]
     fn test_language_model_input_accepts_message_sequence() {
-        let messages = vec![BaseMessage::Human(
+        let messages = vec![AnyMessage::Human(
             HumanMessage::builder().content("Hello").build(),
         )];
         let input: LanguageModelInput = messages.into();
@@ -261,7 +261,7 @@ mod test_language_model_input {
 
         assert_eq!(messages.len(), 1);
         match &messages[0] {
-            BaseMessage::Human(m) => {
+            AnyMessage::Human(m) => {
                 assert_eq!(m.content.as_text(), "hello");
             }
             _ => panic!("Expected Human message"),
@@ -491,8 +491,8 @@ mod test_base_language_model_trait {
             .build();
 
         let messages = vec![
-            BaseMessage::Human(HumanMessage::builder().content("Hi").build()),
-            BaseMessage::AI(AIMessage::builder().content("Hello").build()),
+            AnyMessage::Human(HumanMessage::builder().content("Hi").build()),
+            AnyMessage::AI(AIMessage::builder().content("Hello").build()),
         ];
 
         let result = model.get_num_tokens_from_messages(&messages, None);
@@ -507,7 +507,7 @@ mod test_base_language_model_trait {
             .responses(vec!["response".to_string()])
             .build();
 
-        let messages: Vec<BaseMessage> = vec![];
+        let messages: Vec<AnyMessage> = vec![];
 
         let result = model.get_num_tokens_from_messages(&messages, None);
         assert_eq!(result, 0);
@@ -624,7 +624,7 @@ mod test_get_num_tokens_from_messages_edge_cases {
         let model = FakeListLLM::builder()
             .responses(vec!["response".to_string()])
             .build();
-        let messages = vec![BaseMessage::Human(
+        let messages = vec![AnyMessage::Human(
             HumanMessage::builder().content("Hello world").build(),
         )];
         let result = model.get_num_tokens_from_messages(&messages, None);

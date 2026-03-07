@@ -8,7 +8,7 @@ use serde_json::Value;
 use crate::caches::BaseCache;
 use crate::callbacks::Callbacks;
 use crate::error::Result;
-use crate::messages::{AIMessage, BaseMessage};
+use crate::messages::{AIMessage, AnyMessage};
 use crate::outputs::LLMResult;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -62,7 +62,7 @@ pub enum LanguageModelInput {
     StringPrompt(StringPromptValue),
     ChatPrompt(ChatPromptValue),
     ImagePrompt(ImagePromptValue),
-    Messages(Vec<BaseMessage>),
+    Messages(Vec<AnyMessage>),
 }
 
 impl From<String> for LanguageModelInput {
@@ -95,18 +95,18 @@ impl From<ImagePromptValue> for LanguageModelInput {
     }
 }
 
-impl From<Vec<BaseMessage>> for LanguageModelInput {
-    fn from(m: Vec<BaseMessage>) -> Self {
+impl From<Vec<AnyMessage>> for LanguageModelInput {
+    fn from(m: Vec<AnyMessage>) -> Self {
         LanguageModelInput::Messages(m)
     }
 }
 
 impl LanguageModelInput {
-    pub fn to_messages(&self) -> Vec<BaseMessage> {
+    pub fn to_messages(&self) -> Vec<AnyMessage> {
         use crate::prompt_values::PromptValue;
         match self {
             LanguageModelInput::Text(s) => {
-                vec![BaseMessage::Human(
+                vec![AnyMessage::Human(
                     crate::messages::HumanMessage::builder()
                         .content(s.as_str())
                         .build(),
@@ -299,7 +299,7 @@ pub trait BaseLanguageModel: Send + Sync {
 
     fn get_num_tokens_from_messages(
         &self,
-        messages: &[BaseMessage],
+        messages: &[AnyMessage],
         _tools: Option<&[crate::tools::ToolDefinition]>,
     ) -> usize {
         messages

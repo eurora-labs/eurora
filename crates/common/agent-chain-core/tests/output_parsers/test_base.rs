@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use agent_chain_core::error::{Error, Result};
-use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
+use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage};
 use agent_chain_core::output_parsers::{BaseLLMOutputParser, BaseOutputParser};
 use agent_chain_core::outputs::{ChatGeneration, Generation};
 use agent_chain_core::prompt_values::StringPromptValue;
@@ -125,7 +125,7 @@ fn test_parse_result_single_generation() {
 #[test]
 fn test_parse_result_with_chat_generation() {
     let parser = IntParser;
-    let message: BaseMessage = AIMessage::builder().content("55").build().into();
+    let message: AnyMessage = AIMessage::builder().content("55").build().into();
     let chat_gen = ChatGeneration::builder().message(message).build();
     let generation = Generation::builder().text(&chat_gen.text).build();
     let result = parser.parse_result(&[generation], false).unwrap();
@@ -163,21 +163,21 @@ fn test_bool_parser_invalid() {
 #[test]
 fn test_invoke_with_ai_message() {
     let parser = IntParser;
-    let message: BaseMessage = AIMessage::builder().content("42").build().into();
+    let message: AnyMessage = AIMessage::builder().content("42").build().into();
     assert_eq!(parser.invoke(message, None).unwrap(), 42);
 }
 
 #[test]
 fn test_invoke_with_human_message() {
     let parser = IntParser;
-    let message: BaseMessage = HumanMessage::builder().content("42").build().into();
+    let message: AnyMessage = HumanMessage::builder().content("42").build().into();
     assert_eq!(parser.invoke(message, None).unwrap(), 42);
 }
 
 #[test]
 fn test_invoke_with_ai_message_content() {
     let parser = IntParser;
-    let message: BaseMessage = AIMessage::builder().content("42").build().into();
+    let message: AnyMessage = AIMessage::builder().content("42").build().into();
     let result = parser.invoke(message, None).unwrap();
     assert_eq!(result, 42);
 }

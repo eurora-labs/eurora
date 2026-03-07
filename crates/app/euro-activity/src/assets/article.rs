@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use agent_chain_core::{BaseMessage, HumanMessage};
+use agent_chain_core::{AnyMessage, HumanMessage};
 use async_trait::async_trait;
 use euro_native_messaging::NativeArticleAsset;
 use serde::{Deserialize, Serialize};
@@ -53,7 +53,7 @@ impl AssetFunctionality for ArticleAsset {
         Some("article")
     }
 
-    fn construct_messages(&self) -> Vec<BaseMessage> {
+    fn construct_messages(&self) -> Vec<AnyMessage> {
         let mut content = format!(
             "The user is on a website titled '{}' and has a question about it.",
             self.title
@@ -154,7 +154,7 @@ mod tests {
         let messages = AssetFunctionality::construct_messages(&asset);
         let msg = messages[0].clone();
         let chip = AssetFunctionality::get_context_chip(&asset);
-        assert!(matches!(msg, BaseMessage::Human(_)));
+        assert!(matches!(msg, AnyMessage::Human(_)));
         assert!(chip.is_some());
     }
 }
