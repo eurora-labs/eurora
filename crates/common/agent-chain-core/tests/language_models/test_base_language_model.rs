@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use agent_chain_core::language_models::{
     BaseLanguageModel, FakeListLLM, LangSmithParams, LanguageModelConfig, LanguageModelInput,
-    LanguageModelOutput, get_token_ids_default,
+    get_token_ids_default,
 };
 use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage};
 use agent_chain_core::prompt_values::StringPromptValue;
@@ -277,34 +277,19 @@ mod test_language_model_input {
 }
 
 #[cfg(test)]
-mod test_language_model_output {
+mod test_ai_message_output {
     use super::*;
 
     #[test]
-    fn test_language_model_output_accepts_string() {
-        let output: LanguageModelOutput = "test output".to_string().into();
-        assert_eq!(output.text(), "test output");
-    }
-
-    #[test]
-    fn test_language_model_output_accepts_ai_message() {
+    fn test_ai_message_text() {
         let message = AIMessage::builder().content("test message").build();
-        let output: LanguageModelOutput = message.into();
-        assert_eq!(output.text(), "test message");
+        assert_eq!(message.text(), "test message");
     }
 
     #[test]
-    fn test_language_model_output_into_text() {
-        let output: LanguageModelOutput = "hello".to_string().into();
-        let text = output.into_text();
-        assert_eq!(text, "hello");
-    }
-
-    #[test]
-    fn test_language_model_output_message_variant() {
-        let ai_message = AIMessage::builder().content("direct message").build();
-        let output = LanguageModelOutput::message(ai_message);
-        assert_eq!(output.text(), "direct message");
+    fn test_ai_message_content() {
+        let message = AIMessage::builder().content("direct message").build();
+        assert_eq!(message.text(), "direct message");
     }
 }
 
