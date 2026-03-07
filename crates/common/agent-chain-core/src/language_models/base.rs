@@ -140,44 +140,6 @@ impl std::fmt::Display for LanguageModelInput {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum LanguageModelOutput {
-    Message(Box<AIMessage>),
-    Text(String),
-}
-
-impl From<AIMessage> for LanguageModelOutput {
-    fn from(m: AIMessage) -> Self {
-        LanguageModelOutput::Message(Box::new(m))
-    }
-}
-
-impl From<String> for LanguageModelOutput {
-    fn from(s: String) -> Self {
-        LanguageModelOutput::Text(s)
-    }
-}
-
-impl LanguageModelOutput {
-    pub fn text(&self) -> String {
-        match self {
-            LanguageModelOutput::Message(m) => m.text(),
-            LanguageModelOutput::Text(s) => s.clone(),
-        }
-    }
-
-    pub fn into_text(self) -> String {
-        match self {
-            LanguageModelOutput::Message(m) => m.text(),
-            LanguageModelOutput::Text(s) => s,
-        }
-    }
-
-    pub fn message(m: AIMessage) -> Self {
-        LanguageModelOutput::Message(Box::new(m))
-    }
-}
-
 pub type CustomGetTokenIds = fn(&str) -> Vec<u32>;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -313,9 +275,8 @@ pub trait BaseLanguageModel: Send + Sync {
     }
 }
 
-pub type LanguageModelLike = Arc<
-    dyn crate::runnables::base::Runnable<Input = LanguageModelInput, Output = LanguageModelOutput>,
->;
+pub type LanguageModelLike =
+    Arc<dyn crate::runnables::base::Runnable<Input = LanguageModelInput, Output = AIMessage>>;
 
 #[cfg(test)]
 mod tests {
@@ -350,10 +311,9 @@ mod tests {
     }
 
     #[test]
-    fn test_language_model_output_text() {
-        let output = LanguageModelOutput::Text("Hello".to_string());
+    fn test_ai_message_text() {
+        let output = AIMessage::builder().content("Hello").build();
         assert_eq!(output.text(), "Hello");
-        assert_eq!(output.into_text(), "Hello");
     }
 
     #[test]
